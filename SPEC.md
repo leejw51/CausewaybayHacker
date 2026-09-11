@@ -72,6 +72,23 @@ directory holds a user's own work and nothing else on the machine needs it.
 **Nothing outside the home is written.** No `/tmp`, no project directory. A
 attempt that needs scratch space gets a directory under `build/`.
 
+### 1.1 The LÖVE client's own store
+
+`~/.causewaybayhacker` is the **server's**. The LÖVE desktop client is a
+separate program that may be talking to a server on another machine, so it
+keeps its own state in `~/.causewaybayhackerlove2d` — same conventions, `0700`
+directory and `0600` files, append-only JSONL, state derived by replaying the
+log (the rules in §1.2 below apply unchanged).
+
+It holds only what a client owns: the session token, the chosen server, the
+orientation and fullscreen pins, and where each map was left. **No key
+material, ever** — not the mnemonic, not the private key, not the seed.
+
+**The token is stored per server.** A session token is minted by one server
+and means nothing to another; a client that keeps one token and points it at a
+new address will send a stranger's credential and be told `unauthorized` for
+reasons the player cannot see. Key it by the server URL.
+
 **Attempts are never deleted by the server.** They are the training data for
 §7. `hacker prune` (a CLI subcommand) is the only thing that removes them, and
 only when the user asks.
