@@ -8,6 +8,7 @@ import {
   login,
   logout,
   pickFirstCategory,
+  run,
   sourceThatPrints,
   scene,
   setSource,
@@ -392,4 +393,111 @@ test("both orientations reach the same screen", async ({ page }) => {
 
   // And the game still works afterwards: the node opens.
   await openSelectedNode(page);
+});
+
+test("the compiler's output paints while it is still compiling", async ({ page }, info) => {
+  // **Nobody has ever seen this work.** FE unit-tested the console and could
+  // not confirm it visually — headless RAF starvation defeated its timing
+  // attempts — so `run.log` painting *while* rustc thinks has been believed
+  // rather than known, in both clients, since it was written.
+  //
+  // SPEC §5.4 is explicit about why it matters: "so the player watches
+  // `rustc` think instead of a spinner". A console that only fills in once
+  // the verdict lands is a spinner with extra steps, and every unit test on
+  // both sides still passes.
+  //
+  // Two things make it testable now. RUN keeps its keyboard shortcut
+  // (`Ctrl/Cmd+Enter`) while SUBMIT does not, and a run streams `run.stage`
+  // and `run.log` exactly as a submit does (§4.9b) — so this drives the
+  // button a player actually presses while iterating, which is when they look
+  // at the console. And `settle()` + `png()` give a deterministic frame,
+  // which is the only way to compare two moments of a canvas.
+  //
+  // The assertion is coarse on purpose: the console's text is canvas-drawn,
+  // so there is no DOM to read and no view model to ask. What can be said is
+  // that **the screen changed during the compile while still being the quest
+  // screen** — and a screen that does not change during a five-second
+  // compile is exactly the bug.
+  const account = freshAccount();
+  const wire = await Wire.as(test.info().project.use.baseURL!, account);
+  try {
+    await login(page, account);
+    await enterRustQuest(page, wire);
+
+    // Deliberately slow to compile and slow to run: deep generic nesting
+    // costs rustc real time, and the loop keeps the program alive long
+    // enough that "during" is a genuine interval rather than a race. It is
+    // also a *wrong* answer, which is what a player is usually running.
+    await setSource(
+      page,
+      `
+struct W<T>(T);
+trait Go { fn go(&self) -> usize; }
+impl Go for u8 { fn go(&self) -> usize { *self as usize } }
+impl<T: Go> Go for W<T> { fn go(&self) -> usize { self.0.go() + 1 } }
+type A = W<W<W<W<W<W<W<W<u8>>>>>>>>;
+type B = W<W<W<W<W<W<W<W<A>>>>>>>>;
+fn main() {
+    let b: B = W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(1u8)))))))))))))))); 
+    let mut n = 0usize;
+    for _ in 0..40_000_000 { n = n.wrapping_add(b.go()); }
+    println!("not the answer: {n}");
+}
+`,
+    );
+
+    const frame = async () =>
+      page.evaluate(() => {
+        const api = window.__cwbCapture!;
+        api.settle(0.2); // a short, fixed advance — enough to redraw, not to skip
+        const png = api.png();
+        const name = api.scene();
+        api.resume();
+        return { png, name };
+      });
+
+    const before = await frame();
+    expect(before.name, "should still be on the quest screen").toBe("quest");
+
+    await run(page); // Ctrl/Cmd+Enter — the reflex key
+
+    // Sample while it works. A run does not navigate (§4.9b), so the screen
+    // staying `quest` is expected; what is being looked for is the picture
+    // changing underneath.
+    let changedDuring = false;
+    let sampled = 0;
+    for (let i = 0; i < 24; i++) {
+      await page.waitForTimeout(400);
+      const now = await frame();
+      sampled++;
+      if (now.name !== "quest") break; // it finished and moved on
+      if (now.png !== before.png) {
+        changedDuring = true;
+        await info.attach(`console-mid-run-${info.project.name}.png`, {
+          body: Buffer.from(now.png.split(",")[1], "base64"),
+          contentType: "image/png",
+        });
+        break;
+      }
+    }
+
+    expect(
+      changedDuring,
+      `the quest screen was pixel-identical across ${sampled} samples spanning ` +
+        `a real compile and run. SPEC §5.4 exists so the player watches rustc ` +
+        `think instead of a spinner — if nothing moves, \`run.log\` is being ` +
+        `buffered and flushed at the end, which is a spinner with extra steps. ` +
+        `(This is a coarse check: the console is canvas-drawn, so a changing ` +
+        `picture is the strongest available evidence.)`,
+    ).toBe(true);
+
+    // And the run really did happen — the server saw it, with mode "run".
+    await expect
+      .poll(async () => (await wire.history()).length, { timeout: 120_000 })
+      .toBeGreaterThan(0);
+    const [latest] = await wire.history();
+    expect(latest.verdict, "the slow source was judged").toBeTruthy();
+  } finally {
+    wire.close();
+  }
 });

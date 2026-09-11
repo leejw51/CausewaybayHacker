@@ -9,7 +9,7 @@
 use cwbhacker_core::error::{bad_request, not_found, unauthorized, Error, Result};
 use cwbhacker_core::Connection;
 use cwbhacker_core::{
-    attempts, auth, awards, eth, mistakes, progress, quests, stats, users, world,
+    attempts, auth, awards, drills, eth, mistakes, progress, quests, search, stats, users, world,
 };
 use serde_json::json;
 
@@ -283,6 +283,111 @@ pub fn stats_mistakes(
     Ok(json!({
         "mistakes": mistakes::stats(&conn, address, limit, include_learned)?
     }))
+}
+
+pub fn search_query(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let q = opt_str_field(payload, "q").unwrap_or_default();
+    let mode = search::Mode::parse(
+        payload
+            .get("mode")
+            .and_then(|m| m.as_str())
+            .unwrap_or("unified"),
+    )?;
+    let limit = opt_i64_field(payload, "limit").unwrap_or(20).clamp(1, 100) as usize;
+    let filters = payload.get("filters");
+    let pick = |name: &str| {
+        filters
+            .and_then(|f| f.get(name))
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+    };
+    let filters = search::Filters {
+        land: pick("land"),
+        category: pick("category"),
+        state: pick("state"),
+    };
+    let started = std::time::Instant::now();
+    let conn = state.store.conn();
+    let hits = search::query(
+        &conn,
+        state.embedder.as_ref(),
+        address,
+        &q,
+        mode,
+        &filters,
+        limit,
+    )?;
+    Ok(json!({
+        "hits": hits,
+        "mode": mode.as_str(),
+        "took_ms": started.elapsed().as_millis() as i64,
+    }))
+}
+
+fn drill_json(drill: &drills::Drill) -> serde_json::Value {
+    json!({
+        "id": drill.id,
+        "mode": drill.mode,
+        "plan": drill.plan,
+        "cursor": drill.cursor,
+        "reason": drill.reason,
+        "created_at": drill.created_at,
+    })
+}
+
+pub fn ai_plan(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let mode = drills::Mode::parse(&str_field(payload, "mode")?)?;
+    let land = opt_str_field(payload, "land");
+    let size = opt_i64_field(payload, "size").unwrap_or(drills::DEFAULT_SIZE as i64);
+    let conn = state.store.conn();
+    let drill = drills::create(&conn, address, mode, land.as_deref(), size.max(1) as usize)?;
+    Ok(json!({ "drill": drill_json(&drill) }))
+}
+
+pub fn ai_next(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let drill_id = str_field(payload, "drill_id")?;
+    let conn = state.store.conn();
+    let step = drills::next(&conn, address, &drill_id)?;
+    let quest = quests::get(&conn, &step.quest_id)?;
+    let quest_state = world::state_of(&conn, address, &step.quest_id)?;
+    let row = progress::get(&conn, address, &step.quest_id)?;
+    let opened_at = if quest.time_limit_s.is_some() {
+        progress::open_clock(&conn, address, &step.quest_id)?
+    } else {
+        None
+    };
+    Ok(json!({
+        "quest": quest.to_wire(quest_state, row.stars, row.hints_used, opened_at.as_deref()),
+        "position": step.position,
+        "total": step.total,
+        "why": step.why,
+    }))
+}
+
+pub fn ai_finish(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let drill_id = str_field(payload, "drill_id")?;
+    let conn = state.store.conn();
+    Ok(json!({ "summary": drills::finish(&conn, address, &drill_id)? }))
 }
 
 /// `code.format` (PROTOCOL §4.9d). Never recorded: formatting is not an

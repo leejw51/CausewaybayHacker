@@ -510,6 +510,10 @@ export class MapScene implements Scene {
     }
   }
 
+  controls(): Buttons[] {
+    return [this.bar];
+  }
+
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
     // The strip is above the overworld and is tested first: a button that
     // happens to overlap a far node must not enter a street.

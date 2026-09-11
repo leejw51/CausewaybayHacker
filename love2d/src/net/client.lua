@@ -44,7 +44,15 @@ M.REQUEST_TIMEOUT_S = 180
 --- rule: a second of either while one is in flight is `busy`." One set rather
 --- than two checks on `quest.submit`, so the slot cannot be released by one
 --- message type and held by the other.
-M.EXECUTES = { ["quest.submit"] = true, ["quest.run"] = true }
+M.EXECUTES = {
+  ["quest.submit"] = true,
+  ["quest.run"] = true,
+  -- §4.9c: "the playground is the same runner." Observed on the live server —
+  -- three concurrent `playground.run`s came back `busy` — so the slot is the
+  -- same slot, and this client refuses locally rather than sending a request
+  -- it already knows the answer to.
+  ["playground.run"] = true,
+}
 
 local Client = {}
 Client.__index = Client

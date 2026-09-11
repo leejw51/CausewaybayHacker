@@ -3310,3 +3310,94 @@ category and uniqueness.
 The lesson worth keeping: a spec can hold two rules that are each sensible and
 jointly impossible, and the way it surfaced was someone implementing them both
 and noticing the cost — not review.
+
+## 2026-09-11 — L2D: the clock and FORMAT from the wire, and the playground
+
+### The clock, re-captured — and the caret anchor was wrong
+
+Both flags are cleared. `quest.get` returns the real pair
+(`opened_at=2026-09-11T07:04:33Z`, `deadline_at=…T07:14:33Z`,
+`time_limit_s=600`) and all four registers were photographed from **that
+pair**: only the client's view of *now* was moved, by `Clock.shift`, which is
+the same affordance as `Anim.freeze` and the only honest way to see ten
+minutes of a server-issued deadline inside one run. `calm` is captured with no
+shift at all.
+
+BE's two null-pair rules are pinned in `tests/test_clock.lua`: a quest cleared
+before the clock existed never grows an `opened_at`, and re-entering a cleared
+quest is untimed. Both already produced "no clock" — a limit with no deadline
+is a fact about the quest, not half a clock — but they are asserted now rather
+than assumed.
+
+**And running FORMAT against the real `rustfmt` found a real bug in my caret
+anchoring.** Against a fixture that only re-indents, matching the caret's line
+by its stripped content was perfect. Against a real formatter on a long
+one-liner — which is *exactly* when somebody reaches for FORMAT — rustfmt
+splits the line, no line matches, the fallback fired, and the caret went to the
+end of line 1.
+
+The anchor is now the **ink stream**: "after the Nth non-whitespace character
+of the whole document", restored by counting to the same N. Indentation,
+spacing and line breaks can all change and the caret still lands between the
+same two characters. The exact-line pass is kept as a fast path because it is
+exact when a line does survive. Measured on the wire: **42 document ink before
+→ 42 after**, caret still immediately before the same `=`, having moved from
+line 1 col 46 to line 3 col 16 across a genuine rustfmt split. New headless
+cases cover split, join and total rewrite.
+
+This is the second time a fixture flattered an implementation that a real tool
+broke. Worth remembering: a formatter test that only re-indents is testing the
+easy half.
+
+### The playground (§4.9c)
+
+Mei's desk: snippets list, editor, stdin, RUN, FORMAT, and an output pane.
+Reachable with **P** from the map *and* from the land select, because it
+belongs to nobody's curriculum and should not require picking a land first.
+
+DESIGN's note was that nothing there is scored, so compiler output must not
+speak in the failure register and the word "wrong" must not appear. That is a
+constraint on language, and language is the easiest thing to break by accident
+six months later — so `tests/test_playground.lua` pins it: every string
+literal the scene can put on screen is checked against a banned vocabulary
+(*wrong, fail, invalid, accepted, rejected, verdict, correct*), and the scene
+is asserted not to reference `Theme.red`, `Theme.verdict`, or the rejection
+chime. The five outcomes are described rather than judged — `ran`, `did not
+compile`, `stopped early`, `took too long`, `printed too much`.
+
+Its background scrim is lighter than every other screen's (0.52 against 0.76):
+DESIGN made `bg_playground` and deliberately nothing else, and a dim that hid
+the one asset the screen has would have been drawing it and then covering it
+up.
+
+**Verified from the wire that a playground run does not feed the curriculum.**
+Ran a deliberate `borrow-after-move` — a real `E0382` with two diagnostics —
+and compared `stats.summary` and `stats.mistakes` either side:
+`attempts 9 → 9`, `accuracy 0.222 → 0.222`, `mistake kinds 3 → 3`. That is the
+claim §4.9c makes and it holds.
+
+**`playground.run` shares the one execution slot.** §4.9c says "the playground
+is the same runner", and the server confirmed it: three concurrent
+`playground.run`s came back `busy`. Added to `M.EXECUTES` so this client
+refuses the second locally rather than sending a request whose answer it
+already knows. `code.format` is deliberately *not* in that set — formatting is
+not a run and must not block one.
+
+### One note for PM
+
+**PROTOCOL §4.9c documents two playground messages; five shipped.**
+`playground.run` and `playground.save` are in the contract; `playground.list`,
+`playground.load` and `playground.delete` are not, and this client is written
+against them. Their shapes were established by probing the live server:
+
+```
+playground.list   -> { snippets: SnippetBrief[] }
+playground.load   -> { snippet: Snippet }          not_found on an unknown id
+playground.delete -> { }                           not_found on an unknown id
+```
+
+`SnippetBrief` is §5.9's shape and carries `bytes`, as documented. The probe
+also distinguished a real-but-empty answer from an absent message type: an
+unknown id answers `not_found` with "no such snippet", while a message type
+that does not exist answers "no message type 'x'" — which is how the five were
+identified in the first place.

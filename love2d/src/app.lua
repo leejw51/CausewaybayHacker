@@ -43,6 +43,7 @@ local SCENES = {
   search = "src.scenes.search",
   stats = "src.scenes.stats",
   ai = "src.scenes.ai",
+  playground = "src.scenes.playground",
 }
 
 App.DEFAULT_SERVER = "ws://127.0.0.1:5390/ws"
@@ -294,6 +295,10 @@ function App:back()
     search = "map",
     stats = "map",
     ai = "map",
+    -- Back to wherever it was opened from: the desk is reachable from the
+    -- land select as well as from a map, and landing somebody on a map they
+    -- never chose would be worse than either.
+    playground = "map",
     lands = "lands",
   }
   local target = up[self.scene_name]
@@ -377,6 +382,7 @@ function App:typing()
   local scene = self.scene
   if not scene then return false end
   if self.scene_name == "quest" then return true end
+  if self.scene_name == "playground" then return true end
   if self.scene_name == "login" then return self.wallet_lib ~= nil end
   return false
 end

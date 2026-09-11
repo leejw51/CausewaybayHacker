@@ -74,7 +74,34 @@ def knockout(im):
 
 
 
-def drop_trapped_backdrop(im, max_share=0.10):
+def strong_px(c):
+    """The studio magenta itself, as a bare colour test."""
+    r, g, b = c[0], c[1], c[2]
+    return r > 170 and b > 120 and g < r - 60 and g < b - 20
+
+
+def backdrop_ref(im):
+    """
+    The studio backdrop's own colour, sampled from the raw border.
+
+    It has to be read before `knockout` runs: knockout sets the border to
+    transparent black, so sampling afterwards finds nothing and the exact-colour
+    test below silently never fires. That was a real bug — it is why
+    `badge_shackle` shipped a magenta blob on the first pass.
+    """
+    im = im.convert("RGB")
+    w, h = im.size
+    px = im.load()
+    edge = [px[x, 0] for x in range(0, w, 7)] + [px[x, h - 1] for x in range(0, w, 7)]
+    edge += [px[0, y] for y in range(0, h, 7)] + [px[w - 1, y] for y in range(0, h, 7)]
+    edge = [c for c in edge if strong_px(c)]
+    if not edge:
+        return None
+    n = len(edge)
+    return (sum(c[0] for c in edge) / n, sum(c[1] for c in edge) / n, sum(c[2] for c in edge) / n)
+
+
+def drop_trapped_backdrop(im, ref=None, max_share=0.10, exact=22.0):
     """
     Remove magenta the border-seeded flood fill could not reach.
 
@@ -92,6 +119,15 @@ def drop_trapped_backdrop(im, max_share=0.10):
     the gap is wide: trapped pockets measured 0.2%-3.8% of the ink across this
     set, fx_ribbon's cloth is 33%. The cut is at 10% — above every pocket seen,
     and still a 3x margin under the one region that is genuinely art.
+
+    Size alone has now been beaten twice, though — `boss_deadlock` at 3.8% when
+    the cut was 3%, and `badge_shackle` at 10.8% when it was 10% — so there is
+    a second, sharper test beside it. A trapped pocket is backdrop, so it is
+    *literally the backdrop's colour*; art that merely happens to be pinkish is
+    not. Measured: the shackle's pocket sat at distance 0.0 from the plate's
+    own backdrop, while fx_ribbon's painted cloth is 38 away. Anything within
+    `exact` of the backdrop colour goes regardless of how large it is, which
+    catches a flat unshaded pocket that outgrew the size rule.
     """
     w, h = im.size
     px = im.load()
@@ -123,8 +159,17 @@ def drop_trapped_backdrop(im, max_share=0.10):
                     if 0 <= nx < w and 0 <= ny < h and not seen[ny * w + nx] and strong(nx, ny):
                         seen[ny * w + nx] = 1
                         q.append((nx, ny))
-            if touches or len(cells) > limit:
+            if touches:
                 continue
+            if len(cells) > limit:
+                # Too big for the size rule — but if it is the backdrop's exact
+                # colour it is backdrop anyway.
+                if ref is None:
+                    continue
+                mid = cells[len(cells) // 2]
+                c = px[mid[0], mid[1]]
+                if sum((a - b) ** 2 for a, b in zip(c[:3], ref)) ** 0.5 > exact:
+                    continue
             for cx, cy in cells:
                 px[cx, cy] = (0, 0, 0, 0)
     return im
@@ -178,7 +223,10 @@ def ink_bounds(im, thresh=31):
 
 
 def make_sprite(src, dst, tw, th, pad=0.055, anchor="feet"):
-    im = defringe(drop_trapped_backdrop(knockout(Image.open(src))))
+    src_im = Image.open(src)
+    # Sampled before knockout, which clears the border it would be read from.
+    ref = backdrop_ref(src_im)
+    im = defringe(drop_trapped_backdrop(knockout(src_im), ref=ref))
     bb = ink_bounds(im)
     if bb is None:
         raise SystemExit(f"{src}: the knockout removed everything — re-roll it")

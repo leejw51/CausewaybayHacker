@@ -132,6 +132,23 @@ export class Client {
     }
   }
 
+  /**
+   * Drop this session and come back with a fresh, anonymous connection.
+   *
+   * §3.1: `auth.login` on a connection that is already authenticated is a
+   * `bad_request` — "open a new one to change user" — and the server is right.
+   * A player who reaches the login screen with a live session (a second wallet
+   * made in the same tab, a logout that left the socket up) would otherwise be
+   * refused by the server for a reason that is entirely the client's to fix.
+   */
+  async restart(): Promise<void> {
+    this.forgetToken();
+    this.close();
+    this.retry = 0;
+    this.connect();
+    await this.waitFor("open");
+  }
+
   forgetToken(): void {
     this.token = null;
     this.user = null;

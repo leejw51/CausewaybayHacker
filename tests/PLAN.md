@@ -239,22 +239,29 @@ one test that owns it.
 | 9.6.b | huge output → `output_limit` | **BE** `rust_runner.rs::too_much_output_is_an_output_limit_not_a_full_disk` | green |
 | 9.6.c (half) | a child dies with the process group | **BE** `rust_runner.rs::a_child_that_outlives_the_parent_dies_with_the_process_group` | green |
 | 9.6.c (half) | **and the runner is still alive afterwards** | **QA** `limits.rs::the_runner_still_works_after_every_limit_has_fired` | green |
-| 9.6.d | `GOPROXY=off` | — | **not writable, and not faked** |
+| 9.6.d | `GOPROXY=off` | **QA** `limits.rs::a_go_quest_that_reaches_for_the_internet_fails_cleanly_rather_than_hanging` | green — writable since the Go runner landed |
 | 9.6.e | `RLIMIT_AS` 1 GiB | **QA** `limits.rs::a_program_that_wants_more_memory_than_the_limit_dies_rather_than_the_host` | green |
 | 9.6.f | `RLIMIT_FSIZE` 64 MiB | **QA** `limits.rs::a_program_that_writes_a_huge_file_is_stopped_by_the_file_size_limit` | green |
 | 9.6.g | nothing outside the home | **QA** three tests, see below | green, with a correction |
 | 9.6.h | a timeout is still recorded | **QA** `limits.rs::a_timeout_is_a_verdict_and_not_a_lost_attempt` (runner) + `integration.rs::a_submission_that_times_out_is_still_recorded` (server) | green |
 | 9.6.i | the server survives all of it | **QA** `limits.rs::the_runner_still_works_after_every_limit_has_fired` | green |
 
-### 9.6.d cannot be written, and will not be faked
+### 9.6.d — written, now that Go runs
 
-It wants `GOPROXY=off` to make a Go quest that fetches the internet fail
-cleanly. There is no Go runner in this build —
-`cwbhacker_runner::unsupported("go", …)` returns a reason instead of a
-judgement, and a Go submission comes back `unavailable` with
-`detail.milestone: 2`. A test pointed at it today would pass **because Go is
-unsupported**, not because the proxy was off. That is a test that goes green
-for the wrong reason, which is worse than no test.
+For a while this row could not be written: `unsupported("go", …)` returned a
+reason rather than a judgement, so a test pointed at it would have passed
+**because Go was unsupported**, not because the proxy was off. It stayed
+unwritten and this file said why.
+
+BE built the Go runner, so it is written. **"Cleanly" is the whole
+assertion**: without `GOPROXY=off` a missing module does not fail, it *hangs*,
+resolving against a network CI may not have and a laptop may have only
+intermittently. The test asserts a `compile_error` in under thirty seconds
+whose message names the import, and then that a standard-library program
+still builds afterwards — a failed lookup must not poison the shared module
+cache for the next player.
+
+**All nine rows of §9.6 now have an owner.**
 
 ### 9.6.g was written wrong first, and the correction is the finding
 
@@ -659,8 +666,6 @@ reader of this suite should not assume are covered.
 
 | what | why it is not, and what it would take |
 | --- | --- |
-| **SPEC §9.6.d — `GOPROXY=off`** | Writable now that Go runs, and **not yet written**. The pack fixtures are all `stdio` with no imports, so a quest that tries to fetch has to be constructed. One test, in `backend/runner/tests/limits.rs`, importing `github.com/…` and asserting a clean `compile_error` naming the proxy rather than a hang |
-| **§7.2's rollup over time** | `mistakes.rs` has `the_rollup_counts_clean_attempts`. Nothing drives five consecutive clean attempts through the wire and asserts a kind leaves the AI priority list at `cleared_since >= 5` without being deleted. That is the mechanism the whole training loop rests on |
 | **`search.query`, `ai.*`** | Milestone 2. The only assertion is that they declare themselves `unavailable` with `detail.milestone` — which starts failing the day either ships, and that is the signal |
 | **The two-missed-ping rule** | `--slow` proves the server does **not** drop a keepalive-only connection (70.1 s, passed). Proving it *does* drop a silent one needs a client that deliberately stops answering pongs |
 | **`rate_limited`** | In §3.3's closed set, never provoked. Nothing in the suite knows what the limit is |

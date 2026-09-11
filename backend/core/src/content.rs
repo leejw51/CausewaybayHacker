@@ -601,6 +601,16 @@ fn reconcile(conn: &Connection, pack: &Pack, ids: &[String]) -> Result<PackCount
         )));
     }
 
+    // The text changed, so the vectors for it are stale. Dropping them is
+    // enough: `search::reindex` rebuilds whatever is missing at the next
+    // start, and 126 dot products is not worth being clever about.
+    for quest in &pack.quests {
+        conn.execute(
+            "DELETE FROM quest_vec WHERE quest_id = ?1",
+            params![quest.id],
+        )?;
+    }
+
     // Dependency edges are pack-owned and cheap to rebuild. They carry no user
     // state, unlike the quest rows themselves.
     for quest in &pack.quests {

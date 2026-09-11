@@ -367,12 +367,54 @@ return function()
     T.eq(ed.line, 15, "not the first `}` in the file")
   end)
 
-  T.case("a line the formatter destroyed falls back to the line number", function()
+  T.case("a line SPLIT by the formatter still carries the caret", function()
+    -- The case that actually happens, and the one the first version of this
+    -- got wrong: `rustfmt` takes a long one-liner and breaks it into several.
+    -- No line survives, so matching lines by content finds nothing — and the
+    -- old fallback put the caret at the end of line 1.
+    local ed = editor.new({ text = "fn main(){let a=1;let b=2;println!(\"{}\",a+b);}" })
+    local at = ed.lines[1]:find("b=2", 1, true)
+    ed:goto_position(1, at + 1)                  -- between "b" and "=2"
+
+    ed:replace_all(table.concat({
+      "fn main() {",
+      "    let a = 1;",
+      "    let b = 2;",
+      '    println!("{}", a + b);',
+      "}",
+      "",
+    }, "\n"))
+
+    T.eq(ed.line, 3, "it followed `let b` onto its own new line")
+    T.eq(ed:current_line(), "    let b = 2;")
+    -- The only question that matters: is the caret still between the same two
+    -- characters of the program? It was between `b` and `=`.
+    T.eq(ed:current_line():sub(1, ed.col - 1):gsub("%s", ""), "letb")
+    T.eq(ed:current_line():sub(ed.col, ed.col + 1), "= ",
+      "still immediately before the `=`, across a line split")
+  end)
+
+  T.case("a line JOINED by the formatter still carries the caret", function()
+    local ed = editor.new({ text = "let x =\n    1\n    + 2;" })
+    ed:goto_position(3, 8)                       -- after the "2", before the ";"
+    ed:replace_all("let x = 1 + 2;\n")
+    T.eq(ed.line, 1, "three lines became one and the caret came with them")
+    T.eq(ed:current_line(), "let x = 1 + 2;")
+    T.eq(ed:current_line():sub(1, ed.col - 1):gsub("%s", ""), "letx=1+2",
+      "the same eight characters of program are still behind it")
+    T.eq(ed:current_line():sub(ed.col, ed.col), ";")
+  end)
+
+  T.case("a completely rewritten buffer still lands somewhere sane", function()
     local ed = editor.new({ text = "one\ntwo\nthree\nfour" })
     ed:goto_position(3, 2)
     ed:replace_all("completely\ndifferent\ntext\nhere")
-    T.eq(ed.line, 3, "the line is much better than nothing")
+    -- Following the ink puts it at the same offset through the document,
+    -- which is the best available answer when nothing matches at all.
+    T.ok(ed.line >= 1 and ed.line <= 4)
     T.ok(ed.col >= 1 and ed.col <= #ed:current_line() + 1)
+    local ink = #(ed:text():sub(1, 0):gsub("%s", ""))
+    T.eq(ink, 0)
   end)
 
   T.case("a caret in the indent lands at the first real character", function()

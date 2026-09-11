@@ -45,6 +45,15 @@ ORDER = [
     "badge_cleared", "badge_locked",
     # The playground: the one room in the game with no problem in it.
     "bg_playground", "bg_playground_p",
+    # The award set (docs/decisions.md, "BE: XP, levels and the badge set").
+    # Nine shapes: the silhouette is the family, tiers differ by colour and by
+    # the number the engine prints over them.
+    "badge_stamp", "badge_star",
+    "badge_flame", "badge_flame_7", "badge_flame_30",
+    "badge_chain", "badge_chain_10", "badge_chain_25",
+    "badge_watch", "badge_shackle", "badge_flags", "badge_tally",
+    "badge_chevron_bronze", "badge_chevron_silver", "badge_chevron",
+    "badge_slot",
 ]
 
 # Assets that are not one picture. `walk_mei` is four frames in a row; the

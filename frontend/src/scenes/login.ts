@@ -272,6 +272,14 @@ export class LoginScene implements Scene {
 
   /** One go: derive, sign the challenge, log in, leave. */
   private async attempt(text: string): Promise<void> {
+    // A live session on this socket cannot become a different one (§3.1), and
+    // the server says so in a code the player should never have to read. Trade
+    // it for a fresh anonymous connection first — that is what "log in as
+    // somebody else" means at the wire level.
+    if (this.app.client.state === "authed") {
+      this.status = "closing the old session";
+      await this.app.client.restart();
+    }
     this.status = "deriving";
     const address = unlock(text);
     // The textarea is emptied before a single byte goes near the socket.
@@ -311,6 +319,10 @@ export class LoginScene implements Scene {
       this.status = e instanceof Error ? e.message : "that did not work";
     }
     this.app.chip.fail();
+  }
+
+  controls(): Buttons[] {
+    return [this.buttons];
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {

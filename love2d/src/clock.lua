@@ -38,6 +38,7 @@ local Clock = {}
 local epoch0 = nil
 local mono0 = nil
 local monotonic = nil
+local offset = 0
 
 --- `fn` is a monotonic seconds source — `love.timer.getTime` in the game.
 function Clock.set_source(fn)
@@ -46,11 +47,26 @@ function Clock.set_source(fn)
   mono0 = fn and fn() or 0
 end
 
+--- Move the client's view of *now*, without touching the deadline.
+---
+--- For drive scripts, and the same affordance as `Anim.freeze`: a `hacker`
+--- quest has a ten-minute limit, and the only honest way to photograph all
+--- four registers of a real server-issued `deadline_at` inside one run is to
+--- move the clock rather than to invent the pair. Nothing in the game calls
+--- it; `make drive` does.
+function Clock.shift(seconds)
+  offset = tonumber(seconds) or 0
+end
+
+function Clock.shifted()
+  return offset
+end
+
 function Clock.now()
   if monotonic and epoch0 then
-    return epoch0 + (monotonic() - mono0)
+    return epoch0 + (monotonic() - mono0) + offset
   end
-  return os.time()
+  return os.time() + offset
 end
 
 -- --------------------------------------------------------------- RFC3339

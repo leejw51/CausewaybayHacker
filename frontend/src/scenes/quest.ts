@@ -382,9 +382,15 @@ export class QuestScene implements Scene {
     }
     if ((name === "return" || name === "kpenter") && (ev.metaKey || ev.ctrlKey)) {
       ev.preventDefault();
-      // The reflex key is RUN. Submitting is a decision and it is made with a
-      // button, not with the shortcut somebody's hands press without looking.
-      void this.run();
+      // The reflex key is RUN. Submitting is the same key plus SHIFT — an
+      // escalation of the one the hands already know, not a second shortcut to
+      // learn, and deliberately not something a thumb finds by accident.
+      //
+      // It has a binding at all because a primary action reachable only with a
+      // mouse is an accessibility gap. FORMAT has one; so should the button
+      // that decides whether a street is cleared.
+      if (ev.shiftKey) void this.submit();
+      else void this.run();
     }
     // The binding people already have in their fingers, as close as this
     // plumbing allows: a keystroke only reaches a scene from inside the editor
@@ -393,6 +399,10 @@ export class QuestScene implements Scene {
       ev.preventDefault();
       void this.format();
     }
+  }
+
+  controls(): Buttons[] {
+    return [this.buttons];
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
@@ -536,7 +546,7 @@ export class QuestScene implements Scene {
     footer(
       g,
       layout,
-      "CTRL+ENTER  RUN   CTRL+SHIFT+F  FORMAT   PGUP/PGDN  LOG   F1  ORIENTATION   F3  LOG OUT",
+      "CTRL+ENTER  RUN   CTRL+SHIFT+ENTER  SUBMIT   CTRL+SHIFT+F  FORMAT   PGUP/PGDN  LOG   F1  ORIENTATION",
     );
   }
 

@@ -84,6 +84,7 @@ export class PlaygroundScene implements Scene {
   private dirtyFor = 0;
   private dirty = false;
   private saving = false;
+  private formatting = false;
 
   private stage: RunStage | "idle" = "idle";
   private attemptId: string | null = null;
@@ -321,6 +322,40 @@ export class PlaygroundScene implements Scene {
     }
   }
 
+  /**
+   * §4.9d, the same three outcomes as the quest screen: formatted (the caret
+   * stays put), already tidy (nothing is touched), or it does not parse — in
+   * which case the formatter's own line is shown quietly and the buffer is
+   * left exactly as it is. Half-written code is the normal state of a
+   * scratchpad, not a fault.
+   */
+  private async format(): Promise<void> {
+    if (!this.editor || this.formatting) return;
+    this.formatting = true;
+    try {
+      const res = await this.app.client.request("code.format", {
+        lang: this.held.lang,
+        source: this.editor.source,
+      });
+      if (res.problem) this.status = res.problem;
+      else if (res.changed) {
+        this.editor.replaceAll(res.source);
+        this.touched();
+        this.status = "";
+        this.app.chip.blip();
+      } else this.status = "already tidy";
+    } catch (e) {
+      this.status =
+        e instanceof WireError && e.payload.code === "not_found"
+          ? "this server does not have FORMAT yet"
+          : e instanceof WireError
+            ? playerText(e.payload.code)
+            : "the formatter did not answer";
+    } finally {
+      this.formatting = false;
+    }
+  }
+
   private fresh(): void {
     void this.save();
     this.held = {
@@ -379,6 +414,14 @@ export class PlaygroundScene implements Scene {
       ev.preventDefault();
       void this.save();
     }
+    if (name === "f" && (ev.ctrlKey || ev.metaKey) && ev.shiftKey) {
+      ev.preventDefault();
+      void this.format();
+    }
+  }
+
+  controls(): Buttons[] {
+    return [this.buttons, this.rows];
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
@@ -391,6 +434,7 @@ export class PlaygroundScene implements Scene {
     const hit = this.buttons.hit(x, y) ?? this.rows.hit(x, y);
     if (!hit) return;
     if (hit.id === "run") void this.run();
+    else if (hit.id === "format") void this.format();
     else if (hit.id === "save") void this.save();
     else if (hit.id === "new") this.fresh();
     else if (hit.id === "delete") void this.remove();
@@ -475,6 +519,10 @@ export class PlaygroundScene implements Scene {
           rowH - 2,
           open || hover ? 1 : 0.5,
         );
+        // The language tag owns the right of the row, so the name is measured
+        // against what is left of it. A server-assigned name is a date and it
+        // is long enough to run straight under the tag otherwise.
+        const tagW = Math.round(46 * s);
         g.fillStyle = css(open ? Theme.coin : Theme.cream, hover ? 1 : 0.85);
         printf(
           g,
@@ -482,7 +530,7 @@ export class PlaygroundScene implements Scene {
           snip.name,
           inner[0] + Math.round(10 * s),
           ry + Math.round((rowH - fonts.small.height) / 2),
-          inner[2] - Math.round(20 * s),
+          inner[2] - Math.round(20 * s) - tagW,
           "left",
         );
         g.fillStyle = css(Theme.dim);
@@ -556,7 +604,7 @@ export class PlaygroundScene implements Scene {
     const gap = Math.round(8 * s);
     const stdinH = Math.max(Math.round(46 * s), fonts.codeSm.height * 2 + Math.round(16 * s));
     const outH = Math.round(inner[3] * (layout.isPortrait() ? 0.3 : 0.28));
-    const labels = ["RUN", "SAVE", "MAPS"];
+    const labels = ["RUN", "FORMAT", "SAVE", "MAPS"];
     // The language pair is laid out first and taken out of the row's width,
     // like SUBMIT on the quest screen: it is a *state*, not an action, and it
     // is painted lit so the screen says which file you are in twice over.
@@ -614,6 +662,7 @@ export class PlaygroundScene implements Scene {
           dim: this.stage !== "idle",
           primary: this.stage === "idle",
         },
+        { id: "format", label: "FORMAT", dim: this.formatting },
         { id: "save", label: this.dirty ? "SAVE *" : "SAVE" },
         { id: "back", label: "MAPS" },
       ],

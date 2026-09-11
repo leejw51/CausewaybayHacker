@@ -19,12 +19,13 @@
 //!   "The server is alive" is the assertion that actually matters, and it is
 //!   the one nobody writes.
 //!
-//! **9.6.d is not writable and will not be faked.** It wants `GOPROXY=off` to
-//! make a Go quest that fetches the internet fail cleanly. There is no Go
-//! runner in this build — `cwbhacker_runner::unsupported("go", …)` returns a
-//! reason rather than a judgement — so a test pointed at it would pass
-//! because Go is unsupported, not because the proxy was off. That is a test
-//! that goes green for the wrong reason, which is worse than no test.
+//! * **9.6.d** `GOPROXY=off` — a Go quest that reaches for the internet fails
+//!   cleanly instead of hanging on a network CI may not have.
+//!
+//! 9.6.d was unwritable for a while and this file said so rather than
+//! shipping a test that passed because Go was unsupported. BE built the Go
+//! runner, so it is written now, and with it **all nine rows of §9.6 have an
+//! owner** — see the table in `tests/PLAN.md`.
 //!
 //! These are slow: each one compiles a real program with a real `rustc`.
 //! That is the point. A limit asserted in a comment is not a limit.
@@ -531,4 +532,111 @@ fn a_timeout_is_a_verdict_and_not_a_lost_attempt() {
         Arc::strong_count(&no_events()) > 0,
         "keeps the Arc import honest"
     );
+}
+
+// --------------------------------------------------------------- 9.6.d
+
+#[test]
+fn a_go_quest_that_reaches_for_the_internet_fails_cleanly_rather_than_hanging() {
+    // SPEC §9.6: "`GOPROXY=off` → a quest that tries to fetch fails cleanly."
+    // §5.1: "`GOPROXY=off` — a quest does not fetch the internet."
+    //
+    // This was unwritable until BE built the Go runner, and the module
+    // doc above said so rather than shipping a test that passed because Go
+    // was unsupported. It is writable now, so here it is.
+    //
+    // **"Cleanly" is the whole assertion.** Without `GOPROXY=off` this does
+    // not fail — it *hangs*, resolving a module against a network that CI
+    // may not have and a player's laptop may have only intermittently. A
+    // player would watch a quest compile for thirty seconds and give up; a CI
+    // box would sit on it until something else timed out. A `compile_error`
+    // in under a second is the correct outcome, and the difference between
+    // the two is invisible unless something asserts it.
+    let h = harness();
+    let source = r#"
+package main
+
+import (
+	"fmt"
+
+	"github.com/definitely/not/vendored"
+)
+
+func main() {
+	fmt.Println(vendored.Anything())
+}
+"#;
+    // Generous on purpose: if the proxy were reachable the resolve would take
+    // seconds, and the point is to catch that rather than to race it.
+    let started = Instant::now();
+    let report = run_go_in(&h, "att_goproxy", source, &spec(60_000, "never\n"));
+    let elapsed = started.elapsed();
+
+    assert_ne!(
+        report.verdict,
+        Verdict::Accepted,
+        "a quest importing a module nobody vendored was accepted"
+    );
+    assert_eq!(
+        report.verdict,
+        Verdict::CompileError,
+        "expected a compile error; got {:?}. A timeout here means the build \
+         went looking for the module instead of being told not to.",
+        report.verdict
+    );
+    assert!(
+        elapsed.as_secs() < 30,
+        "it took {elapsed:?}. With GOPROXY=off this is a refusal, not a \
+         network round trip — that shape is what a player sees as a quest \
+         that will not compile and will not stop trying."
+    );
+
+    // The message has to be about the module, not a bare "cannot find
+    // package": a player who reads it should understand that the quest is
+    // supposed to use the standard library, not that their machine is broken.
+    let said = report.compiler_stderr.to_lowercase();
+    assert!(
+        said.contains("github.com/definitely/not/vendored")
+            || said.contains("no required module")
+            || said.contains("goproxy")
+            || said.contains("module lookup disabled"),
+        "the build failed but said nothing about the import: {:?}",
+        report.compiler_stderr
+    );
+
+    // And the runner is fine afterwards — a failed module resolution must not
+    // poison the shared module cache for the next submission.
+    let good = run_go_in(
+        &h,
+        "att_goproxy_after",
+        "package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println(\"ok\") }\n",
+        &spec(30_000, "ok\n"),
+    );
+    assert_eq!(
+        good.verdict,
+        Verdict::Accepted,
+        "a standard-library program stopped working after a failed module \
+         lookup: {:?}",
+        good.compiler_stderr
+    );
+}
+
+/// The Go twin of `run_in`. Kept beside it rather than generalising the one
+/// function, because the language is part of what a reader needs to see.
+fn run_go_in(
+    h: &Harness,
+    attempt: &str,
+    source: &str,
+    spec: &TestSpec,
+) -> cwbhacker_runner::Report {
+    let submission = Submission {
+        attempt_id: attempt,
+        lang: "go",
+        source,
+        spec,
+        workdir: h.root.join("build/go").join(attempt),
+        cache_root: h.root.join("build/go"),
+        events: no_events(),
+    };
+    cwbhacker_runner::run(&submission)
 }

@@ -52,6 +52,28 @@ export interface CaptureApi {
   fps(): number;
   /** Turn the tube on or off from a script, for a shot of each. */
   crt(on?: boolean): boolean;
+  /**
+   * Every button the current screen is hit-testing, by id.
+   *
+   * A canvas control has no DOM node, so an automated run either has this or a
+   * geometric scan of the pixels — and the scan breaks every time a row
+   * re-wraps, which is how three e2e tests went red when SUBMIT moved. The
+   * rects come from the same `Buttons` objects the scene itself hits, so this
+   * cannot disagree with what a click does.
+   *
+   * `rect` is in virtual pixels (the coordinates a scene thinks in) and
+   * `client` is in CSS pixels relative to the viewport, which is what a driver
+   * needs to dispatch a pointer event or to call `page.mouse.click`.
+   */
+  buttons(): Array<{
+    id: string;
+    label: string;
+    dim: boolean;
+    rect: [number, number, number, number];
+    client: [number, number, number, number];
+  }>;
+  /** The middle of one button in CSS pixels, or null if it is not on screen. */
+  buttonAt(id: string): [number, number] | null;
 }
 
 /**
@@ -164,6 +186,29 @@ export function install(app: App): void {
       fx: [app.fx.width, app.fx.height],
     }),
     fps: () => app.fps(),
+    buttons: () => {
+      const out: ReturnType<CaptureApi["buttons"]> = [];
+      for (const list of app.currentScene?.controls?.() ?? []) {
+        for (const b of list.list()) {
+          const [x, y, w, h] = b.rect;
+          const [left, top] = app.layout.toClient(x, y);
+          const [right, bottom] = app.layout.toClient(x + w, y + h);
+          out.push({
+            id: b.id,
+            label: b.label,
+            dim: b.dim === true,
+            rect: [x, y, w, h],
+            client: [left, top, right - left, bottom - top],
+          });
+        }
+      }
+      return out;
+    },
+    buttonAt: (id: string) => {
+      const hit = api.buttons().find((b) => b.id === id);
+      if (!hit) return null;
+      return [hit.client[0] + hit.client[2] / 2, hit.client[1] + hit.client[3] / 2];
+    },
     crt: (on?: boolean) => {
       if (on !== undefined && on !== app.crt.enabled) app.toggleCrt();
       else if (on === undefined) app.toggleCrt();

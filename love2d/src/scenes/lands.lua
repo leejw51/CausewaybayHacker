@@ -165,7 +165,7 @@ function Lands:draw()
       Theme.withAlpha(Theme.cream, 0.7), "center", vw)
   end
 
-  self.app:footer("ARROWS choose   ENTER go")
+  self.app:footer("ARROWS choose   ENTER go   P playground")
 end
 
 --- One land, as a card.
@@ -267,6 +267,9 @@ function Lands:keypressed(key)
     self:choose()
     return true
   end
+  -- Mei's own desk, reachable without picking a land first: it belongs to
+  -- nobody's curriculum (§4.9c).
+  if key == "p" then self.app:go("playground"); return true end
   if key == "r" then self:refresh(); return true end
   return false
 end

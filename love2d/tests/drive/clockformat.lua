@@ -41,31 +41,37 @@ add({ until_ = function(app)
       return q.deadline_at ~= nil and q.opened_at ~= nil
     end, note = "the server stamped the pair", timeout = 10 })
 
-local function register(shift, tag)
+--- `want` is the remaining time to photograph. The shift is worked out from
+--- what the server's deadline actually leaves, because this quest may have
+--- been opened minutes ago by an earlier run — the pair is stamped once and
+--- never re-stamped (§4.8b), which is the whole point of it.
+local function register(want, tag)
   add({ until_ = function(app)
         local Clock = require("src.clock")
-        -- Move only *now*. The deadline is the server's.
-        Clock.set_source(function() return love.timer.getTime() + shift end)
+        -- Move only *now*. The deadline is the server's, untouched.
+        Clock.shift(0)
+        local live = Clock.read(app.scene.quest)
+        Clock.shift(live.remaining - want)
         app.scene.clock_arrived = nil
         app.scene.clock_phase = nil
         app.scene:tick_clock()
         local st = Clock.read(app.scene.quest)
-        print(("%-9s %-7s phase=%-9s remaining=%.0fs   (now shifted +%ds)"):format(
-          tag, Clock.format(st), st.phase, st.remaining, shift))
+        print(("%-9s %-7s phase=%-9s remaining=%.0fs   (now shifted %+ds)"):format(
+          tag, Clock.format(st), st.phase, st.remaining, Clock.shifted()))
         return true
       end, timeout = 5 })
   add({ wait = 0.45 })
   add({ shot = "W-" .. tag .. ".png" })
 end
 
-register(0, "calm")
-register(480, "warning")
-register(565, "urgent")
-register(700, "overtime")
+register(540, "calm")        -- nine minutes left
+register(100, "warning")     -- inside 25% of a ten-minute limit
+register(30, "urgent")       -- inside 8%
+register(-95, "overtime")    -- a minute and a half past
 
 -- Put the clock back where it belongs before touching anything else.
 add({ until_ = function(app)
-      require("src.clock").set_source(function() return love.timer.getTime() end)
+      require("src.clock").shift(0)
       app.scene.clock_phase = nil
       return true
     end, timeout = 3 })
@@ -90,12 +96,17 @@ add({ until_ = function(app)
       local line = ed.lines[1] or ""
       local at = line:find("target=9", 1, true)
       ed:goto_position(1, at + 6)          -- between "target" and "=9"
+      -- **Document** ink, not line ink: the whole point of the anchor is that
+      -- it survives a line being split, so counting within one line would be
+      -- measuring the wrong thing and reporting a false alarm.
+      local document = 0
+      for i = 1, ed.line - 1 do document = document + #(ed.lines[i]:gsub("%s", "")) end
+      document = document + #(line:sub(1, ed.col - 1):gsub("%s", ""))
       app.caret = {
-        line = ed.line, col = ed.col,
-        ink = #(line:sub(1, ed.col - 1):gsub("%s", "")),
+        line = ed.line, col = ed.col, ink = document,
         after = line:sub(ed.col, ed.col + 1),
       }
-      print(("before: line %d col %d, %d ink before, next two [%s]"):format(
+      print(("before: line %d col %d, %d document ink before, next two [%s]"):format(
         app.caret.line, app.caret.col, app.caret.ink, app.caret.after))
       print("source before:\n" .. ed:text())
       return true
@@ -115,16 +126,22 @@ add({ until_ = function(app)
         tostring(q.format_note), tostring(q.format_problem), tostring(q.format_unsupported)))
       print("source after:\n" .. ed:text())
       local line = ed:current_line()
-      local ink = #(line:sub(1, ed.col - 1):gsub("%s", ""))
+      local document = 0
+      for i = 1, ed.line - 1 do document = document + #(ed.lines[i]:gsub("%s", "")) end
+      document = document + #(line:sub(1, ed.col - 1):gsub("%s", ""))
+      local ink = document
       local after = line:sub(ed.col, ed.col + 1)
-      print(("after:  line %d col %d, %d ink before, next two [%s]"):format(
+      print(("after:  line %d col %d, %d document ink before, next two [%s]"):format(
         ed.line, ed.col, ink, after))
       if q.format_unsupported then print("FAIL: FORMAT greyed itself against a server that has it") end
       if ink ~= app.caret.ink then
         print(("NOTE: ink before the caret moved %d -> %d"):format(app.caret.ink, ink))
       end
-      if after ~= app.caret.after then
-        print(("NOTE: the caret is now before [%s], was [%s]"):format(after, app.caret.after))
+      -- The only question that matters: is it still before the same `=`?
+      if after:sub(1, 1) ~= app.caret.after:sub(1, 1) then
+        print(("FAIL: the caret is now before [%s], was [%s]"):format(after, app.caret.after))
+      else
+        print("caret: still immediately before the same character")
       end
       return true
     end, timeout = 5 })

@@ -915,3 +915,90 @@ the first one.
 
 The two badges that already exist — `badge_cleared` and `badge_locked` — were
 made for the category rows and are deliberately not part of any award set.
+
+---
+
+## 2.12 The award set — nine shapes, and the test that vetted them
+
+BE's badge set (`docs/decisions.md`, "XP, levels and the badge set") adopted the
+48px constraint whole: eight families plus the level chevron, tiers differing by
+colour and number, **the silhouette is the family**. Titles are already in the
+award row, so — like the `CLEARED` stamp — none of this art carries a word.
+
+**The acceptance test was a silhouette row, and it failed three of nine.**
+Every badge was composited onto the panel colour at 96, 48 and 32px, and then
+again at 48px as **alpha only, colour stripped**. That last row is the one that
+matters: if two families are the same blob with the colour taken away, they are
+the same badge.
+
+* `badge_shackle` came back as a closed horseshoe — a round blob with a notch,
+  effectively the same silhouette as `badge_watch`, and it did not read as
+  broken at all.
+* `badge_tally` was engraved *into* a slate tile, so with colour removed it was
+  a plain square.
+* `badge_chevron` came back as a whole rank patch — a rounded pentagon, close to
+  the tally square.
+
+All three were re-rolled against the specific failure: the tally's marks became
+raised objects with no tile behind them, the chevron became one bare stripe, and
+the shackle — three attempts, the most of anything in the set — only worked once
+every lock word was removed from the prompt and it was described purely as
+*two separate curved pieces with a wide gap between them that magenta passes
+through*. "Shackle", "padlock" and "break" all cue Grok to draw a lock. The
+final silhouette is an open arch with a gap through it and reads as broken at
+32px, which is what family 6 deserved.
+
+**Tiers.** Flame goes orange → cold blue → white-hot, which is a temperature and
+so reads as a progression rather than as three colours. Chain goes steel →
+brass → gold. Those are generated, because a flame's hue *is* its drawing.
+
+**The chevron is open-ended, so it cannot tier by generated colour.** Asking for
+the same chevron in another metal produced a different shape both times — a
+thinner single chevron in bronze, and in silver a *double* chevron pointing the
+other way, which is precisely what "the silhouette is the family" forbids. So
+bronze and silver are **derived** from the gold one by `art/tools/tier.py`,
+which remaps the metal hue and leaves the value structure — bevel, shine, ink
+outline — alone. The three tiers are the same pixels in different colours and
+cannot drift apart.
+
+That gives the level family a scheme that does not run out: **three metals × one
+to three stacked chevrons = nine bands**, with the engine printing the level
+number. FE stacks; no new art is needed as levels climb.
+
+**One thing for the shelf.** `badge_slot` is an empty recessed socket in a medal
+case. It is the one piece of furniture I made for `stats.awards`, and the reason
+is that it turns a list into a collection: an unearned badge that renders as
+*nothing* is invisible, while an unearned badge that renders as a hollow is a
+thing you can go and get. I did not make a rail or a case frame — a row of
+badges is already busy, and a shelf behind them would be decoration arguing with
+the icons.
+
+**Closest pair, stated so nobody is surprised:** `badge_chain_10` (brass) and
+`badge_chain_25` (gold) are the least separable tier step at 32px. They are
+distinguishable side by side and the printed number disambiguates them, but if
+combo tiers ever need to read without a label, that is the pair to revisit.
+
+## 2.13 A pipeline bug that shipped, and the sharper rule that replaced it
+
+`badge_shackle`'s second roll shipped with a **magenta blob in the middle of
+it** — 10.8% of the sprite, in exactly the backdrop's own colour (253,47,156).
+
+The cause was my own size heuristic. `drop_trapped_backdrop` removes enclosed
+backdrop under a share of the ink, and that threshold has now been beaten twice:
+`boss_deadlock` at 3.8% when the cut was 3%, and this at 10.8% when it was 10%.
+A threshold tuned to the cases you have seen is a threshold the next case walks
+past.
+
+There is a sharper test available and it is now the second half of the rule: a
+trapped pocket **is** backdrop, so it is literally the backdrop's colour, while
+art that merely happens to be pinkish is not. Measured: the shackle's pocket sat
+at distance 0.0 from the plate's own border colour; `fx_ribbon`'s painted cloth
+is 38 away and survives. Anything within 22 of the backdrop goes regardless of
+size.
+
+**And a second bug inside the fix**, worth writing down because it is the kind
+that hides: the first version sampled the reference colour from the border
+*after* `knockout` had already cleared it, so the reference was always empty and
+the new rule silently never fired. It looked like it worked because nothing
+crashed. The reference is now taken from the raw image before knockout, and both
+cases are asserted after every reprocess — the pocket gone, the cloth intact.

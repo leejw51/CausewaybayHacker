@@ -20,6 +20,7 @@ import { Backdrop, type Mood } from "./gfx/backdrop";
 import { Crt } from "./gfx/crt";
 import { Client } from "./net/client";
 import type { Land } from "./net/protocol";
+import type { Buttons } from "./ui/chrome";
 import { Chip } from "./audio/sfx";
 import { wipe as wipeKey } from "./wallet/wallet";
 

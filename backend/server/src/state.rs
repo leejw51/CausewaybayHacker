@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use cwbhacker_core::auth::Challenges;
+use cwbhacker_core::search::{Embedder, HashedEmbedder};
 use cwbhacker_core::Store;
 
 use crate::proto::{Out, Outgoing, ServerFrame};
@@ -58,6 +59,10 @@ pub struct AppState {
     pub static_dir: Option<PathBuf>,
     pub started_at: String,
     pub hub: Hub,
+    /// The live embedder (SPEC §8.2). Built from the corpus at startup, which
+    /// is also when any `quest_vec` row whose `model` no longer matches is
+    /// recomputed.
+    pub embedder: Box<dyn Embedder>,
     /// Submissions compiling right now, across every connection. It is what
     /// `run.stage`'s `queued` depth reports.
     pub running: AtomicUsize,
@@ -70,7 +75,28 @@ impl AppState {
         art_dir: Option<PathBuf>,
         static_dir: Option<PathBuf>,
     ) -> AppState {
+        // Deterministic, no download, no network, and it cannot fail — which
+        // is the whole reason the default embedder is this one.
+        let embedder: Box<dyn Embedder> = {
+            let conn = store.conn();
+            match cwbhacker_core::search::train_from_corpus(&conn) {
+                Ok(embedder) => Box::new(embedder),
+                Err(e) => {
+                    tracing::warn!(error = %e, "could not train the embedder; search will be BM25 only");
+                    Box::new(HashedEmbedder::new(cwbhacker_core::search::HASHED_DIM))
+                }
+            }
+        };
+        {
+            let conn = store.conn();
+            match cwbhacker_core::search::reindex(&conn, embedder.as_ref()) {
+                Ok(0) => {}
+                Ok(n) => tracing::info!(vectors = n, model = embedder.id(), "search index rebuilt"),
+                Err(e) => tracing::warn!(error = %e, "could not build the search index"),
+            }
+        }
         AppState {
+            embedder,
             store,
             challenges: Challenges::new(),
             art_dir,

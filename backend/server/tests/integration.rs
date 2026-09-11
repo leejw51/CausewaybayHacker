@@ -1056,3 +1056,283 @@ async fn every_reply_spells_the_address_the_same_way() {
 
     server.stop().await;
 }
+
+// ------------------------------------------------- SPEC §7.2, the whole arc
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_mistake_is_learned_by_not_making_it_and_the_badge_says_so_once() {
+    // **The load-bearing claim of the product.**
+    //
+    // SPEC §0: "the server classifies them by the compiler's own error
+    // identity and the **AI mode** feeds them back until they stop
+    // happening." SPEC §7.2 is the mechanism: a kind's `count` goes up and
+    // its `cleared_since` resets each time you make it, every *other* kind's
+    // `cleared_since` goes up, and at five the kind is considered learned and
+    // drops out of the drill priority.
+    //
+    // Every piece of that is unit-tested somewhere. `mistakes.rs` has the
+    // rollup arithmetic, `awards.rs::taming_a_mistake_needs_both_halves` has
+    // the badge rule against a hand-built store. **Nothing drove the whole
+    // sequence** — real submissions, real `rustc`, real classification, the
+    // real `stats.mistakes` filter and the real badge — which is the only way
+    // to find out whether the thing the game promises actually happens.
+    //
+    // The arc: make one kind five times, watch it climb; stop making it;
+    // watch `cleared_since` advance **only on submits**; watch it drop out of
+    // the default `stats.mistakes`; watch the badge arrive exactly once.
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let src = content_src(tmp.path());
+    let server = start(&home, &src).await;
+
+    let mut alice = Client::connect(server.port).await;
+    alice.login(ALICE_KEY).await;
+
+    // E0382 — the oldest Rust lesson, and §7.1's first row. Compiled for
+    // real every time, because a test that posted the *kind* directly would
+    // be testing the rollup against itself rather than against the compiler.
+    const MOVED: &str = r#"
+fn main() {
+    let s = String::from("causewaybay");
+    let moved = s;
+    println!("{} {}", s, moved);
+}
+"#;
+    let clean = quest_field(HELLO, "solution");
+
+    let stat = |m: &Value, kind: &str| -> Option<Value> {
+        m["mistakes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["kind"] == kind)
+            .cloned()
+    };
+
+    // ---- 1. make it five times, and watch it climb ----------------------
+    for i in 1..=5 {
+        let a = alice
+            .ok(
+                "quest.submit",
+                json!({ "quest_id": HELLO, "lang": "rust", "source": MOVED }),
+            )
+            .await["attempt"]
+            .clone();
+        assert_eq!(a["verdict"], "compile_error", "submission {i}");
+        let kinds: Vec<&str> = a["mistakes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|m| m["kind"].as_str().unwrap())
+            .collect();
+        assert!(
+            kinds.contains(&"borrow-after-move"),
+            "§7.1: E0382 is the borrow-after-move row, got {kinds:?}"
+        );
+
+        let stats = alice.ok("stats.mistakes", json!({})).await;
+        let row = stat(&stats, "borrow-after-move")
+            .unwrap_or_else(|| panic!("the mistake is not in stats.mistakes after {i}"));
+        assert_eq!(row["count"], i, "§7.2: the count climbs with each one");
+        assert_eq!(
+            row["cleared_since"], 0,
+            "§7.2: making it again resets cleared_since"
+        );
+        assert!(
+            !row["label"].as_str().unwrap().is_empty(),
+            "§5.6: a MistakeStat carries a label a player can read"
+        );
+        assert_eq!(row["example_quest_id"], HELLO, "§5.6: where it happened");
+    }
+
+    // ---- 2. six clean RUNS change nothing ------------------------------
+    //
+    // PROTOCOL §4.9b, and the sharpest edge in the whole mechanism: "evidence
+    // that you have *stopped* making a mistake should cost more than evidence
+    // you are still making it". Pressing RUN six times in a minute is not
+    // evidence. If runs advanced it, "learned" would mean "compiled five
+    // times" and the weakness drill would quietly stop teaching the thing the
+    // player is worst at.
+    for i in 1..=6 {
+        let a = alice
+            .ok(
+                "quest.run",
+                json!({ "quest_id": HELLO, "lang": "rust", "source": clean }),
+            )
+            .await["attempt"]
+            .clone();
+        assert_eq!(a["mode"], "run");
+        assert!(
+            a["mistakes"].as_array().unwrap().is_empty(),
+            "the clean source produced a mistake on run {i}"
+        );
+    }
+    let after_runs = alice.ok("stats.mistakes", json!({})).await;
+    let row = stat(&after_runs, "borrow-after-move").expect("still in the list");
+    assert_eq!(
+        row["cleared_since"], 0,
+        "§4.9b: six clean RUNS advanced cleared_since. A run is evidence you \
+         are still making a mistake, never evidence you have stopped."
+    );
+    assert_eq!(row["count"], 5, "a clean run did not change the count");
+
+    // ---- 3. clean SUBMITS advance it, one at a time ---------------------
+    for expected in 1..=4 {
+        let a = alice
+            .ok(
+                "quest.submit",
+                json!({ "quest_id": HELLO, "lang": "rust", "source": clean }),
+            )
+            .await["attempt"]
+            .clone();
+        assert_eq!(a["verdict"], "accepted", "the clean source");
+        let stats = alice.ok("stats.mistakes", json!({})).await;
+        let row = stat(&stats, "borrow-after-move")
+            .unwrap_or_else(|| panic!("it left the list early, at {expected}"));
+        assert_eq!(
+            row["cleared_since"], expected,
+            "§7.2: one clean submit is one step, not more and not fewer"
+        );
+        // Four is not five. It is still something to practise.
+        assert!(
+            stat(&stats, "borrow-after-move").is_some(),
+            "a kind at cleared_since {expected} must still be drilled"
+        );
+    }
+
+    // ---- 4. the fifth retires it ---------------------------------------
+    alice.events.clear();
+    let fifth = alice
+        .ok(
+            "quest.submit",
+            json!({ "quest_id": HELLO, "lang": "rust", "source": clean }),
+        )
+        .await;
+    assert_eq!(fifth["attempt"]["verdict"], "accepted");
+
+    let default_list = alice.ok("stats.mistakes", json!({})).await;
+    assert!(
+        stat(&default_list, "borrow-after-move").is_none(),
+        "§4.14: a kind at cleared_since 5 is learned and drops out of the \
+         default list — that is the whole promise, 'feeds them back until \
+         they stop happening'. Got {default_list}"
+    );
+
+    // Dropped out, not deleted. SPEC §7.2 is explicit: "without being
+    // deleted". A player's record is theirs.
+    let full_list = alice
+        .ok("stats.mistakes", json!({ "include_learned": true }))
+        .await;
+    let learned =
+        stat(&full_list, "borrow-after-move").expect("§7.2: a learned kind is retired, not erased");
+    assert_eq!(learned["cleared_since"], 5);
+    assert_eq!(
+        learned["count"], 5,
+        "the history of having made it survives"
+    );
+
+    // ---- 5. and the badge, exactly once --------------------------------
+    //
+    // The rollup is now the input to an award, so a bug in it awards
+    // something untrue — and PROTOCOL §4.14b is blunt about the cost:
+    // "a badge that fires on the wrong thing is worse than one that does not
+    // exist — it makes every other badge mean nothing."
+    let announced: Vec<Value> = alice
+        .events
+        .iter()
+        .filter(|e| e["type"] == "award")
+        .cloned()
+        .collect();
+    let tamed: Vec<&Value> = announced
+        .iter()
+        .filter(|e| e["payload"]["id"] == "tamed-borrow-after-move")
+        .collect();
+    assert_eq!(
+        tamed.len(),
+        1,
+        "the badge should be announced exactly once on the submit that earned \
+         it; got {announced:?}"
+    );
+    assert_eq!(
+        tamed[0]["id"],
+        Value::Null,
+        "§2.2: an event carries id: null"
+    );
+    assert_eq!(tamed[0]["payload"]["kind"], "badge");
+    assert!(
+        !tamed[0]["payload"]["title"].as_str().unwrap().is_empty(),
+        "§5.10: a badge has a title the player reads"
+    );
+
+    let shelf = alice.ok("stats.awards", json!({})).await;
+    let owned: Vec<&Value> = shelf["awards"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|a| a["id"] == "tamed-borrow-after-move")
+        .collect();
+    assert_eq!(
+        owned.len(),
+        1,
+        "§4.14b: the shelf holds it once. `UNIQUE (address, kind, id)` is what \
+         makes 'never awarded twice' a property of the database; got {shelf}"
+    );
+    assert_eq!(owned[0]["kind"], "badge");
+    assert!(
+        shelf["awards"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|a| a["kind"] != "stamp"),
+        "§4.14b: `stamp` is a moment, not something a player has, and is never \
+         listed"
+    );
+
+    // ---- 6. and it does not arrive again -------------------------------
+    alice.events.clear();
+    for _ in 0..3 {
+        alice
+            .ok(
+                "quest.submit",
+                json!({ "quest_id": HELLO, "lang": "rust", "source": clean }),
+            )
+            .await;
+    }
+    assert!(
+        !alice
+            .events
+            .iter()
+            .any(|e| e["type"] == "award" && e["payload"]["id"] == "tamed-borrow-after-move"),
+        "the badge was announced a second time"
+    );
+    let shelf = alice.ok("stats.awards", json!({})).await;
+    assert_eq!(
+        shelf["awards"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|a| a["id"] == "tamed-borrow-after-move")
+            .count(),
+        1,
+        "the shelf grew a duplicate"
+    );
+
+    // ---- 7. and making it again brings it back -------------------------
+    //
+    // "Learned" is a statement about the last five attempts, not a permanent
+    // graduation. A player who regresses must be taught again, or the drill
+    // stops working the moment somebody has a bad week.
+    alice
+        .ok(
+            "quest.submit",
+            json!({ "quest_id": HELLO, "lang": "rust", "source": MOVED }),
+        )
+        .await;
+    let back = alice.ok("stats.mistakes", json!({})).await;
+    let row =
+        stat(&back, "borrow-after-move").expect("§7.2: making it again puts it back on the list");
+    assert_eq!(row["cleared_since"], 0, "the counter went back to zero");
+    assert_eq!(row["count"], 6, "and the count remembers all six");
+
+    server.stop().await;
+}

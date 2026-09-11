@@ -179,6 +179,10 @@ export class ResultScene implements Scene {
     if (name === "r") this.retry();
   }
 
+  controls(): Buttons[] {
+    return [this.buttons];
+  }
+
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
     if (phase === "move") {
       this.buttons.hovered = this.buttons.hit(x, y)?.id ?? null;

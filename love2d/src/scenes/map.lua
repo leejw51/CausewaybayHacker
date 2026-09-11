@@ -476,7 +476,7 @@ function Map:draw()
 
   self.app:footer(self.walk
     and "ANY KEY skip"
-    or "ARROWS node   ENTER play   TAB land   Q category   S search   T stats   ESC back")
+    or "ARROWS node   ENTER play   TAB land   Q category   P playground   T stats   ESC back")
 end
 
 --- The header: two land buttons, three category tabs, the count.
@@ -862,6 +862,7 @@ function Map:keypressed(key)
   if key == "s" then self.app:go("search"); return true end
   if key == "t" then self.app:go("stats"); return true end
   if key == "a" then self.app:go("ai"); return true end
+  if key == "p" then self.app:go("playground"); return true end
   return false
 end
 

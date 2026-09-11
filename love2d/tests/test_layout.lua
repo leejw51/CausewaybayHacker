@@ -237,7 +237,7 @@ return function()
 
     local names = {
       "boot", "login", "lands", "categories", "map",
-      "quest", "result", "search", "stats", "ai",
+      "quest", "result", "search", "stats", "ai", "playground",
     }
     for _, mode in ipairs({ "landscape", "portrait" }) do
       at(mode, mode == "portrait" and 720 or 1280, mode == "portrait" and 1280 or 720)

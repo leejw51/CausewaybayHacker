@@ -3310,16 +3310,1166 @@ cases = [
   { name = "clear",  stdin = "6\nADD 1 ADD 2 TOTAL CLEAR TOTAL ADD 9\n",        expect = "3\n0\nCOMMANDS 6\nITEMS 1\n",      visible = false },
 ]
 
-# ---------------------------------------------------------------- 28  BOSS
+# ---------------------------------------------------------------- 28
+[[quest]]
+id           = "rust.hacker.29.dijkstra"
+node         = 28
+title        = "NOT EVERY STREET IS THE SAME LENGTH"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Every map you have cleared so far counted hops. The tram does not care how many stops there are; it cares how long they take."
+concepts     = ["graphs", "heaps", "complexity"]
+requires     = ["rust.hacker.27.commands"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Standard input is `n m seed`: `n` stops, `m` undirected weighted edges. Build
+the graph yourself, with **exactly** this generator, in wrapping `u64`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for i in 1..n:                  # a spanning tree first, so it is connected
+    p = next() % i
+    w = next() % 1000 + 1
+    edge (p, i, w)
+for the remaining m - (n-1) edges:
+    a = next() % n
+    b = next() % n
+    w = next() % 1000 + 1
+    edge (a, b, w)
+```
+
+Print the sum of the shortest distances from stop `0` to every reachable stop
+(including `0` itself, which is `0`), then `MAX <the largest of them>`.
+
+```
+input:  6 8 1
+output: 4594
+        MAX 1582
+```
+
+**The complexity here is enforced.** One hidden case is `n = 100000`,
+`m = 200000`. Dijkstra is the right algorithm either way; what the clock
+decides is the priority queue. Scanning every unvisited node for the minimum
+is `O(V²)` — `10^10` comparisons, and it does not finish in the five second
+run limit. A binary heap makes it `O((V + E) log V)` and it finishes in about
+twenty milliseconds. Both numbers measured on this machine, with the two
+programs that ship in this quest: the starter is the scanning version.
+
+`std::collections::BinaryHeap` is a max-heap, so push `Reverse((distance,
+node))`. It has no decrease-key, and you do not need one: push the improved
+distance as a new entry and skip any entry you pop whose distance is already
+worse than the one you have recorded. That "stale entry" skip is the line
+people forget, and without it the heap grows without bound.
+'''
+starter      = '''
+use std::io::Read;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+fn build(n: usize, m: usize, seed: u64) -> Vec<Vec<(usize, i64)>> {
+    let mut rng = Rng(seed);
+    let mut graph: Vec<Vec<(usize, i64)>> = vec![Vec::new(); n];
+    for i in 1..n {
+        let p = (rng.next() as usize) % i;
+        let w = (rng.next() % 1000 + 1) as i64;
+        graph[p].push((i, w));
+        graph[i].push((p, w));
+    }
+    for _ in 0..m.saturating_sub(n - 1) {
+        let a = (rng.next() as usize) % n;
+        let b = (rng.next() as usize) % n;
+        let w = (rng.next() % 1000 + 1) as i64;
+        graph[a].push((b, w));
+        graph[b].push((a, w));
+    }
+    graph
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, m, seed) = (p[0] as usize, p[1] as usize, p[2]);
+
+    let graph = build(n, m, seed);
+    let mut dist = vec![i64::MAX; n];
+    let mut done = vec![false; n];
+    dist[0] = 0;
+
+    // correct, and far too slow: the minimum is found by scanning every node
+    for _ in 0..n {
+        let mut best = usize::MAX;
+        let mut best_dist = i64::MAX;
+        for u in 0..n {
+            if !done[u] && dist[u] < best_dist {
+                best_dist = dist[u];
+                best = u;
+            }
+        }
+        if best == usize::MAX {
+            break;
+        }
+        done[best] = true;
+        for &(v, w) in &graph[best] {
+            if best_dist + w < dist[v] {
+                dist[v] = best_dist + w;
+            }
+        }
+    }
+
+    let reached: Vec<i64> = dist.into_iter().filter(|&d| d < i64::MAX).collect();
+    println!("{}", reached.iter().sum::<i64>());
+    println!("MAX {}", reached.iter().max().cloned().unwrap_or(0));
+}
+'''
+solution     = '''
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+use std::io::Read;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+fn build(n: usize, m: usize, seed: u64) -> Vec<Vec<(usize, i64)>> {
+    let mut rng = Rng(seed);
+    let mut graph: Vec<Vec<(usize, i64)>> = vec![Vec::new(); n];
+    for i in 1..n {
+        let p = (rng.next() as usize) % i;
+        let w = (rng.next() % 1000 + 1) as i64;
+        graph[p].push((i, w));
+        graph[i].push((p, w));
+    }
+    for _ in 0..m.saturating_sub(n - 1) {
+        let a = (rng.next() as usize) % n;
+        let b = (rng.next() as usize) % n;
+        let w = (rng.next() % 1000 + 1) as i64;
+        graph[a].push((b, w));
+        graph[b].push((a, w));
+    }
+    graph
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, m, seed) = (p[0] as usize, p[1] as usize, p[2]);
+
+    let graph = build(n, m, seed);
+    let mut dist = vec![i64::MAX; n];
+    dist[0] = 0;
+
+    let mut heap: BinaryHeap<Reverse<(i64, usize)>> = BinaryHeap::new();
+    heap.push(Reverse((0, 0)));
+    while let Some(Reverse((d, u))) = heap.pop() {
+        // a stale entry: we already found a shorter way to u
+        if d > dist[u] {
+            continue;
+        }
+        for &(v, w) in &graph[u] {
+            if d + w < dist[v] {
+                dist[v] = d + w;
+                heap.push(Reverse((d + w, v)));
+            }
+        }
+    }
+
+    let reached: Vec<i64> = dist.into_iter().filter(|&d| d < i64::MAX).collect();
+    println!("{}", reached.iter().sum::<i64>());
+    println!("MAX {}", reached.iter().max().cloned().unwrap_or(0));
+}
+'''
+hints = [
+  "Reverse((distance, node)) turns the max-heap into a min-heap, and puts distance first so it is what orders the entries.",
+  "`if d > dist[u] { continue; }` is the stale-entry skip. Without it the algorithm is still correct and the heap fills with obsolete entries.",
+  "The spanning-tree half of the generator guarantees every node is reachable, so the filter on i64::MAX never actually removes anything — keep it anyway, because the version of this question with an unreachable node is the follow-up.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "6 8 1\n",           expect = "4594\nMAX 1582\n",      visible = true },
+  { name = "pair",   stdin = "2 1 5\n",           expect = "774\nMAX 774\n",        visible = false },
+  { name = "ten",    stdin = "10 12 3\n",         expect = "12277\nMAX 2237\n",     visible = false },
+  { name = "big",    stdin = "100000 200000 7\n", expect = "249521722\nMAX 6142\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id           = "rust.hacker.30.range-queries"
+node         = 29
+title        = "TOTALS THAT KEEP CHANGING"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Four million till operations from one day across the whole chain, half of them corrections, and somebody wants the running totals."
+concepts     = ["prefix-sums", "complexity", "collections"]
+requires     = ["rust.hacker.29.dijkstra"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Standard input is `n q seed`. Build an array of `n` values and then run `q`
+operations, all from the same generator, in wrapping `u64`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+values[i] = next() % 1000            for i in 0..n
+
+for each of the q operations:
+    a = next(); b = next(); c = next()
+    if a % 2 == 0:   UPDATE  values[b % n] += (c % 1000) + 1
+    else:            QUERY   l = b % n, r = c % n, swap them if l > r,
+                             and add sum(values[l..=r]) to a running total
+```
+
+Print the running total of every query answer, then `UPDATES <k>`.
+
+```
+input:  8 6 1
+output: 4112
+        UPDATES 3
+```
+
+**The complexity here is enforced, and it took some doing.** The naive answer
+— loop over the range for every query — is `O(n)` per query, and on this
+machine it is *also* vectorised by the compiler into something startlingly
+fast. Small cases will not catch it. So the big hidden case is
+`n = 500000, q = 4000000`, where the naive answer touches on the order of
+`10^11` elements and does not finish in the five second run limit, while a
+Fenwick tree does the whole thing in about a tenth of a second. Both measured,
+with the two programs in this quest.
+
+The lesson is the one an interviewer is fishing for: *point update, range sum*
+is the exact shape a Fenwick tree exists for. Three short functions — add,
+prefix, and range as the difference of two prefixes — and `i & i.wrapping_neg()`
+is how you step by the lowest set bit.
+'''
+starter      = '''
+use std::io::Read;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, q, seed) = (p[0] as usize, p[1] as usize, p[2]);
+
+    let mut rng = Rng(seed);
+    let mut values: Vec<i64> = (0..n).map(|_| (rng.next() % 1000) as i64).collect();
+
+    let mut total = 0i64;
+    let mut updates = 0usize;
+    for _ in 0..q {
+        let (a, b, c) = (rng.next(), rng.next(), rng.next());
+        if a % 2 == 0 {
+            values[(b as usize) % n] += (c % 1000 + 1) as i64;
+            updates += 1;
+        } else {
+            let (mut l, mut r) = ((b as usize) % n, (c as usize) % n);
+            if l > r {
+                std::mem::swap(&mut l, &mut r);
+            }
+            // correct, and far too slow at four million operations
+            total += values[l..=r].iter().sum::<i64>();
+        }
+    }
+
+    println!("{}", total);
+    println!("UPDATES {}", updates);
+}
+'''
+solution     = '''
+use std::io::Read;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+/// Fenwick tree, 1-based internally. `add` and `prefix` are both O(log n).
+struct Fenwick {
+    tree: Vec<i64>,
+}
+
+impl Fenwick {
+    fn new(n: usize) -> Fenwick {
+        Fenwick { tree: vec![0; n + 1] }
+    }
+
+    fn add(&mut self, index: usize, delta: i64) {
+        let mut i = index + 1;
+        while i < self.tree.len() {
+            self.tree[i] += delta;
+            i += i & i.wrapping_neg(); // step up by the lowest set bit
+        }
+    }
+
+    fn prefix(&self, upto: usize) -> i64 {
+        let mut i = upto;
+        let mut sum = 0;
+        while i > 0 {
+            sum += self.tree[i];
+            i -= i & i.wrapping_neg();
+        }
+        sum
+    }
+
+    fn range(&self, l: usize, r: usize) -> i64 {
+        self.prefix(r + 1) - self.prefix(l)
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, q, seed) = (p[0] as usize, p[1] as usize, p[2]);
+
+    let mut rng = Rng(seed);
+    let mut fenwick = Fenwick::new(n);
+    for i in 0..n {
+        fenwick.add(i, (rng.next() % 1000) as i64);
+    }
+
+    let mut total = 0i64;
+    let mut updates = 0usize;
+    for _ in 0..q {
+        let (a, b, c) = (rng.next(), rng.next(), rng.next());
+        if a % 2 == 0 {
+            fenwick.add((b as usize) % n, (c % 1000 + 1) as i64);
+            updates += 1;
+        } else {
+            let (mut l, mut r) = ((b as usize) % n, (c as usize) % n);
+            if l > r {
+                std::mem::swap(&mut l, &mut r);
+            }
+            total += fenwick.range(l, r);
+        }
+    }
+
+    println!("{}", total);
+    println!("UPDATES {}", updates);
+}
+'''
+hints = [
+  "Build the tree by calling add once per initial value. The O(n) bottom-up build is a nice optimisation and is not what the clock is testing.",
+  "i & i.wrapping_neg() isolates the lowest set bit. Adding it walks up the tree; subtracting it walks down.",
+  "range(l, r) is prefix(r + 1) - prefix(l), and getting that pair of off-by-ones right is most of the debugging.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 6 1\n",            expect = "4112\nUPDATES 3\n",                 visible = true },
+  { name = "no-ups", stdin = "5 4 9\n",            expect = "4458\nUPDATES 0\n",                 visible = false },
+  { name = "mid",    stdin = "1000 2000 3\n",      expect = "249603264\nUPDATES 987\n",          visible = false },
+  { name = "big",    stdin = "500000 4000000 7\n", expect = "500026173039045\nUPDATES 2001469\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id           = "rust.hacker.31.palindrome"
+node         = 30
+title        = "THE SAME BACKWARDS"
+difficulty   = 4
+time_limit_s = 1200
+story        = "Top-twenty question, asked in some form in most screens, and the one most people have written once and never understood."
+concepts     = ["strings", "two-pointers", "complexity"]
+requires     = ["rust.hacker.30.range-queries"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Standard input is `n alphabet seed`. Build the string yourself:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+s[i] = 'a' + (next() % alphabet)      for i in 0..n
+```
+
+Print the length of the longest palindromic substring, then `AT <index>` — the
+0-based start of the **leftmost** one of that length.
+
+```
+input:  12 3 5
+output: 5
+        AT 1
+```
+
+Expand around each centre. There are `2n - 1` centres, not `n`: every
+character is a centre for the odd-length palindromes, and every gap between
+two characters is a centre for the even-length ones. Forgetting the gaps is
+why a correct-looking solution returns `1` on `abba`.
+
+**What the tests do and do not enforce**, plainly. One hidden case is
+`n = 20000` over a two-letter alphabet: that rejects the `O(n³)` answer —
+check every substring, test each for being a palindrome — which does not
+finish in five seconds. Another is `n = 20000` over a **one**-letter alphabet,
+which is the worst case for expand-around-centre and makes it do its full
+`O(n²)` work; it takes about a tenth of a second and passes comfortably.
+
+So: the tests reject cubic and accept quadratic. They do **not** demand
+Manacher's algorithm, which is the `O(n)` answer. Know that it exists and what
+it does, because "and can you do better than quadratic?" is the follow-up this
+question is usually asked to set up.
+'''
+starter      = '''
+use std::io::Read;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, alphabet, seed) = (p[0] as usize, p[1], p[2]);
+
+    let mut rng = Rng(seed);
+    let s: Vec<u8> = (0..n)
+        .map(|_| b'a' + (rng.next() % alphabet) as u8)
+        .collect();
+
+    // only the odd centres, so every even-length palindrome is invisible
+    let (mut best_len, mut best_start) = (0usize, 0usize);
+    for centre in 0..n {
+        let (mut i, mut j) = (centre as i64, centre as i64);
+        while i >= 0 && (j as usize) < n && s[i as usize] == s[j as usize] {
+            i -= 1;
+            j += 1;
+        }
+        let len = (j - i - 1) as usize;
+        if len > best_len {
+            best_len = len;
+            best_start = (i + 1) as usize;
+        }
+    }
+
+    println!("{}", best_len);
+    println!("AT {}", best_start);
+}
+'''
+solution     = '''
+use std::io::Read;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, alphabet, seed) = (p[0] as usize, p[1], p[2]);
+
+    let mut rng = Rng(seed);
+    let s: Vec<u8> = (0..n)
+        .map(|_| b'a' + (rng.next() % alphabet) as u8)
+        .collect();
+
+    let (mut best_len, mut best_start) = (0usize, 0usize);
+    let mut expand = |mut i: i64, mut j: i64, best_len: &mut usize, best_start: &mut usize| {
+        while i >= 0 && (j as usize) < n && s[i as usize] == s[j as usize] {
+            i -= 1;
+            j += 1;
+        }
+        // i and j have each stepped one too far
+        let start = (i + 1) as usize;
+        let len = (j - i - 1) as usize;
+        if len > *best_len {
+            *best_len = len;
+            *best_start = start;
+        }
+    };
+
+    for centre in 0..n {
+        // odd length: one character at the middle
+        expand(centre as i64, centre as i64, &mut best_len, &mut best_start);
+        // even length: the gap to the right of it
+        expand(centre as i64, centre as i64 + 1, &mut best_len, &mut best_start);
+    }
+
+    println!("{}", best_len);
+    println!("AT {}", best_start);
+}
+'''
+hints = [
+  "Two calls per centre: (c, c) for odd lengths and (c, c + 1) for even ones. The starter is missing the second.",
+  "When the loop stops, i and j have both moved one past the palindrome — so it starts at i + 1 and its length is j - i - 1.",
+  "Only update on a strictly longer palindrome, and the leftmost of each length is the one you keep, which is what AT is asking for.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "12 3 5\n",    expect = "5\nAT 1\n",         visible = true },
+  { name = "one",     stdin = "1 4 2\n",     expect = "1\nAT 0\n",         visible = false },
+  { name = "random",  stdin = "20000 2 9\n", expect = "41\nAT 2166\n",     visible = false },
+  { name = "all-one", stdin = "20000 1 9\n", expect = "20000\nAT 0\n",     visible = false },
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id           = "rust.hacker.32.modular"
+node         = 31
+title        = "MODULO ONE BILLION AND SEVEN"
+difficulty   = 5
+time_limit_s = 1500
+story        = "The phrase appears at the bottom of the statement and half the room does not know what it is asking them to do."
+concepts     = ["math", "complexity", "recursion"]
+requires     = ["rust.hacker.31.palindrome"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Standard input is `n q seed`. Generate `q` queries, in wrapping `u64`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for each of the q queries:
+    a = next() % (n + 1)
+    b = next() % (a + 1)          # so 0 <= b <= a <= n
+```
+
+For each query compute the binomial coefficient `C(a, b)` **modulo
+1000000007**. Print the sum of all `q` answers, itself modulo `1000000007`,
+then `LAST <the final query's answer>`.
+
+```
+input:  10 5 3
+output: 209
+        LAST 1
+```
+
+`C(a, b)` has hundreds of thousands of digits at these sizes, so it is never
+computed and then reduced — every multiplication is reduced as you go. The
+problem is the division: `a! / (b! (a-b)!)` has no meaning in modular
+arithmetic. What replaces it is the **modular inverse**, and because
+`1000000007` is prime, Fermat's little theorem gives it to you:
+`inverse(v) = v^(p-2) mod p`, computed by fast exponentiation in about thirty
+squarings.
+
+So: precompute `factorial[0..=n]` once, and answer each query as
+`f[a] * inv(f[b]) * inv(f[a-b])`.
+
+**The complexity here is enforced.** One hidden case is `n = 200000`,
+`q = 200000`. Computing each coefficient independently — multiply `b` terms,
+divide by `b` terms, one modular inverse each — does not finish in the five
+second run limit; that is the starter. One shared factorial table finishes in
+about forty milliseconds. Both measured on this machine.
+
+Every intermediate is a product of two values below `2^30`, so it fits in an
+`i64` and nothing overflows. In a language with 32-bit `int` it would not, and
+that is the other half of why this question gets asked.
+'''
+starter      = '''
+use std::io::Read;
+
+const P: i64 = 1_000_000_007;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+fn power(mut base: i64, mut exp: i64) -> i64 {
+    let mut result = 1i64;
+    base %= P;
+    while exp > 0 {
+        if exp & 1 == 1 {
+            result = result * base % P;
+        }
+        base = base * base % P;
+        exp >>= 1;
+    }
+    result
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, q, seed) = (p[0] as usize, p[1] as usize, p[2]);
+
+    let mut rng = Rng(seed);
+    let (mut sum, mut last) = (0i64, 0i64);
+    for _ in 0..q {
+        let a = (rng.next() as usize) % (n + 1);
+        let b = (rng.next() as usize) % (a + 1);
+
+        // correct, and far too slow: b multiplications and a modular inverse
+        // for every single query
+        let mut numerator = 1i64;
+        let mut denominator = 1i64;
+        for k in 0..b {
+            numerator = numerator * (((a - k) as i64) % P) % P;
+            denominator = denominator * (((k + 1) as i64) % P) % P;
+        }
+        let value = numerator * power(denominator, P - 2) % P;
+
+        sum = (sum + value) % P;
+        last = value;
+    }
+
+    println!("{}", sum);
+    println!("LAST {}", last);
+}
+'''
+solution     = '''
+use std::io::Read;
+
+const P: i64 = 1_000_000_007;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+/// base^exp mod P, by repeated squaring: about 30 steps for a 30-bit exponent.
+fn power(mut base: i64, mut exp: i64) -> i64 {
+    let mut result = 1i64;
+    base %= P;
+    while exp > 0 {
+        if exp & 1 == 1 {
+            result = result * base % P;
+        }
+        base = base * base % P;
+        exp >>= 1;
+    }
+    result
+}
+
+/// P is prime, so Fermat gives v^(P-2) as the inverse of v.
+fn inverse(v: i64) -> i64 {
+    power(v, P - 2)
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, q, seed) = (p[0] as usize, p[1] as usize, p[2]);
+
+    // one shared factorial table for every query
+    let mut factorial = vec![1i64; n + 1];
+    for i in 1..=n {
+        factorial[i] = factorial[i - 1] * (i as i64) % P;
+    }
+
+    let mut rng = Rng(seed);
+    let (mut sum, mut last) = (0i64, 0i64);
+    for _ in 0..q {
+        let a = (rng.next() as usize) % (n + 1);
+        let b = (rng.next() as usize) % (a + 1);
+
+        let value = factorial[a] * inverse(factorial[b]) % P * inverse(factorial[a - b]) % P;
+
+        sum = (sum + value) % P;
+        last = value;
+    }
+
+    println!("{}", sum);
+    println!("LAST {}", last);
+}
+'''
+hints = [
+  "Reduce after every multiplication, never at the end. i64 holds the product of two values below P; it does not hold a factorial.",
+  "inverse(v) is power(v, P - 2), and it only works because P is prime — that is the whole content of Fermat's little theorem here.",
+  "Precomputing inverse factorials as well, backwards from inverse(factorial[n]), removes the two power() calls per query. Not needed to pass, and worth saying out loud.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5 3\n",           expect = "209\nLAST 1\n",                 visible = true },
+  { name = "tiny",   stdin = "1 1 1\n",            expect = "1\nLAST 1\n",                   visible = false },
+  { name = "mid",    stdin = "100 50 4\n",         expect = "707023692\nLAST 689856059\n",   visible = false },
+  { name = "big",    stdin = "200000 200000 11\n", expect = "390914381\nLAST 201898882\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id           = "rust.hacker.33.grid-paths"
+node         = 32
+title        = "ACROSS THE BLOCK, NEVER BACKWARDS"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The delivery grid with three streets closed for bamboo. How many ways across, and which way is cheapest."
+concepts     = ["dynamic-programming", "matrix", "math"]
+requires     = ["rust.hacker.32.modular"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Standard input is `r c pct seed`. Build the grid yourself, in row-major order,
+drawing **two** values for every cell:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for i in 0..r, for j in 0..c:
+    a = next(); b = next()
+    the cell is BLOCKED if  a % 100 < pct,
+        except (0,0) and (r-1,c-1), which are never blocked
+    the cell costs  (b % 9) + 1
+```
+
+Move only **right** or **down**, through open cells. Print:
+
+1. `PATHS <k>` — how many distinct routes from `(0,0)` to `(r-1,c-1)`, modulo
+   `1000000007`
+2. `MIN <cost>` — the smallest total cost of a route, counting both endpoints,
+   or `-1` if there is no route
+
+```
+input:  3 4 30 2
+output: PATHS 9
+        MIN 27
+```
+
+One pass in row-major order does both: a cell's routes are the sum of the
+routes into it from above and from the left, and its best cost is its own cost
+plus the cheaper of those two. Because you only ever move right or down, the
+two cells you need are always already finished — which is why this needs no
+recursion and no visited set.
+
+The `PATHS` count is taken modulo `1000000007` for the usual reason: on the
+`1000 × 1000` hidden case the true number has over six hundred digits. Reduce
+as you add.
+
+**What the big case enforces:** it rejects any answer that enumerates routes.
+There are more of them than there are atoms in the room. It does not
+distinguish a bottom-up table from a memoised recursion — both are linear in
+the number of cells and both pass comfortably.
+'''
+starter      = '''
+use std::io::Read;
+
+const P: i64 = 1_000_000_007;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (rows, cols, pct, seed) = (p[0] as usize, p[1] as usize, p[2], p[3]);
+
+    let mut rng = Rng(seed);
+    let mut open = vec![vec![true; cols]; rows];
+    let mut cost = vec![vec![0i64; cols]; rows];
+    for i in 0..rows {
+        for j in 0..cols {
+            let a = rng.next();
+            let b = rng.next();
+            let corner = (i == 0 && j == 0) || (i == rows - 1 && j == cols - 1);
+            if !corner && a % 100 < pct {
+                open[i][j] = false;
+            }
+            cost[i][j] = (b % 9 + 1) as i64;
+        }
+    }
+
+    // fill `ways` and `best` in row-major order
+    let ways = vec![vec![0i64; cols]; rows];
+    let best = vec![vec![i64::MAX; cols]; rows];
+    let _ = (&open, &cost, &ways, &best);
+
+    println!("PATHS 0");
+    println!("MIN -1");
+}
+'''
+solution     = '''
+use std::io::Read;
+
+const P: i64 = 1_000_000_007;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (rows, cols, pct, seed) = (p[0] as usize, p[1] as usize, p[2], p[3]);
+
+    let mut rng = Rng(seed);
+    let mut open = vec![vec![true; cols]; rows];
+    let mut cost = vec![vec![0i64; cols]; rows];
+    for i in 0..rows {
+        for j in 0..cols {
+            let a = rng.next();
+            let b = rng.next();
+            let corner = (i == 0 && j == 0) || (i == rows - 1 && j == cols - 1);
+            if !corner && a % 100 < pct {
+                open[i][j] = false;
+            }
+            cost[i][j] = (b % 9 + 1) as i64;
+        }
+    }
+
+    let mut ways = vec![vec![0i64; cols]; rows];
+    let mut best = vec![vec![i64::MAX; cols]; rows];
+
+    for i in 0..rows {
+        for j in 0..cols {
+            if !open[i][j] {
+                continue;
+            }
+            if i == 0 && j == 0 {
+                ways[0][0] = 1;
+                best[0][0] = cost[0][0];
+                continue;
+            }
+            let mut routes = 0i64;
+            let mut cheapest = i64::MAX;
+            if i > 0 && open[i - 1][j] {
+                routes = (routes + ways[i - 1][j]) % P;
+                cheapest = cheapest.min(best[i - 1][j]);
+            }
+            if j > 0 && open[i][j - 1] {
+                routes = (routes + ways[i][j - 1]) % P;
+                cheapest = cheapest.min(best[i][j - 1]);
+            }
+            ways[i][j] = routes;
+            best[i][j] = if cheapest == i64::MAX {
+                i64::MAX
+            } else {
+                cheapest + cost[i][j]
+            };
+        }
+    }
+
+    println!("PATHS {}", ways[rows - 1][cols - 1]);
+    println!(
+        "MIN {}",
+        if best[rows - 1][cols - 1] == i64::MAX {
+            -1
+        } else {
+            best[rows - 1][cols - 1]
+        }
+    );
+}
+'''
+hints = [
+  "Draw both values for every cell, including the two corners — the generator does not skip them, it only refuses to block them.",
+  "An open cell with no open neighbour above or left is reachable by zero routes and has no best cost; keep i64::MAX meaning `unreachable` and guard the addition.",
+  "The destination can be open and still unreachable, which is exactly when PATHS is 0 and MIN is -1. One of the hidden cases is that.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 4 30 2\n",        expect = "PATHS 9\nMIN 27\n",          visible = true },
+  { name = "one-cell", stdin = "1 1 0 1\n",        expect = "PATHS 1\nMIN 4\n",           visible = false },
+  { name = "walled",  stdin = "5 5 60 4\n",        expect = "PATHS 0\nMIN -1\n",          visible = false },
+  { name = "big",     stdin = "1000 1000 20 13\n", expect = "PATHS 442990855\nMIN 6890\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id           = "rust.hacker.34.stable-sort"
+node         = 33
+title        = "TIES KEEP THEIR PLACE"
+difficulty   = 4
+time_limit_s = 900
+story        = "Two riders finished on the same score and the leaderboard puts them in a different order every time it redraws."
+concepts     = ["sorting", "slices", "complexity"]
+requires     = ["rust.hacker.33.grid-paths"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Standard input is `n buckets seed`. Build `n` riders, where rider `i` has
+index `i` and a score:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+score[i] = next() % buckets           for i in 0..n
+```
+
+Sort the riders by score **descending**. Riders with the same score must keep
+the order they arrived in. Print their indices, space separated, then
+`TIES <k>` — how many adjacent pairs in your sorted order have equal scores.
+
+```
+input:  8 3 5
+output: 1 5 6 0 2 3 4 7
+        TIES 6
+```
+
+`buckets` is small, so almost everything is a tie, and the answer is almost
+entirely decided by what happens to them.
+
+**This is the quest about knowing which sort you are holding.**
+`sort_by_key` is **stable** — equal elements keep their relative order.
+`sort_unstable_by_key` is not, and on a real input it visibly will not: it is
+pattern-defeating quicksort, it is usually faster, and it makes no promise
+about ties whatsoever. The starter uses it, and the hidden cases are large
+enough that it demonstrably scrambles them. (At `n = 8` it happens not to —
+which is why a small test would have proved nothing, and why the small case
+here is the *visible* one rather than the one that judges you.)
+
+There are two correct answers and you should be able to give both. Use a
+stable sort. **Or** use the unstable one and make the comparison **total** —
+sort by `(Reverse(score), index)` so no two elements ever compare equal and
+stability stops being a question. The second is what to reach for by default;
+an unstable sort has nothing to prove when the order is fully specified.
+'''
+starter      = '''
+use std::io::Read;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, buckets, seed) = (p[0] as usize, p[1], p[2]);
+
+    let mut rng = Rng(seed);
+    // (score, original index)
+    let mut riders: Vec<(i64, usize)> = (0..n)
+        .map(|i| ((rng.next() % buckets) as i64, i))
+        .collect();
+
+    // unstable, and the comparison ignores the index — so ties are scrambled
+    riders.sort_unstable_by_key(|r| std::cmp::Reverse(r.0));
+
+    let order: Vec<String> = riders.iter().map(|r| r.1.to_string()).collect();
+    let ties = riders.windows(2).filter(|w| w[0].0 == w[1].0).count();
+    println!("{}", order.join(" "));
+    println!("TIES {}", ties);
+}
+'''
+solution     = '''
+use std::io::Read;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let p: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, buckets, seed) = (p[0] as usize, p[1], p[2]);
+
+    let mut rng = Rng(seed);
+    // (score, original index)
+    let mut riders: Vec<(i64, usize)> = (0..n)
+        .map(|i| ((rng.next() % buckets) as i64, i))
+        .collect();
+
+    // sort_by_key is stable, so equal scores keep the order they arrived in.
+    // The equally correct alternative is
+    //     riders.sort_unstable_by_key(|r| (std::cmp::Reverse(r.0), r.1));
+    // which makes the comparison total and so needs no stability at all.
+    riders.sort_by_key(|r| std::cmp::Reverse(r.0));
+
+    let order: Vec<String> = riders.iter().map(|r| r.1.to_string()).collect();
+    let ties = riders.windows(2).filter(|w| w[0].0 == w[1].0).count();
+    println!("{}", order.join(" "));
+    println!("TIES {}", ties);
+}
+'''
+hints = [
+  "One word: sort_unstable_by_key becomes sort_by_key. That is the stable answer.",
+  "The other answer keeps the unstable sort and sorts by (Reverse(score), index) — a total order, so there are no ties left to be unstable about.",
+  "TIES counts adjacent equal scores in the finished order, and that count is the same whichever of the two you wrote — it is the index order that gives you away.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 3 5\n",   expect = "1 5 6 0 2 3 4 7\nTIES 6\n", visible = true },
+  { name = "three",  stdin = "3 2 1\n",   expect = "1 0 2\nTIES 1\n",           visible = false },
+  { name = "sixty",  stdin = "60 3 11\n", expect = "2 9 11 12 14 15 16 19 22 23 31 33 36 38 47 48 52 56 57 58 0 1 4 5 6 13 17 18 20 24 27 32 34 35 39 40 42 44 45 46 50 51 53 54 59 3 7 8 10 21 25 26 28 29 30 37 41 43 49 55\nTIES 57\n", visible = false },
+  { name = "many",   stdin = "200 10 4\n", expect = "30 32 45 51 62 71 83 86 87 94 103 118 128 130 142 149 164 170 172 176 180 190 191 194 18 19 20 23 31 38 48 74 91 113 116 129 141 146 148 168 175 187 5 15 17 24 28 50 58 68 88 102 110 124 132 137 188 193 196 198 199 0 9 12 25 26 46 49 52 55 70 75 78 84 97 108 112 134 156 158 163 4 10 21 35 42 73 99 104 106 107 114 120 121 125 131 136 150 160 166 173 174 177 2 8 11 13 16 39 40 41 54 65 72 82 93 95 119 123 143 169 178 179 195 197 7 27 36 47 56 61 64 67 69 76 100 126 140 153 157 161 162 181 1 37 57 60 77 85 92 96 98 105 111 117 133 135 138 159 167 186 192 3 6 14 43 53 59 63 66 80 81 101 109 115 122 127 144 145 151 154 155 165 171 183 189 22 29 33 34 44 79 89 90 139 147 152 182 184 185\nTIES 190\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 34  BOSS
 [[quest]]
 id           = "rust.hacker.28.lru"
-node         = 28
+node         = 34
 title        = "THE WHITEBOARD"
 difficulty   = 5
 time_limit_s = 1800
 story        = "Room 7-32, last question, and the interviewer turns the monitor off. No highlighting, no completion, a clock."
 concepts     = ["collections", "linked-lists", "complexity"]
-requires     = ["rust.hacker.27.commands", "rust.hacker.24.inversions"]
+requires     = ["rust.hacker.34.stable-sort", "rust.hacker.24.inversions"]
 map          = { x = 0.618, y = 0.845, kind = "boss" }
 brief        = '''
 Line one is `cap q`. The next `q` lines are `PUT <key> <value>` or

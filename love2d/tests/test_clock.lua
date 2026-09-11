@@ -88,6 +88,35 @@ return function()
     T.eq(state.remaining, 540)
   end)
 
+  T.case("a null pair is normal, not an error", function()
+    -- Two rules BE implemented, and both produce a null pair a client meets
+    -- in ordinary play rather than as a fault:
+    --
+    --   * a quest **cleared before the clock existed** never grows an
+    --     `opened_at` — nothing is invented after the fact;
+    --   * **re-entering a cleared quest is untimed**, so `deadline_at` comes
+    --     back null and there is simply no clock.
+    --
+    -- Either way the screen shows nothing, which is the correct nothing.
+    local json = require("src.json")
+    local cleared_before_clocks = {
+      id = "rust.hacker.01.two-sum", state = "cleared",
+      time_limit_s = 600, opened_at = json.null, deadline_at = json.null,
+    }
+    T.eq(Clock.read(cleared_before_clocks), nil)
+
+    local re_entered = {
+      id = "rust.hacker.01.two-sum", state = "cleared",
+      time_limit_s = 600,   -- the quest still HAS a limit
+      -- …but this visit is not being timed.
+    }
+    T.eq(Clock.read(re_entered), nil,
+      "a limit with no deadline is not a clock — it is a fact about the quest")
+
+    -- And a half-populated pair is not half a clock.
+    T.eq(Clock.read({ time_limit_s = 600, opened_at = "2026-09-11T04:00:00Z" }), nil)
+  end)
+
   T.section("clock — the phases")
 
   T.case("calm for most of its life, which is the whole point", function()
@@ -184,6 +213,23 @@ return function()
     T.eq(Ease.pulse(9, 0.5), 0, "and it does not come back")
     T.eq(Ease.pulse(nil), 0)
     T.eq(Ease.pulse(-1), 0)
+  end)
+
+  T.section("clock — shifting the view of now")
+
+  T.case("shift moves now and leaves the deadline alone", function()
+    -- The drive affordance, and the property that makes it honest: the
+    -- deadline is untouched, so a screenshot taken under a shift is a
+    -- screenshot of the server's own pair seen from a different instant.
+    local q = timed(600)
+    local base = Clock.read(q, OPEN + 60)
+    T.eq(base.remaining, 540)
+    Clock.shift(120)
+    T.eq(Clock.shifted(), 120)
+    -- An explicit `now` still wins, so the pure path is unaffected.
+    T.eq(Clock.read(q, OPEN + 60).remaining, 540)
+    Clock.shift(0)
+    T.eq(Clock.shifted(), 0)
   end)
 
   T.section("clock — no love in the clock")

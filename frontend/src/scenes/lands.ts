@@ -196,6 +196,10 @@ export class LandsScene implements Scene {
     );
   }
 
+  controls(): Buttons[] {
+    return [this.landBtns, this.catBtns];
+  }
+
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
     if (phase === "move") {
       this.landBtns.hovered = this.landBtns.hit(x, y)?.id ?? null;

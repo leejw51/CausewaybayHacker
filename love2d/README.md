@@ -65,6 +65,7 @@ official release from GitHub instead, and `make run` will use a `love` on
 | **F2** | in a quest: **FORMAT** (`rustfmt` / `gofmt`, on the server) |
 | **F6** … **F9** | in a quest: reset · hint · log · `$EDITOR` |
 | **TAB** / **Q** | on the map: switch land · switch category |
+| **P** | the playground — Mei's desk, from the map or the land select |
 | **TAB** / **ESC** | indent · back |
 
 `F` is only a shortcut on screens that are not taking text; in the editor and
@@ -92,6 +93,22 @@ what you are actually struggling with (PROTOCOL §4.9b, SPEC §7).
 Runs and submits share one execution slot: while either is in flight both
 buttons are disabled, and the client refuses the second locally rather than
 making you wait for a round trip to learn it.
+
+### The playground
+
+**P**, from the map or the land select. A scratchpad: no quest, no tests, no
+verdict — write whatever you like in Rust or Go, run it, and it prints what it
+prints. Snippets are saved **server-side**, so the same scratchpad opens in the
+browser and here; autosave is on a four-second timer and `playground.save` is
+idempotent by contract.
+
+Nothing here is scored, and the screen says so by how it looks: no red, no
+banner, no verdict colours, no rejection chime, and the outcome line describes
+what the program did — `ran`, `did not compile`, `stopped early` — rather than
+judging it. That is not decoration. PROTOCOL §4.9c makes a playground run
+deliberately unrecorded *because* this is where somebody writes something
+broken on purpose to see what the compiler says; a screen that scolded them
+for it would be arguing with its own contract.
 
 ### The clock
 

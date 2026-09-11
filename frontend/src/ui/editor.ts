@@ -79,6 +79,35 @@ const base: Extension = [
   }),
 ];
 
+/**
+ * The smallest edit that turns `cur` into `next`: common prefix and suffix
+ * trimmed off, the difference in the middle.
+ *
+ * Exported and pure because it is the half of "FORMAT keeps your caret" that
+ * is ours — CodeMirror maps a selection through an edit, so the narrower the
+ * edit, the less the caret can move. A whole-document replacement is a legal
+ * edit that moves every caret; this is the same result with the caret left
+ * alone. `null` means the two strings are identical and nothing should be
+ * dispatched at all.
+ */
+export function narrowEdit(
+  cur: string,
+  next: string,
+): { from: number; to: number; insert: string } | null {
+  if (cur === next) return null;
+  let a = 0;
+  while (a < cur.length && a < next.length && cur[a] === next[a]) a++;
+  let b = 0;
+  while (
+    b < cur.length - a &&
+    b < next.length - a &&
+    cur[cur.length - 1 - b] === next[next.length - 1 - b]
+  ) {
+    b++;
+  }
+  return { from: a, to: cur.length - b, insert: next.slice(a, next.length - b) };
+}
+
 export class Editor {
   readonly dom = document.createElement("div");
   private view: EditorView;
@@ -125,22 +154,9 @@ export class Editor {
    * of the span rather than at the top of the file.
    */
   replaceAll(next: string): void {
-    const cur = this.view.state.doc.toString();
-    if (cur === next) return;
-    let a = 0;
-    while (a < cur.length && a < next.length && cur[a] === next[a]) a++;
-    let b = 0;
-    while (
-      b < cur.length - a &&
-      b < next.length - a &&
-      cur[cur.length - 1 - b] === next[next.length - 1 - b]
-    ) {
-      b++;
-    }
-    this.view.dispatch({
-      changes: { from: a, to: cur.length - b, insert: next.slice(a, next.length - b) },
-      scrollIntoView: true,
-    });
+    const edit = narrowEdit(this.view.state.doc.toString(), next);
+    if (!edit) return;
+    this.view.dispatch({ changes: edit, scrollIntoView: true });
   }
 
   get source(): string {
