@@ -303,10 +303,27 @@ jobs:
       # the cache the generator is then told to share (it builds under a
       # temporary cache of its own otherwise, which is right for a laptop
       # and wrong for a runner).
+      # ThreadSanitizer, which Go's race runtime is built on, assumes the
+      # address-space layout the kernel's default ASLR entropy gives it.
+      # Ubuntu's runner images raise `vm.mmap_rnd_bits` to 32, and under
+      # that a `-race` binary can hang or die with "unexpected memory
+      # mapping" — which is what a ten-minute `go run -race` of a
+      # twenty-line fixture was. 28 is the value TSan was written for.
+      - name: Give ThreadSanitizer the address space it expects
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
       - name: Warm the race-instrumented standard library
         run: |
           go build -race std
           echo "CWBH_GOCACHE=$(go env GOCACHE)" >> "$GITHUB_ENV"
+
+      # The data-race fixture on its own first, with its stderr in the log,
+      # so a race runtime that cannot start on this runner says why here
+      # rather than as a timeout inside the generator.
+      - name: The race fixture, alone
+        run: |
+          d=$(mktemp -d) && cp tests/vectors/mistakes/go/data-race.go "$d/main.go"
+          cd "$d" && timeout 120 go run -race main.go; echo "exit=$?"
 
       # Every §7.1 taxonomy fixture still compiles to the code it claims.
       - run: python3 tests/vectors/mistakes/generate.py --check
