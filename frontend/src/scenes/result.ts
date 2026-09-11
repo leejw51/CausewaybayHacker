@@ -161,9 +161,12 @@ export class ResultScene implements Scene {
       this.held = true;
       this.hold = 0.13;
     }
-    // The hit lands with the word, not on entry: the shake is punctuation for
-    // the verdict, and punctuation before the sentence is just noise.
-    if (!this.shook && !this.passed && this.word.raw >= 0.5) {
+    // The hit lands with the word — but not before the screen has finished
+    // arriving. The scene change is itself a movement across the whole frame,
+    // and a shake underneath it is simply not visible: the first take of this
+    // caught the result panel still sliding in and nothing read as impact at
+    // all. So it waits for the transition to be over and then hits.
+    if (!this.shook && !this.passed && this.word.raw >= 0.5 && this.t >= seconds("scene")) {
       this.shook = true;
       this.app.shake(this.trauma());
     }

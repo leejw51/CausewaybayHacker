@@ -6,43 +6,39 @@ import { fileURLToPath } from "node:url";
 /**
  * The seam between this suite and the game.
  *
- * ## What changed, and why this file looks different
+ * ## What FE shipped, and why it was the better half
  *
- * The original version of this suite asked FE for a driving API —
- * `view()`, `login()`, `setSource()`, `submit()`. What landed instead is
- * `frontend/src/dev/capture.ts`: a **freeze-and-capture** hook, built for
- * screenshots. It gives `scene()` (the six screen names, exactly), plus
+ * The original version of this suite asked for a driving API — `view()`,
+ * `login()`, `setSource()`, `submit()`. What landed instead is
+ * `frontend/src/dev/capture.ts`: a **freeze-and-capture** hook built for
+ * screenshots, giving `scene()` (the six screen names, exactly), plus
  * `settle()`, `step()`, `freeze()`, `orient()` and `png()`.
  *
- * That turns out to be the better half. `settle()` runs the game at a fixed
- * 1/60 step until every transition is finished and then stops the loop, so a
- * canvas game becomes *deterministic* — which is the thing a browser test
- * actually cannot do for itself. The driving half is not needed at all,
- * because the game is already drivable:
- *
- * * the seed field is a real `<textarea class="cwb-field">`,
- * * the editor is CodeMirror, whose lines are real DOM,
- * * every screen is reachable by keyboard or by a click on the canvas.
+ * That is the half worth having. `settle()` runs the game at a fixed 1/60
+ * step until every transition has finished, which makes a canvas game
+ * **deterministic** — the thing a browser test genuinely cannot do for
+ * itself. The driving half was not needed, because the game is already
+ * drivable: the seed field is a real `<textarea class="cwb-field">`, the
+ * editor is CodeMirror with real DOM lines, and every screen is reachable by
+ * keyboard or by a click.
  *
  * So this suite drives the game the way a person does, and **verifies on the
- * wire**: a second websocket session, opened as the same wallet, asks the
- * server what it believes. That is a stronger assertion than any view model
- * FE could have exposed — it tests the seam rather than the client's own
- * opinion of itself. A frontend that draws CLEARED over a server that never
- * heard about it fails here and passes every unit test on both sides.
+ * wire** — a second websocket session, opened as the same wallet, asks the
+ * server what it actually believes. That is a stronger assertion than any
+ * view model could support: a frontend that draws CLEARED over a server that
+ * never heard about it fails here and passes every unit test on both sides.
  *
  * ## The keys, read out of `frontend/src`
  *
  * | key | what |
  * | --- | --- |
- * | `Ctrl/Cmd+Enter` | submit — the login field and the editor both. A bare Enter in either inserts a newline, deliberately, so a pasted phrase does not fire a login halfway through |
+ * | `Ctrl/Cmd+Enter` | submit — the login field and the editor both. A bare Enter in either inserts a newline, deliberately, so a phrase pasted across two lines does not fire a login halfway through |
  * | `F1` | pin the orientation |
  * | `F3` | log out, from anywhere, including mid-quest |
- * | `←` `→` | lands: switch RUST / GO |
+ * | `←` `→` | lands: toggle RUST / GO. There is no way to *set* it |
  * | `←` `→` `↑` `↓` | map: move between nodes |
  * | `Enter` | map: open the selected node; result: back to the map |
  * | `Escape` | back one screen |
- * | `R` | result: retry |
  *
  * Category selection is **pointer only** — `lands.key()` handles the land
  * toggle and nothing else — so `pickFirstCategory` clicks, and says so.
@@ -53,7 +49,7 @@ import { fileURLToPath } from "node:url";
 export const SCREENS = ["boot", "login", "lands", "map", "quest", "result"] as const;
 export type Screen = (typeof SCREENS)[number];
 
-/** `frontend/src/dev/capture.ts`, as this suite uses it. */
+/** `frontend/src/dev/capture.ts`, as much of it as this suite uses. */
 export interface CaptureApi {
   freeze(): void;
   resume(): void;
@@ -101,9 +97,9 @@ export interface Account {
  *
  * A **private key** rather than a mnemonic: the field takes "twelve words, or
  * 0x + 64 hex", and a key is one paste instead of twelve words through a
- * keystroke handler that FE unit-tests already cover. The key is derived at a
- * high index off the published BIP-39 all-zero mnemonic — still a published
- * phrase, still holds nothing, still somewhere no human browses.
+ * keystroke handler FE unit-tests already cover. Derived at a high index off
+ * the published BIP-39 all-zero mnemonic — still a published phrase, still
+ * holds nothing, still somewhere no human browses.
  */
 let freshN = 0;
 const freshBase = 2_000_000 + Math.floor(Math.random() * 1_000_000);
@@ -136,12 +132,7 @@ export function freshAccount(): Account {
 export function fixtureAccount(index = 0): Account {
   const m = JSON.parse(readFileSync(VECTORS, "utf8")).mnemonics[0];
   const a = m.accounts.find((x: { index: number }) => x.index === index);
-  return {
-    privateKey: a.private_key,
-    address: a.address,
-    lower: a.address_lower,
-    index,
-  };
+  return { privateKey: a.private_key, address: a.address, lower: a.address_lower, index };
 }
 
 // ------------------------------------------------------------ the driving
@@ -149,15 +140,13 @@ export function fixtureAccount(index = 0): Account {
 /**
  * Settle the game, read the screen, and hand the loop back.
  *
- * `settle()` runs the game at a fixed step until every transition has
- * finished and then **freezes** it — which is exactly right for a screenshot
- * and exactly wrong for a test that is going to carry on. A frozen app never
- * ticks again, so anything that arrives afterwards (a `quest.get` reply, and
- * with it the editor being shown) never gets drawn, and the next locator
- * waits thirty seconds for an element that is permanently hidden.
- *
- * So: settle for the determinism, then `resume()` so the game is still alive.
- * The one test that wants a still frame settles without resuming, on purpose.
+ * `settle()` runs until every transition has finished and then **freezes** —
+ * right for a screenshot, wrong for a test that is going to carry on. A
+ * frozen app never ticks again, so anything that arrives afterwards (a
+ * `quest.get` reply, and with it the editor being shown) is never drawn, and
+ * the next locator waits thirty seconds for an element that is permanently
+ * hidden. So: settle for the determinism, then `resume()`. The one test that
+ * wants a still frame settles without resuming, on purpose.
  */
 export async function scene(page: Page): Promise<string | null> {
   return page.evaluate(() => {
@@ -173,29 +162,18 @@ export async function scene(page: Page): Promise<string | null> {
 /**
  * The screen, without settling.
  *
- * `settle()` ticks 150 frames synchronously, which is the right price to pay
- * for an assertion and the wrong one to pay forty times inside a scan. The
- * name is correct either way — a scene is swapped in one go — so the only
- * thing skipping the settle costs is that a transition may still be playing,
- * which a probe does not care about.
+ * `settle()` ticks 150 frames synchronously, which is the right price for an
+ * assertion and the wrong one to pay a hundred times inside a click scan. The
+ * name is correct either way — a scene is swapped in one go.
  */
 export async function sceneNow(page: Page): Promise<string | null> {
   return page.evaluate(() => window.__cwbCapture?.scene() ?? null);
 }
 
-/**
- * Wait for a screen.
- *
- * Every poll settles first, which is what stops the flake: without it the
- * check lands in the middle of a transition and reads whichever scene the
- * tween happens to be between.
- */
+/** Wait for a screen. Every poll settles first, which is what stops the flake. */
 export async function atScreen(page: Page, want: Screen, timeout = 60_000): Promise<void> {
   await expect
-    .poll(async () => scene(page), {
-      timeout,
-      message: `waiting for the ${want} screen`,
-    })
+    .poll(async () => scene(page), { timeout, message: `waiting for the ${want} screen` })
     .toBe(want);
 }
 
@@ -205,9 +183,6 @@ export async function login(page: Page, account: Account): Promise<void> {
   const field = page.locator("textarea.cwb-field");
   await expect(field).toBeVisible();
   await field.fill(account.privateKey);
-  // A bare Enter inserts a newline on purpose (a phrase pasted across two
-  // lines must not fire a login halfway through); the accelerator is the only
-  // keystroke `App` forwards out of the overlay.
   await field.press("ControlOrMeta+Enter");
   await atScreen(page, "lands");
 }
@@ -219,57 +194,39 @@ export async function logout(page: Page): Promise<void> {
 }
 
 /**
- * Click the first category row, which is BASIC.
+ * Click the first category row, and report where the click landed.
  *
  * `lands.key()` handles the land toggle and nothing else, so a category is
  * reachable only with the pointer — and the rows are canvas-drawn, so there
- * is no selector for them. The rows are laid out top-to-bottom in the fixed
- * order `basic`, `advanced`, `hacker` in the right-hand panel, so the first
- * one that takes a click is BASIC.
+ * is no selector for them. Rows are drawn top-to-bottom in the fixed order
+ * `basic`, `advanced`, `hacker`, so the first row that takes a click is
+ * BASIC.
  *
- * Scanning rather than hard-coding a coordinate: a hard-coded point is a test
- * that breaks the next time the panel moves by four pixels, and it fails with
- * "expected map, got lands" rather than with anything useful.
+ * The geometry was measured twice, because guessing cost two matrix runs:
+ *   landscape — a right-hand panel, y ≈ 0.18 … 0.46
+ *   portrait  — full width and low, y ≈ 0.65 … 0.80
+ * The first version swept one x at 0.72 (landscape's panel) and the second
+ * capped its loop at y ≈ 0.55, so portrait's rows were never reached. The
+ * range is computed from the bounds now rather than from an iteration count
+ * somebody has to keep in step with them.
+ *
+ * The hit point is returned so a retry can click the *same* place instead of
+ * sweeping again — see `enterRustQuest` for why that matters.
  */
-export async function pickFirstCategory(page: Page): Promise<void> {
+export async function pickFirstCategory(page: Page): Promise<{ x: number; y: number }> {
   await atScreen(page, "lands");
   const box = await page.locator("canvas#game").boundingBox();
   if (!box) throw new Error("the game canvas has no box");
 
-  // A grid, not a column.
-  //
-  // The first version scanned one x at 72% of the width, which is where the
-  // category panel sits in *landscape*. Portrait stacks the layout, so the
-  // panel is somewhere else entirely and the scan found nothing — and the
-  // failure arrived four minutes into a matrix run, in the project that runs
-  // second. Two fifths of the width apart covers both shapes without caring
-  // which one this is.
-  //
-  // Rows are scanned top-to-bottom and the first hit wins, which is BASIC:
-  // the three rows are drawn in the fixed order `basic`, `advanced`,
-  // `hacker`. Starting the y sweep too low silently selects ADVANCED, and
-  // the only symptom is a quest that will not clear — so it starts above the
-  // first row (measured at ≈0.18 in landscape) and steps finely.
-  // Sweep the whole plate, in both axes.
-  //
-  // Measured, twice, because guessing cost two matrix runs:
-  //   landscape — the rows are a right-hand panel, y ≈ 0.18 … 0.46
-  //   portrait  — the rows are full width and *low*, y ≈ 0.65 … 0.80
-  // The first version swept one x at 0.72 (landscape's panel) and the second
-  // capped its loop at y ≈ 0.55, so portrait's rows were never reached at
-  // all. The range is computed from the bounds now rather than from an
-  // iteration count somebody has to keep in step with them.
   const xs = [0.5, 0.72, 0.25];
-  const TOP = 0.08;
-  const BOTTOM = 0.95;
-  const STEP = 0.012;
-  for (let fy = TOP; fy <= BOTTOM; fy += STEP) {
+  for (let fy = 0.08; fy <= 0.95; fy += 0.012) {
     const y = box.y + box.height * fy;
     for (const fx of xs) {
-      await page.mouse.click(box.x + box.width * fx, y);
+      const x = box.x + box.width * fx;
+      await page.mouse.click(x, y);
       if ((await sceneNow(page)) === "map") {
         await atScreen(page, "map");
-        return;
+        return { x, y };
       }
     }
   }
@@ -288,17 +245,18 @@ export async function pickFirstCategory(page: Page): Promise<void> {
  * Pressing Enter once is not enough. `world.map` is an async fetch, and
  * `map.key()` returns early while `this.nodes` is still empty — so an Enter
  * that arrives between the scene transition and the reply is swallowed, and
- * the test sits on the map for ever waiting for a screen that was never
- * going to change. `settle()` cannot help: it drives the render loop, not
- * the network.
- *
- * So: press, look, press again. This is also what a person does.
+ * the test sits on the map for ever. `settle()` cannot help: it drives the
+ * render loop, not the network. So: press, look, press again. This is also
+ * what a person does.
  */
 export async function openSelectedNode(page: Page): Promise<void> {
   await atScreen(page, "map");
   for (let i = 0; i < 40; i++) {
     await page.keyboard.press("Enter");
-    if ((await scene(page)) === "quest") return;
+    if ((await sceneNow(page)) === "quest") {
+      await atScreen(page, "quest");
+      return;
+    }
     await page.waitForTimeout(250);
   }
   throw new Error(
@@ -320,22 +278,21 @@ export async function editorText(page: Page): Promise<string> {
 /**
  * Which quest did the UI just open?
  *
- * The scan in `pickFirstCategory` clicks its way down the lands plate, and
+ * The scan in `pickFirstCategory` clicks its way across the lands plate, and
  * some of those clicks land on the **land** buttons, which toggle RUST/GO.
  * Nothing on the page reports the current land, so the scan can arrive at a
  * perfectly good map of the wrong land — and the symptom, before this
  * existed, was a submission to `go.basic.01.package-main` while the test
- * asserted against `rust.basic.01.first-light`.
+ * asserted about `rust.basic.01.first-light`.
  *
  * The editor's contents are the answer: it opens with the quest's `starter`
  * (SPEC §12), and starters differ between quests and certainly between
- * languages. So: ask the wire for the starters of everything that is open,
- * and match. This turns "I hope the click went where I meant" into a fact.
+ * languages. So ask the wire for the starters of everything open, and match.
  */
 export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string | null> {
-  // The editor is populated by the `quest.get` reply, which is a round trip
-  // after the scene appears. Reading it too early gets an empty box and a
-  // confident `null`.
+  // The editor is filled by the `quest.get` reply, a round trip after the
+  // scene appears. Reading it too early gets an empty box and a confident
+  // `null`.
   await page
     .waitForFunction(
       () =>
@@ -348,7 +305,7 @@ export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string 
     .catch(() => undefined);
 
   // CodeMirror renders a zero-width space into an empty line and does its own
-  // thing with trailing whitespace, so compare on shape rather than on bytes.
+  // thing with trailing whitespace, so compare on shape rather than bytes.
   const flatten = (s: string) =>
     s
       .replace(/\u200b/g, "")
@@ -368,7 +325,7 @@ export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string 
       if (starter && starter === shown) return node.quest_id;
     }
   }
-  // Not a match, but the language is still a strong signal — and for the
+  // No exact match, but the language is still a strong signal, and for the
   // retry loop that is all that is needed.
   if (/^package\s+main\b/m.test(shown)) return "go.unknown";
   if (/\bfn\s+main\s*\(/.test(shown)) return "rust.unknown";
@@ -376,41 +333,51 @@ export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string 
 }
 
 /**
- * Reach an open RUST quest, whatever the lands scan does on the way.
+ * Reach an open RUST quest, whatever the lands scan does on the way, and
+ * report which quest it actually is.
  *
  * Rather than insisting the scan lands on RUST — which it cannot be made to
  * do reliably while the category rows are canvas-drawn and the land buttons
- * are in the sweep — this opens a quest, asks which one it actually is, and
- * toggles the land and tries again if it is the wrong one. Two attempts is
- * enough: there are two lands.
+ * sit in the sweep — this opens a quest, asks which one it is, and flips the
+ * land if it is the wrong one.
+ *
+ * The trick is that a retry clicks **the remembered point**, not a fresh
+ * sweep. A second sweep's stray clicks would toggle the land an unknown
+ * number of further times and the retry would be a coin flip; one remembered
+ * click toggles nothing, so `ArrowRight` is the only thing that moves the
+ * land and at most one flip is ever needed.
  */
 export async function enterRustQuest(page: Page, wire: Wire): Promise<string> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await pickFirstCategory(page);
+  let hit: { x: number; y: number } | null = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (hit === null) {
+      hit = await pickFirstCategory(page);
+    } else {
+      await page.mouse.click(hit.x, hit.y);
+      await atScreen(page, "map");
+    }
     await openSelectedNode(page);
     const id = await identifyOpenQuest(page, wire);
     if (id === "rust.unknown")
       throw new Error(
         "the browser opened a RUST quest whose starter matches no open quest " +
           "the wire knows about. Either the content on disk and the content " +
-          "in the database disagree (run `cwbhacker doctor`), or the editor " +
-          "is showing something other than the starter.",
+          "in the database disagree (`cwbhacker doctor`), or the editor is " +
+          "showing something other than the starter.",
       );
-    if (id?.startsWith("rust.")) return id;
-    // Back to the lands plate and flip the land. `lands.key` toggles on
-    // left/right and there is no way to *set* it, which is why this is a
-    // retry rather than a calculation.
+    if (id && id.startsWith("rust.")) return id;
+
     await page.keyboard.press("Escape"); // quest → map
     await atScreen(page, "map");
     await page.keyboard.press("Escape"); // map → lands
     await atScreen(page, "lands");
-    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight"); // toggle the land
   }
   throw new Error(
-    "could not reach a RUST quest in three attempts. The lands scan opens a " +
-      "map and `identifyOpenQuest` matches the editor's starter against the " +
-      "wire's quests; if that is returning null, the editor is empty or the " +
-      "starter no longer matches what `quest.get` sends.",
+    "could not reach a RUST quest in four attempts. `identifyOpenQuest` " +
+      "matches the editor's starter against the wire's quests; if it is " +
+      "returning null, the editor is empty or the starter no longer matches " +
+      "what `quest.get` sends.",
   );
 }
 
@@ -437,11 +404,10 @@ export async function submit(page: Page): Promise<void> {
 /**
  * A second opinion, from the server.
  *
- * The browser drives; this asks the server what it actually believes. It is
- * a small PROTOCOL.md client — the same idea as `tests/smoke/contract.mjs`,
- * cut down to the handful of calls this suite needs, and signing through
- * `cwbwallet` for the same reason: a fixture cannot cover a nonce the server
- * invented a moment ago.
+ * The browser drives; this asks the server what it believes. It is a small
+ * PROTOCOL.md client — the same idea as `tests/smoke/contract.mjs`, cut down
+ * to the calls this suite needs, signing through `cwbwallet` for the same
+ * reason: a fixture cannot cover a nonce the server invented a moment ago.
  */
 export class Wire {
   private ws!: WebSocket;
@@ -501,12 +467,11 @@ export class Wire {
 
   async ok(type: string, payload: Record<string, unknown> = {}): Promise<WirePayload> {
     const f = await this.call(type, payload);
-    if (f.type !== `${type}.ok`)
-      throw new Error(`${type} failed: ${JSON.stringify(f.payload)}`);
+    if (f.type !== `${type}.ok`) throw new Error(`${type} failed: ${JSON.stringify(f.payload)}`);
     return f.payload;
   }
 
-  /** The whole rust/basic map, as the server has it for this wallet. */
+  /** The rust/basic map, as the server has it for this wallet. */
   async map(): Promise<MapNode[]> {
     return this.mapOf("rust");
   }
@@ -531,10 +496,11 @@ export class Wire {
     throw new Error("no open quest whose visible case can be answered by printing");
   }
 
-  async history(): Promise<{ id: string; verdict: string }[]> {
+  async history(): Promise<{ id: string; verdict: string; quest_id: string }[]> {
     return (await this.ok("stats.history", { limit: 50 })).attempts as {
       id: string;
       verdict: string;
+      quest_id: string;
     }[];
   }
 

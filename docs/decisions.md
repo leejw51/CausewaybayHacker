@@ -1756,3 +1756,355 @@ Two properties the flow has to keep, both now asserted by
 
 *FE: the model I passed on earlier is withdrawn — the browser should not gate
 either, and should not gate more softly.*
+
+## 2026-09-11 — BE: the importer reconciles a pack instead of parking it
+
+Half the packs had stopped importing and the server was serving yesterday's
+map behind a `WARN` line. Fixed, and the live database repaired: 116 quests,
+six packs, zero failures, zero stranded rows.
+
+**What it was.** `UNIQUE (land, category, node)` meeting an upsert keyed on
+`id`. The old code parked a pack's nodes at `-node`, wrote the new ones, then
+tried to put back whatever the pack no longer mentioned with an
+`UPDATE OR IGNORE`. When a quest was *removed*, the node it used to hold was
+already taken by a renumbered survivor, the `OR IGNORE` silently declined, and
+the removed quest was left sitting on a negative node — **permanently, not
+transiently**. The next import's parking pass then tried to move a survivor
+onto that same negative number, hit the constraint, and rolled the whole pack
+back. Every time, for good.
+
+The real database carried the fingerprint exactly: `rust.basic.12.traits` at
+node **-12**, `go.advanced.10.race` at **-10**, and two more.
+
+**What it does now.** One `BEGIN IMMEDIATE` transaction per pack:
+
+1. delete the rows this pack has that the file no longer names — which also
+   frees the nodes they were holding;
+2. park every survivor at `-1000000 - rowid`, unique per row and far outside
+   anything content can ask for, so it cannot collide with a stranded row an
+   older import left behind;
+3. upsert each quest at its real node;
+4. refuse to commit if anything is still parked.
+
+Step 4 is the one that turns "a quest quietly off the map" into "this import
+did not happen and here is why".
+
+**Progress.** SPEC §2.2 is kept: an edited quest keeps its `progress`, because
+this is still an upsert by `id`. A quest the file no longer names is deleted
+and its progress goes with it — there is nothing left for it to be progress
+*on*. Four ids moved this week (`rust.basic.12.traits` →
+`rust.basic.18.traits` and three like it) because §12 makes the id carry the
+node number and lengthening a map moves the boss. A rename is
+indistinguishable from a delete-plus-insert without guessing, so it is treated
+as the latter: those four clears are lost, which is free now and would not be
+after release.
+
+**Atomic for readers, not only on failure.** L2D saw `world.map` return
+`rust.basic.12.traits` first, out of node order, with `world.lands` disagreeing
+in the same window — `basic` reporting `open:false` despite a cleared node 1.
+Both symptoms are the same stranded row: `ORDER BY node` puts -12 first, and
+`first_node_open` therefore asks whether *traits* is unlocked instead of node
+1. Not a race, and not a missing sort — the node values really were wrong, and
+had been for as long as the old importer left them there.
+
+The property is now asserted rather than assumed.
+`a_reader_never_sees_a_half_reconciled_map` runs a second connection reading
+the map in a loop while a 41-quest pack is reconciled on the first, and
+insists every single observation is wholly the old map or wholly the new one,
+ordered, 1-based and without duplicates. With the transaction removed it
+fails on observation 119 with a 39-row mid-renumber map, so it is not
+vacuous. `BEGIN` became `BEGIN IMMEDIATE` so a second writer is refused before
+the first statement rather than half-way through.
+
+**Loud, finally.**
+
+* `serve` logs a failed pack at ERROR *and* prints it to stderr, with a line
+  saying the database still holds whatever was there before. `--strict-content`
+  refuses to start at all.
+* `import` audits the database against the files afterwards and exits non-zero
+  on either a failure or any drift, naming the missing and left-over ids.
+* `doctor` prints a per-pack line — `in step`, `DRIFT: file 18 / db 19`, `NOT
+  IMPORTED`, or `UNREADABLE` — and exits non-zero. That is the check that would
+  have caught this on day one.
+
+**Also:** `CONCEPT_VOCABULARY` was 38 slugs and `docs/concepts.md` now has 58.
+Re-synced; the import of the new content is warning-free again.
+
+**And the flaky test is fixed.** `limits.rs`'s harness now puts its home in a
+directory of its own rather than at the top of `$TMPDIR`, so
+`the_runner_itself_writes_only_under_the_home_it_was_given` snapshots a parent
+nobody else is writing into. Five consecutive green runs.
+
+---
+
+## FE — a preference is an answer to a question, and the question was the window
+
+The reported bug was "vertical/horizontal mode does not work": Chrome in a
+window 1080 wide and 1730 tall, rendering the **landscape** layout into a band
+across the top with nearly half the window left over. The login screen itself
+was correct — the right layout for the wrong window.
+
+It was not a CSS or a canvas-sizing fault. `Layout` follows the window unless
+the player has pinned an orientation, and the browser build wrote that pin to
+`localStorage` and restored it on every boot. One F1 press, once, in a wide
+window, and every later session in every window was landscape for ever. The
+canvases were covering the viewport the whole time; the *playfield* inside them
+was 1075x907 of it.
+
+Three changes, and they are three because the bug had three halves.
+
+**A choice remembers the window it was made in.** `chosen,<mode>,<w>,<h>`. It
+holds for as long as that window holds. The moment the window is a different
+shape *and* that shape is decisive — 1.2:1 or more lopsided, so a phone or a
+column, not a near-square desktop window that is not saying anything — the
+choice is suspended and the layout follows the window again. Drag the window
+back to the shape the key was pressed in and the choice returns. Suspended,
+never discarded: a preference that evaporates on the first resize is not a
+preference.
+
+**Restored and chosen are different stored values.** A bare `portrait` or
+`landscape` — everything written by the build that had this bug — now reads as
+*not pinned*. That is the safe side and it is the one that unbreaks the players
+who already have the bad record: nothing in that string says anybody ever asked
+for it. (L2D reached the same conclusion on the LÖVE client independently and
+sent the one-line version: "restored" and "chosen" must be different stored
+values, and the third state has to be reachable.)
+
+**F1 cycles landscape → portrait → automatic.** A two-way toggle strands a
+player who has pinned an orientation with no way back to following the window
+except clearing site data, and "no way back" is half of why a stale pin could
+do this much damage. Three states, and the toast says which one you landed on.
+
+Verified at five real window shapes rather than at one: a phone in portrait
+(390x844), a phone on its side (844x390), the user's column (1080x1730), a wide
+desktop (1920x1080) and a square one (1000x1000). Every one of them fills the
+window edge to edge with no bands. The pair of orientation screenshots the
+capture hook produces is *not* this test — it forces an orientation and then
+looks at it, which is exactly the gap the bug lived in.
+
+The bands themselves got better too, for the case where somebody chooses an
+orientation the window disagrees with on purpose. The fall-off was computed
+from the smaller of the two offsets, so a window with a two-pixel side band and
+a four-hundred-pixel top band treated the top with a two-pixel gradient. It is
+per axis now, and the playfield is edged in ink and gold: a screen set into a
+cabinet, rather than a picture that stops.
+
+## FE — the map is a place now, and the camera does not wander
+
+Mode 7, the way the hardware meant it: the overworld painting is a texture on a
+plane, a perspective camera looks at it, and the whole thing is rendered as a
+second scissored pass inside the map plate. `gfx/mode7.ts` owns the projection,
+and both the drawing and the hit-testing of every node go through the same
+`project()` — that property is why the nodes have stayed where they are
+clickable through three rounds of this screen.
+
+Two things were tried and rejected in front of the frame.
+
+**A steep tilt.** `map_rust.jpg` is an axonometric painting: the projection is
+already baked into the pixels, and laying it down at eleven degrees makes the
+buildings lean and turns the overworld into a photograph of a map lying on a
+table. It is just under six degrees now — enough that the near edge is wider
+than the far one and the ground has somewhere to go.
+
+**A camera that leans toward the selected street while you browse.** This is
+the thing the round asked for and it is not shippable on a *finite* plane. Any
+resting lean means the fit has to hold the plate covered at the extremes of it,
+and the slack that buys shows up immediately as the overworld sitting in the
+middle of its own plate with a band of floor all round — the first frame of it
+is unmistakable. The alternative is to fit tight and crop the difference, and
+node 1 of `rust/hacker` stands at u=0.06, so a three percent crop takes half of
+it off the map.
+
+So the plate is filled exactly and the camera move is spent where it reads:
+going *in*. Pressing ENTER pushes the camera toward the chosen street on the
+expo curve while a circular iris closes on that exact point, swaps, and opens
+on the quest screen. While the zoom is pushing, the plane over-fills the plate
+and the lean is free. The map holds still while you read it and moves when you
+commit, which is the better trade anyway.
+
+`fg_wires` hangs in front of the ground and behind the markers. In front of the
+markers it put the awning squarely over node 1. Only the top 55% of the source
+is used: stretched whole across a plate this wide it is half the plate tall, and
+the bottom two thirds of it are four hanging sign panels the size of awnings,
+which sat over nodes 1 to 9. The signs are used at full size on the lands
+screen instead, where there is sky to hang them in.
+
+## FE — the tube, and what it is not allowed to touch
+
+`gfx/crt.ts` is `CausewaybayGolang/love2d/src/crt.lua` — a dark line every other
+row and one soft bar rolling down the screen — with three changes the browser
+forces. The mask is a 1xn pattern stamped in one fill rather than four hundred
+`fillRect`s. The vignette is built on resize, because `createRadialGradient` per
+frame costs more than the gradient does. The scanline period follows the layout
+scale, so the lines stay two *virtual* pixels apart at any window size.
+
+No barrel distortion. Warping the frame means resampling the whole canvas on the
+CPU every frame, and the thing it would bend most is the one thing that has to
+stay straight: eighty columns of code.
+
+It never touches the editor, and not by a rule somebody has to remember. The
+stylesheet stacks `#overlay` — CodeMirror and the seed field — *above* `#game`,
+and the tube is drawn onto `#game`. The editor's glyphs are structurally out of
+reach of the pass. F2 toggles it, default on, and the choice is kept.
+
+## FE — weight, and the frame it is actually visible on
+
+Screen shake is `trauma²` with two sines on an accumulated clock — never
+`Math.random`, so a shaken frame is the same shaken frame every run and the
+capture hook stays deterministic. It is scaled by how you failed: a program that
+would not compile is a wall, a wrong answer on case 3 of 8 is a near miss, and
+shaking equally for both teaches nothing.
+
+Two corrections that only came from taking the frame:
+
+* At an amplitude of nine pixels a wrong answer moved the screen two pixels.
+  It is twenty-six now.
+* It fired while the result screen was still *sliding in*, so it was invisible:
+  a shake underneath a whole-frame transition is not a shake. It waits for the
+  screen to arrive and then hits.
+
+`App.shake` refuses outright while the DOM overlay has anything in it. The
+editor is a real element stacked above the canvas and a canvas transform does
+not move it; a screen trembling around a perfectly still block of code reads as
+a rendering fault, not as impact.
+
+`ACCEPTED` gets hit-stop instead: the stamp travels, and then everything stands
+still for an eighth of a second before it lands.
+
+## FE — the opening is a sequence, not a loop
+
+`scenes/story.ts` plays `docs/story.md` §2 over the eight `open_*` panels DESIGN
+composed for it, typed a character at a time, with an iris on the cut to the
+datacentre and a chip sting on the frame SKYNET is named. §2 only: the two
+lands, the mascots and the antagonists are §3 and later, and an opening is the
+loss and the reason, not the plot.
+
+The skip is real. Any key, any click, at any point, goes straight to the login
+screen — checked before anything else in `key()` and `pointer()`, and there is
+no state in the scene that has to finish first. This screen creates no overlay
+element, so there is nothing that can eat the first keystroke; it was tested by
+dispatching exactly one and watching the scene change.
+
+**It is not a loop, and that is deliberate.** A title screen that spontaneously
+animates away while somebody is typing twelve words into the seed field is a bug
+with a nice name, and the new-wallet panel makes that window long. So it plays
+once from a cold boot when there is no session, ends on the logo, and hands
+over. `STORY` on the login screen replays it on purpose. A boot that cannot
+reach the server goes straight to login and not to the story — an error nobody
+can see behind an attract sequence is worse than no attract sequence.
+
+The captions are bottom-anchored rather than placed at a fraction of the height,
+because every one of the fourteen panels was composed with its lower fifth left
+quiet for exactly this and a box measured down from a fraction drifts out of
+that band as the canvas grows.
+
+The hold between beats is *not* cut by the reduced-motion scale. It is reading
+time, not animation. Somebody who asked for less movement asked for less
+movement, not for three sentences to be taken away faster than they can be read.
+
+## FE — the gate on the new wallet is gone, at the user's instruction
+
+`I HAVE WRITTEN IT DOWN` now derives, signs the challenge and logs in. It does
+not return to the form and it does not ask for three of the twelve words back.
+
+What that costs, once: the gate existed to catch somebody who clicks past the
+phrase without recording it, and it will no longer catch them. The warning on
+the panel — "This is the only copy. There is no reset" — is now the whole of the
+protection, which is why it is unchanged. No softened replacement was added; a
+half-gate has the cost and not the benefit.
+
+Two properties held on to. The words are taken out of the scene and the field is
+cleared *before* the first await, so a double press finds nothing to log in with
+and one account is created rather than two challenges racing — verified by
+pressing it twice in the same frame. And the phrase still never outlives the
+screen: it is dropped the instant it is used and wiped again in `leave()`.
+
+## 2026-09-11 — QA: the importer test that would have caught the stale-content bug
+
+`store.rs::a_clear_survives_a_restart_and_a_reimport` re-imports a pack whose
+**text** changed — a title edited — and asserts progress survives. That passes
+whether the importer works or not, because nothing moved.
+
+Content does not stay still. A quest gets inserted mid-map, one gets cut, a
+boss moves to the end of a longer map — and SPEC §12 ties the id's number to
+`node`, so every quest after the change is a new id *and* a new number.
+`quests` has `UNIQUE (land, category, node)`, so an importer that upserts row
+by row collides with rows still holding the old numbering.
+
+The symptom when it happened was the worst kind: three of six packs silently
+failed, the server logged a WARN and carried on serving **stale content**, and
+the database and the TOML disagreed by whole quests. Nothing was red.
+
+`backend/core/tests/importer_shape.rs`, 4 tests, all green:
+
+* a quest inserted mid-map renumbers the rest, and the **old ids are gone**
+  rather than lingering beside the new ones;
+* a removed quest leaves no orphan `progress` row, and the quests that did
+  not move keep their clear and their stars — SPEC §2.2's "progress is not
+  thrown away for a typo fix";
+* a boss moving from node 12 to node 18 of a grown map, built so the new
+  quests take exactly the numbers the old boss and its neighbours are still
+  holding — the maximally-collision-prone shape, and the one that shipped;
+* an unappliable import is **reported**, and `content::audit_dir` then says
+  the database and the file disagree. That last one is the important half:
+  the failure mode was not "the import errored", it was "the import
+  half-failed and nobody could tell".
+
+The assertion throughout is not "the import returned Ok" but **the database
+matches the file, exactly**, via `content::audit_file`. Three of the four
+pass against the current code, so the collision is already fixed; these now
+guard the fix.
+
+**Worth wiring into `cwbhacker doctor`:** the audit is exactly the check an
+operator needs, and a `doctor` that fails when the database and `content/`
+disagree turns a silent WARN into something CI can catch. BE's call.
+
+## 2026-09-11 — QA: the Go assertions are real now
+
+BE built the Go runner, so the smoke case that asserted *"a Go submission is
+refused"* was stale and has been replaced. It now asserts what matters:
+
+* a Go submission is **judged** — a verdict from §5.4's set, and never
+  `internal_error`, which tells a player their machine is broken and invites
+  a retry that cannot work;
+* the attempt reaches `stats.history` (PROTOCOL.md §4.9, "always recorded");
+* a failed Go submission carries a **classified mistake**, because one that
+  does not teaches nothing (SPEC §7.1);
+* `undefined: tolal` classifies as `unknown-name`, and **the mistake code does
+  not carry the player's own identifier** — otherwise `undefined: tolal` and
+  `undefined: subtotal` are two rows, and §7.2's rollup never reaches five and
+  never learns anything;
+* the wrong `lang` for a quest is still `bad_request`, not a judgement.
+
+The rule underneath is unchanged and is the one worth protecting: nothing
+untrue may enter the curriculum. A verdict the server invented flows into
+`mistakes`, then `mistake_stats`, then the drills, and the player is taught to
+fix something they never did.
+
+`search.query` and `ai.*` keep their `unavailable` + `detail.milestone: 2`
+case. `unsupported()` still refuses the `cargo` and `gotest` harnesses, but
+**no pack declares either** — all 116 quests are `stdio` — so that path is not
+reachable over the wire and is not asserted from here. It is covered in
+`backend/runner/tests/rust_runner.rs::unsupported_names_what_this_build_cannot_judge`.
+
+## 2026-09-11 — QA: PM's verifier re-lifted, with its two new gates
+
+`tests/content/verify_pack.py` is PM's file again as of today, picking up:
+
+* **a brief's worked example must match a visible case.** It caught a quest
+  whose brief showed `1 3` where its test expected `3 1` — unsolvable as
+  written, and invisible to every other check including the reference
+  solution, because the solution was right and the *prose* was wrong.
+* **`--complete`**, which fails on any concept slug no SPEC §7.1 mistake kind
+  can reach. A concept nothing can reach is a dead end the AI drills would
+  point a player at.
+
+Both are now in `tests/run-all.mjs`'s content step. The only local change to
+PM's file is the paths, which were absolute to one machine; they derive from
+the file's own location now and the scratch goes under
+`$CAUSEWAYBAY_HACKER_HOME/build` or the system temp directory, never the
+project tree.
+
+**All 116 quests pass, with `--complete`**: 58 rust + 58 go, every reference
+solution accepted and every starter rejected through the real runner, 58 of 58
+concept slugs reachable.

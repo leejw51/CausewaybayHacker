@@ -266,7 +266,10 @@ export class App {
 
   private shakeOffset(): [number, number] {
     if (this.trauma <= 0.001) return [0, 0];
-    const k = this.trauma * this.trauma * 9 * this.layout.uiScale();
+    // 26 rather than the 9 this started at: at nine, a wrong answer moved the
+    // screen two pixels and a compile error seven, which is a jitter rather
+    // than a hit. Measured by taking the frame, not by reasoning about it.
+    const k = this.trauma * this.trauma * 26 * this.layout.uiScale();
     return [
       Math.round(Math.sin(this.shakeT * 37.1) * k),
       Math.round(Math.sin(this.shakeT * 51.7) * k * 0.8),
