@@ -3401,3 +3401,69 @@ also distinguished a real-but-empty answer from an absent message type: an
 unknown id answers `not_found` with "no such snippet", while a message type
 that does not exist answers "no message type 'x'" — which is how the five were
 identified in the first place.
+
+---
+
+## FE — `__cwbCapture.buttons()`, and SUBMIT gets a key
+
+QA asked for the button list and it was the right thing to ask for. A canvas
+control has no DOM node, so an automated run has either a list of ids or a
+geometric scan of the pixels — and the scan breaks every time a row re-wraps,
+which is exactly what happened when FORMAT pushed RESET onto a second line and
+took three tests with it.
+
+`Buttons.list()` exposes the array the class already hit-tests against; every
+scene with buttons implements `Scene.controls()`; `capture.ts` flattens them
+into `{id, label, dim, rect, client}` and `buttonAt(id)` gives the centre in CSS
+pixels. The rects come from the same objects a click is tested against, so the
+hook and the game cannot disagree about where a button is. Dev and
+`build:e2e` only — verified absent from `dist/assets/*.js` and present in
+`dist-e2e`.
+
+**SUBMIT is Ctrl/Cmd+Shift+Enter.** Not a new shortcut to learn: it is the RUN
+key with SHIFT, an escalation of the one the hands already know, and not
+something a thumb finds by accident. It exists because a primary action
+reachable only with a mouse is an accessibility gap — FORMAT had a binding and
+the button that decides whether a street is cleared did not. It is in the
+footer.
+
+While driving the new hook I found a real bug that no unit test would have
+caught: **`auth.login` on an already-authenticated socket is refused** —
+`bad_request`, "open a new one to change user", and the server is right (§3.1).
+A player who reaches the login screen with a live session (a second wallet in
+the same tab) got "something went wrong here, not on the server" and could not
+get in. `Client.restart()` now trades the live session for a fresh anonymous
+connection before the challenge, which is what "log in as somebody else" means
+at the wire level. Reproduced, fixed, and re-run: the new wallet signs straight
+in.
+
+---
+
+## FE — verified against BE's implementations
+
+Everything I had marked as unverified is now verified against the real server,
+except where noted:
+
+* **Playground** — `playground.save` and `playground.list` round-trip (the
+  server names a new snippet by date, and the row appears in the list);
+  `playground.run` compiled and ran, `IT RAN · 170 ms compile · 372 ms run ·
+  exit 0`, printing `42`. Fixed one thing the real data exposed: a
+  server-assigned name is a date and it ran straight under the language tag, so
+  the name is now measured against the width the tag leaves.
+* **`code.format`** — real `rustfmt` reformatted the buffer through both the
+  button and Ctrl+Shift+F.
+* **The clock** — `TIME LEFT 09:12` on `rust.hacker.01`, from BE's
+  `deadline_at`. The overtime shot in `frontend/shots/` is still the forced one
+  (`45-…-forced`): reaching overtime honestly takes ten minutes, and the state
+  it shows is the same code path.
+* **The caret through FORMAT** — this one is *not* verified end to end. The DOM
+  selection is not a reliable probe for CodeMirror's own selection in this
+  harness, so instead the half that is ours is now a unit test:
+  `narrowEdit(cur, next)` trims the common prefix and suffix, and
+  `tests/editor.test.ts` checks that a change at the top cannot reach a caret at
+  the bottom and vice versa. The mapping itself is CodeMirror's guarantee.
+
+Also fixed while looking at a real HACKER brief: the text ran under its own
+scrollbar. The brief now reserves that gutter permanently — a width that
+changed when the bar appeared would reflow the text that decides whether the
+bar appears.
