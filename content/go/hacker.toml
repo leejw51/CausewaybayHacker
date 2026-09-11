@@ -3307,14 +3307,14 @@ cases = [
 
 # ---------------------------------------------------------------- 24  BOSS
 [[quest]]
-id           = "go.hacker.24.lru"
-node         = 24
+id           = "go.hacker.28.lru"
+node         = 28
 title        = "THE CLOCK"
 difficulty   = 5
 time_limit_s = 1800
 story        = "Same room, last question, and the clock on the wall is the one they replaced with a shorter one."
 concepts     = ["collections", "linked-lists", "complexity"]
-requires     = ["go.hacker.23.trie", "go.hacker.12.heap"]
+requires     = ["go.hacker.27.commands", "go.hacker.24.inversions"]
 map          = { x = 0.111, y = 0.884, kind = "boss" }
 brief        = '''
 Line one is `cap q`. The next `q` lines are `PUT <key> <value>` or

@@ -13,8 +13,10 @@
 //!   what time it is where the player is sitting. "Cleared something at 3am"
 //!   would fire for an afternoon in another timezone.
 //! * **SPEED / FAST CLEAR** — `best_ms` is compile-plus-run time, not how long
-//!   somebody took to solve it. The server never learns when a quest was
-//!   opened, so it cannot tell a fast solve from a slow one.
+//!   somebody took to solve it. What *is* honest is PROTOCOL §4.8b's
+//!   `within_limit`, because the server owns that clock: BEAT THE CLOCK and
+//!   INTERVIEW READY are built on it, and a badge for "solved it in under two
+//!   minutes" still is not, because nothing measures thinking.
 //!
 //! Everything is evaluated by asking "is this true now?" after a submit. The
 //! `UNIQUE (address, kind, award_id)` index in 0004 makes that safe to run as
@@ -235,6 +237,32 @@ fn earned(conn: &Connection, address: &str) -> Result<Vec<Candidate>> {
                 serde_json::json!({ "combo": combo }),
             );
         }
+    }
+
+    // PROTOCOL §4.8b's `within_limit` is the rare fact that makes a
+    // speed-shaped badge honest: the server owns the clock, so "inside the
+    // limit" is something the game actually knows rather than something a
+    // client timer claimed.
+    let in_time: i64 = conn.query_row(
+        "SELECT count(DISTINCT a.quest_id) FROM attempts a JOIN quests q ON q.id = a.quest_id
+          WHERE a.address = ?1 AND a.mode = 'submit' AND a.verdict = 'accepted'
+            AND a.within_limit = 1 AND q.category = 'hacker'",
+        params![address],
+        |r| r.get(0),
+    )?;
+    if in_time >= 1 {
+        badge(
+            "beat-the-clock",
+            "BEAT THE CLOCK",
+            serde_json::json!({ "quests": in_time }),
+        );
+    }
+    if in_time >= 5 {
+        badge(
+            "interview-ready",
+            "INTERVIEW READY",
+            serde_json::json!({ "quests": in_time }),
+        );
     }
 
     let submits = count(

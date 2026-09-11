@@ -2788,16 +2788,538 @@ cases = [
   { name = "negative", stdin = "4 -2\n-1 -1 2 -2\n", expect = "3\nRANGE -2\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 24  BOSS
+# ---------------------------------------------------------------- 24
 [[quest]]
-id           = "rust.hacker.24.lru"
+id           = "rust.hacker.24.inversions"
 node         = 24
+title        = "THE ONE THE CLOCK CATCHES"
+difficulty   = 5
+time_limit_s = 1500
+story        = "First question of the afternoon round. The naive answer is correct, and it is the wrong answer."
+concepts     = ["sorting", "complexity", "recursion"]
+requires     = ["rust.hacker.23.prefix-sums"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Standard input is two integers, `n` and `seed`. There is no array in the input
+— you build it, with **exactly** this generator, in `u64` arithmetic that
+wraps:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (wrapping)
+    next value = (x >> 33) % 1000000007
+```
+
+Count the **inversions**: pairs `i < j` where `a[i] > a[j]`. Print the count,
+then `MAX <largest value>`.
+
+```
+input:  8 1
+output: 19
+        MAX 908834774
+```
+
+For `8 1` the array is
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`.
+
+**This quest enforces its complexity, and it is the only kind that can.** One
+hidden case is `n = 200000`. The `O(n²)` double loop — which is what the
+starter is — is `2 × 10^10` comparisons and does not finish inside the five
+second run limit. Counting inversions during a merge sort is `O(n log n)` and
+finishes in about twenty milliseconds. Measured, on this machine, with these
+two programs.
+
+Two other things the big case decides for you. The answer for `n = 200000` is
+`9990744366`, which does not fit in an `i32` — an accumulator of the wrong
+width is silently wrong, not slow. And the generator must wrap rather than
+panic, which in release mode it does anyway and in debug mode it would not:
+say `wrapping_mul` and `wrapping_add` and mean it.
+'''
+starter      = '''
+use std::io::Read;
+
+fn generate(n: usize, seed: u64) -> Vec<i64> {
+    let mut x = seed;
+    let mut values = Vec::with_capacity(n);
+    for _ in 0..n {
+        x = x
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        values.push(((x >> 33) % 1_000_000_007) as i64);
+    }
+    values
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let parts: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, seed) = (parts[0] as usize, parts[1]);
+
+    let values = generate(n, seed);
+    let max = *values.iter().max().unwrap_or(&0);
+
+    // correct, and far too slow: this is what the big hidden case rejects
+    let mut inversions = 0i64;
+    for i in 0..n {
+        for j in (i + 1)..n {
+            if values[i] > values[j] {
+                inversions += 1;
+            }
+        }
+    }
+
+    println!("{}", inversions);
+    println!("MAX {}", max);
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn generate(n: usize, seed: u64) -> Vec<i64> {
+    let mut x = seed;
+    let mut values = Vec::with_capacity(n);
+    for _ in 0..n {
+        x = x
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        values.push(((x >> 33) % 1_000_000_007) as i64);
+    }
+    values
+}
+
+/// Merge sort over values[lo..hi], returning how many inversions it removed.
+fn sort_count(values: &mut Vec<i64>, scratch: &mut Vec<i64>, lo: usize, hi: usize) -> i64 {
+    if hi - lo < 2 {
+        return 0;
+    }
+    let mid = (lo + hi) / 2;
+    let mut inversions = sort_count(values, scratch, lo, mid)
+        + sort_count(values, scratch, mid, hi);
+
+    let (mut left, mut right, mut out) = (lo, mid, lo);
+    while left < mid && right < hi {
+        if values[left] <= values[right] {
+            scratch[out] = values[left];
+            left += 1;
+        } else {
+            // values[left..mid] are all greater than values[right]
+            inversions += (mid - left) as i64;
+            scratch[out] = values[right];
+            right += 1;
+        }
+        out += 1;
+    }
+    while left < mid {
+        scratch[out] = values[left];
+        left += 1;
+        out += 1;
+    }
+    while right < hi {
+        scratch[out] = values[right];
+        right += 1;
+        out += 1;
+    }
+    values[lo..hi].copy_from_slice(&scratch[lo..hi]);
+    inversions
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let parts: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, seed) = (parts[0] as usize, parts[1]);
+
+    let mut values = generate(n, seed);
+    let max = *values.iter().max().unwrap_or(&0);
+
+    let mut scratch = vec![0i64; n];
+    let inversions = sort_count(&mut values, &mut scratch, 0, n);
+
+    println!("{}", inversions);
+    println!("MAX {}", max);
+}
+'''
+hints = [
+  "Take the max before you sort, or sort a copy. The merge sort reorders the array under you.",
+  "When the right-hand value wins the merge, every remaining element of the left half is greater than it — that is `mid - left` inversions in one go, and it is the whole trick.",
+  "A Fenwick tree over the compressed values is the other O(n log n) answer and is worth naming in the room; merge sort is less code under a clock.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 1\n",          expect = "19\nMAX 908834774\n",          visible = true },
+  { name = "single", stdin = "1 7\n",          expect = "0\nMAX 59165271\n",            visible = false },
+  { name = "dozen",  stdin = "12 99\n",        expect = "33\nMAX 998275676\n",          visible = false },
+  { name = "big",    stdin = "200000 12345\n", expect = "9990744366\nMAX 999991076\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id           = "rust.hacker.25.test-cases"
+node         = 25
+title        = "T TEST CASES FOLLOW"
+difficulty   = 3
+time_limit_s = 900
+story        = "The shape every screen uses, and the bug every candidate writes at least once: the second case remembers the first."
+concepts     = ["io", "collections", "control-flow"]
+requires     = ["rust.hacker.24.inversions"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Line one is `T`, the number of independent test cases. Each case is a line
+with `n`, then a line with `n` integers — and when `n` is `0` that second line
+is empty.
+
+For each case print the **second largest distinct** value, or `NONE` if there
+are fewer than two distinct values. After all of them print `CASES <T>`.
+
+```
+input:  3
+        5
+        3 1 4 1 5
+        3
+        7 7 7
+        0
+
+output: 4
+        NONE
+        NONE
+        CASES 3
+```
+
+This is the standard competitive-screen wrapper and it fails candidates for
+one reason: state that should have been per-case was declared before the
+loop. Every accumulator, every set, every `best` goes **inside** the `for`.
+
+Read by whitespace token rather than by line, and the empty line for `n = 0`
+stops being a special case at all — which is the second thing this shape
+teaches.
+'''
+starter      = '''
+use std::collections::BTreeSet;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut tokens = input.split_whitespace();
+    let cases: usize = tokens.next().unwrap().parse().unwrap();
+
+    // declared once, reused for every case — this is the bug
+    let mut distinct: BTreeSet<i64> = BTreeSet::new();
+
+    for _ in 0..cases {
+        let n: usize = tokens.next().unwrap().parse().unwrap();
+        for _ in 0..n {
+            let value: i64 = tokens.next().unwrap().parse().unwrap();
+            distinct.insert(value);
+        }
+        match distinct.iter().rev().nth(1) {
+            Some(second) => println!("{}", second),
+            None => println!("NONE"),
+        }
+    }
+    println!("CASES {}", cases);
+}
+'''
+solution     = '''
+use std::collections::BTreeSet;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut tokens = input.split_whitespace();
+    let cases: usize = tokens.next().unwrap().parse().unwrap();
+
+    for _ in 0..cases {
+        // fresh for every case
+        let mut distinct: BTreeSet<i64> = BTreeSet::new();
+
+        let n: usize = tokens.next().unwrap().parse().unwrap();
+        for _ in 0..n {
+            let value: i64 = tokens.next().unwrap().parse().unwrap();
+            distinct.insert(value);
+        }
+
+        match distinct.iter().rev().nth(1) {
+            Some(second) => println!("{}", second),
+            None => println!("NONE"),
+        }
+    }
+    println!("CASES {}", cases);
+}
+'''
+hints = [
+  "Move the set inside the loop. That is the entire fix, and it is the entire quest.",
+  "A BTreeSet is sorted and de-duplicated at once, so .iter().rev().nth(1) is the second largest distinct value.",
+  "nth(1) on an iterator with fewer than two items gives None, which is exactly the NONE case — no length check needed.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3\n5\n3 1 4 1 5\n3\n7 7 7\n0\n\n",            expect = "4\nNONE\nNONE\nCASES 3\n",      visible = true },
+  { name = "one",     stdin = "1\n2\n10 -10\n",                              expect = "-10\nCASES 1\n",                visible = false },
+  { name = "pairs",   stdin = "2\n1\n5\n4\n2 2 3 3\n",                       expect = "NONE\n2\nCASES 2\n",            visible = false },
+  { name = "leaky",   stdin = "4\n3\n9 8 7\n1\n1\n2\n4 4\n3\n-1 -2 -3\n",    expect = "8\nNONE\nNONE\n-2\nCASES 4\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id           = "rust.hacker.26.statistics"
+node         = 26
+title        = "SIX DECIMAL PLACES"
+difficulty   = 3
+time_limit_s = 900
+story        = "They want the numbers rounded the way the spec says, not the way your language happens to print them."
+concepts     = ["math", "sorting", "types"]
+requires     = ["rust.hacker.25.test-cases"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+Print three lines, each to **six decimal places**: the mean, the **population**
+standard deviation (divide by `n`, not `n - 1`), and the median — which for an
+even `n` is the average of the two middle values.
+
+```
+input:  5
+        2 4 4 4 5
+output: 3.800000
+        0.979796
+        4.000000
+```
+
+This quest is judged with `match = "float:1e-6"`, so the comparison is
+numeric: `3.8` and `3.800000` both pass, and a value that is off by `1e-7`
+passes too. That is deliberate — the point is not your formatter, it is that
+`sum / n` in integer arithmetic gives `3`, and that the even-length median is
+a boundary people get wrong under a clock.
+
+Population, not sample. Read the statement twice; on a real screen the
+difference between `/ n` and `/ (n - 1)` is the whole submission.
+'''
+starter      = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut values: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    // integer division, so the mean is wrong before anything else is
+    let mean = values.iter().sum::<i64>() / values.len() as i64;
+    values.sort();
+
+    println!("{}.000000", mean);
+    println!("0.000000");
+    println!("{}.000000", values[values.len() / 2]);
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut values: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let n = values.len() as f64;
+    let mean = values.iter().sum::<i64>() as f64 / n;
+
+    let variance = values
+        .iter()
+        .map(|&v| {
+            let delta = v as f64 - mean;
+            delta * delta
+        })
+        .sum::<f64>()
+        / n;
+
+    values.sort();
+    let middle = values.len() / 2;
+    let median = if values.len() % 2 == 1 {
+        values[middle] as f64
+    } else {
+        (values[middle - 1] as f64 + values[middle] as f64) / 2.0
+    };
+
+    println!("{:.6}", mean);
+    println!("{:.6}", variance.sqrt());
+    println!("{:.6}", median);
+}
+'''
+hints = [
+  "Cast to f64 before you divide, not after. `sum / n as i64` has already thrown the fraction away.",
+  "Population variance is the mean of the squared deviations — divide the sum by n.",
+  "For an even count the median is the average of values[n/2 - 1] and values[n/2], and that subtraction is where the off-by-one lives.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "float:1e-6"
+cases = [
+  { name = "odd",    stdin = "5\n2 4 4 4 5\n", expect = "3.800000\n0.979796\n4.000000\n", visible = true },
+  { name = "even",   stdin = "4\n1 2 3 4\n",   expect = "2.500000\n1.118034\n2.500000\n", visible = false },
+  { name = "single", stdin = "1\n7\n",         expect = "7.000000\n0.000000\n7.000000\n", visible = false },
+  { name = "signed", stdin = "2\n-3 3\n",      expect = "0.000000\n3.000000\n0.000000\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id           = "rust.hacker.27.commands"
+node         = 27
+title        = "THE INPUT IS THE PROBLEM"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The till log comes off the machine wrapped at eighty columns, and the count at the top is a count of commands, not of words."
+concepts     = ["io", "stacks-queues", "control-flow"]
+requires     = ["rust.hacker.26.statistics"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Line one is `k`, the number of **commands** that follow. The commands are
+whitespace-separated tokens packed across the remaining lines however they
+happened to wrap — any number per line, any amount of spacing, possibly a
+trailing blank line.
+
+| command | tokens | effect |
+| --- | --- | --- |
+| `ADD <cents>` | two | push an item |
+| `VOID` | one | remove the last item, or do nothing if there is none |
+| `TOTAL` | one | print the current sum |
+| `CLEAR` | one | remove everything |
+
+After the `k` commands, print `COMMANDS <k>` and `ITEMS <how many are left>`.
+
+```
+input:  5
+        ADD 600 ADD 2800 TOTAL VOID TOTAL
+output: 3400
+        600
+        COMMANDS 5
+        ITEMS 1
+```
+
+`k` counts commands, and `ADD` is one command made of two tokens — so a loop
+that runs `k` times and reads one token per turn stops in the wrong place.
+Read `k` commands, pulling the argument only when the command has one.
+
+`VOID` on an empty till and `TOTAL` before anything was added both have to
+work. There is no line in the statement saying they cannot happen, and on a
+real screen that silence is the specification.
+'''
+starter      = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut tokens = input.split_whitespace();
+    let commands: usize = tokens.next().unwrap().parse().unwrap();
+
+    let mut items: Vec<i64> = Vec::new();
+
+    // one token per command — which is wrong for ADD
+    for _ in 0..commands {
+        match tokens.next().unwrap_or("") {
+            "TOTAL" => println!("{}", items.iter().sum::<i64>()),
+            _ => {}
+        }
+    }
+
+    println!("COMMANDS {}", commands);
+    println!("ITEMS {}", items.len());
+    let _ = &mut items;
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut tokens = input.split_whitespace();
+    let commands: usize = tokens.next().unwrap().parse().unwrap();
+
+    let mut items: Vec<i64> = Vec::new();
+
+    for _ in 0..commands {
+        match tokens.next().unwrap_or("") {
+            "ADD" => {
+                // the argument is a second token of the same command
+                let cents: i64 = tokens.next().unwrap_or("0").parse().unwrap_or(0);
+                items.push(cents);
+            }
+            "VOID" => {
+                items.pop();
+            }
+            "TOTAL" => println!("{}", items.iter().sum::<i64>()),
+            "CLEAR" => items.clear(),
+            _ => {}
+        }
+    }
+
+    println!("COMMANDS {}", commands);
+    println!("ITEMS {}", items.len());
+}
+'''
+hints = [
+  "split_whitespace() collapses every run of spaces, tabs and newlines, so the wrapping in the file stops mattering the moment you stop reading lines.",
+  "Pull the ADD argument inside the ADD arm, from the same iterator. The loop counter counts commands, not tokens.",
+  "Vec::pop on an empty Vec returns None and changes nothing, which is exactly what VOID on an empty till should do — no guard needed.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\nADD 600 ADD 2800 TOTAL VOID TOTAL\n",          expect = "3400\n600\nCOMMANDS 5\nITEMS 1\n", visible = true },
+  { name = "ragged", stdin = "6\nADD 100\n  ADD 200   TOTAL\nVOID\n\nVOID TOTAL\n", expect = "300\n0\nCOMMANDS 6\nITEMS 0\n", visible = false },
+  { name = "empty",  stdin = "3\nVOID TOTAL VOID\n",                            expect = "0\nCOMMANDS 3\nITEMS 0\n",         visible = false },
+  { name = "clear",  stdin = "6\nADD 1 ADD 2 TOTAL CLEAR TOTAL ADD 9\n",        expect = "3\n0\nCOMMANDS 6\nITEMS 1\n",      visible = false },
+]
+
+# ---------------------------------------------------------------- 28  BOSS
+[[quest]]
+id           = "rust.hacker.28.lru"
+node         = 28
 title        = "THE WHITEBOARD"
 difficulty   = 5
 time_limit_s = 1800
 story        = "Room 7-32, last question, and the interviewer turns the monitor off. No highlighting, no completion, a clock."
 concepts     = ["collections", "linked-lists", "complexity"]
-requires     = ["rust.hacker.23.prefix-sums", "rust.hacker.12.heap"]
+requires     = ["rust.hacker.27.commands", "rust.hacker.24.inversions"]
 map          = { x = 0.106, y = 0.876, kind = "boss" }
 brief        = '''
 Line one is `cap q`. The next `q` lines are `PUT <key> <value>` or

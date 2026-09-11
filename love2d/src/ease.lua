@@ -82,6 +82,33 @@ function E.apply(name, t)
   return fn(t)
 end
 
+--- The quest clock's attention curve (PROTOCOL §4.8b).
+---
+--- **Zero for most of its life.** The clock sits on the screen somebody is
+--- concentrating on code in, and a permanently animating countdown is noise —
+--- so this returns 0 while there is time, and only rises as the deadline
+--- approaches. `t` is the fraction of the limit still remaining, 1 -> 0.
+---
+--- Here rather than in the quest scene because the browser draws the same
+--- clock and two clients that disagree about when a countdown starts to
+--- insist are two different games.
+function E.attention(t)
+  t = E.clamp(t or 1, 0, 1)
+  if t >= 0.25 then return 0 end
+  -- Expo over the last quarter: nothing, then noticeable, then insistent.
+  return E.expIn(1 - t / 0.25)
+end
+
+--- One pulse, `age` seconds after a moment that mattered — the clock arriving,
+--- a threshold crossed, the deadline passing. 1 at the instant, 0 shortly
+--- after, and nothing before or long after.
+function E.pulse(age, duration)
+  if not age or age < 0 then return 0 end
+  duration = duration or 0.5
+  if age >= duration then return 0 end
+  return E.expOut(1 - age / duration)
+end
+
 function E.lerp(a, b, t)
   return a + (b - a) * t
 end

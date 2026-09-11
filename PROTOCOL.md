@@ -529,7 +529,41 @@ the browser and in the LÖVE client.
 cheap and idempotent: saving identical content returns the same
 `updated_at` rather than churning a new version.
 
-### 4.10 `quest.hint`
+### 4.9d `code.format`
+
+Run the language's own formatter over the source and hand it back. `rustfmt`
+for Rust, `gofmt` for Go — the tools the player's colleagues would use, not a
+house style invented here.
+
+```json
+→ payload: { "lang": "rust", "source": "fn main(){let x=1;}" }
+← payload: { "source": "fn main() {\n    let x = 1;\n}\n", "changed": true }
+```
+
+Usable from a quest screen and from the playground. It is **never recorded** —
+no attempt, no mistake, no effect on anything. Formatting is not an attempt at
+the problem.
+
+**Source that does not parse is not an error.** A formatter is most often
+pressed in the middle of an edit, and half-written code is the normal state of
+a text editor, not a fault:
+
+```json
+← payload: { "source": "<the original, byte for byte>", "changed": false,
+             "problem": "this file contains an unclosed delimiter" }
+```
+
+The reply is `.ok`, the source comes back **untouched**, and `problem` carries
+the formatter's own one-line complaint. A client shows it quietly and leaves
+the buffer alone. It must never return partially formatted text — a formatter
+that mangles code it could not parse is worse than no formatter, because the
+player then has two problems.
+
+`changed` is false when the source was already formatted, so a client can say
+"already tidy" rather than flashing an identical buffer at somebody.
+
+The runner's limits apply: a formatter gets a short timeout of its own, and a
+source over the submit cap is refused the same way.
 
 ```json
 → payload: { "quest_id": "…", "index": 0 }      0-based

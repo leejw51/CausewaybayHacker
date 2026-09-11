@@ -319,3 +319,106 @@ fn awards_are_one_players_own() {
         "one player's badges showed up on another's shelf"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The clock (PROTOCOL §4.8b)
+// ---------------------------------------------------------------------------
+
+/// One clock per player per quest, started once. A reload, a reconnect or a
+/// second window must show the same countdown — which is the entire reason it
+/// is the server's and not the client's.
+#[test]
+fn a_timed_quest_starts_one_clock_and_keeps_it() {
+    let (_tmp, store) = store_with(&[("rust.hacker.01.a", "rust", "hacker", 5)]);
+    let conn = store.conn();
+    let first = progress::open_clock(&conn, ALICE, "rust.hacker.01.a")
+        .unwrap()
+        .expect("the clock started");
+    for _ in 0..5 {
+        assert_eq!(
+            progress::open_clock(&conn, ALICE, "rust.hacker.01.a").unwrap(),
+            Some(first.clone()),
+            "opening it again started a fresh clock"
+        );
+    }
+    // And it is one player's own.
+    assert_eq!(
+        progress::get(&conn, BOB, "rust.hacker.01.a")
+            .unwrap()
+            .opened_at,
+        None
+    );
+}
+
+/// A cleared quest's clock is done: replaying it for practice is untimed.
+#[test]
+fn a_cleared_quest_does_not_start_a_new_clock() {
+    let (_tmp, store) = store_with(&[("rust.hacker.01.a", "rust", "hacker", 5)]);
+    let conn = store.conn();
+    progress::record_clear(&conn, ALICE, "rust.hacker.01.a", 10).unwrap();
+    assert_eq!(
+        progress::open_clock(&conn, ALICE, "rust.hacker.01.a").unwrap(),
+        None,
+        "a quest cleared before the clock existed must not grow one afterwards"
+    );
+}
+
+#[test]
+fn the_deadline_is_opened_at_plus_the_limit() {
+    assert_eq!(
+        progress::deadline(Some("2026-09-11T04:00:00Z"), Some(600)).as_deref(),
+        Some("2026-09-11T04:10:00Z")
+    );
+    // Untimed, or never opened, is no deadline — not a deadline of now.
+    assert_eq!(progress::deadline(Some("2026-09-11T04:00:00Z"), None), None);
+    assert_eq!(progress::deadline(None, Some(600)), None);
+}
+
+#[test]
+fn within_limit_is_a_fact_and_not_a_gate() {
+    // Opened an hour ago with a ten-minute limit: out of time, and `None` only
+    // where there is genuinely nothing to say.
+    let long_ago =
+        cwbhacker_core::time::stamp(cwbhacker_core::time::now() - chrono::Duration::minutes(60));
+    assert_eq!(
+        progress::within_limit(Some(&long_ago), Some(600)),
+        Some(false)
+    );
+    let just_now = cwbhacker_core::time::now_stamp();
+    assert_eq!(
+        progress::within_limit(Some(&just_now), Some(600)),
+        Some(true)
+    );
+    assert_eq!(progress::within_limit(Some(&just_now), None), None);
+    assert_eq!(progress::within_limit(None, Some(600)), None);
+}
+
+/// The clock's one badge. It is honest because the server owns the clock.
+#[test]
+fn beating_the_clock_is_earned_only_by_a_submit_that_actually_did() {
+    let (_tmp, store) = store_with(&[("rust.hacker.01.a", "rust", "hacker", 5)]);
+
+    // A clear with no clock at all earns nothing from it.
+    {
+        let conn = store.conn();
+        progress::record_clear(&conn, ALICE, "rust.hacker.01.a", 10).unwrap();
+    }
+    let id = submit(&store, ALICE, "rust.hacker.01.a", "accepted");
+    let fresh = awards::evaluate(&store.conn(), ALICE).unwrap();
+    assert!(
+        !fresh.iter().any(|a| a.id == "beat-the-clock"),
+        "a submit with no clock beat one: {fresh:?}"
+    );
+
+    // Now one that really was inside the limit.
+    {
+        let conn = store.conn();
+        conn.execute(
+            "UPDATE attempts SET within_limit = 1 WHERE id = ?1",
+            rusqlite::params![id],
+        )
+        .unwrap();
+    }
+    let fresh = awards::evaluate(&store.conn(), ALICE).unwrap();
+    assert!(fresh.iter().any(|a| a.id == "beat-the-clock"), "{fresh:?}");
+}

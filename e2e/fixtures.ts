@@ -409,9 +409,66 @@ export async function setSource(page: Page, source: string): Promise<void> {
   await page.keyboard.insertText(source);
 }
 
-export async function submit(page: Page): Promise<void> {
+/**
+ * Press RUN — the reflex key.
+ *
+ * §4.9b: a run executes the visible cases, never clears, and **stays on the
+ * quest screen**. `Ctrl/Cmd+Enter` is bound to this, deliberately: "Submitting
+ * is a decision and it is made with a button, not with the shortcut
+ * somebody's hands press without looking" (`frontend/src/scenes/quest.ts`).
+ */
+export async function run(page: Page): Promise<void> {
   await page.locator(".cm-content").click();
   await page.keyboard.press("ControlOrMeta+Enter");
+}
+
+/**
+ * Press SUBMIT, which is a **button** and has no keyboard shortcut.
+ *
+ * This helper used to send `Ctrl/Cmd+Enter`, and it worked until `quest.run`
+ * landed and took that key. The symptom was the honest one — the suite waited
+ * three minutes for a result screen that was never coming, because the key it
+ * pressed does not navigate anywhere — and it is exactly the kind of change a
+ * unit test on either side cannot notice.
+ *
+ * The button is canvas-drawn, so this scans for it. Unlike the lands scan,
+ * this one is **self-verifying**: RUN stays on `quest` and SUBMIT goes to
+ * `result`, so a click that reaches the result screen was the right click by
+ * definition. A stray RUN on the way costs a compile and nothing else.
+ */
+export async function submit(page: Page, timeout = 180_000): Promise<void> {
+  const box = await page.locator("canvas#game").boundingBox();
+  if (!box) throw new Error("the game canvas has no box");
+
+  // The action row sits along the bottom of the plate in both orientations.
+  const points: [number, number][] = [];
+  for (const fy of [0.93, 0.88, 0.83, 0.96, 0.78]) {
+    for (const fx of [0.88, 0.72, 0.5, 0.3, 0.12]) points.push([fx, fy]);
+  }
+
+  const deadline = Date.now() + timeout;
+  for (const [fx, fy] of points) {
+    if (Date.now() > deadline) break;
+    await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+    // A submit compiles before it navigates, so give it a real window — but
+    // only on the clicks that might have been it.
+    for (let i = 0; i < 8; i++) {
+      if ((await sceneNow(page)) === "result") {
+        await atScreen(page, "result");
+        return;
+      }
+      if ((await sceneNow(page)) !== "quest") break; // it went somewhere else
+      await page.waitForTimeout(1_000);
+    }
+  }
+  throw new Error(
+    "no click on the quest plate reached the result screen. SUBMIT is a " +
+      "canvas-drawn button with no keyboard shortcut (`quest.ts`: the reflex " +
+      "key is RUN), so this scan is the only way to press it. If the action " +
+      "row has moved, the scan needs to move with it — and this is the third " +
+      "time a canvas control has cost a run, so the hit-test hook requested " +
+      "in docs/decisions.md is worth more than it looks.",
+  );
 }
 
 // -------------------------------------------------------- the wire verifier

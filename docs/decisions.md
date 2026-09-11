@@ -2792,3 +2792,177 @@ are wrong for exactly this reason and have been retaken.
 `app.setOrientation` no longer persists a preference, either. It is the capture
 hook's entry point, and a screenshot run was writing `chosen,landscape,…` into
 whatever machine took the shots. The capture hook is not the player.
+
+## 2026-09-11 — BE: the playground
+
+`playground.run`, `.list`, `.load`, `.save`, `.delete`. PROTOCOL §4.9c
+describes `run` and `save`; the other three I implemented in the obvious shape
+and they want pinning in the contract:
+
+```
+→ playground.list    {}                    ← { snippets: [SnippetBrief] }   newest-updated first
+→ playground.load    { id }                ← { snippet: Snippet }
+→ playground.delete  { id }                ← { id, deleted: true }
+```
+
+`load` and `delete` on somebody else's id answer **`not_found`**, not
+`unauthorized`: whether an id exists is itself none of that user's business.
+
+**A playground run is not recorded, and the reasoning is a comment in
+`server/src/playground.rs` where someone would otherwise "fix" it.** The
+`address` argument is taken and deliberately unused, which makes the claim
+visible at the signature.
+
+**The caps.** An autosave timer against an unbounded table is a disk-filling
+bug waiting for a stuck client, so: **64 snippets per user** and **256 KiB per
+snippet**, names truncated at 80 characters. 64 is more scratchpads than anyone
+keeps and small enough that a runaway client hits a wall in minutes rather than
+filling a disk overnight; 256 KiB is the same limit `quest.submit` already has,
+because one number for "a source file this server accepts" is easier to hold in
+your head than two. Both refusals name the limit.
+
+**Snippets are on disk as well as in the database** —
+`users/<address>/snippets/<id>/{main.rs,snippet.json}`, 0600, beside the
+attempts. Same reason as attempts (SPEC §1): it is the player's own writing,
+and a database is a worse place to lose it from. A delete removes the
+directory.
+
+**Autosave is idempotent**: a save whose source, lang and name all match costs
+one SELECT and no write, and returns the same `updated_at`. Without that a list
+sorted by `updated_at` shuffles every few seconds while nobody is typing.
+
+## 2026-09-11 — BE: XP, levels and the badge set (for DESIGN)
+
+**XP** is `25 × stars × difficulty × category`, where `basic` = 1,
+`advanced` = 2, `hacker` = 3. An easy first clear is 25–75; a three-star
+five-difficulty HACKER quest is 1125. The spread is the point: the far end of
+the map should not feel like the near end. It is **derived from the record**
+(a join over `progress` and `quests`) rather than stored, so it cannot drift
+from the truth.
+
+**Levels** are triangular: level *n* begins at `100 × (n-1) × n / 2` — level 2
+at 100, 3 at 300, 4 at 600, 10 at 4500. Every level costs a little more than
+the last and none of them stalls. The whole content set three-starred is around
+level 36. `User` carries `level`, `xp`, and now `xp_into_level` and
+`xp_for_next` so a client can draw the bar without knowing the curve.
+
+A level-up fires `award` with `kind: "level"` **for every level crossed**, so
+somebody who jumps four at once is told four times rather than silently
+skipped.
+
+### The badge set, and its families
+
+DESIGN's binding limit is distinguishability at 48px, not beauty at 256px, so
+the set is built as **eight badge families plus the level chevron — nine
+shapes**. Within a family the tiers differ by **colour and number only**; the
+silhouette is the family. That is what keeps a row of them readable while
+still letting the set grow.
+
+| # | family (one shape) | ids | earn rule | how many |
+| --- | --- | --- | --- | --- |
+| 1 | **STAMP** — progress | `first-clear` | first quest cleared | 1 |
+| | | `quarter-century` | 25 quests cleared | 1 |
+| | | `cleared-<land>-<category>` | every quest in one map cleared | up to 6 |
+| 2 | **STAR** — craft | `perfectionist` | 10 quests cleared at 3 stars | 1 |
+| | | `no-hints` | 10 quests cleared without taking a hint | 1 |
+| 3 | **FLAME** — streak | `streak-3`, `streak-7`, `streak-30` | that many consecutive days with at least one attempt | 3 |
+| 4 | **CHAIN** — combo | `combo-5`, `combo-10`, `combo-25` | that many accepted **submits** in a row with no failure between | 3 |
+| 5 | **STOPWATCH** — the clock | `beat-the-clock` | one HACKER quest cleared with `within_limit` true | 1 |
+| | | `interview-ready` | five of them | 1 |
+| 6 | **BROKEN SHACKLE** — mastery | `tamed-<kind>` | a mistake kind made ≥5 times whose `cleared_since` has reached 5 | up to 16 |
+| 7 | **TWO FLAGS** — reach | `polyglot` | at least one quest cleared in **both** lands | 1 |
+| | | `big-o` | 5 HACKER quests cleared | 1 |
+| 8 | **TALLY** — volume | `century` | 100 submits | 1 |
+| | | `iterator` | 50 runs — the RUN button is worth celebrating | 1 |
+| 9 | **CHEVRON** — level | `level-<n>` | reaching level *n* | open-ended |
+
+Family 6 is the one this game should be proudest of: *you used to make this
+mistake five times over and you have not made it in five submits since*. It is
+the premise of the AI mode expressed as a reward, and it is honest because
+`cleared_since` only moves on a submit. Its detail carries the `kind`, so the
+art can be one shackle with the taxonomy slug beside it rather than sixteen
+drawings.
+
+**Titles** are already in the data — every award row carries `title` and a
+`detail` object, so DESIGN does not need a second copy of the naming.
+
+### What is deliberately absent, and why
+
+* **NIGHT OWL** — every timestamp here is UTC and the server does not know what
+  time it is where the player is sitting. It would fire for an afternoon.
+* **FAST CLEAR / SPEED** — `best_ms` is compile-plus-run time, not how long
+  somebody took to solve it, and nothing measures thinking. The honest version
+  of this is family 5, which exists because PROTOCOL §4.8b made the server own
+  the clock.
+
+The rule behind both: **only award what can be truly detected.** A badge that
+fires on the wrong thing is worse than one nobody earns, because it makes every
+other badge mean nothing. `awards.rs` states that at the top and every rule in
+it is a query against the record.
+
+### Wire shape, for pinning
+
+Implemented and **not yet in PROTOCOL.md** — please spec or amend:
+
+```
+→ stats.awards  {}   ← { awards: [Award] }          newest first
+
+type Award = {
+  kind: "badge" | "stamp" | "level" | "streak";
+  id: string;                 // "first-clear", "level-4", "tamed-borrow-after-move"
+  title: string;              // "FIRST CLEAR"
+  detail: object;             // whatever the rule counted
+  created_at: string;
+};
+```
+
+The live `award` event (§4.20) now carries the same `id`/`title`/`detail`, and
+is broadcast to the player's other windows as `progress.update` already is.
+`stats.awards` exists because the event is easy to miss and a client wants to
+draw the shelf as well as the fanfare.
+
+**`kind: "stamp"` is the exception**: the per-clear stamp fires every time a
+node turns gold and is *not* stored, because it is not something a player
+"has". Everything else is a row, and the `UNIQUE (address, kind, award_id)`
+index is what makes "never awarded twice" a property of the database rather
+than something the code has to remember.
+
+## 2026-09-11 — BE: the countdown clock
+
+PROTOCOL §4.8b, implemented. Migration 0005 adds `progress.opened_at` and
+`attempts.within_limit`, both nullable with a NULL default — which is what
+makes it safe on the live database.
+
+**The two edge cases, decided:**
+
+* **A quest cleared before the clock existed has no `opened_at`, and never
+  grows one.** `open_clock` returns early on a cleared quest, so nothing is
+  invented after the fact — the same rule as not writing an attempt row for a
+  submission nobody made. Those quests report `opened_at: null`,
+  `deadline_at: null`, and their old attempts report `within_limit: null`,
+  which is the honest answer to "did they beat the clock": *nobody knows*.
+* **Re-entering a cleared quest is untimed**, for the same reason and because
+  your instinct is right: the clock is done, and replaying for practice is not
+  a second interview. `deadline_at` comes back null.
+
+`COALESCE(opened_at, ?)` is what makes the "same pair every time" guarantee
+hold even when two windows open the quest in the same instant. `quest.reset`
+does not touch it. A run never sets `within_limit`, because a run is not an
+answer to the interview.
+
+## 2026-09-11 — `code.format`, and why bad syntax is not an error
+
+A FORMAT button on the coding screens, running `rustfmt` and `gofmt` — the
+tools the player's colleagues use, not a house style invented here. Never
+recorded: formatting is not an attempt at the problem.
+
+**Unparseable source returns `.ok`, not `.err`.** A formatter is most often
+pressed mid-edit, and half-written code is the normal state of a text editor
+rather than a fault. So the original comes back byte for byte with `changed:
+false` and the formatter's own one-line complaint in `problem`, and the client
+says it quietly. Making this an error would put a failure dialogue in front of
+somebody for the ordinary act of typing.
+
+The rule underneath: **never return partially formatted text.** A formatter
+that mangles code it could not parse leaves the player with two problems
+instead of one, and destroys work that was not backed up anywhere.

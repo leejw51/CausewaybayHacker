@@ -16,7 +16,7 @@ import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { btnBox, rowsIn, clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
 import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
-import { seconds, Tween } from "../engine/motion";
+import { CLOCK, clockPulse, reducedMotion, seconds, Tween } from "../engine/motion";
 import { Editor } from "../ui/editor";
 import { Overlay } from "../ui/overlay";
 import { WireError } from "../net/client";
@@ -106,6 +106,15 @@ export class QuestScene implements Scene {
   private briefOverflow = 0;
   private briefRect: Rect = [0, 0, 0, 0];
   private readonly briefIn = new Tween(seconds("panel"));
+  /** The clock arriving, once, when a timed quest opens. */
+  private readonly clockIn = new Tween(seconds("clock"), seconds("stagger") * 2);
+  /**
+   * Seconds since the last threshold the countdown crossed, and which one it
+   * was. Frame-driven: the *value* on the clock comes from the server's
+   * deadline, but the reaction to it is animation like everything else.
+   */
+  private clockSince = 99;
+  private clockMark: "none" | "warn" | "urgent" | "out" = "none";
   private readonly benchIn = new Tween(seconds("panel"), seconds("stagger"));
   private readonly offs: Array<() => void> = [];
 
@@ -369,6 +378,24 @@ export class QuestScene implements Scene {
   update(dt: number): void {
     this.t += dt;
     this.briefIn.update(dt);
+    this.clockIn.update(dt);
+    this.clockSince += dt;
+    const left = this.secondsLeft();
+    if (left !== null) {
+      // One beat per line crossed, and never again for that line. The clock is
+      // calm the rest of the time on purpose — somebody is reading code on
+      // this screen.
+      const mark =
+        left <= 0 ? "out" : left <= CLOCK.urgent ? "urgent" : left <= CLOCK.warn ? "warn" : "none";
+      if (mark !== this.clockMark) {
+        this.clockMark = mark;
+        if (mark !== "none") {
+          this.clockSince = 0;
+          if (mark === "out") this.app.chip.fail();
+          else this.app.chip.blip();
+        }
+      }
+    }
     this.benchIn.update(dt);
     // Clamped here rather than in the wheel handler: the overflow is only
     // known after a frame has measured the text at the current width, and the
@@ -421,7 +448,12 @@ export class QuestScene implements Scene {
       this.quest ? `${String(this.quest.node).padStart(2, "0")} ${this.quest.title}` : "LOADING",
     );
 
-    arriving(g, f, "left", this.briefIn, () => this.drawBrief(g, f.left, accent));
+    arriving(g, f, "left", this.briefIn, () => {
+      // The clock takes the top of the brief column and the brief starts under
+      // it; on an untimed quest it takes nothing and nothing moves.
+      const used = this.drawClock(g, f.left, s);
+      this.drawBrief(g, [f.left[0], f.left[1] + used, f.left[2], f.left[3] - used] as Rect, accent);
+    });
     arriving(g, f, "right", this.benchIn, () => this.drawWorkbench(g, f.right, accent));
 
     this.buttons.draw(g, fonts.button);
@@ -712,6 +744,106 @@ export class QuestScene implements Scene {
       ly += fonts.codeSm.height;
     }
     return h + Math.round(4 * s);
+  }
+
+  /**
+   * How long is left, from the server's deadline and the app's clock.
+   *
+   * Derived every frame rather than decremented: a backgrounded tab stops
+   * getting frames, and a counter that had been ticking down locally would come
+   * back wrong by exactly the time the player was away. Negative means
+   * overtime, which is a real state here — the clock keeps going and the quest
+   * stays open (§4.8b).
+   */
+  private secondsLeft(): number | null {
+    const at = this.quest?.deadline_at;
+    if (!at) return null;
+    const ms = Date.parse(at);
+    if (Number.isNaN(ms)) return null;
+    return (ms - this.app.now()) / 1000;
+  }
+
+  /**
+   * The countdown, if this quest has one.
+   *
+   * It blocks nothing and it is never a punishment: past the line it keeps
+   * counting, in its own colour, and SUBMIT stays exactly as live as it was.
+   * The server records `within_limit`; the screen records nothing.
+   *
+   * @returns the height it used, so the brief starts underneath it.
+   */
+  private drawClock(g: Ctx, rect: Rect, s: number): number {
+    const left = this.secondsLeft();
+    if (left === null) return 0;
+    const fonts = ensureFonts(s);
+    const [x, y, w] = rect;
+    const over = left < 0;
+    const secs = Math.max(0, Math.floor(Math.abs(left)));
+    const text = `${over ? "+" : ""}${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(
+      secs % 60,
+    ).padStart(2, "0")}`;
+    const col = over
+      ? Theme.brick
+      : left <= CLOCK.urgent
+        ? Theme.red
+        : left <= CLOCK.warn
+          ? Theme.coin
+          : Theme.cyan;
+    const h = fonts.code.height + Math.round(18 * s);
+
+    // Arrival: it drops the last few pixels into place on the expo curve and
+    // settles, rather than being there on frame one like a label.
+    const k = this.clockIn.out;
+    const drop = (1 - k) * Math.round(18 * s);
+    const pulse = clockPulse(left, this.clockSince) * (reducedMotion() ? 0.5 : 1);
+    g.save();
+    g.globalAlpha = Math.min(1, this.clockIn.raw * 2.4);
+    g.translate(0, -drop);
+    // The pulse is a swell of the plate, not a shake of the digits: the number
+    // has to stay readable at a glance the whole time.
+    const grow = Math.round(pulse * 3 * s);
+    const px = x - grow;
+    const py = y - grow;
+    const pw = w + grow * 2;
+    const ph = h + grow * 2;
+    // A plate, not floating text: this sits over a photograph of a street and
+    // a number with nothing under it is unreadable the moment the street has a
+    // bright window in it.
+    fill(g, Theme.ink, px, py, pw, ph, 0.88);
+    fill(g, col, px, py, pw, Math.round(2 * s), 0.55 + 0.45 * pulse);
+    fill(g, col, px, py + ph - Math.round(2 * s), pw, Math.round(2 * s), 0.25 + 0.35 * pulse);
+    g.fillStyle = css(Theme.dim);
+    printf(
+      g,
+      fonts.stationSm,
+      over ? "OVERTIME" : "TIME LEFT",
+      x + Math.round(8 * s),
+      y + Math.round(6 * s),
+      w,
+      "left",
+    );
+    g.fillStyle = css(col, 0.75 + 0.25 * Math.min(1, k + pulse));
+    printf(g, fonts.code, text, x, y + Math.round(5 * s), w - Math.round(8 * s), "right");
+    // The bar is the same fact in a shape you can read without counting: it
+    // fills as the limit is spent, and stays full in overtime.
+    const limit = this.quest?.time_limit_s ?? 0;
+    if (limit > 0) {
+      const spent = Math.min(1, Math.max(0, 1 - left / limit));
+      const inset = Math.round(8 * s);
+      const by = y + h - Math.round(7 * s);
+      fill(g, Theme.dim, x + inset, by, w - inset * 2, Math.round(3 * s), 0.35);
+      fill(
+        g,
+        col,
+        x + inset,
+        by,
+        Math.round((w - inset * 2) * (over ? 1 : spent)),
+        Math.round(3 * s),
+        0.9,
+      );
+    }
+    g.restore();
+    return h + Math.round(8 * s);
   }
 
   private stageLabel(): string {

@@ -49,6 +49,8 @@ local Editor = require("src.editor")
 local runlog = require("src.net.runlog")
 local External = require("src.external")
 local Anim = require("src.anim")
+local Clock = require("src.clock")
+local Ease = require("src.ease")
 
 local Quest = {}
 Quest.__index = Quest
@@ -87,6 +89,9 @@ function Quest.new(app)
     run_attempt = nil,
     hint = nil,
     focus = "editor",     -- "editor" | "brief"
+    clock_arrived = nil,  -- when the clock first appeared, for its entrance
+    clock_phase = nil,    -- the last phase seen, so a crossing can pulse
+    clock_crossed = nil,  -- when that crossing happened
     brief_scroll = 0,
     log_scroll = 0,
     show_log = false,
@@ -133,6 +138,13 @@ function Quest:refresh()
       return
     end
     self.quest = payload.quest
+    -- §4.8b: the clock arrives with the quest. `opened_at` and `deadline_at`
+    -- are the server's and are the *same pair* on every later `quest.get`, so
+    -- a reconnect shows one clock rather than starting a new one — which is
+    -- why nothing here records a start time of its own.
+    if Clock.read(self.quest) and not self.clock_arrived then
+      self.clock_arrived = Anim.now()
+    end
     -- Only load the starter into a buffer the player has not touched, so a
     -- reconnect mid-quest does not eat what they were writing.
     if not self.editor.dirty then
