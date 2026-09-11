@@ -25,5 +25,8 @@ pub mod users;
 pub mod world;
 
 pub use error::{Code, Error, Result};
+/// Re-exported so a crate that only talks to the store does not have to pin
+/// the same `rusqlite` version this one does.
+pub use rusqlite::Connection;
 pub use paths::Home;
 pub use store::Store;

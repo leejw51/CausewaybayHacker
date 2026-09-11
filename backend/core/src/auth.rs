@@ -229,6 +229,28 @@ pub fn resume_session(conn: &Connection, token: &str) -> Result<String> {
     Ok(address)
 }
 
+/// PROTOCOL §4.4: `auth.resume` **rotates** the token. The old one stops
+/// working the moment the new one is handed over, so a token read off a disk
+/// backup is good for exactly one resume rather than thirty days.
+pub fn rotate_session(conn: &Connection, token: &str) -> Result<(String, String)> {
+    let address = resume_session(conn, token)?;
+    let fresh = mint_session(conn, &address)?;
+    conn.execute(
+        "DELETE FROM sessions WHERE token_hash = ?1",
+        params![token_hash(token)],
+    )?;
+    Ok((address, fresh))
+}
+
+/// Everything a wallet has open stops working. PROTOCOL §1.2's close code
+/// 4001 is what a connection gets told when this happens under it.
+pub fn revoke_all(conn: &Connection, address: &str) -> Result<usize> {
+    Ok(conn.execute(
+        "DELETE FROM sessions WHERE address = ?1",
+        params![address.to_ascii_lowercase()],
+    )?)
+}
+
 pub fn revoke_session(conn: &Connection, token: &str) -> Result<()> {
     conn.execute(
         "DELETE FROM sessions WHERE token_hash = ?1",

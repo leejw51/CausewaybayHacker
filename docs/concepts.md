@@ -62,7 +62,7 @@ Rules:
 | `data-races` | unsynchronized concurrent access, and detecting it | (the compiler refuses) | `go test -race` |
 | `deadlock` | everyone waiting, nobody moving | lock order, `MutexGuard` scope | `all goroutines are asleep` |
 
-### Algorithms — the `hacker` road (10)
+### Algorithms — the `hacker` road (9)
 
 | slug | what it is |
 | --- | --- |
@@ -74,10 +74,11 @@ Rules:
 | `graphs` | adjacency, BFS, DFS, grids as graphs |
 | `intervals` | ranges: merging, overlapping, sweeping |
 | `dynamic-programming` | reusing sub-answers instead of recomputing them |
-| `recursion` | a function that calls itself, and its base case |
 | `complexity` | what the time limit is actually asking for |
 
-**39 slugs.** That is the whole list. Nothing else is valid in a pack.
+**38 slugs.** That is the whole list. Nothing else is valid in a pack, and
+every one of them is carried by at least one shipped quest — a slug that
+reaches nothing is the same bug as a free-form tag, one step earlier.
 
 ---
 
@@ -115,10 +116,17 @@ uses the quest it happened on instead of guessing.
 ### Coverage
 
 A kind whose concepts reach **zero** shipped quests produces an empty drill,
-which reads to the player as the AI mode being broken. The verifier
-(`tools/verify_pack.py` in the scratch tree, run per pack) prints a coverage
-line per kind. The rule: a kind may be at zero only while the pack that would
-cover it is unwritten, and that is a tracked gap, not an accepted state.
+which reads to the player as the AI mode being broken. This is a CI assertion,
+not a habit: the content check that runs every reference solution
+(SPEC §9.4/§9.5, QA-owned) should print a coverage line per kind and fail on a
+zero. A kind may be at zero only while the pack that would cover it is
+unwritten, and that is a tracked gap, not an accepted state.
 
-`data-race` and `deadlock` are covered by `go/advanced.toml` and
-`rust/advanced.toml` and by nothing before them.
+As of the six packs in `content/`, every kind in the table above reaches at
+least five quests, and every one of the 38 slugs is used. `other` is the only
+row at zero, and that is by design — it has no concepts.
+
+`data-race` and `deadlock` are carried by `rust/advanced.toml` and
+`go/advanced.toml` and by nothing before them; `complexity`, `hashing`,
+`two-pointers`, `binary-search`, `graphs`, `intervals`, `stacks-queues` and
+`dynamic-programming` only by the two `hacker` packs.

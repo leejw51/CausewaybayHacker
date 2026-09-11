@@ -7,14 +7,21 @@
  * build so Rollup drops the whole chunk.
  *
  * It exists because the backend is written in parallel and may not run yet.
- * It is a *server*: the game rules it contains are the ones that belong on the
- * far side of the websocket, and none of them are reachable from a scene. When
- * the real server is up, `VITE_WS_URL` points at it and nothing here loads.
+ * It is a *server*: the game rules in it are the ones that belong on the far
+ * side of the websocket, and none of them are reachable from a scene. When the
+ * real server is up, `VITE_WS_URL` points at it and nothing here loads.
  *
  * The judging is deliberately crude — a substring check, not a compiler. What
- * it faithfully reproduces is the *protocol*: the envelope, the correlation,
- * the `run.stage`/`run.log` stream arriving before the reply, the error codes,
- * the nonce burn. Those are the parts the frontend has to be right about.
+ * it reproduces faithfully is the **protocol**, because a mock that is lenient
+ * where the server is strict is worse than no mock at all. In particular it
+ * obeys the parts of PROTOCOL §8 that are the client's to get wrong:
+ *
+ *   - replies come back **out of order** (a `ping` overtakes a `quest.submit`);
+ *   - `run.log` chunks are split **mid-line** and carry a per-stream `seq`;
+ *   - `auth.resume` **rotates** the token;
+ *   - `progress.update` carries `unlocked`;
+ *   - a second `quest.submit` while one is running is `busy`;
+ *   - only `ping` and `auth.*` are accepted before authentication.
  */
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
@@ -24,82 +31,112 @@ import type { Transport, TransportFactory, TransportHandlers } from "./transport
 
 interface MockQuest extends Quest {
   hints: string[];
-  solution_marker: string;
+  marker: string;
   expect: string;
-  x: number;
-  y: number;
+  mapx: number;
+  mapy: number;
+  /** Lives on `MapNode` on the wire, not on `Quest`; the pack has it. */
   requires: string[];
 }
+
+const now = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
 
 /**
  * Three nodes of RUST/BASIC, which is exactly the PLAN.md vertical slice. The
  * real text comes from `content/rust/basic.toml`, which PM owns; these are
- * placeholders in the same shape so the screens can be built against them.
+ * placeholders in the same shape so the screens have something to draw.
  */
-const QUESTS: MockQuest[] = [
-  {
-    id: "rust.basic.01.hello",
-    land: "rust",
-    category: "basic",
-    node: 1,
-    title: "FIRST LIGHT",
-    difficulty: 1,
+function quests(): MockQuest[] {
+  const base = {
+    land: "rust" as const,
+    category: "basic" as const,
     time_limit_s: null,
-    story: "The terminal blinks. You used to know this one.",
-    brief: "Print `hello, causewaybay` and nothing else.",
-    concepts: ["io", "macros"],
-    hints_total: 2,
-    hints: ["`println!` is a macro, so it takes a `!`.", "The string is exact: one comma, one space."],
-    starter: "fn main() {\n    // your code here\n}\n",
-    solution_marker: 'println!("hello, causewaybay")',
-    expect: "hello, causewaybay\n",
-    x: 0.14,
-    y: 0.72,
-    requires: [],
-  },
-  {
-    id: "rust.basic.02.bindings",
-    land: "rust",
-    category: "basic",
-    node: 2,
-    title: "LET IT BE",
-    difficulty: 1,
-    time_limit_s: null,
-    story: "Skynet wrote this for you once. Write it yourself.",
-    brief: "Bind the number 42 and print it.",
-    concepts: ["bindings"],
-    hints_total: 1,
-    hints: ["`let n = 42;` and then print `n`."],
-    starter: "fn main() {\n    let n = 0;\n    println!(\"{n}\");\n}\n",
-    solution_marker: "42",
-    expect: "42\n",
-    x: 0.42,
-    y: 0.55,
-    requires: ["rust.basic.01.hello"],
-  },
-  {
-    id: "rust.basic.03.shadowing",
-    land: "rust",
-    category: "basic",
-    node: 3,
-    title: "SECOND SELF",
-    difficulty: 2,
-    time_limit_s: null,
-    story: "A name can mean two things. That is not a bug.",
-    brief: "Shadow `x` so the program prints `9`.",
-    concepts: ["shadowing", "bindings"],
-    hints_total: 1,
-    hints: ["A second `let x` in the same scope shadows the first."],
-    starter: "fn main() {\n    let x = 3;\n    // shadow x here\n    println!(\"{x}\");\n}\n",
-    solution_marker: "9",
-    expect: "9\n",
-    x: 0.73,
-    y: 0.33,
-    requires: ["rust.basic.02.bindings"],
-  },
-];
+    hints_used: 0,
+    state: "open" as const,
+    stars: 0 as const,
+  };
+  return [
+    {
+      ...base,
+      id: "rust.basic.01.hello",
+      node: 1,
+      title: "FIRST LIGHT",
+      difficulty: 1,
+      story: "The terminal blinks. You used to know this one.",
+      brief: "Print `hello, causewaybay` and nothing else.",
+      concepts: ["io", "macros"],
+      hints_total: 2,
+      hints: [
+        "`println!` is a macro, so it takes a `!`.",
+        "The string is exact: lowercase, one comma, one space.",
+      ],
+      starter: "fn main() {\n    // your code here\n}\n",
+      marker: 'println!("hello, causewaybay")',
+      expect: "hello, causewaybay\n",
+      mapx: 0.14,
+      mapy: 0.72,
+      requires: [],
+      tests: {
+        match: "trim",
+        timeout_ms: 5000,
+        visible: [{ name: "greets", stdin: "", expect: "hello, causewaybay\n" }],
+        hidden_count: 0,
+      },
+    },
+    {
+      ...base,
+      id: "rust.basic.02.bindings",
+      node: 2,
+      title: "LET IT BE",
+      difficulty: 1,
+      story: "Skynet wrote this for you once. Write it yourself.",
+      brief: "Bind the number 42 and print it.",
+      concepts: ["bindings"],
+      hints_total: 1,
+      hints: ["`let n = 42;` and then print `n`."],
+      starter: 'fn main() {\n    let n = 0;\n    println!("{n}");\n}\n',
+      marker: "42",
+      expect: "42\n",
+      mapx: 0.42,
+      mapy: 0.55,
+      requires: ["rust.basic.01.hello"],
+      tests: {
+        match: "trim",
+        timeout_ms: 5000,
+        visible: [{ name: "prints", stdin: "", expect: "42\n" }],
+        hidden_count: 1,
+      },
+    },
+    {
+      ...base,
+      id: "rust.basic.03.shadowing",
+      node: 3,
+      title: "SECOND SELF",
+      difficulty: 2,
+      story: "A name can mean two things. That is not a bug.",
+      brief: "Shadow `x` so the program prints `9`.",
+      concepts: ["shadowing", "bindings"],
+      hints_total: 1,
+      hints: ["A second `let x` in the same scope shadows the first."],
+      starter: 'fn main() {\n    let x = 3;\n    // shadow x here\n    println!("{x}");\n}\n',
+      marker: "9",
+      expect: "9\n",
+      mapx: 0.73,
+      mapy: 0.33,
+      requires: ["rust.basic.02.bindings"],
+      tests: {
+        match: "trim",
+        timeout_ms: 5000,
+        visible: [{ name: "prints", stdin: "", expect: "9\n" }],
+        hidden_count: 2,
+      },
+    },
+  ] as MockQuest[];
+}
 
-type ProgressRow = { state: "locked" | "open" | "cleared"; stars: 0 | 1 | 2 | 3; fails: number; hints: number };
+const QUESTS = quests();
+
+type Row = { state: "locked" | "open" | "cleared"; stars: 0 | 1 | 2 | 3; fails: number; hints: number; attempts: number };
 
 function hex(bytes: Uint8Array): string {
   let s = "";
@@ -113,7 +150,15 @@ function randomHex(n: number): string {
   return hex(b);
 }
 
-/** The server half of SPEC §3.2, so the client's signature is really checked. */
+function eip55(lower: string): string {
+  const body = lower.replace(/^0x/, "").toLowerCase();
+  const h = hex(keccak_256(new TextEncoder().encode(body)));
+  let out = "0x";
+  for (let i = 0; i < 40; i++) out += parseInt(h[i], 16) >= 8 ? body[i].toUpperCase() : body[i];
+  return out;
+}
+
+/** The server half of PROTOCOL §4.3, so a real signature is really checked. */
 function recoverAddress(message: string, signature: string): string {
   const sig = signature.replace(/^0x/, "");
   if (sig.length !== 130) throw new Error("a signature is 65 bytes");
@@ -122,39 +167,28 @@ function recoverAddress(message: string, signature: string): string {
   const buf = new Uint8Array(prefix.length + body.length);
   buf.set(prefix, 0);
   buf.set(body, prefix.length);
-  const hash = keccak_256(buf);
+  const digest = keccak_256(buf);
 
   const rs = new Uint8Array(64);
   for (let i = 0; i < 64; i++) rs[i] = parseInt(sig.slice(i * 2, i * 2 + 2), 16);
   const v = parseInt(sig.slice(128, 130), 16);
-  // v is 27/28 on the wire; noble wants the bare 0/1 recovery bit in front.
-  const recovery = v >= 27 ? v - 27 : v;
+  // 27/28 on the wire; 0/1 accepted and normalised, exactly as §4.3 says.
   const recovered = new Uint8Array(65);
-  recovered[0] = recovery;
+  recovered[0] = v >= 27 ? v - 27 : v;
   recovered.set(rs, 1);
-  const pub = secp256k1.recoverPublicKey(recovered, hash, { prehash: false });
+  const pub = secp256k1.recoverPublicKey(recovered, digest, { prehash: false });
   const point = secp256k1.Point.fromBytes(pub).toBytes(false);
   return "0x" + hex(keccak_256(point.subarray(1)).subarray(12));
 }
 
-function eip55(lower: string): string {
-  const body = lower.replace(/^0x/, "");
-  const h = hex(keccak_256(new TextEncoder().encode(body)));
-  let out = "0x";
-  for (let i = 0; i < 40; i++) out += parseInt(h[i], 16) >= 8 ? body[i].toUpperCase() : body[i];
-  return out;
-}
-
 /**
- * The mock's whole world, kept outside the transport so a reconnect resumes it
- * — and mirrored into `sessionStorage` so a *reload* does too.
+ * The mock's whole world, mirrored into `sessionStorage` so a *reload* keeps it.
  *
- * That last part matters more than it looks. "Kill it, reload, the quest is
- * still cleared" is the milestone-1 acceptance test (PLAN.md), and a mock whose
- * state evaporated with the page would make that test impossible to write until
- * the real server existed. The real server keeps this in SQLite; this keeps it
- * in a tab. Nonces are deliberately *not* persisted: they are single-use and
- * live 120 seconds, exactly as SPEC §3.2 says.
+ * That matters more than it looks: "clear it, reload, it is still cleared" is
+ * the milestone-1 acceptance test (PLAN.md), and a mock whose state evaporated
+ * with the page would make that test unwritable until the real server existed.
+ * The real server keeps this in SQLite; this keeps it in a tab. Nonces are
+ * deliberately *not* persisted — they are single-use and live 120 seconds.
  */
 const WORLD_KEY = "cwbhacker.mockworld";
 
@@ -162,13 +196,13 @@ const world = {
   nonces: new Map<string, { address: string; message: string; expires: number }>(),
   tokens: new Map<string, string>(),
   users: new Map<string, User>(),
-  progress: new Map<string, Map<string, ProgressRow>>(),
+  progress: new Map<string, Map<string, Row>>(),
 };
 
 type Saved = {
   tokens: Array<[string, string]>;
   users: Array<[string, User]>;
-  progress: Array<[string, Array<[string, ProgressRow]>]>;
+  progress: Array<[string, Array<[string, Row]>]>;
 };
 
 function loadWorld(): void {
@@ -180,7 +214,7 @@ function loadWorld(): void {
     world.users = new Map(s.users);
     world.progress = new Map(s.progress.map(([a, rows]) => [a, new Map(rows)]));
   } catch {
-    /* a corrupt blob just means a fresh world, which is what a dev wants anyway */
+    /* a corrupt blob just means a fresh world, which is what a dev wants */
   }
 }
 
@@ -199,63 +233,94 @@ function saveWorld(): void {
 
 loadWorld();
 
-function progressFor(address: string): Map<string, ProgressRow> {
+function progressFor(address: string): Map<string, Row> {
   let p = world.progress.get(address);
   if (!p) {
     p = new Map();
     for (const q of QUESTS) {
-      p.set(q.id, { state: q.requires.length === 0 ? "open" : "locked", stars: 0, fails: 0, hints: 0 });
+      p.set(q.id, {
+        state: q.requires.length === 0 ? "open" : "locked",
+        stars: 0,
+        fails: 0,
+        hints: 0,
+        attempts: 0,
+      });
     }
     world.progress.set(address, p);
   }
   return p;
 }
 
-function relock(rows: Map<string, ProgressRow>): void {
+/** Recompute which nodes are open, and report the ones that just became so. */
+function relock(rows: Map<string, Row>): string[] {
+  const opened: string[] = [];
   for (const q of QUESTS) {
     const row = rows.get(q.id)!;
     if (row.state === "cleared") continue;
-    row.state = q.requires.every((r) => rows.get(r)?.state === "cleared") ? "open" : "locked";
+    const next = q.requires.every((r) => rows.get(r)?.state === "cleared") ? "open" : "locked";
+    if (next === "open" && row.state === "locked") opened.push(q.id);
+    row.state = next;
   }
+  return opened;
 }
 
 function mapNodes(address: string): MapNode[] {
   const rows = progressFor(address);
-  return QUESTS.map((q) => ({
-    quest_id: q.id,
-    node: q.node,
-    title: q.title,
-    difficulty: q.difficulty,
-    state: rows.get(q.id)!.state,
-    stars: rows.get(q.id)!.stars,
-    x: q.x,
-    y: q.y,
-    kind: "quest" as const,
-  }));
+  return QUESTS.map((q) => {
+    const row = rows.get(q.id)!;
+    return {
+      quest_id: q.id,
+      node: q.node,
+      title: q.title,
+      difficulty: q.difficulty,
+      state: row.state,
+      stars: row.stars,
+      x: q.mapx,
+      y: q.mapy,
+      kind: "quest" as const,
+      requires: q.requires,
+      attempts: row.attempts,
+    };
+  });
 }
 
-function publicQuest(q: MockQuest, cleared: boolean): Quest {
-  const { id, land, category, node, title, brief, story, difficulty, time_limit_s, starter, hints_total, concepts } = q;
+function publicQuest(q: MockQuest, row: Row): Quest {
   const out: Quest = {
-    id,
-    land,
-    category,
-    node,
-    title,
-    brief,
-    story,
-    difficulty,
-    time_limit_s,
-    starter,
-    hints_total,
-    concepts,
+    id: q.id,
+    land: q.land,
+    category: q.category,
+    node: q.node,
+    title: q.title,
+    brief: q.brief,
+    story: q.story,
+    difficulty: q.difficulty,
+    time_limit_s: q.time_limit_s,
+    starter: q.starter,
+    concepts: q.concepts,
+    hints_total: q.hints_total,
+    hints_used: row.hints,
+    state: row.state,
+    stars: row.stars,
+    tests: q.tests,
   };
-  // §6.2: no `solution` unless the player has cleared it.
-  if (cleared) out.solution = q.starter.replace("// your code here", q.solution_marker + ";");
+  // §4.8: `solution` is omitted entirely until cleared — not null, not empty.
+  if (row.state === "cleared") out.solution = q.starter.replace(/\/\/.*$/m, q.marker + ";");
   return out;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Split a string into ragged pieces, so a client that assumes lines breaks. */
+function ragged(text: string): string[] {
+  const out: string[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const n = 5 + Math.floor(Math.random() * 20);
+    out.push(text.slice(i, i + n));
+    i += n;
+  }
+  return out;
+}
 
 /**
  * A mock connection. One per `connect()`, so closing and reopening exercises
@@ -265,27 +330,38 @@ export function mockTransport(): TransportFactory {
   return (h: TransportHandlers): Transport => {
     let closed = false;
     let address: string | null = null;
+    let submitting = false;
+    const seq = new Map<string, number>();
 
     const emit = (id: string | null, type: string, payload: unknown) => {
       if (closed) return;
       h.onMessage(encode(id, type, payload));
     };
     const ok = (id: string, type: string, payload: unknown) => emit(id, `${type}.ok`, payload);
-    const err = (id: string, type: string, code: string, message: string) =>
-      emit(id, `${type}.err`, { code, message, detail: {} });
+    const err = (id: string, type: string, code: string, message: string, detail = {}) =>
+      emit(id, `${type}.err`, { code, message, detail });
+
+    const log = (attemptId: string, stream: "compile" | "stdout" | "stderr", text: string) => {
+      for (const chunk of ragged(text)) {
+        const key = `${attemptId}:${stream}`;
+        const n = seq.get(key) ?? 0;
+        seq.set(key, n + 1);
+        emit(null, "run.log", { attempt_id: attemptId, stream, chunk, seq: n });
+      }
+    };
 
     setTimeout(() => {
       if (!closed) h.onOpen();
     }, 30);
 
     const handle = async (id: string, type: string, p: Record<string, unknown>) => {
-      // §6.4: anonymous connections may only ping or start a login.
+      // §3.1: exactly four messages on an ANONYMOUS connection.
       const preauth = type === "ping" || type.startsWith("auth.");
       if (!address && !preauth) return err(id, type, "unauthorized", "log in first");
 
       switch (type) {
         case "ping":
-          return ok(id, type, { t: Date.now() });
+          return ok(id, type, { t: now() });
 
         case "auth.challenge": {
           const claimed = String(p.address ?? "");
@@ -294,22 +370,20 @@ export function mockTransport(): TransportFactory {
           }
           const nonce = randomHex(32);
           const expires = new Date(Date.now() + 120_000);
+          const expiresAt = expires.toISOString().replace(/\.\d+Z$/, "Z");
+          // §4.2: four lines, `\n` separated, no trailing newline.
           const message = [
             "Causewaybay Hacker login",
-            `address: ${eip55(claimed.toLowerCase())}`,
+            `address: ${eip55(claimed)}`,
             `nonce: ${nonce}`,
-            `expires: ${expires.toISOString().replace(/\.\d+Z$/, "Z")}`,
+            `expires: ${expiresAt}`,
           ].join("\n");
           world.nonces.set(nonce, {
             address: claimed.toLowerCase(),
             message,
             expires: expires.getTime(),
           });
-          return ok(id, type, {
-            nonce,
-            message,
-            expires_at: expires.toISOString().replace(/\.\d+Z$/, "Z"),
-          });
+          return ok(id, type, { nonce, message, expires_at: expiresAt });
         }
 
         case "auth.login": {
@@ -332,16 +406,17 @@ export function mockTransport(): TransportFactory {
           }
           world.nonces.delete(nonce); // single use, burned on success
           address = claimed;
-          const now = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+          const checksummed = eip55(claimed);
           const user: User = world.users.get(claimed) ?? {
-            address: claimed,
-            address_eip55: eip55(claimed),
-            name: `hacker-${claimed.slice(2, 8)}`,
-            created_at: now,
-            last_seen_at: now,
+            address: checksummed,
+            name: typeof p.name === "string" && p.name ? p.name : `hacker-${claimed.slice(2, 8)}`,
+            created_at: now(),
+            last_seen_at: now(),
             settings: {},
+            level: 1,
+            xp: 0,
           };
-          user.last_seen_at = now;
+          user.last_seen_at = now();
           world.users.set(claimed, user);
           const token = randomHex(24);
           world.tokens.set(token, claimed);
@@ -351,16 +426,24 @@ export function mockTransport(): TransportFactory {
         }
 
         case "auth.resume": {
-          const token = String(p.token ?? "");
-          const owner = world.tokens.get(token);
+          const sent = String(p.token ?? "");
+          const owner = world.tokens.get(sent);
           if (!owner) return err(id, type, "unauthorized", "that session is gone");
           address = owner;
-          return ok(id, type, { token, user: world.users.get(owner)! });
+          // §4.4: the server rotates on use. A client that stores the token it
+          // sent rather than the one it got will fail on the *second* resume,
+          // which is exactly the kind of bug a lenient mock hides.
+          world.tokens.delete(sent);
+          const rotated = randomHex(24);
+          world.tokens.set(rotated, owner);
+          saveWorld();
+          return ok(id, type, { token: rotated, user: world.users.get(owner)! });
         }
 
         case "profile.update": {
           const user = world.users.get(address!)!;
           if (typeof p.name === "string") user.name = p.name;
+          // §4.5: a partial settings object replaces the whole thing.
           if (p.settings && typeof p.settings === "object") {
             user.settings = p.settings as Record<string, unknown>;
           }
@@ -370,23 +453,30 @@ export function mockTransport(): TransportFactory {
 
         case "world.lands": {
           const rows = progressFor(address!);
-          const cleared = QUESTS.filter((q) => rows.get(q.id)!.state === "cleared").length;
+          const cleared = QUESTS.filter((q) => rows.get(q.id)!.state === "cleared");
+          const stars = cleared.reduce((n, q) => n + rows.get(q.id)!.stars, 0);
           return ok(id, type, {
             lands: [
               {
                 land: "rust",
                 categories: [
-                  { category: "basic", total: QUESTS.length, cleared },
-                  { category: "advanced", total: 0, cleared: 0 },
-                  { category: "hacker", total: 0, cleared: 0 },
+                  {
+                    category: "basic",
+                    total: QUESTS.length,
+                    cleared: cleared.length,
+                    stars,
+                    open: true,
+                  },
+                  { category: "advanced", total: 0, cleared: 0, stars: 0, open: false },
+                  { category: "hacker", total: 0, cleared: 0, stars: 0, open: false },
                 ],
               },
               {
                 land: "go",
                 categories: [
-                  { category: "basic", total: 0, cleared: 0 },
-                  { category: "advanced", total: 0, cleared: 0 },
-                  { category: "hacker", total: 0, cleared: 0 },
+                  { category: "basic", total: 0, cleared: 0, stars: 0, open: false },
+                  { category: "advanced", total: 0, cleared: 0, stars: 0, open: false },
+                  { category: "hacker", total: 0, cleared: 0, stars: 0, open: false },
                 ],
               },
             ],
@@ -394,27 +484,24 @@ export function mockTransport(): TransportFactory {
         }
 
         case "world.map": {
-          if (p.land !== "rust" || p.category !== "basic") {
-            return ok(id, type, { nodes: [], edges: [] });
+          const land = p.land as string;
+          const category = p.category as string;
+          if (land !== "rust" || category !== "basic") {
+            return ok(id, type, { land, category, nodes: [], edges: [] });
           }
-          const edges: Array<[number, number]> = [];
-          for (const q of QUESTS) {
-            for (const r of q.requires) {
-              const from = QUESTS.find((x) => x.id === r);
-              if (from) edges.push([from.node, q.node]);
-            }
-          }
-          return ok(id, type, { nodes: mapNodes(address!), edges });
+          const edges: Array<[string, string]> = [];
+          for (const q of QUESTS) for (const r of q.requires) edges.push([r, q.id]);
+          return ok(id, type, { land, category, nodes: mapNodes(address!), edges });
         }
 
         case "quest.get": {
           const q = QUESTS.find((x) => x.id === p.quest_id);
           if (!q) return err(id, type, "not_found", "no such quest");
-          const rows = progressFor(address!);
-          if (rows.get(q.id)!.state === "locked") {
-            return err(id, type, "locked", "clear the node before it");
+          const row = progressFor(address!).get(q.id)!;
+          if (row.state === "locked") {
+            return err(id, type, "locked", `${q.id} is locked`, { requires: q.requires });
           }
-          return ok(id, type, { quest: publicQuest(q, rows.get(q.id)!.state === "cleared") });
+          return ok(id, type, { quest: publicQuest(q, row) });
         }
 
         case "quest.reset": {
@@ -426,126 +513,185 @@ export function mockTransport(): TransportFactory {
         case "quest.hint": {
           const q = QUESTS.find((x) => x.id === p.quest_id);
           if (!q) return err(id, type, "not_found", "no such quest");
+          const i = Number(p.index ?? 0);
+          if (!Number.isInteger(i) || i < 0 || i >= q.hints_total) {
+            return err(id, type, "not_found", "no hint at that index");
+          }
           const row = progressFor(address!).get(q.id)!;
-          const i = Math.max(0, Math.min(q.hints.length - 1, Number(p.index ?? 0)));
           row.hints = Math.max(row.hints, i + 1);
           saveWorld();
-          return ok(id, type, { hint: q.hints[i], hints_used: row.hints });
+          return ok(id, type, {
+            hint: q.hints[i],
+            index: i,
+            total: q.hints_total,
+            hints_used: row.hints,
+          });
         }
 
         case "quest.submit": {
           const q = QUESTS.find((x) => x.id === p.quest_id);
           if (!q) return err(id, type, "not_found", "no such quest");
+          // §3.2: one in flight per connection.
+          if (submitting) return err(id, type, "busy", "an attempt is already running");
+          if (p.lang !== q.land) return err(id, type, "bad_request", "lang disagrees with the quest");
+          const source = String(p.source ?? "");
+          if (source.length > 262144) return err(id, type, "bad_request", "source over 256 KiB");
+
+          submitting = true;
           const rows = progressFor(address!);
           const row = rows.get(q.id)!;
-          const source = String(p.source ?? "");
+          row.attempts++;
           const attemptId = "att_" + randomHex(8);
+          const t0 = Date.now();
+          const stage = (s: string, extra = {}) =>
+            emit(null, "run.stage", {
+              attempt_id: attemptId,
+              stage: s,
+              elapsed_ms: Date.now() - t0,
+              ...extra,
+            });
 
-          emit(null, "run.stage", { attempt_id: attemptId, stage: "queued" });
+          stage("queued", { queued: 0 });
           await sleep(120);
-          emit(null, "run.stage", { attempt_id: attemptId, stage: "compiling" });
-          for (const line of [
-            "   Compiling attempt v0.1.0\n",
-            `rustc --edition 2021 -O main.rs -o prog\n`,
-          ]) {
-            await sleep(180);
-            emit(null, "run.log", { attempt_id: attemptId, stream: "compile", chunk: line });
-          }
+          stage("compiling");
+          log(attemptId, "compile", "   Compiling attempt v0.1.0 (mock)\n");
+          await sleep(220);
+          log(attemptId, "compile", "rustc --edition 2021 -O main.rs -o prog\n");
+          await sleep(180);
 
           const broken = !/fn\s+main\s*\(/.test(source);
+          let attempt: Attempt;
           if (broken) {
-            await sleep(200);
-            const stderr = "error: `main` function not found in crate `main`\n";
-            emit(null, "run.log", { attempt_id: attemptId, stream: "stderr", chunk: stderr });
+            const stderr = "error[E0601]: `main` function not found in crate `main`\n";
+            log(attemptId, "stderr", stderr);
             row.fails++;
-            const attempt: Attempt = {
+            attempt = {
               id: attemptId,
+              quest_id: q.id,
               verdict: "compile_error",
               tests_passed: 0,
-              tests_total: 1,
-              compile_ms: 480,
+              tests_total: 1 + q.tests.hidden_count,
+              compile_ms: Date.now() - t0,
               run_ms: 0,
+              exit_code: 1,
               stderr,
               cases: [],
-              mistakes: [{ kind: "syntax", code: "E0601", message: "`main` function not found", line: 1 }],
-              stars: 0,
+              mistakes: [
+                {
+                  kind: "syntax",
+                  code: "E0601",
+                  message: "`main` function not found",
+                  line: 1,
+                  col: 1,
+                },
+              ],
+              stars: row.stars,
               cleared: false,
+              created_at: now(),
             };
-            return ok(id, type, { attempt });
-          }
+          } else {
+            stage("running");
+            await sleep(180);
+            const passed = source.includes(q.marker);
+            const got = passed ? q.expect : "\n";
+            log(attemptId, "stdout", got);
+            stage("judging");
+            await sleep(120);
 
-          emit(null, "run.stage", { attempt_id: attemptId, stage: "running" });
-          await sleep(200);
-          const passed = source.includes(q.solution_marker);
-          const got = passed ? q.expect : "\n";
-          emit(null, "run.log", { attempt_id: attemptId, stream: "stdout", chunk: got });
-          emit(null, "run.stage", { attempt_id: attemptId, stage: "judging" });
-          await sleep(120);
+            const first = passed && row.state !== "cleared";
+            if (!passed) row.fails++;
+            const stars: 0 | 1 | 2 | 3 = !passed
+              ? row.stars
+              : row.fails === 0 && row.hints === 0
+                ? 3
+                : row.fails <= 2 || row.hints > 0
+                  ? 2
+                  : 1;
+            let unlocked: string[] = [];
+            if (passed) {
+              row.state = "cleared";
+              row.stars = Math.max(row.stars, stars) as 0 | 1 | 2 | 3;
+              unlocked = relock(rows);
+            }
+            saveWorld();
 
-          if (!passed) row.fails++;
-          const stars: 0 | 1 | 2 | 3 = !passed
-            ? row.stars
-            : row.fails === 0 && row.hints === 0
-              ? 3
-              : row.fails <= 2 || row.hints > 0
-                ? 2
-                : 1;
-          if (passed) {
-            row.state = "cleared";
-            row.stars = stars;
-            relock(rows);
+            attempt = {
+              id: attemptId,
+              quest_id: q.id,
+              verdict: passed ? "accepted" : "wrong_answer",
+              tests_passed: passed ? 1 + q.tests.hidden_count : 0,
+              tests_total: 1 + q.tests.hidden_count,
+              compile_ms: 480,
+              run_ms: 12,
+              exit_code: 0,
+              stderr: "",
+              cases: [
+                {
+                  name: q.tests.visible[0].name,
+                  passed,
+                  visible: true,
+                  stdin: q.tests.visible[0].stdin,
+                  expect: q.tests.visible[0].expect,
+                  got,
+                },
+                ...Array.from({ length: q.tests.hidden_count }, (_, i) => ({
+                  name: `hidden-${i + 1}`,
+                  passed,
+                  visible: false,
+                })),
+              ],
+              mistakes: passed
+                ? []
+                : [
+                    {
+                      kind: "wrong-answer",
+                      code: null,
+                      message: "output did not match",
+                      line: null,
+                      col: null,
+                    },
+                  ],
+              stars: row.stars,
+              // §5.4: `cleared` is "did *this* submission clear the node".
+              cleared: first,
+              created_at: now(),
+            };
+
+            if (passed) {
+              emit(null, "progress.update", {
+                quest_id: q.id,
+                state: "cleared",
+                stars: row.stars,
+                cleared_total: QUESTS.filter((x) => rows.get(x.id)!.state === "cleared").length,
+                unlocked,
+              });
+              if (first) {
+                emit(null, "award", {
+                  kind: "stamp",
+                  id: "cleared",
+                  title: "STREET CLEARED",
+                  detail: { quest_id: q.id },
+                });
+              }
+            }
           }
           saveWorld();
-          const attempt: Attempt = {
-            id: attemptId,
-            verdict: passed ? "accepted" : "wrong_answer",
-            tests_passed: passed ? 1 : 0,
-            tests_total: 1,
-            compile_ms: 480,
-            run_ms: 12,
-            stderr: "",
-            cases: [
-              {
-                name: "sample",
-                passed,
-                visible: true,
-                stdin: "",
-                expect: q.expect,
-                got,
-              },
-            ],
-            mistakes: passed
-              ? []
-              : [{ kind: "wrong-answer", code: null, message: "output did not match", line: null }],
-            stars,
-            cleared: passed,
-          };
-          if (passed) {
-            const clearedTotal = QUESTS.filter((x) => rows.get(x.id)!.state === "cleared").length;
-            emit(null, "progress.update", {
-              quest_id: q.id,
-              state: "cleared",
-              stars,
-              cleared_total: clearedTotal,
-            });
-            emit(null, "award", {
-              kind: "stamp",
-              title: "STREET CLEARED",
-              detail: { quest_id: q.id },
-            });
-          }
+          submitting = false;
           return ok(id, type, { attempt });
         }
 
         case "stats.summary": {
           const rows = progressFor(address!);
-          const cleared = QUESTS.filter((q) => rows.get(q.id)!.state === "cleared").length;
+          const cleared = QUESTS.filter((q) => rows.get(q.id)!.state === "cleared");
+          const attempts = [...rows.values()].reduce((n, r) => n + r.attempts, 0);
           return ok(id, type, {
-            cleared,
-            attempts: [...rows.values()].reduce((n, r) => n + r.fails, 0) + cleared,
-            accuracy: cleared === 0 ? 0 : 0.5,
-            streak: cleared,
-            by_land: [{ land: "rust", cleared, total: QUESTS.length }],
+            cleared: cleared.length,
+            total: QUESTS.length,
+            attempts,
+            accuracy: attempts === 0 ? 0 : cleared.length / attempts,
+            streak_days: cleared.length > 0 ? 1 : 0,
+            stars: cleared.reduce((n, q) => n + rows.get(q.id)!.stars, 0),
+            by_land: [{ land: "rust", cleared: cleared.length, total: QUESTS.length }],
           });
         }
 
@@ -554,9 +700,12 @@ export function mockTransport(): TransportFactory {
         case "stats.history":
           return ok(id, type, { attempts: [] });
         case "search.query":
-          return ok(id, type, { hits: [] });
+          return ok(id, type, { hits: [], mode: p.mode ?? "unified", took_ms: 1 });
 
         default:
+          // Not in the catalogue. A real server would answer bad_request; the
+          // mock does the same rather than staying silent, so a typo in a
+          // scene surfaces here instead of as a hang.
           return err(id, type, "bad_request", `the mock does not answer ${type}`);
       }
     };
@@ -570,13 +719,13 @@ export function mockTransport(): TransportFactory {
           return emit(f.id, `${f.type}.err`, {
             code: "proto_version",
             message: "this server speaks v1",
-            detail: {},
+            detail: { supported: [1] },
           });
         }
         if (f.id === null) return; // clients do not send events
-        // Never echo a payload: a login frame carries a signature, and a mock
+        // Never echo a payload. A login frame carries a signature, and a mock
         // that logged what it received is exactly how a secret ends up in a
-        // console. Nothing here logs the frame body.
+        // console. Nothing here logs a frame body.
         void handle(f.id, f.type, f.payload as Record<string, unknown>);
       },
       close() {

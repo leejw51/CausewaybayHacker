@@ -1,14 +1,16 @@
 /**
- * The framing from SPEC §6.1, and the client rules from §6.4.
+ * PROTOCOL §2 framing, §3.3 errors, and the client half of the §8 conformance
+ * checklist.
  *
  * The codec gets a test of its own because it is the one piece both ends have
- * to agree on byte for byte, and the client gets one because "one in-flight
- * submit" and "anonymous until login" are rules a scene cannot be trusted to
- * remember.
+ * to agree on byte for byte. The client gets one because the rules that are
+ * easiest to get wrong — out-of-order replies, token rotation, one in-flight
+ * submit — all look fine in a happy-path demo and only fail in production.
  */
 import { describe, expect, it, vi } from "vitest";
 import { asError, decode, encode, makeIdSource, replyKind } from "../src/net/codec";
 import { Client, WireError } from "../src/net/client";
+import { actionFor, ERROR_CODES } from "../src/net/protocol";
 import type { Transport, TransportHandlers } from "../src/net/transport";
 
 describe("the envelope", () => {
@@ -111,6 +113,7 @@ function harness() {
       return t;
     },
     storage: memoryStorage(),
+    keepalive: false,
   });
   return {
     client,
@@ -118,6 +121,7 @@ function harness() {
     reply: (id: string, type: string, payload: unknown) =>
       handlers!.onMessage(encode(id, type, payload)),
     event: (type: string, payload: unknown) => handlers!.onMessage(encode(null, type, payload)),
+    raw: (text: string) => handlers!.onMessage(text),
   };
 }
 
@@ -131,12 +135,13 @@ function memoryStorage() {
 }
 
 const USER = {
-  address: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
-  address_eip55: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", // EIP-55 on the wire
   name: "hacker",
   created_at: "2026-09-11T04:12:33Z",
   last_seen_at: "2026-09-11T04:12:33Z",
   settings: {},
+  level: 1,
+  xp: 0,
 };
 
 describe("the client", () => {
@@ -178,7 +183,7 @@ describe("the client", () => {
     const h = harness();
     h.client.connect();
     await h.client.waitFor("open");
-    const login = h.client.login(USER.address_eip55, "0x" + "11".repeat(65));
+    const login = h.client.login(USER.address, "0x" + "11".repeat(65));
     h.reply(h.sent[0].id!, "auth.login.ok", { token: "tok", user: USER });
     await login;
 
@@ -229,10 +234,11 @@ describe("the client", () => {
         return { send: () => {}, close: () => h.onClose("bye") };
       },
       storage,
+      keepalive: false,
     });
     client.connect();
     await client.waitFor("open");
-    const p = client.login(USER.address_eip55, "0xdeadbeef");
+    const p = client.login(USER.address, "0xdeadbeef");
     handlers!.onMessage(encode("c-1", "auth.login.ok", { token: "sess-token", user: USER }));
     await p;
     expect(client.token).toBe("sess-token");
@@ -251,5 +257,103 @@ describe("the client", () => {
     // `close()` is the deliberate kind; the drop path is what a scene sees.
     await expect(caught).resolves.toBe("internal");
     vi.useRealTimers();
+  });
+});
+
+describe("§8 conformance, the parts that are the client's", () => {
+  it("§8.2 matches out-of-order replies by id", async () => {
+    const h = harness();
+    h.client.connect();
+    await h.client.waitFor("open");
+    const login = h.client.login(USER.address, "0x" + "11".repeat(65));
+    h.reply(h.sent[0].id!, "auth.login.ok", { token: "tok", user: USER });
+    await login;
+
+    const slow = h.client.request("quest.submit", {
+      quest_id: "rust.basic.01.hello",
+      lang: "rust",
+      source: "fn main() {}",
+    });
+    const fast = h.client.request("ping", {});
+    const slowId = h.sent[1].id!;
+    const fastId = h.sent[2].id!;
+    // The ping was sent second and comes back first, which is exactly what a
+    // client that queued replies would get wrong.
+    h.reply(fastId, "ping.ok", { t: "2026-09-11T04:12:33Z" });
+    await expect(fast).resolves.toEqual({ t: "2026-09-11T04:12:33Z" });
+    h.reply(slowId, "quest.submit.ok", { attempt: { id: "att_0", verdict: "accepted" } });
+    await expect(slow).resolves.toHaveProperty("attempt.id", "att_0");
+  });
+
+  it("§8.3 ignores an unknown event type instead of erroring", async () => {
+    const h = harness();
+    h.client.connect();
+    await h.client.waitFor("open");
+    const seen: string[] = [];
+    h.client.on("award", () => seen.push("award"));
+    // A type this version of the client has never heard of.
+    expect(() => h.event("leaderboard.update", { who: "someone" })).not.toThrow();
+    h.event("award", { kind: "stamp", id: "cleared", title: "CLEARED", detail: {} });
+    expect(seen).toEqual(["award"]);
+  });
+
+  it("§8.3 leaves a request pending when an unknown non-reply carries its id", async () => {
+    const h = harness();
+    h.client.connect();
+    await h.client.waitFor("open");
+    let settled = false;
+    const p = h.client.request("ping", {}).then(
+      () => (settled = true),
+      () => (settled = true),
+    );
+    const id = h.sent[0].id!;
+    h.reply(id, "ping.progress", { pct: 50 }); // neither .ok nor .err
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    h.reply(id, "ping.ok", { t: "now" });
+    await p;
+    expect(settled).toBe(true);
+  });
+
+  it("§8.4 gives every code an action, and folds an unknown one to internal", () => {
+    for (const code of ERROR_CODES) expect(typeof actionFor(code)).toBe("string");
+    expect(actionFor("locked")).toBe("show-lock");
+    expect(actionFor("busy")).toBe("wait");
+    expect(new WireError(asError({ code: "teapot" })).action).toBe("retry");
+  });
+
+  it("§8.7 stores the token auth.resume returns, not the one it sent", async () => {
+    const h = harness();
+    h.client.connect();
+    await h.client.waitFor("open");
+    const p = h.client.resume("old-token");
+    expect(h.sent[0].payload.token).toBe("old-token");
+    h.reply(h.sent[0].id!, "auth.resume.ok", { token: "rotated-token", user: USER });
+    await p;
+    expect(h.client.token).toBe("rotated-token");
+  });
+
+  it("§4.21 drops a revoked session rather than reconnecting onto a dead token", async () => {
+    const h = harness();
+    h.client.connect();
+    await h.client.waitFor("open");
+    const login = h.client.login(USER.address, "0x" + "11".repeat(65));
+    h.reply(h.sent[0].id!, "auth.login.ok", { token: "tok", user: USER });
+    await login;
+    expect(h.client.token).toBe("tok");
+    h.event("server.bye", { reason: "revoked" });
+    expect(h.client.token).toBeNull();
+    expect(h.client.needsLogin).toBe(true);
+  });
+
+  it("§2.1 keeps the connection when the server speaks another version", async () => {
+    const h = harness();
+    h.client.connect();
+    await h.client.waitFor("open");
+    const byes: string[] = [];
+    h.client.on("server.bye", (p) => byes.push(p.reason));
+    h.raw(JSON.stringify({ v: 99, id: null, type: "run.log", payload: {} }));
+    expect(byes).toHaveLength(1);
+    expect(h.client.state).not.toBe("offline");
   });
 });

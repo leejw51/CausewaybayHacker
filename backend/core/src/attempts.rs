@@ -95,6 +95,8 @@ pub fn write_to_disk(
     Ok(())
 }
 
+/// PROTOCOL §5.7. `kinds` is what makes a history list readable at a glance:
+/// the verdict says it failed, the kinds say how.
 #[derive(Debug, Clone, Serialize)]
 pub struct AttemptBrief {
     pub id: String,
@@ -102,9 +104,8 @@ pub struct AttemptBrief {
     pub verdict: String,
     pub tests_passed: i64,
     pub tests_total: i64,
-    pub compile_ms: i64,
-    pub run_ms: i64,
     pub created_at: String,
+    pub kinds: Vec<String>,
 }
 
 /// `stats.history`. Always scoped to one address — the caller passes the
@@ -124,13 +125,11 @@ pub fn history(
             verdict: r.get(2)?,
             tests_passed: r.get(3)?,
             tests_total: r.get(4)?,
-            compile_ms: r.get(5)?,
-            run_ms: r.get(6)?,
-            created_at: r.get(7)?,
+            created_at: r.get(5)?,
+            kinds: Vec::new(),
         })
     };
-    const COLS: &str =
-        "id, quest_id, verdict, tests_passed, tests_total, compile_ms, run_ms, created_at";
+    const COLS: &str = "id, quest_id, verdict, tests_passed, tests_total, created_at";
     match quest_id {
         Some(quest_id) => {
             let mut stmt = conn.prepare(&format!(
@@ -150,6 +149,16 @@ pub fn history(
                 out.push(row?);
             }
         }
+    }
+    // One small query per row. At a history limit of fifty this is cheaper
+    // than the join it replaces is to read.
+    for brief in &mut out {
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT kind FROM mistakes WHERE attempt_id = ?1 ORDER BY kind",
+        )?;
+        brief.kinds = stmt
+            .query_map(params![brief.id], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
     }
     Ok(out)
 }

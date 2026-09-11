@@ -284,8 +284,8 @@ fn two_users_do_not_leak_into_each_other() {
             .cleared
     );
 
-    assert!(mistakes::stats(&conn, ALICE, 10).unwrap().is_empty());
-    let bobs = mistakes::stats(&conn, BOB, 10).unwrap();
+    assert!(mistakes::stats(&conn, ALICE, 10, true).unwrap().is_empty());
+    let bobs = mistakes::stats(&conn, BOB, 10, true).unwrap();
     assert_eq!(bobs.len(), 1);
     assert_eq!(bobs[0].count, 2);
 

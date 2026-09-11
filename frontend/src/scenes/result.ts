@@ -43,14 +43,22 @@ export class ResultScene implements Scene {
     readonly category: Category,
     readonly questId: string,
     readonly attempt: Attempt,
-    readonly log: string[],
   ) {}
 
   enter(): void {
-    if (this.attempt.cleared) {
+    if (this.passed) {
       const { vw, vh } = this.app.layout;
       this.confetti = burstPlan(vw / 2, vh * 0.35, 90);
     }
+  }
+
+  /**
+   * `Attempt.cleared` means "did *this* submission clear the node" (§5.4), so
+   * a re-solve comes back accepted with `cleared: false`. The screen keys its
+   * colour off the verdict and its fanfare off `cleared`.
+   */
+  private get passed(): boolean {
+    return this.attempt.verdict === "accepted";
   }
 
   update(dt: number): void {
@@ -86,11 +94,16 @@ export class ResultScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
-    const ok = this.attempt.cleared;
+    const ok = this.passed;
     const accent = this.land === "rust" ? RUST : GO;
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
-    header(g, layout, ok ? "STREET CLEARED" : "NOT YET", this.app.addressLabel);
+    header(
+      g,
+      layout,
+      this.attempt.cleared ? "STREET CLEARED" : ok ? "STILL GOOD" : "NOT YET",
+      this.app.addressLabel,
+    );
     const f = frame(layout, layout.isPortrait() ? 0.42 : 0.42);
     this.buttons.reset();
 
@@ -124,6 +137,7 @@ export class ResultScene implements Scene {
         `compile ${this.attempt.compile_ms} ms`,
         `run     ${this.attempt.run_ms} ms`,
         `attempt ${this.attempt.id}`,
+        this.attempt.exit_code === null ? "" : `exit    ${this.attempt.exit_code}`,
       ].join("\n"),
       left[0],
       y,

@@ -36,10 +36,16 @@ pub struct MapPos {
 }
 
 impl Quest {
-    /// The client shape. `solution` is attached only once the player has
-    /// cleared the quest (SPEC §6.2), and `hints` are counted, not handed
-    /// over — `quest.hint` releases them one at a time.
-    pub fn to_wire(&self, cleared: bool) -> serde_json::Value {
+    /// The PROTOCOL §5.3 `Quest`. `solution` is **omitted entirely** unless
+    /// the player has cleared it — not null, not empty — and `tests` carries
+    /// only the visible cases plus a count of the hidden ones.
+    pub fn to_wire(
+        &self,
+        state: crate::progress::State,
+        stars: i64,
+        hints_used: i64,
+    ) -> serde_json::Value {
+        let cleared = state == crate::progress::State::Cleared;
         let mut value = serde_json::json!({
             "id": self.id,
             "land": self.land,
@@ -52,11 +58,11 @@ impl Quest {
             "time_limit_s": self.time_limit_s,
             "starter": self.starter,
             "concepts": self.concepts,
-            "hint_count": self.hints.len(),
-            "checksum": self.checksum,
-            "map": { "x": self.map.x, "y": self.map.y, "kind": self.map.kind },
-            "cases": self.visible_cases(),
-            "lang": self.land,
+            "hints_total": self.hints.len(),
+            "hints_used": hints_used,
+            "state": state,
+            "stars": stars,
+            "tests": self.tests_wire(),
         });
         if cleared {
             value["solution"] = serde_json::Value::String(self.solution.clone());
@@ -64,39 +70,38 @@ impl Quest {
         value
     }
 
-    /// Only the cases marked `visible` carry their data (SPEC §5.2). A hidden
-    /// case is named so the result screen can say which one failed, and
-    /// nothing else about it crosses the wire.
-    pub fn visible_cases(&self) -> serde_json::Value {
+    fn tests_wire(&self) -> serde_json::Value {
         let empty = Vec::new();
         let cases = self
             .tests
             .get("cases")
             .and_then(|c| c.as_array())
             .unwrap_or(&empty);
-        let out: Vec<serde_json::Value> = cases
-            .iter()
-            .map(|case| {
-                let visible = case
-                    .get("visible")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                if visible {
-                    serde_json::json!({
-                        "name": case.get("name").cloned().unwrap_or_default(),
-                        "visible": true,
-                        "stdin": case.get("stdin").cloned().unwrap_or_default(),
-                        "expect": case.get("expect").cloned().unwrap_or_default(),
-                    })
-                } else {
-                    serde_json::json!({
-                        "name": case.get("name").cloned().unwrap_or_default(),
-                        "visible": false,
-                    })
-                }
-            })
-            .collect();
-        serde_json::Value::Array(out)
+        let mut visible = Vec::new();
+        let mut hidden = 0;
+        for case in cases {
+            let is_visible = case
+                .get("visible")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if is_visible {
+                visible.push(serde_json::json!({
+                    "name": case.get("name").cloned().unwrap_or_default(),
+                    "stdin": case.get("stdin").cloned().unwrap_or_default(),
+                    "expect": case.get("expect").cloned().unwrap_or_default(),
+                }));
+            } else {
+                // A hidden case is a count and nothing else. A player who can
+                // enumerate them can game them.
+                hidden += 1;
+            }
+        }
+        serde_json::json!({
+            "match": self.tests.get("match").and_then(|m| m.as_str()).unwrap_or("trim"),
+            "timeout_ms": self.tests.get("timeout_ms").and_then(|t| t.as_u64()).unwrap_or(5000),
+            "visible": visible,
+            "hidden_count": hidden,
+        })
     }
 }
 

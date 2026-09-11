@@ -12,7 +12,7 @@ import { ensureFonts, printf } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { fill, type Ctx } from "../engine/ui";
 import { Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
-import type { Category, Land, Responses } from "../net/protocol";
+import type { Category, CategorySummary, Land, Responses } from "../net/protocol";
 import { MapScene } from "./map";
 
 type Lands = Responses["world.lands"]["lands"];
@@ -136,18 +136,23 @@ export class LandsScene implements Scene {
     // --- the three categories ---------------------------------------------
     const right = titledPanel(g, f.right, `${this.land.toUpperCase()} — CATEGORY`, Theme.coin);
     const row = this.lands.find((l) => l.land === this.land);
-    const cats: Array<{ category: Category; total: number; cleared: number }> = row
+    const cats: CategorySummary[] = row
       ? row.categories
-      : [
-          { category: "basic", total: 0, cleared: 0 },
-          { category: "advanced", total: 0, cleared: 0 },
-          { category: "hacker", total: 0, cleared: 0 },
-        ];
+      : (["basic", "advanced", "hacker"] as Category[]).map((category) => ({
+          category,
+          total: 0,
+          cleared: 0,
+          stars: 0,
+          open: false,
+        }));
 
     const rowH = Math.max(layout.minTouchH(), Math.round(fonts.button.height + 30 * s));
     let y = right[1];
     for (const c of cats) {
-      const empty = c.total === 0;
+      // §4.6: `open` is false while the category's first node is locked. A
+      // category with content you cannot start yet is not the same as an empty
+      // one, and the row says which.
+      const empty = c.total === 0 || !c.open;
       const barW = right[2];
       fill(g, empty ? Theme.dim : Theme.navy, right[0], y, barW, rowH, empty ? 0.35 : 0.9);
       fill(g, empty ? Theme.dim : Theme.coin, right[0], y + rowH - 3, barW, 3, empty ? 0.4 : 1);
@@ -169,7 +174,7 @@ export class LandsScene implements Scene {
       printf(
         g,
         fonts.stationSm,
-        empty ? "EMPTY" : `${c.cleared}/${c.total}`,
+        c.total === 0 ? "EMPTY" : empty ? "LOCKED" : `${c.cleared}/${c.total}  ★${c.stars}`,
         right[0],
         y + Math.round((rowH - fonts.stationSm.height) / 2),
         barW - Math.round(10 * s),

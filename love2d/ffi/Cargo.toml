@@ -1,0 +1,41 @@
+# cwbh-ffi — the LÖVE client's key derivation, behind a C ABI.
+#
+# BIP-39 + BIP-32 + secp256k1 + keccak is the one part of this client that
+# cannot honestly be written in Lua. It lives here instead, as a cdylib that
+# LuaJIT's `ffi.load` opens: JSON string in, JSON string out, one explicit
+# free, an ABI number that is checked rather than assumed.
+#
+# The idiom is CausewaybayWallet's `rustcli/ffi`, and the derivation is the
+# same arithmetic as its `core/src/{bip39,bip32,wallet}.rs` — but this is its
+# own library with its own `cwbh_` prefix and its own ABI number, so a stale
+# `libcausewaybay_ffi.dylib` can never answer for it.
+#
+# Nothing here ever returns key material across the ABI.
+
+[package]
+name = "cwbh-ffi"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+publish = false
+
+[lib]
+name = "cwbh_ffi"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+k256 = { version = "0.13", features = ["ecdsa", "arithmetic"] }
+sha2 = "0.10"
+sha3 = "0.10"
+hmac = "0.12"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+unicode-normalization = "0.1"
+zeroize = { version = "1", features = ["derive"] }
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 2

@@ -751,22 +751,23 @@ node        = 1
 title       = "FIRST LIGHT"
 difficulty  = 1
 story       = "The terminal blinks. You used to know this one."
-concepts    = ["io", "macros"]
-requires    = []                    # quest ids that unlock this node
+concepts    = ["io", "strings"]      # from the closed vocabulary in docs/concepts.md
+requires    = []                     # quest ids that unlock this node
 map         = { x = 0.12, y = 0.74, kind = "quest" }
-brief       = """
+# time_limit_s = 600                 # the player's clock; `hacker` only (see below)
+brief       = '''
 Print `hello, causewaybay` and nothing else.
-"""
-starter     = """
+'''
+starter     = '''
 fn main() {
     // your code here
 }
-"""
-solution    = """
+'''
+solution    = '''
 fn main() {
     println!("hello, causewaybay");
 }
-"""
+'''
 hints = [
   "`println!` is a macro, so it takes a `!`.",
   "The string is exact: lowercase, one comma, one space.",
@@ -781,6 +782,16 @@ cases = [
 ]
 ```
 
+> **Use `'''`, not `"""`, for every field holding code.** TOML's `"""` is a
+> multi-line *basic* string and processes backslash escapes, so a `'\n'` inside
+> a quest's Rust or Go source is silently rewritten to a real newline before
+> the compiler ever sees it, and the quest breaks in a way that looks like a
+> compiler bug. `'''` is a multi-line *literal* string and passes the bytes
+> through. `brief`, `story`, `starter` and `solution` are always `'''`.
+>
+> The `"…"` form is correct — and required — for `stdin` and `expect`, where
+> `\n` is meant as a newline.
+
 Rules:
 
 * `id` must match `<land>.<category>.<node:02d>.<slug>` and must agree with the
@@ -792,6 +803,14 @@ Rules:
 * `requires` empty means the node is open from the start. Every other node is
   `locked` until all of its `requires` are `cleared`.
 * At least one case must be `visible = true`, so a player is never guessing
-  blind about the output format.
+  blind about the output format. No `expect` may be empty once its `match`
+  normalisation is applied — an empty expectation is cleared by an empty
+  `fn main() {}`, which clears the map for free.
+* `time_limit_s` is a **quest-level** key, set on `hacker` quests and omitted
+  elsewhere. It is the player's clock, and is not `tests.timeout_ms`, which is
+  one run's wall clock — a quest can give you twenty minutes to write something
+  that must execute in five seconds. The importer enforces the biconditional:
+  a `hacker` quest has a `time_limit_s` and at least one hidden case, and a
+  quest outside `hacker` has neither.
 * `solution` is mandatory and is run by CI (SPEC §9.4). A quest without a
   working reference answer does not get imported.

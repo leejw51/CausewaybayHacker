@@ -280,8 +280,13 @@ fn rollup(conn: &Connection, address: &str, mistakes: &[Mistake], now: &str) -> 
             params![address, kind, now],
         )?;
     }
-    // Every kind the user has a row for that this attempt did *not* commit
-    // gets one more consecutive clean attempt to its name.
+    // SPEC §7.2, to the letter: "for every kind *not* in this attempt that the
+    // user has a row for, increment cleared_since". Read as "you have not made
+    // this particular mistake in N attempts", which is the question §7.3's
+    // `cleared_since >= 5` asks. The alternative reading — only an attempt
+    // with no mistakes at all counts as clean — would make a player who fails
+    // in a new way every time never age anything out. If the AI plan wants
+    // that stricter rule later, it is one `if mistakes.is_empty()` away.
     let placeholders = if kinds.is_empty() {
         String::new()
     } else {
@@ -304,6 +309,31 @@ fn rollup(conn: &Connection, address: &str, mistakes: &[Mistake], now: &str) -> 
     Ok(())
 }
 
+/// What to drill to fix a kind (PROTOCOL §5.6). These are the same slugs the
+/// content packs put in `concepts`, which is how §7.3's `weakness` plan will
+/// find "five different shapes of borrow-after-move".
+pub fn concepts_for(kind: &str) -> &'static [&'static str] {
+    match kind {
+        "borrow-after-move" => &["ownership", "move", "clone"],
+        "borrow-conflict" => &["borrowing", "ownership"],
+        "lifetime" => &["lifetimes", "references"],
+        "type-mismatch" => &["types", "inference"],
+        "unknown-name" => &["modules", "scope", "imports"],
+        "missing-trait" => &["traits", "generics"],
+        "unused" => &["bindings", "imports"],
+        "mutability" => &["mutability", "bindings"],
+        "nil-deref" => &["pointers", "errors"],
+        "index-range" => &["slices", "bounds"],
+        "data-race" => &["concurrency", "sync"],
+        "deadlock" => &["concurrency", "channels"],
+        "unhandled-error" => &["errors", "result"],
+        "syntax" => &["syntax"],
+        "wrong-answer" => &["io", "logic"],
+        "timeout" => &["complexity", "algorithms"],
+        _ => &[],
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct MistakeStat {
     pub kind: String,
@@ -312,23 +342,37 @@ pub struct MistakeStat {
     pub last_at: String,
     pub cleared_since: i64,
     pub example_quest_id: Option<String>,
+    pub concepts: Vec<String>,
 }
 
-pub fn stats(conn: &Connection, address: &str, limit: i64) -> Result<Vec<MistakeStat>> {
-    let mut stmt = conn.prepare(
+/// PROTOCOL §4.14: most frequent first, and a kind with `cleared_since >= 5`
+/// is considered learned and is left out unless it is asked for.
+pub fn stats(
+    conn: &Connection,
+    address: &str,
+    limit: i64,
+    include_learned: bool,
+) -> Result<Vec<MistakeStat>> {
+    let learned_filter = if include_learned {
+        ""
+    } else {
+        " AND s.cleared_since < 5"
+    };
+    let mut stmt = conn.prepare(&format!(
         "SELECT s.kind, s.count, s.last_at, s.cleared_since,
                 (SELECT m.quest_id FROM mistakes m
                   WHERE m.address = s.address AND m.kind = s.kind
                   ORDER BY m.created_at DESC LIMIT 1)
            FROM mistake_stats s
-          WHERE s.address = ?1
+          WHERE s.address = ?1{learned_filter}
           ORDER BY s.count DESC, s.last_at DESC
-          LIMIT ?2",
-    )?;
+          LIMIT ?2"
+    ))?;
     let rows = stmt.query_map(params![address, limit], |r| {
         let kind: String = r.get(0)?;
         Ok(MistakeStat {
             label: label(&kind).to_string(),
+            concepts: concepts_for(&kind).iter().map(|c| c.to_string()).collect(),
             kind,
             count: r.get(1)?,
             last_at: r.get(2)?,

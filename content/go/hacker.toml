@@ -36,8 +36,11 @@ input:  4 9
 output: 1 2
 ```
 
-`n` goes to 200000. The nested loop is the wrong answer here even when it
-prints the right numbers.
+The hidden cases here are small: they check the tie-break and the
+no-answer case, not your speed. The question is still the linear one — one
+pass, one hash map — because a real `n` is 200000 and the nested loop is what
+this question exists to weed out. Write the answer the question is asking for,
+not the one that happens to clear these four cases.
 '''
 starter      = '''
 package main

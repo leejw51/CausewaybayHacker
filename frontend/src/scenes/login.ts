@@ -108,7 +108,7 @@ export class LoginScene implements Scene {
 
       this.status = "logging in";
       const user = await this.app.client.login(address.eip55, signature);
-      this.app.addressLabel = user.address_eip55;
+      this.app.addressLabel = user.address;
       this.app.chip.start();
       await this.app.go(new LandsScene(this.app));
     } catch (e) {

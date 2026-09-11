@@ -22,10 +22,21 @@ pub struct User {
 /// The name is only defaulted, never overwritten: a returning player keeps
 /// whatever they chose.
 pub fn upsert(conn: &Connection, address: &str) -> Result<User> {
+    upsert_named(conn, address, None)
+}
+
+/// The same, with the display name a first login may seed (PROTOCOL §4.3).
+/// An existing user keeps whatever they chose: `name` is only ever a default.
+pub fn upsert_named(conn: &Connection, address: &str, name: Option<&str>) -> Result<User> {
     let address = address.to_ascii_lowercase();
     let now = now_stamp();
     let eip55 = to_eip55(&address);
-    let default_name = format!("hacker-{}", &address[address.len() - 4..]);
+    // PROTOCOL §4.3: `hacker-<first 6 of address>` when the client does not
+    // seed a name.
+    let default_name = match name.map(str::trim).filter(|n| !n.is_empty()) {
+        Some(name) => name.chars().take(48).collect::<String>(),
+        None => format!("hacker-{}", &address[2..8]),
+    };
     conn.execute(
         "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
          VALUES (?1, ?2, ?3, ?4, ?4, '{}')

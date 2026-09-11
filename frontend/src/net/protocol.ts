@@ -1,16 +1,24 @@
 /**
- * SPEC §6, transcribed by hand into types.
+ * `PROTOCOL.md`, transcribed by hand into types.
  *
- * Nothing here is generated, and nothing here is inferred from what the server
- * happens to send: the spec is the contract, so a field the server stops
- * sending should break a build rather than quietly become `undefined` three
- * screens later. Every `.ok` payload in §6.2 has a type, every server event in
- * §6.2's second table has a type, and the error code set in §6.1 is closed.
+ * That file is the authority for everything that crosses the network; SPEC §6
+ * is a summary of it. Nothing here is generated and nothing is inferred from
+ * what a server happened to send — the shapes are copied from PROTOCOL §5, so
+ * a field the server stops sending breaks a build rather than quietly becoming
+ * `undefined` three screens later.
+ *
+ * Two habits this file exists to enforce:
+ *
+ *   - the error code set (§3.3) is closed, so a `switch` over it can be
+ *     exhaustive and an unknown code is folded to `internal` in one place;
+ *   - an unknown `type` is ignored rather than treated as an error (§2.3,
+ *     conformance §8.3), which is what lets the server add events without
+ *     breaking a client that is already shipped.
  */
 
 export const PROTOCOL_VERSION = 1;
 
-/** §6.1. `id` is null on a server-initiated event, and only then. */
+/** §2. Exactly these four keys, `payload` always an object. */
 export interface Envelope<T = unknown> {
   v: number;
   id: string | null;
@@ -18,7 +26,7 @@ export interface Envelope<T = unknown> {
   payload: T;
 }
 
-/** §6.1, closed. An unknown code is a protocol bug, not a new case to handle. */
+/** §3.3, closed. An unknown code is a server bug and is treated as `internal`. */
 export const ERROR_CODES = [
   "proto_version",
   "bad_request",
@@ -44,8 +52,48 @@ export function isErrorCode(x: unknown): x is ErrorCode {
   return typeof x === "string" && (ERROR_CODES as readonly string[]).includes(x);
 }
 
+/**
+ * What a screen should do about an error, from §3.3's table. Kept next to the
+ * codes so the table and the behaviour cannot drift.
+ */
+export type ErrorAction =
+  | "update-client" // proto_version
+  | "log-bug" // bad_request
+  | "relogin" // unauthorized, auth_bad_signature
+  | "rechallenge" // auth_expired, auth_nonce_used
+  | "refresh-map" // not_found
+  | "show-lock" // locked
+  | "back-off" // rate_limited
+  | "wait" // busy
+  | "retry"; // internal
+
+export function actionFor(code: ErrorCode): ErrorAction {
+  switch (code) {
+    case "proto_version":
+      return "update-client";
+    case "bad_request":
+      return "log-bug";
+    case "unauthorized":
+    case "auth_bad_signature":
+      return "relogin";
+    case "auth_expired":
+    case "auth_nonce_used":
+      return "rechallenge";
+    case "not_found":
+      return "refresh-map";
+    case "locked":
+      return "show-lock";
+    case "rate_limited":
+      return "back-off";
+    case "busy":
+      return "wait";
+    case "internal":
+      return "retry";
+  }
+}
+
 // ---------------------------------------------------------------------------
-// §6.3 shared shapes
+// §5 shared shapes
 // ---------------------------------------------------------------------------
 
 export type Land = "rust" | "go";
@@ -63,6 +111,18 @@ export type Verdict =
   | "output_limit"
   | "internal_error";
 
+/** §5.1. `address` is EIP-55 on the wire, both directions (§2.4). */
+export interface User {
+  address: string;
+  name: string;
+  created_at: string;
+  last_seen_at: string;
+  settings: Record<string, unknown>;
+  level: number;
+  xp: number;
+}
+
+/** §5.2 */
 export interface MapNode {
   quest_id: string;
   node: number;
@@ -74,8 +134,40 @@ export interface MapNode {
   x: number;
   y: number;
   kind: "quest" | "boss" | "gate";
+  requires: string[];
+  attempts: number;
 }
 
+/** §5.3. `tests.visible` carries only the shown cases; hidden ones are a count. */
+export interface QuestTests {
+  match: "exact" | "trim" | "tokens" | string;
+  timeout_ms: number;
+  visible: Array<{ name: string; stdin: string; expect: string }>;
+  hidden_count: number;
+}
+
+export interface Quest {
+  id: string;
+  land: Land;
+  category: Category;
+  node: number;
+  title: string;
+  brief: string;
+  story: string;
+  difficulty: Difficulty;
+  time_limit_s: number | null;
+  starter: string;
+  concepts: string[];
+  hints_total: number;
+  hints_used: number;
+  state: NodeState;
+  stars: Stars;
+  tests: QuestTests;
+  /** Omitted entirely until the player has cleared it (§4.8). */
+  solution?: string;
+}
+
+/** §5.4 */
 export interface AttemptCase {
   name: string;
   passed: boolean;
@@ -90,31 +182,41 @@ export interface AttemptMistake {
   code: string | null;
   message: string;
   line: number | null;
+  col: number | null;
 }
 
 export interface Attempt {
   id: string;
+  quest_id: string;
   verdict: Verdict;
   tests_passed: number;
   tests_total: number;
   compile_ms: number;
   run_ms: number;
+  exit_code: number | null;
   stderr: string;
   cases: AttemptCase[];
   mistakes: AttemptMistake[];
   stars: Stars;
+  /** "did *this* submission clear the node", not "is the node cleared". */
   cleared: boolean;
+  created_at: string;
 }
 
+/** §5.5 */
 export interface SearchHit {
   quest_id: string;
   title: string;
+  land: string;
+  category: string;
   snippet: string;
   score: number;
   bm25: number | null;
   cosine: number | null;
+  state: NodeState;
 }
 
+/** §5.6 */
 export interface MistakeStat {
   kind: string;
   label: string;
@@ -122,144 +224,147 @@ export interface MistakeStat {
   last_at: string;
   cleared_since: number;
   example_quest_id: string | null;
-}
-
-/** §2.1 `users`, as it comes back on the wire. */
-export interface User {
-  address: string;
-  address_eip55: string;
-  name: string;
-  created_at: string;
-  last_seen_at: string;
-  settings: Record<string, unknown>;
-}
-
-/**
- * `quest.get`'s quest. `solution` is absent unless the player has cleared it
- * (SPEC §6.2), so it is optional here and must be treated as usually missing.
- */
-export interface Quest {
-  id: string;
-  land: Land;
-  category: Category;
-  node: number;
-  title: string;
-  brief: string;
-  story: string;
-  difficulty: Difficulty;
-  time_limit_s: number | null;
-  starter: string;
-  hints_total: number;
   concepts: string[];
-  solution?: string;
+}
+
+/** §5.7 */
+export interface AttemptBrief {
+  id: string;
+  quest_id: string;
+  verdict: string;
+  tests_passed: number;
+  tests_total: number;
+  created_at: string;
+  kinds: string[];
+}
+
+/** §5.8 */
+export interface Drill {
+  id: string;
+  mode: DrillMode;
+  plan: string[];
+  cursor: number;
+  reason: string;
+  created_at: string;
+}
+
+export type DrillMode = "repeat" | "weakness" | "spaced";
+export type SearchMode = "bm25" | "semantic" | "unified";
+
+export interface CategorySummary {
+  category: Category;
+  total: number;
+  cleared: number;
+  stars: number;
+  /** False while the category's first node is still locked (§4.6). */
+  open: boolean;
 }
 
 // ---------------------------------------------------------------------------
-// §6.2 client → server
+// §4 client → server
 // ---------------------------------------------------------------------------
 
 export interface Requests {
+  ping: Record<string, never>;
   "auth.challenge": { address: string };
-  "auth.login": { address: string; signature: string };
+  "auth.login": { address: string; signature: string; name?: string };
   "auth.resume": { token: string };
   "profile.update": { name?: string; settings?: Record<string, unknown> };
   "world.lands": Record<string, never>;
   "world.map": { land: Land; category: Category };
   "quest.get": { quest_id: string };
-  "quest.submit": { quest_id: string; source: string; lang: Land };
+  "quest.submit": { quest_id: string; lang: Land; source: string };
   "quest.hint": { quest_id: string; index: number };
   "quest.reset": { quest_id: string };
   "search.query": {
     q: string;
-    mode: "bm25" | "semantic" | "unified";
-    filters?: Record<string, unknown>;
+    mode?: SearchMode;
+    filters?: { land?: Land; category?: Category; state?: NodeState };
     limit?: number;
   };
   "stats.summary": Record<string, never>;
-  "stats.mistakes": { limit?: number };
+  "stats.mistakes": { limit?: number; include_learned?: boolean };
   "stats.history": { quest_id?: string; limit?: number };
-  "ai.plan": { mode: "repeat" | "weakness" | "spaced"; land?: Land; size?: number };
+  "ai.plan": { mode: DrillMode; land?: Land; size?: number };
   "ai.next": { drill_id: string };
   "ai.finish": { drill_id: string };
-  ping: Record<string, never>;
 }
 
 export interface Responses {
+  ping: { t: string };
   "auth.challenge": { nonce: string; message: string; expires_at: string };
   "auth.login": { token: string; user: User };
   "auth.resume": { token: string; user: User };
   "profile.update": { user: User };
-  "world.lands": {
-    lands: Array<{
-      land: Land;
-      categories: Array<{ category: Category; total: number; cleared: number }>;
-    }>;
+  "world.lands": { lands: Array<{ land: Land; categories: CategorySummary[] }> };
+  "world.map": {
+    land: Land;
+    category: Category;
+    nodes: MapNode[];
+    /** Pairs of quest ids, given explicitly so a client never infers the shape. */
+    edges: Array<[string, string]>;
   };
-  "world.map": { nodes: MapNode[]; edges: Array<[number, number]> };
   "quest.get": { quest: Quest };
   "quest.submit": { attempt: Attempt };
-  "quest.hint": { hint: string; hints_used: number };
+  "quest.hint": { hint: string; index: number; total: number; hints_used: number };
   "quest.reset": { starter: string };
-  "search.query": { hits: SearchHit[] };
+  "search.query": { hits: SearchHit[]; mode: SearchMode; took_ms: number };
   "stats.summary": {
     cleared: number;
+    total: number;
     attempts: number;
     accuracy: number;
-    streak: number;
+    streak_days: number;
+    stars: number;
     by_land: Array<{ land: Land; cleared: number; total: number }>;
   };
   "stats.mistakes": { mistakes: MistakeStat[] };
   "stats.history": { attempts: AttemptBrief[] };
   "ai.plan": { drill: Drill };
-  "ai.next": { quest: Quest; position: number; total: number };
-  "ai.finish": { summary: Record<string, unknown> };
-  ping: { t: number };
-}
-
-export interface AttemptBrief {
-  id: string;
-  quest_id: string;
-  verdict: Verdict;
-  tests_passed: number;
-  tests_total: number;
-  created_at: string;
-}
-
-export interface Drill {
-  id: string;
-  mode: "repeat" | "weakness" | "spaced";
-  plan: string[];
-  cursor: number;
+  "ai.next": { quest: Quest; position: number; total: number; why: string };
+  "ai.finish": {
+    summary: { attempted: number; cleared: number; kinds_improved: string[] };
+  };
 }
 
 export type RequestType = keyof Requests & keyof Responses;
 
 // ---------------------------------------------------------------------------
-// §6.2 server → client, `id: null`
+// §4.17–§4.21 server → client, `id: null`
 // ---------------------------------------------------------------------------
 
+export type RunStage = "queued" | "compiling" | "running" | "judging";
+export type LogStream = "compile" | "stdout" | "stderr";
+
 export interface Events {
-  "run.log": { attempt_id: string; stream: "compile" | "stdout" | "stderr"; chunk: string };
   "run.stage": {
     attempt_id: string;
-    stage: "queued" | "compiling" | "running" | "judging";
+    stage: RunStage;
+    queued?: number;
+    elapsed_ms: number;
+  };
+  "run.log": {
+    attempt_id: string;
+    stream: LogStream;
+    chunk: string;
+    /** From 0, per stream per attempt, so a gap is detectable (§4.18). */
+    seq: number;
   };
   "progress.update": {
     quest_id: string;
     state: NodeState;
     stars: Stars;
     cleared_total: number;
+    /** The nodes this clear opened, so the map updates without refetching. */
+    unlocked: string[];
   };
-  award: { kind: string; title: string; detail: Record<string, unknown> };
-  "server.bye": { reason: string };
+  award: {
+    kind: "badge" | "stamp" | "level" | "streak" | string;
+    id: string;
+    title: string;
+    detail: Record<string, unknown>;
+  };
+  "server.bye": { reason: "shutdown" | "revoked" | "replaced" | string };
 }
 
 export type EventType = keyof Events;
-
-export const EVENT_TYPES: EventType[] = [
-  "run.log",
-  "run.stage",
-  "progress.update",
-  "award",
-  "server.bye",
-];

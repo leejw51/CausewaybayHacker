@@ -145,10 +145,14 @@ pub fn record_clear(
 ) -> Result<Row> {
     ensure_row(conn, address, quest_id)?;
     let before = get(conn, address, quest_id)?;
+    // Only the failures that came before the first clear count. A player who
+    // clears a node, comes back to play with it and fails four times has not
+    // retroactively made their original clear a worse one.
     let failures: i64 = conn.query_row(
         "SELECT count(*) FROM attempts
-          WHERE address = ?1 AND quest_id = ?2 AND verdict <> 'accepted'",
-        params![address, quest_id],
+          WHERE address = ?1 AND quest_id = ?2 AND verdict <> 'accepted'
+            AND (?3 IS NULL OR created_at < ?3)",
+        params![address, quest_id, before.first_clear_at],
         |r| r.get(0),
     )?;
     let stars = stars_for(failures, before.hints_used).max(before.stars);
@@ -172,6 +176,16 @@ pub fn record_clear(
 pub fn cleared_total(conn: &Connection, address: &str) -> Result<i64> {
     Ok(conn.query_row(
         "SELECT count(*) FROM progress WHERE address = ?1 AND state = 'cleared'",
+        params![address],
+        |r| r.get(0),
+    )?)
+}
+
+/// Every star this player holds, which is what `User.level` and `User.xp` are
+/// derived from (PROTOCOL §5.1).
+pub fn stars_total(conn: &Connection, address: &str) -> Result<i64> {
+    Ok(conn.query_row(
+        "SELECT COALESCE(sum(stars), 0) FROM progress WHERE address = ?1",
         params![address],
         |r| r.get(0),
     )?)

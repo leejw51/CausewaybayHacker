@@ -40,9 +40,11 @@ input:  4 9
 output: 1 2
 ```
 
-`n` goes to 200000. The nested loop is the wrong answer here even when it
-prints the right numbers: the hidden cases are sized so that it does not
-finish.
+The hidden cases here are small: they check the tie-break and the
+no-answer case, not your speed. The question is still the linear one — one
+pass, one hash map — because a real `n` is 200000 and the nested loop is what
+this question exists to weed out. Write the answer the question is asking for,
+not the one that happens to clear these four cases.
 '''
 starter      = '''
 use std::collections::HashMap;
@@ -685,9 +687,13 @@ output: 3
         REACH 12
 ```
 
-`target` goes to 100000. The greedy answer — take the biggest coin that fits,
-repeat — is wrong on `3 6 / 3 4`, and the recursive answer without a table
-recomputes the same amount thousands of times.
+The hidden cases are small, so what they catch is wrongness rather than
+slowness — and one of them catches the usual wrong answer. Greedy, taking the
+biggest coin that fits and repeating, makes `6` out of `3 4` by grabbing the
+`4` and then failing, and there is a case for exactly that. The other bad
+answer, plain recursion with no table, is not caught here and still is not the
+one to write: `target` is 100000 in the real thing and the same amount gets
+recomputed thousands of times.
 '''
 starter      = '''
 use std::io::Read;

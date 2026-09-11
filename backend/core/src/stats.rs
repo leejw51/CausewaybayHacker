@@ -8,23 +8,24 @@ use crate::error::Result;
 #[derive(Debug, Clone, Serialize)]
 pub struct Summary {
     pub cleared: i64,
+    pub total: i64,
     pub attempts: i64,
     /// accepted / total, 0.0 when there is nothing to divide.
     pub accuracy: f64,
     /// Consecutive days, ending today or yesterday, with at least one
     /// attempt. Day-shaped rather than attempt-shaped because that is what a
-    /// player means by a streak; the spec names the field and not the rule,
-    /// so this one is written down in docs/decisions.md.
-    pub streak: i64,
+    /// player means by a streak; PROTOCOL §4.13 names the field and not the
+    /// rule, so this one is written down in docs/decisions.md.
+    pub streak_days: i64,
+    pub stars: i64,
     pub by_land: Vec<LandStat>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct LandStat {
     pub land: String,
-    pub total: i64,
     pub cleared: i64,
-    pub attempts: i64,
+    pub total: i64,
 }
 
 pub fn summary(conn: &Connection, address: &str) -> Result<Summary> {
@@ -63,24 +64,19 @@ pub fn summary(conn: &Connection, address: &str) -> Result<Summary> {
             land: r.get(0)?,
             total: r.get(1)?,
             cleared: r.get::<_, Option<i64>>(2)?.unwrap_or(0),
-            attempts: 0,
         })
     })? {
-        let mut land: LandStat = row?;
-        land.attempts = conn.query_row(
-            "SELECT count(*) FROM attempts a JOIN quests q ON q.id = a.quest_id
-              WHERE a.address = ?1 AND q.land = ?2",
-            params![address, land.land],
-            |r| r.get(0),
-        )?;
-        by_land.push(land);
+        by_land.push(row?);
     }
 
+    let total: i64 = conn.query_row("SELECT count(*) FROM quests", [], |r| r.get(0))?;
     Ok(Summary {
         cleared,
+        total,
         attempts,
         accuracy,
-        streak: streak(conn, address)?,
+        streak_days: streak(conn, address)?,
+        stars: crate::progress::stars_total(conn, address)?,
         by_land,
     })
 }

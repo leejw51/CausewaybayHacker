@@ -19,11 +19,12 @@ import { Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chr
 import { Editor } from "../ui/editor";
 import { Overlay } from "../ui/overlay";
 import { WireError } from "../net/client";
-import type { Attempt, Category, Land, Quest } from "../net/protocol";
+import type { Attempt, Category, Land, Quest, RunStage } from "../net/protocol";
+import { LogBuffer } from "../net/logbuf";
 import { MapScene } from "./map";
 import { ResultScene } from "./result";
 
-type Stage = "idle" | "queued" | "compiling" | "running" | "judging";
+type Stage = "idle" | RunStage;
 
 export class QuestScene implements Scene {
   readonly name = "quest";
@@ -33,12 +34,20 @@ export class QuestScene implements Scene {
   private readonly buttons = new Buttons();
   private stage: Stage = "idle";
   private attemptId: string | null = null;
-  private log: string[] = [];
+  /**
+   * `run.log` chunks may split mid-line and carry a per-stream `seq`
+   * (PROTOCOL §4.18), so the console reads from a buffer that reassembles
+   * lines and notices a gap, rather than printing chunks as if they were
+   * lines.
+   */
+  private log = new LogBuffer("");
+  private elapsedMs = 0;
   private hints: string[] = [];
   private error = "";
   private t = 0;
   private consoleOpen = false;
   private logScroll = 0;
+  private queued = 0;
   private readonly offs: Array<() => void> = [];
 
   constructor(
@@ -50,15 +59,24 @@ export class QuestScene implements Scene {
 
   async enter(): Promise<void> {
     this.offs.push(
+      // §4.17–4.18: both may arrive at any time, including after the reply
+      // they relate to. Filtering on `attempt_id` is what keeps a stale event
+      // from a previous run out of this one's console.
       this.app.client.on("run.stage", (p) => {
         if (this.attemptId && p.attempt_id !== this.attemptId) return;
         this.attemptId = p.attempt_id;
         this.stage = p.stage;
+        this.elapsedMs = p.elapsed_ms;
+        this.queued = p.queued ?? 0;
         this.consoleOpen = true;
       }),
       this.app.client.on("run.log", (p) => {
         if (this.attemptId && p.attempt_id !== this.attemptId) return;
-        this.pushLog(p.stream, p.chunk);
+        if (!this.attemptId) {
+          this.attemptId = p.attempt_id;
+          this.log = new LogBuffer(p.attempt_id);
+        }
+        this.log.push(p.stream, p.chunk, p.seq);
       }),
     );
 
@@ -84,22 +102,12 @@ export class QuestScene implements Scene {
     this.overlay = null;
   }
 
-  private pushLog(stream: string, chunk: string): void {
-    const prefix = stream === "stderr" ? "! " : stream === "compile" ? "· " : "  ";
-    for (const line of chunk.replace(/\n$/, "").split("\n")) this.log.push(prefix + line);
-    // The console is a window onto a compiler, not an archive: the attempt's
-    // full output is on the server (SPEC §1) and the last few hundred lines is
-    // everything a person reads.
-    if (this.log.length > 400) this.log.splice(0, this.log.length - 400);
-    this.logScroll = 0;
-  }
-
   // -- actions -------------------------------------------------------------
 
   private async submit(): Promise<void> {
     if (!this.quest || !this.editor || this.stage !== "idle") return;
-    this.log = [];
     this.attemptId = null;
+    this.log = new LogBuffer("");
     this.stage = "queued";
     this.consoleOpen = true;
     this.error = "";
@@ -110,20 +118,31 @@ export class QuestScene implements Scene {
         lang: this.land,
       });
       this.stage = "idle";
+      this.log.end();
       this.showResult(res.attempt);
     } catch (e) {
       this.stage = "idle";
+      this.log.end();
       this.app.chip.fail();
-      this.error =
-        e instanceof WireError ? `${e.payload.code}: ${e.payload.message}` : "the run failed";
+      // §6.6: a submission that was in flight when the socket dropped is still
+      // running, and its result is durable. Telling the player to resubmit
+      // would queue a second compile for an answer the server already has.
+      const dropped = e instanceof WireError && e.payload.detail.disconnected === true;
+      this.error = dropped
+        ? "the connection dropped — that attempt is still running on the server"
+        : e instanceof WireError
+          ? `${e.payload.code}: ${e.payload.message}`
+          : "the run failed";
     }
   }
 
   private showResult(attempt: Attempt): void {
-    if (attempt.cleared) this.app.chip.clear();
+    // `cleared` is "did *this* submission clear it" (§5.4); a re-solve is
+    // still accepted and still deserves the sound, just not the fanfare.
+    if (attempt.verdict === "accepted") this.app.chip.clear();
     else this.app.chip.fail();
     void this.app.go(
-      new ResultScene(this.app, this.land, this.category, this.questId, attempt, this.log.slice()),
+      new ResultScene(this.app, this.land, this.category, this.questId, attempt),
     );
   }
 
@@ -136,6 +155,7 @@ export class QuestScene implements Scene {
         index: this.hints.length,
       });
       this.hints.push(res.hint);
+      if (this.quest) this.quest.hints_used = res.hints_used;
       this.app.chip.coin();
     } catch {
       this.app.say("no more hints");
@@ -298,7 +318,9 @@ export class QuestScene implements Scene {
   private stageLabel(): string {
     if (this.stage === "idle") return "";
     const dots = ".".repeat(1 + (Math.floor(this.t * 3) % 3));
-    return `${this.stage.toUpperCase()}${dots}`;
+    const queue = this.stage === "queued" && this.queued > 0 ? ` (${this.queued} AHEAD)` : "";
+    const secs = this.elapsedMs > 1500 ? ` ${(this.elapsedMs / 1000).toFixed(1)}S` : "";
+    return `${this.stage.toUpperCase()}${dots}${queue}${secs}`;
   }
 
   /**
@@ -314,17 +336,24 @@ export class QuestScene implements Scene {
     const pad = Math.round(6 * s);
     const lineH = fonts.codeSm.height;
     const rows = Math.max(1, Math.floor((h - pad * 2) / lineH));
-    const flat: string[] = [];
-    for (const line of this.log) {
-      for (const piece of wrap(fonts.codeSm, line, w - pad * 2)) flat.push(piece);
+    const flat: Array<{ stream: string; text: string }> = [];
+    for (const line of this.log.lines) {
+      for (const piece of wrap(fonts.codeSm, line.text, w - pad * 2)) {
+        flat.push({ stream: line.stream, text: piece });
+      }
+    }
+    if (!this.log.complete) {
+      flat.push({ stream: "stderr", text: `[some output was lost: ${[...this.log.gaps].join(", ")}]` });
     }
     const start = Math.max(0, flat.length - rows - this.logScroll);
     clipped(g, x + pad, y + pad, w - pad * 2, h - pad * 2, () => {
       let ly = y + pad;
       for (let i = start; i < Math.min(flat.length, start + rows); i++) {
         const line = flat[i];
-        g.fillStyle = css(line.startsWith("!") ? Theme.red : line.startsWith("·") ? Theme.dim : Theme.grass);
-        printf(g, fonts.codeSm, line, x + pad, ly, w - pad * 2, "left");
+        g.fillStyle = css(
+          line.stream === "stderr" ? Theme.red : line.stream === "compile" ? Theme.dim : Theme.grass,
+        );
+        printf(g, fonts.codeSm, line.text, x + pad, ly, w - pad * 2, "left");
         ly += lineH;
       }
       if (flat.length === 0) {

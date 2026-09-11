@@ -371,6 +371,60 @@ async fn the_whole_slice_end_to_end() {
     );
     assert!(alice.ok("ping", json!({})).await["t"].is_number());
 
+    // §6.4: one in-flight submit per connection. Both frames go out before
+    // either is answered, so the second one meets the flag the first set.
+    alice.next_id += 1;
+    let first_id = format!("c-{}", alice.next_id);
+    alice.next_id += 1;
+    let second_id = format!("c-{}", alice.next_id);
+    for id in [&first_id, &second_id] {
+        alice
+            .socket
+            .send(Message::text(
+                json!({
+                    "v": 1, "id": id, "type": "quest.submit",
+                    "payload": {
+                        "quest_id": "rust.basic.01.hello",
+                        "source": solution_of("rust.basic.01.hello"),
+                        "lang": "rust"
+                    }
+                })
+                .to_string(),
+            ))
+            .await
+            .unwrap();
+    }
+    let mut seen = std::collections::HashMap::new();
+    while seen.len() < 2 {
+        let message =
+            tokio::time::timeout(std::time::Duration::from_secs(120), alice.socket.next())
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+        let Message::Text(text) = message else {
+            continue;
+        };
+        let value: Value = serde_json::from_str(&text).unwrap();
+        match value["id"].as_str() {
+            Some(id) if id == first_id || id == second_id => {
+                seen.insert(id.to_string(), value.clone());
+            }
+            _ => alice.events.push(value),
+        }
+    }
+    assert_eq!(
+        seen[&second_id]["payload"]["code"].as_str(),
+        Some("busy"),
+        "a second submission on one connection must be refused: {:?}",
+        seen[&second_id]
+    );
+    assert_eq!(
+        seen[&first_id]["type"].as_str(),
+        Some("quest.submit.ok"),
+        "the first submission should still have been judged"
+    );
+
     // ---- SPEC §3.5: a second user, on their own connection ----
     let mut bob = Client::connect(server.port).await;
     let (bob_address, _) = bob.login(BOB_KEY).await;

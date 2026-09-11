@@ -214,3 +214,38 @@ CausewaybayWallet's `luacli/causewaybay/ffi.lua` already uses over
 `causewaybay-ffi`. The websocket stays in pure Lua over LuaSocket, which LÖVE
 bundles: RFC 6455 is a few hundred lines and being able to read them beats
 another binary dependency.
+
+## 2026-09-11 — PM: the pack verifier, and a request to QA
+
+SPEC §9.4 and §9.5 are the two tests that keep content honest: every reference
+solution is accepted, every starter is not. They are QA's to own and they do
+not exist yet, so PM wrote a standalone one to author against:
+
+```
+/private/tmp/claude-502/-Volumes-nvidia-vivid-CausewaybayHacker/tools/verify_pack.py
+```
+
+Python 3.13, stdlib only (`tomllib`), no repo dependency. Per quest it
+compiles and runs `solution` and `starter` with the **exact** SPEC §5.1
+commands — `rustc --edition 2021 -O --error-format=json main.rs -o prog`, and
+`go build -o prog main.go` with `GOPROXY=off GOFLAGS=-mod=mod` — against every
+case, under the declared `match` mode. Structurally it checks id shape against
+`<land>.<category>.<node:02d>.<slug>`, node contiguity, that every `requires`
+names a lower node in the same pack, one visible case minimum, `map.x`/`map.y`
+inside 0..1 with a real spread and real direction changes, and that every
+`concepts` entry is in `docs/concepts.md`.
+
+Two checks in it are worth lifting verbatim, because both are silent failures:
+
+1. **No `expect` may be empty after its `match` normalisation.** An empty
+   `fn main() {}` compiles and prints nothing, so an empty expectation means
+   the starter passes and the map clears itself.
+2. **`hacker` ⇔ `time_limit_s` ⇔ a hidden case**, in both directions.
+
+*Request to QA:* take this as the seed of the §9.4/§9.5 content CI, under
+`tests/`. PM will keep running it on every content change either way, but the
+copy that gates a merge should live in QA's tree, not in a scratch directory.
+
+Toolchain checked on this machine, for the record: `rustc 1.97.1`,
+`go1.27.1 darwin/arm64`. A bare `go build -o prog main.go` with no `go.mod`
+and `GOPROXY=off` works, so SPEC §5.1's Go command needs no amendment.

@@ -162,16 +162,19 @@ fn the_rollup_counts_clean_attempts() {
     attempt("att_2", &[("type-mismatch", "E0308")]);
     attempt("att_3", &[]);
 
-    let stats = mistakes::stats(&conn, address, 10).unwrap();
+    let stats = mistakes::stats(&conn, address, 10, true).unwrap();
     let borrow = stats
         .iter()
         .find(|s| s.kind == "borrow-after-move")
         .unwrap();
     let mismatch = stats.iter().find(|s| s.kind == "type-mismatch").unwrap();
     assert_eq!(borrow.count, 1);
+    // §7.2 counts attempts in which the kind did not appear, not attempts
+    // that were clean overall: att_2 made a different mistake and att_3 made
+    // none, and neither of them was a borrow-after-move.
     assert_eq!(
         borrow.cleared_since, 2,
-        "two attempts since the last borrow mistake"
+        "two attempts without a borrow mistake"
     );
     assert_eq!(mismatch.cleared_since, 1);
     assert_eq!(borrow.label, "use after move");

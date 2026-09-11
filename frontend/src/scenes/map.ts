@@ -25,7 +25,8 @@ import { QuestScene } from "./quest";
 export class MapScene implements Scene {
   readonly name = "map";
   private nodes: MapNode[] = [];
-  private edges: Array<[number, number]> = [];
+  /** Pairs of quest ids (PROTOCOL §4.7), given so a client never infers them. */
+  private edges: Array<[string, string]> = [];
   private selected = 0;
   private t = 0;
   private status = "";
@@ -33,6 +34,7 @@ export class MapScene implements Scene {
   private pan: [number, number] = [0, 0];
   private plate: Rect = [0, 0, 1, 1];
   private offProgress: (() => void) | null = null;
+  private offState: (() => void) | null = null;
 
   constructor(
     private readonly app: App,
@@ -42,23 +44,37 @@ export class MapScene implements Scene {
 
   async enter(): Promise<void> {
     this.app.chip.music("stage");
+    // PROTOCOL §6.5: never trust a map cached across a disconnect — a
+    // `progress.update` may have been missed while the socket was down.
+    this.offState = this.app.client.onState((s) => {
+      if (s === "authed") void this.refresh();
+    });
     this.fx = MapFx.create(this.app.fx);
     this.fx?.setLand(this.land);
     // A clear landing while the player is looking at the map is the moment the
     // stamp should appear, so the map listens rather than re-fetching.
+    // PROTOCOL §4.19 carries `unlocked`, so a clear updates the overworld in
+    // place. The event also reaches this user's *other* windows, which is how
+    // two of them stay in step — and why this must not be a refetch storm.
     this.offProgress = this.app.client.on("progress.update", (p) => {
       const n = this.nodes.find((x) => x.quest_id === p.quest_id);
       if (n) {
         n.state = p.state;
         n.stars = p.stars;
       }
-      void this.refresh();
+      for (const id of p.unlocked) {
+        const u = this.nodes.find((x) => x.quest_id === id);
+        if (u && u.state === "locked") u.state = "open";
+      }
+      // A node we have never seen means the map really did change shape.
+      if (!n) void this.refresh();
     });
     await this.refresh();
   }
 
   leave(): void {
     this.offProgress?.();
+    this.offState?.();
     this.fx?.dispose();
     this.fx = null;
     // The WebGL canvas keeps its last frame otherwise, and it would show
@@ -229,11 +245,11 @@ export class MapScene implements Scene {
   }
 
   private drawEdges(g: Ctx): void {
-    const byNode = new Map(this.nodes.map((n) => [n.node, n]));
+    const byId = new Map(this.nodes.map((n) => [n.quest_id, n]));
     const s = this.app.layout.uiScale();
     for (const [from, to] of this.edges) {
-      const a = byNode.get(from);
-      const b = byNode.get(to);
+      const a = byId.get(from);
+      const b = byId.get(to);
       if (!a || !b) continue;
       const [ax, ay] = this.nodeAt(a);
       const [bx, by] = this.nodeAt(b);

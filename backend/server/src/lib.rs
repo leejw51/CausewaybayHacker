@@ -11,7 +11,6 @@ use axum::routing::get;
 use axum::Router;
 use tower_http::services::{ServeDir, ServeFile};
 
-use cwbhacker_core::auth::Challenges;
 use cwbhacker_core::error::{internal, Result};
 use cwbhacker_core::Store;
 
@@ -34,13 +33,11 @@ pub struct Config {
 }
 
 pub fn build_state(store: Arc<Store>, config: &Config) -> Shared {
-    Arc::new(AppState {
+    Arc::new(AppState::new(
         store,
-        challenges: Challenges::new(),
-        art_dir: config.art_dir.clone(),
-        static_dir: config.static_dir.clone(),
-        started_at: cwbhacker_core::time::now_stamp(),
-    })
+        config.art_dir.clone(),
+        config.static_dir.clone(),
+    ))
 }
 
 pub fn router(state: Shared) -> Router {

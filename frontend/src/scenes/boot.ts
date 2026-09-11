@@ -54,7 +54,7 @@ export class BootScene implements Scene {
       this.step = "resuming your session";
       try {
         const user = await this.app.client.resume(token);
-        this.app.addressLabel = user.address_eip55;
+        this.app.addressLabel = user.address;
         return void this.app.go(new LandsScene(this.app));
       } catch {
         // A dead token is not an error worth a banner: the login screen is
