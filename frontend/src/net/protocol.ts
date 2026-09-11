@@ -38,6 +38,11 @@ export const ERROR_CODES = [
   "locked",
   "rate_limited",
   "busy",
+  // §3.3, and it is **not** `internal`. A feature that is real, specified and
+  // merely unbuilt answers this with `detail.milestone`, and a client that
+  // folded it into `internal` would tell the player their machine is broken
+  // and invite them to retry something that will never work.
+  "unavailable",
   "internal",
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -65,6 +70,7 @@ export type ErrorAction =
   | "show-lock" // locked
   | "back-off" // rate_limited
   | "wait" // busy
+  | "next-chapter" // unavailable
   | "retry"; // internal
 
 export function actionFor(code: ErrorCode): ErrorAction {
@@ -87,6 +93,8 @@ export function actionFor(code: ErrorCode): ErrorAction {
       return "back-off";
     case "busy":
       return "wait";
+    case "unavailable":
+      return "next-chapter";
     case "internal":
       return "retry";
   }
@@ -120,6 +128,8 @@ export function playerText(code: ErrorCode): string {
       return "slow down a moment";
     case "busy":
       return "an attempt is already running";
+    case "unavailable":
+      return "that part of the city is still being built";
     case "internal":
       return "the server broke — try again";
   }
@@ -270,6 +280,21 @@ export interface SearchHit {
   state: NodeState;
 }
 
+/**
+ * §5.10. The shelf, as opposed to the fanfare (§4.14b).
+ *
+ * `kind: "stamp"` is deliberately absent from the union even though the live
+ * `award` event can carry it: the per-clear stamp is a moment, not something a
+ * player *has*, and it is never in `stats.awards`.
+ */
+export interface Award {
+  kind: "badge" | "level" | "streak";
+  id: string;
+  title: string;
+  detail: Record<string, unknown>;
+  created_at: string;
+}
+
 /** §5.6 */
 export interface MistakeStat {
   kind: string;
@@ -290,6 +315,13 @@ export interface AttemptBrief {
   tests_total: number;
   created_at: string;
   kinds: string[];
+  /**
+   * Observed on the wire and **not** in §5.7 — see `docs/decisions.md`. It
+   * matters: a `run` never clears a node (§4.9b), so a history that does not
+   * say which kind an attempt was reads as a string of failures on a quest the
+   * player went on to clear. Optional, so an older server still parses.
+   */
+  mode?: AttemptMode;
 }
 
 /** §5.8 */
@@ -390,6 +422,8 @@ export interface Requests {
   "playground.delete": { id: string };
   "stats.summary": Record<string, never>;
   "stats.mistakes": { limit?: number; include_learned?: boolean };
+  /** §4.14b. Documented in PROTOCOL but absent from this file until now. */
+  "stats.awards": Record<string, never>;
   "stats.history": { quest_id?: string; limit?: number };
   "ai.plan": { mode: DrillMode; land?: Land; size?: number };
   "ai.next": { drill_id: string };
@@ -437,6 +471,7 @@ export interface Responses {
     by_land: Array<{ land: Land; cleared: number; total: number }>;
   };
   "stats.mistakes": { mistakes: MistakeStat[] };
+  "stats.awards": { awards: Award[] };
   "stats.history": { attempts: AttemptBrief[] };
   "ai.plan": { drill: Drill };
   "ai.next": { quest: Quest; position: number; total: number; why: string };

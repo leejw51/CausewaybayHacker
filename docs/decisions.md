@@ -4046,3 +4046,119 @@ braces.
 implemented on the server, so there is nothing more to do until milestone 2.
 `profile.update` has no command. The TUI has a node list rather than a drawn
 overworld, and no `x`/`y` map layout.
+## 2026-09-11 — FE2: search, stats and AI mode, built against a server that has not built them
+
+Three new screens — `frontend/src/scenes/{search,stats,ai}.ts` — plus five new
+modules under `src/ui` and `src/net` that hold the parts of them that can be
+*wrong* rather than merely ugly. Everything below was checked against the live
+server on 127.0.0.1:5390, not against a mock.
+
+### What the server actually answers today
+
+Probed on a real authenticated connection:
+
+```
+search.query   (all four modes, with and without filters)  -> unavailable, detail.milestone = 2
+ai.plan / ai.next / ai.finish                              -> unavailable, detail.milestone = 2
+stats.summary / stats.mistakes / stats.history             -> ok
+stats.awards                                               -> ok, { awards: [] }
+```
+
+So two of the three screens open on the `unavailable` path and one is fully
+real. All three are written to render whatever comes back.
+
+### `unavailable` was missing from the client's closed code set
+
+`net/protocol.ts`'s `ERROR_CODES` did not contain `unavailable`, so
+`codec.ts::asError` folded it to `internal` — and every one of those replies
+would have been shown to the player as **"the server broke — try again"**, which
+is the exact failure PROTOCOL §3.3 spends a paragraph forbidding. Added, with
+its own `ErrorAction` (`next-chapter`) and its own `playerText`.
+
+`net/milestone.ts` detects it **both ways** — `code === "unavailable"` *or*
+`detail.unknown_code === "unavailable"` — and reads `detail.milestone` from
+either. The fold preserves `detail`, so the second form still carries the
+milestone; the tolerance exists so a merge that lands an older `protocol.ts` on
+top degrades to the right words instead of silently back to "the server broke".
+
+### Three states, not two
+
+Every one of these screens has an unbuilt state, a built-but-empty state and a
+state with data, and the middle one is the one a new player sees. `ui/coach.ts`
+gives each of §7.3's three plans its own answer for *why* it is empty —
+`repeat` with nothing failed is not `weakness` with nothing classified is not
+`spaced` with nothing cleared — and each points somewhere. They are unit-tested
+because `ai.plan` cannot be made to return an empty plan by hand today.
+
+### `stats.mistakes` is asked with `include_learned: true`
+
+§4.14's default hides any kind whose `cleared_since` has reached five — which is
+exactly the moment worth showing. The screen asks for all of them and keeps the
+beaten ones in a BEATEN section under the live ones. A drill list that drops a
+kind the instant it is beaten throws away the only evidence a player ever gets
+that the loop worked.
+
+### The shelf needs a catalogue on the client, and that is deliberate
+
+`stats.awards` returns only what the player *has*. DESIGN drew `badge_slot` so
+an unearned badge reads as a thing you can go and get, which only works if the
+client knows what the gettable things are — so `ui/awards.ts` carries the
+sixteen single-instance awards from BE's own table, earned ones first and empty
+sockets after. The three open-ended families (`tamed-<kind>`, `level-<n>`,
+`cleared-<land>-<category>`) are deliberately **not** drawn as sockets: there is
+no fixed number of them and a socket labelled "LEVEL 37" is a promise this
+client has no business making. An award id the client has never heard of still
+gets a badge rather than a hole.
+
+### Nav: F4 / F5 / F6, and one thing I did not do
+
+`app.ts` gains a module-level `AUX` map and one block in `wireKeys` — F4 search,
+F5 stats, F6 AI, next to F1/F2/F3, dynamically imported like the login screen.
+Cross-navigation between the three, and the way out, is `ui/auxnav.ts`, drawn on
+all three and touching nothing existing.
+
+**What is missing is a visible entry point from the map or the lands screen.**
+`map.ts`'s `barLayout()` is hand-written width arithmetic with a one-line and a
+two-line case, and three more ids do not fit either without rewriting it; the
+lands screen's bottom band is one button tall. Both are FE's hottest files and
+the change is not small. **Requested of FE:** three buttons appended to the
+map bar's tail group (`menu`, `play`, then `search`, `stats`, `ai`), with
+`barLayout`'s `menuW`/`tailLeft` arithmetic widened to match, and the three ids
+handed to `openAux()` from `ui/auxnav.ts` in the existing `onBar` branch.
+
+### For PM — three things §4.12/§4.16/§5.7 do not say
+
+1. **`SearchHit.bm25` has no stated sign convention.** §8.1 uses SQLite's
+   `bm25()`, which is negative-is-better; §5.5 calls the field only
+   "component". A screen that draws a bar has to know which end is good.
+   `ui/relevance.ts` detects it — all values ≤ 0 means lower-is-better — and
+   never compares the two columns against each other, because §8.3 is explicit
+   that they are not on one scale. Please pin the convention in §5.5.
+2. **§4.16 does not say what `ai.next` does at `cursor === 0`,** nor whether
+   `Drill.plan` may be empty. A new player with no mistakes is the normal case
+   for `weakness`, and "empty plan" and "not_found" are different screens. This
+   client treats an empty `plan` as a legitimate answer and says which kind of
+   empty it is.
+3. **`ai.next`'s `position` and `Drill.cursor` have no stated base.** §4.16's
+   example shows `"position": 2, "total": 5` and §5.8 says only
+   `cursor: number`. This client assumes **0-based** — the head reads
+   `position + 1 OF total` and the plan strip marks `i < position` complete. If
+   the server is 1-based the head reads one ahead and the strip marks one pip
+   too many, and neither is detectable from the client without a live drill,
+   which `unavailable` currently makes impossible. Please state the base.
+4. **`AttemptBrief` carries `mode: "run" | "submit"` on the wire and §5.7 does
+   not list it.** It matters: a run never clears a node (§4.9b), so a history
+   that does not distinguish them reads as a string of failures on a quest the
+   player went on to clear. Added to the client type as optional and printed.
+   Related, and worth resolving rather than guessing: **SPEC §7.2 says
+   `cleared_since` is updated "on every attempt", while BE's own note says it
+   only moves on a submit.** The number on screen means different things under
+   the two readings, and the live history does show `mode: "run"` rows carrying
+   `kinds`.
+
+### A pre-existing rendering fault, not ours
+
+After an orientation change (`__cwbCapture.orient()`, and presumably F1) a dark
+rectangle roughly 0.6 × 0.6 of the canvas is left in the top-left of `#game`.
+It is on the **lands** screen too, so it predates these three and is not in FE2's
+files — most likely a buffer in `gfx/crt.ts` that is not resized. Flagging only.

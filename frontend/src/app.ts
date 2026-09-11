@@ -69,6 +69,20 @@ const CRT_KEY = "cwbhacker.crt";
  */
 const TRAUMA_DECAY = 1.9;
 
+/**
+ * The three screens SPEC §10 lists after the main run — search, stats, ai.
+ *
+ * They are on function keys next to F1/F2/F3 and reachable from every screen
+ * for the same reason the orientation toggle is: a way in that only exists on
+ * one screen is a way in nobody finds. Imported on demand, exactly as
+ * `logout()` imports the login screen, so the shell does not depend on them.
+ */
+const AUX: Record<string, ((app: App) => Promise<Scene>) | undefined> = {
+  f4: async (app) => new (await import("./scenes/search")).SearchScene(app),
+  f5: async (app) => new (await import("./scenes/stats")).StatsScene(app),
+  f6: async (app) => new (await import("./scenes/ai")).AiScene(app),
+};
+
 /** A screen change, in the direction of travel. */
 export type Direction = "forward" | "back" | "none";
 
@@ -840,6 +854,19 @@ export class App {
       if (name === "f3") {
         ev.preventDefault();
         if (this.client.state === "authed") void this.logout();
+        return;
+      }
+      // F4/F5/F6: search, stats, AI mode. See `AUX` above. They need a session
+      // like every other screen that asks the server anything, and they refuse
+      // to re-enter the screen you are already on — F5 twice on the stats
+      // screen would otherwise re-run four requests and replay the arrival.
+      const aux = AUX[name];
+      if (aux) {
+        ev.preventDefault();
+        if (this.client.state !== "authed") return;
+        const already = { f4: "search", f5: "stats", f6: "ai" }[name];
+        if (this.scene?.name === already) return;
+        void aux(this).then((s) => this.go(s, "forward"));
         return;
       }
 
