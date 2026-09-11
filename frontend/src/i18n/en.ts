@@ -384,6 +384,7 @@ export const en = {
   "stats.log": "THE LOG",
   "stats.drillTab": "THE DRILL — {n}",
   "stats.shelfTab": "THE SHELF — {have} OF {of}",
+  "stats.haveOf": "{have} OF {of}",
   "stats.logTab": "THE LOG — {n}",
   "stats.stillCatching": "STILL CATCHING YOU",
   "stats.nothingCatching": "NOTHING IS STILL CATCHING YOU",

@@ -22,6 +22,7 @@ local PURE = {
   "tests.test_client",
   "tests.test_session",
   "tests.test_store",
+  "tests.test_i18n",
   "tests.test_display",
   "tests.test_anim",
   "tests.test_clock",
@@ -36,6 +37,7 @@ local PURE = {
 --- Suites that need a LÖVE graphics context.
 local GRAPHICAL = {
   "tests.test_layout",
+  "tests.test_fonts",
 }
 
 function M.run()

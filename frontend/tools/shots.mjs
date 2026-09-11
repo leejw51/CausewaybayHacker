@@ -377,7 +377,18 @@ async function main() {
     if ((await scene()) === "lands") return;
     await page.goto(`${BASE}/`);
     await pastTitle();
-    await at("login", 45000);
+    // A stored token resumes straight to the lobby, so "wait for the login
+    // screen" is only right when there is no session. Waiting for either is
+    // what this actually means, and the group that asked to be signed in does
+    // not care which way it got there.
+    const end = Date.now() + 45000;
+    for (;;) {
+      const now = await scene();
+      if (now === "lands") return;
+      if (now === "login") break;
+      if (Date.now() > end) throw new Error(`still on ${now}, wanted login or lands`);
+      await page.waitForTimeout(200);
+    }
     const field = page.locator("textarea.cwb-field");
     await field.waitFor({ timeout: 15000 });
     await field.fill(KEY);
@@ -673,6 +684,40 @@ async function main() {
     await page.waitForTimeout(400);
     await settle(2);
     await shot("61-playground-portrait");
+  });
+
+  // ---- the three panels behind F4, F5 and F6 -----------------------------
+  //
+  // They had no shots at all, which meant the three densest screens in the
+  // game — a search result list, forty-odd stat labels, a coaching panel —
+  // were the three nobody had ever looked at in another language. They go last
+  // because the Korean pass leaves the language switched, and last is the one
+  // place that costs nothing.
+  const panels = async (tag) => {
+    await size(LAND);
+    await signIn();
+    for (const [key, name, n] of [
+      ["F4", "search", 0],
+      ["F5", "stats", 1],
+      ["F6", "ai", 2],
+    ]) {
+      await page.keyboard.press(key);
+      await at(name, 20000);
+      await settle(2);
+      await shot(`9${n}-${name}${tag}`);
+      await page.keyboard.press("Escape");
+      await at("lands", 20000);
+      await page.waitForTimeout(300);
+    }
+  };
+
+  await group("panels", async () => {
+    await panels("");
+  });
+
+  await group("panels-korean", async () => {
+    await language("ko");
+    await panels("-korean");
   });
 
   await browser.close();

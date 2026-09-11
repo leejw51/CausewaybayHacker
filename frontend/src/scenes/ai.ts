@@ -26,7 +26,17 @@ import type { App, Scene } from "../app";
 import { ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme, type RGBA } from "../engine/theme";
 import { clipped, fill, pixBtn, type Ctx, type Rect } from "../engine/ui";
-import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import {
+  arriving,
+  Buttons,
+  footer,
+  footerH,
+  frame,
+  GO,
+  header,
+  RUST,
+  titledPanel,
+} from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
@@ -582,7 +592,7 @@ export class AiScene implements Scene {
         printf(g, fonts.stationSm, q.concepts.join(" · ").toUpperCase(), x, cy, w, "left");
         cy += fonts.stationSm.height + Math.round(8 * s);
       }
-      const briefBottom = y + h - btnH - Math.round(10 * s) - Math.round(26 * s);
+      const briefBottom = y + h - btnH - Math.round(10 * s) - footerH(this.app.layout);
       if (cy < briefBottom) {
         g.fillStyle = css(Theme.cream, 0.7);
         const lines = wrap(fonts.small, q.brief, w - Math.round(4 * s));
@@ -594,7 +604,7 @@ export class AiScene implements Scene {
     }
 
     // --- the plan, as a row of pips ---------------------------------------
-    const pipY = y + h - btnH - Math.round(26 * s);
+    const pipY = y + h - btnH - footerH(this.app.layout);
     this.drawPlanStrip(g, [x, pipY, w, Math.round(18 * s)], s);
 
     this.drawActions(g, [x, y + h - btnH, w, btnH], s, [

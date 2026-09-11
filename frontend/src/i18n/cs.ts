@@ -240,7 +240,11 @@ export const cs: Partial<Catalogue> = {
   "result.output_limit": "PŘÍLIŠ MNOHO VÝSTUPU",
   "result.internal_error": "SERVER SE SLOŽIL",
   "result.unavailable": "KRAJ GO SE OTEVŘE V DALŠÍ KAPITOLE",
-  "result.streetCleared": "ULICE SPLNĚNA",
+  // The sibling LÖVE client ships this exact phrase, reviewed, as "ULICE
+  // HOTOVA!" — so this one is theirs rather than mine. `splněno` stays for a
+  // quest node, which is *passed* rather than finished; see the note at the
+  // top of this file.
+  "result.streetCleared": "ULICE HOTOVA",
   "result.stillGood": "POŘÁD DOBRÉ",
   "result.notYet": "JEŠTĚ NE",
   "result.verdict": "VERDIKT",
@@ -370,6 +374,7 @@ export const cs: Partial<Catalogue> = {
   "stats.log": "DENÍK",
   "stats.drillTab": "TRÉNINK — {n}",
   "stats.shelfTab": "POLICE — {have} Z {of}",
+  "stats.haveOf": "{have} Z {of}",
   "stats.logTab": "DENÍK — {n}",
   "stats.stillCatching": "CO TĚ POŘÁD CHYTÁ",
   "stats.nothingCatching": "UŽ TĚ NIC NECHYTÁ",

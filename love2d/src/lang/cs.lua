@@ -1,0 +1,202 @@
+-- Czech — the interface, keyed by the English string it replaces.
+--
+-- `src/i18n.lua` looks each of these up by the English text the call site
+-- wrote, so a string with no entry here simply stays English rather than
+-- turning into a key name. That is the property that makes a partial
+-- translation a usable screen.
+--
+-- **Key names are not translated.** `TAB`, `ENTER`, `ESC`, `F5`, `CTRL-S` and
+-- `ARROWS` are what is printed on the keyboard in front of the player; the
+-- verbs around them are what changes. `RUST`, `GO` and `CAUSEWAYBAY` are
+-- names and are left alone for the same reason.
+--
+-- **Technical terms stay in English on purpose**: borrow checker, goroutine,
+-- channel, trait, lifetime, mutex. That is what programmers writing Czech
+-- actually write, and an invented calque would be less clear than the English
+-- rather than more.
+-- Czech needs `č ř š ž ů ě`, which **both** Latin pixel faces already carry —
+-- so Czech draws in Press Start 2P like English does, not in the fallback.
+
+return {
+  -- UNREVIEWED: Czech has **three** plural classes — 1, 2-4, and 5+ — and the
+  -- call sites give it two. The two-form split was added to stop English
+  -- reading "1 days"; it is right for ko/yue/zh/ja, which do not inflect, and
+  -- it still leaves Czech wrong in the 2-4 band ("2 slov" where a speaker
+  -- says "2 slova", "2 dní" for "2 dny", "2 řádků" for "2 řádky"). Fixing it
+  -- properly means a plural rule per language, which is a larger change than
+  -- this round should make quietly — so it is written down rather than
+  -- shipped as if it were correct. Affects: %d word(s), %d day(s),
+  -- %d line(s), %d sample(s).
+  -- UNREVIEWED: "vzorky" for sample test cases; "ukazkove pripady" may read better
+  ["%d / %d samples"] = "vzorky %d / %d",
+  ["%d lines   %d bytes"] = "%d řádků   %d bajtů",
+  ["%d lines   %d bytes%s"] = "%d řádků   %d bajtů%s",
+  ["%d word"] = "%d slovo",
+  ["%d words"] = "%d slov",
+  ["A drill picked from your own mistakes, and a line saying why. It opens in chapter %s."] = "Cvičení vybrané z tvých vlastních chyb, i s řádkem proč. Otevře se v kapitole %s.",
+  ["A drill picked from your own mistakes. Not in this build."] = "Cvičení vybrané z tvých vlastních chyb. V tomto buildu není.",
+  ["COMPILE %dms   RUN %dms   EXIT %s"] = "COMPILE %dms   RUN %dms   EXIT %s",
+  ["CWBH_SERVER=%s is overriding this run — the field is saved for next launch"] = "CWBH_SERVER=%s přebíjí tento běh — zadaná hodnota se uloží na příští spuštění",
+  ["DISPLAY NAME  (OPTIONAL)"] = "ZOBRAZOVANÉ JMÉNO  (NEPOVINNÉ)",
+  ["Deriving an address needs the small Rust library in love2d/ffi. Build it once and restart:"] = "Odvození adresy potřebuje malou Rust knihovnu v love2d/ffi. Jednou ji sestav a restartuj:",
+  ["ENTER create and sign in   C copy   ESC cancel"] = "ENTER vytvořit a přihlásit   C kopírovat   ESC zrušit",
+  ["FORMAT is not on this server yet"] = "FORMAT na tomto serveru zatím není",
+  ["MNEMONIC OR PRIVATE KEY  (F2 SHOWS IT)"] = "MNEMONIC NEBO PRIVÁTNÍ KLÍČ  (F2 ZOBRAZÍ)",
+  ["Nothing here yet. Every run and every submit is kept — including the ones that did not work, which are the ones worth keeping."] = "Zatím tu nic není. Každé spuštění i každé odevzdání se uchovává — včetně těch, co nevyšly, a právě ty stojí za uchování.",
+  ["Nothing yet. Every compiler error you make gets classified and lands here, and the drills are built from it — so this fills up by playing, not by trying to fill it up."] = "Zatím nic. Každá chyba překladače, kterou uděláš, se zařadí a přistane tady, a cvičení se staví z ní — takže tohle se plní hraním, ne snahou to naplnit.",
+  ["One box over every quest, in three rankings at once. It opens in chapter %s."] = "Jedno pole přes všechny questy, ve třech pořadích naráz. Otevře se v kapitole %s.",
+  ["One box over every quest, in three rankings at once. Not in this build."] = "Jedno pole přes všechny questy, ve třech pořadích naráz. V tomto buildu není.",
+  ["RUN is not on this server yet — SUBMIT still works"] = "RUN na tomto serveru zatím není — SUBMIT funguje dál",
+  ["SERVER  (ENTER APPLIES)"] = "SERVER  (ENTER POUŽIJE)",
+  ["TAB field   F2 reveal   N new wallet   ENTER apply/sign in"] = "TAB pole   F2 odkrýt   N nová peněženka   ENTER použít/přihlásit",
+  ["The plan will be a fixed ordered list, so a reconnect resumes the same session rather than reshuffling it — and every step will say why it was chosen."] = "Plán bude pevně seřazený seznam, takže po opětovném připojení pokračuje stejná session a nepřehazuje se — a u každého kroku bude napsáno, proč byl vybrán.",
+  ["This builds a session out of the mistakes you have actually made, so it needs you to have made some. Play a few streets — the errors get classified as they happen — and come back."] = "Tohle staví session z chyb, které jsi opravdu udělal, takže nějaké potřebuje. Projdi pár ulic — chyby se zařazují, jak vznikají — a vrať se.",
+  ["Type and press ENTER. It searches every quest in both lands — titles, briefs, concepts and the story text."] = "Napiš a stiskni ENTER. Prohledá každý quest v obou zemích — názvy, zadání, pojmy i text příběhu.",
+  ["When it lands, each hit will show why it matched — the fused score and the two rankings behind it, so a match on the words reads differently from a match on the meaning."] = "Až to přijde, u každého výsledku bude vidět, proč se trefil — sloučené skóre i obě pořadí za ním, takže shoda na slovech se čte jinak než shoda na významu.",
+  ["Write them on paper, in order. Anyone who reads them owns the account, and nobody — not this game, not the server — can recover them for you."] = "Napiš si je na papír, po pořádku. Kdokoli je přečte, vlastní účet, a nikdo — ani tato hra, ani server — ti je nedokáže obnovit.",
+  ["Your most frequent is %s, %d times. Press ENTER and this will find different shapes of it."] = "Nejčastěji děláš %s, %d×. Stiskni ENTER a najde to různé podoby téhož.",
+  ["a fresh page"] = "čistá stránka",
+  ["a run is still going"] = "ještě běží jedno spuštění",
+  ["a submission is already running"] = "už běží jedno odevzdání",
+  ["already tidy"] = "už je to upravené",
+  ["attempted %d   cleared %d"] = "pokusů %d   hotovo %d",
+  ["built from your own record, not from a language model"] = "postaveno z tvého vlastního záznamu, ne z jazykového modelu",
+  ["clear the category before it first"] = "nejdřív dokonči předchozí kategorii",
+  ["copied — paste it somewhere safe, then clear the clipboard"] = "zkopírováno — vlož to někam bezpečně a pak vyčisti schránku",
+  ["could not generate a wallet"] = "peněženku se nepodařilo vytvořit",
+  ["could not open $EDITOR"] = "$EDITOR se nepodařilo otevřít",
+  ["deriving and signing locally"] = "odvozuji a podepisuji lokálně",
+  ["hint %d of %d — costs stars"] = "nápověda %d z %d — stojí hvězdy",
+  ["hints %d/%d  (F7)"] = "nápovědy %d/%d  (F7)",
+  ["in use: %s  [%s]"] = "používá se: %s  [%s]",
+  ["loaded back from $EDITOR"] = "načteno zpět z $EDITORu",
+  ["no more hints"] = "další nápovědy nejsou",
+  ["not connected to %s"] = "není připojeno k %s",
+  ["nothing matched %q"] = "nic neodpovídá %q",
+  ["private key"] = "privátní klíč",
+  ["starter code restored"] = "výchozí kód obnoven",
+  -- UNREVIEWED: "knihovna klicu" — the library derives keys; not a term in common use
+  ["the key library is not built"] = "knihovna klíčů není sestavená",
+  ["the key library returned %d words, not 12"] = "knihovna klíčů vrátila %d slov, ne 12",
+  ["this wallet:  "] = "tato peněženka:  ",
+  ["twelve words, or 0x + 64 hex"] = "dvanáct slov, nebo 0x + 64 hex",
+  ["waiting for the compiler…"] = "čekám na překladač…",
+  ["WEAKNESS"] = "SLABINA",
+  ["REPEAT"] = "OPAKOVÁNÍ",
+  -- UNREVIEWED: spaced repetition — "rozlozene opakovani" is the textbook term; this is the shortened label
+  ["SPACED"] = "ROZLOŽENÉ",
+  ["Groups your mistakes by kind, takes the ones you keep making, and finds five different shapes of the same problem — including quests you have already cleared. This is the one that teaches."] = "Seskupí tvé chyby podle druhu, vezme ty, které děláš pořád, a najde pět různých podob téhož problému — včetně questů, které už máš hotové. Tohle je ten režim, který učí.",
+  ["The quests you failed most, hardest first. The plain 'do it again until it sticks'."] = "Questy, které ti nejčastěji nevyšly, od nejtěžších. Prostě „dělej to, dokud to nesedne“.",
+  ["Cleared quests due for review. Three stars comes back in two weeks, one star in two days."] = "Hotové questy, které je čas zopakovat. Tři hvězdy se vrátí za dva týdny, jedna hvězda za dva dny.",
+  ["grammar. the streets you already walked."] = "gramatika. ulice, kterými jsi už prošel.",
+  ["threads, mutexes, lifetimes, channels."] = "threads, mutexy, lifetimes, channels.",
+  ["timed. the whiteboard is watching."] = "na čas. tabule se dívá.",
+  ["ownership, borrows, lifetimes"] = "ownership, borrows, lifetimes",
+  ["goroutines, channels, interfaces"] = "goroutines, channels, interfaces",
+  -- UNREVIEWED: "fused" ranking — no settled term
+  ["both rankings, fused"] = "obě pořadí sloučená",
+  ["the words you typed"] = "slova, která jsi napsal",
+  ["what you meant"] = "co jsi tím myslel",
+  ["ran"] = "proběhlo",
+  ["did not compile"] = "nepřeložilo se",
+  ["stopped early"] = "skončilo předčasně",
+  ["took too long"] = "trvalo to příliš dlouho",
+  ["printed too much"] = "vypsalo toho příliš",
+  ["now SUBMIT — %d hidden case has not run yet"] = "teď SUBMIT — %d skrytý případ ještě neproběhl",
+  ["now SUBMIT — %d hidden cases have not run yet"] = "teď SUBMIT — %d skrytých případů ještě neproběhlo",
+  ["now SUBMIT to record it against the node"] = "teď SUBMIT a zapíše se to k tomuto uzlu",
+  ["runs do not count against your stars — but they are kept, and what went wrong feeds your drills"] = "spuštění se nepočítá proti hvězdám — ale ukládá se, a co se pokazilo, se promítne do tvých cvičení",
+  ["%d sample"] = "%d vzorek",
+  ["TESTS  match %s   %d hidden"] = "TESTY  shoda %s   skrytých %d",
+  ["nothing has run yet"] = "zatím nic neproběhlo",
+  ["%d day"] = "%d den",
+  ["SUBMITS"] = "ODEVZDÁNÍ",
+  ["ACCURACY"] = "PŘESNOST",
+  ["STREAK"] = "SÉRIE",
+  ["%d days"] = "%d dní",
+  ["learned — out of the drill"] = "naučeno — mimo drill",
+  ["you did this on your last submit"] = "tohle jsi udělal při posledním odevzdání",
+  ["one clean submit since"] = "od té doby jedno čisté odevzdání",
+  ["%d clean submits since — %d to go"] = "od té doby %d čistých odevzdání — zbývá %d",
+  ["ANY KEY skip"] = "JAKÁKOLIV KLÁVESA přeskočit",
+  ["ARROWS node   ENTER play   P playground   T stats   ESC back"] = "ŠIPKY uzel   ENTER hrát   P hřiště   T statistiky   ESC zpět",
+  ["PICK A LAND"] = "VYBER ZEMI",
+  ["%s LAND"] = "ZEMĚ %s",
+  ["SIGN IN"] = "PŘIHLÁŠENÍ",
+  ["WRITE THIS DOWN"] = "OPIŠ SI TO",
+  ["STATS"] = "STATISTIKY",
+  ["SEARCH"] = "HLEDÁNÍ",
+  ["AI MODE"] = "REŽIM AI",
+  ["PLAYGROUND"] = "HŘIŠTĚ",
+  ["SHELF"] = "POLICE",
+  ["CLEARED"] = "HOTOVO",
+  ["STARS"] = "HVĚZDY",
+  ["DIFFICULTY"] = "OBTÍŽNOST",
+  ["CONCEPTS"] = "POJMY",
+  ["CASES"] = "PŘÍPADY",
+  ["HINT"] = "NÁPOVĚDA",
+  ["READY"] = "PŘIPRAVENO",
+  ["HACKER"] = "HACKER",  -- UNREVIEWED: kept as the English category name
+  ["SNIPPETS"] = "ÚRYVKY",
+  ["STDIN"] = "STANDARDNÍ VSTUP",
+  ["STDERR"] = "STANDARDNÍ CHYBOVÝ VÝSTUP",
+  ["UNAVAILABLE"] = "ZATÍM NENÍ",
+  ["DRILL FINISHED"] = "DRILL DOKONČEN",  -- UNREVIEWED: `drill` has no settled Czech equivalent in this sense
+  ["NOTHING TO DRILL YET"] = "ZATÍM NENÍ CO PROCVIČOVAT",
+  ["NOT BUILT YET"] = "JEŠTĚ NENÍ HOTOVO",
+  ["KEY LIBRARY NOT BUILT"] = "KNIHOVNA KLÍČŮ NENÍ SESTAVENA",
+  ["WHAT WENT WRONG"] = "CO SE POKAZILO",
+  ["WHAT THE COMPILER SAID"] = "CO ŘEKL PŘEKLADAČ",
+  ["RECENT SUBMITS AND RUNS"] = "POSLEDNÍ ODEVZDÁNÍ A SPUŠTĚNÍ",
+  ["YOUR MISTAKES — THIS IS THE CURRICULUM"] = "TVÉ CHYBY — TOHLE JE TEN KURZ",
+  ["a kind leaves the drill after five clean submits"] = "druh chyby opustí drill po pěti čistých odevzdáních",
+  ["%d / %d CLEARED"] = "%d / %d HOTOVO",
+  ["%d ATTEMPTS"] = "%d pokusů",
+  ["%d samples"] = "%d ukázek",
+  ["+%d hidden"] = "+%d skrytých",
+  ["all cases"] = "všechny případy",
+  ["SUGGESTED AFTER %s"] = "DOPORUČENO PO %s",
+  ["drill: %s"] = "drill: %s",  -- UNREVIEWED: same
+  ["last seen on %s"] = "naposledy na %s",
+  ["asking the server…"] = "ptám se serveru…",
+  ["searching…"] = "hledám…",
+  ["loading…"] = "načítám…",
+  ["no attempt"] = "žádný pokus",
+  ["not on this server"] = "na tomhle serveru není",
+  ["nothing saved yet"] = "zatím nic uloženého",
+  ["nothing on it yet — clear a street and the first one lands"] = "zatím je prázdná — dojdi jednu ulici a první přibude",
+  ["already cleared — stars keep the best run"] = "už hotovo — hvězdy si drží nejlepší pokus",
+  ["a run never clears a node — SUBMIT does"] = "spuštění nikdy nedokončí uzel — to dělá SUBMIT",
+  ["output truncated at 256 KiB"] = "výstup useknut na 256 KiB",
+  ["nothing typed here is ever sent. only a signature leaves this machine."] = "nic, co sem napíšeš, se neodesílá. tenhle stroj opouští jen podpis.",
+  ["this is the only copy. there is no reset."] = "tohle je jediná kopie. reset neexistuje.",
+  ["this signs in and takes you to the map."] = "tímhle se přihlásíš a půjdeš na mapu.",
+  ["your wallet is your account"] = "tvoje peněženka je tvůj účet",
+  ["improved: "] = "zlepšeno: ",
+  ["RUN  F5"] = "SPUSTIT  F5",
+  ["SUBMIT  F10"] = "ODEVZDAT  F10",
+  ["FORMAT  F2"] = "FORMÁTOVAT  F2",
+  ["RUNNING…"] = "BĚŽÍ…",
+  ["JUDGING…"] = "HODNOTÍM…",
+  ["CTRL-N new"] = "CTRL-N nový",
+  ["F8 hide"] = "F8 skrýt",
+  ["ESC map"] = "ESC mapa",
+  ["ENTER sign in"] = "ENTER přihlásit",
+  ["ARROWS choose   ENTER go   ESC back"] = "ŠIPKY výběr   ENTER dál   ESC zpět",
+  ["ARROWS choose   ENTER go   P playground"] = "ŠIPKY výběr   ENTER dál   P hřiště",
+  ["ARROWS mode   ENTER start   N next   F finish   ESC back"] = "ŠIPKY režim   ENTER start   N další   F konec   ESC zpět",
+  ["ENTER retry   ESC map   ARROWS scroll"] = "ENTER znovu   ESC mapa   ŠIPKY posun",
+  ["R refresh   H history   ARROWS scroll   ESC back"] = "R obnovit   H historie   ŠIPKY posun   ESC zpět",
+  ["TYPE to search   ENTER go   TAB mode   ARROWS pick   ESC back"] = "PIŠ pro hledání   ENTER dál   TAB režim   ŠIPKY výběr   ESC zpět",
+  -- Two spaces between the pairs rather than three, and the imperative
+  -- rather than the infinitive for each verb (`spusť`, not `spustit`): this
+  -- is the one hint in the client longer than a 720-wide portrait footer can
+  -- hold, and Czech is the language that finds it. A hint is an instruction,
+  -- so the imperative is the better Czech anyway — it is shorter by accident
+  -- rather than by compromise.
+  ["F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"] = "F5 spusť  F2 formát  TAB jazyk  CTRL-S ulož  CTRL-N nový  ESC zpět",
+  ["F6 reset   F7 hint   F8 log   F9 $EDITOR   ESC map"] = "F6 reset   F7 nápověda   F8 log   F9 $EDITOR   ESC mapa",
+  ["BASIC"] = "ZÁKLADY",
+  ["ADVANCED"] = "POKROČILÉ",
+  ["OPEN"] = "OTEVŘENO",
+}

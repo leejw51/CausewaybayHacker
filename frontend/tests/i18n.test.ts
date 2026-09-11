@@ -96,18 +96,20 @@ describe("the locale list", () => {
     for (const l of LOCALES) expect(l.label.length).toBeGreaterThan(0);
   });
 
-  it("asks for a CJK pixel font exactly where one is needed", () => {
+  it("asks for the CJK face exactly where one is needed", () => {
     // English and Czech are covered by Press Start 2P and VT323 — verified
     // against both fonts' `cmap` tables, upper case and lower, diacritics
-    // included — so they must not pull a 900 KB face they do not use.
+    // included — so they must not pull a 6.4 MB face they do not use. The
+    // other direction matters more than it looks: the Noto subset does *not*
+    // carry `č` or `ř`, so a Czech that reached for it would be half-drawn.
     const need = LOCALES.filter((l) => l.font !== null).map((l) => l.id);
     expect(need).toEqual(["ko", "yue", "zh", "ja"]);
+    // One face, one family name, one download, shared by all four.
+    const families = new Set(LOCALES.map((l) => l.font?.family).filter(Boolean));
+    expect([...families]).toEqual(["NotoSansCJK"]);
     for (const l of LOCALES) {
       if (!l.font) continue;
-      expect(l.font.file).toMatch(/^\/fonts\/fusion-pixel\/.*\.woff2$/);
-      // One family name per file. Sharing a name across four faces invites the
-      // browser to pick whichever it loaded first.
-      expect(LOCALES.filter((o) => o.font?.family === l.font?.family)).toHaveLength(1);
+      expect(l.font.file).toMatch(/^\/fonts\/noto-sans-cjk\/.*\.woff2$/);
     }
   });
 });

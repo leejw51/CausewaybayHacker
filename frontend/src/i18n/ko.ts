@@ -358,6 +358,7 @@ export const ko: Partial<Catalogue> = {
   "stats.log": "기록",
   "stats.drillTab": "훈련 — {n}",
   "stats.shelfTab": "진열장 — {of} 중 {have}",
+  "stats.haveOf": "{of} 중 {have}",
   "stats.logTab": "기록 — {n}",
   "stats.stillCatching": "아직 당신을 잡는 것들",
   "stats.nothingCatching": "당신을 잡는 것이 남아 있지 않습니다",

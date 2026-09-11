@@ -25,6 +25,7 @@ local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
+local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Ease = require("src.ease")
 local Anim = require("src.anim")
@@ -476,15 +477,21 @@ function Map:draw()
   elseif self.error then
     UI.text(self.error, 0, vh / 2, 10, Theme.red, "center", vw)
   elseif not self.nodes then
-    UI.text("asking the server…", 0, vh / 2, 10,
+    UI.text(I18n.t("asking the server…"), 0, vh / 2, 10,
       Theme.withAlpha(Theme.cream, 0.7), "center", vw)
   end
 
   self:draw_iris()
 
-  self.app:footer(self.walk
+  self.app:footer(I18n.t(self.walk
     and "ANY KEY skip"
-    or "ARROWS node   ENTER play   TAB land   Q category   P playground   T stats   ESC back")
+    -- **Not a second listing of TAB and Q.** Those two switch the land and
+    -- the category, and both are buttons in this screen's own header a couple
+    -- of centimetres above — the row that exists precisely so the switch is
+    -- visible. Repeating them here made the longest hint in the client, the
+    -- only one still clipping in Korean at the readable type ladder, and it
+    -- bought nothing the header does not already say.
+    or "ARROWS node   ENTER play   P playground   T stats   ESC back"))
 end
 
 --- The header: two land buttons, three category tabs, the count.
@@ -521,66 +528,110 @@ end
 
 function Map:draw_header()
   local vw = Layout.vw
-  local scale = Layout.uiScale()
-  local h = 56
+  -- **Every number in this row is measured from the type in it.** It was
+  -- authored against a 10 px land label and an 8 px category tab in a 56 px
+  -- band; at twice that ladder the two land buttons overlapped each other and
+  -- the three category tabs ran off the end of the row.
+  local land_size, cat_size, tag_size = 10, 8, 7
+  local label_h = UI.lineHeight(land_size)
+  local bh = math.max(38, label_h + 18)
+  local h = bh + 18
   UI.setColor(Theme.ink, 0.88)
   love.graphics.rectangle("fill", 0, 0, vw, h)
   love.graphics.setColor(1, 1, 1, 1)
 
   self.land_rects = {}
   self.category_rects = {}
+  self.header_h = h
 
-  -- The lands, each with its mascot, so the button is recognised before it is
-  -- read (docs/art.md §4.1).
+  -- What the row needs if nothing is squeezed, and what it actually has.
+  local mascot = bh - 10
+  local land_w = 0
+  for _, land in ipairs(LANDS) do
+    land_w = math.max(land_w, mascot + 8 + UI.textWidth(I18n.t(land:upper()), land_size) + 10)
+  end
+  local cat_w = 0
+  for _, category in ipairs(CATEGORIES) do
+    cat_w = math.max(cat_w, UI.textWidth(I18n.t(category:upper()), cat_size) + 16)
+  end
+  local tab_tag = UI.textWidth("TAB", tag_size) + 8
+  local q_tag = UI.textWidth("Q", tag_size) + 8
+  local wanted = 10 + #LANDS * (land_w + 6) + tab_tag
+    + #CATEGORIES * (cat_w + 4) + q_tag + 10
+  -- Too narrow for all of it — a portrait canvas in a language with wide
+  -- glyphs — so the two key tags go first and then everything shrinks
+  -- proportionally. Shrinking is the last resort, not the first.
+  local show_tags = wanted <= vw
+  if not show_tags then
+    wanted = wanted - tab_tag - q_tag
+    tab_tag, q_tag = 0, 0
+  end
+  if wanted > vw then
+    local squeeze = (vw - 20 - #LANDS * 6 - #CATEGORIES * 4)
+      / math.max(1, #LANDS * land_w + #CATEGORIES * cat_w)
+    land_w = math.floor(land_w * squeeze)
+    cat_w = math.floor(cat_w * squeeze)
+  end
+
   local x = 10
-  local bw, bh = math.min(92, math.floor(vw * 0.13)), 38
+  local by = (h - bh) / 2
   for _, land in ipairs(LANDS) do
     local on = land == self.land
     local tint = Theme.land[land] or Theme.coin
     UI.setColor(on and tint or Theme.withAlpha(Theme.dim, 0.45))
-    love.graphics.rectangle("fill", x, 9, bw, bh)
+    love.graphics.rectangle("fill", x, by, land_w, bh)
     love.graphics.setLineWidth(2)
     UI.setColor(on and Theme.cream or Theme.withAlpha(Theme.cream, 0.3))
-    love.graphics.rectangle("line", x + 1, 10, bw - 2, bh - 2)
+    love.graphics.rectangle("line", x + 1, by + 1, land_w - 2, bh - 2)
     love.graphics.setColor(1, 1, 1, 1)
-    Assets.sprite(MASCOT[land], x + 18, 9 + bh - 4, bh - 10,
+    Assets.sprite(MASCOT[land], x + 4 + mascot / 2, by + bh - 4, mascot,
       { alpha = on and 1 or 0.45 })
-    UI.text(land:upper(), x + 32, 9 + (bh - 10) / 2, 10,
+    love.graphics.setScissor(x, by, land_w, bh)
+    UI.text(I18n.t(land:upper()), x + mascot + 6, by + (bh - label_h) / 2, land_size,
       on and Theme.ink or Theme.withAlpha(Theme.cream, 0.55))
-    self.land_rects[land] = { x = x, y = 9, w = bw, h = bh }
-    x = x + bw + 6
+    love.graphics.setScissor()
+    self.land_rects[land] = { x = x, y = by, w = land_w, h = bh }
+    x = x + land_w + 6
   end
 
-  UI.text("TAB", x - 2, 9, 7, Theme.withAlpha(Theme.cream, 0.4))
-  x = x + 22
+  if show_tags then
+    UI.text(I18n.t("TAB"), x, by, tag_size, Theme.withAlpha(Theme.cream, 0.4))
+    x = x + tab_tag
+  end
 
-  -- The categories.
-  local cw = math.min(96, math.floor((vw - x - 120) / #CATEGORIES) - 4)
+  local ch = math.max(28, UI.lineHeight(cat_size) + 12)
+  local cy = (h - ch) / 2
   for _, category in ipairs(CATEGORIES) do
     local on = category == self.category
     UI.setColor(on and Theme.panel or Theme.withAlpha(Theme.dim, 0.4))
-    love.graphics.rectangle("fill", x, 14, cw, 28)
+    love.graphics.rectangle("fill", x, cy, cat_w, ch)
     love.graphics.setLineWidth(2)
     UI.setColor(on and Theme.coin or Theme.withAlpha(Theme.cream, 0.25))
-    love.graphics.rectangle("line", x + 1, 15, cw - 2, 26)
+    love.graphics.rectangle("line", x + 1, cy + 1, cat_w - 2, ch - 2)
     love.graphics.setColor(1, 1, 1, 1)
-    local label = category:upper()
-    UI.text(label, x + (cw - UI.textWidth(label, 8)) / 2, 23, 8,
+    local label = I18n.t(category:upper())
+    love.graphics.setScissor(x, cy, cat_w, ch)
+    UI.text(label, x + (cat_w - UI.textWidth(label, cat_size)) / 2,
+      cy + (ch - UI.lineHeight(cat_size)) / 2, cat_size,
       on and Theme.ink or Theme.withAlpha(Theme.cream, 0.6))
-    self.category_rects[category] = { x = x, y = 14, w = cw, h = 28 }
-    x = x + cw + 4
+    love.graphics.setScissor()
+    self.category_rects[category] = { x = x, y = cy, w = cat_w, h = ch }
+    x = x + cat_w + 4
   end
-  UI.text("Q", x + 2, 21, 7, Theme.withAlpha(Theme.cream, 0.4))
+  if show_tags then
+    UI.text("Q", x + 2, cy, tag_size, Theme.withAlpha(Theme.cream, 0.4))
+    x = x + q_tag
+  end
 
   local cleared, total = 0, 0
   for _, node in ipairs(self.nodes or {}) do
     total = total + 1
     if node.state == "cleared" then cleared = cleared + 1 end
   end
-  local progress = ("%d / %d CLEARED"):format(cleared, total)
-  local pw = UI.textWidth(progress, math.floor(10 * scale))
+  local progress = I18n.t("%d / %d CLEARED", cleared, total)
+  local pw = UI.textWidth(progress, land_size)
   if vw - 10 - pw > x + 16 then
-    UI.text(progress, vw - 10 - pw, 20, math.floor(10 * scale), Theme.cream)
+    UI.text(progress, vw - 10 - pw, (h - label_h) / 2, land_size, Theme.cream)
   end
 end
 
@@ -634,6 +685,10 @@ end
 
 function Map:draw_nodes()
   if not self.nodes then return end
+  -- **Art**, not type. A node marker is a picture, and a picture on a canvas
+  -- half again as tall should be half again as big — that is the one thing
+  -- `uiScale` is still right for. Type went the other way this round: see
+  -- `Layout.uiScale`'s note for why a pixel face may not be multiplied by 1.5.
   local scale = Layout.uiScale()
   for i, node in ipairs(self.nodes) do
     local x, y = self:node_xy(node)
@@ -682,7 +737,7 @@ function Map:draw_nodes()
     if node.state == "cleared" then
       if Assets.marker("stamp_cleared", x, y, size * 1.15) then
         local w = UI.textWidth("CLEARED", 6)
-        UI.text("CLEARED", x - w / 2, y - 3, 6, Theme.cream)
+        UI.text(I18n.t("CLEARED"), x - w / 2, y - 3, 6, Theme.cream)
       else
         UI.setColor(Theme.admit)
         love.graphics.circle("line", x, y, size * 0.5)
@@ -745,8 +800,8 @@ end
 function Map:draw_mei()
   local x, y, facing, moving = self:mei_position()
   if not x then return end
-  local scale = Layout.uiScale()
-  local height = 46 * scale
+  -- Art again: Mei is a sprite, so she grows with the canvas.
+  local height = 46 * Layout.uiScale()
 
   -- A soft shadow so she sits on the plate rather than floating over it.
   UI.setColor(Theme.ink, 0.28)
@@ -767,9 +822,15 @@ function Map:draw_node_card(node)
   -- Tall enough for the last row. The difficulty bar and the "needs …" line
   -- were both added after this number was first picked, and the blocker — the
   -- one thing a locked node has to tell you — was the line that fell off.
-  local h = 112
+  -- Measured from its four rows of type rather than fixed at 112: the title,
+  -- the id, the state, and the difficulty/stars row, plus a last line for the
+  -- suggested route.
+  local title_h, id_h = UI.lineHeight(11), UI.lineHeight(7)
+  local state_h, meta_h = UI.lineHeight(9), UI.lineHeight(7)
+  local h = 10 + title_h + 2 + id_h + 6 + state_h + 6
+    + math.max(meta_h, UI.lineHeight(8)) + 6 + id_h + 8
   local x = portrait and 12 or (vw - w - 16)
-  local y = vh - h - 30
+  local y = vh - h - UI.footerHeight() - 10
 
   UI.panel(x, y, w, h, {
     fill = Theme.withAlpha(Theme.navy, 0.94),
@@ -786,22 +847,36 @@ function Map:draw_node_card(node)
     end
   end
   local color = Theme.cream
-  UI.text(("%02d  %s"):format(node.node, node.title or ""), x + 12, y + 10, 11, color)
-  UI.text(node.quest_id or "", x + 12, y + 28, 7, Theme.withAlpha(color, 0.6))
+  local r1 = y + 10
+  local r2 = r1 + title_h + 2
+  local r3 = r2 + id_h + 6
+  local r4 = r3 + state_h + 6
+  -- The card's own width, minus the boss portrait when there is one. A quest
+  -- title is content and can be any length, so this is the one line on the
+  -- screen that must be given a width rather than trusted to be short.
+  local title_w = w - 24 - boss_w
+  UI.text(("%02d  %s"):format(node.node, node.title or ""), x + 12, r1, 11,
+    color, "left", title_w)
+  UI.text(node.quest_id or "", x + 12, r2, 7, Theme.withAlpha(color, 0.6),
+    "left", title_w)
 
   local state_color = ({ open = Theme.coin, cleared = Theme.admit })[node.state]
     or Theme.cream
-  UI.text((node.state or "?"):upper(), x + 12, y + 44, 9, state_color)
+  UI.text(I18n.t((node.state or "?"):upper()), x + 12, r3, 9, state_color)
   -- Difficulty is a segmented bar; stars are stars. Two scales, two shapes,
   -- and a row of text between them (design review §4).
-  UI.text("DIFFICULTY", x + 12, y + 62, 7, Theme.withAlpha(color, 0.6))
-  UI.pips(x + 12 + UI.textWidth("DIFFICULTY ", 7), y + 60, node.difficulty or 1, 5)
-  local attempts = ("%d ATTEMPTS"):format(node.attempts or 0)
-  UI.text(attempts, x + w - 12 - boss_w - UI.textWidth(attempts, 8), y + 62, 8,
+  local star = math.max(10, math.floor(UI.lineHeight(7) * 0.8))
+  local pip = math.max(6, math.floor(star * 0.6))
+  local dl = I18n.t("DIFFICULTY") .. " "
+  UI.text(dl, x + 12, r4, 7, Theme.withAlpha(color, 0.6))
+  UI.pips(x + 12 + UI.textWidth(dl, 7), r4, node.difficulty or 1, pip)
+  local attempts = I18n.t("%d ATTEMPTS", node.attempts or 0)
+  UI.text(attempts, x + w - 12 - boss_w - UI.textWidth(attempts, 8), r4, 8,
     Theme.withAlpha(color, 0.7))
-  UI.text("STARS", x + w - 12 - boss_w - 3 * 13 - UI.textWidth("STARS ", 7), y + 46, 7,
+  local sl = I18n.t("STARS") .. " "
+  UI.text(sl, x + w - 12 - boss_w - 3 * (star + 3) - UI.textWidth(sl, 7), r3, 7,
     Theme.withAlpha(color, 0.6))
-  UI.stars(x + w - 12 - boss_w - 3 * 13, y + 44, node.stars or 0, 10)
+  UI.stars(x + w - 12 - boss_w - 3 * (star + 3), r3, node.stars or 0, star)
 
   -- `requires` is the suggested route, and saying so is the whole point: it
   -- answers "where next" without ever being a refusal.
@@ -809,7 +884,7 @@ function Map:draw_node_card(node)
     local after = node.requires[1]
     local blocker = self.by_id[after] and self.nodes[self.by_id[after]]
     if blocker and blocker.state ~= "cleared" then
-      UI.text("SUGGESTED AFTER " .. after, x + 12, y + h - 16, 7,
+      UI.text(I18n.t("SUGGESTED AFTER %s", after), x + 12, y + h - 8 - id_h, 7,
         Theme.withAlpha(Theme.cyan, 0.8))
     end
   end

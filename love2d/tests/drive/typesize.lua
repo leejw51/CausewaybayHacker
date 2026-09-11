@@ -35,6 +35,44 @@ local function on_login(app) return app.scene_name == "login" end
 
 local seen = {}
 
+--- Anything drawn wider than the canvas it is drawn on, at the size it was
+--- actually drawn at.
+---
+--- The probes below are all about the **code panes**, because that is what
+--- the control is for. But the same control now scales every label in the
+--- client, and at step 4 a heading authored at 18 asks for 88 px — which is
+--- `PICK A LAND` at 968 px on a 720-wide portrait canvas. Nothing was
+--- watching that, so this wraps `UI.text` from the test side (no production
+--- change) and records every unwrapped draw that ran off the edge.
+-- Keyed by type step, because the question is not "does anything ever clip"
+-- but "does it clip at a size a player did not ask for". Step 1 is the
+-- default and step 2 is one press; those must be clean. Steps 3 and 4 are a
+-- deliberate request for type this big on a canvas this small, and prose that
+-- runs past the edge there is reported rather than failed.
+local overflow = {}
+local function watch_text()
+  local UI = require("src.ui")
+  local Layout = require("src.layout")
+  if UI.__watched then return end
+  UI.__watched = true
+  local real = UI.text
+  UI.text = function(text, x, y, size, colour, align, limit, ...)
+    -- A draw with a limit is a draw that wraps; only the unwrapped ones can
+    -- run off the edge.
+    if limit == nil and type(text) == "string" and #text > 0 then
+      local w = UI.textWidth(text, size)
+      if (x or 0) + w > Layout.vw + 1 then
+        local step = Layout.font
+        overflow[step] = overflow[step] or {}
+        local key = tostring(text):sub(1, 28)
+        overflow[step][key] =
+          math.max(overflow[step][key] or 0, (x or 0) + w - Layout.vw)
+      end
+    end
+    return real(text, x, y, size, colour, align, limit, ...)
+  end
+end
+
 --- Everything a bigger font could have broken, in one line of output.
 local function probe(tag)
   return function(app)
@@ -88,6 +126,7 @@ local function add_all(list)
   for _, step in ipairs(list) do add(step) end
 end
 
+add({ until_ = function() watch_text(); return true end })
 add({ orient = "landscape" })
 add({ wait = 0.6 })
 add({ until_ = function(app) return app.scene_name == "login" or app.session.authed end,
@@ -125,9 +164,7 @@ add({ shot = "T3-playground-big-portrait-full.png" })
 
 add({ click = chip("fullscreen") })
 add({ wait = 1.8 })
-add({ click = chip("orient") })      -- portrait -> automatic
-add({ wait = 0.8 })
-add({ click = chip("orient") })      -- automatic -> landscape
+add({ orient = "landscape" })
 add({ wait = 1.0 })
 add({ until_ = probe("playground/4 land again"), timeout = 5 })
 
@@ -178,24 +215,103 @@ add({ shot = "T6-quest-big-portrait-full.png" })
 
 add({ click = chip("fullscreen") })
 add({ wait = 1.8 })
-add({ click = chip("orient") })
-add({ wait = 0.8 })
-add({ click = chip("orient") })
+add({ orient = "landscape" })
 add({ wait = 1.0 })
 add_all(set_step(1))
 add({ until_ = probe("quest/1 land again"), timeout = 5 })
+
+-- ------------------------------------------------- the screens made of labels
+
+-- `lands` and `map` are not code panes; they are headings, cards and chips,
+-- and step 4 is three presses away from the default. Portrait is the hard
+-- shape because it is the narrow one.
+add({ key = "escape" })
+add({ until_ = scene("map"), timeout = 15 })
+add_all(set_step(4))
+add({ orient = "portrait" })
+add({ wait = 1.2 })
+add({ until_ = probe("map/4 port"), timeout = 5 })
+add({ shot = "T7-map-big-portrait.png" })
+
+add({ key = "t" })
+add({ until_ = scene("stats"), timeout = 15 })
+add({ wait = 1.0 })
+add({ until_ = probe("stats/4 port"), timeout = 5 })
+add({ shot = "T8-stats-big-portrait.png" })
+add({ key = "escape" })
+add({ until_ = scene("map"), timeout = 10 })
+
+add({ key = "escape" })
+add({ until_ = scene("categories"), timeout = 15 })
+add({ wait = 0.8 })
+add({ until_ = probe("categories/4 port"), timeout = 5 })
+add({ shot = "T9-categories-big-portrait.png" })
+
+add({ key = "escape" })
+add({ until_ = scene("lands"), timeout = 15 })
+add({ wait = 0.8 })
+add({ until_ = probe("lands/4 port"), timeout = 5 })
+add({ shot = "TA-lands-big-portrait.png" })
+
+-- And the controls themselves are still reachable at the far end of the
+-- ladder, on the narrow shape. They were not: see `chip_h` in `src/ui.lua`.
+add({ until_ = function(app)
+    local L = require("src.layout")
+    local bad = {}
+    for _, name in ipairs({ "fullscreen", "orient", "font", "lang" }) do
+      local r = app.display_rects and app.display_rects[name]
+      if not r then
+        bad[#bad + 1] = name .. " was not drawn"
+      elseif r.x < 0 or r.y < 0 or r.x + r.w > L.vw + 0.5 or r.y + r.h > L.vh + 0.5 then
+        bad[#bad + 1] = ("%s at %d,%d %dx%d is outside %dx%d")
+          :format(name, r.x, r.y, r.w, r.h, L.vw, L.vh)
+      end
+    end
+    if #bad > 0 then
+      print("FAIL: display controls off the canvas at step 4: "
+        .. table.concat(bad, "; "))
+      return false
+    end
+    print("the four display controls are all on-canvas at step 4, portrait")
+    return true
+  end, timeout = 5 })
+
+-- The same four screens at the **default** step, which is the size a player
+-- who never touches the control sees. A clip here is a defect; a clip at the
+-- far end of the ladder is a preference meeting a small canvas.
+add_all(set_step(1))
+add({ wait = 0.8 })
+add({ until_ = probe("lands/1 port"), timeout = 5 })
+add({ key = "return" })
+add({ until_ = scene("categories"), timeout = 15 })
+add({ wait = 0.8 })
+add({ until_ = probe("categories/1 port"), timeout = 5 })
+add({ key = "return" })
+add({ until_ = function(app) return app.scene_name == "map" and app.scene.nodes end,
+      timeout = 15 })
+add({ wait = 0.8 })
+add({ until_ = probe("map/1 port"), timeout = 5 })
+add({ key = "t" })
+add({ until_ = scene("stats"), timeout = 15 })
+add({ wait = 1.0 })
+add({ until_ = probe("stats/1 port"), timeout = 5 })
+add({ key = "escape" })
+add({ until_ = scene("map"), timeout = 10 })
+add({ orient = "landscape" })
+add({ wait = 1.0 })
+add({ until_ = probe("map/1 land"), timeout = 5 })
 
 -- ------------------------------------------------------------------ the point
 
 add({ until_ = function()
     local ok = true
     for tag, s in pairs(seen) do
-      if (s.rows or 0) < 3 then
+      if s.rows and s.rows < 3 then
         print(("FAIL: %s has %s rows — the pane cannot hold a program")
           :format(tag, tostring(s.rows)))
         ok = false
       end
-      if not s.caret_visible then
+      if s.rows and not s.caret_visible then
         print(("FAIL: %s scrolled the caret off the pane (line %s, scroll shows %s rows)")
           :format(tag, tostring(s.line), tostring(s.rows)))
         ok = false
@@ -240,6 +356,28 @@ add({ until_ = function()
         print(("FAIL: the cycle did not return to the size it started at (%s)")
           :format(pair[1]))
         ok = false
+      end
+    end
+    -- The label screens. A code pane clips on purpose — it scrolls — but a
+    -- heading that runs off the canvas is just gone.
+    for step = 1, 4 do
+      local over = {}
+      for text, px in pairs(overflow[step] or {}) do
+        over[#over + 1] = ("%s (+%dpx)"):format(text, px)
+      end
+      table.sort(over)
+      if #over == 0 then
+        print(("step %d: nothing ran off the canvas"):format(step))
+      elseif step <= 2 then
+        print(("FAIL: step %d is the default (or one press from it) and %d "
+          .. "strings ran off the canvas:"):format(step, #over))
+        for _, line in ipairs(over) do print("    " .. line) end
+        ok = false
+      else
+        print(("step %d: %d strings run past the edge — reported, not failed; "
+          .. "this step is a request for type this big on a canvas this small")
+          :format(step, #over))
+        for _, line in ipairs(over) do print("    " .. line) end
       end
     end
     if ok then

@@ -56,6 +56,22 @@ local KNOCKOUT = {
 
 local FONT_FILE = "assets/fonts/PressStart2P-Regular.ttf"
 local MONO_FILE = "assets/fonts/VT323-Regular.ttf"
+--- GNU Unifont, 5.1 MB, taken whole from `CausewaybayOffice/love2d`.
+---
+--- **One face for every script this interface speaks.** 58,909 glyphs — the
+--- whole Basic Multilingual Plane — so Korean, Japanese kana, Chinese,
+--- Cantonese's own characters (嘅 咗 喺 冇) *and* Czech's `č ř š ž ů ě` all
+--- come out of one file. The obvious alternative, a Noto Sans CJK subset, is
+--- 11.2 MB and does **not** carry the Czech diacritics, which would have made
+--- four hard languages work and quietly broken the easy one.
+---
+--- And it is a **bitmap** face by design: 8×16 px per cell, 16 px wide for a
+--- double-width ideograph. That is the wallet's "the font is baked, not
+--- shrunk" argument satisfied natively rather than approximated — there is no
+--- size at which it needs antialiasing to look right, because it was drawn on
+--- the pixel grid this game draws on. Sizes are multiples of 8 for exactly
+--- that reason; see `A.snap8`.
+local CJK_FILE = "assets/fonts/unifont.otf"
 
 -- ------------------------------------------------------------------ knockout
 
@@ -242,36 +258,106 @@ end
 
 -- --------------------------------------------------------------------- fonts
 
---- A Press Start 2P face at `size`, cached.
+--- Round a pixel size onto the 8-pixel grid both faces are drawn on.
+---
+--- **This is the whole of the "integer scale" rule, applied where it belongs.**
+--- Press Start 2P is an 8×8 design and GNU Unifont is 8×16; at 9, 10 or 15 px
+--- a one-pixel stem lands on a fraction of a screen pixel and the rasteriser
+--- either smears it grey or drops it. `CausewaybayWallet`'s README calls that
+--- out in as many words — *"at 2.5× a one-pixel line lands on half a screen
+--- pixel … and the whole illusion goes"* — and this client was doing it at
+--- every label, because the authored ladder was 7, 8, 9, 10, 11, 12, 13.
+---
+--- `CausewaybayOffice` avoids it by only ever asking for 8 and 16. Same rule,
+--- one function: every size this module hands to the rasteriser is a multiple
+--- of 8, so no glyph is ever resampled.
+function A.snap8(size)
+  return math.max(8, math.floor((tonumber(size) or 8) / 8 + 0.5) * 8)
+end
+
+--- Unifont at `size`, or nil when the file is not there.
+---
+--- Lazily loaded and cached per size: 5.1 MB is not something to read on a
+--- frame that does not need it, and a client whose assets did not ship must
+--- still start and say so rather than crash on a missing font.
+local cjk_data = nil
+local function cjk_font(size)
+  local key = "u" .. size
+  if A.fonts[key] ~= nil then return A.fonts[key] or nil end
+  if cjk_data == nil then
+    cjk_data = love.filesystem.getInfo(CJK_FILE)
+      and love.filesystem.newFileData(CJK_FILE) or false
+  end
+  if not cjk_data then return nil end
+  -- `"mono"` hinting, as `CausewaybayOffice` does it: a bitmap face wants no
+  -- hinting decisions made for it, and the greys that the default hinting
+  -- puts on the edges are the thing a nearest filter turns into blocks.
+  local ok, font = pcall(love.graphics.newFont, cjk_data, size, "mono")
+  if not ok or not font then
+    A.fonts[key] = false
+    return nil
+  end
+  font:setFilter("nearest", "nearest")
+  A.fonts[key] = font
+  return font
+end
+
+A.cjk_font = cjk_font
+
+--- Attach Unifont behind `font`, so anything the Latin face cannot draw is
+--- drawn rather than shown as a box.
+---
+--- **Two faces, not one, and the fallback is per-glyph.** Press Start 2P
+--- keeps drawing the ASCII range, so English is pixel for pixel what it has
+--- always been; Korean, Japanese, Chinese and Cantonese come out of Unifont.
+--- Czech could come from either — both faces have `č ř š ž ů ě` — and it
+--- comes from Press Start 2P because that face wins wherever it has the
+--- glyph, which is what keeps a Czech sentence looking like the rest of the
+--- game rather than like a fallback.
+local function with_fallback(font, size)
+  local cjk = cjk_font(size)
+  if cjk and font.setFallbacks then pcall(font.setFallbacks, font, cjk) end
+  return font
+end
+
+--- A Press Start 2P face at `size`, cached. `size` is snapped to the grid.
 ---
 --- Press Start 2P is the game's voice and is used for every label. The code
 --- editor uses `A.mono` instead, because a player has to read their own
 --- program in it and an 8×8 pixel face at 11px is not that.
 function A.font(size)
-  size = math.max(6, math.floor(size))
+  size = A.snap8(size)
   local key = "p" .. size
   if not A.fonts[key] then
+    local font
     if love.filesystem.getInfo(FONT_FILE) then
-      A.fonts[key] = love.graphics.newFont(FONT_FILE, size)
+      font = love.graphics.newFont(FONT_FILE, size, "mono")
     else
-      A.fonts[key] = love.graphics.newFont(size)
+      font = love.graphics.newFont(size)
     end
-    A.fonts[key]:setFilter("nearest", "nearest")
+    font:setFilter("nearest", "nearest")
+    A.fonts[key] = with_fallback(font, size)
   end
   return A.fonts[key]
 end
 
 --- The editor face: VT323, a terminal font that is still a pixel font.
+---
+--- Snapped to the same grid, and carrying the same fallback: a player can
+--- paste a Chinese comment into the editor, and a box where a character
+--- should be would look like the client had corrupted their program.
 function A.mono(size)
-  size = math.max(8, math.floor(size))
+  size = A.snap8(size)
   local key = "m" .. size
   if not A.fonts[key] then
+    local font
     if love.filesystem.getInfo(MONO_FILE) then
-      A.fonts[key] = love.graphics.newFont(MONO_FILE, size)
+      font = love.graphics.newFont(MONO_FILE, size, "mono")
     else
-      A.fonts[key] = love.graphics.newFont(size)
+      font = love.graphics.newFont(size)
     end
-    A.fonts[key]:setFilter("nearest", "nearest")
+    font:setFilter("nearest", "nearest")
+    A.fonts[key] = with_fallback(font, size)
   end
   return A.fonts[key]
 end

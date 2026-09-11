@@ -36,6 +36,7 @@ local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
+local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Anim = require("src.anim")
 local Ease = require("src.ease")
@@ -96,50 +97,56 @@ function Stats:draw()
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
 
-  local s = Layout.uiScale()
-  UI.setColor(Theme.ink, 0.9)
+    UI.setColor(Theme.ink, 0.9)
   love.graphics.rectangle("fill", 0, 0, vw, 44)
   love.graphics.setColor(1, 1, 1, 1)
-  UI.text("STATS", 12, 12, math.floor(15 * s), Theme.coin)
+  UI.text(I18n.t("STATS"), 12, 12, 15, Theme.coin)
 
   local pad = Layout.isPortrait() and 12 or 46
   local w = vw - pad * 2
   local y = 52
 
-  y = self:draw_summary(pad, y, w, s) + 10
+  y = self:draw_summary(pad, y, w) + 10
   y = self:draw_shelf(pad, y, w) + 10
   self:draw_mistakes(pad, y, w, vh - y - 44)
 
-  self.app:footer("R refresh   H history   ARROWS scroll   ESC back")
+  self.app:footer(I18n.t("R refresh   H history   ARROWS scroll   ESC back"))
 end
 
-function Stats:draw_summary(x, y, w, s)
-  local h = 92
+function Stats:draw_summary(x, y, w)
+  -- Measured from the type it holds. Every offset in this panel used to be a
+  -- constant tuned against 7 px captions and 14 px figures; at twice that the
+  -- caption sat on the figure and the figure sat on the bar.
+  local cap_h, fig_h, land_h = UI.lineHeight(7), UI.lineHeight(14), UI.lineHeight(7)
+  local h = 10 + cap_h + 2 + fig_h + 10 + 9 + 6 + land_h + 8
   UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = Theme.coin })
   local sm = self.summary
   if not sm then
     UI.text(self.errors["stats.summary"] and self.errors["stats.summary"].player
-      or "asking the server…", x, y + 32, 9,
+      or I18n.t("asking the server…"), x, y + 32, 9,
       self.errors["stats.summary"] and Theme.red or Theme.withAlpha(Theme.cream, 0.7),
       "center", w)
     return y + h
   end
 
   local cells = {
-    { "CLEARED", ("%d / %d"):format(sm.cleared or 0, sm.total or 0) },
-    { "SUBMITS", tostring(sm.attempts or 0) },
-    { "ACCURACY", ("%d%%"):format(math.floor((sm.accuracy or 0) * 100 + 0.5)) },
-    { "STARS", tostring(sm.stars or 0) },
-    { "STREAK", ("%d day%s"):format(sm.streak_days or 0,
-      (sm.streak_days or 0) == 1 and "" or "s") },
+    { I18n.t("CLEARED"), ("%d / %d"):format(sm.cleared or 0, sm.total or 0) },
+    { I18n.t("SUBMITS"), tostring(sm.attempts or 0) },
+    { I18n.t("ACCURACY"), ("%d%%"):format(math.floor((sm.accuracy or 0) * 100 + 0.5)) },
+    { I18n.t("STARS"), tostring(sm.stars or 0) },
+    -- Two forms, chosen at the call site and each translatable on its own.
+    -- Routing both through one "%d days" made English read "1 days", which is
+    -- the one language that must never be the casualty of adding five more.
+    { I18n.t("STREAK"), (sm.streak_days or 0) == 1
+      and I18n.t("%d day", 1) or I18n.t("%d days", sm.streak_days or 0) },
   }
   local cw = w / #cells
   for i, cell in ipairs(cells) do
     local cx = x + (i - 1) * cw
-    UI.text(cell[1], cx, y + 12, 7, Theme.withAlpha(Theme.cream, 0.55), "center", cw)
-    UI.text(cell[2], cx, y + 26, math.floor(14 * s), Theme.cream, "center", cw)
+    UI.text(cell[1], cx, y + 10, 7, Theme.withAlpha(Theme.cream, 0.55), "center", cw)
+    UI.text(cell[2], cx, y + 10 + cap_h + 2, 14, Theme.cream, "center", cw)
   end
-  UI.bar(x + 14, y + 58, w - 28, 9, 
+  UI.bar(x + 14, y + 10 + cap_h + 2 + fig_h + 10, w - 28, 9,
     (sm.total or 0) > 0 and (sm.cleared or 0) / sm.total or 0, Theme.admit)
 
   -- Per land, under the bar and on its own line: sharing a row with the
@@ -149,7 +156,8 @@ function Stats:draw_summary(x, y, w, s)
     parts[#parts + 1] = ("%s %d/%d"):format(land.land:upper(), land.cleared, land.total)
   end
   if #parts > 0 then
-    UI.text(table.concat(parts, "     "), x + 14, y + 72, 7,
+    UI.text(table.concat(parts, "     "), x + 14,
+      y + 10 + cap_h + 2 + fig_h + 10 + 9 + 6, 7,
       Theme.withAlpha(Theme.cream, 0.55))
   end
   return y + h
@@ -157,22 +165,26 @@ end
 
 --- The shelf: what the player has, and sockets for what they do not.
 function Stats:draw_shelf(x, y, w)
-  local h = 62
+  local cap_h = UI.lineHeight(7)
+  local size = math.max(34, cap_h * 2)
+  -- Room for the caption, the row of sockets, and the line underneath that
+  -- says what the newest one is — which used to be drawn at `y + h - 16`
+  -- into space the panel did not have.
+  local h = 8 + cap_h + 6 + size + 6 + cap_h + 8
   UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.ink, 0.85), tint = Theme.withAlpha(Theme.coin, 0.5) })
-  UI.text("SHELF", x + 12, y + 8, 7, Theme.withAlpha(Theme.cream, 0.5))
+  UI.text(I18n.t("SHELF"), x + 12, y + 8, 7, Theme.withAlpha(Theme.cream, 0.5))
 
   local awards = self.awards
   if not awards then
-    UI.text("…", x + 12, y + 26, 8, Theme.dim)
+    UI.text("…", x + 12, y + 8 + cap_h + 4, 8, Theme.dim)
     return y + h
   end
 
-  local size = 34
   local gap = 8
   local slots = math.max(Stats.SHELF_SLOTS, #awards)
   local total = slots * (size + gap) - gap
   local sx = x + math.max(12, (w - total) / 2)
-  local sy = y + 22 + size / 2
+  local sy = y + 8 + cap_h + 6 + size / 2
 
   for i = 1, slots do
     local award = awards[i]
@@ -193,11 +205,16 @@ function Stats:draw_shelf(x, y, w)
   end
 
   if #awards == 0 then
-    UI.text("nothing on it yet — clear a street and the first one lands",
-      x + 12, y + h - 16, 7, Theme.withAlpha(Theme.cream, 0.45))
+    -- Given the panel's width. It is a sentence, and a sentence drawn with
+    -- no width is a sentence that leaves the screen — at the **default** type
+    -- step, not just at the largest.
+    UI.text(I18n.t("nothing on it yet — clear a street and the first one lands"),
+      x + 12, y + h - 8 - cap_h, 7, Theme.withAlpha(Theme.cream, 0.45),
+      "left", w - 24)
   else
     local newest = awards[1]
-    UI.text(tostring(newest.title or newest.id), x + 12, y + h - 16, 7, Theme.coin)
+    UI.text(tostring(newest.title or newest.id), x + 12, y + h - 8 - cap_h, 7,
+      Theme.coin, "left", w - 24)
   end
   return y + h
 end
@@ -217,13 +234,15 @@ function Stats:draw_mistakes(x, y, w, h)
     return
   end
 
-  cy = cy + UI.text("YOUR MISTAKES — THIS IS THE CURRICULUM", x + 14, cy, 9, Theme.brick) + 4
-  cy = cy + UI.text("a kind leaves the drill after five clean submits", x + 14, cy, 7,
-    Theme.withAlpha(Theme.cream, 0.5)) + 12
+  cy = cy + UI.text(I18n.t("YOUR MISTAKES — THIS IS THE CURRICULUM"), x + 14, cy, 9,
+    Theme.brick, "left", w - 28) + 4
+  cy = cy + UI.text(I18n.t("a kind leaves the drill after five clean submits"),
+    x + 14, cy, 7, Theme.withAlpha(Theme.cream, 0.5), "left", w - 28) + 12
 
   if not self.mistakes then
     UI.text(self.errors["stats.mistakes"] and self.errors["stats.mistakes"].player
-      or "asking the server…", x + 14, cy, 8, Theme.withAlpha(Theme.cream, 0.6))
+      or I18n.t("asking the server…"), x + 14, cy, 8,
+      Theme.withAlpha(Theme.cream, 0.6), "left", w - 28)
     love.graphics.setScissor()
     return
   end
@@ -232,9 +251,9 @@ function Stats:draw_mistakes(x, y, w, h)
     -- Not an apology. Nothing has gone wrong; there is simply nothing here
     -- yet, and saying what would put something here is more use than silence.
     for _, line in ipairs(UI.wrap(
-      "Nothing yet. Every compiler error you make gets classified and lands "
-        .. "here, and the drills are built from it — so this fills up by "
-        .. "playing, not by trying to fill it up.", w - 40, 8)) do
+      I18n.t("Nothing yet. Every compiler error you make gets classified and "
+        .. "lands here, and the drills are built from it — so this fills up by "
+        .. "playing, not by trying to fill it up."), w - 40, 8)) do
       cy = cy + UI.text(line, x + 14, cy, 8, Theme.withAlpha(Theme.cream, 0.7)) + 4
     end
     love.graphics.setScissor()
@@ -252,11 +271,13 @@ function Stats:draw_mistake(x, y, w, m)
   local since = math.max(0, math.floor(tonumber(m.cleared_since) or 0))
   local learned = since >= Stats.LEARNED_AT
 
-  UI.text(tostring(m.kind), x + 14, y, 9, learned and Theme.admit or Theme.brick)
+  local kind_h, note_h = UI.lineHeight(9), UI.lineHeight(8)
   local count = ("×%d"):format(m.count or 0)
+  UI.text(tostring(m.kind), x + 14, y, 9, learned and Theme.admit or Theme.brick,
+    "left", w - 28 - UI.textWidth(count, 9) - 8)
   UI.text(count, x + w - 14 - UI.textWidth(count, 9), y, 9,
     Theme.withAlpha(Theme.cream, 0.7))
-  y = y + 16
+  y = y + kind_h + 4
 
   if m.label and m.label ~= "" and m.label ~= m.kind then
     for _, line in ipairs(UI.wrap(m.label, w - 44, 8)) do
@@ -299,42 +320,47 @@ function Stats:draw_mistake(x, y, w, m)
   -- And in words, because the sentence is the motivating part.
   local said
   if learned then
-    said = "learned — out of the drill"
+    said = I18n.t("learned — out of the drill")
   elseif since == 0 then
-    said = "you did this on your last submit"
+    said = I18n.t("you did this on your last submit")
   elseif since == 1 then
-    said = "one clean submit since"
+    said = I18n.t("one clean submit since")
   else
-    said = ("%d clean submits since — %d to go"):format(since, Stats.LEARNED_AT - since)
+    said = I18n.t("%d clean submits since — %d to go", since, Stats.LEARNED_AT - since)
   end
-  UI.text(said, tx + Stats.LEARNED_AT * (step + gap) + 10, y + 3, 7,
-    learned and Theme.admit or Theme.coin)
-  -- Four pixels more than the bare track needed: the shackle is taller than
-  -- five 8-pixel steps, and the `drill:` line was landing on its feet.
-  y = y + 22
+  -- Beside the five-step track, in whatever is left of the row.
+  local said_x = tx + Stats.LEARNED_AT * (step + gap) + 10
+  UI.text(said, said_x, y + 3, 7, learned and Theme.admit or Theme.coin,
+    "left", math.max(40, x + w - 14 - said_x))
+  -- The shackle is taller than the track, and the sentence beside it is a
+  -- line of type that grows with the ladder — so this clears whichever of the
+  -- three is tallest rather than a number that was right for one of them.
+  y = y + math.max(22, UI.lineHeight(7) + 10, note_h + 8)
 
   if m.concepts and #m.concepts > 0 then
-    y = y + UI.text("drill: " .. table.concat(m.concepts, ", "), x + 22, y, 7,
-      Theme.withAlpha(Theme.cyan, 0.85)) + 2
+    y = y + UI.text(I18n.t("drill: %s", table.concat(m.concepts, ", ")), x + 22, y, 7,
+      Theme.withAlpha(Theme.cyan, 0.85), "left", w - 44) + 3
   end
   if m.example_quest_id then
-    y = y + UI.text("last seen on " .. tostring(m.example_quest_id), x + 22, y, 7,
-      Theme.withAlpha(Theme.cream, 0.4)) + 2
+    y = y + UI.text(I18n.t("last seen on %s", tostring(m.example_quest_id)), x + 22, y, 7,
+      Theme.withAlpha(Theme.cream, 0.4), "left", w - 44) + 2
   end
   return y
 end
 
 function Stats:draw_history_rows(x, y, w)
-  y = y + UI.text("RECENT SUBMITS AND RUNS", x + 14, y, 9, Theme.cyan) + 12
+  y = y + UI.text(I18n.t("RECENT SUBMITS AND RUNS"), x + 14, y, 9, Theme.cyan,
+    "left", w - 28) + 12
   if not self.history then
-    UI.text("asking the server…", x + 14, y, 8, Theme.withAlpha(Theme.cream, 0.6))
+    UI.text(I18n.t("asking the server…"), x + 14, y, 8,
+      Theme.withAlpha(Theme.cream, 0.6), "left", w - 28)
     return
   end
   if #self.history == 0 then
     for _, line in ipairs(UI.wrap(
-      "Nothing here yet. Every run and every submit is kept — including the "
-        .. "ones that did not work, which are the ones worth keeping.",
-      w - 40, 8)) do
+      I18n.t("Nothing here yet. Every run and every submit is kept — "
+        .. "including the ones that did not work, which are the ones worth "
+        .. "keeping."), w - 40, 8)) do
       y = y + UI.text(line, x + 14, y, 8, Theme.withAlpha(Theme.cream, 0.7)) + 4
     end
     return
@@ -349,7 +375,7 @@ function Stats:draw_history_rows(x, y, w)
       a.tests_passed or 0, a.tests_total or 0)
     UI.text(right, x + w - 14 - UI.textWidth(right, 7), y, 7,
       Theme.withAlpha(colour, 0.8))
-    y = y + 11
+    y = y + UI.lineHeight(7) + 3
     if a.kinds and #a.kinds > 0 then
       y = y + UI.text("  " .. table.concat(a.kinds, ", "), x + 14, y, 7,
         Theme.withAlpha(Theme.brick, 0.8)) + 2

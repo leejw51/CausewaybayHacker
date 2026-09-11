@@ -366,6 +366,7 @@ export const yue: Partial<Catalogue> = {
   "stats.log": "日誌",
   "stats.drillTab": "操練 — {n}",
   "stats.shelfTab": "陳列架 — {of} 中 {have}",
+  "stats.haveOf": "{of} 中 {have}",
   "stats.logTab": "日誌 — {n}",
   "stats.stillCatching": "仲捉到你嘅",
   "stats.nothingCatching": "冇乜捉得到你喇",

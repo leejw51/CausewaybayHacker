@@ -136,6 +136,14 @@ function love.keypressed(key)
     app:toast("code size " .. Layout.fontLabel())
     return
   end
+  -- The language. A letter rather than a function key because every one of
+  -- F1-F12 is taken, and `L` is free on exactly the screens `F` is free on —
+  -- the ones that are not taking text. The button in the footer works
+  -- everywhere, including in the editor, which is the point of having it.
+  if key == "l" and not app:typing() then
+    app:set_lang(require("src.i18n").cycle())
+    return
+  end
   if key == "f4" then
     app:toast(SFX.toggle() and "sound on" or "sound off")
     return

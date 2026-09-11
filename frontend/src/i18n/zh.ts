@@ -354,6 +354,7 @@ export const zh: Partial<Catalogue> = {
   "stats.log": "日志",
   "stats.drillTab": "训练 — {n}",
   "stats.shelfTab": "陈列架 — {of} 中 {have}",
+  "stats.haveOf": "{of} 中 {have}",
   "stats.logTab": "日志 — {n}",
   "stats.stillCatching": "还在抓住你的",
   "stats.nothingCatching": "已经没有什么抓得住你了",

@@ -10,6 +10,7 @@ local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
+local I18n = require("src.i18n")
 local Ease = require("src.ease")
 
 local Boot = {}
@@ -39,11 +40,10 @@ function Boot:draw()
   love.graphics.rectangle("fill", 0, 0, w, h)
   love.graphics.setColor(1, 1, 1, 1)
 
-  local s = Layout.uiScale()
-  local title = math.floor(28 * s)
+    local title = 28
   local y = h * 0.32
-  UI.text("CAUSEWAYBAY", 0, y, title, Theme.coin, "center", w)
-  UI.text("HACKER", 0, y + title * 1.5, title, Theme.land.rust, "center", w)
+  UI.text(I18n.t("CAUSEWAYBAY"), 0, y, title, Theme.coin, "center", w)
+  UI.text(I18n.t("HACKER"), 0, y + title * 1.5, title, Theme.land.rust, "center", w)
 
   local pulse = 0.4 + 0.6 * Ease.cosine((self.t * 1.4) % 1)
   local state = self.app.client and self.app.client.state or "idle"
@@ -56,9 +56,9 @@ function Boot:draw()
     closed = "no server",
   })[state] or state
   UI.text(line:upper() .. "  " .. self.app.server, 0, h * 0.62,
-    math.floor(10 * s), Theme.withAlpha(Theme.cream, pulse), "center", w)
+    10, Theme.withAlpha(Theme.cream, pulse), "center", w)
 
-  self.app:footer("ENTER sign in")
+  self.app:footer(I18n.t("ENTER sign in"))
 end
 
 function Boot:keypressed(key)

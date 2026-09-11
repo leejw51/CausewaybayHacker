@@ -44,8 +44,14 @@ function UI.well(x, y, w, h, tint)
 end
 
 --- One line of Press Start 2P, with a one-pixel ink drop so it reads over art.
+---
+--- `size` is an **authored size**, not a pixel size: `Layout.ui` doubles it
+--- and `Assets.snap8` rounds it onto the 8-pixel grid the faces are drawn on.
+--- Every entry point in this file goes through the same pair — a paragraph
+--- measured at one size and drawn at another wraps wrong in a way nobody
+--- notices until a sentence is cut in half.
 function UI.text(text, x, y, size, color, align, width)
-  local font = Assets.font(size or 12)
+  local font = Assets.font(Layout.ui(size or 12))
   love.graphics.setFont(font)
   if align and width then
     UI.setColor(Theme.ink, 0.65)
@@ -63,7 +69,34 @@ function UI.text(text, x, y, size, color, align, width)
 end
 
 function UI.textWidth(text, size)
-  return Assets.font(size or 12):getWidth(text)
+  return Assets.font(Layout.ui(size or 12)):getWidth(text)
+end
+
+--- The pixel height of a line at an authored size — the number a layout
+--- needs when it is deciding how far apart two rows go.
+function UI.lineHeight(size)
+  return Assets.font(Layout.ui(size or 12)):getHeight()
+end
+
+--- Split a string into UTF-8 characters.
+---
+--- `src/drive.lua` has the same four lines and `src/editor.lua` has a richer
+--- version; this one is here because `src/ui.lua` must not depend on either,
+--- and because the alternative — iterating bytes — is how a Japanese sentence
+--- becomes mojibake.
+function UI.chars(text)
+  local out = {}
+  local i, n = 1, #text
+  while i <= n do
+    local b = text:byte(i)
+    local width = 1
+    if b >= 0xF0 then width = 4
+    elseif b >= 0xE0 then width = 3
+    elseif b >= 0xC0 then width = 2 end
+    out[#out + 1] = text:sub(i, i + width - 1)
+    i = i + width
+  end
+  return out
 end
 
 --- Wrap a paragraph to a **pixel** width, measured with the font it will be
@@ -79,14 +112,22 @@ end
 --- test's expected output) is broken rather than allowed to overflow.
 function UI.wrap(text, width, size)
   size = size or 8
-  local font = Assets.font(size)
+  local font = Assets.font(Layout.ui(size))
   local space = font:getWidth(" ")
   local lines = {}
 
   local function break_long(word)
     local pieces, current = {}, ""
-    for i = 1, #word do
-      local ch = word:sub(i, i)
+    -- **By character, not by byte.** This loop was `for i = 1, #word`, which
+    -- is fine for the ASCII this client used to contain and wrong the moment
+    -- it says anything in Korean or Japanese: those sentences have no spaces,
+    -- so the whole sentence arrives here as one "word", and splitting it at
+    -- byte 40 cuts a three-byte character in half. What comes out is mojibake,
+    -- and `getWidth` on a truncated sequence is not obliged to return at all.
+    --
+    -- Splitting a space-less script by character is also the *correct*
+    -- wrapping rule for it, so this is the same loop with the right stride.
+    for _, ch in ipairs(UI.chars(word)) do
       if current ~= "" and font:getWidth(current .. ch) > width then
         pieces[#pieces + 1] = current
         current = ch
@@ -142,7 +183,7 @@ function UI.button(x, y, w, h, label, state, size)
   UI.setColor(Theme.ink)
   love.graphics.rectangle("line", x + 1, y + 1, w - 2, h - 2)
   size = size or math.max(8, math.floor(h * 0.34))
-  local font = Assets.font(size)
+  local font = Assets.font(Layout.ui(size))
   love.graphics.setFont(font)
   UI.setColor(ink)
   love.graphics.printf(label, x, y + (h - font:getHeight()) / 2, w, "center")
@@ -210,8 +251,34 @@ end
 
 -- ------------------------------------------------------ the display controls
 
---- The footer strip's height, and the controls that live in its right end.
-UI.FOOTER_H = 22
+--- The footer strip's height, measured from the type it has to hold.
+---
+--- It was a hard 22 px, which was right while every label in this client was
+--- 7 or 8 px. The type ladder is twice that now and is a player setting on
+--- top, so a fixed strip would clip its own hint and its own buttons. Two
+--- pixels of air above and below the tallest thing in it.
+UI.FOOTER_SIZE = 8
+
+--- One row, or two.
+---
+--- **Set by the last `UI.footer`, read by the scenes.** A Korean hint at the
+--- readable type ladder is 700 to 1600 pixels of text, and a 720-wide
+--- portrait canvas has 135 left after the connection badge and four buttons.
+--- There is no size at which that fits on one line, so when it does not fit
+--- the strip becomes two rows: the hint gets the whole width on its own row,
+--- the buttons and the badge keep theirs.
+---
+--- Scenes read this a frame after it changes, which is the frame the
+--- orientation or the language changed in and is already being rebuilt.
+UI.footer_rows = 1
+
+function UI.footerRow()
+  return math.max(22, UI.lineHeight(UI.FOOTER_SIZE) + 10)
+end
+
+function UI.footerHeight()
+  return UI.footerRow() * UI.footer_rows
+end
 
 --- Space kept clear for the connection badge, measured against the *longest*
 --- state rather than the current one.
@@ -221,14 +288,31 @@ UI.FOOTER_H = 22
 --- and a control that walks away from the pointer is worse than one that is
 --- slightly further from the edge than it needs to be.
 local function badge_reserve()
-  return UI.textWidth("CONNECTING", 8) + 16
+  return UI.textWidth("CONNECTING", UI.FOOTER_SIZE) + 16
 end
 
-local CHIP_H = 18
-local GLYPH_W = 13
+--- The chips are measured from the footer, so they grow with it.
 local CHIP_PAD = 6
 local CHIP_GAP = 5
 local LABEL = 7
+
+--- One **row** tall, not one strip tall.
+---
+--- This read `UI.footerHeight()`, which is `footerRow() * footer_rows`. The
+--- buttons live on a single row, so on the two- and three-row footers the
+--- hint wraps into, each chip was drawn two or three rows high — and because
+--- `glyph_w` is measured from the chip height, they got proportionally wider
+--- as well. Four chips at three rows came to more than a 720-wide portrait
+--- canvas, so `x` went **negative** and the whole cluster sat off the left
+--- edge: visible as a sliver, clickable nowhere. The type-size and fullscreen
+--- buttons were unreachable by mouse in portrait at every step.
+---
+--- It also closes a feedback loop. `displayReserve` runs before `UI.footer`
+--- decides how many rows the hint needs, so a chip measured from the strip
+--- height was measured from *last* frame's row count, which its own result
+--- then changed. Measured from one row, the geometry settles in one frame.
+local function chip_h() return UI.footerRow() - 4 end
+local function glyph_w() return math.max(9, math.floor(chip_h() * 0.72)) end
 
 --- The three chips, in order, with their labels already decided.
 ---
@@ -247,44 +331,83 @@ local function chips(state)
     {
       id = "fullscreen",
       label = state.fullscreen and "FULL" or "WINDOW",
+      short = "",
       glyph = "screen",
     },
     {
       id = "orient",
       label = (state.orientation == "auto") and "AUTO"
         or (state.orientation == "portrait" and "PORT" or "LAND"),
+      -- `A` for automatic even when compact: hollow-versus-filled says
+      -- "nothing is pinned" only to somebody who already knows it does.
+      short = (state.orientation == "auto") and "A" or "",
       glyph = "orient",
     },
     {
       id = "font",
       label = state.font_label or "1/4",
+      short = tostring(state.font or 1),
       glyph = "type",
+    },
+    {
+      id = "lang",
+      -- **The code, not the name.** `한국어` is three double-width cells where
+      -- `KO` is two single ones, in a strip that already clips its hint on a
+      -- 720-wide canvas. The name in full is what the toast says when the
+      -- button is pressed, which is the moment it is actually needed.
+      label = state.lang_code or "EN",
+      short = state.lang_code or "EN",
+      glyph = "lang",
     },
   }
 end
 
+--- True when the strip is too narrow to carry four labelled buttons.
+---
+--- The glyphs say the state on their own — the screen is inset or filled, the
+--- box is wide or tall and hollow or solid, the `A` is drawn at its own step —
+--- so the word is the part that can go. The type button keeps its digit,
+--- because "which of four" is the one state no glyph shows.
+local compact = false
+
 local function chip_width(chip)
-  return CHIP_PAD + GLYPH_W + 4 + UI.textWidth(chip.label, LABEL) + CHIP_PAD
+  local label = compact and (chip.short or "") or chip.label
+  local text = label ~= "" and (4 + UI.textWidth(label, LABEL)) or 0
+  return CHIP_PAD + glyph_w() + text + CHIP_PAD
 end
 
 --- How wide the cluster is, so the footer can keep the hint out of it.
+---
+--- Also the one place that decides whether the buttons wear their labels: the
+--- full cluster plus the connection badge is 520 px at the readable ladder,
+--- and a 720-wide portrait canvas cannot spend that and still say anything.
 function UI.displayReserve(state)
-  local total = 0
-  for i, chip in ipairs(chips(state)) do
-    total = total + chip_width(chip) + (i > 1 and CHIP_GAP or 0)
+  local function total()
+    local sum = 0
+    for i, chip in ipairs(chips(state)) do
+      sum = sum + chip_width(chip) + (i > 1 and CHIP_GAP or 0)
+    end
+    return sum
   end
-  return total + badge_reserve() + 10
+  compact = false
+  local wide = total()
+  -- Labels only while at least a third of the strip is left for the hint.
+  if wide + badge_reserve() + 10 > Layout.vw * 0.62 then compact = true end
+  return total() + badge_reserve() + 10
 end
 
 --- A small screen, filled when the game owns the whole one.
 local function glyph_screen(x, y, full, ink)
+  local gw, gh = glyph_w(), chip_h()
+  local h = math.max(6, math.floor(gw * 0.7))
+  local top = y + (gh - h) / 2
   UI.setColor(ink)
   if full then
-    love.graphics.rectangle("fill", x, y + 2, GLYPH_W, 9)
+    love.graphics.rectangle("fill", x, top, gw, h)
   else
     love.graphics.setLineWidth(1)
-    love.graphics.rectangle("line", x + 0.5, y + 2.5, GLYPH_W - 1, 8)
-    love.graphics.rectangle("fill", x + 3, y + 5, GLYPH_W - 7, 4)
+    love.graphics.rectangle("line", x + 0.5, top + 0.5, gw - 1, h - 1)
+    love.graphics.rectangle("fill", x + 3, top + 3, gw - 6, h - 6)
   end
   love.graphics.setColor(1, 1, 1, 1)
 end
@@ -292,10 +415,11 @@ end
 --- A wide box or a tall one — the shape you are actually in. Filled when it
 --- is pinned, hollow when the window is deciding.
 local function glyph_orient(x, y, portrait, pinned, ink)
-  local w, h = 12, 9
-  if portrait then w, h = 8, 13 end
-  local gx = x + (GLYPH_W - w) / 2
-  local gy = y + (CHIP_H - 4 - h) / 2
+  local unit = glyph_w()
+  local w, h = unit, math.max(5, math.floor(unit * 0.72))
+  if portrait then w, h = math.max(5, math.floor(unit * 0.6)), unit + 2 end
+  local gx = x + (glyph_w() - w) / 2
+  local gy = y + (chip_h() - h) / 2
   UI.setColor(ink)
   if pinned then
     love.graphics.rectangle("fill", gx, gy, w, h)
@@ -308,12 +432,31 @@ end
 
 --- An `A`, drawn at the step it selects. The control shows its own effect.
 local function glyph_type(x, y, step, ink)
-  local size = 6 + 2 * math.max(1, math.min(4, step or 1))
-  local font = Assets.font(size)
+  -- The `A` is drawn at the step it selects, so the control shows its own
+  -- effect. It is grid-snapped like everything else, so the four steps are
+  -- four visibly different glyph sizes rather than four roundings of one.
+  local font = Assets.font(Assets.snap8(8 * (Layout.FONT_STEPS[step or 1] or 1)))
   love.graphics.setFont(font)
   UI.setColor(ink)
-  love.graphics.print("A", x + (GLYPH_W - font:getWidth("A")) / 2,
-    y + (CHIP_H - 4 - font:getHeight()) / 2)
+  love.graphics.print("A", x + (glyph_w() - font:getWidth("A")) / 2,
+    y + (chip_h() - font:getHeight()) / 2)
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
+--- A globe: a circle with a meridian and two parallels. Three strokes is as
+--- much globe as nine pixels will hold, and it is the one symbol for
+--- "language" that does not belong to a particular country's flag.
+local function glyph_globe(x, y, ink)
+  local d = glyph_w()
+  local r = d / 2
+  local cx, cy = x + r, y + chip_h() / 2
+  UI.setColor(ink)
+  love.graphics.setLineWidth(1)
+  love.graphics.circle("line", cx, cy, r - 0.5, 12)
+  love.graphics.line(cx, cy - r + 1, cx, cy + r - 1)
+  love.graphics.line(cx - r + 1.5, cy, cx + r - 1.5, cy)
+  love.graphics.line(cx - r + 3, cy - r * 0.5, cx + r - 3, cy - r * 0.5)
+  love.graphics.line(cx - r + 3, cy + r * 0.5, cx + r - 3, cy + r * 0.5)
   love.graphics.setColor(1, 1, 1, 1)
 end
 
@@ -343,19 +486,23 @@ function UI.displayControls(state)
     total = total + chip.w + (i > 1 and CHIP_GAP or 0)
   end
 
-  local y = Layout.vh - UI.FOOTER_H + (UI.FOOTER_H - CHIP_H) / 2
-  local x = Layout.vw - 10 - badge_reserve() - total
+  local row, ch = UI.footerRow(), chip_h()
+  local y = Layout.vh - row + (row - ch) / 2
+  -- Never off the left edge, whatever the language and the type step do to
+  -- the labels: a control that has left the canvas cannot be pressed, and
+  -- nothing else in the client would have said so.
+  local x = math.max(6, Layout.vw - 10 - badge_reserve() - total)
   local px, py = pointer()
 
   local rects = {}
   for _, chip in ipairs(list) do
-    local hot = px and px >= x and px <= x + chip.w and py >= y and py <= y + CHIP_H
+    local hot = px and px >= x and px <= x + chip.w and py >= y and py <= y + ch
     local ink = hot and Theme.ink or Theme.cream
     UI.setColor(hot and Theme.coin or Theme.withAlpha(Theme.panel, 0.9))
-    love.graphics.rectangle("fill", x, y, chip.w, CHIP_H)
+    love.graphics.rectangle("fill", x, y, chip.w, ch)
     love.graphics.setLineWidth(1)
     UI.setColor(Theme.withAlpha(hot and Theme.ink or Theme.cream, hot and 0.9 or 0.35))
-    love.graphics.rectangle("line", x + 0.5, y + 0.5, chip.w - 1, CHIP_H - 1)
+    love.graphics.rectangle("line", x + 0.5, y + 0.5, chip.w - 1, ch - 1)
     love.graphics.setColor(1, 1, 1, 1)
 
     local gx = x + CHIP_PAD
@@ -363,12 +510,18 @@ function UI.displayControls(state)
       glyph_screen(gx, y, state.fullscreen, ink)
     elseif chip.glyph == "orient" then
       glyph_orient(gx, y, state.shape == "portrait", state.orientation ~= "auto", ink)
+    elseif chip.glyph == "lang" then
+      glyph_globe(gx, y, ink)
     else
       glyph_type(gx, y, state.font, ink)
     end
 
-    UI.text(chip.label, gx + GLYPH_W + 4, y + (CHIP_H - LABEL) / 2 - 1, LABEL, ink)
-    rects[chip.id] = { x = x, y = y, w = chip.w, h = CHIP_H }
+    local label = compact and (chip.short or "") or chip.label
+    if label ~= "" then
+      UI.text(label, gx + glyph_w() + 4,
+        y + (ch - UI.lineHeight(LABEL)) / 2, LABEL, ink)
+    end
+    rects[chip.id] = { x = x, y = y, w = chip.w, h = ch }
     x = x + chip.w + CHIP_GAP
   end
   return rects
@@ -387,7 +540,38 @@ end
 --- and cannot be conditional on there being room, so it is the hint that
 --- gives way. (It already had to once — see below.)
 function UI.footer(lines, connection, reserve)
-  local h = UI.FOOTER_H
+  local row = UI.footerRow()
+  local keep = math.max(reserve or 0, connection and badge_reserve() or 0)
+  local text = lines or ""
+
+  -- **How many rows this strip needs, and why it is not always one.**
+  --
+  -- A scene hint is a list of keys, and at the readable type ladder the map's
+  -- seven of them are 1344 px in English and 1648 px in Korean. A portrait
+  -- canvas is 720 wide. There is no font size at which that fits on one line
+  -- — dropping a size is a no-op here, because 7 and 8 both round to the same
+  -- 16 px cell — so the strip grows instead:
+  --
+  --   * it fits beside the buttons        → one row, as it always was;
+  --   * it does not                       → up to two rows of hint, wrapped
+  --                                         on word boundaries, and the
+  --                                         buttons keep a row of their own.
+  --
+  -- Two is the cap because a footer taller than that stops being chrome. What
+  -- is past it is clipped, which is the behaviour this function already had
+  -- and already documents below.
+  local beside = Layout.vw - 20 - keep
+  local hint_rows = {}
+  if UI.textWidth(text, UI.FOOTER_SIZE) <= beside then
+    hint_rows = { text }
+    UI.footer_rows = 1
+  else
+    local wrapped = UI.wrap(text, Layout.vw - 20, UI.FOOTER_SIZE)
+    for i = 1, math.min(2, #wrapped) do hint_rows[i] = wrapped[i] end
+    UI.footer_rows = #hint_rows + 1
+  end
+
+  local h = row * UI.footer_rows
   local y = Layout.vh - h
   UI.setColor(Theme.ink, 0.8)
   love.graphics.rectangle("fill", 0, y, Layout.vw, h)
@@ -395,15 +579,14 @@ function UI.footer(lines, connection, reserve)
   -- The hint was drawn at x = 10 and never measured, so on the quest screen
   -- in portrait — seven keys and an address, on a 720-wide canvas — it ran
   -- straight through the connection badge and the two strings were printed
-  -- on top of each other. Two steps, in order: try a size smaller, then clip.
-  -- A hint that is cut off mid-word still reads; one with `OPEN` printed
-  -- through it does not.
-  local keep = math.max(reserve or 0, connection and badge_reserve() or 0)
-  local room = Layout.vw - 20 - keep
-  local text = lines or ""
-  local size = (UI.textWidth(text, 8) > room) and 7 or 8
-  love.graphics.setScissor(0, y, math.max(0, Layout.vw - keep - 8), h)
-  UI.text(text, 10, y + 7 + (8 - size), size, Theme.withAlpha(Theme.cream, 0.85))
+  -- on top of each other. What is left of that fix is the clip: a hint cut
+  -- off mid-word still reads; one with `OPEN` printed through it does not.
+  local room = (UI.footer_rows == 1) and beside or (Layout.vw - 20)
+  love.graphics.setScissor(0, y, math.max(0, room + 10), h - (UI.footer_rows > 1 and row or 0))
+  for i, line in ipairs(hint_rows) do
+    UI.text(line, 10, y + (i - 1) * row + (row - UI.lineHeight(UI.FOOTER_SIZE)) / 2,
+      UI.FOOTER_SIZE, Theme.withAlpha(Theme.cream, 0.85))
+  end
   love.graphics.setScissor()
 
   if connection then
@@ -412,8 +595,9 @@ function UI.footer(lines, connection, reserve)
     elseif connection == "closed" then color = Theme.red
     elseif connection == "connecting" or connection == "handshaking" then color = Theme.coin end
     local label = connection:upper()
-    local w = UI.textWidth(label, 8)
-    UI.text(label, Layout.vw - w - 10, y + 7, 8, color)
+    local w = UI.textWidth(label, UI.FOOTER_SIZE)
+    UI.text(label, Layout.vw - w - 10,
+      Layout.vh - row + (row - UI.lineHeight(UI.FOOTER_SIZE)) / 2, UI.FOOTER_SIZE, color)
   end
 end
 
@@ -421,18 +605,22 @@ end
 function UI.toast(text, alpha)
   if not text or alpha <= 0 then return end
   local size = 10
-  local w = math.min(Layout.vw - 40, UI.textWidth(text, size) + 24)
+  local font = Assets.font(Layout.ui(size))
+  -- The box is measured from the type rather than fixed at 24 px: the type
+  -- size is now a player setting, and a toast that kept a hard height would
+  -- clip its own message at the larger steps.
+  local h = font:getHeight() + 12
+  local w = math.min(Layout.vw - 40, font:getWidth(text) + 24)
   local x = (Layout.vw - w) / 2
-  local y = Layout.vh - 64
+  local y = Layout.vh - UI.footerHeight() - h - 20
   UI.setColor(Theme.ink, 0.85 * alpha)
-  love.graphics.rectangle("fill", x, y, w, 24)
+  love.graphics.rectangle("fill", x, y, w, h)
   UI.setColor(Theme.coin, alpha)
   love.graphics.setLineWidth(2)
-  love.graphics.rectangle("line", x + 1, y + 1, w - 2, 22)
-  local font = Assets.font(size)
+  love.graphics.rectangle("line", x + 1, y + 1, w - 2, h - 2)
   love.graphics.setFont(font)
   UI.setColor(Theme.cream, alpha)
-  love.graphics.printf(text, x, y + (24 - font:getHeight()) / 2, w, "center")
+  love.graphics.printf(text, x, y + (h - font:getHeight()) / 2, w, "center")
   love.graphics.setColor(1, 1, 1, 1)
 end
 

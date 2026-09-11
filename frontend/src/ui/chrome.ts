@@ -9,7 +9,7 @@
  * the boxes it is handed cannot be landscape-only by accident.
  */
 import { css, Theme, TRACK_COL, type RGBA } from "../engine/theme";
-import { ensureFonts, font, printf, width, type Font } from "../engine/text";
+import { bodyFontAt, ensureFonts, font, printf, width, type Font } from "../engine/text";
 import {
   btnBox,
   fill,
@@ -90,11 +90,11 @@ export function frame(
   // room to look.
   const pad = Math.round(10 * s) + Math.round(inset * layout.vw * 0.5);
   const headerH = Math.round(38 * s);
-  const footerH = Math.round(26 * s);
+  const footerBar = footerH(layout);
   const x = pad;
   const y = headerH + pad + reserve;
   const w = layout.vw - pad * 2;
-  const h = layout.vh - headerH - footerH - pad * 2 - reserve;
+  const h = layout.vh - headerH - footerBar - pad * 2 - reserve;
   const portrait = stack === "auto" ? layout.isPortrait() : stack === "column";
   const gap = pad;
   if (portrait) {
@@ -104,7 +104,7 @@ export function frame(
       left: [x, y, w, top],
       right: [x, y + top + gap, w, h - top - gap],
       headerH,
-      footerH,
+      footerH: footerBar,
       scale: s,
       portrait,
       pad,
@@ -116,7 +116,7 @@ export function frame(
     left: [x, y, lw, h],
     right: [x + lw + gap, y, w - lw - gap, h],
     headerH,
-    footerH,
+    footerH: footerBar,
     scale: s,
     portrait,
     pad,
@@ -166,16 +166,62 @@ export function header(g: Ctx, app: App, title: string): void {
   app.logoutRect = [bx, by, w, bh];
 }
 
-/** The key hints along the bottom. Also where F1 is advertised. */
+/**
+ * How tall the footer hint bar is, in virtual pixels.
+ *
+ * It used to be `26 * s` in six places. That was fine while the hint font was
+ * eight pixels of Press Start 2P and could not outgrow it; the moment the small
+ * chrome face became VT323 at 20 the keys ran off the bottom of the screen in
+ * portrait. The bar is now whatever the line in it needs, and every screen that
+ * reserves room for it asks here instead of repeating the number.
+ */
+export function footerH(layout: Layout): number {
+  const s = layout.uiScale();
+  return Math.max(Math.round(26 * s), ensureFonts(s).stationSm.height + Math.round(8 * s));
+}
+
+/**
+ * The key hints along the bottom. Also where F1 is advertised.
+ *
+ * The line is shrunk to fit rather than wrapped. The bar has a fixed height
+ * that several screens reserve room against, so a second row runs off the
+ * bottom of the window — which is exactly what a Korean quest screen in
+ * portrait did the first time the chrome font grew. Dropping hints off the end
+ * instead would be worse: this bar is how a player learns the keyboard, and a
+ * hint that is sometimes there teaches nothing.
+ */
 export function footer(g: Ctx, layout: Layout, hint: string): void {
   const s = layout.uiScale();
-  const h = Math.round(26 * s);
+  const h = footerH(layout);
   const y = layout.vh - h;
   fill(g, Theme.ink, 0, y, layout.vw, h, 0.85);
   fill(g, Theme.wood, 0, y, layout.vw, 2);
-  const f = ensureFonts(s).stationSm;
+  const full = ensureFonts(s).stationSm;
+  const room = layout.vw - Math.round(16 * s);
+  let f = full;
+  // Down in steps, never below two thirds — past that it is the small type
+  // this change existed to get rid of, and a window that narrow has bigger
+  // problems than the key hints.
+  for (let px = full.size; px >= Math.round(full.size * 0.66); px -= Math.max(1, Math.round(s))) {
+    f = bodyFontAt(px);
+    if (width(f, hint) <= room) break;
+  }
+  lastFooterPx = f.size;
   g.fillStyle = css(Theme.dim);
   printf(g, f, hint, 0, y + Math.round((h - f.height) / 2), layout.vw, "center");
+}
+
+/**
+ * The size the footer line was actually drawn at last frame.
+ *
+ * Only the capture hook reads it. It exists because the hint bar is the one
+ * piece of type on screen whose size is decided at draw time, so "how big is
+ * the footer" has no answer anywhere else — and it is one of the two things
+ * the size complaint named.
+ */
+let lastFooterPx = 0;
+export function footerFontPx(): number {
+  return lastFooterPx;
 }
 
 /**

@@ -365,7 +365,15 @@ export class StatsScene implements Scene {
       g.fillStyle = css(Theme.dim);
       printf(g, fonts.stationSm, T("stats.shelf"), x, cy, w, "left");
       g.fillStyle = css(count.have > 0 ? Theme.coin : Theme.dim);
-      printf(g, fonts.stationSm, `${count.have} OF ${count.of}`, x, cy, w, "right");
+      printf(
+        g,
+        fonts.stationSm,
+        T("stats.haveOf", { have: count.have, of: count.of }),
+        x,
+        cy,
+        w,
+        "right",
+      );
       cy += fonts.stationSm.height + Math.round(6 * s);
       const slots = shelf(this.awards);
       const across = Math.max(1, Math.floor(w / (stripH + Math.round(6 * s))));

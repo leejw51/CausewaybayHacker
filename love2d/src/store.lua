@@ -283,6 +283,7 @@ function Store.replay(records)
     display = nil,
     server = nil,
     map = {},           -- "land.category" -> quest_id
+    lang = nil,         -- the interface language, SPEC §1.1
     migrated = false,   -- out of LÖVE's save directory
     moved_from = nil,   -- out of an older home directory
     lines = 0,
@@ -317,6 +318,13 @@ function Store.replay(records)
         -- records would mean two ways for them to disagree.
         font = tonumber(record.font),
       }
+    elseif kind == "lang.set" and type(record.lang) == "string" then
+      -- **Its own record, not a field on `display.set`.** The orientation,
+      -- the fullscreen pin and the type size are one setting — how this
+      -- window is set up — and the language is not one of them: it survives a
+      -- change of window and a change of machine, and writing it alongside
+      -- them would mean every F1 press rewrote it too.
+      folded.lang = record.lang
     elseif kind == "server.set" and type(record.url) == "string" then
       folded.server = record.url
     elseif kind == "map.cursor" and type(record.map) == "string" then
@@ -408,6 +416,8 @@ function Store.fold(record)
     state.sessions[record.server] = nil
   elseif record.kind == "display.set" then
     state.display = folded.display
+  elseif record.kind == "lang.set" then
+    state.lang = folded.lang
   elseif record.kind == "server.set" then
     state.server = folded.server
   elseif record.kind == "map.cursor" then
@@ -618,6 +628,17 @@ function Store.save_display(record)
     fullscreen = record.fullscreen,
     font = record.font,
   })
+end
+
+-- ------------------------------------------------------------------ language
+
+--- The saved interface language, or nil if the player has never chosen one.
+function Store.saved_lang()
+  return state and state.lang or nil
+end
+
+function Store.set_lang(code)
+  return Store.append({ kind = "lang.set", lang = code })
 end
 
 -- -------------------------------------------------------------------- server

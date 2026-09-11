@@ -8,6 +8,7 @@ local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
+local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Anim = require("src.anim")
 
@@ -67,7 +68,7 @@ function Categories:choose()
   if not cat then return end
   if not cat.open then
     SFX.play("locked")
-    self.app:toast("clear the category before it first")
+    self.app:toast(I18n.t("clear the category before it first"))
     return
   end
   self.pressed_at = Anim.now()
@@ -97,14 +98,13 @@ function Categories:draw()
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
 
-  local s = Layout.uiScale()
-  local tint = Theme.land[self.land] or Theme.coin
+    local tint = Theme.land[self.land] or Theme.coin
   local t = Anim.now()
 
   -- The land's own mascot beside the title, idling, so the screen says which
   -- land it is without reading.
   Assets.sprite(MASCOT[self.land], 40, 52 + Anim.bob(t, { amount = 2 }), 44)
-  UI.text(self.land:upper() .. " LAND", 72, 22, math.floor(16 * s), tint)
+  UI.text(self.land:upper() .. " LAND", 72, 22, 16, tint)
 
   local rows = self.categories or {}
   local pad = Layout.isPortrait() and 12 or 60
@@ -171,9 +171,12 @@ function Categories:draw()
     UI.setColor(Theme.ink, 0.55)
     love.graphics.rectangle("fill", pad + 6, ry + 8, gutter - 4, 40)
     love.graphics.setColor(1, 1, 1, 1)
-    UI.text(cat.category:upper(), pad + 14, ry + 12, math.floor(13 * s), color)
-    UI.text(BLURB[cat.category] or "", pad + 14, ry + 32, 7,
-      Theme.withAlpha(color, 0.75))
+    -- The gutter plate's width, not the whole row: to its right is the
+    -- mascot, and a blurb given the row would be drawn underneath it.
+    local blurb_w = math.max(60, band_x - (pad + 14) - 10)
+    UI.text(cat.category:upper(), pad + 14, ry + 12, 13, color, "left", blurb_w)
+    UI.text(I18n.t(BLURB[cat.category] or ""), pad + 14, ry + 32, 7,
+      Theme.withAlpha(color, 0.75), "left", blurb_w)
 
     -- The counts sit on their own plate, because behind them is artwork and
     -- a number over a painted crate is a number nobody can read.
@@ -194,7 +197,7 @@ function Categories:draw()
       -- Only a category that genuinely cannot be entered. Nothing on the map
       -- is locked (§4.7); this is for a pack that failed to import.
       Assets.marker("badge_locked", pad + w - 40, ry + rh - 22, 26, { alpha = 0.85 })
-      UI.text("UNAVAILABLE", pad + 14, ry + rh - 18, 7, Theme.dim)
+      UI.text(I18n.t("UNAVAILABLE"), pad + 14, ry + rh - 18, 7, Theme.dim)
     end
 
     y = y + rh + 12
@@ -205,7 +208,7 @@ function Categories:draw()
       self.error and Theme.red or Theme.withAlpha(Theme.cream, 0.7), "center", vw)
   end
 
-  self.app:footer("ARROWS choose   ENTER go   ESC back")
+  self.app:footer(I18n.t("ARROWS choose   ENTER go   ESC back"))
 end
 
 function Categories:keypressed(key)

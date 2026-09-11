@@ -45,7 +45,7 @@
  * stack that cannot yet supply it means every panel is measured against the
  * fallback and then jumps when the real font lands.
  */
-import { remeasure, setCjkFamily } from "../engine/text";
+import { remeasure, setCjkFamily, setCjkFloor } from "../engine/text";
 import { readEnumPref, writePref } from "../ui/prefs";
 import { en } from "./en";
 import { ko } from "./ko";
@@ -68,14 +68,35 @@ export interface LocaleInfo {
   /** And in English, for a report or a log. */
   english: string;
   /**
-   * The pixel CJK font this language needs, or null when the two Latin faces
-   * already cover it. `cs` is null and that is not an oversight — Press Start
-   * 2P and VT323 both carry the full Czech alphabet.
+   * The CJK font this language needs, or null when the two Latin faces already
+   * cover it. `cs` is null and that is not an oversight — Press Start 2P and
+   * VT323 both carry the full Czech alphabet, and the CJK face does *not*:
+   * `\u010d` and `\u0159` are absent from it, `\u011b` is present, which is
+   * exactly the shape of bug that would leave Czech half-rendered while all
+   * four CJK languages looked perfect. Latin and Czech come from the pixel
+   * faces, CJK from Noto, and the stack in `engine/text.ts` puts them in that
+   * order.
    */
   font: { family: string; file: string } | null;
 }
 
-const FP = "/fonts/fusion-pixel/fusion-pixel-12px-monospaced";
+/**
+ * One face for all four CJK languages.
+ *
+ * `NotoSansCJK-Regular.otf` from the sibling LÖVE client
+ * (`CausewaybayGolang/love2d/assets/fonts/`), already subsetted there to
+ * Hangul, kana, unified ideographs and fullwidth forms — 33,243 codepoints,
+ * read out of its `cmap` rather than taken on trust. It ships here as woff2
+ * because an 11.2 MB OTF over the wire is not a thing to do to a player; the
+ * glyphs are identical, the container is not. 6.4 MB, fetched once, and only
+ * when a language that needs it is chosen.
+ *
+ * It is the **SC** cut, so the Han forms are the mainland ones in Japanese and
+ * in traditional Cantonese too. That is a real cost and it is the sibling's
+ * choice carried over deliberately: one reviewed 6.4 MB file that both clients
+ * share beats four regional files that only this one has.
+ */
+const NOTO = { family: "NotoSansCJK", file: "/fonts/noto-sans-cjk/NotoSansCJK-Regular.woff2" };
 
 export const LOCALES: readonly LocaleInfo[] = [
   { id: "en", label: "ENGLISH", english: "English", font: null },
@@ -83,25 +104,25 @@ export const LOCALES: readonly LocaleInfo[] = [
     id: "ko",
     label: "한국어",
     english: "Korean",
-    font: { family: "FusionPixelKO", file: `${FP}-ko.woff2` },
+    font: NOTO,
   },
   {
     id: "yue",
     label: "廣東話",
     english: "Cantonese",
-    font: { family: "FusionPixelHant", file: `${FP}-zh_hant.woff2` },
+    font: NOTO,
   },
   {
     id: "zh",
     label: "简体中文",
     english: "Chinese (Simplified)",
-    font: { family: "FusionPixelHans", file: `${FP}-zh_hans.woff2` },
+    font: NOTO,
   },
   {
     id: "ja",
     label: "日本語",
     english: "Japanese",
-    font: { family: "FusionPixelJA", file: `${FP}-ja.woff2` },
+    font: NOTO,
   },
   { id: "cs", label: "ČEŠTINA", english: "Czech", font: null },
 ];
@@ -246,6 +267,10 @@ export function setLocale(id: Locale, remember = true): Promise<void> {
   active = info.id;
   table = TABLES[info.id];
   if (remember) writePref(LOCALE_KEY, info.id);
+  // The legibility floor moves with the *script*, not with the download: it is
+  // needed just as much while the system CJK stack is standing in, so it is
+  // raised now rather than in the callback below.
+  setCjkFloor(info.font !== null);
   // Every string is already the new language from here; only the face is
   // outstanding. `remeasure` is called twice on purpose — once now, because
   // the words changed and every cached width is for the old ones, and once

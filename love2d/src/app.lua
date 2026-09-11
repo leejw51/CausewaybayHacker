@@ -23,6 +23,7 @@ local UI = require("src.ui")
 local CRT = require("src.crt")
 local SFX = require("src.sfx")
 local Store = require("src.store")
+local I18n = require("src.i18n")
 local Anim = require("src.anim")
 local Clock = require("src.clock")
 local Wallet = require("src.wallet")
@@ -201,6 +202,13 @@ function App:load()
 
   Layout.storage = { save = Store.save_display, load = Store.load_display }
   Layout.init(os.getenv("CWBH_ORIENT"))
+
+  -- The language, in the same precedence shape as everything else here:
+  -- `CWBH_LANG` for a launch-time override, otherwise what was chosen last,
+  -- otherwise English.
+  local wanted = os.getenv("CWBH_LANG")
+  if not (wanted and I18n.NAMES[wanted]) then wanted = Store.saved_lang() end
+  if wanted then I18n.set(wanted) end
 
   -- A missing key library is *not* fatal: the login screen renders the
   -- reason and the build command, because "run `make -C love2d ffi`" is a
@@ -442,6 +450,12 @@ function App:typing()
   if not scene then return false end
   if self.scene_name == "quest" then return true end
   if self.scene_name == "playground" then return true end
+  -- **The search screen's own footer says `TYPE to search`.** It was missing
+  -- from this list before this round, so `F` had been toggling fullscreen
+  -- instead of typing an `f` into the query box; adding `L` for the language
+  -- would have taken a second letter for the same reason. A screen with a
+  -- text field is a screen that is typing, whatever else it does.
+  if self.scene_name == "search" then return true end
   if self.scene_name == "login" then return self.wallet_lib ~= nil end
   return false
 end
@@ -463,6 +477,8 @@ function App:display_state()
     shape = Layout.mode,
     font = Layout.font,
     font_label = Layout.fontLabel(),
+    lang = I18n.lang,
+    lang_code = I18n.code(),
   }
 end
 
@@ -495,10 +511,27 @@ function App:display_pressed(x, y)
   if inside(rects.font) then
     SFX.play("select")
     Layout.cycleFont()
-    self:toast("code size " .. Layout.fontLabel())
+    self:toast("type size " .. Layout.fontLabel())
+    return true
+  end
+  if inside(rects.lang) then
+    SFX.play("select")
+    self:set_lang(I18n.cycle())
     return true
   end
   return false
+end
+
+--- Change the interface language, and remember it.
+---
+--- The toast says the language's **own name** — `한국어`, not `KO` — because
+--- the button had room for two letters and the moment somebody presses it is
+--- exactly the moment the full name is worth the width.
+function App:set_lang(code)
+  I18n.set(code)
+  Store.set_lang(I18n.lang)
+  self:toast(I18n.name())
+  return I18n.lang
 end
 
 --- The status strip, drawn by every scene so the connection is never a
@@ -517,7 +550,11 @@ function App:footer(hint)
   local state = self:display_state()
   -- The reserve first, so the hint is measured against what is actually left
   -- rather than being clipped by the buttons after the fact.
-  UI.footer(left, self.client and self.client.state or "idle", UI.displayReserve(state))
+  local reserve = UI.displayReserve(state)
+  -- Kept so a drive script can ask whether this screen's own hint fits in the
+  -- room it was given, which is the question a translation actually raises.
+  self.last_hint, self.last_reserve = left, reserve
+  UI.footer(left, self.client and self.client.state or "idle", reserve)
   self.display_rects = UI.displayControls(state)
 end
 

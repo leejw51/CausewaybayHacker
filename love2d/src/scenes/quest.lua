@@ -44,6 +44,7 @@ local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
+local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Editor = require("src.editor")
 local CodePane = require("src.codepane")
@@ -224,7 +225,7 @@ function Quest:execute(mode)
       -- not "no such quest" — SUBMIT still works, so say that.
       if is_run and payload.code == "not_found" then
         self.run_unsupported = true
-        self.error = "RUN is not on this server yet — SUBMIT still works"
+        self.error = I18n.t("RUN is not on this server yet — SUBMIT still works")
         self.app:toast(self.error)
         return
       end
@@ -232,8 +233,8 @@ function Quest:execute(mode)
         -- The other button is still going. Says which, because "busy" with
         -- no subject is the least useful message in any program.
         local running = (payload.detail or {}).running
-        self.app:toast(running == "quest.run" and "a run is still going"
-          or "a submission is already running")
+        self.app:toast(running == "quest.run" and I18n.t("a run is still going")
+          or I18n.t("a submission is already running"))
       end
       return
     end
@@ -292,7 +293,7 @@ function Quest:format()
       -- leaving a control that does nothing.
       if payload.code == "not_found" then
         self.format_unsupported = true
-        self.format_note = "FORMAT is not on this server yet"
+        self.format_note = I18n.t("FORMAT is not on this server yet")
       else
         self.format_note = why.player
       end
@@ -307,7 +308,7 @@ function Quest:format()
       return
     end
     if payload.changed == false then
-      self.format_note = "already tidy"
+      self.format_note = I18n.t("already tidy")
       SFX.play("move")
       return
     end
@@ -323,7 +324,7 @@ function Quest:reset()
     if not ok then return end
     self.editor:set_text(payload.starter or "")
     self.editor.dirty = false
-    self.app:toast("starter code restored")
+    self.app:toast(I18n.t("starter code restored"))
   end)
 end
 
@@ -331,7 +332,7 @@ function Quest:take_hint()
   if not self.quest then return end
   local index = self.quest.hints_used or 0
   if index >= (self.quest.hints_total or 0) then
-    self.app:toast("no more hints")
+    self.app:toast(I18n.t("no more hints"))
     return
   end
   self.app.session:request("quest.hint", { quest_id = self.quest.id, index = index },
@@ -339,7 +340,8 @@ function Quest:take_hint()
       if not ok then self.app:toast(why.player); return end
       self.hint = payload.hint
       self.quest.hints_used = payload.hints_used or (index + 1)
-      self.app:toast(("hint %d of %d — costs stars"):format(payload.index + 1, payload.total))
+      self.app:toast(I18n.t("hint %d of %d — costs stars",
+        payload.index + 1, payload.total))
     end)
 end
 
@@ -347,13 +349,13 @@ end
 function Quest:external_edit()
   local text, err = External.edit(self.editor:text(), self.quest and self.quest.land or "rust")
   if not text then
-    self.app:toast(err or "could not open $EDITOR")
+    self.app:toast(err or I18n.t("could not open $EDITOR"))
     return
   end
   self.editor:push_undo(false)
   self.editor:set_text(text)
   self.editor.dirty = true
-  self.app:toast("loaded back from $EDITOR")
+  self.app:toast(I18n.t("loaded back from $EDITOR"))
 end
 
 --- Notice a threshold crossing, so it can be marked once rather than
@@ -385,9 +387,19 @@ end
 
 --- The two panes, in whichever orientation is current. Both are first-class:
 --- landscape puts the brief beside the editor, portrait stacks them.
+--- The header band's height, measured from the two lines of type in it.
+---
+--- It was a hard 48 px, which fitted a 13 px title over a 7 px id. At twice
+--- that ladder the id was printed through the title and the editor pane
+--- started underneath both.
+function Quest:header_h()
+  return math.max(48, 8 + UI.lineHeight(13) + 2 + UI.lineHeight(7) + 8)
+end
+
 function Quest:panes()
   local vw, vh = Layout.vw, Layout.vh
-  local top, bottom = 48, 56
+  local top = self:header_h()
+  local bottom = math.max(56, UI.footerHeight() + UI.lineHeight(9) + 14)
   local pad = 10
   if Layout.isPortrait() then
     local brief_h = math.floor((vh - top - bottom) * 0.32)
@@ -412,23 +424,34 @@ function Quest:draw()
   love.graphics.setColor(1, 1, 1, 1)
 
   local tint = Theme.land[land] or Theme.coin
+  local head = self:header_h()
+  local row1 = 8
+  local row2 = 8 + UI.lineHeight(13) + 2
   UI.setColor(Theme.ink, 0.9)
-  love.graphics.rectangle("fill", 0, 0, vw, 48)
+  love.graphics.rectangle("fill", 0, 0, vw, head)
   love.graphics.setColor(1, 1, 1, 1)
-  local title = self.quest and self.quest.title or (self.error or "loading…")
-  UI.text(title, 12, 10, 13, tint)
-  UI.text(self.quest_id or "", 12, 30, 7, Theme.withAlpha(Theme.cream, 0.55))
+  -- **The title is the quest's own, and it is not translated** (SPEC §1.1 is
+  -- the client's store; the quests are content and belong to another repo).
+  -- It is drawn beside its id, in the land's tint, so a Korean player reads
+  -- it as the identifier it is rather than as a sentence somebody forgot.
+  local title = self.quest and self.quest.title or (self.error or I18n.t("loading…"))
+  UI.text(title, 12, row1, 13, tint)
+  UI.text(self.quest_id or "", 12, row2, 7, Theme.withAlpha(Theme.cream, 0.55))
   self:draw_clock(vw)
 
   if self.quest then
     -- Earned stars get the star; difficulty gets pips (design review §4).
-    UI.text("STARS", vw - 12 - 3 * 13 - UI.textWidth("STARS ", 7), 12, 7,
+    local star = math.max(10, math.floor(UI.lineHeight(7) * 0.8))
+    local caption = UI.lineHeight(7)
+    UI.text(I18n.t("STARS"), vw - 12 - 3 * (star + 3)
+      - UI.textWidth(I18n.t("STARS") .. " ", 7), row1 + (star - caption) / 2, 7,
       Theme.withAlpha(Theme.cream, 0.6))
-    UI.stars(vw - 12 - 3 * 13, 10, self.quest.stars or 0, 10)
-    local pw = UI.pipsWidth(5)
-    UI.text("DIFFICULTY", vw - 12 - pw - UI.textWidth("DIFFICULTY ", 7), 32, 7,
-      Theme.withAlpha(Theme.cream, 0.6))
-    UI.pips(vw - 12 - pw, 30, self.quest.difficulty or 1, 5)
+    UI.stars(vw - 12 - 3 * (star + 3), row1, self.quest.stars or 0, star)
+    local pip = math.max(6, math.floor(star * 0.6))
+    local pw = UI.pipsWidth(pip)
+    UI.text(I18n.t("DIFFICULTY"), vw - 12 - pw - UI.textWidth(I18n.t("DIFFICULTY") .. " ", 7),
+      row2, 7, Theme.withAlpha(Theme.cream, 0.6))
+    UI.pips(vw - 12 - pw, row2 + (caption - pip * 2) / 2, self.quest.difficulty or 1, pip)
   end
 
   local brief, code = self:panes()
@@ -446,7 +469,7 @@ function Quest:draw()
   -- in portrait once the display controls took the right-hand end of the
   -- strip. What is left is exactly the keys the screen does not otherwise
   -- say out loud.
-  self.app:footer("F6 reset   F7 hint   F8 log   F9 $EDITOR   ESC map")
+  self.app:footer(I18n.t("F6 reset   F7 hint   F8 log   F9 $EDITOR   ESC map"))
 end
 
 --- The clock (PROTOCOL §4.8b), on the header band.
@@ -464,8 +487,7 @@ function Quest:draw_clock(vw)
   local state = Clock.read(self.quest)
   if not state then return end
 
-  local scale = Layout.uiScale()
-  local now = Anim.now()
+    local now = Anim.now()
 
   -- Colour by phase. Overtime gets its own register — counting up, in the
   -- game's failure red — so it is unmistakably past the line rather than a
@@ -485,7 +507,7 @@ function Quest:draw_clock(vw)
   local urgency = Ease.attention(state.fraction)
 
   local text = Clock.format(state)
-  local size = math.floor((state.phase == "overtime" and 15 or 14) * scale)
+  local size = (state.phase == "overtime" and 15 or 14)
   local grow = 1 + 0.35 * crossing + 0.5 * entrance + 0.10 * urgency
   local w = UI.textWidth(text, size)
 
@@ -541,7 +563,7 @@ function Quest:draw_brief(rect, tint)
     y = y + 10
 
     if self.quest.concepts and #self.quest.concepts > 0 then
-      y = y + UI.text("CONCEPTS", x, y, 8, Theme.withAlpha(Theme.cream, 0.6)) + 4
+      y = y + UI.text(I18n.t("CONCEPTS"), x, y, 8, Theme.withAlpha(Theme.cream, 0.6)) + 4
       for _, line in ipairs(UI.wrap(table.concat(self.quest.concepts, ", "), column, 8)) do
         y = y + UI.text(line, x, y, 8, tint) + 3
       end
@@ -549,9 +571,12 @@ function Quest:draw_brief(rect, tint)
     end
 
     local tests = self.quest.tests or {}
-    y = y + UI.text(("TESTS  match %s   %d hidden"):format(
+    -- A `("…"):format(…)` call, which is why the sweep that found every
+    -- `I18n.t` site walked past it: it does not look like a string being
+    -- drawn until you read the line. Given a width for the same reason.
+    y = y + UI.text(I18n.t("TESTS  match %s   %d hidden",
       tostring(tests.match or "?"), tests.hidden_count or 0), x, y, 8,
-      Theme.withAlpha(Theme.cream, 0.6)) + 6
+      Theme.withAlpha(Theme.cream, 0.6), "left", indent) + 6
     for _, case in ipairs(tests.visible or {}) do
       y = y + UI.text("· " .. tostring(case.name), x, y, 8, Theme.cream) + 2
       if case.stdin and case.stdin ~= "" then
@@ -567,12 +592,12 @@ function Quest:draw_brief(rect, tint)
 
     if self.hint then
       y = y + 6
-      y = y + UI.text("HINT", x, y, 8, Theme.coin) + 4
+      y = y + UI.text(I18n.t("HINT"), x, y, 8, Theme.coin) + 4
       for _, line in ipairs(UI.wrap(self.hint, column, 8)) do
         y = y + UI.text(line, x, y, 8, Theme.coin) + 3
       end
     end
-    local hints = ("hints %d/%d  (F7)"):format(
+    local hints = I18n.t("hints %d/%d  (F7)",
       self.quest.hints_used or 0, self.quest.hints_total or 0)
     y = y + 10
     UI.text(hints, x, y, 7, Theme.withAlpha(Theme.cream, 0.5))
@@ -685,9 +710,20 @@ function Quest:draw_editor(rect, tint)
   -- SUBMIT is the deliberate one: F10, five keys away, and the right-hand
   -- button of the pair. A hand going for RUN cannot land on SUBMIT by being
   -- a centimetre off, and a finger going for F5 cannot submit.
-  local bh = 28
+  -- **Measured from their own labels.** `SUBMIT  F10` at the old 9 px ladder
+  -- was 99 px wide inside a 150 px button; at twice the ladder it is 264, and
+  -- a fixed width printed `SUBMIT  F1` and then stopped. The gap between RUN
+  -- and SUBMIT is kept whatever else gives way — it is the reason the two are
+  -- laid out at all (reaching for RUN must never land on SUBMIT).
+  local run_label = self.running_mode == "quest.run" and I18n.t("RUNNING…") or I18n.t("RUN  F5")
+  local submit_label = self.running_mode == "quest.submit"
+    and I18n.t("JUDGING…") or I18n.t("SUBMIT  F10")
+  local format_label = self.formatting and "…" or I18n.t("FORMAT  F2")
+  local bh = math.max(28, UI.lineHeight(9) + 12)
   local gap = 22
-  local bw = math.min(150, math.floor((rect.w - 30 - gap) / 2))
+  local want = math.max(UI.textWidth(run_label, 9), UI.textWidth(submit_label, 9)) + 20
+  local room = math.floor((rect.w - 30 - gap - UI.textWidth(format_label, 8) - 20) / 2)
+  local bw = math.max(60, math.min(want, room))
   local by = rect.y + rect.h - bh - 8
   local sx = rect.x + rect.w - bw - 10
   local rx = sx - gap - bw
@@ -699,19 +735,16 @@ function Quest:draw_editor(rect, tint)
   -- something. It changes the buffer and nothing else — never recorded, no
   -- attempt, no mistake (§4.9d) — so it must not read as a third way to
   -- submit.
-  local fw = math.min(96, math.floor(bw * 0.7))
+  local fw = math.max(48, math.min(UI.textWidth(format_label, 8) + 16,
+    math.max(48, rx - rect.x - 20)))
   local fx = rect.x + 10
-  UI.button(fx, by, fw, bh,
-    self.formatting and "…" or "FORMAT  F2",
+  UI.button(fx, by, fw, bh, format_label,
     (usable and not self.format_unsupported) and "normal" or "disabled", 8)
   self.format_rect = { x = fx, y = by, w = fw, h = bh }
 
-  UI.button(rx, by, bw, bh,
-    self.running_mode == "quest.run" and "RUNNING…" or "RUN  F5",
+  UI.button(rx, by, bw, bh, run_label,
     (usable and not self.run_unsupported) and "normal" or "disabled", 9)
-  UI.button(sx, by, bw, bh,
-    self.running_mode == "quest.submit" and "JUDGING…" or "SUBMIT  F10",
-    usable and "hot" or "disabled", 9)
+  UI.button(sx, by, bw, bh, submit_label, usable and "hot" or "disabled", 9)
   self.run_rect = { x = rx, y = by, w = bw, h = bh }
   self.submit_rect = { x = sx, y = by, w = bw, h = bh }
 
@@ -719,17 +752,22 @@ function Quest:draw_editor(rect, tint)
   local tests = (self.quest and self.quest.tests) or {}
   local visible = #(tests.visible or {})
   local hidden = tests.hidden_count or 0
-  UI.text(self.run_unsupported and "not on this server"
-      or ("%d sample%s"):format(visible, visible == 1 and "" or "s"),
-    rx, by - 12, 7, Theme.withAlpha(self.run_unsupported and Theme.dim or Theme.cyan, 0.9))
-  UI.text(hidden > 0 and ("+%d hidden"):format(hidden) or "all cases",
-    sx, by - 12, 7, Theme.withAlpha(Theme.coin, 0.8))
+  local cap = UI.lineHeight(7) + 3
+  -- Singular and plural as two translatable strings, the same as the streak
+  -- on the stats screen. One "%d samples" for both reads "1 samples" in the
+  -- source language, which is the language that has no excuse.
+  UI.text(self.run_unsupported and I18n.t("not on this server")
+      or (visible == 1 and I18n.t("%d sample", 1) or I18n.t("%d samples", visible)),
+    rx, by - cap, 7, Theme.withAlpha(self.run_unsupported and Theme.dim or Theme.cyan, 0.9))
+  -- Under the SUBMIT button, so it gets the button's width and no more.
+  UI.text(hidden > 0 and I18n.t("+%d hidden", hidden) or I18n.t("all cases"),
+    sx, by - cap, 7, Theme.withAlpha(Theme.coin, 0.8), "left", bw)
 
   -- On the caption row with `1 sample` and `+2 hidden`, not eighteen pixels
   -- off the bottom of the well — which put it *inside* the button band, so
   -- the FORMAT button was printed over the top of it and neither could be
   -- read. Found by looking at a screenshot; no test would have caught it.
-  local info = ("%d lines   %d bytes"):format(total, #self.editor:text())
+  local info = I18n.t("%d lines   %d bytes", total, #self.editor:text())
   UI.text(info, rect.x + 10, by - 12, 7, Theme.withAlpha(Theme.cream, 0.45))
 
   -- §4.9d's `problem`, in the **hint** register rather than the failure one.
@@ -804,7 +842,8 @@ function Quest:draw_run_overlay()
     end
   end
   if #lines == 0 then
-    lines[1] = { name = "", text = self.running_mode and "waiting for the compiler…" or "" }
+    lines[1] = { name = "",
+      text = self.running_mode and I18n.t("waiting for the compiler…") or "" }
   end
 
   local first = math.max(1, math.min(#lines - rows + 1, math.floor(self.log_scroll)))
@@ -824,9 +863,9 @@ function Quest:draw_run_overlay()
   love.graphics.setColor(1, 1, 1, 1)
 
   if self.log and self.log.truncated then
-    UI.text("output truncated at 256 KiB", x + 12, y + h - 16, 7, Theme.coin)
+    UI.text(I18n.t("output truncated at 256 KiB"), x + 12, y + h - 16, 7, Theme.coin)
   end
-  UI.text("F8 hide", x + w - 12 - UI.textWidth("F8 hide", 7), y + h - 16, 7,
+  UI.text(I18n.t("F8 hide"), x + w - 12 - UI.textWidth("F8 hide", 7), y + h - 16, 7,
     Theme.withAlpha(Theme.cream, 0.5))
 
   if self.run_attempt and not self.running_mode then
@@ -852,14 +891,17 @@ function Quest:draw_run_outcome(x, y, w)
   -- half of it says the opposite of the whole of it.
   local note_lines
   if passed then
+    -- Three whole sentences that the `I18n.t` sweep walked past, because
+    -- they are built with `:format` and `UI.wrap` rather than passed to it.
     note_lines = { hidden > 0
-      and ("now SUBMIT — %d hidden case%s have not run yet"):format(
-        hidden, hidden == 1 and "" or "s")
-      or "now SUBMIT to record it against the node" }
+      and (hidden == 1
+        and I18n.t("now SUBMIT — %d hidden case has not run yet", hidden)
+        or I18n.t("now SUBMIT — %d hidden cases have not run yet", hidden))
+      or I18n.t("now SUBMIT to record it against the node") }
   else
     note_lines = UI.wrap(
-      "runs do not count against your stars — but they are kept, "
-        .. "and what went wrong feeds your drills", w - 24, 7)
+      I18n.t("runs do not count against your stars — but they are kept, "
+        .. "and what went wrong feeds your drills"), w - 24, 7)
   end
 
   local h = 30 + #note_lines * 10
@@ -894,7 +936,7 @@ function Quest:draw_run_outcome(x, y, w)
     })[a.verdict] or a.verdict:upper()
   UI.text(headline, x + 12, sy + 9, 11, tint)
 
-  local counts = ("%d / %d samples"):format(a.tests_passed or 0, a.tests_total or 0)
+  local counts = I18n.t("%d / %d samples", a.tests_passed or 0, a.tests_total or 0)
   UI.text(counts, x + w - 12 - UI.textWidth(counts, 9), sy + 10, 9,
     Theme.withAlpha(Theme.cream, 0.85))
 

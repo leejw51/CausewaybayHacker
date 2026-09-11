@@ -10,6 +10,7 @@ local Assets = require("src.assets")
 local UI = require("src.ui")
 local SFX = require("src.sfx")
 local Anim = require("src.anim")
+local I18n = require("src.i18n")
 
 local Lands = {}
 Lands.__index = Lands
@@ -118,6 +119,49 @@ function Lands:selected_age()
   return Anim.now() - self.picked_at
 end
 
+--- Where the cards go — **one function, read by the draw and by the click.**
+---
+--- These were two copies of the same eight lines, and the copies had already
+--- started to matter: the hit test knew the card was capped at 300 px and the
+--- draw knew it too, so changing one would have moved the cards without
+--- moving what you could press.
+---
+--- **Portrait stacks and uses the height it is given.** That is the other
+--- half of the "type is too small" report: on a 1080×1920 the stack was two
+--- 300 px cards at the top of a 1920 px frame and two thirds of the screen
+--- was bare backdrop, which reads as small however big the letters are. The
+--- cap is gone; in portrait the cards divide the column, and the card draws
+--- itself into whatever height it is handed.
+function Lands:card_rects()
+  local vw, vh = Layout.vw, Layout.vh
+  local portrait = Layout.isPortrait()
+  local n = math.max(1, self.lands and #self.lands or 2)
+  -- Measured from the type, not fixed: the title above the cards and the
+  -- footer below them both grow when the player asks for bigger type.
+  local pad = 16
+  local top = math.floor(24 + UI.lineHeight(18) + 18)
+  local bottom = vh - UI.footerHeight() - math.floor(UI.lineHeight(9) * 1.6)
+  local out = {}
+  if portrait then
+    local gap = 14
+    local cw = vw - pad * 2
+    local ch = (bottom - top - gap * (n - 1)) / n
+    for i = 1, n do
+      out[i] = { x = pad, y = top + (i - 1) * (ch + gap), w = cw, h = ch }
+    end
+  else
+    local gap = 18
+    local cw = math.min(460, (vw - pad * 2 - gap * (n - 1)) / n)
+    local ch = bottom - top
+    local total = n * cw + (n - 1) * gap
+    for i = 1, n do
+      out[i] = { x = (vw - total) / 2 + (i - 1) * (cw + gap),
+                 y = top + (bottom - top - ch) / 2, w = cw, h = ch }
+    end
+  end
+  return out, n
+end
+
 function Lands:draw()
   local vw, vh = Layout.vw, Layout.vh
   Assets.cover(Assets.pick("bg_street", "bg_flat"), 0, 0, vw, vh)
@@ -125,70 +169,42 @@ function Lands:draw()
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
 
-  local s = Layout.uiScale()
-  UI.text("PICK A LAND", 0, 24, math.floor(18 * s), Theme.coin, "center", vw)
+  UI.text(I18n.t("PICK A LAND"), 0, 24, 18, Theme.coin, "center", vw)
 
-  local portrait = Layout.isPortrait()
-  local n = math.max(1, self.lands and #self.lands or 2)
-  local pad = 16
-  local top = 70
-  local bottom = vh - 60
-  local cw, ch, gap
-  if portrait then
-    gap = 14
-    cw = vw - pad * 2
-    ch = math.min(300, (bottom - top - gap * (n - 1)) / n)
-  else
-    gap = 18
-    cw = math.min(420, (vw - pad * 2 - gap * (n - 1)) / n)
-    ch = math.min(292, bottom - top)
-  end
-
+  local rects, n = self:card_rects()
   for i = 1, n do
-    local land = self:land_at(i)
-    local x, y
-    if portrait then
-      x = pad
-      y = top + (i - 1) * (ch + gap)
-    else
-      local total = n * cw + (n - 1) * gap
-      x = (vw - total) / 2 + (i - 1) * (cw + gap)
-      y = top + (bottom - top - ch) / 2
-    end
-    self:draw_card(x, y, cw, ch, land, LAND_ORDER[i], i == self.cursor, s)
+    local r = rects[i]
+    self:draw_card(r.x, r.y, r.w, r.h, self:land_at(i), LAND_ORDER[i], i == self.cursor)
   end
 
-  if self.error then
-    UI.text(self.error, 0, vh - 52, 9, Theme.red, "center", vw)
-  elseif not self.lands then
-    UI.text("asking the server…", 0, vh - 52, 9,
-      Theme.withAlpha(Theme.cream, 0.7), "center", vw)
+  local note = self.error or (not self.lands and I18n.t("asking the server…")) or nil
+  if note then
+    UI.text(note, 0, vh - UI.footerHeight() - UI.lineHeight(9) - 6, 9,
+      self.error and Theme.red or Theme.withAlpha(Theme.cream, 0.7), "center", vw)
   end
 
-  self.app:footer("ARROWS choose   ENTER go   P playground")
+  self.app:footer(I18n.t("ARROWS choose   ENTER go   P playground"))
 end
 
---- One land, as a card.
+--- One card, drawn into whatever rectangle it is handed.
 ---
---- The user's note was "add more sprites in each button — not fun", and this
---- is the answer: the land's own mascot on top, and every category row
---- carrying the little action sprite for that land *and* that category
---- (`art/mascot_<land>_<category>.png` — Ferris up a crate, Ferris working
---- two tills, Ferris stuck at a blank board). A column of identical text was
---- the problem; eight drawn characters and a progress rule are not.
-function Lands:draw_card(x, y, w, h, land, fallback, selected, s)
+--- Every offset in here used to be a constant calibrated against 8 px type —
+--- the mascot at `y + 118`, the title at `y + 124`, the blurb at `y + 144`,
+--- the rows from `y + 168` at 32 px each. Doubling the type ladder put the
+--- title through the mascot and the blurb through the title, which is the
+--- predictable half of a typography change and the reason this is now
+--- measured: the head block is as tall as the type in it, the rows are as
+--- tall as the type in them, and the mascot takes whatever is left.
+function Lands:draw_card(x, y, w, h, land, fallback, selected)
   local key = land and land.land or fallback
   local tint = Theme.land[key] or Theme.dim
   local t = Anim.now()
 
-  -- The selected card lifts. Physical rather than merely outlined: the eye
-  -- reads height before it reads a border colour.
   local lift = selected and Anim.lift(self:selected_age()) * 4 or 0
   local push = (selected and self.pressed_at) and Anim.press(t - self.pressed_at) * 3 or 0
   y = y - lift + push
 
   if selected then
-    -- A shadow under the raised card, so a lift is a lift and not a jump.
     UI.setColor(Theme.ink, 0.30)
     love.graphics.rectangle("fill", x + 4, y + h + 2, w - 8, 3 + lift)
     love.graphics.setColor(1, 1, 1, 1)
@@ -199,43 +215,68 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected, s)
     tint = selected and Theme.coin or tint,
   })
 
-  -- The land mascot, idling on her feet with the measured `box`.
+  local pad = 12
+  local title_h = UI.lineHeight(14)
+  local rows = land and #land.categories or 3
+  -- A row is its own type plus a bar and air, never less than the sprite.
+  local row_h = math.max(UI.lineHeight(9) + 20, 32)
+  local rows_h = rows * row_h
+
+  -- **The blurb is measured, not assumed to be one line.** In landscape the
+  -- card is narrow and "ownership, borrows, lifetimes" wraps to two; reserving
+  -- one line's height for it put the second line through the category rows.
+  -- It will wrap again, and differently, in six languages.
+  local blurb = I18n.t(BLURB[key] or "")
+  local blurb_lines = blurb ~= "" and UI.wrap(blurb, w - pad * 2, 8) or {}
+  local blurb_h = #blurb_lines * UI.lineHeight(8)
+
+  local head_h = title_h + 2 + blurb_h
+  local free = h - pad * 2 - rows_h - head_h - 6
+  -- The mascot takes the slack, and the block sits a little above centre in
+  -- what is left — a portrait card is tall enough that a bottom-anchored
+  -- stack leaves a hole in the middle of it.
+  local mascot = math.max(48, math.min(h * 0.42, free))
+  local top = y + pad + math.max(0, (free - mascot) * 0.45)
+
   local bob = Anim.bob(t, { amount = selected and 3 or 1.5, phase = key == "go" and 0.5 or 0 })
-  Assets.sprite(MASCOT[key], x + w / 2, y + 118 + bob, 88)
+  Assets.sprite(MASCOT[key], x + w / 2, top + mascot + bob, mascot)
 
-  UI.text((key or "?"):upper() .. " LAND", x, y + 124, math.floor(14 * s), tint, "center", w)
-  UI.text(BLURB[key] or "", x, y + 144, 8, Theme.withAlpha(Theme.cream, 0.7), "center", w)
+  local ty = top + mascot + 6
+  UI.text(I18n.t("%s LAND", (key or "?"):upper()), x, ty, 14, tint, "center", w)
+  for i, line in ipairs(blurb_lines) do
+    UI.text(line, x, ty + title_h + 2 + (i - 1) * UI.lineHeight(8), 8,
+      Theme.withAlpha(Theme.cream, 0.7), "center", w)
+  end
 
-  local row = y + 168
-  local rh = 32
+  local row = y + h - pad - rows_h
   if land then
+    local sprite_size = math.min(row_h - 6, 34)
     for i, cat in ipairs(land.categories) do
       local color = cat.open and Theme.cream or Theme.dim
-      -- Each row's own action sprite, on its own phase so the three do not
-      -- bob in lockstep — a row of synchronised sprites reads as mechanical.
       local sprite = ("mascot_%s_%s"):format(key, cat.category)
       local rbob = Anim.bob(t, { amount = 1.4, period = 1.9, phase = 0.17 * i })
-      Assets.sprite(sprite, x + 28, row + 26 + rbob, 28,
+      Assets.sprite(sprite, x + pad + sprite_size / 2,
+        row + (row_h + sprite_size) / 2 - 3 + rbob, sprite_size,
         { alpha = cat.open and 1 or 0.4 })
 
-      UI.text(cat.category:upper(), x + 48, row + 2, 9, color)
+      local label_x = x + pad + sprite_size + 8
       local count = ("%d/%d"):format(cat.cleared, cat.total)
-      UI.text(count, x + w - 20 - UI.textWidth(count, 9), row + 2, 9, color)
+      local count_w = UI.textWidth(count, 9)
+      local badge = 26
+      UI.text(I18n.t(cat.category:upper()), label_x, row + 3, 9, color)
+      UI.text(count, x + w - pad - badge - count_w, row + 3, 9, color)
 
-      UI.bar(x + 48, row + 17, w - 72, 5,
+      local bar_y = row + 6 + UI.lineHeight(9)
+      UI.bar(label_x, bar_y, x + w - pad - badge - 6 - label_x, 5,
         cat.total > 0 and cat.cleared / cat.total or 0,
         cat.open and Theme.admit or Theme.dim)
 
-      -- The badges. `badge_cleared` when a whole category is done;
-      -- `badge_locked` **only** when it genuinely cannot be entered — nothing
-      -- on the map is locked any more (§4.7), and a decorative padlock is the
-      -- exact lie that change existed to remove.
       if cat.total > 0 and cat.cleared >= cat.total then
-        Assets.marker("badge_cleared", x + w - 24, row + 14, 22)
+        Assets.marker("badge_cleared", x + w - pad - 10, row + row_h / 2 + 8, 22)
       elseif not cat.open then
-        Assets.marker("badge_locked", x + w - 24, row + 14, 20, { alpha = 0.85 })
+        Assets.marker("badge_locked", x + w - pad - 10, row + row_h / 2 + 8, 20, { alpha = 0.85 })
       end
-      row = row + rh
+      row = row + row_h
     end
   else
     UI.text("…", x, row, 10, Theme.dim, "center", w)
@@ -275,28 +316,10 @@ function Lands:keypressed(key)
 end
 
 function Lands:mousepressed(x, y)
-  local vw, vh = Layout.vw, Layout.vh
-  local portrait = Layout.isPortrait()
-  local n = math.max(1, self.lands and #self.lands or 2)
-  local pad, top, bottom = 16, 70, vh - 60
-  local cw, ch, gap
-  if portrait then
-    gap = 14; cw = vw - pad * 2; ch = math.min(300, (bottom - top - gap * (n - 1)) / n)
-  else
-    gap = 18
-    cw = math.min(420, (vw - pad * 2 - gap * (n - 1)) / n)
-    ch = math.min(292, bottom - top)
-  end
+  local rects, n = self:card_rects()
   for i = 1, n do
-    local cx, cy
-    if portrait then
-      cx, cy = pad, top + (i - 1) * (ch + gap)
-    else
-      local total = n * cw + (n - 1) * gap
-      cx = (vw - total) / 2 + (i - 1) * (cw + gap)
-      cy = top + (bottom - top - ch) / 2
-    end
-    if x >= cx and x <= cx + cw and y >= cy and y <= cy + ch then
+    local r = rects[i]
+    if x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h then
       -- First click selects, second opens: on a card that lifts, the lift is
       -- the feedback that says which one the next click will take.
       if self.cursor ~= i then

@@ -27,6 +27,7 @@ local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
+local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local errors = require("src.net.errors")
 
@@ -126,14 +127,13 @@ function Search:draw()
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
 
-  local s = Layout.uiScale()
-  local pad = Layout.isPortrait() and 12 or 46
+    local pad = Layout.isPortrait() and 12 or 46
   local w = vw - pad * 2
 
   UI.setColor(Theme.ink, 0.9)
   love.graphics.rectangle("fill", 0, 0, vw, 44)
   love.graphics.setColor(1, 1, 1, 1)
-  UI.text("SEARCH", 12, 12, math.floor(15 * s), Theme.cyan)
+  UI.text(I18n.t("SEARCH"), 12, 12, 15, Theme.cyan)
 
   -- The box.
   local by = 54
@@ -168,13 +168,13 @@ function Search:draw()
     UI.button(mx, my, mw, 22, mode:upper(), on and "hot" or "normal", 8)
     self.mode_rects[mode] = { x = mx, y = my, w = mw, h = 22 }
   end
-  UI.text(MODE_BLURB[self.mode] or "", pad + 3 * (mw + 8) + 6, my + 7, 7,
+  UI.text(I18n.t(MODE_BLURB[self.mode] or ""), pad + 3 * (mw + 8) + 6, my + 7, 7,
     Theme.withAlpha(Theme.cream, 0.55))
 
   local ly = my + 32
   self:draw_results(pad, ly, w, vh - ly - 40)
 
-  self.app:footer("TYPE to search   ENTER go   TAB mode   ARROWS pick   ESC back")
+  self.app:footer(I18n.t("TYPE to search   ENTER go   TAB mode   ARROWS pick   ESC back"))
 end
 
 function Search:draw_results(x, y, w, h)
@@ -186,20 +186,21 @@ function Search:draw_results(x, y, w, h)
     -- §3.3: real, but not built yet. Said in the story's voice, with no retry
     -- offered — retrying something that does not exist is the thing this code
     -- exists to avoid.
-    UI.text("NOT BUILT YET", x + 16, cy, 10, Theme.coin)
+    UI.text(I18n.t("NOT BUILT YET"), x + 16, cy, 10, Theme.coin)
     cy = cy + 18
     local said = self.unavailable.milestone
-      and ("One box over every quest, in three rankings at once. It opens in "
-        .. "chapter " .. self.unavailable.milestone .. ".")
-      or "One box over every quest, in three rankings at once. Not in this build."
+      and I18n.t("One box over every quest, in three rankings at once. It "
+        .. "opens in chapter %s.", tostring(self.unavailable.milestone))
+      or I18n.t("One box over every quest, in three rankings at once. Not in "
+        .. "this build.")
     for _, line in ipairs(UI.wrap(said, w - 40, 8)) do
       cy = cy + UI.text(line, x + 16, cy, 8, Theme.cream) + 4
     end
     cy = cy + 8
     for _, line in ipairs(UI.wrap(
-      "When it lands, each hit will show why it matched — the fused score and "
-        .. "the two rankings behind it, so a match on the words reads "
-        .. "differently from a match on the meaning.", w - 40, 7)) do
+      I18n.t("When it lands, each hit will show why it matched — the fused "
+        .. "score and the two rankings behind it, so a match on the words "
+        .. "reads differently from a match on the meaning."), w - 40, 7)) do
       cy = cy + UI.text(line, x + 16, cy, 7, Theme.withAlpha(Theme.cream, 0.55)) + 3
     end
     if self.unavailable.message then
@@ -211,7 +212,7 @@ function Search:draw_results(x, y, w, h)
   end
 
   if self.searching then
-    UI.text("searching…", x + 16, cy, 9, Theme.withAlpha(Theme.cream, 0.7))
+    UI.text(I18n.t("searching…"), x + 16, cy, 9, Theme.withAlpha(Theme.cream, 0.7))
     love.graphics.setScissor()
     return
   end
@@ -222,15 +223,15 @@ function Search:draw_results(x, y, w, h)
   end
   if not self.hits then
     for _, line in ipairs(UI.wrap(
-      "Type and press ENTER. It searches every quest in both lands — titles, "
-        .. "briefs, concepts and the story text.", w - 40, 8)) do
+      I18n.t("Type and press ENTER. It searches every quest in both lands — "
+        .. "titles, briefs, concepts and the story text."), w - 40, 8)) do
       cy = cy + UI.text(line, x + 16, cy, 8, Theme.withAlpha(Theme.cream, 0.6)) + 4
     end
     love.graphics.setScissor()
     return
   end
   if #self.hits == 0 then
-    UI.text(("nothing matched %q"):format(self.asked or ""), x + 16, cy, 9,
+    UI.text(I18n.t("nothing matched %q", self.asked or ""), x + 16, cy, 9,
       Theme.withAlpha(Theme.cream, 0.7))
     love.graphics.setScissor()
     return
@@ -262,7 +263,7 @@ function Search:draw_hit(x, y, w, hit, selected)
   UI.text(tostring(hit.title or hit.quest_id), x + 16, y, 9,
     selected and Theme.coin or Theme.cream)
   if cleared then
-    UI.text("CLEARED", x + w - 16 - UI.textWidth("CLEARED", 7), y, 7, Theme.admit)
+    UI.text(I18n.t("CLEARED"), x + w - 16 - UI.textWidth("CLEARED", 7), y, 7, Theme.admit)
   end
   UI.text(("%s / %s   %s"):format(tostring(hit.land), tostring(hit.category),
     tostring(hit.quest_id)), x + 16, y + 12, 7, Theme.withAlpha(Theme.cream, 0.45))

@@ -32,6 +32,7 @@ local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
+local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Editor = require("src.editor")
 local CodePane = require("src.codepane")
@@ -190,7 +191,7 @@ function Playground:new_snippet()
   self.editor.dirty = false
   self.result = nil
   self.log = nil
-  self.note = "a fresh page"
+  self.note = I18n.t("a fresh page")
   SFX.play("select")
 end
 
@@ -271,7 +272,7 @@ function Playground:format()
     if not ok then
       if payload.code == "not_found" then
         self.format_unsupported = true
-        self.note = "FORMAT is not on this server yet"
+        self.note = I18n.t("FORMAT is not on this server yet")
       else
         self.note = why.player
       end
@@ -282,7 +283,7 @@ function Playground:format()
       return
     end
     if payload.changed == false then
-      self.note = "already tidy"
+      self.note = I18n.t("already tidy")
       return
     end
     self.editor:replace_all(payload.source or self.editor:text())
@@ -343,8 +344,7 @@ function Playground:draw()
   UI.setColor(Theme.ink, 0.9)
   love.graphics.rectangle("fill", 0, 0, vw, 46)
   love.graphics.setColor(1, 1, 1, 1)
-  local s = Layout.uiScale()
-  UI.text("PLAYGROUND", 12, 8, math.floor(14 * s), Theme.cyan)
+    UI.text(I18n.t("PLAYGROUND"), 12, 8, 14, Theme.cyan)
   UI.text(self.name and tostring(self.name) or "unsaved", 12, 28, 7,
     Theme.withAlpha(Theme.cream, 0.55))
 
@@ -353,7 +353,7 @@ function Playground:draw()
   local lx = vw - lw - 12
   UI.button(lx, 8, lw, 28, self.lang:upper(), "normal", 9)
   self.lang_rect = { x = lx, y = 8, w = lw, h = 28 }
-  UI.text("TAB", lx - 26, 16, 7, Theme.withAlpha(Theme.cream, 0.4))
+  UI.text(I18n.t("TAB"), lx - 26, 16, 7, Theme.withAlpha(Theme.cream, 0.4))
 
   if self.saved_at and Anim.now() - self.saved_at < 2.2 then
     local text = "saved"
@@ -366,7 +366,7 @@ function Playground:draw()
   self:draw_code(code)
   self:draw_output(out)
 
-  self.app:footer("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back")
+  self.app:footer(I18n.t("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"))
 end
 
 function Playground:draw_snippets(rect)
@@ -374,7 +374,7 @@ function Playground:draw_snippets(rect)
     fill = Theme.withAlpha(Theme.navy, 0.9),
     tint = self.focus == "snippets" and Theme.coin or Theme.cyan,
   })
-  UI.text("SNIPPETS", rect.x + 10, rect.y + 8, 8, Theme.withAlpha(Theme.cream, 0.7))
+  UI.text(I18n.t("SNIPPETS"), rect.x + 10, rect.y + 8, 8, Theme.withAlpha(Theme.cream, 0.7))
   local y = rect.y + 26
   self.snippet_rects = {}
   for i, brief in ipairs(self.snippets or {}) do
@@ -399,9 +399,9 @@ function Playground:draw_snippets(rect)
   if not self.snippets then
     UI.text("…", rect.x + 10, y, 8, Theme.dim)
   elseif #self.snippets == 0 then
-    UI.text("nothing saved yet", rect.x + 10, y, 7, Theme.withAlpha(Theme.cream, 0.45))
+    UI.text(I18n.t("nothing saved yet"), rect.x + 10, y, 7, Theme.withAlpha(Theme.cream, 0.45))
   end
-  UI.text("CTRL-N new", rect.x + 10, rect.y + rect.h - 16, 7,
+  UI.text(I18n.t("CTRL-N new"), rect.x + 10, rect.y + rect.h - 16, 7,
     Theme.withAlpha(Theme.cream, 0.4))
 end
 
@@ -473,7 +473,7 @@ function Playground:draw_code(rect)
 
   -- stdin, and the buttons.
   local sy = rect.y + rect.h - 52
-  UI.text("STDIN", rect.x + 8, sy - 10, 7, Theme.withAlpha(Theme.cream, 0.5))
+  UI.text(I18n.t("STDIN"), rect.x + 8, sy - 10, 7, Theme.withAlpha(Theme.cream, 0.5))
   UI.setColor(Theme.void, 0.9)
   love.graphics.rectangle("fill", rect.x + 6, sy, rect.w - 210, 22)
   love.graphics.setLineWidth(2)
@@ -498,7 +498,7 @@ function Playground:draw_code(rect)
     self.format_unsupported and "disabled" or "normal", 8)
   self.format_rect = { x = fx, y = sy, w = bw, h = bh }
 
-  local info = ("%d lines   %d bytes%s"):format(
+  local info = I18n.t("%d lines   %d bytes%s",
     self.editor:line_count(), #self.editor:text(),
     self.editor.dirty and "   ·" or "")
   UI.text(info, rect.x + 8, rect.y + rect.h - 18, 7, Theme.withAlpha(Theme.cream, 0.4))
@@ -522,7 +522,7 @@ function Playground:draw_output(rect)
     colour = Theme.coin
   elseif self.result then
     head = ("%s   %dms compile   %dms run   exit %s"):format(
-      OUTCOME[self.result.outcome] or tostring(self.result.outcome),
+      I18n.t(OUTCOME[self.result.outcome] or tostring(self.result.outcome)),
       self.result.compile_ms or 0, self.result.run_ms or 0,
       self.result.exit_code == nil and "-" or tostring(self.result.exit_code))
     -- `ok` gets a quiet green; everything else gets **cream**, not red. What
@@ -531,10 +531,10 @@ function Playground:draw_output(rect)
     colour = self.result.outcome == "ok" and Theme.admit
       or Theme.withAlpha(Theme.cream, 0.85)
   else
-    head = "nothing has run yet"
+    head = I18n.t("nothing has run yet")
     colour = Theme.withAlpha(Theme.cream, 0.45)
   end
-  UI.text(head, rect.x + 10, y, 8, colour)
+  UI.text(head, rect.x + 10, y, 8, colour, "left", rect.w - 20)
   y = y + 18
 
   if self.problem then
@@ -570,7 +570,7 @@ function Playground:draw_output(rect)
     block("STDOUT", self.result.stdout, 1)
     block("STDERR", self.result.stderr, 0.8)
     if self.result.diagnostics and #self.result.diagnostics > 0 then
-      UI.text("WHAT THE COMPILER SAID", rect.x + 10, y, 7,
+      UI.text(I18n.t("WHAT THE COMPILER SAID"), rect.x + 10, y, 7,
         Theme.withAlpha(Theme.cream, 0.4))
       y = y + 12
       for _, d in ipairs(self.result.diagnostics) do

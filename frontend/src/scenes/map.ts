@@ -39,6 +39,7 @@ import {
   Buttons,
   GO,
   RUST,
+  footerH,
 } from "../ui/chrome";
 import { motionScale, reducedMotion, seconds, Tween } from "../engine/motion";
 import type { Category, Land, MapNode } from "../net/protocol";
@@ -718,7 +719,7 @@ export class MapScene implements Scene {
     const s = layout.uiScale();
     const portrait = layout.isPortrait();
     const top = Math.round(38 * s) + Math.round(8 * s) + this.barLayout().h + Math.round(10 * s);
-    const bottom = layout.vh - Math.round(26 * s) - Math.round(8 * s);
+    const bottom = layout.vh - footerH(layout) - Math.round(8 * s);
     const infoH = Math.round((portrait ? 150 : 108) * s);
     const availX = Math.round(8 * s);
     const availW = layout.vw - Math.round(16 * s);
@@ -1226,7 +1227,7 @@ export class MapScene implements Scene {
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
     const top = this.plate[1] + this.plate[3] + Math.round(8 * s);
-    const h = layout.vh - Math.round(26 * s) - top - Math.round(8 * s);
+    const h = layout.vh - footerH(layout) - top - Math.round(8 * s);
     const x = this.plate[0];
     const w = this.plate[2];
     if (h < 20) return;

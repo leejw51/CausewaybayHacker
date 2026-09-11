@@ -51,6 +51,24 @@ local Layout = {
 -- sit in a tiny letterbox.
 local MAX_STRETCH = 1.5
 
+--- How much bigger every authored type size is than it used to be.
+---
+--- **The measured reason, not a preference.** The ladder this client was
+--- drawn with is 7, 8, 9 and 10 px — 55 labels at 7 and 36 at 8 — against a
+--- 1280×720 or 720×1280 design. On the 1080×1920 the bug report came from,
+--- `Layout.scale` is 1 and `MAX_STRETCH` spends every extra pixel on a bigger
+--- canvas rather than bigger furniture, so a 10 px label is **0.52 % of the
+--- frame's height**, where the same label on a laptop window is 1.39 %. The
+--- canvas grew; the type did not.
+---
+--- Doubling the ladder puts roughly 65 characters across a portrait frame
+--- instead of 135, and — because `Assets.snap8` then rounds to the 8-pixel
+--- grid both faces are drawn on — it lands the ladder on 16 / 24 / 32 / 48,
+--- which are sizes Press Start 2P and Unifont are actually drawn at. The old
+--- 7/9/10/11/13 were not, so every one of them was being resampled: the type
+--- was soft *and* small, and the softness made it read smaller still.
+Layout.TEXT_BASE = 2
+
 --- The type-size steps, as multipliers on the authored code size.
 ---
 --- **Four steps and a cycle, not a slider.** A slider in a pixel-art header
@@ -61,7 +79,12 @@ local MAX_STRETCH = 1.5
 ---
 --- Step 1 is the size this client has always drawn, so a store written
 --- before this control existed comes back looking exactly as it did.
-Layout.FONT_STEPS = { 1.0, 1.25, 1.55, 1.9 }
+---
+--- **Halves, not arbitrary fractions.** Every size in this client is rounded
+--- onto an 8-pixel grid, so a step of 1.25 and a step of 1.55 both land a
+--- 16 px label on 24 px and the control would have two positions that did
+--- nothing. Halves move every size by exactly one or two grid cells.
+Layout.FONT_STEPS = { 1.0, 1.5, 2.0, 2.5 }
 
 local FULLSCREEN_TYPES = { desktop = true, exclusive = true }
 
@@ -325,15 +348,35 @@ function Layout.fontLabel()
   return ("%d/%d"):format(Layout.font, #Layout.FONT_STEPS)
 end
 
---- The size to draw code at: the authored size, through the virtual canvas's
---- own scale, times the player's step.
+--- The size to draw **code** at: the authored size times the player's step.
 ---
 --- **One function, called by both editors and by everything that prints a
 --- program's output.** `src/scenes/quest.lua` and `src/scenes/playground.lua`
 --- each derived this expression themselves, which is how the two panes would
 --- have drifted the first time one of them was tuned.
+---
+--- `uiScale()` is deliberately **not** in here any more. It is a fraction —
+--- 1.5 at 1080×1920 — and multiplying a pixel face by 1.5 is the one thing
+--- every reference in this family says not to do. `Assets.snap8` rounds what
+--- comes out of here onto the 8-pixel grid, so the sizes are 16, 24, 32, 48.
 function Layout.codeSize(base)
-  return math.max(8, math.floor((base or 18) * Layout.uiScale() * Layout.fontScale()))
+  return math.max(8, math.floor((base or 18) * Layout.fontScale()))
+end
+
+--- The size to draw **interface** type at.
+---
+--- The authored size, doubled (`TEXT_BASE`) and taken through the player's
+--- step. Everything in `src/ui.lua` goes through this — `text`, `textWidth`,
+--- `wrap` and `button` — because a paragraph measured at one size and drawn
+--- at another wraps wrong in a way nothing notices until a sentence is cut in
+--- half.
+---
+--- No `uiScale()` here either, for the same reason, and it is worth being
+--- explicit about what replaced it: the canvas still stretches, so a bigger
+--- window still shows *more*; what it no longer does is show the same amount
+--- smaller.
+function Layout.ui(size)
+  return math.max(8, math.floor((size or 10) * Layout.TEXT_BASE * Layout.fontScale()))
 end
 
 --- The old two-way toggle, kept because the drive scripts and the tests ask
@@ -432,8 +475,21 @@ function Layout.updateViewport()
   Layout.ensureCanvas()
 end
 
---- Fonts are authored for the 1280×720 / 720×1280 design. When the virtual
---- canvas grows (windowed stretch, tall fullscreen), scale type with it.
+--- **Do not use this for type.** Kept because it is still the honest answer
+--- to "how much bigger than the authored design is this canvas", which the
+--- measurement in `docs/decisions.md` is expressed in — but it is a
+--- *fraction* (1.5 at 1080×1920), and multiplying a pixel face by a fraction
+--- is the whole of the bug this client was reported for: the glyphs are
+--- resampled, so the type reads soft, and soft reads as smaller still.
+---
+--- `Layout.ui` is what type goes through now. It doubles the authored size
+--- and `Assets.snap8` rounds it onto the 8-pixel grid both faces are drawn
+--- on, so every size asked for is a size the face actually has.
+---
+--- It is still right for **art**. `src/scenes/map.lua` scales its node
+--- markers and Mei by it, because a drawn picture resamples cleanly and a
+--- marker on a canvas half again as tall should be half again as big. The
+--- rule is about glyphs, not about everything.
 function Layout.uiScale()
   local bw, bh = baseSize()
   return math.max(1, math.min(Layout.vw / bw, Layout.vh / bh))

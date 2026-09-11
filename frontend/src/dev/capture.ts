@@ -19,6 +19,8 @@
  * a compositor, and nothing that could reach the wallet module.
  */
 import type { App } from "../app";
+import { cjkFloor, ensureFonts } from "../engine/text";
+import { footerFontPx } from "../ui/chrome";
 
 const STEP = 1 / 60;
 
@@ -74,6 +76,24 @@ export interface CaptureApi {
   }>;
   /** The middle of one button in CSS pixels, or null if it is not on screen. */
   buttonAt(id: string): [number, number] | null;
+  /**
+   * The type sizes actually in force, and what a virtual pixel is worth on
+   * this screen.
+   *
+   * Added because "the fonts are too small" is a claim that can only be
+   * settled in numbers, and every number in it was otherwise a guess: the
+   * sizes live behind `ensureFonts`, the scale behind `Layout`, and the two
+   * multiply. `cssPerVirtual` converts a virtual size into what the eye gets,
+   * so a font's on-screen height is `size * cssPerVirtual` in CSS pixels.
+   */
+  metrics(): {
+    uiScale: number;
+    cssPerVirtual: number;
+    virtual: [number, number];
+    floor: number;
+    footerPx: number;
+    fonts: Record<string, { size: number; height: number; css: string }>;
+  };
 }
 
 /**
@@ -239,6 +259,24 @@ export function install(app: App): void {
         }
       }
       return out;
+    },
+    metrics: () => {
+      const s = app.layout.uiScale();
+      const f = ensureFonts(s);
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const out: Record<string, { size: number; height: number; css: string }> = {};
+      for (const [k, v] of Object.entries(f))
+        out[k] = { size: v.size, height: v.height, css: v.css };
+      return {
+        uiScale: s,
+        // `layout.scale` is virtual -> backing store; the backing store is dpr
+        // times the CSS box, so this is virtual -> CSS.
+        cssPerVirtual: app.layout.scale / dpr,
+        virtual: [app.layout.vw, app.layout.vh] as [number, number],
+        floor: cjkFloor(),
+        footerPx: footerFontPx(),
+        fonts: out,
+      };
     },
     buttonAt: (id: string) => {
       const hit = api.buttons().find((b) => b.id === id);

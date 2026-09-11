@@ -917,10 +917,18 @@ export class QuestScene implements Scene {
       // which half is which turns it into a stated fact, and it costs a line.
       if (locale() !== "en") {
         g.fillStyle = css(Theme.cyan, 0.7);
-        yy +=
-          printf(g, fonts.stationSm, t("quest.briefEnglish"), inner[0], yy, textW, "left") *
-          fonts.stationSm.height;
-        yy += Math.round(8 * s);
+        // Line by line rather than one `printf`, for the leading. Press Start
+        // 2P has no room above its capitals, so when this wraps in Czech the
+        // caron of `přeložené` lands in the baseline of the line above it —
+        // visible in the first Czech quest shot. Three virtual pixels is the
+        // whole fix, and it stays local to the one short label on this screen
+        // that is allowed to wrap.
+        const lead = fonts.stationSm.height + Math.round(3 * s);
+        for (const line of wrap(fonts.stationSm, t("quest.briefEnglish"), textW)) {
+          printf(g, fonts.stationSm, line, inner[0], yy, textW, "left");
+          yy += lead;
+        }
+        yy += Math.round(5 * s);
       }
       // `brief` is markdown (SPEC §2.1); the canvas draws the flattening.
       for (const b of blocks(this.quest!.brief)) {

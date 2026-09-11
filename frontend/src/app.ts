@@ -928,8 +928,13 @@ export class App {
    */
   toastBand(): number {
     if (!this.toast) return 0;
+    return this.toastH() + Math.round(6 * this.layout.uiScale());
+  }
+
+  /** The banner's own height: the line in it, or the old minimum. */
+  private toastH(): number {
     const s = this.layout.uiScale();
-    return Math.round(26 * s) + Math.round(6 * s);
+    return Math.max(Math.round(26 * s), ensureFonts(s).stationSm.height + Math.round(8 * s));
   }
 
   private drawToast(g: Ctx): void {
@@ -937,7 +942,7 @@ export class App {
     if (!toast) return;
     const { vw } = this.layout;
     const s = this.layout.uiScale();
-    const h = Math.round(26 * s);
+    const h = this.toastH();
     // Under the header, not over it: the header says where you are, and a
     // banner that covers it trades one piece of information for another. It
     // slides down out of the header rather than appearing, so the eye is

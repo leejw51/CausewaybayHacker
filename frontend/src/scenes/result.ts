@@ -22,6 +22,7 @@ import {
   Buttons,
   clearedStamp,
   footer,
+  footerH,
   frame,
   GO,
   header,
@@ -491,7 +492,7 @@ export class ResultScene implements Scene {
     const btnRect: Rect = [
       f.body[0],
       layout.vh -
-        Math.round(26 * s) -
+        footerH(layout) -
         Math.max(layout.minTouchH(), fonts.button.height + 20) -
         Math.round(6 * s),
       f.body[2],

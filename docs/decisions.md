@@ -5428,3 +5428,370 @@ The rule worth keeping: **a capability that degrades gracefully cannot be verifi
 by looking at it.** The fallback was doing its job perfectly, which is precisely
 why the screen could not be trusted to report whether the thing in front of it was
 working.
+
+---
+
+## 2026-09-11 — L2D: the type was too small, and it was three bugs wearing one coat
+
+The report was a 1080×1920 screenshot of PICK A LAND. Measured before
+changing anything, at the shapes that matter:
+
+```
+window                        canvas       scale   a 10-unit label, on screen
+1080x1920 (the report)        1080x1920    1.00    10px  0.52% of the frame
+1280x720  laptop window       1280x720     1.00    10px  1.39%
+1920x1080 fullscreen          1920x1080    1.00    10px  0.93%
+2160x3840 4K portrait          720x1280    3.00    30px  0.78%
+```
+
+Three separate faults, and the third is the one a screenshot shows loudest.
+
+**1. The canvas grew and the type did not.** `Layout.scale` is 1 for the whole
+band `1 ≤ min(w/bw, h/bh) < 2`, and `MAX_STRETCH` spends every extra pixel on
+a bigger virtual canvas. So the *same label* is 2.7× smaller relative to the
+frame on the reporter's screen than on a laptop window. `uiScale()` exists to
+fix exactly this and its docstring says so; almost nothing multiplied by it —
+15 hand-written `math.floor(N * s)` at titles, and nothing at all on the 55
+labels at size 7, the 36 at size 8 and the 20 at size 9.
+
+**2. Every one of those sizes was off the pixel grid.** Press Start 2P is an
+8×8 design; at 7, 9, 10, 11 or 13 px a one-pixel stem lands on a fraction of a
+screen pixel and is smeared or dropped. `CausewaybayWallet`'s README is
+explicit about it and `CausewaybayOffice` avoids it by only ever asking for 8
+and 16. The type was **soft as well as small, and the softness reads as
+smaller still**. `Assets.snap8` now rounds every size handed to the rasteriser
+onto the grid, and nothing is drawn through `love.graphics.scale`. That is the
+integer-scale rule transposed to a client that rasterises rather than blits: a
+15 px face is not a 1.5×-scaled 10 px face, it is *neither*, and the fix is to
+never ask for 15.
+
+**3. The layout did not use the frame it was given.** `lands.lua` capped its
+cards at `math.min(300, …)`, so the reporter's 1920 px column held two 300 px
+cards and 1200 px of bare backdrop. `CausewaybayOffice`'s SPEC §108 puts it
+well — portrait *reflows*, it does not place a landscape layout in a tall
+window. A screen two thirds empty reads as "too small" even when the glyphs
+are fine.
+
+**What changed.** `Layout.ui(n)` — authored size × 2, snapped to the grid,
+times the player's step — and `src/ui.lua` is its only caller: `text`,
+`textWidth`, `wrap` **and** `button`, all four, because a paragraph measured
+at one size and drawn at another wraps wrong in a way nobody notices until a
+sentence is cut in half.
+
+```
+window                     before                 after
+1080x1920 (the report)     10px  0.52%            24px  1.25%
+1280x720  laptop           10px  1.39%            24px  3.33%
+1512x982  MacBook full     10px  1.02%            24px  2.44%
+720x1280  portrait window  10px  0.78%            24px  1.88%
+```
+
+Doubling the ladder in place broke every layout that stacked rows with a
+constant, which is the predictable half of a typography change and was the
+bulk of the work: the lands card (title through the mascot, blurb through the
+title), the map header (two land buttons overlapping, three category tabs off
+the end of the row), the quest header (id printed through the title) and its
+button row (`SUBMIT  F10` is 264 px at the new ladder and the button was
+150), the AI mode rows, the stats summary, shelf and mistake rows. They are
+measured from `UI.lineHeight` now rather than from numbers that were right for
+8 px type. `lands.lua` also gained one geometry function read by **both** the
+draw and the hit test, which were two copies of the same eight lines.
+
+### Six languages, and one font that can draw them
+
+`en ko yue zh ja cs`. The mechanism is
+`CausewaybayGolang/love2d/src/i18n.lua`'s, ported rather than invented:
+translations keyed by **the English string**, so a call site reads as the
+sentence it draws and an untranslated string stays English rather than
+becoming `lands.title.pick`. Theirs keeps its first three languages inline and
+the rest in files; ours are all in `src/lang/<code>.lua`, because there was no
+first three and one mechanism is easier to keep honest than two.
+
+**The font is GNU Unifont**, 5.1 MB, taken whole from
+`CausewaybayOffice/love2d` with its licence. The alternative on the table was
+a Noto Sans CJK subset at 11.2 MB, and the measurement that settled it is that
+Noto's subset **has no Czech diacritics** — it would have made the four hard
+languages work and quietly broken the easy one. Unifont has all 58,909 glyphs
+of the BMP, and it is a *bitmap* face (8×16 per cell, 16 for a double-width
+ideograph), which is the wallet's "baked, not shrunk" argument satisfied
+natively instead of approximated. Press Start 2P still draws ASCII — English
+is pixel for pixel what it was — with Unifont behind it via `setFallbacks`.
+`love2d/assets` went 8.5 MB → 14 MB; the font is 5.1 of that.
+
+`tests/test_fonts.lua` ports both guards: `CausewaybayOffice`'s advance-width
+checks (ASCII 8, 中 16, 안 16, ř 8, height 16 — one number that catches a
+wrong face, a wrong size and a missing glyph at once) and
+`CausewaybayGolang`'s "the fonts cover every language", run over every
+character every language file can produce.
+
+**Cantonese is held apart from Chinese** — `yue` in traditional characters
+with 嘅 咗 喺 冇, `zh` in simplified Standard Written Chinese — and there is a
+test that asserts the two files actually differ, because a relabelled copy of
+one would pass every other check. The sibling made the same split
+independently, which is the best evidence available that it is right.
+
+**Technical terms are left in English**: borrow checker, ownership, lifetime,
+goroutine, channel, trait, mutex. An English term inside a Korean sentence is
+what Korean programmers write; an invented calque would be less clear than the
+English rather than more. Six entries are marked `UNREVIEWED` in the files —
+`drill` in Czech, and `compiler`/`build`/`HACKER` in Cantonese — and are
+listed in the report rather than presented as settled.
+
+### What the translation broke, which is the point of testing it
+
+`UI.wrap`'s `break_long` iterated **bytes**. Korean and Japanese sentences
+have no spaces, so a long one arrives as a single "word" and went straight
+into a loop that split it at byte 40 — mid-codepoint. Mojibake, and
+`getWidth` on a truncated sequence is not obliged to return at all. Nothing in
+6,000 assertions caught it because every string in the client was ASCII.
+
+And the footer stopped fitting — **in English as well**. A scene hint is a
+list of keys; the map's seven of them are 1344 px at the readable ladder in
+English and 1648 px in Korean, against a 720 px portrait canvas. There is no
+size that fixes that (7 and 8 both round to the same 16 px cell now), so the
+strip grows: one row while the hint fits beside the buttons, otherwise up to
+two rows of wrapped hint with the buttons keeping a row of their own. The four
+buttons also drop their words on a narrow canvas and keep their glyphs, which
+say the state anyway — except the type button, which keeps its digit, because
+"which of four" is the one state no glyph shows.
+
+Two hints were then trimmed rather than wrapped, for the same reason in both
+cases: they listed keys that are **buttons on the same screen**. The quest
+hint listed F5, F10 and F2, all three printed on the buttons they belong to a
+few centimetres above; the map hint listed TAB and Q, which are the two
+switches in that screen's own header. `tests/drive/language.lua` walks all
+ten screens in Korean in both orientations and in fullscreen and prints each
+hint's width against its room; it now reports `hints that clip in ko: none`.
+
+### Where I differ from the references, and why
+
+* **`CausewaybayOffice` creates fonts at 8 and 16 only and gets its size from
+  an integer scene scale.** This client cannot: its screens are authored in a
+  1280×720 / 720×1280 design and there is no integer `k` with
+  `720k ≤ 1080 < 720(k+1)` other than 1, so scaling the *scene* cannot make
+  the type bigger on the reporter's screen without letterboxing a third of it
+  away. The equivalent that does work is to raise the ladder and snap the
+  sizes — the same pixels on screen, no canvas change, and no resampling.
+  Said here rather than silently diverging.
+* **Unifont instead of the Noto subset** the coordinator first pointed at:
+  half the size, a genuine pixel face, and it has the Czech the subset lacks.
+* **The orientation and fullscreen behaviour needed no change** — Office's
+  three states, its "auto (portrait)" readout and its one-record persistence
+  are what this client already did, with the resolved shape drawn as a glyph
+  rather than spelled in brackets so it fits a button.
+
+### For PM
+
+SPEC §1.1 enumerates the client's store as holding "the session token, the
+chosen server, the orientation and fullscreen pins, and where each map was
+left". It now also holds the **type-size step** (on the same `display.set`
+record) and the **interface language** (its own `lang.set` record — it is not
+a property of the window and should not be rewritten every time one is
+resized). Three words in an enumeration.
+
+### Numbers
+
+`make -C love2d test-headless` 298 cases / 6950 assertions, 0 failed (was
+286 / 4958). `make -C love2d test` under LÖVE 317 / 7147. `make lint` and
+`make check-layering` clean, with `src/i18n.lua` and `src/lang/*.lua` added to
+the LÖVE-free set. `love2d/assets` 8.5 MB → 14 MB. Drives:
+`display.lua`, `typesize.lua` and `language.lua` all PASS against the live
+server — the last one in all five translated languages, 10 screens each.
+
+### A second pass, and the four things it found that the first one missed
+
+The first pass was checked by a suite that agreed with it. Re-reading it
+against a reviewer's questions found one defect a player would have hit on
+their first press, two regressions in the **source** language, and a gap of
+about half the interface. All four are now guarded by something that fails.
+
+**The display buttons were off the left edge of the canvas, and unclickable.**
+`chip_h()` returned `UI.footerHeight()` — the height of the whole footer
+strip, which is `footerRow() * footer_rows`. The buttons live on one row, so
+on the two- and three-row footers the translated hints wrap into, each chip
+was drawn two or three rows tall; and because the glyph width is measured from
+the chip height, they got proportionally **wider** too. Four chips at three
+rows came to more than a 720-wide portrait canvas, so the cluster's `x` went
+negative: at the largest type step the fullscreen button sat at `x = -293`.
+Everything still *drew* — a sliver of it was visible at the left margin — and
+the keys still worked, which is exactly why no test and no screenshot caught
+it. It was found by printing the four rects instead of looking at them.
+`chip_h` is `footerRow() - 4` now, `x` is clamped to the canvas, and the drive
+asserts all four rects are inside the canvas at step 4 in portrait.
+
+It also closed a feedback loop that had been there the whole time:
+`displayReserve` runs *before* `UI.footer` decides how many rows the hint
+needs, so a chip measured from the strip height was measured from last frame's
+row count — which its own result then changed.
+
+**English read "1 days".** Routing a streak through one `I18n.t("%d days", n)`
+replaced a call site that had a singular and a plural. The same shape turned
+up twice more: `1 samples` under the RUN button, and `%d word%s` on the login
+screen. Adding five languages must not cost the sixth: singular and plural are
+two translatable strings now, chosen at the call site, in all three places.
+
+**About half the interface prose was never wrapped at all.** The first pass
+wrapped every `I18n.t("…")` a grep could see and stopped there. What a grep
+cannot see: a sentence built with `..` across three lines, a string built with
+`:format` before it is drawn, and a module-level text table populated at load
+time — before the language is known — and translated (or not) at the use site.
+That is 71 strings: every AI mode blurb, the land and category blurbs, the
+search mode labels and their three explanatory paragraphs, both "nothing here
+yet" panels, the playground's five outcome words, every toast in the quest and
+playground screens, and nine of the twelve login strings including the one
+about writing the mnemonic on paper. A Korean player saw a Korean frame around
+an English half.
+
+They are translated, and there are now **two** guards, because one cannot
+cover both halves.
+
+`tests/test_i18n.lua` **reads `src/` and extracts the keys itself** rather
+than trusting the call sites, and asserts every language has every one, with
+an explicit five-name allow-list for the things that are English on purpose
+(`CAUSEWAYBAY`, `HACKER`, `RUST`, `GO`, `TAB`: proper nouns and a key name).
+The extractor is a hand-written walk and not a Lua pattern, because a pattern
+cannot cross a newline with `[^\n]` — the first version of this test found
+127 of the 140 keys and passed, missing exactly the multi-line form it was
+written to catch. The floor is now 138, so losing that form fails here.
+
+The other half a source scan **structurally cannot** see:
+`I18n.t(BLURB[cat.category])`, where the key lives in a module-level table and
+only exists at run time. That indirection is how the land blurbs, the category
+blurbs, the three AI mode blurbs, the search mode labels and the playground's
+five outcome words survived a pass that believed it had translated everything.
+So `tests/drive/language.lua` wraps `I18n.t` as it walks the ten screens and
+**fails** if any key it was asked for has no entry in that language. Both
+guards were verified by deleting a translation — a single-line one and a
+multi-line one — and watching each name it.
+
+**The search screen was not in `App:typing()`**, so `L` cycled the language
+instead of typing an `l` into the query box — and `F` had been toggling
+fullscreen there since before this round, for the same reason. A screen with a
+text field is typing, whatever else it does.
+
+### Clipping, measured per type step rather than argued about
+
+`tests/drive/typesize.lua` now wraps `UI.text` from the test side and records
+every unwrapped draw that runs past the canvas edge, keyed by type step. The
+rule it enforces is the honest one: **step 1 and step 2 must be clean**, since
+that is what a player who never touches the control sees, and steps 3 and 4
+are reported. On the first run steps 1 and 2 were *not* clean — two stats
+sentences and a map node title ran off a 720-wide portrait canvas at the
+default size. Ten draws were given the width they are drawn inside; steps 1, 2
+and 3 are now clean and step 4 leaves five headings over, listed in the run.
+
+`tests/drive/language.lua` reaches the **result screen** now, which it never
+had: it pressed `F5`, and `F5` is RUN, which this server does not have — so it
+waited ninety seconds for a screen that was never coming. `F10` is SUBMIT.
+
+One Czech hint clipped, the playground's. It is the longest hint in the client
+and Czech is the language that finds it; it now uses the imperative (`spusť`,
+`ulož`) rather than the infinitive, which is better Czech for an instruction
+and shorter by accident rather than by compromise. All five languages report
+`hints that clip: none` across all ten screens.
+
+`Layout.uiScale()` survives, but only for **art** — `map.lua` scales its node
+markers and Mei by it, because a drawn picture resamples cleanly and a marker
+on a taller canvas should be bigger. Its docstring used to promise the type
+behaviour that caused the bug; it now says what it is not for.
+
+**Czech plurals are still wrong in the 2-4 band, and that is written down
+rather than hidden.** Czech has three plural classes — 1, 2-4, 5+ — and the
+call sites give it two. The two-form split was added to stop English reading
+"1 days" and is right for ko/yue/zh/ja, which do not inflect; in Czech it
+leaves "2 slov" where a speaker says "2 slova". Doing it properly means a
+plural rule per language, which is a bigger change than this round should make
+quietly, so it is an `UNREVIEWED` note at the top of `src/lang/cs.lua`. The
+point that English must not be the casualty of adding five languages has a
+symmetric half: neither should the fifth.
+
+The `UNREVIEWED` list is seven entries, not six: `drill` (cs),
+`compiler`/`build`/`HACKER` (yue), and from this pass `SPACED` in both Czech
+and Cantonese (spaced repetition has no settled UI term in either), `samples`
+in Czech, `the key library` in Czech, and `fused` ranking in both.
+
+## FE — the CJK font is now the sibling's Noto, and the size floor that came with it
+
+Fusion Pixel is out and `NotoSansCJK-Regular` is in, on the lead's call: the
+LÖVE client in `CausewaybayGolang` had already solved this for the same six
+languages, and one reviewed face that both clients share beats two clients each
+carrying their own. The file here is the same subset — 33,243 codepoints,
+Hangul, kana, unified ideographs, fullwidth forms — converted to woff2, because
+an 11.2 MB OTF over the wire is not a thing to do to a player. 6.4 MB, and the
+glyphs are byte-identical; only the container changed.
+
+Three things about it are worth writing down.
+
+**It is the SC cut.** Japanese and traditional Cantonese are drawn with mainland
+Han forms. That is a real cost, it is visible to a Japanese reader, and it is
+the sibling's choice carried over deliberately rather than an oversight. Four
+regional files would fix it and would cost four downloads, a fifth of the
+shared-review argument, and a divergence from the other client.
+
+**It does not carry Czech.** `č` and `ř` are absent from the subset; `ě` is
+present. A single-font approach would therefore have rendered Czech *almost*
+correctly — which is the worst possible shape for this bug, since all four CJK
+languages would have looked perfect at the same time. Latin and Czech come from
+the two pixel faces, CJK from Noto, in that order in the stack, and
+`tests/fonts.test.ts` is there to say so out loud. That test is borrowed from
+the sibling, name and all ("the fonts cover every language"); the `cmap`
+reading it needs happens offline in `tools/fontcover.py`, because a woff2 is
+brotli-compressed and there is no decompressor in a vitest environment.
+
+**It is a vector face in a pixel-art game and there is no fixing that.**
+`image-rendering: pixelated` does not apply to canvas text. So the choice made
+here is the opposite of hiding it: let the Hangul be smooth and make it
+*bigger*, which is the thing that actually decides whether a reader can read it.
+
+### The disparity, measured
+
+A screenshot from the user, Korean, 1080×1920: the brief body was fine and the
+controls were illegible — about 2.5× between them. The cause was not one global
+number being wrong. It was that a Hangul syllable packs three or four strokes
+into the em box Latin spends on one letterform, and the small chrome face was
+Press Start 2P at **8 virtual pixels**. A capital H at 8px is merely small;
+`과` at 8px is not `과` any more.
+
+Two changes, both in `engine/text.ts` where the fonts are built, so no call site
+had to be touched — and there are 134 of them for `stationSm` alone:
+
+- **The small chrome face is VT323 at 20 instead of Press Start 2P at 8.** The
+  swap is free, which is why it is the one to make: the two have the *same
+  advance width* at those sizes — 8 virtual pixels — so nothing reflowed, while
+  the cap height went 7 → 11.2 and a Hangul syllable went 7.2 → 18.1.
+- **A CJK legibility floor of 24 virtual pixels**, raised with the language and
+  not with the download (the system fallback needs it just as much). It costs
+  less width than it sounds: CJK says in two or three glyphs what English says
+  in eight characters, so a 24px Korean button label is still narrower than its
+  16px English original. The two code faces are exempt — what is in the editor
+  is Rust in Latin whatever the interface is speaking, and it has its own A−/A+.
+
+The bench buttons went 16 → 20 on the eight-pixel grid for every language,
+because a control whose label you cannot read at arm's length is not a control.
+
+On screen, with `__cwbCapture.metrics()` reading the real values rather than me
+guessing: at 1080×1920 a Hangul syllable is 32.6 px in the chrome and 40.7 px in
+the body (was 14.5 and 39.3 — the gap was the whole complaint); at 1440×900 it
+is 24.4 and 30.8. English cap heights at 1080×1920: 20.2 px in the small chrome,
+28.0 px on a button.
+
+### Two bugs the work turned up on the way
+
+**`★ ← →` are in Press Start 2P and not in VT323.** They are the stars on the
+lands panel and the arrow that starts every footer hint. Moving the small chrome
+face to VT323 would have dropped every one of them through to the system — or to
+nothing. Each pixel face now names the other in its stack, and the coverage test
+checks it. This was caught by the new test on its first run, which is the only
+reason it is a paragraph here rather than a bug report later.
+
+**A Korean paragraph was breaking before its full stop.** Every ideograph is its
+own break opportunity, so a line ended on a word and the next began `. 실패한`.
+`tokens()` now refuses to start a line with closing punctuation — kinsoku, the
+one CJK line-breaking rule a reader notices immediately.
+
+### And two more strings that were never translated
+
+`{have} OF {of}` on the stats shelf, found by finally taking a screenshot of the
+three panels behind F4/F5/F6 — which had no shots at all, in any language, and
+are the three densest screens in the game. They have them now, in English and in
+Korean.

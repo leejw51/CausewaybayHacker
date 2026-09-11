@@ -26,6 +26,7 @@ local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
+local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local errors = require("src.net.errors")
 
@@ -165,18 +166,17 @@ function Ai:draw()
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
 
-  local s = Layout.uiScale()
-  local pad = Layout.isPortrait() and 12 or 46
+    local pad = Layout.isPortrait() and 12 or 46
   local w = vw - pad * 2
 
   UI.setColor(Theme.ink, 0.9)
   love.graphics.rectangle("fill", 0, 0, vw, 44)
   love.graphics.setColor(1, 1, 1, 1)
-  UI.text("AI MODE", 12, 10, math.floor(15 * s), Theme.cyan)
+  UI.text(I18n.t("AI MODE"), 12, 10, 15, Theme.cyan)
   -- Measured rather than guessed at: the title's width changes with
   -- `uiScale`, and a fixed offset had the subtitle sitting on top of it.
-  local caption = "built from your own record, not from a language model"
-  local cx = 12 + UI.textWidth("AI MODE", math.floor(15 * s)) + 16
+  local caption = I18n.t("built from your own record, not from a language model")
+  local cx = 12 + UI.textWidth("AI MODE", 15) + 16
   if cx + UI.textWidth(caption, 7) < vw - 12 then
     UI.text(caption, cx, 18, 7, Theme.withAlpha(Theme.cream, 0.45))
   end
@@ -192,7 +192,7 @@ function Ai:draw()
     self:draw_idle(pad, y, w, vh - y - 40)
   end
 
-  self.app:footer("ARROWS mode   ENTER start   N next   F finish   ESC back")
+  self.app:footer(I18n.t("ARROWS mode   ENTER start   N next   F finish   ESC back"))
 end
 
 --- The three plans, each with DESIGN's emblem for it.
@@ -211,7 +211,12 @@ end
 --- anchored **right** with a short fade on its left edge, and the words kept
 --- in their own gutter beside it rather than on top of it.
 function Ai:draw_modes(x, y, w)
-  local h = 76
+  -- Measured from the type, and tall enough for two lines of blurb. The
+  -- fixed 76 was right for an 11 px title over 7 px body; at twice that the
+  -- title sat on the first line of the blurb and the blurb sat on the row
+  -- below it.
+  local title_h, body_h = UI.lineHeight(11), UI.lineHeight(7)
+  local h = 8 + title_h + 6 + body_h * 2 + 8
   local gap = 8
   self.mode_rects = {}
   for i, mode in ipairs(MODES) do
@@ -249,11 +254,13 @@ function Ai:draw_modes(x, y, w)
       end
     end
 
-    UI.text(MODE_TEXT[mode].title, x + 10, my + 8, 11, on and Theme.coin or Theme.cream)
-    local lines = UI.wrap(MODE_TEXT[mode].blurb, text_w, 7)
-    local room = math.floor((h - 28) / 10)
+    UI.text(I18n.t(MODE_TEXT[mode].title), x + 10, my + 8, 11,
+      on and Theme.coin or Theme.cream)
+    local lines = UI.wrap(I18n.t(MODE_TEXT[mode].blurb), text_w, 7)
+    local body_top = my + 8 + title_h + 6
+    local room = math.max(1, math.floor((my + h - 8 - body_top) / body_h))
     for j = 1, math.min(room, #lines) do
-      UI.text(lines[j], x + 10, my + 26 + (j - 1) * 10, 7,
+      UI.text(lines[j], x + 10, body_top + (j - 1) * body_h, 7,
         Theme.withAlpha(Theme.cream, on and 0.85 or 0.5))
     end
     self.mode_rects[i] = { x = x, y = my, w = w, h = h }
@@ -266,20 +273,20 @@ function Ai:draw_idle(x, y, w, h)
   local cy = y + 16
 
   if self.unavailable then
-    UI.text("NOT BUILT YET", x + 16, cy, 10, Theme.coin)
+    UI.text(I18n.t("NOT BUILT YET"), x + 16, cy, 10, Theme.coin)
     cy = cy + 18
     local said = self.unavailable.milestone
-      and ("A drill picked from your own mistakes, and a line saying why. It "
-        .. "opens in chapter " .. self.unavailable.milestone .. ".")
-      or "A drill picked from your own mistakes. Not in this build."
+      and I18n.t("A drill picked from your own mistakes, and a line saying "
+        .. "why. It opens in chapter %s.", tostring(self.unavailable.milestone))
+      or I18n.t("A drill picked from your own mistakes. Not in this build.")
     for _, line in ipairs(UI.wrap(said, w - 40, 8)) do
       cy = cy + UI.text(line, x + 16, cy, 8, Theme.cream) + 4
     end
     cy = cy + 8
     for _, line in ipairs(UI.wrap(
-      "The plan will be a fixed ordered list, so a reconnect resumes the same "
-        .. "session rather than reshuffling it — and every step will say why "
-        .. "it was chosen.", w - 40, 7)) do
+      I18n.t("The plan will be a fixed ordered list, so a reconnect resumes "
+        .. "the same session rather than reshuffling it — and every step will "
+        .. "say why it was chosen."), w - 40, 7)) do
       cy = cy + UI.text(line, x + 16, cy, 7, Theme.withAlpha(Theme.cream, 0.55)) + 3
     end
     if self.unavailable.message then
@@ -297,31 +304,32 @@ function Ai:draw_idle(x, y, w, h)
   -- Somebody with no history. A drill over an empty record is an empty drill,
   -- and the useful thing is to say what fills it.
   if self.mistakes and #self.mistakes == 0 then
-    UI.text("NOTHING TO DRILL YET", x + 16, cy, 10, Theme.withAlpha(Theme.cream, 0.8))
+    UI.text(I18n.t("NOTHING TO DRILL YET"), x + 16, cy, 10, Theme.withAlpha(Theme.cream, 0.8))
     cy = cy + 18
     for _, line in ipairs(UI.wrap(
-      "This builds a session out of the mistakes you have actually made, so "
-        .. "it needs you to have made some. Play a few streets — the errors "
-        .. "get classified as they happen — and come back.", w - 40, 8)) do
+      I18n.t("This builds a session out of the mistakes you have actually "
+        .. "made, so it needs you to have made some. Play a few streets — the "
+        .. "errors get classified as they happen — and come back."),
+      w - 40, 8)) do
       cy = cy + UI.text(line, x + 16, cy, 8, Theme.withAlpha(Theme.cream, 0.7)) + 4
     end
     return
   end
 
   if self.mistakes and #self.mistakes > 0 then
-    UI.text("READY", x + 16, cy, 10, Theme.admit)
+    UI.text(I18n.t("READY"), x + 16, cy, 10, Theme.admit)
     cy = cy + 18
     local top = self.mistakes[1]
     for _, line in ipairs(UI.wrap(
-      ("Your most frequent is %s, %d times. Press ENTER and this will find "
-        .. "different shapes of it."):format(tostring(top.kind), top.count or 0),
+      I18n.t("Your most frequent is %s, %d times. Press ENTER and this will "
+        .. "find different shapes of it.", tostring(top.kind), top.count or 0),
       w - 40, 8)) do
       cy = cy + UI.text(line, x + 16, cy, 8, Theme.cream) + 4
     end
     return
   end
 
-  UI.text("asking the server…", x + 16, cy, 8, Theme.withAlpha(Theme.cream, 0.6))
+  UI.text(I18n.t("asking the server…"), x + 16, cy, 8, Theme.withAlpha(Theme.cream, 0.6))
 end
 
 --- One step of a drill. The **reason** is the headline; the quest is under it.
@@ -363,14 +371,14 @@ end
 function Ai:draw_summary(x, y, w, h)
   UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = Theme.admit })
   local cy = y + 16
-  UI.text("DRILL FINISHED", x + 16, cy, 11, Theme.admit)
+  UI.text(I18n.t("DRILL FINISHED"), x + 16, cy, 11, Theme.admit)
   cy = cy + 22
   local sm = self.summary
-  UI.text(("attempted %d   cleared %d"):format(sm.attempted or 0, sm.cleared or 0),
+  UI.text(I18n.t("attempted %d   cleared %d", sm.attempted or 0, sm.cleared or 0),
     x + 16, cy, 9, Theme.cream)
   cy = cy + 18
   if sm.kinds_improved and #sm.kinds_improved > 0 then
-    UI.text("improved: " .. table.concat(sm.kinds_improved, ", "), x + 16, cy, 8,
+    UI.text(I18n.t("improved: ") .. table.concat(sm.kinds_improved, ", "), x + 16, cy, 8,
       Theme.withAlpha(Theme.cyan, 0.9))
   end
 end

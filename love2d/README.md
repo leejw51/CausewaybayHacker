@@ -51,6 +51,7 @@ official release from GitHub instead, and `make run` will use a `love` on
 | `CWBH_SERVER` | — | a launch-time override; wins for that run |
 | `CWBH_LOVE2D_HOME` | `~/.causewaybaylove2d` | this client's own store |
 | `CWBH_ORIENT` | — | `portrait` or `landscape` to start pinned that way |
+| `CWBH_LANG` | — | `en` `ko` `yue` `zh` `ja` `cs` — a launch-time override |
 | `CWBH_FULLSCREEN` | `desktop` | `exclusive` for a real display-mode change |
 | `CWBH_FFI_LIB` | — | an explicit path to `libcwbh_ffi.dylib` |
 | `CWBH_TEST` | — | `1` runs the suite and quits |
@@ -69,7 +70,8 @@ love . --home ~/somewhere-else       # or --home=~/somewhere-else
 | --- | --- |
 | **F** / **F11** | window ⇄ fullscreen — the same binding as `CausewaybayRaiden` |
 | **F1** | orientation: landscape → portrait → automatic |
-| **F12** | code size: four steps, then back to the first |
+| **F12** | type size: four steps, then back to the first |
+| **L** | language: EN → 한국어 → 粵語 → 简体中文 → 日本語 → Čeština |
 | **F3** / **F4** | scanlines · sound |
 | **F5** / **F10** | in a quest: **RUN** · **SUBMIT** — see below |
 | **F2** | in a quest: **FORMAT** (`rustfmt` / `gofmt`, on the server) |
@@ -229,7 +231,14 @@ the title card included:
 | --- | --- | --- |
 | ▭ `WINDOW` / `FULL` | a small screen, or a filled one | window ⇄ fullscreen |
 | ▯ `LAND` / `PORT` / `AUTO` | the shape you are in; filled when pinned, hollow when the window decides | cycles the three orientation states |
-| `A 1/4` | the `A` is drawn at the step it selects | cycles four code sizes |
+| `A 1/4` | the `A` is drawn at the step it selects | cycles four type sizes |
+| 🌐 `KO` | the language's code; the toast says its own name | cycles the six languages |
+
+On a narrow canvas the four drop their words and keep their glyphs — the
+screen is inset or filled, the box is wide or tall and hollow or solid, the
+`A` is drawn at its own step — because a 720-wide portrait strip cannot spend
+520 pixels on four labels and still say anything. The type button keeps its
+digit, since "which of four" is the one state no glyph shows.
 
 **Each one says the state it is in, not the state it would move to.** A toggle
 whose current value is invisible gets pressed twice: once to find out, once to
@@ -265,28 +274,106 @@ automatic, where the orientation follows the window — which is usually what
 you want in fullscreen, since the shape there is the display's and not yours.
 The footer always says which one you are in.
 
-### The code size
+### The type
 
-**F12**, or the `A n/4` button. Four steps, and it is a cycle rather than a
-slider: a slider in a pixel-art header has no legible current value, no
-keyboard equivalent and eleven positions nobody wants, where four named steps
-have one state each and say which one is live.
+**Everything is drawn on an 8-pixel grid**, because both faces are: Press
+Start 2P is an 8×8 design and GNU Unifont is 8×16. At 9, 10 or 15 px a
+one-pixel stem lands on a fraction of a screen pixel and the rasteriser either
+smears it grey or drops it — `CausewaybayWallet`'s README says it plainly,
+*"at 2.5× a one-pixel line lands on half a screen pixel … and the whole
+illusion goes"* — and this client was doing it at every label, because its
+authored ladder was 7, 8, 9, 10, 11, 12, 13. `Assets.snap8` rounds every size
+this program hands to the rasteriser onto the grid, so no glyph is ever
+resampled. Nothing is ever drawn through `love.graphics.scale`.
 
-**It moves the code face, not the chrome.** The screen it exists for is the
-editor — a forty-line interview answer on a laptop panel is where bigger type
-pays, and it is the one surface here somebody reads for an hour at a time. So
-the step scales `Assets.mono`: both code panes, the run log, the playground's
-output and the stderr on the result screen. It deliberately does *not* rescale
-every label, which would reflow eleven screens authored against a fixed grid
-to help the one screen that is not made of labels.
+**And the ladder was doubled.** Measured, not preferred: on the 1080×1920 the
+bug report came from, `Layout.scale` is 1 and `MAX_STRETCH` spends every extra
+pixel on a bigger canvas rather than bigger furniture, so a 10 px label was
+**0.52 % of the frame's height** where the same label on a laptop window was
+1.39 %. The canvas grew; the type did not.
 
-One function decides it — `Layout.codeSize` — because the quest screen and the
-playground each used to derive the same expression themselves, which is how
-the two panes would have drifted the first time either was tuned.
+| window | before | after |
+| --- | --- | --- |
+| 1080×1920, the bug report | 10 px (0.52 %) | **24 px (1.25 %)** |
+| 1280×720 laptop | 10 px (1.39 %) | **24 px (3.33 %)** |
+| 1512×982 MacBook fullscreen | 10 px (1.02 %) | **24 px (2.44 %)** |
+| 720×1280 portrait window | 10 px (0.78 %) | **24 px (1.88 %)** |
+
+`Layout.ui` is the one function that does it, and `src/ui.lua` is the only
+caller: `text`, `textWidth`, `wrap` and `button` all go through it, because a
+paragraph measured at one size and drawn at another wraps wrong in a way
+nobody notices until a sentence is cut in half.
+
+**The layout is measured from the type, not from constants.** That is the
+other half of the same report: the 1080×1920 screenshot had two 300 px cards
+at the top of a 1920 px frame and two thirds of it bare, which reads as small
+however big the letters are. Portrait now stacks and *uses the height*, the
+map header sizes its buttons from their labels, and every row that used to
+advance by a hardcoded 10 or 16 pixels advances by `UI.lineHeight`.
+
+**F12**, or the `A n/4` button, is a preference on top of that — four steps,
+a cycle rather than a slider, and it moves the code face *and* the chrome.
+`Layout.codeSize` is the one place both code panes ask, because the quest
+screen and the playground each used to derive the same expression themselves.
 `tests/drive/typesize.lua` drives the largest step through both panes, both
 orientations and fullscreen, and asserts the pane still has rows, the caret is
 still on screen, the gutter has not eaten the pane and the buffer is byte for
 byte what it was.
+
+### Six languages
+
+English, 한국어, 粵語, 简体中文, 日本語, Čeština — **L**, or the globe button.
+
+The mechanism is `CausewaybayGolang/love2d/src/i18n.lua`'s: translations are
+keyed by **the English string**, so a call site reads as the sentence it draws
+and a string nobody has translated stays English instead of turning into
+`lands.title.pick`. Each language is one file under `src/lang/`.
+
+**The interface only.** The 138 quests are content owned by another part of
+this repository, and a quest brief is a specification of a program —
+mistranslating one would fail a test for a reason the player cannot see. So a
+Korean player gets a Korean interface around an English quest, with the quest
+title drawn beside its id in the land's tint, as the identifier it is.
+
+**Technical terms stay in English**: borrow checker, ownership, lifetime,
+goroutine, channel, trait, mutex. That is what programmers writing these
+languages actually write. Where a translation was a guess it is marked
+`UNREVIEWED` in the language file — seven entries at present, listed there
+with what is uncertain about each.
+
+**Every English string the interface can draw has a translation, and two
+tests prove it — one reading the source, one watching the game run.**
+
+`tests/test_i18n.lua` extracts the keys from `src/` itself, including the ones
+built by concatenating string literals across three lines, which is how a
+sentence longer than a line is written here and which a grep for `I18n.t("`
+does not see. It is a hand-written walk rather than a Lua pattern, because a
+pattern cannot cross a newline.
+
+`tests/drive/language.lua` wraps `I18n.t` while it walks ten screens and fails
+on any key with no entry — the half no source scan can reach, where the key
+lives in a module-level table (`I18n.t(BLURB[cat.category])`) and only exists
+at run time.
+
+Five names are English on purpose and listed in the test: `CAUSEWAYBAY`,
+`HACKER`, `RUST`, `GO`, `TAB`. A proper noun is not a word and a key name is
+not a word.
+
+**Cantonese is not Chinese.** `yue` is Hong Kong written Cantonese in
+traditional characters — 嘅, 咗, 喺, 冇 — and `zh` is Standard Written Chinese
+in simplified. They share a script and are not the same language.
+
+One font draws all six: **GNU Unifont**, 5.1 MB, taken whole from
+`CausewaybayOffice/love2d`. 58,909 glyphs, the entire Basic Multilingual
+Plane, and it is a *bitmap* face — 8×16 px per cell, 16 px for a double-width
+ideograph — so it is pixel art rather than a vector face filtered to
+`nearest` and hoped over. Press Start 2P keeps drawing ASCII, so English is
+pixel for pixel what it was, and Unifont is attached behind it with
+`setFallbacks`. The alternative, a Noto Sans CJK subset, is 11.2 MB and has
+**no Czech diacritics** — it would have made the four hard languages work and
+quietly broken the easy one. `tests/test_fonts.lua` asserts the advances
+(ASCII 8, 中 16, 안 16, ř 8, height 16) and that every glyph every language
+can produce is drawable.
 
 Both the fullscreen state, the orientation and the code size are remembered
 across restarts,
@@ -343,7 +430,8 @@ make test-all        # all three
 ```
 
 The headless run is the important one: `src/json.lua`, `src/net/**`,
-`src/editor.lua` and `src/wallet.lua` contain **no reference to `love`**, so a
+`src/editor.lua`, `src/wallet.lua`, `src/store.lua`, `src/anim.lua`,
+`src/clock.lua` and `src/i18n.lua` contain **no reference to `love`**, so a
 bare `luajit` can drive the whole protocol. `make check-layering` asserts that
 with a grep, and `T.no_love` asserts it again from inside the suite — if it
 ever stops being true, most of this directory stops being testable.
@@ -372,6 +460,8 @@ src/
   codepane.lua        the mouse and the bracket overlay, shared by two scenes
   external.lua        the $EDITOR escape hatch
   wallet.lua          the LuaJIT binding to libcwbh_ffi
+  i18n.lua            the six languages; LÖVE-free
+  lang/               ko yue zh ja cs, keyed by the English string
   store.lua           ~/.causewaybaylove2d: the token, the server, the
                       display settings and the map cursors — and the
                       one-time move out of the old home

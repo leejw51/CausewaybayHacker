@@ -42,6 +42,7 @@ local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
+local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Wallet = require("src.wallet")
 local App = require("src.app")
@@ -143,13 +144,13 @@ end
 
 function Login:new_wallet()
   if not self.app.wallet_lib then
-    self.error = "the key library is not built"
+    self.error = I18n.t("the key library is not built")
     SFX.play("locked")
     return
   end
   local out, err = Wallet.generate(self.app.wallet_lib, 12)
   if not out then
-    self.error = err or "could not generate a wallet"
+    self.error = err or I18n.t("could not generate a wallet")
     SFX.play("rejected")
     return
   end
@@ -160,7 +161,7 @@ function Login:new_wallet()
   -- library ever returns something that is not a phrase, this screen must not
   -- show it and call it a wallet.
   if #words ~= 12 then
-    self.error = ("the key library returned %d words, not 12"):format(#words)
+    self.error = I18n.t("the key library returned %d words, not 12", #words)
     return
   end
   self.words = words
@@ -190,12 +191,12 @@ end
 function Login:submit(phrase)
   phrase = phrase or self.secret
   if not self.app.wallet_lib then
-    self.error = "the key library is not built"
+    self.error = I18n.t("the key library is not built")
     SFX.play("locked")
     return
   end
   if self.app.client.state ~= "open" then
-    self.error = "not connected to " .. self.app.server
+    self.error = I18n.t("not connected to %s", self.app.server)
     SFX.play("locked")
     return
   end
@@ -206,7 +207,7 @@ function Login:submit(phrase)
 
   self.busy = true
   self.error = nil
-  self.status = "deriving and signing locally"
+  self.status = I18n.t("deriving and signing locally")
   SFX.play("select")
 
   -- Back to the sign-in panel *before* the phrase is dropped. `discard`
@@ -324,29 +325,30 @@ function Login:draw()
     -- No "F11 fullscreen" any more: that control is a button in the corner
     -- of this very strip now, with its state written on it, so listing its
     -- key here spent the room that the four keys with no button need.
-    signin = "TAB field   F2 reveal   N new wallet   ENTER apply/sign in",
-    new_show = "ENTER create and sign in   C copy   ESC cancel",
+    signin = I18n.t("TAB field   F2 reveal   N new wallet   ENTER apply/sign in"),
+    new_show = I18n.t("ENTER create and sign in   C copy   ESC cancel"),
   }
   self.app:footer(hints[self.mode] or "")
 end
 
 function Login:draw_signin(inner, ph)
-  local s = Layout.uiScale()
-  UI.text("SIGN IN", 0, 0, math.floor(16 * s), Theme.coin)
-  UI.text("your wallet is your account", 0, 22, 8, Theme.withAlpha(Theme.cream, 0.7))
+    UI.text(I18n.t("SIGN IN"), 0, 0, 16, Theme.coin)
+  UI.text(I18n.t("your wallet is your account"), 0, 22, 8, Theme.withAlpha(Theme.cream, 0.7))
 
-  field_box(70, inner, 34, "MNEMONIC OR PRIVATE KEY  (F2 SHOWS IT)",
-    self:masked(), self.focus == 1, "twelve words, or 0x + 64 hex")
-  field_box(132, inner, 30, "DISPLAY NAME  (OPTIONAL)",
+  field_box(70, inner, 34, I18n.t("MNEMONIC OR PRIVATE KEY  (F2 SHOWS IT)"),
+    self:masked(), self.focus == 1, I18n.t("twelve words, or 0x + 64 hex"))
+  field_box(132, inner, 30, I18n.t("DISPLAY NAME  (OPTIONAL)"),
     self.name, self.focus == 2, "hacker")
 
   local words = 0
   for _ in self.secret:gmatch("%S+") do words = words + 1 end
   local shape = ""
   if Wallet.looks_like_private_key(self.secret) then
-    shape = "private key"
+    shape = I18n.t("private key")
   elseif words > 0 then
-    shape = ("%d word%s"):format(words, words == 1 and "" or "s")
+    -- Singular and plural as two strings; see the streak on the stats
+    -- screen for why "%d word(s)" is not an option in the source language.
+    shape = words == 1 and I18n.t("%d word", 1) or I18n.t("%d words", words)
   end
   UI.text(shape, 0, 168, 8, Theme.withAlpha(Theme.cream, 0.6))
   UI.text("m/44'/60'/0'/0/0", inner - UI.textWidth("m/44'/60'/0'/0/0", 8), 168, 8,
@@ -356,7 +358,7 @@ function Login:draw_signin(inner, ph)
   -- from inside the game, and the backend now runs on `0.0.0.0` so a phone
   -- on the same tailnet is a real thing somebody wants to point at.
   local override = self.app.server_override
-  field_box(196, inner, 30, "SERVER  (ENTER APPLIES)",
+  field_box(196, inner, 30, I18n.t("SERVER  (ENTER APPLIES)"),
     self.server, self.focus == 3, App.DEFAULT_SERVER)
   self.server_box = { y = 196, h = 30 }
 
@@ -366,13 +368,13 @@ function Login:draw_signin(inner, ph)
     -- Precedence, said out loud. The field still saves; it just does not win
     -- this run, and pretending otherwise would make the control a lie.
     for i, line in ipairs(UI.wrap(
-      ("CWBH_SERVER=%s is overriding this run — the field is saved for next launch")
-        :format(override), inner, 7)) do
+      I18n.t("CWBH_SERVER=%s is overriding this run — the field is saved for next launch",
+        override), inner, 7)) do
       if i <= 2 then UI.text(line, 0, 230 + (i - 1) * 9, 7, Theme.coin) end
     end
   else
     local live = self.app.client and self.app.client.state or "idle"
-    UI.text(("in use: %s  [%s]"):format(self.app.server, live), 0, 230, 7,
+    UI.text(I18n.t("in use: %s  [%s]", self.app.server, live), 0, 230, 7,
       Theme.withAlpha(Theme.cream, 0.5))
   end
 
@@ -388,16 +390,15 @@ function Login:draw_signin(inner, ph)
   local ny = by + bh + 10
   UI.button(0, ny, inner, bh, "NEW WALLET  [N]", self.busy and "disabled" or "normal")
   self.new_button = { y = ny, h = bh }
-  UI.text("nothing typed here is ever sent. only a signature leaves this machine.",
+  UI.text(I18n.t("nothing typed here is ever sent. only a signature leaves this machine."),
     0, ny + bh + 8, 7, Theme.withAlpha(Theme.cream, 0.55))
 end
 
 function Login:draw_new_show(inner, ph)
   if not self.words then return end
-  local s = Layout.uiScale()
-  UI.text("WRITE THIS DOWN", 0, 0, math.floor(15 * s), Theme.coin)
+    UI.text(I18n.t("WRITE THIS DOWN"), 0, 0, 15, Theme.coin)
   -- The copy is doing the work now that nothing gates the button.
-  UI.text("this is the only copy. there is no reset.", 0, 22, 8, Theme.red)
+  UI.text(I18n.t("this is the only copy. there is no reset."), 0, 22, 8, Theme.red)
 
   -- The grid: three columns of four in landscape, two of six in portrait, so
   -- the numbers stay in reading order either way.
@@ -431,13 +432,13 @@ function Login:draw_new_show(inner, ph)
   local y = top + rows * rh + 16
   -- Kept on screen on purpose: it is how a player checks later that the
   -- paper in the drawer is the account they are signed in to.
-  UI.text("this wallet:  " .. tostring(self.new_address), 0, y, 7,
+  UI.text(I18n.t("this wallet:  ") .. tostring(self.new_address), 0, y, 7,
     Theme.withAlpha(Theme.coin, 0.85))
   y = y + 16
 
   for _, line in ipairs(UI.wrap(
-    "Write them on paper, in order. Anyone who reads them owns the account, "
-      .. "and nobody — not this game, not the server — can recover them for you.",
+    I18n.t("Write them on paper, in order. Anyone who reads them owns the account, "
+      .. "and nobody — not this game, not the server — can recover them for you."),
     inner, 8)) do
     y = y + UI.text(line, 0, y, 8, Theme.cream) + 3
   end
@@ -448,14 +449,13 @@ function Login:draw_new_show(inner, ph)
     self.busy and "SIGNING…" or "I HAVE WRITTEN IT DOWN  [ENTER]",
     self.busy and "disabled" or "hot")
   self.show_button = { y = by, h = bh }
-  UI.text("this signs in and takes you to the map.", 0, by + bh + 8, 7,
+  UI.text(I18n.t("this signs in and takes you to the map."), 0, by + bh + 8, 7,
     Theme.withAlpha(Theme.cream, 0.55))
 end
 
 function Login:draw_no_library(inner, ph)
-  local s = Layout.uiScale()
-  UI.text("SIGN IN", 0, 0, math.floor(16 * s), Theme.coin)
-  UI.text("your wallet is your account", 0, 22, 8, Theme.withAlpha(Theme.cream, 0.7))
+    UI.text(I18n.t("SIGN IN"), 0, 0, 16, Theme.coin)
+  UI.text(I18n.t("your wallet is your account"), 0, 22, 8, Theme.withAlpha(Theme.cream, 0.7))
 
   local box_y = 48
   UI.setColor(Theme.red, 0.18)
@@ -464,10 +464,10 @@ function Login:draw_no_library(inner, ph)
   UI.setColor(Theme.red)
   love.graphics.rectangle("line", 1, box_y + 1, inner - 2, ph - box_y - 72)
   love.graphics.setColor(1, 1, 1, 1)
-  UI.text("KEY LIBRARY NOT BUILT", 10, box_y + 10, 10, Theme.red)
+  UI.text(I18n.t("KEY LIBRARY NOT BUILT"), 10, box_y + 10, 10, Theme.red)
   local lines = UI.wrap(
-    "Deriving an address needs the small Rust library in love2d/ffi. "
-      .. "Build it once and restart:", inner - 20, 8)
+    I18n.t("Deriving an address needs the small Rust library in love2d/ffi. "
+      .. "Build it once and restart:"), inner - 20, 8)
   local y = box_y + 30
   for _, line in ipairs(lines) do
     y = y + UI.text(line, 10, y, 8, Theme.cream) + 3
@@ -507,7 +507,7 @@ function Login:keypressed(key, mods)
       -- The clipboard is a real convenience here and a real risk; saying so
       -- out loud is the honest middle.
       love.system.setClipboardText(table.concat(self.words, " "))
-      self.app:toast("copied — paste it somewhere safe, then clear the clipboard")
+      self.app:toast(I18n.t("copied — paste it somewhere safe, then clear the clipboard"))
       return true
     end
     if key == "escape" then

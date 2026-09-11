@@ -357,6 +357,7 @@ export const ja: Partial<Catalogue> = {
   "stats.log": "ログ",
   "stats.drillTab": "ドリル — {n}",
   "stats.shelfTab": "棚 — {of} 中 {have}",
+  "stats.haveOf": "{of} 中 {have}",
   "stats.logTab": "ログ — {n}",
   "stats.stillCatching": "まだあなたを捕まえるもの",
   "stats.nothingCatching": "あなたを捕まえるものは残っていません",

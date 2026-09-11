@@ -12,6 +12,7 @@ local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
+local I18n = require("src.i18n")
 local Ease = require("src.ease")
 local Anim = require("src.anim")
 local Clock = require("src.clock")
@@ -63,13 +64,12 @@ function Result:draw()
 
   local a = self.attempt
   if not a then
-    UI.text("no attempt", 0, vh / 2, 12, Theme.dim, "center", vw)
-    self.app:footer("ESC map")
+    UI.text(I18n.t("no attempt"), 0, vh / 2, 12, Theme.dim, "center", vw)
+    self.app:footer(I18n.t("ESC map"))
     return
   end
 
-  local s = Layout.uiScale()
-  local accepted = a.verdict == "accepted"
+    local accepted = a.verdict == "accepted"
   -- A run should never reach this screen — `src/scenes/quest.lua` keeps them
   -- in place — but if one ever did, it must not be dressed as a verdict.
   -- §4.9b: a run is for the player, a submit is for the record.
@@ -95,7 +95,7 @@ function Result:draw()
   love.graphics.rectangle("line", 0, by, vw, 56)
   love.graphics.setColor(1, 1, 1, 1)
   UI.text(is_run and "SAMPLE RUN" or (VERDICT_LABEL[a.verdict] or a.verdict:upper()),
-    0, by + 18, math.floor(18 * s), Theme.cream, "center", vw)
+    0, by + 18, 18, Theme.cream, "center", vw)
   love.graphics.pop()
 
   local pad = Layout.isPortrait() and 14 or 60
@@ -124,14 +124,14 @@ function Result:draw()
       a.within_limit and Theme.admit or Theme.coin) + 6
   end
 
-  cy = cy + UI.text(("COMPILE %dms   RUN %dms   EXIT %s"):format(
+  cy = cy + UI.text(I18n.t("COMPILE %dms   RUN %dms   EXIT %s",
     a.compile_ms or 0, a.run_ms or 0,
     a.exit_code == nil and "-" or tostring(a.exit_code)), cx, cy, 8,
     Theme.withAlpha(Theme.cream, 0.75)) + 10
 
   -- SPEC §0: the node is stamped CLEARED, for good.
   if is_run then
-    cy = cy + UI.text("a run never clears a node — SUBMIT does", cx, cy, 8,
+    cy = cy + UI.text(I18n.t("a run never clears a node — SUBMIT does"), cx, cy, 8,
       Theme.withAlpha(Theme.cyan, 0.9)) + 10
   elseif a.cleared then
     UI.setColor(Theme.admit, 0.25)
@@ -156,12 +156,12 @@ function Result:draw()
     end
     cy = cy + 42
   elseif accepted then
-    cy = cy + UI.text("already cleared — stars keep the best run", cx, cy, 8,
+    cy = cy + UI.text(I18n.t("already cleared — stars keep the best run"), cx, cy, 8,
       Theme.withAlpha(Theme.cream, 0.7)) + 10
   end
 
   if a.mistakes and #a.mistakes > 0 then
-    cy = cy + UI.text("WHAT WENT WRONG", cx, cy, 9, Theme.red) + 6
+    cy = cy + UI.text(I18n.t("WHAT WENT WRONG"), cx, cy, 9, Theme.red) + 6
     for _, m in ipairs(a.mistakes) do
       local head = ("%s%s"):format(m.kind, m.code and (" [" .. m.code .. "]") or "")
       cy = cy + UI.text(head, cx, cy, 9, Theme.brick) + 3
@@ -178,7 +178,7 @@ function Result:draw()
   end
 
   if a.cases and #a.cases > 0 then
-    cy = cy + UI.text("CASES", cx, cy, 9, Theme.withAlpha(Theme.cream, 0.7)) + 6
+    cy = cy + UI.text(I18n.t("CASES"), cx, cy, 9, Theme.withAlpha(Theme.cream, 0.7)) + 6
     for _, case in ipairs(a.cases) do
       local mark = case.passed and "PASS" or "FAIL"
       cy = cy + UI.text(("%s  %s%s"):format(mark, case.name,
@@ -201,7 +201,7 @@ function Result:draw()
 
   if a.stderr and a.stderr ~= "" then
     cy = cy + 6
-    cy = cy + UI.text("STDERR", cx, cy, 9, Theme.withAlpha(Theme.cream, 0.7)) + 6
+    cy = cy + UI.text(I18n.t("STDERR"), cx, cy, 9, Theme.withAlpha(Theme.cream, 0.7)) + 6
     local font = Assets.mono(Layout.codeSize(16))
     love.graphics.setFont(font)
     UI.setColor(Theme.withAlpha(Theme.cream, 0.85))
@@ -216,7 +216,7 @@ function Result:draw()
   love.graphics.setScissor()
 
   UI.text(a.id or "", x + 10, vh - 48, 7, Theme.withAlpha(Theme.cream, 0.4))
-  self.app:footer("ENTER retry   ESC map   ARROWS scroll")
+  self.app:footer(I18n.t("ENTER retry   ESC map   ARROWS scroll"))
 end
 
 function Result:keypressed(key)
