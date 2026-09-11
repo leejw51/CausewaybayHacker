@@ -682,8 +682,15 @@ Lifted, not reinvented, from the sibling repos:
 * `CausewaybayRaiden` — the retro palette, the chip audio in `audio/chip.ts`,
   and the sprite look.
 
-Screens: `boot → login → land select → category select → map → quest → result`,
-plus `search`, `stats` and `ai` reachable from the map. three.js carries the
+Screens: `boot → login → lands → map → quest → result`, plus `search`, `stats`
+and `ai` reachable from the map.
+
+`lands` is **one** screen, not the two this section first called for. Land and
+category are a 2×3 grid of six choices; splitting them made the player press a
+button to reach a screen with three buttons on it, and a 16-bit select screen
+shows you the whole world at once. Categories are always drawn in the fixed
+order `basic`, `advanced`, `hacker` — never in the server's order, which is
+incidental. three.js carries the
 map's parallax layers and the effects; the quest screen is a 2D canvas overlay
 with the editor (CodeMirror 6) on top — pixel art behind, a real editor in
 front, because a hand-rolled textarea is not something anyone will solve a

@@ -484,3 +484,195 @@ to say what happens if you get it wrong.
 `cases` is the *content pack's* name for them (SPEC §12). The wire deliberately
 uses different names, because the wire form is a strict subset: the hidden
 cases' data never leaves the server.
+
+## 2026-09-11 — QA: the e2e hook contract (proposal to FE)
+
+A 16-bit game draws on a canvas. Playwright cannot see a sprite, cannot click
+one and cannot read text off one, so `e2e/` is 20 skipping tests until the
+frontend publishes a seam. The sibling repo
+(`CausewaybayGolang/typescript/src/main.ts`) solved this with `<html
+data-state>` plus a `window.__view()` accessor, and its e2e suite is readable
+because of it. The same convention, asked for here:
+
+1. **`<html data-state>`** — the current screen, one of
+   `boot | login | lands | categories | map | quest | result`.
+2. **`window.__cwb`** — `view(): string` (the whole view model, JSON),
+   `login(secret): Promise<void>`, `setSource(source): void`, `submit(): void`,
+   `forget(): void`. `login()` exists because typing twelve words into a
+   canvas one keypress at a time tests the keyboard handler, not the login.
+3. **`window.__cwbSocket`** — the live `WebSocket`. Two tests need to kill a
+   socket and forge a frame with an unknown `v`; there is no button for "your
+   wifi died".
+
+Gate all three on `import.meta.env.DEV || location.search.includes("e2e=1")`
+so a shipped bundle carries no "log me in" function.
+
+The `View` type — every field the suite reads — is in `e2e/fixtures.ts`, and
+`e2e/README.md` explains each. The one field with no server counterpart is
+`errors[]`: every `.err` payload the client has received, so a test can prove
+`busy` or `proto_version` actually reached the client rather than being
+swallowed.
+
+FE owns `frontend/**` and takes this. QA does not edit there.
+
+## 2026-09-11 — QA: three SPEC §9 items have no assertion QA can write
+
+SPEC §11's ownership table gives QA `backend/*/tests/**`, but the working
+instruction for milestone 1 is that QA writes nothing under `backend/` or
+`frontend/`. Under that rule these three §9 items are **unownable as
+written**, and the deliverable from QA is the fixture plus this note:
+
+* **§9.1 address conformance** — "asserted in the frontend's unit tests".
+  `tests/vectors/addresses.json` is done and cross-checked against two
+  independent implementations. The assertion is owed by FE (vitest), BE
+  (`backend/core`) and now L2D (the Rust cdylib).
+* **§9.2 signature round trip** — "run in both `backend` and `frontend`
+  suites". `tests/vectors/signatures.json` is done. The recovery assertion is
+  BE's; the signing assertion is FE's and L2D's. The wire-level half — that
+  the server rejects a signature over a *rebuilt* message — is written and
+  lives in `tests/smoke/contract.mjs` §8.6.
+* **§9.3 FTS5 present** — "a startup assertion". It is inside a process QA
+  does not own. The only QA-side proxy is "search returns a hit", which is
+  milestone 2 and much weaker.
+
+Either the ownership rule relaxes for these three files, or BE/FE/L2D pick up
+the rows in `tests/PLAN.md` §9.1.a–c, §9.2.a–e and §9.3.a–c. Both are fine;
+leaving them unassigned is not.
+
+## 2026-09-11 — QA: the Go half of the `unhandled-error` taxonomy row has no fixture
+
+SPEC §7.1 maps `unhandled-error` on the Go side to "`err` assigned and not
+checked (vet)". That is not what `go vet` does. Plain `go vet` — the standard
+analyzer set in the Go distribution — reports nothing for a discarded error;
+the check is `errcheck`, a separate third-party tool that is not installed
+here and is not part of Go.
+
+Evidence: `tests/vectors/mistakes/go/unhandled-error.go` compiles, runs, and
+`go vet ./main.go` exits 0 with empty output. Both are captured in the
+fixture.
+
+Two ways out, PM's call:
+
+1. **BE vendors `errcheck`** and runs it as part of the Go pipeline. It is a
+   real dependency and an offline one, so this is viable — but it is a
+   toolchain decision, not a test decision.
+2. **The row loses its Go half**, and §7.1's Go column for
+   `unhandled-error` becomes `—` like `borrow-after-move`'s.
+
+Until then the case is marked `assert_me: false` in
+`tests/vectors/mistakes/expected.json` with the reason attached, so it is a
+recorded gap rather than a silent omission.
+
+## 2026-09-11 — QA: `E0277` maps to two kinds, and `E0373` maps to none
+
+Two findings from compiling the §7.1 taxonomy against `rustc 1.97.1`:
+
+* **`E0277` is both `missing-trait` and `unhandled-error`.** §7.1 lists it in
+  both rows — `{:?}` on a struct with no `Debug`, and `?` in a `fn main()`
+  returning `()`. The code alone cannot decide; the classifier needs the
+  message text or the span. Both fixtures are present
+  (`rust/missing-trait.rs`, `rust/unhandled-error.rs`) so the disambiguation
+  has something to be tested against.
+* **`E0373` is in no row of §7.1** — and it is the code produced by a
+  *shipped quest's own starter*, `rust.advanced.02.move` ("closure may
+  outlive the current function"). §7.1 says an unmatched code is stored as
+  `other` with the code kept, which is legal and correct. But a player's
+  first real encounter with the training loop filing itself under `other` is
+  a poor first impression, and `lifetime` is the obvious home.
+
+Proposal to PM: add `E0373` to the `lifetime` row, and add a note to §7.1
+that `E0277` needs a message discriminator. No code change is implied by
+either — `expected.json` already records both under
+`code_collisions` and `rust_codes_outside_the_71_table`.
+
+## 2026-09-11 — QA: `verify_pack.py` lifted into `tests/content/`
+
+PM's pack verifier was living outside the repo. It is SPEC §9.4 and §9.5
+already implemented and already proven on real content, so it is now
+`tests/content/verify_pack.py` rather than a second implementation written by
+QA. Two changes, both mechanical:
+
+* `REPO` is derived from the file's own location, and `SCRATCH`/`CACHE` moved
+  under `$CAUSEWAYBAY_HACKER_HOME/build/content-ci` (or the system temp
+  directory when that is unset), honouring SPEC §1's "nothing outside the
+  home is written". They were absolute paths to one machine, which CI cannot
+  be.
+* `path.relative_to(REPO)` is guarded, so a pack given by an absolute path
+  outside the checkout prints rather than raising.
+
+**It runs and it is green: 60/60 quests, six packs, ~65 seconds cold.** Every
+reference solution compiles and passes every case; every starter is rejected.
+
+**Request to whoever owns the Makefile:** a `make test-content` target, and
+`make test` left alone — 65 seconds is too much to charge every `make test`,
+and the packs only change when content changes.
+
+```make
+test-content: ## every reference solution and starter, through the real runner
+	python3 tests/content/verify_pack.py content/rust/*.toml content/go/*.toml
+```
+
+## 2026-09-11 — QA: packs the importer must refuse
+
+`tests/content/invalid-packs/` holds nine content packs that are valid TOML
+and invalid content, with `expected.json` naming the rule each one breaks.
+They are for BE's importer tests: SPEC §12's rules are only enforced if
+something proves the importer refuses a pack that breaks them.
+
+All nine **parse** on purpose. A fixture that is merely malformed tests the
+TOML parser and nothing else.
+
+One deserves BE's attention before the importer is written.
+`basic-escapes.toml` uses `"""` for `starter` instead of SPEC §12's `'''`,
+and the damage is demonstrable: `tomllib` turns the two characters written
+`\n` inside the quest's own comment into a real newline before the compiler
+ever sees them. That quest is *about* printing a literal backslash-n, so the
+corruption destroys the lesson silently.
+
+**A TOML parser cannot report which quote style a string used.** So an
+importer enforcing the `'''` rule has to scan the raw bytes for a quest-level
+`starter =` / `solution =` followed by `"""`, before or alongside parsing.
+Checking the parsed value is not enough and never will be.
+
+## 2026-09-11 — QA: two gaps in PROTOCOL.md, found by writing the checker
+
+Neither is urgent; both are places where an implementer has to guess.
+
+1. **What `id` does a server echo on a frame it could not parse?** §1.2 says
+   a frame that is not a JSON object is closed with 1003, which covers the
+   worst case. But a frame that *is* a JSON object with no `id` — or an
+   unparseable `id` — still needs an answer, and §2.2 only says the reply
+   carries "the same `id`". `tests/smoke/contract.mjs` tolerates `id: null`
+   on an `.err` for this reason. Proposal: §3.3 gains one sentence —
+   "an error about a frame whose `id` could not be read carries `id: null`".
+
+2. **`map.x` / `map.y` outside 0..1.** SPEC §12 says they are 0..1 of the map
+   image; nothing says whether an importer refuses a value outside that or
+   clamps it. There is no fixture in `tests/content/invalid-packs/` for it
+   because QA does not know which behaviour to assert. PM's call.
+
+## 2026-09-11 — QA: what is actually green today
+
+So that nobody plans against an overstated test suite. Full detail in
+`tests/PLAN.md`.
+
+**Green, run, and proven:**
+
+* `tests/vectors/` — three fixtures, all generated from real tools, all
+  idempotent under `--check`. Addresses cross-checked against `eth-account`;
+  the EIP-191 digest assembly cross-checked against four published vectors.
+* `tests/vectors/mistakes/` — 33 cases, 0 unverified, against real
+  `rustc 1.97.1` and `go1.27.1` output captured on disk.
+* `tests/content/verify_pack.py` — 60/60 quests.
+* `tests/smoke/selftest.mjs` — 20/20: a correct mock scores §8 12/12, and
+  each of 19 injected faults is caught by the §8 point that owns that rule.
+
+**Written, not yet meaningful:**
+
+* `tests/smoke/contract.mjs` — 12/12 against a mock QA also wrote. It has
+  never met BE's server, and the first run against it will find things.
+* `e2e/` — 20 tests, all skipping, each naming what has to exist.
+
+**Not written:** every SPEC §9.6 runner-limit case (blocked on a runner), the
+§7.2 mistake rollup, and the three items in the "unownable as written" entry
+above.

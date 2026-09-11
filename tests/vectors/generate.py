@@ -292,7 +292,9 @@ def cross_check(addresses: list) -> dict:
             compared += 1
     return {
         "checked": True,
-        "source": str(ref_path),
+        # Relative to the checkout, not this machine: an absolute path in a
+        # committed fixture is a path that is wrong on every other computer.
+        "source": "../CausewaybayWallet/testvectors/derivation.json",
         "source_generator": ref.get("source"),
         "rows_compared": compared,
     }

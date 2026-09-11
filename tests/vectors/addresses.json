@@ -9,7 +9,7 @@
   },
   "cross_checked_against": {
     "checked": true,
-    "source": "/Volumes/nvidia/vivid/CausewaybayWallet/testvectors/derivation.json",
+    "source": "../CausewaybayWallet/testvectors/derivation.json",
     "source_generator": "eth-account BIP-44 derivation over well-known mnemonics",
     "rows_compared": 10
   },
