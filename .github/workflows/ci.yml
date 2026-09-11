@@ -200,6 +200,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The data-race fixture is checked with `go run -race`, and the first
+      # `-race` build on a fresh runner instruments the standard library from
+      # scratch — minutes of work that blew the generator's per-run timeout
+      # before the fixture itself was even compiled. Warmed once here, so the
+      # three runs the generator makes hit the build cache.
+      - name: Warm the race-instrumented standard library
+        run: go build -race std
+
       # Every §7.1 taxonomy fixture still compiles to the code it claims.
       - run: python3 tests/vectors/mistakes/generate.py --check
 

@@ -396,8 +396,16 @@ mod tests {
     spec.timeout_ms = 2000;
     let started = std::time::Instant::now();
     let run = run(source, &spec);
+    // Three honest endings, by platform. On macOS `RLIMIT_AS` is not honoured
+    // and the wall clock wins: `Timeout`. On Linux it is, and libtest's own
+    // capture buffer — which is where the flood is going — hits the 1 GiB
+    // address-space cap first; the allocation fails, the test binary aborts,
+    // and that is a `RuntimeError`. What no platform may say is `Accepted`.
     assert!(
-        matches!(run.report.verdict, Verdict::Timeout | Verdict::OutputLimit),
+        matches!(
+            run.report.verdict,
+            Verdict::Timeout | Verdict::OutputLimit | Verdict::RuntimeError
+        ),
         "a flooding test was judged {:?}",
         run.report.verdict
     );
