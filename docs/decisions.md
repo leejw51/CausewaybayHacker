@@ -3173,3 +3173,120 @@ is not on this server yet — SUBMIT still works". The clock's four registers
 were verified from a synthetic `opened_at`/`deadline_at` pair in §5.3's shape —
 **rendering, not wire**, and to be re-captured against the real thing the way
 `S1`/`S2` were.
+
+---
+
+## FE — the clock is the server's, and the screen only reads it
+
+§4.8b. `Quest` carries `opened_at` and `deadline_at`; the quest screen derives
+"how long is left" from the deadline and the app's clock **every frame** rather
+than decrementing a counter of its own. A decremented counter is wrong by
+exactly the time a backgrounded tab was away, and a trainer that lies about the
+clock is worse than one with no clock.
+
+It blocks nothing, which is the part worth writing down. Time runs out, the
+quest stays open, the countdown keeps going — `OVERTIME +00:03` in the brick
+colour, bar full — and SUBMIT is exactly as live as it was a second earlier.
+The server records `within_limit`; the screen records nothing and stops nobody.
+A trainer that throws you out mid-thought has taught you that you are out of
+time, which you already knew.
+
+The motion is deliberately almost all in the transitions. It arrives on the expo
+curve and settles; it beats once when it crosses a minute, once at thirty
+seconds and once when it runs out, each with a chip note; and the rest of its
+life it is a number that does not move, because somebody is reading code two
+inches to the right of it. The pulse is a swell of the *plate*, never a shake of
+the digits — the number has to stay readable at a glance the whole time —
+and `prefers-reduced-motion` halves the swell rather than removing it.
+`CLOCK.warn`, `CLOCK.urgent` and `clockPulse()` live in `engine/motion.ts` with
+the other durations, so the next screen that needs a countdown does not invent
+its own numbers.
+
+The one place the game is now allowed to read the wall clock is `App.now()`,
+and it stands still while the capture hook is frozen. A clock is exactly the
+thing that turns a reproducible screenshot into a flaky one, so the exception is
+one function with a comment on it rather than a `Date.now()` in a draw call.
+
+Verified against a stand-in for the server (the reply rewritten in the browser
+so it carried a deadline): `TIME LEFT 01:01` in cyan, the threshold beats, and
+`OVERTIME` counting up with the quest still open and SUBMIT still green.
+
+---
+
+## FE — FORMAT, and the caret
+
+§4.9d, on the quest screen and in the playground, on a button and on
+Ctrl/Cmd+Shift+F. Three outcomes, three registers: formatted, "already tidy"
+(nothing is touched — replacing a buffer with an identical one makes a button
+feel broken), and a formatter's complaint about source that does not parse,
+shown *quietly* and with the buffer left exactly as it is. Half-written code is
+the normal state of an editor, not a fault.
+
+The part that is ours alone is the caret. `Editor.replaceAll` trims the common
+prefix and suffix and dispatches only the span that differs, so CodeMirror maps
+the existing selection through the edit: a caret above or below the reformatted
+span does not move at all, and one inside it lands at the end of the span. A
+`setState` would have been one line and would have dumped the cursor to the top
+of the file, which is infuriating when FORMAT was pressed mid-thought.
+
+The binding is Ctrl+Shift+F rather than the editor-conventional Shift+Alt+F
+because of this game's own plumbing: a keystroke only reaches a scene from
+inside the editor when Ctrl or Cmd is held, so Shift+Alt+F could never have
+arrived. It is in the footer, which is where a player finds out.
+
+While adding the button I found the message bar painting over the button row —
+the row wraps to two lines at 1280 with FORMAT on it, and the bar was an overlay
+across the bottom of the body. The panels give up its height now instead, so
+nothing is ever drawn underneath it. That is twice in one round that something
+was drawn over a button, both times because a height was assumed rather than
+measured.
+
+---
+
+## FE — the lands screen says which kind of nothing
+
+A category with `open: false` is no longer drawn as a locked road, because
+nothing is locked (§4.7) — it means the pack did not import, which is a fault
+and not a rule. The row says `NOT INSTALLED` and wears `badge_locked`, which is
+the one place in the game that padlock is allowed to appear. It never goes on
+the map.
+
+## 2026-09-11 — QA: e2e is 6/9, and the reason is one missing hook
+
+Three e2e tests went red when `quest.run` landed, and the diagnosis is
+complete:
+
+* `Ctrl/Cmd+Enter` used to submit. §4.9b gave that key to **RUN**,
+  deliberately — *"Submitting is a decision and it is made with a button, not
+  with the shortcut somebody's hands press without looking"*. A run stays on
+  the quest screen, so the suite waited three minutes for a result screen that
+  was never coming. **That is the test working**: no unit test on either side
+  would have noticed the key moving.
+* SUBMIT is now a canvas-drawn button with no keyboard binding, and it raises
+  a confirmation dialogue. A geometric scan over the bottom half of the plate,
+  answering the dialogue with Enter after each click, does not reach the
+  result screen.
+
+The three red tests are `a wrong answer…`, `the right answer…` and `logout,
+then a second wallet…`. The six that pass include the two with the most
+teeth — the seed never crossing the wire, and the map being playable.
+
+**This is the third time a canvas-only control has cost a full run** — the
+category rows twice (wrong column, then wrong y range), the submit button now.
+More scanning is not the answer. The ask from the earlier entry stands and is
+now the single highest-value thing anybody could hand this suite:
+
+```ts
+// on __cwbCapture
+buttons(): { id: string; rect: [number, number, number, number] }[];
+```
+
+Every scene already builds a `Buttons` list with exactly that shape
+(`ui/chrome.ts`), so it is a getter, not a feature. With it, `submit()`
+becomes one click on `#submit`, `pickFirstCategory` becomes one click on
+`cat:basic`, and three fragile helpers and a whole class of
+silent-wrong-thing failures go away.
+
+Until it lands, treat an e2e failure in `submit()` or `enterRustQuest()` as
+"a canvas control moved" before believing it is a product bug — the error
+messages say so.

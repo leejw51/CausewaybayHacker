@@ -56,7 +56,7 @@ keepalive check runs over 6 s rather than §1.1's 70 s unless `--slow`).
 | `tests/content/verify_pack.py` | yes | **60/60 quests** | every solution passes, every starter rejected |
 | `tests/smoke/selftest.mjs` | yes | 20/20 | proves the checker catches 19 injected faults |
 | `tests/smoke/contract.mjs` | yes, against the real backend | **12/12** | BE fixed the §8.1 divergence |
-| `e2e/` | **yes — 18/18** | **green** | 9 tests × 2 orientations, driving the real UI |
+| `e2e/` | yes | **6 of 9 green** | the three that submit are **red**: SUBMIT is a canvas button with no shortcut and a confirm dialogue, and the scan cannot press it |
 
 Nothing above is green by assumption. `verify_pack.py` really compiled 60
 quests; the mistake fixtures really ran `rustc` and `go`; the smoke checker
@@ -443,8 +443,35 @@ implementation of that in the test tree is the drift §9.1 exists to prevent.
 
 ## The end-to-end journey — `e2e/`
 
-**Off the ground. 9 tests × 2 orientations = 18, all passing**, against a
-real backend serving the real bundle.
+**Off the ground, and currently 6 of 9 green.** It ran 18/18 earlier today;
+three tests went red when `quest.run` landed, and the cause is understood.
+
+### The three that are red, and exactly why
+
+`a wrong answer…`, `the right answer…` and `logout, then a second wallet…`
+all need to press **SUBMIT**, and SUBMIT can no longer be pressed by this
+suite:
+
+* `Ctrl/Cmd+Enter` used to submit. §4.9b gave that key to **RUN**, on
+  purpose — *"Submitting is a decision and it is made with a button, not with
+  the shortcut somebody's hands press without looking"*
+  (`frontend/src/scenes/quest.ts`). A run stays on the quest screen, so the
+  suite waited three minutes for a result screen that was never coming.
+* SUBMIT is therefore a **canvas-drawn button with no keyboard binding**, and
+  it raises a **confirmation dialogue** before anything happens. A geometric
+  scan over the whole bottom half of the plate, clicking and answering Enter,
+  does not reach the result screen.
+
+This is the third time a canvas-only control has cost a full run — the
+category rows twice, the submit button now. **The fix is not more scanning.**
+It is the hit-test hook already requested in `docs/decisions.md`: even
+`__cwbCapture.buttons()` returning `{id, rect}[]` would delete all of it and
+the whole class of failures with it. Until then these three stay red, and
+they are red for a reason that is written down rather than a mystery.
+
+The six that pass are not trivial: boot, the address conformance, **the seed
+never crossing the wire**, the playable map, the canvas filling both
+orientations with matching layers, and the mid-session orientation flips.
 
 ```
 login → train → logout → login as a second wallet
