@@ -86,6 +86,8 @@ export class Client {
   private closing = false;
   private retry = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Bumped on every connect and close, so a stale socket cannot speak. */
+  private generation = 0;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
 
   state: ConnState = "offline";
@@ -140,22 +142,40 @@ export class Client {
   connect(): void {
     if (this.transport) return;
     this.closing = false;
+    // A websocket reports its close on a later task. A logout closes one
+    // socket and opens the next in the same turn, so without this generation
+    // stamp the *old* socket's close would arrive after the new one is up and
+    // knock it back to offline — and schedule a reconnect for a connection
+    // that was never lost. Callbacks from a superseded transport are ignored.
+    const gen = ++this.generation;
     this.setState("connecting");
     this.transport = this.opts.transport({
       onOpen: () => {
+        if (gen !== this.generation) return;
         this.setState("open");
         this.startKeepalive();
       },
-      onMessage: (text) => this.receive(text),
-      onClose: (reason) => this.dropped(reason),
+      onMessage: (text) => {
+        if (gen !== this.generation) return;
+        this.receive(text);
+      },
+      onClose: (reason) => {
+        if (gen !== this.generation) return;
+        this.dropped(reason);
+      },
     });
   }
 
   close(): void {
     this.closing = true;
+    // The socket being dropped here is no longer ours, so its own close
+    // callback is ignored (see `connect`) — which means this is the only
+    // place left that can fail the requests that were riding on it.
+    this.generation++;
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
     this.stopKeepalive();
+    this.failPending("closed");
     this.transport?.close();
     this.transport = null;
     this.setState("offline");
@@ -179,13 +199,13 @@ export class Client {
     this.pingTimer = null;
   }
 
-  private dropped(reason: string): void {
-    this.transport = null;
-    this.stopKeepalive();
-    // §6.6: a `quest.submit` that was in flight is *still running* server-side
-    // and its result is durable. The promise fails so the UI stops waiting;
-    // the quest screen tells the player to look at the history rather than
-    // resubmitting.
+  /**
+   * §6.6: a `quest.submit` that was in flight is *still running* server-side
+   * and its result is durable. The promise fails so the UI stops waiting; the
+   * quest screen tells the player to look at the history rather than
+   * resubmitting.
+   */
+  private failPending(reason: string): void {
     this.submitInFlight = false;
     for (const [, p] of this.pending) {
       clearTimeout(p.timer);
@@ -198,6 +218,12 @@ export class Client {
       );
     }
     this.pending.clear();
+  }
+
+  private dropped(reason: string): void {
+    this.transport = null;
+    this.stopKeepalive();
+    this.failPending(reason);
     this.setState("offline");
     if (this.closing) return;
     this.retryTimer = setTimeout(() => {

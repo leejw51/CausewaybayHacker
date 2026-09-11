@@ -1,0 +1,211 @@
+# Causewaybay Hacker — the art, and how to make it again
+#
+# Every file in art/ came out of art/tools/gen.sh, which calls
+# art/tools/grok_image.sh (Grok / xAI, model grok-imagine-image) and then
+# art/tools/process.py. This file is the recipe for the whole set: change the
+# direction, edit a prompt, re-run, and the set is re-rolled.
+#
+#     art/tools/gen.sh map_rust bg 3:2 1152 768 center "..."
+#
+# Conventions inherited from CausewaybayGolang, which shipped this pipeline:
+#
+#   * BACKGROUNDS are 3:2 (or 2:3 for the portrait variants) and carry a flat,
+#     level ground line across the bottom fifth of the frame, because the world
+#     code pins the ground there. Delivered as JPEG at 1152x768 / 768x1152.
+#   * SPRITES are 1:1 on a SOLID MAGENTA field. process.py runs the same
+#     border-seeded flood fill love2d/src/assets.lua runs, so the magenta
+#     becomes transparency and pink *inside* the sprite survives. Delivered as
+#     PNG with binary alpha (0 or 255 — the engine scales by an integer factor
+#     and a soft edge becomes mud).
+#   * NEVER ask for lettering. Grok cannot spell. Every word the player reads
+#     is printed by the engine in Press Start 2P, over the art, including the
+#     word on the CLEARED stamp — see docs/design-review.md.
+#
+# `rerolls` is how many generations that asset took before one was accepted.
+# It is the useful number for whoever runs the next batch.
+
+
+[[asset]]
+name = "title_bg"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 1
+note = "First roll came back pastel and empty. The saturation, the dark outlines and the market stallholders had to be asked for by name."
+prompt = """\
+16-bit SNES pixel art painted background in the style of Super Mario World and Wonder Boy in Monster World: SATURATED candy colours, high contrast, deep saturated cobalt sky, warm gold morning light, strong dark outlines on every object. NOT pastel, NOT washed out, NOT lo-fi. Causeway Bay, Hong Kong, 06:40 on a Tuesday. Seen from the pavement: a bright blue double-decker tram on its rails under a web of overhead tram wires, bamboo scaffolding lashed in gold poles up a coral-pink tenement on the left, blank vertical shop sign panels in hot pink jade green and cyan stacked down the building faces, roller shutters going up on a market lane, crates of oranges and greens on the pavement, a stallholder in a red apron setting up, a woman in a yellow jacket walking to work, a big banyan tree with hanging roots on the right, air-conditioner boxes and laundry poles. Chunky hard-edged pixels, heavy dithering, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The pavement is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "map_rust"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+note = "LAND FILLS THE ENTIRE FRAME is the load-bearing clause: node x/y are 0..1 of the plate, so any large water region guarantees nodes in the sea. See docs/design-review.md D3."
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen: three-quarter top-down bird's eye view of a toy diorama, chunky hard-edged pixels, saturated candy colours, strong dark outlines, heavy dithering, no anti-aliasing, no soft gradient, no drop shadow. The subject is Causeway Bay Hong Kong shrunk to a miniature island: LAND FILLS THE ENTIRE FRAME FROM EDGE TO EDGE, with only a thin strip of blue harbour water in the extreme top corners and nowhere else. Green grass and paved plaza cover everywhere. Scattered across the land, small and toylike: a blue double-decker tram on a curving track, a row of coral and mint tenement blocks with gold bamboo scaffolding, a small market lane with striped awnings, a green park with round trees and a bandstand, a squat mall block, a tiled-roof temple, a stubby office tower, a pier shelter, round bushes and flower beds. A wide winding tan paved path snakes across the whole map from the bottom left corner to the top right corner, curving and folding back through the middle, unbroken and clearly visible over the grass. Warm Ferris-orange morning light, amber and terracotta ground tones over Super Mario World blue sky. Absolutely no text, no letters, no words, no numbers, no signs with writing, no markers, no dots, no circles on the path. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "sprite_mei"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-11"
+rerolls = 0
+note = "Delivered as a 128x128 standing figure, not the sibling's 32x48 walk cell: Grok renders at ~1024 and a downscale to 32x48 is mud. The box puts her on her feet."
+prompt = """\
+16-bit SNES pixel art character sprite, full body, standing, facing the viewer, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The character is Mei Cheung, a Hong Kong Chinese woman in her thirties, a senior software engineer: short black bob haircut, round wire glasses, a rust-orange zip hoodie over a plain cream tee, dark slim jeans, white trainers, a canvas messenger bag on one shoulder, a closed laptop tucked under her left arm. Her expression is flat and unimpressed, slightly annoyed, not smiling, not heroic. Chunky hard-edged pixels, bold dark outline all the way round the figure, flat cel shading with dithered shadow, saturated Super Mario World and Wonder Boy colours, no anti-aliasing, no soft gradient, no drop shadow on the ground, no glow. Absolutely no text, no letters, no words, no numbers, no logo on the clothing. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "sprite_ferris"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-11"
+rerolls = 0
+note = "Matched to the sibling's Ferris (same round stalk eyes, same orange shell) so a player who has played CausewaybayGolang recognises him, plus the milk tea and crates for this street."
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The character is a friendly cartoon crab: a wide rounded orange shell, two big round white eyes with black pupils on short stalks, a small smiling mouth, two raised claws, four little legs. One claw is holding a tiny takeaway cup of Hong Kong milk tea. He is sitting on a small stack of wooden fruit crates. Chunky hard-edged pixels, bold dark outline all the way round, flat cel shading with dithered highlight on the shell, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "stamp_cleared"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+note = "A WORDLESS ring. docs/art.md asks for the word CLEARED baked into the sprite; that is wrong twice over — Grok cannot spell, and the sibling prints the word in Press Start 2P over stamp_served.png at runtime. The rim is thinner than the sibling's so seven glyphs fit the field where six did."
+prompt = """\
+16-bit SNES pixel art game icon, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the icon). The icon is a round rubber-stamp impression seen flat-on: a thick gold outer rim, a dark ink outline, and a wide flat bright green disc filling the middle, completely blank and empty with nothing printed on it. Chunky hard-edged pixels, heavy dithering on the rim, strong dark outline, no anti-aliasing, no soft gradient, no drop shadow, no bevel, no glow. Absolutely no text, no letters, no words, no numbers, no symbols inside the disc. Painted 16-bit console game sprite, not 3D rendered."""
+
+[[asset]]
+name = "title_bg_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background, TALL PORTRAIT composition. Causeway Bay, Hong Kong, 06:40 on a Tuesday, looking straight up a narrow street: a coral-pink tenement tower filling most of the frame with gold bamboo scaffolding lashed up its whole height, blank vertical shop sign panels in hot pink jade green and cyan projecting out over the street one above the other all the way up, air-conditioner boxes and laundry poles on every floor, a web of overhead tram wires across a deep saturated cobalt strip of sky at the very top, and at the bottom of the frame the pavement with a blue double-decker tram nose and a market stall with crates of oranges. Warm gold morning light. The pavement is flat and level and runs unbroken across the bottom fifth of the frame. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "map_go"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen: three-quarter top-down bird's eye view of a toy diorama, at NIGHT under a deep indigo sky, lit by cyan and turquoise light. The subject is the Hong Kong MTR Island Line shrunk to a miniature: LAND FILLS THE ENTIRE FRAME FROM EDGE TO EDGE, with only a thin strip of dark water in the extreme bottom corners and nowhere else. A cutaway station platform with a cyan-lit train, glowing turquoise station entrances, a fast-food kitchen block with its windows lit warm, stacked delivery-bike racks, a cluster of neon-lit night market stalls, a footbridge, a small park with round dark trees, rooftop water tanks, all small and toylike and evenly spread over the whole map. A wide winding pale concrete walkway snakes across the whole map from the top right corner down to the bottom left, curving and folding back through the middle, unbroken and clearly visible. Gopher-cyan and turquoise light spill over cool blue-grey ground. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "map_go"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen: three-quarter top-down bird's eye view of a toy diorama at NIGHT, deep indigo and cool blue-grey ground lit by cyan and turquoise neon. CRITICAL: solid built-up ground COMPLETELY COVERS THE WHOLE IMAGE, every corner and every edge, from the very top edge to the very bottom edge and from the very left edge to the very right edge. THERE IS NO WATER, NO SEA, NO SKY, NO EMPTY DARK AREA ANYWHERE IN THE PICTURE — if a region would be empty, fill it with more buildings, more roof tops, more little parks, more streets. The subject is the Hong Kong MTR Island Line at night shrunk to a miniature: a cutaway station platform with a cyan-lit train, glowing turquoise station entrances, a fast-food kitchen block with warm lit windows, racks of delivery bikes, clusters of neon night market stalls, a footbridge, small parks of round dark trees, rooftop water tanks, low concrete blocks, all small and toylike and spread evenly across every part of the map with nothing left bare. A wide winding pale concrete walkway snakes across the whole map from the top right corner down to the bottom left corner, curving and folding back through the middle, unbroken and clearly visible the whole way. Chunky hard-edged pixels, heavy dithering, strong dark outlines, no anti-aliasing, no soft gradients, no drop shadow, no glow bloom. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign or stall. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "map_go_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen, TALL PORTRAIT composition: three-quarter top-down bird's eye view of a toy diorama at NIGHT, deep indigo and cool blue-grey ground lit by cyan and turquoise neon. CRITICAL: solid ground COMPLETELY COVERS THE WHOLE IMAGE, every corner and every edge. THERE IS NO WATER, NO SEA, NO SKY, NO EMPTY AREA ANYWHERE — if a region would be empty, fill it with more buildings, roof tops, little parks and streets. The subject is the Hong Kong MTR Island Line at night shrunk to a miniature: a cutaway station platform with a cyan-lit train, glowing turquoise station entrances, a fast-food kitchen block with warm lit windows, racks of delivery bikes, clusters of neon night market stalls, a footbridge, small parks of round dark trees, rooftop water tanks, low concrete blocks, spread evenly across every part of the tall map with nothing left bare. A wide winding pale concrete walkway snakes the full height of the map from the top right corner down to the bottom left corner, curving and folding back through the middle, unbroken and clearly visible. Chunky hard-edged pixels, heavy dithering, strong dark outlines, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "map_rust_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES overworld world map in the style of the Super Mario World world map screen, TALL PORTRAIT composition, three-quarter top-down bird's eye view of a warm sunlit toy diorama town. CRITICAL: the entire image is one CONTINUOUS GROUND SURFACE of paving, road and grass, seen from above. There is NO flat background colour showing anywhere between the buildings — every single gap between two buildings is filled with street, pavement, grass, kerb or rooftop. NO water, NO sea, NO sky, NO void, NO empty coloured field, right out to all four edges and into all four corners. Saturated green grass and warm tan paving everywhere, gold morning light, terracotta and amber roofs, Super Mario World candy colours. Scattered densely over the whole surface: a blue double-decker tram on a curving track, coral and mint tenement blocks with gold bamboo scaffolding, a market lane with red and white striped awnings, a park of round green trees with a bandstand, a squat mall, a tiled-roof temple, flower beds, round bushes, low shophouses. A wide winding tan paved road snakes the full height of the map from the bottom left up to the top right, curving in smooth S-bends and folding back through the middle, unbroken and clearly visible. Chunky hard-edged pixels, heavy dithering, strong dark outlines, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "map_go_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES overworld world map in the style of the Super Mario World world map screen, TALL PORTRAIT composition, three-quarter top-down bird's eye view of a night-time toy diorama town. CRITICAL: the entire image is one CONTINUOUS GROUND SURFACE of paving, road and grass, seen from above. There is NO flat background colour showing anywhere between the buildings — every single gap between two buildings is filled with street, pavement, grass, kerb or rooftop. NO water, NO sea, NO sky, NO void, NO empty coloured field, right out to all four edges and into all four corners. The ground is cool blue-grey paving and dark green grass lit from below by cyan and turquoise neon and warm yellow shop windows, deep and moody but every surface clearly lit and visible, never black. Scattered densely over the whole surface: a cutaway MTR station platform with a cyan-lit train, glowing turquoise station entrances, a late-night fast-food kitchen with warm lit windows, racks of delivery bikes, dense clusters of neon night market stalls with coloured canopies, a concrete footbridge, small parks of round dark trees, rooftop water tanks, low concrete blocks. A wide winding pale concrete walkway snakes the full height of the map from the top right down to the bottom left, curving in smooth S-bends and folding back through the middle, unbroken and clearly visible. Chunky hard-edged pixels, heavy dithering, strong dark outlines, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_street"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background. Jardine's Bazaar, Causeway Bay, Hong Kong, mid-morning: a narrow market lane seen straight on from the pavement. Both sides crowded with open shopfronts under red-and-white striped canvas awnings, wooden crates of oranges greens and leafy vegetables stacked to the kerb, a fishmonger's steel counter, hanging bundles of dried goods, blank painted shop sign boards in hot pink and jade projecting over the lane, roller shutters half up, a stallholder in a blue apron weighing fruit, a grandmother with a red shopping trolley, gold bamboo scaffolding up the tenement above, air-conditioner boxes and drying laundry poles, a slot of saturated cobalt sky at the top. Warm gold morning light. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board or poster. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_times"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background. The ground-floor food hall of a Hong Kong shopping mall at 12:30 in the lunch rush, seen straight on: a long fast-food counter with two tills side by side, warm yellow menu lightboxes above them that are completely blank with nothing written on them, a steel kitchen pass behind with steam rising, plastic trays stacked, a queue of office workers in shirts and lanyards, a cleaner with a mop, potted plants, a polished terrazzo floor, escalators and a glass balustrade behind, red and gold mall columns. Bright interior light, warm reds oranges and golds. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board or poster. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_mtr"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background. A Hong Kong MTR underground station platform, seen straight on down the platform: a glossy tiled wall in bands of turquoise and cream, tall platform screen doors with a silver train behind them, its cyan-lit windows and open doors, a crowd of commuters in dark coats boarding and leaving at the same time, a woman running for the door, a man with a bicycle, blank rectangular sign panels and blank route-map boards mounted on the wall with nothing written on them, round ceiling lights, a yellow safety stripe. Cool cyan and turquoise light with warm lamps. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board or poster. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_till"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background. The front counter of a small Hong Kong fast-food shop at five to midday, seen straight on from where a customer would stand, close in. One till on a red laminate counter with a chrome register, a blank order display screen above it on a swivel arm, a paper spike of order slips, a stack of nested trays, a lidded pot of milk tea and a row of clean glasses, a hatch through to the steel kitchen behind with a heat lamp and steam, blank cream menu boards across the back wall, tiled cream walls, a tired counter clerk in a red cap and a red apron waiting, a mop bucket in the corner. Bright warm interior light, saturated reds golds and creams. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board, poster or slip of paper — every board and screen is completely blank. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_room732"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background. An empty small university seminar room in Hong Kong, seen straight on from the front of the room, late afternoon. A very large white whiteboard filling most of the back wall, completely clean and blank with nothing drawn or written on it, an aluminium pen tray with two markers and a grey eraser, a round white wall clock with plain black hands above it to the right, two rows of pale wooden desks with grey plastic chairs seen from behind, one lone chair turned out at an angle, a tall window on the left with a slatted blind half raised showing a slice of green hillside and grey tower blocks, a whirring ceiling fan, a cork pinboard that is completely empty, scuffed pale grey vinyl floor. Cool daylight from the window with warm fluorescent light. Quiet, still, slightly oppressive. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board, poster or slip of paper — every board and screen is completely blank. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_room732_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background, TALL PORTRAIT composition. An empty small university seminar room in Hong Kong, seen straight on from the front of the room, late afternoon. A very large white whiteboard filling the upper half of the frame, completely clean and blank with nothing drawn or written on it, an aluminium pen tray with two markers and a grey eraser below it, a round white wall clock with plain black hands high on the right, a whirring ceiling fan above, and in the lower half two rows of pale wooden desks with grey plastic chairs seen from behind, one lone chair turned out at an angle, a strip of tall window on the left with a slatted blind showing a slice of green hillside, scuffed pale grey vinyl floor. Cool daylight with warm fluorescent light. Quiet, still, slightly oppressive. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board, poster or slip of paper — every board and screen is completely blank. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_datacentre"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background. The basement server room of a university engineering building at night, seen straight on down a cold aisle. Two facing walls of tall black server racks running away from the viewer, every rack packed with identical machines showing thousands of tiny cyan and amber indicator lights, thick looms of cable in orange and blue slung overhead in a tray, a perforated raised floor tile lifted out of the way, round ducting, one dim emergency lamp casting deep shadow, a haze of cold blue light. Menacing and utterly indifferent, not a face and not a monster, just machines. Deep navy and near-black with cyan and amber pinpricks. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board, poster or slip of paper — every board and screen is completely blank. Painted 16-bit console game art, not 3D rendered, not photographic."""

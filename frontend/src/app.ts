@@ -95,6 +95,9 @@ export class App {
   /** Set by `logout()` so the login screen can say why it is being shown. */
   loggedOutNotice = "";
 
+  /** True only while `logout()` is tearing the socket down on purpose. */
+  private closingOnPurpose = false;
+
   constructor(
     readonly canvas: HTMLCanvasElement,
     readonly fx: HTMLCanvasElement,
@@ -120,7 +123,10 @@ export class App {
     // The connection banner is the app's, not a scene's: it has to be visible
     // on whichever screen the player happens to be on when the server goes.
     client.onState((s) => {
-      if (s === "offline") this.say("connection lost — reconnecting");
+      // A logout closes the socket on purpose. Announcing that as a failure
+      // would put a red alarm across the login screen the player just asked
+      // for, so the deliberate case is swallowed here.
+      if (s === "offline" && !this.closingOnPurpose) this.say("connection lost — reconnecting");
       if (s === "authed") this.toast = null;
     });
     client.on("server.bye", (p) => this.say(p.reason));
@@ -290,12 +296,16 @@ export class App {
     }
     wipeKey();
     this.client.forgetToken();
+    this.closingOnPurpose = true;
     this.client.close();
     this.addressLabel = "";
     this.loggedOutNotice = reason;
     this.chip.music("stop");
     // A fresh connection, anonymous, ready for whoever logs in next.
     this.client.connect();
+    this.closingOnPurpose = false;
+    // Anything the old session had to say is about a session that is gone.
+    this.toast = null;
     const { LoginScene } = await import("./scenes/login");
     await this.go(new LoginScene(this), "back");
     return true;
@@ -308,6 +318,12 @@ export class App {
     // one wins and the second is declined, which is the safe answer for a
     // dialogue whose only job is to stop something destructive.
     if (this.modal) return Promise.resolve(false);
+    // The editor and the seed field are DOM, stacked *above* the canvas by the
+    // stylesheet, so a modal drawn on the canvas would appear behind them —
+    // and a confirmation you can click straight through is not a
+    // confirmation. The whole overlay is hidden for as long as the question
+    // is on screen.
+    this.overlay.style.visibility = "hidden";
     return new Promise<boolean>((resolve) => {
       this.modal = {
         ...q,
@@ -323,6 +339,7 @@ export class App {
     const m = this.modal;
     if (!m) return;
     this.modal = null;
+    this.overlay.style.visibility = "";
     this.chip.select();
     m.resolve(ok);
   }

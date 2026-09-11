@@ -38,6 +38,21 @@ export class ResultScene implements Scene {
   readonly mood = "result" as const;
   private t = 0;
   private readonly buttons = new Buttons();
+
+  /**
+   * The headline for this attempt.
+   *
+   * Go has no runner until the next milestone, and the server reports that as
+   * an internal error because from its side it *is* one. Repeating that word
+   * to the player would teach them to distrust a server that is working
+   * exactly as built, so the one case we know about is named honestly.
+   */
+  private verdictWord(): string {
+    if (this.attempt.verdict === "internal_error" && this.land === "go") {
+      return "THE GO LAND OPENS IN THE NEXT CHAPTER";
+    }
+    return VERDICT_TEXT[this.attempt.verdict];
+  }
   private confetti: Plan | null = null;
 
   /**
@@ -145,15 +160,7 @@ export class ResultScene implements Scene {
     g.scale(wordScale, wordScale);
     g.translate(-(left[0] + left[2] / 2), -(y + fonts.title.height / 2));
     g.fillStyle = css(ok ? Theme.admit : Theme.red);
-    const lines = printf(
-      g,
-      fonts.title,
-      VERDICT_TEXT[this.attempt.verdict],
-      left[0],
-      y,
-      left[2],
-      "center",
-    );
+    const lines = printf(g, fonts.title, this.verdictWord(), left[0], y, left[2], "center");
     g.restore();
     y += lines * fonts.title.height;
     y += Math.round(8 * s);
@@ -255,7 +262,13 @@ export class ResultScene implements Scene {
       if (this.attempt.mistakes.length > 0) {
         ry += Math.round(8 * s);
         g.fillStyle = css(Theme.coin);
-        printf(g, fonts.stationSm, "THE COMPILER'S OWN WORDS", right[0], ry, right[2], "left");
+        // The taxonomy carries more than compiler diagnostics — a wrong answer
+        // lands here too — so the heading has to match what is under it.
+        const heading =
+          this.attempt.verdict === "compile_error"
+            ? "THE COMPILER'S OWN WORDS"
+            : "WHAT THE RUNNER SAW";
+        printf(g, fonts.stationSm, heading, right[0], ry, right[2], "left");
         ry += fonts.stationSm.height + Math.round(6 * s);
         for (const m of this.attempt.mistakes) {
           g.fillStyle = css(Theme.pink);

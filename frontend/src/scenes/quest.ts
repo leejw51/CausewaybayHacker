@@ -307,16 +307,15 @@ export class QuestScene implements Scene {
 
     this.buttons.draw(g, fonts.button);
     if (this.error) {
+      // A bar rather than a loose line: the message crosses both panels, and
+      // bare text laid over a panel border is unreadable at the seam.
+      const barH = fonts.small.height + Math.round(8 * s);
+      const barY = f.body[1] + f.body[3] - barH;
+      g.fillStyle = "rgba(24,6,10,0.92)";
+      g.fillRect(f.body[0], barY, f.body[2], barH);
       g.fillStyle = css(Theme.red);
-      printf(
-        g,
-        fonts.small,
-        this.error,
-        f.body[0],
-        f.body[1] + f.body[3] - fonts.small.height,
-        f.body[2],
-        "left",
-      );
+      g.fillRect(f.body[0], barY, f.body[2], Math.max(1, Math.round(s)));
+      printf(g, fonts.small, this.error, f.body[0], barY + Math.round(4 * s), f.body[2], "center");
     }
     footer(
       g,

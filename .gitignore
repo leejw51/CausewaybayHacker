@@ -10,3 +10,9 @@ test-results/
 playwright-report/
 .wrangler/
 .run/
+
+# Screenshots are regenerable from __cwbCapture (`make -C frontend shots`) and
+# churn on every visual change. 6.6 MB of PNGs in the history buys nothing that
+# re-running the capture does not.
+frontend/shots/
+frontend/dist-e2e/

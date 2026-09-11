@@ -161,6 +161,12 @@ export class Backdrop {
 
   static create(canvas: HTMLCanvasElement): Backdrop | null {
     try {
+      // A dev-only way to stand in the shoes of a player whose browser has no
+      // WebGL. The fallback is a whole second look at the game and it has to
+      // be walkable, not merely believed in.
+      if (import.meta.env.DEV && new URLSearchParams(location.search).get("nogl") === "1") {
+        return null;
+      }
       const renderer = new WebGLRenderer({ canvas, antialias: false, alpha: false });
       return new Backdrop(renderer);
     } catch {

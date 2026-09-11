@@ -1008,3 +1008,116 @@ the refusal, the code, the milestone, **and that `stats.history` and
 `stats.mistakes` are both empty** — the two places a fabricated verdict would
 surface in the player's curriculum. Verified against a live server with a fresh
 wallet: `unavailable`, milestone 2, 0 attempts, 0 mistakes.
+
+## 2026-09-11 — FE: three.js carries the whole game, not just the map
+
+The WebGL canvas was owned by the map scene, created and destroyed with it.
+Two bugs came out of that, and one of them was invisible: `#fx` was never
+sized, so it kept the browser's default **300×150** backing store stretched by
+CSS to the window — every pixel on it was drawn at a quarter resolution and in
+the wrong place. `App` now owns exactly one `Backdrop`, sizes it from `Layout`
+alongside the 2D canvas on every resize and orientation change, and each scene
+only declares a `mood`.
+
+The backdrop is a **procedurally drawn Causeway Bay** in three parallax bands
+(`src/gfx/skyline.ts`): the harbour towers, the mid blocks with their grid of
+lit windows, and in front the two things that name the place — vertical
+signage stacked down a building's face, and the tram wire. Generated rather
+than shipped as art because it tiles seamlessly at any width, re-tints per
+land without a second set of files, and stays crisp at `NearestFilter`. The
+generator is seeded, so the city is the same on every run and a screenshot is
+comparable to the last one.
+
+Panel faces went from 0.94 to 0.84 opacity to let it through. The mood table
+is the design: the quest screen nearly stops the city and nearly darkens it,
+because that is the screen where somebody is trying to think and motion behind
+text is a tax on reading it.
+
+## 2026-09-11 — FE: exponential easing is the house curve
+
+`engine/ease.ts` gains `expInOut`; `engine/motion.ts` holds every duration in
+the game in one table, plus `Tween` and `Chase`. No scene picks a duration out
+of the air — six screens each choosing their own is how a game ends up feeling
+assembled rather than designed.
+
+Expo is almost still, then very fast, then almost still. That shape needs
+*longer* than a cubic to read as deliberate rather than abrupt: a screen
+change is 0.62 s where a cubic would be fine at 0.3 s. `prefers-reduced-motion`
+cuts every duration to a quarter rather than to zero — someone who asked for
+less animation still needs to see *what changed*.
+
+Nothing in the render path reads the wall clock; every tween is driven by the
+`dt` it is handed. That is what makes `dev/capture.ts` able to step the game at
+a fixed 1/60 and get the same frame every run.
+
+## 2026-09-11 — FE: the capture hook, for screenshots and for QA
+
+A canvas game never stops changing, so a screenshot tool that waits for the
+page to be idle waits for ever — Playwright's own screenshot call times out on
+this app, frozen or not. `src/dev/capture.ts` exposes `window.__cwbCapture`
+with `freeze`/`resume`/`step`/`settle`/`orient`/`png`, and `?freeze=1` brings
+the page up already settled and stopped.
+
+It is dev **and** e2e, not dev alone: QA needs it in a *built* bundle, so the
+guard is `import.meta.env.DEV || import.meta.env.VITE_E2E === "1"` and there is
+an `npm run build:e2e` that emits `dist-e2e/`. The production build contains
+neither the hook nor the mock, which is checked by grepping `dist/` for their
+sentinels.
+
+`png()` re-draws the DOM overlay — the seed field and the CodeMirror editor —
+into the composite, because a canvas cannot composite a DOM element and a shot
+of the quest screen without its editor would be missing the point of the
+screen. It is a *rendering*, not a screengrab: no caret, no selection, no
+syntax colour. It skips the overlay entirely when a modal has hidden it, so a
+capture never shows a z-order bug that is not there.
+
+## 2026-09-11 — FE: a socket that has been replaced must stop talking
+
+Logging out closes one websocket and opens the next in the same turn. A real
+websocket reports its close on a later task, so the *old* socket's `onClose`
+arrived after the new connection was already up, knocked the client back to
+`offline`, and scheduled a reconnect for a connection nobody had lost. On
+screen that was a red CONNECTION LOST — RECONNECTING banner across the login
+screen the player had just asked for — found by looking at a screenshot, not
+by reading the code.
+
+`Client.connect()` now stamps each transport with a generation number and
+ignores `onOpen`/`onMessage`/`onClose` from any transport that is no longer the
+current one; `close()` bumps the same counter. Because a deliberate close can
+no longer rely on its own socket's callback, `close()` fails the requests that
+were riding on it directly (`failPending`), which is what §6.6 asks for. There
+is a test for the exact ordering — close, connect, *then* the first socket's
+close arrives.
+
+The app suppresses the offline toast for the one close it asked for. Both
+halves are needed: the flag catches the synchronous transition, the generation
+catches the late one.
+
+## 2026-09-11 — FE: the flat path is walkable, not merely believed in
+
+`Backdrop.create()` returning `null` is the whole second look at this game and
+claiming it "degrades silently" without ever seeing it is not evidence. In dev,
+`?nogl=1` forces that path. Walking it found that `MapScene` cleared the canvas
+to transparent on the assumption that WebGL was behind it, which on the flat
+path left the map floating on the page background; every scene now goes through
+`App.clear`, which fills when there is no backdrop and clears when there is.
+
+## 2026-09-11 — Screenshots stay out of the tree
+
+`frontend/shots/` is 6.6 MB of PNGs regenerable from the `__cwbCapture` hook.
+Gitignored: they would churn on every visual change and bloat every future
+diff, and a screenshot in git goes stale silently — it keeps looking like
+evidence long after it stops being true. Regenerate them to review; do not
+archive them.
+
+## 2026-09-11 — Seen with eyes, not read from code
+
+The lead looked at six of FE's 26 shots. What the capture hook bought, beyond
+unblocking QA: the login screen's explanatory slab has no panel frame while
+everything beside it does; the CLEARED stamp lands across the star row rather
+than beside it; both result panels are 50/50 while their content is 10/90; the
+map plate shows a five-star difficulty row two screens away from a three-star
+earned row, and nothing tells the player they are different scales; and an
+internal `attempt att_…` id is on the victory screen.
+
+None of these are visible in the source. All of them are obvious in a PNG.

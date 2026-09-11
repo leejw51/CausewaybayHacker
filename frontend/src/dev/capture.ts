@@ -58,6 +58,11 @@ export interface CaptureApi {
  * shot should know that; it is stated wherever these are published.
  */
 function paintOverlay(app: App, g: CanvasRenderingContext2D): void {
+  // The overlay host is hidden outright while a modal is up, so that the
+  // canvas-drawn dialogue is genuinely on top. A capture that painted the
+  // editor anyway would show a bug that is not there — worse than showing one
+  // that is, because it sends someone looking for it.
+  if (getComputedStyle(app.overlay).visibility === "hidden") return;
   const host = app.overlay.getBoundingClientRect();
   const dpr = app.canvas.width / Math.max(1, app.canvas.clientWidth);
   for (const el of Array.from(app.overlay.children) as HTMLElement[]) {

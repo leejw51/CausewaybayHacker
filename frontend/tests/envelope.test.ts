@@ -348,6 +348,34 @@ describe("§8 conformance, the parts that are the client's", () => {
     expect(h.client.needsLogin).toBe(true);
   });
 
+  it("ignores a socket that closes after it has been replaced", async () => {
+    // The logout shape: close one socket, open the next in the same turn. A
+    // real websocket reports its close a task later, so the late callback has
+    // to be dropped or it takes the new connection down with it.
+    let handlers: TransportHandlers | null = null;
+    const closed: Array<() => void> = [];
+    const client = new Client({
+      transport: (h) => {
+        handlers = h;
+        const mine = h;
+        queueMicrotask(() => mine.onOpen());
+        return { send: () => {}, close: () => closed.push(() => mine.onClose("gone")) };
+      },
+      storage: memoryStorage(),
+      keepalive: false,
+    });
+    client.connect();
+    await client.waitFor("open");
+    const first = handlers;
+    client.close();
+    client.connect();
+    await client.waitFor("open");
+    expect(handlers).not.toBe(first);
+    // Now the first socket finally reports its close.
+    for (const late of closed) late();
+    expect(client.state).toBe("open");
+  });
+
   it("§2.1 keeps the connection when the server speaks another version", async () => {
     const h = harness();
     h.client.connect();

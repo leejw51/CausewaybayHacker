@@ -220,9 +220,10 @@ export class MapScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     const accent = this.land === "rust" ? RUST : GO;
-    // The WebGL sky is already behind; the 2D layer only needs to not paint
-    // over it, so the backdrop here is transparent rather than a fill.
-    g.clearRect(0, 0, layout.vw, layout.vh);
+    // The WebGL sky is already behind, so this clears rather than fills — but
+    // only when there *is* one. Without WebGL the same call would leave the
+    // map floating on the page background, so the app decides.
+    this.app.clear(g, Theme.void);
     this.plate = this.mapPlate();
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
