@@ -115,7 +115,17 @@ test("the seed never crosses the wire", async ({ page }) => {
   await expect(page.locator("textarea.cwb-field")).toHaveCount(0);
 });
 
-test("RUST × BASIC opens a map, and only the first node is open", async ({ page }) => {
+test("RUST × BASIC opens a map, and every node on it is playable", async ({ page }) => {
+  // This test used to assert "node 1 is open, the rest are locked". §4.7
+  // changed that — "**Every node is playable. Nothing is locked.** … This is
+  // a trainer, not a platformer" — so the old assertion is wrong, and simply
+  // deleting it would leave a test that checks a map exists.
+  //
+  // The inverse is the real assertion and it has teeth: a fresh player, who
+  // has cleared nothing, can open the **last** street on the map. That is
+  // §4.7's own worked reason — an interview on Thursday, the dynamic
+  // programming street on Tuesday, without eighteen quests about `&str`
+  // first.
   const account = freshAccount();
   await login(page, account);
   await pickFirstCategory(page);
@@ -127,13 +137,24 @@ test("RUST × BASIC opens a map, and only the first node is open", async ({ page
     const nodes = await wire.map();
     expect(nodes.length, "the rust/basic map has nodes").toBeGreaterThanOrEqual(3);
     const byNode = [...nodes].sort((a, b) => a.node - b.node);
-    expect(byNode[0].state, "SPEC §12: an empty `requires` is open from the start").toBe(
-      "open",
-    );
+
     expect(
-      byNode.slice(1).every((n) => n.state === "locked"),
-      "a new player was handed more than the first street",
+      byNode.filter((n) => (n.state as string) === "locked").map((n) => n.quest_id),
+      "§5.2: `state` is `open` or `cleared`, never `locked`",
+    ).toEqual([]);
+    expect(
+      byNode.every((n) => n.state === "open"),
+      "a brand-new player's map already has something cleared on it",
     ).toBe(true);
+    expect(byNode.every((n) => n.stars === 0)).toBe(true);
+
+    // The suggested route is still described — the map draws it, and "where
+    // do I go next" is a real question. Advice, not a gate.
+    const map = await wire.ok("world.map", { land: "rust", category: "basic" });
+    expect(
+      (map.edges as unknown[]).length,
+      "§4.7: `edges` still describe the suggested route",
+    ).toBeGreaterThan(0);
   } finally {
     wire.close();
   }

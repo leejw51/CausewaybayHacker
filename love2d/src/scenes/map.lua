@@ -31,6 +31,19 @@ local Ease = require("src.ease")
 local Map = {}
 Map.__index = Map
 
+-- The two lands and the three categories, in SPEC §0's order.
+local LANDS = { "rust", "go" }
+local CATEGORIES = { "basic", "advanced", "hacker" }
+local MASCOT = { rust = "sprite_ferris", go = "sprite_gogo" }
+
+--- Where the player was, per map, keyed `land.category`.
+---
+--- Module-level rather than per-scene, because the scene is rebuilt every
+--- time the map is entered and "come back to where I was" has to survive
+--- that. The same idea as `CausewaybayGolang`'s `Game.trackQuest`, which
+--- remembers the quest last visited in each language track.
+Map.last_node = {}
+
 function Map.new(app)
   return setmetatable({
     app = app,
@@ -64,6 +77,74 @@ end
 function Map:leave()
   self.app.session:off_all(self.subscriptions)
   self.subscriptions = nil
+end
+
+function Map:key()
+  return self.land .. "." .. self.category
+end
+
+--- Switch to another map without leaving the screen.
+---
+--- `world.map` is one cheap call, so looking costs nothing and is entirely
+--- reversible — which is the point. Before the gates came off, reaching
+--- HACKER was ESC → lands → land → category; the gate is gone but that
+--- friction would have stayed.
+---
+--- **A cut, not a walk.** Mei is standing on a node of the map being left;
+--- on the next map she is somewhere else entirely, and animating a figure
+--- between two different overworlds would be nonsense. The walk is for moving
+--- *within* a map. `CausewaybayGolang`'s `Game:setQuest` does the same thing
+--- — it nils `mapHeroX/Y` and clears `mapWalking` on a track change.
+function Map:switch(land, category)
+  land = land or self.land
+  category = category or self.category
+  if land == self.land and category == self.category then return end
+
+  -- Remember where the player was on the map being left.
+  local here = self:node_at(self.cursor)
+  if here then Map.last_node[self:key()] = here.quest_id end
+
+  self.land, self.category = land, category
+  self.app.land, self.app.category = land, category
+
+  -- The cut.
+  self.walk = nil
+  self.at = nil
+  self.nodes = nil
+  self.by_id = {}
+  self.edges = {}
+  self.adjacency = nil
+  self.stamped = {}
+  self.switched_at = self.t
+
+  SFX.play("select")
+  self.app:toast(("%s / %s"):format(land:upper(), category:upper()))
+  self:refresh()
+end
+
+--- TAB — the other land, **keeping the category**.
+---
+--- Somebody comparing how Rust and Go do concurrency wants to land on the
+--- concurrency map, not at the top of GO BASIC.
+function Map:cycle_land()
+  for i, land in ipairs(LANDS) do
+    if land == self.land then
+      self:switch(LANDS[i % #LANDS + 1], self.category)
+      return
+    end
+  end
+  self:switch(LANDS[1], self.category)
+end
+
+--- Q — the next category of this land, wrapping. One action, not two.
+function Map:cycle_category()
+  for i, category in ipairs(CATEGORIES) do
+    if category == self.category then
+      self:switch(self.land, CATEGORIES[i % #CATEGORIES + 1])
+      return
+    end
+  end
+  self:switch(self.land, CATEGORIES[1])
 end
 
 function Map:refresh()
@@ -100,12 +181,18 @@ function Map:refresh()
       for i, node in ipairs(self.nodes) do
         self.by_id[node.quest_id] = i
       end
-      -- Every node is playable now, so "where was I" is the only useful
-      -- question: the earliest one not yet cleared, which is where the
-      -- suggested route has got to.
+      -- Where was I? The node this map was left on, if the player has been
+      -- here before; otherwise the earliest one not yet cleared, which is
+      -- where the suggested route has got to.
       self.cursor = 1
-      for i, node in ipairs(self.nodes) do
-        if node.state ~= "cleared" then self.cursor = i; break end
+      local remembered = Map.last_node[self:key()]
+      local found = remembered and self.by_id[remembered]
+      if found then
+        self.cursor = found
+      else
+        for i, node in ipairs(self.nodes) do
+          if node.state ~= "cleared" then self.cursor = i; break end
+        end
       end
       self.cursor = math.max(1, math.min(#self.nodes, self.cursor))
       -- She appears where the player left off rather than walking in from
@@ -335,22 +422,7 @@ function Map:draw()
   self:draw_nodes()
   self:draw_mei()
 
-  -- The header band.
-  local tint = Theme.land[self.land] or Theme.coin
-  UI.setColor(Theme.ink, 0.85)
-  love.graphics.rectangle("fill", 0, 0, vw, 56)
-  love.graphics.setColor(1, 1, 1, 1)
-  local s = Layout.uiScale()
-  UI.text(("%s / %s"):format(self.land:upper(), self.category:upper()),
-    12, 12, math.floor(13 * s), tint)
-
-  local cleared, total = 0, 0
-  for _, node in ipairs(self.nodes or {}) do
-    total = total + 1
-    if node.state == "cleared" then cleared = cleared + 1 end
-  end
-  local progress = ("%d / %d CLEARED"):format(cleared, total)
-  UI.text(progress, vw - 12 - UI.textWidth(progress, 10), 14, 10, Theme.cream)
+  self:draw_header()
 
   local node = self:node_at(self.cursor)
   if node then
@@ -364,7 +436,79 @@ function Map:draw()
 
   self.app:footer(self.walk
     and "ANY KEY skip"
-    or "ARROWS node   ENTER play   S search   T stats   A ai   ESC back")
+    or "ARROWS node   ENTER play   TAB land   Q category   S search   T stats   ESC back")
+end
+
+--- The header: two land buttons, three category tabs, the count.
+---
+--- The switch has to be **visible**. A keybinding nobody can see is not a
+--- feature, and the whole reason for this row is that reaching HACKER used to
+--- cost a trip out to two other screens. `CausewaybayGolang` puts "the three
+--- big buttons" for its language tracks on its map for the same reason; these
+--- are the same idea with this game's two lands and three categories.
+function Map:draw_header()
+  local vw = Layout.vw
+  local scale = Layout.uiScale()
+  local h = 56
+  UI.setColor(Theme.ink, 0.88)
+  love.graphics.rectangle("fill", 0, 0, vw, h)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  self.land_rects = {}
+  self.category_rects = {}
+
+  -- The lands, each with its mascot, so the button is recognised before it is
+  -- read (docs/art.md §4.1).
+  local x = 10
+  local bw, bh = math.min(92, math.floor(vw * 0.13)), 38
+  for _, land in ipairs(LANDS) do
+    local on = land == self.land
+    local tint = Theme.land[land] or Theme.coin
+    UI.setColor(on and tint or Theme.withAlpha(Theme.dim, 0.45))
+    love.graphics.rectangle("fill", x, 9, bw, bh)
+    love.graphics.setLineWidth(2)
+    UI.setColor(on and Theme.cream or Theme.withAlpha(Theme.cream, 0.3))
+    love.graphics.rectangle("line", x + 1, 10, bw - 2, bh - 2)
+    love.graphics.setColor(1, 1, 1, 1)
+    Assets.sprite(MASCOT[land], x + 18, 9 + bh - 4, bh - 10,
+      { alpha = on and 1 or 0.45 })
+    UI.text(land:upper(), x + 32, 9 + (bh - 10) / 2, 10,
+      on and Theme.ink or Theme.withAlpha(Theme.cream, 0.55))
+    self.land_rects[land] = { x = x, y = 9, w = bw, h = bh }
+    x = x + bw + 6
+  end
+
+  UI.text("TAB", x - 2, 9, 7, Theme.withAlpha(Theme.cream, 0.4))
+  x = x + 22
+
+  -- The categories.
+  local cw = math.min(96, math.floor((vw - x - 120) / #CATEGORIES) - 4)
+  for _, category in ipairs(CATEGORIES) do
+    local on = category == self.category
+    UI.setColor(on and Theme.panel or Theme.withAlpha(Theme.dim, 0.4))
+    love.graphics.rectangle("fill", x, 14, cw, 28)
+    love.graphics.setLineWidth(2)
+    UI.setColor(on and Theme.coin or Theme.withAlpha(Theme.cream, 0.25))
+    love.graphics.rectangle("line", x + 1, 15, cw - 2, 26)
+    love.graphics.setColor(1, 1, 1, 1)
+    local label = category:upper()
+    UI.text(label, x + (cw - UI.textWidth(label, 8)) / 2, 23, 8,
+      on and Theme.ink or Theme.withAlpha(Theme.cream, 0.6))
+    self.category_rects[category] = { x = x, y = 14, w = cw, h = 28 }
+    x = x + cw + 4
+  end
+  UI.text("Q", x + 2, 21, 7, Theme.withAlpha(Theme.cream, 0.4))
+
+  local cleared, total = 0, 0
+  for _, node in ipairs(self.nodes or {}) do
+    total = total + 1
+    if node.state == "cleared" then cleared = cleared + 1 end
+  end
+  local progress = ("%d / %d CLEARED"):format(cleared, total)
+  local pw = UI.textWidth(progress, math.floor(10 * scale))
+  if vw - 10 - pw > x + 16 then
+    UI.text(progress, vw - 10 - pw, 20, math.floor(10 * scale), Theme.cream)
+  end
 end
 
 function Map:draw_edges()
@@ -626,6 +770,8 @@ function Map:keypressed(key)
   if key == "up" then self:step(0, -1); return true end
   if key == "down" then self:step(0, 1); return true end
   if key == "return" or key == "kpenter" or key == "space" then self:open_node(); return true end
+  if key == "tab" then self:cycle_land(); return true end
+  if key == "q" then self:cycle_category(); return true end
   if key == "r" then self:refresh(); return true end
   if key == "s" then self.app:go("search"); return true end
   if key == "t" then self.app:go("stats"); return true end
@@ -634,6 +780,15 @@ function Map:keypressed(key)
 end
 
 function Map:mousepressed(x, y)
+  local function inside(r)
+    return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
+  end
+  for land, rect in pairs(self.land_rects or {}) do
+    if inside(rect) then self:switch(land, self.category); return end
+  end
+  for category, rect in pairs(self.category_rects or {}) do
+    if inside(rect) then self:switch(self.land, category); return end
+  end
   if not self.nodes then return end
   for i, node in ipairs(self.nodes) do
     local nx, ny = self:node_xy(node)

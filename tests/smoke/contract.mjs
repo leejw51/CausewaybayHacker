@@ -1212,7 +1212,30 @@ check("8.10", "a second quest.submit while one is in flight is busy", async () =
       "busy",
       "§3.2: the second concurrent submit on one connection",
     );
+    // §4.9b: runs and submits share the one-execution rule, so the pair that
+    // matters is the *mixed* one. A server that keeps two locks — one for
+    // runs, one for submits — passes submit-then-submit and then compiles two
+    // programs at once the first time a player presses RUN while a SUBMIT is
+    // still going.
+    assertErr(
+      await cl.send("quest.run", { ...body, source: WRONG_SOURCE }),
+      "busy",
+      "§4.9b: a run while a submit is in flight",
+    );
     assertEq((await first).type, "quest.submit.ok", "the first submit still finished");
+
+    const running = cl.send("quest.run", body);
+    assertErr(
+      await cl.send("quest.submit", { ...body, source: WRONG_SOURCE }),
+      "busy",
+      "§4.9b: a submit while a run is in flight — the other half of the pair",
+    );
+    assertErr(
+      await cl.send("quest.run", { ...body, source: WRONG_SOURCE }),
+      "busy",
+      "§4.9b: a run while a run is in flight",
+    );
+    assertEq((await running).type, "quest.run.ok", "the first run still finished");
 
     // §3.2: "This is per connection, not per user" — the same wallet in two
     // windows gets two slots, and the server serialises the compiler behind
@@ -1715,6 +1738,140 @@ check(null, "beyond: what is not built says so, and what is built is judged", as
       "bad_request",
       "§4.9: lang disagreeing with the quest's land",
     );
+  } finally {
+    cl.close();
+  }
+});
+
+check(null, "beyond: a run is for the player, a submit is for the record", async () => {
+  // PROTOCOL.md §4.9b. The invariant here is **asymmetric**, and it is easy
+  // to get backwards in either direction:
+  //
+  //   a run does NOT count toward the node's `attempts` or the accuracy,
+  //   a run DOES put its mistakes into the curriculum.
+  //
+  // A query that forgets `mode` overstates how much the player is failing —
+  // iterating honestly starts to look like flailing, and the stars go with
+  // it. A query that filters runs out of `mistakes` understates what they are
+  // actually struggling with, and SPEC §7 builds the drills from that table,
+  // so the AI mode would train on the tidied-up version of their week.
+  //
+  // So: many runs, one submit, and count both sides.
+  const cl = await session(freshAccount("runmode"), "run");
+  try {
+    const { node, quest } = await firstOpenQuest(cl);
+    const right = rightSourceFor(quest);
+    const body = { quest_id: node.quest_id, lang: "rust" };
+
+    const before = await cl.send("stats.summary", {});
+    const beforeMistakes = (await cl.send("stats.mistakes", { limit: 50 })).payload
+      .mistakes.reduce((s, m) => s + m.count, 0);
+
+    // Five runs that fail the way a player iterating fails: a compile error,
+    // then wrong output. Five rather than twenty because each one is a real
+    // `rustc`, and the invariant does not get truer at twenty.
+    const RUNS = 5;
+    for (let i = 0; i < RUNS; i++) {
+      const r = await cl.send("quest.run", {
+        ...body,
+        source:
+          i % 2 === 0
+            ? "fn main() { let x: i32 = \"nope\"; }"
+            : `fn main() { println!("iteration {i}"); }`,
+      });
+      assertEq(r.type, "quest.run.ok", `run ${i}`);
+      const a = r.payload.attempt;
+      assertEq(a.mode, "run", "§5.4: an Attempt from quest.run carries mode: run");
+      assertEq(a.cleared, false, "§4.9b: a run never clears a node");
+      assertEq(a.stars, 0, "§4.9b: a run never awards stars");
+      // §4.9b: only the visible cases run, and a run must not leak whether
+      // the hidden ones pass — not in `cases`, and not in the counts.
+      const visible = quest.tests.visible.length;
+      assertEq(
+        a.tests_total,
+        visible,
+        `§4.9b: a run counts the ${visible} visible case(s), not the hidden ones`,
+      );
+      assert(
+        a.cases.every((c) => c.visible),
+        "§4.9b: a run reported a hidden case, which is what submitting is for",
+      );
+      assert(
+        a.tests_passed <= visible,
+        "a run passed more cases than it ran",
+      );
+    }
+
+    // No progress.update followed any of them.
+    assertEq(
+      cl.events.filter((e) => e.type === "progress.update").length,
+      0,
+      "§4.9b: a run must not announce progress",
+    );
+
+    // The node has seen no attempts at all yet.
+    const midway = (await cl.send("world.map", { land: "rust", category: "basic" })).payload
+      .nodes.find((n) => n.quest_id === node.quest_id);
+    assertEq(
+      midway.attempts,
+      0,
+      `§4.9b: ${RUNS} runs counted toward the node's \`attempts\`; iterating ` +
+        "honestly must not look like failing repeatedly",
+    );
+    assertEq(midway.state, "open", "a run cleared the node");
+
+    // ...but the curriculum has them. This is the half that quietly rots:
+    // nothing else in the suite would notice if runs stopped being recorded.
+    const afterRunsMistakes = (await cl.send("stats.mistakes", { limit: 50 })).payload
+      .mistakes.reduce((s, m) => s + m.count, 0);
+    assert(
+      afterRunsMistakes > beforeMistakes,
+      "§4.9b: the mistakes a player made while iterating never reached the " +
+        "curriculum. SPEC §7 builds the drills from that table, so the AI " +
+        "mode would be training on the tidied-up version of their week.",
+    );
+    const runHistory = (await cl.send("stats.history", { quest_id: node.quest_id }))
+      .payload.attempts;
+    assertEq(runHistory.length, RUNS, "§4.9b: a run is still recorded");
+
+    // Now one submit, and the node's counter moves by exactly one.
+    const done = await cl.send("quest.submit", { ...body, source: right ?? WRONG_SOURCE });
+    assertEq(done.type, "quest.submit.ok", "the submit");
+    assertEq(done.payload.attempt.mode, "submit", "§5.4: mode on a submit");
+
+    const after = (await cl.send("world.map", { land: "rust", category: "basic" })).payload
+      .nodes.find((n) => n.quest_id === node.quest_id);
+    assertEq(
+      after.attempts,
+      1,
+      `§4.9b: ${RUNS} runs then one submit must leave the node at 1 attempt, ` +
+        `got ${after.attempts}`,
+    );
+
+    // And the accuracy is computed over submits only. With one submit, it is
+    // either 0 or 1 — anything between means the runs were counted.
+    const summary = (await cl.send("stats.summary", {})).payload;
+    assert(
+      summary.accuracy === 0 || summary.accuracy === 1,
+      `§4.9b: accuracy is ${summary.accuracy} after exactly one submit, so ` +
+        "the runs are in the denominator",
+    );
+    assertEq(
+      summary.attempts - before.payload.attempts,
+      1,
+      "§4.9b: stats.summary counted the runs as attempts",
+    );
+
+    // If the submit was right, the stars are the clean-clear grade — the runs
+    // did not spend them.
+    if (done.payload.attempt.verdict === "accepted") {
+      assertEq(
+        done.payload.attempt.stars,
+        3,
+        `§6.3 + §4.9b: ${RUNS} runs before a first-time clear cost a star; ` +
+          "a run is not a failed attempt",
+      );
+    }
   } finally {
     cl.close();
   }

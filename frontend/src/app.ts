@@ -515,12 +515,17 @@ export class App {
     this.scene?.resized?.();
   }
 
+  /**
+   * Force an orientation for this window, without recording it as a *choice*.
+   *
+   * The only caller is the capture hook, and the capture hook is not the
+   * player: a screenshot run that wrote `chosen,landscape,…` into localStorage
+   * would leave a real preference behind on whatever machine took the shots.
+   * F1 saves; this does not.
+   */
   setOrientation(mode: Orientation): void {
-    // Forced, for this window: the capture hook asks for a landscape shot in a
-    // tall window and must actually get one.
     this.layout.pin(mode);
     this.remeasure();
-    this.saveOrientation();
   }
 
   /**

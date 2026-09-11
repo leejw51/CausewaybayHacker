@@ -1,38 +1,20 @@
 ==================
 WARNING: DATA RACE
-Read at 0x00c0000bc038 by goroutine 8:
+Read at 0x00c000114038 by goroutine 7:
   main.main.func1()
       <work>/main.go:17 +0x68
 
-Previous write at 0x00c0000bc038 by goroutine 7:
+Previous write at 0x00c000114038 by goroutine 105:
   main.main.func1()
       <work>/main.go:17 +0x78
 
-Goroutine 8 (running) created at:
+Goroutine 7 (running) created at:
   main.main()
       <work>/main.go:15 +0x6c
 
-Goroutine 7 (finished) created at:
-  main.main()
-      <work>/main.go:15 +0x6c
-==================
-==================
-WARNING: DATA RACE
-Write at 0x00c0000bc038 by goroutine 8:
-  main.main.func1()
-      <work>/main.go:17 +0x78
-
-Previous write at 0x00c0000bc038 by goroutine 10:
-  main.main.func1()
-      <work>/main.go:17 +0x78
-
-Goroutine 8 (running) created at:
-  main.main()
-      <work>/main.go:15 +0x6c
-
-Goroutine 10 (finished) created at:
+Goroutine 105 (finished) created at:
   main.main()
       <work>/main.go:15 +0x6c
 ==================
-Found 2 data race(s)
+Found 1 data race(s)
 exit status 66

@@ -62,6 +62,7 @@ official release from GitHub instead, and `make run` will use a `love` on
 | **F3** / **F4** | scanlines · sound |
 | **F5** / **F10** | in a quest: **RUN** · **SUBMIT** — see below |
 | **F6** … **F9** | in a quest: reset · hint · log · `$EDITOR` |
+| **TAB** / **Q** | on the map: switch land · switch category |
 | **TAB** / **ESC** | indent · back |
 
 `F` is only a shortcut on screens that are not taking text; in the editor and
@@ -96,6 +97,17 @@ making you wait for a round trip to learn it.
 The paths and the node order are the *suggested* route — the order the content
 was written to be learned in — so the map still draws them and the node card
 still says `SUGGESTED AFTER …`, but it is advice and the player decides.
+
+**Switch land and category from the map itself** — **TAB** for the land,
+**Q** for the category, or click the two land buttons and the three category
+tabs in the header. A land switch **keeps the category**, so comparing how
+Rust and Go do concurrency lands you on the concurrency map rather than at the
+top of GO BASIC. Each map remembers the node you left it on, and switching is
+one `world.map` call, so looking costs nothing and is entirely reversible.
+
+The keys are the sibling's: `CausewaybayGolang` switches its three language
+tracks with TAB and its quests with Q, and a player who has used it already
+knows them.
 
 Picking a node walks **Mei** there along the drawn path, on an exponential
 ease-in-out: almost still, then fast, then almost still. It is capped at

@@ -261,8 +261,8 @@ export async function openSelectedNode(page: Page): Promise<void> {
   }
   throw new Error(
     "Enter never opened a node. Either the map is still empty (`world.map` " +
-      "did not answer) or the selected node is locked — `map.open()` refuses " +
-      "a locked node with 'clear the street before it first'.",
+      "did not answer) or the node could not be opened for some other reason. " +
+      "§4.7 means it will not be because it is locked: every node is playable.",
   );
 }
 
@@ -319,7 +319,7 @@ export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string 
   if (!shown) return null;
   for (const land of ["rust", "go"] as const) {
     for (const node of await wire.mapOf(land)) {
-      if (node.state === "locked") continue;
+
       const got = await wire.ok("quest.get", { quest_id: node.quest_id });
       const starter = flatten(String((got.quest as { starter?: string }).starter ?? ""));
       if (starter && starter === shown) return node.quest_id;
@@ -524,7 +524,8 @@ export interface MapNode {
   quest_id: string;
   node: number;
   title: string;
-  state: "locked" | "open" | "cleared";
+  /** §5.2: `open` or `cleared`. Never `locked` — §4.7, every node is playable. */
+  state: "open" | "cleared";
   stars: 0 | 1 | 2 | 3;
 }
 interface QuestShape {

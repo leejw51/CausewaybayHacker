@@ -645,15 +645,37 @@ export class QuestScene implements Scene {
       : a.verdict === "accepted"
         ? "THE SAMPLE DOES NOT MATCH YET"
         : VERDICT_LINE[a.verdict];
+    // The hidden count is on both paths. "what a run did and did not check" is
+    // the whole point of the strip, and it is *more* important when the sample
+    // failed — that is exactly when somebody might think they have seen the
+    // worst of it.
+    const notRun =
+      hidden > 0 ? ` · ${hidden} hidden ${hidden === 1 ? "case" : "cases"} not run` : "";
     const detail = ok
       ? hidden > 0
-        ? `${a.tests_passed}/${a.tests_total} sample cases · ${hidden} hidden ${hidden === 1 ? "case was" : "cases were"} not run — press SUBMIT to check ${hidden === 1 ? "it" : "them"}`
+        ? `${a.tests_passed}/${a.tests_total} sample cases${notRun} — press SUBMIT to check ${hidden === 1 ? "it" : "them"}`
         : `${a.tests_passed}/${a.tests_total} sample cases — press SUBMIT to record it`
       : failed
-        ? `${failed.name} · expected ${show(failed.expect ?? "")} · got ${show(failed.got ?? "")}`
-        : `${a.tests_passed}/${a.tests_total} sample cases`;
+        ? `${failed.name} · expected ${show(failed.expect ?? "")} · got ${show(failed.got ?? "")}${notRun}`
+        : `${a.tests_passed}/${a.tests_total} sample cases${notRun}`;
 
-    const lines = wrap(fonts.codeSm, detail, w - pad * 2);
+    // Clamped, twice. `expect` and `got` are arbitrary program output: a
+    // program that prints a paragraph wraps to six lines here, and an
+    // unclamped strip would paint straight over the button row it sits above
+    // — the same failure a card sized for one row and drawn with two has.
+    // Three lines, and never more than three fifths of the drawer.
+    const all = wrap(fonts.codeSm, detail, w - pad * 2);
+    const room = Math.max(
+      1,
+      Math.floor(
+        (rect[3] * 0.6 - pad * 2 - fonts.stationSm.height - Math.round(4 * s)) /
+          fonts.codeSm.height,
+      ),
+    );
+    const lines = all.slice(0, Math.max(1, Math.min(3, room)));
+    if (all.length > lines.length && lines.length > 0) {
+      lines[lines.length - 1] = lines[lines.length - 1].replace(/.{0,2}$/u, "…");
+    }
     const h =
       pad * 2 + fonts.stationSm.height + Math.round(4 * s) + lines.length * fonts.codeSm.height;
     const accent = ok ? Theme.cyan : Theme.red;
@@ -663,15 +685,11 @@ export class QuestScene implements Scene {
     g.fillStyle = css(accent);
     printf(g, fonts.stationSm, `RUN · ${head}`, x + pad, y + pad, w - pad * 2, "left");
     g.fillStyle = css(Theme.cream, 0.85);
-    printf(
-      g,
-      fonts.codeSm,
-      detail,
-      x + pad,
-      y + pad + fonts.stationSm.height + Math.round(4 * s),
-      w - pad * 2,
-      "left",
-    );
+    let ly = y + pad + fonts.stationSm.height + Math.round(4 * s);
+    for (const line of lines) {
+      printf(g, fonts.codeSm, line, x + pad, ly, w - pad * 2, "left");
+      ly += fonts.codeSm.height;
+    }
     return h + Math.round(4 * s);
   }
 

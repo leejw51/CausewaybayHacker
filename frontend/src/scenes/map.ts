@@ -27,7 +27,7 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, printf } from "../engine/text";
 import { css, Theme, TRACK_HAZE } from "../engine/theme";
-import { clipped, fill, panel, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, clipped, fill, panel, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import {
   clearRibbon,
   clearedStamp,
@@ -36,6 +36,7 @@ import {
   footer,
   header,
   stars as drawStars,
+  Buttons,
   GO,
   RUST,
 } from "../ui/chrome";
@@ -46,6 +47,15 @@ import { QuestScene } from "./quest";
 
 /** The overworld art, per land. Two places, not one plate and a tint. */
 const PLATE: Record<Land, string> = { rust: "map_rust", go: "map_go" };
+
+/**
+ * The six maps, laid out the way the switcher shows them: two lands across
+ * three categories. The order is the order of the bar and the order the keys
+ * cycle in, and there is one of each so the player can see all six places from
+ * any one of them.
+ */
+const LANDS: readonly Land[] = ["rust", "go"];
+const CATEGORIES: readonly Category[] = ["basic", "advanced", "hacker"];
 
 /**
  * The face at the end of each category, keyed by the quest it guards.
@@ -82,6 +92,8 @@ export class MapScene implements Scene {
   /** Each node's arrival, staggered, so the overworld assembles itself. */
   private pops: Tween[] = [];
   private readonly plateIn = new Tween(seconds("panel"));
+  /** The land/category switcher's hit rects, rebuilt every frame from `bar()`. */
+  private readonly bar = new Buttons();
   private readonly infoIn = new Tween(seconds("panel"), seconds("stagger") * 2);
   private offProgress: (() => void) | null = null;
   private offState: (() => void) | null = null;
@@ -122,8 +134,13 @@ export class MapScene implements Scene {
 
   constructor(
     private readonly app: App,
-    readonly land: Land,
-    readonly category: Category,
+    // Not `readonly`: the switcher changes which of the six maps this screen is
+    // showing without leaving the screen. Going back to the lands screen to
+    // reach the dynamic-programming street is the friction the unlocking was
+    // supposed to remove. `land` stays public because `Scene.land` is what the
+    // city behind the screen is tinted from — and it has to follow the switch.
+    public land: Land,
+    private category: Category,
   ) {}
 
   async enter(): Promise<void> {
@@ -259,10 +276,165 @@ export class MapScene implements Scene {
     else gl.map.aim(n?.x ?? 0.5, n?.y ?? 0.5, this.zoom);
   }
 
+  // -- the switcher --------------------------------------------------------
+
+  /**
+   * Where the five buttons go, and how tall the strip they need is.
+   *
+   * Measured, then laid out, then reported — `mapPlate` subtracts the height
+   * this returns, so the overworld is never drawn underneath the bar. When the
+   * five will not fit on one line (a narrow phone in portrait) it becomes two,
+   * lands over categories, rather than shrinking the labels to initials: the
+   * whole point of the strip is that a player can read where the other five
+   * maps are.
+   */
+  private barLayout(): { h: number; rows: Rect[] } {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const f = ensureFonts(s).button;
+    const gap = Math.round(f.size * 0.5);
+    const pad = f.size * 2;
+    const minH = layout.minTouchH();
+    const bh = btnBox(f, ["BASIC"], 0, pad, minH)[1];
+    const wide = layout.vw - Math.round(16 * s);
+    const landW = LANDS.map((l) => btnBox(f, [l.toUpperCase()], 0, pad, minH)[0]);
+    const catW = CATEGORIES.map((c) => btnBox(f, [c.toUpperCase()], 0, pad, minH)[0]);
+    const sum = (a: number[]) => a.reduce((x, y) => x + y, 0) + gap * (a.length - 1);
+    // A wider gap between the two groups than inside them: "which land" and
+    // "which road" are two questions, and a row of five evenly spaced buttons
+    // reads as one list of five.
+    const split = gap * 3;
+    const oneLine = sum(landW) + split + sum(catW) <= wide;
+    const x0 = Math.round(8 * s);
+    if (oneLine) {
+      const total = sum(landW) + split + sum(catW);
+      let x = x0 + Math.round((wide - total) / 2);
+      const rows: Rect[] = [];
+      for (const w of landW) {
+        rows.push([x, 0, w, bh]);
+        x += w + gap;
+      }
+      x += split - gap;
+      for (const w of catW) {
+        rows.push([x, 0, w, bh]);
+        x += w + gap;
+      }
+      return { h: bh, rows };
+    }
+    const rows: Rect[] = [];
+    let x = x0 + Math.round((wide - sum(landW)) / 2);
+    for (const w of landW) {
+      rows.push([x, 0, w, bh]);
+      x += w + gap;
+    }
+    x = x0 + Math.round((wide - sum(catW)) / 2);
+    for (const w of catW) {
+      rows.push([x, bh + gap, w, bh]);
+      x += w + gap;
+    }
+    return { h: bh * 2 + gap, rows };
+  }
+
+  /**
+   * RUST | GO and BASIC | ADVANCED | HACKER, across the top of the overworld.
+   *
+   * The lit land wears its own colour (the same orange and cyan the lands
+   * screen and the map haze use) rather than the generic gold, so "which land
+   * am I in" is answered by a colour the player has already learnt; the lit
+   * category is gold like every other selected thing in the game.
+   */
+  private drawBar(g: Ctx, y0: number): void {
+    const s = this.app.layout.uiScale();
+    const f = ensureFonts(s).button;
+    const { rows } = this.barLayout();
+    this.bar.reset();
+    const labels = [
+      ...LANDS.map((l) => ({ id: `land:${l}`, label: l.toUpperCase(), lit: l === this.land })),
+      ...CATEGORIES.map((c) => ({
+        id: `cat:${c}`,
+        label: c.toUpperCase(),
+        lit: c === this.category,
+      })),
+    ];
+    for (let i = 0; i < labels.length; i++) {
+      const [x, ry, w, h] = rows[i];
+      const y = y0 + ry;
+      const item = labels[i];
+      this.bar.add({ id: item.id, rect: [x, y, w, h], label: item.label });
+      const hover = this.bar.hovered === item.id;
+      const land = item.id.startsWith("land:") ? (item.id.slice(5) as Land) : null;
+      if (land && item.lit) {
+        // The one button `pixBtn` cannot draw: a face in the track's colour.
+        panel(g, x, y, w, h, land === "rust" ? RUST : GO);
+        g.fillStyle = css(Theme.ink);
+        printf(g, f, item.label, x, y + 8 + Math.floor((h - 8 - f.height) * 0.5), w, "center");
+      } else {
+        pixBtn(g, f, x, y, w, h, item.label, {
+          lit: item.lit,
+          hover,
+          quiet: !item.lit,
+        });
+      }
+      // A gold pip under whichever button is open, in both groups: the colour
+      // alone does not survive a colour-blind eye or a dim screen.
+      if (item.lit)
+        fill(g, Theme.coin, x + w / 2 - Math.round(5 * s), y + h + 2, Math.round(10 * s), 2);
+    }
+  }
+
+  /**
+   * Change which of the six maps this is, in place.
+   *
+   * A cut, deliberately, and never a walk: Mei is standing on a street in Rust
+   * Land and the next frame she is standing on a different street in Go Land,
+   * which is not a journey anybody can animate honestly. The plate and the
+   * nodes replay their arrival instead, so the screen says "this is a different
+   * place" with the language it already has.
+   */
+  private switchTo(land: Land, category: Category): void {
+    if (land === this.land && category === this.category) return;
+    this.land = land;
+    this.category = category;
+    this.app.chip.select();
+    this.walk = null;
+    this.pendingOpen = null;
+    this.meiOn = null;
+    this.selected = 0;
+    this.zoom = 1;
+    this.nodes = [];
+    this.edges = [];
+    this.pops = [];
+    this.status = "";
+    this.plateIn.restart();
+    this.infoIn.restart();
+    void this.refresh();
+  }
+
+  private cycleLand(): void {
+    this.switchTo(LANDS[(LANDS.indexOf(this.land) + 1) % LANDS.length], this.category);
+  }
+
+  private cycleCategory(step: number): void {
+    const i = CATEGORIES.indexOf(this.category);
+    const n = CATEGORIES.length;
+    this.switchTo(this.land, CATEGORIES[(i + step + n) % n]);
+  }
+
   // -- input ---------------------------------------------------------------
 
-  key(name: string): void {
+  key(name: string, ev?: KeyboardEvent): void {
     if (name === "escape") return void this.app.go(new LandsScene(this.app), "back");
+    // Switching is a look, not a commitment: one `world.map` call, reversible
+    // with the same key. It is allowed to interrupt a walk, because the walk
+    // belongs to a map that is about to stop existing.
+    if (name === "tab") {
+      // Otherwise the browser walks the focus ring off the canvas and the next
+      // keystroke goes somewhere else entirely.
+      ev?.preventDefault();
+      return this.cycleLand();
+    }
+    if (name === "q") return this.cycleCategory(-1);
+    if (name === "e") return this.cycleCategory(1);
     // The walk is delight, not a toll. Any key while she is walking puts her at
     // the far end of it immediately — a player who has chosen a street wants
     // the street, and a cutscene between the click and the quest is a cutscene
@@ -281,6 +453,18 @@ export class MapScene implements Scene {
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
+    // The strip is above the overworld and is tested first: a button that
+    // happens to overlap a far node must not enter a street.
+    const onBar = this.bar.hit(x, y);
+    if (phase === "move") this.bar.hovered = onBar?.id ?? null;
+    if (onBar) {
+      if (phase === "down") {
+        const [kind, value] = onBar.id.split(":");
+        if (kind === "land") this.switchTo(value as Land, this.category);
+        else this.switchTo(this.land, value as Category);
+      }
+      return;
+    }
     for (let i = 0; i < this.nodes.length; i++) {
       const [nx, ny] = this.nodeAt(this.nodes[i]);
       if (Math.hypot(x - nx, y - ny) > this.nodeRadius(this.nodes[i]) * 1.4) continue;
@@ -420,7 +604,7 @@ export class MapScene implements Scene {
     const { layout } = this.app;
     const s = layout.uiScale();
     const portrait = layout.isPortrait();
-    const top = Math.round(38 * s) + Math.round(8 * s);
+    const top = Math.round(38 * s) + Math.round(8 * s) + this.barLayout().h + Math.round(10 * s);
     const bottom = layout.vh - Math.round(26 * s) - Math.round(8 * s);
     const infoH = Math.round((portrait ? 150 : 108) * s);
     const availX = Math.round(8 * s);
@@ -507,6 +691,9 @@ export class MapScene implements Scene {
     g.restore();
 
     header(g, this.app, `${this.land.toUpperCase()} · ${this.category.toUpperCase()}`);
+    // Outside the plate's lift and alpha: the switcher is chrome, and chrome
+    // that fades in with the ground reads as part of the ground.
+    this.drawBar(g, Math.round(38 * s) + Math.round(8 * s));
     const infoDrop = (1 - this.infoIn.out) * Math.round(60 * s);
     g.save();
     g.globalAlpha = Math.min(1, this.infoIn.raw * 2.2);
@@ -526,7 +713,11 @@ export class MapScene implements Scene {
         "center",
       );
     }
-    footer(g, layout, "←→  STREET   ENTER  GO IN   ESC  BACK   F1  ORIENTATION   F3  LOG OUT");
+    footer(
+      g,
+      layout,
+      "←→  STREET   ENTER  GO IN   TAB  LAND   Q/E  CATEGORY   ESC  BACK   F3  LOG OUT",
+    );
   }
 
   /** The map's own frame, plus the background art if it arrived. */

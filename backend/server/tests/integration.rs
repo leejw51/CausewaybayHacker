@@ -455,7 +455,12 @@ async fn a_cleared_quest_survives_the_server_being_put_down_and_brought_back() {
         let cleared = alice.submit(HELLO, &quest_field(HELLO, "solution")).await;
         assert_eq!(cleared["cleared"], true);
         assert_eq!(cleared["stars"], 2, "one failure, so two stars");
-        assert_eq!(alice.node(SUM).await["state"], "open", "node 2 unlocked");
+        // Not "node 2 is now open" — §4.7 makes that true from the start, so
+        // asserting it would assert nothing. What has to survive a restart is
+        // the *record*: the node's own counters.
+        let one = alice.node(HELLO).await;
+        assert_eq!(one["attempts"], 2, "one failure and one clear");
+        assert_eq!(one["state"], "cleared");
 
         server.stop().await;
     }
@@ -481,10 +486,15 @@ async fn a_cleared_quest_survives_the_server_being_put_down_and_brought_back() {
     let node = alice.node(HELLO).await;
     assert_eq!(node["state"], "cleared", "the clear did not survive");
     assert_eq!(node["stars"], 2, "the grade did not survive");
+    let one = alice.node(HELLO).await;
     assert_eq!(
-        alice.node(SUM).await["state"],
-        "open",
-        "the unlock did not survive; the player is locked out of their own map"
+        one["attempts"], 2,
+        "the node's attempt count did not survive the restart"
+    );
+    assert_eq!(
+        alice.node(SUM).await["attempts"],
+        0,
+        "a node nobody touched came back with attempts on it"
     );
 
     // The attempts are training data (SPEC §7) and are never thrown away.
@@ -519,16 +529,22 @@ async fn a_cleared_quest_survives_the_server_being_put_down_and_brought_back() {
 // -------------------------------------------------- the unlock cascade
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn clearing_a_node_unlocks_exactly_the_next_one_and_announces_it() {
-    // SPEC §12: "`requires` empty means the node is open from the start.
-    // Every other node is `locked` until all of its `requires` are
-    // `cleared`." PROTOCOL.md §4.19: `progress.update` carries `unlocked`,
-    // "so a client updates the overworld without refetching it".
+async fn every_node_is_playable_and_a_clear_still_announces_the_route() {
+    // PROTOCOL.md §4.7 changed under this test, and the old version is worth
+    // saying out loud because relaxing it quietly would have been the easy
+    // mistake: it used to assert "node 1 is open, the rest are locked" and
+    // "a locked node refuses a submission with `locked` and names the
+    // blocker". Both of those are now wrong.
     //
-    // `store.rs` has the store-level cascade. What is added here is the
-    // event: a client that trusted `unlocked` and a server that computed it
-    // wrong would draw a map with the wrong nodes lit, and the only way to
-    // see that is to compare the event against the map it claims to describe.
+    // §4.7: "**Every node is playable. Nothing is locked.** `requires` and
+    // `edges` describe the *suggested* route … but a player may enter any
+    // node at any time, and the server never refuses one on the grounds that
+    // an earlier node is unfinished. This is a trainer, not a platformer."
+    //
+    // So this is not a weakened test. It is the **inverse** assertion, and it
+    // is the one with consequences: somebody with an interview on Thursday
+    // opens the last street on Tuesday. If that ever starts failing, the
+    // platformer is back.
     let tmp = tempfile::tempdir().unwrap();
     let home = tmp.path().join("home");
     let src = content_src(tmp.path());
@@ -537,42 +553,65 @@ async fn clearing_a_node_unlocks_exactly_the_next_one_and_announces_it() {
     let mut alice = Client::connect(server.port).await;
     alice.login(ALICE_KEY).await;
 
-    // At the start: node 1 open, the rest locked. Anything else and a new
-    // player either cannot start or is handed the whole map.
     let map = alice
         .ok("world.map", json!({ "land": "rust", "category": "basic" }))
         .await;
     let nodes = map["nodes"].as_array().unwrap().clone();
     assert!(nodes.len() >= 3, "the fixture map has three nodes");
+
+    // Nothing is locked, and `state` only has two values now (§5.2).
     for n in &nodes {
-        let expected = if n["node"] == 1 { "open" } else { "locked" };
-        assert_eq!(
-            n["state"], expected,
-            "node {} should start {expected}",
+        let state = n["state"].as_str().unwrap();
+        assert!(
+            state == "open" || state == "cleared",
+            "node {} is {state}; §5.2 says `open` or `cleared`, never `locked`",
             n["node"]
         );
     }
 
-    // A locked node refuses a submission rather than judging it — and names
-    // the blocker, so the client can say *which* street to clear first.
-    let locked = alice
-        .call(
-            "quest.submit",
-            json!({ "quest_id": SHADOWING, "lang": "rust", "source": "fn main(){}" }),
-        )
-        .await;
-    assert_eq!(locked["type"], "quest.submit.err");
-    assert_eq!(locked["payload"]["code"], "locked");
-    assert_eq!(
-        locked["payload"]["detail"]["requires"],
-        json!([SUM]),
-        "`locked` must name what is blocking it"
+    // The route is still described, because "where do I go next" is a real
+    // question and the map draws the line. Advice, not a gate.
+    assert!(
+        !map["edges"].as_array().unwrap().is_empty(),
+        "§4.7: `edges` still describe the suggested route"
+    );
+    let last = nodes.last().unwrap();
+    assert!(
+        !last["requires"].as_array().unwrap().is_empty(),
+        "the last node still declares what it suggests you do first"
     );
 
-    // Clear node 1. The event should announce node 2 and nothing else.
+    // And the deepest node takes a submission from a player who has cleared
+    // nothing at all. This is the whole of §4.7 in one call.
+    let deepest = last["quest_id"].as_str().unwrap().to_string();
+    let straight_in = alice
+        .ok(
+            "quest.submit",
+            json!({ "quest_id": deepest, "lang": "rust", "source": quest_field(&deepest, "solution") }),
+        )
+        .await;
+    assert_eq!(
+        straight_in["attempt"]["verdict"], "accepted",
+        "the last node of the map refused a player who started there"
+    );
+    assert_eq!(straight_in["attempt"]["cleared"], true);
+    assert_eq!(
+        straight_in["attempt"]["stars"], 3,
+        "starting at the end is not a penalty"
+    );
+
+    // Clearing still *announces* itself, and `unlocked` still carries the
+    // nodes whose suggested requirements are now met — a client draws the
+    // route from it without refetching (§4.19). It is advice the client can
+    // act on, not permission the server granted.
     alice.events.clear();
-    let attempt = alice.submit(HELLO, &quest_field(HELLO, "solution")).await;
-    assert_eq!(attempt["cleared"], true);
+    let cleared = alice
+        .ok(
+            "quest.submit",
+            json!({ "quest_id": HELLO, "lang": "rust", "source": quest_field(HELLO, "solution") }),
+        )
+        .await;
+    assert_eq!(cleared["attempt"]["cleared"], true);
 
     let update = alice
         .events
@@ -583,19 +622,21 @@ async fn clearing_a_node_unlocks_exactly_the_next_one_and_announces_it() {
     assert_eq!(update["id"], Value::Null, "§2.2: an event carries id: null");
     assert_eq!(update["payload"]["quest_id"], HELLO);
     assert_eq!(update["payload"]["state"], "cleared");
-    assert_eq!(update["payload"]["cleared_total"], 1);
     assert_eq!(
-        update["payload"]["unlocked"],
-        json!([SUM]),
-        "clearing node 1 unlocks node 2 and only node 2; node 3 still needs node 2"
+        update["payload"]["cleared_total"], 2,
+        "the deepest node and node 1"
+    );
+    assert!(
+        update["payload"]["unlocked"].is_array(),
+        "§4.19: `unlocked` is still there for the client to redraw from"
     );
 
-    // The map agrees with the event it just sent. These are computed by
-    // different code paths and a client trusts both.
+    // The map agrees with the event it just sent — two code paths a client
+    // trusts equally.
     let after = alice
         .ok("world.map", json!({ "land": "rust", "category": "basic" }))
         .await;
-    let by_node: Vec<(i64, String)> = after["nodes"]
+    let states: Vec<(i64, String)> = after["nodes"]
         .as_array()
         .unwrap()
         .iter()
@@ -607,44 +648,135 @@ async fn clearing_a_node_unlocks_exactly_the_next_one_and_announces_it() {
         })
         .collect();
     assert_eq!(
-        by_node,
+        states,
         vec![
             (1, "cleared".into()),
             (2, "open".into()),
-            (3, "locked".into())
+            (3, "cleared".into())
         ],
-        "the map does not match the unlock the server just announced"
+        "the map does not match what the server just announced"
     );
 
-    // And the last one: clearing node 2 opens node 3 and the map is finished.
-    alice.events.clear();
-    alice.submit(SUM, &quest_field(SUM, "solution")).await;
-    let update = alice
-        .events
-        .iter()
-        .find(|e| e["type"] == "progress.update")
-        .expect("a second progress.update")
-        .clone();
-    assert_eq!(update["payload"]["unlocked"], json!([SHADOWING]));
-    assert_eq!(update["payload"]["cleared_total"], 2);
+    server.stop().await;
+}
 
-    alice
-        .submit(SHADOWING, &quest_field(SHADOWING, "solution"))
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_run_is_for_the_player_and_a_submit_is_for_the_record() {
+    // PROTOCOL.md §4.9b, and the asymmetry that is easy to get backwards in
+    // *either* direction:
+    //
+    //   a run does NOT count toward the node's `attempts` or the accuracy,
+    //   a run DOES put its mistakes into the curriculum.
+    //
+    // A query that forgets `mode` overstates how much the player is failing —
+    // iterating honestly starts to look like flailing, and the stars go with
+    // it. One that filters runs out of `mistakes` understates what they are
+    // struggling with, and SPEC §7 builds the drills from that table.
+    //
+    // The store-level half is BE's. What this adds is the arithmetic through
+    // the real runner, which is where a `WHERE mode = 'submit'` in the wrong
+    // query shows up.
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let src = content_src(tmp.path());
+    let server = start(&home, &src).await;
+
+    let mut alice = Client::connect(server.port).await;
+    alice.login(ALICE_KEY).await;
+
+    const RUNS: usize = 4;
+    for i in 0..RUNS {
+        let source = if i % 2 == 0 {
+            "fn main() { let x: i32 = \"nope\"; }".to_string()
+        } else {
+            format!("fn main() {{ println!(\"iteration {i}\"); }}")
+        };
+        let r = alice
+            .ok(
+                "quest.run",
+                json!({ "quest_id": HELLO, "lang": "rust", "source": source }),
+            )
+            .await;
+        let a = &r["attempt"];
+        assert_eq!(a["mode"], "run", "§5.4: an Attempt from quest.run");
+        assert_eq!(a["cleared"], false, "§4.9b: a run never clears");
+        assert_eq!(a["stars"], 0, "§4.9b: a run never awards stars");
+        // §4.9b: only the visible cases, and no hint of the hidden ones.
+        for case in a["cases"].as_array().unwrap() {
+            assert_eq!(
+                case["visible"], true,
+                "§4.9b: a run reported a hidden case — that is what submitting is for"
+            );
+        }
+    }
+
+    assert!(
+        alice
+            .events
+            .iter()
+            .all(|e| e["type"] != "progress.update"),
+        "§4.9b: a run announced progress"
+    );
+
+    // The node has seen nothing.
+    assert_eq!(
+        alice.node(HELLO).await["attempts"],
+        0,
+        "§4.9b: {RUNS} runs counted toward the node's attempts"
+    );
+    assert_eq!(alice.node(HELLO).await["state"], "open");
+
+    // The curriculum has them. This is the half that quietly rots: nothing
+    // else in the suite would notice if runs stopped being recorded.
+    let history = alice.ok("stats.history", json!({ "quest_id": HELLO })).await;
+    assert_eq!(
+        history["attempts"].as_array().unwrap().len(),
+        RUNS,
+        "§4.9b: a run is still recorded"
+    );
+    let mistakes = alice.ok("stats.mistakes", json!({})).await;
+    let total: i64 = mistakes["mistakes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["count"].as_i64().unwrap())
+        .sum();
+    assert!(
+        total > 0,
+        "§4.9b: the mistakes a player made while iterating never reached the \
+         curriculum, so the drills would train on the tidied-up version of \
+         their week"
+    );
+
+    // One submit, and the counter moves by exactly one.
+    let done = alice
+        .ok(
+            "quest.submit",
+            json!({ "quest_id": HELLO, "lang": "rust", "source": quest_field(HELLO, "solution") }),
+        )
         .await;
-    let lands = alice.ok("world.lands", json!({})).await;
-    let basic = lands["lands"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|l| l["land"] == "rust")
-        .unwrap()["categories"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["category"] == "basic")
-        .unwrap()
-        .clone();
-    assert_eq!(basic["cleared"], basic["total"], "the map is finished");
+    assert_eq!(done["attempt"]["mode"], "submit");
+    assert_eq!(done["attempt"]["verdict"], "accepted");
+    assert_eq!(
+        done["attempt"]["stars"], 3,
+        "§6.3 + §4.9b: runs before a first-time clear do not cost a star"
+    );
+    assert_eq!(
+        alice.node(HELLO).await["attempts"],
+        1,
+        "§4.9b: {RUNS} runs then one submit must leave the node at 1"
+    );
+
+    let summary = alice.ok("stats.summary", json!({})).await;
+    assert_eq!(
+        summary["attempts"], 1,
+        "§4.9b: stats.summary counted the runs as attempts"
+    );
+    assert_eq!(
+        summary["accuracy"], 1.0,
+        "§4.9b: one accepted submit and {RUNS} runs is 100% accuracy; anything \
+         less means the runs are in the denominator"
+    );
 
     server.stop().await;
 }
@@ -694,11 +826,20 @@ async fn two_players_on_one_quest_at_the_same_time_stay_separate() {
         "open",
         "bob's node went cleared on alice's work"
     );
+    // This used to assert bob's node 2 was still *locked*, which §4.7 has
+    // made meaningless — every node is playable for everybody, so "open" is
+    // now true for bob whatever alice did, and the assertion would have
+    // stopped testing anything.
+    //
+    // What is still private, and still worth asserting, is the per-node
+    // record: bob has attempted nothing on node 2 and earned nothing there.
+    let bob_two = bob.node(SUM).await;
     assert_eq!(
-        bob.node(SUM).await["state"],
-        "locked",
-        "bob's node 2 unlocked on alice's clear"
+        bob_two["attempts"], 0,
+        "alice's work landed on bob's node 2"
     );
+    assert_eq!(bob_two["stars"], 0, "alice's stars landed on bob's node 2");
+    assert_eq!(bob_two["state"], "open", "§4.7: every node is playable");
 
     // History does not cross, in both directions.
     let a_ids: Vec<String> = alice.ok("stats.history", json!({ "limit": 50 })).await["attempts"]

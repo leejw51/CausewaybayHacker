@@ -101,6 +101,12 @@ export class LoginScene implements Scene {
    * held here and nowhere else, and `leave()` drops it.
    */
   private minted: string[] | null = null;
+  /**
+   * True while the sign-in for a minted phrase is parked waiting for the
+   * socket. The phrase stays on screen the whole time — see `signIn`.
+   */
+  private waiting = false;
+  private stopWait: ((ok: boolean) => void) | null = null;
   private t = 0;
   private readonly leftIn = new Tween(seconds("panel"));
   private readonly rightIn = new Tween(seconds("panel"), seconds("stagger"));
@@ -136,6 +142,7 @@ export class LoginScene implements Scene {
     // Whatever is in the box is key material. It does not outlive the screen.
     this.field.value = "";
     this.minted = null;
+    this.stopWait?.(false);
     this.overlay.destroy();
   }
 
@@ -149,19 +156,57 @@ export class LoginScene implements Scene {
   }
 
   /**
-   * `I HAVE WRITTEN IT DOWN`: sign in with the phrase that is on screen.
+   * `I HAVE WRITTEN IT DOWN`: sign in with the phrase that is on screen, and
+   * go. No confirmation step, no return to the form.
    *
-   * The words are taken and the field holding them is cleared *before* the
-   * first await, which is what makes a double press safe — the second one finds
-   * nothing to log in with and `busy` is already set anyway, so one account is
-   * created and one challenge is asked for, not two racing.
+   * A double press is safe because `signIn` sets `busy` synchronously, before
+   * its first await — the second press a frame later finds it already set and
+   * returns. One challenge, one login, one account.
+   *
+   * The words are deliberately *not* cleared here. They used to be, and that
+   * made a dropped socket the worst thing this screen can do: the only copy of
+   * the phrase went out of existence to serve an error message. They are held
+   * until the login succeeds (at which point the screen is gone) or the player
+   * presses CANCEL (at which point losing them is their decision).
    */
   private takeMinted(): void {
     if (this.busy) return;
     const words = this.minted;
     if (!words) return;
-    this.minted = null;
-    void this.signIn(words.join(" "));
+    void this.signIn(words.join(" "), true);
+  }
+
+  /**
+   * Resolve once the socket can carry a login, or `false` if the player gave
+   * up. The client reconnects on its own with §6.2 backoff, so all this does
+   * is wait for it and say so.
+   */
+  private reachable(): Promise<boolean> {
+    const client = this.app.client;
+    if (client.state === "open" || client.state === "authed") return Promise.resolve(true);
+    this.waiting = true;
+    this.status = "the server is not answering — you will be signed in the moment it does";
+    return new Promise<boolean>((resolve) => {
+      let off: (() => void) | null = null;
+      const done = (ok: boolean) => {
+        off?.();
+        this.stopWait = null;
+        this.waiting = false;
+        resolve(ok);
+      };
+      off = client.onState((next) => {
+        if (next === "open" || next === "authed") done(true);
+      });
+      this.stopWait = done;
+    });
+  }
+
+  /** A failure that waiting could fix, as opposed to one the player must. */
+  private static transient(e: unknown): boolean {
+    if (!(e instanceof WireError)) return false;
+    if (e.payload.code !== "internal") return false;
+    const d = e.payload.detail as { disconnected?: boolean } | undefined;
+    return d?.disconnected === true || /not connected|timed out/.test(e.payload.message);
   }
 
   private derivePreview(): void {
@@ -200,44 +245,72 @@ export class LoginScene implements Scene {
    * Derive, sign the server's challenge, and go. One path, whether the phrase
    * was typed into the field or handed out by this screen a second ago.
    */
-  private async signIn(text: string): Promise<void> {
+  private async signIn(text: string, minted = false): Promise<void> {
     if (this.busy) return;
     this.busy = true;
-    this.status = "deriving";
     try {
-      const address = unlock(text);
-      // The textarea is emptied before a single byte goes near the socket.
-      this.field.value = "";
-      this.preview = address.eip55;
-
-      this.status = "asking for a challenge";
-      const challenge = await this.app.client.challenge(address.eip55);
-
-      this.status = "signing";
-      const signature = signMessage(challenge.message);
-
-      this.status = "logging in";
-      const user = await this.app.client.login(address.eip55, signature);
-      this.app.addressLabel = user.address;
-      this.app.chip.start();
-      await this.app.go(new LandsScene(this.app), "forward");
-    } catch (e) {
-      // §3.3: the server's `message` is for a developer. The player gets our
-      // wording, keyed off the code; the server's line goes to the console
-      // where a developer can actually find it.
-      if (e instanceof WireError) {
-        console.warn("auth failed:", e.payload.code, e.payload.message, e.payload.detail);
-        this.status = playerText(e.payload.code);
-        // §3.3's table: a spent or expired nonce is retryable as-is, and
-        // saying "log in again" about it would be a lie.
-        if (e.action === "rechallenge") this.status += " — press ENTER";
-      } else {
-        this.status = e instanceof Error ? e.message : "that did not work";
+      // Up to five goes for a phrase this screen handed out, each one parked
+      // on `reachable` until the socket is back. A typed phrase gets one go:
+      // it still exists on paper or in a password manager, and the player is
+      // in front of a form they can press ENTER on again.
+      for (let attempt = 0; attempt < (minted ? 5 : 1); attempt++) {
+        if (minted && !(await this.reachable())) return;
+        try {
+          await this.attempt(text);
+          return;
+        } catch (e) {
+          this.report(e);
+          if (!minted || !LoginScene.transient(e)) return;
+        }
       }
-      this.app.chip.fail();
+      this.status =
+        "the server is still not reachable — your words are still here, press the button again";
     } finally {
       this.busy = false;
     }
+  }
+
+  /** One go: derive, sign the challenge, log in, leave. */
+  private async attempt(text: string): Promise<void> {
+    this.status = "deriving";
+    const address = unlock(text);
+    // The textarea is emptied before a single byte goes near the socket.
+    this.field.value = "";
+    this.preview = address.eip55;
+
+    this.status = "asking for a challenge";
+    const challenge = await this.app.client.challenge(address.eip55);
+
+    this.status = "signing";
+    const signature = signMessage(challenge.message);
+
+    this.status = "logging in";
+    const user = await this.app.client.login(address.eip55, signature);
+    this.app.addressLabel = user.address;
+    // Past the point of no return for the phrase, and the screen is leaving.
+    this.minted = null;
+    this.app.chip.start();
+    await this.app.go(new LandsScene(this.app), "forward");
+  }
+
+  /**
+   * §3.3: the server's `message` is for a developer. The player gets our
+   * wording, keyed off the code; the server's line goes to the console where a
+   * developer can actually find it.
+   */
+  private report(e: unknown): void {
+    if (e instanceof WireError) {
+      console.warn("auth failed:", e.payload.code, e.payload.message, e.payload.detail);
+      this.status = LoginScene.transient(e)
+        ? "the server is not reachable — waiting for it"
+        : playerText(e.payload.code);
+      // §3.3's table: a spent or expired nonce is retryable as-is, and saying
+      // "log in again" about it would be a lie.
+      if (e.action === "rechallenge") this.status += " — press ENTER";
+    } else {
+      this.status = e instanceof Error ? e.message : "that did not work";
+    }
+    this.app.chip.fail();
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
@@ -254,6 +327,8 @@ export class LoginScene implements Scene {
     if (hit.id === "story") void this.app.go(new StoryScene(this.app, true), "forward");
     if (hit.id === "keep") this.takeMinted();
     if (hit.id === "discard") {
+      // The one place the phrase is allowed to disappear: because they said so.
+      this.stopWait?.(false);
       this.minted = null;
       this.preview = "";
       this.field.value = "";
@@ -543,11 +618,17 @@ export class LoginScene implements Scene {
       [
         {
           id: "keep",
-          label: this.busy ? "…" : "I HAVE WRITTEN IT DOWN",
+          label: this.waiting
+            ? "WAITING FOR THE SERVER"
+            : this.busy
+              ? "…"
+              : "I HAVE WRITTEN IT DOWN",
           dim: this.busy,
           primary: !this.busy,
         },
-        { id: "discard", label: "CANCEL", dim: this.busy },
+        // Live while we wait, and only while we wait: giving up has to be
+        // possible, and it is the only thing that throws the words away.
+        { id: "discard", label: "CANCEL", dim: this.busy && !this.waiting },
       ],
       layout.minTouchH(),
     );

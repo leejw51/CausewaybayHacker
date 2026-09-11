@@ -139,7 +139,12 @@ add({ shot = "R4-quest-two-buttons.png" })
 add({ note = "a wrong answer, RUN — must not read as a verdict" })
 add({ key = "a", mods = { ctrl = true } })
 add({ key = "backspace" })
+-- Deliberately wrong output, but it must still compile — the point of this
+-- step is a run that fails its sample, not one that fails to build.
 add({ text = 'fn main() {\nprintln!("not the answer");' })
+add({ key = "return" })
+add({ key = "tab", mods = { shift = true } })
+add({ text = '}' })
 add({ key = "f5" })
 -- A second and third press, immediately: the shared slot must refuse them.
 add({ key = "f5" })
@@ -190,6 +195,9 @@ add({ note = "now the right answer, RUN first" })
 add({ key = "a", mods = { ctrl = true } })
 add({ key = "backspace" })
 add({ text = 'fn main() {\nprintln!("hello, causewaybay");' })
+add({ key = "return" })
+add({ key = "tab", mods = { shift = true } })
+add({ text = '}' })
 add({ key = "f5" })
 add({ until_ = function(app)
       if app.run_unsupported then return true end

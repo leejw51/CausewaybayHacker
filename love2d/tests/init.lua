@@ -23,6 +23,7 @@ local PURE = {
   "tests.test_session",
   "tests.test_display",
   "tests.test_walk",
+  "tests.test_mapswitch",
   "tests.test_editor",
   "tests.test_wallet",
 }

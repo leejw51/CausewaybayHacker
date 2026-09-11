@@ -2363,3 +2363,122 @@ The §8.4 *point* is still worth keeping exactly as it is otherwise: "every code
 a client can meet is reachable" is the assertion that stops a code being
 specified and never emitted. `locked` is now deliberately in that state, which
 is the one exception the contract names.
+
+## 2026-09-11 — QA: every test that asserted `locked`, and what it asserts now
+
+PROTOCOL.md §4.7 made every node playable. Six assertions of mine were about
+the old behaviour. **None of them was deleted and none was quietly relaxed** —
+each became the inverse assertion, which is the one with consequences.
+
+| where | asserted | now asserts |
+| --- | --- | --- |
+| `contract.mjs` §8.4 | a locked node refuses a submit with `locked` + `detail.requires` | **the deepest node on the map takes a submission from a player who has cleared nothing** — §4.7's own worked reason, the interview on Thursday. Plus: no node is ever `locked` |
+| `contract.mjs` shapes | `state ∈ locked\|open\|cleared` | `state ∈ open\|cleared`, and the envelope validator now flags `locked` on **any** frame as a violation — a server that starts emitting it again has reintroduced a rule the spec removed |
+| `contract.mjs` §8.4 closed set | "7+ codes provoked" | the set and the *reachable* subset are now separate claims. `locked` stays in `ERROR_CODES` (removing it would break an exhaustive client) and is listed in a new `NOT_EMITTED` set, with an explicit `assert(!seen.has("locked"))` |
+| `integration.rs` unlock cascade | node 1 open, the rest locked; a locked node refuses | renamed `every_node_is_playable_and_a_clear_still_announces_the_route`. Asserts no node is locked, the **last** node accepts a solution from a fresh player and pays full stars, `edges` and `requires` still describe the route, and `progress.update` still carries `unlocked` — advice a client redraws from, not permission the server granted |
+| `integration.rs` isolation | "bob's node 2 is still locked" | that is now true for bob whatever alice did, so it tested nothing. Replaced with what is genuinely private: **bob's node 2 has 0 attempts and 0 stars** |
+| `integration.rs` restart | "node 2 is open after the restart" | also trivially true now. Replaced with the thing that must survive: the node's own `attempts` count (2 — a failure and a clear), and that an untouched node comes back with 0 |
+| `e2e/journey.spec.ts` | node 1 open, the rest locked | renamed "every node on it is playable": nothing is `locked`, every node is `open` with 0 stars for a brand-new player, and `edges` are still there |
+
+`e2e/fixtures.ts`'s `MapNode.state` is two values now, and
+`identifyOpenQuest` no longer skips locked nodes because there are none.
+
+## 2026-09-11 — QA: the `quest.run` invariant, which is asymmetric on purpose
+
+PROTOCOL.md §4.9b. The property worth a test is not "a run runs" — it is the
+accounting, which is easy to get backwards in **either** direction:
+
+* a run does **not** count toward the node's `attempts` or
+  `stats.summary.accuracy`;
+* a run **does** put its mistakes into `mistakes` / `mistake_stats`.
+
+Get the first wrong and iterating honestly looks like flailing — the star
+grade goes with it, and a player is punished for using the button that exists
+to be used. Get the second wrong and the curriculum is trained on the
+tidied-up version of the player's week, which is precisely the thing SPEC §7
+says the mistakes table is for.
+
+Written twice, deliberately, because the two levels catch different bugs:
+
+* `tests/smoke/contract.mjs`, "a run is for the player, a submit is for the
+  record" — five runs then one submit over the wire. Asserts `mode: "run"`,
+  `cleared: false`, `stars: 0`, **no `progress.update`**, `tests_total` equal
+  to the *visible* count, every reported case `visible: true` (a run must not
+  reveal whether the hidden cases pass — that is what submitting is for), the
+  node still at **0 attempts** after five runs and **1** after the submit,
+  the mistake total strictly up, `stats.history` holding all five runs, and
+  accuracy that is 0 or 1 rather than something in between.
+* `backend/server/tests/integration.rs`, `a_run_is_for_the_player_and_a_submit_is_for_the_record`
+  — the same arithmetic through the real runner, which is where a
+  `WHERE mode = 'submit'` in the wrong query shows up.
+
+And §8.10 now covers the **mixed** pair, not just submit-then-submit: a run
+while a submit is in flight, a submit while a run is in flight, and a run
+while a run is in flight. A server keeping two locks — one per kind — passes
+the old test and then compiles two programs at once the first time a player
+presses RUN during a SUBMIT.
+
+Both pass against the live server: smoke **20 checks, §8 12/12**;
+`integration.rs` **8/8**.
+
+## 2026-09-11 — L2D: land and category switch from the map
+
+**TAB** switches land, **Q** switches category, both from the map itself, plus
+two land buttons and three category tabs in the header for anyone who would
+rather click. A keybinding nobody can see is not a feature, so the buttons and
+the keys ship together and the footer names both.
+
+The keys are `CausewaybayGolang`'s, deliberately: it switches its three
+language tracks with TAB and its quests with Q, and the user has pointed at
+that repo twice now for this kind of question. Its map puts "the three big
+buttons" for the tracks on the map screen for exactly this reason; these are
+the same idea with this game's two lands and three categories.
+
+**A land switch keeps the category.** Somebody comparing how Rust and Go do
+concurrency wants the concurrency map, not the top of GO BASIC. Asserted for
+all three categories in `tests/test_mapswitch.lua`, because it is the one part
+of this that is easy to get subtly wrong and never notice.
+
+**A switch is a cut, not a walk.** Mei stands on a node of the map being left;
+on the next map she is somewhere else entirely, and a walk left running would
+interpolate between nodes that no longer exist. `switch` drops `walk`, `at`,
+`adjacency`, `nodes` and the stamp animations in one place — the same thing
+`CausewaybayGolang`'s `Game:setQuest` does when the track changes. The walk is
+for moving *within* a map.
+
+**Each map remembers the node it was left on**, keyed `land.category`, at
+module level so it survives the scene being rebuilt — the sibling's
+`Game.trackQuest` idea. That is what makes "nothing is lost by looking" true
+rather than merely cheap.
+
+Why this mattered more than it looked: removing the gates was so that somebody
+with an interview on Thursday could go straight to the dynamic-programming
+street. Reaching HACKER still cost ESC → lands → land → category, so the gate
+was gone and the friction was not. It is now one keypress from the map.
+
+### Re-run against the shipped server
+
+BE's `quest.run` and unlocking are live, so the two things the last round could
+only report are now verified end to end:
+
+```
+map states as the server reports them: cleared=1 open=17
+run:    mode=run    verdict=wrong_answer 0/1 cleared=false
+in flight: 1 quest.run, 0 quest.submit left the client
+run:    accepted, 1/1 samples, cleared=false — still on the quest screen: true
+submit: mode=submit verdict=accepted     1/1 cleared=false stars=2
+switch: GO / HACKER in one keypress, straight from the map
+memory: came back to node 5, where it was left
+```
+
+* `world.map` no longer emits `locked`, so the fold-to-`open` is the no-op it
+  was predicted to be. It stays as one line, because a client that breaks when
+  an old server is on the other end is a client that breaks during a rollout.
+* `Attempt.mode` is on the wire — `run` and `submit` both observed.
+* The shared execution slot held against the real thing: a second RUN and a
+  SUBMIT pressed while a run was in flight were both refused locally, and one
+  `quest.run` left the client.
+* **`S1`/`S2` are retired.** Those screenshots were rendered from a synthetic
+  `Attempt` and were labelled as proving the rendering and not the wire;
+  `R5-run-failed.png` and `R6-run-passes.png` are the same screen from real
+  server replies.
