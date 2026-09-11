@@ -528,7 +528,7 @@ Kinds (the slug stored in `mistakes.kind`), each mapped from one or more codes:
 | --- | --- | --- |
 | `borrow-after-move` | E0382, E0505 | — |
 | `borrow-conflict` | E0499, E0502 | — |
-| `lifetime` | E0106, E0597, E0621 | — |
+| `lifetime` | E0106, E0597, E0621, E0373 | — |
 | `type-mismatch` | E0308 | `cannot use … as … value` |
 | `unknown-name` | E0425, E0433 | `undefined: X` |
 | `missing-trait` | E0277 | — |
@@ -538,7 +538,7 @@ Kinds (the slug stored in `mistakes.kind`), each mapped from one or more codes:
 | `index-range` | runtime `index out of bounds` | runtime `index out of range` |
 | `data-race` | — | `go test -race` report |
 | `deadlock` | — | `all goroutines are asleep` |
-| `unhandled-error` | E0277 on `Result` | `err` assigned and not checked (vet) |
+| `unhandled-error` | E0277 *discriminated*, see below | `err` assigned and not checked |
 | `syntax` | any parse error | any parse error |
 | `wrong-answer` | — | — (verdict, not a compiler code) |
 | `timeout` | — | — |
