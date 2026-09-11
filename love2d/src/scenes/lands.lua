@@ -139,7 +139,7 @@ function Lands:card_rects()
   -- Measured from the type, not fixed: the title above the cards and the
   -- footer below them both grow when the player asks for bigger type.
   local pad = 16
-  local top = math.floor(24 + UI.lineHeight(18) + 18)
+  local top = math.floor(24 + UI.lineHeight(Lands.title_size(Layout.vw)) + 18)
   local bottom = vh - UI.footerHeight() - math.floor(UI.lineHeight(9) * 1.6)
   local out = {}
   if portrait then
@@ -162,6 +162,18 @@ function Lands:card_rects()
   return out, n
 end
 
+--- The largest size on the ladder at which the title still fits across the
+--- canvas on one line. At step 4 in portrait, 18 is wider than 720 px and
+--- the title wrapped into the first card; the cards start under whatever
+--- size this returns, so the two can never meet.
+function Lands.title_size(vw)
+  local label = I18n.t("PICK A LAND")
+  for _, size in ipairs({ 18, 16, 14, 12, 10, 8 }) do
+    if UI.textWidth(label, size) <= vw - 40 then return size end
+  end
+  return 8
+end
+
 function Lands:draw()
   local vw, vh = Layout.vw, Layout.vh
   Assets.cover(Assets.pick("bg_street", "bg_flat"), 0, 0, vw, vh)
@@ -169,7 +181,7 @@ function Lands:draw()
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
 
-  UI.text(I18n.t("PICK A LAND"), 0, 24, 18, Theme.coin, "center", vw)
+  UI.text(I18n.t("PICK A LAND"), 0, 24, Lands.title_size(vw), Theme.coin, "center", vw)
 
   local rects, n = self:card_rects()
   for i = 1, n do

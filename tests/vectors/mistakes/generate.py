@@ -174,7 +174,11 @@ def go_env(build_root: pathlib.Path) -> dict:
     env = dict(os.environ)
     env.update(
         {
-            "GOCACHE": str(build_root / "gocache"),
+            # Its own cache, so a run leaves nothing behind — unless the
+            # caller shares one (CI does: the first `-race` build instruments
+            # the whole standard library, minutes of work a fresh cache pays
+            # for on every run and a warmed one pays for once).
+            "GOCACHE": os.environ.get("CWBH_GOCACHE") or str(build_root / "gocache"),
             "GOMODCACHE": str(build_root / "gomodcache"),
             "GOPATH": str(build_root / "gopath"),
             "GOFLAGS": "-mod=mod",
@@ -284,7 +288,9 @@ def run_go(src: pathlib.Path, work: pathlib.Path, build_root: pathlib.Path) -> d
                 capture_output=True,
                 text=True,
                 env=env,
-                timeout=180,
+                # Ten minutes, not three: with a cold cache the first of these
+                # builds the race-instrumented standard library from scratch.
+                timeout=600,
             )
             races.append("DATA RACE" in r.stderr)
             if races[-1]:

@@ -231,11 +231,13 @@ jobs:
           nohup backend/target/debug/cwbhacker serve --bind 127.0.0.1:5390 \
             --home "$home" --content content --strict-content \
             > "$home/server.log" 2>&1 &
+          # No frontend build here, so `/` is a 404 by design; `/art/` is
+          # served from the checkout and is what says the server is up.
           for _ in $(seq 1 60); do
-            curl -fsS http://127.0.0.1:5390/ >/dev/null 2>&1 && break
+            curl -fsS http://127.0.0.1:5390/art/manifest.json >/dev/null 2>&1 && break
             sleep 0.5
           done
-          curl -fsS http://127.0.0.1:5390/ >/dev/null || { cat "$home/server.log"; exit 1; }
+          curl -fsS http://127.0.0.1:5390/art/manifest.json >/dev/null || { cat "$home/server.log"; exit 1; }
           grep -q "content imported" "$home/server.log" || { cat "$home/server.log"; exit 1; }
 
       - name: The suite, with a window
@@ -297,10 +299,14 @@ jobs:
       # The data-race fixture is checked with `go run -race`, and the first
       # `-race` build on a fresh runner instruments the standard library from
       # scratch — minutes of work that blew the generator's per-run timeout
-      # before the fixture itself was even compiled. Warmed once here, so the
-      # three runs the generator makes hit the build cache.
+      # before the fixture itself was even compiled. Warmed once here, into
+      # the cache the generator is then told to share (it builds under a
+      # temporary cache of its own otherwise, which is right for a laptop
+      # and wrong for a runner).
       - name: Warm the race-instrumented standard library
-        run: go build -race std
+        run: |
+          go build -race std
+          echo "CWBH_GOCACHE=$(go env GOCACHE)" >> "$GITHUB_ENV"
 
       # Every §7.1 taxonomy fixture still compiles to the code it claims.
       - run: python3 tests/vectors/mistakes/generate.py --check

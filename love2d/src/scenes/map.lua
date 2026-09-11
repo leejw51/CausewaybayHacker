@@ -827,7 +827,23 @@ function Map:draw_node_card(node)
   -- suggested route.
   local title_h, id_h = UI.lineHeight(11), UI.lineHeight(7)
   local state_h, meta_h = UI.lineHeight(9), UI.lineHeight(7)
-  local h = 10 + title_h + 2 + id_h + 6 + state_h + 6
+  -- The boss portrait's width is needed before the height, because the
+  -- title wraps around it — and the title's line count decides the height.
+  local boss_w = 0
+  if node.kind == "boss" then
+    local boss = BOSS[self.land .. "." .. self.category]
+    if boss and Assets.image(boss) then boss_w = 78 end
+  end
+  -- The card's own width, minus the boss portrait when there is one. A quest
+  -- title is content and can be any length, so this is the one line on the
+  -- screen that must be given a width rather than trusted to be short — and
+  -- the card has to be as tall as the lines that width makes of it, or the
+  -- second line of the title is printed through the id (portrait, step 4).
+  local title_w = w - 24 - boss_w
+  local title = ("%02d  %s"):format(node.node, node.title or "")
+  local title_lines = math.max(1, #UI.wrap(title, title_w, 11))
+  local id_lines = math.max(1, #UI.wrap(node.quest_id or "", title_w, 7))
+  local h = 10 + title_lines * title_h + 2 + id_lines * id_h + 6 + state_h + 6
     + math.max(meta_h, UI.lineHeight(8)) + 6 + id_h + 8
   local x = portrait and 12 or (vw - w - 16)
   local y = vh - h - UI.footerHeight() - 10
@@ -838,25 +854,15 @@ function Map:draw_node_card(node)
   })
   -- The boss gets its portrait, standing on the card's baseline. It is the
   -- thing the premise is named after and it was drawn exactly like node 5.
-  local boss_w = 0
-  if node.kind == "boss" then
-    local boss = BOSS[self.land .. "." .. self.category]
-    if boss and Assets.image(boss) then
-      boss_w = 78
-      Assets.sprite(boss, x + w - boss_w / 2 - 6, y + h - 8, h - 24)
-    end
+  if boss_w > 0 then
+    Assets.sprite(BOSS[self.land .. "." .. self.category], x + w - boss_w / 2 - 6, y + h - 8, h - 24)
   end
   local color = Theme.cream
   local r1 = y + 10
-  local r2 = r1 + title_h + 2
-  local r3 = r2 + id_h + 6
+  local r2 = r1 + title_lines * title_h + 2
+  local r3 = r2 + id_lines * id_h + 6
   local r4 = r3 + state_h + 6
-  -- The card's own width, minus the boss portrait when there is one. A quest
-  -- title is content and can be any length, so this is the one line on the
-  -- screen that must be given a width rather than trusted to be short.
-  local title_w = w - 24 - boss_w
-  UI.text(("%02d  %s"):format(node.node, node.title or ""), x + 12, r1, 11,
-    color, "left", title_w)
+  UI.text(title, x + 12, r1, 11, color, "left", title_w)
   UI.text(node.quest_id or "", x + 12, r2, 7, Theme.withAlpha(color, 0.6),
     "left", title_w)
 
