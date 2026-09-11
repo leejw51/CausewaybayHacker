@@ -361,8 +361,18 @@ fn signal_of(_status: Option<&std::process::ExitStatus>) -> Option<i32> {
     None
 }
 
+/// The type `getrlimit` takes its resource as. glibc declares it as its own
+/// `__rlimit_resource_t` (an unsigned enum); macOS, musl and the BSDs use a
+/// plain `c_int`. `libc` mirrors each, so `libc::RLIMIT_AS` is a different
+/// type per platform and the helper has to take whichever it is — this was
+/// written on macOS and first compiled for Linux by CI.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+type RlimitResource = libc::__rlimit_resource_t;
+#[cfg(all(unix, not(all(target_os = "linux", target_env = "gnu"))))]
+type RlimitResource = libc::c_int;
+
 #[cfg(unix)]
-unsafe fn set_rlimit(resource: libc::c_int, value: u64) {
+unsafe fn set_rlimit(resource: RlimitResource, value: u64) {
     let mut current = libc::rlimit {
         rlim_cur: 0,
         rlim_max: 0,
