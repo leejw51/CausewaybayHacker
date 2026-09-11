@@ -23,6 +23,11 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0003_snippets",
         include_str!("../migrations/0003_snippets.sql"),
     ),
+    (
+        4,
+        "0004_awards",
+        include_str!("../migrations/0004_awards.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {
