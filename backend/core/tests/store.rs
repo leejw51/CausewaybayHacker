@@ -636,3 +636,110 @@ fn a_renumbered_boss_does_not_collide_with_its_replacement() {
             .cleared
     );
 }
+
+/// A client that fetches the map *while* a pack is being re-imported must see
+/// either the old map or the new one, never a mix.
+///
+/// This is not hypothetical: the LÖVE client caught `world.map` returning
+/// `rust.basic.12.traits` first, out of node order, with `world.lands`
+/// disagreeing with it in the same window. The cause was a row the old
+/// importer had stranded on node -12 — permanent, not transient — and the
+/// reconciliation above removes that state entirely. This test guards the
+/// property the fix depends on: the whole reconcile is one write transaction,
+/// so a reader on another connection is on a snapshot until it commits.
+#[test]
+fn a_reader_never_sees_a_half_reconciled_map() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+
+    // Big enough that the reconcile is not over before the reader's first
+    // look, and shaped so that *every* node number moves.
+    let old_shape: Vec<(i64, String)> = (1..=40).map(|n| (n, format!("old{n:02}"))).collect();
+    let new_shape: Vec<(i64, String)> = std::iter::once((1, "inserted".to_string()))
+        .chain((1..=40).map(|n| (n + 1, format!("old{n:02}"))))
+        .collect();
+    fn as_pairs(v: &[(i64, String)]) -> Vec<(i64, &str)> {
+        v.iter().map(|(n, s)| (*n, s.as_str())).collect()
+    }
+
+    let store = reimport(&home, tmp.path(), &pack_of(&as_pairs(&old_shape)));
+    let before = ids_and_nodes(&store);
+    drop(store);
+
+    let expected_after: Vec<(String, i64)> = new_shape
+        .iter()
+        .map(|(n, slug)| (format!("rust.basic.{n:02}.{slug}"), *n))
+        .collect();
+
+    let db_path = home.join("hacker.db");
+    let stop = Arc::new(AtomicBool::new(false));
+    let reader_stop = stop.clone();
+    let reader = std::thread::spawn(move || {
+        // A second connection to the same file — a running server, in effect.
+        let conn = cwbhacker_core::db::open(&db_path).expect("reader connects");
+        let mut seen: Vec<Vec<(String, i64)>> = Vec::new();
+        while !reader_stop.load(Ordering::Relaxed) || seen.len() < 2 {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, node FROM quests
+                      WHERE land='rust' AND category='basic' ORDER BY node",
+                )
+                .unwrap();
+            let rows: Vec<(String, i64)> = stmt
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+                .unwrap()
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .unwrap();
+            seen.push(rows);
+            if seen.len() > 4000 {
+                break;
+            }
+        }
+        seen
+    });
+
+    let src = content_dir(tmp.path(), &pack_of(&as_pairs(&new_shape)));
+    let store = Store::open(&home).unwrap();
+    {
+        let conn = store.conn();
+        let report = content::import_dir(&conn, store.home(), &src).unwrap();
+        assert!(report.failures.is_empty(), "{:?}", report.failures);
+    }
+    stop.store(true, Ordering::Relaxed);
+    let observations = reader.join().unwrap();
+
+    assert!(
+        observations.len() > 1,
+        "the reader never got a look in; the test proves nothing"
+    );
+    let mut saw_old = false;
+    let mut saw_new = false;
+    for (i, rows) in observations.iter().enumerate() {
+        // Whatever it saw, it must be a map: ordered, 1-based, no duplicates.
+        let nodes: Vec<i64> = rows.iter().map(|(_, n)| *n).collect();
+        assert!(
+            nodes.windows(2).all(|w| w[1] > w[0]),
+            "observation {i} came back out of node order: {nodes:?}"
+        );
+        assert!(
+            nodes.first().copied().unwrap_or(1) >= 1,
+            "observation {i} had a node below 1: {nodes:?}"
+        );
+        if *rows == before {
+            saw_old = true;
+        } else if *rows == expected_after {
+            saw_new = true;
+        } else {
+            panic!(
+                "observation {i} was neither the old map nor the new one: {} rows, nodes {:?}",
+                rows.len(),
+                nodes
+            );
+        }
+    }
+    assert!(saw_new, "the reader never saw the import land");
+    let _ = saw_old;
+}

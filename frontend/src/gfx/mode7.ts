@@ -216,11 +216,7 @@ export class Mode7 {
     const z = this.zoom.value;
     // Only what the push has bought. `1 - z` is how far in we are.
     const lean = Math.max(0, 1 - z) * Mode7.DIVE_LEAN * (reducedMotion() ? 0.4 : 1);
-    this.look(
-      0.5 + (this.fu.value - 0.5) * lean,
-      0.5 + (this.fv.value - 0.5) * lean,
-      z,
-    );
+    this.look(0.5 + (this.fu.value - 0.5) * lean, 0.5 + (this.fv.value - 0.5) * lean, z);
   }
 
   private look(u: number, v: number, zoom: number): void {
@@ -273,13 +269,7 @@ export class Mode7 {
    * draws in virtual pixels inset into the window. Both conversions live here
    * so that no caller can do one of them and forget the other.
    */
-  project(
-    u: number,
-    v: number,
-    ox: number,
-    oy: number,
-    scale: number,
-  ): [number, number] | null {
+  project(u: number, v: number, ox: number, oy: number, scale: number): [number, number] | null {
     if (!this.live) return null;
     const p = this.world(u, v).project(this.camera);
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;

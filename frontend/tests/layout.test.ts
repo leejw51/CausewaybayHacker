@@ -140,8 +140,29 @@ describe("the virtual canvas", () => {
     // The window is landscape; the player said portrait *here*, so portrait.
     expect(l.isPortrait()).toBe(true);
     expect(l.vw).toBeLessThanOrEqual(Math.floor(Theme.portW * 1.5));
-    l.toggleOrientation();
+    // F1 cycles landscape, portrait, automatic. Portrait is pinned, so the
+    // next press is the way out — back to following the window, which here is
+    // landscape — and the one after that starts the cycle again.
+    expect(l.cycleOrientation()).toBe("auto");
     expect(l.isPortrait()).toBe(false);
+    expect(l.cycleOrientation()).toBe("landscape");
+    expect(l.isPortrait()).toBe(false);
+    expect(l.cycleOrientation()).toBe("portrait");
+    expect(l.isPortrait()).toBe(true);
+  });
+
+  it("cycles from automatic into a choice and back out of it", () => {
+    windowOf(1080, 1730, 1);
+    const l = new Layout(canvasOf(1080, 1730));
+    l.measure();
+    expect(l.mode).toBe("portrait");
+    expect(l.cycleOrientation()).toBe("landscape");
+    expect(l.mode).toBe("landscape");
+    expect(l.cycleOrientation()).toBe("portrait");
+    expect(l.cycleOrientation()).toBe("auto");
+    expect(l.mode).toBe("portrait");
+    expect(l.ox).toBe(0);
+    expect(l.oy).toBe(0);
   });
 
   it("suspends a choice made in a window that is no longer on screen", () => {

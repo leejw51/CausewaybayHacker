@@ -108,7 +108,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
             continue;
         }
         tracing::info!(version, name, "applying migration");
-        conn.execute_batch("BEGIN")?;
+        conn.execute_batch("BEGIN IMMEDIATE")?;
         let applied = conn
             .execute_batch(sql)
             .and_then(|_| conn.execute_batch(&format!("PRAGMA user_version = {version}")));

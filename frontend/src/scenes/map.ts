@@ -305,8 +305,7 @@ export class MapScene implements Scene {
    */
   private road(a: MapNode, b: MapNode): { c: [number, number] } {
     let e = this.edges.findIndex(
-      ([f, t]) =>
-        (f === a.quest_id && t === b.quest_id) || (f === b.quest_id && t === a.quest_id),
+      ([f, t]) => (f === a.quest_id && t === b.quest_id) || (f === b.quest_id && t === a.quest_id),
     );
     if (e < 0) e = 0;
     // The plate's aspect, so "perpendicular" means perpendicular on screen and
@@ -725,7 +724,12 @@ export class MapScene implements Scene {
     const phase = walking ? (this.walk as { tween: Tween }).tween.raw * 14 : this.t * 2.2;
     // With a real four-frame cycle the body does not need a bob; the sprite has
     // one in it. The lozenge fallback still gets one, and so does standing.
-    const bob = strip && walking ? 0 : walking ? Math.abs(Math.sin(phase)) * h * 0.1 : Math.sin(phase) * h * 0.03;
+    const bob =
+      strip && walking
+        ? 0
+        : walking
+          ? Math.abs(Math.sin(phase)) * h * 0.1
+          : Math.sin(phase) * h * 0.03;
 
     // The shadow first: an ellipse on the ground at her feet.
     g.save();
@@ -761,17 +765,7 @@ export class MapScene implements Scene {
       g.save();
       g.translate(x, y - feet - bob);
       if (this.facing < 0) g.scale(-1, 1);
-      g.drawImage(
-        sheet,
-        i * strip.fw,
-        0,
-        strip.fw,
-        strip.fh,
-        -cw / 2,
-        0,
-        cw,
-        cellH * scale,
-      );
+      g.drawImage(sheet, i * strip.fw, 0, strip.fw, strip.fh, -cw / 2, 0, cw, cellH * scale);
       g.restore();
       return;
     }
@@ -878,7 +872,14 @@ export class MapScene implements Scene {
 
     const starX = ix + Math.round(col);
     label("STARS", starX);
-    drawStars(g, starX + Math.round(7 * s), valueY + Math.round(5 * s), Math.round(7 * s), n.stars, 3);
+    drawStars(
+      g,
+      starX + Math.round(7 * s),
+      valueY + Math.round(5 * s),
+      Math.round(7 * s),
+      n.stars,
+      3,
+    );
 
     const tryX = ix + Math.round(col * 2);
     label("TRIES", tryX);

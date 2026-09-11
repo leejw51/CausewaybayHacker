@@ -293,11 +293,7 @@ export class App {
    * change is an iris out of that point and back in; omitted, the two screens
    * slide past each other as they always have.
    */
-  async go(
-    next: Scene,
-    direction: Direction = "forward",
-    iris?: [number, number],
-  ): Promise<void> {
+  async go(next: Scene, direction: Direction = "forward", iris?: [number, number]): Promise<void> {
     const old = this.scene;
     old?.leave?.();
     // The outgoing screen keeps being drawn — its DOM overlay is already gone,
@@ -525,13 +521,21 @@ export class App {
   }
 
   /**
-   * Read back the saved orientation, and the window it was chosen in.
+   * Read back the saved orientation.
    *
-   * The shape is the whole point. A preference with no shape attached is what
-   * put the landscape layout into a window 1080 wide and 1730 tall and left
-   * nearly half of it empty: the choice outlived the window it was an answer
-   * to. Stored as `mode,w,h`; the older bare `portrait`/`landscape` still
-   * loads, and loses to the first window that decisively disagrees with it.
+   * Three things can be in there and they are three different values, which is
+   * the whole fix:
+   *
+   *   - `chosen,<mode>,<w>,<h>` — somebody pressed F1, in a window of that
+   *     shape. Honoured, and suspended only while a decisively different window
+   *     is on screen (`Layout.measure`).
+   *   - `auto` — somebody pressed F1 until it said automatic. Follow the window.
+   *   - a bare `portrait`/`landscape` — written by the build that had no such
+   *     distinction, where *restoring* a preference was recorded as *choosing*
+   *     one. It is read as **not pinned**, which is the safe side: it is the
+   *     exact record that put the landscape layout into a 1080x1730 window and
+   *     left 47% of it empty, and nothing in it says the player ever asked for
+   *     that.
    */
   private restoreOrientation(): void {
     let raw: string | null = null;
@@ -541,20 +545,27 @@ export class App {
       return;
     }
     if (!raw) return;
-    const [mode, w, h] = raw.split(",");
+    const parts = raw.split(",");
+    if (parts[0] !== "chosen") return;
+    const mode = parts[1];
     if (mode !== "portrait" && mode !== "landscape") return;
+    const w = +parts[2];
+    const h = +parts[3];
     const shape: [number, number] | null =
-      w && h && Number.isFinite(+w) && Number.isFinite(+h) ? [+w, +h] : null;
+      Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 ? [w, h] : null;
     this.layout.pin(mode as Orientation, shape);
   }
 
-  private saveOrientation(): void {
+  private saveOrientation(
+    picked: Orientation | "auto" = this.layout.isPortrait() ? "portrait" : "landscape",
+  ): void {
     try {
+      if (picked === "auto") {
+        localStorage.setItem(ORIENT_KEY, "auto");
+        return;
+      }
       const [w, h] = this.layout.choiceShape;
-      localStorage.setItem(
-        ORIENT_KEY,
-        `${this.layout.isPortrait() ? "portrait" : "landscape"},${w},${h}`,
-      );
+      localStorage.setItem(ORIENT_KEY, `chosen,${picked},${w},${h}`);
     } catch {
       /* the choice still holds for this session */
     }
@@ -770,10 +781,14 @@ export class App {
       // both orientations first-class, so the toggle cannot belong to the map.
       if (name === "f1") {
         ev.preventDefault();
-        this.layout.toggleOrientation();
+        const picked = this.layout.cycleOrientation();
         this.remeasure();
-        this.saveOrientation();
-        this.say(`orientation: ${this.layout.isPortrait() ? "portrait" : "landscape"}`);
+        this.saveOrientation(picked);
+        this.say(
+          picked === "auto"
+            ? "orientation: automatic — follows the window"
+            : `orientation: ${picked}`,
+        );
         return;
       }
       // F2 is the tube. On by default and remembered, because a scanline mask

@@ -1,10 +1,9 @@
 -- LOGIN. A mnemonic (or a private key) goes in; a signature goes out.
 --
--- Three modes, because a first-time player owns neither:
+-- Two modes, because a first-time player owns neither:
 --
 --   signin   — type a phrase you already have
 --   new_show — twelve freshly generated words, on screen, to write down
---   new_confirm — three of them typed back, before the wallet is used
 --
 -- SPEC §3.1 and PROTOCOL §4.3, restated as a screen:
 --
@@ -17,16 +16,23 @@
 --   * nothing about the phrase is ever printed, toasted or logged. The
 --     status line says "deriving" and "signing", not what it is signing.
 --
--- ## Why the confirmation is a typed word and not a checkbox
+-- ## There is no confirmation step, and that is deliberate
 --
--- The phrase is the account. There is no reset, no email, no support desk —
--- SPEC §3 makes the wallet the identity, so a phrase that was never actually
--- written down is an account that ends the first time the machine does. A
--- checkbox measures whether the player clicked a checkbox. Typing three of
--- the twelve words back, with the list hidden, measures the thing that
--- matters. `B` puts the list back up for somebody who genuinely needs it,
--- because a confirmation nobody can pass is a confirmation people work
--- around.
+-- An earlier version hid the list and made the player type three of the
+-- twelve words back before the wallet could be used. The argument for it was
+-- that the phrase *is* the account (SPEC §3), so a phrase never actually
+-- written down is an account that ends with the machine.
+--
+-- The user looked at the screen and decided the friction was not worth it:
+-- **`I HAVE WRITTEN IT DOWN` derives, signs and logs straight in.** It is
+-- their wallet and their call.
+--
+-- A softer gate — a checkbox, one word instead of three — is deliberately
+-- *not* here. A half-gate costs the interruption without buying the check,
+-- which is the worst of both. What does the work instead is the copy and the
+-- address: the words are on screen, the line says in as many words that this
+-- is the only copy and there is no reset, and the account the phrase derives
+-- is shown so it can be checked against the paper later.
 --
 -- And the failure this screen has to handle well: **the FFI library is not
 -- built.** That is the most likely first-run state in a fresh checkout, and
@@ -43,7 +49,6 @@ local Login = {}
 Login.__index = Login
 
 local FIELDS = { "secret", "name" }
-local CONFIRM_COUNT = 3
 
 function Login.new(app)
   return setmetatable({
@@ -57,12 +62,9 @@ function Login.new(app)
     error = nil,
     busy = false,
     t = 0,
-    -- new_show / new_confirm
-    words = nil,       -- the generated phrase, split
+    -- new_show
+    words = nil,       -- the generated phrase, split; dropped on leaving
     new_address = nil,
-    asked = nil,       -- the word indices the player has to type back
-    answers = nil,
-    answer_focus = 1,
   }, Login)
 end
 
@@ -88,8 +90,7 @@ function Login:discard()
   end
   Wallet.forget(self, "words")
   self.words = nil
-  self.answers = nil
-  self.asked = nil
+  self.new_address = nil
 end
 
 function Login:field()
@@ -144,36 +145,17 @@ function Login:new_wallet()
   SFX.play("select")
 end
 
---- Pick the words the player has to type back: distinct, spread out, and
---- chosen fresh each time so the answer cannot be learned.
-function Login:begin_confirm()
-  local pool = {}
-  for i = 1, #self.words do pool[i] = i end
-  for i = #pool, 2, -1 do
-    local j = love.math.random(1, i)
-    pool[i], pool[j] = pool[j], pool[i]
-  end
-  local asked = {}
-  for i = 1, CONFIRM_COUNT do asked[i] = pool[i] end
-  table.sort(asked)
-  self.asked = asked
-  self.answers = { "", "", "" }
-  self.answer_focus = 1
-  self.mode = "new_confirm"
-  self.error = nil
-end
-
-function Login:check_confirm()
-  for i, index in ipairs(self.asked) do
-    local given = (self.answers[i] or ""):lower():gsub("%s", "")
-    if given ~= self.words[index] then
-      self.error = ("word %d is not right — press B to see the list again"):format(index)
-      SFX.play("rejected")
-      return
-    end
-  end
-  SFX.play("accepted")
-  self:submit(table.concat(self.words, " "))
+--- `I HAVE WRITTEN IT DOWN`: derive, sign, log in, straight to the map.
+---
+--- Safe on a double press. The first call takes the phrase; `submit` sets
+--- `busy` and calls `discard`, so every later call finds `words` already nil.
+--- Two presses a frame apart create one account and send one
+--- `auth.challenge`, not two racing each other.
+function Login:create_wallet()
+  if self.busy or not self.words then return end
+  local phrase = table.concat(self.words, " ")
+  self:submit(phrase)
+  phrase = nil
 end
 
 -- ------------------------------------------------------------------ signing
@@ -202,12 +184,11 @@ function Login:submit(phrase)
   SFX.play("select")
 
   -- Back to the sign-in panel *before* the phrase is dropped. `discard`
-  -- clears `words`, `asked` and `answers`, and the confirm panel draws all
-  -- three — leaving the mode set would raise inside `draw` on the very next
-  -- frame, which is a blank error screen at the exact moment the player's
-  -- brand-new wallet is being created.
+  -- clears `words`, and the WRITE THIS DOWN panel draws from it — leaving the
+  -- mode set would raise inside `draw` on the very next frame, which is a
+  -- blank error screen at the exact moment the player's brand-new wallet is
+  -- being created. (It did, once.)
   self.mode = "signin"
-  self.answer_focus = 1
   -- Every copy this scene holds goes now; the only one left is the local
   -- argument, which `Session:login` drops as soon as a signature exists.
   self.secret = ""
@@ -267,7 +248,11 @@ function Login:panel_rect()
   -- The word grid is three columns of four in landscape and two of six in
   -- portrait, so the panel is shorter in the orientation with more room
   -- across. Sized to the content rather than to the screen.
-  local ph = math.min(vh - 48, portrait and (tall and 600 or 520) or (tall and 380 or 400))
+  -- Sized to the content. The word grid is three columns of four in
+  -- landscape and two of six in portrait, so the panel is shorter in the
+  -- orientation with more room across; the confirmation step that used to
+  -- need the extra height is gone.
+  local ph = math.min(vh - 48, portrait and (tall and 560 or 520) or (tall and 330 or 400))
   return (vw - pw) / 2, (vh - ph) / 2 - (portrait and 30 or 0), pw, ph
 end
 
@@ -289,8 +274,6 @@ function Login:draw()
     self:draw_no_library(inner, ph)
   elseif self.mode == "new_show" then
     self:draw_new_show(inner, ph)
-  elseif self.mode == "new_confirm" then
-    self:draw_new_confirm(inner, ph)
   else
     self:draw_signin(inner, ph)
   end
@@ -313,8 +296,7 @@ function Login:draw()
 
   local hints = {
     signin = "TAB field   F2 reveal   N new wallet   ENTER sign in   F11 fullscreen",
-    new_show = "ENTER continue   C copy   ESC cancel",
-    new_confirm = "TAB field   B show the words again   ENTER confirm",
+    new_show = "ENTER create and sign in   C copy   ESC cancel",
   }
   self.app:footer(hints[self.mode] or "")
 end
@@ -363,8 +345,8 @@ function Login:draw_new_show(inner, ph)
   if not self.words then return end
   local s = Layout.uiScale()
   UI.text("WRITE THIS DOWN", 0, 0, math.floor(15 * s), Theme.coin)
-  UI.text("these twelve words ARE the account. there is no reset.",
-    0, 22, 8, Theme.red)
+  -- The copy is doing the work now that nothing gates the button.
+  UI.text("this is the only copy. there is no reset.", 0, 22, 8, Theme.red)
 
   -- The grid: three columns of four in landscape, two of six in portrait, so
   -- the numbers stay in reading order either way.
@@ -396,8 +378,10 @@ function Login:draw_new_show(inner, ph)
   end
 
   local y = top + rows * rh + 16
+  -- Kept on screen on purpose: it is how a player checks later that the
+  -- paper in the drawer is the account they are signed in to.
   UI.text("this wallet:  " .. tostring(self.new_address), 0, y, 7,
-    Theme.withAlpha(Theme.cream, 0.6))
+    Theme.withAlpha(Theme.coin, 0.85))
   y = y + 16
 
   for _, line in ipairs(UI.wrap(
@@ -409,35 +393,12 @@ function Login:draw_new_show(inner, ph)
 
   local bh = 30
   local by = math.min(ph - 78, y + 12)
-  UI.button(0, by, inner, bh, "I HAVE WRITTEN THEM DOWN  [ENTER]", "hot")
+  UI.button(0, by, inner, bh,
+    self.busy and "SIGNING…" or "I HAVE WRITTEN IT DOWN  [ENTER]",
+    self.busy and "disabled" or "hot")
   self.show_button = { y = by, h = bh }
-end
-
-function Login:draw_new_confirm(inner, ph)
-  if not (self.asked and self.answers) then return end
-  local s = Layout.uiScale()
-  UI.text("CONFIRM", 0, 0, math.floor(15 * s), Theme.coin)
-  for i, line in ipairs(UI.wrap(
-    "From your paper, not from memory. Type these three words back.", inner, 8)) do
-    UI.text(line, 0, 22 + (i - 1) * 11, 8, Theme.withAlpha(Theme.cream, 0.8))
-  end
-
-  local y = 56
-  for i, index in ipairs(self.asked) do
-    field_box(y + 14, inner, 30, ("WORD %d"):format(index),
-      self.answers[i] or "", self.answer_focus == i, "")
-    y = y + 58
-  end
-
-  local bh = 30
-  local by = math.min(ph - 76, y + 6)
-  local ready = true
-  for i = 1, #self.asked do
-    if (self.answers[i] or "") == "" then ready = false end
-  end
-  UI.button(0, by, inner, bh, self.busy and "SIGNING…" or "CREATE WALLET  [ENTER]",
-    (ready and not self.busy) and "hot" or "disabled")
-  self.confirm_button = { y = by, h = bh }
+  UI.text("this signs in and takes you to the map.", 0, by + bh + 8, 7,
+    Theme.withAlpha(Theme.cream, 0.55))
 end
 
 function Login:draw_no_library(inner, ph)
@@ -473,15 +434,6 @@ end
 
 function Login:textinput(text)
   if self.busy or not self.app.wallet_lib then return end
-  if self.mode == "new_confirm" then
-    local i = self.answer_focus
-    -- Only letters: every BIP-39 word is lowercase a-z, so a stray space or
-    -- digit is a typo, not an answer.
-    if text:match("^%a$") then
-      self.answers[i] = (self.answers[i] or "") .. text:lower()
-    end
-    return
-  end
   if self.mode ~= "signin" then return end
   local name = self:field()
   self[name] = self[name] .. text
@@ -496,7 +448,7 @@ function Login:keypressed(key, mods)
   -- ------------------------------------------------------------ new_show
   if self.mode == "new_show" then
     if key == "return" or key == "kpenter" or key == "space" then
-      self:begin_confirm()
+      self:create_wallet()
       return true
     end
     if key == "c" or (cmd and key == "c") then
@@ -513,46 +465,6 @@ function Login:keypressed(key, mods)
       return true
     end
     return true -- the screen is modal: nothing else happens while it is up
-  end
-
-  -- --------------------------------------------------------- new_confirm
-  if self.mode == "new_confirm" then
-    if key == "b" then
-      self.mode = "new_show"
-      self.error = nil
-      return true
-    end
-    if key == "tab" then
-      local step = mods.shift and -1 or 1
-      self.answer_focus = ((self.answer_focus - 1 + step) % #self.asked) + 1
-      SFX.play("move")
-      return true
-    end
-    if key == "down" then self.answer_focus = (self.answer_focus % #self.asked) + 1; return true end
-    if key == "up" then
-      self.answer_focus = ((self.answer_focus - 2) % #self.asked) + 1
-      return true
-    end
-    if key == "backspace" then
-      local i = self.answer_focus
-      self.answers[i] = (self.answers[i] or ""):sub(1, -2)
-      return true
-    end
-    if key == "return" or key == "kpenter" then
-      if self.answer_focus < #self.asked and (self.answers[self.answer_focus] or "") ~= "" then
-        self.answer_focus = self.answer_focus + 1
-        return true
-      end
-      self:check_confirm()
-      return true
-    end
-    if key == "escape" then
-      self:discard()
-      self.mode = "signin"
-      SFX.play("back")
-      return true
-    end
-    return true
   end
 
   -- -------------------------------------------------------------- signin
@@ -607,15 +519,7 @@ function Login:mousepressed(x, y)
   end
 
   if self.mode == "new_show" then
-    if hit(self.show_button) then self:begin_confirm() end
-    return
-  end
-  if self.mode == "new_confirm" then
-    for i = 1, #self.asked do
-      local top = 56 + (i - 1) * 58 + 14
-      if ly >= top and ly <= top + 30 then self.answer_focus = i; return end
-    end
-    if hit(self.confirm_button) then self:check_confirm() end
+    if hit(self.show_button) then self:create_wallet() end
     return
   end
 

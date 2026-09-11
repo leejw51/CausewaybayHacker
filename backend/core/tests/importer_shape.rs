@@ -35,9 +35,8 @@ const ALICE: &str = "0x9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f";
 /// §12 requires — `"""` would process the `\n` in `expect` and quietly
 /// rewrite the content.
 fn pack_of(quests: &[(u32, &str)]) -> String {
-    let mut out = String::from(
-        "pack = \"rust.basic\"\nland = \"rust\"\ncategory = \"basic\"\nversion = 1\n",
-    );
+    let mut out =
+        String::from("pack = \"rust.basic\"\nland = \"rust\"\ncategory = \"basic\"\nversion = 1\n");
     for (i, (node, slug)) in quests.iter().enumerate() {
         let requires = if i == 0 {
             String::from("[]")
@@ -247,7 +246,10 @@ fn a_removed_quest_leaves_nothing_behind_and_the_survivors_keep_their_progress()
     let conn = store.conn();
     // The quest that did not move keeps everything.
     let kept = progress::get(&conn, ALICE, "rust.basic.01.hello").unwrap();
-    assert!(kept.cleared, "a clear was lost to an edit elsewhere in the pack");
+    assert!(
+        kept.cleared,
+        "a clear was lost to an edit elsewhere in the pack"
+    );
     assert_eq!(kept.stars, 3, "the grade was lost to an edit elsewhere");
 
     // The quest that was renumbered is, by SPEC §4.1, a different quest: the
@@ -296,7 +298,11 @@ fn a_boss_moving_to_the_end_of_a_longer_map_is_not_a_collision() {
     let src = write_pack(tmp.path(), &pack_of(&after));
     import(&store, &src);
 
-    assert_agrees(&store, &src, "after the boss moved to the end of a longer map");
+    assert_agrees(
+        &store,
+        &src,
+        "after the boss moved to the end of a longer map",
+    );
     let rows = shape(&store);
     assert_eq!(rows.len(), 18, "the grown map is not all there");
     assert_eq!(rows[17].1, "rust.basic.18.traits", "the boss did not move");
@@ -313,9 +319,23 @@ fn a_boss_moving_to_the_end_of_a_longer_map_is_not_a_collision() {
 /// A stable slug per node, so a growing map is reproducible.
 fn slug_for(n: u32) -> &'static str {
     const SLUGS: [&str; 17] = [
-        "hello", "bindings", "sum", "shadowing", "slices", "strings", "vectors", "maps",
-        "structs", "enums", "options", "results", "iterators", "closures", "generics",
-        "errors", "modules",
+        "hello",
+        "bindings",
+        "sum",
+        "shadowing",
+        "slices",
+        "strings",
+        "vectors",
+        "maps",
+        "structs",
+        "enums",
+        "options",
+        "results",
+        "iterators",
+        "closures",
+        "generics",
+        "errors",
+        "modules",
     ];
     SLUGS[(n as usize - 1) % SLUGS.len()]
 }
@@ -352,7 +372,10 @@ fn an_import_that_cannot_be_applied_is_reported_and_not_swallowed() {
         "a pack with a node gap imported cleanly; SPEC §12 says it is refused"
     );
     let (path, reason) = &report.failures[0];
-    assert!(path.contains("basic.toml"), "the failure names the file: {path}");
+    assert!(
+        path.contains("basic.toml"),
+        "the failure names the file: {path}"
+    );
     assert!(
         !reason.is_empty(),
         "the failure has no reason, so nobody can act on it"

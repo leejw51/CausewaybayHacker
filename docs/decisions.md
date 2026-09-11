@@ -1717,3 +1717,42 @@ depends on array order for correctness — positions come from `x`/`y`, paths
 from `edges`, labels from `node.node` — but "the first node the player can
 play" is a walk over that list, and one sort makes the screen right whatever
 arrives.
+
+## 2026-09-11 — L2D: the new-wallet confirmation is removed, at the user's call
+
+`I HAVE WRITTEN IT DOWN` now derives, signs and logs straight in. The three-
+word type-back is gone.
+
+I argued for that gate and the argument still holds on its own terms — the
+phrase *is* the account (SPEC §3), so one never actually written down is an
+account that ends with the machine. The user looked at the screen and decided
+the friction was not worth it. It is their wallet and their call, and it is
+settled.
+
+**No softer gate was substituted.** Not a checkbox, not one word instead of
+three. A half-gate costs the interruption without buying the check, which is
+the worst of both — so what does the work now is the copy and the address:
+the words on screen, "this is the only copy. there is no reset." in red, and
+the account the phrase derives shown beside it so a player can check the paper
+in the drawer against what they are signed in to later. `src/scenes/login.lua`
+says all of this in its header, so the next person to read that file finds the
+reasoning rather than re-deriving it and re-adding the gate.
+
+**Unchanged:** the ABI. `generate` returning the phrase exactly once is still
+the design, still version 2, still the only op that returns key material, and
+`describe()` still declares it. Only the screen flow moved.
+
+Two properties the flow has to keep, both now asserted by
+`tests/drive/newwallet.lua` against the live server:
+
+* **a double press creates one account.** The button is the whole gate now, so
+  a fast double-tap must not race two `auth.challenge`s. `create_wallet`
+  returns early on `busy` *or* on `words` already being nil, and `submit`
+  clears both before the first request goes out. Observed:
+  `double press: 1 auth.challenge, 1 auth.login`.
+* **the phrase does not outlive the screen**, whether it was used or
+  cancelled. Observed: `cancel: phrase dropped, no account created` and
+  `phrase: gone from Lua state after signing in`.
+
+*FE: the model I passed on earlier is withdrawn — the browser should not gate
+either, and should not gate more softly.*

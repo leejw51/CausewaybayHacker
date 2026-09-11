@@ -481,7 +481,13 @@ pub fn checksum(quest: &QuestDef) -> Result<String> {
 /// somewhere nothing can collide with, then write the real numbers.
 fn apply(conn: &Connection, pack: &Pack) -> Result<PackCounts> {
     let ids: Vec<String> = pack.quests.iter().map(|q| q.id.clone()).collect();
-    conn.execute_batch("BEGIN")?;
+    // IMMEDIATE, not deferred: the write lock is taken before the first
+    // statement rather than part-way through, so a second writer fails here
+    // instead of half-way through a reconciliation. In WAL mode every reader
+    // stays on the snapshot it started with until this commits, which is what
+    // makes the map a client fetches mid-import either wholly the old one or
+    // wholly the new one — never a boss sitting at node -12.
+    conn.execute_batch("BEGIN IMMEDIATE")?;
     let result = reconcile(conn, pack, &ids);
     match result {
         Ok(counts) => {

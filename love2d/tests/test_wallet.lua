@@ -139,6 +139,20 @@ return function()
     end
   end)
 
+  T.case("the phrase is the only key material that ever comes back", function()
+    -- `generate` is the one sanctioned exception (love2d/ffi/src/lib.rs), and
+    -- it is bounded: a phrase, and things derived from it that are safe to
+    -- show. No private key, no seed, in this response or any other.
+    local out = wallet.generate(lib, 12)
+    T.ok(out ~= nil)
+    local keys = {}
+    for k in pairs(out) do keys[#keys + 1] = k end
+    table.sort(keys)
+    T.same(keys, { "address", "address_lower", "mnemonic", "ok", "path", "words" })
+    -- And the phrase really is a phrase, not a key.
+    T.nope(wallet.looks_like_private_key(out.mnemonic))
+  end)
+
   T.case("a word count BIP-39 does not have is refused, with no phrase", function()
     local out, err = wallet.generate(lib, 13)
     T.eq(out, nil)

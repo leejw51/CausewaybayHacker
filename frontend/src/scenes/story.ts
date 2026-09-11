@@ -63,10 +63,7 @@ const BEATS: Beat[] = [
     bg: "open_flat",
     cut: "fade",
     hold: 1.4,
-    lines: [
-      "TUESDAY, 06:40.",
-      "Mei opens the editor above Jardine's Bazaar to fix one function.",
-    ],
+    lines: ["TUESDAY, 06:40.", "Mei opens the editor above Jardine's Bazaar to fix one function."],
   },
   {
     bg: "open_cursor",
@@ -375,8 +372,7 @@ export class StoryScene implements Scene {
       return;
     }
     const zoom = 1 + ken * 0.07;
-    const scale =
-      Math.max(layout.vw / img.naturalWidth, layout.vh / img.naturalHeight) * zoom;
+    const scale = Math.max(layout.vw / img.naturalWidth, layout.vh / img.naturalHeight) * zoom;
     const aw = img.naturalWidth * scale;
     const ah = img.naturalHeight * scale;
     g.save();
@@ -448,7 +444,15 @@ export class StoryScene implements Scene {
     g.save();
     g.globalAlpha = Math.min(1, this.logoIn.raw * 2);
     g.translate(0, (1 - t) * Math.round(20 * s));
-    neonPrint(g, fonts.title, "CAUSEWAYBAY", cy - fonts.title.height, layout.vw, Theme.cyan, this.t);
+    neonPrint(
+      g,
+      fonts.title,
+      "CAUSEWAYBAY",
+      cy - fonts.title.height,
+      layout.vw,
+      Theme.cyan,
+      this.t,
+    );
     neonPrint(
       g,
       fonts.title,

@@ -158,6 +158,13 @@ const SUITES = [
     cmd: [
       "python3",
       "tests/content/verify_pack.py",
+      // PM's two newer gates, both worth having in CI:
+      //   * a brief's worked example must match a visible case — it caught a
+      //     quest whose brief showed `1 3` where its test expected `3 1`,
+      //     unsolvable as written and invisible to every other check;
+      //   * `--complete` fails on a concept slug no §7.1 mistake kind can
+      //     reach, so the AI drills cannot be pointed at a dead end.
+      "--complete",
       "content/rust/basic.toml",
       "content/rust/advanced.toml",
       "content/rust/hacker.toml",

@@ -7,8 +7,10 @@ both clients derive it the same way.
 
 **No wallet yet?** The login screen's **NEW WALLET** button makes one: twelve
 words from the operating system's CSPRNG, generated offline inside
-`love2d/ffi`, shown once to write down, and confirmed by typing three of them
-back before the account is used. Nothing about it touches the network.
+`love2d/ffi`, shown once with the address they derive. **I HAVE WRITTEN IT
+DOWN** signs you in; **ESC** backs out and nothing is created. Nothing about
+it touches the network, and the phrase is dropped from memory the moment you
+leave the screen — it is written down or it is gone.
 
 ```
     love2d (LuaJIT)                  server (Rust)               host

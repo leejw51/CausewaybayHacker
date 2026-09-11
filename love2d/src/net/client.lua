@@ -103,6 +103,7 @@ function M.new(opts)
 
     counter = 0,
     pending = {},          -- id -> { type, cb, sent_at }
+    sent_types = {},       -- a bounded history of request types, for tests
     handlers = {},         -- type -> { fn, ... }  server-initiated events
     state_handlers = {},
     unknown_types = {},    -- type -> count, for §8 point 3
@@ -567,6 +568,11 @@ function Client:request(type_name, payload, cb)
     return nil, "could not encode the frame"
   end
   self.pending[id] = { type = type_name, cb = cb, sent_at = self.now() }
+  -- A short log of what actually went out, newest last. Bounded, and kept
+  -- because "did a double press send two of these?" is otherwise unanswerable
+  -- from outside — the pending table is empty again by the time anybody asks.
+  self.sent_types[#self.sent_types + 1] = type_name
+  if #self.sent_types > 64 then table.remove(self.sent_types, 1) end
   self:push(frame)
   return id
 end

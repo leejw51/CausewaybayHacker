@@ -105,6 +105,13 @@ export class Layout {
     if (window.innerHeight > window.innerWidth) this.mode = "portrait";
   }
 
+  /** Follow the window again. The third state, and the way out of a pin. */
+  auto(): void {
+    this.pinned = null;
+    this.pinnedShape = null;
+    this.measure();
+  }
+
   /**
    * Restore a saved orientation.
    *
@@ -152,13 +159,32 @@ export class Layout {
     return this.mode === "portrait";
   }
 
-  toggleOrientation(): void {
-    this.mode = this.mode === "landscape" ? "portrait" : "landscape";
-    this.pinned = this.mode;
+  /**
+   * The orientation key: landscape, then portrait, then back to following the
+   * window.
+   *
+   * Three states, not two. A two-way toggle strands a player who has pinned an
+   * orientation with no way back to automatic — the only exit is clearing site
+   * data — and "no way back" is half of why a stale pin was able to put the
+   * landscape layout into a window shaped like a column. (L2D reached the same
+   * conclusion on the LÖVE client and this matches it deliberately.)
+   *
+   * @returns what the key just selected, for the player to be told.
+   */
+  cycleOrientation(): Orientation | "auto" {
+    const next =
+      this.pinned === null ? "landscape" : this.pinned === "landscape" ? "portrait" : null;
+    if (next === null) {
+      this.auto();
+      return "auto";
+    }
+    this.mode = next;
+    this.pinned = next;
     // The choice is about *this* window. Recorded before `measure`, because
     // `dw`/`dh` still hold the window the key was pressed in.
     this.pinnedShape = [this.dw, this.dh];
     this.measure();
+    return next;
   }
 
   /**

@@ -25,10 +25,18 @@
  * the project could produce twelve words — a player who had never run
  * `CausewaybayWallet` was simply locked out of the front door.
  *
- * A generated phrase is shown once, on a panel that says so, and the player has
- * to say they have written it down before it goes anywhere near the field. It
- * lives in one field on this scene, is wiped in `leave()`, and is never logged,
- * never stored and never sent.
+ * A generated phrase is shown once, on a panel that says so, and
+ * `I HAVE WRITTEN IT DOWN` signs in with it — it does not go back to the form
+ * and it does not ask for three of the words back. There *was* a gate here: the
+ * player had to type three of the twelve before the phrase would be accepted.
+ * It is gone at the user's instruction, and what that costs is worth stating
+ * once: somebody who clicks past the words without writing them down now loses
+ * the account with nothing to catch them. The warning on the panel is the whole
+ * of the protection, which is why the warning stays exactly as written.
+ *
+ * The phrase lives in one field on this scene, is dropped the instant it has
+ * been used, is wiped in `leave()`, and is never logged, never stored and never
+ * sent.
  */
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
@@ -54,16 +62,16 @@ import { StoryScene } from "./story";
 /** The empty field's own instructions, restored whenever it is handed back. */
 const FIELD_HINT = "twelve words, or 0x + 64 hex";
 
-/** Why the gate is here, in the two lines it takes to say it. */
-const QUIZ_INTRO =
-  "Read three back off the paper, in this order. There is no reset and nobody can send them to you again.";
-
 /**
  * How many rows a set of labels wraps to inside `width`, at the same gap
  * `Buttons.row` uses. Kept next to the one screen that needs it rather than in
  * `chrome.ts`, because the answer depends on the exact label list.
  */
-function rowsFor(f: { size: number; css: string; height: number }, width: number, labels: string[]) {
+function rowsFor(
+  f: { size: number; css: string; height: number },
+  width: number,
+  labels: string[],
+) {
   const gap = Math.round(f.size * 0.5);
   let rows = 1;
   let x = 0;
@@ -93,12 +101,6 @@ export class LoginScene implements Scene {
    * held here and nowhere else, and `leave()` drops it.
    */
   private minted: string[] | null = null;
-  /**
-   * Which three words are being asked for, zero-based, once the list has been
-   * put away. Null while the list is still up.
-   */
-  private quiz: number[] | null = null;
-  private quizError = "";
   private t = 0;
   private readonly leftIn = new Tween(seconds("panel"));
   private readonly rightIn = new Tween(seconds("panel"), seconds("stagger"));
@@ -134,96 +136,39 @@ export class LoginScene implements Scene {
     // Whatever is in the box is key material. It does not outlive the screen.
     this.field.value = "";
     this.minted = null;
-    this.quiz = null;
     this.overlay.destroy();
   }
 
   /** Twelve new words, shown once. Nothing is sent and nothing is stored. */
   private mint(): void {
+    if (this.busy) return;
     this.minted = newMnemonic().split(" ");
     this.preview = addressFromMnemonic(this.minted.join(" ")).eip55;
     this.status = "";
-    this.quiz = null;
-    this.quizError = "";
     this.field.value = "";
   }
 
   /**
-   * Put the list away and ask for three of the words back.
+   * `I HAVE WRITTEN IT DOWN`: sign in with the phrase that is on screen.
    *
-   * Not a checkbox. SPEC §3 makes the wallet the identity: there is no reset
-   * and there is no support desk, so a phrase that was never actually written
-   * down is an account that ends with the machine. A checkbox measures whether
-   * somebody can click a checkbox. (L2D reached the same conclusion for the
-   * LÖVE client and this matches it deliberately, so the two clients do not
-   * disagree about how serious the moment is.)
-   *
-   * The three are drawn from `crypto.getRandomValues` rather than
-   * `Math.random`, for the same reason the phrase is: nothing predictable goes
-   * anywhere near this screen.
+   * The words are taken and the field holding them is cleared *before* the
+   * first await, which is what makes a double press safe — the second one finds
+   * nothing to log in with and `busy` is already set anyway, so one account is
+   * created and one challenge is asked for, not two racing.
    */
-  private askBack(): void {
-    if (!this.minted) return;
-    const pick = new Set<number>();
-    const draw = new Uint8Array(1);
-    while (pick.size < 3) {
-      crypto.getRandomValues(draw);
-      pick.add(draw[0] % this.minted.length);
-    }
-    this.quiz = [...pick].sort((a, b) => a - b);
-    this.quizError = "";
-    this.field.value = "";
-    this.field.placeholder = "the three words, in order, separated by spaces";
-    queueMicrotask(() => this.field.focus());
-  }
-
-  /** Back to the list, for somebody who genuinely needs another look. */
-  private showAgain(): void {
-    this.quiz = null;
-    this.quizError = "";
-    this.field.value = "";
-    this.field.placeholder = FIELD_HINT;
-  }
-
-  /**
-   * Check the three, then hand the phrase over.
-   *
-   * Only on a pass does the phrase reach the field, so the words cannot be
-   * quietly submitted from behind the panel that is telling somebody to write
-   * them down.
-   */
-  private checkBack(): void {
+  private takeMinted(): void {
+    if (this.busy) return;
     const words = this.minted;
-    const quiz = this.quiz;
-    if (!words || !quiz) return;
-    const typed = this.field.value.trim().toLowerCase().split(/\s+/u).filter(Boolean);
-    if (typed.length !== quiz.length) {
-      this.quizError = `three words, in order — ${quiz.map((i) => i + 1).join(", ")}`;
-      return;
-    }
-    for (let i = 0; i < quiz.length; i++) {
-      if (typed[i] !== words[quiz[i]]) {
-        // Say which one, by its number. "Wrong" with no handle on it is a
-        // dead end, and the list is one keypress away anyway.
-        this.quizError = `word ${String(quiz[i] + 1).padStart(2, "0")} is not right`;
-        return;
-      }
-    }
-    this.field.value = words.join(" ");
-    this.field.placeholder = FIELD_HINT;
+    if (!words) return;
     this.minted = null;
-    this.quiz = null;
-    this.quizError = "";
-    this.status = "the phrase is in the box — press ENTER";
-    this.derivePreview();
-    queueMicrotask(() => this.field.focus());
+    void this.signIn(words.join(" "));
   }
 
   private derivePreview(): void {
-    // While a minted phrase is in play the field holds three words, not a
-    // phrase, so deriving from it would throw and blank the address the list
-    // panel is showing. The preview belongs to the typed-phrase path only.
-    if (this.minted || this.quiz) return;
+    // While a minted phrase is on screen the preview belongs to *it*, and a
+    // stray keystroke in the field must not blank the address the panel is
+    // showing. The preview belongs to the typed-phrase path only.
+    if (this.minted) return;
     const text = this.field.value.trim();
     this.status = "";
     if (!text) {
@@ -248,6 +193,15 @@ export class LoginScene implements Scene {
       this.status = "type a seed phrase first";
       return;
     }
+    await this.signIn(text);
+  }
+
+  /**
+   * Derive, sign the server's challenge, and go. One path, whether the phrase
+   * was typed into the field or handed out by this screen a second ago.
+   */
+  private async signIn(text: string): Promise<void> {
+    if (this.busy) return;
     this.busy = true;
     this.status = "deriving";
     try {
@@ -298,13 +252,9 @@ export class LoginScene implements Scene {
     if (hit.id === "enter") void this.submit();
     if (hit.id === "new") this.mint();
     if (hit.id === "story") void this.app.go(new StoryScene(this.app, true), "forward");
-    if (hit.id === "keep") this.askBack();
-    if (hit.id === "confirm") this.checkBack();
-    if (hit.id === "again") this.showAgain();
+    if (hit.id === "keep") this.takeMinted();
     if (hit.id === "discard") {
       this.minted = null;
-      this.quiz = null;
-      this.quizError = "";
       this.preview = "";
       this.field.value = "";
       this.field.placeholder = FIELD_HINT;
@@ -328,8 +278,7 @@ export class LoginScene implements Scene {
       // While a new phrase is in play, Enter means "check what I typed" or
       // "yes, put the list away" — never "log in with a phrase I have not
       // written down yet".
-      if (this.quiz) this.checkBack();
-      else if (this.minted) this.askBack();
+      if (this.minted) this.takeMinted();
       else void this.submit();
     }
   }
@@ -414,11 +363,9 @@ export class LoginScene implements Scene {
     g.save();
     g.globalAlpha = Math.min(1, this.rightIn.raw * 2.2);
     g.translate(0, drop);
-    const bottom = this.quiz
-      ? this.drawQuiz(g, colX, cardY, colW)
-      : this.minted
-        ? this.drawPhrase(g, colX, cardY, colW)
-        : this.drawKeyCard(g, colX, cardY, colW);
+    const bottom = this.minted
+      ? this.drawPhrase(g, colX, cardY, colW)
+      : this.drawKeyCard(g, colX, cardY, colW);
     this.buttons.draw(g, fonts.button);
     g.restore();
 
@@ -430,11 +377,9 @@ export class LoginScene implements Scene {
     footer(
       g,
       layout,
-      this.quiz
-        ? "ENTER  CHECK      F1  ORIENTATION"
-        : this.minted
-          ? "ENTER  I HAVE WRITTEN IT DOWN      F1  ORIENTATION"
-          : "ENTER  LOG IN      F1  ORIENTATION",
+      this.minted
+        ? "ENTER  I HAVE WRITTEN IT DOWN AND I AM GOING IN      F1  ORIENTATION"
+        : "ENTER  LOG IN      F1  ORIENTATION",
     );
   }
 
@@ -455,12 +400,13 @@ export class LoginScene implements Scene {
     // Measured, not guessed. `Buttons.row` wraps when a label will not fit, so
     // the card has to be told how many rows that turns out to be — a card sized
     // for one row and drawn with two puts its last button outside itself, which
-    // is the bug the quiz card already had.
-    const btnRows = rowsFor(
-      fonts.button,
-      w - Math.round(24 * s),
-      ["ENTER", "NEW WALLET", "STORY", "CLEAR"],
-    );
+    // leaves its last button outside its own panel.
+    const btnRows = rowsFor(fonts.button, w - Math.round(24 * s), [
+      "ENTER",
+      "NEW WALLET",
+      "STORY",
+      "CLEAR",
+    ]);
     const cardH =
       Math.round(30 * s) +
       fieldH +
@@ -595,96 +541,17 @@ export class LoginScene implements Scene {
       fonts.button,
       [card[0], cy, card[2], btnH * btnRows],
       [
-        { id: "keep", label: "I HAVE WRITTEN IT DOWN", primary: true },
-        { id: "discard", label: "CANCEL" },
+        {
+          id: "keep",
+          label: this.busy ? "…" : "I HAVE WRITTEN IT DOWN",
+          dim: this.busy,
+          primary: !this.busy,
+        },
+        { id: "discard", label: "CANCEL", dim: this.busy },
       ],
       layout.minTouchH(),
     );
     this.overlay.hide();
-    return y + cardH;
-  }
-
-  /**
-   * The gate: three of the twelve, typed back.
-   *
-   * The list is gone by the time this is on screen, which is the whole point —
-   * the only way through is off the paper. `SHOW ME THEM AGAIN` exists because
-   * a gate nobody can pass is a gate people route around, and somebody who
-   * genuinely mis-copied one word should not lose the wallet over it.
-   */
-  private drawQuiz(g: Ctx, x: number, y: number, w: number): number {
-    const { layout } = this.app;
-    const s = layout.uiScale();
-    const fonts = ensureFonts(s);
-    const quiz = this.quiz ?? [];
-    const pad = Math.round(10 * s);
-    const askH = fonts.code.height + Math.round(8 * s);
-    const fieldH = Math.max(fonts.small.height * 1.8, Math.round(56 * s));
-    const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
-    // Three buttons never fit one line at this column width, so the row is
-    // measured rather than assumed — a card sized for one row and drawn with
-    // two puts the last button outside its own panel.
-    const btnRows = 2;
-    const introLines = wrap(fonts.small, QUIZ_INTRO, w - Math.round(24 * s)).length;
-    const cardH =
-      Math.round(30 * s) +
-      introLines * fonts.small.height +
-      pad +
-      askH +
-      pad +
-      fieldH +
-      pad +
-      fonts.stationSm.height +
-      pad +
-      btnH * btnRows +
-      (btnRows - 1) * Math.round(fonts.button.size * 0.5) +
-      pad;
-
-    const card = titledPanel(g, [x, y, w, cardH], "PROVE YOU WROTE THEM DOWN", Theme.coin);
-    g.fillStyle = css(Theme.cream);
-    printf(g, fonts.small, QUIZ_INTRO, card[0], card[1], card[2], "center");
-    let cy = card[1] + introLines * fonts.small.height + pad;
-
-    g.fillStyle = css(Theme.coin);
-    printf(
-      g,
-      fonts.code,
-      quiz.map((i) => `WORD ${String(i + 1).padStart(2, "0")}`).join("   "),
-      card[0],
-      cy,
-      card[2],
-      "center",
-    );
-    cy += askH + pad;
-
-    well(g, card[0], cy, card[2], fieldH);
-    this.fieldRect = [card[0] + 4, cy + 4, card[2] - 8, fieldH - 8];
-    if (this.rightIn.finished) this.overlay.place(this.fieldRect, fonts.small.size);
-    else this.overlay.hide();
-    cy += fieldH + pad;
-
-    g.fillStyle = css(this.quizError ? Theme.red : Theme.dim);
-    printf(
-      g,
-      fonts.stationSm,
-      this.quizError || "THREE WORDS, SEPARATED BY SPACES",
-      card[0],
-      cy,
-      card[2],
-      "center",
-    );
-    cy += fonts.stationSm.height + pad;
-
-    this.buttons.row(
-      fonts.button,
-      [card[0], cy, card[2], btnH * btnRows],
-      [
-        { id: "confirm", label: "CONFIRM", primary: true },
-        { id: "again", label: "SHOW THEM AGAIN" },
-        { id: "discard", label: "CANCEL" },
-      ],
-      layout.minTouchH(),
-    );
     return y + cardH;
   }
 

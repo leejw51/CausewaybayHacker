@@ -13,9 +13,10 @@ For every quest it:
 import os, re, shutil, subprocess, sys, tomllib, tempfile, pathlib, json
 
 # Written by PM and lifted into tests/ by QA so SPEC §9.4 and §9.5 have one
-# implementation rather than two. The paths below were absolute in the
-# original; they are derived now, so the script runs from a checkout anywhere
-# and CI does not have to be this machine.
+# implementation rather than two. Re-lifted 2026-09-11 to pick up the brief
+# worked-example gate and `--complete`. The only local change is the paths,
+# which were absolute in the original; they are derived now, so the script
+# runs from a checkout anywhere and CI does not have to be this machine.
 #
 #   REPO    the checkout this file lives in
 #   SCRATCH per-run build directories, wiped on every run
@@ -54,6 +55,15 @@ def load_vocab():
         m = re.match(r"^\|\s*`([a-z0-9-]+)`\s*\|(.*)\|\s*$", line)
         if m:
             kinds[m.group(1)] = re.findall(r"`([a-z0-9-]+)`", m.group(2))
+    named = set()
+    for cs in kinds.values():
+        named |= set(cs)
+    orphan_named = sorted(named - vocab)
+    orphan_vocab = sorted(vocab - named)
+    if orphan_named:
+        raise SystemExit(f"docs/concepts.md: §2 names slugs not in §1: {orphan_named}")
+    if orphan_vocab:
+        raise SystemExit(f"docs/concepts.md: §1 slugs no mistake kind names: {orphan_vocab}")
     return vocab, kinds
 
 
@@ -159,6 +169,27 @@ def judge(lang, src, q, workdir):
     return verdict, passed, len(cases), notes
 
 
+
+def brief_examples(brief):
+    """Pull the `output:` blocks out of a brief's fenced worked examples."""
+    out, inside, buf, taking = [], False, [], False
+    for line in brief.split("\n"):
+        if line.strip().startswith("```"):
+            if inside and taking:
+                out.append("\n".join(buf))
+            inside, buf, taking = not inside, [], False
+            continue
+        if not inside:
+            continue
+        if line.lstrip().startswith("output:"):
+            taking = True
+            rest = line.split("output:", 1)[1].strip()
+            buf = [rest] if rest else []
+        elif taking:
+            buf.append(line.strip())
+    return out
+
+
 # ---------------------------------------------------------------- structure
 def structural(pack, path, vocab):
     errs = []
@@ -235,6 +266,13 @@ def structural(pack, path, vocab):
             errs.append(f"{qid}: non-hacker quest with time_limit_s")
         if cat == "hacker" and not any(not c.get("visible") for c in cases):
             errs.append(f"{qid}: hacker quest with no hidden case")
+        # the brief's worked example must be one of the visible cases, or the
+        # player is being shown output the tests do not agree with
+        shown = [norm("trim", c["expect"]) for c in cases if c.get("visible")]
+        for example in brief_examples(q["brief"]):
+            if norm("trim", example) not in shown:
+                errs.append(f"{qid}: brief's worked output {example!r} "
+                            f"matches no visible case")
     # map layout: not a straight line, no two nodes on top of each other
     for i in range(len(pts)):
         for j in range(i + 1, len(pts)):
@@ -260,6 +298,8 @@ def structural(pack, path, vocab):
 
 # ---------------------------------------------------------------- main
 def main(argv):
+    complete = "--complete" in argv
+    argv = [a for a in argv if a != "--complete"]
     vocab, kindmap = load_vocab()
     if SCRATCH.exists():
         shutil.rmtree(SCRATCH)
@@ -311,10 +351,16 @@ def main(argv):
         for c in cs:
             reach |= concept_use.get(c, set())
         flag = "" if reach else "   <-- ZERO"
+        if complete and not reach and kind != "other":
+            flag += "  FAIL"
+            all_ok = False
         print(f"  {kind:<20} {len(reach):>3} quests via {','.join(cs)}{flag}")
     unused = sorted(vocab - set(concept_use))
+    if complete and unused:
+        all_ok = False
     print(f"\n  vocabulary: {len(vocab)} slugs, {len(concept_use)} used, "
-          f"unused in these packs: {' '.join(unused) or '(none)'}")
+          f"unused in these packs: {' '.join(unused) or '(none)'}"
+          + ("   FAIL" if (complete and unused) else ""))
     print(f"\n=== {'ALL PACKS VERIFIED' if all_ok else 'FAILURES ABOVE'} ===")
     return 0 if all_ok else 1
 
