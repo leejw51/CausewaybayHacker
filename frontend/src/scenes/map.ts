@@ -43,6 +43,7 @@ import {
 import { motionScale, reducedMotion, seconds, Tween } from "../engine/motion";
 import type { Category, Land, MapNode } from "../net/protocol";
 import { LandsScene } from "./lands";
+import { PlaygroundScene } from "./playground";
 import { QuestScene } from "./quest";
 
 /** The overworld art, per land. Two places, not one plate and a tint. */
@@ -67,6 +68,7 @@ const CATEGORIES: readonly Category[] = ["basic", "advanced", "hacker"];
  * not outlive the tab.
  */
 const MENU_LABEL = "ALL MAPS";
+const PLAY_LABEL = "PLAYGROUND";
 
 const LAST_AT = new Map<string, string>();
 const slot = (land: Land, category: Category): string => `${land}.${category}`;
@@ -334,7 +336,7 @@ export class MapScene implements Scene {
     const w = (label: string) => btnBox(f, [label], 0, pad, minH)[0];
     const landW = LANDS.map((l) => w(l.toUpperCase()));
     const catW = CATEGORIES.map((c) => w(c.toUpperCase()));
-    const menuW = w(MENU_LABEL);
+    const menuW = w(MENU_LABEL) + gap + w(PLAY_LABEL);
     const sum = (a: number[]) => a.reduce((x, y) => x + y, 0) + gap * (a.length - 1);
     // A wider gap between the groups than inside them: "which land", "which
     // road" and "show me all of them" are three questions, and a row of six
@@ -353,14 +355,18 @@ export class MapScene implements Scene {
       const rows = lay(landW, 0, left);
       const catLeft = left + sum(landW) + split;
       rows.push(...lay(catW, 0, catLeft));
-      rows.push([catLeft + sum(catW) + split, 0, menuW, bh]);
+      const tailLeft = catLeft + sum(catW) + split;
+      rows.push([tailLeft, 0, w(MENU_LABEL), bh]);
+      rows.push([tailLeft + w(MENU_LABEL) + gap, 0, w(PLAY_LABEL), bh]);
       return { h: bh, rows };
     }
     // Two lines: the land and the way out on top, the three roads under them.
     const topTotal = sum(landW) + split + menuW;
     const topLeft = x0 + Math.round((wide - topTotal) / 2);
     const rows = lay(landW, 0, topLeft);
-    rows.push([topLeft + sum(landW) + split, 0, menuW, bh]);
+    const tail = topLeft + sum(landW) + split;
+    rows.push([tail, 0, w(MENU_LABEL), bh]);
+    rows.push([tail + w(MENU_LABEL) + gap, 0, w(PLAY_LABEL), bh]);
     rows.push(...lay(catW, bh + gap, x0 + Math.round((wide - sum(catW)) / 2)));
     return { h: bh * 2 + gap, rows };
   }
@@ -390,6 +396,10 @@ export class MapScene implements Scene {
       // player who wants the chooser is exactly the player who does not yet
       // know where anything is.
       { id: "menu", label: MENU_LABEL, lit: false },
+      // The scratchpad. It is not one of the six maps and it is not styled
+      // like one: nothing there is scored, and a button that looked like a
+      // category would promise otherwise.
+      { id: "play", label: PLAY_LABEL, lit: false },
     ];
     for (let i = 0; i < labels.length; i++) {
       const [x, ry, w, h] = rows[i];
@@ -498,6 +508,7 @@ export class MapScene implements Scene {
       if (phase === "down") {
         const [kind, value] = onBar.id.split(":");
         if (onBar.id === "menu") void this.app.go(new LandsScene(this.app), "back");
+        else if (onBar.id === "play") void this.app.go(new PlaygroundScene(this.app), "forward");
         else if (kind === "land") this.switchTo(value as Land, this.category);
         else this.switchTo(this.land, value as Category);
       }

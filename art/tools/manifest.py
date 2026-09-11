@@ -36,6 +36,13 @@ ORDER = [
     # For the technique round: an animation strip, a near-parallax overlay,
     # and a palette-cycling source.
     "walk_mei", "fg_wires", "neon_signs",
+    # CHOOSE YOUR LAND: one wide emblem band per land x category, the mascot
+    # doing that category's job, and the two states a row can be in.
+    "emblem_rust_basic", "emblem_rust_advanced", "emblem_rust_hacker",
+    "emblem_go_basic", "emblem_go_advanced", "emblem_go_hacker",
+    "mascot_rust_basic", "mascot_rust_advanced", "mascot_rust_hacker",
+    "mascot_go_basic", "mascot_go_advanced", "mascot_go_hacker",
+    "badge_cleared", "badge_locked",
 ]
 
 # Assets that are not one picture. `walk_mei` is four frames in a row; the

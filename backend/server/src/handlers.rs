@@ -8,7 +8,9 @@
 
 use cwbhacker_core::error::{bad_request, not_found, unauthorized, Error, Result};
 use cwbhacker_core::Connection;
-use cwbhacker_core::{attempts, auth, eth, mistakes, progress, quests, stats, users, world};
+use cwbhacker_core::{
+    attempts, auth, awards, eth, mistakes, progress, quests, stats, users, world,
+};
 use serde_json::json;
 
 use crate::proto::{bool_field, i64_field, opt_i64_field, opt_str_field, str_field};
@@ -59,19 +61,22 @@ impl Session {
 /// PROTOCOL §5.1. `address` is the EIP-55 spelling: checksummed on the wire in
 /// both directions, lowercase only inside the server (SPEC §3.4).
 pub fn user_json(conn: &Connection, user: &users::User) -> Result<serde_json::Value> {
-    let stars = progress::stars_total(conn, &user.address)?;
-    // Ten XP a star, a hundred XP a level. The protocol fixes the fields and
-    // not the curve; this one is written down in docs/decisions.md so the two
-    // clients agree about what they are drawing.
-    let xp = stars * 10;
+    // XP is stars weighted by difficulty and category, and the level curve is
+    // triangular (`awards.rs`). The protocol fixes the fields and not the
+    // curve; the curve is written down in docs/decisions.md so the two clients
+    // draw the same number.
+    let xp = awards::total_xp(conn, &user.address)?;
+    let level = awards::level_for_xp(xp);
     Ok(json!({
         "address": user.address_eip55,
         "name": user.name,
         "created_at": user.created_at,
         "last_seen_at": user.last_seen_at,
         "settings": user.settings,
-        "level": 1 + xp / 100,
+        "level": level,
         "xp": xp,
+        "xp_into_level": xp - awards::xp_for_level(level),
+        "xp_for_next": awards::xp_for_level(level + 1) - awards::xp_for_level(level),
     }))
 }
 
@@ -267,6 +272,15 @@ pub fn stats_mistakes(
     Ok(json!({
         "mistakes": mistakes::stats(&conn, address, limit, include_learned)?
     }))
+}
+
+/// Everything this player has earned (badges, levels, streaks), newest first.
+/// The live `award` event is easy to miss — a client wants to be able to draw
+/// the shelf as well as the fanfare.
+pub fn stats_awards(state: &Shared, session: &Session) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let conn = state.store.conn();
+    Ok(json!({ "awards": awards::list(&conn, address)? }))
 }
 
 pub fn stats_history(

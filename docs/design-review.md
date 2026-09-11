@@ -6,8 +6,9 @@ Start 2P, and Causeway Bay as a real place.
 
 ## What this review is based on
 
-**Seen.** All 26 captures in `frontend/shots/`, both orientations, opened and
-looked at. Where a finding says SEEN, it is something visible in a named file.
+**Seen.** Every capture in `frontend/shots/`, both orientations, opened and
+looked at — the 26-shot set for §1-§17, and the regenerated set for the later
+rounds. Where a finding says SEEN, it is something visible in a named file.
 
 **Read.** `frontend/src/**` — `engine/theme.ts`, `engine/text.ts`,
 `engine/layout.ts`, `ui/chrome.ts`, `scenes/{login,lands,map,quest,result}.ts`,
@@ -24,14 +25,17 @@ get one, because it is where the game is actually played.
 Every finding is marked **FE** (code) or **DESIGN** (asset), ordered by how much
 it hurts.
 
-**Status.** §1–§17 were written against the first round of captures. FE and L2D
-have since acted on most of them — see `docs/decisions.md` for what was changed
+**Status.** §1–§17 were written against the first round of captures, and FE and
+L2D have since acted on most of them — see `docs/decisions.md` for what changed
 and why, including the wallet-generation path (§1), difficulty no longer drawn
 as stars (§4), the art wired up (§5), and the overworld plate no longer cropped
-(§13). The findings are kept as written rather than edited down, because the
-reasoning is what makes the next round of judgements, not the verdicts. The two
-sections after §17 — the opening sequence and the technique assets — are the
-second round and are current.
+(§13). They are kept as written rather than edited down to their verdicts,
+because the reasoning is what makes the next round of judgements.
+
+Everything after §17 is a later round and is current: **the opening sequence**,
+**CHOOSE YOUR LAND**, **the technique assets**, and the pipeline findings. Each
+of those names the captures it was written against, since the shot set is
+regenerated between rounds and the filenames move.
 
 ---
 
@@ -487,6 +491,80 @@ already that image — racks serving the whole island, indifferent, no face — 
 the opening should not spend a beat on the ending's location. Use it if the
 sequence wants an eighth card.
 
+## CHOOSE YOUR LAND — third round
+
+The user's note was "add more sprites in each button — not fun", and that is the
+right diagnosis of the right screen. SEEN `20-lands-landscape.png`:
+READ `scenes/lands.ts:286-338`.
+
+The row is `[right[0], y, barW, rowH]` at full panel width, with the category
+label pinned left at `+10*s` and the counts pinned right, both vertically
+centred, and `rowH` computed by dividing the leftover panel height by three —
+so the row **grows** with the window while its contents stay at the two ends.
+At the captured size that is an 807×168 slab with roughly 580px of nothing
+between the word and the numbers. Three of them stacked. The land plates beside
+them have Ferris and Gogo and read as a place; the rows read as a settings menu.
+
+What is already right, and I did not touch: the 3px bottom rule doubling as a
+progress bar (`Theme.admit` filled to `cleared/total`) is good, quiet design —
+the row already tells you how far in you are without a number.
+
+**Shape: a wide band, not a square badge.** The empty space is 4.8:1, and the
+two ends are spoken for, so an emblem that fills it has to be a band. Each one
+is 384×128 (3:1), an object group on transparency rather than a scene plate —
+no sky, no ground, no painted background — so it composites onto the navy row
+without fighting the panel colour, and onto a different colour later if the
+panel changes.
+
+**Placement is FE's, and the band needs insetting.** I composed each emblem with
+an empty left quarter so the label would have clean space, and then my own
+`process.py` cropped it to the ink and re-centred it, which is correct for every
+other sprite in the set and wrong for this one. So the ink now fills the cell:
+draw it inset from the label and clear of the counts, and the `box` gives the
+exact ink extent. Worth knowing rather than rediscovering.
+
+| emblem | what is in it |
+| --- | --- |
+| `emblem_rust_basic` | tram, striped awning, crates of oranges, roller shutter, bamboo |
+| `emblem_rust_advanced` | one counter, **two** tills, steam, trays, two workers waiting |
+| `emblem_rust_hacker` | blank whiteboard, clock, one chair — three objects, nothing else |
+| `emblem_go_basic` | turquoise station arch, delivery bike, parcels, lit bollard |
+| `emblem_go_advanced` | **six** bikes racked, **two** turnstiles, platform edge, train |
+| `emblem_go_hacker` | the same board, clock and chair, lit cold |
+
+Two things the set is doing deliberately. The ADVANCED emblems say their
+category by **quantity** — two tills on one counter, six bikes and two
+turnstiles — because that road is about two things happening at once, and the
+picture can say that without a word. And the two HACKER emblems are **the same
+three objects in two different lights**, which is what `docs/story.md` §5 says
+the second interview is: same room, and this time the clock is shorter.
+
+**The mascots are the part that answers "not fun".** Emblems fill the row;
+they do not make it playful. So each row also gets its land's mascot *doing that
+category's job* — Ferris up a crate holding an orange, Ferris working two tills
+at once with a tray on his shell, Ferris stuck at a blank board with a marker;
+Gogo with a parcel, Gogo flat out on a delivery bike, Gogo holding a clock he is
+running out of. Six 128×128 sprites, feet-boxed, sized to sit at row height
+between the label and the emblem. That is the literal reading of the request and
+also the right one: a mascot reacting is character, and character is what the
+land plates already have and the rows did not.
+
+**Two state badges**, because a row that never changes is furniture and a row
+that visibly changes is a game: `badge_cleared` (a gold rosette with a green
+centre, for a category finished) and `badge_locked` (a shut brass padlock,
+deliberately desaturated). The locked row currently only dims, which is §11 of
+this review happening again on a different screen — dimming says *not now* but
+never says *why*.
+
+**Checked at the size they are drawn, not the size they were made.** Every
+emblem was composited onto the real row colour at 384×128 and at 192×64, every
+mascot at 120px and 60px, every badge at 64px and 32px. That caught two:
+`emblem_rust_hacker` came back as seven pale boxes that turned to mud when
+small, and `mascot_rust_hacker` put a huge whiteboard next to a tiny crab. Both
+re-rolled — the emblem down to three high-contrast objects and nothing else, the
+mascot with Ferris as the subject and the board reduced to a corner behind him.
+This is the `boss_deadlock` lesson applied before shipping rather than after.
+
 ## For the technique round
 
 Three assets aimed at what FE is building rather than at another still:
@@ -528,11 +606,11 @@ problem. Sprites that want a pink use crimson or violet. Both rules are now in
 
 ## The art, and what is in it
 
-49 assets in `art/` — 27 backgrounds and story panels, 21 sprites and one
-animation strip — from 66 generations across two rounds, so 17 re-rolls. The
+63 assets in `art/` — 27 backgrounds and story panels, 35 sprites and one
+animation strip — from 82 generations across three rounds, so 19 re-rolls. The
 per-asset count is in `art/prompts.toml`, which is also the recipe: change a
 prompt, re-run `art/tools/gen.sh`, and that asset is re-rolled.
-`art/manifest.json` is in `CausewaybayGolang`'s shape with all 21
+`art/manifest.json` is in `CausewaybayGolang`'s shape with all 35
 sprite boxes measured from the actual alpha — plus a box per frame on the
 `walk_mei` strip: `art/tools/manifest.py` calls the same `ink_bounds` the
 knockout uses, so no box is guessed.

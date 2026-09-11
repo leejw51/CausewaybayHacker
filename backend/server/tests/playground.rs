@@ -327,14 +327,12 @@ async fn snippets_save_load_list_and_delete() {
     );
 
     // §1: the player's own work is in the home, not only in the database.
+    let eip55 = client.ok("profile.update", json!({})).await["user"]["address"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let dir = server.store.home().snippet_dir(
-        &cwbhacker_core::eth::normalize_address(
-            &client.ok("profile.update", json!({})).await["user"]["address"]
-                .as_str()
-                .unwrap()
-                .to_string(),
-        )
-        .unwrap(),
+        &cwbhacker_core::eth::normalize_address(&eip55).unwrap(),
         &id,
     );
     assert!(dir.join("main.rs").is_file(), "{}", dir.display());

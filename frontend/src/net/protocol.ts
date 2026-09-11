@@ -307,6 +307,46 @@ export interface CategorySummary {
 // §4 client → server
 // ---------------------------------------------------------------------------
 
+/**
+ * §5.9 — what one playground run printed.
+ *
+ * Note what is *not* here: no verdict, no stars, no tests. A playground run is
+ * not recorded and does not feed the drills (§4.9c), which is the deliberate
+ * opposite of the quest RUN rule, because a scratchpad is exactly where
+ * somebody writes something broken on purpose to see what the compiler says.
+ */
+export interface PlaygroundRun {
+  /** Minted so the stream can be correlated; never stored. */
+  attempt_id: string;
+  lang: Land;
+  outcome: "ok" | "compile_error" | "runtime_error" | "timeout" | "output_limit";
+  compile_ms: number;
+  run_ms: number;
+  exit_code: number | null;
+  stdout: string;
+  stderr: string;
+  diagnostics: Array<{
+    kind: string;
+    code: string | null;
+    message: string;
+    line: number | null;
+    col: number | null;
+  }>;
+}
+
+/** §5.9 — a saved scratchpad, per user, server-side. */
+export interface Snippet {
+  id: string;
+  name: string;
+  lang: Land;
+  source: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** The same thing without the text, for the list. */
+export type SnippetBrief = Omit<Snippet, "source"> & { bytes: number };
+
 export interface Requests {
   ping: Record<string, never>;
   "auth.challenge": { address: string };
@@ -327,6 +367,14 @@ export interface Requests {
     filters?: { land?: Land; category?: Category; state?: NodeState };
     limit?: number;
   };
+  // §4.9c. `list`, `load` and `delete` are the snippet half; a server that
+  // has not shipped them answers `not_found`, which the screen says out loud
+  // rather than silently pretending the scratchpad is empty.
+  "playground.run": { lang: Land; source: string; stdin?: string };
+  "playground.save": { id?: string; name?: string; lang: Land; source: string };
+  "playground.list": Record<string, never>;
+  "playground.load": { id: string };
+  "playground.delete": { id: string };
   "stats.summary": Record<string, never>;
   "stats.mistakes": { limit?: number; include_learned?: boolean };
   "stats.history": { quest_id?: string; limit?: number };
@@ -354,6 +402,11 @@ export interface Responses {
   "quest.run": { attempt: Attempt };
   "quest.hint": { hint: string; index: number; total: number; hints_used: number };
   "quest.reset": { starter: string };
+  "playground.run": { run: PlaygroundRun };
+  "playground.save": { snippet: Snippet };
+  "playground.list": { snippets: SnippetBrief[] };
+  "playground.load": { snippet: Snippet };
+  "playground.delete": Record<string, never>;
   "search.query": { hits: SearchHit[]; mode: SearchMode; took_ms: number };
   "stats.summary": {
     cleared: number;

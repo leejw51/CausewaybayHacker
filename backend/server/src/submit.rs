@@ -301,6 +301,32 @@ pub fn run(
         &report.to_json(),
     )?;
 
+    // The reward loop (PROTOCOL §4.20). Evaluated after every **submit** — not
+    // only a clearing one, because a combo, a century and a streak are earned
+    // by submitting at all — and never for a run or a playground run. Each
+    // rule is a query against the record, so nothing can be awarded for
+    // something that did not happen.
+    if mode.is_submit() {
+        let fresh = {
+            let conn = state.store.conn();
+            cwbhacker_core::awards::evaluate(&conn, address)?
+        };
+        for award in fresh {
+            let frame = ServerFrame::event(
+                "award",
+                json!({
+                    "kind": award.kind,
+                    "id": award.id,
+                    "title": award.title,
+                    "detail": award.detail,
+                }),
+            );
+            send(out, frame.clone());
+            // The other window should see the fanfare too.
+            state.hub.broadcast(address, connection_id, &frame);
+        }
+    }
+
     if just_cleared {
         let update = ServerFrame::event(
             "progress.update",
@@ -315,6 +341,8 @@ pub fn run(
         send(out, update.clone());
         // §4.19: the same user's other windows hear about it too.
         state.hub.broadcast(address, connection_id, &update);
+        // The stamp is per-clear rather than per-player, so it is not in the
+        // `awards` table: it fires every time a node turns gold.
         send(
             out,
             ServerFrame::event(

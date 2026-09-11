@@ -127,7 +127,11 @@ fn earned(conn: &Connection, address: &str) -> Result<Vec<Candidate>> {
         badge("first-clear", "FIRST CLEAR", serde_json::json!({}));
     }
     if cleared >= 25 {
-        badge("quarter-century", "TWENTY-FIVE STREETS", serde_json::json!({ "cleared": cleared }));
+        badge(
+            "quarter-century",
+            "TWENTY-FIVE STREETS",
+            serde_json::json!({ "cleared": cleared }),
+        );
     }
 
     // Both lands. The one badge that says "you are not only a Rust person".
@@ -138,7 +142,11 @@ fn earned(conn: &Connection, address: &str) -> Result<Vec<Candidate>> {
         |r| r.get(0),
     )?;
     if lands >= 2 {
-        badge("polyglot", "POLYGLOT", serde_json::json!({ "lands": lands }));
+        badge(
+            "polyglot",
+            "POLYGLOT",
+            serde_json::json!({ "lands": lands }),
+        );
     }
 
     let perfect = count(
@@ -147,7 +155,11 @@ fn earned(conn: &Connection, address: &str) -> Result<Vec<Candidate>> {
         address,
     )?;
     if perfect >= 10 {
-        badge("perfectionist", "PERFECTIONIST", serde_json::json!({ "three_stars": perfect }));
+        badge(
+            "perfectionist",
+            "PERFECTIONIST",
+            serde_json::json!({ "three_stars": perfect }),
+        );
     }
 
     let unaided = count(
@@ -157,7 +169,11 @@ fn earned(conn: &Connection, address: &str) -> Result<Vec<Candidate>> {
         address,
     )?;
     if unaided >= 10 {
-        badge("no-hints", "NO HINTS NEEDED", serde_json::json!({ "cleared": unaided }));
+        badge(
+            "no-hints",
+            "NO HINTS NEEDED",
+            serde_json::json!({ "cleared": unaided }),
+        );
     }
 
     let hacker = conn.query_row(
@@ -167,7 +183,11 @@ fn earned(conn: &Connection, address: &str) -> Result<Vec<Candidate>> {
         |r| r.get::<_, i64>(0),
     )?;
     if hacker >= 5 {
-        badge("big-o", "BIG O MASTER", serde_json::json!({ "hacker_cleared": hacker }));
+        badge(
+            "big-o",
+            "BIG O MASTER",
+            serde_json::json!({ "hacker_cleared": hacker }),
+        );
     }
 
     // A whole category finished. The id carries which one, so the UNIQUE index
@@ -194,7 +214,11 @@ fn earned(conn: &Connection, address: &str) -> Result<Vec<Candidate>> {
         if total > 0 && done == total {
             badge(
                 &format!("cleared-{land}-{category}"),
-                &format!("{} {} CLEARED", land.to_uppercase(), category.to_uppercase()),
+                &format!(
+                    "{} {} CLEARED",
+                    land.to_uppercase(),
+                    category.to_uppercase()
+                ),
                 serde_json::json!({ "land": land, "category": category, "total": total }),
             );
         }
@@ -219,7 +243,11 @@ fn earned(conn: &Connection, address: &str) -> Result<Vec<Candidate>> {
         address,
     )?;
     if submits >= 100 {
-        badge("century", "ONE HUNDRED SUBMISSIONS", serde_json::json!({ "submits": submits }));
+        badge(
+            "century",
+            "ONE HUNDRED SUBMISSIONS",
+            serde_json::json!({ "submits": submits }),
+        );
     }
     let runs = count(
         conn,
@@ -227,7 +255,11 @@ fn earned(conn: &Connection, address: &str) -> Result<Vec<Candidate>> {
         address,
     )?;
     if runs >= 50 {
-        badge("iterator", "FIFTY ITERATIONS", serde_json::json!({ "runs": runs }));
+        badge(
+            "iterator",
+            "FIFTY ITERATIONS",
+            serde_json::json!({ "runs": runs }),
+        );
     }
 
     // A mistake you used to make and have stopped making. `count >= 5` is "you

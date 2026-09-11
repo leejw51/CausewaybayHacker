@@ -10,11 +10,12 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { clipped, fill, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, clipped, fill, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import type { Category, CategorySummary, Land, Responses } from "../net/protocol";
 import { MapScene } from "./map";
+import { PlaygroundScene } from "./playground";
 
 type Lands = Responses["world.lands"]["lands"];
 
@@ -207,6 +208,10 @@ export class LandsScene implements Scene {
       this.land = hit.id.slice(5) as Land;
       return;
     }
+    if (hit.id === "playground") {
+      void this.app.go(new PlaygroundScene(this.app), "forward");
+      return;
+    }
     if (hit.id.startsWith("cat:")) {
       const category = hit.id.slice(4) as Category;
       void this.app.go(new MapScene(this.app, this.land, category), "forward");
@@ -343,10 +348,11 @@ export class LandsScene implements Scene {
 
       const rowsTop = right[1] + recH + gap * 2;
       const minRowH = Math.max(layout.minTouchH(), Math.round(fonts.button.height + 52 * s));
-      const rowH = Math.max(
-        minRowH,
-        Math.floor((right[1] + right[3] - rowsTop) / cats.length) - gap,
-      );
+      // The scratchpad lives under the three roads, with its own band of air,
+      // because it is not a fourth road: nothing there is scored.
+      const playH = Math.max(layout.minTouchH(), fonts.button.height + 20);
+      const rowsBottom = right[1] + right[3] - playH - gap * 2;
+      const rowH = Math.max(minRowH, Math.floor((rowsBottom - rowsTop) / cats.length) - gap);
 
       let y = rowsTop;
       for (const c of cats) {
@@ -421,6 +427,38 @@ export class LandsScene implements Scene {
         });
         y += rowH + gap;
       }
+
+      const [pw] = btnBox(
+        fonts.button,
+        ["PLAYGROUND"],
+        0,
+        fonts.button.size * 2,
+        layout.minTouchH(),
+      );
+      // Painted here rather than through `Buttons.draw`: the land plates use
+      // that list for hit boxes only, and nothing on this screen paints it.
+      const pbw = Math.max(pw, Math.round(right[2] * 0.4));
+      const pby = right[1] + right[3] - playH;
+      const phov = this.landBtns.hovered === "playground";
+      pixBtn(g, fonts.button, right[0], pby, pbw, playH, "PLAYGROUND", {
+        hover: phov,
+        quiet: !phov,
+      });
+      g.fillStyle = css(Theme.cream, 0.55);
+      printf(
+        g,
+        fonts.small,
+        "write anything · nothing here is scored",
+        right[0] + pbw + Math.round(12 * s),
+        pby + Math.round((playH - fonts.small.height) / 2),
+        right[2] - pbw - Math.round(12 * s),
+        "left",
+      );
+      this.landBtns.add({
+        id: "playground",
+        rect: [right[0], pby, pbw, playH],
+        label: "PLAYGROUND",
+      });
 
       if (this.error) {
         g.fillStyle = css(Theme.red);

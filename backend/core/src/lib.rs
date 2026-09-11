@@ -6,8 +6,8 @@
 //! them into exit statuses. Neither concern lives here.
 
 pub mod attempts;
-pub mod awards;
 pub mod auth;
+pub mod awards;
 pub mod content;
 pub mod db;
 pub mod drills;

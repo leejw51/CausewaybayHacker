@@ -560,9 +560,9 @@ kind = "sprite"
 aspect = "16:9"
 size = [384, 128]
 generated = "2026-09-11"
-rerolls = 0
+rerolls = 1
 prompt = """\
-16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of seminar-room objects, daylight: a large blank white whiteboard in an aluminium frame standing on a castored A-frame stand with a pen tray holding two markers, a plain round wall clock with black hands mounted on a short bracket beside it, and one lone grey steel-framed chair turned out at an angle. Austere, still, cold. Muted sage greens, cool greys and bone white with one warm amber note. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen or board — every board and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND holding ONLY THREE OBJECTS, well separated, standing in a row on a common ground line with nothing else at all between or behind them — no cabinets, no boxes, no extra panels, no background, only flat magenta. The three objects: 1 a large blank WHITE whiteboard in a dark aluminium frame on a castored A-frame stand, its face bright bone-white and completely empty; 2 a plain round white wall clock with bold black hands on a short dark bracket; 3 one lone grey steel-framed chair turned out at an angle. High contrast — bright white board and pale clock face against dark frames and dark chair, so the three shapes stay separate and legible when the picture is made small. Austere daylight, muted sage green and cool grey with bone white and one warm amber note. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
 
 [[asset]]
 name = "emblem_go_basic"
@@ -593,3 +593,83 @@ generated = "2026-09-11"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. THE SAME ROOM AS BEFORE BUT AT NIGHT: a large blank white whiteboard in an aluminium frame on a castored A-frame stand with a pen tray, a plain round wall clock with black hands on a bracket beside it, and one lone grey steel-framed chair turned out at an angle — the identical objects, now lit cold from one side so the white board glows pale cyan and the shadows go deep indigo. Colder, later, more oppressive. Night-time. Cool cyan and turquoise light with warm amber window glow and deep indigo shadow; a night palette. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "mascot_rust_basic"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen or board — every board and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. Ferris, a friendly cartoon crab: a wide rounded bright orange shell, two big round white eyes with black pupils on short stalks, a small smiling mouth, two raised claws and four little legs. He is standing on a wooden crate of oranges holding one bright orange up in a raised claw, with a small red-and-white striped awning corner behind his shoulder. Cheerful, pleased with himself. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "mascot_rust_advanced"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen or board — every board and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. Ferris, a friendly cartoon crab: a wide rounded bright orange shell, two big round white eyes with black pupils on short stalks, a small smiling mouth, two raised claws and four little legs. He is standing behind a short red counter with a chrome cash till under EACH of his two raised claws, one on his left and one on his right, working both at once, a plastic tray balanced on his shell and a puff of steam beside him. Frantic, overloaded, eyes wide. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "mascot_rust_hacker"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-11"
+rerolls = 1
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing anywhere. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A friendly cartoon crab FILLING MOST OF THE PICTURE as the clear main subject, large and central: Ferris, a wide rounded bright orange shell, two big round white eyes with black pupils on short stalks, a worried open mouth, four little legs. He holds a marker pen up in his raised right claw and scratches the top of his shell with his left claw, looking up and to one side. Behind his shoulder, small and partly hidden by him, just the bottom corner of a blank white board on a thin leg — the board is a minor detail at the edge, NOT the subject and NOT large. The crab is at least three times the size of the visible piece of board. Stuck, thinking hard, slightly sweating, one sweat droplet. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the subject). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "mascot_go_basic"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen or board — every board and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. Gogo, a chubby cartoon gopher standing upright: pale tan and brown fur, a big rounded muzzle with two large front teeth, tiny round ears, big friendly black eyes, small paws, wearing a small cyan cap. He is holding a small cardboard parcel in both paws in front of him, a turquoise-lit doorway arch behind his shoulder. Cheerful, helpful, ready to deliver. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "mascot_go_advanced"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen or board — every board and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. Gogo, a chubby cartoon gopher standing upright: pale tan and brown fur, a big rounded muzzle with two large front teeth, tiny round ears, big friendly black eyes, small paws, wearing a small cyan cap. He is sitting astride a small red delivery bike with an insulated box on the back, paws on the handlebars, leaning forward, cyan motion streaks behind him. Rushing, in a hurry, busy. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "mascot_go_hacker"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen or board — every board and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. Gogo, a chubby cartoon gopher standing upright: pale tan and brown fur, a big rounded muzzle with two large front teeth, tiny round ears, big friendly black eyes, small paws, wearing a small cyan cap. He is holding a large plain round wall clock with bold black hands in both paws in front of his chest, looking down at it, a blank white whiteboard edge behind his shoulder lit cold cyan. Anxious, out of time. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "badge_cleared"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing anywhere. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A single award rosette seen flat-on, centred: a round bright gold medallion with a milled notched rim and a flat deep green centre disc that is completely blank and empty, ringed by a starburst of short gold laurel points all the way round the outside, and two short ribbon tails in deep green hanging down from the bottom with V-notched ends. One white shine highlight in the upper left. Bold and simple so it reads instantly when small. Gold, deep green and dark outline only. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the subject). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "badge_locked"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing anywhere. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A single chunky closed brass padlock seen flat-on, centred, filling the picture: a fat rounded brass body with a thick dark steel shackle closed over the top, one round dark keyhole low on the face, heavy dark outline, a couple of dithered highlights on the brass. Two short links of dark heavy chain hang from the shackle. Dull, heavy and shut. Muted brass gold and dark grey-brown only, deliberately desaturated and lifeless compared to a lit icon. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the subject). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
