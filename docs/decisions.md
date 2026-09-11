@@ -5950,3 +5950,53 @@ visible; and submitting the revealed answer clears the street at **two stars**,
 which is the whole point of the price. `tsc --noEmit` clean, 188 vitest tests
 green, `npm run build` clean, and `__cwbCapture` / `buttonAt` / `mockTransport`
 appear zero times in every file of `dist/assets/`.
+
+## 2026-09-11 — SOLVE is shift-F7, because no function key was free
+
+The LÖVE client's half of `Quest.draft` and `quest.solve`. The draft needed one
+line — `draft ?? starter` through `Editor.opening_text`, with no save path on
+this side, because every RUN and SUBMIT already sends the buffer. SOLVE needed
+a key, and there was not one.
+
+**All twelve function keys were already taken on the quest screen**: F1/F3/F4/
+F11/F12 are global in `main.lua` (orientation, scanlines, sound, fullscreen,
+type size) and F2/F5/F6/F7/F8/F9/F10 belong to the scene (format, run, reset,
+hint, log, `$EDITOR`, submit). `L` is the language and is a letter precisely
+because the F row ran out a round ago. So SOLVE is **shift-F7** — a modifier on
+the *hint* key, which is what §4.11b says it is: "priced like the largest hint
+there is". The bare key still takes an ordinary hint; the chord is tested first
+and excludes ctrl. It is also five keys from RUN and three from SUBMIT.
+
+The key is printed on the button (`SOLVE  SHIFT-F7`) rather than added to the
+footer strip, following this screen's existing rule: F5, F10 and F2 are on
+their buttons and the footer lists only the keys that have none.
+
+**Four buttons do not fit across one row**, so the two that only ever change
+the buffer — SOLVE and FORMAT — take a row of their own above the pair that
+costs something, whenever their labels do not fit beside it. In English that
+is both orientations; in Korean the labels are short enough that all four sit
+on one row. The RUN/SUBMIT gap is never what gives way, and RUN and SUBMIT are
+now measured before the left cluster rather than after it, which is the
+`SUBMIT  F1` bug this file already records, one button further along.
+
+Two smaller things the screenshots caught, neither of which a test would have:
+the consequence sentence wrapped to four lines and was being cut at three
+("… only SUBMIT records" — the word `one` was the difference between the
+sentence and its opposite), and CJK lines set at exactly `getHeight()` have no
+air between them at all, so `I18n.is_cjk` finally has the caller it was
+written for.
+
+And one thing the second row broke that was already half broken: the editor
+was told the well ran to the bottom of the panel, so the last lines of a long
+program sat behind the buttons. The band is now measured once
+(`Quest:button_band`) and subtracted from the rows the editor is given —
+about one hidden line before this round, three after it if nobody had looked.
+
+Read-only, for the record: the browser client's §4.11b copy landed
+independently and agrees almost word for word — `costs a star`, `the answer is
+in the editor — CTRL+Z puts your own code back`, `no answer key here`. Two
+differences, both deliberate on this side: the LÖVE client puts the short
+price *before* the press and the whole consequence *after* it (the browser
+does the reverse), and it stops at "no answer key here" rather than naming the
+interview, because `not_found` is also what a server without §4.11b returns
+and this screen already has that trap written down for RUN.

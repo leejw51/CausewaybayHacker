@@ -114,6 +114,7 @@ function Quest.new(app)
     -- greys the button for the rest of the visit, the way FORMAT's does.
     solve_note = nil,
     solve_unsupported = false,
+    solving = false,
     focus = "editor",     -- "editor" | "brief"
     clock_arrived = nil,  -- when the clock first appeared, for its entrance
     clock_phase = nil,    -- the last phase seen, so a crossing can pulse
@@ -403,7 +404,12 @@ end
 --- wire, the same trap RUN documents above. So the message says what is true
 --- of both rather than guessing which.
 function Quest:solve()
-  if not self.quest or self.solving or self.solve_unsupported then
+  -- `running_mode` is in the list because the button is painted `disabled`
+  -- while a run or a submit is in flight, and a press that does something a
+  -- greyed control says it will not do is worse than either behaviour on its
+  -- own. (`Quest:format` still has that gap; it is not this round's to close.)
+  if not self.quest or self.solving or self.solve_unsupported
+    or self.running_mode then
     if self.solve_unsupported then SFX.play("locked") end
     return
   end
@@ -418,7 +424,7 @@ function Quest:solve()
         SFX.play("locked")
         if payload.code == "not_found" then
           self.solve_unsupported = true
-          self.solve_note = I18n.t("no answer key here")
+          self.solve_note = "unavailable"
         else
           self.solve_note = why.player
         end
@@ -429,11 +435,26 @@ function Quest:solve()
       -- The server just moved it, so this screen's hint counter is stale by
       -- exactly one round trip. Taken from the payload rather than guessed.
       if payload.hints_used then self.quest.hints_used = payload.hints_used end
-      self.solve_note = I18n.t("the answer is in the editor — CTRL-Z puts yours "
-        .. "back. It can still clear, just not at three stars, and asking is "
-        .. "not an attempt — only SUBMIT records one")
+      -- The *kind* of thing that happened, not the sentence: the language
+      -- button is on the footer of this very screen, and a sentence resolved
+      -- at request time would still be in the old language a press later.
+      self.solve_note = "solved"
       SFX.play("select")
     end)
+end
+
+--- What SOLVE has to say, in whatever language is current *now*.
+function Quest:solve_said()
+  local note = self.solve_note
+  if not note then return nil end
+  if note == "solved" then
+    return I18n.t("the answer is in the editor — CTRL-Z puts yours "
+      .. "back. It can still clear, just not at three stars, and asking is "
+      .. "not an attempt — only SUBMIT records one")
+  end
+  if note == "unavailable" then return I18n.t("no answer key here") end
+  -- Anything else is the error's own player-facing text, already resolved.
+  return note
 end
 
 --- The honest fallback: hand the buffer to `$EDITOR` and read it back.
@@ -696,6 +717,103 @@ function Quest:draw_brief(rect, tint)
   love.graphics.setScissor()
 end
 
+--- Where the four buttons stand, and how much of the well they stand in.
+---
+--- Its own function because `draw_editor` has to know the answer *before* it
+--- decides how many rows of code fit. The band is two rows deep in English
+--- now, and the editor was still being told the well ran all the way to the
+--- bottom — which put the last lines of a long program, and the caret with
+--- them, behind the SOLVE button. It was one row's worth of hidden text
+--- before this round and would have been three.
+function Quest:button_band(rect)
+  -- RUN and SUBMIT, with a deliberate gap between them.
+  --
+  -- RUN is the reflex button and keeps F5, the key it has always had here.
+  -- SUBMIT is the deliberate one: F10, five keys away, and the right-hand
+  -- button of the pair. A hand going for RUN cannot land on SUBMIT by being
+  -- a centimetre off, and a finger going for F5 cannot submit.
+  -- **Measured from their own labels.** `SUBMIT  F10` at the old 9 px ladder
+  -- was 99 px wide inside a 150 px button; at twice the ladder it is 264, and
+  -- a fixed width printed `SUBMIT  F1` and then stopped. The gap between RUN
+  -- and SUBMIT is kept whatever else gives way — it is the reason the two are
+  -- laid out at all (reaching for RUN must never land on SUBMIT).
+  local run_label = self.running_mode == "quest.run" and I18n.t("RUNNING…") or I18n.t("RUN  F5")
+  local submit_label = self.running_mode == "quest.submit"
+    and I18n.t("JUDGING…") or I18n.t("SUBMIT  F10")
+  local format_label = self.formatting and "…" or I18n.t("FORMAT  F2")
+  local solve_label = self.solving and "…" or I18n.t("SOLVE  SHIFT-F7")
+  local bh = math.max(28, UI.lineHeight(9) + 12)
+  local gap = 22
+  local want = math.max(UI.textWidth(run_label, 9), UI.textWidth(submit_label, 9)) + 20
+  -- The left-hand cluster is two buttons now, and both are measured from
+  -- their own labels for the reason the pair on the right is: `SOLVE
+  -- SHIFT-F7` in Czech is not `SOLVE  SHIFT-F7` in English, and a width
+  -- written as a number prints half a word at the other end of the language
+  -- list. The `gap` stays a subtracted term and is never divided up.
+  --
+  -- **The right-hand pair is measured first and keeps its labels.** The left
+  -- cluster is subtracted as a floor, not as its full want: sizing RUN and
+  -- SUBMIT around whatever SOLVE and FORMAT would like is how `SUBMIT  F10`
+  -- became `SUBMIT  F1` the last time, and this screen has that mistake
+  -- written down.
+  local left_gap = 8
+  local left_floor = 100
+  -- The caption row's height, needed here as well as below: when the buffer
+  -- buttons take a row of their own, the captions belonging to RUN and SUBMIT
+  -- have to fit *between* the two rows rather than through the upper one.
+  local cap = UI.lineHeight(7) + 3
+  local room = math.floor((rect.w - 30 - gap - left_floor - 10) / 2)
+  local bw = math.max(60, math.min(want, room))
+  local by = rect.y + rect.h - bh - 8
+  local sx = rect.x + rect.w - bw - 10
+  local rx = sx - gap - bw
+
+
+  -- The left of the row is the two buttons that only ever change the buffer:
+  -- **SOLVE, then FORMAT**, then a wide gap, then the pair that costs
+  -- something. Neither of the left two writes an attempt (§4.9d, §4.11b), and
+  -- neither must read as a third way to submit.
+  --
+  -- SOLVE is the far-left button on purpose: FORMAT stands between it and
+  -- RUN, so the one control on this screen that gives the answer away cannot
+  -- be reached by a press that was aimed a centimetre wide of RUN.
+  local sw = UI.textWidth(solve_label, 8) + 16
+  local fw = UI.textWidth(format_label, 8) + 16
+  local left_room = rx - rect.x - 20
+  -- Which row the two of them sit on. Beside RUN and SUBMIT when they fit
+  -- there; **on their own row above** when they do not, which is portrait in
+  -- every language and landscape in Czech. Four full labels do not fit across
+  -- 720 virtual pixels, and of the three ways out — shrink the pair on the
+  -- right, shrink the type, or use the empty row above — only the last one
+  -- costs nothing. The well has that row spare on every screen this game
+  -- draws, and the wide gap between the reflex button and the deliberate one
+  -- survives untouched.
+  local ly = by
+  if sw + left_gap + fw > left_room then
+    ly = by - bh - 6 - cap
+    left_room = rect.w - 20
+    if sw + left_gap + fw > left_room then
+      -- Narrower still: both give way together rather than one eating the
+      -- other, with a floor that still shows a word.
+      local scale = (left_room - left_gap) / (sw + fw)
+      sw = math.max(44, math.floor(sw * scale))
+      fw = math.max(44, math.floor(fw * scale))
+    end
+  end
+  local vx = rect.x + 10
+  local fx = vx + sw + left_gap
+  return {
+    run_label = run_label, submit_label = submit_label,
+    format_label = format_label, solve_label = solve_label,
+    bh = bh, cap = cap, bw = bw,
+    by = by, sx = sx, rx = rx, ly = ly,
+    vx = vx, fx = fx, sw = sw, fw = fw,
+    -- From the caption row above the topmost button row to the bottom of the
+    -- well: the strip the code must not be laid out into.
+    reserve = (rect.y + rect.h) - (math.min(by, ly) - cap),
+  }
+end
+
 function Quest:draw_editor(rect, tint)
   UI.well(rect.x, rect.y, rect.w, rect.h,
     self.focus == "editor" and Theme.coin or tint)
@@ -710,7 +828,8 @@ function Quest:draw_editor(rect, tint)
   -- it the last digit of the line number touches the first character of an
   -- unindented line and `1` reads as part of `fn`.
   local gutter = font:getWidth("0000 ")
-  local rows = math.max(1, math.floor((rect.h - 12) / line_h))
+  local band = self:button_band(rect)
+  local rows = math.max(1, math.floor((rect.h - 12 - band.reserve) / line_h))
   self.editor:ensure_visible(rows)
   self.visible_rows = rows
   self.editor_rect = rect
@@ -795,84 +914,17 @@ function Quest:draw_editor(rect, tint)
     love.graphics.setColor(1, 1, 1, 1)
   end
 
-  -- RUN and SUBMIT, with a deliberate gap between them.
-  --
-  -- RUN is the reflex button and keeps F5, the key it has always had here.
-  -- SUBMIT is the deliberate one: F10, five keys away, and the right-hand
-  -- button of the pair. A hand going for RUN cannot land on SUBMIT by being
-  -- a centimetre off, and a finger going for F5 cannot submit.
-  -- **Measured from their own labels.** `SUBMIT  F10` at the old 9 px ladder
-  -- was 99 px wide inside a 150 px button; at twice the ladder it is 264, and
-  -- a fixed width printed `SUBMIT  F1` and then stopped. The gap between RUN
-  -- and SUBMIT is kept whatever else gives way — it is the reason the two are
-  -- laid out at all (reaching for RUN must never land on SUBMIT).
-  local run_label = self.running_mode == "quest.run" and I18n.t("RUNNING…") or I18n.t("RUN  F5")
-  local submit_label = self.running_mode == "quest.submit"
-    and I18n.t("JUDGING…") or I18n.t("SUBMIT  F10")
-  local format_label = self.formatting and "…" or I18n.t("FORMAT  F2")
-  local solve_label = self.solving and "…" or I18n.t("SOLVE  SHIFT-F7")
-  local bh = math.max(28, UI.lineHeight(9) + 12)
-  local gap = 22
-  local want = math.max(UI.textWidth(run_label, 9), UI.textWidth(submit_label, 9)) + 20
-  -- The left-hand cluster is two buttons now, and both are measured from
-  -- their own labels for the reason the pair on the right is: `SOLVE
-  -- SHIFT-F7` in Czech is not `SOLVE  SHIFT-F7` in English, and a width
-  -- written as a number prints half a word at the other end of the language
-  -- list. The `gap` stays a subtracted term and is never divided up.
-  --
-  -- **The right-hand pair is measured first and keeps its labels.** The left
-  -- cluster is subtracted as a floor, not as its full want: sizing RUN and
-  -- SUBMIT around whatever SOLVE and FORMAT would like is how `SUBMIT  F10`
-  -- became `SUBMIT  F1` the last time, and this screen has that mistake
-  -- written down.
-  local left_gap = 8
-  local left_floor = 100
-  -- The caption row's height, needed here as well as below: when the buffer
-  -- buttons take a row of their own, the captions belonging to RUN and SUBMIT
-  -- have to fit *between* the two rows rather than through the upper one.
-  local cap = UI.lineHeight(7) + 3
-  local room = math.floor((rect.w - 30 - gap - left_floor - 10) / 2)
-  local bw = math.max(60, math.min(want, room))
-  local by = rect.y + rect.h - bh - 8
-  local sx = rect.x + rect.w - bw - 10
-  local rx = sx - gap - bw
+  -- RUN and SUBMIT, with a deliberate gap between them, and SOLVE and FORMAT
+  -- on the left. The geometry is `button_band`'s — worked out at the top of
+  -- this function, because the code above had to be laid out around it.
+  local run_label, submit_label = band.run_label, band.submit_label
+  local format_label, solve_label = band.format_label, band.solve_label
+  local bh, cap, bw = band.bh, band.cap, band.bw
+  local by, sx, rx, ly = band.by, band.sx, band.rx, band.ly
+  local vx, fx, sw, fw = band.vx, band.fx, band.sw, band.fw
 
   local busy = self.running_mode ~= nil
   local usable = (self.quest ~= nil) and not busy
-
-  -- The left of the row is the two buttons that only ever change the buffer:
-  -- **SOLVE, then FORMAT**, then a wide gap, then the pair that costs
-  -- something. Neither of the left two writes an attempt (§4.9d, §4.11b), and
-  -- neither must read as a third way to submit.
-  --
-  -- SOLVE is the far-left button on purpose: FORMAT stands between it and
-  -- RUN, so the one control on this screen that gives the answer away cannot
-  -- be reached by a press that was aimed a centimetre wide of RUN.
-  local sw = UI.textWidth(solve_label, 8) + 16
-  local fw = UI.textWidth(format_label, 8) + 16
-  local left_room = rx - rect.x - 20
-  -- Which row the two of them sit on. Beside RUN and SUBMIT when they fit
-  -- there; **on their own row above** when they do not, which is portrait in
-  -- every language and landscape in Czech. Four full labels do not fit across
-  -- 720 virtual pixels, and of the three ways out — shrink the pair on the
-  -- right, shrink the type, or use the empty row above — only the last one
-  -- costs nothing. The well has that row spare on every screen this game
-  -- draws, and the wide gap between the reflex button and the deliberate one
-  -- survives untouched.
-  local ly = by
-  if sw + left_gap + fw > left_room then
-    ly = by - bh - 6 - cap
-    left_room = rect.w - 20
-    if sw + left_gap + fw > left_room then
-      -- Narrower still: both give way together rather than one eating the
-      -- other, with a floor that still shows a word.
-      local scale = (left_room - left_gap) / (sw + fw)
-      sw = math.max(44, math.floor(sw * scale))
-      fw = math.max(44, math.floor(fw * scale))
-    end
-  end
-  local vx = rect.x + 10
-  local fx = vx + sw + left_gap
   UI.button(vx, ly, sw, bh, solve_label,
     (usable and not self.solve_unsupported) and "normal" or "disabled", 8)
   self.solve_rect = { x = vx, y = ly, w = sw, h = bh }
@@ -927,12 +979,14 @@ function Quest:draw_editor(rect, tint)
   -- line there puts it through the labels. `by - 12` was right when there was
   -- one row and is a stripe across two.
   local two_rows = ly ~= by
-  -- Two rows frees the left margin of the *lower* caption row, which is where
-  -- this line has always lived; one row does not, because SOLVE's own caption
-  -- is there, so it goes just past FORMAT instead.
-  local ix = two_rows and (rect.x + 10) or (fx + fw + 10)
-  local iy = two_rows and (by - cap) or (by - 12)
-  local limit = rx - 8
+  -- On the buffer buttons' own caption row when they have one — beside
+  -- `costs a star`, above FORMAT, with the whole width of the well to run
+  -- into — and otherwise just past FORMAT on the single row. Never at the old
+  -- left margin, which is where SOLVE's caption is now, and never below an
+  -- upper row, which is the button band itself.
+  local ix = two_rows and fx or (fx + fw + 10)
+  local iy = two_rows and (ly - cap) or (by - 12)
+  local limit = two_rows and (rect.x + rect.w - 10) or (rx - 8)
   if ix + UI.textWidth(info, 7) < limit then
     UI.text(info, ix, iy, 7, Theme.withAlpha(Theme.cream, 0.45))
   end
@@ -947,7 +1001,7 @@ function Quest:draw_editor(rect, tint)
   --   * §4.11b's aftermath — what the answer just cost, and what it did not.
   --     Three lines rather than two, because that sentence has to arrive
   --     whole: half of it says the opposite of the whole of it.
-  local said = self.format_problem or self.format_note or self.solve_note
+  local said = self.format_problem or self.format_note or self:solve_said()
   if said then
     local colour = (self.format_problem or self.solve_note) and Theme.coin
       or Theme.withAlpha(Theme.cyan, 0.9)
@@ -961,8 +1015,14 @@ function Quest:draw_editor(rect, tint)
     -- overlay over somebody's program, and unreadable advice printed through
     -- their own code is worse than none.
     local lines = UI.wrap(said, rect.w - 28, 7)
-    local lh = UI.lineHeight(7)
-    local shown = math.min(#lines, 4)
+    -- **Leading, and Korean needs more of it.** Unifont's cells fill the whole
+    -- point size, so CJK lines set at exactly `getHeight()` sit edge to edge
+    -- with no air at all and read as one band; the Latin face leaves its own
+    -- gap and needs only a little. `I18n.is_cjk` was written for this ("so a
+    -- layout can give it room rather than discover it needs some") and had no
+    -- caller until now.
+    local lh = UI.lineHeight(7) + (I18n.is_cjk() and 5 or 2)
+    local shown = math.min(#lines, 5)
     local top = math.min(by, ly) - cap - 6 - shown * lh
     UI.setColor(Theme.ink, 0.88)
     love.graphics.rectangle("fill", rect.x + 4, top - 5, rect.w - 8, shown * lh + 10)

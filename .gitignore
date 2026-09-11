@@ -24,3 +24,7 @@ art/raw/
 # Playwright MCP scratch (console logs, page snapshots) from driving the app.
 .playwright-mcp/
 .worktrees/
+/*.png   # scratch screenshots agents drop at repo root for their own verification
+
+# Claude Code / harness-internal state, not project content.
+.claude/

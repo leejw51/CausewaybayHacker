@@ -106,7 +106,7 @@ add({ until_ = function(app)
       print(("quest.solve: %d sent"):format(solves))
       print(("after SOLVE:  hints_used=%d/%d   (was %d)")
         :format(q.hints_used or 0, q.hints_total or 0, app.probe_hints_before))
-      print("the note says: " .. tostring(app.scene.solve_note))
+      print("the note says: " .. tostring(app.scene:solve_said()))
       print("the editor now holds:\n" .. got)
       if got == app.probe_mine then
         print("FAIL: the buffer was not replaced")
@@ -163,6 +163,31 @@ add({ until_ = function(app)
 add({ wait = 0.3 })
 add({ shot = "S3-solve-button.png" })
 
+-- Korean, where every label on the row is a different width and the note is
+-- a different number of lines. A layout that only ever fits in English fits
+-- in one of the six languages this client ships.
+add({ note = "the language button, on the footer" })
+add({ click = function(app)
+      local r = app.display_rects.lang
+      return { r.x + r.w / 2, r.y + r.h / 2 }
+    end })
+add({ until_ = function(app)
+      local I18n = require("src.i18n")
+      if I18n.lang ~= "ko" then return false end
+      app:draw()
+      local r, f = app.scene.solve_rect, app.scene.format_rect
+      print(("korean: SOLVE %d..%d y=%d   FORMAT %d..%d y=%d   RUN %d y=%d")
+        :format(r.x, r.x + r.w, r.y, f.x, f.x + f.w, f.y,
+          app.scene.run_rect.x, app.scene.run_rect.y))
+      if r.x + r.w > f.x then print("FAIL: SOLVE runs into FORMAT in Korean"); return false end
+      if f.y == app.scene.run_rect.y and f.x + f.w > app.scene.run_rect.x then
+        print("FAIL: FORMAT runs into RUN in Korean"); return false
+      end
+      return true
+    end, note = "the row holds in Korean", timeout = 8 })
+add({ wait = 0.4 })
+add({ shot = "S3c-solve-korean.png" })
+
 -- Portrait, where the well is narrowest and four buttons have least room.
 -- The decisions log has a caption that was printed *inside* the button band
 -- and was only ever found in a picture; this is the picture.
@@ -188,7 +213,7 @@ add({ until_ = function(app)
       end
       return true
     end, note = "four buttons, no overlap", timeout = 5 })
-add({ shot = "S3b-solve-portrait.png" })
+add({ shot = "S3b-solve-portrait-korean.png" })
 add({ orient = "landscape" })
 add({ wait = 0.4 })
 

@@ -146,6 +146,37 @@ add({ until_ = function(app)
 add({ wait = 0.4 })
 add({ shot = "D3-draft-restored.png" })
 
+-- A long program, and the last line of it. The button band is two rows deep
+-- in English now; the editor has to know that, or the caret goes behind
+-- SOLVE on line 60 and the player types where they cannot see.
+add({ key = "a", mods = { ctrl = true } })
+add({ key = "backspace" })
+add({ text = function()
+      local out = {}
+      for i = 1, 60 do out[#out + 1] = ("let v%d = %d;"):format(i, i) end
+      return table.concat(out, "\n")
+    end })
+add({ until_ = function(app)
+      local sc = app.scene
+      if not sc.editor_rect or not sc.solve_rect then return false end
+      local top = math.min(sc.solve_rect.y, sc.run_rect.y)
+      local caret_y = sc.editor_rect.y + 6
+        + (sc.editor.line - sc.editor.scroll - 1) * sc.line_h
+      print(("long program: %d lines, caret on %d, scroll %d, %d rows visible")
+        :format(sc.editor:line_count(), sc.editor.line, sc.editor.scroll,
+          sc.visible_rows or -1))
+      print(("caret row %d..%d   the button band starts at %d")
+        :format(caret_y, caret_y + sc.line_h, top))
+      if caret_y + sc.line_h > top then
+        print("FAIL: the caret line is behind the buttons")
+        return false
+      end
+      print("PASS: the last line of a long program clears the button band")
+      return true
+    end, note = "the caret is not behind a button", timeout = 20 })
+add({ wait = 0.3 })
+add({ shot = "D4-long-program.png" })
+
 add({ until_ = function(app)
       print(("\nsummary: quest=%s  this launch was a %s visit")
         :format(tostring(app.probe_quest_id),
