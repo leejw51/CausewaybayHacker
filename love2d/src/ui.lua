@@ -7,6 +7,10 @@
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local Layout = require("src.layout")
+-- For the language button's candidate labels: it is measured from every code
+-- it can ever wear (`YUE` is half again as wide as `EN`), not from the one it
+-- happens to be showing.
+local I18n = require("src.i18n")
 
 local UI = {}
 
@@ -248,73 +252,118 @@ function UI.bar(x, y, w, h, fraction, color)
   love.graphics.rectangle("line", x + 1, y + 1, w - 2, h - 2)
   love.graphics.setColor(1, 1, 1, 1)
 end
-
 -- ------------------------------------------------------ the display controls
 
---- The footer strip's height, measured from the type it has to hold.
----
---- It was a hard 22 px, which was right while every label in this client was
---- 7 or 8 px. The type ladder is twice that now and is a player setting on
---- top, so a fixed strip would clip its own hint and its own buttons. Two
---- pixels of air above and below the tallest thing in it.
+--- The size the hint and the connection badge are set in.
 UI.FOOTER_SIZE = 8
 
---- One row, or two.
+--- The size the display buttons are set in — **the button face, not the
+--- caption face.**
 ---
---- **Set by the last `UI.footer`, read by the scenes.** A Korean hint at the
---- readable type ladder is 700 to 1600 pixels of text, and a 720-wide
---- portrait canvas has 135 left after the connection badge and four buttons.
---- There is no size at which that fits on one line, so when it does not fit
---- the strip becomes two rows: the hint gets the whole width on its own row,
---- the buttons and the badge keep theirs.
----
---- Scenes read this a frame after it changes, which is the frame the
---- orientation or the language changed in and is already being rebuilt.
-UI.footer_rows = 1
+--- 9 is what `src/scenes/quest.lua` draws RUN, SUBMIT, FORMAT and SOLVE at,
+--- and these four are buttons of exactly that kind: things a player aims at
+--- and presses. They were drawn at 7, which is the size this client uses for
+--- the smallest caption under a node card, and the result was a row of chips
+--- that read as footer chrome rather than as controls. At the authored size
+--- ladder's first step both snap to the same 16 px cell; at the steps above
+--- it they do not, and the caption face stayed 32 px while every real button
+--- on the screen went to 48.
+UI.CHIP_SIZE = 9
 
+--- The floor under a display button's height.
+---
+--- `CausewaybayGolang/love2d/src/game.lua` puts its HUD buttons on a 36 px
+--- floor (`btnBox(…, 112, 32, 36)`) and gives them a strip of their own,
+--- `TOP = btnH + 20`. This is the same number for the same reason: 36 px is
+--- about 9 mm on a laptop panel and is the smallest thing a finger hits
+--- without aiming. What was here before was `footerRow() - 4` — **22 px** —
+--- which is a caption with a box drawn round it.
+UI.CHIP_MIN_H = 36
+
+--- One row of hint, or two. **Set by the last `UI.footer`, read by scenes and
+--- by `tests/drive/language.lua`.**
+---
+--- A Korean hint at the readable type ladder is 700 to 1600 pixels of text
+--- and a 720-wide portrait canvas cannot hold it on one line at any size, so
+--- the hint is allowed a second row. Two is the cap: a strip taller than that
+--- stops being chrome, and what is past it is clipped (a hint cut off
+--- mid-word still reads; one printed through the connection badge does not).
+UI.hint_rows = 1
+
+--- True when the last hint did not fit in the rows it was given, so a drive
+--- script can say which screen in which language is losing the end of its
+--- own sentence instead of leaving it to somebody's eye.
+UI.hint_clipped = false
+
+--- The height of one row of hint.
 function UI.footerRow()
   return math.max(22, UI.lineHeight(UI.FOOTER_SIZE) + 10)
 end
 
+--- How tall one display button is: its own ink plus air, never under the
+--- floor. Measured, so it grows with the player's type-size step the way
+--- every other button in this client does.
+function UI.chipHeight()
+  return math.max(UI.CHIP_MIN_H, UI.lineHeight(UI.CHIP_SIZE) + 14)
+end
+
+--- The display buttons' **own row**, which is the other half of the fix.
+---
+--- They used to share the hint's row: four controls, a wallet address, a
+--- scene hint and the connection state, on one 22 px line. Golang gives the
+--- same cluster a reserved strip (`TOP`, sized from `btnH + 20`) and that is
+--- what this is — 10 px of air around a 36 px button, at the bottom rather
+--- than the top because that is where this client's chrome already lives and
+--- where every scene already subtracts `UI.footerHeight()`. Nothing else had
+--- to learn about a new band.
+function UI.controlRow()
+  return UI.chipHeight() + 10
+end
+
+--- The whole strip: the hint's rows, plus the controls' row.
 function UI.footerHeight()
-  return UI.footerRow() * UI.footer_rows
+  return UI.footerRow() * UI.hint_rows + UI.controlRow()
 end
 
 --- Space kept clear for the connection badge, measured against the *longest*
 --- state rather than the current one.
 ---
---- A reserve that tracked the live string would move the three display
---- buttons sideways every time the socket went from `open` to `connecting`,
---- and a control that walks away from the pointer is worse than one that is
---- slightly further from the edge than it needs to be.
+--- A reserve that tracked the live string would move whatever sits beside it
+--- every time the socket went from `open` to `connecting`, and a control that
+--- walks away from the pointer is worse than one that is slightly further
+--- from the edge than it needs to be.
 local function badge_reserve()
   return UI.textWidth("CONNECTING", UI.FOOTER_SIZE) + 16
 end
 
---- The chips are measured from the footer, so they grow with it.
-local CHIP_PAD = 6
-local CHIP_GAP = 5
-local LABEL = 7
+UI.badgeReserve = badge_reserve
 
---- One **row** tall, not one strip tall.
----
---- This read `UI.footerHeight()`, which is `footerRow() * footer_rows`. The
---- buttons live on a single row, so on the two- and three-row footers the
---- hint wraps into, each chip was drawn two or three rows high — and because
---- `glyph_w` is measured from the chip height, they got proportionally wider
---- as well. Four chips at three rows came to more than a 720-wide portrait
---- canvas, so `x` went **negative** and the whole cluster sat off the left
---- edge: visible as a sliver, clickable nowhere. The type-size and fullscreen
---- buttons were unreachable by mouse in portrait at every step.
----
---- It also closes a feedback loop. `displayReserve` runs before `UI.footer`
---- decides how many rows the hint needs, so a chip measured from the strip
---- height was measured from *last* frame's row count, which its own result
---- then changed. Measured from one row, the geometry settles in one frame.
-local function chip_h() return UI.footerRow() - 4 end
-local function glyph_w() return math.max(9, math.floor(chip_h() * 0.72)) end
+--- The chips are measured from the type in them, so they grow with it.
+local CHIP_PAD = 12      -- between the frame and what is inside it
+local CHIP_INNER = 8     -- between the glyph and the label
+local CHIP_GAP = 8       -- between one button and the next
 
---- The three chips, in order, with their labels already decided.
+--- The `A` the type-size button draws, at the step it selects.
+---
+--- The control shows its own effect, and the four steps have to be four
+--- visibly different glyphs rather than four roundings of one — so the size
+--- is taken off `Layout.FONT_STEPS` directly and snapped onto the 8-pixel
+--- grid, then capped so it cannot outgrow the button it is drawn in.
+local function type_font(step)
+  local want = Assets.snap8(16 * (Layout.FONT_STEPS[step or 1] or 1))
+  return Assets.font(math.min(want, Assets.snap8(UI.chipHeight() - 10)))
+end
+
+--- The glyph cell: a square the size of the label's own ink, except on the
+--- type button, where the glyph is the point and is measured from itself.
+local function glyph_w(chip, state)
+  if chip and chip.glyph == "type" then
+    return math.max(UI.lineHeight(UI.CHIP_SIZE), type_font(state.font):getWidth("A"))
+  end
+  return UI.lineHeight(UI.CHIP_SIZE)
+end
+
+--- The four chips, in order, with their labels already decided.
 ---
 --- **Each one says the state it is in, not the state it would move to.** A
 --- toggle whose current value is invisible gets pressed twice: once to find
@@ -326,11 +375,24 @@ local function glyph_w() return math.max(9, math.floor(chip_h() * 0.72)) end
 --- player chose, and it has *resolved* to a shape they should be able to see
 --- — so the word says AUTO and the glyph draws the shape it landed on,
 --- hollow rather than filled to say that nothing is pinned.
+---
+--- `every` is every label this button can ever wear, which is what its width
+--- is measured from: `btnBox` in `CausewaybayGolang/love2d/src/game.lua`
+--- sizes a button from the widest of its candidates rather than from the one
+--- it happens to be showing, so a button does not change width — or clip —
+--- when its own state changes. The language button's candidates are all six
+--- codes, which is where `YUE` comes in: it is half again as wide as `EN` and
+--- it is the reason a fixed width was wrong.
 local function chips(state)
+  local steps = {}
+  for i = 1, #Layout.FONT_STEPS do steps[i] = ("%d/%d"):format(i, #Layout.FONT_STEPS) end
+  local codes = {}
+  for _, code in ipairs(I18n.LANGS) do codes[#codes + 1] = I18n.CODES[code] or "EN" end
   return {
     {
       id = "fullscreen",
       label = state.fullscreen and "FULL" or "WINDOW",
+      every = { "FULL", "WINDOW" },
       short = "",
       glyph = "screen",
     },
@@ -338,6 +400,7 @@ local function chips(state)
       id = "orient",
       label = (state.orientation == "auto") and "AUTO"
         or (state.orientation == "portrait" and "PORT" or "LAND"),
+      every = { "AUTO", "PORT", "LAND" },
       -- `A` for automatic even when compact: hollow-versus-filled says
       -- "nothing is pinned" only to somebody who already knows it does.
       short = (state.orientation == "auto") and "A" or "",
@@ -345,81 +408,98 @@ local function chips(state)
     },
     {
       id = "font",
+      -- **`A 1/4` is the glyph plus the fraction, and the glyph is the `A`.**
+      -- Spelling the letter into the label as well gave `A A 1/4`, which is
+      -- how you find out that the control the user calls "A 1/4" was already
+      -- saying the right thing — it was saying it 22 px tall in a caption
+      -- face, which is a different problem and is the one this pass fixes.
       label = state.font_label or "1/4",
+      every = steps,
       short = tostring(state.font or 1),
       glyph = "type",
     },
     {
       id = "lang",
       -- **The code, not the name.** `한국어` is three double-width cells where
-      -- `KO` is two single ones, in a strip that already clips its hint on a
-      -- 720-wide canvas. The name in full is what the toast says when the
-      -- button is pressed, which is the moment it is actually needed.
+      -- `KO` is two single ones, and the name in full is what the toast says
+      -- when the button is pressed, which is the moment it is needed.
       label = state.lang_code or "EN",
+      every = codes,
       short = state.lang_code or "EN",
       glyph = "lang",
     },
   }
 end
 
---- True when the strip is too narrow to carry four labelled buttons.
+--- True when the row is too narrow to carry four labelled buttons.
 ---
 --- The glyphs say the state on their own — the screen is inset or filled, the
---- box is wide or tall and hollow or solid, the `A` is drawn at its own step —
---- so the word is the part that can go. The type button keeps its digit,
+--- box is wide or tall and hollow or solid, the `A` is drawn at its own step
+--- — so the word is the part that can go. The type button keeps its digit,
 --- because "which of four" is the one state no glyph shows.
 local compact = false
 
-local function chip_width(chip)
-  local label = compact and (chip.short or "") or chip.label
-  local text = label ~= "" and (4 + UI.textWidth(label, LABEL)) or 0
-  return CHIP_PAD + glyph_w() + text + CHIP_PAD
+--- `btnBox`, in this client's furniture: a button is as wide as the widest
+--- label it can ever wear, plus a glyph, plus real padding — never a number
+--- somebody typed in.
+local function chip_width(chip, state)
+  local text = 0
+  if compact then
+    if (chip.short or "") ~= "" then
+      text = CHIP_INNER + UI.textWidth(chip.short, UI.CHIP_SIZE)
+    end
+  else
+    for _, label in ipairs(chip.every) do
+      text = math.max(text, CHIP_INNER + UI.textWidth(label, UI.CHIP_SIZE))
+    end
+  end
+  return CHIP_PAD + glyph_w(chip, state) + text + CHIP_PAD
 end
 
---- How wide the cluster is, so the footer can keep the hint out of it.
+--- How wide the cluster is, and — the other half of the job — whether the
+--- buttons can wear their labels at this canvas width.
 ---
---- Also the one place that decides whether the buttons wear their labels: the
---- full cluster plus the connection badge is 520 px at the readable ladder,
---- and a 720-wide portrait canvas cannot spend that and still say anything.
+--- The controls have a row to themselves now, so what they are measured
+--- against is the whole width rather than what is left after a hint and a
+--- badge. That is what buys the labels back in portrait: the full cluster is
+--- about 500 px at the first type step and a 720-wide portrait canvas has all
+--- of it to spend.
 function UI.displayReserve(state)
   local function total()
     local sum = 0
     for i, chip in ipairs(chips(state)) do
-      sum = sum + chip_width(chip) + (i > 1 and CHIP_GAP or 0)
+      sum = sum + chip_width(chip, state) + (i > 1 and CHIP_GAP or 0)
     end
     return sum
   end
   compact = false
-  local wide = total()
-  -- Labels only while at least a third of the strip is left for the hint.
-  if wide + badge_reserve() + 10 > Layout.vw * 0.62 then compact = true end
-  return total() + badge_reserve() + 10
+  if total() > Layout.vw - 20 then compact = true end
+  return total()
 end
 
 --- A small screen, filled when the game owns the whole one.
-local function glyph_screen(x, y, full, ink)
-  local gw, gh = glyph_w(), chip_h()
-  local h = math.max(6, math.floor(gw * 0.7))
-  local top = y + (gh - h) / 2
+local function glyph_screen(x, y, cell, full, ink)
+  local h = math.max(6, math.floor(cell * 0.72))
+  local top = y + (UI.chipHeight() - h) / 2
+  local inset = math.max(2, math.floor(cell / 6))
   UI.setColor(ink)
   if full then
-    love.graphics.rectangle("fill", x, top, gw, h)
+    love.graphics.rectangle("fill", x, top, cell, h)
   else
     love.graphics.setLineWidth(1)
-    love.graphics.rectangle("line", x + 0.5, top + 0.5, gw - 1, h - 1)
-    love.graphics.rectangle("fill", x + 3, top + 3, gw - 6, h - 6)
+    love.graphics.rectangle("line", x + 0.5, top + 0.5, cell - 1, h - 1)
+    love.graphics.rectangle("fill", x + inset, top + inset, cell - inset * 2, h - inset * 2)
   end
   love.graphics.setColor(1, 1, 1, 1)
 end
 
 --- A wide box or a tall one — the shape you are actually in. Filled when it
 --- is pinned, hollow when the window is deciding.
-local function glyph_orient(x, y, portrait, pinned, ink)
-  local unit = glyph_w()
-  local w, h = unit, math.max(5, math.floor(unit * 0.72))
-  if portrait then w, h = math.max(5, math.floor(unit * 0.6)), unit + 2 end
-  local gx = x + (glyph_w() - w) / 2
-  local gy = y + (chip_h() - h) / 2
+local function glyph_orient(x, y, cell, portrait, pinned, ink)
+  local w, h = cell, math.max(5, math.floor(cell * 0.72))
+  if portrait then w, h = math.max(5, math.floor(cell * 0.62)), cell end
+  local gx = x + (cell - w) / 2
+  local gy = y + (UI.chipHeight() - h) / 2
   UI.setColor(ink)
   if pinned then
     love.graphics.rectangle("fill", gx, gy, w, h)
@@ -431,32 +511,28 @@ local function glyph_orient(x, y, portrait, pinned, ink)
 end
 
 --- An `A`, drawn at the step it selects. The control shows its own effect.
-local function glyph_type(x, y, step, ink)
-  -- The `A` is drawn at the step it selects, so the control shows its own
-  -- effect. It is grid-snapped like everything else, so the four steps are
-  -- four visibly different glyph sizes rather than four roundings of one.
-  local font = Assets.font(Assets.snap8(8 * (Layout.FONT_STEPS[step or 1] or 1)))
+local function glyph_type(x, y, cell, step, ink)
+  local font = type_font(step)
   love.graphics.setFont(font)
   UI.setColor(ink)
-  love.graphics.print("A", x + (glyph_w() - font:getWidth("A")) / 2,
-    y + (chip_h() - font:getHeight()) / 2)
+  love.graphics.print("A", x + (cell - font:getWidth("A")) / 2,
+    y + (UI.chipHeight() - font:getHeight()) / 2)
   love.graphics.setColor(1, 1, 1, 1)
 end
 
 --- A globe: a circle with a meridian and two parallels. Three strokes is as
---- much globe as nine pixels will hold, and it is the one symbol for
---- "language" that does not belong to a particular country's flag.
-local function glyph_globe(x, y, ink)
-  local d = glyph_w()
-  local r = d / 2
-  local cx, cy = x + r, y + chip_h() / 2
+--- much globe as this cell will hold, and it is the one symbol for "language"
+--- that does not belong to a particular country's flag.
+local function glyph_globe(x, y, cell, ink)
+  local r = cell / 2
+  local cx, cy = x + r, y + UI.chipHeight() / 2
   UI.setColor(ink)
   love.graphics.setLineWidth(1)
-  love.graphics.circle("line", cx, cy, r - 0.5, 12)
+  love.graphics.circle("line", cx, cy, r - 0.5, 16)
   love.graphics.line(cx, cy - r + 1, cx, cy + r - 1)
   love.graphics.line(cx - r + 1.5, cy, cx + r - 1.5, cy)
-  love.graphics.line(cx - r + 3, cy - r * 0.5, cx + r - 3, cy - r * 0.5)
-  love.graphics.line(cx - r + 3, cy + r * 0.5, cx + r - 3, cy + r * 0.5)
+  love.graphics.line(cx - r + r * 0.3, cy - r * 0.5, cx + r - r * 0.3, cy - r * 0.5)
+  love.graphics.line(cx - r + r * 0.3, cy + r * 0.5, cx + r - r * 0.3, cy + r * 0.5)
   love.graphics.setColor(1, 1, 1, 1)
 end
 
@@ -474,52 +550,61 @@ end
 
 --- Draw the cluster and return the rectangles it drew, for the hit test.
 ---
---- **The same three controls, in the same corner, on every screen** — the
---- title card included. They are drawn from `App:footer`, which every scene
---- already calls, so a new scene gets them without knowing they exist and
---- cannot forget them. The keys still work; these are the visible half.
+--- **The same four controls, in the same corner, on every screen** — the
+--- title card and the opening included. They are drawn from `App:footer`,
+--- which every scene already calls, so a new scene gets them without knowing
+--- they exist and cannot forget them. The keys still work; these are the
+--- visible half.
 function UI.displayControls(state)
   local list = chips(state)
   local total = 0
   for i, chip in ipairs(list) do
-    chip.w = chip_width(chip)
+    chip.w = chip_width(chip, state)
     total = total + chip.w + (i > 1 and CHIP_GAP or 0)
   end
 
-  local row, ch = UI.footerRow(), chip_h()
-  local y = Layout.vh - row + (row - ch) / 2
+  local ch = UI.chipHeight()
+  local row = UI.controlRow()
+  local y = math.floor(Layout.vh - row + (row - ch) / 2)
   -- Never off the left edge, whatever the language and the type step do to
   -- the labels: a control that has left the canvas cannot be pressed, and
-  -- nothing else in the client would have said so.
-  local x = math.max(6, Layout.vw - 10 - badge_reserve() - total)
+  -- nothing else in this client would have said so. (It had, once: four
+  -- chips measured from a three-row strip came to more than a portrait
+  -- canvas and the whole cluster sat off the left edge, visible as a sliver
+  -- and clickable nowhere.)
+  local x = math.max(6, Layout.vw - 10 - total)
   local px, py = pointer()
 
   local rects = {}
   for _, chip in ipairs(list) do
     local hot = px and px >= x and px <= x + chip.w and py >= y and py <= y + ch
     local ink = hot and Theme.ink or Theme.cream
-    UI.setColor(hot and Theme.coin or Theme.withAlpha(Theme.panel, 0.9))
+    UI.setColor(hot and Theme.coin or Theme.withAlpha(Theme.panel, 0.16))
     love.graphics.rectangle("fill", x, y, chip.w, ch)
-    love.graphics.setLineWidth(1)
-    UI.setColor(Theme.withAlpha(hot and Theme.ink or Theme.cream, hot and 0.9 or 0.35))
-    love.graphics.rectangle("line", x + 0.5, y + 0.5, chip.w - 1, ch - 1)
+    -- A hard two-pixel border, the same frame `UI.button` and `UI.panel`
+    -- wear. At one pixel and a third of an alpha these read as boxes drawn
+    -- round some text; the point of this pass is that they read as buttons.
+    love.graphics.setLineWidth(2)
+    UI.setColor(Theme.withAlpha(hot and Theme.ink or Theme.cream, hot and 0.9 or 0.55))
+    love.graphics.rectangle("line", x + 1, y + 1, chip.w - 2, ch - 2)
     love.graphics.setColor(1, 1, 1, 1)
 
+    local cell = glyph_w(chip, state)
     local gx = x + CHIP_PAD
     if chip.glyph == "screen" then
-      glyph_screen(gx, y, state.fullscreen, ink)
+      glyph_screen(gx, y, cell, state.fullscreen, ink)
     elseif chip.glyph == "orient" then
-      glyph_orient(gx, y, state.shape == "portrait", state.orientation ~= "auto", ink)
+      glyph_orient(gx, y, cell, state.shape == "portrait", state.orientation ~= "auto", ink)
     elseif chip.glyph == "lang" then
-      glyph_globe(gx, y, ink)
+      glyph_globe(gx, y, cell, ink)
     else
-      glyph_type(gx, y, state.font, ink)
+      glyph_type(gx, y, cell, state.font, ink)
     end
 
     local label = compact and (chip.short or "") or chip.label
     if label ~= "" then
-      UI.text(label, gx + glyph_w() + 4,
-        y + (ch - UI.lineHeight(LABEL)) / 2, LABEL, ink)
+      UI.text(label, gx + cell + CHIP_INNER,
+        y + (ch - UI.lineHeight(UI.CHIP_SIZE)) / 2, UI.CHIP_SIZE, ink)
     end
     rects[chip.id] = { x = x, y = y, w = chip.w, h = ch }
     x = x + chip.w + CHIP_GAP
@@ -529,60 +614,66 @@ end
 
 --- The status strip every screen carries along its bottom edge.
 ---
---- Three zones: the scene's own hint on the left, the connection on the
---- right, and between them the display controls (`UI.displayControls`).
---- Those live here rather than in each scene because they are global — they
---- work on every screen, so they should be reachable on every screen without
---- each scene having to remember to draw them.
+--- Two bands, not three zones:
 ---
---- `reserve` is how much of the right-hand end is spoken for. It is taken out
---- **before** the hint is measured, not after: the controls are the feature
---- and cannot be conditional on there being room, so it is the hint that
---- gives way. (It already had to once — see below.)
-function UI.footer(lines, connection, reserve)
+---   * the **hint row** — the scene's own line of keys on the left, the
+---     connection state on the right;
+---   * the **control row** under it, which belongs to the display buttons
+---     (`UI.displayControls`) and to nothing else.
+---
+--- It was one row with all five things on it, and the four buttons were 22 px
+--- tall at a caption size because that is all the room a row shared with a
+--- wallet address has. Splitting it is what makes them buttons: the hint gets
+--- the whole width back, and the controls get a height they were never going
+--- to be given while they were sharing.
+---
+--- The controls live here rather than in each scene because they are global —
+--- they work on every screen, so they should be reachable on every screen
+--- without each scene having to remember to draw them.
+---
+--- Returns the room the hint was given, which is the number
+--- `tests/drive/language.lua` prints a translated string against.
+function UI.footer(lines, connection)
   local row = UI.footerRow()
-  local keep = math.max(reserve or 0, connection and badge_reserve() or 0)
   local text = lines or ""
+  local beside = Layout.vw - 20 - (connection and badge_reserve() or 0)
 
-  -- **How many rows this strip needs, and why it is not always one.**
-  --
-  -- A scene hint is a list of keys, and at the readable type ladder the map's
-  -- seven of them are 1344 px in English and 1648 px in Korean. A portrait
-  -- canvas is 720 wide. There is no font size at which that fits on one line
-  -- — dropping a size is a no-op here, because 7 and 8 both round to the same
-  -- 16 px cell — so the strip grows instead:
-  --
-  --   * it fits beside the buttons        → one row, as it always was;
-  --   * it does not                       → up to two rows of hint, wrapped
-  --                                         on word boundaries, and the
-  --                                         buttons keep a row of their own.
-  --
-  -- Two is the cap because a footer taller than that stops being chrome. What
-  -- is past it is clipped, which is the behaviour this function already had
-  -- and already documents below.
-  local beside = Layout.vw - 20 - keep
   local hint_rows = {}
+  UI.hint_clipped = false
   if UI.textWidth(text, UI.FOOTER_SIZE) <= beside then
     hint_rows = { text }
-    UI.footer_rows = 1
+    UI.hint_rows = 1
   else
-    local wrapped = UI.wrap(text, Layout.vw - 20, UI.FOOTER_SIZE)
+    -- **Wrapped to the room it is actually given**, which is the width beside
+    -- the connection badge — not to the whole canvas. Wrapping to the canvas
+    -- and then drawing inside a narrower scissor is how a hint that reports
+    -- "one row, wrapped, fine" loses its last two words: `UI.wrap` collapses
+    -- the runs of spaces a key list is spelled with, so a 704 px Korean hint
+    -- comes back as one 600 px line, which is still 76 px wider than the row
+    -- it is drawn in.
+    local wrapped = UI.wrap(text, beside, UI.FOOTER_SIZE)
     for i = 1, math.min(2, #wrapped) do hint_rows[i] = wrapped[i] end
-    UI.footer_rows = #hint_rows + 1
+    UI.hint_rows = math.max(1, #hint_rows)
+    UI.hint_clipped = #wrapped > 2
   end
 
-  local h = row * UI.footer_rows
+  local h = UI.footerHeight()
   local y = Layout.vh - h
   UI.setColor(Theme.ink, 0.8)
   love.graphics.rectangle("fill", 0, y, Layout.vw, h)
+  -- A rule between the two bands, so the control row reads as a place the
+  -- buttons live rather than as more of the same strip.
+  UI.setColor(Theme.cream, 0.12)
+  love.graphics.rectangle("fill", 0, Layout.vh - UI.controlRow(), Layout.vw, 1)
+  love.graphics.setColor(1, 1, 1, 1)
 
-  -- The hint was drawn at x = 10 and never measured, so on the quest screen
-  -- in portrait — seven keys and an address, on a 720-wide canvas — it ran
-  -- straight through the connection badge and the two strings were printed
-  -- on top of each other. What is left of that fix is the clip: a hint cut
-  -- off mid-word still reads; one with `OPEN` printed through it does not.
-  local room = (UI.footer_rows == 1) and beside or (Layout.vw - 20)
-  love.graphics.setScissor(0, y, math.max(0, room + 10), h - (UI.footer_rows > 1 and row or 0))
+  -- The hint was drawn at x = 10 and never measured, once, so on the quest
+  -- screen in portrait it ran straight through the connection badge and the
+  -- two strings were printed on top of each other. What is left of that fix
+  -- is the clip: a hint cut off mid-word still reads; one with `OPEN`
+  -- printed through it does not.
+  local room = beside
+  love.graphics.setScissor(0, y, math.max(0, room + 10), row * UI.hint_rows)
   for i, line in ipairs(hint_rows) do
     UI.text(line, 10, y + (i - 1) * row + (row - UI.lineHeight(UI.FOOTER_SIZE)) / 2,
       UI.FOOTER_SIZE, Theme.withAlpha(Theme.cream, 0.85))
@@ -596,9 +687,13 @@ function UI.footer(lines, connection, reserve)
     elseif connection == "connecting" or connection == "handshaking" then color = Theme.coin end
     local label = connection:upper()
     local w = UI.textWidth(label, UI.FOOTER_SIZE)
+    -- On the hint's first row, at the right-hand end: it is a status line,
+    -- and it belongs with the other status line rather than in the middle of
+    -- a row of buttons.
     UI.text(label, Layout.vw - w - 10,
-      Layout.vh - row + (row - UI.lineHeight(UI.FOOTER_SIZE)) / 2, UI.FOOTER_SIZE, color)
+      y + (row - UI.lineHeight(UI.FOOTER_SIZE)) / 2, UI.FOOTER_SIZE, color)
   end
+  return room
 end
 
 --- A one-line notice that fades. Owned by the app, drawn here.

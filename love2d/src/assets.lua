@@ -378,7 +378,10 @@ function A.pick(...)
 end
 
 --- Draw an image to cover `w × h`, cropped rather than squashed.
-function A.cover(name, x, y, w, h, tint)
+--- `alpha` is for a cross-fade: `src/scenes/story.lua` draws the outgoing
+--- painting, then the incoming one over it as it arrives, and a cover that
+--- always painted at full opacity would make every cut a hard cut.
+function A.cover(name, x, y, w, h, tint, alpha)
   local image = A.images[name]
   if not image then
     love.graphics.setColor(tint or Theme.navy)
@@ -391,7 +394,7 @@ function A.cover(name, x, y, w, h, tint)
   local dx = x + (w - iw * s) / 2
   local dy = y + (h - ih * s) / 2
   love.graphics.setScissor(x, y, w, h)
-  love.graphics.setColor(1, 1, 1, 1)
+  love.graphics.setColor(1, 1, 1, alpha or 1)
   love.graphics.draw(image, dx, dy, 0, s, s)
   love.graphics.setScissor()
   return true

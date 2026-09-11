@@ -284,6 +284,7 @@ function Store.replay(records)
     server = nil,
     map = {},           -- "land.category" -> quest_id
     lang = nil,         -- the interface language, SPEC §1.1
+    story = false,      -- has the opening been watched (or skipped) here?
     migrated = false,   -- out of LÖVE's save directory
     moved_from = nil,   -- out of an older home directory
     lines = 0,
@@ -325,6 +326,12 @@ function Store.replay(records)
       -- change of window and a change of machine, and writing it alongside
       -- them would mean every F1 press rewrote it too.
       folded.lang = record.lang
+    elseif kind == "story.seen" then
+      -- **One way, on purpose.** There is no `story.unseen` record: the flag
+      -- says "this person has had their chance at the opening", and the way
+      -- to see it again is the STORY button on the login screen, which plays
+      -- it without pretending it was never watched.
+      folded.story = true
     elseif kind == "server.set" and type(record.url) == "string" then
       folded.server = record.url
     elseif kind == "map.cursor" and type(record.map) == "string" then
@@ -418,6 +425,8 @@ function Store.fold(record)
     state.display = folded.display
   elseif record.kind == "lang.set" then
     state.lang = folded.lang
+  elseif record.kind == "story.seen" then
+    state.story = true
   elseif record.kind == "server.set" then
     state.server = folded.server
   elseif record.kind == "map.cursor" then
@@ -639,6 +648,27 @@ end
 
 function Store.set_lang(code)
   return Store.append({ kind = "lang.set", lang = code })
+end
+
+-- --------------------------------------------------------------- the opening
+
+--- Has the opening (`src/scenes/story.lua`) been watched on this machine?
+---
+--- The one piece of state the title card needs. A player who has seen it —
+--- **or skipped it**, which means the same thing to them — goes straight to
+--- the login screen on every later launch.
+function Store.story_seen()
+  return (state and state.story) == true
+end
+
+--- Remember that the opening has been offered and dealt with.
+---
+--- Called when the sequence ends *and* when it is skipped. A replay asked for
+--- from the login screen deliberately does not clear it: watching it again on
+--- purpose is not the same as never having been shown it.
+function Store.set_story_seen()
+  if Store.story_seen() then return true end
+  return Store.append({ kind = "story.seen" })
 end
 
 -- -------------------------------------------------------------------- server

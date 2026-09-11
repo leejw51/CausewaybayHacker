@@ -21,8 +21,13 @@ return {
       end
       return app.client.attempt >= 5
     end, note = "five refused connections, backing off", timeout = 60 },
+  -- Twenty, not ten. The client rests on a title card that waits
+  -- (`src/scenes/title.lua`) and hands over to the login screen after eight
+  -- seconds with nobody at the keyboard, so the offline path to login is
+  -- "the socket gave up" plus that eight. It measured 9.6 s against the old
+  -- ten, which passed and should not have been asked to.
   { until_ = function(app) return app.scene_name == "login" end,
-    note = "the login screen, not a crash", timeout = 10 },
+    note = "the login screen, not a crash", timeout = 20 },
   { wait = 0.5 },
   { shot = "O1-offline.png" },
   { note = "and typing a key while offline is refused politely" },

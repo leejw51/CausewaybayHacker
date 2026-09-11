@@ -2,7 +2,7 @@
 --
 -- Screens, per SPEC §10:
 --
---   boot → login → lands → categories → map → quest → result
+--   boot → title → (story) → login → lands → categories → map → quest → result
 --
 -- plus `search`, `stats` and `ai` reachable from the map, and `playground`
 -- from either. `stats` is live; `search` and `ai` are built against their
@@ -36,6 +36,8 @@ App.__index = App
 
 local SCENES = {
   boot = "src.scenes.boot",
+  title = "src.scenes.title",
+  story = "src.scenes.story",
   login = "src.scenes.login",
   lands = "src.scenes.lands",
   categories = "src.scenes.categories",
@@ -236,20 +238,47 @@ function App:load()
   -- A connection that will not open, with no token for this address, is the
   -- login screen's business: the player has just typed a server that is not
   -- answering and needs to see the field they typed it into.
+  --- The title card and the opening are exempt alongside `boot` and `login`:
+  --- a card that waits for a keypress must not be yanked out from under the
+  --- player because the server is not running, and the opening is a minute of
+  --- reading that needs no server at all. Both land on the login screen by
+  --- themselves, which is where the reason is shown.
+  local function on_a_card()
+    return self.scene_name == "boot" or self.scene_name == "title"
+      or self.scene_name == "story" or self.scene_name == "login"
+  end
   self.session:on("state", function(payload)
-    if payload.state == "closed" and not self.session.token
-      and self.scene_name ~= "login" and self.scene_name ~= "boot" then
+    if payload.state == "closed" and not self.session.token and not on_a_card() then
       self:go("login")
     end
   end)
 
+  --- `need_login` fires the moment the socket opens with no stored token,
+  --- which on loopback is a third of a second after launch. That is what
+  --- takes the boot screen off — but it must take it off to the **title
+  --- card**, not past it, or the card this client just grew would never be
+  --- seen by the one player it exists for: somebody opening the game for the
+  --- first time. On the card and in the opening it is ignored; both end at
+  --- the login screen on their own.
   self.session:on("need_login", function(payload)
     if payload and payload.message then self:toast(payload.message) end
-    if self.scene_name ~= "login" then self:go("login") end
+    if self.scene_name == "boot" then
+      self:go("title")
+    elseif self.scene_name ~= "login" and self.scene_name ~= "title"
+      and self.scene_name ~= "story" then
+      self:go("login")
+    end
   end)
 
   self.session:on("auth", function(payload)
-    if self.scene_name == "login" or self.scene_name == "boot" then
+    -- A resumed session still gets the title card: it is the game's front
+    -- door, not a login prompt, and `make gui` resumes every launch — so a
+    -- boot that skipped it would be a game nobody ever saw the name of. The
+    -- card and the opening are not yanked either; they read `session.authed`
+    -- on the way out and go to `lands` instead of `login`.
+    if self.scene_name == "boot" then
+      self:go("title")
+    elseif self.scene_name == "login" then
       self:go("lands")
     end
     self:toast(("welcome, %s"):format(payload.user and payload.user.name or "hacker"))
@@ -535,7 +564,7 @@ function App:set_lang(code)
 end
 
 --- The status strip, drawn by every scene so the connection is never a
---- mystery — and, in its right-hand end, the three display controls.
+--- mystery — and, on a row of its own under it, the four display controls.
 ---
 --- They are drawn from here rather than from each scene for the same reason
 --- the connection badge is: they work on every screen, so they belong in the
@@ -548,13 +577,17 @@ function App:footer(hint)
     left = ("%s  %s   %s"):format(self.session:display_name(), self.session:short_address(), left)
   end
   local state = self:display_state()
-  -- The reserve first, so the hint is measured against what is actually left
-  -- rather than being clipped by the buttons after the fact.
+  -- **First**, because this is also what decides whether the buttons can
+  -- wear their labels at this canvas width, and the answer has to be settled
+  -- before anything is drawn with it.
   local reserve = UI.displayReserve(state)
   -- Kept so a drive script can ask whether this screen's own hint fits in the
   -- room it was given, which is the question a translation actually raises.
+  -- `last_reserve` is what the control row costs; `last_room` is what the
+  -- hint was actually given, which since the split is very nearly the whole
+  -- width.
   self.last_hint, self.last_reserve = left, reserve
-  UI.footer(left, self.client and self.client.state or "idle", reserve)
+  self.last_room = UI.footer(left, self.client and self.client.state or "idle")
   self.display_rects = UI.displayControls(state)
 end
 

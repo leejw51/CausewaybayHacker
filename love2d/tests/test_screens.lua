@@ -224,11 +224,13 @@ return function()
     -- exactly "every scene calls `app:footer`". A scene added tomorrow gets
     -- them for free and this case is what notices if one does not.
     --
-    -- The title card is in the list on purpose: a player who wants to play in
-    -- portrait should not have to sign in first to be allowed to ask.
+    -- The title card and the opening are in the list on purpose: a player who
+    -- wants to play in portrait should not have to sign in first to be
+    -- allowed to ask, and somebody watching a minute of story should be able
+    -- to change the language it is told in.
     local scenes = {
-      "boot", "login", "lands", "categories", "map", "quest", "result",
-      "search", "stats", "ai", "playground",
+      "boot", "title", "story", "login", "lands", "categories", "map",
+      "quest", "result", "search", "stats", "ai", "playground",
     }
     for _, name in ipairs(scenes) do
       local path = "src/scenes/" .. name .. ".lua"
@@ -240,6 +242,123 @@ return function()
         T.skip(path, "not readable from this working directory")
       end
     end
+  end)
+
+  T.case("the display buttons are a real target, measured from their own labels", function()
+    local _, code = strings_of("src/ui.lua")
+    if not code then return end
+    -- The numbers the user asked to be reported, asserted rather than
+    -- described: a floor at least as high as `CausewaybayGolang`'s 36 px, and
+    -- a label at the size this client draws RUN and SUBMIT at rather than the
+    -- size it draws the smallest caption under a node card at.
+    local floor_h = tonumber(code:match("UI%.CHIP_MIN_H = (%d+)"))
+    T.ok(floor_h ~= nil and floor_h >= 32,
+      "a display button is at least 32 px tall, got " .. tostring(floor_h))
+    local chip_size = tonumber(code:match("UI%.CHIP_SIZE = (%d+)"))
+    local _, quest = strings_of("src/scenes/quest.lua")
+    local button_size = quest and tonumber(quest:match("submit_label, usable and \"hot\" or \"disabled\", (%d+)"))
+    T.eq(chip_size, button_size,
+      "the chips are set in the same face SUBMIT is, not in the caption face")
+    -- `btnBox`: every label the button can ever wear, not the one it happens
+    -- to be showing. A fixed width clips `WINDOW` or leaves `EN` ragged, and
+    -- `YUE` is half again as wide as `EN`.
+    T.ok(code:find("for _, label in ipairs(chip.every) do", 1, true) ~= nil,
+      "each chip is measured across every label it can wear")
+    T.ok(code:find("I18n.CODES[code]", 1, true) ~= nil,
+      "including all six language codes")
+    -- Their own row. A design that puts four controls on one 22 px line
+    -- beside a wallet address is the thing this replaced.
+    T.ok(code:find("function UI.controlRow()", 1, true) ~= nil,
+      "the buttons have a row of their own")
+    T.ok(code:find("UI.footerRow() * UI.hint_rows + UI.controlRow()", 1, true) ~= nil,
+      "and the strip is the hint's rows plus that one")
+    -- The feedback loop this file already paid for: a chip measured from the
+    -- whole strip is measured from a number its own result changes.
+    T.nope(code:find("chipHeight()\n  return math.max(UI.CHIP_MIN_H, UI.footerHeight", 1, true),
+      "the chip height is never derived from the strip height")
+  end)
+
+  T.section("the title card, and the opening it guards")
+
+  T.case("the card waits, and its idle clock is wall time", function()
+    local _, code = strings_of("src/scenes/title.lua")
+    if not code then
+      T.skip("src/scenes/title.lua", "not readable from this working directory")
+      return
+    end
+    local idle = tonumber(code:match("Title%.IDLE_OUT = (%d+)"))
+    T.ok(idle ~= nil and idle > 0, "the card gives up eventually")
+    -- Every script under tests/drive waits for the login screen with
+    -- `timeout = 15`, which is also `src/drive.lua`'s default. The card plus
+    -- the boot screen's handshake has to land well inside that.
+    T.ok(idle <= 10,
+      "the idle-out (" .. tostring(idle) .. "s) fits the drive harness's 15 s budget")
+    -- `main.lua` caps dt at 0.05 and macOS throttles an occluded window, so a
+    -- deadline summed from dt runs twenty times slow — an 8 second card
+    -- becomes an 80 second one behind another window, and the budget above is
+    -- blown by the very thing it was measured against.
+    T.ok(code:find("love.timer.getTime()", 1, true) ~= nil,
+      "the deadline is wall time, the same rule src/drive.lua states")
+    T.nope(code:find("self.idle = self.idle + dt", 1, true),
+      "and not a counter fed by dt")
+  end)
+
+  T.case("the opening is offered once and remembered, skipped or not", function()
+    local _, title = strings_of("src/scenes/title.lua")
+    local _, story = strings_of("src/scenes/story.lua")
+    if not (title and story) then return end
+    -- The one question the card asks the store.
+    T.ok(title:find("Store.story_seen()", 1, true) ~= nil,
+      "a returning player is never shown it again unasked")
+    -- And the one place the answer is written — in `out`, which is both the
+    -- skip and the end, because they mean the same thing to the player.
+    local out = story:match("function Story:out%(%).-\nend")
+    T.ok(out ~= nil and out:find("Store.set_story_seen()", 1, true) ~= nil,
+      "skipping counts: it is the same exit the ending uses")
+    T.ok(story:find("function Story:keypressed", 1, true) ~= nil
+      and story:find("function Story:mousepressed", 1, true) ~= nil,
+      "any key, any click")
+    -- The idle hand-over never marks it seen: nobody was there to see it.
+    local start = title:match("function Title:start%(idle%)(.-)function Title:update")
+    T.ok(start ~= nil, "the card has one way out and it is `start`")
+    T.nope(start and start:find("set_story_seen", 1, true),
+      "a card that timed out has not shown anybody anything")
+  end)
+
+  T.case("the opening does not spoil the map", function()
+    local strings = strings_of("src/scenes/story.lua")
+    if not strings then return end
+    local all = table.concat(strings, "\n")
+    -- docs/story.md §2 is the loss and the reason. The two lands, the
+    -- mascots, the bosses and the ending are §3 and later, and an opening
+    -- that names them has spent the game's own reveals in its first minute.
+    for _, banned in ipairs({
+      "RUST LAND", "GO LAND", "Ferris", "Gogo", "DEADLOCK", "NULLPTR",
+      "THE AUTOCOMPLETE", "bg_datacentre", "HKU",
+    }) do
+      T.nope(all:find(banned, 1, true),
+        ("the opening names %q, which belongs to a later chapter"):format(banned))
+    end
+    -- And it uses the seven paintings that were generated for it.
+    for _, name in ipairs({
+      "open_flat", "open_cursor", "open_ghost", "open_face", "open_tills",
+      "open_stairs", "open_lands",
+    }) do
+      T.ok(all:find(name, 1, true) ~= nil, "the opening uses " .. name)
+    end
+  end)
+
+  T.case("there is a way back into it, with a key and a button", function()
+    local _, code = strings_of("src/scenes/login.lua")
+    if not code then return end
+    -- The house rule: a control nobody can see is not a feature, and a key
+    -- nobody can find is not a control.
+    T.ok(code:find("self.story_button", 1, true) ~= nil, "a button with a hit test")
+    T.ok(code:find('key == "f10"', 1, true) ~= nil, "and a key, printed on it")
+    -- Watching it again on purpose must not make it play unasked next launch.
+    local watch = code:match("function Login:watch_story%(%).-\nend")
+    T.nope(watch and watch:find("clear", 1, true),
+      "a replay does not reset the flag")
   end)
 
   T.case("the app draws the cluster and tests it before the scene", function()

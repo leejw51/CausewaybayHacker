@@ -44,7 +44,12 @@ end
 return {
   { orient = "landscape" },
   { wait = 0.6 },
-  { until_ = scene("login"), note = "login screen", timeout = 10 },
+  -- Twenty, not ten. The client now rests on a title card that waits
+  -- (`src/scenes/title.lua`), and a run with nobody at the keyboard spends
+  -- its eight-second idle-out before the login screen appears — measured at
+  -- 7.4 s from launch here, which is inside ten and not by enough. This is
+  -- the one script whose budget the card actually came close to.
+  { until_ = scene("login"), note = "login screen", timeout = 20 },
   { shot = "01-login.png" },
 
   { note = "typing the mnemonic — derived locally, never sent" },
@@ -93,7 +98,13 @@ return {
   { text = 'fn main() {\n    println!("hello, world")\n}\n' },
   { wait = 0.3 },
   { shot = "07-quest-typed.png" },
-  { key = "f5" },
+  -- **F10, not F5.** RUN is an iteration and deliberately stays on the quest
+  -- screen ("bouncing the player to a result screen after every RUN would
+  -- make the reflex button feel expensive" — `src/scenes/quest.lua`); only
+  -- SUBMIT produces a verdict. This script pressed F5 and then waited ninety
+  -- seconds for a screen that was never coming, which reads exactly like a
+  -- server that has stopped answering.
+  { key = "f10" },
   { wait = 0.9 },
   { shot = "08-running.png" },
 
@@ -110,7 +121,7 @@ return {
   ctrl("a"),
   { text = 'fn main() {\n    println!("hello, causewaybay");\n}\n' },
   { wait = 0.3 },
-  { key = "f5" },
+  { key = "f10" },
   { until_ = scene("result"), note = "judged", timeout = 90 },
   { until_ = function(app)
       return app.scene.attempt and app.scene.attempt.verdict == "accepted"

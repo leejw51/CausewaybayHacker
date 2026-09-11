@@ -239,6 +239,18 @@ function Login:update(dt)
   self.t = self.t + dt
 end
 
+--- Play the opening, on purpose.
+---
+--- It does **not** clear `story.seen`: watching it again deliberately is not
+--- the same as never having been offered it, and a replay that reset the flag
+--- would show it unasked at the next launch. The scene comes back here when
+--- it ends or is skipped.
+function Login:watch_story()
+  if self.busy then return end
+  SFX.play("select")
+  self.app:go("story", { replay = true })
+end
+
 -- ------------------------------------------------------------------ drawing
 
 local function field_box(y, w, h, label, shown, focused, hint)
@@ -279,7 +291,12 @@ function Login:panel_rect()
   -- landscape and two of six in portrait, so the panel is shorter in the
   -- orientation with more room across; the confirmation step that used to
   -- need the extra height is gone.
-  local ph = math.min(vh - 48, portrait and (tall and 560 or 560) or (tall and 330 or 460))
+  -- The WRITE THIS DOWN panel is 400 in landscape rather than 330: at the
+  -- doubled type ladder its twelve words, the address, the four-line warning
+  -- and the button do not fit in 330, and what gave way was the red line
+  -- saying this is the only copy — printed under the word grid's own plate
+  -- and invisible. That line is the whole screen.
+  local ph = math.min(vh - 48, portrait and 560 or (tall and 400 or 460))
   return (vw - pw) / 2, (vh - ph) / 2 - (portrait and 30 or 0), pw, ph
 end
 
@@ -325,15 +342,18 @@ function Login:draw()
     -- No "F11 fullscreen" any more: that control is a button in the corner
     -- of this very strip now, with its state written on it, so listing its
     -- key here spent the room that the four keys with no button need.
-    signin = I18n.t("TAB field   F2 reveal   N new wallet   ENTER apply/sign in"),
+    signin = I18n.t("TAB field   F2 reveal   N new wallet   F10 story   ENTER apply/sign in"),
     new_show = I18n.t("ENTER create and sign in   C copy   ESC cancel"),
   }
   self.app:footer(hints[self.mode] or "")
 end
 
 function Login:draw_signin(inner, ph)
-    UI.text(I18n.t("SIGN IN"), 0, 0, 16, Theme.coin)
-  UI.text(I18n.t("your wallet is your account"), 0, 22, 8, Theme.withAlpha(Theme.cream, 0.7))
+  UI.text(I18n.t("SIGN IN"), 0, 0, 16, Theme.coin)
+  -- Under the heading rather than through it: `22` was written against an
+  -- 8 px ladder and the heading is 32 px tall at the doubled one.
+  UI.text(I18n.t("your wallet is your account"), 0, UI.lineHeight(16) + 4, 8,
+    Theme.withAlpha(Theme.cream, 0.7))
 
   field_box(70, inner, 34, I18n.t("MNEMONIC OR PRIVATE KEY  (F2 SHOWS IT)"),
     self:masked(), self.focus == 1, I18n.t("twelve words, or 0x + 64 hex"))
@@ -367,10 +387,14 @@ function Login:draw_signin(inner, ph)
   elseif override then
     -- Precedence, said out loud. The field still saves; it just does not win
     -- this run, and pretending otherwise would make the control a lie.
+    -- Spaced by the line's own height: `9` was written against a 7 px ladder,
+    -- so at the doubled one the second line was printed through the SIGN IN
+    -- button underneath it.
+    local step = UI.lineHeight(7) + 2
     for i, line in ipairs(UI.wrap(
       I18n.t("CWBH_SERVER=%s is overriding this run — the field is saved for next launch",
         override), inner, 7)) do
-      if i <= 2 then UI.text(line, 0, 230 + (i - 1) * 9, 7, Theme.coin) end
+      if i <= 2 then UI.text(line, 0, 230 + (i - 1) * step, 7, Theme.coin) end
     end
   else
     local live = self.app.client and self.app.client.state or "idle"
@@ -390,15 +414,37 @@ function Login:draw_signin(inner, ph)
   local ny = by + bh + 10
   UI.button(0, ny, inner, bh, "NEW WALLET  [N]", self.busy and "disabled" or "normal")
   self.new_button = { y = ny, h = bh }
-  UI.text(I18n.t("nothing typed here is ever sent. only a signature leaves this machine."),
-    0, ny + bh + 8, 7, Theme.withAlpha(Theme.cream, 0.55))
+
+  -- The way back into the opening, which is the browser client's `STORY`
+  -- button in this client's furniture. It is on the login screen for the same
+  -- reason it is there: the opening plays once, on the first launch, and
+  -- after that the only place anybody would think to look for it is the
+  -- screen they arrive at. Narrower than the two buttons above it and set to
+  -- one side, because it is the one control here that is not the way in.
+  local sy = ny + bh + 12
+  local swide = math.max(140, UI.textWidth(I18n.t("STORY  [F10]"), 8) + 28)
+  UI.button(0, sy, swide, bh - 4, I18n.t("STORY  [F10]"), "normal", 8)
+  self.story_button = { y = sy, h = bh - 4, w = swide }
+  UI.text(I18n.t("watch the opening again"), swide + 12,
+    sy + (bh - 4 - UI.lineHeight(7)) / 2, 7, Theme.withAlpha(Theme.cream, 0.55))
+
+  -- Wrapped, not printed straight: at the doubled type ladder this sentence
+  -- is wider than the panel it is in, and an unwrapped `UI.text` runs off the
+  -- right edge and over Ferris.
+  local ny2 = sy + bh + 10
+  for _, line in ipairs(UI.wrap(
+    I18n.t("nothing typed here is ever sent. only a signature leaves this machine."),
+    inner, 7)) do
+    ny2 = ny2 + UI.text(line, 0, ny2, 7, Theme.withAlpha(Theme.cream, 0.55)) + 2
+  end
 end
 
 function Login:draw_new_show(inner, ph)
   if not self.words then return end
     UI.text(I18n.t("WRITE THIS DOWN"), 0, 0, 15, Theme.coin)
   -- The copy is doing the work now that nothing gates the button.
-  UI.text(I18n.t("this is the only copy. there is no reset."), 0, 22, 8, Theme.red)
+  UI.text(I18n.t("this is the only copy. there is no reset."), 0, UI.lineHeight(15) + 4, 8,
+    Theme.red)
 
   -- The grid: three columns of four in landscape, two of six in portrait, so
   -- the numbers stay in reading order either way.
@@ -406,8 +452,10 @@ function Login:draw_new_show(inner, ph)
   local cols = portrait and 2 or 3
   local rows = math.ceil(#self.words / cols)
   local cw = inner / cols
-  local top = 46
-  local rh = 26
+  -- Measured from the two lines above it rather than fixed at 46, which was
+  -- written against an 8 px ladder and now starts inside the red line.
+  local top = UI.lineHeight(15) + UI.lineHeight(8) + 16
+  local rh = math.max(26, UI.lineHeight(8) + 10)
 
   UI.setColor(Theme.void, 0.8)
   love.graphics.rectangle("fill", 0, top - 6, inner, rows * rh + 12)
@@ -445,17 +493,24 @@ function Login:draw_new_show(inner, ph)
 
   local bh = 30
   local by = math.min(ph - 78, y + 12)
+  -- **Size 8, said out loud.** `UI.button`'s default is a third of its own
+  -- height, which at this ladder is 24 px a character: thirty-one characters
+  -- of `I HAVE WRITTEN IT DOWN  [ENTER]` then wrap to a second line inside a
+  -- thirty-pixel button and the `[ENTER]` half is drawn through the bottom
+  -- edge. This is the longest label in the client and it is the one button
+  -- that has to be read before it is pressed.
   UI.button(0, by, inner, bh,
     self.busy and "SIGNING…" or "I HAVE WRITTEN IT DOWN  [ENTER]",
-    self.busy and "disabled" or "hot")
+    self.busy and "disabled" or "hot", 8)
   self.show_button = { y = by, h = bh }
   UI.text(I18n.t("this signs in and takes you to the map."), 0, by + bh + 8, 7,
     Theme.withAlpha(Theme.cream, 0.55))
 end
 
 function Login:draw_no_library(inner, ph)
-    UI.text(I18n.t("SIGN IN"), 0, 0, 16, Theme.coin)
-  UI.text(I18n.t("your wallet is your account"), 0, 22, 8, Theme.withAlpha(Theme.cream, 0.7))
+  UI.text(I18n.t("SIGN IN"), 0, 0, 16, Theme.coin)
+  UI.text(I18n.t("your wallet is your account"), 0, UI.lineHeight(16) + 4, 8,
+    Theme.withAlpha(Theme.cream, 0.7))
 
   local box_y = 48
   UI.setColor(Theme.red, 0.18)
@@ -528,6 +583,10 @@ function Login:keypressed(key, mods)
     self.reveal = not self.reveal
     return true
   end
+  if key == "f10" then
+    self:watch_story()
+    return true
+  end
   if key == "tab" then
     self.focus = (self.focus % #FIELDS) + 1
     SFX.play("move")
@@ -579,6 +638,12 @@ function Login:mousepressed(x, y)
     return
   end
 
+  if self.story_button and ly >= self.story_button.y
+    and ly <= self.story_button.y + self.story_button.h
+    and lx <= self.story_button.w then
+    self:watch_story()
+    return
+  end
   if ly >= 70 and ly <= 104 then self.focus = 1 end
   if ly >= 132 and ly <= 162 then self.focus = 2 end
   if ly >= 196 and ly <= 226 then self.focus = 3 end

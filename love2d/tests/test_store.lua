@@ -462,6 +462,45 @@ return function()
     wipe(dir)
   end)
 
+  T.section("store — the opening, watched once")
+
+  T.case("the flag is remembered, and it is one-way", function()
+    -- The title card asks exactly one question of the store: has this person
+    -- already been shown the opening? A returning player must never sit
+    -- through it again unasked, and "skipped" counts as "shown" — somebody
+    -- who pressed a key to get out of it is exactly the person who must not
+    -- meet it twice.
+    local dir = scratch()
+    Store.open({ dir = dir })
+    T.eq(Store.story_seen(), false, "a fresh store has never seen it")
+    Store.set_story_seen()
+    T.eq(Store.story_seen(), true, "and the live state is updated, not just the file")
+
+    -- The whole point: it survives the restart.
+    Store.reset()
+    T.eq(Store.story_seen(), false, "with no store open, nothing is remembered")
+    Store.open({ dir = dir })
+    T.eq(Store.story_seen(), true, "the next launch replays it off disk")
+
+    -- Setting it twice writes one line, not two: a flag is not a counter.
+    local before = #lines_of(dir)
+    Store.set_story_seen()
+    T.eq(#lines_of(dir), before, "asking again appends nothing")
+    Store.reset()
+    wipe(dir)
+  end)
+
+  T.case("the fold sets it and nothing unsets it", function()
+    T.eq(Store.replay({}).story, false)
+    T.eq(Store.replay({ { kind = "story.seen" } }).story, true)
+    -- There is no record that clears it. Watching it again on purpose from
+    -- the login screen is not the same as never having been offered it.
+    T.eq(Store.replay({
+      { kind = "story.seen" },
+      { kind = "lang.set", lang = "ko" },
+    }).story, true)
+  end)
+
   T.section("store — replay is a pure fold")
 
   T.case("replay can be driven with no filesystem at all", function()

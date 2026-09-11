@@ -6000,3 +6000,169 @@ price *before* the press and the whole consequence *after* it (the browser
 does the reverse), and it stops at "no answer key here" rather than naming the
 interview, because `not_found` is also what a server without §4.11b returns
 and this screen already has that trap written down for RUN.
+
+---
+
+## LOVE — a title card that waits, seven panels, and buttons you can hit
+
+Two things, one round, in `love2d/`.
+
+### The card, ported rather than re-derived
+
+`src/scenes/title.lua` and `src/scenes/story.lua` are the browser's
+`scenes/title.ts` and `scenes/story.ts` in this client's furniture, and the
+entry above them — "FE — a title card that waits, and the fifteen seconds that
+are a compromise" — is where the argument lives. What changed on this side:
+
+* **`boot` stopped being the title card.** It showed the name over the plate
+  for a fixed two seconds and then went to the login screen whether anybody
+  was there or not. It is now what it always should have been — the handshake,
+  and nothing else — and it hands over to the card. In practice that happens a
+  third of a second in, because `need_login` fires the moment the socket opens
+  with no stored token; the two-second timer is only reached when there is no
+  server at all. `need_login` routes `boot → title` and is ignored on the card
+  and in the opening, both of which end at the login screen by themselves.
+* **Eight seconds, not fifteen, and measured against this client's own
+  harness.** The browser picked 15 against a 90 s e2e poll. Here the budget is
+  `tests/drive/`: nineteen scripts boot the client and wait for the login
+  screen, seventeen of them at `timeout = 15` (also `src/drive.lua`'s default)
+  and **two at 10** — `slice.lua`, the documented fresh-`--home` run, and
+  `offline.lua`, which has no server at all. Ten is the real budget, so the
+  card takes eight of it and login lands at **8.02 s measured** with a server
+  and **7.9 s without**. Those two scripts were raised to 20, each with the
+  measurement written next to it, because 2.6 s of margin is not margin; the
+  other seventeen were left alone, since a number that has 7 s of headroom is
+  not evidence of anything. Idle goes to *login*, never to the story, for the
+  browser's reason: idle → story → login is forty seconds and there is no
+  budget on any machine for that.
+* **`boot` leaves on a refused connection too**, after a third of a second
+  rather than the full two. Its whole job is saying where the socket got to,
+  and a socket that has stopped has said it — which is two seconds back for
+  the offline path, whose budget the card was eating.
+* **The idle clock is `love.timer.getTime()`, not summed `dt`.** `main.lua`
+  caps `dt` at 0.05 and macOS throttles an occluded window to a couple of
+  frames a second, so a counter added up from `dt` runs about twenty times
+  slow: an eight-second card behind another window is an eighty-second one,
+  and the budget above would be blown by exactly the thing it was measured
+  against. `src/drive.lua` already has this paragraph about its own deadlines.
+* **Seven panels, not the browser's eight.** The browser gives the SKYNET
+  sentences a panel of their own over `bg_datacentre`. That painting is where
+  the *ending* happens (`docs/story.md` §6, the rack in the basement of the
+  Chow Yei Ching Building), and spending it in the first two minutes spends
+  the last screen's only room. So the `open_tills` panel turns cold halfway
+  through instead — `cold_from` is the line the type changes colour on, the
+  panel's spine goes cyan with it, and the sting fires on that character. One
+  shot instead of two, and the seven paintings the opening was drawn for are
+  the seven panels.
+* **`story.seen` is a store record**, set when the opening ends *and* when it
+  is skipped, never cleared — `STORY [F10]` on the login screen replays it
+  without pretending it was never watched. `tests/drive/story.lua` is two runs
+  of one script against one `--home`: run 1 asserts card → SPACE → opening →
+  skip → login with the flag on disk; run 2 asserts card → SPACE → login with
+  no opening in between. Both pass.
+
+The opening types **characters, not bytes**. Slicing a partly-typed line at a
+byte crashed the frame on the English beat — *UTF-8 decoding error: Not enough
+space*, at the em dash in "It was taken — one accepted suggestion at a time" —
+and typing by byte would also have run Korean and Japanese three times slower
+than English for the same sentence.
+
+### The buttons, measured before and after
+
+The report was that `FULL`, `PORT`, `A 1/4` and `EN` were unreadable on the
+lands screen. Measured on this machine, at the first type step:
+
+| | before | after |
+| --- | --- | --- |
+| button height | **22 px** (`footerRow() - 4`) | **36 px** |
+| label face | authored 7 — the smallest caption in the client | authored 9 — what RUN, SUBMIT and FORMAT are set in |
+| chip widths | 63–95 px, from a glyph-derived guess | 96–144 px, each measured from its own longest label |
+| what they shared a line with | a wallet address, a scene hint, the connection state | nothing |
+| strip height | 26 px (52 when the hint wrapped) | 72 px (98 when it wraps) |
+
+Three changes, and the middle one is the real one:
+
+1. **`UI.CHIP_MIN_H = 36`**, which is `CausewaybayGolang`'s own floor
+   (`btnBox(…, 112, 32, 36)`), and a hard two-pixel border like every other
+   button in this client rather than a one-pixel line at a third alpha.
+2. **Their own row.** Golang gives the same cluster a reserved strip
+   (`TOP = btnH + 20`); this is that, at the bottom, where this client's chrome
+   already lives and where every scene already subtracts `UI.footerHeight()`
+   — so nothing had to learn about a new band. 46 px of strip for a 36 px
+   button, which is *less* than Golang spends on the same thing.
+3. **`btnBox` widths.** Each chip is as wide as the widest label it can ever
+   wear — `WINDOW` for the first, `AUTO/PORT/LAND` for the second, all six
+   language codes for the last, where `YUE` is half again as wide as `EN`.
+
+Two things fell out of the split. The hint got the whole width back: in
+portrait it used to be measured against `vw - 20 - 504`, which is **196 px**
+on a 720-wide canvas, and is now 524. And the hint is now **wrapped to the room
+it is drawn in** rather than to the canvas — `UI.wrap` collapses the runs of
+spaces a key list is spelled with, so a 704 px Korean hint came back as one
+600 px line, reported itself as fitting, and lost its last two words inside a
+534 px scissor. All six languages fit in both orientations now; the drive
+script prints `UI.hint_clipped` rather than a width comparison that cannot see
+this.
+
+**`A 1/4` keeps its label.** Spelling the letter into the label as well as
+drawing it as the glyph gave `A A 1/4`, which is how you find out that the
+control the user calls "A 1/4" was already saying the right thing — it was
+saying it 22 px tall in a caption face. The glyph is still drawn at the step it
+selects, so the control shows its own effect, and it is four visibly different
+sizes now that there is room for them.
+
+### What the screenshots caught, which no test would have
+
+Four things, all pre-existing and all on the login screen — the screen the
+`STORY` button now lives on, which is why they were looked at:
+
+* the **WRITE THIS DOWN panel could not say the one thing it exists to say**.
+  `this is the only copy. there is no reset.` was drawn at `y = 22` under a
+  32 px heading and then painted over by the word grid's own plate at `y = 40`.
+  The panel is 400 tall in landscape now instead of 330, the heading and the
+  grid are measured from their own type, and the line is red and visible.
+* **`I HAVE WRITTEN IT DOWN  [ENTER]`** — the longest label in the client —
+  was wrapping to a second line *inside* a 30 px button, because
+  `UI.button`'s default size is a third of its own height, which at this
+  ladder is 24 px a character. It is drawn at 8 now, explicitly.
+* `CWBH_SERVER=… is overriding this run` printed its second line **through the
+  SIGN IN button** (`9 px` of line spacing against a 16 px line), and
+  `your wallet is your account` printed through the `SIGN IN` heading.
+* `nothing typed here is ever sent…` ran off the right edge of the panel and
+  over Ferris, because it was one `UI.text` with no width. It wraps now.
+
+None of these are the round's subject; all four are the same class as the
+quest screen's, recorded above — a number written against the 8 px ladder,
+still there after it doubled. What is *not* fixed and should be recorded:
+**the lands cards at type step 4/4 overlap their own rows**, which is that
+same class at its worst. The control row costs the card 22 px of the 720 and
+the overlap is far larger than that, so this pass neither caused it nor fixed
+it.
+
+**The chip labels are not translated, and that is a finding rather than a
+decision taken here.** `FULL`, `WINDOW`, `AUTO`, `PORT` and `LAND` are literals
+in `src/ui.lua` and always have been, so "test the longest label in every
+language" only ever moved the language code. Left alone on purpose for now:
+they are state codes in the same family as `TAB`, `ENTER` and `F10`, which this
+client documents as never translated, and `tests/test_i18n.lua` allows a
+language at most five translations identical to their English — Czech is at
+five, and `AUTO` in Czech is `AUTO`. Translating them is five keys and one
+`I18n.t` each, plus a Czech word for automatic that is not the English one.
+
+## 2026-09-11 — LOVE: a resumed session still gets the title card
+
+The first cut of the title card (above) exempted a session that resumes
+during the handshake: `boot` went straight to `lands`, on the reasoning that
+the card is "for people who do not have one". The player's first `make gui`
+after that landed on the map and reported, correctly, *no title, no story* —
+because `make gui` resumes every launch, so the card would only ever have
+been seen once, on the first run of a fresh store.
+
+Changed: the card is the front door, not a login prompt. `boot` hands over to
+`title` on `auth` as well as on `need_login`; the card and the opening are
+never yanked by a resume arriving underneath them; and on the way out both
+read `session.authed` and go to `lands` instead of `login`. The idle-out
+does the same, so a drive script against a stored session still reaches the
+map inside its 25 s budget (card 8 s). `tests/drive/resume_title.lua` is
+the proof, run against the real store: resumed, card up and waiting, SPACE
+→ opening on a store that had not seen it → `lands`.

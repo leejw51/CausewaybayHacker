@@ -76,17 +76,21 @@ local function measure(tag)
       pct = 100 * on_screen / math.max(1, Layout.vh * Layout.scale),
       -- Does this screen's own hint fit the room the footer gives it?
       hint_w = UI.textWidth(app.last_hint or "", 8),
-      -- The room the footer actually gave it: the full width when the strip
-      -- grew to two rows, what is left beside the buttons when it did not.
-      room = (UI.footer_rows > 1 and 2 or 1)
-        * (Layout.vw - 20 - (UI.footer_rows > 1 and 0 or (app.last_reserve or 0))),
-      rows = UI.footer_rows,
+      -- The room the footer actually gave it, which the footer now reports
+      -- rather than this script re-deriving: the display buttons have a row
+      -- of their own, so the hint is no longer measured against what is left
+      -- beside them — it gets the width beside the connection badge, once per
+      -- row. `app.last_reserve` is still the cluster's width and is no longer
+      -- subtracted from any of this.
+      room = (app.last_room or 0) * UI.hint_rows,
+      rows = UI.hint_rows,
+      clipped = UI.hint_clipped,
     }
     seen[#seen + 1] = row
     print(("%-22s %-11s %-3s %5dx%-5d s=%.2f full=%-5s cap=%2dpx on-screen=%3dpx (%.2f%%)  hint %4d/%4d %s")
       :format(tag, tostring(row.scene), row.lang, row.vw, row.vh, row.scale,
         tostring(row.full), row.cap, row.screen_cap, row.pct,
-        row.hint_w, row.room, row.hint_w <= row.room and "fits" or "CLIPPED"))
+        row.hint_w, row.room, row.clipped and "CLIPPED" or "fits"))
     return true
   end
 end
@@ -214,7 +218,11 @@ add({ until_ = function()
     local screens, clipped = {}, {}
     for _, row in ipairs(seen) do
       screens[row.scene] = true
-      if row.hint_w > row.room then
+      -- The footer's own answer, not a width comparison this script makes:
+      -- `UI.wrap` collapses the runs of spaces a key list is spelled with, so
+      -- the drawn line is narrower than the string it was measured from and a
+      -- comparison here disagrees with what is on the screen.
+      if row.clipped then
         clipped[#clipped + 1] = row.tag
       end
       if row.cap < 12 then

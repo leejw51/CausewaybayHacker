@@ -176,7 +176,8 @@ return function()
     end
     for _, name in ipairs({
       "app", "ui", "layout",
-      "scenes/boot", "scenes/login", "scenes/lands", "scenes/categories",
+      "scenes/boot", "scenes/title", "scenes/story",
+      "scenes/login", "scenes/lands", "scenes/categories",
       "scenes/map", "scenes/quest", "scenes/result", "scenes/stats",
       "scenes/ai", "scenes/search", "scenes/playground",
     }) do
@@ -187,7 +188,7 @@ return function()
     for _ in pairs(keys) do n = n + 1 end
     -- A floor high enough that losing the multi-line form fails here. The
     -- pattern this replaced found 127; the walk finds 140.
-    T.ok(n >= 138, "found " .. n .. " translatable strings in the sources")
+    T.ok(n >= 160, "found " .. n .. " translatable strings in the sources")
 
     -- Proper nouns and key names, English on purpose. A name is not a word.
     local english_on_purpose = {
