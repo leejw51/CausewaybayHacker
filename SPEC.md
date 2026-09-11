@@ -721,3 +721,68 @@ Ownership, so two people do not edit one file:
 
 A change that crosses a boundary is proposed in `docs/decisions.md` and taken
 by the owner.
+
+---
+
+## 12. Content packs
+
+One TOML file per land + category, in `content/<land>/<category>.toml`. The
+server imports them at startup (and on `cwbhacker import`), upserting by
+`quests.id` and recomputing `checksum`.
+
+```toml
+pack = "rust.basic"
+land = "rust"
+category = "basic"
+version = 1
+
+[[quest]]
+id          = "rust.basic.01.hello"
+node        = 1
+title       = "FIRST LIGHT"
+difficulty  = 1
+story       = "The terminal blinks. You used to know this one."
+concepts    = ["io", "macros"]
+requires    = []                    # quest ids that unlock this node
+map         = { x = 0.12, y = 0.74, kind = "quest" }
+brief       = """
+Print `hello, causewaybay` and nothing else.
+"""
+starter     = """
+fn main() {
+    // your code here
+}
+"""
+solution    = """
+fn main() {
+    println!("hello, causewaybay");
+}
+"""
+hints = [
+  "`println!` is a macro, so it takes a `!`.",
+  "The string is exact: lowercase, one comma, one space.",
+]
+
+[quest.tests]
+harness      = "stdio"
+timeout_ms   = 5000
+match        = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]
+```
+
+Rules:
+
+* `id` must match `<land>.<category>.<node:02d>.<slug>` and must agree with the
+  file's `land` and `category`. The importer refuses a pack where it does not.
+* `node` is unique within a pack and 1-based and contiguous. A gap is an error,
+  because the map draws a path through them.
+* `map.x` / `map.y` are 0..1 of the map image, so the art can be replaced
+  without touching content. `map.kind` is `quest`, `boss` or `gate`.
+* `requires` empty means the node is open from the start. Every other node is
+  `locked` until all of its `requires` are `cleared`.
+* At least one case must be `visible = true`, so a player is never guessing
+  blind about the output format.
+* `solution` is mandatory and is run by CI (SPEC §9.4). A quest without a
+  working reference answer does not get imported.
