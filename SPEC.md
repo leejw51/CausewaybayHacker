@@ -83,8 +83,23 @@ port (§5.3) — the file system is not where it comes from.
 
 `~/.causewaybayhacker` is the **server's**. The LÖVE desktop client is a
 separate program that may be talking to a server on another machine, so it
-keeps its own state in `~/.causewaybayhackerlove2d` — `0700` directory, `0600`
-files, append-only JSONL, state derived by replaying the log.
+keeps its own state in `~/.causewaybaylove2d` — `0700` directory, `0600` files,
+append-only JSONL, state derived by replaying the log.
+
+Resolved in the same precedence order `CausewaybayWallet` uses, because a
+family of programs that each invent their own is a family nobody can script:
+
+1. an explicit flag
+2. the `CWBH_LOVE2D_HOME` environment variable
+3. `~/.causewaybaylove2d`
+
+The name follows the wallet's shape — `.causewaybay` plus the component — and
+it was once `.causewaybayhackerlove2d`. **A store found at the old path is
+migrated once and the old directory left alone**, the same way the first
+version migrated out of LÖVE's own save directory. Somebody is playing with a
+session and a cleared map in there; a rename that silently starts them fresh
+would be a self-inflicted version of the thing this project warns players
+about.
 
 The JSONL rules, in full, so this section does not depend on another document:
 
