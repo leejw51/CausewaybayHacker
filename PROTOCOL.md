@@ -244,8 +244,14 @@ Asking again invalidates nothing: several challenges may be outstanding.
 → payload: {
     "address":   "0xAbC1…",
     "signature": "0x" + 130 hex,        r || s || v, 65 bytes
-    "name":      "ferris"               optional, only used when creating
+    "name":      "ferris",              optional, only used when creating
+    "nonce":     "3f1a…"                optional; test harnesses only
   }
+
+There is **no required `nonce` field**: the server matches the newest live
+challenge for that address, so the normal flow is one `auth.challenge`, sign,
+one `auth.login`. A harness that deliberately holds several challenges open at
+once can pin one with the optional `nonce`.
 
 ← payload: {
     "token": "base64url, 43 chars",
@@ -260,9 +266,17 @@ digest = keccak256( "\x19Ethereum Signed Message:\n" + len(message) + message )
 ```
 
 `len` is the byte length in ASCII decimal. `v` is 27 or 28 (0 or 1 is also
-accepted and normalised). The server recovers the address with secp256k1 and
-compares it case-insensitively to `address`; a mismatch is
-`auth_bad_signature`.
+accepted and normalised), and the `0x` prefix is optional. The server recovers
+the address with secp256k1 and compares it case-insensitively to `address`; a
+mismatch is `auth_bad_signature`.
+
+> **Byte order, because it has already cost this project time.** The signature
+> is `r || s || v` — 32 bytes, 32 bytes, 1 byte. Several libraries hand you the
+> recovery id *first*: `@noble/curves` v2's
+> `secp256k1.sign(digest, key, {format: "recovered"})` returns `[recid, r, s]`.
+> Concatenating that as-is produces a well-formed signature that recovers a
+> completely different address, and the server can only tell you
+> `auth_bad_signature`. Move the byte and add 27.
 
 > **The mnemonic and the private key never appear in this protocol.** There is
 > no field for them and there will never be one. A client that transmits key
