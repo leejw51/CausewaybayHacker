@@ -190,7 +190,9 @@ function Title:draw()
   UI.button(sx, sy, sw, sh, slabel, "normal", 8)
   self.story_rect = { x = sx, y = sy, w = sw, h = sh }
 
-  self.app:footer(I18n.t("SPACE start   ANY KEY works   F10 story   L language"))
+  -- "any key" is not in the hint: the card says it in full two lines up, and
+  -- at the default type step a portrait footer has room for three items.
+  self.app:footer(I18n.t("SPACE start   F10 story   L language"))
 end
 
 function Title:keypressed(key)

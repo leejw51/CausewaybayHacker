@@ -30,9 +30,9 @@ local Layout = {
   --- inferred again the next time that shape changes. See `orientationFor`.
   pinned = false,
   fullscreen = false,
-  --- The type-size step, an index into `FONT_STEPS`. Scales the **code**
-  --- face and nothing else — see `Layout.codeSize`.
-  font = 1,
+  --- The type-size step, an index into `FONT_STEPS`. See `DEFAULT_FONT`
+  --- for why it starts on the second rung rather than the first.
+  font = 2,
   --- Overrides CWBH_FULLSCREEN when set. "desktop" | "exclusive".
   fullscreenPref = nil,
   pendingWindow = false,
@@ -85,6 +85,18 @@ Layout.TEXT_BASE = 2
 --- 16 px label on 24 px and the control would have two positions that did
 --- nothing. Halves move every size by exactly one or two grid cells.
 Layout.FONT_STEPS = { 1.0, 1.5, 2.0, 2.5 }
+
+--- The step a fresh install opens on.
+---
+--- **2, not 1.** Step 1 is the size this client was authored at, and on a
+--- laptop window in landscape it reads. In portrait — the shape a tall window
+--- or a rotated panel gives — the canvas stretches along the long axis and
+--- the same 16 px label is a smaller fraction of a taller frame; the report
+--- was "the font is too small in vertical mode", and it was. Step 2 is one
+--- grid cell up (16 → 24 px) and reads in both shapes. A player who prefers
+--- the authored size presses the button once; a store that already carries a
+--- chosen step keeps it, as `Layout.load` always did.
+Layout.DEFAULT_FONT = 2
 
 local FULLSCREEN_TYPES = { desktop = true, exclusive = true }
 
@@ -263,8 +275,8 @@ function Layout.load()
     applied = true
   end
   -- Somebody who prefers big type wants it every launch, not once. An
-  -- out-of-range step from a newer client falls back to the authored size
-  -- rather than indexing off the end of the table.
+  -- out-of-range step from a newer client falls back to the default rather
+  -- than indexing off the end of the table.
   local step = tonumber(rec.font)
   if step and Layout.FONT_STEPS[math.floor(step)] then
     Layout.font = math.floor(step)

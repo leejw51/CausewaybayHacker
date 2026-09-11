@@ -195,11 +195,17 @@ return function()
 
   T.section("display — the type-size step")
 
+  T.case("a fresh install opens on step 2", function()
+    T.eq(Layout.DEFAULT_FONT, 2, "portrait at step 1 was reported as too small")
+    T.ok(Layout.FONT_STEPS[Layout.DEFAULT_FONT], "the default is a real rung")
+    T.eq(Layout.FONT_STEPS[Layout.DEFAULT_FONT], 1.5, "one grid cell up from the authored size")
+  end)
+
   T.case("the step cycles and wraps, and says which one it is in", function()
     Layout.storage = memory_storage()
     Layout.font = 1
     T.eq(Layout.fontLabel(), "1/4")
-    T.eq(Layout.fontScale(), 1.0, "step 1 is the size this client always drew")
+    T.eq(Layout.fontScale(), 1.0, "step 1 is the size this client was authored at")
     local seen = {}
     for _ = 1, #Layout.FONT_STEPS do seen[#seen + 1] = Layout.cycleFont() end
     T.same(seen, { 2, 3, 4, 1 }, "four steps and back to the start")

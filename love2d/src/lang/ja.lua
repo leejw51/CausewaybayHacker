@@ -193,7 +193,7 @@ return {
   -- client's — one voice across the two clients, rather than two.
   ["PRESS SPACE"] = "スペースキーを押す",
   ["— or any key, or a click —"] = "— どのキーでも、クリックでも —",
-  ["SPACE start   ANY KEY works   F10 story   L language"] = "SPACE スタート   どのキーでも   F10 ストーリー   L 言語",
+  ["SPACE start   F10 story   L language"] = "SPACE スタート   F10 ストーリー   L 言語",
   ["ANY KEY  SKIP"] = "どれかのキー  スキップ",
   ["PRESS ANY KEY"] = "どれかのキーを押してください",
   ["TUESDAY, 06:40."] = "火曜日、06:40。",
