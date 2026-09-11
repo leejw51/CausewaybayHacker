@@ -25,6 +25,8 @@ export interface Scene {
   pointer?(x: number, y: number, phase: "down" | "move" | "up"): void;
   /** A LÖVE-flavoured key name from `engine/input.ts`. */
   key?(name: string, ev: KeyboardEvent): void;
+  /** Wheel or trackpad, in virtual pixels. Positive is downwards. */
+  wheel?(dy: number, x: number, y: number): void;
   /** The window changed shape or orientation; rebuild anything cached. */
   resized?(): void;
 }
@@ -143,6 +145,18 @@ export class App {
     this.canvas.addEventListener("pointermove", (ev) => send(ev, "move"));
     this.canvas.addEventListener("pointerup", (ev) => send(ev, "up"));
     this.canvas.addEventListener("pointercancel", (ev) => send(ev, "up"));
+    this.canvas.addEventListener(
+      "wheel",
+      (ev) => {
+        const v = this.layout.toVirtual(ev.clientX, ev.clientY);
+        if (!v) return;
+        // The page cannot scroll — there is nothing to scroll — so the wheel
+        // belongs to whatever the cursor is over.
+        ev.preventDefault();
+        this.scene?.wheel?.(ev.deltaY / this.layout.scale, v[0], v[1]);
+      },
+      { passive: false },
+    );
   }
 
   private wireKeys(): void {

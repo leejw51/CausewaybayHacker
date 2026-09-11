@@ -73,6 +73,10 @@ end
 ---   rand       function(lo, hi) -> integer, for mask keys
 ---   log        function(level, message)
 ---   auto_reconnect  default true
+---
+--- `update(dt)` takes `dt` only so it drops straight into the game's frame
+--- callback; every deadline in here is measured against `now()`, because a
+--- summed `dt` drifts and a laptop that slept did not advance it at all.
 function M.new(opts)
   opts = opts or {}
   local parsed, err = M.parse_url(opts.url or "ws://127.0.0.1:5390/ws")
@@ -302,7 +306,6 @@ function Client:update(dt)
   end
 
   self:expire_requests(now)
-  if dt then end -- dt is accepted for symmetry with love.update; `now` rules
 end
 
 --- Read whatever the socket has and turn it into frames.
@@ -417,6 +420,35 @@ function M.is_envelope(env)
   return true
 end
 
+--- Turn `json.null` into absence, in place, inside a payload.
+---
+--- PROTOCOL §2.4: "an optional field is **omitted**, not sent as `null`,
+--- unless `null` is a meaningful value (`id`, `time_limit_s`, `code`)." Of
+--- those three, only `id` carries information a client acts on — it is what
+--- separates a reply from a server-initiated event (§2.2) — and it is read
+--- off the envelope below *before* this runs.
+---
+--- The other two mean the same thing to this client as absence:
+--- `time_limit_s: null` is "untimed" and `code: null` is "no compiler code",
+--- and both render as nothing either way. Leaving the sentinel in would put a
+--- table where every scene expects a string or nil, and the failure is a
+--- crash inside `draw` on the one attempt whose mistake had no error code —
+--- which is exactly how it was found.
+local function denull(value, depth)
+  if type(value) ~= "table" then return value end
+  if (depth or 0) > 32 then return value end
+  for k, v in pairs(value) do
+    if v == json.null then
+      value[k] = nil
+    elseif type(v) == "table" then
+      denull(v, (depth or 0) + 1)
+    end
+  end
+  return value
+end
+
+M.denull = denull
+
 function Client:handle_text(text)
   local env, err = json.try_decode(text)
   if not env then
@@ -429,8 +461,10 @@ function Client:handle_text(text)
     return
   end
 
+  -- Read `id` first; it is the one null whose meaning a client acts on.
   local id = env.id
   if id == json.null then id = nil end
+  denull(env.payload)
 
   if id ~= nil then
     local entry = self.pending[id]

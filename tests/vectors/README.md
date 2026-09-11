@@ -20,8 +20,12 @@ tests/vectors/
     ├── rust/*.rustc.json    the real `rustc --error-format=json` output
     ├── go/*.go
     ├── go/*.gobuild.txt     the real `go build` output
-    └── */*.runtime.txt      the real panic / fatal output, where there is one
+    ├── */*.runtime.txt      the real panic / fatal output, where there is one
+    └── content/*.rustc.json the same, for starters that ship in content/**
 ```
+
+Read alongside `tests/PLAN.md`, which says what each of these is for and what
+state the test that consumes it is actually in.
 
 Regenerate everything:
 
@@ -136,28 +140,41 @@ The digest path was itself checked against the wallet's published
 vectors — including the empty string and a non-ASCII one — reproduce both the
 `prefixed_hash` and the `signature` byte for byte.
 
-### Two things this fixture decides that SPEC §3.2 does not
+### Two things this fixture had to decide, now settled by PROTOCOL.md
 
-1. **No trailing newline.** §3.2 prints the message in a fenced block, which
-   does not settle whether it ends with `\n`. This fixture says it does not:
-   the message ends with the `Z` of the expiry. It is recorded three ways —
-   `message` (a JSON string with explicit `\n`), `message_hex` (the UTF-8
-   bytes) and `message_len` (the number that goes into the EIP-191 prefix) —
-   so no implementation can differ from another without this file catching it.
-   **Provisional.** A proposal to nail it down in §3.2 is in
-   `docs/decisions.md`.
+Both were ambiguous in SPEC §3.2 when the fixture was generated, and both
+were resolved the same way by `PROTOCOL.md` §4.2, which is now the authority
+for the wire. The fixture was written first and did not have to change.
 
-2. **`(EIP-55)` is an annotation, not text.** §3.2's second line reads
+1. **No trailing newline.** SPEC §3.2 prints the message in a fenced block,
+   which does not settle whether it ends with `\n`. PROTOCOL.md §4.2 settles
+   it: "four lines, `\n`-separated, no trailing newline". The fixture records
+   it three ways — `message` (a JSON string with explicit `\n`),
+   `message_hex` (the UTF-8 bytes) and `message_len` (the number that goes
+   into the EIP-191 prefix) — so no implementation can differ from another
+   without this file catching it. EIP-191 hashes the byte *length*, so a
+   single stray newline makes the digest completely different and the login
+   fails with no clue why.
+
+2. **`(EIP-55)` is an annotation, not text.** SPEC §3.2's second line reads
    `address: 0xAbC…                (EIP-55)`. The parenthetical says how the
-   address is spelled; it is not part of the signed message. The address is
-   the checksummed form.
+   address is spelled; it is not part of the signed message. PROTOCOL.md §4.2
+   gives the message without it.
+
+PROTOCOL.md §4.2 also adds the rule this fixture cannot express on its own:
+**sign `message` byte-for-byte as given, never rebuild it from the parts.**
+`tests/smoke/contract.mjs` §8.6 is the test for that — it signs the server's
+own string, and separately signs a reconstruction with one trailing newline
+and requires the server to refuse it.
 
 ### `v`, which is the likeliest interop bug in the whole auth path
 
 The last byte of `r||s||v` in these vectors is `0x1b` or `0x1c` — **27 or 28**,
 the Ethereum convention. `k256`'s `RecoveryId`, which SPEC §3.2 step 4 says
 the server recovers with, is **0 or 1**. A verifier that hands 27 straight to
-`k256` fails every login. Both spellings are in each vector:
+`k256` fails every login. PROTOCOL.md §4.3 requires **both** to be accepted
+("`v` is 27 or 28; 0 or 1 is also accepted and normalised"), so both
+spellings are in each vector:
 
 ```jsonc
 { "signature": "0x…1c", "v": 28, "recovery_id": 1, "r": "0x…", "s": "0x…" }
@@ -239,9 +256,34 @@ behave alike:
   `nil-deref`, `deadlock`.
 * `tool` — needs something that is not the plain build: `go vet`, `go -race`.
 
+### Two groups of cases
+
+* **27 synthetic sources** under `rust/` and `go/`, one or more per taxonomy
+  row, written to isolate one diagnostic each.
+* **6 real starters** from the shipped content, under `content_starter_cases`
+  in `expected.json`. These are worth more than the synthetic ones beside
+  them: they are the exact bytes a player's editor opens with, so the
+  classifier's first real input on day one is one of these.
+
+  The **source is not copied here.** It lives in `content/**`, PM owns it,
+  and a copy would drift. The generator reads the `starter` out of the TOML
+  at generate time and captures the compiler output into
+  `mistakes/content/<quest_id>.rustc.json`, which is all a classifier needs
+  offline. If a quest is renamed or its starter fixed, the generator says so
+  instead of silently testing a stale copy.
+
+  | quest | kind | code |
+  | --- | --- | --- |
+  | `rust.basic.04.the-move` | `borrow-after-move` | E0382 |
+  | `rust.advanced.02.move` | `lifetime` | **E0373** |
+  | `rust.advanced.05.rwlock` | `mutability` | E0596 |
+  | `rust.advanced.06.lifetimes` | `lifetime` | E0106 |
+  | `rust.advanced.07.generics` | `type-mismatch` | E0308 |
+  | `go.advanced.09.errors-in-flight` | `unused` | `imported and not used` |
+
 ### Coverage, honestly
 
-26 of 27 cases verified against the real toolchain. Fifteen of the taxonomy's
+33 of 33 cases verified against the real toolchain. Fifteen of the taxonomy's
 seventeen kinds have at least one verified fixture.
 
 **Not covered, and why:**
@@ -252,7 +294,16 @@ seventeen kinds have at least one verified fixture.
 | `wrong-answer` | **N/A here.** A verdict, not a compiler identity — the program compiles, runs, prints the wrong thing. It belongs to SPEC §9.6 / the runner suite. |
 | `timeout` | **N/A here.** Also a verdict. Its fixture is an infinite loop and what is asserted is the SIGKILL, not a diagnostic. `tests/PLAN.md` owns it. |
 
-**Two findings BE should read before writing the classifier:**
+**Three findings BE should read before writing the classifier:**
+
+* **`E0373` is in no row of SPEC §7.1's table** — and it is what a *shipped
+  quest's own starter* produces (`rust.advanced.02.move`, "closure may
+  outlive the current function"). §7.1 says an unmatched code is stored as
+  `other` with the code kept, which is legal; filing a quest's own starter
+  under `other` on the player's first encounter with the training loop is a
+  poor first impression. Recorded in `expected.json` under
+  `rust_codes_outside_the_71_table` and proposed to PM in
+  `docs/decisions.md`.
 
 * **`rust:E0277` maps to two kinds.** `missing-trait` (`{:?}` on a struct with
   no `Debug`) and `unhandled-error` (`?` in a `fn main()` returning `()`) are

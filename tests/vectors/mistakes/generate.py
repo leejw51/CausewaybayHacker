@@ -84,6 +84,24 @@ GAPS = {
     "vendors errcheck, or the row loses its Go half. See docs/decisions.md.",
 }
 
+# Starters that ship in `content/**` and are rejected by the compiler itself.
+#
+# These are worth more than the synthetic cases beside them: they are the
+# exact bytes a player's editor opens with, so the classifier's first real
+# input on day one is one of these. The source is NOT copied here — it lives
+# in content/, PM owns it, and a copy would drift. What is captured is the
+# compiler output, which is all a classifier needs offline.
+#
+# (quest id, pack file, kind, code)
+CONTENT_CASES = [
+    ("rust.basic.04.the-move", "rust/basic", "borrow-after-move", "E0382"),
+    ("rust.advanced.02.move", "rust/advanced", "lifetime", "E0373"),
+    ("rust.advanced.05.rwlock", "rust/advanced", "mutability", "E0596"),
+    ("rust.advanced.06.lifetimes", "rust/advanced", "lifetime", "E0106"),
+    ("rust.advanced.07.generics", "rust/advanced", "type-mismatch", "E0308"),
+    ("go.advanced.09.errors-in-flight", "go/advanced", "unused", "go:imported-not-used"),
+]
+
 # Rows of the §7.1 table that no fixture can honestly cover. Written into
 # expected.json so "not covered" is a recorded fact rather than an omission.
 NOT_COVERED = {
@@ -94,6 +112,30 @@ NOT_COVERED = {
     "belongs to the runner-limits suite (§9.6) because what is asserted is "
     "the SIGKILL, not a diagnostic.",
 }
+
+
+# Runtime output carries three things that change on every run and are
+# properties of this machine, not of the mistake: the scratch directory's
+# path, the thread id in a Rust panic, and the program counter in a Go one.
+# Left in, they make `--check` impossible AND bake a path from this computer
+# into a fixture BE is meant to run anywhere. They are normalised out, and
+# the substitutions are recorded in expected.json so nobody mistakes the
+# placeholders for something the toolchain printed.
+RUNTIME_NORMALISATIONS = [
+    (r"/[^\s\"]*cwbhacker-(?:mistake|content|gobuild)-[A-Za-z0-9_]+", "<work>"),
+    (r"panicked at ([^:]+):(\d+):(\d+)", r"panicked at \1:\2:\3"),  # keep, listed for clarity
+    (r"thread '([^']*)' \(\d+\)", r"thread '\1' (<tid>)"),
+    (r"pc=0x[0-9a-f]+", "pc=0x<pc>"),
+    (r"goroutine (\d+) \[", r"goroutine \1 ["),  # stable; listed for clarity
+]
+
+
+def normalise_runtime(text: str) -> str:
+    import re
+
+    for pattern, repl in RUNTIME_NORMALISATIONS:
+        text = re.sub(pattern, repl, text)
+    return text
 
 
 def tool_version(*argv: str) -> str:
@@ -141,8 +183,8 @@ def run_rust(src: pathlib.Path, work: pathlib.Path) -> dict:
         )
         result["run_command"] = "./prog"
         result["run_exit"] = run_out.returncode
-        result["run_stdout"] = run_out.stdout
-        result["run_stderr"] = run_out.stderr
+        result["run_stdout"] = normalise_runtime(run_out.stdout)
+        result["run_stderr"] = normalise_runtime(run_out.stderr)
     return result
 
 
@@ -187,7 +229,7 @@ def run_go(src: pathlib.Path, work: pathlib.Path, build_root: pathlib.Path) -> d
         "compile_command": " ".join(GO_BUILD + ["main.go"]),
         "compile_exit": build.returncode,
         "compiles": build.returncode == 0,
-        "raw_compile_stderr": build.stderr,
+        "raw_compile_stderr": normalise_runtime(build.stderr),
         "diagnostics": parse_go_text(build.stderr),
     }
     if result["compiles"]:
@@ -197,8 +239,8 @@ def run_go(src: pathlib.Path, work: pathlib.Path, build_root: pathlib.Path) -> d
             )
             result["run_command"] = "./prog"
             result["run_exit"] = run_out.returncode
-            result["run_stdout"] = run_out.stdout
-            result["run_stderr"] = run_out.stderr
+            result["run_stdout"] = normalise_runtime(run_out.stdout)
+            result["run_stderr"] = normalise_runtime(run_out.stderr)
         except subprocess.TimeoutExpired:
             result["run_command"] = "./prog"
             result["run_exit"] = None
@@ -209,7 +251,7 @@ def run_go(src: pathlib.Path, work: pathlib.Path, build_root: pathlib.Path) -> d
         )
         result["vet_command"] = "go vet ./main.go"
         result["vet_exit"] = vet.returncode
-        result["vet_stderr"] = vet.stderr
+        result["vet_stderr"] = normalise_runtime(vet.stderr)
         # -race, run three times: the detector is sampling, not proving.
         races = []
         for _ in range(3):
@@ -223,7 +265,7 @@ def run_go(src: pathlib.Path, work: pathlib.Path, build_root: pathlib.Path) -> d
             )
             races.append("DATA RACE" in r.stderr)
             if races[-1]:
-                result["race_stderr"] = r.stderr
+                result["race_stderr"] = normalise_runtime(r.stderr)
         result["race_command"] = "go run -race main.go"
         result["race_detected_runs"] = races
     return result
@@ -322,6 +364,83 @@ def verify(case: dict, res: dict) -> tuple[bool, str]:
     return False, f"unknown phase {phase}"
 
 
+def content_starters(build_root: pathlib.Path) -> list:
+    """Compile the real shipped starters and capture what the toolchain said."""
+    import tomllib
+
+    repo = HERE.parents[2]
+    out = []
+    for quest_id, pack, kind, code in CONTENT_CASES:
+        toml_path = repo / "content" / f"{pack}.toml"
+        if not toml_path.exists():
+            out.append(
+                {
+                    "quest_id": quest_id,
+                    "kind": kind,
+                    "code": code,
+                    "verified": False,
+                    "verification_failure": f"content pack not found: {toml_path}",
+                }
+            )
+            continue
+        doc = tomllib.loads(toml_path.read_bytes().decode())
+        quest = next((q for q in doc["quest"] if q["id"] == quest_id), None)
+        if quest is None:
+            out.append(
+                {
+                    "quest_id": quest_id,
+                    "kind": kind,
+                    "code": code,
+                    "verified": False,
+                    "verification_failure": f"{quest_id} is no longer in {pack}.toml",
+                }
+            )
+            continue
+        lang = "rust" if quest_id.startswith("rust.") else "go"
+        work = pathlib.Path(tempfile.mkdtemp(prefix="cwbhacker-content-"))
+        try:
+            src = work / ("starter.rs" if lang == "rust" else "starter.go")
+            src.write_text(quest["starter"])
+            res = (
+                run_rust(src, work)
+                if lang == "rust"
+                else run_go(src, work, build_root)
+            )
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+
+        case = {
+            "quest_id": quest_id,
+            "pack": f"content/{pack}.toml",
+            "lang": lang,
+            "kind": kind,
+            "code": code,
+            "phase": "compile",
+            "level": "error",
+            "compile_time": True,
+            "compiles": res["compiles"],
+            "source_is_in": f"content/{pack}.toml → quest {quest_id} → starter",
+        }
+        ok, why = verify({"lang": lang, "code": code, "phase": "compile"}, res)
+        case["verified"] = ok
+        case["assert_me"] = True
+        if not ok:
+            case["verification_failure"] = why
+        case["observed"] = {
+            "compile_command": res["compile_command"],
+            "compile_exit": res["compile_exit"],
+            "identities": observed_identity(lang, res),
+            "diagnostics": res["diagnostics"][:4],
+        }
+        ext = "rustc.json" if lang == "rust" else "gobuild.txt"
+        cap = HERE / "content" / f"{quest_id}.{ext}"
+        cap.parent.mkdir(exist_ok=True)
+        cap.write_text(res["raw_compile_stderr"])
+        case["captured"] = str(cap.relative_to(HERE))
+        out.append(case)
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
@@ -412,20 +531,21 @@ def main() -> int:
                     rcap.write_text(blob)
                     case["captured_runtime"] = str(rcap.relative_to(HERE))
             cases_out.append(case)
+        content_out = content_starters(build_root)
     finally:
         shutil.rmtree(build_root, ignore_errors=True)
 
     covered = sorted({c["kind"] for c in cases_out if c["verified"]})
     unverified = [
         c["file"] for c in cases_out if not c["verified"] and c.get("assert_me", True)
-    ]
+    ] + [c["quest_id"] for c in content_out if not c["verified"]]
 
     # Two kinds keyed off one code cannot both be decided by the code alone.
     # The classifier needs a second signal; naming the collisions here is
     # cheaper than BE finding out from a misfiled mistake row.
     by_code: dict[str, set] = {}
-    for c in cases_out:
-        if c["code"]:
+    for c in cases_out + content_out:
+        if c.get("code"):
             by_code.setdefault(f"{c['lang']}:{c['code']}", set()).add(c["kind"])
     collisions = {
         code: {
@@ -436,6 +556,25 @@ def main() -> int:
         for code, kinds in by_code.items()
         if len(kinds) > 1
     }
+
+    # Codes these fixtures actually produced that SPEC §7.1's table does not
+    # list. §7.1 says "Never drop a code you did not recognize" — so the
+    # honest place for them is a named list, not a silent `other`.
+    TAXONOMY_CODES = {
+        "E0382", "E0505", "E0499", "E0502", "E0106", "E0597", "E0621", "E0308",
+        "E0425", "E0433", "E0277", "E0596", "E0594",
+        "unused_variables", "unused_imports",
+    }
+    off_table = sorted(
+        {
+            c["code"]
+            for c in cases_out + content_out
+            if c.get("lang") == "rust"
+            and c.get("code")
+            and c["code"] not in TAXONOMY_CODES
+            and c.get("kind") != "other"
+        }
+    )
 
     doc = {
         "$comment": "Generated by tests/vectors/mistakes/generate.py — do not edit by hand.",
@@ -455,14 +594,39 @@ def main() -> int:
             "compile_time": "true for compile and lint, false for runtime and tool",
             "verified": "this generator re-ran the toolchain and saw the "
             "expected identity. false means the row is a claim, not a fact.",
-            "captured": "the real compiler output, byte for byte, so the "
-            "classifier can be tested with no toolchain installed",
+            "captured": "the real compiler output, so the classifier can be "
+            "tested with no toolchain installed. Byte for byte except for the "
+            "normalisations below.",
+        },
+        "normalisation": {
+            "why": "runtime output carries a scratch path, a thread id and a "
+            "program counter that differ on every run and on every machine. "
+            "Left in, they make `--check` impossible and bake this computer's "
+            "temp directory into a fixture meant to run anywhere.",
+            "substitutions": {
+                "<work>": "the per-case scratch directory",
+                "<tid>": "the thread id in a Rust panic header",
+                "0x<pc>": "the program counter in a Go SIGSEGV line",
+            },
+            "not_normalised": "file names and line:col — `main.rs:5:21` is the "
+            "span the classifier reads, and it is already relative because each "
+            "source is compiled from its own temp cwd",
         },
         "cases": cases_out,
+        "content_starter_cases": content_out,
         "kinds_covered": covered,
         "kinds_not_covered": NOT_COVERED,
         "known_gaps": {k: v for k, v in GAPS.items()},
         "code_collisions": collisions,
+        "rust_codes_outside_the_71_table": {
+            "codes": off_table,
+            "note": "These came out of real fixtures but are in no row of SPEC "
+            "§7.1's table. §7.1 says an unmatched code is stored as `other` "
+            "with the code kept — but each of these has an obvious home, and "
+            "filing a shipped quest's own starter under `other` on day one "
+            "would be a poor first impression of the training loop. Proposed "
+            "to PM in docs/decisions.md.",
+        },
         "unverified_cases": unverified,
     }
 
@@ -476,7 +640,10 @@ def main() -> int:
         print("expected.json is up to date")
         return 0
     path.write_text(text)
-    print(f"wrote {path}: {len(cases_out)} cases, {len(unverified)} unverified")
+    print(
+        f"wrote {path}: {len(cases_out)} synthetic + {len(content_out)} real-content "
+        f"cases, {len(unverified)} unverified"
+    )
     for f in unverified:
         print(f"  UNVERIFIED: {f}")
     return 0

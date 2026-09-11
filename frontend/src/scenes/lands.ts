@@ -8,7 +8,7 @@
  * later would otherwise read as the game growing a new limb.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf } from "../engine/text";
+import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { fill, type Ctx } from "../engine/ui";
 import { Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
@@ -19,7 +19,7 @@ type Lands = Responses["world.lands"]["lands"];
 
 const NPC: Record<Land, string> = { rust: "sprite_ferris", go: "sprite_gogo" };
 const BLURB: Record<Land, string> = {
-  rust: "Ownership, borrows, lifetimes. The craft you had before the machine\nwrote it for you.",
+  rust: "Ownership, borrows, lifetimes. The craft you had before the machine wrote it for you.",
   go: "Goroutines, channels, the small language that fits in a head.",
 };
 
@@ -108,37 +108,42 @@ export class LandsScene implements Scene {
       layout.minTouchH(),
     );
 
+    // The blurb is measured before the sprite is placed, so the sprite gets
+    // whatever is genuinely left rather than a guess — a three-line blurb in a
+    // narrow portrait panel would otherwise run off the bottom of the frame.
+    const blurbLines = wrap(fonts.small, BLURB[this.land], left[2]).length;
+    const blurbH = blurbLines * fonts.small.height;
+    const blurbY = left[1] + left[3] - blurbH;
+
     const sprite = this.app.assets?.picture(NPC[this.land]);
     const spriteTop = left[1] + Math.round(fonts.button.height + 34 * s);
-    if (sprite) {
+    const room = blurbY - Math.round(10 * s) - spriteTop;
+    if (sprite && room > 20) {
       // The `box` metadata from the art manifest is what lets a sprite stand on
       // its feet instead of on the bottom of its transparent margin.
       const box = this.app.assets?.box.get(NPC[this.land]);
-      const h = Math.min(left[3] - (spriteTop - left[1]), Math.round(120 * s));
+      const h = Math.min(room, left[2] * 0.8);
       const scale = h / sprite.naturalHeight;
       const w = sprite.naturalWidth * scale;
       const bob = Math.sin(this.t * 2.2) * 2 * s;
       const feet = box ? box.feet * scale : h;
-      g.drawImage(sprite, left[0] + (left[2] - w) / 2, spriteTop + (h - feet) + bob, w, h);
+      g.drawImage(sprite, left[0] + (left[2] - w) / 2, spriteTop + (room - feet) + bob, w, h);
     }
 
     g.fillStyle = css(Theme.cream);
-    printf(
-      g,
-      fonts.small,
-      BLURB[this.land],
-      left[0],
-      left[1] + left[3] - fonts.small.height * 2,
-      left[2],
-      "center",
-    );
+    printf(g, fonts.small, BLURB[this.land], left[0], blurbY, left[2], "center");
 
     // --- the three categories ---------------------------------------------
     const right = titledPanel(g, f.right, `${this.land.toUpperCase()} — CATEGORY`, Theme.coin);
     const row = this.lands.find((l) => l.land === this.land);
+    // A fixed order, not the server's. `world.lands` does not promise one, and
+    // a map whose rows move between sessions is a map you cannot learn.
+    const ORDER: Category[] = ["basic", "advanced", "hacker"];
     const cats: CategorySummary[] = row
-      ? row.categories
-      : (["basic", "advanced", "hacker"] as Category[]).map((category) => ({
+      ? ORDER.map((c) => row.categories.find((x) => x.category === c)).filter(
+          (c): c is CategorySummary => c !== undefined,
+        )
+      : ORDER.map((category) => ({
           category,
           total: 0,
           cleared: 0,

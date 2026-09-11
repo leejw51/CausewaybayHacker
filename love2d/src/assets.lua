@@ -40,15 +40,80 @@ local IMAGES = {
   ui_coin = "assets/ui_coin.png",
 }
 
+-- Sprites and effects are cut out of their background; full-bleed plates are
+-- not. See `knockout` below for why this list exists at all.
+local KNOCKOUT = {
+  sprite_mei = true, sprite_alex = true, sprite_ferris = true,
+  sprite_gogo = true, sprite_clerk = true, stamp_cleared = true,
+  fx_ribbon = true, fx_medal = true, fx_star = true, fx_confetti = true,
+  ui_panel = true, ui_coin = true,
+}
+
 local FONT_FILE = "assets/fonts/PressStart2P-Regular.ttf"
 local MONO_FILE = "assets/fonts/VT323-Regular.ttf"
+
+--- Flood the background out of a sprite, from the edges inward.
+---
+--- The placeholder sprites carried over from `CausewaybayGolang/love2d/assets`
+--- are JPEGs — no alpha channel at all — drawn on a magenta screen. Blitted
+--- as they are, Ferris arrives sitting on a hot-pink rectangle, which is
+--- exactly what the first screenshot of the login screen showed.
+---
+--- Ported from that repo's `src/assets.lua`. Flooding from the edges rather
+--- than testing every pixel is the point: a magenta pixel *inside* the sprite
+--- (an eye highlight, a sign) is part of the art and must survive, and only
+--- background connected to the border is a background.
+local function knockout(data)
+  local w, h = data:getWidth(), data:getHeight()
+  local function is_bg(x, y)
+    local r, g, b, a = data:getPixel(x, y)
+    if a < 0.12 then return true end
+    -- The magenta screen. A JPEG round trip drags it toward hot pink, so the
+    -- test is generous rather than exact.
+    if r > 0.55 and b > 0.30 and g < 0.45 and b < r + 0.2 then return true end
+    -- And the lime some of the older plates used.
+    if g > 0.62 and r < 0.50 and b < 0.50 then return true end
+    return false
+  end
+
+  local seen = {}
+  local qx, qy, tail, head = {}, {}, 0, 1
+  local function push(x, y)
+    if x < 0 or y < 0 or x >= w or y >= h then return end
+    local k = y * w + x
+    if seen[k] then return end
+    if not is_bg(x, y) then return end
+    seen[k] = true
+    tail = tail + 1
+    qx[tail], qy[tail] = x, y
+  end
+
+  for x = 0, w - 1 do push(x, 0); push(x, h - 1) end
+  for y = 0, h - 1 do push(0, y); push(w - 1, y) end
+
+  while head <= tail do
+    local x, y = qx[head], qy[head]
+    head = head + 1
+    data:setPixel(x, y, 0, 0, 0, 0)
+    push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1)
+  end
+  return data
+end
+
+A.knockout = knockout
 
 function A.load()
   love.graphics.setDefaultFilter("nearest", "nearest")
   for name, path in pairs(IMAGES) do
     if love.filesystem.getInfo(path) then
-      local ok, image = pcall(love.graphics.newImage, path)
-      if ok then
+      local ok, image = pcall(function()
+        if KNOCKOUT[name] then
+          local data = love.image.newImageData(path)
+          return love.graphics.newImage(knockout(data))
+        end
+        return love.graphics.newImage(path)
+      end)
+      if ok and image then
         image:setFilter("nearest", "nearest")
         A.images[name] = image
       else

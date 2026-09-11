@@ -114,13 +114,16 @@ class Wallet:
 
 
 def challenge_message(address_eip55: str) -> str:
-    """SPEC §3.2, verbatim.
+    """PROTOCOL.md §4.2, verbatim.
 
-    Four lines, no trailing newline. The SPEC prints this inside a fenced
-    block, which does not settle whether a final newline is part of it, and
-    EIP-191 hashes the byte length — so one newline is the difference between
-    a login that works and one that silently does not. See the decisions.md
-    entry of 2026-09-11 "the challenge message has no trailing newline".
+    Four lines, `\n`-separated, no trailing newline. SPEC §3.2 printed this
+    inside a fenced block, which did not settle whether a final newline was
+    part of it; PROTOCOL.md §4.2 — now the authority for the wire — says it
+    is not. EIP-191 hashes the byte length, so that one newline is the
+    difference between a login that works and one that silently does not.
+
+    The `(EIP-55)` that SPEC §3.2 printed beside the address is an annotation
+    about spelling, not part of the message.
     """
     return (
         "Causewaybay Hacker login\n"
@@ -341,6 +344,8 @@ def main() -> int:
                 "digest": "cwbwallet --json utils keccak --hex <0x19 || prefix || len || message>",
                 "recover": "cwbwallet --json verify --message <msg> --signature <sig> --address <a>",
             },
+            "authority": "PROTOCOL.md §4.2 (the message) and §4.3 (the digest "
+            "and the v encoding). SPEC §6 is a summary of it.",
             "message_template": {
                 "lines": [
                     "Causewaybay Hacker login",
@@ -350,9 +355,11 @@ def main() -> int:
                 ],
                 "joined_by": "\\n",
                 "trailing_newline": False,
-                "note": "SPEC §3.2 prints '(EIP-55)' beside the address line as an "
-                "annotation; it is NOT part of the message. The absence of a "
-                "trailing newline is this fixture's choice — see docs/decisions.md.",
+                "note": "SPEC §3.2 printed '(EIP-55)' beside the address line as "
+                "an annotation; it is NOT part of the message. PROTOCOL.md §4.2 "
+                "pins both the four lines and the absence of a trailing newline. "
+                "Clients must sign this string byte-for-byte as the server gives "
+                "it, never rebuild it from the parts.",
             },
             "v_encoding": {
                 "in_fixture": "27 or 28 (Ethereum convention, the last byte of r||s||v)",

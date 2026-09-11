@@ -1,0 +1,26 @@
+# An expectation that is empty after `match` normalisation is satisfied by an
+# empty `fn main() {}` — which is exactly the starter. The map would clear
+# itself. See tests/content/verify_pack.py, which refuses this.
+pack = "rust.basic"
+land = "rust"
+category = "basic"
+version = 1
+
+[[quest]]
+id = "rust.basic.01.nothing"
+node = 1
+title = "NOTHING"
+difficulty = 1
+concepts = ["io"]
+requires = []
+map = { x = 0.1, y = 0.1, kind = "quest" }
+brief = "Print nothing."
+starter = '''fn main() {}
+'''
+solution = '''fn main() {}
+'''
+[quest.tests]
+harness = "stdio"
+timeout_ms = 5000
+match = "trim"
+cases = [ { name = "quiet", stdin = "", expect = "   \n\n", visible = true } ]

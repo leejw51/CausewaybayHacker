@@ -1,0 +1,69 @@
+{
+  "$comment": "Hand-written. Each file is a content pack the importer MUST refuse, and the reason it must refuse it.",
+  "spec": "SPEC §12 (content packs), §9.4, §9.5",
+  "how_to_use": "Feed each file to `cwbhacker import`. The importer must exit non-zero and say something that identifies the rule. Every one of these parses as valid TOML — a fixture that was merely malformed would test the TOML parser and nothing else. Verified with Python's tomllib.",
+  "packs": [
+    {
+      "file": "node-gap.toml",
+      "rule": "SPEC §12: node is 1-based and contiguous; a gap is an error",
+      "why": "The map draws a path through the nodes. A gap leaves the overworld with a road to nowhere.",
+      "detect": "nodes are 1 and 3"
+    },
+    {
+      "file": "id-mismatch.toml",
+      "rule": "SPEC §12: the id must agree with the file's land and category, and with node",
+      "why": "A misfiled quest imports into the wrong map and is unreachable from the one it was written for.",
+      "detect": "id is go.advanced.07.wrong in a rust/basic pack at node 1"
+    },
+    {
+      "file": "no-visible-case.toml",
+      "rule": "SPEC §12: at least one case must be visible",
+      "why": "A player with no visible case is guessing blind about the output format, which teaches nothing.",
+      "detect": "the only case has visible = false"
+    },
+    {
+      "file": "empty-expect.toml",
+      "rule": "no `expect` may be empty after `match` normalisation",
+      "why": "An empty expectation is satisfied by an empty `fn main() {}` — which is the starter. The node clears itself on the first submit.",
+      "detect": "expect is \"   \\n\\n\", which trims to \"\"",
+      "note": "Not in SPEC §12's text; added by PM's verifier and kept because it is the sharpest of the lot."
+    },
+    {
+      "file": "starter-accepted.toml",
+      "rule": "SPEC §9.5: the starter must NOT be accepted",
+      "why": "Otherwise the map clears itself.",
+      "detect": "starter and solution are byte-identical"
+    },
+    {
+      "file": "solution-fails.toml",
+      "rule": "SPEC §9.4: the reference solution must pass every case",
+      "why": "A quest whose own answer fails is a broken quest, and running it is the only way to find out.",
+      "detect": "the solution prints \"the wrong thing\" and the case expects \"a\""
+    },
+    {
+      "file": "hacker-no-time-limit.toml",
+      "rule": "SPEC §12 (amended): hacker ⇔ quest-level time_limit_s ⇔ at least one hidden case",
+      "why": "The countdown is the hacker category's whole identity, and a HackerRank-style quest with every case visible is a quest with the answer printed beside it.",
+      "detect": "category is hacker; no time_limit_s; no hidden case"
+    },
+    {
+      "file": "basic-with-time-limit.toml",
+      "rule": "the same rule, the other direction",
+      "why": "A countdown on a grammar drill is a content mistake, not a feature — and the enforcement has to run both ways or half of it never fires.",
+      "detect": "category is basic and time_limit_s is 300"
+    },
+    {
+      "file": "basic-escapes.toml",
+      "rule": "SPEC §12 (amended): code fields use TOML literal strings ('''), never \"\"\"",
+      "why": "A \"\"\" string processes backslash escapes, so a `\\n` written inside quest source becomes a real newline before rustc ever sees it — silently, with nothing looking wrong. This fixture's starter is a quest ABOUT printing a literal backslash-n, so the corruption destroys the lesson.",
+      "detect": "the `starter` field is \"\"\"-quoted; after parsing, the two characters written as backslash-n inside the comment are one newline",
+      "verified": "python3 -c \"import tomllib; print(repr(tomllib.loads(open('basic-escapes.toml','rb').read().decode())['quest'][0]['starter']))\" shows the escape already eaten",
+      "note": "A TOML parser cannot report which quote style a string used, so an importer must check the raw bytes — scan the source for a quest-level `starter =` or `solution =` followed by \"\"\", not the parsed value. Flagged to BE in docs/decisions.md."
+    }
+  ],
+  "also_worth_refusing_but_not_fixtured_here": {
+    "duplicate-id": "two quests with the same id in one pack — caught by the UNIQUE constraint in SPEC §2.1 rather than by the importer, so the test belongs to BE's store tests",
+    "requires-cycle": "a requires chain that loops. Worth a fixture once the importer exists and it is clear whether it is refused or simply leaves every node locked",
+    "map-out-of-range": "map.x or map.y outside 0..1. Cheap to add; left out because nothing in SPEC §12 says it is an error rather than a clamp — raised in docs/decisions.md"
+  }
+}

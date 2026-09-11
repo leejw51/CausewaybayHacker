@@ -328,6 +328,11 @@ class Client {
         reject: (e) => (clearTimeout(timer), reject(e)),
       });
     });
+    // An abandoned request whose socket dies later would otherwise be an
+    // unhandled rejection and take the process with it. Registering a no-op
+    // handler here marks it handled; a caller that does await it still gets
+    // the rejection, because this is the same promise.
+    p.catch(() => {});
     this.write(frame);
     return p;
   }
@@ -540,8 +545,10 @@ check("8.2", "replies are matched by id and may arrive out of order", async () =
 });
 
 check("8.3", "an unknown type is ignored, not an error and not a close", async () => {
-  const cl = new Client(URL_WS, "p3");
-  await cl.connect();
+  // Authenticated on purpose: an unknown type sent while ANONYMOUS is
+  // answered `unauthorized` by §3.1 before the server ever reaches its
+  // unknown-type path, and a test that stops there proves nothing.
+  const cl = await session(account("reader"), "p3");
   try {
     // The server's half: a type it does not know gets an error from the
     // closed set, and the connection lives.

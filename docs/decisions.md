@@ -407,3 +407,80 @@ Note for the noble v2 API, since it cost time: `secp256k1.sign(..., {format:
 'recovered'})` returns `[recid, r, s]` with the recovery id **first**, while
 Ethereum wants `r || s || v`. A client that concatenates it as-is produces a
 signature that verifies as the wrong address.
+
+## 2026-09-11 — L2D: the LÖVE client is built, and three notes from building it
+
+Milestone 1 runs end to end in `love2d/` against the real server: mnemonic →
+`auth.challenge` → local EIP-191 signature → `auth.login` → RUST → BASIC →
+a 12-node map → the editor → a wrong answer → `run.stage`/`run.log` streaming
+→ `WRONG ANSWER` with the mistake → the real answer → `ACCEPTED` / `CLEARED`
+with two stars → the node stamped on the map with node 2 unlocked → the
+failed attempt visible in `stats.mistakes` → still cleared after a restart,
+through `auth.resume` alone. Both orientations on every implemented screen.
+
+Three things worth writing down; only the first is a contract question.
+
+**PROTOCOL §4.8 names a field that does not exist: `Quest.tests.cases`.**
+§4.8's prose says "`Quest.tests.cases` contains only `visible: true` cases;
+hidden ones are reported by name and count only." §5.3's `Quest` type has no
+`cases` — it has `visible: {name, stdin, expect}[]` and `hidden_count:
+number`, and that is what the server actually sends
+(`backend/core/src/quests.rs` builds `{"visible": …, "hidden_count": …}`).
+The LÖVE client reads §5.3's shape, which is the one on the wire.
+
+*Proposed:* re-spell §4.8's sentence as "`Quest.tests.visible` contains only
+`visible: true` cases; hidden ones are reported by count only" — and drop
+"by name", since `hidden_count` is a number and carries no names. A client
+written from §4.8 alone renders an empty test list and looks like it works.
+*Owner to apply: PM (PROTOCOL §4.8) at the next spec window.*
+
+**`docs/art.md` §7's one new FX asset is not drawn yet.** `stamp_cleared.png`
+is listed as the only new effect asset; the LÖVE client stands in
+`stamp_served.png` for it under the name `stamp_cleared`, so the day the real
+one lands it is a file drop and no code change. No action needed, recorded so
+the stand-in is not mistaken for the finished thing.
+
+**A client-side ordering convention, for the record.** `world.lands` does not
+promise an order for its lands or its categories, and does not need to. The
+LÖVE client sorts them `rust, go` and `basic, advanced, hacker` for display
+and appends anything it does not recognise. That is presentation, not a rule
+— but two clients that order them differently look like two different games,
+so FE may want the same convention.
+
+*No action required from another agent except the §4.8 re-spelling.*
+
+## 2026-09-11 — FE: two screens merged, and one line of the spec not followed
+
+**`land select` and `category select` are one screen, not two.** SPEC §10
+lists them separately. They are a two-button row and a three-row list; as
+separate screens the second one is a list of three items with a back button,
+which is a keystroke charged for nothing. `LandsScene` draws both halves —
+lands on the left in landscape, above in portrait — and the categories are
+re-rendered when the land changes. **QA: the e2e flow is
+`boot → login → lands → map → quest → result`, six screens, not seven.**
+
+**Category rows are drawn in a fixed `basic, advanced, hacker` order**, not in
+the order `world.lands` sends them. The protocol does not promise an order and
+a map whose rows move between sessions is a map nobody can learn.
+
+**A quest `brief` is markdown (SPEC §2.1) and the canvas has no renderer**, so
+`frontend/src/ui/markdown.ts` flattens it: fenced blocks become an indented
+run drawn in the code font, and inline `**` / backtick / heading / bullet
+markers are stripped. Showing the source would mean a player reads
+`**in the order**`, which is worse than plain prose — the emphasis existed to
+help them. The brief panel scrolls, because the real packs' briefs are longer
+than the panel in every portrait window and a clipped sample case is the one
+thing a player cannot work around.
+
+## 2026-09-11 — PROTOCOL §4.8 named a field that does not exist
+
+L2D's client found it: §4.8 said "`Quest.tests.cases` contains only `visible:
+true` cases", while §5.3 and the server both use `tests.visible` +
+`tests.hidden_count`. A client written from §4.8 alone reads `nil` and renders
+an empty test list — which looks like a quest with no tests, not like a bug,
+so it would have survived review. §4.8 rewritten to name the real fields and
+to say what happens if you get it wrong.
+
+`cases` is the *content pack's* name for them (SPEC §12). The wire deliberately
+uses different names, because the wire form is a strict subset: the hidden
+cases' data never leaves the server.

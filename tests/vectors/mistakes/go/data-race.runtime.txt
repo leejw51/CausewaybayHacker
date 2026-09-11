@@ -1,38 +1,38 @@
 ==================
 WARNING: DATA RACE
-Read at 0x00c00019e038 by goroutine 7:
+Read at 0x00c00019e038 by goroutine 9:
   main.main.func1()
-      /private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-cle6zgd6/main.go:17 +0x68
+      <work>/main.go:17 +0x68
 
 Previous write at 0x00c00019e038 by goroutine 8:
   main.main.func1()
-      /private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-cle6zgd6/main.go:17 +0x78
+      <work>/main.go:17 +0x78
 
-Goroutine 7 (running) created at:
+Goroutine 9 (running) created at:
   main.main()
-      /private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-cle6zgd6/main.go:15 +0x6c
+      <work>/main.go:15 +0x6c
 
 Goroutine 8 (running) created at:
   main.main()
-      /private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-cle6zgd6/main.go:15 +0x6c
+      <work>/main.go:15 +0x6c
 ==================
 ==================
 WARNING: DATA RACE
-Write at 0x00c00019e038 by goroutine 7:
+Write at 0x00c00019e038 by goroutine 9:
   main.main.func1()
-      /private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-cle6zgd6/main.go:17 +0x78
+      <work>/main.go:17 +0x78
 
-Previous write at 0x00c00019e038 by goroutine 9:
+Previous write at 0x00c00019e038 by goroutine 12:
   main.main.func1()
-      /private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-cle6zgd6/main.go:17 +0x78
+      <work>/main.go:17 +0x78
 
-Goroutine 7 (running) created at:
+Goroutine 9 (running) created at:
   main.main()
-      /private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-cle6zgd6/main.go:15 +0x6c
+      <work>/main.go:15 +0x6c
 
-Goroutine 9 (finished) created at:
+Goroutine 12 (finished) created at:
   main.main()
-      /private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-cle6zgd6/main.go:15 +0x6c
+      <work>/main.go:15 +0x6c
 ==================
 Found 2 data race(s)
 exit status 66

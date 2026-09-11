@@ -24,10 +24,19 @@ Session.__index = Session
 ---   client    an `src/net/client.lua` instance
 ---   lib       the loaded FFI library, or nil
 ---   log       function(level, message)
+---   store     durable storage; defaults to `src/store.lua`
+---
+--- `store` is injected for one reason: `src/store.lua` writes through
+--- `love.filesystem`, and the reconnect-and-resume behaviour below is the
+--- half of PROTOCOL §6 most worth testing with no window and no server. A
+--- table with `load_session`, `save_session` and `clear_session` is the whole
+--- interface.
 function M.new(opts)
+  local store = opts.store or Store
   local self = setmetatable({
     client = opts.client,
     lib = opts.lib,
+    store = store,
     log = opts.log or function() end,
     user = nil,
     token = nil,
@@ -40,7 +49,7 @@ function M.new(opts)
     last_error = nil,
   }, Session)
 
-  local stored = Store.load_session()
+  local stored = store.load_session()
   if stored then
     self.token = stored.token
     self.remembered = { address = stored.address, name = stored.name }
@@ -81,14 +90,42 @@ end
 
 -- ------------------------------------------------------------------- events
 
+--- Subscribe. Returns a handle to pass to `off`.
+---
+--- Scenes come and go — the quest screen is entered once per attempt at a
+--- node — so a subscription that could not be cancelled would pile up one
+--- dead listener per visit, each still holding the scene it belonged to. The
+--- handle is how `Scene:leave` takes its own listeners back off.
 function Session:on(name, fn)
   local list = self.listeners[name]
   if not list then list = {}; self.listeners[name] = list end
   list[#list + 1] = fn
+  return { name = name, fn = fn }
+end
+
+function Session:off(handle)
+  if type(handle) ~= "table" then return end
+  local list = self.listeners[handle.name]
+  if not list then return end
+  for i = #list, 1, -1 do
+    if list[i] == handle.fn then table.remove(list, i) end
+  end
+end
+
+--- Drop several at once, for a scene that took a handful.
+function Session:off_all(handles)
+  for _, handle in ipairs(handles or {}) do self:off(handle) end
 end
 
 function Session:fire(name, payload, env)
-  for _, fn in ipairs(self.listeners[name] or {}) do
+  -- Iterated over a copy: a listener that unsubscribes during dispatch (a
+  -- scene switching in response to an event) must not shift the list out
+  -- from under this loop.
+  local list = self.listeners[name]
+  if not list or #list == 0 then return end
+  local snapshot = {}
+  for i, fn in ipairs(list) do snapshot[i] = fn end
+  for _, fn in ipairs(snapshot) do
     local ok, err = pcall(fn, payload, env)
     if not ok then self.log("error", ("listener %s: %s"):format(name, tostring(err))) end
   end
@@ -131,14 +168,14 @@ function Session:adopt(token, user)
   self.user = user
   self.authed = true
   self.last_error = nil
-  Store.save_session(token, user, self.client.url)
+  self.store.save_session(token, user, self.client.url)
 end
 
 function Session:forget_token(why)
   self.token = nil
   self.user = nil
   self.authed = false
-  Store.clear_session()
+  self.store.clear_session()
   self.last_error = why
   self:fire("need_login", { message = why })
 end

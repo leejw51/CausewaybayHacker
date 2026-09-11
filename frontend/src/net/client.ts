@@ -143,7 +143,6 @@ export class Client {
     this.setState("connecting");
     this.transport = this.opts.transport({
       onOpen: () => {
-        this.retry = 0;
         this.setState("open");
         this.startKeepalive();
       },
@@ -201,7 +200,10 @@ export class Client {
     this.pending.clear();
     this.setState("offline");
     if (this.closing) return;
-    this.retryTimer = setTimeout(() => this.reconnect(), this.backoff());
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      void this.reconnect();
+    }, this.backoff());
   }
 
   /** §6.2: 0.5, 1, 2, 4, 8, then 8 s, each with ±20% jitter. */
@@ -220,11 +222,23 @@ export class Client {
       await this.resume(token);
     } catch (e) {
       // §6.4: an `unauthorized` resume means the session is gone for good and
-      // the player has to produce the key again. Anything else is transient
-      // and the next backoff tick will try again.
+      // the player has to produce the key again.
       if (e instanceof WireError && e.payload.code === "unauthorized") {
         this.forgetToken();
         this.needsLogin = true;
+        return;
+      }
+      // Anything else is transient — but the socket is open and anonymous,
+      // so nothing would retry on its own. Schedule the next attempt here
+      // rather than leaving the client quietly stuck.
+      if (!this.closing && !this.retryTimer) {
+        this.retryTimer = setTimeout(() => {
+          this.retryTimer = null;
+          this.close();
+          this.closing = false;
+          this.connect();
+          void this.reconnect();
+        }, this.backoff());
       }
     }
   }
@@ -337,6 +351,10 @@ export class Client {
   }
 
   private adopt(token: string, user: User): void {
+    // Only a *working* session resets the backoff. Resetting it on `open`
+    // would mean a server that accepts connections and then fails every
+    // resume gets hammered at half a second for ever.
+    this.retry = 0;
     this.token = token;
     this.user = user;
     this.needsLogin = false;

@@ -92,6 +92,39 @@ export function actionFor(code: ErrorCode): ErrorAction {
   }
 }
 
+/**
+ * What the player is told. PROTOCOL §3.3 is explicit that the `message` on an
+ * error is "English, one line, for a log or a developer — **not** for the
+ * player. A client renders its own text from `code`." So the server's prose
+ * goes to `console.warn` and this goes on screen.
+ */
+export function playerText(code: ErrorCode): string {
+  switch (code) {
+    case "proto_version":
+      return "this client is too old for that server";
+    case "bad_request":
+      return "something went wrong here, not on the server";
+    case "unauthorized":
+      return "that session has gone — log in again";
+    case "auth_expired":
+      return "that took too long; try again";
+    case "auth_nonce_used":
+      return "that login was already used; try again";
+    case "auth_bad_signature":
+      return "that key does not match that address";
+    case "not_found":
+      return "that is not there any more";
+    case "locked":
+      return "clear the street before it first";
+    case "rate_limited":
+      return "slow down a moment";
+    case "busy":
+      return "an attempt is already running";
+    case "internal":
+      return "the server broke — try again";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // §5 shared shapes
 // ---------------------------------------------------------------------------

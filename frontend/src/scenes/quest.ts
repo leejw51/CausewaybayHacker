@@ -14,17 +14,28 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { clipped, fill, well, type Ctx, type Rect } from "../engine/ui";
+import { clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
 import { Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
 import { Editor } from "../ui/editor";
 import { Overlay } from "../ui/overlay";
 import { WireError } from "../net/client";
+import { playerText } from "../net/protocol";
 import type { Attempt, Category, Land, Quest, RunStage } from "../net/protocol";
 import { LogBuffer } from "../net/logbuf";
+import { blocks } from "../ui/markdown";
 import { MapScene } from "./map";
 import { ResultScene } from "./result";
 
 type Stage = "idle" | RunStage;
+
+/**
+ * Expected output with its whitespace made visible. "your answer is right but
+ * has a trailing newline" is not a lesson worth teaching (SPEC §5.2), and it
+ * is not one a player can even see unless the newline is drawn.
+ */
+function show(text: string): string {
+  return JSON.stringify(text);
+}
 
 export class QuestScene implements Scene {
   readonly name = "quest";
@@ -48,6 +59,9 @@ export class QuestScene implements Scene {
   private consoleOpen = false;
   private logScroll = 0;
   private queued = 0;
+  private briefScroll = 0;
+  private briefOverflow = 0;
+  private briefRect: Rect = [0, 0, 0, 0];
   private readonly offs: Array<() => void> = [];
 
   constructor(
@@ -89,7 +103,12 @@ export class QuestScene implements Scene {
       this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
       queueMicrotask(() => this.editor?.focus());
     } catch (e) {
-      this.error = e instanceof WireError ? e.payload.message : "could not open the quest";
+      if (e instanceof WireError) {
+        console.warn("quest.get failed:", e.payload.code, e.payload.message, e.payload.detail);
+        this.error = playerText(e.payload.code);
+      } else {
+        this.error = "could not open the quest";
+      }
     }
   }
 
@@ -128,10 +147,14 @@ export class QuestScene implements Scene {
       // running, and its result is durable. Telling the player to resubmit
       // would queue a second compile for an answer the server already has.
       const dropped = e instanceof WireError && e.payload.detail.disconnected === true;
+      if (e instanceof WireError) {
+        console.warn("submit failed:", e.payload.code, e.payload.message, e.payload.detail);
+      }
+      // §3.3 again: our words on screen, the server's in the console.
       this.error = dropped
         ? "the connection dropped — that attempt is still running on the server"
         : e instanceof WireError
-          ? `${e.payload.code}: ${e.payload.message}`
+          ? playerText(e.payload.code)
           : "the run failed";
     }
   }
@@ -146,11 +169,11 @@ export class QuestScene implements Scene {
 
   private async hint(): Promise<void> {
     if (!this.quest) return;
-    if (this.hints.length >= this.quest.hints_total) return;
+    if (this.quest.hints_used >= this.quest.hints_total) return;
     try {
       const res = await this.app.client.request("quest.hint", {
         quest_id: this.quest.id,
-        index: this.hints.length,
+        index: this.quest.hints_used,
       });
       this.hints.push(res.hint);
       if (this.quest) this.quest.hints_used = res.hints_used;
@@ -213,6 +236,19 @@ export class QuestScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
+    // Clamped here rather than in the wheel handler: the overflow is only
+    // known after a frame has measured the text at the current width, and the
+    // width changes with the orientation.
+    this.briefScroll = Math.max(0, Math.min(this.briefScroll, this.briefOverflow));
+  }
+
+  wheel(dy: number, x: number, y: number): void {
+    if (inRect(x, y, this.briefRect)) {
+      this.briefScroll = Math.max(0, Math.min(this.briefOverflow, this.briefScroll + dy));
+    } else if (this.consoleOpen) {
+      // The console scrolls backwards: positive is "further into the past".
+      this.logScroll = Math.max(0, this.logScroll - Math.round(dy / 8));
+    }
   }
 
   // -- drawing -------------------------------------------------------------
@@ -258,33 +294,91 @@ export class QuestScene implements Scene {
     const s = this.app.layout.uiScale();
     const fonts = ensureFonts(s);
     const inner = titledPanel(g, rect, "THE JOB", accent);
+    this.briefRect = inner;
     if (!this.quest) {
       g.fillStyle = css(Theme.dim);
       printf(g, fonts.small, "…", inner[0], inner[1], inner[2], "left");
       return;
     }
-    let y = inner[1];
-    if (this.quest.story) {
-      g.fillStyle = css(Theme.cyan);
-      y +=
-        printf(g, fonts.small, `“${this.quest.story}”`, inner[0], y, inner[2], "left") *
-        fonts.small.height;
-      y += Math.round(6 * s);
-    }
-    g.fillStyle = css(Theme.cream);
-    clipped(g, inner[0], y, inner[2], inner[1] + inner[3] - y, () => {
-      let yy = y;
-      yy +=
-        printf(g, fonts.small, this.quest!.brief, inner[0], yy, inner[2], "left") *
-        fonts.small.height;
-      for (const h of this.hints) {
+
+    // A brief is longer than the panel on most quests and in every portrait
+    // window, so it scrolls rather than being silently cut off — a clipped
+    // sample case is the one thing a player cannot work around.
+    const top = inner[1] - this.briefScroll;
+    let yy = top;
+    clipped(g, inner[0], inner[1], inner[2], inner[3], () => {
+      if (this.quest!.story) {
+        g.fillStyle = css(Theme.cyan);
+        yy +=
+          printf(g, fonts.small, `“${this.quest!.story}”`, inner[0], yy, inner[2], "left") *
+          fonts.small.height;
         yy += Math.round(6 * s);
+      }
+
+      // `brief` is markdown (SPEC §2.1); the canvas draws the flattening.
+      for (const b of blocks(this.quest!.brief)) {
+        if (b.kind === "code") {
+          const lines = wrap(fonts.codeSm, b.text, inner[2] - Math.round(10 * s));
+          const h = lines.length * fonts.codeSm.height + Math.round(8 * s);
+          fill(g, Theme.ink, inner[0], yy, inner[2], h, 0.45);
+          g.fillStyle = css(Theme.grass);
+          let cy = yy + Math.round(4 * s);
+          for (const line of lines) {
+            printf(g, fonts.codeSm, line, inner[0] + Math.round(6 * s), cy, inner[2], "left");
+            cy += fonts.codeSm.height;
+          }
+          yy += h + Math.round(6 * s);
+        } else {
+          g.fillStyle = css(Theme.cream);
+          yy += printf(g, fonts.small, b.text, inner[0], yy, inner[2], "left") * fonts.small.height;
+          yy += Math.round(6 * s);
+        }
+      }
+
+      // SPEC §5.2 and §12: at least one case is `visible` precisely so "a
+      // player is never guessing blind about the output format".
+      const tests = this.quest!.tests;
+      for (const c of tests.visible) {
+        g.fillStyle = css(Theme.cyan);
+        printf(g, fonts.stationSm, `SAMPLE · ${c.name}`, inner[0], yy, inner[2], "left");
+        yy += fonts.stationSm.height + Math.round(3 * s);
+        if (c.stdin) {
+          g.fillStyle = css(Theme.dim);
+          yy +=
+            printf(g, fonts.codeSm, `in   ${show(c.stdin)}`, inner[0], yy, inner[2], "left") *
+            fonts.codeSm.height;
+        }
+        g.fillStyle = css(Theme.grass);
+        yy +=
+          printf(g, fonts.codeSm, `out  ${show(c.expect)}`, inner[0], yy, inner[2], "left") *
+          fonts.codeSm.height;
+        yy += Math.round(6 * s);
+      }
+      if (tests.hidden_count > 0) {
+        // The count only — never the data (SPEC §5.2).
+        g.fillStyle = css(Theme.dim);
+        printf(g, fonts.stationSm, `+${tests.hidden_count} HIDDEN`, inner[0], yy, inner[2], "left");
+        yy += fonts.stationSm.height + Math.round(6 * s);
+      }
+
+      for (const h of this.hints) {
         g.fillStyle = css(Theme.coin);
         yy +=
           printf(g, fonts.small, `HINT: ${h}`, inner[0], yy, inner[2], "left") * fonts.small.height;
-        g.fillStyle = css(Theme.cream);
+        yy += Math.round(6 * s);
       }
     });
+
+    this.briefOverflow = Math.max(0, yy - top - inner[3]);
+    if (this.briefOverflow > 0) {
+      // A scrollbar, because a panel that can scroll and does not say so is a
+      // panel whose bottom half nobody finds.
+      const trackH = inner[3];
+      const thumbH = Math.max(12, (trackH * trackH) / (trackH + this.briefOverflow));
+      const t = this.briefScroll / this.briefOverflow;
+      fill(g, Theme.ink, inner[0] + inner[2] - 4, inner[1], 4, trackH, 0.5);
+      fill(g, Theme.coin, inner[0] + inner[2] - 4, inner[1] + (trackH - thumbH) * t, 4, thumbH);
+    }
   }
 
   /** The editor well, the button row, and the console drawer under them. */
@@ -311,7 +405,9 @@ export class QuestScene implements Scene {
     else this.overlay?.hide();
 
     const rowY = inner[1] + editorH + Math.round(8 * s);
-    const hintsLeft = this.quest ? this.quest.hints_total - this.hints.length : 0;
+    // `hints_used` comes back on `quest.get` (§5.3) and on every `quest.hint`,
+    // so leaving a quest and coming back does not offer a hint already paid for.
+    const hintsLeft = this.quest ? this.quest.hints_total - this.quest.hints_used : 0;
     this.buttons.row(
       fonts.button,
       [inner[0], rowY, inner[2], btnH],

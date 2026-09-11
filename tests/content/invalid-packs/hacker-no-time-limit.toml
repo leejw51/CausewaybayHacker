@@ -1,0 +1,26 @@
+# SPEC §12, as amended: `hacker` ⇔ quest-level `time_limit_s` ⇔ at least one
+# hidden case, in both directions. This one has the category and neither
+# of the other two.
+pack = "rust.hacker"
+land = "rust"
+category = "hacker"
+version = 1
+
+[[quest]]
+id = "rust.hacker.01.untimed"
+node = 1
+title = "UNTIMED"
+difficulty = 3
+concepts = ["complexity"]
+requires = []
+map = { x = 0.1, y = 0.1, kind = "quest" }
+brief = "Print it."
+starter = '''fn main() {}
+'''
+solution = '''fn main() { println!("a"); }
+'''
+[quest.tests]
+harness = "stdio"
+timeout_ms = 5000
+match = "trim"
+cases = [ { name = "a", stdin = "", expect = "a\n", visible = true } ]

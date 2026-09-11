@@ -26,6 +26,7 @@ import { fill, well, type Ctx, type Rect } from "../engine/ui";
 import { Buttons, footer, frame, header, RUST, titledPanel } from "../ui/chrome";
 import { Overlay } from "../ui/overlay";
 import { WireError } from "../net/client";
+import { playerText } from "../net/protocol";
 import {
   addressFromMnemonic,
   addressFromPrivateKeyHex,
@@ -118,12 +119,18 @@ export class LoginScene implements Scene {
       this.app.chip.start();
       await this.app.go(new LandsScene(this.app));
     } catch (e) {
-      this.status =
-        e instanceof WireError
-          ? `${e.payload.code}: ${e.payload.message}`
-          : e instanceof Error
-            ? e.message
-            : "that did not work";
+      // §3.3: the server's `message` is for a developer. The player gets our
+      // wording, keyed off the code; the server's line goes to the console
+      // where a developer can actually find it.
+      if (e instanceof WireError) {
+        console.warn("auth failed:", e.payload.code, e.payload.message, e.payload.detail);
+        this.status = playerText(e.payload.code);
+        // §3.3's table: a spent or expired nonce is retryable as-is, and
+        // saying "log in again" about it would be a lie.
+        if (e.action === "rechallenge") this.status += " — press ENTER";
+      } else {
+        this.status = e instanceof Error ? e.message : "that did not work";
+      }
       this.app.chip.fail();
     } finally {
       this.busy = false;

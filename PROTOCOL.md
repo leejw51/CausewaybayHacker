@@ -359,8 +359,16 @@ explicitly so a client never has to infer the overworld's shape.
 
 `locked` if the node's requirements are not met. `Quest.solution` is **omitted
 entirely** unless the player has cleared it — not sent as null, not sent
-empty. `Quest.tests.cases` contains only `visible: true` cases; hidden ones
-are reported by name and count only.
+empty.
+
+There is **no `tests.cases` field on a `Quest`** — that name belongs to the
+content pack (SPEC §12), not to the wire. What a client receives is
+`tests.visible`, an array of the cases marked `visible: true` with their
+`stdin` and `expect`, plus `tests.hidden_count`, an integer. The hidden cases'
+data never crosses the wire in any form. See §5.3 for the exact shape, and
+build the quest screen's test list from `tests.visible` — a client that reads
+`tests.cases` gets `nil` and renders an empty list, which looks like a quest
+with no tests rather than like a bug.
 
 ### 4.9 `quest.submit`
 

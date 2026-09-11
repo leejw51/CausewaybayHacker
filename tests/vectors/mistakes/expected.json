@@ -12,7 +12,16 @@
     "phase": "compile = build fails | lint = build succeeds with a warning | runtime = build succeeds, program dies | tool = needs go vet or -race, not the plain build",
     "compile_time": "true for compile and lint, false for runtime and tool",
     "verified": "this generator re-ran the toolchain and saw the expected identity. false means the row is a claim, not a fact.",
-    "captured": "the real compiler output, byte for byte, so the classifier can be tested with no toolchain installed"
+    "captured": "the real compiler output, so the classifier can be tested with no toolchain installed. Byte for byte except for the normalisations below."
+  },
+  "normalisation": {
+    "why": "runtime output carries a scratch path, a thread id and a program counter that differ on every run and on every machine. Left in, they make `--check` impossible and bake this computer's temp directory into a fixture meant to run anywhere.",
+    "substitutions": {
+      "<work>": "the per-case scratch directory",
+      "<tid>": "the thread id in a Rust panic header",
+      "0x<pc>": "the program counter in a Go SIGSEGV line"
+    },
+    "not_normalised": "file names and line:col — `main.rs:5:21` is the span the classifier reads, and it is already relative because each source is compiled from its own temp cwd"
   },
   "cases": [
     {
@@ -577,7 +586,7 @@
         "diagnostics": [],
         "run_command": "./prog",
         "run_exit": 101,
-        "run_stderr": "\nthread 'main' (8378599) panicked at main.rs:5:21:\nindex out of bounds: the len is 3 but the index is 5\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+        "run_stderr": "\nthread 'main' (<tid>) panicked at main.rs:5:21:\nindex out of bounds: the len is 3 but the index is 5\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
       },
       "captured": "rust/index-range.rustc.json",
       "captured_runtime": "rust/index-range.runtime.txt"
@@ -787,7 +796,7 @@
         "diagnostics": [],
         "run_command": "./prog",
         "run_exit": 2,
-        "run_stderr": "panic: runtime error: invalid memory address or nil pointer dereference\n[signal SIGSEGV: segmentation violation code=0x2 addr=0x0 pc=0x102653550]\n\ngoroutine 1 [running]:\nmain.main()\n\t/private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-aly9f1hs/main.go:12 +0x20\n",
+        "run_stderr": "panic: runtime error: invalid memory address or nil pointer dereference\n[signal SIGSEGV: segmentation violation code=0x2 addr=0x0 pc=0x<pc>]\n\ngoroutine 1 [running]:\nmain.main()\n\t<work>/main.go:12 +0x20\n",
         "vet_command": "go vet ./main.go",
         "vet_exit": 0,
         "vet_stderr": "",
@@ -819,7 +828,7 @@
         "diagnostics": [],
         "run_command": "./prog",
         "run_exit": 2,
-        "run_stderr": "panic: runtime error: index out of range [5] with length 3\n\ngoroutine 1 [running]:\nmain.main()\n\t/private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-1bjbbbh9/main.go:12 +0x8c\n",
+        "run_stderr": "panic: runtime error: index out of range [5] with length 3\n\ngoroutine 1 [running]:\nmain.main()\n\t<work>/main.go:12 +0x8c\n",
         "vet_command": "go vet ./main.go",
         "vet_exit": 0,
         "vet_stderr": "",
@@ -851,7 +860,7 @@
         "diagnostics": [],
         "run_command": "./prog",
         "run_exit": 2,
-        "run_stderr": "fatal error: all goroutines are asleep - deadlock!\n\ngoroutine 1 [chan receive]:\nmain.main()\n\t/private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-tmdb6gbs/main.go:8 +0x34\n",
+        "run_stderr": "fatal error: all goroutines are asleep - deadlock!\n\ngoroutine 1 [chan receive]:\nmain.main()\n\t<work>/main.go:8 +0x34\n",
         "vet_command": "go vet ./main.go",
         "vet_exit": 0,
         "vet_stderr": "",
@@ -958,6 +967,238 @@
       "captured": "go/other-unmatched.gobuild.txt"
     }
   ],
+  "content_starter_cases": [
+    {
+      "quest_id": "rust.basic.04.the-move",
+      "pack": "content/rust/basic.toml",
+      "lang": "rust",
+      "kind": "borrow-after-move",
+      "code": "E0382",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "source_is_in": "content/rust/basic.toml → quest rust.basic.04.the-move → starter",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "rustc --edition 2021 -O --error-format=json main.rs -o prog",
+        "compile_exit": 1,
+        "identities": [
+          "E0382"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "E0382",
+            "message": "borrow of moved value: `name`",
+            "file": "main.rs",
+            "line": 12,
+            "col": 13
+          },
+          {
+            "level": "error",
+            "code": null,
+            "message": "aborting due to 1 previous error",
+            "file": null,
+            "line": null,
+            "col": null
+          }
+        ]
+      },
+      "captured": "content/rust.basic.04.the-move.rustc.json"
+    },
+    {
+      "quest_id": "rust.advanced.02.move",
+      "pack": "content/rust/advanced.toml",
+      "lang": "rust",
+      "kind": "lifetime",
+      "code": "E0373",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "source_is_in": "content/rust/advanced.toml → quest rust.advanced.02.move → starter",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "rustc --edition 2021 -O --error-format=json main.rs -o prog",
+        "compile_exit": 1,
+        "identities": [
+          "E0373"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "E0373",
+            "message": "closure may outlive the current function, but it borrows `line`, which is owned by the current function",
+            "file": "main.rs",
+            "line": 13,
+            "col": 39
+          },
+          {
+            "level": "error",
+            "code": null,
+            "message": "aborting due to 1 previous error",
+            "file": null,
+            "line": null,
+            "col": null
+          }
+        ]
+      },
+      "captured": "content/rust.advanced.02.move.rustc.json"
+    },
+    {
+      "quest_id": "rust.advanced.05.rwlock",
+      "pack": "content/rust/advanced.toml",
+      "lang": "rust",
+      "kind": "mutability",
+      "code": "E0596",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "source_is_in": "content/rust/advanced.toml → quest rust.advanced.05.rwlock → starter",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "rustc --edition 2021 -O --error-format=json main.rs -o prog",
+        "compile_exit": 1,
+        "identities": [
+          "E0596"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "E0596",
+            "message": "cannot borrow data in dereference of `std::sync::RwLockReadGuard<'_, HashMap<String, i64>>` as mutable",
+            "file": "main.rs",
+            "line": 21,
+            "col": 14
+          },
+          {
+            "level": "error",
+            "code": null,
+            "message": "aborting due to 1 previous error",
+            "file": null,
+            "line": null,
+            "col": null
+          }
+        ]
+      },
+      "captured": "content/rust.advanced.05.rwlock.rustc.json"
+    },
+    {
+      "quest_id": "rust.advanced.06.lifetimes",
+      "pack": "content/rust/advanced.toml",
+      "lang": "rust",
+      "kind": "lifetime",
+      "code": "E0106",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "source_is_in": "content/rust/advanced.toml → quest rust.advanced.06.lifetimes → starter",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "rustc --edition 2021 -O --error-format=json main.rs -o prog",
+        "compile_exit": 1,
+        "identities": [
+          "E0106"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "E0106",
+            "message": "missing lifetime specifier",
+            "file": "main.rs",
+            "line": 4,
+            "col": 16
+          },
+          {
+            "level": "error",
+            "code": null,
+            "message": "aborting due to 1 previous error",
+            "file": null,
+            "line": null,
+            "col": null
+          }
+        ]
+      },
+      "captured": "content/rust.advanced.06.lifetimes.rustc.json"
+    },
+    {
+      "quest_id": "rust.advanced.07.generics",
+      "pack": "content/rust/advanced.toml",
+      "lang": "rust",
+      "kind": "type-mismatch",
+      "code": "E0308",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "source_is_in": "content/rust/advanced.toml → quest rust.advanced.07.generics → starter",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "rustc --edition 2021 -O --error-format=json main.rs -o prog",
+        "compile_exit": 1,
+        "identities": [
+          "E0308"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "E0308",
+            "message": "mismatched types",
+            "file": "main.rs",
+            "line": 41,
+            "col": 28
+          },
+          {
+            "level": "error",
+            "code": null,
+            "message": "aborting due to 1 previous error",
+            "file": null,
+            "line": null,
+            "col": null
+          }
+        ]
+      },
+      "captured": "content/rust.advanced.07.generics.rustc.json"
+    },
+    {
+      "quest_id": "go.advanced.09.errors-in-flight",
+      "pack": "content/go/advanced.toml",
+      "lang": "go",
+      "kind": "unused",
+      "code": "go:imported-not-used",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "source_is_in": "content/go/advanced.toml → quest go.advanced.09.errors-in-flight → starter",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "go build -o prog main.go",
+        "compile_exit": 1,
+        "identities": [
+          "\"fmt\" imported and not used"
+        ],
+        "diagnostics": [
+          {
+            "file": "./main.go",
+            "line": 5,
+            "col": 2,
+            "message": "\"fmt\" imported and not used"
+          }
+        ]
+      },
+      "captured": "content/go.advanced.09.errors-in-flight.gobuild.txt"
+    }
+  ],
   "kinds_covered": [
     "borrow-after-move",
     "borrow-conflict",
@@ -990,6 +1231,12 @@
       ],
       "note": "the code alone does not decide the kind; the classifier needs the message or the span too"
     }
+  },
+  "rust_codes_outside_the_71_table": {
+    "codes": [
+      "E0373"
+    ],
+    "note": "These came out of real fixtures but are in no row of SPEC §7.1's table. §7.1 says an unmatched code is stored as `other` with the code kept — but each of these has an obvious home, and filing a shipped quest's own starter under `other` on day one would be a poor first impression of the training loop. Proposed to PM in docs/decisions.md."
   },
   "unverified_cases": []
 }

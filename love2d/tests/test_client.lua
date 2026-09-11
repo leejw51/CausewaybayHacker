@@ -450,6 +450,44 @@ return function()
     T.same(chunks, { "err", "late" })
   end)
 
+  T.case("a null inside a payload arrives as absence, not as a sentinel", function()
+    -- Found by running against the real server: §5.4's `mistakes[].code` is
+    -- `string | null`, and a `null` decoded to the json sentinel — a *table*
+    -- — which crashed the result screen the first time an attempt had a
+    -- diagnostic with no error code. §2.2's `id` is read before this happens,
+    -- so the one null that carries meaning is untouched.
+    local c, server = connected()
+    local got
+    local id = c:request("quest.submit", { quest_id = "q", lang = "rust", source = "x" },
+      function(_, payload) got = payload end)
+    c:update()
+    server:send_envelope({
+      v = 1, id = id, type = "quest.submit.ok",
+      payload = json.decode([[{"attempt":{
+        "id":"att_1","verdict":"compile_error","exit_code":null,
+        "mistakes":[{"kind":"syntax","code":null,"message":"expected `;`",
+                     "line":4,"col":null}],
+        "cases":[],"stars":0,"cleared":false}}]]),
+    })
+    c:update()
+    T.eq(got.attempt.exit_code, nil, "`exit_code: null` is nil, not a table")
+    T.eq(got.attempt.mistakes[1].code, nil)
+    T.eq(got.attempt.mistakes[1].col, nil)
+    T.eq(got.attempt.mistakes[1].kind, "syntax", "everything else survives")
+    -- The concatenation that crashed.
+    T.eq(("%s%s"):format(got.attempt.mistakes[1].kind,
+      got.attempt.mistakes[1].code and (" [" .. got.attempt.mistakes[1].code .. "]") or ""),
+      "syntax")
+
+    -- And a server event's own `id: null` is still what routes it.
+    local seen
+    c:on("run.log", function(p) seen = p.chunk end)
+    server:send_envelope({ v = 1, id = json.null, type = "run.log",
+      payload = { attempt_id = "att_1", stream = "compile", chunk = "x", seq = 0 } })
+    c:update()
+    T.eq(seen, "x")
+  end)
+
   T.case("a request sent while closed is answered locally, not queued", function()
     local c = netclient.new({
       url = "ws://127.0.0.1:5390/ws",

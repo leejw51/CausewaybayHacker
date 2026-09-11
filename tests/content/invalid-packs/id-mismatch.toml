@@ -1,0 +1,24 @@
+# SPEC §12: the id must agree with the file's land and category, and with node.
+pack = "rust.basic"
+land = "rust"
+category = "basic"
+version = 1
+
+[[quest]]
+id = "go.advanced.07.wrong"
+node = 1
+title = "MISFILED"
+difficulty = 1
+concepts = ["io"]
+requires = []
+map = { x = 0.1, y = 0.1, kind = "quest" }
+brief = "Print it."
+starter = '''fn main() {}
+'''
+solution = '''fn main() { println!("a"); }
+'''
+[quest.tests]
+harness = "stdio"
+timeout_ms = 5000
+match = "trim"
+cases = [ { name = "a", stdin = "", expect = "a\n", visible = true } ]

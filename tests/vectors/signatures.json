@@ -8,6 +8,7 @@
     "digest": "cwbwallet --json utils keccak --hex <0x19 || prefix || len || message>",
     "recover": "cwbwallet --json verify --message <msg> --signature <sig> --address <a>"
   },
+  "authority": "PROTOCOL.md §4.2 (the message) and §4.3 (the digest and the v encoding). SPEC §6 is a summary of it.",
   "message_template": {
     "lines": [
       "Causewaybay Hacker login",
@@ -17,7 +18,7 @@
     ],
     "joined_by": "\\n",
     "trailing_newline": false,
-    "note": "SPEC §3.2 prints '(EIP-55)' beside the address line as an annotation; it is NOT part of the message. The absence of a trailing newline is this fixture's choice — see docs/decisions.md."
+    "note": "SPEC §3.2 printed '(EIP-55)' beside the address line as an annotation; it is NOT part of the message. PROTOCOL.md §4.2 pins both the four lines and the absence of a trailing newline. Clients must sign this string byte-for-byte as the server gives it, never rebuild it from the parts."
   },
   "v_encoding": {
     "in_fixture": "27 or 28 (Ethereum convention, the last byte of r||s||v)",

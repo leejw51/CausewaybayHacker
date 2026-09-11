@@ -192,7 +192,15 @@ function App:draw()
   UI.toast(self.toast_text, math.min(1, self.toast_left / 0.5))
 end
 
+--- The modifier keys held right now.
+---
+--- `App.mods_override` exists for `src/drive.lua`: a scripted `love.keypressed`
+--- cannot hold a physical modifier, so a drive step that wants ctrl-A sets
+--- this for the length of the call. Nothing else writes it.
+App.mods_override = nil
+
 local function mods()
+  if App.mods_override then return App.mods_override end
   return {
     ctrl = love.keyboard.isDown("lctrl", "rctrl"),
     shift = love.keyboard.isDown("lshift", "rshift"),

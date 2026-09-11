@@ -2,4 +2,4 @@ panic: runtime error: index out of range [5] with length 3
 
 goroutine 1 [running]:
 main.main()
-	/private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-1bjbbbh9/main.go:12 +0x8c
+	<work>/main.go:12 +0x8c

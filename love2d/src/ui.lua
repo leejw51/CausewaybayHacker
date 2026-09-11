@@ -66,23 +66,58 @@ function UI.textWidth(text, size)
   return Assets.font(size or 12):getWidth(text)
 end
 
---- Press Start 2P has no wrapping to speak of, so a paragraph is wrapped by
---- hand at a character count that suits the panel's width.
-function UI.wrap(text, columns)
+--- Wrap a paragraph to a **pixel** width, measured with the font it will be
+--- drawn in.
+---
+--- The first version of this counted characters against a guessed
+--- characters-per-pixel ratio, and the guess was wrong: the quest brief ran
+--- off the right edge of its panel in portrait, where the panel is wider and
+--- the error is larger. Press Start 2P is close enough to monospace that the
+--- guess *nearly* worked, which is the worst kind of nearly.
+---
+--- A single word longer than the line (a quest id, a long identifier in a
+--- test's expected output) is broken rather than allowed to overflow.
+function UI.wrap(text, width, size)
+  size = size or 8
+  local font = Assets.font(size)
+  local space = font:getWidth(" ")
   local lines = {}
+
+  local function break_long(word)
+    local pieces, current = {}, ""
+    for i = 1, #word do
+      local ch = word:sub(i, i)
+      if current ~= "" and font:getWidth(current .. ch) > width then
+        pieces[#pieces + 1] = current
+        current = ch
+      else
+        current = current .. ch
+      end
+    end
+    if current ~= "" then pieces[#pieces + 1] = current end
+    return pieces
+  end
+
   for raw in (tostring(text) .. "\n"):gmatch("(.-)\n") do
     if raw == "" then
       lines[#lines + 1] = ""
     else
-      local line = ""
+      local line, line_w = "", 0
       for word in raw:gmatch("%S+") do
-        if line == "" then
-          line = word
-        elseif #line + 1 + #word <= columns then
+        local ww = font:getWidth(word)
+        if ww > width then
+          if line ~= "" then lines[#lines + 1] = line; line, line_w = "", 0 end
+          for _, piece in ipairs(break_long(word)) do
+            lines[#lines + 1] = piece
+          end
+        elseif line == "" then
+          line, line_w = word, ww
+        elseif line_w + space + ww <= width then
           line = line .. " " .. word
+          line_w = line_w + space + ww
         else
           lines[#lines + 1] = line
-          line = word
+          line, line_w = word, ww
         end
       end
       if line ~= "" then lines[#lines + 1] = line end
