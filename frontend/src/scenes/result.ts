@@ -66,6 +66,43 @@ export class ResultScene implements Scene {
   private readonly stamp = new Tween(seconds("stamp"), seconds("verdict") * 0.55);
   private readonly detail = new Tween(seconds("panel"), seconds("verdict") * 0.4);
   private stampRung = false;
+  private shook = false;
+  /**
+   * Hit-stop: seconds of the verdict sequence that are simply not played.
+   *
+   * The stamp travels, and then everything on the screen stands still for an
+   * eighth of a second before it lands. It is the oldest trick in a fighting
+   * game and it works for the same reason here — the pause is what tells the
+   * eye that something is about to be *hit*, and without it the stamp arrives
+   * smoothly and lands like a sticker.
+   */
+  private hold = 0;
+  private held = false;
+
+  /**
+   * How hard the screen is hit by each way of being wrong.
+   *
+   * Scaled, not uniform. A program that would not compile is a wall; a wrong
+   * answer on case 3 of 8 is a near miss, and shaking the screen equally for
+   * both teaches the player nothing about which one they are looking at.
+   */
+  private trauma(): number {
+    switch (this.attempt.verdict) {
+      case "compile_error":
+        return 0.85;
+      case "runtime_error":
+        return 0.75;
+      case "timeout":
+      case "output_limit":
+        return 0.5;
+      case "wrong_answer":
+        return 0.42;
+      default:
+        // `internal_error` in the Go land is this milestone being honest about
+        // itself, not the player failing at anything. It gets no impact.
+        return this.land === "go" ? 0 : 0.35;
+    }
+  }
 
   constructor(
     private readonly app: App,
@@ -98,6 +135,12 @@ export class ResultScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
+    // The freeze eats the frame's time rather than the frame: the loop keeps
+    // running, the screen keeps being drawn, and the sequence stands still.
+    if (this.hold > 0) {
+      this.hold -= dt;
+      return;
+    }
     this.word.update(dt);
     this.stamp.update(dt);
     this.detail.update(dt);
@@ -108,6 +151,21 @@ export class ResultScene implements Scene {
     if (!this.stampRung && this.passed && this.stamp.raw >= 1) {
       this.stampRung = true;
       this.app.backdrop?.pulse(this.attempt.cleared ? 0xf8d030 : 0x50d8f8);
+      // The stamp is an impact. It gets a small one of its own, in the same
+      // currency as the failures, so a clear is not the only thing on this
+      // screen with no weight.
+      this.app.shake(0.3);
+    }
+    // A breath held just short of the landing.
+    if (!this.held && this.passed && this.stamp.raw >= 0.8) {
+      this.held = true;
+      this.hold = 0.13;
+    }
+    // The hit lands with the word, not on entry: the shake is punctuation for
+    // the verdict, and punctuation before the sentence is just noise.
+    if (!this.shook && !this.passed && this.word.raw >= 0.5) {
+      this.shook = true;
+      this.app.shake(this.trauma());
     }
   }
 

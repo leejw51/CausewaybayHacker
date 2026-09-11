@@ -24,6 +24,15 @@ get one, because it is where the game is actually played.
 Every finding is marked **FE** (code) or **DESIGN** (asset), ordered by how much
 it hurts.
 
+**Status.** §1–§17 were written against the first round of captures. FE and L2D
+have since acted on most of them — see `docs/decisions.md` for what was changed
+and why, including the wallet-generation path (§1), difficulty no longer drawn
+as stars (§4), the art wired up (§5), and the overworld plate no longer cropped
+(§13). The findings are kept as written rather than edited down, because the
+reasoning is what makes the next round of judgements, not the verdicts. The two
+sections after §17 — the opening sequence and the technique assets — are the
+second round and are current.
+
 ---
 
 ## 1. A first-time player cannot start the game — FE
@@ -521,14 +530,12 @@ problem. Sprites that want a pink use crimson or violet. Both rules are now in
 
 49 assets in `art/` — 27 backgrounds and story panels, 21 sprites and one
 animation strip — from 66 generations across two rounds, so 17 re-rolls. The
-first round's figures were 32 assets from 40 generations; this round added 17
-new assets and re-rolled 5 existing ones.
-
-Superseded numbers below refer to the first round and are kept as written:
-32 assets in `art/` — 13 backgrounds and 19 sprites — from 40 generations, so 8
-re-rolls. `art/manifest.json` is in `CausewaybayGolang`'s shape with all 19
-sprite boxes measured from the actual alpha: `art/tools/manifest.py` calls the
-same `ink_bounds` the knockout uses, so no box is guessed.
+per-asset count is in `art/prompts.toml`, which is also the recipe: change a
+prompt, re-run `art/tools/gen.sh`, and that asset is re-rolled.
+`art/manifest.json` is in `CausewaybayGolang`'s shape with all 21
+sprite boxes measured from the actual alpha — plus a box per frame on the
+`walk_mei` strip: `art/tools/manifest.py` calls the same `ink_bounds` the
+knockout uses, so no box is guessed.
 
 **One caveat on `box`.** `feet` means "the row the ink stands on", and for the
 cast, the bosses and the node markers that is exactly what it is — place
@@ -540,7 +547,7 @@ incidental. The sibling manifest has the same shape for the same assets, so this
 is a note, not a difference — but do not anchor a panel frame to `feet`.
 
 **The pipeline is not the sibling's, and this matters.** `love2d/src/assets.lua`
-knocks the magenta out at load time; `frontend/src/engine/assets.ts:57-64` does
+knocks the magenta out at load time; `frontend/src/engine/assets.ts:64` does
 no pixel work at all — it fetches a PNG and draws it. Raw Grok output dropped
 into `frontend/public/art/` would render as **magenta squares**. So
 `art/tools/process.py` runs the knockout ahead of time: the same border-seeded

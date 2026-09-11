@@ -39,6 +39,18 @@ export class Chip {
   clear(): void {
     this.cue(SFX.oneup, SFX.power);
   }
+  /**
+   * The name landing. Two low hits and a warning tone, which is the bank's
+   * nearest thing to a sting — this bank was written for a shoot-'em-up and
+   * has no "dread" cue, so the dread is made out of a bomb and a siren.
+   */
+  stinger(): void {
+    this.cue(SFX.bomb, SFX.warn2);
+  }
+  /** A single typed character. Quiet, and only every few letters. */
+  type(): void {
+    this.cue(SFX.graze);
+  }
   music(which: "title" | "stage" | "boss" | "stop"): void {
     this.cue(which === "stop" ? MUSIC.stop : MUSIC[which]);
   }

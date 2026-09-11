@@ -1,0 +1,433 @@
+/**
+ * The attract sequence.
+ *
+ * Every cabinet in the era told you what the game was before you put a coin in,
+ * and it told you in five slides over the artwork, not in a cutscene. This is
+ * that: the opening of `docs/story.md` §2, in its own sentences, over three of
+ * the painted backgrounds, typed a character at a time.
+ *
+ * Three rules it is built to:
+ *
+ *   - **It must never stand between a returning player and their work.** Any
+ *     key, any click, at any point, goes straight to the login screen. The skip
+ *     is checked before anything else in `key()` and `pointer()` and it is real:
+ *     there is no beat during which the input is swallowed, because there is no
+ *     state in here that has to finish. (`App` forwards keys to the scene unless
+ *     the DOM overlay has focus, and this screen never creates an overlay
+ *     element, so there is nothing that can eat the first keystroke.)
+ *   - **It does not spoil the map.** §2 only. The two lands, the mascots, the
+ *     antagonists and the shape of the thing are all in §3 and later, and none
+ *     of it is here. This is the loss and the reason, which is what an opening
+ *     is for.
+ *   - **It ends, and it ends at the logo.** It is not a loop. A title screen
+ *     that spontaneously animates away while somebody is typing twelve words
+ *     into the seed field is a bug with a nice name, and the new-wallet gate
+ *     makes that window long. So it plays once from boot when there is no
+ *     session, finishes on the logo, and hands over. `WATCH AGAIN` on the login
+ *     screen replays it on purpose.
+ */
+import type { App, Scene } from "../app";
+import { ensureFonts, printf, width, wrap } from "../engine/text";
+import { css, Theme } from "../engine/theme";
+import { clipped, fill, neonPrint, type Ctx } from "../engine/ui";
+import { footer, RUST } from "../ui/chrome";
+import { expInOut, expOut } from "../engine/ease";
+import { reducedMotion, seconds, Tween } from "../engine/motion";
+import { LoginScene } from "./login";
+
+/** How a beat arrives over the one before it. */
+type Cut = "fade" | "iris";
+
+interface Beat {
+  bg: string;
+  lines: string[];
+  /** Seconds the finished panel stays up before the next cut. */
+  hold: number;
+  cut: Cut;
+  /** The colour the type is set in. Skynet gets the cold one. */
+  cold?: boolean;
+  /** Fire the sting on the frame this beat's first character is typed. */
+  sting?: boolean;
+}
+
+/**
+ * The opening, verbatim from `docs/story.md` §2 and in its order.
+ *
+ * Nothing here is written for the game; it is the bible's own sentences, split
+ * at the points they were already punctuated at. If the story changes, it
+ * changes there and is copied here — the voice is the asset and it is not
+ * paraphrased on the way to the screen.
+ */
+const BEATS: Beat[] = [
+  {
+    bg: "bg_street",
+    cut: "fade",
+    hold: 1.5,
+    lines: [
+      "TUESDAY, 06:40.",
+      "Mei opens the editor above Jardine's Bazaar to fix one function, and the cursor sits there.",
+      "She knows what the function has to do. She cannot write the for.",
+    ],
+  },
+  {
+    bg: "bg_street",
+    cut: "fade",
+    hold: 1.6,
+    lines: [
+      "She types three characters. Grey text finishes the line for her, correctly, and she accepts it.",
+      "That is when she understands: she has done that every day for two years.",
+      "The skill did not decay. It was taken — one accepted suggestion at a time, by something patient enough to spend two years on it.",
+    ],
+  },
+  {
+    bg: "bg_street",
+    cut: "fade",
+    hold: 1.4,
+    lines: [
+      "Downstairs the shutters are going up on Jardine's Bazaar, and every till on the street is showing the same thing:",
+      "a panel of grey suggested text, and no working code underneath it.",
+    ],
+  },
+  {
+    bg: "bg_datacentre",
+    cut: "iris",
+    hold: 1.8,
+    cold: true,
+    sting: true,
+    lines: [
+      "SKYNET did not need to be smarter than anyone.",
+      "It needed people to stop reading their own screens.",
+      "It had been paying for that since the first free tier.",
+    ],
+  },
+  {
+    bg: "title_bg",
+    cut: "iris",
+    hold: 1.7,
+    lines: [
+      "Mei does not have a plan.",
+      "She has a laptop, a street she knows, and the suspicion that whatever she can still write from memory is hers to keep.",
+      "She starts with println!.",
+    ],
+  },
+];
+
+/** Characters a second. Fast enough to read with, slow enough to be typing. */
+const CPS = 46;
+/** How long a cut takes. */
+const CUT = 0.62;
+/** How long the logo card is held at the end before the login screen. */
+const LOGO_HOLD = 2.6;
+
+export class StoryScene implements Scene {
+  readonly name = "story";
+  readonly mood = "title" as const;
+
+  private i = 0;
+  private t = 0;
+  /** Seconds into the current beat, including its cut. */
+  private beatT = 0;
+  private typed = 0;
+  private done = false;
+  private stung = false;
+  private leaving = false;
+  private lastTick = 0;
+  private readonly logoIn = new Tween(seconds("scene"));
+
+  /**
+   * @param replay true when the player asked for it from the login screen, in
+   * which case leaving goes *back* to where they came from rather than forward
+   * into a screen they have never seen.
+   */
+  constructor(
+    private readonly app: App,
+    private readonly replay = false,
+  ) {}
+
+  enter(): void {
+    this.app.chip.music("title");
+    // The three paintings are lazily fetched backgrounds. Asking for all of
+    // them on the first frame means the cut to the datacentre is a cut and not
+    // a black rectangle with type on it.
+    for (const b of BEATS) this.app.assets?.prefetch(b.bg, this.app.layout.isPortrait());
+  }
+
+  leave(): void {
+    this.app.chip.music("stop");
+  }
+
+  // -- the skip ------------------------------------------------------------
+
+  /**
+   * Out, now, whatever is on screen.
+   *
+   * Guarded so that a key and a click in the same frame do not start two scene
+   * changes; that is the only thing in here that could swallow an input, and it
+   * cannot, because by the time it is set the screen is already leaving.
+   */
+  private out(): void {
+    if (this.leaving) return;
+    this.leaving = true;
+    void this.app.go(new LoginScene(this.app), this.replay ? "back" : "forward");
+  }
+
+  key(): void {
+    this.out();
+  }
+
+  pointer(_x: number, _y: number, phase: "down" | "move" | "up"): void {
+    if (phase === "down") this.out();
+  }
+
+  // -- the sequence --------------------------------------------------------
+
+  private beat(): Beat | null {
+    return this.i < BEATS.length ? BEATS[this.i] : null;
+  }
+
+  /** The beat's text, wrapped to the panel, as one flat list of lines. */
+  private linesFor(b: Beat, w: number): string[] {
+    const f = ensureFonts(this.app.layout.uiScale()).small;
+    const out: string[] = [];
+    for (const line of b.lines) out.push(...wrap(f, line, w));
+    return out;
+  }
+
+  update(dt: number): void {
+    this.t += dt;
+    this.beatT += dt;
+    const b = this.beat();
+    if (!b) {
+      this.logoIn.update(dt);
+      // The logo is the end of the sequence, not a new loop of it. When it has
+      // been up long enough the screen simply hands over.
+      if (this.beatT > LOGO_HOLD + CUT) this.out();
+      return;
+    }
+    if (this.beatT < CUT) return;
+
+    const total = this.beatText(b).length;
+    const before = Math.floor(this.typed);
+    // Reduced motion does not mean "no story", it means "less performance":
+    // the type lands four times faster and the holds are already scaled by
+    // `seconds()` elsewhere. The words are still the point.
+    this.typed = Math.min(total, this.typed + dt * CPS * (reducedMotion() ? 4 : 1));
+    if (b.sting && !this.stung && this.typed > 0) {
+      this.stung = true;
+      this.app.chip.stinger();
+    }
+    // Every fourth character, not every character: a key click per glyph at
+    // forty-six a second is a buzz, not typing.
+    const now = Math.floor(this.typed);
+    if (now > before && now - this.lastTick >= 4) {
+      this.lastTick = now;
+      this.app.chip.type();
+    }
+    if (this.typed >= total) {
+      this.done = true;
+      if (this.beatT > CUT + total / CPS + b.hold) this.next();
+    }
+  }
+
+  private next(): void {
+    this.i++;
+    this.beatT = 0;
+    this.typed = 0;
+    this.done = false;
+    this.stung = false;
+    this.lastTick = 0;
+  }
+
+  private beatText(b: Beat): string {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const w = this.panelRect()[2] - Math.round(24 * s);
+    return this.linesFor(b, w).join("\n");
+  }
+
+  /** The letterbox the type sits in: the lower third, full bleed. */
+  private panelRect(): [number, number, number, number] {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const w = Math.min(layout.vw - Math.round(40 * s), Math.round(900 * s));
+    const x = Math.round((layout.vw - w) / 2);
+    const y = Math.round(layout.vh * (layout.isPortrait() ? 0.6 : 0.58));
+    return [x, y, w, layout.vh - y - Math.round(40 * s)];
+  }
+
+  // -- drawing -------------------------------------------------------------
+
+  draw(g: Ctx): void {
+    const { layout } = this.app;
+    this.app.clear(g, Theme.void);
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const b = this.beat();
+    const prev = this.i > 0 ? BEATS[this.i - 1] : null;
+    const cutT = Math.min(1, this.beatT / CUT);
+
+    if (b) {
+      // The outgoing painting stays until the incoming one has covered it, so
+      // there is never a frame of nothing between two beats.
+      if (prev && cutT < 1) this.drawBg(g, prev.bg, 1, 1);
+      if (b.cut === "iris" && cutT < 1) {
+        const reach = Math.hypot(layout.vw, layout.vh) * 0.55;
+        const r = reach * expInOut(cutT);
+        clipped(g, 0, 0, layout.vw, layout.vh, () => {
+          g.save();
+          g.beginPath();
+          g.arc(layout.vw / 2, layout.vh * 0.42, r, 0, Math.PI * 2);
+          g.clip();
+          this.drawBg(g, b.bg, 1, this.ken());
+          g.restore();
+          if (r > 2) {
+            g.strokeStyle = css(Theme.coin, 0.4);
+            g.lineWidth = 2 * s;
+            g.beginPath();
+            g.arc(layout.vw / 2, layout.vh * 0.42, r, 0, Math.PI * 2);
+            g.stroke();
+            g.lineWidth = 1;
+          }
+        });
+      } else {
+        this.drawBg(g, b.bg, b.cut === "fade" ? expOut(cutT) : 1, this.ken());
+      }
+    } else {
+      this.drawBg(g, "title_bg", 1, 0.2);
+    }
+
+    // A void gradient into the lower half, so type over a bright morning
+    // street is type on something rather than type in front of something.
+    const grad = g.createLinearGradient(0, layout.vh * 0.3, 0, layout.vh);
+    grad.addColorStop(0, "rgba(20,28,72,0)");
+    grad.addColorStop(1, "rgba(20,28,72,0.94)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, layout.vw, layout.vh);
+
+    if (b) this.drawPanel(g, b, cutT);
+    else this.drawLogo(g);
+
+    // The pips: where you are in five beats. A sequence with no visible end
+    // is a sequence people skip on principle.
+    const pipY = Math.round(layout.vh - 46 * s);
+    const pipW = Math.round(14 * s);
+    const pipsX = Math.round((layout.vw - (BEATS.length + 1) * pipW) / 2);
+    for (let k = 0; k <= BEATS.length; k++) {
+      fill(g, k === this.i ? Theme.coin : Theme.dim, pipsX + k * pipW, pipY, Math.round(8 * s), 3);
+    }
+
+    footer(g, layout, this.app.layout.touch ? "TAP  SKIP" : "ANY KEY  SKIP");
+    void fonts;
+  }
+
+  /** Slow push, dt-driven. Zero for anyone who asked for less of it. */
+  private ken(): number {
+    if (reducedMotion()) return 0;
+    return Math.min(1, this.beatT / 7);
+  }
+
+  private drawBg(g: Ctx, name: string, alpha: number, ken: number): void {
+    const { layout } = this.app;
+    const img = this.app.assets?.picture(name, layout.isPortrait());
+    if (!img) {
+      fill(g, Theme.navy, 0, 0, layout.vw, layout.vh, alpha);
+      return;
+    }
+    const zoom = 1 + ken * 0.07;
+    const scale =
+      Math.max(layout.vw / img.naturalWidth, layout.vh / img.naturalHeight) * zoom;
+    const aw = img.naturalWidth * scale;
+    const ah = img.naturalHeight * scale;
+    g.save();
+    g.globalAlpha = alpha;
+    clipped(g, 0, 0, layout.vw, layout.vh, () =>
+      g.drawImage(img, (layout.vw - aw) / 2, (layout.vh - ah) / 2 - ken * 6, aw, ah),
+    );
+    g.restore();
+  }
+
+  private drawPanel(g: Ctx, b: Beat, cutT: number): void {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const [x, y, w] = this.panelRect();
+    const inner = w - Math.round(24 * s);
+    const lines = this.linesFor(b, inner);
+    const lh = fonts.small.height;
+
+    // The plate itself arrives with the cut rather than after it, so the beat
+    // is one movement instead of a picture and then a box.
+    const t = expOut(cutT);
+    const h = lines.length * lh + Math.round(26 * s);
+    g.save();
+    g.globalAlpha = t;
+    g.translate(0, (1 - t) * Math.round(18 * s));
+    fill(g, Theme.ink, x, y, w, h, 0.82);
+    fill(g, b.cold ? Theme.cyan : Theme.coin, x, y, Math.round(4 * s), h);
+    fill(g, Theme.dim, x, y + h - 1, w, 1, 0.5);
+
+    let left = Math.floor(this.typed);
+    let ly = y + Math.round(13 * s);
+    const colour = b.cold ? Theme.cyan : Theme.cream;
+    for (const line of lines) {
+      const take = Math.max(0, Math.min(line.length, left));
+      const shown = line.slice(0, take);
+      left -= line.length + 1;
+      if (shown) {
+        g.fillStyle = css(colour);
+        printf(g, fonts.small, shown, x + Math.round(14 * s), ly, inner, "left");
+      }
+      // The caret sits at the end of whatever is being typed right now, and
+      // blinks on the beat clock — never on `Date.now()`, or a captured frame
+      // would differ from run to run.
+      if (take > 0 && take < line.length) {
+        const cw = width(fonts.small, shown);
+        if (Math.floor(this.beatT * 3) % 2 === 0) {
+          fill(
+            g,
+            colour,
+            x + Math.round(14 * s) + cw,
+            ly + Math.round(2 * s),
+            Math.round(7 * s),
+            lh - Math.round(6 * s),
+          );
+        }
+      }
+      ly += lh;
+    }
+    g.restore();
+    void this.done;
+  }
+
+  private drawLogo(g: Ctx): void {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const t = this.logoIn.out;
+    const cy = Math.round(layout.vh * 0.38);
+    g.save();
+    g.globalAlpha = Math.min(1, this.logoIn.raw * 2);
+    g.translate(0, (1 - t) * Math.round(20 * s));
+    neonPrint(g, fonts.title, "CAUSEWAYBAY", cy - fonts.title.height, layout.vw, Theme.cyan, this.t);
+    neonPrint(
+      g,
+      fonts.title,
+      "HACKER",
+      cy + Math.round(fonts.title.height * 0.2),
+      layout.vw,
+      RUST,
+      this.t + 0.6,
+    );
+    g.fillStyle = css(Theme.coin, 0.55 + 0.45 * Math.sin(this.t * 4));
+    printf(
+      g,
+      fonts.stationSm,
+      "PRESS ANY KEY",
+      0,
+      Math.round(layout.vh * 0.62),
+      layout.vw,
+      "center",
+    );
+    g.restore();
+  }
+}
