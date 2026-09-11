@@ -674,8 +674,25 @@ def main() -> int:
     path = HERE / "expected.json"
     old = path.read_text() if path.exists() else None
     if args.check:
-        if old != text:
+        # The `toolchain` block names the machine the file was written on —
+        # `go version … darwin/arm64`, `Darwin 25.6.0 arm64` — and is kept as
+        # provenance, not as a claim. Compared without it, or the check can
+        # never pass anywhere but the laptop that wrote the file; and the
+        # rest is shown as a diff, because "stale" on a machine that did not
+        # run the generator is a question, not an instruction.
+        def without_toolchain(raw):
+            d = json.loads(raw)
+            d.pop("toolchain", None)
+            return json.dumps(d, indent=2, ensure_ascii=False).splitlines()
+
+        was = without_toolchain(old) if old else []
+        now = without_toolchain(text)
+        if was != now:
+            import difflib
+
             print("expected.json is stale — rerun the generator", file=sys.stderr)
+            for line in list(difflib.unified_diff(was, now, "expected.json", "generated", lineterm=""))[:120]:
+                print(line, file=sys.stderr)
             return 1
         print("expected.json is up to date")
         return 0
