@@ -245,7 +245,16 @@ def parse_rustc_json(stderr: str) -> list:
     return out
 
 
-def run_go(src: pathlib.Path, work: pathlib.Path, build_root: pathlib.Path) -> dict:
+def run_go(
+    src: pathlib.Path, work: pathlib.Path, build_root: pathlib.Path, race: bool = False
+) -> dict:
+    """`race` runs the detector as well — only for the fixture that exists
+    for it. It used to run for every program that compiled, and on Linux
+    that hung CI for ten minutes on `deadlock.go`: the race runtime needs
+    cgo, and with cgo in the picture the Go runtime does not report "all
+    goroutines are asleep" — the program that ends instantly under `go run`
+    waits forever under `go run -race`. macOS reported the deadlock either
+    way, which is why nobody saw it on a laptop."""
     shutil.copy(src, work / "main.go")
     env = go_env(build_root)
     build = subprocess.run(
@@ -279,6 +288,7 @@ def run_go(src: pathlib.Path, work: pathlib.Path, build_root: pathlib.Path) -> d
         result["vet_command"] = "go vet ./main.go"
         result["vet_exit"] = vet.returncode
         result["vet_stderr"] = normalise_runtime(vet.stderr)
+    if result["compiles"] and race:
         # -race, run three times: the detector is sampling, not proving.
         races = []
         for _ in range(3):
@@ -489,7 +499,7 @@ def main() -> int:
                 res = (
                     run_rust(src, work)
                     if lang == "rust"
-                    else run_go(src, work, build_root)
+                    else run_go(src, work, build_root, race=(level == "race"))
                 )
             finally:
                 shutil.rmtree(work, ignore_errors=True)
