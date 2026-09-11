@@ -189,6 +189,14 @@ export interface Quest {
   story: string;
   difficulty: Difficulty;
   time_limit_s: number | null;
+  /**
+   * §4.8b — the server's clock, not ours. The first `quest.get` stamps the
+   * pair and every later one returns the same two instants, so a reload or a
+   * second window shows *one* countdown rather than starting a new one. Both
+   * are null on an untimed quest, and on a server that has not shipped §4.8b.
+   */
+  opened_at?: string | null;
+  deadline_at?: string | null;
   starter: string;
   concepts: string[];
   hints_total: number;
@@ -244,6 +252,9 @@ export interface Attempt {
   /** "did *this* submission clear the node", not "is the node cleared". */
   cleared: boolean;
   created_at: string;
+  /** §4.8b: whether it landed inside the time limit. Never a gate — a late
+   *  submit is judged exactly like an early one; this only records it. */
+  within_limit?: boolean;
 }
 
 /** §5.5 */

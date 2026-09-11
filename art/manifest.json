@@ -733,6 +733,18 @@
         "maxx": 78,
         "maxy": 89
       }
+    },
+    {
+      "name": "bg_playground",
+      "file": "bg_playground.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_playground_p",
+      "file": "bg_playground_p.jpg",
+      "w": 768,
+      "h": 1152
     }
   ]
 }

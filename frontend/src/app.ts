@@ -121,6 +121,8 @@ export class App {
   private last = 0;
   private raf = 0;
   private frozen = false;
+  /** The instant `freeze()` happened, so `now()` can hold still. */
+  private frozenAt = Date.now();
   private modal: Modal | null = null;
   /** A one-line banner for anything the player needs told: errors, reconnects. */
   private toast: { text: string; left: number; tween: Tween } | null = null;
@@ -278,7 +280,23 @@ export class App {
 
   /** Dev/e2e only: stop the loop so a screenshot has something still to take. */
   freeze(): void {
+    if (!this.frozen) this.frozenAt = Date.now();
     this.frozen = true;
+  }
+
+  /**
+   * The wall clock, as the game is allowed to see it.
+   *
+   * Almost nothing may read the real one — the whole render path is frame
+   * driven so a capture is reproducible. The countdown is the exception the
+   * spec forces: §4.8b's deadline is an instant on the *server*, and a client
+   * that decremented its own counter would come back wrong from a backgrounded
+   * tab. So it re-derives from here every frame, and here stands still while
+   * the capture hook is frozen — a screenshot of a clock has to be the same
+   * screenshot twice.
+   */
+  now(): number {
+    return this.frozen ? this.frozenAt : Date.now();
   }
 
   resume(): void {

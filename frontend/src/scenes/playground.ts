@@ -58,7 +58,12 @@ const OUTCOME: Record<PlaygroundRun["outcome"], string> = {
   output_limit: "IT PRINTED TOO MUCH",
 };
 
-type Held = { id: string | null; name: string; lang: Land; source: string };
+/**
+ * The open scratchpad. `dirty` is mirrored with it: text that never reached the
+ * server must be able to say so after a reload, or the next visit would fetch
+ * the older server copy over the top of it and the loss would be silent.
+ */
+type Held = { id: string | null; name: string; lang: Land; source: string; dirty?: boolean };
 
 export class PlaygroundScene implements Scene {
   readonly name = "playground";
@@ -133,7 +138,10 @@ export class PlaygroundScene implements Scene {
     this.restoreLocal();
     this.mount();
     void this.refreshList();
-    if (this.held.id) void this.load(this.held.id, true);
+    // Only when there is nothing local worth keeping. Loading the server's
+    // snapshot over text that never got saved is exactly the loss this screen
+    // is not allowed to have.
+    if (this.held.id && !this.dirty) void this.load(this.held.id, true);
   }
 
   leave(): void {
@@ -167,7 +175,7 @@ export class PlaygroundScene implements Scene {
 
   private writeLocal(): void {
     try {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(this.held));
+      localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...this.held, dirty: this.dirty }));
     } catch {
       /* private browsing: the server copy is still the real one */
     }
@@ -184,7 +192,11 @@ export class PlaygroundScene implements Scene {
         name: typeof v.name === "string" ? v.name : "SCRATCH",
         lang: v.lang === "go" ? "go" : "rust",
         source: v.source,
+        dirty: v.dirty === true,
       };
+      // Unsaved text from last time is still unsaved: it stays on screen, it is
+      // not fetched over, and the first autosave pushes it up.
+      this.dirty = this.held.dirty === true;
     } catch {
       /* a corrupt mirror is not worth a screen full of error */
     }
@@ -291,11 +303,11 @@ export class PlaygroundScene implements Scene {
       });
       this.result = res.run;
       if (res.run.outcome === "ok") this.app.chip.coin();
-      else {
-        this.app.chip.fail();
-        // Weight, but a fraction of a quest's: nothing is at stake here.
-        this.app.shake(0.25);
-      }
+      // No screen shake here, on purpose *and* because it could not land:
+      // `App.shake` refuses while the overlay has children, and this screen
+      // always has two. A failed compile in a scratchpad is also not a failure
+      // — it is the thing you came here to read.
+      else this.app.chip.fail();
     } catch (e) {
       this.status =
         e instanceof WireError && e.payload.code === "not_found"

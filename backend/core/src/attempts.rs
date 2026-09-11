@@ -68,6 +68,9 @@ pub struct AttemptRecord {
     pub stderr: String,
     pub tests_passed: i64,
     pub tests_total: i64,
+    /// PROTOCOL §4.8b. `None` on an untimed quest, and on every attempt made
+    /// before the clock existed.
+    pub within_limit: Option<bool>,
     pub created_at: String,
 }
 
@@ -75,8 +78,8 @@ pub fn insert(conn: &Connection, record: &AttemptRecord) -> Result<()> {
     conn.execute(
         "INSERT INTO attempts (id, address, quest_id, lang, mode, source, verdict, compile_ms,
                                run_ms, exit_code, stdout_bytes, stderr, tests_passed,
-                               tests_total, created_at)
-         VALUES (?1,?2,?3,?4,?15,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
+                               tests_total, created_at, within_limit)
+         VALUES (?1,?2,?3,?4,?15,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?16)",
         params![
             record.id,
             record.address,
@@ -93,6 +96,7 @@ pub fn insert(conn: &Connection, record: &AttemptRecord) -> Result<()> {
             record.tests_total,
             record.created_at,
             record.mode.as_str(),
+            record.within_limit,
         ],
     )?;
     Ok(())
@@ -215,6 +219,7 @@ pub fn new_record(
         stderr: String::new(),
         tests_passed: 0,
         tests_total: 0,
+        within_limit: None,
         created_at: now_stamp(),
     }
 }

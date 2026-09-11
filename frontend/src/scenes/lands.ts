@@ -362,10 +362,13 @@ export class LandsScene implements Scene {
 
       let y = rowsTop;
       for (const c of cats) {
-        // Nothing is locked (PROTOCOL §4.7): `open` is not consulted, because a
-        // road with streets in it is a road you may walk down today. `empty`
-        // means there is genuinely nothing there — a pack that has not shipped.
-        const empty = c.total === 0;
+        // Nothing is *locked* (PROTOCOL §4.7): a road with streets in it is a
+        // road you may walk down today, whatever you have cleared. `open` is
+        // still read, but it no longer means "not yet" — it means the pack did
+        // not import, which is a fault and not a rule, and the row says which
+        // of the two kinds of nothing it is rather than just going grey.
+        const missing = c.total > 0 && !c.open;
+        const empty = c.total === 0 || missing;
         const id = `cat:${c.category}`;
         if (!this.glow.has(id)) this.glow.set(id, 0);
         const lit = this.glow.get(id) ?? 0;
@@ -455,7 +458,7 @@ export class LandsScene implements Scene {
         printf(
           g,
           fonts.stationSm,
-          empty ? "EMPTY" : `${c.cleared}/${c.total}  ★${c.stars}`,
+          missing ? "NOT INSTALLED" : empty ? "EMPTY" : `${c.cleared}/${c.total}  ★${c.stars}`,
           tx + Math.round(4 * s),
           titleY + Math.round(2 * s),
           tw,
@@ -476,6 +479,16 @@ export class LandsScene implements Scene {
           g.fill();
         }
 
+        // The padlock is for this and only this: a road whose pack is not on
+        // the server. It is never drawn on the map, where nothing is locked.
+        const badge = missing ? this.app.assets?.picture("badge_locked") : null;
+        if (badge) {
+          const bh2 = Math.min(rowH - Math.round(16 * s), Math.round(34 * s));
+          g.save();
+          g.globalAlpha = 0.75;
+          g.drawImage(badge, rx + barW - bh2 - Math.round(12 * s), y + (rowH - bh2) / 2, bh2, bh2);
+          g.restore();
+        }
         this.catBtns.add({
           id,
           rect: [right[0], y, barW, rowH],

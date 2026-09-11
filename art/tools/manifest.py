@@ -43,6 +43,8 @@ ORDER = [
     "mascot_rust_basic", "mascot_rust_advanced", "mascot_rust_hacker",
     "mascot_go_basic", "mascot_go_advanced", "mascot_go_hacker",
     "badge_cleared", "badge_locked",
+    # The playground: the one room in the game with no problem in it.
+    "bg_playground", "bg_playground_p",
 ]
 
 # Assets that are not one picture. `walk_mei` is four frames in a row; the

@@ -208,7 +208,16 @@ pub fn quest_get(
     let quest_id = str_field(payload, "quest_id")?;
     let conn = state.store.conn();
     let (quest, quest_state, row) = readable_quest(&conn, address, &quest_id)?;
-    Ok(json!({ "quest": quest.to_wire(quest_state, row.stars, row.hints_used) }))
+    // PROTOCOL §4.8b: opening a timed quest starts its clock, once. Untimed
+    // quests never get one — there is nothing for it to count down to.
+    let opened_at = if quest.time_limit_s.is_some() {
+        progress::open_clock(&conn, address, &quest_id)?
+    } else {
+        None
+    };
+    Ok(json!({
+        "quest": quest.to_wire(quest_state, row.stars, row.hints_used, opened_at.as_deref())
+    }))
 }
 
 /// §4.10. Taking a hint is permanent and costs stars; taking the same one
@@ -250,6 +259,8 @@ pub fn quest_reset(
     let address = session.address()?;
     let quest_id = str_field(payload, "quest_id")?;
     let conn = state.store.conn();
+    // §4.8b: resetting the editor is not a new attempt at the interview, so
+    // the clock is deliberately untouched here.
     let (quest, _, _) = readable_quest(&conn, address, &quest_id)?;
     Ok(json!({ "starter": quest.starter }))
 }

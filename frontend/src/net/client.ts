@@ -300,6 +300,9 @@ export class Client {
   // -- requests ------------------------------------------------------------
 
   /** §3.1: exactly four messages are accepted on an ANONYMOUS connection. */
+  /** The calls that compile something. See the timeout in `request`. */
+  private static readonly SLOW = new Set(["quest.submit", "quest.run", "playground.run"]);
+
   private static readonly PREAUTH = new Set([
     "ping",
     "auth.challenge",
@@ -331,7 +334,12 @@ export class Client {
     }
 
     const id = this.nextId();
-    const ms = type === "quest.submit" ? SUBMIT_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
+    // Every call that puts a compiler behind it gets the long budget, not just
+    // the one that records a verdict: `quest.run` and `playground.run` are the
+    // same runner as a submit, and a cold `cargo` build that finished at 70
+    // seconds would otherwise be reported to the player as a run that never
+    // came back.
+    const ms = Client.SLOW.has(type) ? SUBMIT_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
     return new Promise<Responses[K]>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);

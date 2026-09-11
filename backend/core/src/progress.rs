@@ -45,13 +45,17 @@ pub struct Row {
     pub attempts: i64,
     pub hints_used: i64,
     pub first_clear_at: Option<String>,
+    /// When this player first opened the quest, on a timed one (PROTOCOL
+    /// §4.8b). `None` on an untimed quest, and on one cleared before the clock
+    /// existed — which is not invented after the fact.
+    pub opened_at: Option<String>,
     pub cleared: bool,
 }
 
 pub fn get(conn: &Connection, address: &str, quest_id: &str) -> Result<Row> {
     let row = conn
         .query_row(
-            "SELECT state, stars, best_ms, attempts, hints_used, first_clear_at
+            "SELECT state, stars, best_ms, attempts, hints_used, first_clear_at, opened_at
                FROM progress WHERE address = ?1 AND quest_id = ?2",
             params![address, quest_id],
             |r| {
@@ -63,6 +67,7 @@ pub fn get(conn: &Connection, address: &str, quest_id: &str) -> Result<Row> {
                     attempts: r.get(3)?,
                     hints_used: r.get(4)?,
                     first_clear_at: r.get(5)?,
+                    opened_at: r.get(6)?,
                 })
             },
         )
@@ -89,6 +94,49 @@ pub fn derive_state(quest_id: &str, cleared: &HashSet<String>) -> State {
     } else {
         State::Open
     }
+}
+
+/// Start the clock, once (PROTOCOL §4.8b).
+///
+/// The first `quest.get` on a timed quest stamps it; every later one returns
+/// the same stamp, so a reload, a reconnect or a second window shows one clock
+/// rather than a fresh one. `COALESCE` is what makes that true even if two
+/// windows ask at the same moment.
+///
+/// A quest already cleared does not start one: its clock is done, and
+/// replaying it for practice is untimed.
+pub fn open_clock(conn: &Connection, address: &str, quest_id: &str) -> Result<Option<String>> {
+    let row = get(conn, address, quest_id)?;
+    if row.cleared {
+        return Ok(row.opened_at);
+    }
+    ensure_row(conn, address, quest_id)?;
+    let now = now_stamp();
+    conn.execute(
+        "UPDATE progress SET opened_at = COALESCE(opened_at, ?3), updated_at = ?4
+          WHERE address = ?1 AND quest_id = ?2",
+        params![address, quest_id, now, now],
+    )?;
+    Ok(get(conn, address, quest_id)?.opened_at)
+}
+
+/// `opened_at + time_limit_s`, when there is one of each.
+pub fn deadline(opened_at: Option<&str>, time_limit_s: Option<i64>) -> Option<String> {
+    let opened = crate::time::parse(opened_at?)?;
+    Some(crate::time::stamp(
+        opened + chrono::Duration::seconds(time_limit_s?.max(0)),
+    ))
+}
+
+/// Whether a submit arriving now is inside the clock. `None` on an untimed
+/// quest, and on one whose clock never started.
+///
+/// The clock blocks nothing: a late submit is judged exactly like an early
+/// one and simply is not `within_limit`.
+pub fn within_limit(opened_at: Option<&str>, time_limit_s: Option<i64>) -> Option<bool> {
+    let deadline = deadline(opened_at, time_limit_s)?;
+    let deadline = crate::time::parse(&deadline)?;
+    Some(crate::time::now() <= deadline)
 }
 
 fn ensure_row(conn: &Connection, address: &str, quest_id: &str) -> Result<()> {

@@ -48,6 +48,7 @@ local SFX = require("src.sfx")
 local Editor = require("src.editor")
 local runlog = require("src.net.runlog")
 local External = require("src.external")
+local Anim = require("src.anim")
 
 local Quest = {}
 Quest.__index = Quest
@@ -229,6 +230,7 @@ function Quest:execute(mode)
       -- player to a result screen after every RUN would make the reflex
       -- button feel expensive.
       self.run_attempt = attempt
+      self.run_at = Anim.now()
       self.show_log = true
       return
     end
@@ -660,6 +662,16 @@ function Quest:draw_run_outcome(x, y, w)
 
   local h = 30 + #note_lines * 10
   local sy = y - h - 6
+  -- A failed run shakes the strip — and **only** the strip. The editor is
+  -- where somebody is reading their own program, and nothing on this screen
+  -- may make that harder; shaking the code would be the worst thing this
+  -- whole round could ship.
+  local shx, shy = 0, 0
+  if not passed and self.run_at then
+    shx, shy = Anim.shake(Anim.now() - self.run_at, { duration = 0.3, amount = 4 })
+  end
+  love.graphics.push()
+  love.graphics.translate(shx, shy)
   local tint = passed and Theme.cyan or (Theme.verdict[a.verdict] or Theme.brick)
   UI.setColor(Theme.ink, 0.96)
   love.graphics.rectangle("fill", x, sy, w, h)
@@ -690,6 +702,7 @@ function Quest:draw_run_outcome(x, y, w)
   for i, line in ipairs(note_lines) do
     UI.text(line, x + 12, sy + 24 + (i - 1) * 10, 7, Theme.withAlpha(Theme.cream, 0.75))
   end
+  love.graphics.pop()
 end
 
 -- -------------------------------------------------------------------- input

@@ -855,3 +855,63 @@ list.
 * **`CLEAR` is orphaned onto its own row** under `ENTER` / `NEW WALLET` /
   `STORY` (`10-login-landscape.png`). Four buttons wrapping 3+1 looks like a
   layout accident; `CLEAR` is also the least important of the four.
+
+---
+
+## 2.10 The playground — what I decided, and what I deliberately did not make
+
+READ `docs/decisions.md`, "The playground, and why it is the opposite of RUN":
+*"no quest, no tests, no verdict… it is where somebody deliberately writes
+something broken to find out what the compiler says. That is the last thing
+that should be counted against them."*
+
+Every other backdrop in this game is a **place in Causeway Bay with a problem in
+it** — a till that takes orders it cannot fill, a platform where two counters
+disagree, a room with a clock. If the playground got another one, it would be
+another job, and the one screen that is not a job would stop reading as one.
+
+So the playground is **Mei's own desk** — the room the game opens in
+(`open_flat`), returned to in the afternoon, lived in, with the mug half drunk
+and a shirt on the drying rack. The narrative fit is exact: the game opens with
+her sitting in that room unable to write a `for` loop, and the playground is
+that same room with nothing at stake, where she can write anything she likes and
+no one is counting. A player who has seen the opening will recognise it without
+being told.
+
+`bg_playground` and `bg_playground_p`. **Two assets, and deliberately nothing
+else** — no emblem, no badge, no stamp, no ornament. The playground's identity
+is *absence*: no score, no clock, no verdict, no antagonist. Furniture that
+decorated it would be arguing with the only thing that makes it different.
+
+**One design note that is FE's, not mine.** Since nothing here is scored, the
+playground's compiler output must not speak in the failure register. A red
+`WRONG ANSWER` treatment on a scratchpad punishes the exact behaviour the
+decision says the scratchpad exists for. Compiler output here is *information* —
+`Theme.cream` on the panel, the error code in `Theme.coin` — and the word
+"wrong" should not appear on this screen at all.
+
+## 2.11 Badges — blocked, and what I need to start
+
+PROTOCOL §4.20 defines the `award` envelope (`kind` ∈ `badge | stamp | level |
+streak`), but `docs/decisions.md` carries no badge *set* — no ids, no list, no
+rule for what earns one. I have not drawn any, which is the instruction and also
+the right call: fourteen badges drawn against a set that turns out to be nine is
+waste, and worse, a drawn badge with no rule behind it invites someone to invent
+an achievement to justify the art.
+
+What I need is just the list: **an id, a one-line earn rule, and roughly how
+many**. From that the visual system follows.
+
+What I can say now, so the list can be sized against it. These are drawn small,
+in a row, several at once, so **distinguishability at 48px is the binding
+constraint, not beauty at 256px** — six gold discs is one badge repeated. That
+gives a practical ceiling of about **eight to ten** badges before silhouettes
+start colliding, and it argues for badges that differ by *shape* first and
+colour second: a rosette, a shield, a bar, a ring, a chevron, a star, a
+hexagon — each recognisable as a blob. If the set runs longer than ten, the
+right move is families (one shape per land or per category, varying by tier)
+rather than ten unrelated objects, and I would want to know that before drawing
+the first one.
+
+The two badges that already exist — `badge_cleared` and `badge_locked` — were
+made for the category rows and are deliberately not part of any award set.

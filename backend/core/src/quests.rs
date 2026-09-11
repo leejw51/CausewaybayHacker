@@ -44,6 +44,7 @@ impl Quest {
         state: crate::progress::State,
         stars: i64,
         hints_used: i64,
+        opened_at: Option<&str>,
     ) -> serde_json::Value {
         let cleared = state == crate::progress::State::Cleared;
         let mut value = serde_json::json!({
@@ -62,6 +63,10 @@ impl Quest {
             "hints_used": hints_used,
             "state": state,
             "stars": stars,
+            // PROTOCOL §4.8b: the same pair every time, so a reload shows one
+            // clock rather than a fresh one. Both null on an untimed quest.
+            "opened_at": opened_at,
+            "deadline_at": crate::progress::deadline(opened_at, self.time_limit_s),
             "tests": self.tests_wire(),
         });
         if cleared {

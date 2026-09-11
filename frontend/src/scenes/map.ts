@@ -776,7 +776,11 @@ export class MapScene implements Scene {
     footer(
       g,
       layout,
-      "←→  STREET   ENTER  GO IN   TAB  LAND   Q/E  CATEGORY   ESC  BACK   F3  LOG OUT",
+      // ESC is not in this line any more: ALL MAPS is a visible button that
+      // does the same thing, which was the point of adding it. F1 is, because
+      // the orientation toggle is the thing a player on a phone reaches for and
+      // this is the screen they are on when they want it.
+      "←→  STREET   ENTER  GO IN   TAB  LAND   Q/E  CATEGORY   F1  ORIENTATION   F3  LOG OUT",
     );
   }
 

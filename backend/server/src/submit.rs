@@ -138,11 +138,11 @@ pub fn run(
     }
     // No gate: every node is playable (PROTOCOL §4.7). The only reason to
     // refuse here is that the quest does not exist.
-    let (quest, was_cleared) = {
+    let (quest, was_cleared, opened_at) = {
         let conn = state.store.conn();
         let quest = quests::get(&conn, &quest_id)?;
-        let cleared = progress::get(&conn, address, &quest_id)?.cleared;
-        (quest, cleared)
+        let row = progress::get(&conn, address, &quest_id)?;
+        (quest, row.cleared, row.opened_at)
     };
     let lang = opt_str_field(payload, "lang").unwrap_or_else(|| quest.land.clone());
     if lang != quest.land {
@@ -254,6 +254,15 @@ pub fn run(
     record.stderr = human_stderr.clone();
     record.tests_passed = report.tests_passed;
     record.tests_total = report.tests_total;
+    // PROTOCOL §4.8b. Only a submit carries the flag: a run never changes
+    // whether the interview was answered in time. The clock blocks nothing —
+    // a late submit is judged exactly like an early one and simply is not
+    // `within_limit`.
+    record.within_limit = if mode.is_submit() {
+        progress::within_limit(opened_at.as_deref(), quest.time_limit_s)
+    } else {
+        None
+    };
 
     let accepted = report.verdict == Verdict::Accepted;
     // §5.4: `cleared` answers "did *this* submission clear the node", so
@@ -373,6 +382,7 @@ pub fn run(
             "mistakes": found,
             "stars": stars,
             "cleared": just_cleared,
+            "within_limit": record.within_limit,
             "created_at": record.created_at,
         }
     }))

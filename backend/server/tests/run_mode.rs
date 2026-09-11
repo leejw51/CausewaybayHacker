@@ -19,6 +19,18 @@ const HELLO: &str = "fn main() { println!(\"hello, causewaybay\"); }";
 const BROKEN: &str = "fn main() { let x: i32 = \"not a number\"; println!(\"{x}\"); }";
 /// Passes `rust.basic.02.sum`'s visible case and fails its hidden one.
 const HARDCODED: &str = "fn main() { println!(\"6\"); }";
+/// The real answer to `rust.basic.02.sum`, which is a difficulty-2 quest.
+const SUM_SOLUTION: &str = r#"
+use std::io::Read;
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut parts = input.split_whitespace();
+    let n: usize = parts.next().unwrap().parse().unwrap();
+    let total: i64 = parts.take(n).map(|t| t.parse::<i64>().unwrap()).sum();
+    println!("{total}");
+}
+"#;
 
 type Socket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
@@ -458,9 +470,13 @@ async fn a_clear_earns_something_and_the_shelf_remembers() {
         awarded.contains(&("badge".into(), "first-clear".into())),
         "a first clear earned no badge: {awarded:?}"
     );
+    // A three-star clear on a difficulty-1 basic quest is 75 xp, and level 2
+    // begins at 100 — so the first clear is a badge and not yet a level. That
+    // is the curve doing its job rather than an oversight, and asserting it
+    // here keeps the two in step.
     assert!(
-        awarded.iter().any(|(kind, _)| kind == "level"),
-        "75 xp is level 2 and nobody said so: {awarded:?}"
+        !awarded.iter().any(|(kind, _)| kind == "level"),
+        "the first clear should not be a level-up at 75 xp: {awarded:?}"
     );
 
     // The shelf, for a client that missed the fanfare.
@@ -472,7 +488,6 @@ async fn a_clear_earns_something_and_the_shelf_remembers() {
         .map(|a| a["id"].as_str().unwrap())
         .collect();
     assert!(ids.contains(&"first-clear"), "{shelf}");
-    assert!(ids.contains(&"level-2"), "{shelf}");
     // The per-clear stamp is not on the shelf: it fires every time a node
     // turns gold, and is not something a player "has".
     assert!(!ids.contains(&"cleared"), "{shelf}");
@@ -495,8 +510,26 @@ async fn a_clear_earns_something_and_the_shelf_remembers() {
     // And the user's level and xp travel with them.
     let user = client.ok("profile.update", json!({})).await["user"].clone();
     assert_eq!(user["xp"].as_i64(), Some(75), "{user}");
+    assert_eq!(user["level"].as_i64(), Some(1));
+    assert_eq!(user["xp_into_level"].as_i64(), Some(75));
+    assert_eq!(user["xp_for_next"].as_i64(), Some(100));
+
+    // The second clear — a difficulty-2 quest, so 150 xp — crosses it, and
+    // the level-up is announced.
+    client.events.clear();
+    client
+        .execute("quest.submit", "rust.basic.02.sum", SUM_SOLUTION)
+        .await;
+    let levels: Vec<&str> = client
+        .events
+        .iter()
+        .filter(|e| e["type"] == "award" && e["payload"]["kind"] == "level")
+        .map(|e| e["payload"]["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(levels, vec!["level-2"], "{:?}", client.events);
+    let user = client.ok("profile.update", json!({})).await["user"].clone();
+    assert_eq!(user["xp"].as_i64(), Some(225));
     assert_eq!(user["level"].as_i64(), Some(2));
-    assert!(user["xp_into_level"].is_number());
     server.handle.abort();
 }
 

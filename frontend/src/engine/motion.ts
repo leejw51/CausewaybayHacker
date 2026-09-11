@@ -56,6 +56,10 @@ const BASE = {
   /** A star appearing, and the gap between them. */
   star: 0.38,
   starStagger: 0.13,
+  /** The clock arriving when a timed quest opens. */
+  clock: 0.66,
+  /** One beat of the clock reacting: a threshold crossed, or time running out. */
+  clockBeat: 0.9,
 } as const;
 
 export type Beat = keyof typeof BASE;
@@ -190,4 +194,37 @@ export class Chase {
  */
 export function slideIn(t: Tween, distance: number): number {
   return (1 - t.out) * distance;
+}
+
+/**
+ * The countdown's thresholds, in seconds remaining.
+ *
+ * Here rather than in the quest scene because they are part of the same
+ * vocabulary as the durations above: "a minute left" is a beat of this game's
+ * motion, and a screen that invented its own number would drift from the next
+ * screen that does the same.
+ */
+export const CLOCK = {
+  /** It starts paying attention. */
+  warn: 60,
+  /** It means it. */
+  urgent: 30,
+} as const;
+
+/**
+ * How hard the clock is pulsing right now, 0..1, for `left` seconds remaining
+ * and `since` seconds after the most recent threshold was crossed.
+ *
+ * Calm for most of its life on purpose: this sits on the screen somebody is
+ * reading code on, and a countdown that animates every second is noise. The
+ * motion belongs to the moments that mean something — arriving, crossing a
+ * line, running out — and the reduced-motion scale shortens the beat rather
+ * than removing it.
+ */
+export function clockPulse(left: number, since: number): number {
+  const beat = seconds("clockBeat");
+  if (since >= beat) return 0;
+  const k = 1 - since / beat;
+  const depth = left <= 0 ? 1 : left <= CLOCK.urgent ? 0.8 : 0.55;
+  return k * k * depth;
 }
