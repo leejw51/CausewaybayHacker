@@ -191,7 +191,7 @@ return {
   -- client's — one voice across the two clients, rather than two.
   ["PRESS SPACE"] = "스페이스를 누르세요",
   ["— or any key, or a click —"] = "— 아무 키나, 클릭도 됩니다 —",
-  ["SPACE start   ANY KEY works   L language"] = "SPACE 시작   아무 키나 됩니다   L 언어",
+  ["SPACE start   ANY KEY works   F10 story   L language"] = "SPACE 시작   아무 키나 됩니다   F10 이야기   L 언어",
   ["ANY KEY  SKIP"] = "아무 키  건너뛰기",
   ["PRESS ANY KEY"] = "아무 키나 누르세요",
   ["TUESDAY, 06:40."] = "화요일, 06:40.",

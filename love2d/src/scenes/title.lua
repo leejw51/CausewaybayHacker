@@ -46,6 +46,18 @@
 -- hands are already on. `STORY` on the login screen plays the opening on
 -- purpose, as it always did.
 --
+-- ## STORY on the card too, because `make gui` never shows the login screen
+--
+-- `make gui` resumes the stored session every launch, so a returning player
+-- goes card → `lands` and never sees the login screen — and the login screen
+-- was the only place `STORY` lived. Once `story.seen` was on disk the opening
+-- was unreachable from the desktop client: SPACE went past it, and the one
+-- button that replays it was on a screen the player could no longer reach.
+-- So the card carries the same control. F10, or the small plate under the
+-- big one; it plays the opening as a replay (`{ replay = true }`) and does
+-- not touch the flag, exactly as the login screen's does. Every other key
+-- and every other click still means "start".
+--
 -- **The idle clock is wall time, not summed `dt`.** `main.lua` caps `dt` at
 -- 0.05 and macOS throttles an occluded window to a couple of frames a second,
 -- so a timer added up from `dt` runs twenty times slow — an eight-second card
@@ -95,6 +107,16 @@ function Title:start(idle)
   else
     self.app:go("story")
   end
+end
+
+--- The opening, asked for by name. See the header: this is the login
+--- screen's `STORY` on the card, for the player who never reaches the login
+--- screen. A replay, so the flag is left alone.
+function Title:watch_story()
+  if self.leaving then return end
+  self.leaving = true
+  SFX.play("select")
+  self.app:go("story", { replay = true })
 end
 
 function Title:update(dt)
@@ -157,21 +179,43 @@ function Title:draw()
   UI.text(I18n.t("— or any key, or a click —"), 0, by + bh + 18, 8,
     Theme.withAlpha(Theme.cream, 0.7), "center", w)
 
-  self.app:footer(I18n.t("SPACE start   ANY KEY works   L language"))
+  -- The way into the opening for somebody the card would otherwise send
+  -- straight past it. Small and below the fold of the plate: it is the one
+  -- control here that is not "start".
+  local slabel = I18n.t("STORY  [F10]")
+  local sw = math.max(140, UI.textWidth(slabel, 8) + 28)
+  local sh = math.max(30, UI.lineHeight(8) + 14)
+  local sx = math.floor((w - sw) / 2)
+  local sy = by + bh + 18 + UI.lineHeight(8) + 22
+  UI.button(sx, sy, sw, sh, slabel, "normal", 8)
+  self.story_rect = { x = sx, y = sy, w = sw, h = sh }
+
+  self.app:footer(I18n.t("SPACE start   ANY KEY works   F10 story   L language"))
 end
 
-function Title:keypressed()
+function Title:keypressed(key)
   -- Any key. `main.lua` has already taken the display and language keys, so
-  -- what reaches here is somebody asking to start.
+  -- what reaches here is somebody asking to start — except F10, which asks
+  -- for the opening by name.
+  if key == "f10" then
+    self:watch_story()
+    return true
+  end
   self:start(false)
   return true
 end
 
-function Title:mousepressed()
+function Title:mousepressed(x, y)
   -- Anywhere, not only on the plate. The plate exists so that a thumb and an
   -- automated run have something specific to aim at, not to make the rest of
   -- the screen dead. A press on the footer's display controls never gets
-  -- here: `App:mousepressed` tests those first and consumes them.
+  -- here: `App:mousepressed` tests those first and consumes them. The one
+  -- exception is the STORY plate, which means the opening rather than start.
+  local r = self.story_rect
+  if r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h then
+    self:watch_story()
+    return
+  end
   self:start(false)
 end
 

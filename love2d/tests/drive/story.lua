@@ -11,7 +11,8 @@
 --
 --   run 1 (fresh store)   boot → title → SPACE → story → skip → login
 --                         and `story.seen` is on disk afterwards
---   run 2 (same store)    boot → title → SPACE → login, with no story at all
+--   run 2 (same store)    boot → title → SPACE → login, with no story at all,
+--                         then title → F10 → story, the card's own way back in
 --
 -- Run 1 also presses `STORY` on the login screen, which is the way back in,
 -- and checks that using it does **not** clear the flag: watching the opening
@@ -123,6 +124,27 @@ add({ until_ = function(app)
       return true
     end, timeout = 6, when = function() return not first_run end })
 add({ shot = "S4-second-run-login.png", when = function() return not first_run end })
+
+-- The card's own way in. `make gui` resumes the session, so a returning
+-- player never reaches the login screen and its STORY button; F10 on the
+-- card is the only route left to the opening, and it must not clear the flag.
+add({ note = "back to the card, then F10", when = function() return not first_run end })
+add({ until_ = function(app) app:go("title"); return true end, timeout = 3,
+      when = function() return not first_run end })
+add({ until_ = scene("title"), note = "the card again", timeout = 5,
+      when = function() return not first_run end })
+add({ wait = 0.3, when = function() return not first_run end })
+add({ key = "f10", when = function() return not first_run end })
+add({ until_ = scene("story"), note = "F10 on the card played the opening", timeout = 5,
+      when = function() return not first_run end })
+add({ shot = "S5-story-from-card.png", when = function() return not first_run end })
+add({ key = "space", when = function() return not first_run end })
+add({ until_ = scene("login"), note = "back from the card's replay", timeout = 6,
+      when = function() return not first_run end })
+add({ until_ = function()
+      check(Store.story_seen(), "the card's replay cleared the flag, which it must not")
+      return true
+    end, timeout = 3, when = function() return not first_run end })
 
 add({ until_ = function(app)
       if fail then

@@ -197,7 +197,7 @@ return {
   -- client's — one voice across the two clients, rather than two.
   ["PRESS SPACE"] = "撳空白鍵",
   ["— or any key, or a click —"] = "— 撳邊個掣都得，撳一下都得 —",
-  ["SPACE start   ANY KEY works   L language"] = "SPACE 開始   撳邊個掣都得   L 語言",
+  ["SPACE start   ANY KEY works   F10 story   L language"] = "SPACE 開始   撳邊個掣都得   F10 故事   L 語言",
   ["ANY KEY  SKIP"] = "任何掣  跳過",
   ["PRESS ANY KEY"] = "撳任何掣",
   ["TUESDAY, 06:40."] = "星期二，06:40。",

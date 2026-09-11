@@ -212,7 +212,7 @@ return {
   -- client's — one voice across the two clients, rather than two.
   ["PRESS SPACE"] = "STISKNI MEZERNÍK",
   ["— or any key, or a click —"] = "— nebo jakoukoli klávesu, nebo klikni —",
-  ["SPACE start   ANY KEY works   L language"] = "SPACE start   JAKÁKOLI KLÁVESA   L jazyk",
+  ["SPACE start   ANY KEY works   F10 story   L language"] = "SPACE start   JAKÁKOLI KLÁVESA   F10 příběh   L jazyk",
   ["ANY KEY  SKIP"] = "JAKÁKOLI KLÁVESA  PŘESKOČIT",
   ["PRESS ANY KEY"] = "STISKNI JAKOUKOLI KLÁVESU",
   ["TUESDAY, 06:40."] = "ÚTERÝ, 06:40.",
