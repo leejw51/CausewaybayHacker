@@ -23,6 +23,7 @@ import {
   btnBox,
   clipped,
   fill,
+  inRect,
   panel,
   pixBtn,
   rowsIn,
@@ -97,6 +98,14 @@ export class PlaygroundScene implements Scene {
   private result: PlaygroundRun | null = null;
   /** What the *run* said. The output panel is its and nothing else's. */
   private status = "";
+  /**
+   * Lines back from the tail, not an absolute index — so the window keeps
+   * showing the same *moment* as more output arrives, the way `quest.ts`'s
+   * console scrollback does. 0 is "live", at the bottom.
+   */
+  private outputScroll = 0;
+  private outputOverflow = 0;
+  private outputRect: Rect = [0, 0, 0, 0];
   /**
    * What *saving* said, kept apart from `status` on purpose: an autosave that
    * fires two seconds after a keystroke must never overwrite the reason a run
@@ -452,12 +461,27 @@ export class PlaygroundScene implements Scene {
     this.t += dt;
     this.benchIn.update(dt);
     this.listIn.update(dt);
+    // Clamped here rather than in the wheel handler, for the same reason
+    // quest.ts clamps briefScroll here: the overflow is only known after a
+    // frame has laid the lines out, and it changes as output streams in.
+    this.outputScroll = Math.max(0, Math.min(this.outputScroll, this.outputOverflow));
     if (this.dirty) {
       this.dirtyFor += dt;
       if (this.dirtyFor >= AUTOSAVE_AFTER) {
         this.dirtyFor = 0;
         void this.save();
       }
+    }
+  }
+
+  wheel(dy: number, x: number, y: number): void {
+    if (inRect(x, y, this.outputRect)) {
+      // Same convention as the quest console: positive dy is "further into
+      // the past", so it *increases* how far back from the live tail we are.
+      this.outputScroll = Math.max(
+        0,
+        Math.min(this.outputOverflow, this.outputScroll - Math.round(dy / 8)),
+      );
     }
   }
 
@@ -794,6 +818,7 @@ export class PlaygroundScene implements Scene {
     }
 
     well(g, x, ty, w, Math.max(16, y + h - ty), [0.04, 0.03, 0.1, 0.98]);
+    this.outputRect = [x, ty, w, y + h - ty];
     const lineH = fonts.codeSm.height;
     const room = Math.max(1, Math.floor((y + h - ty - pad * 2) / lineH));
     const out: Array<[string, readonly [number, number, number, number]]> = [];
@@ -810,11 +835,20 @@ export class PlaygroundScene implements Scene {
       for (const l of this.log.lines)
         out.push([l.text, l.stream === "stderr" ? Theme.red : Theme.dim]);
     if (out.length === 0) {
+      this.outputOverflow = 0;
       g.fillStyle = css(Theme.dim);
       printf(g, fonts.codeSm, t("pg.nothingRun"), x + pad * 2, ty + pad, w - pad * 4, "left");
       return;
     }
-    const shown = out.slice(Math.max(0, out.length - room));
+    // `outputScroll` counts lines back from the tail (0 = live), so the same
+    // *moment* stays on screen as more output streams in, rather than an
+    // absolute index that would silently point somewhere else. This is the
+    // fix for "cannot scroll" — the panel used to always show only the tail,
+    // with nothing to move that window and no wheel handler to move it.
+    this.outputOverflow = Math.max(0, out.length - room);
+    const scroll = Math.min(this.outputScroll, this.outputOverflow);
+    const end = out.length - scroll;
+    const shown = out.slice(Math.max(0, end - room), end);
     clipped(g, x, ty, w, y + h - ty, () => {
       let ly = ty + pad;
       for (const [text, col] of shown) {
@@ -823,6 +857,16 @@ export class PlaygroundScene implements Scene {
         ly += lineH;
       }
     });
+    if (this.outputOverflow > 0) {
+      // Same widget as the quest console's brief scrollbar: a track the full
+      // height of the well, a thumb sized and placed by how much is hidden —
+      // a panel that can scroll and does not say so is a panel nobody finds.
+      const trackH = y + h - ty;
+      const thumbH = Math.max(12, (trackH * trackH) / (trackH + this.outputOverflow * lineH));
+      const frac = 1 - scroll / this.outputOverflow;
+      fill(g, Theme.ink, x + w - 4, ty, 4, trackH, 0.5);
+      fill(g, Theme.coin, x + w - 4, ty + (trackH - thumbH) * frac, 4, thumbH);
+    }
   }
 
   private stageLabel(): string {
