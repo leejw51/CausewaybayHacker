@@ -1572,12 +1572,14 @@ map          = { x = 0.045, y = 0.931, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
-Print three lines:
+Print four lines:
 
 1. `CELL <k>` — a `Cell<usize>` bumped once per value, read back with `.get()`,
    all through a plain `&` reference
-2. `REF <sum>` — a `RefCell<Vec<i64>>` filled with the values and summed
-3. `DOUBLE panic` — take two `borrow_mut()` on the same `RefCell` at the same
+2. `REF <sum>` — a ledger filled with the values and summed
+3. `RC <k>` — the ledger is an `Rc<RefCell<Vec<i64>>>` and you hold **two**
+   handles to it; print `Rc::strong_count` while both are alive
+4. `DOUBLE panic` — take two `borrow_mut()` on the same `RefCell` at the same
    time, deliberately, and catch the panic with `std::panic::catch_unwind`
 
 ```
@@ -1585,6 +1587,7 @@ input:  3
         1 2 3
 output: CELL 3
         REF 6
+        RC 2
         DOUBLE panic
 ```
 
@@ -1594,6 +1597,14 @@ moves whole values in and out, so it needs no checking at all; `RefCell` hands
 out real references and therefore has to enforce the borrow rules — at run
 time, with a panic, instead of at compile time with an error.
 
+`Rc<RefCell<T>>` is the pair everyone eventually reaches for, and it is worth
+being able to say what each half does. `Rc` gives the value more than one
+owner — a non-atomic refcount, so it is not `Send` and does not cross a thread
+(that was the `send-sync` map). `RefCell` gives those owners the right to
+mutate. Neither is a `Mutex`. Shared **and** mutable is exactly what the
+borrow checker refuses at compile time, so this pattern buys it back at run
+time and charges you a panic when you get it wrong.
+
 That panic is not a bug in the quest. It is the price, and seeing it once is
 the point.
 '''
@@ -1601,6 +1612,7 @@ starter     = '''
 use std::cell::{Cell, RefCell};
 use std::io::Read;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::rc::Rc;
 
 fn bump(counter: &Cell<usize>) {
     let _ = counter;
@@ -1617,12 +1629,14 @@ fn main() {
         .collect();
 
     let counter = Cell::new(0usize);
-    let ledger = RefCell::new(Vec::<i64>::new());
+    let ledger: Rc<RefCell<Vec<i64>>> = Rc::new(RefCell::new(Vec::new()));
 
+    // take a second handle to the ledger, fill it, then report on both
     let _ = (&counter, &ledger, &nums, bump);
     let _ = catch_unwind(AssertUnwindSafe(|| {}));
     println!("CELL 0");
     println!("REF 0");
+    println!("RC 0");
     println!("DOUBLE ok");
 }
 '''
@@ -1630,6 +1644,7 @@ solution    = '''
 use std::cell::{Cell, RefCell};
 use std::io::Read;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::rc::Rc;
 
 fn bump(counter: &Cell<usize>) {
     counter.set(counter.get() + 1);
@@ -1645,7 +1660,9 @@ fn main() {
         .collect();
 
     let counter = Cell::new(0usize);
-    let ledger = RefCell::new(Vec::<i64>::new());
+    let ledger: Rc<RefCell<Vec<i64>>> = Rc::new(RefCell::new(Vec::new()));
+    // a second owner of the same ledger; the clone is the handle, not the data
+    let mirror = Rc::clone(&ledger);
 
     for &value in &nums {
         bump(&counter);
@@ -1653,11 +1670,13 @@ fn main() {
     }
 
     println!("CELL {}", counter.get());
-    println!("REF {}", ledger.borrow().iter().sum::<i64>());
+    // read through the other handle: same Vec, same contents
+    println!("REF {}", mirror.borrow().iter().sum::<i64>());
+    println!("RC {}", Rc::strong_count(&ledger));
 
     let outcome = catch_unwind(AssertUnwindSafe(|| {
         let _first = ledger.borrow_mut();
-        let _second = ledger.borrow_mut();
+        let _second = mirror.borrow_mut();
     }));
     println!("DOUBLE {}", if outcome.is_err() { "panic" } else { "ok" });
 }
@@ -1666,6 +1685,7 @@ hints = [
   "Cell has no borrow(): you get() a copy out and set() a whole value in. That is why it needs no runtime bookkeeping.",
   "ledger.borrow_mut().push(v) as one statement lets the guard drop at the semicolon, which is what keeps the loop legal.",
   "catch_unwind needs AssertUnwindSafe around the closure because it captures a &RefCell; the panic message still goes to stderr, which the tests do not read.",
+  "Rc::clone(&ledger) is spelled that way rather than .clone() so a reader can see it copies a handle and not the Vec. Rc::strong_count reads 2 while both handles are alive, and the two borrow_mut() in the panic test can come one from each handle — they are the same RefCell, and it counts them together.",
 ]
 
 [quest.tests]
@@ -1675,10 +1695,10 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "three", stdin = "3\n1 2 3\n",        expect = "CELL 3\nREF 6\nDOUBLE panic\n",    visible = true },
-  { name = "one",   stdin = "1\n-5\n",           expect = "CELL 1\nREF -5\nDOUBLE panic\n",   visible = false },
-  { name = "none",  stdin = "0\n",               expect = "CELL 0\nREF 0\nDOUBLE panic\n",    visible = false },
-  { name = "four",  stdin = "4\n10 20 30 40\n",  expect = "CELL 4\nREF 100\nDOUBLE panic\n",  visible = false },
+  { name = "three", stdin = "3\n1 2 3\n",        expect = "CELL 3\nREF 6\nRC 2\nDOUBLE panic\n",    visible = true },
+  { name = "one",   stdin = "1\n-5\n",           expect = "CELL 1\nREF -5\nRC 2\nDOUBLE panic\n",   visible = false },
+  { name = "none",  stdin = "0\n",               expect = "CELL 0\nREF 0\nRC 2\nDOUBLE panic\n",    visible = false },
+  { name = "four",  stdin = "4\n10 20 30 40\n",  expect = "CELL 4\nREF 100\nRC 2\nDOUBLE panic\n",  visible = false },
 ]
 
 # ---------------------------------------------------------------- 14

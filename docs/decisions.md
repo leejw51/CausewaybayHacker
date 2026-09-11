@@ -4517,7 +4517,11 @@ the bare key is a character the player types and no global takes it with ctrl.
   with the band drawn the way `categories.lua` worked out — own aspect, as tall
   as the row, anchored right, short fade on its left edge, words in their own
   gutter. It also makes the screen look like the lands and category screens,
-  which are the same idea.
+  which are the same idea. **Without `categories.lua`'s left-edge fade**: that
+  fade exists to hide a hard cut, and these three emblems carry 20 to 50 pixels
+  of their own transparent margin (`minx` 21, 48 and 31 of 384, in the
+  manifest). Painted over empty canvas it was a darker bar with a hard edge of
+  its own. Copied the pattern, looked at it, and took half of it back out.
 * **`fg_wires` was drawn and then taken out.** It is a foreground layer for an
   *elevation* — a street seen from the side — and every full-screen plate in
   this client is either a top-down town or a room. Slung across the map it
@@ -4550,8 +4554,8 @@ now, in both scenes.
 
 ### Numbers
 
-`make test-headless` 233 cases / 4714 assertions → **265 / 4846**. Under LÖVE,
-`make test` is **280 / 4943**. `make ffi-test`, `make lint` and
+`make test-headless` 233 cases / 4714 assertions → **265 / 4841**. Under LÖVE,
+`make test` is **280 / 4938**. `make ffi-test`, `make lint` and
 `make check-layering` green; `src/editor.lua` is still LÖVE-free, which is what
 the injected `measure` is for.
 
@@ -4697,3 +4701,27 @@ is the first intended use of the resolved rule, and the script now accepts it.
 **Not mine, so flagged rather than fixed:** `backend/runner/tests/cargo_harness.rs`
 has one failing test, `an_ignored_test_has_not_passed`. It belongs to the
 harness agent.
+
+## 2026-09-11 — QA: a content edit showed up as a stale fixture, which is the design working
+
+`go.advanced.09.errors-in-flight`'s starter used to fail to compile with
+`imported and not used`, and was one of the six real-content cases in
+`tests/vectors/mistakes/`. PM fixed the starter. The next `--check` went
+`verified: false` with *"expected a compile failure; it compiled"*.
+
+That is the fixture working exactly as intended. Those six cases read the
+`starter` out of `content/**` **at generate time** rather than copying it, so
+a content edit surfaces as a stale claim instead of a test quietly checking a
+file nobody ships any more. A copy would still be green today and would be
+testing nothing.
+
+Replaced with `go.advanced.12.chan-directions`, which is now the **only** Go
+starter in the shipped content that still fails to compile — an `invalid
+operation: cannot send to receive-only channel`, which §7.1 files under
+`type-mismatch`, Go's E0308 row. The Go verifier accepts both shapes of that
+lesson now (`cannot use X as Y value` and the directional-channel form).
+
+Worth knowing for whoever edits Go content next: the classifier's real-input
+coverage on the Go side now rests on that one quest. If its starter is ever
+fixed too, the six-case set loses its Go half and the row should be replaced
+rather than dropped.

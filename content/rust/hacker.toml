@@ -394,27 +394,24 @@ fn main() {
         reached = 1;
     }
 
+    const STEPS: [(i64, i64); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+
     while let Some((r, c)) = queue.pop_front() {
-        let here = dist[r][c];
-        let mut step = |nr: usize, nc: usize, q: &mut VecDeque<(usize, usize)>,
-                        d: &mut Vec<Vec<i64>>, seen: &mut usize| {
-            if grid[nr][nc] == b'.' && d[nr][nc] < 0 {
-                d[nr][nc] = here + 1;
-                *seen += 1;
-                q.push_back((nr, nc));
+        let next = dist[r][c] + 1;
+        for (dr, dc) in STEPS {
+            // signed arithmetic on purpose: r is a usize, and r - 1 at r == 0
+            // panics in debug and wraps to a gigantic index in release
+            let (nr, nc) = (r as i64 + dr, c as i64 + dc);
+            if nr < 0 || nr >= rows as i64 || nc < 0 || nc >= cols as i64 {
+                continue;
             }
-        };
-        if r > 0 {
-            step(r - 1, c, &mut queue, &mut dist, &mut reached);
-        }
-        if r + 1 < rows {
-            step(r + 1, c, &mut queue, &mut dist, &mut reached);
-        }
-        if c > 0 {
-            step(r, c - 1, &mut queue, &mut dist, &mut reached);
-        }
-        if c + 1 < cols {
-            step(r, c + 1, &mut queue, &mut dist, &mut reached);
+            let (nr, nc) = (nr as usize, nc as usize);
+            if grid[nr][nc] != b'.' || dist[nr][nc] >= 0 {
+                continue;
+            }
+            dist[nr][nc] = next;
+            reached += 1;
+            queue.push_back((nr, nc));
         }
     }
 
@@ -426,6 +423,7 @@ hints = [
   "A VecDeque used as a queue is the whole difference between BFS and DFS here.",
   "Mark a cell when you push it, not when you pop it, or it goes into the queue several times.",
   "The distance grid doubles as the visited set: -1 means not seen yet, so you need no second structure.",
+  "One array of the four offsets beats four copies of the body. Compute the neighbour in i64 and bounds-check before you cast back: row and column are usize, and `r - 1` when `r` is 0 panics in a debug build and wraps to about 1.8e19 in a release one.",
 ]
 
 [quest.tests]
@@ -659,6 +657,7 @@ cases = [
   { name = "descending", stdin = "3\n5 4 3\n",       expect = "-1 -1 -1\nNONE 3\n",        visible = false },
   { name = "ascending",  stdin = "5\n1 2 3 4 5\n",   expect = "2 3 4 5 -1\nNONE 1\n",      visible = false },
   { name = "plateau",    stdin = "6\n2 2 2 1 3 1\n", expect = "3 3 3 3 -1 -1\nNONE 2\n",   visible = false },
+  { name = "single",     stdin = "1\n5\n",           expect = "-1\nNONE 1\n",              visible = false },
 ]
 
 # ---------------------------------------------------------------- 07
@@ -801,9 +800,14 @@ output: bus
         DISTINCT 3
 ```
 
-Count with a hash map, then rank. The tie-break is not decoration — a sort
-that is not stable on it gives a different answer on a different machine, and
-this is the question where that gets noticed.
+Count with a hash map, then rank. The tie-break is not decoration. A
+`HashMap` hands its entries out in an order that is randomised per process, so
+a comparator that looks only at the count leaves equal-count words in whatever
+order the map happened to produce — the same program prints a different answer
+on the next run, and no amount of sort *stability* saves it, because the input
+to the sort was already arbitrary. Making the comparison **total** — count
+descending, then the word ascending — is what fixes it, and it is the answer
+the interviewer is listening for.
 '''
 starter      = '''
 use std::collections::HashMap;
@@ -1580,7 +1584,7 @@ fn main() {
 solution     = '''
 use std::io::Read;
 
-fn search(grid: &mut Vec<Vec<u8>>, r: usize, c: usize, word: &[u8], at: usize) -> bool {
+fn search(grid: &mut [Vec<u8>], r: usize, c: usize, word: &[u8], at: usize) -> bool {
     if grid[r][c] != word[at] {
         return false;
     }
@@ -1591,21 +1595,12 @@ fn search(grid: &mut Vec<Vec<u8>>, r: usize, c: usize, word: &[u8], at: usize) -
     let here = grid[r][c];
     grid[r][c] = b'#';
 
-    let rows = grid.len();
-    let cols = grid[0].len();
-    let mut found = false;
-    if r > 0 && search(grid, r - 1, c, word, at + 1) {
-        found = true;
-    }
-    if !found && r + 1 < rows && search(grid, r + 1, c, word, at + 1) {
-        found = true;
-    }
-    if !found && c > 0 && search(grid, r, c - 1, word, at + 1) {
-        found = true;
-    }
-    if !found && c + 1 < cols && search(grid, r, c + 1, word, at + 1) {
-        found = true;
-    }
+    // `||` short-circuits, so the first direction that spells the rest of the
+    // word stops the other three from being tried at all
+    let found = (r > 0 && search(grid, r - 1, c, word, at + 1))
+        || (r + 1 < grid.len() && search(grid, r + 1, c, word, at + 1))
+        || (c > 0 && search(grid, r, c - 1, word, at + 1))
+        || (c + 1 < grid[r].len() && search(grid, r, c + 1, word, at + 1));
 
     grid[r][c] = here;
     found
@@ -1623,22 +1618,13 @@ fn main() {
         .collect();
     let word = lines.next().unwrap().as_bytes().to_vec();
 
-    let mut starts = 0usize;
-    let mut found = false;
-    for r in 0..rows {
-        for c in 0..cols {
-            if grid[r][c] == word[0] {
-                starts += 1;
-            }
-        }
-    }
-    for r in 0..rows {
-        for c in 0..cols {
-            if search(&mut grid, r, c, &word, 0) {
-                found = true;
-            }
-        }
-    }
+    // count the starting letters before any cell is marked
+    let starts = grid.iter().flatten().filter(|&&cell| cell == word[0]).count();
+
+    // stop at the first cell the word spells out from; `any` short-circuits
+    let found = (0..rows)
+        .flat_map(|r| (0..cols).map(move |c| (r, c)))
+        .any(|(r, c)| search(&mut grid, r, c, &word, 0));
 
     println!("{}", if found { "FOUND" } else { "ABSENT" });
     println!("STARTS {}", starts);
@@ -1648,6 +1634,7 @@ hints = [
   "Overwrite the cell with a character the word cannot contain, recurse, then put the original back.",
   "Count the starting letters in a separate pass before you search, or the '#' marks will confuse the count.",
   "The success base case is `at + 1 == word.len()` — checked after matching this cell, not before.",
+  "Chain the four directions with `||` rather than four ifs and a `found` flag: `||` already stops at the first branch that succeeds, and so does `any` over the starting cells. Carrying on after a hit is work you were asked not to do.",
 ]
 
 [quest.tests]
@@ -2063,7 +2050,8 @@ concepts     = ["dynamic-programming", "strings", "matrix"]
 requires     = ["rust.hacker.17.lis"]
 map          = { x = 0.529, y = 0.468, kind = "quest" }
 brief        = '''
-Two lines, one word each, lowercase.
+Two lines, one word each, lowercase. Either line may be **empty**, and then
+the answer is the length of the other one.
 
 Print the **edit distance**: the fewest single-character insertions,
 deletions or substitutions that turn the first into the second. Then print
@@ -2159,6 +2147,7 @@ cases = [
   { name = "same",    stdin = "causeway\ncauseway\n", expect = "0\nLCS 8\n", visible = false },
   { name = "nothing", stdin = "abc\nxyz\n",           expect = "3\nLCS 0\n", visible = false },
   { name = "insert",  stdin = "mtr\nmetro\n",         expect = "2\nLCS 3\n", visible = false },
+  { name = "empty",   stdin = "\nabc\n",              expect = "3\nLCS 0\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 19
@@ -2246,7 +2235,8 @@ fn main() {
         }
     }
 
-    let mut order: Vec<(usize, i64)> = items.clone();
+    // the table is finished with `items`, so take it rather than copy it
+    let mut order = items;
     order.sort_by(|a, b| {
         let left = b.1 * a.0 as i64;
         let right = a.1 * b.0 as i64;
@@ -2544,7 +2534,11 @@ Line one is `n q`. The next `n` lines are lowercase words to insert. The next
 Build a trie — a tree of nodes each holding up to 26 children — and answer:
 
 * `WORD <s>` → `YES` if `s` was inserted, `NO` otherwise
-* `PREFIX <s>` → how many inserted words start with `s`
+* `PREFIX <s>` → how many of the `n` inserted words start with `s`
+
+The `n` words are not promised to be distinct, and `PREFIX` counts
+**insertions**, not distinct words: insert `tram` twice and `PREFIX tram` is
+`2`. `NODES` counts nodes, so the second insertion adds none.
 
 Then print `NODES <k>`, the number of nodes in the trie including the root.
 
@@ -2683,6 +2677,7 @@ cases = [
   { name = "missing", stdin = "1 2\nmtr\nPREFIX z\nWORD mtr\n",                              expect = "0\nYES\nNODES 4\n",     visible = false },
   { name = "nested",  stdin = "2 2\na\nab\nPREFIX a\nWORD a\n",                              expect = "2\nYES\nNODES 3\n",     visible = false },
   { name = "empty-q", stdin = "2 1\nhku\nhk\nPREFIX hk\n",                                   expect = "2\nNODES 4\n",          visible = false },
+  { name = "twice",   stdin = "3 3\ntram\ntram\ntrap\nPREFIX tram\nPREFIX tra\nWORD tram\n",  expect = "2\n3\nYES\nNODES 6\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 23
@@ -2974,7 +2969,7 @@ title        = "T TEST CASES FOLLOW"
 difficulty   = 3
 time_limit_s = 900
 story        = "The shape every screen uses, and the bug every candidate writes at least once: the second case remembers the first."
-concepts     = ["io", "collections", "control-flow"]
+concepts     = ["io", "collections", "control-flow", "sorting"]
 requires     = ["rust.hacker.24.inversions"]
 map          = { x = 0.472, y = 0.739, kind = "quest" }
 brief        = '''

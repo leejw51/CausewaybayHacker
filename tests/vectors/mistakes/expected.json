@@ -1169,34 +1169,34 @@
       "captured": "content/rust.advanced.07.generics.rustc.json"
     },
     {
-      "quest_id": "go.advanced.09.errors-in-flight",
+      "quest_id": "go.advanced.12.chan-directions",
       "pack": "content/go/advanced.toml",
       "lang": "go",
-      "kind": "unused",
-      "code": "go:imported-not-used",
+      "kind": "type-mismatch",
+      "code": "go:cannot-use-as",
       "phase": "compile",
       "level": "error",
       "compile_time": true,
       "compiles": false,
-      "source_is_in": "content/go/advanced.toml → quest go.advanced.09.errors-in-flight → starter",
+      "source_is_in": "content/go/advanced.toml → quest go.advanced.12.chan-directions → starter",
       "verified": true,
       "assert_me": true,
       "observed": {
         "compile_command": "go build -o prog main.go",
         "compile_exit": 1,
         "identities": [
-          "\"fmt\" imported and not used"
+          "invalid operation: cannot send to receive-only channel <-chan int in (variable of type <-chan int)"
         ],
         "diagnostics": [
           {
             "file": "./main.go",
-            "line": 5,
+            "line": 18,
             "col": 2,
-            "message": "\"fmt\" imported and not used"
+            "message": "invalid operation: cannot send to receive-only channel <-chan int in (variable of type <-chan int)"
           }
         ]
       },
-      "captured": "content/go.advanced.09.errors-in-flight.gobuild.txt"
+      "captured": "content/go.advanced.12.chan-directions.gobuild.txt"
     }
   ],
   "kinds_covered": [

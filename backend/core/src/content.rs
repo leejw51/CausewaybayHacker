@@ -298,12 +298,16 @@ pub fn validate(pack: &Pack) -> Result<()> {
                 quest.id, pack.land, pack.category
             )));
         }
-        if node as i64 != quest.node {
-            return Err(bad_request(format!(
-                "quest '{}' says node {} but its id says {node}",
-                quest.id, quest.node
-            )));
-        }
+        // SPEC §12 deliberately does NOT require the id's number to equal
+        // `node`. It once did, and that contradicted §4.1 — "stable forever;
+        // if a node moves, the `node` column changes and the id does not."
+        // Enforcing it renumbered four boss quests on three occasions, and
+        // every rename is a delete-and-insert that discards whoever had
+        // cleared them. The number in an id is the node the quest was *born*
+        // at; `node` is the authority on where it sits today, so a pack may
+        // legitimately have ids that look out of order. Shape, land, category
+        // and uniqueness are still checked, above and below.
+        let _ = node;
         if !ids.insert(quest.id.clone()) {
             return Err(bad_request(format!("duplicate quest id '{}'", quest.id)));
         }

@@ -99,7 +99,17 @@ CONTENT_CASES = [
     ("rust.advanced.05.rwlock", "rust/advanced", "mutability", "E0596"),
     ("rust.advanced.06.lifetimes", "rust/advanced", "lifetime", "E0106"),
     ("rust.advanced.07.generics", "rust/advanced", "type-mismatch", "E0308"),
-    ("go.advanced.09.errors-in-flight", "go/advanced", "unused", "go:imported-not-used"),
+    # PM fixed `go.advanced.09.errors-in-flight` so its starter compiles, and
+    # this row went `verified: false` the moment it did — which is the fixture
+    # working: it is read out of `content/**` at generate time rather than
+    # copied, so a content edit shows up as a stale claim instead of a test
+    # quietly checking a file nobody ships any more.
+    #
+    # `chan-directions` is the replacement: the only Go starter in the shipped
+    # content that still fails to compile today. Its error is a type error on
+    # a directional channel, which §7.1 files under `type-mismatch` — Go's
+    # E0308 row.
+    ("go.advanced.12.chan-directions", "go/advanced", "type-mismatch", "go:cannot-use-as"),
 ]
 
 # Rows of the §7.1 table that no fixture can honestly cover. Written into
@@ -322,8 +332,14 @@ def verify(case: dict, res: dict) -> tuple[bool, str]:
             ok = any(d["code"] == code for d in res["diagnostics"])
             return ok, "" if ok else f"{code} not among {observed_identity(lang, res)}"
         blob = res["raw_compile_stderr"]
+        if code == "go:cannot-use-as":
+            ok = "cannot use" in blob or "invalid operation" in blob
+            return ok, "" if ok else "no type error in the build output"
         needle = {
-            "go:cannot-use-as": "cannot use",
+            # Two shapes of the same lesson: `cannot use X as Y value`, and
+            # the directional-channel form `invalid operation: cannot send to
+            # receive-only channel`. Both are §7.1's type-mismatch row.
+            "go:cannot-use-as": None,
             "go:undefined": "undefined:",
             "go:declared-not-used": "declared and not used",
             "go:imported-not-used": "imported and not used",

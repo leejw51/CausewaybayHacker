@@ -927,12 +927,12 @@ fn main() {
         .map(|t| t.parse().unwrap())
         .collect();
 
-    let even_sum: i64 = nums.iter().filter(|n| *n % 2 == 0).sum();
+    let even_sum: i64 = nums.iter().filter(|&&n| n % 2 == 0).sum();
     println!("{}", even_sum);
 
     let big: Vec<String> = nums
         .iter()
-        .filter(|n| **n > 10)
+        .filter(|&&n| n > 10)
         .map(|n| (n * 2).to_string())
         .collect();
     if big.is_empty() {
@@ -946,7 +946,7 @@ fn main() {
 }
 '''
 hints = [
-  "nums.iter() yields &i64, so a filter closure gets &&i64 — dereference until the comparison type-checks.",
+  "nums.iter() yields &i64 and filter hands its closure a reference to that, so the argument is &&i64. Take it apart in the pattern — |&&n| n % 2 == 0 — rather than guessing at how many stars the body needs.",
   "join needs strings, so map each number with to_string() before you collect into a Vec<String>.",
   "A HashSet built straight from the iterator gives you the distinct count with len().",
 ]
@@ -1389,100 +1389,145 @@ cases = [
 [[quest]]
 id          = "rust.basic.16.smart-pointers"
 node        = 16
-title       = "TWO HANDLES, ONE LEDGER"
+title       = "A SIZE THE COMPILER CAN NAME"
 difficulty  = 3
-story       = "The morning till and the evening till write into the same book, and neither of them owns it."
-concepts    = ["smart-pointers", "interior-mutability", "collections"]
+story       = "The Lucky Mac docket spike: every slip pinned to the one under it, all the way down to the counter."
+concepts    = ["smart-pointers", "ownership", "structs"]
 requires    = ["rust.basic.15.modules"]
 map          = { x = 0.619, y = 0.868, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` integers.
+Standard input is a count `n`, then `n` amounts in cents.
 
-Hold one ledger as `Rc<RefCell<Vec<i64>>>` and take **two** handles to it.
-Through the first, push every even value. Through the second, push every odd
-one. Then print:
+Hold them in a chain, one node per amount, in the order they arrived:
 
-1. the ledger's contents in the order they were pushed, space separated
-2. `RC <k>`, the strong count while both handles are alive
-3. `BOX <sum>`, the total, computed through a `Box<i64>`
+```
+struct Entry {
+    cents: i64,
+    next: Option<Box<Entry>>,
+}
+```
+
+Print three lines:
+
+1. the amounts in order, space separated, or `-` if there are none
+2. `SUM <total>`, from a **recursive** function over the chain
+3. `LAST <cents>` — the amount on the final node — or `LAST NONE`
 
 ```
 input:  5
         1 2 3 4 5
-output: 2 4 1 3 5
-        RC 2
-        BOX 15
+output: 1 2 3 4 5
+        SUM 15
+        LAST 5
 ```
 
-`Rc` is shared ownership. `RefCell` is the borrow check, moved to runtime.
-Neither is a `Mutex` and neither is thread safe — that is the next map.
-Together they are how one value gets two owners that can both change it.
+The starter does not compile, and the error is the reason `Box` exists. Write
+`next: Option<Entry>` and the compiler has to lay `Entry` out in memory: it
+needs `8` bytes for `cents` plus however big an `Entry` is — which is the
+thing it is trying to work out. E0072, *recursive type has infinite size*.
+
+A `Box<Entry>` is a pointer to a heap allocation, and a pointer has a size the
+compiler already knows. It owns what it points at: exactly one owner, freed
+when the `Box` is dropped, no counting and nothing shared. `Option<Box<Entry>>`
+is the end of the chain and a node in it, in one pointer-sized value — the
+`None` is stored as the null address rather than as an extra tag byte, so it
+costs nothing over the `Box` alone.
 '''
 starter     = '''
-use std::cell::RefCell;
 use std::io::Read;
-use std::rc::Rc;
+
+struct Entry {
+    cents: i64,
+    // E0072: this is what a type with no nameable size looks like
+    next: Option<Entry>,
+}
+
+fn sum(chain: &Option<Entry>) -> i64 {
+    let _ = chain;
+    0
+}
 
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input
+    let amounts: Vec<i64> = input
         .split_whitespace()
         .skip(1)
         .map(|t| t.parse().unwrap())
         .collect();
 
-    let ledger: Rc<RefCell<Vec<i64>>> = Rc::new(RefCell::new(Vec::new()));
+    // build the chain in arrival order, walk it, then sum it recursively
+    let head: Option<Entry> = None;
+    let _ = (head, amounts, sum);
 
-    // take a second handle, push the evens through one and the odds through
-    // the other, then print the ledger, the strong count and the boxed sum
-    let _ = (ledger, nums);
-    println!("?");
-    println!("RC 0");
-    println!("BOX 0");
+    println!("-");
+    println!("SUM 0");
+    println!("LAST NONE");
 }
 '''
 solution    = '''
-use std::cell::RefCell;
 use std::io::Read;
-use std::rc::Rc;
+
+struct Entry {
+    cents: i64,
+    next: Option<Box<Entry>>,
+}
+
+/// The tail of a chain is another chain, so the walk is the type's own shape.
+fn sum(chain: &Option<Box<Entry>>) -> i64 {
+    match chain {
+        Some(entry) => entry.cents + sum(&entry.next),
+        None => 0,
+    }
+}
+
+fn last(chain: &Option<Box<Entry>>) -> Option<i64> {
+    let entry = chain.as_ref()?;
+    if entry.next.is_none() {
+        return Some(entry.cents);
+    }
+    last(&entry.next)
+}
 
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input
+    let amounts: Vec<i64> = input
         .split_whitespace()
         .skip(1)
         .map(|t| t.parse().unwrap())
         .collect();
 
-    let morning: Rc<RefCell<Vec<i64>>> = Rc::new(RefCell::new(Vec::new()));
-    let evening = Rc::clone(&morning);
-
-    for &value in &nums {
-        if value % 2 == 0 {
-            morning.borrow_mut().push(value);
-        }
-    }
-    for &value in &nums {
-        if value % 2 != 0 {
-            evening.borrow_mut().push(value);
-        }
+    // built back to front, so the finished chain reads in arrival order
+    let mut head: Option<Box<Entry>> = None;
+    for &cents in amounts.iter().rev() {
+        head = Some(Box::new(Entry { cents, next: head }));
     }
 
-    let entries = morning.borrow();
-    let line: Vec<String> = entries.iter().map(|v| v.to_string()).collect();
-    println!("{}", line.join(" "));
-    println!("RC {}", Rc::strong_count(&morning));
+    let mut parts: Vec<String> = Vec::with_capacity(amounts.len());
+    let mut walk = head.as_ref();
+    while let Some(entry) = walk {
+        parts.push(entry.cents.to_string());
+        walk = entry.next.as_ref();
+    }
+    if parts.is_empty() {
+        println!("-");
+    } else {
+        println!("{}", parts.join(" "));
+    }
 
-    let total: Box<i64> = Box::new(entries.iter().sum());
-    println!("BOX {}", *total);
+    println!("SUM {}", sum(&head));
+    match last(&head) {
+        Some(cents) => println!("LAST {}", cents),
+        None => println!("LAST NONE"),
+    }
 }
 '''
 hints = [
-  "Rc::clone(&handle) is the second handle. It is spelled that way rather than .clone() so a reader can see it is cheap.",
-  "borrow_mut() hands you a RefMut; hold two at once and the program panics at runtime instead of failing to compile. Let each one end at the end of its statement.",
-  "Rc::strong_count counts live handles, so it reads 2 while both are in scope.",
+  "One word fixes the compile error: Option<Entry> becomes Option<Box<Entry>>, and the constructor gains a Box::new.",
+  "Build it back to front — iterate the amounts in reverse and give each new node the chain you already had as its next. Building front to back needs a cursor into the tail, and that is a borrow fight you do not need yet.",
+  "To walk without consuming, hold an Option<&Box<Entry>>: head.as_ref() to start, and entry.next.as_ref() to step. .as_ref() turns &Option<T> into Option<&T>, which is the move that keeps the chain intact.",
+  "The recursive sum needs no mut and no loop: Some(entry) => entry.cents + sum(&entry.next), None => 0.",
 ]
 
 [quest.tests]
@@ -1492,10 +1537,10 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "mixed",     stdin = "5\n1 2 3 4 5\n", expect = "2 4 1 3 5\nRC 2\nBOX 15\n", visible = true },
-  { name = "one-odd",   stdin = "1\n7\n",         expect = "7\nRC 2\nBOX 7\n",          visible = false },
-  { name = "all-even",  stdin = "2\n2 4\n",       expect = "2 4\nRC 2\nBOX 6\n",        visible = false },
-  { name = "negatives", stdin = "3\n-1 -2 0\n",   expect = "-2 0 -1\nRC 2\nBOX -3\n",   visible = false },
+  { name = "five",      stdin = "5\n1 2 3 4 5\n",    expect = "1 2 3 4 5\nSUM 15\nLAST 5\n",       visible = true },
+  { name = "single",    stdin = "1\n700\n",          expect = "700\nSUM 700\nLAST 700\n",          visible = false },
+  { name = "none",      stdin = "0\n",                expect = "-\nSUM 0\nLAST NONE\n",             visible = false },
+  { name = "negatives", stdin = "3\n-100 50 -25\n",  expect = "-100 50 -25\nSUM -75\nLAST -25\n",  visible = false },
 ]
 
 # ---------------------------------------------------------------- 17
@@ -1624,37 +1669,69 @@ node        = 18
 title       = "THE AUTOCOMPLETE"
 difficulty  = 4
 story       = "The Percival Street phone kiosk finishes every line before you have one. It has no completion for a trait you named yourself."
-concepts    = ["traits", "structs", "smart-pointers", "pattern-matching"]
+concepts    = ["traits", "structs", "generics"]
 requires    = ["rust.basic.17.testing", "rust.basic.13.combinators"]
 map          = { x = 0.949, y = 0.868, kind = "boss" }
 brief       = '''
 Standard input is a count `n`, then `n` lines, each either
 
-* `SHOP <NAME> <FLOOR>` — renders as `<NAME> / F<FLOOR>`
-* `STOP <ROUTE>` — renders as `TRAM <ROUTE>`
+* `SHOP <NAME> <FLOOR>`
+* `STOP <ROUTE>` — `ROUTE` is a number
 
-Print every sign rendered, in order, and then `SIGNS <n>`.
+Print one line per sign as `<tag> <rendering>`, then `SIGNS <n>`:
+
+* a `Shop` renders as `<NAME> / F<FLOOR>` and its tag is `SIGN`
+* a `Stop` renders as its route number and its tag is `TRAM`
 
 ```
 input:  3
         SHOP HYSAN 4
         STOP 2
         SHOP SOGO 1
-output: HYSAN / F4
+output: SIGN HYSAN / F4
         TRAM 2
-        SOGO / F1
+        SIGN SOGO / F1
         SIGNS 3
 ```
 
-Declare a trait `Sign` with `fn render(&self) -> String`, implement it for two
-different structs, and keep them in one `Vec<Box<dyn Sign>>`. One list, two
-types, no `match` at print time.
+Declare one trait and implement it for two different structs:
+
+```
+trait Sign {
+    fn render(&self) -> String;      // required: no body, every implementor writes one
+    fn tag(&self) -> &'static str { "SIGN" }   // provided: an implementor gets this free
+}
+```
+
+`tag` is a **default method**. `Shop` says nothing about it and gets `SIGN`;
+`Stop` writes its own and gets `TRAM`. That is the half of traits people forget
+in an interview: a trait is not only a list of signatures, it can carry
+behaviour, and overriding is opt-in.
+
+Print through **one** function, `fn show<T: Sign>(sign: &T)`. The bound is the
+contract — `show` knows nothing about `Shop` or `Stop`, only that whatever it
+was handed has `render` and `tag`. The compiler stamps out one copy of `show`
+per concrete type and the calls are direct.
+
+The starter does not compile. The trait is declared and the structs exist, and
+that buys you nothing on its own: `show(&Shop { .. })` is E0277, *the trait
+bound `Shop: Sign` is not satisfied*. Declaring a trait and implementing it are
+two separate acts, and in Rust the second one is always written out.
+
+Both signs in one `Vec` would be a different mechanism — `Box<dyn Sign>`, a
+pointer plus a vtable, looked up at run time. You do not need it here, because
+at every call site the concrete type is still visible. That is the next map's
+question, and knowing which of the two you are holding is what it asks.
 '''
 starter     = '''
 use std::io::Read;
 
 trait Sign {
     fn render(&self) -> String;
+
+    fn tag(&self) -> &'static str {
+        "SIGN"
+    }
 }
 
 struct Shop {
@@ -1663,15 +1740,14 @@ struct Shop {
 }
 
 struct Stop {
-    route: String,
+    route: i64,
 }
 
 // impl Sign for Shop { ... }
-// impl Sign for Stop { ... }
+// impl Sign for Stop { ... }   and Stop does not want the default tag
 
-fn show(signs: &[Box<dyn Sign>]) {
-    let _ = signs;
-    todo!()
+fn show<T: Sign>(sign: &T) {
+    println!("{} {}", sign.tag(), sign.render());
 }
 
 fn main() {
@@ -1680,53 +1756,6 @@ fn main() {
     let mut lines = input.lines();
     let n: usize = lines.next().unwrap().trim().parse().unwrap();
 
-    let signs: Vec<Box<dyn Sign>> = Vec::new();
-    let _ = (&mut lines, n, &Shop { name: String::new(), floor: 0 }, &Stop { route: String::new() });
-    show(&signs);
-}
-'''
-solution    = '''
-use std::io::Read;
-
-trait Sign {
-    fn render(&self) -> String;
-}
-
-struct Shop {
-    name: String,
-    floor: i64,
-}
-
-struct Stop {
-    route: String,
-}
-
-impl Sign for Shop {
-    fn render(&self) -> String {
-        format!("{} / F{}", self.name, self.floor)
-    }
-}
-
-impl Sign for Stop {
-    fn render(&self) -> String {
-        format!("TRAM {}", self.route)
-    }
-}
-
-fn show(signs: &[Box<dyn Sign>]) {
-    for sign in signs {
-        println!("{}", sign.render());
-    }
-    println!("SIGNS {}", signs.len());
-}
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let mut lines = input.lines();
-    let n: usize = lines.next().unwrap().trim().parse().unwrap();
-
-    let mut signs: Vec<Box<dyn Sign>> = Vec::new();
     for _ in 0..n {
         let line = lines.next().unwrap();
         let mut parts = line.split_whitespace();
@@ -1734,22 +1763,92 @@ fn main() {
             "SHOP" => {
                 let name = parts.next().unwrap().to_string();
                 let floor: i64 = parts.next().unwrap().parse().unwrap();
-                signs.push(Box::new(Shop { name, floor }));
+                show(&Shop { name, floor });
             }
             _ => {
-                let route = parts.next().unwrap().to_string();
-                signs.push(Box::new(Stop { route }));
+                let route: i64 = parts.next().unwrap().parse().unwrap();
+                show(&Stop { route });
             }
         }
     }
 
-    show(&signs);
+    println!("SIGNS {}", n);
+}
+'''
+solution    = '''
+use std::io::Read;
+
+trait Sign {
+    /// Required: no body here, so every implementor has to supply one.
+    fn render(&self) -> String;
+
+    /// Provided: an implementor gets this unless it says otherwise.
+    fn tag(&self) -> &'static str {
+        "SIGN"
+    }
+}
+
+struct Shop {
+    name: String,
+    floor: i64,
+}
+
+struct Stop {
+    route: i64,
+}
+
+impl Sign for Shop {
+    fn render(&self) -> String {
+        format!("{} / F{}", self.name, self.floor)
+    }
+    // tag is not written here, so Shop uses the default
+}
+
+impl Sign for Stop {
+    fn render(&self) -> String {
+        self.route.to_string()
+    }
+
+    fn tag(&self) -> &'static str {
+        "TRAM"
+    }
+}
+
+/// One function, two types. The bound is everything it knows about T.
+fn show<T: Sign>(sign: &T) {
+    println!("{} {}", sign.tag(), sign.render());
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    for _ in 0..n {
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        match parts.next().unwrap() {
+            "SHOP" => {
+                let name = parts.next().unwrap().to_string();
+                let floor: i64 = parts.next().unwrap().parse().unwrap();
+                show(&Shop { name, floor });
+            }
+            _ => {
+                let route: i64 = parts.next().unwrap().parse().unwrap();
+                show(&Stop { route });
+            }
+        }
+    }
+
+    println!("SIGNS {}", n);
 }
 '''
 hints = [
-  "impl Sign for Shop goes outside the struct; the trait says what, the impl says how.",
-  "Box<dyn Sign> is how two different types live in one Vec — the size is the box's, not theirs.",
-  "show does not need to know which is which. That is the whole reason the trait is there.",
+  "impl Sign for Shop goes outside the struct. The trait says what; the impl says how; and the compiler will not infer the second from the first.",
+  "Leave tag out of Shop's impl entirely and it takes the trait's version. Write it in Stop's impl and Stop's wins. That is the whole of what a default method is.",
+  "show<T: Sign>(sign: &T) is generic, so the type has to be known where it is called — which is inside the match arm, while you can still see what you just built.",
+  "A single Vec holding both would need Box<dyn Sign>, and that is a different mechanism with a run-time lookup. You are not being asked for it, and reaching for it here would be the wrong answer to a question about traits.",
 ]
 
 [quest.tests]
@@ -1759,7 +1858,8 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "three-signs", stdin = "3\nSHOP HYSAN 4\nSTOP 2\nSHOP SOGO 1\n", expect = "HYSAN / F4\nTRAM 2\nSOGO / F1\nSIGNS 3\n", visible = true },
-  { name = "one-stop",    stdin = "1\nSTOP 116\n", expect = "TRAM 116\nSIGNS 1\n", visible = false },
-  { name = "two-shops",   stdin = "2\nSHOP LUCKYMAC 0\nSHOP TIMES 9\n", expect = "LUCKYMAC / F0\nTIMES / F9\nSIGNS 2\n", visible = false },
+  { name = "three-signs", stdin = "3\nSHOP HYSAN 4\nSTOP 2\nSHOP SOGO 1\n", expect = "SIGN HYSAN / F4\nTRAM 2\nSIGN SOGO / F1\nSIGNS 3\n", visible = true },
+  { name = "one-stop",    stdin = "1\nSTOP 116\n",                            expect = "TRAM 116\nSIGNS 1\n",                                  visible = false },
+  { name = "two-shops",   stdin = "2\nSHOP LUCKYMAC 0\nSHOP TIMES 9\n",      expect = "SIGN LUCKYMAC / F0\nSIGN TIMES / F9\nSIGNS 2\n",      visible = false },
+  { name = "none",        stdin = "0\n",                                       expect = "SIGNS 0\n",                                             visible = false },
 ]

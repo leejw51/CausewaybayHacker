@@ -1,0 +1,2 @@
+# command-line-arguments
+./main.go:18:2: invalid operation: cannot send to receive-only channel <-chan int in (variable of type <-chan int)
