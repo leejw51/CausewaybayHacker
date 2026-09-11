@@ -57,9 +57,33 @@ export class Crt {
   }
 
   /**
-   * @param g the 2D context, in **device** coordinates with no transform.
+   * @param g the 2D context. **Device** coordinates: this method puts the
+   * identity transform on for its own duration and puts the caller's back.
    * @param dw,dh the backing store size.
    * @param scale device pixels per virtual pixel, from `Layout`.
+   *
+   * The identity is set *here* rather than asked for at the call site, and
+   * that is the fix for a bug that survived several rounds. `App.render`
+   * leaves the context in virtual coordinates when it finishes with the
+   * scenes — `frameEdge` and `drawIris` each set their own identity and put it
+   * back — and this was the one overlay handed the transform as it stood. A
+   * full-canvas `fillRect(0, 0, dw, dh)` under `(s,0,0,s,ox,oy)` covers the
+   * device rect `[ox, ox + dw·s] x [oy, oy + dh·s]`, so the tube treated a
+   * rectangle exactly **`scale` by `scale`** of the canvas, anchored at the
+   * playfield's top-left corner, and left the rest of the window untreated.
+   *
+   * At the design size `scale` is 1 and the two rectangles coincide, which is
+   * why it was invisible in every shot taken at 1280x720. The moment an
+   * orientation change puts a layout into a window it does not fit — the one
+   * case where `scale` is not 1 — the seam appears: at 1280x800 turned to
+   * portrait, `scale` is 0.625 and the treated patch is 0.63 by 0.63 of the
+   * canvas. That is the "dark rectangle roughly 0.6 x 0.6 in the top-left of
+   * `#game`" in `docs/decisions.md`, to two decimal places.
+   *
+   * The mask was double-scaled by the same mistake (`period` is already in
+   * device pixels and the transform multiplied it again), so the scanline
+   * pitch changes in every window where `scale` is not 1. That is the fix
+   * landing, not a new fault.
    */
   draw(g: CanvasRenderingContext2D, dw: number, dh: number, scale: number): void {
     if (!this.enabled || dw < 4 || dh < 4) return;
@@ -68,6 +92,7 @@ export class Crt {
     if (!this.vignette || dw !== this.vw || dh !== this.vh) this.buildVignette(g, dw, dh);
 
     g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
     if (this.pattern) {
       g.fillStyle = this.pattern;
       g.fillRect(0, 0, dw, dh);

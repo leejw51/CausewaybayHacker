@@ -34,6 +34,20 @@ const ROW: ReadonlyArray<{ id: string; label: string; screen: AuxScreen | null }
 export const AUX_HINT = "F4 SEARCH   F5 STATS   F6 AI   ESC MAPS";
 
 /**
+ * The three screens as another screen's button strip can carry them — the same
+ * ids and the same words, without ALL MAPS, which every screen that would use
+ * this already has its own way to.
+ *
+ * It is exported rather than retyped so that the map's strip and this row
+ * cannot come to disagree about what the three things are called. `openAux`
+ * takes these ids unchanged, which is the point: a caller adds the row and
+ * forwards the id, and there is no second table of names anywhere.
+ */
+export const AUX_BAR: ReadonlyArray<{ id: string; label: string }> = ROW.filter(
+  (item) => item.screen !== null,
+).map((item) => ({ id: item.id, label: item.label }));
+
+/**
  * Lay the row out inside `rect` and return how tall it came out.
  *
  * The button for the screen you are already on is `dim`, which in `Buttons` is

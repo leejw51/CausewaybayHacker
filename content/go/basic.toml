@@ -250,7 +250,7 @@ requires    = ["go.basic.03.control-flow"]
 map          = { x = 0.603, y = 0.055, kind = "quest" }
 brief       = '''
 Standard input is a count `n` on the first line and then `n` integers on the
-second, separated by spaces.
+second, separated by spaces. `n` is at least `1`.
 
 Print three lines: the first value, the last value, and the sum of everything
 strictly between them. With fewer than three values that sum is `0`.
@@ -1779,11 +1779,15 @@ func main() {
 	sum, count = total()
 	fmt.Printf("NONE %d %d\n", sum, count)
 
-	head := list
-	if len(head) > 2 {
-		head = head[:2]
+	// passed individually — the form the spread exists to contrast with
+	switch len(list) {
+	case 0:
+		sum, count = total()
+	case 1:
+		sum, count = total(list[0])
+	default:
+		sum, count = total(list[0], list[1])
 	}
-	sum, count = total(head...)
 	fmt.Printf("TWO %d %d\n", sum, count)
 }
 '''
@@ -2182,24 +2186,24 @@ func main() {
 		orders = append(orders, &Order{Name: fields[0], Cents: cents})
 	}
 
-	real := make([]*Order, 0, len(orders))
+	present := make([]*Order, 0, len(orders))
 	missing := 0
 	for _, order := range orders {
 		if order == nil {
 			missing++
 			continue
 		}
-		real = append(real, order)
+		present = append(present, order)
 	}
 
-	sort.Slice(real, func(i, j int) bool {
-		if real[i].Cents != real[j].Cents {
-			return real[i].Cents > real[j].Cents
+	sort.Slice(present, func(i, j int) bool {
+		if present[i].Cents != present[j].Cents {
+			return present[i].Cents > present[j].Cents
 		}
-		return real[i].Name < real[j].Name
+		return present[i].Name < present[j].Name
 	})
 
-	for _, order := range real {
+	for _, order := range present {
 		fmt.Printf("%s %d\n", order.Name, order.Cents)
 	}
 	fmt.Printf("NIL %d\n", missing)

@@ -350,12 +350,31 @@ pub fn validate(pack: &Pack) -> Result<()> {
         // An empty expectation is satisfied by an empty `fn main() {}`, which
         // clears the node for free. Whitespace-only counts as empty under
         // every match mode but `exact`, and `exact` on nothing is worse still.
+        //
+        // That reasoning is about *stdio*, where a case is input and expected
+        // output. On `cargo` and `gotest` a case names a test that must pass
+        // and there is no expected output to compare, so the same rule would
+        // refuse every such quest at import. The hole it guards is closed in
+        // the runner instead: a suite that ran no tests never passes.
+        let harness = tests
+            .get("harness")
+            .and_then(|v| v.as_str())
+            .unwrap_or("stdio");
         for case in cases {
-            let expect = case.get("expect").and_then(|v| v.as_str()).unwrap_or("");
-            if expect.trim().is_empty() {
-                let name = case.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+            let name = case.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            if harness == "stdio" {
+                let expect = case.get("expect").and_then(|v| v.as_str()).unwrap_or("");
+                if expect.trim().is_empty() {
+                    let shown = if name.is_empty() { "?" } else { name };
+                    return Err(bad_request(format!(
+                        "quest '{}' case '{shown}' expects nothing; an empty main would clear it",
+                        quest.id
+                    )));
+                }
+            } else if name.trim().is_empty() {
                 return Err(bad_request(format!(
-                    "quest '{}' case '{name}' expects nothing; an empty main would clear it",
+                    "quest '{}' has a {harness} case with no name; a case here names \
+                     the test that must pass",
                     quest.id
                 )));
             }

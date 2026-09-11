@@ -264,10 +264,29 @@ function Stats:draw_mistake(x, y, w, m)
     end
   end
 
-  -- **The track.** Five steps, the ones behind you filled. The shape says how
-  -- far there is to go, which a bare number cannot.
+  -- **The shackle, and the track.** `art/shackle_break` is a six-frame
+  -- progression and `cleared_since` runs 0..5, so frame `since + 1` is the
+  -- state of this kind exactly — intact at zero, in pieces at five. It is the
+  -- premise of the whole game in one glyph: the thing that had you is coming
+  -- apart because you stopped doing it.
+  --
+  -- It stands **beside** the track rather than replacing it. The shackle says
+  -- where you are; only the five steps say how far there is to go, and
+  -- dropping them to make room for the picture would have traded the more
+  -- useful half for the prettier one.
+  local shackle = x + 34
+  Assets.frame("shackle_break", math.min(since, Stats.LEARNED_AT) + 1,
+    shackle, y + 20, 19)
+  if learned then
+    -- What is left of it. Static, on a row that is already in this state —
+    -- the stats screen renders what the server says and has no moment of
+    -- breaking to animate, and an effect with no event behind it would be
+    -- decoration pretending to be feedback.
+    Assets.marker("fx_shards", shackle + 16, y + 8, 20, { alpha = 0.85 })
+  end
+
   local step, gap = 14, 5
-  local tx = x + 22
+  local tx = x + 58
   for i = 1, Stats.LEARNED_AT do
     local done = i <= since
     UI.setColor(done and (learned and Theme.admit or Theme.coin)
@@ -290,7 +309,9 @@ function Stats:draw_mistake(x, y, w, m)
   end
   UI.text(said, tx + Stats.LEARNED_AT * (step + gap) + 10, y + 3, 7,
     learned and Theme.admit or Theme.coin)
-  y = y + 18
+  -- Four pixels more than the bare track needed: the shackle is taller than
+  -- five 8-pixel steps, and the `drill:` line was landing on its feet.
+  y = y + 22
 
   if m.concepts and #m.concepts > 0 then
     y = y + UI.text("drill: " .. table.concat(m.concepts, ", "), x + 22, y, 7,

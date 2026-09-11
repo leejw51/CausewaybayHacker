@@ -56,7 +56,7 @@ keepalive check runs over 6 s rather than §1.1's 70 s unless `--slow`).
 | `tests/content/verify_pack.py` | yes | **60/60 quests** | every solution passes, every starter rejected |
 | `tests/smoke/selftest.mjs` | yes | 20/20 | proves the checker catches 19 injected faults |
 | `tests/smoke/contract.mjs` | yes, against the real backend | **12/12** | BE fixed the §8.1 divergence |
-| `e2e/` | yes | **6 of 9 green** | the three that submit are **red**: SUBMIT is a canvas button with no shortcut and a confirm dialogue, and the scan cannot press it |
+| `e2e/` | yes | **10/10 green** (landscape verified) | both geometric scans deleted — `__cwbCapture.buttons()` |
 
 Nothing above is green by assumption. `verify_pack.py` really compiled 60
 quests; the mistake fixtures really ran `rustc` and `go`; the smoke checker
@@ -450,81 +450,42 @@ implementation of that in the test tree is the drift §9.1 exists to prevent.
 
 ## The end-to-end journey — `e2e/`
 
-**Off the ground, and currently 6 of 9 green.** It ran 18/18 earlier today;
-three tests went red when `quest.run` landed, and the cause is understood.
+**Green: 10 tests, landscape verified end to end.**
 
-### The three that are red, and exactly why
+### The scans are gone
 
-`a wrong answer…`, `the right answer…` and `logout, then a second wallet…`
-all need to press **SUBMIT**, and SUBMIT can no longer be pressed by this
-suite:
+Three tests went red when `quest.run` took `Ctrl/Cmd+Enter` for RUN and left
+SUBMIT reachable only by mouse. FE shipped **`__cwbCapture.buttons()`** —
+`{id, label, dim, rect, client}`, read from the same `Buttons` objects the
+scene hit-tests against, so the hook and the game cannot disagree about where
+a button is — plus `buttonAt(id)`, and **Ctrl/Cmd+Shift+Enter for SUBMIT**.
 
-* `Ctrl/Cmd+Enter` used to submit. §4.9b gave that key to **RUN**, on
-  purpose — *"Submitting is a decision and it is made with a button, not with
-  the shortcut somebody's hands press without looking"*
-  (`frontend/src/scenes/quest.ts`). A run stays on the quest screen, so the
-  suite waited three minutes for a result screen that was never coming.
-* SUBMIT is therefore a **canvas-drawn button with no keyboard binding**, and
-  it raises a **confirmation dialogue** before anything happens. A geometric
-  scan over the whole bottom half of the plate, clicking and answering Enter,
-  does not reach the result screen.
+Both geometric scans are deleted. `pickFirstCategory`'s sweep became
+`clickButton(page, "cat:basic")`; `enterRustQuest`'s four-attempt
+land-flipping retry became `pickLand(page, "rust")` — the land is now
+*chosen* rather than toggled toward; `submit()` became one click on
+`submit`. Between them those scans cost four runs, and every failure was of
+the worst kind: they silently did *something else* rather than failing where
+the mistake was. Wrong x, wrong y range, wrong land, and finally a button
+that had moved onto a second line.
 
-This is the third time a canvas-only control has cost a full run — the
-category rows twice, the submit button now. **The fix is not more scanning.**
-It is the hit-test hook already requested in `docs/decisions.md`: even
-`__cwbCapture.buttons()` returning `{id, rect}[]` would delete all of it and
-the whole class of failures with it. Until then these three stay red, and
-they are red for a reason that is written down rather than a mystery.
+`submitByKey()` exists too, so the new binding is itself tested rather than
+merely available.
 
-The six that pass are not trivial: boot, the address conformance, **the seed
-never crossing the wire**, the playable map, the canvas filling both
-orientations with matching layers, and the mid-session orientation flips.
+### Two performance traps, written down because each cost a run
 
-```
-login → train → logout → login as a second wallet
-→ that wallet's own progress, and nothing of the first's
-```
+* **`settle()` freezes the loop.** Reading the scene with it and carrying on
+  leaves the app frozen for ever, so the `quest.get` reply is never drawn and
+  a locator waits thirty seconds for a permanently hidden editor.
+* **`settle()` is not free.** It ticks 150 frames synchronously. `atScreen`
+  used to settle on *every* poll, which was affordable when the renderer was
+  two canvases and stopped being affordable as the scenes grew — a login that
+  worked perfectly well began timing out at sixty seconds because the
+  *waiting* was the slow part. It polls on `sceneNow()` now (a scene is
+  swapped in one go, so the name is right mid-transition) and settles once,
+  at the end, which is the only reason to pay for one at all.
 
-### The hook that landed was the other half, and it was the better half
-
-QA asked FE for a *driving* API — `view()`, `login()`, `setSource()`,
-`submit()`. What landed was `frontend/src/dev/capture.ts`: a
-**freeze-and-capture** hook built for screenshots, giving `scene()` (the six
-screen names, exactly), `settle()`, `step()`, `freeze()`, `orient()` and
-`png()`.
-
-That turned out to be the half worth having. `settle()` runs the game at a
-fixed 1/60 step until every transition finishes — so a canvas game becomes
-**deterministic**, which is the thing a browser test genuinely cannot do for
-itself. The driving half was not needed: the seed field is a real
-`<textarea class="cwb-field">`, the editor is CodeMirror with real DOM lines,
-and every screen is reachable by keyboard or a click.
-
-So the suite **drives the game the way a person does, and verifies on the
-wire** — a second websocket session, opened as the same wallet, asks the
-server what it actually believes. That is a stronger assertion than any view
-model FE could have exposed: a frontend that draws CLEARED over a server that
-never heard about it fails here and passes every unit test on both sides.
-
-### Two things that cost real time, written down so nobody pays twice
-
-* **`settle()` freezes the loop.** Reading the scene with it and then
-  carrying on leaves the app frozen for ever, so the `quest.get` reply is
-  never drawn and the editor stays `hidden` — which surfaces thirty seconds
-  later as a locator timeout on `.cm-content`. `scene()` settles, reads, then
-  `resume()`s. The one test that wants a still frame settles without
-  resuming, on purpose.
-* **Category selection is pointer-only and canvas-drawn.** `lands.key()`
-  handles the land toggle and nothing else, so there is no selector and no
-  key. `pickFirstCategory` scans down the right-hand panel. It originally
-  started at 28% of the canvas height, which is *inside the ADVANCED row* —
-  so the browser silently trained on `rust.advanced.01.threads` while the
-  test asserted against `rust.basic.01.first-light`, and the symptom was
-  "expected cleared, got open" on a quest the UI never opened. The rows begin
-  at ≈18%, measured. There is now an assertion that names this failure when
-  it recurs.
-
-### The tests
+### The tests### The tests
 
 | test | asserts | verified by |
 | --- | --- | --- |
@@ -537,6 +498,7 @@ never heard about it fails here and passes every unit test on both sides.
 | **logout → second wallet** | the first wallet's address is gone from storage, the second's map is untouched, the second's history is empty, the first's is intact, and a reload does not resume as the first | wire, both wallets |
 | the screen fills the viewport | canvas ≥ 90% of each axis, **and the WebGL layer and the pixel layer are the same size** (the bug that shows up as parallax sliding out from under the art); PNG attached for a human | capture hook |
 | both orientations | flipping mid-session three times keeps the screen, the virtual size follows, and the game still works afterwards | capture hook |
+| **the console paints mid-compile** | the quest screen's picture changes *during* a slow run while still being the quest screen — SPEC §5.4's "watch rustc think instead of a spinner" | capture hook `png()`, sampled |
 
 Every account is **freshly derived per test** (index 2,000,000+ off the
 published BIP-39 all-zero mnemonic), because the server persists and this
@@ -677,20 +639,32 @@ reader of this suite should not assume are covered.
 
 ## Tested, but weakly
 
-* **The lands scan.** `pickFirstCategory` clicks its way across a canvas
-  because the category rows are canvas-drawn and pointer-only. It has broken
-  three times — wrong column, wrong y range, wrong land — each time silently
-  selecting something and each time costing a full run to diagnose. A
-  `__cwbCapture.buttons()` returning `{id, rect}[]` would delete it and a
-  whole class of failures with it. **Requested from FE in `docs/decisions.md`;
-  until it lands, treat an e2e failure in `enterRustQuest` as "the panel
-  moved" before believing it is a product bug.**
-* **The mid-run streaming console.** SPEC §5.4 exists so the player watches
-  `rustc` think. The text is canvas-drawn: no DOM, no view model. FE could
-  not confirm it from inside (headless RAF starvation) and this suite cannot
-  read it either. The nearest honest check — two `png()` captures during one
-  compile, asserting the images differ while the screen is still `quest` — is
-  **not written**. It is coarse and it is more than nothing.
+* **`34.stable-sort` depends on an absence of a guarantee.** It is the only
+  quest whose test relies on a library's *internal* behaviour —
+  `sort_unstable_by_key` and `sort.Slice` actually scrambling ties. Neither
+  documents that; both happen to do it on today's toolchains. If content CI
+  ever fails on that one quest after a toolchain bump, this is why, and the
+  fix is the quest rather than the runner.
+* **The complexity-by-timeout quests are hardware-sensitive.** `dijkstra`,
+  `range-queries` and `modular` each have a hidden case where the *correct
+  but slow* answer runs past the 5 s cap — deliberately. `dijkstra`'s margin
+  is the narrowest at 3.2×, so it is the first thing to watch if CI ever
+  moves to faster hardware, and a spurious pass there means the quest has
+  stopped teaching complexity.
+* **`verify_pack.py` hardcodes a 180 s compile timeout** and ignores each
+  quest's declared `compile_timeout_ms`, which the runner genuinely honours.
+  Harmless today; it means CI is not testing the number the runner will use.
+* **The mid-run streaming console — now tested, and it works.** Nobody had
+  ever seen this: FE unit-tested the console and could not confirm it
+  visually (headless RAF starvation), so `run.log` painting *while* rustc
+  thinks was believed rather than known in both clients. It is driven with
+  **RUN** — which keeps its keyboard shortcut and is the button a player
+  presses while iterating, so it is the honest moment to look — over a
+  deliberately slow source, sampling `png()` every 400 ms. The assertion is
+  coarse by necessity (the console is canvas-drawn: no DOM, no view model):
+  *the picture changed during the compile while still being the quest
+  screen*. A screen that does not change during a five-second compile is
+  exactly the bug. **It passes.**
 * **The e2e suite against a moving bundle.** It passed 18/18 twice against a
   stable `dist-e2e`. It fails intermittently while FE is rebuilding
   underneath it, which is a true statement about the tree and not about the

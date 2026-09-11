@@ -152,6 +152,57 @@ return function()
     T.nope(code:find("first%-clear"), "no invented award id")
   end)
 
+  T.case("the shackle is the track's state, not a replacement for it", function()
+    local _, code = strings_of("src/scenes/stats.lua")
+    if not code then return end
+    -- `art/shackle_break` is six frames and `cleared_since` runs 0..5, so
+    -- frame `since + 1` is the state of the kind exactly. It stands beside
+    -- the five-step track: the shackle says where you are and only the steps
+    -- say how far there is to go, so the picture must not have cost the
+    -- more useful half.
+    T.ok(code:find("shackle_break", 1, true) ~= nil, "the strip is drawn")
+    T.ok(code:find("math.min(since, Stats.LEARNED_AT) + 1", 1, true) ~= nil,
+      "the frame is clamped to the strip rather than trusting the server's number")
+    T.ok(code:find("for i = 1, Stats.LEARNED_AT do", 1, true) ~= nil,
+      "and the five steps are still there")
+  end)
+
+  T.section("screens — one code pane, not two that look alike")
+
+  T.case("the quest screen and the playground share the editor's mouse", function()
+    -- Both screens draw an `Editor`. Before `src/codepane.lua` they each
+    -- carried their own copy of the pixel → (line, col) hit test, character
+    -- for character, and drag-select would have been a third and a fourth.
+    -- This asserts the duplication does not come back.
+    for _, path in ipairs({ "src/scenes/quest.lua", "src/scenes/playground.lua" }) do
+      local _, code = strings_of(path)
+      if code then
+        T.ok(code:find('require("src.codepane")', 1, true) ~= nil,
+          path .. " uses the shared pane")
+        T.nope(code:find("Editor.next_boundary", 1, true),
+          path .. " does not walk the glyphs itself any more")
+        T.ok(code:find("pane:mousemoved", 1, true) ~= nil,
+          path .. " is wired for a drag, not only a click")
+        T.ok(code:find('isDown("lshift", "rshift")', 1, true) ~= nil,
+          path .. " extends on either shift, not only the left one")
+      else
+        T.skip(path, "not readable from this working directory")
+      end
+    end
+  end)
+
+  T.case("the app dispatches the two callbacks a drag needs", function()
+    local _, code = strings_of("src/app.lua")
+    if not code then return end
+    T.ok(code:find("function App:mousemoved", 1, true) ~= nil)
+    T.ok(code:find("function App:mousereleased", 1, true) ~= nil)
+    local _, main = strings_of("main.lua")
+    if not main then return end
+    T.ok(main:find("function love.mousemoved", 1, true) ~= nil,
+      "LÖVE's callback exists, or the app's is never called")
+    T.ok(main:find("function love.mousereleased", 1, true) ~= nil)
+  end)
+
   T.section("screens — search shows why something matched")
 
   T.case("a null component is absence, not zero", function()

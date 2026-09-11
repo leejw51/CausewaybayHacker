@@ -4292,3 +4292,408 @@ could not answer a question. None came from review.
    message type 'x'". Now documented, including that another player's snippet
    id answers `not_found` rather than `unauthorized`, so the pair cannot be
    used to enumerate what other people have saved.
+
+## 2026-09-11 — BE: search, AI mode, and interview mode
+
+The last three gaps. All specced, all now built.
+
+### Search (SPEC §8)
+
+**BM25** over FTS5 with §8.1's column weights `(4.0, 1.0, 2.0, 0.5)` and
+`snippet()` for the excerpt. Two things the spec leaves to the implementation:
+
+* **A search box is not a query language.** Everything but letters and digits
+  is stripped and each word is quoted, so a player typing `Box<dyn Error>` gets
+  a search rather than an FTS5 syntax error. There is a test that throws six
+  shapes of punctuation at it.
+* **Every word first, then any word.** An AND match is more precise; if it
+  finds nothing the same query runs as OR, because zero results for one stray
+  word in four is a worse answer than a loose one.
+
+**The `hashed` embedder** is 512 buckets of word unigrams (weight 1.0) and
+character 3-grams (weight 0.35), sub-linear term frequency, IDF learned from
+the corpus, L2-normalized, FNV-1a for the hash. The grams are what make it
+forgive a plural or a typo — `iterater` finds the iterator quest, which BM25
+cannot — and the unigrams are what stop `borrow` and `barrow` ranking alike.
+It is deterministic, needs no download and cannot fail, which is the whole
+reason it is the default. `onnx` is untouched and stays off.
+
+The hash is FNV-1a **because it will never change**: a stored vector is only
+valid while the function that made it is, and `quest_vec.model` carries
+`hashed-v1-512` so a change of either forces a recompute at startup. An import
+also drops the vectors for the quests it touched, so an edited brief never
+leaves a vector describing the old text.
+
+**Unified** is RRF with `k = 60`, and the response carries `bm25` and `cosine`
+beside the fused `score` so the screen can show why something matched. A
+document first in both rankings scores exactly `2/61`, which is asserted.
+
+### AI mode (SPEC §7.3)
+
+Three plans, all joins against tables the server already keeps. Migration 0006
+adds `drills.reason`, because §5.8's `Drill` carries the sentence and a
+reconnect has to resume the same one.
+
+**`other` falls back to the concepts of the quests where the mistake was
+made.** PM is right that the empty row is deliberate — an unrecognised compiler
+code says nothing about which idea is missing — so the fallback is a fact
+rather than a guess: the concepts of the quests the player actually made it on.
+That also let `other` back into the candidate kinds, where it had been excluded
+outright.
+
+**What each plan does for a player with no history**, because otherwise all
+three collapse to the same five nodes:
+
+* `repeat` — what you started and did not finish; failing that, the road ahead.
+* `weakness` — a spread of ideas you have not met yet, one quest per concept.
+  Genuinely different from the other two, and it says *"come back when
+  something has gone wrong"*.
+* `spaced` — nothing is due, so the ones that come back soonest; and if nothing
+  is cleared at all it says so rather than inventing a review.
+
+**Never empty and never silent**: every path sets `reason`, and there is a test
+that asserts all three modes answer a brand-new player with a sentence and that
+`repeat` and `weakness` do not answer with the same list.
+
+`ai.next`'s `why` is generated per quest from the tables — *"you hit use after
+move 6 times, and this one is about ownership"*, *"this one has caught you 3
+times"*, *"you cleared this 16 days ago with 1 star; 2 days is when it fades"*.
+
+`ai.finish`'s `kinds_improved` is measured, not assumed: kinds made before the
+drill and not since it started. It compares RFC3339-second timestamps, so a
+drill that starts and ends inside one second cannot tell before from during —
+noted in the code, and the only case it affects.
+
+### Interview mode (PROTOCOL §4.9e) — and a table the spec does not have
+
+**`SPEC.md` §2.1 has no `interviews` table.** Migration 0007 adds one:
+`id, address, quest_id, opened_at, approach, approach_at, finished_at,
+created_at`, indexed by `(address, created_at DESC)`. **PM: this wants adding
+to §2.1.**
+
+* **The mask is on the session, not on progress.** `Quest::to_wire_under_
+  interview` removes `solution`, sets `hints_total: 0` and adds
+  `under_interview: true`. It applies to `interview.*` *and* to an ordinary
+  `quest.get` for the same quest, so a client cannot route around the session
+  by asking the normal way — and it holds for a quest the player cleared a
+  month ago. `quest.hint` answers `not_found`: absent, not refused-for-now.
+* **The approach is kept verbatim and never graded.** The first one stamps
+  `approach_at` (the editor unlocks); a later edit refines the words without
+  pretending they were written then. An empty one is refused, because writing
+  it is the exercise.
+* **`reference_summary` is derived, never generated.** If the content author
+  put a leading `//` comment on the solution, that is the best description of
+  the approach that exists and it is theirs; otherwise the honest thing to say
+  is how many lines it is and what it is filed under. The server does not have
+  an opinion about code and should not pretend to. **PM: a `approach = '''…'''`
+  field per quest in the pack would make this much better, and it is the kind
+  of thing only the author can write.**
+* **The pick** is a quest the player has not cleared, timed ones first (a
+  screen with a clock is the thing being rehearsed), randomised among equals so
+  the same interview does not come round twice in an afternoon.
+* Starting another finishes the first, and the abandoned one keeps its report —
+  an interview you walked out of is still a thing that happened.
+
+---
+
+## 2026-09-11 — L2D: the mouse in the editor, brackets, and three things a screenshot found
+
+The editor is the surface a player stares at longest and it was the least
+finished thing in this client. Two of the four gaps the last round named are
+closed; the other two are deliberately still open and the reasons are below.
+
+### Drag-select, and why it is in the pure module
+
+`src/editor.lua` gained `begin_select` / `drag_to` / `end_select`, and the
+pixel → column step is `M.column_at(line, target_x, measure)` — `measure` is
+injected, so the file still never names `love.graphics` and a fixed-width stub
+in the suite **is** a monospace font, which is the only kind this editor is
+ever drawn in. Click, drag, double click for a word, triple for a line, and a
+word or line drag then grows *by words or lines*, which is the half that is
+easy to leave out and immediately noticeable when it is missing.
+
+**The nearest boundary wins, not the last one that starts before the click.**
+The old hit test rounded down, so clicking the right-hand half of a character
+put the caret before it; with only click-to-place that reads as slight
+imprecision, but the moment you can drag it means a selection started
+mid-character drops that character.
+
+**There was no `love.mousemoved` and no `love.mousereleased` anywhere in this
+client.** A client with `mousepressed` alone can place a caret and cannot
+select a range, which is why this was missing rather than broken. Both are now
+dispatched through `App` with the same `Layout.toVirtual` the press uses — and
+`mousereleased` is dispatched even when the pointer has left the canvas, or a
+drag that ended off the edge leaves a button held down forever.
+
+**No auto-scroll timer.** Dragging above the pane gives a negative row, which
+clamps, and the editor's own `ensure_visible` on the next draw scrolls to
+follow. Clamping plus the follow that was already there is the whole
+behaviour; a per-frame drag timer would have been state to get wrong.
+
+### One pane, not two that look alike
+
+`src/codepane.lua` is new and it is the reason this was worth doing properly.
+The quest screen and the playground each carried their own copy of the hit
+test, character for character — drag-select would have been a third and a
+fourth copy, and the bracket overlay a fifth and a sixth. The geometry is
+**recorded by the draw**, not re-derived by the handler: `frame()` takes the
+numbers that frame actually used, so a click is tested against what is on
+screen. A press before the first draw simply does not land, which is correct,
+because there was nothing there.
+
+`tests/test_screens.lua` now asserts neither scene walks the glyphs itself
+again.
+
+### Brackets — and the unmatched ones are the point
+
+A matched pair around the caret is a small convenience. **An unbalanced brace
+is the single most common thing that stops a submission compiling**, and until
+the compiler says so it is invisible. So `M.brackets` pairs the whole buffer
+with a stack and returns the ones that never found a partner; the pane outlines
+those in `brick` *and* turns their line number `brick`, because the bracket
+itself may have scrolled off to the right.
+
+Three decisions inside that:
+
+* **Only `()`, `[]` and `{}`.** In Rust `<` and `>` are comparison, `->`, `=>`
+  and generics in roughly equal measure. A matcher that guessed would be wrong
+  on `Vec<u8>` more often than it was right, on the screen where being wrong is
+  most expensive.
+* **Which bytes are code is decided by `M.highlight`** — the same tokenizer
+  that colours the pane, not a second scanner. Two scanners that disagreed
+  would draw a brace as matched while colouring it as part of a string, and a
+  feature that contradicts the screen it sits on is worse than no feature.
+  Verified on the wire: `println!("{} says }", x);` marks nothing.
+* **Steady, always.** No pulse, no blink. The rule that the editor pane never
+  animates is not negotiable and it is why the shake lives on the run strip.
+
+Known gap, recorded rather than papered over: `highlight` does not know about
+`'`, so a `'}'` character literal counts as a brace and a lifetime is
+punctuation. Rewriting the tokenizer that the colouring already depends on, to
+fix something that does not appear in a forty-line answer, was the wrong trade.
+
+The stack pairs innermost-first, so the brace reported as unclosed is the
+**outermost** one — which is also what `rustc` points at. A test pins that,
+with the reason, so the next person does not "fix" it.
+
+`ctrl-]` jumps to the partner and `ctrl-shift-]` selects to it. `]` is free:
+the bare key is a character the player types and no global takes it with ctrl.
+
+### What I deliberately left out
+
+* **Search in the editor.** A quest answer is forty lines and the whole of it
+  is on screen. A find box in a file you can already see is a key that opens a
+  dialog you then close. If the playground grows long snippets that changes,
+  and that is the moment to decide.
+* **Multi-cursor.** A luxury, and a large one — every edit primitive has to
+  become a list operation and the undo stack with it. Nothing in this game
+  needs to rename a variable in nine places.
+* **An off-screen marker for an unmatched bracket.** The red line number says
+  it for a visible line and the outline says it for a visible bracket; a brace
+  forty lines up says nothing until you scroll. Ticks on the scrollbar are the
+  obvious answer and I did not build them, because in a file this short the
+  whole buffer is one scroll away and I would have been designing for a size
+  this editor does not see.
+
+### The art
+
+* **`shackle_break` is now the `cleared_since` track's state glyph.** Six
+  frames, `cleared_since` 0..5, so frame `since + 1` is the state of that
+  mistake exactly — intact at zero, in pieces at five. It is the premise of the
+  whole game in one glyph. It stands **beside** the five-step track rather than
+  replacing it: the shackle says where you are, and only the steps say how far
+  there is to go. Replacing the track would have traded the more useful half
+  for the prettier one.
+* **`fx_shards`** is drawn on a learned row and nowhere else. Stats renders
+  what the server says and has no client-observable *moment* of a kind being
+  learned, so shards on a transition would have been an effect with no event
+  behind it — tested code nothing can call, in the shape that is hardest to
+  notice.
+* **The three AI emblems** are in, and getting them in fixed a layout bug:
+  three 74-pixel cards across a 720-wide canvas left 226 each, and the
+  paragraph saying what a plan selects wrapped to four lines and then clipped,
+  so the screen described two of the three modes and cut the third off
+  mid-sentence. The rows are **stacked in both orientations** now, full width,
+  with the band drawn the way `categories.lua` worked out — own aspect, as tall
+  as the row, anchored right, short fade on its left edge, words in their own
+  gutter. It also makes the screen look like the lands and category screens,
+  which are the same idea.
+* **`fg_wires` was drawn and then taken out.** It is a foreground layer for an
+  *elevation* — a street seen from the side — and every full-screen plate in
+  this client is either a top-down town or a room. Slung across the map it
+  crossed six nodes and two streets and read as damage, not atmosphere. The two
+  elevation plates that would suit it, `title_bg` and `bg_street`, already have
+  their catenary painted in. The asset stays unused on purpose, and
+  `src/scenes/map.lua` says so where somebody would otherwise add it again.
+
+### Three things an hour of looking found that no test would have
+
+1. **`N lines  N bytes` was printed underneath the FORMAT button.** It was
+   drawn at `rect.h - 18`, and the button row occupies `rect.h - 36` to
+   `rect.h - 8`. Both strings were on the same pixels and neither could be
+   read. It is on the caption row with `1 sample` and `+2 hidden` now. This has
+   presumably been true since FORMAT shipped.
+2. **The quest footer printed straight through the connection badge.** In
+   portrait, seven keys and an address on a 720-wide canvas: `ESC map` and
+   `OPEN` were drawn on top of each other. `UI.footer` measured the *display*
+   string against the badge and never measured the hint at all. It now tries a
+   size smaller and then clips — a hint cut off mid-word still reads, one with
+   `OPEN` printed through it does not.
+3. **The line number touched the code.** `gutter = getWidth("0000")` with a
+   `%4d` right-aligned number meant line 1 of an unindented file rendered as
+   `1fn main()`. One space in the gutter measurement.
+
+And one bug in the old hit test, found by reading it rather than by looking:
+shift-click asked `love.keyboard.isDown("lshift")`, so extending a selection
+with the right-hand shift key quietly placed the caret instead. Both shifts
+now, in both scenes.
+
+### Numbers
+
+`make test-headless` 233 cases / 4714 assertions → **265 / 4846**. Under LÖVE,
+`make test` is **280 / 4943**. `make ffi-test`, `make lint` and
+`make check-layering` green; `src/editor.lua` is still LÖVE-free, which is what
+the injected `measure` is for.
+
+`tests/drive/mouse.lua` is new and drives the real widget against the live
+server — press, move and release through LÖVE's own callbacks, because
+scripting a selection any other way would be testing the script. `src/drive.lua`
+grew `drag` and a `clicks` count for that; `click` now emits a release too, as
+a real mouse does.
+
+## 2026-09-11 — PM: two false measured claims fixed, and one recommendation declined
+
+**PM2 was right about both wrong numbers, and I re-derived them rather than
+copying them.** In `rust.hacker.31.palindrome` the brief credited the
+enforcement to the wrong case. Measured here with the cubic answer written out:
+the two-letter `n = 20000` case takes **0.64 s** — it does not reject cubic at
+all. The **one-letter** `n = 20000` case is the one that does: cubic was still
+running after **forty seconds** against a five second limit, while
+expand-around-centre does its full `O(n²)` there in **0.08 s**. The brief now
+names the one-letter case as the enforcing one and re-describes the two-letter
+case as a correctness case that checks the generator and the leftmost tie-break
+at scale.
+
+In `rust.hacker.29.dijkstra` the brief said the heap answer takes "about twenty
+milliseconds". Measured: **50 ms**, with the linear-scan starter at **15.94 s**
+of CPU against a five second limit. Rust's scan and PM2's Go scan agree to
+within a fifth of a second (15.94 s vs 16.1 s), which is a second piece of
+cross-language evidence nobody was looking for. The brief also now says the
+thing worth seeing: **the starter is not wrong** — it prints the right answer
+and is rejected only for arriving three times too late.
+
+**A new caveat, which is the more interesting finding.** What the one-letter
+case rejects is check-*every*-substring. Add a single line skipping any
+substring no longer than the best so far and the same cubic loop passes both
+big cases, because on that input the pruning collapses it to `O(n²)`. A timed
+case rejects a *program*, not a complexity class. That is now stated in the
+brief and in `coverage.md` §4. `32.modular` was off by ten milliseconds the
+same way (forty → **fifty**, measured) and is corrected. `24.inversions`
+(0.02 s) and `30.range-queries` (0.10 s) re-measured and **correct as written**.
+
+**Declined: removing `complexity` from `34.stable-sort`'s concepts.** The
+suggestion was that the quest enforces nothing about cost, so the tag pulls it
+into the `timeout` drill under false pretences. Two things are wrong with it.
+The stated goal is not achieved — `concepts.md` §2 routes `timeout` through
+`sorting` as well, so the quest stays in that drill either way. And the cost is
+real: the `wrong-answer` row contains `complexity` but **neither `sorting` nor
+`slices`**, so dropping the tag removes the quest from the one drill it most
+belongs in. An unstable sort does not time out; it returns the wrong order, and
+the verifier confirms the starter is rejected `wrong_answer`. The tag also
+earns its place on content grounds — `sort_unstable_by_key` and `sort.Slice`
+exist *because* they are faster. **Both packs keep all three tags**, so there is
+nothing to mirror and `content/go/` was not touched.
+
+**`tools/verify_pack.py` now distinguishes `timeout` from `wrong_answer`**
+instead of calling every failure a wrong answer. That is what let the four
+enforcement claims be confirmed as real — `24.inversions`, `29.dijkstra`,
+`30.range-queries` and `32.modular` all report `rejected:timeout`, while
+`31.palindrome`, `33.grid-paths` and `34.stable-sort` report
+`rejected:wrong_answer`, which is correct for each. **BE needs the same
+distinction**: they are different SPEC §7.1 kinds feeding different drills, and
+collapsing them would mis-route every player whose real problem is speed. It
+also stopped a false alarm — under load the old verifier reported
+`12.heap FAIL:wrong_answer 3/4`, which was a timeout on a busy machine, not a
+content defect; all four cases reproduce exactly by hand.
+
+## 2026-09-11 — QA: §7.2's rollup, driven end to end
+
+The load-bearing claim of the product — *"the AI mode feeds them back until
+they stop happening"* (SPEC §0) — now has a test that drives the whole arc
+against a real server with real compilation:
+`backend/server/tests/integration.rs::a_mistake_is_learned_by_not_making_it_and_the_badge_says_so_once`.
+
+Every piece of it was unit-tested somewhere. `mistakes.rs` has the rollup
+arithmetic; `awards.rs::taming_a_mistake_needs_both_halves` has the badge rule
+against a hand-built store. **Nothing drove the sequence**, and the sequence is
+the product.
+
+Seven stages, each a real `rustc`:
+
+1. **Make E0382 five times.** Each submission is compiled for real — a test
+   that posted the *kind* directly would be testing the rollup against itself
+   rather than against the compiler. The count climbs 1…5, `cleared_since`
+   resets to 0 each time, and the row carries a readable `label` and an
+   `example_quest_id`.
+2. **Six clean RUNS change nothing.** The sharpest edge in the mechanism, and
+   the one BE argued for: *evidence you have stopped should cost more than
+   evidence you are still going*. `cleared_since` stays at 0. If runs
+   advanced it, "learned" would mean "compiled five times" and the weakness
+   drill would quietly stop teaching the thing the player is worst at.
+3. **Clean SUBMITS advance it, one at a time** — 1, 2, 3, 4, and at each step
+   the kind is still in the default list, because four is not five and it is
+   still something to practise.
+4. **The fifth retires it.** It drops out of the default `stats.mistakes`
+   (§4.14) — that is the whole promise — and is **still there** under
+   `include_learned: true` with its count intact, because SPEC §7.2 says
+   "without being deleted". A player's record is theirs.
+5. **The badge arrives exactly once**, as a live `award` event with `id: null`
+   (§2.2) and `kind: "badge"`, and appears once on the shelf. The shelf holds
+   no `stamp` (§4.14b: a stamp is a moment, not something a player *has*).
+6. **And it does not arrive again** — three more clean submits produce no
+   second announcement and no duplicate on the shelf.
+7. **And making it again brings it back**: `cleared_since` to 0, `count` to 6.
+   "Learned" is a statement about the last five attempts, not a permanent
+   graduation — otherwise the drill stops working the moment somebody has a
+   bad week.
+
+The badge is why the stakes moved. §4.14b is blunt: *"a badge that fires on
+the wrong thing is worse than one that does not exist — it makes every other
+badge mean nothing."* A rollup bug used to mean a slightly wrong drill order;
+it now means telling a player they have mastered something they have not.
+
+## 2026-09-11 — QA: 9.6.d is written, and all nine rows have an owner
+
+`limits.rs::a_go_quest_that_reaches_for_the_internet_fails_cleanly_rather_than_hanging`.
+It stayed unwritten while Go was unsupported, because a test pointed at it
+then would have passed **because Go was unsupported** rather than because the
+proxy was off. BE built the runner, so it is written.
+
+**"Cleanly" is the whole assertion.** Without `GOPROXY=off` a missing module
+does not fail — it *hangs*, resolving against a network CI may not have and a
+laptop may have only intermittently. A player watches a quest compile for
+thirty seconds and gives up. The test asserts a `compile_error` in under
+thirty seconds whose message names the import, and then that a
+standard-library program still builds afterwards: a failed lookup must not
+poison the shared module cache for the next player.
+
+**All nine rows of SPEC §9.6 now have a named owner** — three BE's, six mine,
+tabulated in `tests/PLAN.md` so none is counted twice.
+
+## 2026-09-11 — QA: the repealed id-equals-node check is deleted
+
+`verify_pack.py` enforced that an id's `NN` equalled its `node`. SPEC §12
+repealed that: it contradicted §4.1 ("stable forever … so a reordered map does
+not renumber someone's cleared list into nonsense"), and enforcing it had cost
+four boss quests their ids on three occasions — each rename a delete-and-insert
+that discards whoever had cleared them, which is precisely what §4.1 exists to
+prevent.
+
+The check is gone, with the history in a comment so nobody restores it.
+Everything around it stands: the id's shape, its land and category, and
+uniqueness within the pack. The LRU boss keeping `*.hacker.28.lru` at node 34
+is the first intended use of the resolved rule, and the script now accepts it.
+
+**Not mine, so flagged rather than fixed:** `backend/runner/tests/cargo_harness.rs`
+has one failing test, `an_ignored_test_has_not_passed`. It belongs to the
+harness agent.

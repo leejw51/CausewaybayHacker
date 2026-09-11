@@ -220,13 +220,27 @@ function UI.footer(lines, connection, display)
   local y = Layout.vh - h
   UI.setColor(Theme.ink, 0.8)
   love.graphics.rectangle("fill", 0, y, Layout.vw, h)
-  UI.text(lines or "", 10, y + 7, 8, Theme.withAlpha(Theme.cream, 0.85))
+
+  -- The hint was drawn at x = 10 and never measured, so on the quest screen
+  -- in portrait — seven keys and an address, on a 720-wide canvas — it ran
+  -- straight through the connection badge and the two strings were printed
+  -- on top of each other. Two steps, in order: try a size smaller, then clip.
+  -- A hint that is cut off mid-word still reads; one with `OPEN` printed
+  -- through it does not.
+  local badge = connection and (UI.textWidth(connection:upper(), 8) + 16) or 0
+  local room = Layout.vw - 20 - badge
+  local text = lines or ""
+  local size = (UI.textWidth(text, 8) > room) and 7 or 8
+  love.graphics.setScissor(0, y, math.max(0, Layout.vw - badge - 8), h)
+  UI.text(text, 10, y + 7 + (8 - size), size, Theme.withAlpha(Theme.cream, 0.85))
+  love.graphics.setScissor()
+
   if display then
     local w = UI.textWidth(display, 8)
     local right = Layout.vw - 10 - (connection and (UI.textWidth("CONNECTING", 8) + 14) or 0)
     -- Only when there is honest room; a hint that collides with the
     -- connection badge is worse than one that is not there.
-    if right - w > UI.textWidth(lines or "", 8) + 24 then
+    if right - w > UI.textWidth(text, size) + 24 then
       UI.text(display, right - w, y + 7, 8, Theme.withAlpha(Theme.cream, 0.55))
     end
   end

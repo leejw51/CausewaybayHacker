@@ -455,6 +455,14 @@ function Map:draw()
   love.graphics.rectangle("fill", px, py, pw, ph)
   love.graphics.setColor(1, 1, 1, 1)
 
+  -- `art/fg_wires` was drawn here for one round and taken out again. It is a
+  -- foreground layer for an **elevation** — a street seen from the side — and
+  -- every full-screen plate in this client is either a top-down town or a
+  -- room. A slung cable over a top-down town is a cable lying in the road: it
+  -- crossed six nodes and two streets and read as damage. The two elevation
+  -- plates that would suit it, `title_bg` and `bg_street`, already have their
+  -- catenary painted in. The asset stays unused on purpose.
+
   self:draw_agents()
   self:draw_edges()
   self:draw_nodes()

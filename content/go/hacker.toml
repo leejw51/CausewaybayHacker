@@ -117,6 +117,9 @@ cases = [
   { name = "late",   stdin = "5 10\n1 2 3 4 6\n",     expect = "4 5\n", visible = false },
   { name = "none",   stdin = "3 100\n1 2 3\n",        expect = "-1\n",  visible = false },
   { name = "signed", stdin = "6 0\n-3 4 3 90 -1 1\n", expect = "1 3\n", visible = false },
+  # the partner repeats before it is needed: storing the LAST index of a value
+  # instead of the first answers "2 3" and breaks the stated tie-break
+  { name = "repeat", stdin = "3 5\n2 2 3\n",           expect = "1 3\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 02
@@ -236,6 +239,8 @@ cases = [
   { name = "one",    stdin = "1 4\n4\n",               expect = "1\n1\n", visible = false },
   { name = "never",  stdin = "3 11\n1 1 1\n",          expect = "0\n0\n", visible = false },
   { name = "tail",   stdin = "8 15\n1 2 3 4 5 6 7 8\n", expect = "2\n7\n", visible = false },
+  # three windows of length 2 all reach s; `<=` instead of `<` keeps the last
+  { name = "ties",   stdin = "5 5\n1 4 1 4 1\n",       expect = "2\n1\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 03
@@ -362,6 +367,9 @@ cases = [
   { name = "touching", stdin = "2\n1 4\n4 5\n",              expect = "1 5\nCOUNT 1\n",              visible = false },
   { name = "point",    stdin = "1\n5 5\n",                   expect = "5 5\nCOUNT 1\n",              visible = false },
   { name = "unsorted", stdin = "3\n5 6\n1 2\n3 4\n",         expect = "1 2\n3 4\n5 6\nCOUNT 3\n",    visible = false },
+  # the second span is swallowed whole: assigning the new end unconditionally
+  # instead of taking the larger one shortens the merge to "1 3"
+  { name = "swallowed", stdin = "2\n1 10\n2 3\n",           expect = "1 10\nCOUNT 1\n",             visible = false },
 ]
 
 # ---------------------------------------------------------------- 04
@@ -771,6 +779,9 @@ cases = [
   { name = "missing",   stdin = "7 3\n4 5 6 7 0 1 2\n", expect = "-1\nPIVOT 5\n", visible = false },
   { name = "single",    stdin = "1 1\n1\n",             expect = "1\nPIVOT 1\n",  visible = false },
   { name = "unrotated", stdin = "5 5\n5 6 7 8 9\n",     expect = "1\nPIVOT 1\n",  visible = false },
+  # the target is BEFORE the pivot, so only searching the half from the pivot
+  # to the end — which clears every other case here — answers -1
+  { name = "left-half", stdin = "7 6\n4 5 6 7 0 1 2\n", expect = "3\nPIVOT 5\n",  visible = false },
 ]
 
 # ---------------------------------------------------------------- 07
@@ -1236,6 +1247,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 )
 
 func present(tree []int64, i int) bool {
@@ -1272,14 +1285,11 @@ func main() {
 }
 
 func join(values []int64) string {
-	s := ""
+	parts := make([]string, len(values))
 	for i, v := range values {
-		if i > 0 {
-			s += " "
-		}
-		s += fmt.Sprint(v)
+		parts[i] = strconv.FormatInt(v, 10)
 	}
-	return s
+	return strings.Join(parts, " ")
 }
 '''
 solution     = '''
@@ -1289,6 +1299,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 )
 
 func present(tree []int64, i int) bool {
@@ -1342,14 +1354,11 @@ func main() {
 }
 
 func join(values []int64) string {
-	s := ""
+	parts := make([]string, len(values))
 	for i, v := range values {
-		if i > 0 {
-			s += " "
-		}
-		s += fmt.Sprint(v)
+		parts[i] = strconv.FormatInt(v, 10)
 	}
-	return s
+	return strings.Join(parts, " ")
 }
 '''
 hints = [
@@ -1405,6 +1414,13 @@ output: VALID
 Checking `left < node < right` at each node **is not enough** — a value deep
 in the left subtree can still be larger than an ancestor. Carry the open
 interval down instead.
+
+A lookup is the **BST descent**, not a search of the whole tree: from the root,
+go left when the target is smaller and right when it is larger, and stop when
+you fall off. On an `INVALID` tree that descent can walk straight past a value
+that is sitting in the array — and it must still report `ABSENT`, because the
+descent is the only thing a BST lookup is allowed to cost. One hidden case is
+exactly that tree.
 '''
 starter      = '''
 package main
@@ -2066,6 +2082,9 @@ Kahn's algorithm: count how many things each task waits on, start with the
 ones waiting on nothing, and when you take a task, decrement its dependents.
 If you finish with tasks left over, those tasks are in a cycle.
 
+`DONE` is how many tasks you actually ordered, which on a cycle is the number
+you got through before you stalled — not zero, unless nothing was ready at all.
+
 The ready set is kept sorted here because `n` is small and it reads clearly.
 A heap is the answer for a real `n`, and node 12 already built one.
 '''
@@ -2178,6 +2197,9 @@ cases = [
   { name = "cycle",   stdin = "3 3\n0 1\n1 2\n2 0\n",      expect = "CYCLE\nDONE 0\n",     visible = false },
   { name = "loose",   stdin = "3 0\n",                     expect = "0 1 2\nDONE 3\n",     visible = false },
   { name = "chain",   stdin = "5 4\n4 3\n3 2\n2 1\n1 0\n", expect = "4 3 2 1 0\nDONE 5\n", visible = false },
+  # a cycle with two tasks outside it: DONE is what you ordered before you
+  # stalled, so a program that prints DONE 0 on any cycle is wrong here
+  { name = "partial", stdin = "4 3\n0 1\n2 3\n3 2\n",     expect = "CYCLE\nDONE 2\n",    visible = false },
 ]
 
 # ---------------------------------------------------------------- 16
@@ -2480,7 +2502,8 @@ concepts     = ["dynamic-programming", "prefix-sums", "complexity"]
 requires     = ["go.hacker.17.coins"]
 map          = { x = 0.529, y = 0.448, kind = "quest" }
 brief        = '''
-Line one is `n`. Line two is `n` integers, which may be negative.
+Line one is `n`, at least `1`. Line two is `n` integers, which may be
+negative.
 
 Print three lines:
 
@@ -3012,8 +3035,11 @@ output: 7 4 1
         1 2 3 6 9 8 7 4 5
 ```
 
-The rotation is the one to do in place: transpose, then reverse each row.
-Naming that out loud is half the question.
+The rotation is transpose-then-reverse-each-row, and both steps are swaps —
+so it needs no second grid. Naming that out loud is half the question. Here
+you still have to keep the original, because the spiral walks it afterwards:
+copy once, rotate the copy in place, and say why the copy is there. An
+interviewer who asks for the rotation alone is asking for `O(1)` extra space.
 '''
 starter      = '''
 package main
@@ -3501,7 +3527,7 @@ title        = "T TEST CASES FOLLOW"
 difficulty   = 3
 time_limit_s = 900
 story        = "The shape every screen uses, and the bug every candidate writes at least once: the second case remembers the first."
-concepts     = ["io", "collections", "control-flow"]
+concepts     = ["io", "hashing", "control-flow"]
 requires     = ["go.hacker.24.inversions"]
 map          = { x = 0.481, y = 0.737, kind = "quest" }
 brief        = '''
@@ -3661,7 +3687,7 @@ concepts     = ["math", "sorting", "types"]
 requires     = ["go.hacker.25.test-cases"]
 map          = { x = 0.378, y = 0.664, kind = "quest" }
 brief        = '''
-Line one is `n`. Line two is `n` integers.
+Line one is `n`, at least `1`. Line two is `n` integers.
 
 Print three lines, each to **six decimal places**: the mean, the **population**
 standard deviation (divide by `n`, not `n - 1`), and the median — which for an
@@ -4129,10 +4155,10 @@ type item struct {
 
 type pq []item
 
-func (p pq) Len() int            { return len(p) }
-func (p pq) Less(i, j int) bool  { return p[i].dist < p[j].dist }
-func (p pq) Swap(i, j int)       { p[i], p[j] = p[j], p[i] }
-func (p *pq) Push(x any)         { *p = append(*p, x.(item)) }
+func (p pq) Len() int           { return len(p) }
+func (p pq) Less(i, j int) bool { return p[i].dist < p[j].dist }
+func (p pq) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p *pq) Push(x any)        { *p = append(*p, x.(item)) }
 func (p *pq) Pop() any {
 	old := *p
 	last := len(old) - 1
@@ -5035,6 +5061,13 @@ There are two correct answers and you should be able to give both. Use
 ever compare equal and stability stops being a question. The second is what to
 reach for by default; an unstable sort has nothing to prove when the order is
 fully specified.
+
+The modern spellings are `slices.SortFunc` and `slices.SortStableFunc`, whose
+comparison returns a negative number, zero or a positive number instead of a
+`bool` — `cmp.Compare` is the one that gives you exactly `-1`, `0` or `1`. They are generic
+rather than reflective, so they are faster, and the same stability distinction
+applies with the same two names. Know both — this pack writes `sort` because
+that is what you will be reading in most Go you are handed.
 '''
 starter      = '''
 package main

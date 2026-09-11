@@ -44,6 +44,29 @@ export interface Strip {
   boxes: Box[];
 }
 
+/**
+ * One entry of `art/palette.json`: a strip whose frames differ only in hue.
+ *
+ * It is a separate file from the manifest on purpose. The manifest is the art
+ * *contract* — names, sizes, the ink box — and this is a **measurement taken
+ * out of** the delivered PNGs: the tube colour, the darker face under it and
+ * the hue in degrees, for every frame. Keeping them apart means the numbers can
+ * be re-measured when a sprite is redrawn without anything having to agree
+ * about a schema, and it means a client that cannot find the file still draws
+ * the art, just without the cycle.
+ */
+export interface Palette {
+  frames: number;
+  fw: number;
+  fh: number;
+  hues: Array<{
+    i: number;
+    tube: [number, number, number];
+    face: [number, number, number];
+    hue_deg: number;
+  }>;
+}
+
 export interface Box {
   /** The middle of the ink, and the row its feet stand on. */
   cx: number;
@@ -62,6 +85,8 @@ export class Assets {
   private readonly entries = new Map<string, Entry>();
   private readonly pending = new Set<string>();
   readonly box = new Map<string, Box>();
+  /** Measured hue tables, by asset name. Empty when `palette.json` is absent. */
+  readonly palettes = new Map<string, Palette>();
 
   private constructor(private readonly base: string) {}
 
@@ -81,6 +106,23 @@ export class Assets {
       // The .jpg files are the backgrounds; the .png files are the sprites.
       if (e.file.endsWith(".png")) eager.push(a.fetch(e));
     }
+    // Optional, and deliberately not fatal: a build served without
+    // `palette.json` draws every sprite exactly as before, and only the neon
+    // stops cycling.
+    eager.push(
+      (async () => {
+        try {
+          const res2 = await fetch(`${base}/palette.json`);
+          if (!res2.ok) return;
+          const raw = (await res2.json()) as Record<string, Palette>;
+          for (const [name, entry] of Object.entries(raw)) {
+            if (entry && Array.isArray(entry.hues)) a.palettes.set(name, entry);
+          }
+        } catch {
+          /* no palette: the art still draws */
+        }
+      })(),
+    );
     await Promise.all(eager);
     return a;
   }

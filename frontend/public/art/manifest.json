@@ -501,12 +501,12 @@
       "h": 384,
       "box": {
         "cx": 575.0,
-        "feet": 342.0,
-        "h": 300.0,
+        "feet": 335.0,
+        "h": 286.0,
         "minx": 63,
-        "miny": 42,
+        "miny": 49,
         "maxx": 1087,
-        "maxy": 341
+        "maxy": 334
       }
     },
     {
@@ -745,6 +745,371 @@
       "file": "bg_playground_p.jpg",
       "w": 768,
       "h": 1152
+    },
+    {
+      "name": "badge_stamp",
+      "file": "badge_stamp.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.5,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 13,
+        "miny": 5,
+        "maxx": 82,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "badge_star",
+      "file": "badge_star.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 90.0,
+        "h": 84.0,
+        "minx": 5,
+        "miny": 6,
+        "maxx": 89,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "badge_flame",
+      "file": "badge_flame.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.5,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 16,
+        "miny": 5,
+        "maxx": 79,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "badge_flame_7",
+      "file": "badge_flame_7.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.5,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 18,
+        "miny": 5,
+        "maxx": 77,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "badge_flame_30",
+      "file": "badge_flame_30.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.5,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 18,
+        "miny": 5,
+        "maxx": 77,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "badge_chain",
+      "file": "badge_chain.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 5,
+        "miny": 5,
+        "maxx": 89,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "badge_chain_10",
+      "file": "badge_chain_10.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 5,
+        "miny": 5,
+        "maxx": 89,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "badge_chain_25",
+      "file": "badge_chain_25.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 90.0,
+        "h": 84.0,
+        "minx": 5,
+        "miny": 6,
+        "maxx": 89,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "badge_watch",
+      "file": "badge_watch.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.5,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 15,
+        "miny": 5,
+        "maxx": 80,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "badge_shackle",
+      "file": "badge_shackle.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 76.0,
+        "h": 52.0,
+        "minx": 5,
+        "miny": 24,
+        "maxx": 89,
+        "maxy": 75
+      }
+    },
+    {
+      "name": "badge_flags",
+      "file": "badge_flags.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 77.0,
+        "h": 58.0,
+        "minx": 5,
+        "miny": 19,
+        "maxx": 89,
+        "maxy": 76
+      }
+    },
+    {
+      "name": "badge_tally",
+      "file": "badge_tally.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 83.0,
+        "h": 71.0,
+        "minx": 5,
+        "miny": 12,
+        "maxx": 89,
+        "maxy": 82
+      }
+    },
+    {
+      "name": "badge_chevron_bronze",
+      "file": "badge_chevron_bronze.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 89.0,
+        "h": 83.0,
+        "minx": 5,
+        "miny": 6,
+        "maxx": 89,
+        "maxy": 88
+      }
+    },
+    {
+      "name": "badge_chevron_silver",
+      "file": "badge_chevron_silver.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 89.0,
+        "h": 83.0,
+        "minx": 5,
+        "miny": 6,
+        "maxx": 89,
+        "maxy": 88
+      }
+    },
+    {
+      "name": "badge_chevron",
+      "file": "badge_chevron.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 89.0,
+        "h": 83.0,
+        "minx": 5,
+        "miny": 6,
+        "maxx": 89,
+        "maxy": 88
+      }
+    },
+    {
+      "name": "badge_slot",
+      "file": "badge_slot.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.5,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 6,
+        "miny": 5,
+        "maxx": 89,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "emblem_ai_repeat",
+      "file": "emblem_ai_repeat.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 110.0,
+        "h": 92.0,
+        "minx": 21,
+        "miny": 18,
+        "maxx": 362,
+        "maxy": 109
+      }
+    },
+    {
+      "name": "emblem_ai_weakness",
+      "file": "emblem_ai_weakness.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 48,
+        "miny": 7,
+        "maxx": 335,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_ai_spaced",
+      "file": "emblem_ai_spaced.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 31,
+        "miny": 7,
+        "maxx": 351,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "shackle_break",
+      "file": "shackle_break.png",
+      "w": 384,
+      "h": 64,
+      "frames": 6,
+      "fw": 64,
+      "fh": 64,
+      "boxes": [
+        {
+          "cx": 31.5,
+          "feet": 49.0,
+          "h": 34.0,
+          "minx": 11,
+          "miny": 15,
+          "maxx": 52,
+          "maxy": 48
+        },
+        {
+          "cx": 31.0,
+          "feet": 49.0,
+          "h": 34.0,
+          "minx": 4,
+          "miny": 15,
+          "maxx": 58,
+          "maxy": 48
+        },
+        {
+          "cx": 31.5,
+          "feet": 49.0,
+          "h": 34.0,
+          "minx": 4,
+          "miny": 15,
+          "maxx": 59,
+          "maxy": 48
+        },
+        {
+          "cx": 31.5,
+          "feet": 50.0,
+          "h": 36.0,
+          "minx": 4,
+          "miny": 14,
+          "maxx": 59,
+          "maxy": 49
+        },
+        {
+          "cx": 31.5,
+          "feet": 50.0,
+          "h": 36.0,
+          "minx": 4,
+          "miny": 14,
+          "maxx": 59,
+          "maxy": 49
+        },
+        {
+          "cx": 31.0,
+          "feet": 50.0,
+          "h": 37.0,
+          "minx": 6,
+          "miny": 13,
+          "maxx": 56,
+          "maxy": 49
+        }
+      ]
+    },
+    {
+      "name": "fx_shards",
+      "file": "fx_shards.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 90.0,
+        "h": 84.0,
+        "minx": 5,
+        "miny": 6,
+        "maxx": 89,
+        "maxy": 89
+      }
     }
   ]
 }

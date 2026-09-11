@@ -195,27 +195,70 @@ function Ai:draw()
   self.app:footer("ARROWS mode   ENTER start   N next   F finish   ESC back")
 end
 
+--- The three plans, each with DESIGN's emblem for it.
+---
+--- **Stacked, in both orientations.** Three cards side by side left 226
+--- pixels each in portrait, and a paragraph saying what a plan actually
+--- selects does not fit in 206 of them — it wrapped to four lines and then
+--- clipped, so the screen explained two of the three modes and cut the third
+--- off mid-sentence. Full-width rows also make this screen look like the
+--- lands and category screens, which are the same idea: a row, a picture, a
+--- choice.
+---
+--- The emblems (`emblem_ai_weakness`, `_repeat`, `_spaced`) are 384x128 —
+--- the same 3:1 as the category bands — so they are drawn the way
+--- `categories.lua` worked out: at their own aspect, as tall as the row,
+--- anchored **right** with a short fade on its left edge, and the words kept
+--- in their own gutter beside it rather than on top of it.
 function Ai:draw_modes(x, y, w)
-  local h = 74
-  local cw = (w - 16) / #MODES
+  local h = 76
+  local gap = 8
   self.mode_rects = {}
   for i, mode in ipairs(MODES) do
-    local mx = x + (i - 1) * (cw + 8)
+    local my = y + (i - 1) * (h + gap)
     local on = i == self.cursor
-    UI.panel(mx, y, cw, h, {
+    UI.panel(x, my, w, h, {
       fill = Theme.withAlpha(on and Theme.navy or Theme.ink, 0.92),
       tint = on and Theme.coin or Theme.cyan,
     })
-    local text = MODE_TEXT[mode]
-    UI.text(text.title, mx + 10, y + 8, 11, on and Theme.coin or Theme.cream)
-    local lines = UI.wrap(text.blurb, cw - 20, 7)
-    for j = 1, math.min(4, #lines) do
-      UI.text(lines[j], mx + 10, y + 26 + (j - 1) * 10, 7,
+
+    -- The band first, so the words land on top of its fade and not under it.
+    local text_w = w - 20
+    local image = Assets.image("emblem_ai_" .. mode)
+    if image then
+      local iw, ih = image:getDimensions()
+      local es = (h - 8) / ih
+      local ew = iw * es
+      -- Only when the words and the picture both fit. A band squeezed into
+      -- whatever is left over is not the picture DESIGN drew.
+      if w - ew >= 230 then
+        local ex = x + w - ew - 4
+        love.graphics.setScissor(x + 4, my + 4, w - 8, h - 8)
+        love.graphics.setColor(1, 1, 1, on and 1 or 0.7)
+        love.graphics.draw(image, ex, my + 4, 0, es, es)
+        -- **No left-edge fade here**, unlike `categories.lua`. That fade
+        -- exists to hide a hard cut, and these three emblems have 20 to 50
+        -- pixels of their own transparent margin before the ink starts
+        -- (`minx` 21, 48 and 31 of 384, in the manifest) — so there is no cut
+        -- to hide, and a strip of panel colour painted over empty canvas was
+        -- a visibly darker bar with a hard edge of its own. Looked at, not
+        -- assumed from the sibling screen.
+        love.graphics.setScissor()
+        love.graphics.setColor(1, 1, 1, 1)
+        text_w = w - ew - 30
+      end
+    end
+
+    UI.text(MODE_TEXT[mode].title, x + 10, my + 8, 11, on and Theme.coin or Theme.cream)
+    local lines = UI.wrap(MODE_TEXT[mode].blurb, text_w, 7)
+    local room = math.floor((h - 28) / 10)
+    for j = 1, math.min(room, #lines) do
+      UI.text(lines[j], x + 10, my + 26 + (j - 1) * 10, 7,
         Theme.withAlpha(Theme.cream, on and 0.85 or 0.5))
     end
-    self.mode_rects[i] = { x = mx, y = y, w = cw, h = h }
+    self.mode_rects[i] = { x = x, y = my, w = w, h = h }
   end
-  return y + h
+  return y + #MODES * (h + gap) - gap
 end
 
 function Ai:draw_idle(x, y, w, h)

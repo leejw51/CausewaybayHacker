@@ -46,6 +46,7 @@ local Assets = require("src.assets")
 local UI = require("src.ui")
 local SFX = require("src.sfx")
 local Editor = require("src.editor")
+local CodePane = require("src.codepane")
 local runlog = require("src.net.runlog")
 local External = require("src.external")
 local Anim = require("src.anim")
@@ -108,6 +109,9 @@ function Quest:enter(params)
     },
     now = function() return love.timer.getTime() end,
   })
+  -- The mouse half of the pane: the hit test, drag-select and the bracket
+  -- overlay, shared with the playground so the two cannot drift.
+  self.pane = CodePane.new(self.editor)
 
   -- Taken back in `leave`: this scene is entered once per visit to a node,
   -- and a subscription that outlived it would keep this scene (and its whole
@@ -578,7 +582,10 @@ function Quest:draw_editor(rect, tint)
   local size = math.floor(18 * scale)
   local font = Assets.mono(size)
   local line_h = font:getHeight()
-  local gutter = font:getWidth("0000")
+  -- The trailing space is not decoration: `%4d` right-aligns, so without
+  -- it the last digit of the line number touches the first character of an
+  -- unindented line and `1` reads as part of `fn`.
+  local gutter = font:getWidth("0000 ")
   local rows = math.max(1, math.floor((rect.h - 12) / line_h))
   self.editor:ensure_visible(rows)
   self.visible_rows = rows
@@ -592,6 +599,9 @@ function Quest:draw_editor(rect, tint)
 
   local x0 = rect.x + 8
   local y0 = rect.y + 6
+  -- The numbers the draw actually used, handed to the pane so a click is
+  -- tested against what is on screen rather than a re-derivation of it.
+  self.pane:frame(rect, font, gutter, x0, y0, line_h, rows)
   local state = "code"
   -- Comment state has to be carried from line 1, not from the first visible
   -- line, or scrolling into the middle of a /* … */ colours it as code.
@@ -623,7 +633,10 @@ function Quest:draw_editor(rect, tint)
       love.graphics.rectangle("fill", sx, y, math.max(2, sw), line_h)
     end
 
-    UI.setColor(Theme.dim, 0.9)
+    -- A line number in `brick` means that line holds a bracket that never
+    -- closed — said in the gutter as well as on the bracket, because the
+    -- bracket itself may have scrolled off to the right.
+    UI.setColor(self.pane:gutter_color(index))
     love.graphics.print(("%4d"):format(index), x0, y)
 
     local spans
@@ -643,6 +656,7 @@ function Quest:draw_editor(rect, tint)
       end
     end
   end
+  self.pane:draw_brackets()
   love.graphics.setScissor()
   love.graphics.setColor(1, 1, 1, 1)
 
@@ -703,8 +717,12 @@ function Quest:draw_editor(rect, tint)
   UI.text(hidden > 0 and ("+%d hidden"):format(hidden) or "all cases",
     sx, by - 12, 7, Theme.withAlpha(Theme.coin, 0.8))
 
+  -- On the caption row with `1 sample` and `+2 hidden`, not eighteen pixels
+  -- off the bottom of the well — which put it *inside* the button band, so
+  -- the FORMAT button was printed over the top of it and neither could be
+  -- read. Found by looking at a screenshot; no test would have caught it.
   local info = ("%d lines   %d bytes"):format(total, #self.editor:text())
-  UI.text(info, rect.x + 10, rect.y + rect.h - 18, 7, Theme.withAlpha(Theme.cream, 0.45))
+  UI.text(info, rect.x + 10, by - 12, 7, Theme.withAlpha(Theme.cream, 0.45))
 
   -- §4.9d's `problem`, in the **hint** register rather than the failure one.
   -- A formatter pressed mid-edit meeting half-written code is the normal
@@ -712,10 +730,11 @@ function Quest:draw_editor(rect, tint)
   local said = self.format_problem or self.format_note
   if said then
     local colour = self.format_problem and Theme.coin or Theme.withAlpha(Theme.cyan, 0.9)
-    local room = rect.w - 24 - (self.format_rect and self.format_rect.w or 0)
+    -- Above the button row now, so it has the whole width of the well.
+    local room = rect.w - 24
     for i, line in ipairs(UI.wrap(said, room, 7)) do
       if i <= 2 then
-        UI.text(line, rect.x + 10, rect.y + rect.h - 46 + (i - 1) * 9, 7, colour)
+        UI.text(line, rect.x + 10, by - 34 + (i - 1) * 9, 7, colour)
       end
     end
   end
@@ -942,6 +961,10 @@ function Quest:mousepressed(x, y, button)
   local function inside(r)
     return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
   end
+  -- The buttons sit inside the code well, so they are tested first. They also
+  -- fire on the press and not the release, which is what makes a drag that
+  -- started in the text and ended over SUBMIT harmless: the release does
+  -- nothing at all.
   if inside(self.format_rect) then self:format(); return end
   if inside(self.run_rect) then self:run(); return end
   if inside(self.submit_rect) then self:submit(); return end
@@ -949,23 +972,23 @@ function Quest:mousepressed(x, y, button)
     self.focus = "brief"
     return
   end
-  if x >= code.x and x <= code.x + code.w and y >= code.y and y <= code.y + code.h then
+  -- Both shifts. The old hit test asked `isDown("lshift")` only, so
+  -- shift-clicking with the right hand quietly placed the caret instead of
+  -- extending the selection.
+  local shift = love.keyboard.isDown("lshift", "rshift")
+  if self.pane:mousepressed(x, y, button, shift) then
     self.focus = "editor"
-    -- Put the caret where the click was.
-    if self.mono_font and self.line_h then
-      local row = math.floor((y - code.y - 6) / self.line_h) + 1
-      local index = self.editor.scroll + row
-      local line = self.editor.lines[math.max(1, math.min(#self.editor.lines, index))] or ""
-      local target = x - code.x - 8 - (self.gutter or 0)
-      local col = 1
-      while col <= #line do
-        local nextb = Editor.next_boundary(line, col)
-        if self.mono_font:getWidth(line:sub(1, nextb - 1)) > target then break end
-        col = nextb
-      end
-      self.editor:goto_position(index, col, button == 1 and love.keyboard.isDown("lshift"))
-    end
+    return
   end
+  if inside(code) then self.focus = "editor" end
+end
+
+function Quest:mousemoved(x, y)
+  if self.pane then self.pane:mousemoved(x, y) end
+end
+
+function Quest:mousereleased()
+  if self.pane then self.pane:mousereleased() end
 end
 
 return Quest

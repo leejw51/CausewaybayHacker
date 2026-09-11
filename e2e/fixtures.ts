@@ -185,11 +185,30 @@ export async function sceneNow(page: Page): Promise<string | null> {
   return page.evaluate(() => window.__cwbCapture?.scene() ?? null);
 }
 
-/** Wait for a screen. Every poll settles first, which is what stops the flake. */
-export async function atScreen(page: Page, want: Screen, timeout = 60_000): Promise<void> {
+/**
+ * Wait for a screen: poll cheaply, settle once at the end.
+ *
+ * This used to `settle()` on every poll, which ticks 150 frames
+ * synchronously. That was affordable when the renderer was two canvases; it
+ * stopped being affordable as the scenes grew, and a login that works
+ * perfectly well started timing out at sixty seconds because the *waiting*
+ * was the slow part. A test that fails for the cost of its own polling is
+ * worse than no test — it sends somebody looking for a product bug.
+ *
+ * Polling on `scene()` alone is correct: a scene is swapped in one go, so the
+ * name is right even mid-transition. The single `settle()` afterwards is what
+ * makes whatever the caller asserts next deterministic, and it is the only
+ * reason to pay for one at all.
+ */
+export async function atScreen(page: Page, want: Screen, timeout = 90_000): Promise<void> {
   await expect
-    .poll(async () => scene(page), { timeout, message: `waiting for the ${want} screen` })
+    .poll(async () => sceneNow(page), { timeout, message: `waiting for the ${want} screen` })
     .toBe(want);
+  await page.evaluate(() => {
+    const api = window.__cwbCapture;
+    api?.settle();
+    api?.resume();
+  });
 }
 
 /**

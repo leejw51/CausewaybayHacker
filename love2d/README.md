@@ -68,9 +68,43 @@ official release from GitHub instead, and `make run` will use a `love` on
 | **P** | the playground — Mei's desk, from the map or the land select |
 | **S** / **T** / **A** | from the map: search · stats · AI mode |
 | **TAB** / **ESC** | indent · back |
+| **ctrl-]** | in the editor: jump to the matching bracket (shift to select) |
 
 `F` is only a shortcut on screens that are not taking text; in the editor and
 the login fields it is the letter. `F11` always works.
+
+### The editor
+
+It is where a player spends most of an evening, so it behaves the way an
+editor behaves. Multi-line, UTF-8-aware motion, word motion, smart home, a
+goal column, tab stops, block indent and dedent, indent-aware backspace,
+brace auto-indent, ctrl-/ to comment, undo that takes back a word rather than
+a letter, redo, the system clipboard, and a FORMAT that puts the caret back
+between the same two characters after `rustfmt` has re-flowed the file.
+
+**The mouse selects.** Click to place, drag to select, double click for a
+word, triple click for a line — and a word or line drag then grows by words
+or lines, not by characters. Shift-click extends whatever is already
+selected. A drag off the top or bottom of the pane scrolls to follow.
+
+**Brackets are matched, and the unmatched ones are named.** The pair around
+the caret is outlined in cyan; a `(`, `[` or `{` that never closed — or a
+closer with nothing open — is outlined in red and its line number turns red
+with it, so a brace that has scrolled off to the right still says so. An
+unbalanced brace is the most common reason a submission does not compile and
+it is invisible until the compiler says so.
+
+Only `()`, `[]` and `{}`. `<` and `>` are deliberately left alone: in Rust
+they are comparison, `->`, `=>` and generics in roughly equal measure, and a
+matcher that guessed would be wrong on `Vec<u8>` more often than it was right.
+
+What is decided to be a bracket comes from the same tokenizer that colours the
+pane, so a brace inside a string literal or a comment is text — and a brace
+can never be drawn as matched while being coloured as part of a string.
+
+**No search and no multi-cursor.** A quest answer is forty lines; a search box
+in a file you can see all of is a key that opens a dialog you then close. If
+the playground grows long snippets that changes.
 
 ### RUN and SUBMIT
 
@@ -262,6 +296,7 @@ src/
   theme.lua ease.lua crt.lua                    (ported)
   assets.lua ui.lua sfx.lua                     art, chrome, chip audio
   editor.lua          the code editor's model — pure, no love
+  codepane.lua        the mouse and the bracket overlay, shared by two scenes
   external.lua        the $EDITOR escape hatch
   wallet.lua          the LuaJIT binding to libcwbh_ffi
   store.lua           the session token, and nothing else, on disk

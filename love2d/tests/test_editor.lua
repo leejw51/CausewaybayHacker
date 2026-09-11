@@ -553,6 +553,300 @@ return function()
     end
   end)
 
+  -- ------------------------------------------------------------- the mouse
+
+  T.section("editor — the pixel that was clicked")
+
+  --- A fixed-width font, which is the only kind this editor is ever drawn
+  --- in: eight pixels a character, so a width is a character count times 8.
+  local function mono(w)
+    w = w or 8
+    return function(s) return editor.char_count(s) * w end
+  end
+
+  T.case("a click lands on the nearest boundary, not the last one passed", function()
+    local line = "let x = 1;"
+    local m = mono(8)
+    T.eq(editor.column_at(line, 0, m), 1, "the far left is column 1")
+    T.eq(editor.column_at(line, -40, m), 1, "left of the text is still column 1")
+    T.eq(editor.column_at(line, 8, m), 2, "exactly one character in")
+    -- The half that matters: clicking the right-hand side of a character
+    -- puts the caret after it. A hit test that rounded down would make a
+    -- drag started mid-character drop that character.
+    T.eq(editor.column_at(line, 11, m), 2, "the left half of character 2")
+    T.eq(editor.column_at(line, 13, m), 3, "the right half of character 2")
+    T.eq(editor.column_at(line, 4000, m), #line + 1, "past the end is the end")
+  end)
+
+  T.case("clicking the empty space right of a short line lands at its end", function()
+    -- Every click in the blank half of the pane is this case, and the first
+    -- version of the early exit could bail on the first boundary and answer
+    -- column 1 — which would put the caret at the *start* of the line the
+    -- player clicked past the end of.
+    local m = mono(8)
+    T.eq(editor.column_at("ab", 600, m), 3, "two characters, clicked far right")
+    T.eq(editor.column_at("", 600, m), 1, "an empty line has only one column")
+    T.eq(editor.column_at("x", 9, m), 2, "and one just past the only character")
+    T.eq(editor.column_at("x", 3, m), 1, "but the left third of it is still before")
+  end)
+
+  T.case("a click counts code points, not bytes", function()
+    local line = 'let s = "銅鑼灣";'
+    local m = mono(8)
+    -- Each of the three CJK characters is three bytes and one cell.
+    -- `let s = "` is nine cells and nine bytes; the CJK that follows is one
+    -- cell and three bytes each.
+    T.eq(editor.column_at(line, 8 * 9, m), 10, "nine cells in is byte 10")
+    T.eq(editor.column_at(line, 8 * 10, m), 13, "one cell later is three bytes later")
+    T.eq(editor.column_at(line, 8 * 11, m), 16, "and again")
+  end)
+
+  T.section("editor — what a double click takes")
+
+  T.case("word_span takes a run of one kind at a time", function()
+    local line = "let mut counts = HashMap::new();"
+    local from, to = editor.word_span(line, 9)
+    T.eq(line:sub(from, to - 1), "counts", "an identifier")
+    from, to = editor.word_span(line, 8)
+    T.eq(line:sub(from, to - 1), " ", "the space between two words")
+    from, to = editor.word_span(line, 25)
+    T.eq(line:sub(from, to - 1), "::", "a run of punctuation")
+    from, to = editor.word_span(line, #line + 1)
+    T.eq(line:sub(from, to - 1), "();", "past the end takes the last run")
+    from, to = editor.word_span("", 1)
+    T.eq(from, 1, "an empty line has an empty span")
+    T.eq(to, 1, "an empty line has an empty span")
+  end)
+
+  T.case("word_span does not split a multi-byte character", function()
+    local line = "let 銅鑼灣 = 1;"
+    local from, to = editor.word_span(line, 5)
+    T.eq(line:sub(from, to - 1), "銅鑼灣", "three code points, nine bytes, one word")
+  end)
+
+  T.section("editor — dragging with the mouse")
+
+  local function drag_fixture()
+    return editor.new({ text = "alpha beta\ngamma delta\nepsilon zeta" })
+  end
+
+  T.case("press, move, release selects the range dragged over", function()
+    local ed = drag_fixture()
+    ed:begin_select(1, 1, "char")
+    T.nope(ed:has_selection(), "a press alone selects nothing")
+    ed:drag_to(2, 6)
+    T.eq(ed:selected_text(), "alpha beta\ngamma", "the drag selected forwards")
+    T.ok(ed:dragging(), "the button is still down")
+    ed:end_select()
+    T.nope(ed:dragging(), "and now it is not")
+    T.eq(ed:selected_text(), "alpha beta\ngamma", "the release keeps the selection")
+  end)
+
+  T.case("a backwards drag selects the same range", function()
+    local ed = drag_fixture()
+    ed:begin_select(2, 6, "char")
+    ed:drag_to(1, 1)
+    T.eq(ed:selected_text(), "alpha beta\ngamma", "dragged up, same text")
+    T.eq(ed.line, 1, "the caret is at the end the pointer is at")
+    T.eq(ed.col, 1, "the caret is at the end the pointer is at")
+  end)
+
+  T.case("a move with no button down does nothing", function()
+    local ed = drag_fixture()
+    ed:goto_position(1, 3)
+    T.nope(ed:drag_to(3, 1), "a stray mousemoved is refused")
+    T.eq(ed.line, 1, "the caret did not move")
+    T.eq(ed.col, 3, "the caret did not move")
+  end)
+
+  T.case("a double click takes the word, and the drag then grows by words", function()
+    local ed = drag_fixture()
+    ed:begin_select(1, 8, "word")
+    T.eq(ed:selected_text(), "beta", "the word under the pointer")
+    ed:drag_to(2, 3)
+    T.eq(ed:selected_text(), "beta\ngamma", "grown to whole words, not characters")
+  end)
+
+  T.case("a word drag backwards keeps the origin word whole", function()
+    local ed = drag_fixture()
+    ed:begin_select(2, 8, "word")
+    T.eq(ed:selected_text(), "delta", "the origin word")
+    ed:drag_to(1, 2)
+    T.eq(ed:selected_text(), "alpha beta\ngamma delta",
+      "the origin word survived being dragged away from")
+  end)
+
+  T.case("a triple click takes the line, including its newline", function()
+    local ed = drag_fixture()
+    ed:begin_select(2, 4, "line")
+    T.eq(ed:selected_text(), "gamma delta\n", "the whole line and the break after it")
+    ed:drag_to(3, 1)
+    T.eq(ed:selected_text(), "gamma delta\nepsilon zeta", "two whole lines")
+  end)
+
+  T.case("a triple click on the last line has no newline to take", function()
+    local ed = drag_fixture()
+    ed:begin_select(3, 2, "line")
+    T.eq(ed:selected_text(), "epsilon zeta", "the last line, and nothing after it")
+  end)
+
+  T.case("shift-click extends from the caret, and again from the anchor", function()
+    local ed = drag_fixture()
+    ed:goto_position(1, 1)
+    ed:begin_select(1, 6, "char", true)
+    ed:end_select()
+    T.eq(ed:selected_text(), "alpha", "the first shift-click extended from the caret")
+    ed:begin_select(2, 6, "char", true)
+    ed:end_select()
+    T.eq(ed:selected_text(), "alpha beta\ngamma",
+      "the second grew the same selection rather than starting a new one")
+  end)
+
+  T.case("a drag off the top of the pane clamps rather than breaking", function()
+    local ed = drag_fixture()
+    ed:begin_select(3, 5, "char")
+    ed:drag_to(-40, 1)
+    T.eq(ed.line, 1, "clamped to the first line")
+    T.eq(ed:selected_text(), "alpha beta\ngamma delta\nepsi", "and the selection is honest")
+  end)
+
+  -- --------------------------------------------------------------- brackets
+
+  T.section("editor — brackets, and the ones that never closed")
+
+  local function unmatched_of(text)
+    local at, unmatched = editor.brackets(editor.new({ text = text }).lines)
+    local said = {}
+    for i, e in ipairs(unmatched) do
+      said[i] = ("%s@%d:%d"):format(e.char, e.line, e.col)
+    end
+    return table.concat(said, " "), at
+  end
+
+  T.case("a balanced program has nothing unmatched", function()
+    local said = unmatched_of("fn main() {\n    let v = vec![1, 2];\n}\n")
+    T.eq(said, "", "every bracket found its partner")
+  end)
+
+  T.case("an unclosed brace is named, with its line", function()
+    local said = unmatched_of("fn main() {\n    let x = 1;\n")
+    T.eq(said, "{@1:11", "the opener that never closed")
+  end)
+
+  T.case("a closer with nothing open is named too", function()
+    local said = unmatched_of("let x = 1;\n}\n")
+    T.eq(said, "}@2:1", "a stray closing brace")
+  end)
+
+  T.case("a mismatched pair reports both ends", function()
+    local said = unmatched_of("fn f(x: i32] {}\n")
+    T.eq(said, "(@1:5 ]@1:12", "the paren that stayed open and the wrong closer")
+  end)
+
+  T.case("brackets inside a string are text, not structure", function()
+    local said = unmatched_of('println!("}} not a brace {");\n')
+    T.eq(said, "", "the braces in the literal were not counted")
+  end)
+
+  T.case("brackets inside comments are text too", function()
+    T.eq(unmatched_of("fn main() {\n    // }\n}\n"), "", "a line comment")
+    T.eq(unmatched_of("/* {\n   still open }\n*/\nfn main() {}\n"), "",
+      "a block comment across three lines")
+  end)
+
+  T.case("angle brackets are deliberately not matched", function()
+    -- `<` and `>` are comparison, `->`, `=>` and generics in Rust. A matcher
+    -- that guessed would be wrong more often than right, so it does not
+    -- guess — and `a < b` must not be reported as an unclosed anything.
+    T.eq(unmatched_of("let v: Vec<u8> = Vec::new();\n"), "", "generics are quiet")
+    T.eq(unmatched_of("if a < b { println!(\"y\"); }\n"), "", "so is a comparison")
+  end)
+
+  T.case("the pair is found from either side of the caret", function()
+    local ed = editor.new({ text = "fn main() {\n    ok();\n}\n" })
+    ed:goto_position(1, 12) -- just after the `{`
+    local here = ed:bracket_at_caret()
+    T.eq(here and here.char, "{", "the bracket before the caret wins")
+    T.eq(here.partner and here.partner.line, 3, "and it knows where it closes")
+    ed:goto_position(1, 11) -- just before the `{`
+    here = ed:bracket_at_caret()
+    T.eq(here and here.char, "{", "the bracket at the caret is found too")
+    ed:goto_position(2, 5)
+    T.eq(ed:bracket_at_caret(), nil, "and nowhere near one, nothing")
+  end)
+
+  T.case("an unmatched bracket at the caret has no partner", function()
+    local ed = editor.new({ text = "fn main() {\n" })
+    ed:goto_position(1, 12)
+    local here = ed:bracket_at_caret()
+    T.eq(here and here.char, "{", "it is still a bracket")
+    T.eq(here.partner, nil, "it simply never closed")
+  end)
+
+  T.case("ctrl-] jumps to the partner, and back", function()
+    local ed = editor.new({ text = "fn main() {\n    ok();\n}\n" })
+    ed:goto_position(1, 12)
+    T.ok(ed:keypressed("]", { ctrl = true }), "the key is consumed")
+    T.eq(ed.line, 3, "landed on the closing brace")
+    T.eq(ed.col, 1, "landed on the closing brace")
+    ed:keypressed("]", { ctrl = true })
+    T.eq(ed.line, 1, "and back to the opening one")
+    T.eq(ed.col, 11, "and back to the opening one")
+  end)
+
+  T.case("ctrl-shift-] selects to the partner", function()
+    local ed = editor.new({ text = "fn main() {\n    ok();\n}\n" })
+    ed:goto_position(1, 12)
+    ed:keypressed("]", { ctrl = true, shift = true })
+    T.eq(ed:selected_text(), "\n    ok();\n", "the block between the braces")
+  end)
+
+  T.case("with no bracket at the caret the jump is refused", function()
+    local ed = editor.new({ text = "let x = 1;\n" })
+    ed:goto_position(1, 4)
+    T.nope(ed:goto_match(), "nothing to jump to")
+    T.eq(ed.col, 4, "and the caret did not move")
+  end)
+
+  T.case("the analysis follows the buffer as it is typed", function()
+    local c = clock()
+    local ed = editor.new({ now = c.now, text = "fn main() {\n" })
+    T.eq(#ed:unmatched_brackets(), 1, "one brace open")
+    T.ok(ed:unmatched_lines()[1], "line 1 is the one to look at")
+    ed:goto_position(2, 1)
+    type_text(ed, "}")
+    T.eq(#ed:unmatched_brackets(), 0, "closing it clears the report")
+    T.nope(ed:unmatched_lines()[1], "and line 1 is quiet again")
+    ed:undo()
+    T.eq(#ed:unmatched_brackets(), 1, "undo puts the problem back")
+  end)
+
+  T.case("FORMAT's whole-buffer replace re-reads the brackets", function()
+    local ed = editor.new({ text = "fn main() {\n" })
+    T.eq(#ed:unmatched_brackets(), 1, "before")
+    ed:replace_all("fn main() {}\n")
+    T.eq(#ed:unmatched_brackets(), 0, "after")
+  end)
+
+  -- Pairing is a stack, so the last `}` closes the *innermost* `{` and the
+  -- one left over is the outermost. That is not an accident and it is what
+  -- `rustc` points at too: the brace that was opened and never closed is the
+  -- function's, whatever the player thought they were forgetting.
+  T.case("a forty-line answer with one missing brace names the line left open", function()
+    local lines = {}
+    for i = 1, 40 do
+      lines[i] = ("    let v%d = compute(%d);"):format(i, i)
+    end
+    table.insert(lines, 1, "fn main() {")
+    table.insert(lines, 12, "    if v11 > 0 {")
+    lines[#lines + 1] = "}"
+    local ed = editor.new({ text = table.concat(lines, "\n") })
+    local unmatched = ed:unmatched_brackets()
+    T.eq(#unmatched, 1, "exactly one thing is wrong")
+    T.eq(unmatched[1].line, 1, "and it is the `fn main() {` that never closed")
+    T.eq(unmatched[1].char, "{", "an opener with no closer")
+  end)
+
   T.section("editor — no love in the model")
 
   T.case("src/editor.lua does not reference love", function()

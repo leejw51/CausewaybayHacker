@@ -41,6 +41,13 @@ output: 0 4
 
 The results arrive in whatever order the scheduler feels like. Carrying the
 index is what makes the program's answer the same every run.
+
+Every goroutine in this pack takes the loop variable as a **parameter**. Since
+Go 1.22 — and only in a module whose `go` directive says `1.22` or later — the
+`for` loop gives each iteration its own `i` and `v`, so capturing them directly
+is safe there; everywhere else, capturing them is the single most common Go bug
+there is. Passing them in is correct under every version, and names in the
+signature exactly what the goroutine is allowed to see.
 '''
 starter     = '''
 package main
@@ -1140,6 +1147,9 @@ func main() {
 	// then collect n, sort by index, print, then SUM and ERRORS
 	_ = lines
 	_ = ch
+
+	fmt.Printf("SUM %d\n", 0)
+	fmt.Printf("ERRORS %d\n", 0)
 }
 '''
 solution    = '''
@@ -1186,18 +1196,18 @@ func main() {
 	sort.Slice(got, func(a, b int) bool { return got[a].index < got[b].index })
 
 	var sum int64
-	errors := 0
+	bad := 0
 	for _, p := range got {
 		if p.err != nil {
 			fmt.Printf("BAD %s\n", strings.TrimSpace(p.line))
-			errors++
+			bad++
 			continue
 		}
 		fmt.Println(p.value)
 		sum += p.value
 	}
 	fmt.Printf("SUM %d\n", sum)
-	fmt.Printf("ERRORS %d\n", errors)
+	fmt.Printf("ERRORS %d\n", bad)
 }
 '''
 hints = [

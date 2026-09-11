@@ -556,3 +556,105 @@ async fn a_run_earns_nothing() {
         .is_empty());
     server.handle.abort();
 }
+
+/// Interview mode over the wire (PROTOCOL §4.9e). The rule worth proving here
+/// is the one a client cannot enforce for itself: the answer and the hints are
+/// **absent** for the session, even on a quest this player cleared long ago.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn an_interview_withholds_the_answer_and_the_hints() {
+    let server = start().await;
+    let mut client = Client::connect(server.port).await;
+    client.login().await;
+
+    // Clear everything but one, so the pick is forced and the cleared quest is
+    // available to check the mask against.
+    client
+        .execute("quest.submit", "rust.basic.01.hello", HELLO)
+        .await;
+    let cleared = client
+        .ok("quest.get", json!({ "quest_id": "rust.basic.01.hello" }))
+        .await;
+    assert!(
+        cleared["quest"]["solution"].as_str().is_some(),
+        "outside an interview, a cleared quest shows its answer"
+    );
+
+    let session = client
+        .ok("interview.start", json!({ "land": "rust" }))
+        .await["session"]
+        .clone();
+    let id = session["id"].as_str().unwrap().to_string();
+    assert!(id.starts_with("int_"));
+    assert!(session["approach"].is_null());
+    assert!(
+        session["approach_at"].is_null(),
+        "the editor is not unlocked yet"
+    );
+    assert!(session["quest"].get("solution").is_none(), "{session}");
+    assert_eq!(session["quest"]["hints_total"].as_i64(), Some(0));
+    let quest_id = session["quest"]["id"].as_str().unwrap().to_string();
+    assert_ne!(quest_id, "rust.basic.01.hello", "it picked a cleared quest");
+
+    // The approach unlocks the editor and is kept verbatim.
+    let written = client
+        .ok(
+            "interview.approach",
+            json!({ "session_id": id, "text": "Read it all, sum as I go. O(n)." }),
+        )
+        .await["session"]
+        .clone();
+    assert_eq!(
+        written["approach"].as_str(),
+        Some("Read it all, sum as I go. O(n).")
+    );
+    assert!(written["approach_at"].as_str().is_some());
+
+    // No hints, for the session. Absent, not rate-limited.
+    let refused = client
+        .call("quest.hint", json!({ "quest_id": quest_id, "index": 0 }))
+        .await;
+    assert_eq!(
+        refused["type"].as_str(),
+        Some("quest.hint.err"),
+        "{refused}"
+    );
+    assert_eq!(refused["payload"]["code"].as_str(), Some("not_found"));
+    // And `quest.get` on the interview's quest is masked too, so a client
+    // cannot route around the session by asking the ordinary way.
+    let asked = client
+        .ok("quest.get", json!({ "quest_id": quest_id }))
+        .await;
+    assert!(asked["quest"].get("solution").is_none(), "{asked}");
+    assert_eq!(asked["quest"]["under_interview"].as_bool(), Some(true));
+    // A *different* quest is untouched by the mask.
+    let other = client
+        .ok("quest.get", json!({ "quest_id": "rust.basic.01.hello" }))
+        .await;
+    assert!(other["quest"]["solution"].as_str().is_some());
+
+    // RUN still works on a real screen.
+    let run = client.execute("quest.run", quest_id.as_str(), HELLO).await;
+    assert_eq!(run["mode"].as_str(), Some("run"));
+
+    let report = client
+        .ok("interview.finish", json!({ "session_id": id }))
+        .await["report"]
+        .clone();
+    assert_eq!(report["quest_id"].as_str(), Some(quest_id.as_str()));
+    assert_eq!(
+        report["approach"].as_str(),
+        Some("Read it all, sum as I go. O(n).")
+    );
+    assert!(
+        !report["reference_summary"].as_str().unwrap().is_empty(),
+        "the report must say what the reference does"
+    );
+    assert!(report["attempts"].is_array());
+
+    // The session is over, so the quest is a quest again.
+    let after = client
+        .ok("quest.get", json!({ "quest_id": quest_id }))
+        .await;
+    assert!(after["quest"]["under_interview"].is_null(), "{after}");
+    server.handle.abort();
+}

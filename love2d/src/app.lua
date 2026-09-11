@@ -379,6 +379,29 @@ function App:mousepressed(x, y, button)
   if self.scene and self.scene.mousepressed then self.scene:mousepressed(vx, vy, button) end
 end
 
+--- A drag, and the end of one.
+---
+--- These exist for the code editor: a client with `mousepressed` and nothing
+--- else can place a caret but cannot select a range with the mouse, which is
+--- the one thing every other editor does. `mousereleased` is dispatched even
+--- when the pointer has left the pane it started in, because that is exactly
+--- the case a scene has to know about — a selection dragged past the edge
+--- must end without the release landing on whatever is underneath.
+function App:mousemoved(x, y)
+  local vx, vy = Layout.toVirtual(x, y)
+  if not vx then return end
+  if self.scene and self.scene.mousemoved then self.scene:mousemoved(vx, vy) end
+end
+
+function App:mousereleased(x, y, button)
+  local vx, vy = Layout.toVirtual(x, y)
+  -- A release outside the letterbox still has to reach the scene, or a drag
+  -- that ended off the edge of the canvas leaves a button held down forever.
+  if self.scene and self.scene.mousereleased then
+    self.scene:mousereleased(vx, vy, button)
+  end
+end
+
 function App:wheelmoved(dx, dy)
   if self.scene and self.scene.wheelmoved then self.scene:wheelmoved(dx, dy) end
 end

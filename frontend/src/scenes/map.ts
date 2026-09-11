@@ -45,6 +45,8 @@ import type { Category, Land, MapNode } from "../net/protocol";
 import { LandsScene } from "./lands";
 import { PlaygroundScene } from "./playground";
 import { QuestScene } from "./quest";
+import { AUX_BAR, openAux } from "../ui/auxnav";
+import { NeonRail } from "../gfx/neon";
 
 /** The overworld art, per land. Two places, not one plate and a tint. */
 const PLATE: Record<Land, string> = { rust: "map_rust", go: "map_go" };
@@ -103,6 +105,8 @@ export class MapScene implements Scene {
   private edges: Array<[string, string]> = [];
   private selected = 0;
   private t = 0;
+  /** The signs over the street, and their palette cycle. */
+  private readonly neon = new NeonRail();
   private status = "";
   private plate: Rect = [0, 0, 1, 1];
   /** Each node's arrival, staggered, so the overworld assembles itself. */
@@ -243,6 +247,7 @@ export class MapScene implements Scene {
   }
 
   update(dt: number): void {
+    this.neon.update(dt);
     this.t += dt;
     this.plateIn.update(dt);
     this.infoIn.update(dt);
@@ -315,71 +320,127 @@ export class MapScene implements Scene {
   // -- the switcher --------------------------------------------------------
 
   /**
-   * Where the five buttons go, and how tall the strip they need is.
+   * Every button on the strip, in the order it is read in, with the group it
+   * belongs to.
+   *
+   * One list, consumed by both the layout and the drawing, because the last
+   * bug this strip shipped was exactly a layout and a draw that agreed in the
+   * common case and disagreed in the rare one: `barLayout` returned its rects
+   * grouped by *line* while `drawBar` consumed them by *label*, and on a narrow
+   * window ALL MAPS was painted on top of PLAYGROUND. Two orders that have to
+   * match cannot be written down twice.
+   *
+   * The group number is the only thing the layout knows about meaning. "Which
+   * land", "which road" and "where else can I go" are three questions, and a
+   * strip of ten evenly spaced buttons reads as one list of ten — so the gap
+   * between groups is wider than the gap inside one, and a group is kept whole
+   * on a line where it can be.
+   */
+  private barItems(): Array<{ id: string; label: string; lit: boolean; group: number }> {
+    return [
+      ...LANDS.map((l) => ({
+        id: `land:${l}`,
+        label: l.toUpperCase(),
+        lit: l === this.land,
+        group: 0,
+      })),
+      ...CATEGORIES.map((c) => ({
+        id: `cat:${c}`,
+        label: c.toUpperCase(),
+        lit: c === this.category,
+        group: 1,
+      })),
+      // The way to see all six at once. ESC does the same thing and always
+      // did, but a keystroke printed in the footer is not a control — the
+      // player who wants the chooser is exactly the player who does not yet
+      // know where anything is.
+      { id: "menu", label: MENU_LABEL, lit: false, group: 2 },
+      // The scratchpad. It is not one of the six maps and it is not styled
+      // like one: nothing there is scored, and a button that looked like a
+      // category would promise otherwise.
+      { id: "play", label: PLAY_LABEL, lit: false, group: 2 },
+      // Search, stats and AI mode. They were on F4/F5/F6 and nowhere else,
+      // which meant three finished screens that a player could only reach by
+      // being told they existed. The ids are `ui/auxnav.ts`'s own, so
+      // `openAux` opens them here with no second table of names to drift.
+      ...AUX_BAR.map((a) => ({ id: a.id, label: a.label, lit: false, group: 3 })),
+    ];
+  }
+
+  /**
+   * Where the buttons go, and how tall the strip they need is.
    *
    * Measured, then laid out, then reported — `mapPlate` subtracts the height
-   * this returns, so the overworld is never drawn underneath the bar. When the
-   * five will not fit on one line (a narrow phone in portrait) it becomes two,
-   * lands over categories, rather than shrinking the labels to initials: the
-   * whole point of the strip is that a player can read where the other five
-   * maps are.
+   * this returns, so the overworld is never drawn underneath the bar.
+   *
+   * It flows rather than choosing between a one-line and a two-line case. It
+   * used to be the latter, written out longhand, and adding three ids to it
+   * fitted neither branch: the arithmetic was a description of five buttons
+   * rather than of a strip. A flow costs nothing, has no case that is only
+   * exercised on a phone, and the labels stay words — shrinking them to
+   * initials would throw away the one thing the strip is for, which is that a
+   * player can read where the other five maps are.
+   *
+   * The rects come back in label order whatever line they land on.
    */
   private barLayout(): { h: number; rows: Rect[] } {
     const { layout } = this.app;
     const s = layout.uiScale();
     const f = ensureFonts(s).button;
     const gap = Math.round(f.size * 0.5);
+    const split = gap * 3;
     const pad = f.size * 2;
     const minH = layout.minTouchH();
     const bh = btnBox(f, ["BASIC"], 0, pad, minH)[1];
-    const wide = layout.vw - Math.round(16 * s);
-    const w = (label: string) => btnBox(f, [label], 0, pad, minH)[0];
-    const landW = LANDS.map((l) => w(l.toUpperCase()));
-    const catW = CATEGORIES.map((c) => w(c.toUpperCase()));
-    const menuW = w(MENU_LABEL) + gap + w(PLAY_LABEL);
-    const sum = (a: number[]) => a.reduce((x, y) => x + y, 0) + gap * (a.length - 1);
-    // A wider gap between the groups than inside them: "which land", "which
-    // road" and "show me all of them" are three questions, and a row of six
-    // evenly spaced buttons reads as one list of six.
-    const split = gap * 3;
     const x0 = Math.round(8 * s);
-    const lay = (widths: number[], y: number, left: number): Rect[] =>
-      widths.map((bw, i) => {
-        const x = left + widths.slice(0, i).reduce((a, b) => a + b + gap, 0);
-        return [x, y, bw, bh] as Rect;
-      });
-    const oneLine = sum(landW) + split + sum(catW) + split + menuW <= wide;
-    // The rects come back in the order the labels are drawn in — lands, then
-    // categories, then the two way-out buttons — whatever line they land on.
-    // They did not, once, and ALL MAPS was drawn on top of PLAYGROUND.
-    if (oneLine) {
-      const total = sum(landW) + split + sum(catW) + split + menuW;
-      const left = x0 + Math.round((wide - total) / 2);
-      const catLeft = left + sum(landW) + split;
-      const tailLeft = catLeft + sum(catW) + split;
-      return {
-        h: bh,
-        rows: [
-          ...lay(landW, 0, left),
-          ...lay(catW, 0, catLeft),
-          [tailLeft, 0, w(MENU_LABEL), bh] as Rect,
-          [tailLeft + w(MENU_LABEL) + gap, 0, w(PLAY_LABEL), bh] as Rect,
-        ],
-      };
-    }
-    // Two lines: the land and the two ways out on top, the three roads under.
-    const topTotal = sum(landW) + split + menuW;
-    const topLeft = x0 + Math.round((wide - topTotal) / 2);
-    const tail = topLeft + sum(landW) + split;
-    return {
-      h: bh * 2 + gap,
-      rows: [
-        ...lay(landW, 0, topLeft),
-        ...lay(catW, bh + gap, x0 + Math.round((wide - sum(catW)) / 2)),
-        [tail, 0, w(MENU_LABEL), bh] as Rect,
-        [tail + w(MENU_LABEL) + gap, 0, w(PLAY_LABEL), bh] as Rect,
-      ],
+    const wide = layout.vw - Math.round(16 * s);
+
+    const items = this.barItems();
+    const widths = items.map((it) => btnBox(f, [it.label], 0, pad, minH)[0]);
+    /** How much room a whole group wants, so it is not split when it need not be. */
+    const span = (group: number): number => {
+      let total = 0;
+      let n = 0;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].group !== group) continue;
+        total += widths[i];
+        n++;
+      }
+      return total + gap * Math.max(0, n - 1);
     };
+    const lead = (i: number): number =>
+      items[i].group !== items[i - 1].group ? split : gap;
+
+    // Greedy flow. A group starting a line is tested by the width of the
+    // *group*; anything else by its own.
+    const lines: Array<{ from: number; to: number; width: number }> = [];
+    let from = 0;
+    let used = widths[0] ?? 0;
+    for (let i = 1; i < items.length; i++) {
+      const fresh = items[i].group !== items[i - 1].group;
+      const need = lead(i) + (fresh ? span(items[i].group) : widths[i]);
+      if (i > from && used + need > wide) {
+        lines.push({ from, to: i, width: used });
+        from = i;
+        used = widths[i];
+      } else {
+        used += lead(i) + widths[i];
+      }
+    }
+    if (items.length > 0) lines.push({ from, to: items.length, width: used });
+
+    const rows: Rect[] = [];
+    let y = 0;
+    for (const line of lines) {
+      let cx = x0 + Math.round((wide - line.width) / 2);
+      for (let i = line.from; i < line.to; i++) {
+        if (i > line.from) cx += lead(i);
+        rows[i] = [cx, y, widths[i], bh];
+        cx += widths[i];
+      }
+      y += bh + gap;
+    }
+    return { h: Math.max(bh, lines.length * bh + (lines.length - 1) * gap), rows };
   }
 
   /**
@@ -395,23 +456,7 @@ export class MapScene implements Scene {
     const f = ensureFonts(s).button;
     const { rows } = this.barLayout();
     this.bar.reset();
-    const labels = [
-      ...LANDS.map((l) => ({ id: `land:${l}`, label: l.toUpperCase(), lit: l === this.land })),
-      ...CATEGORIES.map((c) => ({
-        id: `cat:${c}`,
-        label: c.toUpperCase(),
-        lit: c === this.category,
-      })),
-      // The way to see all six at once. ESC does the same thing and always
-      // did, but a keystroke printed in the footer is not a control — the
-      // player who wants the chooser is exactly the player who does not yet
-      // know where anything is.
-      { id: "menu", label: MENU_LABEL, lit: false },
-      // The scratchpad. It is not one of the six maps and it is not styled
-      // like one: nothing there is scored, and a button that looked like a
-      // category would promise otherwise.
-      { id: "play", label: PLAY_LABEL, lit: false },
-    ];
+    const labels = this.barItems();
     for (let i = 0; i < labels.length; i++) {
       const [x, ry, w, h] = rows[i];
       const y = y0 + ry;
@@ -524,6 +569,10 @@ export class MapScene implements Scene {
         const [kind, value] = onBar.id.split(":");
         if (onBar.id === "menu") void this.app.go(new LandsScene(this.app), "back");
         else if (onBar.id === "play") void this.app.go(new PlaygroundScene(this.app), "forward");
+        // Before the land/category dispatch, not after it. `aux:search` splits
+        // into `["aux", "search"]`, and a fall-through would have sent
+        // `switchTo(this.land, "search")` to `world.map` as a category.
+        else if (kind === "aux") void openAux(this.app, onBar.id);
         else if (kind === "land") this.switchTo(value as Land, this.category);
         else this.switchTo(this.land, value as Category);
       }
@@ -1040,6 +1089,45 @@ export class MapScene implements Scene {
       h,
     );
     g.restore();
+    this.drawNeon(g, py - Math.round(h * 0.06) + h * 0.62);
+  }
+
+  /**
+   * The signs hanging off the wires.
+   *
+   * `fg_wires` stops at 55% of its source because the four hanging panels
+   * below that line are the size of shop awnings and sat over nodes 1 to 9.
+   * The wires are still a place to hang something from, though, and
+   * `neon_signs` is six signs at a size that fits: they drop into the band
+   * `fg_wires` gave up, above the first row of nodes, and they are the one
+   * thing on this screen that changes colour while you are reading it.
+   *
+   * The cycle is in `gfx/neon.ts` and it is a real palette cycle — the same
+   * slot drawn from a different frame of the strip on each beat, in the order
+   * of the hues measured in `art/palette.json`.
+   */
+  private drawNeon(g: Ctx, y: number): void {
+    const art = this.app.assets?.picture("neon_signs");
+    if (!art) return;
+    const s = this.app.layout.uiScale();
+    const [px, py, pw, ph] = this.plate;
+    const h = Math.min(Math.round(56 * s), Math.round(ph * 0.13));
+    // Fewer in portrait: the plate is narrower there and six signs across it
+    // is a fence rather than a street.
+    const count = this.app.layout.isPortrait() ? 4 : 6;
+    // Inset, so a sign never hangs over the plate's own gold edge.
+    const inset = Math.round(pw * 0.06);
+    this.neon.draw(
+      g,
+      this.app.assets ?? null,
+      art,
+      px + inset,
+      Math.max(py, y),
+      pw - inset * 2,
+      h,
+      count,
+      0.92,
+    );
   }
 
   /**

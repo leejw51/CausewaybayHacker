@@ -122,6 +122,16 @@ function love.mousepressed(x, y, button)
   app:mousepressed(x, y, button)
 end
 
+function love.mousemoved(x, y)
+  if testing or not app then return end
+  app:mousemoved(x, y)
+end
+
+function love.mousereleased(x, y, button)
+  if testing or not app then return end
+  app:mousereleased(x, y, button)
+end
+
 function love.wheelmoved(dx, dy)
   if testing or not app then return end
   app:wheelmoved(dx, dy)

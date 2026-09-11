@@ -203,7 +203,25 @@ export function shadowText(
   printf(g, font, text, x, y, w, align);
 }
 
-/** The pulsing neon title, drawn as five widening ghosts and a white core. */
+/**
+ * The pulsing neon title: five widening ghosts, an ink outline, a white core.
+ *
+ * The outline is the middle step and it was not there. DESIGN measured the
+ * glyph at **8.26:1** against the sky behind it and **2.25:1** where it crosses
+ * the pink tenement of `title_bg` — one run of type with its legibility
+ * changing along its own length, which is why the game's name read as patchy
+ * rather than as dim. A glow is not an outline: it spreads the colour the glyph
+ * is already made of, so on a bright patch it adds light to light.
+ *
+ * Two pixels of `Theme.ink` in the four cardinal directions, which is what a
+ * SNES title screen does, and the reason it was chosen over the title plate
+ * that was also offered: a plate would cover the painted street that §6 exists
+ * to have put there, and the outline only has to win against the worst patch
+ * rather than the average one.
+ *
+ * Order matters. The ghosts first or the outline eats them; the outline before
+ * the face or the face is eaten in turn.
+ */
 export function neonPrint(
   g: Ctx,
   font: Font,
@@ -219,9 +237,20 @@ export function neonPrint(
     printf(g, font, text, -i, y, w, "center");
     printf(g, font, text, i, y, w, "center");
   }
+  g.fillStyle = css(Theme.ink);
+  for (const [dx, dy] of NEON_OUTLINE) printf(g, font, text, dx, y + dy, w, "center");
   g.fillStyle = `rgba(255,255,255,${pulse})`;
   printf(g, font, text, 0, y, w, "center");
 }
+
+/** Four directions, two pixels. Not eight: the diagonals thicken the stroke
+ *  into a slab and this type is already heavy. */
+const NEON_OUTLINE: Array<[number, number]> = [
+  [-2, 0],
+  [2, 0],
+  [0, -2],
+  [0, 2],
+];
 
 export function inRect(x: number, y: number, r: Rect | null | undefined): boolean {
   return !!r && x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3];

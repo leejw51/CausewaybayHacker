@@ -245,7 +245,11 @@ fn the_report_is_the_product() {
     assert_eq!(report.session_id, session.id);
     assert!(report.cleared);
     assert_eq!(report.within_limit, Some(true));
-    assert_eq!(report.limit_ms, Some(600 * 1000));
+    // The pick is randomised among the timed quests, so the limit is checked
+    // against the quest that was actually picked rather than a constant.
+    let picked = quests::get(&conn, &session.quest_id).unwrap();
+    assert_eq!(report.limit_ms, picked.time_limit_s.map(|s| s * 1000));
+    assert!(report.limit_ms.is_some(), "a hacker quest is timed");
     assert!(report.took_ms >= 0);
     assert_eq!(report.approach.as_deref(), Some("Count with a map."));
     assert_eq!(report.attempts.len(), 2, "{:?}", report.attempts);

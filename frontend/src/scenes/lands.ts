@@ -26,6 +26,20 @@ const BLURB: Record<Land, string> = {
 };
 
 /**
+ * How much wider than its own column an emblem band may be drawn before it
+ * stops growing: 1 would never crop, and 1.3 hides just under a quarter.
+ *
+ * It is a bound on the *crop*, never on the proportions — the aspect ratio
+ * drawn is always the art's. A 3.37:1 band and a row column that is nearer
+ * 1.3:1 cannot both be honoured, and the only question is which way to give:
+ * the full row height with most of the picture cropped away, or the whole
+ * picture at a third of the row's height. Neither extreme is right. A quarter
+ * of the width behind a fade is where a market stall still reads as a market
+ * stall and the band is still as tall as the row can nearly make it.
+ */
+const EMBLEM_OVERHANG = 1.3;
+
+/**
  * What each road *is*, from `docs/story.md` §4, in one line.
  *
  * The rows used to be a word, a count and a hundred and thirty pixels of empty
@@ -397,36 +411,74 @@ export class LandsScene implements Scene {
         // The emblem band. DESIGN composed these 3:1 with a quiet left quarter
         // and the pipeline then cropped to the ink, so the ink fills the cell:
         // it is drawn from the manifest `box`, inset, and it owns the right of
-        // the row while the words own the left. Nothing overlaps.
+        // the row while the words own the left.
+        //
+        // **At its own aspect.** It used to take the scale from the row height
+        // and then clamp the *width* to 44% of the row with the height left
+        // alone, which is not a fit, it is a squash: `emblem_rust_basic`'s ink
+        // is 384x114 (3.37:1) and it was drawn at 322x145 (2.22:1) — 66% of its
+        // correct width, most visible on the tram, which came out tall and
+        // narrow instead of long and low.
+        //
+        // The fix is the one the LÖVE client arrived at on the same art rather
+        // than DESIGN's §2.4 (`k = min(bandH/inkH, 0.44*barW/inkW)`, a smaller
+        // emblem that fits inside 44%): the band is drawn at **row height**, in
+        // its own proportions, anchored to the right, and clipped to the column
+        // the words do not own — with a fade on its leading edge so a band
+        // wider than the room it has cuts into the row instead of ending in a
+        // vertical line. §2.4's version keeps the whole picture but shrinks it
+        // to about two thirds of the row's height, and these are 3:1 bands: the
+        // thing worth protecting is how tall the objects on them are, not how
+        // many of them are on screen. The words' column is a floor, so the
+        // blurb cannot be starved by an emblem that happens to be wide.
         const art = this.app.assets?.picture(`emblem_${this.land}_${c.category}`);
         const abox = this.app.assets?.box.get(`emblem_${this.land}_${c.category}`);
+        const gutter = Math.round(barW * 0.58);
         let textW = barW;
         if (art && !empty) {
           const inset = Math.round(8 * s);
           const bandH = rowH - inset * 2;
-          const k = bandH / Math.max(1, abox ? abox.maxy - abox.miny : art.naturalHeight);
-          const iw = (abox ? abox.maxx - abox.minx : art.naturalWidth) * k;
-          const bw = Math.min(iw, barW * 0.44);
+          const inkW = abox ? abox.maxx - abox.minx : art.naturalWidth;
+          const inkH = abox ? abox.maxy - abox.miny : art.naturalHeight;
+          const winX = rx + gutter;
+          const winW = barW - gutter - inset;
+          // Row height, with a bound on how far the band may run past its own
+          // window. Unbounded it is right where the row is long and low — which
+          // is the landscape case, and it is what the LÖVE client sees — and
+          // wrong in a tall portrait row, where filling a 194px height with a
+          // 3.37:1 band means six hundred pixels of picture in a column two
+          // hundred and fifty wide and everything but the last object cropped
+          // away. `OVERHANG` is the most of itself a band may hide: past that
+          // it stops growing, keeps its proportions, and stands on the bottom
+          // of the row rather than filling it.
+          const k = Math.min(
+            bandH / Math.max(1, inkH),
+            (winW * EMBLEM_OVERHANG) / Math.max(1, inkW),
+          );
+          const bw = inkW * k;
+          const bh = inkH * k;
           const bx = rx + barW - bw - inset;
-          g.save();
-          g.globalAlpha = 0.55 + 0.45 * lit;
-          if (abox) {
-            g.drawImage(
-              art,
-              abox.minx,
-              abox.miny,
-              abox.maxx - abox.minx,
-              abox.maxy - abox.miny,
-              bx,
-              y + inset,
-              bw,
-              bandH,
-            );
-          } else {
-            g.drawImage(art, bx, y + inset, bw, bandH);
+          const by = y + inset + (bandH - bh);
+          if (winW > Math.round(24 * s)) {
+            clipped(g, winX, y + inset, winW, bandH, () => {
+              g.save();
+              g.globalAlpha = 0.55 + 0.45 * lit;
+              if (abox) {
+                g.drawImage(art, abox.minx, abox.miny, inkW, inkH, bx, by, bw, bh);
+              } else {
+                g.drawImage(art, bx, by, bw, bh);
+              }
+              g.restore();
+              const fx = Math.max(bx, winX);
+              const fw = Math.min(Math.round(52 * s), Math.max(1, Math.round(bw * 0.35)));
+              const grad = g.createLinearGradient(fx, 0, fx + fw, 0);
+              grad.addColorStop(0, css(Theme.navy, 0.95));
+              grad.addColorStop(1, css(Theme.navy, 0));
+              g.fillStyle = grad;
+              g.fillRect(fx, by, fw, bh);
+            });
           }
-          g.restore();
-          textW = bx - rx - inset;
+          textW = gutter - inset;
         }
 
         const tx = rx + Math.round(14 * s);

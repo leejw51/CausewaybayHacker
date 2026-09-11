@@ -466,6 +466,7 @@ export class PlaygroundScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
+    this.drawRoom(g);
     header(g, this.app, `PLAYGROUND · ${this.held.name.toUpperCase()}`);
     const f = frame(layout, layout.isPortrait() ? 0.26 : 0.26, 0.07);
     const s = f.scale;
@@ -479,6 +480,44 @@ export class PlaygroundScene implements Scene {
       layout,
       "CTRL+ENTER  RUN   CTRL+SHIFT+F  FORMAT   CTRL+S  SAVE   ESC  BACK   F1  ORIENTATION",
     );
+  }
+
+  /**
+   * Mei's own desk.
+   *
+   * `bg_playground` was made for this screen and this screen only — the room
+   * the game opens in, deliberately the one room in the pack with no problem
+   * in it — and nothing referenced it, so the scratchpad drew the generic
+   * night city like every other screen. An asset made for one screen and not
+   * wired to it is the same fault as a screen with no art, arrived at by a
+   * longer road.
+   *
+   * Cover, never stretch: a 3:2 room pulled to a 0.6:1 window is the "three
+   * unrelated rooms tiled down the page" the lands screen was reported for.
+   * And the scrim is **lighter than every other screen's** — 0.5 against the
+   * quest screen's 0.55 and the lands screen's effective 0.75 — because the
+   * one asset this screen has is the room, and dimming it to the point where
+   * it could be any dark blue would be drawing it and then covering it up.
+   * (The LÖVE client settled on 0.52 for the same reason; this is the same
+   * decision, taken against this client's own panels.)
+   *
+   * It is drawn on both paths, WebGL or not. The city behind is generic and
+   * this is not, so there is nothing here for the parallax to add.
+   */
+  private drawRoom(g: Ctx): void {
+    const { layout } = this.app;
+    const room = this.app.assets?.picture("bg_playground", layout.isPortrait());
+    if (!room) return;
+    const k = Math.max(layout.vw / room.naturalWidth, layout.vh / room.naturalHeight);
+    const aw = room.naturalWidth * k;
+    const ah = room.naturalHeight * k;
+    g.save();
+    g.globalAlpha = 0.9;
+    clipped(g, 0, 0, layout.vw, layout.vh, () =>
+      g.drawImage(room, (layout.vw - aw) / 2, (layout.vh - ah) / 2, aw, ah),
+    );
+    g.restore();
+    fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.5);
   }
 
   /** The saved snippets, and the one line that says what this screen is. */

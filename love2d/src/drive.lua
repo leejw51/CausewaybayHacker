@@ -17,6 +17,10 @@
 --                                      text the script cannot know in
 --                                      advance — a freshly generated word)
 --   { click = { x, y } }               a click in virtual coordinates
+--   { clicks = 2 }                     on a `click`: a double or triple click
+--   { drag = { {x1,y1}, {x2,y2} } }    press, move and release, in virtual
+--                                      coordinates — the only way to script
+--                                      a selection made with the mouse
 --   { orient = "portrait" }            pin the orientation
 --   { resize = { w, h } }              resize the window
 --   { shot = "map.png" }               screenshot into the save directory
@@ -82,7 +86,25 @@ function Drive:fire(step, app)
   elseif step.click then
     local c = step.click
     if type(c) == "function" then c = c(app) end
-    love.mousepressed(c[1] * Layout.scale + Layout.ox, c[2] * Layout.scale + Layout.oy, 1)
+    local sx, sy = Drive.to_screen(c)
+    for _ = 1, (step.clicks or 1) do
+      love.mousepressed(sx, sy, 1)
+      love.mousereleased(sx, sy, 1)
+    end
+  elseif step.drag then
+    -- A real drag, through the real callbacks: press, a handful of moves so
+    -- the pane sees motion rather than a teleport, then release. Scripting a
+    -- selection any other way would be testing the script.
+    local from, to = step.drag[1], step.drag[2]
+    if type(from) == "function" then from = from(app) end
+    if type(to) == "function" then to = to(app) end
+    local fx, fy = Drive.to_screen(from)
+    local tx, ty = Drive.to_screen(to)
+    love.mousepressed(fx, fy, 1)
+    for k = 1, 8 do
+      love.mousemoved(fx + (tx - fx) * k / 8, fy + (ty - fy) * k / 8)
+    end
+    love.mousereleased(tx, ty, 1)
   elseif step.orient then
     Layout.setOrientation(step.orient)
     Layout.flush()
@@ -101,6 +123,11 @@ function Drive:fire(step, app)
   elseif step.quit then
     love.event.quit(step.code or 0)
   end
+end
+
+--- Virtual coordinates to the window's own, the way a real pointer arrives.
+function Drive.to_screen(p)
+  return p[1] * Layout.scale + Layout.ox, p[2] * Layout.scale + Layout.oy
 end
 
 --- Split a string into UTF-8 characters, so a drive script can type a name

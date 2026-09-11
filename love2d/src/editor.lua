@@ -16,6 +16,22 @@
 -- Positions are `(line, col)` with `col` a **byte** index, 1 = before the
 -- first byte. Motion steps by UTF-8 code point, so an emoji in a string
 -- literal is one press of the left arrow and not four.
+--
+-- ## The mouse, without a window
+--
+-- Drag-selection lives here too, and it has to, because the alternative is a
+-- second selection mechanism in each of the two scenes that draw an editor.
+-- The only thing the model cannot know is how wide a glyph is, so the pixel →
+-- column step (`M.column_at`) takes a `measure` callback and the scenes hand
+-- it `font:getWidth`. A fake `measure` in the suite is a fixed-width font,
+-- which is exactly what the real one is.
+--
+-- ## Brackets
+--
+-- `M.brackets` pairs `()`, `[]` and `{}` across the whole buffer and — the
+-- part that earns its place — names the ones that never found a partner. An
+-- unbalanced brace is the most common reason a submission does not compile,
+-- and it is invisible until the compiler says so.
 
 local M = {}
 
@@ -97,6 +113,12 @@ function M.new(opts)
     goal_char = nil,
     scroll = 0,
     scroll_x = 0,
+    -- Bumped by every edit. The bracket analysis is a whole-buffer walk, so
+    -- it is computed once per change and not once per frame.
+    rev = 0,
+    bracket_cache = nil,
+    -- The origin span of a mouse drag: nil when no button is down.
+    drag = nil,
     undo_stack = {},
     redo_stack = {},
     last_edit_at = -1e9,
@@ -123,7 +145,17 @@ end
 
 -- --------------------------------------------------------------------- text
 
+--- Mark the buffer as changed, so anything derived from it is recomputed.
+---
+--- Deliberately called at the *top* of every mutator rather than only where
+--- an edit really happened: a spurious bump costs one re-analysis and a
+--- missed one shows the player a bracket outline around text that has moved.
+function Editor:bump()
+  self.rev = self.rev + 1
+end
+
 function Editor:set_text(text)
+  self:bump()
   text = tostring(text or "")
   -- Normalise line endings on the way in: a quest's `starter` comes off the
   -- wire and a paste comes off the system, and neither is guaranteed to be
@@ -226,6 +258,7 @@ function Editor:snapshot()
 end
 
 function Editor:restore(state)
+  self:bump()
   local copy = {}
   for i, l in ipairs(state.lines) do copy[i] = l end
   self.lines = copy
@@ -279,6 +312,7 @@ end
 -- -------------------------------------------------------------------- edits
 
 function Editor:delete_selection()
+  self:bump()
   local l1, c1, l2, c2 = self:selection()
   if not l1 then return false end
   local head = self.lines[l1]:sub(1, c1 - 1)
@@ -296,6 +330,7 @@ end
 --- Insert `text` at the cursor, replacing any selection.
 function Editor:insert(text, coalesce)
   if self.read_only then return end
+  self:bump()
   text = tostring(text or ""):gsub("\r\n", "\n"):gsub("\r", "\n")
   if text == "" then return end
   self:push_undo(coalesce and not self:has_selection())
@@ -387,6 +422,7 @@ end
 --- One `push_undo` and no other, so ctrl-Z puts the buffer back in one press.
 function Editor:replace_all(text)
   if self.read_only then return false end
+  self:bump()
   local old_text = self:text()
   local old_line = self.lines[self.line] or ""
   local anchor = old_line:gsub("%s", "")
@@ -446,6 +482,7 @@ end
 --- rather than four spaces in.
 function Editor:newline()
   if self.read_only then return end
+  self:bump()
   self:push_undo(false)
   self:delete_selection()
   local current = self.lines[self.line]
@@ -475,6 +512,7 @@ end
 
 function Editor:backspace()
   if self.read_only then return end
+  self:bump()
   if self:has_selection() then
     self:push_undo(false)
     self:delete_selection()
@@ -510,6 +548,7 @@ end
 
 function Editor:delete_forward()
   if self.read_only then return end
+  self:bump()
   if self:has_selection() then
     self:push_undo(false)
     self:delete_selection()
@@ -535,6 +574,7 @@ end
 --- spaces up to the next tab stop.
 function Editor:indent(outdent)
   if self.read_only then return end
+  self:bump()
   local l1, _, l2 = self:selection()
   if l1 then
     self:push_undo(false)
@@ -578,6 +618,7 @@ end
 --- Toggle `// ` on every selected line, the way every editor's ctrl-/ does.
 function Editor:toggle_comment()
   if self.read_only then return end
+  self:bump()
   local l1, _, l2 = self:selection()
   l1 = l1 or self.line
   l2 = l2 or self.line
@@ -704,6 +745,302 @@ function Editor:scroll_by(lines, rows)
   self.scroll = math.max(0, math.min(max_scroll, self.scroll))
 end
 
+-- -------------------------------------------------------------- the mouse
+
+--- Which column a click `target_x` pixels into the text lands on.
+---
+--- `measure(s)` returns the pixel width of `s` in the pane's font. It is
+--- injected because this file must not name `love.graphics`, and because a
+--- fixed-width stub in the suite *is* a monospace font — which is the only
+--- kind this editor is ever drawn in.
+---
+--- The **nearest** boundary wins, not the last one that starts before the
+--- click. Clicking the right-hand half of a character puts the caret after
+--- it, which is what every editor does and what makes a drag that starts in
+--- the middle of a character include that character.
+function M.column_at(line, target_x, measure)
+  if target_x <= 0 or #line == 0 then return 1 end
+  local best_col, best_d = 1, math.abs(target_x)
+  local col = 1
+  while col <= #line do
+    local nextb = M.next_boundary(line, col)
+    local w = measure(line:sub(1, nextb - 1))
+    local d = math.abs(w - target_x)
+    if d < best_d then
+      best_col, best_d = nextb, d
+    elseif w > target_x then
+      -- Past the click and no longer improving. Widths only grow, so every
+      -- later boundary is further away than this one.
+      break
+    end
+    col = nextb
+  end
+  return best_col
+end
+
+--- What kind of run a byte belongs to, for double-click granularity.
+local function class_of(c)
+  if c == nil or c == "" then return "none" end
+  if c:match("%s") then return "space" end
+  if is_word_byte(c) then return "word" end
+  return "punct"
+end
+
+--- The run of like characters around `col`: an identifier, a stretch of
+--- whitespace, or a stretch of punctuation. Returned as `from, to` with `to`
+--- one past the end, the same half-open shape as a selection.
+function M.word_span(line, col)
+  if #line == 0 then return 1, 1 end
+  if col > #line then col = M.prev_boundary(line, col) end
+  local kind = class_of(line:sub(col, col))
+  local from = col
+  while from > 1 do
+    local p = M.prev_boundary(line, from)
+    if class_of(line:sub(p, p)) ~= kind then break end
+    from = p
+  end
+  local to = M.next_boundary(line, col)
+  while to <= #line do
+    if class_of(line:sub(to, to)) ~= kind then break end
+    to = M.next_boundary(line, to)
+  end
+  return from, to
+end
+
+local function before(l1, c1, l2, c2)
+  return l1 < l2 or (l1 == l2 and c1 < c2)
+end
+
+function Editor:clamp(line, col)
+  line = math.max(1, math.min(#self.lines, math.floor(line or 1)))
+  col = math.max(1, math.min(#(self.lines[line] or "") + 1, math.floor(col or 1)))
+  return line, col
+end
+
+--- The span a press at `(line, col)` selects, given the click granularity.
+function Editor:span_for(line, col, mode)
+  line, col = self:clamp(line, col)
+  if mode == "word" then
+    local from, to = M.word_span(self.lines[line] or "", col)
+    return line, from, line, to
+  elseif mode == "line" then
+    if line < #self.lines then return line, 1, line + 1, 1 end
+    return line, 1, line, #(self.lines[line] or "") + 1
+  end
+  return line, col, line, col
+end
+
+--- Press: start a mouse selection at `(line, col)`.
+---
+--- `mode` is `"char"` for a click, `"word"` for a double click and `"line"`
+--- for a triple. The **origin** of a word or line drag is the whole word or
+--- line, so dragging out of a double click grows by words the way it does in
+--- every other editor rather than collapsing back to one character.
+---
+--- `extend` is a shift-click: it keeps the existing anchor and only moves the
+--- far end, so shift-clicking twice grows the same selection.
+function Editor:begin_select(line, col, mode, extend)
+  mode = mode or "char"
+  line, col = self:clamp(line, col)
+  if extend then
+    -- Shift-click with no selection yet extends from where the caret is,
+    -- which is what the keyboard's shift-arrow does from the same place.
+    local al = self.anchor and self.anchor.line or self.line
+    local ac = self.anchor and self.anchor.col or self.col
+    self.drag = { mode = "char", l1 = al, c1 = ac, l2 = al, c2 = ac }
+    self:drag_to(line, col)
+    return
+  end
+  local l1, c1, l2, c2 = self:span_for(line, col, mode)
+  self.drag = { mode = mode, l1 = l1, c1 = c1, l2 = l2, c2 = c2 }
+  if mode == "char" then
+    self.anchor = nil
+    self.line, self.col = l1, c1
+  else
+    self.anchor = { line = l1, col = c1 }
+    self.line, self.col = l2, c2
+  end
+  self.goal_char = nil
+end
+
+--- Move: extend the live selection to `(line, col)`. A no-op with no button
+--- down, which is what keeps a stray `mousemoved` from dragging the caret
+--- around while somebody is only passing over the pane.
+function Editor:drag_to(line, col)
+  local drag = self.drag
+  if not drag then return false end
+  line, col = self:clamp(line, col)
+  local tl1, tc1, tl2, tc2 = self:span_for(line, col, drag.mode)
+
+  local al, ac, cl, cc
+  if before(tl1, tc1, drag.l1, drag.c1) then
+    -- Dragging backwards: the anchor sits at the far end of the origin.
+    al, ac = drag.l2, drag.c2
+    cl, cc = tl1, tc1
+  else
+    al, ac = drag.l1, drag.c1
+    cl, cc = tl2, tc2
+  end
+
+  self.line, self.col = self:clamp(cl, cc)
+  if al == self.line and ac == self.col then
+    self.anchor = nil
+  else
+    self.anchor = { line = al, col = ac }
+  end
+  self.goal_char = nil
+  return true
+end
+
+--- Release. The drag is over; the selection it made stays.
+function Editor:end_select()
+  local was = self.drag ~= nil
+  self.drag = nil
+  return was
+end
+
+function Editor:dragging()
+  return self.drag ~= nil
+end
+
+-- ------------------------------------------------------------------ brackets
+
+--- The three bracket pairs this editor matches, and deliberately no more.
+---
+--- `<` and `>` are **not** here. In Rust they are comparison, `->`, `=>` and
+--- generics in roughly equal measure, and a matcher that guessed at them
+--- would be confidently wrong on the screen where being wrong is most
+--- expensive. A player writing `Vec<u8>` is better served by no marking than
+--- by a marking that disagrees with the compiler.
+M.OPENERS = { ["("] = ")", ["["] = "]", ["{"] = "}" }
+M.CLOSERS = { [")"] = "(", ["]"] = "[", ["}"] = "{" }
+
+local function bracket_key(line, col)
+  return line .. ":" .. col
+end
+M.bracket_key = bracket_key
+
+--- Pair every bracket in `lines`, and name the ones that never found a
+--- partner.
+---
+--- **Which bytes are code is decided by `M.highlight`**, the same tokenizer
+--- that colours the pane — not by a second scanner. Two scanners that
+--- disagreed would draw a brace as matched while colouring it as part of a
+--- string, and a feature that contradicts the screen it sits on is worse
+--- than no feature. So a brace inside a string literal or a comment is text
+--- and is not counted, and block comments carry across lines because
+--- `highlight` already carries that state.
+---
+--- Known gap, recorded rather than papered over: `highlight` does not know
+--- about `'`, so a `'}'` character literal counts as a brace and a lifetime
+--- is punctuation. Neither appears often in a forty-line interview answer,
+--- and fixing it means rewriting the tokenizer that the colouring already
+--- depends on.
+---
+--- Returns `at, unmatched`:
+---   `at[bracket_key(line, col)]` = `{ line, col, char, open, partner }`
+---   `unmatched`                  = those with no partner, in document order
+function M.brackets(lines)
+  local at, order, stack, unmatched = {}, {}, {}, {}
+  local state = "code"
+  for index, line in ipairs(lines) do
+    local spans
+    spans, state = M.highlight(line, state)
+    local col = 1
+    for _, span in ipairs(spans) do
+      if span.kind == "punct" then
+        local ch = span.text
+        if M.OPENERS[ch] or M.CLOSERS[ch] then
+          local entry = { line = index, col = col, char = ch,
+            open = M.OPENERS[ch] ~= nil }
+          at[bracket_key(index, col)] = entry
+          order[#order + 1] = entry
+        end
+      end
+      col = col + #span.text
+    end
+  end
+
+  for _, entry in ipairs(order) do
+    if entry.open then
+      stack[#stack + 1] = entry
+    else
+      local top = stack[#stack]
+      if top and M.OPENERS[top.char] == entry.char then
+        stack[#stack] = nil
+        top.partner = entry
+        entry.partner = top
+      else
+        -- A closer with nothing open, or the wrong kind of closer. The
+        -- opener it did not match stays on the stack and is reported too,
+        -- because both ends of a mismatch are worth looking at.
+        unmatched[#unmatched + 1] = entry
+      end
+    end
+  end
+  for _, entry in ipairs(stack) do
+    unmatched[#unmatched + 1] = entry
+  end
+  table.sort(unmatched, function(a, b)
+    if a.line ~= b.line then return a.line < b.line end
+    return a.col < b.col
+  end)
+  return at, unmatched
+end
+
+--- The analysis of the current buffer, recomputed only when it changes.
+function Editor:brackets()
+  local cache = self.bracket_cache
+  if cache and cache.rev == self.rev then return cache.at, cache.unmatched end
+  local at, unmatched = M.brackets(self.lines)
+  self.bracket_cache = { rev = self.rev, at = at, unmatched = unmatched }
+  return at, unmatched
+end
+
+function Editor:unmatched_brackets()
+  local _, unmatched = self:brackets()
+  return unmatched
+end
+
+--- The set of line numbers carrying an unmatched bracket, so the gutter can
+--- say so for a line whose bracket has scrolled off the side.
+function Editor:unmatched_lines()
+  local cache = self.bracket_cache
+  if cache and cache.rev == self.rev and cache.lines then return cache.lines end
+  local _, unmatched = self:brackets()
+  local set = {}
+  for _, entry in ipairs(unmatched) do set[entry.line] = true end
+  self.bracket_cache.lines = set
+  return set
+end
+
+--- The bracket the caret is touching, with `.partner` set when it has one.
+---
+--- The bracket **before** the caret wins over the one after it: that is what
+--- makes the pair light up the instant a closing brace is typed, which is the
+--- moment the information is worth most.
+function Editor:bracket_at_caret()
+  local at = self:brackets()
+  local line = self.lines[self.line] or ""
+  local cols = {}
+  if self.col > 1 then cols[#cols + 1] = M.prev_boundary(line, self.col) end
+  if self.col <= #line then cols[#cols + 1] = self.col end
+  for _, col in ipairs(cols) do
+    local entry = at[bracket_key(self.line, col)]
+    if entry then return entry end
+  end
+  return nil
+end
+
+--- Jump to the partner of the bracket at the caret. False when there is no
+--- bracket there, or when it has no partner — which is itself worth knowing.
+function Editor:goto_match(extend)
+  local entry = self:bracket_at_caret()
+  if not (entry and entry.partner) then return false end
+  self:goto_position(entry.partner.line, entry.partner.col, extend)
+  return true
+end
+
 -- --------------------------------------------------------------- clipboard
 
 function Editor:copy()
@@ -763,6 +1100,12 @@ function Editor:keypressed(key, mods)
   end
   if cmd and key == "y" then self:redo(); return true end
   if cmd and (key == "/" or key == "slash") then self:toggle_comment(); return true end
+  -- Jump to the other end of the block. `]` is free here — the bare key is a
+  -- character the player types, and no global shortcut takes it with ctrl.
+  if cmd and (key == "]" or key == "rightbracket") then
+    self:goto_match(shift)
+    return true
+  end
   if cmd and key == "home" then self:move("doc_start", { extend = shift }); return true end
   if cmd and key == "end" then self:move("doc_end", { extend = shift }); return true end
 

@@ -76,7 +76,9 @@ What actually fails candidates is rarely the algorithm.
   bounds, even-length median).
 * **Returning the right thing when there is no answer** — covered (`-1`,
   `NONE`, `ABSENT`, `CYCLE`, `-`).
-* **Sorting stability** — still not exercised. See §5.
+* **Sorting stability** — now exercised by `34.stable-sort`, whose hidden
+  cases are sized (`n = 60`, `n = 200`) to actually separate a stable sort from
+  an unstable one. See §4.
 
 ### 1.4 Language questions that are not algorithm questions
 
@@ -100,10 +102,11 @@ nil inside an interface, and `defer` argument evaluation. Now
 
 ### 1.5 Volume
 
-24 `hacker` quests per language covered roughly 19 recognisable archetypes.
-**28 covers about 23.** For a random screen question to land on something
-recognisable most of the time, the honest number is **30–34** per language —
-see §5 for the six that would get there.
+24 `hacker` quests per language covered roughly 19 recognisable archetypes;
+28 covered about 23. **34 per language now covers about 29 archetypes**, and
+34 quests is inside the 30–34 band this section called honest. The six that closed the gap are
+`29.dijkstra`, `30.range-queries`, `31.palindrome`, `32.modular`,
+`33.grid-paths` and `34.stable-sort`, at nodes 28–33 in both languages.
 
 ---
 
@@ -158,10 +161,17 @@ constraint no test enforces*:
   too slow**, each with the measured numbers in its own brief:
   `24.inversions` (merge sort vs the double loop), `29.dijkstra` (heap vs
   linear-scan min), `30.range-queries` (Fenwick vs the per-query loop),
-  `31.palindrome` (quadratic accepted, cubic rejected — and Manacher explicitly
+  `31.palindrome` (quadratic accepted, naive cubic rejected — and Manacher explicitly
   *not* demanded), and `32.modular` (one factorial table vs a modular inverse
   per query). `33.grid-paths` rejects route enumeration, which is a
   mathematical statement rather than a timing one.
+* **One caveat on `31.palindrome`, because it is the limit of what timing can
+  enforce.** The one-letter case rejects check-*every*-substring. Add a single
+  line skipping any substring no longer than the best found so far and that
+  same cubic loop passes both big cases, because on this input the pruning
+  collapses it to `O(n²)`. A timed case rejects a *program*, not a complexity
+  class. This is the one enforcement in the pack where that gap is narrow
+  enough to reach by accident, and the brief now says so.
 * Every other quest's hidden cases are small, and every brief that discusses
   complexity now says the cases are small and what the real constraint would
   be. `19.knapsack` is the one other quest whose test punishes a *wrong
@@ -236,7 +246,7 @@ teaching the thing the language actually makes hard is.
 
 They would recognise the shape of the session, read the statement properly,
 handle the empty and single-element cases, reach for the right structure on
-roughly nine questions in ten, and — after four quests whose hidden cases kill
+roughly nine questions in ten, and — after five quests whose hidden cases kill
 a correct-but-slow answer — know in their hands and not just in a brief that
 the right algorithm is part of the answer and not a bonus.
 

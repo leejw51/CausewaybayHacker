@@ -3964,7 +3964,7 @@ So: precompute `factorial[0..=n]` once, and answer each query as
 `q = 200000`. Computing each coefficient independently — multiply `b` terms,
 divide by `b` terms, one modular inverse each — does not finish in the five
 second run limit; that is the starter. One shared factorial table finishes in
-about forty milliseconds. Both measured on this machine.
+about fifty milliseconds. Both measured on this machine.
 
 Every intermediate is a product of two values below `2^30`, so it fits in an
 `i64` and nothing overflows. In a language with 32-bit `int` it would not, and

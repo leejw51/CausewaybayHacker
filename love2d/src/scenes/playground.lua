@@ -34,6 +34,7 @@ local Assets = require("src.assets")
 local UI = require("src.ui")
 local SFX = require("src.sfx")
 local Editor = require("src.editor")
+local CodePane = require("src.codepane")
 local Anim = require("src.anim")
 local runlog = require("src.net.runlog")
 
@@ -94,6 +95,9 @@ function Playground:enter()
     },
     now = function() return love.timer.getTime() end,
   })
+  -- Same pane object as the quest screen's: the hit test, drag-select and the
+  -- bracket overlay are one implementation, not two that look alike.
+  self.pane = CodePane.new(self.editor)
   self.editor:set_text(STARTER[self.lang])
   self.editor.dirty = false
 
@@ -409,7 +413,10 @@ function Playground:draw_code(rect)
   local size = math.floor(18 * scale)
   local font = Assets.mono(size)
   local line_h = font:getHeight()
-  local gutter = font:getWidth("0000")
+  -- The trailing space is not decoration: `%4d` right-aligns, so without
+  -- it the last digit of the line number touches the first character of an
+  -- unindented line and `1` reads as part of `fn`.
+  local gutter = font:getWidth("0000 ")
   local rows = math.max(1, math.floor((rect.h - 64) / line_h))
   self.editor:ensure_visible(rows)
   self.visible_rows = rows
@@ -421,6 +428,7 @@ function Playground:draw_code(rect)
   love.graphics.setScissor(rect.x + 3, rect.y + 3, rect.w - 6, rect.h - 60)
   love.graphics.setFont(font)
   local x0, y0 = rect.x + 8, rect.y + 6
+  self.pane:frame(rect, font, gutter, x0, y0, line_h, rows)
   local state = "code"
   for i = 1, self.editor.scroll do
     _, state = Editor.highlight(self.editor.lines[i] or "", state)
@@ -444,7 +452,7 @@ function Playground:draw_code(rect)
       love.graphics.rectangle("fill", sx, y,
         math.max(2, font:getWidth(line:sub(from, to - 1))), line_h)
     end
-    UI.setColor(Theme.dim, 0.9)
+    UI.setColor(self.pane:gutter_color(index))
     love.graphics.print(("%4d"):format(index), x0, y)
     local spans
     spans, state = Editor.highlight(line, state)
@@ -461,6 +469,7 @@ function Playground:draw_code(rect)
         x0 + gutter + font:getWidth(line:sub(1, self.editor.col - 1)), y, 2, line_h)
     end
   end
+  self.pane:draw_brackets()
   love.graphics.setScissor()
   love.graphics.setColor(1, 1, 1, 1)
 
@@ -674,23 +683,21 @@ function Playground:mousepressed(x, y, button)
       return
     end
   end
-  local code = select(1, self:panes())
-  if inside(code) then
+  -- Both shifts: the old hit test asked for the left one only.
+  local shift = love.keyboard.isDown("lshift", "rshift")
+  if self.pane:mousepressed(x, y, button, shift) then
     self.focus = "editor"
-    if self.mono_font and self.line_h then
-      local row = math.floor((y - code.y - 6) / self.line_h) + 1
-      local index = self.editor.scroll + row
-      local line = self.editor.lines[math.max(1, math.min(#self.editor.lines, index))] or ""
-      local target = x - code.x - 8 - (self.gutter or 0)
-      local col = 1
-      while col <= #line do
-        local nextb = Editor.next_boundary(line, col)
-        if self.mono_font:getWidth(line:sub(1, nextb - 1)) > target then break end
-        col = nextb
-      end
-      self.editor:goto_position(index, col, button == 1 and love.keyboard.isDown("lshift"))
-    end
+    return
   end
+  if inside(select(1, self:panes())) then self.focus = "editor" end
+end
+
+function Playground:mousemoved(x, y)
+  if self.pane then self.pane:mousemoved(x, y) end
+end
+
+function Playground:mousereleased()
+  if self.pane then self.pane:mousereleased() end
 end
 
 return Playground
