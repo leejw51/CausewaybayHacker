@@ -2349,3 +2349,17 @@ asserts only this client's half:
 * `world.map` still sends `locked` for 16 of 18 nodes. The client entered one
   anyway and let the server answer, which is the correct division either way.
 * `Attempt.mode` is not yet on the wire; the client tolerates its absence.
+
+### Two more for QA, from the same change
+
+`tests/smoke/contract.mjs` §8.4 now scores 11/12. It provokes error codes and
+asserts "7+ of the closed set"; `locked` was the seventh and PROTOCOL §4.7 has
+just made it unemittable on purpose. The guard at line 773 (`find(n => n.state
+=== "locked")`) already handles its absence — it is only the count at line 809
+that needs to be 6+. Lines 1347 and 1403 accept `open`/`cleared` already and
+need nothing.
+
+The §8.4 *point* is still worth keeping exactly as it is otherwise: "every code
+a client can meet is reachable" is the assertion that stops a code being
+specified and never emitted. `locked` is now deliberately in that state, which
+is the one exception the contract names.

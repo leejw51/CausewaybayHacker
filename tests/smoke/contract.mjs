@@ -64,7 +64,16 @@ const WALLET =
 /** PROTOCOL.md §2: exactly these four top-level keys, no others. */
 const ENVELOPE_KEYS = ["id", "payload", "type", "v"]; // sorted
 
-/** PROTOCOL.md §3.3. Closed. A code outside it is a server bug. */
+/**
+ * PROTOCOL.md §3.3. Closed. A code outside it is a server bug.
+ *
+ * "Closed" and "reachable" are two different claims and this suite keeps them
+ * apart. `locked` is still *in* the set and is no longer *emitted* (§4.7:
+ * every node is playable). It stays in the set because removing a code from a
+ * closed set is the one change that breaks a client switching exhaustively —
+ * so a client must still handle it, and a test that deleted it from here
+ * would stop noticing if a server started emitting it again.
+ */
 const ERROR_CODES = new Set([
   "proto_version",
   "bad_request",
@@ -73,6 +82,7 @@ const ERROR_CODES = new Set([
   "auth_nonce_used",
   "auth_bad_signature",
   "not_found",
+  // In the set, never emitted — see NOT_EMITTED below.
   "locked",
   "rate_limited",
   "busy",
@@ -82,6 +92,15 @@ const ERROR_CODES = new Set([
   "unavailable",
   "internal",
 ]);
+
+/**
+ * Codes that are in the closed set and that this build must never send.
+ *
+ * `locked` went this way when §4.7 made every node playable. A server that
+ * starts emitting one again has quietly reintroduced a rule the spec
+ * removed, and the player finds out by being refused a quest they can see.
+ */
+const NOT_EMITTED = new Set(["locked"]);
 
 /** PROTOCOL.md §4.17–§4.21, the server-initiated events. */
 const EVENT_TYPES = new Set([
@@ -327,6 +346,12 @@ class Client {
           `error code ${JSON.stringify(p.code)} is outside §3.3's closed set`,
           f,
         );
+      else if (NOT_EMITTED.has(p.code))
+        this.violate(
+          `error code ${JSON.stringify(p.code)} is in §3.3's set but §4.7 says ` +
+            `it is never emitted — every node is playable`,
+          f,
+        );
       if (typeof p.message === "string" && p.message.includes("\n"))
         this.violate("§3.3: `message` is one line", f);
     }
@@ -481,7 +506,7 @@ async function firstOpenQuest(cl) {
   const map = await cl.send("world.map", { land: "rust", category: "basic" });
   assertEq(map.type, "world.map.ok", "world.map");
   const open = map.payload.nodes.find((n) => n.state === "open");
-  assert(open, "the map has no open node; SPEC §12 says an empty `requires` is open");
+  assert(open, "the map has no open node, and §4.7 says every node is playable");
   const got = await cl.send("quest.get", { quest_id: open.quest_id });
   assertEq(got.type, "quest.get.ok", "quest.get");
   return { node: open, quest: got.payload.quest, map: map.payload };
@@ -770,22 +795,40 @@ check("8.4", "every error code is in §3.3's closed set, and they are reachable"
     );
     seen.add("not_found");
 
-    // locked — a node whose requires are not cleared.
+    // §4.7: **every node is playable**, so `locked` is no longer reachable.
+    // This is the inverse assertion — the map offers nothing locked, and the
+    // deepest node on it takes a submission like any other.
+    //
+    // The rule it protects is the reason §4.7 exists: "somebody with an
+    // interview on Thursday needs to open the dynamic-programming street on
+    // Tuesday without grinding through eighteen quests about `&str` first."
     const map = await auth.send("world.map", { land: "rust", category: "basic" });
-    const locked = map.payload.nodes.find((n) => n.state === "locked");
-    if (locked) {
-      const l = await auth.send("quest.submit", {
-        quest_id: locked.quest_id,
-        lang: "rust",
-        source: WRONG_SOURCE,
-      });
-      assertErr(l, "locked", "submitting to a locked node");
-      assert(
-        Array.isArray(l.payload.detail?.requires),
-        "§3.3's worked example: `locked` names the blocker in detail.requires",
-      );
-      seen.add("locked");
-    }
+    const nodes = map.payload.nodes;
+    assert(nodes.length > 1, "the rust/basic map has more than one node");
+    const stillLocked = nodes.filter((n) => n.state === "locked");
+    assertEq(
+      stillLocked.map((n) => n.quest_id),
+      [],
+      "§4.7 and §5.2: `state` is `open` or `cleared`, never `locked`",
+    );
+
+    const deepest = nodes.reduce((a, b) => (a.node > b.node ? a : b));
+    assert(
+      deepest.node > 1,
+      "the map is one node deep, so 'you may start anywhere' is untestable",
+    );
+    const straightIn = await auth.send("quest.submit", {
+      quest_id: deepest.quest_id,
+      lang: "rust",
+      source: WRONG_SOURCE,
+    });
+    assertEq(
+      straightIn.type,
+      "quest.submit.ok",
+      `§4.7: the last node of the map (${deepest.quest_id}) refused a ` +
+        `submission from a player who has cleared nothing`,
+    );
+    assertEq(straightIn.payload.attempt.cleared, false, "it was the wrong answer");
 
     // bad_request — `lang` disagreeing with the quest (§4.9).
     const open = map.payload.nodes.find((n) => n.state === "open");
@@ -804,9 +847,20 @@ check("8.4", "every error code is in §3.3's closed set, and they are reachable"
   } finally {
     cl.close();
   }
+  // Seven of the eleven are provoked here. The rest are reachable but not
+  // from one connection in one pass — `rate_limited` needs a limit nothing in
+  // this suite knows, `internal` needs a broken server, `auth_expired` needs
+  // a 120-second wait — and `locked` is in the set and deliberately
+  // unreachable (§4.7). Naming that is the point: "every code is in the set"
+  // and "every code can be produced" are different claims.
   assert(
-    seen.size >= 7,
-    `only provoked ${[...seen].sort().join(", ")} — expected 7+ of the closed set`,
+    seen.size >= 6,
+    `only provoked ${[...seen].sort().join(", ")} — expected 6+ of the closed set`,
+  );
+  assert(
+    !seen.has("locked"),
+    "`locked` was emitted. §4.7 says every node is playable and this code is " +
+      "kept in the closed set only so an exhaustive client still compiles.",
   );
 });
 
@@ -1344,7 +1398,8 @@ check(null, "beyond: world.lands, world.map and quest.get match §5", async () =
         /^(rust|go)\.(basic|advanced|hacker)\.\d{2}\..+$/.test(n.quest_id),
         `SPEC §4.1: quest_id ${n.quest_id}`,
       );
-      assert(["locked", "open", "cleared"].includes(n.state), `§5.2: state ${n.state}`);
+      // §5.2: `open` | `cleared`. Never `locked` — see §4.7.
+      assert(["open", "cleared"].includes(n.state), `§5.2: state ${n.state}`);
       assert(n.stars >= 0 && n.stars <= 3, `§5.2: stars ${n.stars}`);
       assert(n.difficulty >= 1 && n.difficulty <= 5, `§5.2: difficulty ${n.difficulty}`);
       assert(["quest", "boss", "gate"].includes(n.kind), `§5.2: kind ${n.kind}`);
@@ -1400,7 +1455,7 @@ check(null, "beyond: world.lands, world.map and quest.get match §5", async () =
       quest.time_limit_s === null || typeof quest.time_limit_s === "number",
       "§5.3: time_limit_s is a number or null",
     );
-    assert(["locked", "open", "cleared"].includes(quest.state), "§5.3: quest.state");
+    assert(["open", "cleared"].includes(quest.state), "§5.3: quest.state");
   } finally {
     cl.close();
   }
@@ -1570,8 +1625,8 @@ check(null, "beyond: what is not built says so, and what is built is judged", as
     const goNode = goMap.payload.nodes?.find((n) => n.state === "open");
     assert(
       goNode,
-      "the go/basic map has no open node — either Go content is missing or " +
-        "every node starts locked, and §12 says an empty `requires` is open",
+      "the go/basic map has no open node — Go content is missing, since §4.7 " +
+        "says every node is playable",
     );
 
     const before = (await cl.send("stats.history", { quest_id: goNode.quest_id })).payload

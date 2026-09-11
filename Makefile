@@ -79,23 +79,33 @@ help: ## what you can do
 
 start: ## start both servers in the background
 	@mkdir -p $(RUN)
+	@# Per service, not all-or-nothing: a rebuild replaces the backend binary
+	@# and kills it while the dev server keeps running, and refusing to start
+	@# the half that is down because the other half is up is how you end up
+	@# staring at CONNECTION LOST.
 	@if $(call held,$(BACK_PORT),cwbhacker); then \
-	  echo "backend already up on $(BACK_PORT) — 'make restart' to bounce it"; exit 1; fi
-	@if $(call held,$(WEB_PORT),node|vite); then \
-	  echo "frontend already up on $(WEB_PORT) — 'make restart' to bounce it"; exit 1; fi
-	@echo "building the backend (the first one is slow)…"
-	@cd backend && cargo build -p cwbhacker 2>&1 | tail -3
+	  echo "backend already up on $(BACK_PORT) — 'make restart' to bounce it"; \
+	else \
+	  echo "building the backend (the first one is slow)…"; \
+	  ( cd backend && cargo build -p cwbhacker 2>&1 | tail -3 ) || exit 1; \
+	fi
 	@if [ ! -x "$(VITE)" ]; then echo "installing frontend deps…"; cd frontend && npm install; fi
-	@if [ ! -f frontend/dist/index.html ]; then \
+	@if $(call held,$(BACK_PORT),cwbhacker); then :; elif [ ! -f frontend/dist/index.html ]; then \
 	  echo "building the frontend (the server serves it on $(BACK_PORT))…"; \
 	  cd frontend && npm run build >/dev/null 2>&1 || { echo "  frontend build failed — run 'cd frontend && npm run build'"; exit 1; }; \
 	fi
-	@CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) nohup $(BACK_BIN) serve --bind $(BIND):$(BACK_PORT) \
-	  < /dev/null > $(RUN)/backend.log 2>&1 & echo $$! > $(RUN)/backend.pid
-	@$(MAKE) -s _wait PORT=$(BACK_PORT) WHAT=backend LOG=$(RUN)/backend.log
-	@( cd frontend && exec ../$(VITE) --host --port $(WEB_PORT) ) \
-	  < /dev/null > $(RUN)/web.log 2>&1 & echo $$! > $(RUN)/web.pid
-	@$(MAKE) -s _wait PORT=$(WEB_PORT) WHAT=frontend LOG=$(RUN)/web.log
+	@if $(call held,$(BACK_PORT),cwbhacker); then :; else \
+	  CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) nohup $(BACK_BIN) serve --bind $(BIND):$(BACK_PORT) \
+	    < /dev/null > $(RUN)/backend.log 2>&1 & echo $$! > $(RUN)/backend.pid; \
+	  $(MAKE) -s _wait PORT=$(BACK_PORT) WHAT=backend LOG=$(RUN)/backend.log; \
+	fi
+	@if $(call held,$(WEB_PORT),node|vite); then \
+	  echo "  frontend already up on $(WEB_PORT)"; \
+	else \
+	  ( cd frontend && exec ../$(VITE) --host --port $(WEB_PORT) ) \
+	    < /dev/null > $(RUN)/web.log 2>&1 & echo $$! > $(RUN)/web.pid; \
+	  $(MAKE) -s _wait PORT=$(WEB_PORT) WHAT=frontend LOG=$(RUN)/web.log; \
+	fi
 	@echo ""
 	@echo "  play here     http://127.0.0.1:$(BACK_PORT)"
 	@echo "  hot reload    http://127.0.0.1:$(WEB_PORT)   (this machine only — see below)"

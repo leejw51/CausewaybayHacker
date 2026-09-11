@@ -235,15 +235,23 @@ export class QuestScene implements Scene {
       // §3.3 again: our words on screen, the server's in the console.
       const goGap = this.land === "go" && e instanceof WireError && e.payload.code === "internal";
       this.notice = goGap;
-      this.error = dropped
-        ? "the connection dropped — that attempt is still running on the server"
-        : goGap
-          ? // The Go runner arrives in the next milestone. Reporting that as a
-            // server fault teaches the player to distrust a working server.
-            "the GO land opens in the next chapter"
-          : e instanceof WireError
-            ? playerText(e.payload.code)
-            : "the run failed";
+      // A server that has not caught up with §4.9b answers an unknown request
+      // type with `not_found`, and "that is not there any more" sends the
+      // player looking for a missing quest. Name the actual situation.
+      const noRun =
+        kind === "quest.run" && e instanceof WireError && e.payload.code === "not_found";
+      this.notice = this.notice || noRun;
+      this.error = noRun
+        ? "this server does not have RUN yet — press SUBMIT"
+        : dropped
+          ? "the connection dropped — that attempt is still running on the server"
+          : goGap
+            ? // The Go runner arrives in the next milestone. Reporting that as a
+              // server fault teaches the player to distrust a working server.
+              "the GO land opens in the next chapter"
+            : e instanceof WireError
+              ? playerText(e.payload.code)
+              : "the run failed";
     }
   }
 
