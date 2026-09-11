@@ -2,4 +2,4 @@ panic: runtime error: index out of range [5] with length 3
 
 goroutine 1 [running]:
 main.main()
-	<work>/main.go:12 +0x8c
+	<work>/main.go:12 +0x<off>

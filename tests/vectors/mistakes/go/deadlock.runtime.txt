@@ -2,4 +2,4 @@ fatal error: all goroutines are asleep - deadlock!
 
 goroutine 1 [chan receive]:
 main.main()
-	<work>/main.go:8 +0x34
+	<work>/main.go:8 +0x<off>

@@ -796,7 +796,7 @@
         "diagnostics": [],
         "run_command": "./prog",
         "run_exit": 2,
-        "run_stderr": "panic: runtime error: invalid memory address or nil pointer dereference\n[signal SIGSEGV: segmentation violation code=0x2 addr=0x0 pc=0x<pc>]\n\ngoroutine 1 [running]:\nmain.main()\n\t<work>/main.go:12 +0x20\n",
+        "run_stderr": "panic: runtime error: invalid memory address or nil pointer dereference\n[signal SIGSEGV: segmentation violation code=0x<code> addr=0x0 pc=0x<pc>]\n\ngoroutine 1 [running]:\nmain.main()\n\t<work>/main.go:12 +0x<off>\n",
         "vet_command": "go vet ./main.go",
         "vet_exit": 0,
         "vet_stderr": ""
@@ -822,7 +822,7 @@
         "diagnostics": [],
         "run_command": "./prog",
         "run_exit": 2,
-        "run_stderr": "panic: runtime error: index out of range [5] with length 3\n\ngoroutine 1 [running]:\nmain.main()\n\t<work>/main.go:12 +0x8c\n",
+        "run_stderr": "panic: runtime error: index out of range [5] with length 3\n\ngoroutine 1 [running]:\nmain.main()\n\t<work>/main.go:12 +0x<off>\n",
         "vet_command": "go vet ./main.go",
         "vet_exit": 0,
         "vet_stderr": ""
@@ -848,7 +848,7 @@
         "diagnostics": [],
         "run_command": "./prog",
         "run_exit": 2,
-        "run_stderr": "fatal error: all goroutines are asleep - deadlock!\n\ngoroutine 1 [chan receive]:\nmain.main()\n\t<work>/main.go:8 +0x34\n",
+        "run_stderr": "fatal error: all goroutines are asleep - deadlock!\n\ngoroutine 1 [chan receive]:\nmain.main()\n\t<work>/main.go:8 +0x<off>\n",
         "vet_command": "go vet ./main.go",
         "vet_exit": 0,
         "vet_stderr": ""

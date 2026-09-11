@@ -150,6 +150,12 @@ RUNTIME_NORMALISATIONS = [
     (r"thread '([^']*)' \(\d+\)", r"thread '\1' (<tid>)"),
     (r"pc=0x[0-9a-f]+", "pc=0x<pc>"),
     (r"goroutine (\d+) \[", r"goroutine \1 ["),  # stable; listed for clarity
+    # Per architecture, not per program: the offset of a frame within its
+    # function (`main.go:12 +0x20` on arm64, `+0x16` on amd64) and the
+    # SIGSEGV code byte (`code=0x2` / `code=0x1`). The line number is the
+    # identity; these two are where the machine shows through.
+    (r"(\.go:\d+) \+0x[0-9a-f]+", r"\1 +0x<off>"),
+    (r"code=0x[0-9a-f]+", "code=0x<code>"),
 ]
 
 

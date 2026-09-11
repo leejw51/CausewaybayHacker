@@ -1,6 +1,6 @@
 panic: runtime error: invalid memory address or nil pointer dereference
-[signal SIGSEGV: segmentation violation code=0x2 addr=0x0 pc=0x<pc>]
+[signal SIGSEGV: segmentation violation code=0x<code> addr=0x0 pc=0x<pc>]
 
 goroutine 1 [running]:
 main.main()
-	<work>/main.go:12 +0x20
+	<work>/main.go:12 +0x<off>
