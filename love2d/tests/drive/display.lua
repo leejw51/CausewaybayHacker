@@ -200,6 +200,10 @@ add({ until_ = snapshot("click-orient-3"), timeout = 5 })
 add({ note = "click the type-size chip through all four steps and back" })
 add({ until_ = function(app)
       local L = require("src.layout")
+      -- From the first rung, whatever the default is (`Layout.DEFAULT_FONT`
+      -- is 2): the assertion below is that the cycle climbs and wraps, and
+      -- a cycle started on rung 2 climbs 3, 4, then drops to 1.
+      L.setFont(1)
       seen.font_start = L.font
       seen.font_sizes = { L.codeSize(18) }
       return true

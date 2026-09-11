@@ -24,40 +24,25 @@
 --     resumed during the handshake still sees the card — it is the front
 --     door — but one press takes them to `lands`, not to a login screen.
 --
--- ## The idle hand-over, and the eight seconds that are a compromise
+-- ## The card waits for a person. Only a drive script gets the idle hand-over
 --
--- Left alone the card gives up after `IDLE_OUT` seconds and hands over to the
--- login screen. That is not what a cabinet does — a cabinet plays its attract
--- loop — and the reason it does not is worth writing down rather than
--- rediscovering:
+-- Left alone with a player in front of it, the card waits. It used to give
+-- up after `IDLE_OUT` seconds and hand over to the login screen, and the
+-- report was exactly that: "after a while the title goes on by itself". A
+-- cabinet plays its attract loop; it does not start the game because nobody
+-- touched it. So for a player there is no clock at all.
 --
---   * A screen that waits forever cannot be driven by anything that does not
---     know to press a key, and **every script under `tests/drive/` boots the
---     client and waits for the login screen**, with `timeout = 15` (which is
---     also `src/drive.lua`'s default). A card with no exit is a suite that
---     hangs — `love.event.quit(1)`, loudly, in that case, but still a suite
---     that fails for the one reason that is not a bug.
---   * Going to the *story* on idle instead would be more faithful and costs
---     the whole budget: the opening is ~40 s against a 15 s wait.
---
--- So: the boot screen hands over as soon as the socket has answered (under a
--- second on loopback), the card spends eight of the fifteen, and login lands
--- at about 8.5 s with nearly half the budget unspent. Nobody is watching, so
--- the cabinet does not perform — it puts up the screen a returning player's
--- hands are already on. `STORY` on the login screen plays the opening on
--- purpose, as it always did.
---
--- ## STORY on the card too, because `make gui` never shows the login screen
---
--- `make gui` resumes the stored session every launch, so a returning player
--- goes card → `lands` and never sees the login screen — and the login screen
--- was the only place `STORY` lived. Once `story.seen` was on disk the opening
--- was unreachable from the desktop client: SPACE went past it, and the one
--- button that replays it was on a screen the player could no longer reach.
--- So the card carries the same control. F10, or the small plate under the
--- big one; it plays the opening as a replay (`{ replay = true }`) and does
--- not touch the flag, exactly as the login screen's does. Every other key
--- and every other click still means "start".
+-- The clock still exists, and it exists for one reader: **every script under
+-- `tests/drive/` boots the client and waits for the login screen**, with
+-- `timeout = 15` (which is also `src/drive.lua`'s default), and twenty of
+-- them do not know to press SPACE on a card that did not exist when they
+-- were written. So when `CWBH_DRIVE` names a script the card hands over
+-- after `IDLE_OUT` seconds, as before: the boot screen hands over as soon as
+-- the socket has answered (under a second on loopback), the card spends
+-- eight of the fifteen, and login lands at about 8.5 s with nearly half the
+-- budget unspent. Going to the *story* on idle instead would be more
+-- faithful and costs the whole budget: the opening is ~40 s against a 15 s
+-- wait.
 --
 -- **The idle clock is wall time, not summed `dt`.** `main.lua` caps `dt` at
 -- 0.05 and macOS throttles an occluded window to a couple of frames a second,
@@ -78,8 +63,14 @@ local Ease = require("src.ease")
 local Title = {}
 Title.__index = Title
 
---- Seconds of nobody-at-all before the card hands over. See the header.
+--- Seconds of nobody-at-all before the card hands over — **under a drive
+--- script only**. See the header: a player is waited for.
 Title.IDLE_OUT = 8
+
+--- Whether this run has a script at the keyboard rather than a person.
+function Title.driven()
+  return (os.getenv("CWBH_DRIVE") or "") ~= ""
+end
 
 function Title.new(app)
   return setmetatable({ app = app, t = 0, leaving = false }, Title)
@@ -122,7 +113,8 @@ end
 
 function Title:update(dt)
   self.t = self.t + dt
-  if not self.leaving and love.timer.getTime() - (self.since or 0) > Title.IDLE_OUT then
+  if not self.leaving and Title.driven()
+    and love.timer.getTime() - (self.since or 0) > Title.IDLE_OUT then
     self:start(true)
   end
 end

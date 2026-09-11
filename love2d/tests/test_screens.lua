@@ -280,14 +280,21 @@ return function()
 
   T.section("the title card, and the opening it guards")
 
-  T.case("the card waits, and its idle clock is wall time", function()
+  T.case("the card waits for a person; only a drive script gets the idle hand-over", function()
     local _, code = strings_of("src/scenes/title.lua")
     if not code then
       T.skip("src/scenes/title.lua", "not readable from this working directory")
       return
     end
     local idle = tonumber(code:match("Title%.IDLE_OUT = (%d+)"))
-    T.ok(idle ~= nil and idle > 0, "the card gives up eventually")
+    T.ok(idle ~= nil and idle > 0, "the card gives up eventually — under a script")
+    -- The report: "after a while the title goes on by itself". The clock
+    -- runs only when CWBH_DRIVE names a script, and the update gates on it.
+    local update = code:match("function Title:update%(dt%)(.-)\nend")
+    T.ok(update ~= nil and update:find("Title.driven()", 1, true) ~= nil,
+      "a player in front of the card is waited for, however long")
+    T.ok(code:find('os.getenv("CWBH_DRIVE")', 1, true) ~= nil,
+      "and `driven` is the drive harness's own switch, not a second flag")
     -- Every script under tests/drive waits for the login screen with
     -- `timeout = 15`, which is also `src/drive.lua`'s default. The card plus
     -- the boot screen's handshake has to land well inside that.
@@ -301,6 +308,43 @@ return function()
       "the deadline is wall time, the same rule src/drive.lua states")
     T.nope(code:find("self.idle = self.idle + dt", 1, true),
       "and not a counter fed by dt")
+  end)
+
+  T.case("with a person at the card, no amount of time moves it on", function()
+    if not (love and love.timer and love.timer.getTime) then
+      T.skip("title idle", "needs love.timer")
+      return
+    end
+    local Title = require("src.scenes.title")
+    local went = {}
+    local app = { session = { authed = false }, go = function(_, name) went[#went + 1] = name end }
+    local driven = Title.driven
+    -- A player, not a script: the clock must not exist for them.
+    Title.driven = function() return false end
+    local card = Title.new(app)
+    card:enter()
+    card.since = love.timer.getTime() - (Title.IDLE_OUT * 10)
+    card:update(0.016)
+    T.eq(#went, 0, "eighty seconds of nobody is still the title card")
+    T.nope(card.leaving)
+    -- Every key but SPACE is ignored too.
+    for _, key in ipairs({ "return", "escape", "x", "kpenter", "up" }) do
+      card:keypressed(key)
+    end
+    T.eq(#went, 0, "no key but SPACE starts")
+    card:keypressed("space")
+    T.eq(#went, 1, "SPACE is the one way on")
+    T.ok(went[1] == "story" or went[1] == "login",
+      "to the opening on a fresh store, the login screen otherwise")
+    -- A script at the keyboard still gets the hand-over the suite relies on.
+    Title.driven = function() return true end
+    went = {}
+    local scripted = Title.new(app)
+    scripted:enter()
+    scripted.since = love.timer.getTime() - (Title.IDLE_OUT + 1)
+    scripted:update(0.016)
+    T.same(went, { "login" }, "under CWBH_DRIVE the card hands over on the clock, to login")
+    Title.driven = driven
   end)
 
   T.case("the opening is offered once and remembered, skipped or not", function()
