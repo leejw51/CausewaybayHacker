@@ -23,6 +23,7 @@ local CRT = require("src.crt")
 local SFX = require("src.sfx")
 local Store = require("src.store")
 local Anim = require("src.anim")
+local Clock = require("src.clock")
 local Wallet = require("src.wallet")
 local Session = require("src.session")
 local netclient = require("src.net.client")
@@ -144,6 +145,12 @@ function App:load()
   -- own; the game gives it this one, and a drive script can pin it so a
   -- screenshot of a bobbing mascot is the same screenshot every run.
   Anim.set_clock(function() return love.timer.getTime() end)
+  -- The quest clock's wall time (§4.8b). `os.time()` alone stutters at one
+  -- second; `love.timer.getTime()` alone starts at an arbitrary zero. Pinned
+  -- together at startup they give real wall time, smoothly, and — unlike a
+  -- counter fed by `dt` — they keep counting while the window is occluded,
+  -- which is exactly when somebody has alt-tabbed away to read docs.
+  Clock.set_source(function() return love.timer.getTime() end)
 
   -- The key library first: `src/store.lua` wants its `secure` op for the
   -- `0700`/`0600` SPEC §1.1 asks for, and a store that opened before the

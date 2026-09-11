@@ -109,8 +109,11 @@ function Categories:draw()
   local rows = self.categories or {}
   local pad = Layout.isPortrait() and 12 or 60
   local w = vw - pad * 2
-  local rh = math.min(104, math.max(76, (vh - 140) / math.max(1, #rows) - 12))
-  local y = 70
+  -- Taller rows: the emblems are 3:1 and a short row shows very little of
+  -- one. This is the number the art wants rather than the number the old
+  -- text rows wanted.
+  local rh = math.min(128, math.max(84, (vh - 120) / math.max(1, #rows) - 12))
+  local y = 66
 
   for i, cat in ipairs(rows) do
     local selected = i == self.cursor
@@ -134,32 +137,54 @@ function Categories:draw()
     local right = 96
     local band_x = pad + gutter
     local band_w = w - gutter - right
+    -- **Adapted, not assumed.** The emblems are 384x128 — 3:1 — and DESIGN
+    -- sized that for the browser's category row. This row is nearer 9:1, so
+    -- `cover` scaled to the width and threw away two thirds of the picture
+    -- vertically: a horizontal slice of a tram. Instead the band is drawn at
+    -- its own aspect, as tall as the row, anchored to the **right** so it
+    -- never runs under the label, with the panel showing through beside it.
     local emblem = ("emblem_%s_%s"):format(self.land, cat.category)
-    if band_w > 40 then
+    local image = Assets.image(emblem)
+    if band_w > 40 and image then
+      local iw, ih = image:getDimensions()
+      local es = (rh - 8) / ih
+      local ew = iw * es
+      local ex = band_x + band_w - ew
       love.graphics.setScissor(band_x, ry + 4, band_w, rh - 8)
-      if not Assets.cover(emblem, band_x, ry + 4, band_w, rh - 8) then
-        -- No art: the mascot alone rather than a coloured hole.
-        Assets.sprite(("mascot_%s_%s"):format(self.land, cat.category),
-          band_x + band_w / 2, ry + rh - 8, rh - 20)
+      love.graphics.setColor(1, 1, 1, 1)
+      love.graphics.draw(image, ex, ry + 4, 0, es, es)
+      -- A short fade on its left edge so the art does not cut hard against
+      -- the panel it sits in.
+      for k = 0, 14 do
+        UI.setColor(Theme.navy, 0.95 - k * 0.068)
+        love.graphics.rectangle("fill", ex + k * 3, ry + 4, 3, rh - 8)
       end
       love.graphics.setScissor()
-      -- A short gradient-ish fade at the label edge, so the band does not cut
-      -- against the word.
-      for k = 0, 10 do
-        UI.setColor(Theme.navy, 0.9 - k * 0.09)
-        love.graphics.rectangle("fill", band_x + k * 2, ry + 4, 2, rh - 8)
-      end
       love.graphics.setColor(1, 1, 1, 1)
+    elseif band_w > 40 then
+      -- No art: the action mascot alone rather than a coloured hole.
+      Assets.sprite(("mascot_%s_%s"):format(self.land, cat.category),
+        band_x + band_w - 40, ry + rh - 8, rh - 20)
     end
 
     local color = cat.open and Theme.cream or Theme.dim
+    UI.setColor(Theme.ink, 0.55)
+    love.graphics.rectangle("fill", pad + 6, ry + 8, gutter - 4, 40)
+    love.graphics.setColor(1, 1, 1, 1)
     UI.text(cat.category:upper(), pad + 14, ry + 12, math.floor(13 * s), color)
     UI.text(BLURB[cat.category] or "", pad + 14, ry + 32, 7,
-      Theme.withAlpha(color, 0.7))
+      Theme.withAlpha(color, 0.75))
 
+    -- The counts sit on their own plate, because behind them is artwork and
+    -- a number over a painted crate is a number nobody can read.
     local progress = ("%d / %d"):format(cat.cleared, cat.total)
-    UI.text(progress, pad + w - 14 - UI.textWidth(progress, 10), ry + 12, 10, color)
-    UI.bar(pad + w - 14 - 76, ry + 30, 76, 7,
+    local pw = math.max(76, UI.textWidth(progress, 10) + 12)
+    UI.setColor(Theme.ink, 0.72)
+    love.graphics.rectangle("fill", pad + w - 14 - pw, ry + 8, pw, 34)
+    love.graphics.setColor(1, 1, 1, 1)
+    UI.text(progress, pad + w - 8 - pw + (pw - UI.textWidth(progress, 10)) / 2,
+      ry + 12, 10, color)
+    UI.bar(pad + w - 10 - pw + 4, ry + 30, pw - 12, 7,
       cat.total > 0 and cat.cleared / cat.total or 0,
       cat.open and Theme.admit or Theme.dim)
 
@@ -201,8 +226,8 @@ function Categories:mousepressed(x, y)
   local rows = self.categories or {}
   local pad = Layout.isPortrait() and 16 or 80
   local w = Layout.vw - pad * 2
-  local rh = math.min(104, math.max(76, (Layout.vh - 140) / math.max(1, #rows) - 12))
-  local ry = 70
+  local rh = math.min(128, math.max(84, (Layout.vh - 120) / math.max(1, #rows) - 12))
+  local ry = 66
   for i = 1, #rows do
     if x >= pad and x <= pad + w and y >= ry and y <= ry + rh then
       if self.cursor ~= i then

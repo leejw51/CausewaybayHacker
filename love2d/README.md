@@ -62,6 +62,7 @@ official release from GitHub instead, and `make run` will use a `love` on
 | **F1** | orientation: landscape → portrait → automatic |
 | **F3** / **F4** | scanlines · sound |
 | **F5** / **F10** | in a quest: **RUN** · **SUBMIT** — see below |
+| **F2** | in a quest: **FORMAT** (`rustfmt` / `gofmt`, on the server) |
 | **F6** … **F9** | in a quest: reset · hint · log · `$EDITOR` |
 | **TAB** / **Q** | on the map: switch land · switch category |
 | **TAB** / **ESC** | indent · back |
@@ -91,6 +92,22 @@ what you are actually struggling with (PROTOCOL §4.9b, SPEC §7).
 Runs and submits share one execution slot: while either is in flight both
 buttons are disabled, and the client refuses the second locally rather than
 making you wait for a round trip to learn it.
+
+### The clock
+
+A `hacker` quest carries a time limit, and **the server owns it** (PROTOCOL
+§4.8b) — the client reads `deadline_at` against the wall clock rather than
+running a counter, so a reconnect shows one clock and alt-tabbing away to read
+documentation does not stop it.
+
+It is **calm for most of its life**: a number that changes once a second and
+does nothing else, because it sits on the screen you are concentrating on code
+in. The motion is saved for the three moments that mean something — arriving
+with the quest, crossing a threshold, and running out. Overtime counts **up**,
+in red, with a sign.
+
+It blocks nothing. Time runs out, the quest stays open, and a late clear still
+counts; the attempt simply records `within_limit: false`.
 
 ### The map
 

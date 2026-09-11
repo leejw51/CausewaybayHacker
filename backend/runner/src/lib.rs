@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
+pub mod format;
 pub mod go;
 pub mod harness;
 pub mod proc;

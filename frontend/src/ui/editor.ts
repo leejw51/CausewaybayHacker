@@ -112,6 +112,37 @@ export class Editor {
     this.view.setState(this.stateFor(lang, doc, this.onChange));
   }
 
+  /**
+   * Replace the whole document while keeping the caret where the person left
+   * it — for the formatter.
+   *
+   * A `setState` would be one line and would dump the cursor to the top and
+   * drop the selection, which is infuriating if FORMAT was pressed mid-thought.
+   * So the change is narrowed to the span that actually differs — common
+   * prefix and suffix trimmed off — and dispatched as an edit. CodeMirror maps
+   * the existing selection through an edit, so a caret above or below the
+   * reformatted span does not move at all, and one inside it lands at the end
+   * of the span rather than at the top of the file.
+   */
+  replaceAll(next: string): void {
+    const cur = this.view.state.doc.toString();
+    if (cur === next) return;
+    let a = 0;
+    while (a < cur.length && a < next.length && cur[a] === next[a]) a++;
+    let b = 0;
+    while (
+      b < cur.length - a &&
+      b < next.length - a &&
+      cur[cur.length - 1 - b] === next[next.length - 1 - b]
+    ) {
+      b++;
+    }
+    this.view.dispatch({
+      changes: { from: a, to: cur.length - b, insert: next.slice(a, next.length - b) },
+      scrollIntoView: true,
+    });
+  }
+
   get source(): string {
     return this.view.state.doc.toString();
   }

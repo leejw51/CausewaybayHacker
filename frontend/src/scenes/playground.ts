@@ -430,7 +430,11 @@ export class PlaygroundScene implements Scene {
     this.drawList(g, f.left, s);
     this.drawBench(g, f.right, s);
     this.buttons.draw(g, ensureFonts(s).button);
-    footer(g, layout, "CTRL+ENTER  RUN   CTRL+S  SAVE   ESC  BACK   F1  ORIENTATION   F3  LOG OUT");
+    footer(
+      g,
+      layout,
+      "CTRL+ENTER  RUN   CTRL+SHIFT+F  FORMAT   CTRL+S  SAVE   ESC  BACK   F1  ORIENTATION",
+    );
   }
 
   /** The saved snippets, and the one line that says what this screen is. */

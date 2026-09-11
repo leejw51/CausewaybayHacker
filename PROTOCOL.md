@@ -624,6 +624,29 @@ The heart of the training loop.
 Only kinds with `cleared_since < 5` are returned by default; pass
 `"include_learned": true` for all of them.
 
+### 4.14b `stats.awards`
+
+The shelf, as opposed to the fanfare.
+
+```json
+→ payload: {}
+← payload: { "awards": [ Award, … ] }    newest first
+```
+
+`award` (§4.20) announces one as it happens; this lists what the player has.
+Both carry the same `id`, `title` and `detail`, and the live event reaches the
+player's other windows the way `progress.update` does.
+
+**`kind: "stamp"` is the exception and is never in this list.** The per-clear
+stamp fires every time a node turns gold; it is a moment, not something a
+player *has*. Everything else is stored, and a `UNIQUE (address, kind, id)`
+index is what makes "never awarded twice" a property of the database rather
+than something the code has to remember to check.
+
+Nothing is awarded for something that did not happen. Every rule is a query
+against the record, and a badge that fires on the wrong thing is worse than one
+that does not exist — it makes every other badge mean nothing.
+
 ### 4.15 `stats.history`
 
 ```json
@@ -855,6 +878,19 @@ type SearchHit = {
   bm25: number | null;                   // component, null if not in that ranking
   cosine: number | null;
   state: "open" | "cleared";
+};
+```
+
+### 5.10 `Award`
+
+```ts
+type Award = {
+  kind: "badge" | "level" | "streak";   // "stamp" is live-only, never listed
+  id: string;                            // "first-clear", "level-4",
+                                         // "tamed-borrow-after-move"
+  title: string;                         // "FIRST CLEAR"
+  detail: object;                        // whatever the rule counted
+  created_at: string;
 };
 ```
 

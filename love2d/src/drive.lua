@@ -22,6 +22,7 @@
 --   { shot = "map.png" }               screenshot into the save directory
 --   { wait = 0.5 }                     hold for seconds
 --   { until_ = f, timeout = 10 }       hold until f(app) is true
+--   { freeze = 12.5 }                  pin the animation clock (nil releases)
 --   { note = "…" }                     print a line, so a log reads as a story
 --   { quit = true }
 --
@@ -88,6 +89,11 @@ function Drive:fire(step, app)
   elseif step.resize then
     love.window.setMode(step.resize[1], step.resize[2], { resizable = true, highdpi = true })
     Layout.updateViewport()
+  elseif step.freeze ~= nil then
+    -- A screenshot of a bobbing mascot is a different screenshot every run.
+    -- Pinning `src/anim.lua`'s clock makes a drive comparable across runs
+    -- without making the game itself stand still.
+    require("src.anim").freeze(step.freeze ~= false and step.freeze or nil)
   elseif step.shot then
     love.graphics.captureScreenshot(step.shot)
     print(("drive: shot %s   scene=%s  %s  %dx%d"):format(

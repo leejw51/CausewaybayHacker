@@ -258,6 +258,61 @@ function Quest:execute(mode)
   end)
 end
 
+--- FORMAT (PROTOCOL §4.9d) — `rustfmt` or `gofmt`, on the server.
+---
+--- Three things this has to get right, and all three are about not punishing
+--- somebody for pressing it mid-thought:
+---
+---   * **unparseable source is not an error.** The reply is `.ok` with the
+---     original bytes and the formatter's complaint in `problem`. It is shown
+---     in the hint register, not the failure register, and the buffer is left
+---     exactly alone.
+---   * **`changed: false` means already tidy** — say so rather than replacing
+---     the buffer with an identical one, which makes the button feel broken.
+---   * **the caret survives**, as one undo step. `Editor:replace_all` anchors
+---     it to the text rather than to a coordinate; see its header.
+function Quest:format()
+  if not self.quest or self.formatting then return end
+  self.formatting = true
+  self.format_note = nil
+  self.format_problem = nil
+  SFX.play("move")
+
+  self.app.session:request("code.format", {
+    lang = self.quest.land,
+    source = self.editor:text(),
+  }, function(ok, payload, why)
+    self.formatting = false
+    if not ok then
+      -- A server without §4.9d yet: grey the button and say so, rather than
+      -- leaving a control that does nothing.
+      if payload.code == "not_found" then
+        self.format_unsupported = true
+        self.format_note = "FORMAT is not on this server yet"
+      else
+        self.format_note = why.player
+      end
+      SFX.play("locked")
+      return
+    end
+
+    if payload.problem and payload.problem ~= "" then
+      -- Quiet. Half-written code is the normal state of an editor, not a
+      -- fault, and the buffer is not touched.
+      self.format_problem = payload.problem
+      return
+    end
+    if payload.changed == false then
+      self.format_note = "already tidy"
+      SFX.play("move")
+      return
+    end
+    self.editor:replace_all(payload.source or self.editor:text())
+    self.format_note = "formatted"
+    SFX.play("select")
+  end)
+end
+
 function Quest:reset()
   if not self.quest then return end
   self.app.session:request("quest.reset", { quest_id = self.quest.id }, function(ok, payload)
@@ -297,8 +352,26 @@ function Quest:external_edit()
   self.app:toast("loaded back from $EDITOR")
 end
 
+--- Notice a threshold crossing, so it can be marked once rather than
+--- animated continuously.
+function Quest:tick_clock()
+  local state = Clock.read(self.quest)
+  if not state then
+    self.clock_phase = nil
+    return nil
+  end
+  if state.phase ~= self.clock_phase then
+    -- Not on the first sight of the clock: arriving is its own moment and
+    -- already has an entrance.
+    if self.clock_phase ~= nil then self.clock_crossed = Anim.now() end
+    self.clock_phase = state.phase
+  end
+  return state
+end
+
 function Quest:update(dt)
   self.t = self.t + dt
+  self:tick_clock()
   if self.running_mode then
     self.elapsed_ms = self.elapsed_ms + dt * 1000
   end
@@ -341,6 +414,8 @@ function Quest:draw()
   local title = self.quest and self.quest.title or (self.error or "loading…")
   UI.text(title, 12, 10, 13, tint)
   UI.text(self.quest_id or "", 12, 30, 7, Theme.withAlpha(Theme.cream, 0.55))
+  self:draw_clock(vw)
+
   if self.quest then
     -- Earned stars get the star; difficulty gets pips (design review §4).
     UI.text("STARS", vw - 12 - 3 * 13 - UI.textWidth("STARS ", 7), 12, 7,
@@ -361,7 +436,68 @@ function Quest:draw()
   end
 
   self.app:footer(
-    "F5 run   F10 submit   F6 reset   F7 hint   F8 log   F9 $EDITOR   ESC map")
+    "F5 run   F10 submit   F2 format   F6 reset   F7 hint   F8 log   ESC map")
+end
+
+--- The clock (PROTOCOL §4.8b), on the header band.
+---
+--- **Calm for most of its life.** `Ease.attention` is flat zero until the last
+--- quarter of the limit, so for the great majority of a timed quest this is a
+--- number that changes once a second and does nothing else. It sits on the
+--- screen somebody is concentrating on code in, and a permanently animating
+--- countdown is noise.
+---
+--- The motion is saved for the three moments that mean something: the clock
+--- arriving with the quest, a threshold crossing, and the deadline passing.
+--- Each is one pulse, not a loop.
+function Quest:draw_clock(vw)
+  local state = Clock.read(self.quest)
+  if not state then return end
+
+  local scale = Layout.uiScale()
+  local now = Anim.now()
+
+  -- Colour by phase. Overtime gets its own register — counting up, in the
+  -- game's failure red — so it is unmistakably past the line rather than a
+  -- countdown that went strange.
+  local colour = ({
+    calm = Theme.cream,
+    warning = Theme.coin,
+    urgent = Theme.brick,
+    overtime = Theme.red,
+  })[state.phase] or Theme.cream
+
+  -- Three one-shot moments, never a loop.
+  local entrance = Ease.pulse(self.clock_arrived and (now - self.clock_arrived), 0.55)
+  local crossing = Ease.pulse(self.clock_crossed and (now - self.clock_crossed),
+    state.phase == "overtime" and 0.9 or 0.5)
+  -- And a floor of insistence in the last quarter, which is zero before it.
+  local urgency = Ease.attention(state.fraction)
+
+  local text = Clock.format(state)
+  local size = math.floor((state.phase == "overtime" and 15 or 14) * scale)
+  local grow = 1 + 0.35 * crossing + 0.5 * entrance + 0.10 * urgency
+  local w = UI.textWidth(text, size)
+
+  -- Sliding down into place on arrival, rather than appearing.
+  local y = 6 - (1 - Ease.expOut(math.min(1,
+    self.clock_arrived and (now - self.clock_arrived) / 0.4 or 1))) * 26
+  local x = vw / 2
+
+  love.graphics.push()
+  love.graphics.translate(x, y + size / 2 + 2)
+  love.graphics.scale(grow, grow)
+  -- A faint plate behind it so it reads against the map art in the header.
+  UI.setColor(Theme.ink, 0.55 + 0.35 * math.max(crossing, urgency))
+  love.graphics.rectangle("fill", -w / 2 - 10, -size / 2 - 5, w + 20, size + 10)
+  UI.text(text, -w / 2, -size / 2 - 1, size, colour)
+  love.graphics.pop()
+
+  local caption = Clock.caption(state)
+  if caption then
+    local cw = UI.textWidth(caption, 7)
+    UI.text(caption, x - cw / 2, y + size + 10, 7, Theme.withAlpha(colour, 0.85))
+  end
 end
 
 function Quest:draw_brief(rect, tint)
@@ -537,6 +673,17 @@ function Quest:draw_editor(rect, tint)
   local busy = self.running_mode ~= nil
   local usable = (self.quest ~= nil) and not busy
 
+  -- FORMAT sits on the far left of the row, apart from the pair that costs
+  -- something. It changes the buffer and nothing else — never recorded, no
+  -- attempt, no mistake (§4.9d) — so it must not read as a third way to
+  -- submit.
+  local fw = math.min(96, math.floor(bw * 0.7))
+  local fx = rect.x + 10
+  UI.button(fx, by, fw, bh,
+    self.formatting and "…" or "FORMAT  F2",
+    (usable and not self.format_unsupported) and "normal" or "disabled", 8)
+  self.format_rect = { x = fx, y = by, w = fw, h = bh }
+
   UI.button(rx, by, bw, bh,
     self.running_mode == "quest.run" and "RUNNING…" or "RUN  F5",
     (usable and not self.run_unsupported) and "normal" or "disabled", 9)
@@ -558,6 +705,20 @@ function Quest:draw_editor(rect, tint)
 
   local info = ("%d lines   %d bytes"):format(total, #self.editor:text())
   UI.text(info, rect.x + 10, rect.y + rect.h - 18, 7, Theme.withAlpha(Theme.cream, 0.45))
+
+  -- §4.9d's `problem`, in the **hint** register rather than the failure one.
+  -- A formatter pressed mid-edit meeting half-written code is the normal
+  -- state of a text editor, not a fault, and the buffer was left alone.
+  local said = self.format_problem or self.format_note
+  if said then
+    local colour = self.format_problem and Theme.coin or Theme.withAlpha(Theme.cyan, 0.9)
+    local room = rect.w - 24 - (self.format_rect and self.format_rect.w or 0)
+    for i, line in ipairs(UI.wrap(said, room, 7)) do
+      if i <= 2 then
+        UI.text(line, rect.x + 10, rect.y + rect.h - 46 + (i - 1) * 9, 7, colour)
+      end
+    end
+  end
 end
 
 --- The run overlay: the four stages, then whatever has streamed in.
@@ -738,6 +899,10 @@ function Quest:keypressed(key, mods)
     self:submit(); return true
   end
   if key == "f6" then self:reset(); return true end
+  -- F2, not F4: `main.lua` takes F1/F3/F4/F11 globally (orientation,
+  -- scanlines, sound, fullscreen) before a scene ever sees them, and a
+  -- FORMAT bound to one of those would silently never fire.
+  if key == "f2" or (cmd and mods.shift and key == "f") then self:format(); return true end
   if key == "f7" then self:take_hint(); return true end
   if key == "f8" then self.show_log = not self.show_log; return true end
   if key == "f9" then self:external_edit(); return true end
@@ -777,6 +942,7 @@ function Quest:mousepressed(x, y, button)
   local function inside(r)
     return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
   end
+  if inside(self.format_rect) then self:format(); return end
   if inside(self.run_rect) then self:run(); return end
   if inside(self.submit_rect) then self:submit(); return end
   if x >= brief.x and x <= brief.x + brief.w and y >= brief.y and y <= brief.y + brief.h then

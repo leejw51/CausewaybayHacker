@@ -15,6 +15,23 @@ local Lands = {}
 Lands.__index = Lands
 
 local LAND_ORDER = { "rust", "go" }
+local CATEGORY_ORDER = { basic = 1, advanced = 2, hacker = 3 }
+
+--- SPEC §0's order. `world.lands` does not promise one, and the rows were
+--- arriving alphabetical — ADVANCED, BASIC, HACKER — which reads as a list of
+--- words rather than a path through a subject. `src/scenes/categories.lua`
+--- already sorted; this screen had been left out of that change.
+local function ordered_categories(categories)
+  local out = {}
+  for i, cat in ipairs(categories or {}) do out[i] = cat end
+  table.sort(out, function(a, b)
+    local ra = CATEGORY_ORDER[a.category] or 99
+    local rb = CATEGORY_ORDER[b.category] or 99
+    if ra ~= rb then return ra < rb end
+    return tostring(a.category) < tostring(b.category)
+  end)
+  return out
+end
 local MASCOT = { rust = "sprite_ferris", go = "sprite_gogo" }
 local BLURB = {
   rust = "ownership, borrows, lifetimes",
@@ -67,6 +84,9 @@ function Lands:refresh()
       return
     end
     self.lands = ordered(payload.lands)
+    for _, land in ipairs(self.lands) do
+      land.categories = ordered_categories(land.categories)
+    end
     -- Come back to the land the player was last in.
     for i, land in ipairs(self.lands) do
       if land.land == self.app.land then self.cursor = i end

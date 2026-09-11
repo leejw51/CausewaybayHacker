@@ -450,6 +450,12 @@ export async function submit(page: Page, timeout = 180_000): Promise<void> {
   for (const [fx, fy] of points) {
     if (Date.now() > deadline) break;
     await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+    // SUBMIT raises a confirmation first — "submitting is a decision" — and
+    // `App` answers a modal with Enter. Without this the click lands, the
+    // dialogue goes up, the scene stays `quest`, and every later click in the
+    // scan hits the modal instead of the plate. That is what a scan over the
+    // whole bottom of the canvas finding nothing looked like.
+    await page.keyboard.press("Enter");
     // A submit compiles before it navigates, so give it a real window — but
     // only on the clicks that might have been it.
     for (let i = 0; i < 8; i++) {

@@ -285,6 +285,34 @@ pub fn stats_mistakes(
     }))
 }
 
+/// `code.format` (PROTOCOL §4.9d). Never recorded: formatting is not an
+/// attempt at the problem. Blocking — it runs a subprocess — so the caller
+/// puts it on a blocking thread.
+pub fn code_format(payload: &serde_json::Value) -> Result<serde_json::Value> {
+    let lang = str_field(payload, "lang")?;
+    let source = str_field(payload, "source")?;
+    if source.len() > crate::submit::MAX_SOURCE_BYTES {
+        return Err(bad_request(format!(
+            "source is {} bytes; the limit is {}",
+            source.len(),
+            crate::submit::MAX_SOURCE_BYTES
+        )));
+    }
+    if !cwbhacker_runner::format::is_supported(&lang) {
+        return Err(bad_request(format!("there is no formatter for '{lang}'")));
+    }
+    let formatted = cwbhacker_runner::format::format(&lang, &source)
+        .map_err(|e| cwbhacker_core::error::internal(format!("the formatter: {e}")))?;
+    let mut out = json!({
+        "source": formatted.source,
+        "changed": formatted.changed,
+    });
+    if let Some(problem) = formatted.problem {
+        out["problem"] = json!(problem);
+    }
+    Ok(out)
+}
+
 /// Everything this player has earned (badges, levels, streaks), newest first.
 /// The live `award` event is easy to miss — a client wants to be able to draw
 /// the shelf as well as the fanfare.

@@ -52,19 +52,6 @@ return function()
     T.ne(a, b, "two mascots on one screen must not pulse together")
   end)
 
-  T.case("a blink is mostly open, briefly shut, and never sticks", function()
-    local opts = { period = 4.0, shut = 0.12 }
-    local shut_samples, open_samples = 0, 0
-    for i = 0, 4000 do
-      local v = Anim.blink(i / 1000, opts)
-      T.ok(v >= 0 and v <= 1, "openness stays 0..1")
-      if v < 0.5 then shut_samples = shut_samples + 1 else open_samples = open_samples + 1 end
-    end
-    T.ok(open_samples > shut_samples * 20, "eyes are open the overwhelming majority")
-    T.ok(shut_samples > 0, "and they do actually shut")
-    T.near(Anim.blink(0, opts), 1, 1e-9)
-  end)
-
   T.section("anim — selection")
 
   T.case("a lift leaves at once and settles", function()
@@ -131,29 +118,6 @@ return function()
       T.ok(v <= previous + 1e-9, "the iris never reopens")
       previous = v
     end
-  end)
-
-  T.section("anim — palette rotation from art/palette.json")
-
-  T.case("a hue rotation of zero changes nothing", function()
-    for _, rgb in ipairs({ { 0.7, 0.01, 0.1 }, { 0.02, 0.35, 0.75 }, { 0.89, 0.71, 0.04 } }) do
-      local r, g, b = Anim.rotate_hue(rgb[1], rgb[2], rgb[3], 0)
-      T.near(r, rgb[1], 0.01)
-      T.near(g, rgb[2], 0.01)
-      T.near(b, rgb[3], 0.01)
-    end
-  end)
-
-  T.case("a rotation actually moves the hue, and stays in gamut", function()
-    -- Sign 0 in art/palette.json is a red tube at hue 352.
-    local r, g, b = Anim.rotate_hue(177 / 255, 2 / 255, 25 / 255, 120)
-    T.ok(g > r, "red rotated a third of the way round is no longer reddest")
-    for _, v in ipairs({ r, g, b }) do
-      T.ok(v >= 0 and v <= 1, "and it is still a colour")
-    end
-    -- Full circle returns roughly where it started.
-    local r2 = select(1, Anim.rotate_hue(177 / 255, 2 / 255, 25 / 255, 360))
-    T.near(r2, 177 / 255, 0.02)
   end)
 
   T.section("anim — no love in the motion layer")

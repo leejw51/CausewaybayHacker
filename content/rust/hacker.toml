@@ -447,7 +447,7 @@ id           = "rust.hacker.05.binary-search"
 node         = 5
 title        = "HOW BIG A VAN"
 difficulty   = 4
-time_limit_s = 900
+time_limit_s = 1200
 story        = "The depot wants the smallest van that clears the day's dockets in the days they have. They will not tell you which van; they will tell you if one you name is too small."
 concepts     = ["binary-search", "complexity", "slices"]
 requires     = ["rust.hacker.04.grid"]
@@ -671,7 +671,7 @@ time_limit_s = 1200
 story        = "The Percival Street till has three coin trays and a customer who will not take a note."
 concepts     = ["dynamic-programming", "complexity", "slices"]
 requires     = ["rust.hacker.06.stack"]
-map          = { x = 0.898, y = 0.393, kind = "quest" }
+map          = { x = 0.898, y = 0.326, kind = "quest" }
 brief        = '''
 Line one is `n target`. Line two is `n` coin values. Every coin is available
 in unlimited quantity.
@@ -785,7 +785,7 @@ time_limit_s = 900
 story        = "Warm-up round. They ask for the five words that came up most in last year's tickets, and they time it anyway."
 concepts     = ["hashing", "sorting", "complexity"]
 requires     = ["rust.hacker.07.coins", "rust.hacker.01.two-sum"]
-map          = { x = 0.785, y = 0.329, kind = "quest" }
+map          = { x = 0.785, y = 0.263, kind = "quest" }
 brief        = '''
 Line one is `n k`. Line two is `n` words separated by spaces.
 
@@ -874,11 +874,11 @@ id           = "rust.hacker.09.linked-list"
 node         = 9
 title        = "THE CHAIN"
 difficulty   = 4
-time_limit_s = 900
+time_limit_s = 1200
 story        = "They want it without a Vec. Nodes that point at nodes, because that is the shape the question is really about."
 concepts     = ["linked-lists", "two-pointers", "smart-pointers"]
 requires     = ["rust.hacker.08.top-k"]
-map          = { x = 0.557, y = 0.405, kind = "quest" }
+map          = { x = 0.557, y = 0.338, kind = "quest" }
 brief        = '''
 Line one is `n`. Line two is `n` integers, in order.
 
@@ -1014,7 +1014,7 @@ time_limit_s = 900
 story        = "A tree on the whiteboard and the question nobody should have to think about twice: name the three orders."
 concepts     = ["trees", "recursion", "stacks-queues"]
 requires     = ["rust.hacker.09.linked-list"]
-map          = { x = 0.447, y = 0.347, kind = "quest" }
+map          = { x = 0.447, y = 0.280, kind = "quest" }
 brief        = '''
 Line one is `n`. Line two is `n` values in **level order**, where `-1` means
 "no node here" — so the tree is stored the way a heap is: the children of
@@ -1146,7 +1146,7 @@ time_limit_s = 900
 story        = "The follow-up. Everyone checks the two children and everyone is wrong the first time."
 concepts     = ["trees", "recursion", "binary-search"]
 requires     = ["rust.hacker.10.tree-walk"]
-map          = { x = 0.222, y = 0.381, kind = "quest" }
+map          = { x = 0.222, y = 0.314, kind = "quest" }
 brief        = '''
 Same level-order encoding as the last quest: `-1` is a missing node, children
 of `i` are `2i+1` and `2i+2`.
@@ -1286,7 +1286,7 @@ time_limit_s = 1200
 story        = "Every Lucky Mac branch sends its dockets already in order. Merge them into one line without sorting the lot again."
 concepts     = ["heaps", "sorting", "complexity"]
 requires     = ["rust.hacker.11.bst"]
-map          = { x = 0.116, y = 0.342, kind = "quest" }
+map          = { x = 0.116, y = 0.276, kind = "quest" }
 brief        = '''
 Line one is `k`. Then `k` lines, each a count followed by that many integers,
 already sorted ascending.
@@ -1401,7 +1401,7 @@ time_limit_s = 900
 story        = "List every way the shop could be laid out. All of them, in a fixed order, and do not print the same one twice."
 concepts     = ["backtracking", "recursion", "slices"]
 requires     = ["rust.hacker.12.heap"]
-map          = { x = 0.045, y = 0.664, kind = "quest" }
+map          = { x = 0.045, y = 0.531, kind = "quest" }
 brief        = '''
 Line one is `n`. Line two is `n` distinct integers **already in ascending
 order**.
@@ -1525,7 +1525,7 @@ time_limit_s = 1200
 story        = "A board of letters and a name. They want to know whether the name is written in it, and they want the count of dead ends."
 concepts     = ["backtracking", "matrix", "graphs"]
 requires     = ["rust.hacker.13.backtracking"]
-map          = { x = 0.287, y = 0.588, kind = "quest" }
+map          = { x = 0.287, y = 0.454, kind = "quest" }
 brief        = '''
 Line one is `r c`. The next `r` lines are a grid of lowercase letters. The
 last line is the word.
@@ -1673,7 +1673,7 @@ time_limit_s = 1200
 story        = "Eleven crates and a dependency graph. Name a build order, or name the cycle that means there is not one."
 concepts     = ["graphs", "stacks-queues", "sorting"]
 requires     = ["rust.hacker.14.word-search"]
-map          = { x = 0.391, y = 0.690, kind = "quest" }
+map          = { x = 0.391, y = 0.556, kind = "quest" }
 brief        = '''
 Line one is `n m`: `n` tasks numbered `0..n-1` and `m` edges. The next `m`
 lines are `<a> <b>`, meaning `a` must be built before `b`.
@@ -1808,7 +1808,7 @@ time_limit_s = 1200
 story        = "The tram network, the MTR and the minibus routes on one sheet. How many separate networks are there really."
 concepts     = ["disjoint-set", "graphs", "complexity"]
 requires     = ["rust.hacker.15.topo-sort"]
-map          = { x = 0.619, y = 0.601, kind = "quest" }
+map          = { x = 0.619, y = 0.468, kind = "quest" }
 brief        = '''
 Line one is `n m`: `n` stops numbered `0..n-1`, `m` undirected links. The next
 `m` lines are `<a> <b>`.
@@ -1953,7 +1953,7 @@ time_limit_s = 1200
 story        = "A year of daily takings. They want the longest stretch of improving days, and they do not have to be consecutive."
 concepts     = ["dynamic-programming", "binary-search", "complexity"]
 requires     = ["rust.hacker.16.union-find"]
-map          = { x = 0.719, y = 0.687, kind = "quest" }
+map          = { x = 0.719, y = 0.554, kind = "quest" }
 brief        = '''
 Line one is `n`. Line two is `n` integers.
 
@@ -2061,7 +2061,7 @@ time_limit_s = 1200
 story        = "Two spellings of the same street on two different signs. How many single-character edits between them."
 concepts     = ["dynamic-programming", "strings", "matrix"]
 requires     = ["rust.hacker.17.lis"]
-map          = { x = 0.949, y = 0.601, kind = "quest" }
+map          = { x = 0.949, y = 0.468, kind = "quest" }
 brief        = '''
 Two lines, one word each, lowercase.
 
@@ -2171,7 +2171,7 @@ time_limit_s = 1200
 story        = "One rider, one bag, and a board of orders each with a weight and a tip. Greedy picks the wrong ones."
 concepts     = ["dynamic-programming", "greedy", "slices"]
 requires     = ["rust.hacker.18.edit-distance"]
-map          = { x = 0.899, y = 0.915, kind = "quest" }
+map          = { x = 0.899, y = 0.715, kind = "quest" }
 brief        = '''
 Line one is `n cap`. The next `n` lines are `<weight> <value>`. Each item can
 be taken at most **once**.
@@ -2290,11 +2290,11 @@ id           = "rust.hacker.20.bits"
 node         = 20
 title        = "THE ONE THAT IS ALONE"
 difficulty   = 4
-time_limit_s = 900
+time_limit_s = 600
 story        = "Every docket is scanned twice except one. They will not let you use a hash map and they will not let you sort."
 concepts     = ["bit-manipulation", "math", "complexity"]
 requires     = ["rust.hacker.19.knapsack"]
-map          = { x = 0.773, y = 0.865, kind = "quest" }
+map          = { x = 0.773, y = 0.665, kind = "quest" }
 brief        = '''
 Line one is `n`. Line two is `n` non-negative integers, in which every value
 appears exactly twice except one.
@@ -2399,11 +2399,11 @@ id           = "rust.hacker.21.matrix"
 node         = 21
 title        = "TURN THE FLOOR PLAN"
 difficulty   = 4
-time_limit_s = 900
+time_limit_s = 1200
 story        = "The plan is the wrong way up and there is no room on the table for a second copy of it."
 concepts     = ["matrix", "slices", "iteration"]
 requires     = ["rust.hacker.20.bits"]
-map          = { x = 0.565, y = 0.925, kind = "quest" }
+map          = { x = 0.565, y = 0.725, kind = "quest" }
 brief        = '''
 Line one is `n`. The next `n` lines are an `n × n` grid of integers.
 
@@ -2532,11 +2532,11 @@ id           = "rust.hacker.22.trie"
 node         = 22
 title        = "THE PREFIX BOX"
 difficulty   = 5
-time_limit_s = 1200
+time_limit_s = 1500
 story        = "Autocomplete for the stop board — the honest kind, that only completes what is actually on the list."
 concepts     = ["tries", "strings", "collections"]
 requires     = ["rust.hacker.21.matrix"]
-map          = { x = 0.449, y = 0.867, kind = "quest" }
+map          = { x = 0.449, y = 0.667, kind = "quest" }
 brief        = '''
 Line one is `n q`. The next `n` lines are lowercase words to insert. The next
 `q` lines are queries, each `WORD <s>` or `PREFIX <s>`.
@@ -2695,7 +2695,7 @@ time_limit_s = 1200
 story        = "A day of takings and a number the auditor wants to see. How many runs of consecutive hours add up to exactly that."
 concepts     = ["prefix-sums", "hashing", "complexity"]
 requires     = ["rust.hacker.22.trie"]
-map          = { x = 0.218, y = 0.924, kind = "quest" }
+map          = { x = 0.218, y = 0.724, kind = "quest" }
 brief        = '''
 Line one is `n k`. Line two is `n` integers, which may be negative.
 
@@ -2798,7 +2798,7 @@ time_limit_s = 1500
 story        = "First question of the afternoon round. The naive answer is correct, and it is the wrong answer."
 concepts     = ["sorting", "complexity", "recursion"]
 requires     = ["rust.hacker.23.prefix-sums"]
-map          = { x = 0.0, y = 0.0, kind = "quest" }
+map          = { x = 0.106, y = 0.676, kind = "quest" }
 brief        = '''
 Standard input is two integers, `n` and `seed`. There is no array in the input
 — you build it, with **exactly** this generator, in `u64` arithmetic that
@@ -2976,7 +2976,7 @@ time_limit_s = 900
 story        = "The shape every screen uses, and the bug every candidate writes at least once: the second case remembers the first."
 concepts     = ["io", "collections", "control-flow"]
 requires     = ["rust.hacker.24.inversions"]
-map          = { x = 0.0, y = 0.0, kind = "quest" }
+map          = { x = 0.052, y = 0.950, kind = "quest" }
 brief        = '''
 Line one is `T`, the number of independent test cases. Each case is a line
 with `n`, then a line with `n` integers — and when `n` is `0` that second line
@@ -3091,7 +3091,7 @@ time_limit_s = 900
 story        = "They want the numbers rounded the way the spec says, not the way your language happens to print them."
 concepts     = ["math", "sorting", "types"]
 requires     = ["rust.hacker.25.test-cases"]
-map          = { x = 0.0, y = 0.0, kind = "quest" }
+map          = { x = 0.282, y = 0.868, kind = "quest" }
 brief        = '''
 Line one is `n`. Line two is `n` integers.
 
@@ -3203,7 +3203,7 @@ time_limit_s = 1200
 story        = "The till log comes off the machine wrapped at eighty columns, and the count at the top is a count of commands, not of words."
 concepts     = ["io", "stacks-queues", "control-flow"]
 requires     = ["rust.hacker.26.statistics"]
-map          = { x = 0.0, y = 0.0, kind = "quest" }
+map          = { x = 0.395, y = 0.950, kind = "quest" }
 brief        = '''
 Line one is `k`, the number of **commands** that follow. The commands are
 whitespace-separated tokens packed across the remaining lines however they
@@ -3320,7 +3320,7 @@ time_limit_s = 1800
 story        = "Room 7-32, last question, and the interviewer turns the monitor off. No highlighting, no completion, a clock."
 concepts     = ["collections", "linked-lists", "complexity"]
 requires     = ["rust.hacker.27.commands", "rust.hacker.24.inversions"]
-map          = { x = 0.106, y = 0.876, kind = "boss" }
+map          = { x = 0.618, y = 0.845, kind = "boss" }
 brief        = '''
 Line one is `cap q`. The next `q` lines are `PUT <key> <value>` or
 `GET <key>`.

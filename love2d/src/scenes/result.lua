@@ -14,6 +14,7 @@ local Assets = require("src.assets")
 local UI = require("src.ui")
 local Ease = require("src.ease")
 local Anim = require("src.anim")
+local Clock = require("src.clock")
 
 local Result = {}
 Result.__index = Result
@@ -115,6 +116,14 @@ function Result:draw()
 
   cy = cy + UI.text(("TESTS  %d / %d"):format(a.tests_passed or 0, a.tests_total or 0),
     cx, cy, 10, Theme.cream) + 6
+  -- §4.8b: whether the submit beat the clock. Recorded, never enforced —
+  -- the quest stayed open and a late clear still counts.
+  local timing = Clock.verdict_note(a)
+  if timing then
+    cy = cy + UI.text(timing, cx, cy, 9,
+      a.within_limit and Theme.admit or Theme.coin) + 6
+  end
+
   cy = cy + UI.text(("COMPILE %dms   RUN %dms   EXIT %s"):format(
     a.compile_ms or 0, a.run_ms or 0,
     a.exit_code == nil and "-" or tostring(a.exit_code)), cx, cy, 8,

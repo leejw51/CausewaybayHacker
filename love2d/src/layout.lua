@@ -389,7 +389,11 @@ end
 
 function Layout.begin()
   Layout.updateViewport()
-  love.graphics.setCanvas(Layout.canvas)
+  -- `stencil = true` so a scene can mask: the map's iris (`src/scenes/map.lua`)
+  -- draws everything *outside* a shrinking circle, and a canvas bound without
+  -- a stencil buffer raises the moment it tries. Costs a depth/stencil
+  -- attachment on one canvas and nothing else.
+  love.graphics.setCanvas({ Layout.canvas, stencil = true })
   love.graphics.clear(Theme.void)
 end
 

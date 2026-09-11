@@ -332,6 +332,73 @@ local function indent_of(line)
   return line:match("^[ \t]*") or ""
 end
 
+--- Replace the whole buffer, keeping the caret where the player left it, as
+--- **one undo step**.
+---
+--- This is what a FORMAT button does (PROTOCOL §4.9d), and it is the one
+--- operation in this editor that can throw somebody to line 1 while they were
+--- thinking. `rustfmt` and `gofmt` overwhelmingly change *whitespace*: the
+--- indentation of a line, the spaces inside it, sometimes a line break. So the
+--- caret is anchored to the text rather than to a coordinate:
+---
+---   1. remember the current line with its whitespace stripped, and how many
+---      **non-whitespace** characters sit before the caret on it;
+---   2. after the replacement, find the line whose stripped form matches —
+---      nearest to the old line number, so a file with twenty `}` lines picks
+---      the right one;
+---   3. put the caret after the same count of non-whitespace characters.
+---
+--- Indentation can change by any amount and the caret still lands between the
+--- same two characters. When nothing matches — the formatter joined or split
+--- the line — it falls back to the same line number, clamped, because the
+--- line is much better than nothing.
+---
+--- One `push_undo` and no other, so ctrl-Z puts the buffer back in one press.
+function Editor:replace_all(text)
+  if self.read_only then return false end
+  local old_line = self.lines[self.line] or ""
+  local before = old_line:sub(1, self.col - 1)
+  local ink_before = #(before:gsub("%s", ""))
+  local anchor = old_line:gsub("%s", "")
+  local old_index = self.line
+
+  self:push_undo(false)
+  self:set_text(text)
+
+  local target = nil
+  if anchor ~= "" then
+    local best
+    for i, line in ipairs(self.lines) do
+      if line:gsub("%s", "") == anchor then
+        local distance = math.abs(i - old_index)
+        if not best or distance < best then best, target = distance, i end
+      end
+    end
+  end
+  target = target or math.max(1, math.min(#self.lines, old_index))
+
+  -- Walk the new line counting non-whitespace, and stop where the caret was.
+  local line = self.lines[target]
+  local col, seen = 1, 0
+  while col <= #line and seen < ink_before do
+    local nextb = M.next_boundary(line, col)
+    if not line:sub(col, nextb - 1):match("^%s") then seen = seen + 1 end
+    col = nextb
+  end
+  -- Land after the run of whitespace the formatter may have inserted, rather
+  -- than inside it.
+  if ink_before == 0 then
+    col = (#(line:match("^[ \t]*") or "")) + 1
+  end
+
+  self.line = target
+  self.col = math.max(1, math.min(#line + 1, col))
+  self.anchor = nil
+  self.goal_char = nil
+  self.dirty = true
+  return true
+end
+
 --- Enter: keep the indentation, and add a level after an opening brace.
 ---
 --- The closing brace on the new line is matched back out, so typing

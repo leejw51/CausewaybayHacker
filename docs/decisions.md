@@ -2966,3 +2966,210 @@ somebody for the ordinary act of typing.
 The rule underneath: **never return partially formatted text.** A formatter
 that mangles code it could not parse leaves the player with two problems
 instead of one, and destroys work that was not backed up anywhere.
+
+## 2026-09-11 — BE: the formatter
+
+`code.format` (PROTOCOL §4.9d), using `rustfmt --edition 2021` and `gofmt`
+over stdin. Never recorded — formatting is not an attempt at the problem, the
+same reasoning as the playground.
+
+**Unparseable source returns the original byte for byte.** The tests assert
+equality against the input rather than "an error was reported", because that
+is the failure that would actually hurt: a formatter that hands back mangled
+text destroys work backed up nowhere and leaves the player with two problems.
+On a non-zero exit, a timeout, *or* an empty stdout from a zero exit, the
+original comes back untouched with the tool's own one-line complaint in
+`problem`. There is no path that returns partial output.
+
+Ten-second timeout of its own, the submit cap on size, and it does **not**
+take the execution slot: pressing FORMAT while a submission compiles is a
+normal thing to do. It runs on a blocking thread because it spawns a process.
+
+The tools keep their environment and get no rlimits — they are trusted tools
+rather than the player's code. What they do get is the timeout and the output
+cap, through exactly the same `proc::run` a submission uses.
+
+## 2026-09-11 — PM: complexity is enforced by a seeded generator, not a big file
+
+The acceptance criterion became "a player who clears everything can pass a
+live screen". The audit is `docs/coverage.md`; its worst finding was that
+**no quest rejected a correct-but-slow answer** — every hidden case was ten
+elements, while several briefs claimed the quadratic answer would not finish.
+
+The obstacle was that `stdin` lives literally in the TOML, so a 200000-element
+case is about a megabyte of unreadable pack. **The input is generated instead
+of stored**: `stdin` is `n seed`, the brief specifies an exact LCG, and the
+program builds its own array. Twelve bytes of pack for 200000 elements.
+
+Measured on this machine, with the two programs that ship inside the quest:
+
+```
+n=200000  merge-sort inversion count   0.02s
+n=200000  O(n^2) double loop          >5s TIMEOUT (killed by the runner)
+```
+
+Verified that Rust's `wrapping_mul`/`wrapping_add` and Go's naturally-wrapping
+`uint64` produce byte-identical arrays across six seeds, so the two packs can
+share expected values.
+
+`24.inversions` ships the naive answer **as its starter**; it is rejected for
+being slow. That is the only quest in the repository where the complexity claim
+in the brief is a thing the tests actually do, and the brief says exactly that.
+
+**QA:** one hidden case in each `24.inversions` deliberately runs for the full
+5 s timeout. A content-CI run costs ~10 s more because of it. That is the
+feature, not a flake.
+
+**`match = "float:1e-6"`** (SPEC §5.2) was unused by all 116 quests and is now
+exercised by `26.statistics` in both languages — worth knowing before the
+importer and the runner are assumed to handle only `trim`.
+
+**Four boss ids moved again**, for the same §12 reason as last round: the boss
+must be the last node, and the maps grew.
+
+| was | is |
+| --- | --- |
+| `rust.hacker.24.lru` | `rust.hacker.28.lru` |
+| `go.hacker.24.lru` | `go.hacker.28.lru` |
+| `rust.advanced.16.deadlock` | `rust.advanced.17.deadlock` |
+| `go.advanced.16.race` | `go.advanced.17.race` |
+
+Slugs unchanged. This is the second renumbering and it is the last one that is
+free: once anyone has cleared a node, §4.1 wins and ids freeze, at which point
+a lengthened map means an id whose number no longer matches its node. **That
+conflict between §4.1 and §12 should be resolved in the spec before release** —
+PM's recommendation is that §12's rule be relaxed to "the id's number is the
+node it was *created* at", which keeps ids stable and keeps the importer's
+check meaningful.
+
+**`time_limit_s` re-reviewed** now that PROTOCOL §4.8b makes it enforced and
+displayed. Ten limits moved; the banding and the reasoning are in
+`docs/coverage.md` §3. The one that is worth repeating: the same problem is not
+the same length in both languages — `linked-list` went to 1200 s in Rust and
+stayed at 900 s in Go, because `Option<Box<Node>>` reversal is fiddly in a way
+the `*Node` version is not.
+
+
+## 2026-09-11 — L2D: the art round, the motion, the clock, and FORMAT
+
+### `src/anim.lua` — one pure module, so motion stays headless-testable
+
+Every effect is a function of time returning a number: `bob`, `lift`, `press`,
+`shake`, `stamp`, `iris`. No `love.`, no clock of its own — the game hands it
+`love.timer.getTime`. That is what makes "no effect may require a window to
+test" true rather than aspirational: a bob is a formula, and a formula can be
+asserted at chosen instants.
+
+A drive script can `freeze` that clock, so a screenshot of a bobbing mascot is
+the same screenshot every run. The game still animates; only captures stand
+still. `Anim.shake` is built from two sines rather than `random` for the same
+reason — a screenshot of a shake must repeat.
+
+### The screens
+
+**Lands** — the user's note was "add more sprites in each button — not fun".
+Eight sprites now instead of two: each land's mascot idling on top, and every
+category row carrying its own action sprite (`mascot_<land>_<category>` —
+Ferris up a crate, Ferris working two tills, Ferris stuck at a blank board),
+each on its own bob phase so the row does not pulse in lockstep. Plus a
+progress rule per row, `badge_cleared` on a finished category, and a card that
+physically lifts with a shadow under it.
+
+Also fixed while in there: the rows were arriving **alphabetical** — ADVANCED,
+BASIC, HACKER — which reads as a list of words rather than a path through a
+subject. `src/scenes/categories.lua` had been sorted and this screen had been
+left out of that change.
+
+**Categories** — the full-width emblem bands, and **the trap was real**.
+DESIGN composed each with an empty left quarter for the label and `process.py`
+then cropped to the ink and re-centred; the manifest proves it
+(`emblem_go_basic` has ink from x=24 to x=359 of 384). So the label sits in
+its own gutter with the band inset beside it, not on top of it.
+
+And a second adaptation the brief invited: a 3:1 emblem drawn `cover`-style
+into a row nearer 9:1 threw away two thirds of the picture — what shipped
+first was a horizontal slice of a tram. The band is now drawn at its own
+aspect, as tall as the row, anchored right, with a short fade on its left
+edge. Checked against this client's proportions rather than assumed from the
+browser's, as instructed.
+
+**Map** — every node bobs on its own phase with a shadow grounding it, and
+picking one irises out of that node into the quest screen. Measured live:
+1.00 → 0.00 over 0.26 s, then the handover. Any key lands it immediately.
+
+**Feedback** — a failed verdict shakes the banner; a failed run shakes the run
+strip. **Only** those. The editor pane never moves: it is where somebody is
+reading their own program, and shaking the code would have been the worst
+thing this round could ship. The CLEARED stamp holds a beat, then lands
+oversize and settles — an instant stamp reads as a state change, a held one
+reads as a verdict.
+
+### The clock (§4.8b)
+
+`src/clock.lua`, pure: `(deadline_at, now)` in, remaining/phase/format out, so
+the suite asserts a countdown without waiting a second. Four phases with
+thresholds that are `max(fraction, floor)` — a pure fraction gives a
+one-minute quest a five-second warning, a pure constant warns for half its
+length.
+
+**Calm for most of its life.** `Ease.attention` is flat zero until the last
+quarter; the motion is three one-shot pulses (arrival, threshold, deadline).
+Overtime counts up, in red, with a sign and a caption that says the quest is
+still open.
+
+Wall time is `os.time()` pinned to `love.timer.getTime()` at startup: real
+time, sub-second, and — unlike a counter fed by `dt` — still counting while
+the window is occluded. That is the same trap that once turned a 90-second
+drive timeout into half an hour, and the same fix.
+
+### FORMAT (§4.9d)
+
+**F2**, not F4 — `main.lua` takes F1/F3/F4/F11 globally and a FORMAT bound to
+one of those would silently never fire.
+
+The caret work is in `Editor:replace_all` and is the part that mattered:
+`rustfmt` overwhelmingly changes whitespace, so the caret is anchored to the
+**text** — the line's stripped form, and the count of non-whitespace
+characters before the caret — not to a coordinate. Indentation can change by
+any amount and the caret lands between the same two characters; a file of
+twenty `}` lines picks the nearest; a line the formatter destroyed falls back
+to the line number. One `push_undo`, so ctrl-Z is one press. Nine headless
+cases.
+
+`problem` renders in the hint register and the buffer is untouched;
+`changed: false` says "already tidy" rather than flashing an identical buffer.
+
+### What I tried and rejected
+
+* **A blink, and a steam drift.** Built and tested, then **deleted**. Every
+  mascot in `art/` is a single frame with no closed-eye variant, so a blink
+  could only be faked by squashing a whole crab vertically — which reads as a
+  rendering bug. A steam plume in front of a 28px sprite on a category row is
+  noise at that size. Three tested functions nothing can call is worse than
+  their absence.
+* **The neon palette cycle.** `art/palette.json`'s six measured tube/face
+  pairs are exactly the right data for it, and I wrote and tested the hue
+  rotation — then deleted that too. There is no screen in this client that
+  composes a neon sign: the map plates are painted with the signs already in
+  them, and the only surface a separate strip could overlay is the one
+  somebody writes code on. Inventing a composition DESIGN did not ask for, on
+  the screen the legibility constraint protects, was the wrong trade. The data
+  is still there the day a screen wants it.
+* **The view pushing in on the map on select.** The iris does that job for a
+  fraction of the risk: a zoom of a `cover`-drawn plate has to rescale the
+  node coordinate mapping mid-animation, and Mei and the cursor drifting off
+  the path during a transition would be a real bug in exchange for a small
+  effect.
+* **Anything on the editor pane.** No shake, no bob, no colour cycle. The
+  constraint is not negotiable and it is the reason the shake is on the strip
+  and the banner instead.
+
+### Server status at the time of writing
+
+`quest.get` returns `time_limit_s: 600` but no `opened_at` / `deadline_at`, and
+`code.format` answers `not_found`. Both degrade the way the milestone-2 screens
+do: the clock simply does not appear, and FORMAT greys itself and says "FORMAT
+is not on this server yet — SUBMIT still works". The clock's four registers
+were verified from a synthetic `opened_at`/`deadline_at` pair in §5.3's shape —
+**rendering, not wire**, and to be re-captured against the real thing the way
+`S1`/`S2` were.

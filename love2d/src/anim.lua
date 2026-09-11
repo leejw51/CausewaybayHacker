@@ -1,4 +1,4 @@
--- The motion vocabulary: bobs, blinks, lifts, shakes, irises.
+-- The motion vocabulary: bobs, lifts, presses, shakes, stamps, irises.
 --
 -- **Pure.** No `love.`, no window, no global clock of its own — every function
 -- takes a time and returns a number. That is the constraint that makes the
@@ -49,7 +49,7 @@ end
 
 -- ------------------------------------------------------------------- idling
 
---- A two-frame bob: a sprite that rises and settles, forever.
+--- A bob: a sprite that rises and settles, forever.
 ---
 --- Cosine rather than a sawtooth because the eye reads the pause at the top
 --- and the bottom as breathing; a linear rise and snap reads as a glitch.
@@ -63,32 +63,17 @@ function Anim.bob(t, opts)
   return -amount * (0.5 - 0.5 * math.cos(((t / period) + phase) % 1 * math.pi * 2))
 end
 
---- 1 while the eyes are open, 0 while they are shut.
----
---- Long open, brief shut, and the gap is a function of `phase` so two
---- characters on one screen do not blink together. Returns a 0..1 openness so
---- a caller can squash a sprite rather than hide it.
-function Anim.blink(t, opts)
-  opts = opts or {}
-  local period = opts.period or 4.3
-  local shut = opts.shut or 0.12
-  local phase = opts.phase or 0
-  local x = ((t + phase * period) % period) / period
-  local start = 1 - (shut / period)
-  if x < start then return 1 end
-  -- Down and up across the shut window, so it is a blink and not a flicker.
-  local k = (x - start) / (shut / period)
-  return math.abs(k * 2 - 1)
-end
-
---- A slow drift, for steam and for anything that should not look placed.
-function Anim.drift(t, opts)
-  opts = opts or {}
-  local period = opts.period or 3.1
-  local amount = opts.amount or 1
-  local phase = opts.phase or 0
-  return amount * math.sin(((t / period) + phase) * math.pi * 2)
-end
+-- Deliberately **not** here: a blink, a steam drift, and a palette cycle.
+--
+-- Every mascot in `art/` is a single frame with no closed-eye variant, so a
+-- blink would have to be faked by squashing a whole crab vertically — which
+-- reads as a rendering bug, not as a blink. A steam plume in front of a 28px
+-- sprite on a category row is noise at that size. And `art/palette.json`'s
+-- six measured neon hues have no screen in this client that composes a neon
+-- sign: the map plates are painted with the signs already in them, and the
+-- only surface a separate strip could overlay is the one somebody writes code
+-- on. Shipping three tested functions nothing can call would be worse than
+-- the absence of them; see `docs/decisions.md` for the longer version.
 
 -- ---------------------------------------------------------------- selection
 
@@ -176,31 +161,6 @@ end
 --- True once an iris has finished.
 function Anim.iris_done(seconds, duration)
   return (seconds or 0) >= (duration or 0.28)
-end
-
--- ------------------------------------------------------------------- colour
-
---- Rotate an RGB triple by `degrees` around the hue circle.
----
---- `art/palette.json` carries measured tube/face pairs and a `hue_deg` for
---- each neon sign precisely so a cycle can be driven from data rather than by
---- eyedropping a sprite. Values are 0..1.
-function Anim.rotate_hue(r, g, b, degrees)
-  local u = math.cos(degrees * math.pi / 180)
-  local w = math.sin(degrees * math.pi / 180)
-  -- The standard YIQ hue rotation matrix. Cheap, and exact enough for six
-  -- flat neon hues that carry no texture.
-  local nr = (0.299 + 0.701 * u + 0.168 * w) * r
-    + (0.587 - 0.587 * u + 0.330 * w) * g
-    + (0.114 - 0.114 * u - 0.497 * w) * b
-  local ng = (0.299 - 0.299 * u - 0.328 * w) * r
-    + (0.587 + 0.413 * u + 0.035 * w) * g
-    + (0.114 - 0.114 * u + 0.292 * w) * b
-  local nb = (0.299 - 0.300 * u + 1.250 * w) * r
-    + (0.587 - 0.588 * u - 1.050 * w) * g
-    + (0.114 + 0.886 * u - 0.203 * w) * b
-  local function clamp(v) return math.max(0, math.min(1, v)) end
-  return clamp(nr), clamp(ng), clamp(nb)
 end
 
 return Anim

@@ -500,3 +500,54 @@ async fn the_snippet_caps_are_enforced_with_a_reason() {
     );
     server.handle.abort();
 }
+
+/// `code.format` over the wire (PROTOCOL §4.9d). Usable from the quest screen
+/// and the playground alike, and never recorded.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_formatter_tidies_and_never_records() {
+    let server = start().await;
+    let mut client = Client::connect(server.port).await;
+    client.login(ALICE_KEY).await;
+    let before = table_counts(&server);
+
+    let tidied = client
+        .ok(
+            "code.format",
+            json!({ "lang": "rust", "source": "fn main(){let x=1;println!(\"{}\",x);}" }),
+        )
+        .await;
+    assert_eq!(tidied["changed"].as_bool(), Some(true));
+    assert!(tidied["source"].as_str().unwrap().contains("fn main() {"));
+    assert!(tidied.get("problem").is_none(), "{tidied}");
+
+    // Already tidy: a client can say so rather than flashing the same buffer.
+    let again = client
+        .ok(
+            "code.format",
+            json!({ "lang": "rust", "source": tidied["source"].clone() }),
+        )
+        .await;
+    assert_eq!(again["changed"].as_bool(), Some(false));
+    assert_eq!(again["source"], tidied["source"]);
+
+    // Half-written code is the normal state of an editor, not a fault: `.ok`,
+    // the original byte for byte, and the formatter's own complaint beside it.
+    let half = "fn main() {\n    let x = vec![1, 2,\n";
+    let refused = client
+        .ok("code.format", json!({ "lang": "rust", "source": half }))
+        .await;
+    assert_eq!(
+        refused["source"].as_str(),
+        Some(half),
+        "the buffer was mangled: {refused}"
+    );
+    assert_eq!(refused["changed"].as_bool(), Some(false));
+    assert!(refused["problem"].as_str().is_some(), "{refused}");
+
+    assert_eq!(
+        table_counts(&server),
+        before,
+        "formatting is not an attempt at the problem and must record nothing"
+    );
+    server.handle.abort();
+}

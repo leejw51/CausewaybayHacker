@@ -1988,16 +1988,162 @@ cases = [
   { name = "none",   stdin = "0\n",          expect = "TOTAL 0\nHITS 0\nDROP second\nDROP first\n",  visible = false },
 ]
 
-# ---------------------------------------------------------------- 16  BOSS
+# ---------------------------------------------------------------- 16
 [[quest]]
-id          = "rust.advanced.16.deadlock"
+id          = "rust.advanced.16.closure-kinds"
 node        = 16
+title       = "THREE KINDS OF CLOSURE"
+difficulty  = 4
+story       = "The interviewer writes `Fn`, `FnMut` and `FnOnce` on the board and asks which one the callback should be. There is a right answer."
+concepts    = ["closures", "traits", "ownership"]
+requires    = ["rust.advanced.15.atomics"]
+map          = { x = 0.619, y = 0.868, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers, `n` at least one.
+
+Use one closure of each kind:
+
+* `apply_fn<F: Fn(i64) -> i64>` — captures the first value by copy and adds it
+  to every value. Print each result.
+* `apply_fn_mut<F: FnMut(i64)>` — bumps a counter that lives in `main`. Print
+  `SEEN <k>`.
+* `apply_once<F: FnOnce() -> String>` — **moves** a `String` out of its
+  capture and returns it. Print `TAKEN <s>`, where the string is
+  `<n> items`.
+
+```
+input:  3
+        10 20 30
+output: 20
+        30
+        40
+        SEEN 3
+        TAKEN 3 items
+```
+
+The three traits are a hierarchy, not a menu: every `Fn` is an `FnMut` and
+every `FnMut` is an `FnOnce`. What a closure implements is decided by what it
+*does* with its captures — reads them (`Fn`), mutates them (`FnMut`), or
+consumes them (`FnOnce`) — and `move` changes how they are captured, not which
+trait comes out.
+
+The starter does not compile. `apply_once` asks for `Fn`, and a closure that
+gives its `String` away can only be called once, so it is `FnOnce` and nothing
+more. Take the weakest bound the call site can live with: ask for `FnOnce` if
+you call it once, and you have not ruled out every other closure for no
+reason.
+'''
+starter     = '''
+use std::io::Read;
+
+fn apply_fn<F: Fn(i64) -> i64>(values: &[i64], f: F) {
+    for &value in values {
+        println!("{}", f(value));
+    }
+}
+
+fn apply_fn_mut<F: FnMut(i64)>(values: &[i64], mut f: F) {
+    for &value in values {
+        f(value);
+    }
+}
+
+// this bound is wrong for what main passes it
+fn apply_once<F: Fn() -> String>(f: F) -> String {
+    f()
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let offset = values[0];
+    apply_fn(&values, |value| value + offset);
+
+    let mut seen = 0usize;
+    apply_fn_mut(&values, |_| seen += 1);
+    println!("SEEN {}", seen);
+
+    let label = format!("{} items", values.len());
+    println!("TAKEN {}", apply_once(move || label));
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn apply_fn<F: Fn(i64) -> i64>(values: &[i64], f: F) {
+    for &value in values {
+        println!("{}", f(value));
+    }
+}
+
+fn apply_fn_mut<F: FnMut(i64)>(values: &[i64], mut f: F) {
+    for &value in values {
+        f(value);
+    }
+}
+
+fn apply_once<F: FnOnce() -> String>(f: F) -> String {
+    f()
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    // reads a Copy capture: Fn
+    let offset = values[0];
+    apply_fn(&values, |value| value + offset);
+
+    // mutates a capture: FnMut, and the borrow of `seen` ends with the call
+    let mut seen = 0usize;
+    apply_fn_mut(&values, |_| seen += 1);
+    println!("SEEN {}", seen);
+
+    // consumes a capture: FnOnce
+    let label = format!("{} items", values.len());
+    println!("TAKEN {}", apply_once(move || label));
+}
+'''
+hints = [
+  "The error is E0525: expected a closure implementing Fn, but this one only implements FnOnce.",
+  "One word changes: the bound on apply_once. The closure is already correct.",
+  "apply_fn_mut takes `mut f: F` — the parameter itself has to be mutable for the closure to mutate its own captures.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n10 20 30\n", expect = "20\n30\n40\nSEEN 3\nTAKEN 3 items\n",    visible = true },
+  { name = "single", stdin = "1\n-5\n",       expect = "-10\nSEEN 1\nTAKEN 1 items\n",           visible = false },
+  { name = "zero",   stdin = "2\n0 7\n",      expect = "0\n7\nSEEN 2\nTAKEN 2 items\n",          visible = false },
+  { name = "same",   stdin = "4\n1 1 1 1\n",  expect = "2\n2\n2\n2\nSEEN 4\nTAKEN 4 items\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 17  BOSS
+[[quest]]
+id          = "rust.advanced.17.deadlock"
+node        = 17
 title       = "DEADLOCK"
 difficulty  = 5
 story       = "The Times Square plant room, two floors down. Two locks, two threads, and both escalators stopped in the same second."
 concepts    = ["deadlock", "shared-state", "concurrency", "smart-pointers"]
-requires    = ["rust.advanced.15.atomics", "rust.advanced.04.mutex"]
-map          = { x = 0.619, y = 0.868, kind = "boss" }
+requires    = ["rust.advanced.16.closure-kinds", "rust.advanced.04.mutex"]
+map          = { x = 0.719, y = 0.950, kind = "boss" }
 brief       = '''
 Two accounts, `A` and `B`, each an `Arc<Mutex<i64>>`.
 

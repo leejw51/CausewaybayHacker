@@ -381,6 +381,8 @@ export interface Requests {
   // §4.9c. `list`, `load` and `delete` are the snippet half; a server that
   // has not shipped them answers `not_found`, which the screen says out loud
   // rather than silently pretending the scratchpad is empty.
+  // §4.9d. Never recorded: formatting is not an attempt at the problem.
+  "code.format": { lang: Land; source: string };
   "playground.run": { lang: Land; source: string; stdin?: string };
   "playground.save": { id?: string; name?: string; lang: Land; source: string };
   "playground.list": Record<string, never>;
@@ -413,6 +415,12 @@ export interface Responses {
   "quest.run": { attempt: Attempt };
   "quest.hint": { hint: string; index: number; total: number; hints_used: number };
   "quest.reset": { starter: string };
+  /**
+   * §4.9d. Source that does not parse is **not** an error: the reply is `.ok`,
+   * `source` comes back byte for byte, `changed` is false and `problem` carries
+   * the formatter's own one-line complaint.
+   */
+  "code.format": { source: string; changed: boolean; problem?: string };
   "playground.run": { run: PlaygroundRun };
   "playground.save": { snippet: Snippet };
   "playground.list": { snippets: SnippetBrief[] };

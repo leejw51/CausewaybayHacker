@@ -250,6 +250,34 @@ async fn dispatch(
     // RUN and SUBMIT are the same path with a flag (PROTOCOL §4.9b), and they
     // share the one-execution-per-connection rule: a second of *either* while
     // one is in flight is `busy`.
+    // The formatter runs a subprocess, so it does not belong on an async
+    // worker — but it does not take the execution slot either: pressing FORMAT
+    // while a submit compiles is a normal thing to do.
+    if kind == "code.format" {
+        let state_for_task = state.clone();
+        let tx = tx.clone();
+        let live_ids = live_ids.clone();
+        let payload = frame.payload.clone();
+        let _ = state_for_task;
+        tokio::spawn(async move {
+            let result = tokio::task::spawn_blocking(move || handlers::code_format(&payload)).await;
+            release(&live_ids, &id);
+            send(
+                &tx,
+                match result {
+                    Ok(Ok(payload)) => ServerFrame::ok(id, "code.format", payload),
+                    Ok(Err(e)) => ServerFrame::err(id, "code.format", &e),
+                    Err(e) => ServerFrame::err(
+                        id,
+                        "code.format",
+                        &Error::new(Code::Internal, format!("the formatter panicked: {e}")),
+                    ),
+                },
+            );
+        });
+        return;
+    }
+
     if let Some(execution) = Execution::for_kind(&kind) {
         execute_async(
             state,

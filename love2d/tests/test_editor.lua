@@ -331,6 +331,95 @@ return function()
     T.eq(ed.col, 1)
   end)
 
+  T.section("editor — replace_all keeps the caret (PROTOCOL §4.9d)")
+
+  T.case("re-indentation does not move the caret off its character", function()
+    -- What `rustfmt` actually does to a line: change its leading whitespace.
+    local c = clock()
+    local ed = editor.new({ text = "fn main() {\nlet x=1;\n}", now = c.now })
+    ed:goto_position(2, 6)                         -- between "let x" and "=1;"
+    T.eq(ed:current_line():sub(1, 5), "let x")
+    ed:replace_all("fn main() {\n    let x = 1;\n}\n")
+    T.eq(ed.line, 2, "still on the same line of code")
+    -- Four non-whitespace characters preceded the caret (l, e, t, x — the
+    -- space between them is whitespace); four still do.
+    local before = ed:current_line():sub(1, ed.col - 1)
+    T.eq(#(before:gsub("%s", "")), 4, "the caret is after the same four characters")
+    T.eq(ed:current_line():sub(ed.col, ed.col + 1), " =", "and between the same two")
+  end)
+
+  T.case("a line that moved is found by its text, nearest first", function()
+    local c = clock()
+    local ed = editor.new({ text = "a();\nb();\nc();", now = c.now })
+    ed:goto_position(3, 2)
+    -- The formatter inserted two lines above.
+    ed:replace_all("use std::io;\n\na();\nb();\nc();\n")
+    T.eq(ed:current_line(), "c();", "followed its own line down the file")
+    T.eq(ed.col, 2)
+  end)
+
+  T.case("with twenty identical lines it picks the nearest", function()
+    local lines = {}
+    for i = 1, 20 do lines[i] = "}" end
+    local ed = editor.new({ text = table.concat(lines, "\n") })
+    ed:goto_position(15, 1)
+    ed:replace_all(table.concat(lines, "\n"))
+    T.eq(ed.line, 15, "not the first `}` in the file")
+  end)
+
+  T.case("a line the formatter destroyed falls back to the line number", function()
+    local ed = editor.new({ text = "one\ntwo\nthree\nfour" })
+    ed:goto_position(3, 2)
+    ed:replace_all("completely\ndifferent\ntext\nhere")
+    T.eq(ed.line, 3, "the line is much better than nothing")
+    T.ok(ed.col >= 1 and ed.col <= #ed:current_line() + 1)
+  end)
+
+  T.case("a caret in the indent lands at the first real character", function()
+    local ed = editor.new({ text = "fn main() {\nlet x = 1;\n}" })
+    ed:goto_position(2, 1)
+    ed:replace_all("fn main() {\n        let x = 1;\n}\n")
+    T.eq(ed.line, 2)
+    T.eq(ed.col, 9, "after the new indent, not buried inside it")
+  end)
+
+  T.case("a format is ONE undo step", function()
+    local c = clock()
+    local ed = editor.new({ text = "fn main(){let x=1;}", now = c.now })
+    local before = ed:text()
+    c.advance(2)
+    ed:replace_all("fn main() {\n    let x = 1;\n}\n")
+    T.ne(ed:text(), before)
+    T.eq(ed:undo(), true)
+    T.eq(ed:text(), before, "one ctrl-Z puts it back")
+  end)
+
+  T.case("undo after a format restores the caret too", function()
+    local c = clock()
+    local ed = editor.new({ text = "fn main(){\nlet x=1;\n}", now = c.now })
+    ed:goto_position(2, 4)
+    c.advance(2)
+    ed:replace_all("fn main() {\n    let x = 1;\n}\n")
+    ed:undo()
+    T.eq(ed.line, 2)
+    T.eq(ed.col, 4)
+  end)
+
+  T.case("read-only refuses a replacement", function()
+    local ed = editor.new({ text = "fn main() {}", read_only = true })
+    T.eq(ed:replace_all("something else"), false)
+    T.eq(ed:text(), "fn main() {}")
+  end)
+
+  T.case("UTF-8 in the line does not shift the caret", function()
+    local ed = editor.new({ text = 'let s="銅鑼灣";' })
+    ed:goto_position(1, 1)
+    ed:move("right"); ed:move("right"); ed:move("right")   -- after "let"
+    local ink = #(ed:current_line():sub(1, ed.col - 1):gsub("%s", ""))
+    ed:replace_all('let s = "銅鑼灣";\n')
+    T.eq(#(ed:current_line():sub(1, ed.col - 1):gsub("%s", "")), ink)
+  end)
+
   T.section("editor — the view")
 
   T.case("the cursor stays inside the viewport", function()

@@ -96,6 +96,8 @@ export class QuestScene implements Scene {
    * to the ACCEPTED screen for it would teach them that green means done.
    */
   private runResult: Attempt | null = null;
+  /** One formatter call at a time. */
+  private formatting = false;
   /** True when `error` is news rather than a fault; it changes the colour. */
   private notice = false;
   private t = 0;
@@ -293,6 +295,48 @@ export class QuestScene implements Scene {
     );
   }
 
+  /**
+   * §4.9d: run the language's own formatter over the buffer.
+   *
+   * Three outcomes and three registers. Formatted: the buffer changes and the
+   * caret stays where it was. Already tidy: it says so and touches nothing,
+   * because replacing a buffer with an identical one makes a button feel
+   * broken. Does not parse: the formatter's one-line complaint, shown *quietly*
+   * — half-written code is the normal state of an editor, not a fault — and the
+   * buffer is left exactly as it is.
+   */
+  private async format(): Promise<void> {
+    if (!this.quest || !this.editor || this.formatting) return;
+    this.formatting = true;
+    try {
+      const res = await this.app.client.request("code.format", {
+        lang: this.land,
+        source: this.editor.source,
+      });
+      if (res.problem) {
+        this.error = res.problem;
+        this.notice = true;
+      } else if (res.changed) {
+        this.editor.replaceAll(res.source);
+        this.error = "";
+        this.app.chip.blip();
+      } else {
+        this.error = "already tidy";
+        this.notice = true;
+      }
+    } catch (e) {
+      this.error =
+        e instanceof WireError && e.payload.code === "not_found"
+          ? "this server does not have FORMAT yet"
+          : e instanceof WireError
+            ? playerText(e.payload.code)
+            : "the formatter did not answer";
+      this.notice = true;
+    } finally {
+      this.formatting = false;
+    }
+  }
+
   private async hint(): Promise<void> {
     if (!this.quest) return;
     if (this.quest.hints_used >= this.quest.hints_total) return;
@@ -341,6 +385,13 @@ export class QuestScene implements Scene {
       // The reflex key is RUN. Submitting is a decision and it is made with a
       // button, not with the shortcut somebody's hands press without looking.
       void this.run();
+    }
+    // The binding people already have in their fingers, as close as this
+    // plumbing allows: a keystroke only reaches a scene from inside the editor
+    // when Ctrl or Cmd is held, so Shift+Alt+F could never arrive here.
+    if (name === "f" && (ev.metaKey || ev.ctrlKey) && ev.shiftKey) {
+      ev.preventDefault();
+      void this.format();
     }
   }
 
@@ -448,13 +499,22 @@ export class QuestScene implements Scene {
       this.quest ? `${String(this.quest.node).padStart(2, "0")} ${this.quest.title}` : "LOADING",
     );
 
+    // The message bar is *part of the layout*, not an overlay: it used to be
+    // painted across the bottom of the body over whatever was there, and with
+    // the button row wrapped to two lines that was RESET. The panels give up
+    // its height instead, so nothing is ever drawn under it.
+    const barH = this.error ? fonts.small.height + Math.round(8 * s) : 0;
+    const room = barH > 0 ? barH + Math.round(6 * s) : 0;
+    const left: Rect = [f.left[0], f.left[1], f.left[2], f.left[3] - room];
+    const right: Rect = [f.right[0], f.right[1], f.right[2], f.right[3] - room];
+
     arriving(g, f, "left", this.briefIn, () => {
       // The clock takes the top of the brief column and the brief starts under
       // it; on an untimed quest it takes nothing and nothing moves.
-      const used = this.drawClock(g, f.left, s);
-      this.drawBrief(g, [f.left[0], f.left[1] + used, f.left[2], f.left[3] - used] as Rect, accent);
+      const used = this.drawClock(g, left, s);
+      this.drawBrief(g, [left[0], left[1] + used, left[2], left[3] - used] as Rect, accent);
     });
-    arriving(g, f, "right", this.benchIn, () => this.drawWorkbench(g, f.right, accent));
+    arriving(g, f, "right", this.benchIn, () => this.drawWorkbench(g, right, accent));
 
     this.buttons.draw(g, fonts.button);
     if (this.error) {
@@ -464,7 +524,6 @@ export class QuestScene implements Scene {
       // Red is failure and only failure. "The GO land opens in the next
       // chapter" is news, not a fault, and painting news in the failure colour
       // is how a colour ends up meaning three things and therefore nothing.
-      const barH = fonts.small.height + Math.round(8 * s);
       const barY = f.body[1] + f.body[3] - barH;
       const tone = this.notice ? Theme.coin : Theme.red;
       fill(g, Theme.ink, f.body[0], barY, f.body[2], barH, 0.92);
@@ -474,7 +533,11 @@ export class QuestScene implements Scene {
     }
     // The keys that are *only* keys. `ESC MAP` used to sit under a button that
     // already said MAP, which is the footer explaining the screen to itself.
-    footer(g, layout, "CTRL+ENTER  RUN   PGUP/PGDN  LOG   F1  ORIENTATION   F3  LOG OUT");
+    footer(
+      g,
+      layout,
+      "CTRL+ENTER  RUN   CTRL+SHIFT+F  FORMAT   PGUP/PGDN  LOG   F1  ORIENTATION   F3  LOG OUT",
+    );
   }
 
   private drawBrief(g: Ctx, rect: Rect, accent: readonly [number, number, number, number]): void {
@@ -616,7 +679,7 @@ export class QuestScene implements Scene {
     const rowGap = Math.round(fonts.button.size * 0.5);
     const rows = rowsIn(
       fonts.button,
-      ["RUN", hintLabel, this.consoleOpen ? "HIDE LOG" : "LOG", "MAP", "RESET"],
+      ["RUN", "FORMAT", hintLabel, this.consoleOpen ? "HIDE LOG" : "LOG", "MAP", "RESET"],
       rowW,
       layout.minTouchH(),
     );
@@ -646,6 +709,7 @@ export class QuestScene implements Scene {
           dim: this.stage !== "idle",
           primary: this.stage === "idle",
         },
+        { id: "format", label: "FORMAT", dim: this.formatting },
         { id: "hint", label: hintLabel, dim: hintsLeft <= 0 },
         { id: "console", label: this.consoleOpen ? "HIDE LOG" : "LOG" },
         { id: "back", label: "MAP" },
