@@ -184,7 +184,7 @@ player. A client renders its own text from `code`. `detail` is always present,
 | `auth_nonce_used` | that nonce was already spent | start `auth.challenge` again |
 | `auth_bad_signature` | recovery did not match the address | the key is wrong; re-prompt |
 | `not_found` | no such quest / drill / attempt | refresh the map |
-| `locked` | the quest's `requires` are not cleared | show the lock, name the blocker |
+| `locked` | *(not emitted — every node is playable, §4.7)* | — |
 | `rate_limited` | too many requests | back off; `detail.retry_after_ms` |
 | `busy` | a submission is already in flight | disable the submit button |
 | `unavailable` | real, but not built yet | say so in the story's voice; `detail.milestone` |
@@ -366,6 +366,22 @@ One overworld.
 `edges` are the paths the map draws, derived from `requires`. They are given
 explicitly so a client never has to infer the overworld's shape.
 
+**Every node is playable. Nothing is locked.** `requires` and `edges` describe
+the *suggested* route — the order the content was written to be learned in, and
+the line the map draws — and a client should still show it, because "where do I
+go next" is a real question. But a player may enter any node at any time, and
+the server never refuses one on the grounds that an earlier node is unfinished.
+
+This is a trainer, not a platformer. Somebody with an interview on Thursday
+needs to open the dynamic-programming street on Tuesday without grinding
+through eighteen quests about `&str` first, and somebody who already knows Go
+should not have to prove it to reach the concurrency map. The map's shape is
+advice; the player decides.
+
+`locked` remains in §3.3's closed set and is no longer emitted. It stays
+because removing a code from a closed set is the one change that breaks an
+exhaustive client, and because a future mode may want it.
+
 ### 4.8 `quest.get`
 
 ```json
@@ -373,7 +389,7 @@ explicitly so a client never has to infer the overworld's shape.
 ← payload: { "quest": Quest }             §5.3
 ```
 
-`locked` if the node's requirements are not met. `Quest.solution` is **omitted
+`Quest.solution` is **omitted
 entirely** unless the player has cleared it — not sent as null, not sent
 empty.
 
@@ -632,7 +648,7 @@ type MapNode = {
   node: number;                          // 1-based, contiguous within a map
   title: string;
   difficulty: 1|2|3|4|5;
-  state: "locked" | "open" | "cleared";
+  state: "open" | "cleared";             // never "locked" — see §4.7
   stars: 0|1|2|3;
   x: number; y: number;                  // 0..1 of the map image
   kind: "quest" | "boss" | "gate";
@@ -653,7 +669,7 @@ type Quest = {
   concepts: string[];
   hints_total: number;                   // the text comes from quest.hint
   hints_used: number;
-  state: "locked" | "open" | "cleared";
+  state: "open" | "cleared";
   stars: 0|1|2|3;
   tests: {
     match: "exact"|"trim"|"tokens"|string;   // "float:1e-6"
@@ -707,7 +723,7 @@ type SearchHit = {
   score: number;                         // the fused RRF score
   bm25: number | null;                   // component, null if not in that ranking
   cosine: number | null;
-  state: "locked" | "open" | "cleared";
+  state: "open" | "cleared";
 };
 ```
 

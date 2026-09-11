@@ -135,6 +135,8 @@ CREATE TABLE progress (
   address       TEXT NOT NULL REFERENCES users(address) ON DELETE CASCADE,
   quest_id      TEXT NOT NULL REFERENCES quests(id) ON DELETE CASCADE,
   state         TEXT NOT NULL CHECK (state IN ('locked','open','cleared')),
+                -- 'locked' is legacy: every node is playable (PROTOCOL §4.7).
+                -- The column keeps the value so an old row still reads.
   stars         INTEGER NOT NULL DEFAULT 0,   -- 0..3, see §6.3
   best_ms       INTEGER,                      -- fastest clear, wall clock
   attempts      INTEGER NOT NULL DEFAULT 0,
@@ -819,8 +821,11 @@ Rules:
   because the map draws a path through them.
 * `map.x` / `map.y` are 0..1 of the map image, so the art can be replaced
   without touching content. `map.kind` is `quest`, `boss` or `gate`.
-* `requires` empty means the node is open from the start. Every other node is
-  `locked` until all of its `requires` are `cleared`.
+* `requires` is the **suggested** route: the order the pack was written to be
+  learned in, and the line the map draws between nodes. It does **not** gate
+  anything — every node is playable from the start (PROTOCOL §4.7). A pack
+  still declares it, because "what should I do next" is a question worth
+  answering; it is advice, not a lock.
 * At least one case must be `visible = true`, so a player is never guessing
   blind about the output format. No `expect` may be empty once its `match`
   normalisation is applied — an empty expectation is cleared by an empty

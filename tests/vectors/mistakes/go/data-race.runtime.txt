@@ -1,10 +1,10 @@
 ==================
 WARNING: DATA RACE
-Read at 0x00c000186038 by goroutine 8:
+Read at 0x00c0000bc038 by goroutine 8:
   main.main.func1()
       <work>/main.go:17 +0x68
 
-Previous write at 0x00c000186038 by goroutine 7:
+Previous write at 0x00c0000bc038 by goroutine 7:
   main.main.func1()
       <work>/main.go:17 +0x78
 
@@ -18,11 +18,11 @@ Goroutine 7 (finished) created at:
 ==================
 ==================
 WARNING: DATA RACE
-Write at 0x00c000186038 by goroutine 8:
+Write at 0x00c0000bc038 by goroutine 8:
   main.main.func1()
       <work>/main.go:17 +0x78
 
-Previous write at 0x00c000186038 by goroutine 10:
+Previous write at 0x00c0000bc038 by goroutine 10:
   main.main.func1()
       <work>/main.go:17 +0x78
 

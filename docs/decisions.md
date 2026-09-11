@@ -2133,3 +2133,24 @@ practise.
 
 `mode` defaults to `'submit'`, so every row written before today reads
 correctly.
+
+## 2026-09-11 — Every node is playable; the map's shape is advice
+
+Asked for: "user can click any stage in the map." Nothing is locked. The server
+never refuses a quest because an earlier one is unfinished, and `MapNode.state`
+is now `open` or `cleared` only.
+
+`requires` and `edges` stay, and clients should keep drawing the route — "where
+do I go next" is a real question and the packs are written in a deliberate
+order. It is advice rather than a gate.
+
+The reasoning is what this product is. A trainer is not a platformer: somebody
+with an interview on Thursday needs the dynamic-programming street on Tuesday
+without first grinding eighteen quests about `&str`, and somebody who already
+writes Go should not have to prove it to reach the concurrency map. Locking
+optimises for a sense of progression the player did not ask for, at the cost of
+the thing they came for.
+
+`locked` stays in PROTOCOL §3.3's closed set, unemitted. Removing a code from a
+closed set is the one change that breaks a client switching exhaustively on it,
+and the cost of keeping a dead row in a table is nothing.
