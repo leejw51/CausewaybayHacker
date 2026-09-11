@@ -61,7 +61,7 @@ WAIT_SECS  ?= 90
 held = p=$$(lsof -nP -iTCP:$(1) -sTCP:LISTEN -t 2>/dev/null | head -1); \
        [ -n "$$p" ] && ps -o comm= -p $$p 2>/dev/null | grep -qE '$(2)'
 
-.PHONY: help start stop restart status logs remote art serve web build test test-all test-all-list test-be test-fe \
+.PHONY: help start stop restart status logs remote art gui serve web build test test-all test-all-list test-be test-fe \
         test-love test-e2e smoke fmt lint doctor clean clean-home
 
 ##@ Running
@@ -149,6 +149,18 @@ remote: ## the addresses a phone or another machine can use
 
 logs: ## follow both logs (ctrl-C to stop following; the servers stay up)
 	@tail -f $(RUN)/backend.log $(RUN)/web.log
+
+gui: ## play in the LÖVE desktop client (fetches LÖVE and builds the key library if needed)
+	@# The client needs three things and each fails differently if it is missing,
+	@# so check them here rather than let the player meet three separate errors.
+	@if ! $(call held,$(BACK_PORT),cwbhacker); then \
+	  echo "the server is not up — starting it first"; $(MAKE) -s start; fi
+	@test -f love2d/ffi/target/release/libcwbh_ffi.dylib \
+	  || { echo "building the key library…"; $(MAKE) -s -C love2d ffi; }
+	@command -v love >/dev/null || test -d love2d/build/love.app \
+	  || { echo "fetching LÖVE…"; $(MAKE) -s -C love2d love-bin; }
+	@echo "  connecting to ws://127.0.0.1:$(BACK_PORT)/ws  (CWBH_SERVER overrides)"
+	CWBH_SERVER=ws://127.0.0.1:$(BACK_PORT)/ws $(MAKE) -s -C love2d run
 
 serve: ## the backend in the foreground, for a stack trace
 	cd backend && CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) cargo run -p cwbhacker -- serve --bind $(BIND):$(BACK_PORT)

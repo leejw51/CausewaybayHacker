@@ -162,6 +162,25 @@ async function main() {
    * otherwise be handed the login screen. The screenshots want the cold path
    * every time, so they ask for it.
    */
+  /**
+   * Throw away the session so the next `goto` really is a cold start.
+   *
+   * `boot.ts` resumes a stored token straight past the title card and the
+   * login screen, which is correct and is exactly what makes a group that
+   * wants either of them report "still on lands". Only the token is removed —
+   * the orientation and the language are preferences and a shot run has no
+   * business editing somebody's.
+   */
+  const forgetSession = async () => {
+    await page.evaluate(() => {
+      try {
+        localStorage.removeItem("cwbhacker.token");
+      } catch {
+        /* nothing to forget */
+      }
+    });
+  };
+
   const forgetStory = async () => {
     await page.evaluate(() => {
       try {
@@ -221,6 +240,7 @@ async function main() {
   // ---- the title card ----------------------------------------------------
   await group("title", async () => {
     await size(LAND);
+    await forgetSession();
     await forgetStory();
     await page.goto(`${BASE}/`);
     await at("title", 25000);
@@ -234,6 +254,7 @@ async function main() {
 
   await group("story", async () => {
     await size(LAND);
+    await forgetSession();
     await forgetStory();
     await page.goto(`${BASE}/`);
     await at("title", 25000);
@@ -261,6 +282,7 @@ async function main() {
 
   await group("story-portrait", async () => {
     await size(PORT);
+    await forgetSession();
     await forgetStory();
     await page.goto(`${BASE}/`);
     await at("title", 25000);
@@ -273,6 +295,7 @@ async function main() {
   // ---- login -------------------------------------------------------------
   await group("login", async () => {
     await size(LAND);
+    await forgetSession();
     await page.goto(`${BASE}/`);
     await pastTitle();
     await at("login", 45000);
@@ -314,8 +337,11 @@ async function main() {
         if (await dead.evaluate(() => Boolean(window.__cwbCapture?.scene))) break;
         await dead.waitForTimeout(150);
       }
-      await on("title", 25000);
-      const go = await dead.evaluate(() => window.__cwbCapture.buttonAt("start"));
+      // It shares `localStorage` with the rest of the run, so it may already
+      // have a token and be resumed straight past the card — and with the
+      // socket routed dead the resume fails and it lands on login anyway.
+      // Both paths are correct; only one of them has a card to press.
+      const go = await dead.evaluate(() => window.__cwbCapture?.buttonAt("start") ?? null);
       if (go) await dead.mouse.click(go[0], go[1]);
       await on("login");
       await dead.evaluate(() => window.__cwbCapture.settle(2.5));
@@ -438,6 +464,106 @@ async function main() {
     await at("map", 25000);
     await settle(3);
     await shot("36-map-no-webgl-1080x1750");
+  });
+
+  // ---- the six languages -------------------------------------------------
+  //
+  // At least one CJK language on every kind of screen, and Czech, because the
+  // two break a layout in opposite directions: CJK glyphs are wider per
+  // character and Czech words are longer. Anything measured in characters
+  // rather than pixels fails on one of the two.
+  //
+  // The language is set through the game's own controls — the row on the title
+  // card and F7 — rather than by writing the preference into localStorage, so
+  // what the shot proves is that the control works, not that the table exists.
+  const language = async (id) => {
+    await ready();
+    const at = await page.evaluate((i) => window.__cwbCapture.buttonAt(`lang:${i}`), id);
+    if (at) {
+      await page.mouse.click(at[0], at[1]);
+    } else {
+      // Not on the title card: cycle with F7 until it lands.
+      for (let i = 0; i < 6; i++) {
+        if ((await page.evaluate(() => localStorage.getItem("cwbhacker.locale"))) === id) break;
+        await page.keyboard.press("F7");
+        await page.waitForTimeout(700);
+      }
+    }
+    // The CJK face is ~900 KB and is fetched on the switch; the frame that
+    // matters is the one after it has landed.
+    await page.waitForTimeout(2500);
+  };
+
+  await group("language-title", async () => {
+    await size(LAND);
+    await forgetSession();
+    await forgetStory();
+    await page.goto(`${BASE}/`);
+    await at("title", 25000);
+    await language("ko");
+    await settle(2.5);
+    await shot("70-title-korean");
+  });
+
+  await group("language-korean", async () => {
+    await size(LAND);
+    await forgetSession();
+    await page.goto(`${BASE}/`);
+    await pastTitle();
+    await at("login", 45000);
+    await language("ko");
+    await settle(2.5);
+    await shot("71-login-korean");
+    await signIn();
+    await settle(2.5);
+    await shot("72-lands-korean");
+    await press("cat:basic", 2500);
+    await at("map", 25000);
+    await settle(3);
+    await shot("73-map-korean");
+    await page.keyboard.press("Enter");
+    await at("quest", 30000);
+    await page.waitForTimeout(2500);
+    await settle(2.5);
+    await shot("74-quest-korean");
+    await size(PORT);
+    await page.waitForTimeout(400);
+    await settle(2);
+    await shot("75-quest-korean-portrait");
+    await size(LAND);
+  });
+
+  await group("language-czech", async () => {
+    await size(LAND);
+    await page.goto(`${BASE}/`);
+    await pastTitle();
+    await at("lands", 45000);
+    await language("cs");
+    await settle(2.5);
+    await shot("76-lands-czech");
+    await press("cat:basic", 2500);
+    await at("map", 25000);
+    await page.keyboard.press("Enter");
+    await at("quest", 30000);
+    await page.waitForTimeout(2500);
+    await settle(2.5);
+    await shot("77-quest-czech");
+  });
+
+  await group("language-cantonese", async () => {
+    await size(LAND);
+    await page.goto(`${BASE}/`);
+    await pastTitle();
+    await at("lands", 45000);
+    await language("yue");
+    await settle(2.5);
+    await shot("78-lands-cantonese");
+  });
+
+  // Back to English, so every shot after this one is the source language.
+  await group("language-back", async () => {
+    await ready();
+    await language("en");
   });
 
   // ---- a quest, and what comes out of it ---------------------------------
