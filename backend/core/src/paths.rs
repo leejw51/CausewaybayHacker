@@ -111,6 +111,13 @@ impl Home {
     pub fn attempt_dir(&self, address: &str, attempt_id: &str) -> PathBuf {
         self.user_dir(address).join("attempts").join(attempt_id)
     }
+    /// `users/<address>/snippets/<id>/` — the playground's own work, kept
+    /// beside the attempts for the same reason they are there: it is the
+    /// player's writing, and a database is a worse place to lose it from.
+    pub fn snippet_dir(&self, address: &str, snippet_id: &str) -> PathBuf {
+        self.user_dir(address).join("snippets").join(snippet_id)
+    }
+
     /// Scratch for one attempt (SPEC §5.1). Under `build/`, never `/tmp`.
     pub fn attempt_build_dir(&self, lang: &str, attempt_id: &str) -> PathBuf {
         self.build_lang_dir(lang).join(attempt_id)
@@ -118,7 +125,8 @@ impl Home {
 
     pub fn ensure_user_dirs(&self, address: &str) -> Result<()> {
         ensure_dir(&self.user_dir(address))?;
-        ensure_dir(&self.user_dir(address).join("attempts"))
+        ensure_dir(&self.user_dir(address).join("attempts"))?;
+        ensure_dir(&self.user_dir(address).join("snippets"))
     }
 }
 

@@ -37,17 +37,19 @@ const TRUNCATION_CHUNK: &str = "\n…output truncated\n";
 
 /// Per-attempt streaming bookkeeping: a `seq` counter per stream, and one
 /// shared byte budget across all of them.
-struct Streamer {
-    attempt_id: String,
-    out: Out,
-    started: Instant,
-    seqs: Mutex<Vec<(String, u64)>>,
-    streamed: AtomicUsize,
-    truncated: AtomicUsize,
+/// Shared with the playground, which streams the same way under the same
+/// `attempt_id` field even though it stores nothing.
+pub struct Streamer {
+    pub attempt_id: String,
+    pub out: Out,
+    pub started: Instant,
+    pub seqs: Mutex<Vec<(String, u64)>>,
+    pub streamed: AtomicUsize,
+    pub truncated: AtomicUsize,
 }
 
 impl Streamer {
-    fn next_seq(&self, stream: &str) -> u64 {
+    pub(crate) fn next_seq(&self, stream: &str) -> u64 {
         let mut seqs = self.seqs.lock().unwrap();
         match seqs.iter_mut().find(|(name, _)| name == stream) {
             Some((_, seq)) => {
@@ -62,7 +64,7 @@ impl Streamer {
         }
     }
 
-    fn log(&self, stream: &str, chunk: &str) {
+    pub(crate) fn log(&self, stream: &str, chunk: &str) {
         let used = self.streamed.fetch_add(chunk.len(), Ordering::Relaxed);
         if used >= MAX_STREAM_BYTES {
             // One final chunk, once, and then silence for the rest of the run.
@@ -86,7 +88,7 @@ impl Streamer {
         }
     }
 
-    fn emit(&self, stream: &str, chunk: &str) {
+    pub(crate) fn emit(&self, stream: &str, chunk: &str) {
         send(
             &self.out,
             ServerFrame::event(
@@ -101,7 +103,7 @@ impl Streamer {
         );
     }
 
-    fn stage(&self, stage: &str, queued: usize) {
+    pub(crate) fn stage(&self, stage: &str, queued: usize) {
         send(
             &self.out,
             ServerFrame::event(

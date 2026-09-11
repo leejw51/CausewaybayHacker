@@ -533,3 +533,63 @@ generated = "2026-09-11"
 rerolls = 2
 prompt = """\
 16-bit SNES pixel art sprite row, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not a sign). CRITICAL COLOUR RULE: nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone and must appear nowhere on any sign. SIX separate tall narrow vertical Hong Kong neon shop signs in an evenly spaced horizontal row with plain magenta between them so they never touch. Each sign is a plain rectangle on a short dark grey metal bracket, edged with a thick bright glowing neon tube outline, the panel face inside the tube filled with a darker shade of that same colour. Each sign is ONE colour only, left to right: 1 DEEP CRIMSON RED, 2 CYAN BLUE, 3 LIME GREEN, 4 GOLD YELLOW, 5 ORANGE, 6 DEEP VIOLET PURPLE. All six must be strong and saturated — no white signs, no pale signs, no grey signs, no two the same. Flat pure hues, no blending, no gradient, no soft glow halo, no blur. Chunky hard-edged pixels, bold dark outlines, no anti-aliasing. Absolutely no text, no letters, no words, no numbers, no symbols — every panel face is completely blank."""
+
+[[asset]]
+name = "emblem_rust_basic"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of Hong Kong street objects, morning: a blue double-decker tram seen three-quarter from the front on its rails, a market stall with a red-and-white striped canvas awning and wooden crates of oranges and greens stacked beside it, a half-raised grey roller shutter, and two gold bamboo scaffolding poles lashed together. Warm gold morning daylight, saturated ambers, corals, greens and a strong blue; a bright daytime street palette. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_rust_advanced"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of lunch-rush objects: one long red-and-cream counter with TWO chrome cash tills standing side by side on top of it, a steel kitchen pass behind with steam rising from it, a tall stack of plastic trays, and two office workers in pale shirts with lanyards standing waiting side by side. Two of everything, crowded and busy. Warm gold morning daylight, saturated ambers, corals, greens and a strong blue; a bright daytime street palette. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_rust_hacker"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of seminar-room objects, daylight: a large blank white whiteboard in an aluminium frame standing on a castored A-frame stand with a pen tray holding two markers, a plain round wall clock with black hands mounted on a short bracket beside it, and one lone grey steel-framed chair turned out at an angle. Austere, still, cold. Muted sage greens, cool greys and bone white with one warm amber note. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_go_basic"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of night-street objects: a glowing turquoise MTR station entrance arch, a red delivery bike with a insulated box on the back leaning on its stand, a small stack of cardboard parcels, and a low concrete kerb with a cyan-lit bollard. Night-time. Cool cyan and turquoise light with warm amber window glow and deep indigo shadow; a night palette. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_go_advanced"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of interchange objects, crowded: a rack holding SIX delivery bikes packed tightly in a line, TWO grey steel ticket turnstiles side by side with chrome tripod barrier arms, and a slice of platform edge with a yellow safety stripe and the cyan-lit nose of a train. Many of everything, packed and busy. Night-time. Cool cyan and turquoise light with warm amber window glow and deep indigo shadow; a night palette. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_go_hacker"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. THE SAME ROOM AS BEFORE BUT AT NIGHT: a large blank white whiteboard in an aluminium frame on a castored A-frame stand with a pen tray, a plain round wall clock with black hands on a bracket beside it, and one lone grey steel-framed chair turned out at an angle — the identical objects, now lit cold from one side so the white board glows pale cyan and the shadows go deep indigo. Colder, later, more oppressive. Night-time. Cool cyan and turquoise light with warm amber window glow and deep indigo shadow; a night palette. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""

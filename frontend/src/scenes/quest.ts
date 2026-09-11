@@ -114,6 +114,13 @@ export class QuestScene implements Scene {
     readonly land: Land,
     readonly category: Category,
     readonly questId: string,
+    /**
+     * What the player had in the editor last time, if they are coming back
+     * from a verdict. TRY AGAIN used to reload the starter, which threw away
+     * the attempt they had just made — the one thing on this screen that is
+     * theirs. Undefined means a first visit, and then the starter is right.
+     */
+    private readonly draft?: string,
   ) {}
 
   async enter(): Promise<void> {
@@ -142,7 +149,7 @@ export class QuestScene implements Scene {
     try {
       const res = await this.app.client.request("quest.get", { quest_id: this.questId });
       this.quest = res.quest;
-      this.editor = new Editor(this.land, res.quest.starter, () => {
+      this.editor = new Editor(this.land, this.draft ?? res.quest.starter, () => {
         /* the source is read on submit; there is nothing to save locally */
       });
       this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
@@ -265,7 +272,16 @@ export class QuestScene implements Scene {
     // still accepted and still deserves the sound, just not the fanfare.
     if (attempt.verdict === "accepted") this.app.chip.clear();
     else this.app.chip.fail();
-    void this.app.go(new ResultScene(this.app, this.land, this.category, this.questId, attempt));
+    void this.app.go(
+      new ResultScene(
+        this.app,
+        this.land,
+        this.category,
+        this.questId,
+        attempt,
+        this.editor?.source,
+      ),
+    );
   }
 
   private async hint(): Promise<void> {

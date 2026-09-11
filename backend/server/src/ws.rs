@@ -21,6 +21,7 @@ use cwbhacker_core::attempts::Mode;
 use cwbhacker_core::error::{bad_request, Code, Error};
 
 use crate::handlers::{self, Session};
+use crate::playground;
 use crate::proto::{self, send, Incoming, Out, Outgoing, ServerFrame, MAX_FRAME_BYTES};
 use crate::state::Shared;
 use crate::submit;
@@ -249,7 +250,7 @@ async fn dispatch(
     // RUN and SUBMIT are the same path with a flag (PROTOCOL §4.9b), and they
     // share the one-execution-per-connection rule: a second of *either* while
     // one is in flight is `busy`.
-    if let Some(mode) = execution_mode(&kind) {
+    if let Some(execution) = Execution::for_kind(&kind) {
         execute_async(
             state,
             connection_id,
@@ -258,7 +259,7 @@ async fn dispatch(
             live_ids,
             tx,
             id,
-            mode,
+            execution,
             frame.payload,
         );
         return;
@@ -280,6 +281,10 @@ async fn dispatch(
         "stats.summary" => handlers::stats_summary(state, session),
         "stats.mistakes" => handlers::stats_mistakes(state, session, payload),
         "stats.history" => handlers::stats_history(state, session, payload),
+        "playground.list" => playground::list(state, session),
+        "playground.load" => playground::load(state, session, payload),
+        "playground.save" => playground::save(state, session, payload),
+        "playground.delete" => playground::delete(state, session, payload),
         "search.query" => Err(handlers::unimplemented("search (SPEC §8)")),
         "ai.plan" | "ai.next" | "ai.finish" => {
             Err(handlers::unimplemented("AI drills (SPEC §7.3)"))
@@ -314,11 +319,31 @@ fn release(live_ids: &Arc<Mutex<HashSet<String>>>, id: &Option<String>) {
     }
 }
 
-fn execution_mode(kind: &str) -> Option<Mode> {
-    match kind {
-        "quest.submit" => Some(Mode::Submit),
-        "quest.run" => Some(Mode::Run),
-        _ => None,
+/// The three things that compile and run. They share one slot per connection
+/// (PROTOCOL §3.2): a second of *any* of them while one is in flight is
+/// `busy`, because they share one compiler and one machine.
+#[derive(Debug, Clone, Copy)]
+enum Execution {
+    Quest(Mode),
+    Playground,
+}
+
+impl Execution {
+    fn for_kind(kind: &str) -> Option<Execution> {
+        match kind {
+            "quest.submit" => Some(Execution::Quest(Mode::Submit)),
+            "quest.run" => Some(Execution::Quest(Mode::Run)),
+            "playground.run" => Some(Execution::Playground),
+            _ => None,
+        }
+    }
+
+    fn reply_kind(self) -> &'static str {
+        match self {
+            Execution::Quest(Mode::Submit) => "quest.submit",
+            Execution::Quest(Mode::Run) => "quest.run",
+            Execution::Playground => "playground.run",
+        }
     }
 }
 
@@ -331,13 +356,10 @@ fn execute_async(
     live_ids: &Arc<Mutex<HashSet<String>>>,
     tx: &Out,
     id: Option<String>,
-    mode: Mode,
+    execution: Execution,
     payload: serde_json::Value,
 ) {
-    let reply_kind = match mode {
-        Mode::Submit => "quest.submit",
-        Mode::Run => "quest.run",
-    };
+    let reply_kind = execution.reply_kind();
     let address = match session.address.clone() {
         Some(address) => address,
         None => {
@@ -379,8 +401,11 @@ fn execute_async(
         // channel the writer task owns.
         let result = {
             let tx = tx.clone();
-            tokio::task::spawn_blocking(move || {
-                submit::run(&state, &address, connection_id, mode, &payload, &tx)
+            tokio::task::spawn_blocking(move || match execution {
+                Execution::Quest(mode) => {
+                    submit::run(&state, &address, connection_id, mode, &payload, &tx)
+                }
+                Execution::Playground => playground::run(&state, &address, &payload, &tx),
             })
             .await
         };

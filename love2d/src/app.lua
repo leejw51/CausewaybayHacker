@@ -188,6 +188,16 @@ function App:load()
     log = function(level, message) self:log(level, message) end,
   })
 
+  -- A connection that will not open, with no token for this address, is the
+  -- login screen's business: the player has just typed a server that is not
+  -- answering and needs to see the field they typed it into.
+  self.session:on("state", function(payload)
+    if payload.state == "closed" and not self.session.token
+      and self.scene_name ~= "login" and self.scene_name ~= "boot" then
+      self:go("login")
+    end
+  end)
+
   self.session:on("need_login", function(payload)
     if payload and payload.message then self:toast(payload.message) end
     if self.scene_name ~= "login" then self:go("login") end

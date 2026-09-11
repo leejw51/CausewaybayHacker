@@ -110,6 +110,8 @@ export class ResultScene implements Scene {
     readonly category: Category,
     readonly questId: string,
     readonly attempt: Attempt,
+    /** The source that produced this verdict, carried back to TRY AGAIN. */
+    private readonly source?: string,
   ) {}
 
   enter(): void {
@@ -195,7 +197,11 @@ export class ResultScene implements Scene {
   }
 
   private retry(): void {
-    void this.app.go(new QuestScene(this.app, this.land, this.category, this.questId), "back");
+    // With their code, not with the starter: "try again" means try this again.
+    void this.app.go(
+      new QuestScene(this.app, this.land, this.category, this.questId, this.source),
+      "back",
+    );
   }
 
   /** What the verdict plate needs, before it is drawn. */

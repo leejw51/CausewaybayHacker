@@ -102,6 +102,31 @@ pub struct TestSpec {
 }
 
 impl TestSpec {
+    /// A one-case spec for the playground (PROTOCOL §4.9c): run the program
+    /// once on this stdin under SPEC §5.3's limits, unchanged.
+    ///
+    /// The harness will compare the output to the empty string and decide
+    /// `accepted` or `wrong_answer`; the playground **discards that**, because
+    /// there is nothing to be right or wrong about. What it wants from the
+    /// harness is the running — the timeout, the output cap, the stripped
+    /// environment, the process group — and this is the cheapest way to get
+    /// all of it without a second copy of the case loop.
+    pub fn playground(stdin: &str, timeout_ms: u64, compile_timeout_ms: u64) -> TestSpec {
+        TestSpec {
+            harness: Harness::Stdio,
+            timeout_ms,
+            compile_timeout_ms,
+            max_stdout_bytes: 262_144,
+            cases: vec![Case {
+                name: "playground".to_string(),
+                stdin: stdin.to_string(),
+                expect: String::new(),
+                visible: true,
+            }],
+            match_mode: MatchMode::Trim,
+        }
+    }
+
     /// The same spec with only the visible cases (PROTOCOL §4.9b).
     ///
     /// A run must not tell the player whether the hidden cases pass — that is

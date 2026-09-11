@@ -76,9 +76,26 @@ attempt that needs scratch space gets a directory under `build/`.
 
 `~/.causewaybayhacker` is the **server's**. The LÖVE desktop client is a
 separate program that may be talking to a server on another machine, so it
-keeps its own state in `~/.causewaybayhackerlove2d` — same conventions, `0700`
-directory and `0600` files, append-only JSONL, state derived by replaying the
-log (the rules in §1.2 below apply unchanged).
+keeps its own state in `~/.causewaybayhackerlove2d` — `0700` directory, `0600`
+files, append-only JSONL, state derived by replaying the log.
+
+The JSONL rules, in full, so this section does not depend on another document:
+
+* One compact JSON object per line, UTF-8, `\n` terminated, no trailing spaces.
+* **Append-only.** State is derived by replaying every line in order; later
+  records supersede earlier ones. A crash can at worst lose the last, partial
+  line — and an append that finds the previous line unterminated **starts a
+  fresh one**, so a torn write costs that line and not the next one too.
+* Every record carries `schema` (currently `1`), `kind`, and an RFC3339 UTC
+  timestamp.
+* A malformed or unparsable line is **skipped with a warning** rather than
+  aborting the replay. A line whose `schema` is greater than the reader's is
+  skipped.
+* Removing something — forgetting a session — is a record (`session.clear`),
+  not an edit to an earlier line.
+
+These are `CausewaybayWallet`'s conventions, and its `rustcli/core/src/store.rs`
+is the reference implementation if a detail is ever in doubt.
 
 It holds only what a client owns: the session token, the chosen server, the
 orientation and fullscreen pins, and where each map was left. **No key

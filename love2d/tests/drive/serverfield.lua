@@ -27,6 +27,17 @@ add({ until_ = function(app)
     end, timeout = 3 })
 add({ shot = "V1-login-with-server.png" })
 
+-- Start from a known address. The saved field persists across runs — which
+-- is the point of it — so a previous run of this script may have left the
+-- client pointed somewhere else.
+add({ until_ = function(app)
+      local ok, why = app:set_server("ws://127.0.0.1:5390/ws")
+      print(("reset to the default -> %s %s"):format(tostring(ok), tostring(why)))
+      return ok == true
+    end, timeout = 5 })
+add({ until_ = function(app) return app.client.state == "open" end,
+      note = "connected to the default", timeout = 20 })
+
 add({ note = "sign in on the default server (skipped if already resumed)" })
 add({ text = "legal winner thank year wave sausage worth useful legal winner thank yellow",
       when = on_login })
@@ -39,19 +50,31 @@ add({ until_ = function(app)
       return true
     end, timeout = 3 })
 
-add({ note = "now point it at the same server by a different address" })
+-- A second address for the same machine. `localhost` is deliberate: on this
+-- box it resolves to ::1 while the server binds 127.0.0.1, so it is also a
+-- server that does not answer — which is the other half of what this field
+-- has to handle gracefully.
+add({ note = "now point it at a different address" })
 add({ until_ = function(app)
       local ok, why = app:set_server("ws://localhost:5390/ws")
       print(("set_server -> %s %s"):format(tostring(ok), tostring(why)))
       return ok == true
     end, note = "the server changed", timeout = 5 })
 add({ until_ = function(app)
-      -- A different address is a different server as far as the store is
-      -- concerned, so there is no token for it and the client must ask.
-      print(("after switch: authed=%s token=%s"):format(
-        tostring(app.session.authed), tostring(app.session.token ~= nil)))
-      return app.scene_name == "login"
-    end, note = "no token for the new address — back to the login screen", timeout = 20 })
+      -- The assertion that matters, and it does not need the new address to
+      -- answer: a different server is a different token, so this client has
+      -- none for it and cannot send the other one's.
+      print(("after switch: authed=%s token=%s saved=%s"):format(
+        tostring(app.session.authed), tostring(app.session.token ~= nil),
+        tostring(require("src.store").saved_server())))
+      if app.session.token ~= nil then
+        print("FAIL: a token followed the client to a different server")
+        return false
+      end
+      return app.session.authed == false
+    end, note = "no token for the new address", timeout = 20 })
+add({ until_ = function(app) return app.scene_name == "login" end,
+      note = "and the login screen, not a silent dead connection", timeout = 25 })
 add({ wait = 0.5 })
 add({ shot = "V2-new-server-no-token.png" })
 

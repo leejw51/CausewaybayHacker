@@ -178,12 +178,10 @@ const push = (map, key, value) => {
   map.set(key, list);
 };
 
-const stateOf = (lower, q) => {
-  if (progress.get(`${lower}|${q.id}`)?.state === "cleared") return "cleared";
-  return q.requires.every((r) => progress.get(`${lower}|${r}`)?.state === "cleared")
-    ? "open"
-    : "locked";
-};
+// §4.7: every node is playable. `requires` and `edges` stay in the payload as
+// the suggested route, and are no longer a gate.
+const stateOf = (lower, q) =>
+  progress.get(`${lower}|${q.id}`)?.state === "cleared" ? "cleared" : "open";
 const clearedCount = (lower) =>
   QUESTS.filter((q) => progress.get(`${lower}|${q.id}`)?.state === "cleared").length;
 const starsOf = (lower) =>
@@ -479,14 +477,13 @@ wss.on("connection", (ws) => {
       }
 
       // ---------------------------------------------------------- §4.9
+      case "quest.run":
       case "quest.submit": {
+        const isRun = type === "quest.run";
         const q = QUESTS.find((x) => x.id === payload.quest_id);
         if (!q) return err(id, type, "not_found", "no such quest");
         if (payload.lang !== "rust")
           return err(id, type, "bad_request", "lang does not match the quest's land");
-        if (stateOf(me, q) === "locked")
-          return err(id, type, "locked", `${q.id} is locked`, { requires: q.requires });
-
         // §3.2: one in flight per CONNECTION, not per user.
         const isBusy = broke("busy-per-user")
           ? [...connections].some((s) => s.address === me && s.inFlight)
@@ -552,11 +549,24 @@ wss.on("connection", (ws) => {
                     col: null,
                   },
                 ],
-            stars: ok ? (had?.tries ? 2 : 3) : 0,
-            cleared: firstClear,
+            stars: isRun || !ok ? 0 : had?.tries ? 2 : 3,
+            cleared: isRun ? false : firstClear,
+            mode: isRun ? "run" : "submit",
             created_at: now(),
           };
           push(attempts, me, attempt);
+          // §4.9b: a run is recorded and its mistakes enter the curriculum,
+          // but it never clears, never scores and never counts as an attempt
+          // on the node.
+          if (isRun) {
+            if (!ok)
+              push(mistakes, me, {
+                kind: "wrong-answer",
+                code: null,
+                message: "output differs",
+              });
+            return reply(id, "quest.run.ok", { attempt });
+          }
           if (!ok)
             push(mistakes, me, {
               kind: "wrong-answer",

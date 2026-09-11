@@ -24,6 +24,20 @@ const BLURB: Record<Land, string> = {
   go: "Goroutines, channels, the small language that fits in a head.",
 };
 
+/**
+ * What each road *is*, from `docs/story.md` §4, in one line.
+ *
+ * The rows used to be a word, a count and a hundred and thirty pixels of empty
+ * blue — three of them stacked, which read as a settings menu rather than as
+ * three places you could go. A road that says what it is is both more useful
+ * and more alive than a slab with a label on it.
+ */
+const CAT_LINE: Record<Category, string> = {
+  basic: "The morning walk. Shopfronts, kiosks and tills — read what the machine wrote.",
+  advanced: "The lunch rush. Two tills on one counter, and both of them happened at once.",
+  hacker: "The interview. One room, one clock, and nothing finishing your lines.",
+};
+
 export class LandsScene implements Scene {
   readonly name = "lands";
   readonly mood = "lands" as const;
@@ -36,6 +50,14 @@ export class LandsScene implements Scene {
   private readonly catBtns = new Buttons();
   private t = 0;
   private error = "";
+  /**
+   * How lit each row is, 0..1, eased per frame rather than switched.
+   *
+   * Frame-driven like everything else on this screen — nothing here reads the
+   * wall clock, so the capture hook still gets the same picture for the same
+   * number of steps.
+   */
+  private readonly glow = new Map<string, number>();
   private readonly leftIn = new Tween(seconds("panel"));
   private readonly rightIn = new Tween(seconds("panel"), seconds("stagger"));
 
@@ -81,11 +103,29 @@ export class LandsScene implements Scene {
       const hh = Math.min(room, inner[2] * 0.62);
       const scale = hh / sprite.naturalHeight;
       const ww = sprite.naturalWidth * scale;
-      const bob = Math.sin(this.t * 2.2) * 2 * s;
       const feet = box ? box.feet * scale : hh;
+      // The chosen land's mascot is awake: a two-beat idle with a hop every
+      // few seconds, a shadow that tightens as he leaves the ground, and a
+      // little squash on the landing. The other land's mascot is asleep, and
+      // that is the difference between "not selected" and "not drawn yet".
+      const beat = this.t * 2.2;
+      const cycle = (this.t % 3.4) / 3.4;
+      const hop = chosen && cycle < 0.18 ? Math.sin((cycle / 0.18) * Math.PI) : 0;
+      const bob = chosen ? Math.sin(beat) * 2 * s + hop * -10 * s : 0;
+      const squash = chosen ? 1 - hop * 0.06 + Math.sin(beat) * 0.01 : 1;
+      const air = Math.min(1, Math.abs(bob) / (10 * s));
+      const fx = inner[0] + inner[2] / 2;
+      const fy = inner[1] + room;
       g.save();
       if (!chosen) g.globalAlpha = 0.5;
-      g.drawImage(sprite, inner[0] + (inner[2] - ww) / 2, inner[1] + (room - feet) + bob, ww, hh);
+      // The shadow is what makes a hop a hop rather than a drift.
+      g.fillStyle = css(Theme.ink, (chosen ? 0.45 : 0.3) * (1 - air * 0.6));
+      g.beginPath();
+      g.ellipse(fx, fy - 2, ww * 0.34 * (1 - air * 0.25), Math.max(2, 4 * s), 0, 0, Math.PI * 2);
+      g.fill();
+      const dh = hh * squash;
+      const dw = ww / squash;
+      g.drawImage(sprite, fx - dw / 2, inner[1] + (room - feet) + bob + (hh - dh), dw, dh);
       g.restore();
     }
 
@@ -134,6 +174,14 @@ export class LandsScene implements Scene {
     this.t += dt;
     this.leftIn.update(dt);
     this.rightIn.update(dt);
+    // Chase the hover, do not snap to it: a row that lifts over three frames
+    // reads as a thing being picked up, and a row that changes colour in one
+    // reads as a stylesheet.
+    const k = 1 - Math.exp(-dt * 16);
+    for (const [id, v] of this.glow) {
+      const want = this.catBtns.hovered === id ? 1 : 0;
+      this.glow.set(id, v + (want - v) * k);
+    }
     // The overworld is a megabyte of JPEG and the player is one click from it.
     this.app.assets?.prefetch(
       this.land === "rust" ? "map_rust" : "map_go",
@@ -144,6 +192,11 @@ export class LandsScene implements Scene {
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
     if (phase === "move") {
       this.landBtns.hovered = this.landBtns.hit(x, y)?.id ?? null;
+      const was = this.catBtns.hovered;
+      this.catBtns.hovered = this.catBtns.hit(x, y)?.id ?? null;
+      // One note when the cursor arrives on a row, and none while it sits
+      // there: a blip per mouse-move event is a rattle, not feedback.
+      if (this.catBtns.hovered && this.catBtns.hovered !== was) this.app.chip.blip();
       return;
     }
     if (phase !== "down") return;
@@ -297,39 +350,71 @@ export class LandsScene implements Scene {
 
       let y = rowsTop;
       for (const c of cats) {
-        // §4.6: `open` is false while the category's first node is locked. A
-        // category with content you cannot start yet is not the same as an empty
-        // one, and the row says which.
-        const empty = c.total === 0 || !c.open;
+        // Nothing is locked (PROTOCOL §4.7): `open` is not consulted, because a
+        // road with streets in it is a road you may walk down today. `empty`
+        // means there is genuinely nothing there — a pack that has not shipped.
+        const empty = c.total === 0;
+        const id = `cat:${c.category}`;
+        if (!this.glow.has(id)) this.glow.set(id, 0);
+        const lit = this.glow.get(id) ?? 0;
         const barW = right[2];
-        fill(g, empty ? Theme.dim : Theme.navy, right[0], y, barW, rowH, empty ? 0.35 : 0.9);
-        fill(g, empty ? Theme.dim : Theme.coin, right[0], y + rowH - 3, barW, 3, empty ? 0.4 : 1);
+        const slide = Math.round(lit * 8 * s);
+        const rx = right[0] + slide;
+        const accent = this.land === "rust" ? RUST : GO;
+
+        fill(g, empty ? Theme.dim : Theme.navy, rx, y, barW, rowH, empty ? 0.35 : 0.9);
+        // The lit face is the land's own colour at a whisper, so hovering GO
+        // and hovering RUST do not feel like the same screen.
+        if (lit > 0.01) fill(g, accent, rx, y, barW, rowH, 0.18 * lit);
+        // A thick bar down the leading edge, which is the thing that actually
+        // reads as "this row is under the cursor" at a glance.
+        fill(g, accent, rx, y, Math.round(4 * s), rowH, 0.35 + 0.65 * lit);
+        fill(g, empty ? Theme.dim : Theme.coin, rx, y + rowH - 3, barW, 3, empty ? 0.4 : 1);
         // The cleared bar: the map's own progress, read straight off the server.
         if (c.total > 0) {
-          fill(g, Theme.admit, right[0], y + rowH - 3, Math.round((barW * c.cleared) / c.total), 3);
+          fill(g, Theme.admit, rx, y + rowH - 3, Math.round((barW * c.cleared) / c.total), 3);
         }
+
+        const tx = rx + Math.round(14 * s);
+        const tw = barW - Math.round(28 * s);
+        const lineH = fonts.small.height;
+        const titleY = y + Math.round(12 * s);
         g.fillStyle = css(empty ? Theme.dim : Theme.cream);
-        printf(
-          g,
-          fonts.button,
-          c.category.toUpperCase(),
-          right[0] + Math.round(10 * s),
-          y + Math.round((rowH - fonts.button.height) / 2),
-          barW,
-          "left",
-        );
+        printf(g, fonts.button, c.category.toUpperCase(), tx, titleY, tw, "left");
+        // What the road is, from the bible. Only when the row is tall enough
+        // to hold it — in a short portrait window the count is what matters.
+        const lineY = titleY + fonts.button.height + Math.round(6 * s);
+        if (rowH > fonts.button.height + lineH * 2 + Math.round(24 * s)) {
+          g.fillStyle = css(Theme.cream, empty ? 0.3 : 0.55 + 0.35 * lit);
+          printf(g, fonts.small, CAT_LINE[c.category], tx, lineY, tw, "left");
+        }
         g.fillStyle = css(empty ? Theme.dim : Theme.coin);
         printf(
           g,
           fonts.stationSm,
-          c.total === 0 ? "EMPTY" : empty ? "LOCKED" : `${c.cleared}/${c.total}  ★${c.stars}`,
-          right[0],
-          y + Math.round((rowH - fonts.stationSm.height) / 2),
-          barW - Math.round(10 * s),
+          empty ? "EMPTY" : `${c.cleared}/${c.total}  ★${c.stars}`,
+          rx,
+          titleY + Math.round(2 * s),
+          barW - Math.round(14 * s),
           "right",
         );
+        // The chevron that says a row is a door. It only exists while the row
+        // is lit, and it nudges with the same value the row slides on.
+        if (lit > 0.02 && !empty) {
+          const cxx = rx + barW - Math.round(16 * s) + lit * Math.round(4 * s);
+          const cy = y + rowH / 2;
+          const r = Math.round(7 * s);
+          g.fillStyle = css(Theme.coin, lit);
+          g.beginPath();
+          g.moveTo(cxx - r, cy - r);
+          g.lineTo(cxx, cy);
+          g.lineTo(cxx - r, cy + r);
+          g.closePath();
+          g.fill();
+        }
+
         this.catBtns.add({
-          id: `cat:${c.category}`,
+          id,
           rect: [right[0], y, barW, rowH],
           label: "",
           dim: empty,

@@ -711,10 +711,7 @@ async fn a_run_is_for_the_player_and_a_submit_is_for_the_record() {
     }
 
     assert!(
-        alice
-            .events
-            .iter()
-            .all(|e| e["type"] != "progress.update"),
+        alice.events.iter().all(|e| e["type"] != "progress.update"),
         "§4.9b: a run announced progress"
     );
 
@@ -728,7 +725,9 @@ async fn a_run_is_for_the_player_and_a_submit_is_for_the_record() {
 
     // The curriculum has them. This is the half that quietly rots: nothing
     // else in the suite would notice if runs stopped being recorded.
-    let history = alice.ok("stats.history", json!({ "quest_id": HELLO })).await;
+    let history = alice
+        .ok("stats.history", json!({ "quest_id": HELLO }))
+        .await;
     assert_eq!(
         history["attempts"].as_array().unwrap().len(),
         RUNS,

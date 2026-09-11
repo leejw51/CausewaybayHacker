@@ -58,6 +58,20 @@ const LANDS: readonly Land[] = ["rust", "go"];
 const CATEGORIES: readonly Category[] = ["basic", "advanced", "hacker"];
 
 /**
+ * Where each of the six maps was left, keyed by land and category.
+ *
+ * Module-level on purpose: the scene is rebuilt every time it is entered — from
+ * the lands screen, from a quest, from a verdict — and a player who switches to
+ * GO·HACKER to look at something and comes back should find the cursor and Mei
+ * where they left them, not at node 1. Six entries, quest ids only, and it does
+ * not outlive the tab.
+ */
+const MENU_LABEL = "ALL MAPS";
+
+const LAST_AT = new Map<string, string>();
+const slot = (land: Land, category: Category): string => `${land}.${category}`;
+
+/**
  * The face at the end of each category, keyed by the quest it guards.
  *
  * By quest id rather than by node number: the number is a position in a pack
@@ -94,6 +108,8 @@ export class MapScene implements Scene {
   private readonly plateIn = new Tween(seconds("panel"));
   /** The land/category switcher's hit rects, rebuilt every frame from `bar()`. */
   private readonly bar = new Buttons();
+  /** Set by `switchTo`, so the next `refresh` restores that map's cursor. */
+  private justSwitched = false;
   private readonly infoIn = new Tween(seconds("panel"), seconds("stagger") * 2);
   private offProgress: (() => void) | null = null;
   private offState: (() => void) | null = null;
@@ -177,7 +193,14 @@ export class MapScene implements Scene {
     await this.refresh();
   }
 
+  /** Park the cursor for this map, so coming back costs nothing. */
+  private remember(): void {
+    const n = this.nodes[this.selected];
+    if (n) LAST_AT.set(slot(this.land, this.category), n.quest_id);
+  }
+
   leave(): void {
+    this.remember();
     this.offProgress?.();
     this.offState?.();
     this.app.chip.music("stop");
@@ -201,6 +224,17 @@ export class MapScene implements Scene {
       }
       this.status = this.nodes.length === 0 ? "no streets here yet" : "";
       if (this.selected >= this.nodes.length) this.selected = 0;
+      // Back to where this map was left, if it has been open before.
+      const was = LAST_AT.get(slot(this.land, this.category));
+      if (first || this.justSwitched) {
+        this.justSwitched = false;
+        const i = was ? this.nodes.findIndex((n) => n.quest_id === was) : -1;
+        if (i >= 0) {
+          this.selected = i;
+          this.meiOn = this.nodes[i].quest_id;
+          this.mei = [this.nodes[i].x, this.nodes[i].y];
+        }
+      }
     } catch {
       this.status = "could not read the map";
     }
@@ -297,41 +331,37 @@ export class MapScene implements Scene {
     const minH = layout.minTouchH();
     const bh = btnBox(f, ["BASIC"], 0, pad, minH)[1];
     const wide = layout.vw - Math.round(16 * s);
-    const landW = LANDS.map((l) => btnBox(f, [l.toUpperCase()], 0, pad, minH)[0]);
-    const catW = CATEGORIES.map((c) => btnBox(f, [c.toUpperCase()], 0, pad, minH)[0]);
+    const w = (label: string) => btnBox(f, [label], 0, pad, minH)[0];
+    const landW = LANDS.map((l) => w(l.toUpperCase()));
+    const catW = CATEGORIES.map((c) => w(c.toUpperCase()));
+    const menuW = w(MENU_LABEL);
     const sum = (a: number[]) => a.reduce((x, y) => x + y, 0) + gap * (a.length - 1);
-    // A wider gap between the two groups than inside them: "which land" and
-    // "which road" are two questions, and a row of five evenly spaced buttons
-    // reads as one list of five.
+    // A wider gap between the groups than inside them: "which land", "which
+    // road" and "show me all of them" are three questions, and a row of six
+    // evenly spaced buttons reads as one list of six.
     const split = gap * 3;
-    const oneLine = sum(landW) + split + sum(catW) <= wide;
     const x0 = Math.round(8 * s);
+    const lay = (widths: number[], y: number, left: number): Rect[] =>
+      widths.map((bw, i) => {
+        const x = left + widths.slice(0, i).reduce((a, b) => a + b + gap, 0);
+        return [x, y, bw, bh] as Rect;
+      });
+    const oneLine = sum(landW) + split + sum(catW) + split + menuW <= wide;
     if (oneLine) {
-      const total = sum(landW) + split + sum(catW);
-      let x = x0 + Math.round((wide - total) / 2);
-      const rows: Rect[] = [];
-      for (const w of landW) {
-        rows.push([x, 0, w, bh]);
-        x += w + gap;
-      }
-      x += split - gap;
-      for (const w of catW) {
-        rows.push([x, 0, w, bh]);
-        x += w + gap;
-      }
+      const total = sum(landW) + split + sum(catW) + split + menuW;
+      const left = x0 + Math.round((wide - total) / 2);
+      const rows = lay(landW, 0, left);
+      const catLeft = left + sum(landW) + split;
+      rows.push(...lay(catW, 0, catLeft));
+      rows.push([catLeft + sum(catW) + split, 0, menuW, bh]);
       return { h: bh, rows };
     }
-    const rows: Rect[] = [];
-    let x = x0 + Math.round((wide - sum(landW)) / 2);
-    for (const w of landW) {
-      rows.push([x, 0, w, bh]);
-      x += w + gap;
-    }
-    x = x0 + Math.round((wide - sum(catW)) / 2);
-    for (const w of catW) {
-      rows.push([x, bh + gap, w, bh]);
-      x += w + gap;
-    }
+    // Two lines: the land and the way out on top, the three roads under them.
+    const topTotal = sum(landW) + split + menuW;
+    const topLeft = x0 + Math.round((wide - topTotal) / 2);
+    const rows = lay(landW, 0, topLeft);
+    rows.push([topLeft + sum(landW) + split, 0, menuW, bh]);
+    rows.push(...lay(catW, bh + gap, x0 + Math.round((wide - sum(catW)) / 2)));
     return { h: bh * 2 + gap, rows };
   }
 
@@ -355,6 +385,11 @@ export class MapScene implements Scene {
         label: c.toUpperCase(),
         lit: c === this.category,
       })),
+      // The way to see all six at once. ESC does the same thing and always
+      // did, but a keystroke printed in the footer is not a control — the
+      // player who wants the chooser is exactly the player who does not yet
+      // know where anything is.
+      { id: "menu", label: MENU_LABEL, lit: false },
     ];
     for (let i = 0; i < labels.length; i++) {
       const [x, ry, w, h] = rows[i];
@@ -393,6 +428,8 @@ export class MapScene implements Scene {
    */
   private switchTo(land: Land, category: Category): void {
     if (land === this.land && category === this.category) return;
+    this.remember();
+    this.justSwitched = true;
     this.land = land;
     this.category = category;
     this.app.chip.select();
@@ -460,7 +497,8 @@ export class MapScene implements Scene {
     if (onBar) {
       if (phase === "down") {
         const [kind, value] = onBar.id.split(":");
-        if (kind === "land") this.switchTo(value as Land, this.category);
+        if (onBar.id === "menu") void this.app.go(new LandsScene(this.app), "back");
+        else if (kind === "land") this.switchTo(value as Land, this.category);
         else this.switchTo(this.land, value as Category);
       }
       return;

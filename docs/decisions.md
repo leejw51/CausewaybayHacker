@@ -2501,3 +2501,100 @@ derived from.
 The second reason is about what a scratchpad is *for*. It is where somebody
 deliberately writes something broken to find out what the compiler says. That
 is the last thing that should be counted against them.
+
+## 2026-09-11 — L2D: a server field, and the client's own store (SPEC §1.1)
+
+### The server field
+
+On the login screen, validated, saved, and applied by dropping the connection
+and coming back on the new address. `Client:set_url` suppresses the reconnect
+backoff across the teardown so the timer cannot race the move and bring the
+*old* server back.
+
+**Precedence, written down because a control that is silently ignored is a
+lie:** `CWBH_SERVER` is a launch-time override and wins for that run;
+otherwise the saved field; otherwise the default. Editing always persists, and
+when an override is active the screen says *"CWBH_SERVER=… is overriding this
+run — the field is saved for next launch"* rather than pretending.
+
+Validation names the fault rather than letting the connection fail mutely:
+
+```
+""                         -> type a server address
+"localhost:5390"           -> needs a scheme: ws://host:port/ws
+"http://127.0.0.1:5390/ws" -> this is a websocket address — try ws://…
+"wss://example.com/ws"     -> wss:// needs TLS, which this client does not have
+"ws://127.0.0.1/ws"        -> needs a port: ws://host:5390/ws
+"ws://:5390/ws"            -> no host before the port
+"ws://127.0.0.1:5390"      -> needs a path: ws://host:5390/ws
+```
+
+`wss://` is refused rather than accepted-and-broken: LuaSocket has no TLS, so
+this client genuinely cannot open one, and a tailnet or an SSH tunnel is the
+answer rather than a scheme change.
+
+Also added: a connection that will not open, with no token for that address,
+now lands on the login screen. Before, a player who typed a wrong address sat
+on the map with a CLOSED badge and nowhere to fix it.
+
+### The store
+
+`~/.causewaybayhackerlove2d`, `0700`/`0600`, append-only JSONL, replayed. The
+four properties the wallet's own suite tests are asserted in
+`tests/test_store.lua`: a malformed line is skipped, a newer `schema` is
+skipped, a crash mid-write costs at worst the last line, and a value is the
+last line that set it.
+
+**The token is per server**, keyed by URL, as §1.1 requires. Switching to a
+second address finds no token and asks; switching back finds the first one
+still there. Verified live.
+
+**Permissions needed the cdylib.** LÖVE has no `chmod` and `love.filesystem`
+is sandboxed to a save directory this store deliberately does not use, so the
+key library grew a `secure` op (ABI 2 → 3). It is the one operation there that
+is not cryptography, and the header says so: it exists because the file holds
+a credential and `0600` is not decorative. The fallback when the library is
+missing is `os.execute("chmod")`, at most twice per launch rather than per
+write; if neither works the store still functions and says so once.
+
+**The old save is migrated once**, not silently discarded. Somebody is playing
+right now with a session and a cleared map behind `love.filesystem`, and
+losing them to a storage change would be a self-inflicted version of the thing
+this game keeps warning players about. The old files are not deleted.
+
+### Two bugs the new tests caught immediately
+
+* **`map.cursor` was never written.** Its field was named `key`, and
+  `check_no_secrets` refuses any field whose name contains "key" — which is
+  there to catch `private_key` and its spellings. The refusal was correct and
+  the field name was wrong; it is `map` now. Nothing in the game would have
+  reported this, it would simply have forgotten where you were, forever.
+* **An append after a torn line spliced onto it.** A crash mid-write leaves a
+  line with no newline; appending straight onto that produced one unparseable
+  line and lost the *good* record as well as the torn one. `append` now starts
+  on a fresh line when the previous one did not end. That is the difference
+  between "a crash costs the last line" and "a crash costs the last line and
+  the next one".
+
+### One note for PM
+
+SPEC §1.1 says "the rules in §1.2 below apply unchanged", but there is no
+§1.2 in `SPEC.md` — §1.1 is followed by §2. The rules were clear enough from
+§1.1's own sentence and from `CausewaybayWallet`'s `store.rs`, which is what
+§1.1 names, so nothing was blocked. Worth either writing §1.2 or pointing the
+sentence at the wallet directly.
+
+## 2026-09-11 — SPEC §1.1 pointed at a section that did not exist
+
+Caught by L2D while implementing it. §1.1 said "the rules in §1.2 below apply
+unchanged" — but §1.2 is in *CausewaybayWallet's* SPEC, not this one; ours goes
+§1.1 straight to §2. The renumbering that was supposed to create it silently
+matched nothing.
+
+Fixed by inlining the JSONL rules so §1.1 stands on its own, with the wallet's
+`store.rs` named as the reference implementation rather than as a load-bearing
+cross-document reference. A spec that cites a section that is not there is
+worse than one that repeats itself.
+
+L2D was right to implement from the sentence plus the wallet's source and flag
+the gap rather than guess at what §1.2 might have said.

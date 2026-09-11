@@ -48,7 +48,8 @@ official release from GitHub instead, and `make run` will use a `love` on
 
 | variable | default | |
 | --- | --- | --- |
-| `CWBH_SERVER` | `ws://127.0.0.1:5390/ws` | where the server is |
+| `CWBH_SERVER` | — | a launch-time override; wins for that run |
+| `CWBH_LOVE2D_HOME` | `~/.causewaybayhackerlove2d` | this client's own store |
 | `CWBH_ORIENT` | — | `portrait` or `landscape` to start pinned that way |
 | `CWBH_FULLSCREEN` | `desktop` | `exclusive` for a real display-mode change |
 | `CWBH_FFI_LIB` | — | an explicit path to `libcwbh_ffi.dylib` |
@@ -138,6 +139,32 @@ inferred from last week's window comes back as a starting guess and is
 re-derived; a mode you pressed F1 for comes back as a pin. Those are different
 things and storing them as the same thing is a real bug — see
 `tests/test_display.lua`.
+
+## The server, and where state lives
+
+There is a **SERVER** field on the login screen — the backend can run on
+`0.0.0.0` so a phone on the same tailnet can reach it, and an environment
+variable is not discoverable from inside a game. Type an address, press
+ENTER: it is validated, saved, and the client drops its connection and comes
+back on the new one. A bad address says what is wrong (`needs a port`,
+`wss:// needs TLS, which this client does not have`) rather than failing to
+connect for unexplained reasons.
+
+**Precedence:** `CWBH_SERVER` is a launch-time override and wins for that
+run; otherwise the saved field; otherwise `ws://127.0.0.1:5390/ws`. Editing
+the field always saves — and when an override is active the screen says so,
+rather than pretending to apply something it will not.
+
+State lives in **`~/.causewaybayhackerlove2d`** (SPEC §1.1), not in LÖVE's
+save directory: `0700` directory, `0600` files, append-only JSONL, state
+derived by replaying the log. It holds the session token, the chosen server,
+the orientation and fullscreen pins, and where each map was left — and **no
+key material, ever**. An existing LÖVE save is migrated across once.
+
+**The token is stored per server.** A token minted by one server means
+nothing to another, so pointing the client at a new address asks you to sign
+in rather than sending a stranger's credential and getting an `unauthorized`
+you cannot explain. Switching away and back leaves you signed in to both.
 
 ## Testing
 

@@ -20,6 +20,11 @@ pub fn pack_id() -> String {
     format!("pack_{}", suffix())
 }
 
+/// A playground scratchpad (PROTOCOL §5.9).
+pub fn snippet_id() -> String {
+    format!("pg_{}", suffix())
+}
+
 /// A quest id is `<land>.<category>.<node:02d>.<slug>` (SPEC §4.1). The
 /// importer refuses a pack whose ids disagree with its own land/category, so
 /// the check lives here rather than in a comment.

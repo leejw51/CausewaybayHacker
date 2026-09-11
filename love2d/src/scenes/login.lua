@@ -49,7 +49,7 @@ local App = require("src.app")
 local Login = {}
 Login.__index = Login
 
-local FIELDS = { "secret", "name" }
+local FIELDS = { "secret", "name", "server" }
 
 function Login.new(app)
   return setmetatable({
@@ -66,6 +66,11 @@ function Login.new(app)
     -- new_show
     words = nil,       -- the generated phrase, split; dropped on leaving
     new_address = nil,
+    -- The **saved** server, editable. Not necessarily the effective one: a
+    -- launch-time override wins for the run and the panel says so rather
+    -- than overwriting what the player typed.
+    server = "",
+    server_error = nil,
   }, Login)
 end
 
@@ -74,6 +79,8 @@ function Login:enter()
   if remembered and remembered.name then
     self.name = remembered.name
   end
+  -- The saved value, not the effective one — see `draw_signin`.
+  self.server = require("src.store").saved_server() or self.app.server or ""
   if self.app.session.last_error then
     self.error = self.app.session.last_error
   end
@@ -105,6 +112,24 @@ function Login:masked()
   -- Word boundaries stay visible: a player counting to twelve should be able
   -- to, without reading the words.
   return (self.secret:gsub("%S", "*"))
+end
+
+--- Apply and persist whatever is in the server field.
+---
+--- `App:set_server` validates, persists, rebinds the session to that server's
+--- own token (SPEC §1.1) and drops the connection. A refusal comes back as a
+--- sentence and is shown under the field, because "failing to connect for
+--- unexplained reasons" is the thing this control exists to avoid.
+function Login:apply_server()
+  local ok, why = self.app:set_server(self.server)
+  if not ok then
+    self.server_error = why
+    SFX.play("locked")
+    return
+  end
+  self.server_error = nil
+  SFX.play("select")
+  self.app:toast(type(why) == "string" and why or ("server: " .. self.server))
 end
 
 function Login:can_submit()
