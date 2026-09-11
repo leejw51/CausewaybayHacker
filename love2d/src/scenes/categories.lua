@@ -91,6 +91,78 @@ end
 --- to the right of it, and the counts sit clear on the other side. Assuming
 --- the empty quarter was still there would have put the word CATEGORY on top
 --- of a crate of oranges.
+--- Every measurement the rows are drawn from, taken from the type at the
+--- current step. A function of the canvas and the rows rather than of the
+--- scene, so `tests/test_screens.lua` can ask what the answer *is* at every
+--- step without drawing anything.
+---
+---   * the gutter is the widest category name plus its padding, never less
+---     than the authored share of the row, and never so wide that the
+---     emblem has no band left — when the name alone needs the row, the
+---     band gives way, because a name wrapped one letter to a line is not a
+---     name;
+---   * the row is as tall as the name, one line of blurb and the plates
+---     need, and taller when the screen has the room;
+---   * the counts plate is as wide as `NN / NN` at its size, and the right
+---     margin follows it.
+function Categories.metrics(vw, vh, rows)
+  local title_y = 22
+  local title_h = UI.lineHeight(16)
+  local y0 = title_y + title_h + 18
+  local pad = Layout.isPortrait() and 12 or 60
+  local w = vw - pad * 2
+
+  local name_h, blurb_h = UI.lineHeight(13), UI.lineHeight(7)
+  local plate_h = name_h + 8
+  local count_h = UI.lineHeight(10) + 4 + 7 + 10
+  local widest = 0
+  for _, cat in ipairs(rows) do
+    widest = math.max(widest, UI.textWidth(tostring(cat.category or ""):upper(), 13))
+  end
+  local count_w = math.max(76, UI.textWidth("00 / 00", 10) + 16)
+  local right = count_w + 20
+
+  local gutter = math.max(math.floor(math.min(150, w * 0.28)), widest + 28)
+  -- The band wants at least a square of the row; below that it is a sliver
+  -- of a painting and the name takes the width instead.
+  local band_min = 120
+  if gutter > w - right - band_min then gutter = w - right end
+  -- And when the name does not fit beside the counts either — the largest
+  -- type step in a narrow portrait — the counts go **under** the name, on
+  -- the row's second line, and the name gets the whole row.
+  local stacked = widest + 28 > w - right
+  if stacked then gutter = w - 12 end
+  local label_w = math.max(40, gutter - 24)
+  local count_y = stacked and (12 + name_h + 8) or 8
+
+  -- Rows: what the type needs, stretched to what the screen has.
+  local n = math.max(1, #rows)
+  local bottom = vh - UI.footerHeight() - 12
+  local need = 12 + name_h + 4 + blurb_h + 14
+  need = math.max(need, 8 + math.max(plate_h, count_h) + 8 + 22)
+  if stacked then need = math.max(need, count_y + count_h + 10) end
+  local avail = math.floor((bottom - y0) / n) - 12
+  local rh = math.max(need, math.min(math.max(84, avail), math.max(128, need)))
+  rh = math.min(rh, math.max(need, avail))
+
+  -- Blurb lines that fit under the name inside the row, above the badge
+  -- strip at the bottom.
+  local blurb_y = 12 + name_h + 4
+  local blurb_lh = blurb_h + 2
+  local blurb_lines = math.max(0, math.floor((rh - blurb_y - 12) / blurb_lh))
+  -- Stacked, the blurb would run under the counts plate: it goes.
+  if stacked then blurb_lines = 0 end
+
+  return {
+    title_y = title_y, title_h = title_h, y0 = y0,
+    pad = pad, w = w, rh = rh, gutter = gutter, right = right,
+    label_w = label_w, plate_h = plate_h,
+    blurb_y = blurb_y, blurb_lh = blurb_lh, blurb_lines = math.min(blurb_lines, 3),
+    count_w = count_w, count_h = count_h, count_y = count_y,
+    stacked = stacked, widest = widest,
+  }
+end
+
 function Categories:draw()
   local vw, vh = Layout.vw, Layout.vh
   Assets.cover(Assets.pick("bg_times", "bg_flat"), 0, 0, vw, vh)
@@ -101,19 +173,24 @@ function Categories:draw()
     local tint = Theme.land[self.land] or Theme.coin
   local t = Anim.now()
 
+  -- Every size on this screen is taken from the type it has to hold, at
+  -- the player's step. It used to be a set of numbers — a 150 px gutter, a
+  -- 40 px plate, rows starting at y=66 — that were right at the authored
+  -- size and wrong at every other: at step 4 in portrait the category name
+  -- was 65 px tall in a 150 px gutter, and wrapped one letter to a line.
+  -- The browser client measures the same way (`lands.ts`: the row is the
+  -- taller of a touch target and the type it holds).
+  local m = Categories.metrics(vw, vh, self.categories or {})
+
   -- The land's own mascot beside the title, idling, so the screen says which
   -- land it is without reading.
-  Assets.sprite(MASCOT[self.land], 40, 52 + Anim.bob(t, { amount = 2 }), 44)
-  UI.text(self.land:upper() .. " LAND", 72, 22, 16, tint)
+  Assets.sprite(MASCOT[self.land], 40, m.title_y + m.title_h * 0.9 + Anim.bob(t, { amount = 2 }),
+    math.max(44, m.title_h * 1.4))
+  UI.text(self.land:upper() .. " LAND", 72, m.title_y, 16, tint)
 
   local rows = self.categories or {}
-  local pad = Layout.isPortrait() and 12 or 60
-  local w = vw - pad * 2
-  -- Taller rows: the emblems are 3:1 and a short row shows very little of
-  -- one. This is the number the art wants rather than the number the old
-  -- text rows wanted.
-  local rh = math.min(128, math.max(84, (vh - 120) / math.max(1, #rows) - 12))
-  local y = 66
+  local pad, w, rh = m.pad, m.w, m.rh
+  local y = m.y0
 
   for i, cat in ipairs(rows) do
     local selected = i == self.cursor
@@ -133,8 +210,7 @@ function Categories:draw()
     })
 
     -- The label gutter on the left, then the band, then the counts.
-    local gutter = math.floor(math.min(150, w * 0.28))
-    local right = 96
+    local gutter, right = m.gutter, m.right
     local band_x = pad + gutter
     local band_w = w - gutter - right
     -- **Adapted, not assumed.** The emblems are 384x128 — 3:1 — and DESIGN
@@ -145,7 +221,9 @@ function Categories:draw()
     -- never runs under the label, with the panel showing through beside it.
     local emblem = ("emblem_%s_%s"):format(self.land, cat.category)
     local image = Assets.image(emblem)
-    if band_w > 40 and image then
+    if m.stacked then
+      -- The name has the row; there is no band to draw a painting in.
+    elseif band_w > 40 and image then
       local iw, ih = image:getDimensions()
       local es = (rh - 8) / ih
       local ew = iw * es
@@ -169,34 +247,46 @@ function Categories:draw()
 
     local color = cat.open and Theme.cream or Theme.dim
     UI.setColor(Theme.ink, 0.55)
-    love.graphics.rectangle("fill", pad + 6, ry + 8, gutter - 4, 40)
+    love.graphics.rectangle("fill", pad + 6, ry + 8, gutter - 4, m.plate_h)
     love.graphics.setColor(1, 1, 1, 1)
     -- The gutter plate's width, not the whole row: to its right is the
     -- mascot, and a blurb given the row would be drawn underneath it.
-    local blurb_w = math.max(60, band_x - (pad + 14) - 10)
+    local blurb_w = m.label_w
     UI.text(cat.category:upper(), pad + 14, ry + 12, 13, color, "left", blurb_w)
-    UI.text(I18n.t(BLURB[cat.category] or ""), pad + 14, ry + 32, 7,
-      Theme.withAlpha(color, 0.75), "left", blurb_w)
+    -- Only the blurb lines the row has room for, and none when it has room
+    -- for none: a blurb wrapped to eight lines is drawn through the plate
+    -- under it, and one clipped mid-sentence says less than nothing.
+    if m.blurb_lines > 0 then
+      local lines = UI.wrap(I18n.t(BLURB[cat.category] or ""), blurb_w, 7)
+      for k = 1, math.min(#lines, m.blurb_lines) do
+        UI.text(lines[k], pad + 14, m.blurb_y + ry + (k - 1) * m.blurb_lh, 7,
+          Theme.withAlpha(color, 0.75))
+      end
+    end
 
     -- The counts sit on their own plate, because behind them is artwork and
     -- a number over a painted crate is a number nobody can read.
     local progress = ("%d / %d"):format(cat.cleared, cat.total)
-    local pw = math.max(76, UI.textWidth(progress, 10) + 12)
+    local pw = m.count_w
     UI.setColor(Theme.ink, 0.72)
-    love.graphics.rectangle("fill", pad + w - 14 - pw, ry + 8, pw, 34)
+    local cy = ry + m.count_y
+    love.graphics.rectangle("fill", pad + w - 14 - pw, cy, pw, m.count_h)
     love.graphics.setColor(1, 1, 1, 1)
-    UI.text(progress, pad + w - 8 - pw + (pw - UI.textWidth(progress, 10)) / 2,
-      ry + 12, 10, color)
-    UI.bar(pad + w - 10 - pw + 4, ry + 30, pw - 12, 7,
+    UI.text(progress, pad + w - 14 - pw + (pw - UI.textWidth(progress, 10)) / 2,
+      cy + 4, 10, color)
+    UI.bar(pad + w - 14 - pw + 6, cy + 4 + UI.lineHeight(10) + 4, pw - 12, 7,
       cat.total > 0 and cat.cleared / cat.total or 0,
       cat.open and Theme.admit or Theme.dim)
 
+    -- The badge keeps clear of the counts plate, which sits at the bottom
+    -- right when the row is stacked.
+    local bx = m.stacked and (pad + w - 14 - pw - 36) or (pad + w - 40)
     if cat.total > 0 and cat.cleared >= cat.total then
-      Assets.marker("badge_cleared", pad + w - 40, ry + rh - 22, 30)
+      Assets.marker("badge_cleared", bx, ry + rh - 22, 30)
     elseif not cat.open then
       -- Only a category that genuinely cannot be entered. Nothing on the map
       -- is locked (§4.7); this is for a pack that failed to import.
-      Assets.marker("badge_locked", pad + w - 40, ry + rh - 22, 26, { alpha = 0.85 })
+      Assets.marker("badge_locked", bx, ry + rh - 22, 26, { alpha = 0.85 })
       UI.text(I18n.t("UNAVAILABLE"), pad + 14, ry + rh - 18, 7, Theme.dim)
     end
 
@@ -227,10 +317,12 @@ end
 
 function Categories:mousepressed(x, y)
   local rows = self.categories or {}
-  local pad = Layout.isPortrait() and 16 or 80
-  local w = Layout.vw - pad * 2
-  local rh = math.min(128, math.max(84, (Layout.vh - 120) / math.max(1, #rows) - 12))
-  local ry = 66
+  -- The same numbers the draw used. This had its own copy — with a different
+  -- margin, even — so a press was tested against rows that were not where
+  -- the rows were drawn.
+  local m = Categories.metrics(Layout.vw, Layout.vh, rows)
+  local pad, w, rh = m.pad, m.w, m.rh
+  local ry = m.y0
   for i = 1, #rows do
     if x >= pad and x <= pad + w and y >= ry and y <= ry + rh then
       if self.cursor ~= i then

@@ -11,6 +11,10 @@
 #   love2d    the LÖVE client: the key library (Rust), the headless suite under
 #             LuaJIT (no window — the layout cases skip themselves and say so),
 #             and the .love archive, checked for every module and painting.
+#   love2d-window
+#             the same client with a window, under Xvfb: the layout and scene
+#             cases, and the type sweep — every type step in both orientations
+#             through a real RUN against the server built from this checkout.
 #   content   the slow gate: every reference solution is accepted and no starter
 #             is, and every §7.1 mistake fixture still compiles to what it claims.
 #
@@ -177,6 +181,96 @@ jobs:
       - run: make -C love2d test-headless
       # The archive a release ships, checked for every module and painting.
       - run: make -C love2d love-file
+
+  # The LÖVE client with a window — the layout and scene cases the headless
+  # job has to skip, and the type sweep: every type step in both orientations
+  # through lands → categories → map → quest, with a real RUN against a real
+  # server and the geometry asserted. Ubuntu's `love` package is 11.5, the
+  # version the client is written for; Xvfb is the window server the runner
+  # does not have, and SDL's dummy audio driver stands in for the sound card
+  # it does not have either. The server is the one built from this checkout,
+  # started on a temporary home with the content packs imported.
+  love2d-window:
+    name: LÖVE client (windowed suite and type sweep, under Xvfb)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      # The sweep RUNs a Go program, so the server needs Go to compile it.
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: |
+            backend
+            love2d/ffi
+
+      - name: Install LÖVE, LuaJIT and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends love luajit xvfb zip rsync
+          love --version
+
+      - run: make -C love2d ffi
+      - run: cd backend && cargo build -p cwbhacker
+
+      - name: Start the server
+        run: |
+          home=$(mktemp -d)
+          echo "CWBH_HOME=$home" >> "$GITHUB_ENV"
+          nohup backend/target/debug/cwbhacker serve --bind 127.0.0.1:5390 \
+            --home "$home" --content content --strict-content \
+            > "$home/server.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:5390/ >/dev/null 2>&1 && break
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:5390/ >/dev/null || { cat "$home/server.log"; exit 1; }
+          grep -q "content imported" "$home/server.log" || { cat "$home/server.log"; exit 1; }
+
+      - name: The suite, with a window
+        env:
+          SDL_AUDIODRIVER: dummy
+        run: xvfb-run -a -s "-screen 0 1280x800x24" make -C love2d test
+
+      - name: The type sweep, against the server
+        env:
+          SDL_AUDIODRIVER: dummy
+          CWBH_SERVER: ws://127.0.0.1:5390/ws
+        run: >
+          xvfb-run -a -s "-screen 0 1280x1000x24"
+          make -C love2d drive SCRIPT=tests/drive/typesweep.lua ARGS="--home $(mktemp -d)"
+
+      - name: The story and title drives
+        env:
+          SDL_AUDIODRIVER: dummy
+          CWBH_SERVER: ws://127.0.0.1:5390/ws
+        run: |
+          home=$(mktemp -d)
+          xvfb-run -a make -C love2d drive SCRIPT=tests/drive/story.lua ARGS="--home $home"
+          xvfb-run -a make -C love2d drive SCRIPT=tests/drive/story.lua ARGS="--home $home"
+
+      - name: Server log
+        if: always()
+        run: tail -50 "$CWBH_HOME/server.log" || true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: love2d-screens
+          path: ~/.local/share/love/causewaybay-hacker/*.png
+          if-no-files-found: ignore
+          retention-days: 7
 
   content:
     name: Content (solutions, starters, mistake fixtures)

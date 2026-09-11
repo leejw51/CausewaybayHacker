@@ -8,6 +8,8 @@
 
 local T = require("tests.framework")
 local errors = require("src.net.errors")
+local UI = require("src.ui")
+local Assets = require("src.assets")
 
 local function source_of(path)
   local fh = io.open(path, "r")
@@ -119,6 +121,80 @@ return function()
         end
       end
     end
+  end)
+
+  T.section("screens — laid out from the type, at every step")
+
+  T.case("the categories row fits its widest name at every type step and shape", function()
+    if not (love and love.graphics) then
+      T.skip("categories metrics", "needs fonts, so needs LÖVE")
+      return
+    end
+    local Layout = require("src.layout")
+    local Categories = require("src.scenes.categories")
+    local rows = {
+      { category = "basic", cleared = 0, total = 18, open = true },
+      { category = "advanced", cleared = 0, total = 17, open = true },
+      { category = "hacker", cleared = 0, total = 34, open = true },
+    }
+    local was_font, was_mode = Layout.font, Layout.mode
+    for _, step in ipairs({ 1, 2, 3, 4 }) do
+      Layout.font = step
+      for _, shape in ipairs({ { "landscape", 1280, 720 }, { "portrait", 720, 1280 }, { "portrait", 1080, 1920 } }) do
+        Layout.mode = shape[1]
+        local m = Categories.metrics(shape[2], shape[3], rows)
+        local tag = ("step %d %s %dx%d"):format(step, shape[1], shape[2], shape[3])
+        -- The report: "Bgrama…" down the left edge — a name wrapped one
+        -- letter to a line because the gutter was a number.
+        T.ok(m.label_w >= m.widest, tag .. ": the label column holds the widest name")
+        T.ok(m.rh >= 12 + UI.lineHeight(13) + 4 + UI.lineHeight(7) + 14,
+          tag .. ": the row is at least the name and a line of blurb")
+        T.ok(m.y0 + #rows * (m.rh + 12) - 12 <= shape[3] - UI.footerHeight(),
+          tag .. ": three rows end above the footer")
+        T.ok(m.count_w >= UI.textWidth("00 / 00", 10), tag .. ": the counts plate holds NN / NN")
+        T.ok(m.y0 > m.title_y + m.title_h, tag .. ": the first row starts under the title")
+      end
+    end
+    Layout.font, Layout.mode = was_font, was_mode
+  end)
+
+  T.case("the quest console is inside the well and clear of the buttons at every step", function()
+    if not (love and love.graphics) then
+      T.skip("quest console", "needs fonts, so needs LÖVE")
+      return
+    end
+    local Layout = require("src.layout")
+    local Quest = require("src.scenes.quest")
+    local was_font, was_mode, was_vw, was_vh = Layout.font, Layout.mode, Layout.vw, Layout.vh
+    local app = { session = { authed = true }, land = "go", category = "basic" }
+    for _, step in ipairs({ 1, 2, 4 }) do
+      Layout.font = step
+      for _, shape in ipairs({ { "landscape", 1280, 720 }, { "portrait", 720, 1280 }, { "portrait", 720, 1000 } }) do
+        Layout.mode, Layout.vw, Layout.vh = shape[1], shape[2], shape[3]
+        local q = Quest.new(app)
+        q.quest = { id = "x", land = "go", tests = { visible = {}, hidden_count = 2 } }
+        -- A finished run that failed to compile: the outcome strip is up.
+        q.run_attempt = { verdict = "compile_error", tests_passed = 0, tests_total = 1 }
+        q.show_log = true
+        local _, well = q:panes()
+        local band = q:button_band(well)
+        local c = q:console_rect(well, band)
+        local tag = ("step %d %s %dx%d"):format(step, shape[1], shape[2], shape[3])
+        T.ok(c.open, tag .. ": a run that came back opens the console")
+        T.ok(c.x >= well.x and c.x + c.w <= well.x + well.w, tag .. ": the console is inside the well, across")
+        T.ok(c.y >= well.y, tag .. ": the console starts inside the well")
+        T.ok(c.y + c.h <= math.min(band.by, band.ly) - band.cap - 6,
+          tag .. ": the console ends above the caption row and the buttons")
+        T.ok(c.log_rows >= 1,
+          tag .. ": under the outcome strip there is at least one log row")
+        T.ok(c.reserve == c.h + 10, tag .. ": the code rows give up exactly the console")
+        -- No run at all: nothing is reserved, and the screen is what it was.
+        q.run_attempt, q.log, q.running_mode = nil, nil, nil
+        local none = q:console_rect(well, band)
+        T.ok(not none.open and none.reserve == 0, tag .. ": with nothing to show, no console")
+      end
+    end
+    Layout.font, Layout.mode, Layout.vw, Layout.vh = was_font, was_mode, was_vw, was_vh
   end)
 
   T.section("screens — stats gives `cleared_since` its weight")

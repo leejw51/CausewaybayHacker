@@ -547,8 +547,15 @@ function Quest:draw()
   -- It is drawn beside its id, in the land's tint, so a Korean player reads
   -- it as the identifier it is rather than as a sentence somebody forgot.
   local title = self.quest and self.quest.title or (self.error or I18n.t("loading…"))
+  -- Clipped short of the right-hand cluster rather than printed through it:
+  -- at the largest type step a title is wider than a portrait header.
+  local cluster = self.quest and (UI.textWidth(I18n.t("DIFFICULTY") .. " ", 7)
+    + math.max(UI.pipsWidth(math.max(6, math.floor(math.max(10, math.floor(UI.lineHeight(7) * 0.8)) * 0.6))),
+      3 * (math.max(10, math.floor(UI.lineHeight(7) * 0.8)) + 3)) + 24) or 0
+  love.graphics.setScissor(0, 0, math.max(40, vw - cluster - 12), head)
   UI.text(title, 12, row1, 13, tint)
   UI.text(self.quest_id or "", 12, row2, 7, Theme.withAlpha(Theme.cream, 0.55))
+  love.graphics.setScissor()
   self:draw_clock(vw)
 
   if self.quest then
@@ -570,8 +577,8 @@ function Quest:draw()
   self:draw_brief(brief, tint)
   self:draw_editor(code, tint)
 
-  if self.show_log and (self.running_mode or self.log or self.run_attempt) then
-    self:draw_run_overlay()
+  if self:console_open() then
+    self:draw_run_overlay(self.console_rect_drawn)
   end
 
   -- **Not** a second listing of F5, F10 and F2. Those three are printed on
@@ -745,6 +752,17 @@ function Quest:button_band(rect)
   local bh = math.max(28, UI.lineHeight(9) + 12)
   local gap = 22
   local want = math.max(UI.textWidth(run_label, 9), UI.textWidth(submit_label, 9)) + 20
+  -- A label wider than its button is printed through the neighbour. When
+  -- the pair cannot have the width their full labels want, the key comes
+  -- off — `RUN` and `SUBMIT` — rather than the word: the keys are in the
+  -- footer's hint as well, and the word is what the button is.
+  local function bare(label) return (label:gsub("%s%s+.*$", "")) end
+  local room_pair = math.floor((rect.w - 30 - gap - 100 - 10) / 2)
+  if want > room_pair then
+    run_label = self.running_mode == "quest.run" and run_label or bare(run_label)
+    submit_label = self.running_mode == "quest.submit" and submit_label or bare(submit_label)
+    want = math.max(UI.textWidth(run_label, 9), UI.textWidth(submit_label, 9)) + 20
+  end
   -- The left-hand cluster is two buttons now, and both are measured from
   -- their own labels for the reason the pair on the right is: `SOLVE
   -- SHIFT-F7` in Czech is not `SOLVE  SHIFT-F7` in English, and a width
@@ -779,6 +797,14 @@ function Quest:button_band(rect)
   -- be reached by a press that was aimed a centimetre wide of RUN.
   local sw = UI.textWidth(solve_label, 8) + 16
   local fw = UI.textWidth(format_label, 8) + 16
+  -- The same rule for the left pair: when SOLVE and FORMAT with their keys
+  -- do not fit a row of the well, the keys go.
+  if sw + 8 + fw > rect.w - 20 then
+    solve_label = self.solving and solve_label or bare(solve_label)
+    format_label = self.formatting and format_label or bare(format_label)
+    sw = UI.textWidth(solve_label, 8) + 16
+    fw = UI.textWidth(format_label, 8) + 16
+  end
   local left_room = rx - rect.x - 20
   -- Which row the two of them sit on. Beside RUN and SUBMIT when they fit
   -- there; **on their own row above** when they do not, which is portrait in
@@ -829,10 +855,20 @@ function Quest:draw_editor(rect, tint)
   -- unindented line and `1` reads as part of `fn`.
   local gutter = font:getWidth("0000 ")
   local band = self:button_band(rect)
-  local rows = math.max(1, math.floor((rect.h - 12 - band.reserve) / line_h))
+  -- The console — the run's stages, its log and what it came back with —
+  -- is **part of the layout, not a float**. It used to be a panel pinned to
+  -- the bottom of the screen at a fixed 300 px, which in portrait sat on top
+  -- of the button band and its captions: the very buttons a player needs
+  -- after reading "does not compile" were under the compiler's output. The
+  -- browser client subtracts a console height from the editor before laying
+  -- anything out (`consoleH` in `frontend/src/scenes/quest.ts`), and this is
+  -- the same rule: the code rows give up the space, the band keeps its row.
+  local console = self:console_rect(rect, band)
+  local rows = math.max(1, math.floor((rect.h - 12 - band.reserve - console.reserve) / line_h))
   self.editor:ensure_visible(rows)
   self.visible_rows = rows
   self.editor_rect = rect
+  self.console_rect_drawn = console.open and console or nil
   self.line_h = line_h
   self.gutter = gutter
   self.mono_font = font
@@ -959,11 +995,13 @@ function Quest:draw_editor(rect, tint)
   -- a warning and this is a price. The rest of the story — that nothing is
   -- recorded by asking — is in the note the press itself puts up, where
   -- somebody is actually looking.
-  UI.text(self.solve_unsupported and I18n.t("no answer key here")
-      or I18n.t("costs a star"),
-    vx, ly - cap, 7,
-    Theme.withAlpha(self.solve_unsupported and Theme.dim or Theme.coin, 0.85),
-    "left", sw)
+  -- One line, or nothing: a caption wrapped to two lines lands on the
+  -- button it captions.
+  local price = self.solve_unsupported and I18n.t("no answer key here") or I18n.t("costs a star")
+  if UI.textWidth(price, 7) <= sw then
+    UI.text(price, vx, ly - cap, 7,
+      Theme.withAlpha(self.solve_unsupported and Theme.dim or Theme.coin, 0.85))
+  end
 
   -- On the caption row with `1 sample` and `+2 hidden`, not eighteen pixels
   -- off the bottom of the well — which put it *inside* the button band, so
@@ -1033,41 +1071,144 @@ function Quest:draw_editor(rect, tint)
   end
 end
 
---- The run overlay: the four stages, then whatever has streamed in.
-function Quest:draw_run_overlay()
-  local vw, vh = Layout.vw, Layout.vh
-  local w = math.min(vw - 40, Layout.isPortrait() and (vw - 24) or 620)
-  local h = math.min(vh - 120, 300)
-  local x = (vw - w) / 2
-  local y = vh - h - 64
+--- How a console `h` tall is divided once the outcome strip has taken
+--- `strip_h`: the chrome (the stage names, their bar, and the F8 hint) and
+--- the log rows under it. The chrome gives way before the log does — at the
+--- largest type step in a short landscape window a full set of stage names
+--- would leave no row for the one line that says what went wrong, and the
+--- stage names are the least of it once the run is over. Returns the chrome
+--- height, whether the stage row is drawn, and the number of log rows.
+function Quest.console_split(h, strip_h, line_h)
+  local left = h - strip_h
+  local full, tight = 52, 12
+  if left - full >= line_h then
+    return full, true, math.floor((left - full) / line_h)
+  end
+  return tight, false, math.max(0, math.floor((left - tight) / line_h))
+end
+
+--- Whether the console has anything to show. `show_log` is the player's
+--- toggle (F8); it only opens when there is a run to look at.
+function Quest:console_open()
+  return self.show_log and (self.running_mode ~= nil or self.log ~= nil or self.run_attempt ~= nil)
+end
+
+--- Where the console goes: inside the well, above the button band and its
+--- caption row, and above the note plate when one is up. `reserve` is what
+--- the code rows give up for it — zero when it is closed, so a screen with
+--- no run in flight is exactly the screen it always was.
+---
+--- A fraction of the well rather than a fixed height, and a larger one in
+--- portrait (the browser's 0.36 / 0.32): a portrait well is tall and narrow,
+--- and a compiler error wraps to more lines there. Floored at four log rows
+--- so a short landscape window still shows the line that matters.
+function Quest:console_rect(rect, band)
+  if not self:console_open() then
+    return { open = false, reserve = 0 }
+  end
+  local mono = Assets.mono(Layout.codeSize(16))
+  local line_h = mono:getHeight()
+  local frac = Layout.isPortrait() and 0.36 or 0.32
+  local want = math.floor(rect.h * frac)
+  -- Above the caption row, and above the note plate if one is showing.
+  local top_of_band = math.min(band.by, band.ly) - band.cap - 6
+  local said = self.format_problem or self.format_note or self:solve_said()
+  if said then
+    local lines = UI.wrap(said, rect.w - 28, 7)
+    local lh = UI.lineHeight(7) + (I18n.is_cjk() and 5 or 2)
+    top_of_band = top_of_band - math.min(#lines, 5) * lh - 10
+  end
+  local bottom = top_of_band - 6
+  -- Everything the well has above the band, keeping two code rows when it
+  -- can; when it cannot, the console may take the rows too — a player who
+  -- pressed RUN wants the answer, and F8 gives the code back.
+  local code_line = Assets.mono(Layout.codeSize(18)):getHeight()
+  local max_h = bottom - (rect.y + 6) - 6
+  local kept = bottom - (rect.y + 6 + 2 * code_line) - 6
+  -- The outcome strip, shrunk to what the console can hold with one log row
+  -- under it, so the floor below is a floor that fits.
+  local strip_h = 0
+  if not self.running_mode then
+    local _, sh = self:outcome_note(rect.w - 8, math.max(0, max_h - 12 - line_h))
+    strip_h = sh
+  end
+  local floor_h = strip_h + 52 + 4 * line_h
+  local h = math.max(floor_h, want)
+  -- The floor wins over the fraction, the kept code rows win over the
+  -- floor while they can, and the well wins over everything: nothing is
+  -- ever drawn outside it.
+  if floor_h <= kept then
+    h = math.min(math.max(floor_h, math.min(h, kept)), kept)
+  else
+    h = math.min(math.max(floor_h, strip_h + 12 + line_h), max_h)
+  end
+  h = math.max(0, h)
+  local _, _, log_rows = Quest.console_split(h, strip_h, line_h)
+  return {
+    open = true,
+    x = rect.x + 4, y = bottom - h, w = rect.w - 8, h = h,
+    strip_h = strip_h, log_rows = log_rows,
+    -- What the rows lose: the console's own height plus the gap under it.
+    reserve = h + 10,
+  }
+end
+
+--- The run console: what the run came back with (once it has), the four
+--- stages, then whatever has streamed in. Drawn into the rect `console_rect`
+--- reserved inside the well — never over the buttons, never over the code
+--- rows that were laid out around it.
+function Quest:draw_run_overlay(rect)
+  if not rect then return end
+  local x, y, w, h = rect.x, rect.y, rect.w, rect.h
 
   UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.ink, 0.96), tint = Theme.coin })
 
-  local stage_index = STAGES[self.stage or ""] or 0
-  local names = { "QUEUED", "COMPILING", "RUNNING", "JUDGING" }
-  local sx = x + 12
-  for i, name in ipairs(names) do
-    local done = i < stage_index
-    local now = i == stage_index
-    local color = done and Theme.admit or (now and Theme.coin or Theme.dim)
-    UI.text(name, sx, y + 10, 8, color)
-    sx = sx + UI.textWidth(name, 8) + 14
-  end
-  local ms = ("%dms"):format(math.floor(self.elapsed_ms))
-  UI.text(ms, x + w - 12 - UI.textWidth(ms, 8), y + 10, 8, Theme.withAlpha(Theme.cream, 0.7))
-  if self.queued and self.queued > 0 then
-    UI.text(("%d ahead"):format(self.queued), x + 12, y + 24, 7, Theme.coin)
-  end
-
-  UI.bar(x + 12, y + 26, w - 24, 6, stage_index / 4, Theme.coin)
-
+  -- The outcome strip takes the top of the console once the run has come
+  -- back, and the stages and the log move down under it. It used to be
+  -- drawn *above* the console, over the player's code — the one surface
+  -- this screen must never print through.
   -- The compiler's own words, at the player's step: this is code too, and
   -- somebody who made the editor bigger did it because 18px was hard to read.
   local font = Assets.mono(Layout.codeSize(16))
-  love.graphics.setFont(font)
   local line_h = font:getHeight()
-  local top = y + 40
-  local rows = math.floor((h - 52) / line_h)
+
+  local head = 0
+  if self.run_attempt and not self.running_mode then
+    head = self:draw_run_outcome(x, y, w, h - 12 - line_h)
+    y = y + head
+    h = h - head
+  end
+  local chrome, stages, rows = Quest.console_split(h + head, head, line_h)
+  self.console_log_rows = rows
+
+  local stage_index = STAGES[self.stage or ""] or 0
+  if stages then
+    local names = { "QUEUED", "COMPILING", "RUNNING", "JUDGING" }
+    local ms = ("%dms"):format(math.floor(self.elapsed_ms))
+    -- The four names, or — when they would run into the timer — only the
+    -- one the run is on. The bar under them says the same thing either way.
+    local total = 0
+    for _, name in ipairs(names) do total = total + UI.textWidth(name, 8) + 14 end
+    local fits = x + 12 + total < x + w - 12 - UI.textWidth(ms, 8) - 8
+    local sx = x + 12
+    for i, name in ipairs(names) do
+      local done = i < stage_index
+      local now = i == stage_index
+      if fits or now then
+        local color = done and Theme.admit or (now and Theme.coin or Theme.dim)
+        UI.text(name, sx, y + 10, 8, color)
+        sx = sx + UI.textWidth(name, 8) + 14
+      end
+    end
+    UI.text(ms, x + w - 12 - UI.textWidth(ms, 8), y + 10, 8, Theme.withAlpha(Theme.cream, 0.7))
+    if self.queued and self.queued > 0 then
+      UI.text(("%d ahead"):format(self.queued), x + 12, y + 24, 7, Theme.coin)
+    end
+    UI.bar(x + 12, y + 26, w - 24, 6, stage_index / 4, Theme.coin)
+  end
+
+  love.graphics.setFont(font)
+  local top = y + (stages and 40 or 6)
 
   local lines = {}
   if self.log then
@@ -1109,14 +1250,12 @@ function Quest:draw_run_overlay()
   love.graphics.setScissor()
   love.graphics.setColor(1, 1, 1, 1)
 
-  if self.log and self.log.truncated then
-    UI.text(I18n.t("output truncated at 256 KiB"), x + 12, y + h - 16, 7, Theme.coin)
-  end
-  UI.text(I18n.t("F8 hide"), x + w - 12 - UI.textWidth("F8 hide", 7), y + h - 16, 7,
-    Theme.withAlpha(Theme.cream, 0.5))
-
-  if self.run_attempt and not self.running_mode then
-    self:draw_run_outcome(x, y, w)
+  if stages then
+    if self.log and self.log.truncated then
+      UI.text(I18n.t("output truncated at 256 KiB"), x + 12, y + h - 16, 7, Theme.coin)
+    end
+    UI.text(I18n.t("F8 hide"), x + w - 12 - UI.textWidth("F8 hide", 7), y + h - 16, 7,
+      Theme.withAlpha(Theme.cream, 0.5))
   end
 end
 
@@ -1127,19 +1266,18 @@ end
 --- that passes means "the sample works, now submit", and a screen that said
 --- anything stronger would be contradicted by the very next thing the player
 --- does.
-function Quest:draw_run_outcome(x, y, w)
+--- The outcome strip's note lines and its height, for a console `w` wide.
+--- One function, because `console_rect` has to reserve the strip's height
+--- before the strip is drawn — a console floored below its own headline
+--- handed the log a negative scissor and took the frame with it.
+function Quest:outcome_note(w, budget)
   local a = self.run_attempt
+  if not a then return {}, 0 end
   local passed = a.verdict == "accepted"
   local tests = (self.quest and self.quest.tests) or {}
   local hidden = tests.hidden_count or 0
-
-  -- The note wraps, and the strip grows to hold it. The line about runs
-  -- being kept is the one sentence on this screen that must not be clipped:
-  -- half of it says the opposite of the whole of it.
   local note_lines
   if passed then
-    -- Three whole sentences that the `I18n.t` sweep walked past, because
-    -- they are built with `:format` and `UI.wrap` rather than passed to it.
     note_lines = { hidden > 0
       and (hidden == 1
         and I18n.t("now SUBMIT — %d hidden case has not run yet", hidden)
@@ -1150,9 +1288,61 @@ function Quest:draw_run_outcome(x, y, w)
       I18n.t("runs do not count against your stars — but they are kept, "
         .. "and what went wrong feeds your drills"), w - 24, 7)
   end
+  local head_h = UI.lineHeight(11)
+  local note_lh = UI.lineHeight(7) + 2
+  -- The counts share the headline's line when both fit across the strip,
+  -- and take a line of their own when they do not — at the largest type
+  -- step "DOES NOT COMPILE" alone is wider than a portrait console.
+  local headline = self:outcome_headline()
+  local counts = I18n.t("%d / %d samples", a.tests_passed or 0, a.tests_total or 0)
+  local two_lines = UI.textWidth(headline, 11) + UI.textWidth(counts, 9) + 36 > w
+  local counts_h = two_lines and (UI.lineHeight(9) + 2) or 0
+  local function height(n) return 8 + head_h + counts_h + 6 + n * note_lh + 8 end
+  -- `budget` is what the console can give the strip. The note gives way a
+  -- line at a time before the headline does: at the largest type step in a
+  -- 720 px landscape window the whole well is under 400 px, and a strip
+  -- that insisted on its four-line note would start above the well.
+  local no_counts = false
+  if budget then
+    while #note_lines > 0 and height(#note_lines) > budget do
+      note_lines[#note_lines] = nil
+    end
+    -- And after the note, the counts' own line: the headline is the one
+    -- thing the strip exists to say, and it is the last to go.
+    if two_lines and height(0) > budget then
+      two_lines, counts_h, no_counts = false, 0, true
+    end
+  end
+  return note_lines, height(#note_lines), two_lines, no_counts
+end
 
-  local h = 30 + #note_lines * 10
-  local sy = y - h - 6
+--- `SAMPLE PASSES`, not `ACCEPTED`: a run is not a verdict.
+function Quest:outcome_headline()
+  local a = self.run_attempt
+  if not a then return "" end
+  if a.verdict == "accepted" then return "SAMPLE PASSES" end
+  return ({
+    wrong_answer = "SAMPLE FAILS",
+    compile_error = "DOES NOT COMPILE",
+    runtime_error = "CRASHED",
+    timeout = "TOO SLOW",
+    output_limit = "TOO MUCH OUTPUT",
+    internal_error = "THE RUNNER BROKE",
+  })[a.verdict] or tostring(a.verdict):upper()
+end
+
+function Quest:draw_run_outcome(x, y, w, budget)
+  local a = self.run_attempt
+  local passed = a.verdict == "accepted"
+
+  -- The note wraps, and the strip grows to hold it. The line about runs
+  -- being kept is the one sentence on this screen that must not be clipped:
+  -- half of it says the opposite of the whole of it — so when the budget
+  -- cannot hold all of it, `outcome_note` drops whole lines, never half.
+  local note_lines, h, two_lines, no_counts = self:outcome_note(w, budget)
+  local head_h = UI.lineHeight(11)
+  local note_lh = UI.lineHeight(7) + 2
+  local sy = y
   -- A failed run shakes the strip — and **only** the strip. The editor is
   -- where somebody is reading their own program, and nothing on this screen
   -- may make that harder; shaking the code would be the worst thing this
@@ -1172,28 +1362,27 @@ function Quest:draw_run_outcome(x, y, w)
   love.graphics.setColor(1, 1, 1, 1)
 
   -- The headline. `SAMPLE PASSES`, not `ACCEPTED`.
-  local headline = passed and "SAMPLE PASSES"
-    or ({
-      wrong_answer = "SAMPLE FAILS",
-      compile_error = "DOES NOT COMPILE",
-      runtime_error = "CRASHED",
-      timeout = "TOO SLOW",
-      output_limit = "TOO MUCH OUTPUT",
-      internal_error = "THE RUNNER BROKE",
-    })[a.verdict] or a.verdict:upper()
-  UI.text(headline, x + 12, sy + 9, 11, tint)
+  local headline = self:outcome_headline()
+  UI.text(headline, x + 12, sy + 8, 11, tint)
 
   local counts = I18n.t("%d / %d samples", a.tests_passed or 0, a.tests_total or 0)
-  UI.text(counts, x + w - 12 - UI.textWidth(counts, 9), sy + 10, 9,
-    Theme.withAlpha(Theme.cream, 0.85))
+  local counts_y = two_lines and (sy + 8 + head_h + 2) or (sy + 8 + (head_h - UI.lineHeight(9)) / 2)
+  local counts_h = two_lines and (UI.lineHeight(9) + 2) or 0
+  if not no_counts then
+    UI.text(counts, x + w - 12 - UI.textWidth(counts, 9), counts_y, 9,
+      Theme.withAlpha(Theme.cream, 0.85))
+  end
 
   -- The line that has to be exactly right (§4.9b). A run *is* saved and its
   -- mistakes *do* feed the drills; what it does not do is count against the
   -- node. "Runs aren't saved" would be false and is written nowhere.
   for i, line in ipairs(note_lines) do
-    UI.text(line, x + 12, sy + 24 + (i - 1) * 10, 7, Theme.withAlpha(Theme.cream, 0.75))
+    UI.text(line, x + 12, sy + 8 + head_h + counts_h + 6 + (i - 1) * note_lh, 7,
+      Theme.withAlpha(Theme.cream, 0.75))
   end
   love.graphics.pop()
+  self.outcome_rect = { x = x, y = sy, w = w, h = h }
+  return h
 end
 
 -- -------------------------------------------------------------------- input
