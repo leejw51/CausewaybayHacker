@@ -451,8 +451,42 @@ Every run gets: a hard wall-clock timeout (`timeout_ms`, killed with SIGKILL
 after a SIGTERM grace of 500 ms), an output byte cap, a stripped environment
 (`PATH`, `HOME` pointed at the build dir, the toolchain vars above, nothing
 else), no inherited stdin beyond the case's, and `setrlimit` for address space
-(1 GiB), file size (64 MiB) and processes where the platform provides it. The
-child is put in its own process group so a fork bomb dies with it.
+(1 GiB), file size (64 MiB) and processes where the platform provides it.
+
+**The timeout is the runner's clock, not the submission's.** Output is drained
+on its own threads, and they are abandoned half a second after the kill.
+Everything a submission spawns inherits the same stdout pipe, so waiting for
+that pipe to close is waiting for a process the runner may not be able to kill
+— a submission that spawned `sleep 30` used to choose its own wall clock that
+way, and returned at 6.4 s against a 5 s timeout.
+
+**What the kill reaches.** The child is put in its own process group and the
+group is killed — SIGTERM, 500 ms, SIGKILL — which takes every child that
+stayed in the group, the ordinary fork bomb included. But a process can *leave*
+a group (`setsid`, `setpgid`, `Command::process_group(0)`), and a group kill
+cannot reach one that has. So the runner also samples the process table every
+100 ms for the life of the attempt, recording every process that was, at that
+moment, in the submission's group or a descendant of something already
+recorded. On every exit — clean, output-capped or timed out — everything on
+that list that is still alive is stopped and then killed by pid, with each
+recorded start time checked first so that a recycled pid is never signalled.
+A fork bomb whose children each leave the group is stopped by this; a
+submission that exits cleanly having left `sleep 120` behind is too.
+
+**What it does not reach.** Said plainly, because an earlier version of this
+paragraph claimed a containment the implementation did not have:
+
+* A process that both leaves the group **and** is orphaned between two
+  samples. Once its parent has exited the kernel keeps no link back to the
+  attempt, and macOS will not report a session id to a non-root process, so
+  there is no third key left to match on. It survives, and
+  `backend/runner/tests/limits.rs` contains a test that says so out loud.
+* Anything at all on a platform that is neither macOS nor Linux, where the
+  sweep is a no-op and the group kill is the whole of it.
+
+This is a best effort, not a boundary. A cgroup or a jail would be a boundary;
+this project has deliberately not built one, which is what the next paragraph
+is about.
 
 > **This is not a sandbox.** Causewaybay Hacker compiles and runs code you
 > typed, on your machine, as you. It is a single-trusted-user local trainer.
@@ -741,8 +775,13 @@ These are the ones that catch a whole class of "it works on my machine":
 5. **Every quest's starter code is *not* accepted.** Otherwise the map clears
    itself.
 6. **Runner limits.** Infinite loop → `timeout`. Huge output → `output_limit`.
-   Fork bomb → killed, server alive. `GOPROXY=off` → a quest that tries to
-   fetch fails cleanly.
+   Fork bomb → killed, server alive — both shapes: children that stay in the
+   process group, and children that leave it, which `killpg` alone never
+   reached. A submission cannot extend its own wall clock by spawning
+   something that outlives it. And the hole §5.3 admits to — a descendant
+   orphaned out of the group between two samples — has a test that asserts it
+   is still there, so the day it closes the claim is rewritten rather than
+   left stale. `GOPROXY=off` → a quest that tries to fetch fails cleanly.
 7. **Mistake classification.** Fixture sources → expected `kind`, one per row
    of the §7.1 table.
 8. **Multi-user isolation.** Two sessions, two addresses, interleaved

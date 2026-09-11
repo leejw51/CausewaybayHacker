@@ -33,6 +33,7 @@ import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import type { Category, Land, NodeState, SearchHit, SearchMode } from "../net/protocol";
 import { unbuilt, unbuiltLine } from "../net/milestone";
+import { t } from "../i18n";
 import { auxHeight, auxRow, drawAux, AUX_HINT, openAux } from "../ui/auxnav";
 import { drawNotice, type Notice } from "../ui/notice";
 import { emptySearch } from "../ui/coach";
@@ -42,32 +43,30 @@ import { QuestScene } from "./quest";
 const MODES: readonly SearchMode[] = ["unified", "bm25", "semantic"];
 
 /** What each mode is, in the one line there is room for. */
-const MODE_LINE: Record<SearchMode, string> = {
-  unified:
-    "Both indexes, fused by rank. A street the words found and the meaning found too comes first.",
-  bm25: "The text index only: the words as written, with a title match worth four of a story match.",
-  semantic:
-    "The meaning index only. It is hashed, not a language model — it will not find CONCURRENCY from PARALLEL.",
+const MODE_LINE: Record<SearchMode, () => string> = {
+  unified: () => t("search.modeUnified"),
+  bm25: () => t("search.modeText"),
+  semantic: () => t("search.modeMeaning"),
 };
 
 /** `state` is offered as two values, not three: §4.7 never locks anything. */
-const STATES: ReadonlyArray<{ id: string; label: string; value: NodeState | null }> = [
-  { id: "state:any", label: "ANY", value: null },
-  { id: "state:open", label: "OPEN", value: "open" },
-  { id: "state:cleared", label: "CLEARED", value: "cleared" },
+const STATES = (): ReadonlyArray<{ id: string; label: string; value: NodeState | null }> => [
+  { id: "state:any", label: t("search.any"), value: null },
+  { id: "state:open", label: t("search.open"), value: "open" },
+  { id: "state:cleared", label: t("search.cleared"), value: "cleared" },
 ];
 
-const LANDS: ReadonlyArray<{ id: string; label: string; value: Land | null }> = [
-  { id: "land:any", label: "ANY", value: null },
-  { id: "land:rust", label: "RUST", value: "rust" },
-  { id: "land:go", label: "GO", value: "go" },
+const LANDS = (): ReadonlyArray<{ id: string; label: string; value: Land | null }> => [
+  { id: "land:any", label: t("search.any"), value: null },
+  { id: "land:rust", label: t("search.rust"), value: "rust" },
+  { id: "land:go", label: t("search.go"), value: "go" },
 ];
 
-const CATS: ReadonlyArray<{ id: string; label: string; value: Category | null }> = [
-  { id: "cat:any", label: "ANY", value: null },
-  { id: "cat:basic", label: "BASIC", value: "basic" },
-  { id: "cat:advanced", label: "ADV", value: "advanced" },
-  { id: "cat:hacker", label: "HACKER", value: "hacker" },
+const CATS = (): ReadonlyArray<{ id: string; label: string; value: Category | null }> => [
+  { id: "cat:any", label: t("search.any"), value: null },
+  { id: "cat:basic", label: t("search.basic"), value: "basic" },
+  { id: "cat:advanced", label: t("search.adv"), value: "advanced" },
+  { id: "cat:hacker", label: t("search.hacker"), value: "hacker" },
 ];
 
 /** §4.12: default 20, max 100. Twenty is plenty for a screen you scroll. */
@@ -119,7 +118,7 @@ export class SearchScene implements Scene {
     el.autocapitalize = "off";
     el.autocomplete = "off";
     el.setAttribute("autocorrect", "off");
-    el.placeholder = "borrow checker";
+    el.placeholder = t("search.placeholder");
     // Its own listener, because `App` forwards a keystroke out of the overlay
     // only when Ctrl or Cmd is held — a bare Enter inside a field never reaches
     // `Scene.key`, and wiring it there would look like a dead button.
@@ -211,19 +210,16 @@ export class SearchScene implements Scene {
     if (gap) {
       console.info("search.query is not built yet:", gap.developerMessage);
       return {
-        head: unbuiltLine("THE SEARCH INDEX", gap).toUpperCase(),
-        body:
-          "SPEC §8 has all of it — a text index over every brief, a meaning index beside it, " +
-          "and the two fused by rank. None of it is in this build of the server yet. Nothing " +
-          "you do here is lost; the box works the day the index does.",
+        head: unbuiltLine(t("search.unbuiltHead"), gap).toUpperCase(),
+        body: t("search.unbuiltBody"),
         tone: "unbuilt",
       };
     }
     if (e instanceof WireError) {
       console.warn("search.query failed:", e.payload.code, e.payload.message, e.payload.detail);
-      return { head: "THAT DID NOT WORK", body: playerText(e.payload.code), tone: "fault" };
+      return { head: t("search.failedHead"), body: playerText(e.payload.code), tone: "fault" };
     }
-    return { head: "THAT DID NOT WORK", body: "the search did not come back", tone: "fault" };
+    return { head: t("search.failedHead"), body: t("search.failedBody"), tone: "fault" };
   }
 
   // -- input ---------------------------------------------------------------
@@ -304,7 +300,7 @@ export class SearchScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
-    header(g, this.app, "SEARCH");
+    header(g, this.app, t("search.title"));
     const f = frame(layout, layout.isPortrait() ? 0.42 : 0.34, 0.03);
     this.chips.reset();
     this.hitBtns.reset();
@@ -312,12 +308,12 @@ export class SearchScene implements Scene {
     arriving(g, f, "left", this.leftIn, () => this.drawAsk(g, f.left, f.scale));
     arriving(g, f, "right", this.rightIn, () => this.drawHits(g, f.right, f.scale));
 
-    footer(g, layout, `ENTER  SEARCH   ${AUX_HINT}`);
+    footer(g, layout, t("search.footer", { aux: AUX_HINT() }));
   }
 
   private drawAsk(g: Ctx, rect: Rect, s: number): void {
     const fonts = ensureFonts(s);
-    const inner = titledPanel(g, rect, "ONE BOX, 126 STREETS", Theme.coin);
+    const inner = titledPanel(g, rect, t("search.oneBox", { n: 126 }), Theme.coin);
     const [x, y, w, h] = inner;
     const gap = Math.round(8 * s);
 
@@ -332,7 +328,7 @@ export class SearchScene implements Scene {
     const btnH = Math.max(this.app.layout.minTouchH(), fonts.button.height + 20);
     const by = y + fieldH + gap;
     const half = Math.floor((w - gap) * 0.62);
-    const goLabel = this.busy ? "…" : "SEARCH";
+    const goLabel = this.busy ? "…" : t("search.search");
     pixBtn(g, fonts.button, x, by, half, btnH, goLabel, {
       lit: !this.busy,
       hover: this.chips.hovered === "go",
@@ -341,17 +337,26 @@ export class SearchScene implements Scene {
     this.chips.add({ id: "go", rect: [x, by, half, btnH], label: goLabel, dim: this.busy });
     const clearX = x + half + gap;
     const clearW = w - half - gap;
-    pixBtn(g, fonts.button, clearX, by, clearW, btnH, "CLEAR", {
+    pixBtn(g, fonts.button, clearX, by, clearW, btnH, t("search.clear"), {
       quiet: true,
       hover: this.chips.hovered === "clear",
     });
-    this.chips.add({ id: "clear", rect: [clearX, by, clearW, btnH], label: "CLEAR" });
+    this.chips.add({ id: "clear", rect: [clearX, by, clearW, btnH], label: t("search.clear") });
 
     let cy = by + btnH + gap * 2;
     cy = this.drawChipRow(
       g,
-      "HOW",
-      MODES.map((m) => ({ id: `mode:${m}`, label: m.toUpperCase(), on: m === this.mode })),
+      t("search.how"),
+      MODES.map((m) => ({
+        id: `mode:${m}`,
+        label:
+          m === "unified"
+            ? t("search.unified")
+            : m === "bm25"
+              ? t("search.text")
+              : t("search.meaning"),
+        on: m === this.mode,
+      })),
       [x, cy, w, 0],
       s,
     );
@@ -360,7 +365,7 @@ export class SearchScene implements Scene {
     // will leave the default alone for ever — which is fine, but it should be a
     // choice rather than a shrug.
     g.fillStyle = css(Theme.cream, 0.6);
-    const lines = wrap(fonts.small, MODE_LINE[this.mode], w);
+    const lines = wrap(fonts.small, MODE_LINE[this.mode](), w);
     for (let i = 0; i < lines.length && cy + fonts.small.height < y + h; i++) {
       printf(g, fonts.small, lines[i], x, cy, w, "left");
       cy += fonts.small.height;
@@ -369,22 +374,22 @@ export class SearchScene implements Scene {
 
     cy = this.drawChipRow(
       g,
-      "LAND",
-      LANDS.map((l) => ({ id: l.id, label: l.label, on: l.value === this.filterLand })),
+      t("search.land"),
+      LANDS().map((l) => ({ id: l.id, label: l.label, on: l.value === this.filterLand })),
       [x, cy, w, 0],
       s,
     );
     cy = this.drawChipRow(
       g,
-      "ROAD",
-      CATS.map((c) => ({ id: c.id, label: c.label, on: c.value === this.filterCat })),
+      t("search.road"),
+      CATS().map((c) => ({ id: c.id, label: c.label, on: c.value === this.filterCat })),
       [x, cy, w, 0],
       s,
     );
     cy = this.drawChipRow(
       g,
-      "STATE",
-      STATES.map((st) => ({ id: st.id, label: st.label, on: st.value === this.filterState })),
+      t("search.state"),
+      STATES().map((st) => ({ id: st.id, label: st.label, on: st.value === this.filterState })),
       [x, cy, w, 0],
       s,
     );
@@ -418,7 +423,7 @@ export class SearchScene implements Scene {
     const pad = Math.round(7 * s);
     const gap = Math.round(5 * s);
     const h = Math.max(this.app.layout.minTouchH(), f.height + Math.round(10 * s));
-    const labelW = width(f, "STATE") + pad;
+    const labelW = width(f, t("search.state")) + pad;
     g.fillStyle = css(Theme.dim);
     printf(g, f, label, x, y + Math.round((h - f.height) / 2), labelW, "left");
 
@@ -448,8 +453,13 @@ export class SearchScene implements Scene {
     // measurements of a search that never ran.
     const title =
       this.notice || this.searched === ""
-        ? "RESULTS"
-        : `${this.hits.length} OF 126 · ${this.answeredMode.toUpperCase()} · ${this.tookMs} MS`;
+        ? t("search.results")
+        : t("search.resultLine", {
+            n: this.hits.length,
+            total: 126,
+            mode: this.answeredMode.toUpperCase(),
+            ms: this.tookMs,
+          });
     const inner = titledPanel(g, rect, title, Theme.cyan);
     const [x, y, w, h] = inner;
 

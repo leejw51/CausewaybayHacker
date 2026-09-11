@@ -25,6 +25,7 @@
  * failure §3.3 was written to prevent.
  */
 import { WireError } from "./client";
+import { t } from "../i18n";
 
 export interface Unbuilt {
   /** `detail.milestone`, when the server said which one. */
@@ -55,6 +56,6 @@ export function unbuilt(e: unknown): Unbuilt | null {
  */
 export function unbuiltLine(feature: string, u: Unbuilt): string {
   return u.milestone === null
-    ? `${feature} is still being built`
-    : `${feature} opens in chapter ${u.milestone}`;
+    ? t("milestone.building", { feature })
+    : t("milestone.chapter", { feature, n: u.milestone });
 }

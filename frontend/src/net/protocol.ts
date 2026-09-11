@@ -19,6 +19,8 @@
 export const PROTOCOL_VERSION = 1;
 
 /** §2. Exactly these four keys, `payload` always an object. */
+import { t } from "../i18n";
+
 export interface Envelope<T = unknown> {
   v: number;
   id: string | null;
@@ -107,32 +109,10 @@ export function actionFor(code: ErrorCode): ErrorAction {
  * goes to `console.warn` and this goes on screen.
  */
 export function playerText(code: ErrorCode): string {
-  switch (code) {
-    case "proto_version":
-      return "this client is too old for that server";
-    case "bad_request":
-      return "something went wrong here, not on the server";
-    case "unauthorized":
-      return "that session has gone — log in again";
-    case "auth_expired":
-      return "that took too long; try again";
-    case "auth_nonce_used":
-      return "that login was already used; try again";
-    case "auth_bad_signature":
-      return "that key does not match that address";
-    case "not_found":
-      return "that is not there any more";
-    case "locked":
-      return "clear the street before it first";
-    case "rate_limited":
-      return "slow down a moment";
-    case "busy":
-      return "an attempt is already running";
-    case "unavailable":
-      return "that part of the city is still being built";
-    case "internal":
-      return "the server broke — try again";
-  }
+  // One key per code, so the closed set in §3.3 and the closed set of strings
+  // are the same set and a code added later is a missing key rather than a
+  // silent fall-through.
+  return t(`err.${code}` as "err.internal");
 }
 
 // ---------------------------------------------------------------------------

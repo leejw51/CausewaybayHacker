@@ -18,6 +18,7 @@
  *      nothing it is, and points at the thing that would fill it.
  */
 import type { DrillMode, MistakeStat } from "../net/protocol";
+import { t, tn } from "../i18n";
 
 /** §7.2. Clean submits in a row before a kind is considered learned. */
 export const LEARNED_AT = 5;
@@ -44,17 +45,16 @@ export function isLearned(m: Pick<MistakeStat, "cleared_since">): boolean {
  */
 export function tamedLine(m: Pick<MistakeStat, "cleared_since">): string {
   const n = Math.max(0, Math.floor(m.cleared_since));
-  if (n >= LEARNED_AT) return "LEARNED — OFF THE DRILL";
-  if (n === 0) return "MADE IT ON YOUR LAST SUBMIT";
+  if (n >= LEARNED_AT) return t("coach.learned");
+  if (n === 0) return t("coach.learnedLast");
   const left = LEARNED_AT - n;
-  const submits = n === 1 ? "1 CLEAN SUBMIT" : `${n} CLEAN SUBMITS`;
-  return `${submits} SINCE — ${left} TO GO`;
+  return t("coach.since", { since: tn("coach.cleanSubmits", n), left });
 }
 
 /** What the stats screen puts at the top of the drill list. */
 export function drillHeadline(mistakes: MistakeStat[]): string {
   const live = mistakes.filter((m) => !isLearned(m));
-  if (live.length === 0) return "NOTHING IS ON THE DRILL";
+  if (live.length === 0) return t("coach.nothingOnDrill");
   const worst = live.reduce((a, b) => (b.count > a.count ? b : a));
   return `${worst.label.toUpperCase()} — ${worst.count}×`;
 }
@@ -89,57 +89,41 @@ export interface CoachContext {
 export function emptyDrill(mode: DrillMode, ctx: CoachContext): EmptyState {
   if (ctx.attempts === 0) {
     return {
-      head: "THE COACH HAS NOT MET YOU YET",
-      body:
-        "Every plan here is built from your own record — what you failed, what you got wrong, " +
-        "what you cleared and when. Go and make some. Anything you do on a street writes the " +
-        "first row.",
-      action: "TO THE MAPS",
+      head: t("coach.noRecordHead"),
+      body: t("coach.noRecordBody"),
+      action: t("coach.toTheMaps"),
     };
   }
   switch (mode) {
     case "repeat":
       return {
-        head: "NOTHING TO REPEAT",
-        body:
-          "REPEAT is the quests you failed, hardest first. You have not failed one that is " +
-          "still standing — which is the good version of an empty list. Try WEAKNESS, or go " +
-          "and find a street that beats you.",
-        action: "TO THE MAPS",
+        head: t("coach.noRepeatHead"),
+        body: t("coach.noRepeatBody"),
+        action: t("coach.toTheMaps"),
       };
     case "weakness":
       return ctx.learned > 0
         ? {
-            head: "NO WEAK SPOT LEFT",
-            body:
-              `You have beaten ${ctx.learned} mistake ${ctx.learned === 1 ? "kind" : "kinds"} ` +
-              `and nothing is above the line. WEAKNESS drills the kinds you are still making, ` +
-              `so it fills up again the moment the compiler catches you.`,
-            action: "SEE THE SHELF",
+            head: t("coach.noWeakLeftHead"),
+            body: tn("coach.noWeakLeftBody", ctx.learned),
+            action: t("coach.seeShelf"),
           }
         : {
-            head: "NO WEAK SPOT YET",
-            body:
-              "WEAKNESS groups your compiler errors by kind and hands you five different " +
-              "shapes of the one you make most. Nothing has been classified yet, so there is " +
-              "nothing to group.",
-            action: "TO THE MAPS",
+            head: t("coach.noWeakYetHead"),
+            body: t("coach.noWeakYetBody"),
+            action: t("coach.toTheMaps"),
           };
     case "spaced":
       return ctx.cleared === 0
         ? {
-            head: "NOTHING TO COME BACK TO",
-            body:
-              "SPACED brings a cleared quest back before you forget it — three stars in a " +
-              "fortnight, one star in two days. Clear one and it joins the queue.",
-            action: "TO THE MAPS",
+            head: t("coach.noSpacedHead"),
+            body: t("coach.noSpacedBody"),
+            action: t("coach.toTheMaps"),
           }
         : {
-            head: "NOTHING IS DUE",
-            body:
-              `All ${ctx.cleared} of your clears are still fresh. SPACED will bring them back ` +
-              "on their own schedule; there is nothing useful to review today.",
-            action: "TO THE MAPS",
+            head: t("coach.nothingDueHead"),
+            body: t("coach.nothingDueBody", { n: ctx.cleared }),
+            action: t("coach.toTheMaps"),
           };
   }
 }
@@ -154,23 +138,21 @@ export function emptyDrill(mode: DrillMode, ctx: CoachContext): EmptyState {
 export function emptySearch(q: string, searched: boolean): EmptyState {
   if (q.trim() === "") {
     return {
-      head: "ONE BOX, 126 STREETS",
-      body:
-        "Type what you half-remember — a word from the brief, a concept, the shape of the " +
-        "bug. UNIFIED asks the text index and the meaning index both and fuses the two " +
-        "rankings, and every hit shows you which of them found it.",
-      action: "SEARCH",
+      head: t("search.emptyHead", { n: 126 }),
+      body: t("search.emptyBody"),
+      action: t("search.search"),
     };
   }
   if (!searched) {
-    return { head: "READY", body: `Press ENTER to look for “${q.trim()}”.`, action: "SEARCH" };
+    return {
+      head: t("search.readyHead"),
+      body: t("search.readyBody", { q: q.trim() }),
+      action: t("search.search"),
+    };
   }
   return {
-    head: "NOTHING MATCHED",
-    body:
-      `No street mentions “${q.trim()}”. The meaning index is a hashed one — it is not a ` +
-      "language model and will not find CONCURRENCY from PARALLEL — so a plainer word, or " +
-      "one that would appear in the brief itself, usually finds it.",
-    action: "CLEAR",
+    head: t("search.noneHead"),
+    body: t("search.noneBody", { q: q.trim() }),
+    action: t("search.clear"),
   };
 }

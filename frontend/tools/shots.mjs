@@ -124,6 +124,54 @@ async function main() {
     await page.mouse.click(at[0], at[1]);
     await page.waitForTimeout(wait);
   };
+  /**
+   * Get past the title card.
+   *
+   * The game now rests on a "PRESS SPACE" card at a cold boot (`scenes/title.ts`)
+   * rather than walking straight into the opening. Every group that navigates
+   * from nothing has to press it — clicking the `start` button rather than
+   * sending a key, because a click is what the button list can be checked
+   * against and a key press that arrives before the hook is installed is a key
+   * press that goes nowhere.
+   *
+   * It is a no-op on any other screen, including a resumed session that never
+   * saw the card.
+   */
+  const pastTitle = async (ms = 25000) => {
+    await ready();
+    const end = Date.now() + ms;
+    for (;;) {
+      const now = await scene();
+      if (now !== "title" && now !== "boot") return now;
+      if (now === "title") {
+        const at = await page.evaluate(() => window.__cwbCapture.buttonAt("start"));
+        if (at) await page.mouse.click(at[0], at[1]);
+        await page.waitForTimeout(400);
+        return await scene();
+      }
+      if (Date.now() > end) throw new Error(`stuck on ${now} waiting for the title card`);
+      await page.waitForTimeout(200);
+    }
+  };
+
+  /**
+   * Forget that this browser has watched the opening.
+   *
+   * The card remembers, deliberately — a returning player is not made to sit
+   * through it twice — so a second story shot in a second orientation would
+   * otherwise be handed the login screen. The screenshots want the cold path
+   * every time, so they ask for it.
+   */
+  const forgetStory = async () => {
+    await page.evaluate(() => {
+      try {
+        localStorage.removeItem("cwbhacker.story.seen");
+      } catch {
+        /* nothing to forget */
+      }
+    });
+  };
+
   /** Wait for a screen, or say which one we are stuck on. */
   const at = async (name, ms = 20000) => {
     const end = Date.now() + ms;
@@ -170,9 +218,26 @@ async function main() {
     [38.8, "06-story-lands"],
   ];
 
+  // ---- the title card ----------------------------------------------------
+  await group("title", async () => {
+    await size(LAND);
+    await forgetStory();
+    await page.goto(`${BASE}/`);
+    await at("title", 25000);
+    await settle(2.5);
+    await shot("00-title-landscape");
+    await size(PORT);
+    await page.waitForTimeout(300);
+    await settle(2);
+    await shot("09-title-portrait");
+  });
+
   await group("story", async () => {
     await size(LAND);
+    await forgetStory();
     await page.goto(`${BASE}/`);
+    await at("title", 25000);
+    await pastTitle();
     await at("story", 25000);
     // Real time to each beat, frozen only for the frame itself: the beats
     // wait on background JPEGs that a frozen loop would never receive, and a
@@ -196,7 +261,10 @@ async function main() {
 
   await group("story-portrait", async () => {
     await size(PORT);
+    await forgetStory();
     await page.goto(`${BASE}/`);
+    await at("title", 25000);
+    await pastTitle();
     await at("story", 25000);
     await page.waitForTimeout(2600);
     await shot("08-story-portrait");
@@ -206,6 +274,7 @@ async function main() {
   await group("login", async () => {
     await size(LAND);
     await page.goto(`${BASE}/`);
+    await pastTitle();
     await at("login", 45000);
     await settle(2.5);
     await shot("10-login-landscape");
@@ -240,6 +309,14 @@ async function main() {
           await dead.waitForTimeout(200);
         }
       };
+      // Its own page means its own title card, and its own hook to wait for.
+      for (let i = 0; i < 120; i++) {
+        if (await dead.evaluate(() => Boolean(window.__cwbCapture?.scene))) break;
+        await dead.waitForTimeout(150);
+      }
+      await on("title", 25000);
+      const go = await dead.evaluate(() => window.__cwbCapture.buttonAt("start"));
+      if (go) await dead.mouse.click(go[0], go[1]);
       await on("login");
       await dead.evaluate(() => window.__cwbCapture.settle(2.5));
       const hit = await dead.evaluate(() => window.__cwbCapture.buttonAt("new"));
@@ -273,6 +350,7 @@ async function main() {
   const signIn = async () => {
     if ((await scene()) === "lands") return;
     await page.goto(`${BASE}/`);
+    await pastTitle();
     await at("login", 45000);
     const field = page.locator("textarea.cwb-field");
     await field.waitFor({ timeout: 15000 });
@@ -304,6 +382,7 @@ async function main() {
   await group("lands-nogl", async () => {
     await size(TALL);
     await page.goto(`${BASE}/?nogl=1`);
+    await pastTitle();
     await at("lands", 45000);
     await settle(2.5);
     await shot("23-lands-no-webgl-1080x1750");
@@ -312,6 +391,7 @@ async function main() {
   await group("map", async () => {
     await size(LAND);
     await page.goto(`${BASE}/`);
+    await pastTitle();
     await at("lands", 45000);
     await settle(2);
     await press("cat:basic", 2500);
@@ -351,6 +431,7 @@ async function main() {
   await group("map-nogl", async () => {
     await size(TALL);
     await page.goto(`${BASE}/?nogl=1`);
+    await pastTitle();
     await at("lands", 45000);
     await settle(2);
     await press("cat:basic", 2500);
@@ -362,6 +443,7 @@ async function main() {
   // ---- a quest, and what comes out of it ---------------------------------
   const openQuest = async (category = "cat:basic") => {
     await page.goto(`${BASE}/`);
+    await pastTitle();
     await at("lands", 45000);
     await settle(2);
     await press(category, 2500);
@@ -423,6 +505,7 @@ async function main() {
   await group("playground", async () => {
     await size(LAND);
     await page.goto(`${BASE}/`);
+    await pastTitle();
     await at("lands", 45000);
     await settle(2);
     await press("playground", 2500);

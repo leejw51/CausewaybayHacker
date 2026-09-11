@@ -34,6 +34,8 @@ import { footer, RUST } from "../ui/chrome";
 import { expInOut, expOut } from "../engine/ease";
 import { reducedMotion, seconds, Tween } from "../engine/motion";
 import { LoginScene } from "./login";
+import { markStorySeen } from "./title";
+import { t } from "../i18n";
 
 /** How a beat arrives over the one before it. */
 type Cut = "fade" | "iris";
@@ -58,48 +60,51 @@ interface Beat {
  * changes there and is copied here — the voice is the asset and it is not
  * paraphrased on the way to the screen.
  */
-const BEATS: Beat[] = [
+/**
+ * The opening, from `docs/story.md` §2 and in its order.
+ *
+ * The English is the bible's own sentences, split at the points they were
+ * already punctuated at — the voice is the asset and it is not paraphrased on
+ * the way to the screen. The other five languages are translations of *those*
+ * sentences and are held to the same rule: the register is a person telling
+ * you what happened, not marketing copy.
+ *
+ * The keys are indexed by beat and line so a translator can see the shape of
+ * the panel they are writing into. A beat is two or three lines because that
+ * is what fits the quiet lower fifth every one of these paintings was composed
+ * with; a translation that runs to five lines would push the caption box up
+ * over the art, which is why `panelRect` measures rather than assumes.
+ */
+const BEATS = (): Beat[] => [
   {
     bg: "open_flat",
     cut: "fade",
     hold: 1.4,
-    lines: ["TUESDAY, 06:40.", "Mei opens the editor above Jardine's Bazaar to fix one function."],
+    lines: [t("story.1.1"), t("story.1.2")],
   },
   {
     bg: "open_cursor",
     cut: "fade",
     hold: 1.5,
-    lines: [
-      "The cursor sits there.",
-      "She knows what the function has to do. She cannot write the for.",
-    ],
+    lines: [t("story.2.1"), t("story.2.2")],
   },
   {
     bg: "open_ghost",
     cut: "fade",
     hold: 1.7,
-    lines: [
-      "She types three characters.",
-      "Grey text finishes the line for her, correctly, and she accepts it.",
-    ],
+    lines: [t("story.3.1"), t("story.3.2")],
   },
   {
     bg: "open_face",
     cut: "fade",
     hold: 1.9,
-    lines: [
-      "That is when she understands: she has done that every day for two years.",
-      "The skill did not decay. It was taken — one accepted suggestion at a time, by something patient enough to spend two years on it.",
-    ],
+    lines: [t("story.4.1"), t("story.4.2")],
   },
   {
     bg: "open_tills",
     cut: "fade",
     hold: 1.6,
-    lines: [
-      "Downstairs the shutters are going up on Jardine's Bazaar, and every till on the street is showing the same thing:",
-      "a panel of grey suggested text, and no working code underneath it.",
-    ],
+    lines: [t("story.5.1"), t("story.5.2")],
   },
   {
     bg: "bg_datacentre",
@@ -107,28 +112,24 @@ const BEATS: Beat[] = [
     hold: 1.9,
     cold: true,
     sting: true,
-    lines: [
-      "SKYNET did not need to be smarter than anyone.",
-      "It needed people to stop reading their own screens.",
-      "It had been paying for that since the first free tier.",
-    ],
+    lines: [t("story.6.1"), t("story.6.2"), t("story.6.3")],
   },
   {
     bg: "open_stairs",
     cut: "iris",
     hold: 1.6,
-    lines: [
-      "Mei does not have a plan.",
-      "She has a laptop, a street she knows, and the suspicion that whatever she can still write from memory is hers to keep.",
-    ],
+    lines: [t("story.7.1"), t("story.7.2")],
   },
   {
     bg: "open_lands",
     cut: "fade",
     hold: 1.8,
-    lines: ["She starts with println!."],
+    lines: [t("story.8.1")],
   },
 ];
+
+/** How many beats there are. Fixed, and independent of the language. */
+const BEAT_COUNT = 8;
 
 /** Characters a second. Fast enough to read with, slow enough to be typing. */
 const CPS = 46;
@@ -168,7 +169,7 @@ export class StoryScene implements Scene {
     // The three paintings are lazily fetched backgrounds. Asking for all of
     // them on the first frame means the cut to the datacentre is a cut and not
     // a black rectangle with type on it.
-    for (const b of BEATS) this.app.assets?.prefetch(b.bg, this.app.layout.isPortrait());
+    for (const b of BEATS()) this.app.assets?.prefetch(b.bg, this.app.layout.isPortrait());
   }
 
   leave(): void {
@@ -187,6 +188,11 @@ export class StoryScene implements Scene {
   private out(): void {
     if (this.leaving) return;
     this.leaving = true;
+    // Watched or skipped, it has had its chance: the title card hands a second
+    // visit straight to the login screen rather than offering the opening
+    // again. Skipping counts on purpose — somebody who pressed a key to get
+    // out of it is exactly the person who must not be shown it twice.
+    markStorySeen();
     void this.app.go(new LoginScene(this.app), this.replay ? "back" : "forward");
   }
 
@@ -201,7 +207,7 @@ export class StoryScene implements Scene {
   // -- the sequence --------------------------------------------------------
 
   private beat(): Beat | null {
-    return this.i < BEATS.length ? BEATS[this.i] : null;
+    return this.i < BEAT_COUNT ? BEATS()[this.i] : null;
   }
 
   /** The beat's text, wrapped to the panel, as one flat list of lines. */
@@ -299,7 +305,7 @@ export class StoryScene implements Scene {
     this.app.clear(g, Theme.void);
     const s = layout.uiScale();
     const b = this.beat();
-    const prev = this.i > 0 ? BEATS[this.i - 1] : null;
+    const prev = this.i > 0 ? BEATS()[this.i - 1] : null;
     const cutT = Math.min(1, this.beatT / CUT);
 
     if (b) {
@@ -350,12 +356,12 @@ export class StoryScene implements Scene {
     // is a sequence people skip on principle.
     const pipY = Math.round(layout.vh - 46 * s);
     const pipW = Math.round(14 * s);
-    const pipsX = Math.round((layout.vw - (BEATS.length + 1) * pipW) / 2);
-    for (let k = 0; k <= BEATS.length; k++) {
+    const pipsX = Math.round((layout.vw - (BEAT_COUNT + 1) * pipW) / 2);
+    for (let k = 0; k <= BEAT_COUNT; k++) {
       fill(g, k === this.i ? Theme.coin : Theme.dim, pipsX + k * pipW, pipY, Math.round(8 * s), 3);
     }
 
-    footer(g, layout, layout.touch ? "TAP  SKIP" : "ANY KEY  SKIP");
+    footer(g, layout, layout.touch ? t("story.skipTap") : t("story.skipKey"));
   }
 
   /** Slow push, dt-driven. Zero for anyone who asked for less of it. */
@@ -395,10 +401,10 @@ export class StoryScene implements Scene {
 
     // The plate itself arrives with the cut rather than after it, so the beat
     // is one movement instead of a picture and then a box.
-    const t = expOut(cutT);
+    const k = expOut(cutT);
     g.save();
-    g.globalAlpha = t;
-    g.translate(0, (1 - t) * Math.round(18 * s));
+    g.globalAlpha = k;
+    g.translate(0, (1 - k) * Math.round(18 * s));
     fill(g, Theme.ink, x, y, w, h, 0.82);
     fill(g, b.cold ? Theme.cyan : Theme.coin, x, y, Math.round(4 * s), h);
     fill(g, Theme.dim, x, y + h - 1, w, 1, 0.5);
@@ -439,11 +445,11 @@ export class StoryScene implements Scene {
     const { layout } = this.app;
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
-    const t = this.logoIn.out;
+    const k = this.logoIn.out;
     const cy = Math.round(layout.vh * 0.38);
     g.save();
     g.globalAlpha = Math.min(1, this.logoIn.raw * 2);
-    g.translate(0, (1 - t) * Math.round(20 * s));
+    g.translate(0, (1 - k) * Math.round(20 * s));
     neonPrint(
       g,
       fonts.title,
@@ -466,7 +472,7 @@ export class StoryScene implements Scene {
     printf(
       g,
       fonts.stationSm,
-      "PRESS ANY KEY",
+      t("story.pressAnyKey"),
       0,
       Math.round(layout.vh * 0.62),
       layout.vw,

@@ -18,6 +18,7 @@ Three clients speak it — the browser (`frontend/`), the LÖVE desktop client
 | Frames | **text**, UTF-8, exactly one JSON object per frame |
 | Compression | none (`permessage-deflate` is not negotiated) |
 | Max frame | 4 MiB inbound, server closes with 1009 above it |
+| Max nesting | 64 levels; a deeper frame is answered `bad_request` (§3.3) and the connection **stays open** |
 | Binary frames | not used; a client that sends one is closed with 1003 |
 
 The same HTTP server also serves the built browser frontend at `/` and the art
@@ -47,6 +48,13 @@ laptop sleep** — see reconnection, §6.
 
 A close is never the answer to an application error. Application errors are
 `*.err` messages (§3.3) and the connection stays open.
+
+`1003` means what it says. A frame that is a JSON object but nests deeper than
+§1's limit is **not** one of these: it is an object, so closing it 1003 would
+be telling the client something untrue. It is answered `bad_request`, and it is
+correlated — the server recovers the top-level `id` and `type` from a frame its
+JSON parser gave up on, precisely so that a client is not left with a request
+that never comes back.
 
 ---
 

@@ -23,6 +23,7 @@ import type { Land } from "./net/protocol";
 import type { Buttons } from "./ui/chrome";
 import { Chip } from "./audio/sfx";
 import { wipe as wipeKey } from "./wallet/wallet";
+import { localeInfo, nextLocale, setLocale, t } from "./i18n";
 
 export interface Scene {
   readonly name: string;
@@ -189,7 +190,7 @@ export class App {
       // A logout closes the socket on purpose. Announcing that as a failure
       // would put a red alarm across the login screen the player just asked
       // for, so the deliberate case is swallowed here.
-      if (s === "offline" && !this.closingOnPurpose) this.say("connection lost — reconnecting");
+      if (s === "offline" && !this.closingOnPurpose) this.say(t("app.connLost"));
       if (s === "authed") this.toast = null;
     });
     client.on("server.bye", (p) => this.say(p.reason));
@@ -638,10 +639,10 @@ export class App {
   async logout(reason = ""): Promise<boolean> {
     if (this.scene?.unsaved?.()) {
       const ok = await this.ask({
-        title: "LOG OUT?",
-        body: "The code in the editor is not saved. Logging out throws it away.",
-        confirm: "LOG OUT",
-        cancel: "KEEP WRITING",
+        title: t("app.logoutTitle"),
+        body: t("app.logoutBody"),
+        confirm: t("app.logout"),
+        cancel: t("app.keepWriting"),
       });
       if (!ok) return false;
     }
@@ -836,8 +837,10 @@ export class App {
         this.saveOrientation(picked);
         this.say(
           picked === "auto"
-            ? "orientation: automatic — follows the window"
-            : `orientation: ${picked}`,
+            ? t("app.orientAuto")
+            : picked === "portrait"
+              ? t("app.orientPortrait")
+              : t("app.orientLandscape"),
         );
         return;
       }
@@ -846,7 +849,7 @@ export class App {
       // share ours.
       if (name === "f2") {
         ev.preventDefault();
-        this.say(`crt: ${this.toggleCrt() ? "on" : "off"}`);
+        this.say(this.toggleCrt() ? t("app.crtOn") : t("app.crtOff"));
         return;
       }
       // F3 logs out from anywhere, including mid-quest. It is on a function
@@ -854,6 +857,19 @@ export class App {
       if (name === "f3") {
         ev.preventDefault();
         if (this.client.state === "authed") void this.logout();
+        return;
+      }
+      // F7 cycles the language, from any screen, exactly like F1 and F2 — a
+      // language you can only choose on the title card is a language you
+      // cannot change once you are three screens in and have realised the
+      // interface is in one you do not read. The toast names the new language
+      // *in that language*, which is the only label that helps somebody who
+      // has just pressed it by accident.
+      if (name === "f7") {
+        ev.preventDefault();
+        const next = nextLocale();
+        void setLocale(next);
+        this.say(t("app.language", { name: localeInfo(next).label }));
         return;
       }
       // F4/F5/F6: search, stats, AI mode. See `AUX` above. They need a session
@@ -896,6 +912,24 @@ export class App {
 
   say(text: string, secs = 4): void {
     this.toast = { text, left: secs, tween: new Tween(seconds("panel")) };
+  }
+
+  /**
+   * How much room the banner is taking under the header, in virtual pixels.
+   *
+   * Zero when there is none. It exists because the banner is drawn *over* the
+   * screen and one screen — the quest bench — now puts a toolbar in exactly
+   * the band it slides into, so "connection lost" would paint across BACK TO
+   * MAP and PASTE. The screens that have something there ask for this and give
+   * up the height; everything else is unaffected and does not have to know.
+   *
+   * The height is the banner's own arithmetic, kept in step by being the same
+   * expression `drawToast` lays out with.
+   */
+  toastBand(): number {
+    if (!this.toast) return 0;
+    const s = this.layout.uiScale();
+    return Math.round(26 * s) + Math.round(6 * s);
   }
 
   private drawToast(g: Ctx): void {

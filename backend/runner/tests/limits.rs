@@ -640,3 +640,255 @@ fn run_go_in(
     };
     cwbhacker_runner::run(&submission)
 }
+
+// ------------------------------------------- the escape §5.3 did not cover
+
+/// SPEC §5.3 says the child is put in its own process group "so a fork bomb
+/// dies with it", and 9.6.c tests exactly one shape of that: a child that
+/// stays in the group, which `killpg` does catch. A child that **leaves** —
+/// `Command::process_group(0)`, `setsid`, `setpgid` — is by definition not in
+/// the group the kill is aimed at.
+///
+/// This test is the one that was missing. Whatever the runner does about it,
+/// this asserts what is actually true today, so the day the behaviour changes
+/// the test fails loudly rather than the claim quietly rotting.
+#[test]
+fn a_descendant_that_leaves_the_process_group_is_still_reaped() {
+    let h = harness();
+    let marker = h.root.join("escaped.txt");
+    let _ = std::fs::remove_file(&marker);
+
+    // The escapee outlives the timeout on purpose: `sleep 6` against a 5 s
+    // clock. If the kill reaches it, the marker never appears; if it does not,
+    // the marker is written about a second *after* the runner said it had
+    // killed everything.
+    let source = format!(
+        r#"
+use std::os::unix::process::CommandExt;
+fn main() {{
+    let mut command = std::process::Command::new("/bin/sh");
+    command.arg("-c").arg("sleep 6; printf escaped > {}");
+    // A new process group. `killpg` on the submission's group cannot reach it.
+    command.process_group(0);
+    let child = command.spawn().expect("spawn");
+    eprintln!("escapee {{}}", child.id());
+    loop {{ std::hint::spin_loop(); }}
+}}
+"#,
+        marker.display()
+    );
+
+    let started = Instant::now();
+    let report = run_in(&h, "att_escape_group", &source, &spec(5_000, "never\n"));
+    let elapsed = started.elapsed();
+
+    assert_eq!(
+        report.verdict,
+        Verdict::Timeout,
+        "the submission itself must still be killed on the clock: {:?}",
+        report.runtime_stderr
+    );
+
+    // The runner returning on its own clock, rather than on a pipe an escapee
+    // is holding, is asserted on its own below — with a margin a loaded
+    // machine cannot eat — by
+    // `a_submission_cannot_set_its_own_wall_clock_by_spawning_something`.
+    assert!(
+        elapsed < std::time::Duration::from_secs(45),
+        "the whole attempt took {elapsed:?}"
+    );
+
+    // Now the question the whole test exists for. `sleep 6` from the start of
+    // the run; give it four seconds past the 5 s kill and look.
+    std::thread::sleep(std::time::Duration::from_secs(4));
+    let escaped = marker.exists();
+    let _ = std::fs::remove_file(&marker);
+    assert!(
+        !escaped,
+        "a descendant that put itself in a new process group outlived the \
+         kill and ran to completion. SPEC §5.3 claims the group kill contains \
+         a fork bomb; it does not contain this."
+    );
+}
+
+/// The hole the sweep does **not** close, asserted out loud so that it is in
+/// the suite rather than in somebody's head — the same reason
+/// `it_is_not_a_sandbox_and_this_test_says_so_out_loud` exists.
+///
+/// A process that both **leaves the process group and is orphaned** before the
+/// runner's next sample of the process table is gone: its parent is dead, so
+/// the kernel no longer holds the link that would identify it as ours, and it
+/// is in nobody's group we know. `ps`/`libproc` on macOS will not report a
+/// session id to a non-root user, so there is no third key to match on.
+///
+/// The day this test fails, something has closed the hole — a sandbox, a
+/// cgroup, root privileges. That is good news, and the thing to do is rewrite
+/// this test into the assertion everyone would prefer and **correct SPEC
+/// §5.3**, which is written to match exactly what is asserted here.
+#[test]
+fn a_descendant_orphaned_between_two_samples_escapes_and_this_is_documented() {
+    let h = harness();
+    let marker = h.root.join("orphan.txt");
+    let _ = std::fs::remove_file(&marker);
+
+    // `sh` starts a background subshell in its own process group and exits at
+    // once. The subshell is then an orphan (`ppid` 1) outside the group — the
+    // one shape nothing can find. The submission lingers just long enough to
+    // guarantee the orphaning has happened before the run ends, so this is a
+    // deterministic escape rather than a race the test might win.
+    let source = format!(
+        r#"
+use std::os::unix::process::CommandExt;
+fn main() {{
+    let mut command = std::process::Command::new("/bin/sh");
+    command.arg("-c").arg("(sleep 4; printf escaped > {}) & exit 0");
+    command.process_group(0);
+    let mut child = command.spawn().expect("spawn");
+    let _ = child.wait();
+    std::thread::sleep(std::time::Duration::from_millis(400));
+    println!("done");
+}}
+"#,
+        marker.display()
+    );
+
+    let report = run_in(&h, "att_escape_orphan", &source, &spec(10_000, "done\n"));
+    assert_eq!(
+        report.verdict,
+        Verdict::Accepted,
+        "the probe did not even run: {:?} / {:?}",
+        report.compiler_stderr,
+        report.runtime_stderr
+    );
+
+    std::thread::sleep(std::time::Duration::from_secs(5));
+    let escaped = marker.exists();
+    let _ = std::fs::remove_file(&marker);
+    assert!(
+        escaped,
+        "the orphan did NOT escape. That is better than SPEC §5.3 claims, \
+         which means containment has improved — rewrite this test into the \
+         assertion everyone would prefer and correct §5.3, which is written \
+         to describe exactly the hole this test asserts."
+    );
+}
+
+/// The escalation SPEC §9.6's fork-bomb row does not reach: children that each
+/// leave the process group. The existing test covers the in-group shape, which
+/// `killpg` catches on its own.
+#[test]
+fn a_fork_bomb_whose_children_leave_the_group_is_still_stopped() {
+    let h = harness();
+    let source = r#"
+use std::os::unix::process::CommandExt;
+fn main() {
+    // Not unbounded — RLIMIT_NPROC is per real UID on macOS and setting it
+    // would throttle the whole login session (see §5.3) — but every one of
+    // these is in a process group of its own, so `killpg` reaches exactly
+    // none of them. Before the descendant sweep they all ran to completion
+    // after the runner reported the attempt killed.
+    for _ in 0..24 {
+        let mut command = std::process::Command::new("/bin/sh");
+        command.arg("-c").arg("sleep 317");
+        command.process_group(0);
+        let _ = command.spawn();
+    }
+    println!("spawned");
+    loop { std::hint::spin_loop(); }
+}
+"#;
+    let started = Instant::now();
+    let report = run_in(&h, "att_bomb_setsid", source, &spec(3_000, "never\n"));
+    let elapsed = started.elapsed();
+
+    assert_eq!(report.verdict, Verdict::Timeout);
+
+    // The assertion with teeth: nothing of ours is left running. The sleep is
+    // an odd number of seconds nothing else in the suite uses, so a sibling
+    // test's `sleep` cannot be mistaken for one of these.
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    // `expect`, not `unwrap_or(0)`: a missing `pgrep` would otherwise make
+    // this assertion pass having tested nothing, in the same file as
+    // `it_is_not_a_sandbox_and_this_test_says_so_out_loud`.
+    let found = std::process::Command::new("/usr/bin/pgrep")
+        .args(["-f", "sleep 317"])
+        .output()
+        .expect("pgrep ran; without it this test cannot check anything");
+    // pgrep exits 1 when it matches nothing, which is the answer this test
+    // wants, and 2 or 3 when it could not do its job at all.
+    let code = found.status.code().unwrap_or(-1);
+    assert!(
+        code == 0 || code == 1,
+        "pgrep failed ({code}): {}",
+        String::from_utf8_lossy(&found.stderr)
+    );
+    let survivors = String::from_utf8_lossy(&found.stdout)
+        .split_whitespace()
+        .count();
+    assert_eq!(
+        survivors, 0,
+        "{survivors} children survived the kill in their own process groups"
+    );
+
+    // And the runner still works, which is what §9.6 actually asks.
+    let good = run_in(
+        &h,
+        "att_bomb_setsid_after",
+        r#"fn main() { println!("hello, causewaybay"); }"#,
+        &spec(30_000, "hello, causewaybay\n"),
+    );
+    assert_eq!(
+        good.verdict,
+        Verdict::Accepted,
+        "{:?}",
+        good.compiler_stderr
+    );
+    assert!(elapsed.as_secs() < 90, "the whole thing took {elapsed:?}");
+}
+
+/// SPEC §5.3 calls `timeout_ms` "a hard wall-clock timeout". It was not one.
+///
+/// The drain threads end when the **last** holder of the pipe's write end
+/// closes it, and everything a submission spawns inherits that pipe. So a
+/// submission could set its own clock: spawn something long-lived, and the
+/// runner sat in `join()` waiting for it long after it had reported the
+/// attempt killed — the reviewer's probe returned at 6.4 s against a 5 s
+/// timeout. The join is bounded now, and what it gave up on is exactly what
+/// the runner could not kill.
+///
+/// The margin here is deliberately enormous: the orphan lives thirty seconds,
+/// so "the runner waited for it" and "the machine was busy" cannot be confused
+/// for one another.
+#[test]
+fn a_submission_cannot_set_its_own_wall_clock_by_spawning_something() {
+    let h = harness();
+    let source = r#"
+use std::os::unix::process::CommandExt;
+fn main() {
+    // Orphaned and out of the group — the one thing the sweep cannot reach —
+    // holding the stdout pipe it inherited for half a minute.
+    let mut command = std::process::Command::new("/bin/sh");
+    command.arg("-c").arg("(sleep 30) & exit 0");
+    command.process_group(0);
+    let mut child = command.spawn().expect("spawn");
+    let _ = child.wait();
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    println!("done");
+}
+"#;
+    let report = run_in(&h, "att_own_clock", source, &spec(10_000, "done\n"));
+    assert_eq!(
+        report.verdict,
+        Verdict::Accepted,
+        "the probe did not run: {:?} / {:?}",
+        report.compiler_stderr,
+        report.runtime_stderr
+    );
+    assert!(
+        report.run_ms < 10_000,
+        "a program that printed one line took {} ms, and the only thing still \
+         running was a `sleep 30` it left behind. The runner is waiting on a \
+         pipe rather than on its own clock.",
+        report.run_ms
+    );
+}

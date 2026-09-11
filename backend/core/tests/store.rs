@@ -789,3 +789,70 @@ fn a_reader_never_sees_a_half_reconciled_map() {
     assert!(saw_new, "the reader never saw the import land");
     let _ = saw_old;
 }
+
+#[test]
+fn taking_the_connection_twice_on_one_thread_panics_instead_of_hanging() {
+    // The guard is a plain mutex and is not reentrant, so this is a deadlock.
+    // A deadlock hangs, and a hang is a bad way to lose ten minutes — it has
+    // cost two agents an afternoon each. It now panics with the remedy in the
+    // message, which is the whole point of the change and is worth a test so
+    // nobody "simplifies" the bookkeeping away.
+    let tmp = tempfile::tempdir().unwrap();
+    let store = Store::open_memory(&tmp.path().join("home")).unwrap();
+
+    let outer = store.conn();
+    // The hook would print the panic to stderr and make a passing run look
+    // like a failing one to anyone reading the output.
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _inner = store.conn();
+    }));
+    std::panic::set_hook(previous);
+    let payload = panicked.expect_err("the second take must not succeed");
+    let said = payload
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string()))
+        .unwrap_or_default();
+    assert!(
+        said.contains("twice on one thread"),
+        "the panic must name what happened: {said:?}"
+    );
+    assert!(
+        said.contains("with_conn"),
+        "and the remedy, or the next person only learns that it broke: {said:?}"
+    );
+
+    // The bookkeeping survived the panic: the outer guard still works, and
+    // dropping it leaves the store usable.
+    outer.execute_batch("select 1").unwrap();
+    drop(outer);
+    store
+        .with_conn(|conn| conn.execute_batch("select 1"))
+        .unwrap();
+}
+
+#[test]
+fn two_threads_taking_the_connection_is_not_reentrance() {
+    // The check is per thread, and must not turn ordinary contention — two
+    // connections doing database work at once, which is the normal state of
+    // the server — into a panic.
+    let tmp = tempfile::tempdir().unwrap();
+    let store = std::sync::Arc::new(Store::open_memory(&tmp.path().join("home")).unwrap());
+    let mut threads = Vec::new();
+    for _ in 0..8 {
+        let store = store.clone();
+        threads.push(std::thread::spawn(move || {
+            for _ in 0..50 {
+                store
+                    .with_conn(|conn| conn.execute_batch("select 1"))
+                    .unwrap();
+            }
+        }));
+    }
+    for t in threads {
+        t.join()
+            .expect("no thread mistook contention for reentrance");
+    }
+}

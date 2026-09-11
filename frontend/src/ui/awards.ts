@@ -22,6 +22,7 @@
  * "LEVEL 37" would be a promise this client has no business making.
  */
 import type { Award } from "../net/protocol";
+import { t } from "../i18n";
 
 /** The nine shapes, by the art name in `public/art/manifest.json`. */
 export type Family =
@@ -99,49 +100,118 @@ export interface Slot {
  * Every award that is a single fixed thing, in the order DESIGN's families run
  * — progress, craft, streak, combo, clock, reach, volume.
  *
+ * A function rather than a constant, because the titles and hints are
+ * translated: a module-level array is built once at import time and would keep
+ * whatever language the game started in for the rest of the session. It is
+ * rebuilt per call, which is per frame, and sixteen `t()` lookups is a map
+ * read — nothing this screen does is measured against it.
+ *
+ * The keys are derived from the id (`beat-the-clock` → `award.beatTheClock`,
+ * plus `…Note` for the hint) so there is one name per award rather than three.
+ *
  * Mastery (`tamed-*`) is missing on purpose even though it is the family this
  * game should be proudest of: there are sixteen taxonomy kinds and a shelf of
  * sixteen empty shackles would drown the seventeen sockets a player can
  * actually plan for. The stats screen makes that promise where it belongs, on
  * the mistake row itself, counting towards five.
  */
-const CATALOGUE: ReadonlyArray<Omit<Slot, "award">> = [
-  { id: "first-clear", title: "FIRST CLEAR", hint: "clear one street", art: "badge_stamp" },
+const CATALOGUE = (): ReadonlyArray<Omit<Slot, "award">> => [
+  {
+    id: "first-clear",
+    title: t("award.firstClear" as "award.firstClear"),
+    hint: t("award.firstClearNote" as "award.firstClearNote"),
+    art: "badge_stamp",
+  },
   {
     id: "quarter-century",
-    title: "QUARTER CENTURY",
-    hint: "clear twenty-five",
+    title: t("award.quarterCentury" as "award.firstClear"),
+    hint: t("award.quarterCenturyNote" as "award.firstClearNote"),
     art: "badge_stamp",
   },
   {
     id: "perfectionist",
-    title: "PERFECTIONIST",
-    hint: "ten streets at three stars",
+    title: t("award.perfectionist" as "award.firstClear"),
+    hint: t("award.perfectionistNote" as "award.firstClearNote"),
     art: "badge_star",
   },
-  { id: "no-hints", title: "NO HINTS", hint: "ten cleared without a hint", art: "badge_star" },
-  { id: "streak-3", title: "STREAK 3", hint: "three days running", art: "badge_flame" },
-  { id: "streak-7", title: "STREAK 7", hint: "seven days running", art: "badge_flame_7" },
-  { id: "streak-30", title: "STREAK 30", hint: "thirty days running", art: "badge_flame_30" },
-  { id: "combo-5", title: "COMBO 5", hint: "five accepted submits in a row", art: "badge_chain" },
-  { id: "combo-10", title: "COMBO 10", hint: "ten in a row", art: "badge_chain_10" },
-  { id: "combo-25", title: "COMBO 25", hint: "twenty-five in a row", art: "badge_chain_25" },
+  {
+    id: "no-hints",
+    title: t("award.noHints" as "award.firstClear"),
+    hint: t("award.noHintsNote" as "award.firstClearNote"),
+    art: "badge_star",
+  },
+  {
+    id: "streak-3",
+    title: t("award.streak3" as "award.firstClear"),
+    hint: t("award.streak3Note" as "award.firstClearNote"),
+    art: "badge_flame",
+  },
+  {
+    id: "streak-7",
+    title: t("award.streak7" as "award.firstClear"),
+    hint: t("award.streak7Note" as "award.firstClearNote"),
+    art: "badge_flame_7",
+  },
+  {
+    id: "streak-30",
+    title: t("award.streak30" as "award.firstClear"),
+    hint: t("award.streak30Note" as "award.firstClearNote"),
+    art: "badge_flame_30",
+  },
+  {
+    id: "combo-5",
+    title: t("award.combo5" as "award.firstClear"),
+    hint: t("award.combo5Note" as "award.firstClearNote"),
+    art: "badge_chain",
+  },
+  {
+    id: "combo-10",
+    title: t("award.combo10" as "award.firstClear"),
+    hint: t("award.combo10Note" as "award.firstClearNote"),
+    art: "badge_chain_10",
+  },
+  {
+    id: "combo-25",
+    title: t("award.combo25" as "award.firstClear"),
+    hint: t("award.combo25Note" as "award.firstClearNote"),
+    art: "badge_chain_25",
+  },
   {
     id: "beat-the-clock",
-    title: "BEAT THE CLOCK",
-    hint: "one HACKER street inside its limit",
+    title: t("award.beatTheClock" as "award.firstClear"),
+    hint: t("award.beatTheClockNote" as "award.firstClearNote"),
     art: "badge_watch",
   },
   {
     id: "interview-ready",
-    title: "INTERVIEW READY",
-    hint: "five of them",
+    title: t("award.interviewReady" as "award.firstClear"),
+    hint: t("award.interviewReadyNote" as "award.firstClearNote"),
     art: "badge_watch",
   },
-  { id: "polyglot", title: "POLYGLOT", hint: "clear one in each land", art: "badge_flags" },
-  { id: "big-o", title: "BIG O", hint: "five HACKER streets", art: "badge_flags" },
-  { id: "century", title: "CENTURY", hint: "one hundred submits", art: "badge_tally" },
-  { id: "iterator", title: "ITERATOR", hint: "fifty runs", art: "badge_tally" },
+  {
+    id: "polyglot",
+    title: t("award.polyglot" as "award.firstClear"),
+    hint: t("award.polyglotNote" as "award.firstClearNote"),
+    art: "badge_flags",
+  },
+  {
+    id: "big-o",
+    title: t("award.bigO" as "award.firstClear"),
+    hint: t("award.bigONote" as "award.firstClearNote"),
+    art: "badge_flags",
+  },
+  {
+    id: "century",
+    title: t("award.century" as "award.firstClear"),
+    hint: t("award.centuryNote" as "award.firstClearNote"),
+    art: "badge_tally",
+  },
+  {
+    id: "iterator",
+    title: t("award.iterator" as "award.firstClear"),
+    hint: t("award.iteratorNote" as "award.firstClearNote"),
+    art: "badge_tally",
+  },
 ];
 
 /**
@@ -159,7 +229,7 @@ export function shelf(awards: readonly Award[]): Slot[] {
   const earned: Slot[] = [];
   const empty: Slot[] = [];
   for (const a of awards) {
-    const known = CATALOGUE.find((s) => s.id === a.id);
+    const known = CATALOGUE().find((s) => s.id === a.id);
     earned.push({
       id: a.id,
       title: a.title || known?.title || a.id.toUpperCase(),
@@ -168,7 +238,7 @@ export function shelf(awards: readonly Award[]): Slot[] {
       award: a,
     });
   }
-  for (const slot of CATALOGUE) {
+  for (const slot of CATALOGUE()) {
     if (!byId.has(slot.id)) empty.push({ ...slot, award: null });
   }
   return [...earned, ...empty];
@@ -178,6 +248,6 @@ export function shelf(awards: readonly Award[]): Slot[] {
 export function shelfCount(awards: readonly Award[]): { have: number; of: number } {
   const ids = new Set(awards.map((a) => a.id));
   let have = 0;
-  for (const slot of CATALOGUE) if (ids.has(slot.id)) have++;
-  return { have, of: CATALOGUE.length };
+  for (const slot of CATALOGUE()) if (ids.has(slot.id)) have++;
+  return { have, of: CATALOGUE().length };
 }

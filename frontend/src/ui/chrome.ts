@@ -24,6 +24,7 @@ import {
 import type { Layout } from "../engine/layout";
 import type { App } from "../app";
 import type { Tween } from "../engine/motion";
+import { t } from "../i18n";
 
 // One definition per land, taken from the palette rather than restated here.
 export const RUST: RGBA = TRACK_COL.rust;
@@ -38,16 +39,50 @@ export interface Frame {
   headerH: number;
   footerH: number;
   scale: number;
+  /**
+   * True when the two boxes are **stacked** rather than side by side.
+   *
+   * Usually that is the window's orientation, which is why it is called this;
+   * a screen that passes `stack` overrides it, and then this says what the
+   * layout actually did rather than what the window is. The only consumer is
+   * `arriveFrom`, which needs to know which edge a panel comes in from, and
+   * that is a fact about the layout and not about the window.
+   */
   portrait: boolean;
   pad: number;
 }
 
 /**
+ * How the two boxes sit relative to each other.
+ *
+ * `auto` follows the window, which is what every screen wants and what they
+ * all did before there was a choice. The quest screen offers the other two to
+ * the player, because it is the screen somebody stares at for an hour and a
+ * brief beside the editor and a brief above it suit different eyes and
+ * different windows — a wide monitor can want the stacked one, and a tall
+ * window can want the columns.
+ */
+export type Stack = "auto" | "row" | "column";
+
+/**
  * `split` is how much of the long axis the first box takes, 0..1. The gap and
  * the margins are in virtual pixels scaled by the UI scale, so they stay the
  * same size to the eye whether the canvas grew or shrank.
+ *
+ * `reserve` is height taken off the top of the body before the boxes are cut,
+ * for a screen that puts a toolbar between the header and its panels. It is a
+ * parameter rather than each screen subtracting it afterwards because a box
+ * whose height was adjusted after the split is a box whose *contents* were
+ * laid out against the wrong height — which is the fault decisions.md records
+ * twice as "measure the row before you reserve its height".
  */
-export function frame(layout: Layout, split = 0.5, inset = 0): Frame {
+export function frame(
+  layout: Layout,
+  split = 0.5,
+  inset = 0,
+  stack: Stack = "auto",
+  reserve = 0,
+): Frame {
   const s = layout.uiScale();
   // `inset` holds the panels off the edges as a fraction of the body, so a
   // screen can let the city breathe around it. The working screens — map and
@@ -57,10 +92,10 @@ export function frame(layout: Layout, split = 0.5, inset = 0): Frame {
   const headerH = Math.round(38 * s);
   const footerH = Math.round(26 * s);
   const x = pad;
-  const y = headerH + pad;
+  const y = headerH + pad + reserve;
   const w = layout.vw - pad * 2;
-  const h = layout.vh - headerH - footerH - pad * 2;
-  const portrait = layout.isPortrait();
+  const h = layout.vh - headerH - footerH - pad * 2 - reserve;
+  const portrait = stack === "auto" ? layout.isPortrait() : stack === "column";
   const gap = pad;
   if (portrait) {
     const top = Math.round((h - gap) * split);
@@ -117,7 +152,7 @@ export function header(g: Ctx, app: App, title: string): void {
   // The address is abbreviated because the full forty hex characters is not
   // information anybody reads — the ends are what you check against a wallet.
   const who = `${app.addressLabel.slice(0, 6)}…${app.addressLabel.slice(-4)}`;
-  const label = `${who}  LOG OUT`;
+  const label = `${who}  ${t("chrome.logout")}`;
   const pad = Math.round(8 * s);
   const w = width(sm, label) + pad * 2;
   const bx = layout.vw - w - Math.round(6 * s);
@@ -264,7 +299,7 @@ export function stars(g: Ctx, x: number, y: number, r: number, n: number, of = 3
 export function difficulty(g: Ctx, x: number, y: number, w: number, n: number, of = 5): void {
   const f = font("stationSm");
   g.fillStyle = css(Theme.dim);
-  printf(g, f, "DIFFICULTY", x, y, w, "left");
+  printf(g, f, t("chrome.difficulty"), x, y, w, "left");
   const by = y + f.height + Math.round(f.size * 0.4);
   const gap = Math.max(2, Math.round(f.size * 0.3));
   const seg = (w - gap * (of - 1)) / of;
@@ -290,7 +325,7 @@ export function difficultyH(): number {
  */
 export function clearRibbon(g: Ctx, cx: number, cy: number, w: number): void {
   const f = font("stationSm");
-  const label = "CLEAR";
+  const label = t("chrome.clearRibbon");
   const scale = (w * 0.78) / Math.max(1, width(f, label));
   g.save();
   g.translate(cx, cy);
@@ -330,7 +365,7 @@ export function clearedStamp(
   angle = -0.18,
 ): void {
   const f = font("stamp");
-  const label = "CLEARED";
+  const label = t("chrome.cleared");
   const tw = Math.max(1, width(f, label));
   const ring = app.assets?.picture("stamp_cleared") ?? null;
   g.save();

@@ -18,9 +18,10 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc::unbounded_channel;
 
 use cwbhacker_core::attempts::Mode;
-use cwbhacker_core::error::{bad_request, Code, Error};
+use cwbhacker_core::error::{bad_request, rate_limited, Code, Error};
 
 use crate::handlers::{self, Session};
+use crate::limits::{self, ConnectionLimits};
 use crate::playground;
 use crate::proto::{self, send, Incoming, Out, Outgoing, ServerFrame, MAX_FRAME_BYTES};
 use crate::state::Shared;
@@ -111,6 +112,8 @@ async fn connection(socket: WebSocket, state: Shared) {
     let in_flight = Arc::new(AtomicBool::new(false));
     // §2.2: reusing an `id` that is still in flight is `bad_request`.
     let live_ids: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
+    // What this connection is allowed to ask for, and how fast (`limits.rs`).
+    let allowance = Arc::new(ConnectionLimits::default());
 
     while let Some(message) = stream.next().await {
         let message = match message {
@@ -145,6 +148,7 @@ async fn connection(socket: WebSocket, state: Shared) {
                     &mut session,
                     &in_flight,
                     &live_ids,
+                    &allowance,
                     &tx,
                     text.as_str(),
                 )
@@ -184,6 +188,7 @@ async fn dispatch(
     session: &mut Session,
     in_flight: &Arc<AtomicBool>,
     live_ids: &Arc<Mutex<HashSet<String>>>,
+    allowance: &Arc<ConnectionLimits>,
     tx: &Out,
     text: &str,
 ) {
@@ -197,12 +202,27 @@ async fn dispatch(
             return;
         }
         Incoming::Malformed { id, kind, error } => {
-            send(tx, ServerFrame::err(id, &kind, &error));
+            // Charged too. A frame the server could not understand is still a
+            // frame it had to read and answer, and this arm is now reachable
+            // in a loop: a 300-deep object is `bad_request` with the
+            // connection open (§3.3) where it used to be a close, so without
+            // a token it would be an unmetered reply at network speed.
+            if charge(allowance, tx, &id, &kind) {
+                send(tx, ServerFrame::err(id, &kind, &error));
+            }
             return;
         }
     };
     let id = frame.id.clone();
     let kind = frame.kind.clone();
+
+    // §3.3 `rate_limited`, before everything: before the version check, whose
+    // answer is a reply like any other; before `live_ids`, so a refusal has
+    // nothing to release; and before the ANONYMOUS gate, because an anonymous
+    // socket asking for a hundred nonces is the case that needed a limit most.
+    if !charge(allowance, tx, &id, &kind) {
+        return;
+    }
 
     if frame.v != proto::PROTOCOL_VERSION {
         // §2.1: answered, and the connection stays open, so a client can
@@ -220,6 +240,21 @@ async fn dispatch(
             ),
         );
         return;
+    }
+
+    if kind == "auth.challenge" {
+        if let Err(retry_after_ms) = allowance.challenge() {
+            // Each challenge mints a nonce that lives 120 seconds (SPEC §3.2).
+            send(
+                tx,
+                ServerFrame::err(
+                    id,
+                    &kind,
+                    &rate_limited("too many login challenges", retry_after_ms),
+                ),
+            );
+            return;
+        }
     }
 
     if let Some(id) = id.as_deref() {
@@ -254,13 +289,26 @@ async fn dispatch(
     // worker — but it does not take the execution slot either: pressing FORMAT
     // while a submit compiles is a normal thing to do.
     if kind == "code.format" {
-        let state_for_task = state.clone();
+        // It skips the execution slot, so it needs a ceiling of its own or a
+        // loop of it spawns `rustfmt` without bound.
+        let Some(pass) = state.formatters.enter() else {
+            release(live_ids, &id);
+            send(
+                tx,
+                ServerFrame::err(
+                    id,
+                    "code.format",
+                    &rate_limited("too many formatters running", limits::FORMAT_RETRY_MS),
+                ),
+            );
+            return;
+        };
         let tx = tx.clone();
         let live_ids = live_ids.clone();
         let payload = frame.payload.clone();
-        let _ = state_for_task;
         tokio::spawn(async move {
             let result = tokio::task::spawn_blocking(move || handlers::code_format(&payload)).await;
+            drop(pass);
             release(&live_ids, &id);
             send(
                 &tx,
@@ -345,6 +393,32 @@ async fn dispatch(
     );
 }
 
+/// Spend one of this connection's request tokens. `false` means the token was
+/// not there and a correlated `rate_limited` has already gone out, so the
+/// caller must answer nothing further.
+///
+/// **Every path that replies to a frame goes through this**, including the two
+/// that reply before the frame is understood — a malformed envelope and an
+/// unsupported `v`. They are answered rather than closed (§2.1, §3.3), so a
+/// loop of them is a loop of replies, and a limit those two paths sit above is
+/// not a limit.
+fn charge(allowance: &ConnectionLimits, tx: &Out, id: &Option<String>, kind: &str) -> bool {
+    match allowance.request() {
+        Ok(()) => true,
+        Err(retry_after_ms) => {
+            send(
+                tx,
+                ServerFrame::err(
+                    id.clone(),
+                    kind,
+                    &rate_limited("too many requests on this connection", retry_after_ms),
+                ),
+            );
+            false
+        }
+    }
+}
+
 fn release(live_ids: &Arc<Mutex<HashSet<String>>>, id: &Option<String>) {
     if let Some(id) = id {
         live_ids.lock().unwrap().remove(id);
@@ -423,6 +497,29 @@ fn execute_async(
         return;
     }
 
+    // The per-connection slot is taken; now the global one. This order
+    // matters: `busy` is the more specific answer and the one a client has a
+    // button to disable, so a connection that is already compiling hears
+    // `busy` rather than being told the whole server is loaded.
+    let Some(pass) = state.executions.enter() else {
+        // Give the slot straight back, or this connection can never run
+        // anything again.
+        in_flight.store(false, Ordering::SeqCst);
+        release(live_ids, &id);
+        send(
+            tx,
+            ServerFrame::err(
+                id,
+                reply_kind,
+                &rate_limited(
+                    "the server is compiling as much as it can at once",
+                    limits::EXECUTION_RETRY_MS,
+                ),
+            ),
+        );
+        return;
+    };
+
     let state = state.clone();
     let tx = tx.clone();
     let flag = in_flight.clone();
@@ -441,6 +538,7 @@ fn execute_async(
             })
             .await
         };
+        drop(pass);
         flag.store(false, Ordering::SeqCst);
         release(&live_ids, &id);
         let frame = match result {

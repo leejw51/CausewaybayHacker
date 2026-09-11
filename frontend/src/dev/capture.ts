@@ -90,6 +90,42 @@ export interface CaptureApi {
  * the selection and the syntax colours are not reproduced. Anyone reading a
  * shot should know that; it is stated wherever these are published.
  */
+/**
+ * What a field's text looks like *on the screen*, which is not always what is
+ * in its `value`.
+ *
+ * The seed field is masked (`-webkit-text-security`, or a blur where that is
+ * not implemented). A capture hook that painted `el.value` would take a
+ * screenshot in which the twelve words are legible while the browser was
+ * showing dots — and those screenshots go into `frontend/shots/` and into
+ * pull requests. So the mask is read off the element and reproduced.
+ *
+ * It is done by reading the computed style rather than by special-casing the
+ * login screen, so the rule is "the hook paints what is on screen" and any
+ * future masked field is covered by it without anybody remembering to.
+ */
+function maskedFor(el: HTMLElement, text: string): string {
+  let masked = el.classList.contains("cwb-masked");
+  if (!masked) {
+    try {
+      const style = getComputedStyle(el);
+      const sec =
+        style.getPropertyValue("-webkit-text-security") || style.getPropertyValue("text-security");
+      masked = sec.trim() !== "" && sec.trim() !== "none";
+    } catch {
+      /* an element with no computed style is not masked */
+    }
+  }
+  if (!masked) return text;
+  // Line structure is kept: a phrase pasted across two lines still looks like
+  // two lines of something, which is information about the *shape* of what is
+  // in the box and not about its content.
+  return text
+    .split("\n")
+    .map((line) => "\u2022".repeat(line.length))
+    .join("\n");
+}
+
 function paintOverlay(app: App, g: CanvasRenderingContext2D): void {
   // The overlay host is hidden outright while a modal is up, so that the
   // canvas-drawn dialogue is genuinely on top. A capture that painted the
@@ -121,7 +157,7 @@ function paintOverlay(app: App, g: CanvasRenderingContext2D): void {
     const lines: string[] = [];
     let colour = "#fcecc8";
     if (el instanceof HTMLTextAreaElement) {
-      if (el.value) lines.push(...el.value.split("\n"));
+      if (el.value) lines.push(...maskedFor(el, el.value).split("\n"));
       else {
         lines.push(el.placeholder);
         colour = "#786858";

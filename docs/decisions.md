@@ -4784,3 +4784,162 @@ ignoring each quest's declared `compile_timeout_ms`. Every shipped quest is
 verified by a different code path from the one that will judge it — which is
 the exact shape of bug this script exists to catch. It should delegate to the
 real runner. Noted in `tests/PLAN.md` as a known hole rather than fixed here.
+
+## 2026-09-11 — BE: the process-group kill was escapable, and three other holds
+
+An adversarial reviewer ran 47 attacks; 46 held. These are the four that did
+not, in the order of what they cost.
+
+### 1. `killpg` never reached a child that left the group
+
+SPEC §5.3 said "the child is put in its own process group so a fork bomb dies
+with it", and §9.6 tested it — with a child that **stays** in the group, which
+is the only shape `killpg` catches. A grandchild spawned with
+`Command::process_group(0)` (or `setsid`, or `setpgid`) is by construction not
+in the group the kill is aimed at. Reproduced: the marker file was written a
+second *after* the runner reported the attempt killed.
+
+Reproducing it turned up a second bug nobody had noticed, and it is the worse
+of the two. `proc::run` joined the output-drain threads unconditionally, and a
+drain thread ends only when the **last** holder of the pipe's write end closes
+it. Everything a submission spawns inherits that pipe. So `run()` returned at
+**6.4 s against a 5 s timeout** — a submission could set its own wall clock by
+spawning something long-lived, and §5.3's "hard wall-clock timeout" was not
+one. That is fixed independently of the sweep: one deadline, 500 ms after the
+kill, and the threads are dropped rather than joined if they have not finished.
+The buffers are shared `Arc`s, so what did arrive is kept.
+
+**The fix, and exactly how far it goes.** `backend/runner/src/reap.rs` samples
+the process table every 100 ms for the life of the attempt (`proc_listpids` +
+`proc_pidinfo` on darwin, `/proc/*/stat` on linux — about 0.5 ms a sample for
+500 processes) and records every process that was, at that moment, in the
+submission's group or a descendant of something already recorded. On **every**
+exit path — clean, output-capped, timed out — the escapees are SIGSTOPped to a
+fixpoint, the documented `killpg` TERM/grace/KILL runs for the group itself,
+and everything recorded and still alive is SIGKILLed by pid. Each pid carries
+the process start time it was recorded with, checked again before any signal,
+so a recycled pid is never signalled — killing by pid is only safe with that
+guard.
+
+In-group processes are deliberately **not** stopped first: a stopped process
+does not handle SIGTERM, so freezing them would silently delete the 500 ms of
+grace §5.3 promises.
+
+**What is left, and it is not nothing.** A process that both leaves the group
+*and* is orphaned between two samples is unreachable: once its parent has
+exited the kernel keeps no link back to us. The obvious third key would be the
+session id — put each attempt in its own session and sweep by it — but macOS
+reports `sess` as `0` to a non-root process (checked: `ps -A -o sess=`), and
+`proc_bsdinfo` does not carry it either. There is no `PR_SET_PDEATHSIG` and no
+cgroup on darwin. So this is a best effort and §5.3 now says so in those words
+rather than claiming containment for a second time.
+
+`backend/runner/tests/limits.rs` has four new tests: the `process_group(0)`
+escapee is reaped; a fork bomb whose 24 children each leave the group leaves
+zero survivors; a submission cannot extend its own clock (30 s orphan, asserted
+under 10 s, a margin a loaded machine cannot eat); and
+`a_descendant_orphaned_between_two_samples_escapes_and_this_is_documented`,
+which asserts the hole **is still there** — in the style of
+`it_is_not_a_sandbox_and_this_test_says_so_out_loud`. The day it fails,
+containment improved and §5.3 needs rewriting, which the failure message says.
+
+### 2. `rate_limited` was in the closed set and nothing constructed it
+
+120 rapid requests produced none. PROTOCOL §3.2's one-execution slot is **per
+connection** by design, so two sockets were two compilers; `code.format` skips
+that slot on purpose (pressing FORMAT mid-compile is normal), so a loop of it
+spawned `rustfmt` without bound; and an anonymous socket could mint 100 nonces
+that each sit in memory for 120 s. With the server binding `0.0.0.0` and the
+README saying "many players, one server", that is one client degrading
+availability for a tailnet.
+
+`backend/server/src/limits.rs` adds a token bucket per connection (240 burst,
+60/s), a tighter one for `auth.challenge` (20 burst, 1/s), and two global
+gates: 8 concurrent executions and 4 concurrent formatters. Every refusal is
+`rate_limited` with `detail.retry_after_ms`, per §3.3.
+
+Two things that are easy to get wrong and are therefore tested. The global
+execution cap is checked **after** the per-connection slot, so a connection
+already compiling still hears `busy` — the more specific answer, and the one a
+client has a button for; and on the `rate_limited` path the slot and the
+in-flight id are both given back, or that connection would be dead for the rest
+of its life. The gates are occupied directly from the test rather than by
+racing nine real compiles, so the assertion is about the ceiling and not about
+how fast the machine is.
+
+**The numbers are chosen so a person cannot reach them**, and
+`nothing_a_person_can_do_is_throttled` is the test that matters more than the
+other four: a full startup fan-out, thirty screen changes at four requests
+each, twenty keepalives and six RUNs, with no pause anywhere, none of it
+throttled. If that test ever fails the fix is a bigger burst, not a slower
+client. A trainer that tells a player to press RUN more slowly has failed at
+the only thing it does.
+
+### 3. A 300-deep but valid object was closed `1003`
+
+`1003` means "a binary frame, or a frame that is not a JSON object" (§1.2) and
+this **is** an object — it just trips serde's recursion limit of 128, and by
+then the error is indistinguishable from a syntax error. Refusing it is right;
+the reason was a lie.
+
+Answered `bad_request` with the connection open, which is what §3.3 prefers for
+an application-level problem. The depth is now checked before serde sees the
+text, by one non-recursive pass over the bytes that also salvages the top-level
+`id` and `type` — so the refusal is **correlated**, which a close could never
+be. Limit 64, well under serde's 128 so the two can never disagree.
+
+The pass skips string contents with full escape handling, and that is the whole
+risk in the change rather than a nicety: every `quest.submit` carries a program
+in `payload.source`, so a depth counter that counted the braces inside
+`"fn main() { … }"` would refuse every real submission and look like the runner
+had broken. There is a unit test for exactly that, and one for `"a\\"`.
+
+### 4. `Store::conn()` hung instead of panicking
+
+Taking the guard twice on one thread is a deadlock, and it had cost two agents
+ten minutes each. The proposed `with_conn(|conn| …)` is added, but on its own
+it prevents nothing — so the real fix is that the second take now **panics with
+the remedy in the message**. A thread-local list of the stores this thread is
+inside, cleared by the guard's `Drop`.
+
+It rippled nowhere: 125 call sites, and exactly one named `MutexGuard` (the
+signature itself). `conn()` returns a `Conn<'_>` that derefs to `Connection`,
+so `conn.prepare(..)`, `&conn` and `&*conn` are all unchanged. Call sites were
+not migrated to `with_conn`; it is there for new code.
+
+### What a second pass found, and the one that mattered
+
+**The limiter sat below three early returns.** `dispatch` answers a malformed
+envelope and an unsupported `v` *before* it understands the frame, and both
+keep the connection open by design (§2.1, §3.3). The token was spent after
+them, so those two paths were unmetered — and fix #3 above had just made one of
+them cheap to reach in a loop, because a 300-deep frame now gets a reply where
+it used to get a close. That is finding #2 reopened on a different path by the
+fix for finding #3. Every reply now goes through one `charge()`, including
+those two. `a_loop_of_frames_the_server_cannot_parse_is_rate_limited_too`
+covers both probes, and was checked against the old ordering: it fails there,
+so it is a real regression test and not a green tick.
+
+**A test that could pass for the wrong reason.** The fork-bomb survivor count
+came from `pgrep(...).unwrap_or(0)` — a missing `pgrep` would have asserted
+nothing and passed. It is `expect` plus an exit-status check now. In the file
+that contains `it_is_not_a_sandbox_and_this_test_says_so_out_loud`, that
+particular shape of bug is the one to be least relaxed about.
+
+**An empty process table is not an empty process list.** `kill_strays` broke
+out of its loop on "no strays", and a transient `proc_listpids` failure looks
+exactly like that — which would have left anything `freeze_escapees` had
+SIGSTOPped stopped for ever, holding the output pipe, never dying. Worse than
+the hole §5.3 admits to. The two cases are distinguished now, and if the table
+never comes back at all a SIGCONT goes out to every recorded pid: it is a no-op
+for a process that was never stopped and for a pid that has been recycled,
+which is what makes it the one signal worth sending unverified.
+
+**The depth cap is a client-visible rule**, so it is in `PROTOCOL.md` §1 beside
+the 4 MiB frame cap and in §1.2, not only in `SPEC.md` — three clients are
+written against that file and none of them against this one.
+
+### Suite
+
+219 → 244 passing, 0 failing (`cd backend && cargo test --workspace`), clippy
+and `cargo fmt --check` clean.

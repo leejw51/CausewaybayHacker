@@ -32,6 +32,7 @@ import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import type { Category, Drill, DrillMode, Land, MistakeStat, Quest } from "../net/protocol";
 import { unbuilt, unbuiltLine } from "../net/milestone";
+import { t as T } from "../i18n";
 import { auxHeight, auxRow, drawAux, AUX_HINT, openAux } from "../ui/auxnav";
 import { drawNotice, type Notice } from "../ui/notice";
 import { emptyDrill, isLearned, type CoachContext } from "../ui/coach";
@@ -40,20 +41,17 @@ import { LandsScene } from "./lands";
 
 const MODES: readonly DrillMode[] = ["weakness", "repeat", "spaced"];
 
-const MODE_TITLE: Record<DrillMode, string> = {
-  weakness: "WEAKNESS",
-  repeat: "REPEAT",
-  spaced: "SPACED",
-};
+const MODE_TITLE = (m: DrillMode): string => T(`ai.${m}` as "ai.weakness");
 
 /** What each plan is, from §7.3, in the coach's own voice. */
-const MODE_LINE: Record<DrillMode, string> = {
-  weakness:
-    "The mistake you make most, in five different shapes — cleared streets included. " +
-    "The one that teaches.",
-  repeat: "The streets that beat you, worst first. Do it again until it sticks.",
-  spaced: "Cleared streets, due for review. Three stars in a fortnight, one star in two days.",
-};
+const MODE_LINE = (m: DrillMode): string =>
+  T(
+    (m === "weakness"
+      ? "ai.weaknessBlurb"
+      : m === "repeat"
+        ? "ai.repeatBlurb"
+        : "ai.spacedBlurb") as "ai.weaknessBlurb",
+  );
 
 /** §4.16's `size`. Five is the example and a sensible sitting. */
 const SIZE = 5;
@@ -185,7 +183,7 @@ export class AiScene implements Scene {
       }
     } catch (e) {
       session = null;
-      this.notice = this.explain(e, "THE COACH");
+      this.notice = this.explain(e, T("ai.coach"));
       this.app.chip.fail();
     } finally {
       this.busy = false;
@@ -210,7 +208,7 @@ export class AiScene implements Scene {
       if (e instanceof WireError && e.payload.code === "not_found" && session) {
         await this.finish();
       } else {
-        this.notice = this.explain(e, "THE NEXT STREET");
+        this.notice = this.explain(e, T("ai.nextStreet"));
         this.app.chip.fail();
       }
     } finally {
@@ -227,7 +225,7 @@ export class AiScene implements Scene {
       session.quest = null;
       this.app.chip.clear();
     } catch (e) {
-      this.notice = this.explain(e, "THE SUMMARY");
+      this.notice = this.explain(e, T("ai.summary"));
       session.done = true;
       session.quest = null;
     }
@@ -239,18 +237,15 @@ export class AiScene implements Scene {
       console.info("ai.* is not built yet:", gap.developerMessage);
       return {
         head: unbuiltLine(what, gap).toUpperCase(),
-        body:
-          "SPEC §7.3 has all three plans and none of them needs a language model — they are " +
-          "queries over the mistakes you have already made. The tables are being filled in " +
-          "every time you press SUBMIT; the coach that reads them is not in this build yet.",
+        body: T("ai.unbuiltBody"),
         tone: "unbuilt",
       };
     }
     if (e instanceof WireError) {
       console.warn("ai call failed:", e.payload.code, e.payload.message, e.payload.detail);
-      return { head: "THAT DID NOT WORK", body: playerText(e.payload.code), tone: "fault" };
+      return { head: T("ai.failedHead"), body: playerText(e.payload.code), tone: "fault" };
     }
-    return { head: "THAT DID NOT WORK", body: "the coach did not answer", tone: "fault" };
+    return { head: T("ai.failedHead"), body: T("ai.failedBody"), tone: "fault" };
   }
 
   // -- input ---------------------------------------------------------------
@@ -350,7 +345,7 @@ export class AiScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
-    header(g, this.app, "AI MODE");
+    header(g, this.app, T("ai.title"));
     const f = frame(layout, layout.isPortrait() ? 0.44 : 0.36, 0.03);
     this.picks.reset();
     this.acts.reset();
@@ -358,12 +353,12 @@ export class AiScene implements Scene {
     arriving(g, f, "left", this.leftIn, () => this.drawChooser(g, f.left, f.scale));
     arriving(g, f, "right", this.rightIn, () => this.drawSession(g, f.right, f.scale));
 
-    footer(g, layout, `Q/E  PLAN   ENTER  GO   ${AUX_HINT}`);
+    footer(g, layout, T("ai.footer", { aux: AUX_HINT() }));
   }
 
   private drawChooser(g: Ctx, rect: Rect, s: number): void {
     const fonts = ensureFonts(s);
-    const inner = titledPanel(g, rect, "WHAT SHOULD I DRILL", Theme.coin);
+    const inner = titledPanel(g, rect, T("ai.question"), Theme.coin);
     const [x, y, w, h] = inner;
     const touch = this.app.layout.minTouchH();
     const navH = auxHeight(fonts.stationSm, w, touch);
@@ -387,11 +382,11 @@ export class AiScene implements Scene {
     const chipY = Math.min(cy, floor - chipH);
     let cx = x;
     g.fillStyle = css(Theme.dim);
-    const labelW = width(fonts.stationSm, "LAND") + Math.round(8 * s);
+    const labelW = width(fonts.stationSm, T("ai.land")) + Math.round(8 * s);
     printf(
       g,
       fonts.stationSm,
-      "LAND",
+      T("ai.land"),
       x,
       chipY + Math.round((chipH - fonts.stationSm.height) / 2),
       labelW,
@@ -399,9 +394,9 @@ export class AiScene implements Scene {
     );
     cx += labelW;
     for (const [id, label, value] of [
-      ["land:any", "ANY", null],
-      ["land:rust", "RUST", "rust"],
-      ["land:go", "GO", "go"],
+      ["land:any", T("ai.any"), null],
+      ["land:rust", T("ai.rust"), "rust"],
+      ["land:go", T("ai.go"), "go"],
     ] as Array<[string, string, Land | null]>) {
       const cw = width(fonts.stationSm, label) + Math.round(14 * s);
       const on = value === this.landFilter;
@@ -421,7 +416,11 @@ export class AiScene implements Scene {
       cx += cw + Math.round(5 * s);
     }
 
-    const label = this.busy ? "…" : session && !session.done ? "NEW PLAN" : `DRILL ${SIZE}`;
+    const label = this.busy
+      ? "…"
+      : session && !session.done
+        ? T("ai.newPlan")
+        : T("ai.drillSize", { n: SIZE });
     const by = y + h - navH - btnH - Math.round(8 * s);
     pixBtn(g, fonts.button, x, by, w, btnH, label, {
       strong: !this.busy,
@@ -445,11 +444,11 @@ export class AiScene implements Scene {
     fill(g, accent, x, y + h - 2, w, 2, on ? 1 : 0.35);
     const pad = Math.round(10 * s);
     g.fillStyle = css(on ? Theme.coin : hot ? Theme.cream : Theme.dim);
-    printf(g, fonts.station, MODE_TITLE[m], x + pad, y + pad, w - pad * 2, "left");
+    printf(g, fonts.station, MODE_TITLE(m), x + pad, y + pad, w - pad * 2, "left");
     const lineY = y + pad + fonts.station.height + Math.round(4 * s);
     const fits = Math.floor((y + h - Math.round(8 * s) - lineY) / fonts.small.height);
     if (fits >= 1) {
-      const all = wrap(fonts.small, MODE_LINE[m], w - pad * 2);
+      const all = wrap(fonts.small, MODE_LINE(m), w - pad * 2);
       const use = all.slice(0, fits);
       if (all.length > use.length && use.length > 0) {
         use[use.length - 1] = use[use.length - 1].replace(/.{0,2}$/u, "…");
@@ -461,7 +460,7 @@ export class AiScene implements Scene {
         ly += fonts.small.height;
       }
     }
-    this.picks.add({ id: `mode:${m}`, rect, label: MODE_TITLE[m] });
+    this.picks.add({ id: `mode:${m}`, rect, label: MODE_TITLE(m) });
   }
 
   private drawSession(g: Ctx, rect: Rect, s: number): void {
@@ -469,10 +468,14 @@ export class AiScene implements Scene {
     // A finished plan does not have a current position: leaving the head on
     // "2 OF 5" over a PLAN COMPLETE panel is the screen contradicting itself.
     const title = !session
-      ? "THE COACH"
+      ? T("ai.coach")
       : session.done
-        ? `${MODE_TITLE[session.drill.mode]} — DONE`
-        : `${MODE_TITLE[session.drill.mode]} — ${Math.min(session.position + 1, session.total)} OF ${session.total}`;
+        ? T("ai.done", { title: MODE_TITLE(session.drill.mode) })
+        : T("ai.position", {
+            title: MODE_TITLE(session.drill.mode),
+            at: Math.min(session.position + 1, session.total),
+            total: session.total,
+          });
     const inner = titledPanel(g, rect, title, Theme.cyan);
     const [x, y, w, h] = inner;
     const touch = this.app.layout.minTouchH();
@@ -481,8 +484,8 @@ export class AiScene implements Scene {
     if (this.notice) {
       drawNotice(g, this.app, [x, y, w, h - btnH - Math.round(10 * s)], this.notice);
       this.drawActions(g, [x, y + h - btnH, w, btnH], s, [
-        { id: "again", label: "TRY ANOTHER PLAN" },
-        { id: "maps", label: "TO THE MAPS" },
+        { id: "again", label: T("ai.tryAnother") },
+        { id: "maps", label: T("ai.toTheMaps") },
       ]);
       this.overflow = 0;
       return;
@@ -490,11 +493,8 @@ export class AiScene implements Scene {
 
     if (!session) {
       drawNotice(g, this.app, [x, y, w, h], {
-        head: "PICK A PLAN",
-        body:
-          "Three of them, all built from your own record rather than from a model: what you " +
-          "failed, what you keep getting wrong, and what you cleared long enough ago to have " +
-          "forgotten. Choose one and the coach will say why each street is next.",
+        head: T("ai.pickHead"),
+        body: T("ai.pickBody"),
         tone: "empty",
       });
       this.overflow = 0;
@@ -504,8 +504,8 @@ export class AiScene implements Scene {
     if (session.done) {
       this.drawSummary(g, [x, y, w, h - btnH - Math.round(10 * s)], s);
       this.drawActions(g, [x, y + h - btnH, w, btnH], s, [
-        { id: "again", label: "ANOTHER PLAN" },
-        { id: "maps", label: "TO THE MAPS" },
+        { id: "again", label: T("ai.anotherPlan") },
+        { id: "maps", label: T("ai.toTheMaps") },
       ]);
       this.overflow = 0;
       return;
@@ -530,7 +530,15 @@ export class AiScene implements Scene {
         fill(g, Theme.ink, x, y, w, bandH, 0.7);
         fill(g, Theme.coin, x, y, Math.round(5 * s), bandH);
         g.fillStyle = css(Theme.dim);
-        printf(g, fonts.stationSm, "WHY THIS ONE", x + pad, y + Math.round(4 * s), inner2, "left");
+        printf(
+          g,
+          fonts.stationSm,
+          T("ai.whyThisOne"),
+          x + pad,
+          y + Math.round(4 * s),
+          inner2,
+          "left",
+        );
         g.fillStyle = css(Theme.coin);
         let ly = y + pad + Math.round(6 * s);
         for (const line of lines) {
@@ -590,9 +598,9 @@ export class AiScene implements Scene {
     this.drawPlanStrip(g, [x, pipY, w, Math.round(18 * s)], s);
 
     this.drawActions(g, [x, y + h - btnH, w, btnH], s, [
-      { id: "go", label: "GO IN", primary: true },
-      { id: "skip", label: "SKIP" },
-      { id: "finish", label: "FINISH" },
+      { id: "go", label: T("ai.goIn"), primary: true },
+      { id: "skip", label: T("ai.skip") },
+      { id: "finish", label: T("ai.finish") },
     ]);
     this.overflow = 0;
   }
@@ -626,25 +634,33 @@ export class AiScene implements Scene {
     const sum = session?.summary;
     if (!sum) {
       drawNotice(g, this.app, rect, {
-        head: "THAT IS THE PLAN DONE",
-        body: "The server did not send a summary for it, which is no reflection on the work.",
+        head: T("ai.planDoneHead"),
+        body: T("ai.planDoneBody"),
         tone: "empty",
       });
       return;
     }
     let cy = y + Math.round(10 * s);
     g.fillStyle = css(Theme.coin);
-    printf(g, fonts.station, "PLAN COMPLETE", x, cy, w, "left");
+    printf(g, fonts.station, T("ai.planComplete"), x, cy, w, "left");
     cy += fonts.station.height + Math.round(12 * s);
     g.fillStyle = css(Theme.cream);
-    printf(g, fonts.station, `${sum.cleared} CLEARED OF ${sum.attempted}`, x, cy, w, "left");
+    printf(
+      g,
+      fonts.station,
+      T("ai.clearedOf", { cleared: sum.cleared, attempted: sum.attempted }),
+      x,
+      cy,
+      w,
+      "left",
+    );
     cy += fonts.station.height + Math.round(14 * s);
     if (sum.kinds_improved.length > 0) {
       // The whole point of the mode, said back to the player in their own
       // taxonomy. `kinds_improved` is the only place the game ever tells
       // somebody they got *better at a kind of mistake* rather than at a quest.
       g.fillStyle = css(Theme.dim);
-      printf(g, fonts.stationSm, "BETTER AT", x, cy, w, "left");
+      printf(g, fonts.stationSm, T("ai.betterAt"), x, cy, w, "left");
       cy += fonts.stationSm.height + Math.round(12 * s);
       clipped(g, x, cy, w, Math.max(0, y + h - cy), () => {
         for (const kind of sum.kinds_improved) {
@@ -656,16 +672,7 @@ export class AiScene implements Scene {
       });
     } else {
       g.fillStyle = css(Theme.cream, 0.6);
-      printf(
-        g,
-        fonts.small,
-        "No kind moved off the drill this time. A kind needs five clean submits in a row to " +
-          "leave, so the run that finally does it is usually not the one you notice.",
-        x,
-        cy,
-        w,
-        "left",
-      );
+      printf(g, fonts.small, T("ai.nothingMoved"), x, cy, w, "left");
     }
   }
 

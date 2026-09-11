@@ -16,13 +16,14 @@ import { seconds, Tween } from "../engine/motion";
 import type { Category, CategorySummary, Land, Responses } from "../net/protocol";
 import { MapScene } from "./map";
 import { PlaygroundScene } from "./playground";
+import { t } from "../i18n";
 
 type Lands = Responses["world.lands"]["lands"];
 
 const NPC: Record<Land, string> = { rust: "sprite_ferris", go: "sprite_gogo" };
-const BLURB: Record<Land, string> = {
-  rust: "Ownership, borrows, lifetimes. The craft you had before the machine wrote it for you.",
-  go: "Goroutines, channels, the small language that fits in a head.",
+const BLURB: Record<Land, () => string> = {
+  rust: () => t("lands.rustBlurb"),
+  go: () => t("lands.goBlurb"),
 };
 
 /**
@@ -47,10 +48,10 @@ const EMBLEM_OVERHANG = 1.3;
  * three places you could go. A road that says what it is is both more useful
  * and more alive than a slab with a label on it.
  */
-const CAT_LINE: Record<Category, string> = {
-  basic: "The morning walk. Shopfronts, kiosks and tills — read what the machine wrote.",
-  advanced: "The lunch rush. Two tills on one counter, and both of them happened at once.",
-  hacker: "The interview. One room, one clock, and nothing finishing your lines.",
+const CAT_LINE: Record<Category, () => string> = {
+  basic: () => t("lands.basicBlurb"),
+  advanced: () => t("lands.advancedBlurb"),
+  hacker: () => t("lands.hackerBlurb"),
 };
 
 export class LandsScene implements Scene {
@@ -105,7 +106,7 @@ export class LandsScene implements Scene {
     // `inner`, so nothing can land on the plate's own border — which is where
     // `0/58 ★0` was being cut in half.
     const recH = fonts.stationSm.height + Math.round(6 * s);
-    const blurbLines = wrap(fonts.small, BLURB[land], inner[2]).length;
+    const blurbLines = wrap(fonts.small, BLURB[land](), inner[2]).length;
     const blurbH = blurbLines * fonts.small.height;
     const blurbY = inner[1] + inner[3] - recH - blurbH;
     const room = blurbY - Math.round(8 * s) - inner[1];
@@ -151,13 +152,15 @@ export class LandsScene implements Scene {
     }
 
     g.fillStyle = css(chosen ? Theme.cream : Theme.dim);
-    printf(g, fonts.small, BLURB[land], inner[0], blurbY, inner[2], "center");
+    printf(g, fonts.small, BLURB[land](), inner[0], blurbY, inner[2], "center");
 
     g.fillStyle = css(chosen ? accent : Theme.dim);
     printf(
       g,
       fonts.stationSm,
-      rec.total > 0 ? `${rec.cleared}/${rec.total} CLEARED   ★${rec.stars}` : "—",
+      rec.total > 0
+        ? t("lands.record", { cleared: rec.cleared, total: rec.total, stars: rec.stars })
+        : "—",
       inner[0],
       inner[1] + inner[3] - fonts.stationSm.height,
       inner[2],
@@ -183,7 +186,7 @@ export class LandsScene implements Scene {
       const res = await this.app.client.request("world.lands", {});
       this.lands = res.lands;
     } catch {
-      this.error = "the server did not send the world";
+      this.error = t("lands.noWorld");
     }
   }
 
@@ -275,7 +278,7 @@ export class LandsScene implements Scene {
         fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.5);
       }
     }
-    header(g, this.app, "CHOOSE YOUR LAND");
+    header(g, this.app, t("lands.title"));
     const f = frame(layout, layout.isPortrait() ? 0.46 : 0.34, 0.07);
     const s = f.scale;
     const fonts = ensureFonts(s);
@@ -330,7 +333,12 @@ export class LandsScene implements Scene {
       // than as a street — which is exactly what it was reported as. A screen
       // that asks the game's one real question should not be decorated by
       // something nobody can name.
-      const right = titledPanel(g, f.right, `${this.land.toUpperCase()} — CATEGORY`, Theme.coin);
+      const right = titledPanel(
+        g,
+        f.right,
+        t("lands.category", { land: this.land.toUpperCase() }),
+        Theme.coin,
+      );
 
       // The record, inside the panel and above the rows, with room round it.
       // It used to be a thin strip wedged between two panels with no breathing
@@ -343,7 +351,9 @@ export class LandsScene implements Scene {
       printf(
         g,
         fonts.stationSm,
-        rec.total > 0 ? `${rec.cleared} / ${rec.total} CLEARED` : "NOTHING HERE YET",
+        rec.total > 0
+          ? t("lands.clearedOf", { cleared: rec.cleared, total: rec.total })
+          : t("lands.nothingYet"),
         right[0] + Math.round(12 * s),
         right[1] + Math.round(7 * s),
         right[2] - Math.round(24 * s),
@@ -486,7 +496,7 @@ export class LandsScene implements Scene {
         const lineH = fonts.small.height;
         const titleY = y + Math.round(12 * s);
         g.fillStyle = css(empty ? Theme.dim : Theme.cream);
-        printf(g, fonts.button, c.category.toUpperCase(), tx, titleY, tw, "left");
+        printf(g, fonts.button, t(`map.${c.category}` as "map.basic"), tx, titleY, tw, "left");
         // What the road is, from the bible. Only when the row is tall enough
         // to hold it — in a short portrait window the count is what matters.
         const lineY = titleY + fonts.button.height + Math.round(6 * s);
@@ -495,7 +505,7 @@ export class LandsScene implements Scene {
         // over its own bottom edge was the first thing the eye found.
         const fits = Math.floor((y + rowH - Math.round(10 * s) - lineY) / lineH);
         if (fits >= 1) {
-          const all = wrap(fonts.small, CAT_LINE[c.category], tw);
+          const all = wrap(fonts.small, CAT_LINE[c.category](), tw);
           const use = all.slice(0, fits);
           if (all.length > use.length && use.length > 0) {
             use[use.length - 1] = use[use.length - 1].replace(/.{0,2}$/u, "…");
@@ -514,7 +524,11 @@ export class LandsScene implements Scene {
         printf(
           g,
           fonts.stationSm,
-          missing ? "NOT INSTALLED" : empty ? "EMPTY" : `${c.cleared}/${c.total}  ★${c.stars}`,
+          missing
+            ? t("lands.notInstalled")
+            : empty
+              ? t("lands.empty")
+              : `${c.cleared}/${c.total}  ★${c.stars}`,
           tx + Math.round(4 * s),
           titleY + Math.round(2 * s),
           tw,
@@ -556,7 +570,7 @@ export class LandsScene implements Scene {
 
       const [pw] = btnBox(
         fonts.button,
-        ["PLAYGROUND"],
+        [t("lands.playground")],
         0,
         fonts.button.size * 2,
         layout.minTouchH(),
@@ -566,7 +580,7 @@ export class LandsScene implements Scene {
       const pbw = Math.max(pw, Math.round(right[2] * 0.4));
       const pby = right[1] + right[3] - playH;
       const phov = this.landBtns.hovered === "playground";
-      pixBtn(g, fonts.button, right[0], pby, pbw, playH, "PLAYGROUND", {
+      pixBtn(g, fonts.button, right[0], pby, pbw, playH, t("lands.playground"), {
         hover: phov,
         quiet: !phov,
       });
@@ -574,7 +588,7 @@ export class LandsScene implements Scene {
       printf(
         g,
         fonts.small,
-        "nothing here is scored",
+        t("lands.playgroundNote"),
         right[0] + pbw + Math.round(12 * s),
         pby + Math.round((playH - fonts.small.height) / 2),
         right[2] - pbw - Math.round(12 * s),
@@ -583,7 +597,7 @@ export class LandsScene implements Scene {
       this.landBtns.add({
         id: "playground",
         rect: [right[0], pby, pbw, playH],
-        label: "PLAYGROUND",
+        label: t("lands.playground"),
       });
 
       if (this.error) {
@@ -600,6 +614,6 @@ export class LandsScene implements Scene {
       }
     });
 
-    footer(g, layout, "←→  LAND   CLICK  CATEGORY   F1  ORIENTATION   F3  LOG OUT");
+    footer(g, layout, t("lands.footer"));
   }
 }

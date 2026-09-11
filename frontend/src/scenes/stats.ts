@@ -34,6 +34,7 @@ import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import type { AttemptBrief, Award, Category, Land, MistakeStat, Responses } from "../net/protocol";
 import { unbuilt, unbuiltLine } from "../net/milestone";
+import { t as T, tn } from "../i18n";
 import { auxHeight, auxRow, drawAux, AUX_HINT, openAux } from "../ui/auxnav";
 import { drawNotice, type Notice } from "../ui/notice";
 import { isLearned, LEARNED_AT, tamedFraction, tamedLine } from "../ui/coach";
@@ -44,10 +45,10 @@ type Summary = Responses["stats.summary"];
 
 type Tab = "drill" | "shelf" | "log";
 
-const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
-  { id: "drill", label: "THE DRILL" },
-  { id: "shelf", label: "THE SHELF" },
-  { id: "log", label: "THE LOG" },
+const TABS = (): ReadonlyArray<{ id: Tab; label: string }> => [
+  { id: "drill", label: T("stats.drill") },
+  { id: "shelf", label: T("stats.shelf") },
+  { id: "log", label: T("stats.log") },
 ];
 
 /** A fixed order, never the server's — `by_land` came back alphabetical. */
@@ -132,22 +133,20 @@ export class StatsScene implements Scene {
       }
     }
     const names = failures.map(([t]) => t.replace("stats.", "")).join(", ");
-    this.partial = `no ${names} from this server`;
+    this.partial = T("stats.unbuilt", { names });
     if (failures.length === 4) {
       const first = failures[0][1];
       const gap = unbuilt(first);
       this.notice = gap
         ? {
-            head: unbuiltLine("THE RECORD", gap).toUpperCase(),
-            body: "Nothing has been kept yet on this server. It will be, and it will be yours.",
+            head: unbuiltLine(T("stats.emptyHead"), gap).toUpperCase(),
+            body: T("stats.emptyBody"),
             tone: "unbuilt",
           }
         : {
-            head: "THE RECORD DID NOT COME BACK",
+            head: T("stats.failedHead"),
             body:
-              first instanceof WireError
-                ? playerText(first.payload.code)
-                : "the server did not answer",
+              first instanceof WireError ? playerText(first.payload.code) : T("stats.failedBody"),
             tone: "fault",
           };
     }
@@ -169,8 +168,8 @@ export class StatsScene implements Scene {
   }
 
   private cycle(step: number): void {
-    const i = TABS.findIndex((t) => t.id === this.tab);
-    this.tab = TABS[(i + step + TABS.length) % TABS.length].id;
+    const i = TABS().findIndex((t) => t.id === this.tab);
+    this.tab = TABS()[(i + step + TABS().length) % TABS().length].id;
     this.app.chip.blip();
   }
 
@@ -222,7 +221,7 @@ export class StatsScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
-    header(g, this.app, "THE RECORD");
+    header(g, this.app, T("stats.title"));
     const f = frame(layout, layout.isPortrait() ? 0.38 : 0.34, 0.03);
     this.tabs.reset();
     this.rows.reset();
@@ -230,12 +229,12 @@ export class StatsScene implements Scene {
     arriving(g, f, "left", this.leftIn, () => this.drawSummary(g, f.left, f.scale));
     arriving(g, f, "right", this.rightIn, () => this.drawTabbed(g, f.right, f.scale));
 
-    footer(g, layout, `Q/E  TAB   ${AUX_HINT}`);
+    footer(g, layout, T("stats.footer", { aux: AUX_HINT() }));
   }
 
   private drawSummary(g: Ctx, rect: Rect, s: number): void {
     const fonts = ensureFonts(s);
-    const inner = titledPanel(g, rect, "WHERE YOU ARE", Theme.coin);
+    const inner = titledPanel(g, rect, T("stats.where"), Theme.coin);
     const [x, y, w, h] = inner;
     const touch = this.app.layout.minTouchH();
     const navH = auxHeight(fonts.stationSm, w, touch);
@@ -245,8 +244,8 @@ export class StatsScene implements Scene {
       if (this.notice) drawNotice(g, this.app, [x, y, w, floor - y], this.notice);
       else {
         drawNotice(g, this.app, [x, y, w, floor - y], {
-          head: "READING THE RECORD",
-          body: "The server is being asked for four things at once.",
+          head: T("stats.readingHead"),
+          body: T("stats.readingBody"),
           tone: "empty",
         });
       }
@@ -266,7 +265,7 @@ export class StatsScene implements Scene {
     printf(
       g,
       fonts.stationSm,
-      `CLEARED OF ${sum.total}`,
+      T("stats.clearedOf", { total: sum.total }),
       x + width(fonts.title, `${sum.cleared}`) + Math.round(10 * s),
       cy + bigH - fonts.stationSm.height - Math.round(4 * s),
       w,
@@ -284,10 +283,10 @@ export class StatsScene implements Scene {
     // percentage with no decimal: 22% is a fact and 0.2222222 is a float.
     const cell = Math.floor((w - Math.round(8 * s)) / 2);
     const facts: Array<[string, string, RGBA]> = [
-      ["ATTEMPTS", `${sum.attempts}`, Theme.cream],
-      ["ACCEPTED", `${Math.round((sum.accuracy ?? 0) * 100)}%`, Theme.cyan],
-      ["STREAK", `${sum.streak_days} ${sum.streak_days === 1 ? "DAY" : "DAYS"}`, Theme.brick],
-      ["STARS", `${sum.stars}`, Theme.coin],
+      [T("stats.attempts"), `${sum.attempts}`, Theme.cream],
+      [T("stats.accepted"), `${Math.round((sum.accuracy ?? 0) * 100)}%`, Theme.cyan],
+      [T("stats.streak"), tn("stats.days", sum.streak_days), Theme.brick],
+      [T("stats.stars"), `${sum.stars}`, Theme.coin],
     ];
     for (let i = 0; i < facts.length; i++) {
       const [label, value, col] = facts[i];
@@ -364,7 +363,7 @@ export class StatsScene implements Scene {
     if (cy + stripH + fonts.stationSm.height * 2 < floor) {
       const count = shelfCount(this.awards);
       g.fillStyle = css(Theme.dim);
-      printf(g, fonts.stationSm, "THE SHELF", x, cy, w, "left");
+      printf(g, fonts.stationSm, T("stats.shelf"), x, cy, w, "left");
       g.fillStyle = css(count.have > 0 ? Theme.coin : Theme.dim);
       printf(g, fonts.stationSm, `${count.have} OF ${count.of}`, x, cy, w, "right");
       cy += fonts.stationSm.height + Math.round(6 * s);
@@ -416,21 +415,21 @@ export class StatsScene implements Scene {
     const live = this.mistakes.filter((m) => !isLearned(m));
     const title =
       this.tab === "drill"
-        ? `THE DRILL — ${live.length}`
+        ? T("stats.drillTab", { n: live.length })
         : this.tab === "shelf"
           ? (() => {
               const c = shelfCount(this.awards);
-              return `THE SHELF — ${c.have} OF ${c.of}`;
+              return T("stats.shelfTab", { have: c.have, of: c.of });
             })()
-          : `THE LOG — ${this.history.length}`;
+          : T("stats.logTab", { n: this.history.length });
     const inner = titledPanel(g, rect, title, Theme.cyan);
     const [x, y, w, h] = inner;
 
     // The tabs, as a strip of three inside the panel's own head.
     const tabH = Math.max(this.app.layout.minTouchH(), fonts.stationSm.height + Math.round(12 * s));
     const tabW = Math.floor((w - Math.round(8 * s)) / 3);
-    for (let i = 0; i < TABS.length; i++) {
-      const t = TABS[i];
+    for (let i = 0; i < TABS().length; i++) {
+      const t = TABS()[i];
       const tx = x + i * (tabW + Math.round(4 * s));
       const on = t.id === this.tab;
       const hot = this.tabs.hovered === `tab:${t.id}`;
@@ -462,12 +461,8 @@ export class StatsScene implements Scene {
     const [x, y, w, h] = rect;
     if (this.mistakes.length === 0) {
       drawNotice(g, this.app, rect, {
-        head: this.notice ? this.notice.head : "NOTHING ON THE DRILL",
-        body: this.notice
-          ? this.notice.body
-          : "Every compiler error you make is filed by kind and counted here, and each one " +
-            "leaves after five clean submits. Yours is empty — either you have not been caught " +
-            "yet, or you have already beaten everything that caught you.",
+        head: this.notice ? this.notice.head : T("stats.noDrillHead"),
+        body: this.notice ? this.notice.body : T("stats.noDrillBody"),
         tone: this.notice ? this.notice.tone : "empty",
       });
       this.overflow = 0;
@@ -488,7 +483,7 @@ export class StatsScene implements Scene {
       printf(
         g,
         fonts.stationSm,
-        live.length > 0 ? "STILL CATCHING YOU" : "NOTHING IS STILL CATCHING YOU",
+        live.length > 0 ? T("stats.stillCatching") : T("stats.nothingCatching"),
         x,
         cy,
         w,
@@ -502,7 +497,7 @@ export class StatsScene implements Scene {
       if (tamed.length > 0) {
         cy += Math.round(4 * s);
         g.fillStyle = css(Theme.admit);
-        printf(g, fonts.stationSm, `BEATEN — ${tamed.length}`, x, cy, w, "left");
+        printf(g, fonts.stationSm, T("stats.beaten", { n: tamed.length }), x, cy, w, "left");
         cy += headH;
         for (const m of tamed) {
           this.drawMistake(g, m, [x, cy, w, rowH], s, true);
@@ -577,7 +572,7 @@ export class StatsScene implements Scene {
     // are the server's own answer to "what should I go and read", so they are
     // printed rather than summarised.
     const tailY = pipY + pipR + Math.round(6 * s);
-    const concepts = m.concepts.length > 0 ? m.concepts.join(" · ") : "no concepts filed";
+    const concepts = m.concepts.length > 0 ? m.concepts.join(" · ") : T("stats.noConcepts");
     const tailW = w - pad * 2;
     // The quest id is the door and it goes on the right, measured, so that a
     // long list of concepts crowds itself rather than pushing the one clickable
@@ -637,7 +632,7 @@ export class StatsScene implements Scene {
       printf(
         g,
         fonts.stationSm,
-        asked ? "NOTHING AWARDED YET" : "THIS SERVER DID NOT ANSWER FOR THE SHELF",
+        asked ? T("stats.noAwardsHead") : T("stats.noShelfHead"),
         x,
         y + h - fonts.stationSm.height,
         w,
@@ -693,11 +688,8 @@ export class StatsScene implements Scene {
     const [x, y, w, h] = rect;
     if (this.history.length === 0) {
       drawNotice(g, this.app, rect, {
-        head: this.notice?.head ?? "NOTHING IN THE LOG",
-        body:
-          this.notice?.body ??
-          "Every run and every submit lands here, newest first, with what the compiler made " +
-            "of it. Go and press RUN on something.",
+        head: this.notice?.head ?? T("stats.noLogHead"),
+        body: this.notice?.body ?? T("stats.noLogBody"),
         tone: this.notice?.tone ?? "empty",
       });
       this.overflow = 0;
@@ -734,7 +726,7 @@ export class StatsScene implements Scene {
         // printed because a RUN never clears a node (§4.9b), so a log that did
         // not distinguish them reads as a string of failures on a quest the
         // player went on to clear.
-        const kind = a.mode === "run" ? "RUN" : "SUBMIT";
+        const kind = a.mode === "run" ? T("stats.run") : T("stats.submit");
         printf(
           g,
           fonts.stationSm,
@@ -745,7 +737,7 @@ export class StatsScene implements Scene {
           "right",
         );
         g.fillStyle = css(Theme.dim);
-        const kinds = a.kinds.length > 0 ? a.kinds.join(" · ") : "no mistakes filed";
+        const kinds = a.kinds.length > 0 ? a.kinds.join(" · ") : T("stats.noMistakes");
         printf(
           g,
           fonts.stationSm,

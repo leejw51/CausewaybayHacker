@@ -46,6 +46,7 @@ import { LandsScene } from "./lands";
 import { PlaygroundScene } from "./playground";
 import { QuestScene } from "./quest";
 import { AUX_BAR, openAux } from "../ui/auxnav";
+import { t } from "../i18n";
 import { NeonRail } from "../gfx/neon";
 
 /** The overworld art, per land. Two places, not one plate and a tint. */
@@ -69,8 +70,8 @@ const CATEGORIES: readonly Category[] = ["basic", "advanced", "hacker"];
  * where they left them, not at node 1. Six entries, quest ids only, and it does
  * not outlive the tab.
  */
-const MENU_LABEL = "ALL MAPS";
-const PLAY_LABEL = "PLAYGROUND";
+const MENU_LABEL = (): string => t("map.allMaps");
+const PLAY_LABEL = (): string => t("map.playground");
 
 const LAST_AT = new Map<string, string>();
 const slot = (land: Land, category: Category): string => `${land}.${category}`;
@@ -228,7 +229,7 @@ export class MapScene implements Scene {
           (_, i) => new Tween(seconds("node"), seconds("nodeStagger") * i),
         );
       }
-      this.status = this.nodes.length === 0 ? "no streets here yet" : "";
+      this.status = this.nodes.length === 0 ? t("map.none") : "";
       if (this.selected >= this.nodes.length) this.selected = 0;
       // Back to where this map was left, if it has been open before.
       const was = LAST_AT.get(slot(this.land, this.category));
@@ -242,7 +243,7 @@ export class MapScene implements Scene {
         }
       }
     } catch {
-      this.status = "could not read the map";
+      this.status = t("map.failed");
     }
   }
 
@@ -340,13 +341,13 @@ export class MapScene implements Scene {
     return [
       ...LANDS.map((l) => ({
         id: `land:${l}`,
-        label: l.toUpperCase(),
+        label: l === "rust" ? t("map.rust") : t("map.go"),
         lit: l === this.land,
         group: 0,
       })),
       ...CATEGORIES.map((c) => ({
         id: `cat:${c}`,
-        label: c.toUpperCase(),
+        label: t(`map.${c}` as "map.basic"),
         lit: c === this.category,
         group: 1,
       })),
@@ -354,16 +355,16 @@ export class MapScene implements Scene {
       // did, but a keystroke printed in the footer is not a control — the
       // player who wants the chooser is exactly the player who does not yet
       // know where anything is.
-      { id: "menu", label: MENU_LABEL, lit: false, group: 2 },
+      { id: "menu", label: MENU_LABEL(), lit: false, group: 2 },
       // The scratchpad. It is not one of the six maps and it is not styled
       // like one: nothing there is scored, and a button that looked like a
       // category would promise otherwise.
-      { id: "play", label: PLAY_LABEL, lit: false, group: 2 },
+      { id: "play", label: PLAY_LABEL(), lit: false, group: 2 },
       // Search, stats and AI mode. They were on F4/F5/F6 and nowhere else,
       // which meant three finished screens that a player could only reach by
       // being told they existed. The ids are `ui/auxnav.ts`'s own, so
       // `openAux` opens them here with no second table of names to drift.
-      ...AUX_BAR.map((a) => ({ id: a.id, label: a.label, lit: false, group: 3 })),
+      ...AUX_BAR().map((a) => ({ id: a.id, label: a.label, lit: false, group: 3 })),
     ];
   }
 
@@ -391,7 +392,7 @@ export class MapScene implements Scene {
     const split = gap * 3;
     const pad = f.size * 2;
     const minH = layout.minTouchH();
-    const bh = btnBox(f, ["BASIC"], 0, pad, minH)[1];
+    const bh = btnBox(f, [t("map.basic")], 0, pad, minH)[1];
     const x0 = Math.round(8 * s);
     const wide = layout.vw - Math.round(16 * s);
 
@@ -408,8 +409,7 @@ export class MapScene implements Scene {
       }
       return total + gap * Math.max(0, n - 1);
     };
-    const lead = (i: number): number =>
-      items[i].group !== items[i - 1].group ? split : gap;
+    const lead = (i: number): number => (items[i].group !== items[i - 1].group ? split : gap);
 
     // Greedy flow. A group starting a line is tested by the width of the
     // *group*; anything else by its own.
@@ -833,7 +833,7 @@ export class MapScene implements Scene {
       // does the same thing, which was the point of adding it. F1 is, because
       // the orientation toggle is the thing a player on a phone reaches for and
       // this is the screen they are on when they want it.
-      "←→  STREET   ENTER  GO IN   TAB  LAND   Q/E  CATEGORY   F1  ORIENTATION   F3  LOG OUT",
+      t("map.footer"),
     );
   }
 
@@ -1279,7 +1279,7 @@ export class MapScene implements Scene {
     printf(
       g,
       fonts.station,
-      `${String(n.node).padStart(2, "0")}  ${n.title}${n.kind === "boss" ? "  ·  BOSS" : ""}`,
+      `${String(n.node).padStart(2, "0")}  ${n.title}${n.kind === "boss" ? `  ·  ${t("map.boss")}` : ""}`,
       ix,
       iy,
       textW,
@@ -1311,7 +1311,7 @@ export class MapScene implements Scene {
     const valueY = iy + fonts.stationSm.height + Math.round(f8(s));
 
     const starX = ix + Math.round(col);
-    label("STARS", starX);
+    label(t("map.stars"), starX);
     drawStars(
       g,
       starX + Math.round(7 * s),
@@ -1322,7 +1322,7 @@ export class MapScene implements Scene {
     );
 
     const tryX = ix + Math.round(col * 2);
-    label("TRIES", tryX);
+    label(t("map.tries"), tryX);
     g.fillStyle = css(n.attempts > 0 ? Theme.cream : Theme.dim);
     printf(g, fonts.small, String(n.attempts), tryX, valueY, textW, "left");
 
@@ -1337,13 +1337,12 @@ export class MapScene implements Scene {
     let line: string;
     let colour = Theme.coin;
     if (n.state === "cleared") {
-      line = `CLEARED · ${n.stars}/3 STARS · ENTER to walk back in`;
+      line = t("map.clearedLine", { stars: n.stars });
       colour = Theme.admit;
     } else if (next && next.quest_id === n.quest_id) {
-      line =
-        n.kind === "boss" ? "NEXT ON THE ROUTE · the boss" : "NEXT ON THE ROUTE · ENTER to go in";
+      line = n.kind === "boss" ? t("map.nextBoss") : t("map.next");
     } else {
-      line = n.kind === "boss" ? "the boss of this street · ENTER to go in" : "ENTER to go in";
+      line = n.kind === "boss" ? t("map.bossHere") : t("map.enterToGo");
     }
     g.fillStyle = css(colour);
     printf(g, fonts.small, line, ix, iy, textW, "left");

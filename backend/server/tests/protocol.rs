@@ -232,6 +232,58 @@ async fn a_binary_frame_closes_1003() {
     server.handle.abort();
 }
 
+/// A deeply nested but **valid** object is not a transport failure. It used to
+/// be closed 1003, whose documented meaning is "a frame that is not a JSON
+/// object" — and this is an object, so the close said something untrue. §3.3
+/// prefers an application error for an application-level problem, so it is
+/// `bad_request`, correlated, with the connection left open.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_frame_nested_three_hundred_deep_is_bad_request_and_not_a_close() {
+    let server = start().await;
+    let mut socket = connect(server.port).await;
+
+    let deep = format!(
+        r#"{{"v":1,"id":"c-deep","type":"ping","payload":{}1{}}}"#,
+        r#"{"a":"#.repeat(300),
+        "}".repeat(300)
+    );
+    // Sanity: the probe really is a well-formed object, and the only thing
+    // wrong with it is its depth. serde says so itself — its complaint is the
+    // recursion limit, not a syntax error — and without this assertion the
+    // test could pass for the wrong reason.
+    let complaint = serde_json::from_str::<Value>(&deep)
+        .expect_err("serde refuses it")
+        .to_string();
+    assert!(
+        complaint.contains("recursion limit exceeded"),
+        "the probe is malformed for some other reason: {complaint}"
+    );
+    assert!(deep.starts_with('{') && deep.ends_with('}'));
+
+    socket.send(Message::text(deep)).await.unwrap();
+    let reply = next_json(&mut socket).await;
+    assert_eq!(reply["type"].as_str(), Some("ping.err"), "{reply}");
+    assert_eq!(reply["payload"]["code"].as_str(), Some("bad_request"));
+    assert_eq!(
+        reply["id"].as_str(),
+        Some("c-deep"),
+        "the id is salvaged from a frame serde could not parse"
+    );
+
+    // And the connection survives, which is the half a close got wrong.
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-after", "type":"ping", "payload":{} }),
+    )
+    .await;
+    assert_eq!(
+        next_json(&mut socket).await["type"].as_str(),
+        Some("ping.ok"),
+        "the connection did not survive a frame that was merely too deep"
+    );
+    server.handle.abort();
+}
+
 /// §2.2: reusing an `id` that is still in flight is `bad_request`. The submit
 /// is the only request that takes long enough for it to matter, which is
 /// exactly why it is the one a client will collide on.

@@ -11,6 +11,7 @@ import { App } from "./app";
 import { Client } from "./net/client";
 import { chooseTransport } from "./net/endpoint";
 import { BootScene } from "./scenes/boot";
+import { preferredLocale, setLocale } from "./i18n";
 
 /**
  * Dev, or a build made for the end-to-end suite. QA needs the capture hook in
@@ -23,6 +24,11 @@ async function main(): Promise<void> {
   const fx = document.getElementById("fx") as HTMLCanvasElement | null;
   const overlay = document.getElementById("overlay");
   if (!canvas || !fx || !overlay) throw new Error("the page is missing its canvases");
+
+  // The language before anything is measured. `setLocale` swaps the table on
+  // the call and only the CJK face is asynchronous, so every string below is
+  // already in the right language and `boot.ts` waits for the font.
+  void setLocale(preferredLocale(), false);
 
   const { factory, label } = await chooseTransport();
   const client = new Client({ transport: factory, storage: localStorage });

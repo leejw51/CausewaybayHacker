@@ -22,16 +22,11 @@ import { Buttons, clearedStamp, footer, frame, GO, header, RUST, titledPanel } f
 import type { Attempt, Category, Land } from "../net/protocol";
 import { MapScene } from "./map";
 import { QuestScene } from "./quest";
+import { t } from "../i18n";
 
-const VERDICT_TEXT: Record<Attempt["verdict"], string> = {
-  accepted: "ACCEPTED",
-  wrong_answer: "WRONG ANSWER",
-  compile_error: "IT DID NOT COMPILE",
-  runtime_error: "IT CRASHED",
-  timeout: "TOO SLOW",
-  output_limit: "TOO MUCH OUTPUT",
-  internal_error: "THE SERVER FELL OVER",
-};
+function verdictText(v: Attempt["verdict"]): string {
+  return t(`result.${v}` as "result.accepted");
+}
 
 export class ResultScene implements Scene {
   readonly name = "result";
@@ -49,9 +44,9 @@ export class ResultScene implements Scene {
    */
   private verdictWord(): string {
     if (this.attempt.verdict === "internal_error" && this.land === "go") {
-      return "THE GO LAND OPENS IN THE NEXT CHAPTER";
+      return t("result.unavailable");
     }
-    return VERDICT_TEXT[this.attempt.verdict];
+    return verdictText(this.attempt.verdict);
   }
   private confetti: Plan | null = null;
 
@@ -248,7 +243,15 @@ export class ResultScene implements Scene {
     const accent = this.land === "rust" ? RUST : GO;
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
-    header(g, this.app, this.attempt.cleared ? "STREET CLEARED" : ok ? "STILL GOOD" : "NOT YET");
+    header(
+      g,
+      this.app,
+      this.attempt.cleared
+        ? t("result.streetCleared")
+        : ok
+          ? t("result.stillGood")
+          : t("result.notYet"),
+    );
     const full = frame(layout, 0.42, 0.05);
     // Sized to what is on it. A 50/50 split stretched to the window, holding
     // five short rows on one side and one line on the other, reads as a screen
@@ -266,7 +269,7 @@ export class ResultScene implements Scene {
     this.buttons.reset();
 
     // --- the verdict plate --------------------------------------------------
-    const left = titledPanel(g, f.left, "VERDICT", ok ? Theme.admit : Theme.red);
+    const left = titledPanel(g, f.left, t("result.verdict"), ok ? Theme.admit : Theme.red);
     let y = left[1];
     // Half the size it was. The coloured title bar above already carries the
     // verdict, so a 40px headline was saying it a second time and pushing the
@@ -343,12 +346,12 @@ export class ResultScene implements Scene {
     // appears when it is not zero, because on a screen whose headline is that
     // something went wrong, "exit 0" is noise that contradicts the headline.
     const rows = [
-      `tests   ${this.attempt.tests_passed}/${this.attempt.tests_total}`,
-      `compile ${this.attempt.compile_ms} ms`,
-      `run     ${this.attempt.run_ms} ms`,
+      `${t("result.tests")}   ${this.attempt.tests_passed}/${this.attempt.tests_total}`,
+      `${t("result.compileMs")} ${this.attempt.compile_ms} ms`,
+      `${t("result.runMs")}     ${this.attempt.run_ms} ms`,
     ];
     if (this.attempt.exit_code !== null && this.attempt.exit_code !== 0) {
-      rows.push(`exit    ${this.attempt.exit_code}`);
+      rows.push(`${t("result.exit")}    ${this.attempt.exit_code}`);
     }
     g.fillStyle = css(Theme.cream);
     printf(g, fonts.small, rows.join("\n"), left[0], y, left[2], "left");
@@ -368,7 +371,12 @@ export class ResultScene implements Scene {
     );
 
     // --- what went wrong ----------------------------------------------------
-    const right = titledPanel(g, f.right, ok ? "THE RUN" : "WHAT WENT WRONG", accent);
+    const right = titledPanel(
+      g,
+      f.right,
+      ok ? t("result.theRun") : t("result.whatWentWrong"),
+      accent,
+    );
     clipped(g, right[0], right[1], right[2], right[3], () => {
       let ry = right[1];
       const lineH = fonts.small.height;
@@ -378,7 +386,7 @@ export class ResultScene implements Scene {
         printf(
           g,
           fonts.small,
-          `${c.passed ? "PASS" : "FAIL"}  ${c.name}`,
+          `${c.passed ? t("result.pass") : t("result.fail")}  ${c.name}`,
           right[0],
           ry,
           right[2],
@@ -394,7 +402,7 @@ export class ResultScene implements Scene {
         if (c.visible && !c.passed) {
           const want = JSON.stringify(c.expect ?? "");
           const got = JSON.stringify(c.got ?? "");
-          const labelW = width(fonts.stationSm, "EXPECTED") + Math.round(10 * s);
+          const labelW = width(fonts.stationSm, t("result.expected")) + Math.round(10 * s);
           const rowH = Math.max(fonts.small.height, fonts.stationSm.height);
           const wellH = rowH * 2 + Math.round(24 * s);
           well(g, right[0], ry, right[2], wellH);
@@ -402,8 +410,24 @@ export class ResultScene implements Scene {
           const ty = ry + Math.round(10 * s);
           const tw = right[2] - Math.round(20 * s);
           g.fillStyle = css(Theme.dim);
-          printf(g, fonts.stationSm, "EXPECTED", tx, ty + Math.round(4 * s), labelW, "left");
-          printf(g, fonts.stationSm, "GOT", tx, ty + rowH + Math.round(4 * s), labelW, "left");
+          printf(
+            g,
+            fonts.stationSm,
+            t("result.expected"),
+            tx,
+            ty + Math.round(4 * s),
+            labelW,
+            "left",
+          );
+          printf(
+            g,
+            fonts.stationSm,
+            t("result.got"),
+            tx,
+            ty + rowH + Math.round(4 * s),
+            labelW,
+            "left",
+          );
           g.fillStyle = css(Theme.cream);
           printf(g, fonts.small, want, tx + labelW, ty, tw - labelW, "left");
           // The one that is wrong is the one that is coloured.
@@ -420,8 +444,8 @@ export class ResultScene implements Scene {
         // lands here too — so the heading has to match what is under it.
         const heading =
           this.attempt.verdict === "compile_error"
-            ? "THE COMPILER'S OWN WORDS"
-            : "WHAT THE RUNNER SAW";
+            ? t("result.compilerWords")
+            : t("result.runnerSaw");
         printf(g, fonts.stationSm, heading, right[0], ry, right[2], "left");
         ry += fonts.stationSm.height + Math.round(6 * s);
         for (const m of this.attempt.mistakes) {
@@ -468,13 +492,13 @@ export class ResultScene implements Scene {
       fonts.button,
       btnRect,
       [
-        { id: "retry", label: ok ? "AGAIN" : "TRY AGAIN" },
-        { id: "map", label: "BACK TO THE MAP" },
+        { id: "retry", label: ok ? t("result.again") : t("result.tryAgain") },
+        { id: "map", label: t("result.backToMap") },
       ],
       layout.minTouchH(),
     );
     this.buttons.draw(g, fonts.button);
-    footer(g, layout, "ENTER  MAP   R  TRY AGAIN   F1  ORIENTATION   F3  LOG OUT");
+    footer(g, layout, t("result.footer"));
   }
 
   /**

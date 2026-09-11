@@ -15,6 +15,7 @@ use cwbhacker_core::error::{internal, Result};
 use cwbhacker_core::Store;
 
 pub mod handlers;
+pub mod limits;
 pub mod playground;
 pub mod proto;
 pub mod state;

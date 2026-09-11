@@ -15,6 +15,22 @@ pub const PROTOCOL_VERSION: i64 = 1;
 /// PROTOCOL §1: 4 MiB inbound, above which the connection is closed with 1009.
 pub const MAX_FRAME_BYTES: usize = 4 * 1024 * 1024;
 
+/// How deep a frame may nest.
+///
+/// `serde_json` refuses at 128 and reports it as an ordinary parse error, so a
+/// deeply nested but perfectly valid object used to come out of `parse` as
+/// `NotAnObject` and close the connection with 1003 — whose documented meaning
+/// (§1.2) is "a binary frame, or a frame that is not a JSON object". It *is* an
+/// object, so that close said something untrue.
+///
+/// The depth is therefore checked here, before serde sees the text, and
+/// answered `bad_request` with the connection left open. §3.3 prefers that for
+/// anything that is an application-level problem, and a frame nested three
+/// hundred deep is a client bug, not a broken transport. 64 sits well under
+/// serde's own limit so the two can never disagree; the deepest thing this
+/// protocol actually carries is a test spec, four levels down.
+pub const MAX_DEPTH: usize = 64;
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClientFrame {
@@ -107,6 +123,23 @@ pub enum Incoming {
 }
 
 pub fn parse(text: &str) -> Incoming {
+    // Depth first, because serde cannot be asked afterwards: once it has hit
+    // its recursion limit the error is indistinguishable from a syntax error,
+    // and the two deserve opposite answers.
+    let skim = skim(text);
+    if !skim.is_object {
+        return Incoming::NotAnObject;
+    }
+    if skim.max_depth > MAX_DEPTH {
+        return Incoming::Malformed {
+            id: skim.id,
+            kind: skim.kind.unwrap_or_else(|| "frame".to_string()),
+            error: bad_request(format!(
+                "the frame nests {} deep and the limit is {MAX_DEPTH}",
+                skim.max_depth
+            )),
+        };
+    }
     let value: serde_json::Value = match serde_json::from_str(text) {
         Ok(value) => value,
         Err(_) => return Incoming::NotAnObject,
@@ -139,6 +172,133 @@ pub fn parse(text: &str) -> Incoming {
     }
 }
 
+/// What one non-recursive pass over the raw text can learn that serde cannot
+/// tell us once it has given up: whether this is an object at all, how deep it
+/// nests, and the top-level `id` and `type` — so that a frame refused for its
+/// depth is still correlated to the request that sent it (§2.2).
+#[derive(Debug, Default)]
+struct Skim {
+    is_object: bool,
+    max_depth: usize,
+    id: Option<String>,
+    kind: Option<String>,
+}
+
+/// Walk the bytes once, iteratively. **String contents are skipped with full
+/// escape handling, and that is not a nicety:** every `quest.submit` carries a
+/// program in `payload.source`, so a depth counter that counted the braces
+/// inside `"fn main() { … }"` would refuse every real submission and look like
+/// the runner had broken.
+fn skim(text: &str) -> Skim {
+    let b = text.as_bytes();
+    let mut i = 0;
+    while i < b.len() && b[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i >= b.len() || b[i] != b'{' {
+        return Skim::default();
+    }
+
+    let mut out = Skim {
+        is_object: true,
+        ..Skim::default()
+    };
+    let mut depth = 0usize;
+    // Set the moment a key may begin: just after the `{` that opens an object,
+    // or after a `,` that separates its members.
+    let mut key_position = false;
+
+    while i < b.len() {
+        match b[i] {
+            b'"' => {
+                let (text, next) = read_string(b, i);
+                if depth == 1 && key_position {
+                    if let Some(key) = text.as_deref() {
+                        if key == "id" || key == "type" {
+                            let mut j = next;
+                            while j < b.len() && b[j].is_ascii_whitespace() {
+                                j += 1;
+                            }
+                            if j < b.len() && b[j] == b':' {
+                                j += 1;
+                                while j < b.len() && b[j].is_ascii_whitespace() {
+                                    j += 1;
+                                }
+                                if j < b.len() && b[j] == b'"' {
+                                    if let (Some(value), _) = read_string(b, j) {
+                                        if key == "id" {
+                                            out.id = Some(value);
+                                        } else {
+                                            out.kind = Some(value);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                key_position = false;
+                i = next;
+                continue;
+            }
+            b'{' | b'[' => {
+                depth += 1;
+                out.max_depth = out.max_depth.max(depth);
+                key_position = b[i] == b'{';
+            }
+            b'}' | b']' => {
+                depth = depth.saturating_sub(1);
+                key_position = false;
+            }
+            b',' => key_position = true,
+            c if c.is_ascii_whitespace() => {}
+            _ => key_position = false,
+        }
+        i += 1;
+    }
+    out
+}
+
+/// Read the JSON string starting at `b[start]` (which must be `"`). Returns
+/// its decoded contents — `None` if it never closed — and the index one past
+/// the closing quote.
+///
+/// Only the escapes that can appear in a key or in `id`/`type` are decoded;
+/// `\u` is consumed and dropped rather than transcoded, because nothing here
+/// needs the character, only the correct place to stop.
+fn read_string(b: &[u8], start: usize) -> (Option<String>, usize) {
+    let mut i = start + 1;
+    let mut out: Vec<u8> = Vec::new();
+    while i < b.len() {
+        match b[i] {
+            b'"' => return (Some(String::from_utf8_lossy(&out).into_owned()), i + 1),
+            b'\\' => {
+                i += 1;
+                if i >= b.len() {
+                    break;
+                }
+                match b[i] {
+                    b'n' => out.push(b'\n'),
+                    b't' => out.push(b'\t'),
+                    b'r' => out.push(b'\r'),
+                    b'b' => out.push(0x08),
+                    b'f' => out.push(0x0c),
+                    b'u' => i += 4,
+                    other => out.push(other),
+                }
+                i += 1;
+            }
+            other => {
+                out.push(other);
+                i += 1;
+            }
+        }
+    }
+    // Unterminated. Say so, and hand back the end of the text so the caller
+    // stops rather than looping; serde will reject the frame right after.
+    (None, b.len())
+}
+
 /// Payload accessors that produce a `bad_request` rather than a silent
 /// default: "the field was missing" is something a client needs told.
 pub fn str_field(payload: &serde_json::Value, name: &str) -> Result<String> {
@@ -169,4 +329,95 @@ pub fn opt_i64_field(payload: &serde_json::Value, name: &str) -> Option<i64> {
 
 pub fn bool_field(payload: &serde_json::Value, name: &str) -> bool {
     payload.get(name).and_then(|v| v.as_bool()).unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn depth(text: &str) -> usize {
+        skim(text).max_depth
+    }
+
+    #[test]
+    fn braces_inside_a_string_are_not_nesting() {
+        // The failure this guards against refuses every real `quest.submit`:
+        // a program is a JSON string full of `{`, `}`, `"` and `\"`.
+        let frame = serde_json::json!({
+            "v": 1, "id": "c-1", "type": "quest.submit",
+            "payload": { "source": "fn main() { let s = \"}}}\"; println!(\"{s}\"); }" }
+        })
+        .to_string();
+        assert_eq!(
+            depth(&frame),
+            2,
+            "the top object and the payload, and nothing from the program: {frame}"
+        );
+        match parse(&frame) {
+            Incoming::Frame(f) => assert_eq!(f.kind, "quest.submit"),
+            _ => panic!("a normal submission was refused"),
+        }
+    }
+
+    #[test]
+    fn an_escaped_backslash_before_a_quote_does_not_swallow_the_string() {
+        // `"a\\"` ends at the second quote; a scanner that treated the `\\` as
+        // escaping it would run on into the rest of the frame.
+        let frame = r#"{"v":1,"id":"c-1","type":"ping","payload":{"s":"a\\"}}"#;
+        assert_eq!(depth(frame), 2);
+        assert!(matches!(parse(frame), Incoming::Frame(_)));
+    }
+
+    #[test]
+    fn the_top_level_id_and_type_survive_a_frame_too_deep_to_parse() {
+        let deep = format!(
+            r#"{{"v":1,"id":"c-9","type":"quest.get","payload":{}}}"#,
+            "[".repeat(300) + &"]".repeat(300)
+        );
+        match parse(&deep) {
+            Incoming::Malformed { id, kind, error } => {
+                assert_eq!(id.as_deref(), Some("c-9"));
+                assert_eq!(kind, "quest.get");
+                assert_eq!(error.code, cwbhacker_core::error::Code::BadRequest);
+            }
+            _ => panic!("a 300-deep frame was accepted"),
+        }
+    }
+
+    #[test]
+    fn a_frame_that_is_not_an_object_is_still_not_an_object() {
+        for text in ["[1,2,3]", "\"hello\"", "42", "", "   ", "not json"] {
+            assert!(
+                matches!(parse(text), Incoming::NotAnObject),
+                "{text:?} should be NotAnObject"
+            );
+        }
+    }
+
+    #[test]
+    fn a_broken_object_is_left_to_serde() {
+        // Depth is fine, the syntax is not: the existing 1003 behaviour.
+        assert!(matches!(parse("{\"v\":1,"), Incoming::NotAnObject));
+    }
+
+    #[test]
+    fn sixty_four_deep_is_allowed_and_sixty_five_is_not() {
+        // The payload has to be an object all the way down, or the frame is
+        // refused for that instead and the test proves nothing.
+        let nest = |total: usize| {
+            let inner = total - 1;
+            format!(
+                r#"{{"v":1,"id":"c-1","type":"ping","payload":{}1{}}}"#,
+                r#"{"a":"#.repeat(inner),
+                "}".repeat(inner)
+            )
+        };
+        assert_eq!(depth(&nest(MAX_DEPTH)), MAX_DEPTH);
+        assert!(matches!(parse(&nest(MAX_DEPTH)), Incoming::Frame(_)));
+        assert_eq!(depth(&nest(MAX_DEPTH + 1)), MAX_DEPTH + 1);
+        assert!(matches!(
+            parse(&nest(MAX_DEPTH + 1)),
+            Incoming::Malformed { .. }
+        ));
+    }
 }

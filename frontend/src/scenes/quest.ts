@@ -15,7 +15,17 @@ import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { btnBox, rowsIn, clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
-import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import {
+  arriving,
+  Buttons,
+  footer,
+  frame,
+  GO,
+  header,
+  RUST,
+  titledPanel,
+  type Stack,
+} from "../ui/chrome";
 import { CLOCK, clockPulse, reducedMotion, seconds, Tween } from "../engine/motion";
 import { Editor } from "../ui/editor";
 import { Overlay } from "../ui/overlay";
@@ -24,10 +34,37 @@ import { playerText } from "../net/protocol";
 import type { Attempt, Category, Land, Quest, RunStage } from "../net/protocol";
 import { LogBuffer } from "../net/logbuf";
 import { blocks } from "../ui/markdown";
+import { clipMessage, copyText, readText } from "../ui/clip";
+import { readEnumPref, readNumberPref, writePref } from "../ui/prefs";
+import { LandsScene } from "./lands";
+import { locale, t, tn } from "../i18n";
 import { MapScene } from "./map";
 import { ResultScene } from "./result";
 
 type Stage = "idle" | RunStage;
+
+/**
+ * How the brief and the bench sit, and how big the code is — remembered.
+ *
+ * This is the screen with the most dwell time in the game by a wide margin.
+ * Somebody working through a hard quest is in front of it for an hour, and the
+ * two things they will want to change about it are where the brief is and how
+ * big the type is. A control that has to be found again every session is a
+ * control that gets used once and resented after that, so both are preferences
+ * and both survive a reload.
+ *
+ * The layout key is deliberately *not* the orientation pin on F1. F1 says what
+ * shape the whole screen is; this says where the brief goes inside it, and the
+ * two are different questions — which is why the button says BRIEF: SIDE and
+ * BRIEF: TOP rather than H and V.
+ */
+const STACK_KEY = "quest.stack";
+const FONT_KEY = "quest.font";
+const STACKS = ["auto", "row", "column"] as const;
+/** Half again down, two and a half times up, in steps somebody can feel. */
+const FONT_MIN = 0.7;
+const FONT_MAX = 2.4;
+const FONT_STEP = 0.15;
 
 /**
  * Expected output with its whitespace made visible. "your answer is right but
@@ -43,15 +80,9 @@ function show(text: string): string {
  * and never a judgement — "ACCEPTED" belongs to the verdict screen and must
  * not appear anywhere a run can reach.
  */
-const VERDICT_LINE: Record<Attempt["verdict"], string> = {
-  accepted: "THE SAMPLE WORKS",
-  wrong_answer: "THE SAMPLE DOES NOT MATCH YET",
-  compile_error: "IT DID NOT COMPILE",
-  runtime_error: "IT CRASHED",
-  timeout: "TOO SLOW",
-  output_limit: "TOO MUCH OUTPUT",
-  internal_error: "THE SERVER COULD NOT RUN IT",
-};
+function verdictLine(v: Attempt["verdict"]): string {
+  return t(`verdict.${v}` as "verdict.accepted");
+}
 
 /**
  * The street this quest happens on, as a painted backdrop.
@@ -119,6 +150,20 @@ export class QuestScene implements Scene {
   private clockMark: "none" | "warn" | "urgent" | "out" = "none";
   private readonly benchIn = new Tween(seconds("panel"), seconds("stagger"));
   private readonly offs: Array<() => void> = [];
+  /**
+   * The toolbar's own button list, separate from the bench's.
+   *
+   * Two lists rather than one because they are drawn in two different faces —
+   * the bench in the button font, the toolbar in the small station font so
+   * nine controls fit on one line — and `Buttons.draw` takes one font for the
+   * whole list. Both are handed to `controls()`, so the capture hook and an
+   * automated run see every control on the screen regardless.
+   */
+  private readonly bar = new Buttons();
+  private stack: Stack = readEnumPref(STACK_KEY, STACKS, "auto");
+  private fontMul = readNumberPref(FONT_KEY, 1, FONT_MIN, FONT_MAX);
+  /** Where the toolbar was this frame, so the panels start under it. */
+  private barH = 0;
 
   constructor(
     private readonly app: App,
@@ -170,7 +215,7 @@ export class QuestScene implements Scene {
         console.warn("quest.get failed:", e.payload.code, e.payload.message, e.payload.detail);
         this.error = playerText(e.payload.code);
       } else {
-        this.error = "could not open the quest";
+        this.error = t("quest.openFailed");
       }
     }
   }
@@ -260,16 +305,16 @@ export class QuestScene implements Scene {
         kind === "quest.run" && e instanceof WireError && e.payload.code === "not_found";
       this.notice = this.notice || noRun;
       this.error = noRun
-        ? "this server does not have RUN yet — press SUBMIT"
+        ? t("quest.noRun")
         : dropped
-          ? "the connection dropped — that attempt is still running on the server"
+          ? t("quest.dropped")
           : goGap
             ? // The Go runner arrives in the next milestone. Reporting that as a
               // server fault teaches the player to distrust a working server.
-              "the GO land opens in the next chapter"
+              t("quest.goGap")
             : e instanceof WireError
               ? playerText(e.payload.code)
-              : "the run failed";
+              : t("quest.runFailed");
     }
   }
 
@@ -321,16 +366,16 @@ export class QuestScene implements Scene {
         this.error = "";
         this.app.chip.blip();
       } else {
-        this.error = "already tidy";
+        this.error = t("quest.alreadyTidy");
         this.notice = true;
       }
     } catch (e) {
       this.error =
         e instanceof WireError && e.payload.code === "not_found"
-          ? "this server does not have FORMAT yet"
+          ? t("quest.noFormat")
           : e instanceof WireError
             ? playerText(e.payload.code)
-            : "the formatter did not answer";
+            : t("quest.formatSilent");
       this.notice = true;
     } finally {
       this.formatting = false;
@@ -349,7 +394,7 @@ export class QuestScene implements Scene {
       if (this.quest) this.quest.hints_used = res.hints_used;
       this.app.chip.coin();
     } catch {
-      this.app.say("no more hints");
+      this.app.say(t("quest.noMoreHints"));
     }
   }
 
@@ -361,6 +406,182 @@ export class QuestScene implements Scene {
     } catch {
       this.editor.load(this.land, this.quest.starter);
     }
+  }
+
+  // -- leaving, and the one question worth asking ---------------------------
+
+  /**
+   * Walk away, having asked first if that throws work away.
+   *
+   * `App.logout` has asked this question since the beginning and the two ways
+   * *off this screen* did not, which meant F3 was more careful with a player's
+   * code than the MAP button next to it. The check is `unsaved()` — the buffer
+   * against the starter, not a dirty flag — so typing something and undoing it
+   * back to the starter does not produce a question, and a question nobody
+   * needs is a question everybody learns to click through.
+   */
+  private async leaveTo(where: "map" | "lobby"): Promise<void> {
+    if (this.unsaved()) {
+      const ok = await this.app.ask({
+        title: where === "map" ? t("quest.leaveMapTitle") : t("quest.leaveLobbyTitle"),
+        body: t("quest.leaveBody"),
+        confirm: t("quest.leave"),
+        cancel: t("quest.keepWriting"),
+      });
+      if (!ok) return;
+    }
+    await this.app.go(
+      where === "map" ? new MapScene(this.app, this.land, this.category) : new LandsScene(this.app),
+      "back",
+    );
+  }
+
+  // -- the clipboard --------------------------------------------------------
+
+  /**
+   * The brief as text somebody can paste into a notebook.
+   *
+   * Canvas text is pixels: there is nothing on this screen to select with a
+   * mouse, so this button is not a convenience, it is the only way the words
+   * leave the screen at all. It is assembled rather than taken from one field
+   * because the brief a player sees is four things — the job, the samples, the
+   * hints they have paid for and the story line — and a copy that dropped the
+   * sample output would drop the one fact SPEC §5.2 exists to guarantee.
+   *
+   * The hidden cases are named and never shown, here as everywhere else.
+   */
+  private briefText(): string {
+    const q = this.quest;
+    if (!q) return "";
+    const out: string[] = [`${String(q.node).padStart(2, "0")}  ${q.title}`, "", q.brief.trim()];
+    for (const c of q.tests.visible) {
+      out.push("", t("quest.sample", { name: c.name }));
+      if (c.stdin) out.push(`  ${t("quest.in")}   ${show(c.stdin)}`);
+      out.push(`  ${t("quest.out")}  ${show(c.expect)}`);
+    }
+    if (q.tests.hidden_count > 0) {
+      out.push("", tn("quest.hiddenCount", q.tests.hidden_count));
+    }
+    for (const h of this.hints) out.push("", t("quest.hint", { text: h }));
+    if (q.story) out.push("", `“${q.story}”`);
+    return out.join("\n") + "\n";
+  }
+
+  /** Everything in the console drawer, including the run report above it. */
+  private consoleText(): string {
+    const out: string[] = [];
+    const a = this.runResult;
+    if (a) {
+      const ok = this.samplePassed(a);
+      out.push(
+        t("run.head", {
+          what: ok
+            ? t("verdict.accepted")
+            : a.verdict === "accepted"
+              ? t("verdict.wrong_answer")
+              : verdictLine(a.verdict),
+        }),
+        t("run.counts", { passed: a.tests_passed, total: a.tests_total, notRun: "" }),
+      );
+      for (const c of a.cases) {
+        if (c.visible && !c.passed) {
+          out.push(`${c.name}: expected ${show(c.expect ?? "")} got ${show(c.got ?? "")}`);
+        }
+      }
+      out.push("");
+    }
+    for (const line of this.log.lines) out.push(line.text);
+    if (!this.log.complete)
+      out.push(t("quest.lostOutput", { gaps: [...this.log.gaps].join(", ") }));
+    return out.join("\n").trim();
+  }
+
+  /** Put a clipboard verdict on the message bar. Always says something. */
+  private report(what: string, res: Awaited<ReturnType<typeof copyText>>, verb: "copy" | "paste") {
+    const m = clipMessage(what, res, verb);
+    this.error = m.text;
+    this.notice = m.notice;
+    if (res.ok) this.app.chip.blip();
+    else this.app.chip.fail();
+  }
+
+  private async copy(what: "brief" | "code" | "output"): Promise<void> {
+    const text =
+      what === "brief"
+        ? this.briefText()
+        : what === "code"
+          ? (this.editor?.source ?? "")
+          : this.consoleText();
+    const name =
+      what === "brief"
+        ? t("clip.theBrief")
+        : what === "code"
+          ? t("clip.yourCode")
+          : t("clip.theOutput");
+    this.report(name, await copyText(text), "copy");
+  }
+
+  /**
+   * Replace the buffer with whatever is on the clipboard.
+   *
+   * Destructive, and deliberately **not** behind a confirmation. A dialogue in
+   * front of a paste is a dialogue somebody dismisses without reading by the
+   * third time, and it protects nothing that Ctrl+Z does not protect better.
+   * `Editor.replaceAll` narrows the change to the span that differs and
+   * dispatches it as one edit, so CodeMirror's history undoes the whole paste
+   * in a single step — which is what the message on screen says it will.
+   *
+   * The case where the clipboard already matches the buffer is called out
+   * rather than left silent: `narrowEdit` correctly does nothing, and a button
+   * that correctly does nothing is indistinguishable from a broken one.
+   */
+  private async paste(): Promise<void> {
+    if (!this.editor) return;
+    const res = await readText();
+    if (!res.ok) return this.report(t("clip.yourCode"), res, "paste");
+    if (res.text === this.editor.source) {
+      this.error = t("clip.sameAlready");
+      this.notice = true;
+      return;
+    }
+    this.editor.replaceAll(res.text);
+    // The caret goes into the editor, and that is load-bearing rather than
+    // polite: the message says CTRL+Z puts it back, and CodeMirror's history
+    // only hears a keystroke when CodeMirror has the focus. Pressing a canvas
+    // button leaves the focus on the page, so a paste that did not hand it
+    // over would make the screen's own promise false.
+    this.editor.focus();
+    this.report(t("clip.yourCode"), res, "paste");
+  }
+
+  // -- how the screen is set up ---------------------------------------------
+
+  /** Brief beside the bench, or above it. Remembered. */
+  private cycleStack(): void {
+    // Two states, not three. `auto` is where a player starts and it is a fine
+    // place to stay, but somebody who has pressed this button has told us they
+    // want to decide, and offering them "let the window decide again" as one
+    // of three presses is a control that is wrong two times in three.
+    const side = this.stack === "auto" ? !this.app.layout.isPortrait() : this.stack === "row";
+    this.stack = side ? "column" : "row";
+    writePref(STACK_KEY, this.stack);
+  }
+
+  /** True when the brief is beside the bench rather than above it. */
+  private get side(): boolean {
+    return this.stack === "auto" ? !this.app.layout.isPortrait() : this.stack === "row";
+  }
+
+  private sizeFont(by: number): void {
+    const next = Math.min(
+      FONT_MAX,
+      Math.max(FONT_MIN, Math.round((this.fontMul + by) * 100) / 100),
+    );
+    if (next === this.fontMul) return;
+    this.fontMul = next;
+    writePref(FONT_KEY, String(next));
+    this.error = t("quest.fontSize", { percent: Math.round(next * 100) });
+    this.notice = true;
   }
 
   // -- input ---------------------------------------------------------------
@@ -377,7 +598,7 @@ export class QuestScene implements Scene {
       if (name === "end") return void (this.logScroll = 0);
     }
     if (name === "escape") {
-      void this.app.go(new MapScene(this.app, this.land, this.category), "back");
+      void this.leaveTo("map");
       return;
     }
     if ((name === "return" || name === "kpenter") && (ev.metaKey || ev.ctrlKey)) {
@@ -402,16 +623,17 @@ export class QuestScene implements Scene {
   }
 
   controls(): Buttons[] {
-    return [this.buttons];
+    return [this.buttons, this.bar];
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
     if (phase === "move") {
       this.buttons.hovered = this.buttons.hit(x, y)?.id ?? null;
+      this.bar.hovered = this.bar.hit(x, y)?.id ?? null;
       return;
     }
     if (phase !== "down") return;
-    const hit = this.buttons.hit(x, y);
+    const hit = this.buttons.hit(x, y) ?? this.bar.hit(x, y);
     if (!hit) return;
     this.app.chip.select();
     switch (hit.id) {
@@ -430,8 +652,36 @@ export class QuestScene implements Scene {
       case "console":
         this.consoleOpen = !this.consoleOpen;
         break;
+      // The two ways off this screen. They live in the toolbar, hard against
+      // the top of the window and a whole panel away from SUBMIT, because a
+      // control that leaves the screen must not be reachable by a hand that
+      // was aiming at the one that spends an attempt.
       case "back":
-        void this.app.go(new MapScene(this.app, this.land, this.category), "back");
+        void this.leaveTo("map");
+        break;
+      case "lobby":
+        void this.leaveTo("lobby");
+        break;
+      case "copybrief":
+        void this.copy("brief");
+        break;
+      case "copycode":
+        void this.copy("code");
+        break;
+      case "copyout":
+        void this.copy("output");
+        break;
+      case "paste":
+        void this.paste();
+        break;
+      case "stack":
+        this.cycleStack();
+        break;
+      case "fontdown":
+        this.sizeFont(-FONT_STEP);
+        break;
+      case "fontup":
+        this.sizeFont(FONT_STEP);
         break;
     }
   }
@@ -496,25 +746,58 @@ export class QuestScene implements Scene {
       g.globalAlpha = 1;
       fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.55);
     }
-    // In portrait the brief is read once and the editor is lived in, so the
-    // split is not the same number as landscape.
-    const f = frame(layout, layout.isPortrait() ? 0.26 : 0.34);
-    const s = f.scale;
+    const s = layout.uiScale();
     const fonts = ensureFonts(s);
     this.buttons.reset();
+    this.bar.reset();
 
     header(
       g,
       this.app,
-      this.quest ? `${String(this.quest.node).padStart(2, "0")} ${this.quest.title}` : "LOADING",
+      this.quest
+        ? `${String(this.quest.node).padStart(2, "0")} ${this.quest.title}`
+        : t("quest.loading"),
     );
+
+    // The toolbar is measured *before* the frame is cut, and the frame is told
+    // how much to give up for it. Laying the panels out against the full body
+    // and subtracting afterwards is the fault this file already carries two
+    // scars from: the contents are laid out against a height the panel does
+    // not have, and the last thing in them lands outside it.
+    const pad = Math.round(10 * s);
+    const toolW = layout.vw - pad * 2;
+    const toolRows = rowsIn(fonts.stationSm, this.toolLabels(), toolW, layout.minTouchH());
+    const toolRowH = Math.max(layout.minTouchH(), fonts.stationSm.height + 20);
+    const toolGap = Math.round(fonts.stationSm.size * 0.5);
+    this.barH = toolRows * toolRowH + (toolRows - 1) * toolGap;
+
+    // Beside, or above. The player's choice if they have made one, the
+    // window's if they have not — and the split is different for the two,
+    // because a brief above the bench is read once and a brief beside it is
+    // referred back to.
+    const side = this.side;
+    // The connection banner is app-level and slides down out of the header —
+    // straight through this toolbar's band. So the toolbar moves under it
+    // while it is up rather than being painted over: the same rule as the
+    // message bar at the bottom of this screen, which is part of the layout
+    // rather than an overlay for exactly this reason.
+    const toast = this.app.toastBand();
+    const f = frame(
+      layout,
+      side ? 0.34 : 0.26,
+      0,
+      side ? "row" : "column",
+      this.barH + Math.round(6 * s) + toast,
+    );
+
+    this.drawToolbar(g, [pad, Math.round(38 * s) + pad + toast, toolW, this.barH]);
 
     // The message bar is *part of the layout*, not an overlay: it used to be
     // painted across the bottom of the body over whatever was there, and with
     // the button row wrapped to two lines that was RESET. The panels give up
     // its height instead, so nothing is ever drawn under it.
-    const barH = this.error ? fonts.small.height + Math.round(8 * s) : 0;
-    const room = barH > 0 ? barH + Math.round(6 * s) : 0;
+    const msgH = this.error ? fonts.small.height + Math.round(8 * s) : 0;
+    const room = msgH > 0 ? msgH + Math.round(6 * s) : 0;
     const left: Rect = [f.left[0], f.left[1], f.left[2], f.left[3] - room];
     const right: Rect = [f.right[0], f.right[1], f.right[2], f.right[3] - room];
 
@@ -527,6 +810,7 @@ export class QuestScene implements Scene {
     arriving(g, f, "right", this.benchIn, () => this.drawWorkbench(g, right, accent));
 
     this.buttons.draw(g, fonts.button);
+    this.bar.draw(g, fonts.stationSm);
     if (this.error) {
       // A bar rather than a loose line: the message crosses both panels, and
       // bare text laid over a panel border is unreadable at the seam.
@@ -534,26 +818,73 @@ export class QuestScene implements Scene {
       // Red is failure and only failure. "The GO land opens in the next
       // chapter" is news, not a fault, and painting news in the failure colour
       // is how a colour ends up meaning three things and therefore nothing.
-      const barY = f.body[1] + f.body[3] - barH;
+      const barY = f.body[1] + f.body[3] - msgH;
       const tone = this.notice ? Theme.coin : Theme.red;
-      fill(g, Theme.ink, f.body[0], barY, f.body[2], barH, 0.92);
+      fill(g, Theme.ink, f.body[0], barY, f.body[2], msgH, 0.92);
       fill(g, tone, f.body[0], barY, f.body[2], Math.max(1, Math.round(s)));
       g.fillStyle = css(this.notice ? Theme.cream : Theme.red);
       printf(g, fonts.small, this.error, f.body[0], barY + Math.round(4 * s), f.body[2], "center");
     }
     // The keys that are *only* keys. `ESC MAP` used to sit under a button that
     // already said MAP, which is the footer explaining the screen to itself.
-    footer(
-      g,
-      layout,
-      "CTRL+ENTER  RUN   CTRL+SHIFT+ENTER  SUBMIT   CTRL+SHIFT+F  FORMAT   PGUP/PGDN  LOG   F1  ORIENTATION",
-    );
+    footer(g, layout, t("quest.footer"));
+  }
+
+  /**
+   * The toolbar's labels, in the order they are laid out.
+   *
+   * Shared by the measurement and the drawing so the two cannot disagree about
+   * how many lines it wraps onto — the exact fault that put ALL MAPS on top of
+   * PLAYGROUND on the map screen, recorded in decisions.md as a class rather
+   * than as one bug.
+   */
+  private toolItems(): Array<{ id: string; label: string; dim?: boolean }> {
+    const noOutput = !this.runResult && this.log.lines.length === 0;
+    return [
+      // Leaving, first and leftmost: the top-left of a screen is where a
+      // person looks for the way back out of it.
+      { id: "back", label: t("quest.backToMap") },
+      { id: "lobby", label: t("quest.lobby") },
+      // The clipboard. Canvas text cannot be selected, so these are not a
+      // convenience — they are the only way any of it leaves the screen.
+      { id: "copybrief", label: t("quest.copyBrief"), dim: !this.quest },
+      { id: "copycode", label: t("quest.copyCode"), dim: !this.editor },
+      { id: "copyout", label: t("quest.copyOutput"), dim: noOutput },
+      { id: "paste", label: t("quest.paste"), dim: !this.editor },
+      // How the screen is set up, and it says what it controls rather than
+      // which axis it is: F1 is already the orientation and two buttons that
+      // both read as "vertical" are two buttons nobody can tell apart.
+      { id: "stack", label: this.side ? t("quest.briefSide") : t("quest.briefTop") },
+      { id: "fontdown", label: t("quest.fontDown"), dim: this.fontMul <= FONT_MIN + 0.001 },
+      { id: "fontup", label: t("quest.fontUp"), dim: this.fontMul >= FONT_MAX - 0.001 },
+    ];
+  }
+
+  private toolLabels(): string[] {
+    return this.toolItems().map((i) => i.label);
+  }
+
+  /**
+   * The strip between the header and the panels.
+   *
+   * It gets its own plate for the same reason the message bar does: this sits
+   * over a photograph of a street, and a row of small controls with a lit
+   * window behind them is a row of small controls nobody can read.
+   */
+  private drawToolbar(g: Ctx, rect: Rect): void {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const [x, y, w, h] = rect;
+    fill(g, Theme.ink, x - 4, y - 3, w + 8, h + 6, 0.82);
+    fill(g, Theme.dim, x - 4, y + h + 3, w + 8, 1, 0.5);
+    this.bar.row(fonts.stationSm, [x, y, w, h], this.toolItems(), layout.minTouchH());
   }
 
   private drawBrief(g: Ctx, rect: Rect, accent: readonly [number, number, number, number]): void {
     const s = this.app.layout.uiScale();
     const fonts = ensureFonts(s);
-    const inner = titledPanel(g, rect, "THE JOB", accent);
+    const inner = titledPanel(g, rect, t("quest.job"), accent);
     this.briefRect = inner;
     if (!this.quest) {
       g.fillStyle = css(Theme.dim);
@@ -577,6 +908,20 @@ export class QuestScene implements Scene {
     const textW = inner[2] - Math.round(8 * s);
     let yy = top;
     clipped(g, inner[0], inner[1], inner[2], inner[3], () => {
+      // The one place a mixed-language screen has to be honest about itself.
+      //
+      // The interface is translated and the 138 briefs are not — they belong
+      // to `content/` and translating them is a different, much larger job. A
+      // Korean panel with an English paragraph inside it and no explanation
+      // reads as a translation somebody abandoned halfway. One line saying
+      // which half is which turns it into a stated fact, and it costs a line.
+      if (locale() !== "en") {
+        g.fillStyle = css(Theme.cyan, 0.7);
+        yy +=
+          printf(g, fonts.stationSm, t("quest.briefEnglish"), inner[0], yy, textW, "left") *
+          fonts.stationSm.height;
+        yy += Math.round(8 * s);
+      }
       // `brief` is markdown (SPEC §2.1); the canvas draws the flattening.
       for (const b of blocks(this.quest!.brief)) {
         if (b.kind === "code") {
@@ -609,28 +954,37 @@ export class QuestScene implements Scene {
         const tw = textW - Math.round(16 * s);
         let ty = yy + Math.round(8 * s);
         g.fillStyle = css(Theme.cyan);
-        printf(g, fonts.stationSm, `SAMPLE · ${c.name}`, tx, ty, tw, "left");
+        printf(g, fonts.stationSm, t("quest.sample", { name: c.name }), tx, ty, tw, "left");
         ty += fonts.stationSm.height + Math.round(4 * s);
         if (c.stdin) {
           g.fillStyle = css(Theme.dim);
-          printf(g, fonts.code, `in   ${show(c.stdin)}`, tx, ty, tw, "left");
+          printf(g, fonts.code, `${t("quest.in")}   ${show(c.stdin)}`, tx, ty, tw, "left");
           ty += fonts.code.height;
         }
         g.fillStyle = css(Theme.grass);
-        printf(g, fonts.code, `out  ${show(c.expect)}`, tx, ty, tw, "left");
+        printf(g, fonts.code, `${t("quest.out")}  ${show(c.expect)}`, tx, ty, tw, "left");
         yy += wellH + Math.round(8 * s);
       }
       if (tests.hidden_count > 0) {
         // The count only — never the data (SPEC §5.2).
         g.fillStyle = css(Theme.dim);
-        printf(g, fonts.stationSm, `+${tests.hidden_count} HIDDEN`, inner[0], yy, textW, "left");
+        printf(
+          g,
+          fonts.stationSm,
+          tn("quest.hiddenCount", tests.hidden_count),
+          inner[0],
+          yy,
+          textW,
+          "left",
+        );
         yy += fonts.stationSm.height + Math.round(8 * s);
       }
 
       for (const h of this.hints) {
         g.fillStyle = css(Theme.coin);
         yy +=
-          printf(g, fonts.small, `HINT: ${h}`, inner[0], yy, textW, "left") * fonts.small.height;
+          printf(g, fonts.small, t("quest.hint", { text: h }), inner[0], yy, textW, "left") *
+          fonts.small.height;
         yy += Math.round(6 * s);
       }
 
@@ -678,13 +1032,18 @@ export class QuestScene implements Scene {
     // `hints_used` comes back on `quest.get` (§5.3) and on every `quest.hint`,
     // so leaving a quest and coming back does not offer a hint already paid for.
     const hintsLeft = this.quest ? this.quest.hints_total - this.quest.hints_used : 0;
-    const hintLabel =
-      hintsLeft === 0 ? "NO HINTS" : hintsLeft === 1 ? "1 HINT LEFT" : `${hintsLeft} HINTS LEFT`;
+    const hintLabel = hintsLeft === 0 ? t("quest.noHints") : tn("quest.hintsLeft", hintsLeft);
     // SUBMIT is laid out first and taken out of the row's width, so it sits at
     // the far end of the bench and the everyday buttons flow up to it. It is
     // the one control on this screen that spends an attempt, and a control that
     // can be hit on the way to RUN is a control that will be.
-    const [subW] = btnBox(fonts.button, ["SUBMIT"], 0, fonts.button.size * 2, layout.minTouchH());
+    const [subW] = btnBox(
+      fonts.button,
+      [t("quest.submit")],
+      0,
+      fonts.button.size * 2,
+      layout.minTouchH(),
+    );
     const gap = Math.round(fonts.button.size * 1.6);
     const rowW = inner[2] - subW - gap;
     // Measured, not assumed. At 1280 across, RESET wraps onto a second line,
@@ -693,7 +1052,13 @@ export class QuestScene implements Scene {
     const rowGap = Math.round(fonts.button.size * 0.5);
     const rows = rowsIn(
       fonts.button,
-      ["RUN", "FORMAT", hintLabel, this.consoleOpen ? "HIDE LOG" : "LOG", "MAP", "RESET"],
+      [
+        t("quest.run"),
+        t("quest.format"),
+        hintLabel,
+        this.consoleOpen ? t("quest.hideLog") : t("quest.log"),
+        t("quest.reset"),
+      ],
       rowW,
       layout.minTouchH(),
     );
@@ -705,8 +1070,12 @@ export class QuestScene implements Scene {
     // CodeMirror is a DOM element outside the canvas transform, so it waits
     // for its well to land rather than hanging in the air while the panel
     // slides in underneath it.
-    if (this.editor && this.benchIn.finished) this.overlay?.place(editorRect, fonts.codeSm.size);
-    else this.overlay?.hide();
+    // The editor's type is the player's to set — `A-` / `A+` in the toolbar,
+    // remembered between sessions. Everything else on the screen keeps the UI
+    // scale: the panels are furniture and the code is the work.
+    if (this.editor && this.benchIn.finished) {
+      this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
+    } else this.overlay?.hide();
 
     const rowY = inner[1] + editorH + Math.round(8 * s);
     this.buttons.row(
@@ -719,22 +1088,24 @@ export class QuestScene implements Scene {
       [
         {
           id: "run",
-          label: this.stage === "idle" ? "RUN" : "…",
+          label: this.stage === "idle" ? t("quest.run") : "…",
           dim: this.stage !== "idle",
           primary: this.stage === "idle",
         },
-        { id: "format", label: "FORMAT", dim: this.formatting },
+        { id: "format", label: t("quest.format"), dim: this.formatting },
         { id: "hint", label: hintLabel, dim: hintsLeft <= 0 },
-        { id: "console", label: this.consoleOpen ? "HIDE LOG" : "LOG" },
-        { id: "back", label: "MAP" },
-        { id: "reset", label: "RESET" },
+        { id: "console", label: this.consoleOpen ? t("quest.hideLog") : t("quest.log") },
+        // MAP used to be here, one gap from SUBMIT. It is in the toolbar at
+        // the top of the screen now: a control that abandons the quest has no
+        // business sharing a row with the control that submits it.
+        { id: "reset", label: t("quest.reset") },
       ],
       layout.minTouchH(),
     );
     this.buttons.add({
       id: "submit",
       rect: [inner[0] + inner[2] - subW, rowY, subW, btnH],
-      label: this.stage === "idle" ? "SUBMIT" : "…",
+      label: this.stage === "idle" ? t("quest.submit") : "…",
       dim: this.stage !== "idle",
       strong: this.stage === "idle",
     });
@@ -772,23 +1143,31 @@ export class QuestScene implements Scene {
     const failed = a.cases.find((c) => c.visible && !c.passed);
 
     const head = ok
-      ? "THE SAMPLE WORKS"
+      ? t("verdict.accepted")
       : a.verdict === "accepted"
-        ? "THE SAMPLE DOES NOT MATCH YET"
-        : VERDICT_LINE[a.verdict];
+        ? t("verdict.wrong_answer")
+        : verdictLine(a.verdict);
     // The hidden count is on both paths. "what a run did and did not check" is
     // the whole point of the strip, and it is *more* important when the sample
     // failed — that is exactly when somebody might think they have seen the
     // worst of it.
-    const notRun =
-      hidden > 0 ? ` · ${hidden} hidden ${hidden === 1 ? "case" : "cases"} not run` : "";
+    const notRun = hidden > 0 ? tn("run.notRun", hidden) : "";
     const detail = ok
       ? hidden > 0
-        ? `${a.tests_passed}/${a.tests_total} sample cases${notRun} — press SUBMIT to check ${hidden === 1 ? "it" : "them"}`
-        : `${a.tests_passed}/${a.tests_total} sample cases — press SUBMIT to record it`
+        ? tn("run.passCheck", hidden, {
+            passed: a.tests_passed,
+            total: a.tests_total,
+            notRun,
+          })
+        : t("run.passRecord", { passed: a.tests_passed, total: a.tests_total })
       : failed
-        ? `${failed.name} · expected ${show(failed.expect ?? "")} · got ${show(failed.got ?? "")}${notRun}`
-        : `${a.tests_passed}/${a.tests_total} sample cases${notRun}`;
+        ? t("run.failDetail", {
+            name: failed.name,
+            expect: show(failed.expect ?? ""),
+            got: show(failed.got ?? ""),
+            notRun,
+          })
+        : t("run.counts", { passed: a.tests_passed, total: a.tests_total, notRun });
 
     // Clamped, twice. `expect` and `got` are arbitrary program output: a
     // program that prints a paragraph wraps to six lines here, and an
@@ -814,7 +1193,15 @@ export class QuestScene implements Scene {
     fill(g, accent, x, y, Math.round(3 * s), h);
     fill(g, Theme.dim, x, y + h - 1, w, 1, 0.5);
     g.fillStyle = css(accent);
-    printf(g, fonts.stationSm, `RUN · ${head}`, x + pad, y + pad, w - pad * 2, "left");
+    printf(
+      g,
+      fonts.stationSm,
+      t("run.head", { what: head }),
+      x + pad,
+      y + pad,
+      w - pad * 2,
+      "left",
+    );
     g.fillStyle = css(Theme.cream, 0.85);
     let ly = y + pad + fonts.stationSm.height + Math.round(4 * s);
     for (const line of lines) {
@@ -894,7 +1281,7 @@ export class QuestScene implements Scene {
     printf(
       g,
       fonts.stationSm,
-      over ? "OVERTIME" : "TIME LEFT",
+      over ? t("quest.overtime") : t("quest.timeLeft"),
       x + Math.round(8 * s),
       y + Math.round(6 * s),
       w,
@@ -927,7 +1314,8 @@ export class QuestScene implements Scene {
   private stageLabel(): string {
     if (this.stage === "idle") return "";
     const dots = ".".repeat(1 + (Math.floor(this.t * 3) % 3));
-    const queue = this.stage === "queued" && this.queued > 0 ? ` (${this.queued} AHEAD)` : "";
+    const queue =
+      this.stage === "queued" && this.queued > 0 ? t("quest.queued", { n: this.queued }) : "";
     const secs = this.elapsedMs > 1500 ? ` ${(this.elapsedMs / 1000).toFixed(1)}S` : "";
     return `${this.stage.toUpperCase()}${dots}${queue}${secs}`;
   }
@@ -960,7 +1348,7 @@ export class QuestScene implements Scene {
     if (!this.log.complete) {
       flat.push({
         stream: "stderr",
-        text: `[some output was lost: ${[...this.log.gaps].join(", ")}]`,
+        text: t("quest.lostOutput", { gaps: [...this.log.gaps].join(", ") }),
       });
     }
     const start = Math.max(0, flat.length - rows - this.logScroll);
@@ -980,15 +1368,7 @@ export class QuestScene implements Scene {
       }
       if (flat.length === 0) {
         g.fillStyle = css(Theme.dim);
-        printf(
-          g,
-          fonts.codeSm,
-          "the compiler has not said anything yet",
-          x + pad,
-          y + pad,
-          w - pad * 2,
-          "left",
-        );
+        printf(g, fonts.codeSm, t("quest.silentCompiler"), x + pad, y + pad, w - pad * 2, "left");
       }
     });
     if (this.stage !== "idle") {

@@ -16,22 +16,29 @@ import type { App } from "../app";
 import type { Font } from "../engine/text";
 import { rowsIn, type Ctx, type Rect } from "../engine/ui";
 import { Buttons } from "./chrome";
+import { t } from "../i18n";
 
 export type AuxScreen = "search" | "stats" | "ai";
 
 /** In the order they are drawn, which is the order they are learned in. */
-const ROW: ReadonlyArray<{ id: string; label: string; screen: AuxScreen | null }> = [
-  { id: "aux:search", label: "SEARCH", screen: "search" },
-  { id: "aux:stats", label: "STATS", screen: "stats" },
-  { id: "aux:ai", label: "AI MODE", screen: "ai" },
+const ROW = (): ReadonlyArray<{ id: string; label: string; screen: AuxScreen | null }> => [
+  { id: "aux:search", label: t("aux.search"), screen: "search" },
+  { id: "aux:stats", label: t("aux.stats"), screen: "stats" },
+  { id: "aux:ai", label: t("aux.ai"), screen: "ai" },
   // Last, and named for a place rather than a direction: "BACK" from a screen
   // you reached with a function key from an unknown other screen is a promise
   // nothing here can keep.
-  { id: "aux:maps", label: "ALL MAPS", screen: null },
+  { id: "aux:maps", label: t("aux.allMaps"), screen: null },
 ];
 
-/** The key hint every one of the three screens ends its footer with. */
-export const AUX_HINT = "F4 SEARCH   F5 STATS   F6 AI   ESC MAPS";
+/**
+ * The key hint every one of the three screens ends its footer with.
+ *
+ * A function rather than a constant now the words can change: a module-level
+ * string is baked at import time and would stay in whatever language the game
+ * started in for the rest of the session.
+ */
+export const AUX_HINT = (): string => t("aux.hint");
 
 /**
  * The three screens as another screen's button strip can carry them — the same
@@ -43,9 +50,10 @@ export const AUX_HINT = "F4 SEARCH   F5 STATS   F6 AI   ESC MAPS";
  * takes these ids unchanged, which is the point: a caller adds the row and
  * forwards the id, and there is no second table of names anywhere.
  */
-export const AUX_BAR: ReadonlyArray<{ id: string; label: string }> = ROW.filter(
-  (item) => item.screen !== null,
-).map((item) => ({ id: item.id, label: item.label }));
+export const AUX_BAR = (): ReadonlyArray<{ id: string; label: string }> =>
+  ROW()
+    .filter((item) => item.screen !== null)
+    .map((item) => ({ id: item.id, label: item.label }));
 
 /**
  * Lay the row out inside `rect` and return how tall it came out.
@@ -59,7 +67,7 @@ export function auxRow(btns: Buttons, f: Font, rect: Rect, here: AuxScreen, minH
   btns.row(
     f,
     rect,
-    ROW.map((item) => ({ id: item.id, label: item.label, dim: item.screen === here })),
+    ROW().map((item) => ({ id: item.id, label: item.label, dim: item.screen === here })),
     minH,
   );
   return auxHeight(f, rect[2], minH);
@@ -67,7 +75,7 @@ export function auxRow(btns: Buttons, f: Font, rect: Rect, here: AuxScreen, minH
 
 /** How tall `auxRow` will draw in `width`, before it is drawn. */
 export function auxHeight(f: Font, width: number, minH = 0): number {
-  const labels = ROW.map((item) => item.label);
+  const labels = ROW().map((item) => item.label);
   const rows = rowsIn(f, labels, width, minH);
   const one = Math.max(minH, f.height + 20);
   const gap = Math.round(f.size * 0.5);

@@ -14,6 +14,7 @@ pub mod go;
 pub mod gotest;
 pub mod harness;
 pub mod proc;
+pub mod reap;
 pub mod rust;
 pub mod spec;
 pub mod suite;

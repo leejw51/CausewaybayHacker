@@ -22,12 +22,57 @@
  *     sentence is one very wide line.
  */
 
-/** Press Start 2P for the chrome, VT323 for body text, the system CJK behind both. */
+/**
+ * Press Start 2P for the chrome, VT323 for body text — and behind both, a CJK
+ * face, because neither of the two has a single Korean, Japanese or Chinese
+ * glyph in it. Their `cmap` tables were read rather than assumed: Czech and
+ * the rest of Latin are covered by both, in upper and lower case, diacritics
+ * included; Hangul, kana and Han are covered by neither.
+ *
+ * There are two layers of fallback and the order is the whole design:
+ *
+ *   1. **A CJK pixel font**, when one has been loaded for the active language
+ *      (`setCjkFamily`, driven by `i18n/`). This is Fusion Pixel 12px, which
+ *      is a bitmap face and therefore keeps the 16-bit look — the thing the
+ *      whole project is for. It is ~900 KB, so it is fetched only when a
+ *      language that needs it is chosen and never for English or Czech.
+ *   2. **The system CJK stack**, which is what was here before and is still
+ *      the floor. It works offline, costs nothing, and renders a smooth,
+ *      anti-aliased, entirely wrong-looking Korean next to crisp pixel Latin.
+ *      That is a far better failure than a row of tofu boxes, which is what a
+ *      machine with no CJK system font shows instead.
+ */
 const CJK =
   '"Noto Sans CJK KR","Noto Sans CJK SC","Noto Sans KR","Noto Sans SC","Hiragino Sans",' +
   '"Yu Gothic","Microsoft YaHei","Malgun Gothic",sans-serif';
-const PIXEL = `"PressStart2P",ui-monospace,monospace,${CJK}`;
-const BODY = `"VT323",ui-monospace,monospace,${CJK}`;
+
+/** The pixel CJK family for the active language, or "" for none. */
+let cjk = "";
+
+/**
+ * Name the CJK pixel family that is now resident, or clear it.
+ *
+ * Called by `i18n/` after the font has actually finished loading, never
+ * before: a family named in a stack it cannot supply is a frame measured
+ * against the fallback and then re-laid-out when it lands, which is the jump
+ * `boot.ts` already goes out of its way to avoid for the two Latin faces.
+ *
+ * It drops every cached measurement, because every one of them was taken
+ * against a different stack.
+ */
+export function setCjkFamily(family: string): void {
+  if (family === cjk) return;
+  cjk = family;
+  remeasure();
+}
+
+export function cjkFamily(): string {
+  return cjk;
+}
+
+const back = () => (cjk ? `"${cjk}",${CJK}` : CJK);
+const PIXEL = () => `"PressStart2P",ui-monospace,monospace,${back()}`;
+const BODY = () => `"VT323",ui-monospace,monospace,${back()}`;
 
 export type FontName =
   | "title"
@@ -54,7 +99,7 @@ function snap8(n: number): number {
   return Math.max(8, Math.round(n / 8) * 8);
 }
 
-let scaleKey = -1;
+let scaleKey = "";
 let fonts: Record<FontName, Font> | null = null;
 let widths = new Map<string, number>();
 let measurer: CanvasRenderingContext2D | null = null;
@@ -91,23 +136,28 @@ function make(size: number, family: string): Font {
  */
 export function ensureFonts(scale: number): Record<FontName, Font> {
   const s = Math.max(1, scale);
-  const key = Math.round(s * 100);
+  // The active CJK family is part of the key. Without it, switching language
+  // hands back the record built for the previous one and every Korean string
+  // on screen is measured — and drawn — in a stack that cannot render it.
+  const key = `${Math.round(s * 100)}\n${cjk}`;
   if (key === scaleKey && fonts) return fonts;
   scaleKey = key;
   widths = new Map();
+  const pixel = PIXEL();
+  const body = BODY();
   fonts = {
-    title: make(snap8(40 * s), PIXEL),
-    subtitle: make(40 * s, BODY),
-    ui: make(snap8(16 * s), PIXEL),
-    small: make(30 * s, BODY),
-    code: make(28 * s, BODY),
-    codeSm: make(22 * s, BODY),
-    bubble: make(30 * s, BODY),
-    station: make(snap8(16 * s), PIXEL),
-    stationSm: make(snap8(8 * s), PIXEL),
-    button: make(snap8(16 * s), PIXEL),
-    stamp: make(snap8(24 * s), PIXEL),
-    help: make(32 * s, BODY),
+    title: make(snap8(40 * s), pixel),
+    subtitle: make(40 * s, body),
+    ui: make(snap8(16 * s), pixel),
+    small: make(30 * s, body),
+    code: make(28 * s, body),
+    codeSm: make(22 * s, body),
+    bubble: make(30 * s, body),
+    station: make(snap8(16 * s), pixel),
+    stationSm: make(snap8(8 * s), pixel),
+    button: make(snap8(16 * s), pixel),
+    stamp: make(snap8(24 * s), pixel),
+    help: make(32 * s, body),
   };
   return fonts;
 }
@@ -115,7 +165,7 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
 /** Forget every measurement. Called once the real fonts finish downloading:
  *  anything measured against the fallback is the wrong width. */
 export function remeasure(): void {
-  scaleKey = -1;
+  scaleKey = "";
   widths = new Map();
 }
 

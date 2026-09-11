@@ -37,6 +37,7 @@ import { Overlay } from "../ui/overlay";
 import { LogBuffer } from "../net/logbuf";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
+import { t } from "../i18n";
 import type { Land, PlaygroundRun, RunStage, SnippetBrief } from "../net/protocol";
 import { LandsScene } from "./lands";
 
@@ -50,12 +51,12 @@ const STARTER: Record<Land, string> = {
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hello, causewaybay")\n}\n',
 };
 
-const OUTCOME: Record<PlaygroundRun["outcome"], string> = {
-  ok: "IT RAN",
-  compile_error: "IT DID NOT COMPILE",
-  runtime_error: "IT STOPPED",
-  timeout: "IT RAN OUT OF TIME",
-  output_limit: "IT PRINTED TOO MUCH",
+const OUTCOME: Record<PlaygroundRun["outcome"], () => string> = {
+  ok: () => t("pg.ran"),
+  compile_error: () => t("pg.didNotCompile"),
+  runtime_error: () => t("pg.stopped"),
+  timeout: () => t("pg.timedOut"),
+  output_limit: () => t("pg.tooMuch"),
 };
 
 /**
@@ -78,6 +79,10 @@ export class PlaygroundScene implements Scene {
 
   private snippets: SnippetBrief[] = [];
   private held: Held = { id: null, name: "SCRATCH", lang: "rust", source: STARTER.rust };
+  /** The unsaved pad's name, translated. The stored `name` stays as it is. */
+  private heldName(): string {
+    return this.held.id === null ? t("pg.scratch") : this.held.name;
+  }
   /** What the server last confirmed, so an identical save is not sent at all. */
   private savedSource = "";
   private savedLang: Land = "rust";
@@ -111,7 +116,7 @@ export class PlaygroundScene implements Scene {
     const el = document.createElement("textarea");
     el.className = "cwb-field";
     el.spellcheck = false;
-    el.placeholder = "stdin — what the program reads";
+    el.placeholder = t("pg.stdinHint");
     this.stdinEl = el;
   }
 
@@ -214,7 +219,7 @@ export class PlaygroundScene implements Scene {
       // this tab's until the calls land. Say so rather than showing nothing.
       this.snippets = [];
       if (e instanceof WireError && e.payload.code === "not_found") {
-        this.saveNote = "snippets are not kept on this server yet — saved in this browser";
+        this.saveNote = t("pg.noList");
       }
     }
   }
@@ -239,8 +244,7 @@ export class PlaygroundScene implements Scene {
       if (!quiet) this.app.chip.select();
     } catch (e) {
       if (!quiet)
-        this.status =
-          e instanceof WireError ? playerText(e.payload.code) : "could not open that one";
+        this.status = e instanceof WireError ? playerText(e.payload.code) : t("pg.openFailed");
     }
   }
 
@@ -279,8 +283,8 @@ export class PlaygroundScene implements Scene {
       // saved" must never look the same.
       this.saveNote =
         e instanceof WireError && e.payload.code === "not_found"
-          ? "not kept on this server yet — kept in this browser"
-          : "could not save to the server — kept in this browser";
+          ? t("pg.localOnly")
+          : t("pg.saveFailed");
     } finally {
       this.saving = false;
     }
@@ -312,10 +316,10 @@ export class PlaygroundScene implements Scene {
     } catch (e) {
       this.status =
         e instanceof WireError && e.payload.code === "not_found"
-          ? "this server does not have the playground yet"
+          ? t("pg.noPlayground")
           : e instanceof WireError
             ? playerText(e.payload.code)
-            : "the run did not come back";
+            : t("pg.runSilent");
       this.app.chip.fail();
     } finally {
       this.stage = "idle";
@@ -343,14 +347,14 @@ export class PlaygroundScene implements Scene {
         this.touched();
         this.status = "";
         this.app.chip.blip();
-      } else this.status = "already tidy";
+      } else this.status = t("quest.alreadyTidy");
     } catch (e) {
       this.status =
         e instanceof WireError && e.payload.code === "not_found"
-          ? "this server does not have FORMAT yet"
+          ? t("quest.noFormat")
           : e instanceof WireError
             ? playerText(e.payload.code)
-            : "the formatter did not answer";
+            : t("quest.formatSilent");
     } finally {
       this.formatting = false;
     }
@@ -398,7 +402,7 @@ export class PlaygroundScene implements Scene {
       this.saveNote = "deleted";
       void this.refreshList();
     } catch (e) {
-      this.saveNote = e instanceof WireError ? playerText(e.payload.code) : "could not delete it";
+      this.saveNote = e instanceof WireError ? playerText(e.payload.code) : t("pg.deleteFailed");
     }
   }
 
@@ -467,7 +471,7 @@ export class PlaygroundScene implements Scene {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
     this.drawRoom(g);
-    header(g, this.app, `PLAYGROUND · ${this.held.name.toUpperCase()}`);
+    header(g, this.app, t("pg.title", { name: this.heldName().toUpperCase() }));
     const f = frame(layout, layout.isPortrait() ? 0.26 : 0.26, 0.07);
     const s = f.scale;
     this.buttons.reset();
@@ -475,11 +479,7 @@ export class PlaygroundScene implements Scene {
     this.drawList(g, f.left, s);
     this.drawBench(g, f.right, s);
     this.buttons.draw(g, ensureFonts(s).button);
-    footer(
-      g,
-      layout,
-      "CTRL+ENTER  RUN   CTRL+SHIFT+F  FORMAT   CTRL+S  SAVE   ESC  BACK   F1  ORIENTATION",
-    );
+    footer(g, layout, t("pg.footer"));
   }
 
   /**
@@ -523,7 +523,7 @@ export class PlaygroundScene implements Scene {
   /** The saved snippets, and the one line that says what this screen is. */
   private drawList(g: Ctx, rect: Rect, s: number): void {
     const fonts = ensureFonts(s);
-    const inner = titledPanel(g, rect, "SCRATCHPADS", Theme.coin);
+    const inner = titledPanel(g, rect, t("pg.scratchpads"), Theme.coin);
     let y = inner[1];
     const pad = Math.round(8 * s);
 
@@ -531,7 +531,7 @@ export class PlaygroundScene implements Scene {
     // the quest screen's rule and the player has to be told which one they are
     // standing on.
     g.fillStyle = css(Theme.cream, 0.7);
-    const note = "Nothing here is part of your record. Write anything, break anything.";
+    const note = t("pg.notScored");
     const lines = wrap(fonts.small, note, inner[2]);
     for (const line of lines) {
       printf(g, fonts.small, line, inner[0], y, inner[2], "left");
@@ -587,7 +587,7 @@ export class PlaygroundScene implements Scene {
       }
       if (this.snippets.length === 0) {
         g.fillStyle = css(Theme.dim);
-        printf(g, fonts.small, "nothing saved yet", inner[0], y + pad, inner[2], "center");
+        printf(g, fonts.small, t("pg.nothingSaved"), inner[0], y + pad, inner[2], "center");
       }
       if (this.saveNote) {
         g.fillStyle = css(Theme.coin, 0.85);
@@ -605,7 +605,7 @@ export class PlaygroundScene implements Scene {
 
     const [nw, nh] = btnBox(
       fonts.button,
-      ["NEW"],
+      [t("pg.new")],
       0,
       fonts.button.size * 2,
       this.app.layout.minTouchH(),
@@ -613,12 +613,12 @@ export class PlaygroundScene implements Scene {
     this.buttons.add({
       id: "new",
       rect: [inner[0], inner[1] + inner[3] - nh, nw, nh],
-      label: "NEW",
+      label: t("pg.new"),
     });
     if (this.held.id) {
       const [dw] = btnBox(
         fonts.button,
-        ["DELETE"],
+        [t("pg.delete")],
         0,
         fonts.button.size * 2,
         this.app.layout.minTouchH(),
@@ -626,7 +626,7 @@ export class PlaygroundScene implements Scene {
       this.buttons.add({
         id: "delete",
         rect: [inner[0] + inner[2] - dw, inner[1] + inner[3] - nh, dw, nh],
-        label: "DELETE",
+        label: t("pg.delete"),
       });
     }
   }
@@ -643,18 +643,18 @@ export class PlaygroundScene implements Scene {
     const gap = Math.round(8 * s);
     const stdinH = Math.max(Math.round(46 * s), fonts.codeSm.height * 2 + Math.round(16 * s));
     const outH = Math.round(inner[3] * (layout.isPortrait() ? 0.3 : 0.28));
-    const labels = ["RUN", "FORMAT", "SAVE", "MAPS"];
+    const labels = [t("pg.run"), t("pg.format"), t("pg.save"), t("pg.maps")];
     // The language pair is laid out first and taken out of the row's width,
     // like SUBMIT on the quest screen: it is a *state*, not an action, and it
     // is painted lit so the screen says which file you are in twice over.
     const [langW, langH] = btnBox(
       fonts.button,
-      ["RUST"],
+      [t("pg.rust")],
       0,
       fonts.button.size * 2,
       layout.minTouchH(),
     );
-    const [goW] = btnBox(fonts.button, ["GO"], 0, fonts.button.size * 2, layout.minTouchH());
+    const [goW] = btnBox(fonts.button, [t("pg.go")], 0, fonts.button.size * 2, layout.minTouchH());
     const langGap = Math.round(fonts.button.size * 0.5);
     const rowW = inner[2] - langW - goW - langGap * 2 - Math.round(fonts.button.size * 1.6);
     const rows = rowsIn(fonts.button, labels, rowW, layout.minTouchH());
@@ -675,7 +675,7 @@ export class PlaygroundScene implements Scene {
     printf(
       g,
       fonts.stationSm,
-      "STDIN",
+      t("pg.stdin"),
       inner[0] + Math.round(6 * s),
       stdinY + Math.round(4 * s),
       inner[2],
@@ -697,13 +697,13 @@ export class PlaygroundScene implements Scene {
       [
         {
           id: "run",
-          label: this.stage === "idle" ? "RUN" : "…",
+          label: this.stage === "idle" ? t("pg.run") : "…",
           dim: this.stage !== "idle",
           primary: this.stage === "idle",
         },
-        { id: "format", label: "FORMAT", dim: this.formatting },
-        { id: "save", label: this.dirty ? "SAVE *" : "SAVE" },
-        { id: "back", label: "MAPS" },
+        { id: "format", label: t("pg.format"), dim: this.formatting },
+        { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
+        { id: "back", label: t("pg.maps") },
       ],
       layout.minTouchH(),
     );
@@ -763,18 +763,18 @@ export class PlaygroundScene implements Scene {
       printf(
         g,
         fonts.stationSm,
-        OUTCOME[r.outcome],
+        OUTCOME[r.outcome](),
         x + pad,
         ty + Math.round(3 * s),
         w - pad * 2,
         "left",
       );
       g.fillStyle = css(Theme.dim);
-      const exit = r.exit_code === null ? "" : ` · exit ${r.exit_code}`;
+      const exit = r.exit_code === null ? "" : t("pg.exit", { code: r.exit_code });
       printf(
         g,
         fonts.stationSm,
-        `${r.compile_ms} ms compile · ${r.run_ms} ms run${exit}`,
+        t("pg.timings", { compile: r.compile_ms, run: r.run_ms, exit }),
         x,
         ty + Math.round(3 * s),
         w - pad,
@@ -811,15 +811,7 @@ export class PlaygroundScene implements Scene {
         out.push([l.text, l.stream === "stderr" ? Theme.red : Theme.dim]);
     if (out.length === 0) {
       g.fillStyle = css(Theme.dim);
-      printf(
-        g,
-        fonts.codeSm,
-        "nothing has been run yet",
-        x + pad * 2,
-        ty + pad,
-        w - pad * 4,
-        "left",
-      );
+      printf(g, fonts.codeSm, t("pg.nothingRun"), x + pad * 2, ty + pad, w - pad * 4, "left");
       return;
     }
     const shown = out.slice(Math.max(0, out.length - room));
@@ -834,7 +826,7 @@ export class PlaygroundScene implements Scene {
   }
 
   private stageLabel(): string {
-    if (this.stage === "idle") return this.dirty ? "UNSAVED" : "";
+    if (this.stage === "idle") return this.dirty ? t("pg.unsaved") : "";
     const dots = ".".repeat(1 + (Math.floor(this.t * 3) % 3));
     return `${this.stage.toUpperCase()}${dots}`;
   }

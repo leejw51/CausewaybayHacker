@@ -69,6 +69,29 @@ body {
 .cwb-field::placeholder {
   color: #786858;
 }
+/* A seed phrase is a password, and twelve words on a screen in a cafe is the
+   one moment this game can genuinely cost somebody something. The field is
+   masked by default and the REVEAL button on the panel lifts it, because
+   people mistype a phrase and have to be able to check it.
+
+   `-webkit-text-security` rather than `input[type=password]` for two reasons:
+   the field is a textarea (twelve words arrive by paste, sometimes across two
+   lines) and swapping the element type would break both the paste behaviour
+   and every selector that finds it. It is implemented in Chrome, Safari, Edge
+   and Firefox 118+.
+
+   Where it is not implemented the text is blurred instead. That is a real
+   fallback rather than a decorative one: a shoulder cannot read it, the caret
+   and the selection still work, and REVEAL still clears it. It is deliberately
+   not "give up and show the words". */
+.cwb-field.cwb-masked {
+  -webkit-text-security: disc;
+}
+@supports not (-webkit-text-security: disc) {
+  .cwb-field.cwb-masked {
+    filter: blur(5px);
+  }
+}
 .cwb-editor {
   overflow: hidden;
   background: rgba(10, 8, 26, 0.96);

@@ -10,6 +10,7 @@ use cwbhacker_core::auth::Challenges;
 use cwbhacker_core::search::{Embedder, HashedEmbedder};
 use cwbhacker_core::Store;
 
+use crate::limits::{self, Gate};
 use crate::proto::{Out, Outgoing, ServerFrame};
 
 /// PROTOCOL §4.19: `progress.update` also goes to the same user's other open
@@ -66,6 +67,13 @@ pub struct AppState {
     /// Submissions compiling right now, across every connection. It is what
     /// `run.stage`'s `queued` depth reports.
     pub running: AtomicUsize,
+    /// The global ceiling on compiles, across every connection. PROTOCOL
+    /// §3.2's one-execution slot is **per connection**, so without this one
+    /// client with two sockets is two compilers and twenty is twenty.
+    pub executions: Arc<Gate>,
+    /// And on formatters. `code.format` skips the execution slot on purpose,
+    /// which is what let a tight loop of it spawn `rustfmt` without bound.
+    pub formatters: Arc<Gate>,
     next_connection: AtomicU64,
 }
 
@@ -104,6 +112,8 @@ impl AppState {
             started_at: cwbhacker_core::time::now_stamp(),
             hub: Hub::default(),
             running: AtomicUsize::new(0),
+            executions: Gate::new(limits::MAX_CONCURRENT_EXECUTIONS),
+            formatters: Gate::new(limits::MAX_CONCURRENT_FORMATS),
             next_connection: AtomicU64::new(1),
         }
     }

@@ -13,24 +13,29 @@ import { css, Theme } from "../engine/theme";
 import { neonPrint, type Ctx } from "../engine/ui";
 import { LandsScene } from "./lands";
 import { LoginScene } from "./login";
-import { StoryScene } from "./story";
+import { TitleScene } from "./title";
+import { localeReady, t } from "../i18n";
 
 export class BootScene implements Scene {
   readonly name = "boot";
   readonly mood = "title" as const;
   private t = 0;
-  private step = "waking up";
+  private step = t("boot.waking");
 
   constructor(private readonly app: App) {}
 
   async enter(): Promise<void> {
-    this.step = "loading the art";
+    this.step = t("boot.art");
     try {
       // Both fonts must be resident before anything is measured, or every
       // panel is sized against the fallback and then jumps when they land.
       await Promise.all([
         document.fonts.load('16px "PressStart2P"'),
         document.fonts.load('16px "VT323"'),
+        // And the CJK pixel face, if the chosen language needs one. Same
+        // reason as the other two: a panel measured against the fallback and
+        // then re-measured when the real font lands is a panel that jumps.
+        localeReady(),
       ]);
       remeasure();
     } catch {
@@ -43,10 +48,10 @@ export class BootScene implements Scene {
       // the login screen first tries to draw it.
       this.app.assets.prefetch("title_bg", this.app.layout.isPortrait());
     } catch {
-      this.app.say("the art did not load — carrying on without it");
+      this.app.say(t("boot.artFailed"));
     }
 
-    this.step = "reaching the server";
+    this.step = t("boot.server");
     this.app.client.connect();
     try {
       await this.app.client.waitFor("open");
@@ -54,13 +59,13 @@ export class BootScene implements Scene {
       // Straight to login, not to the story. Somebody whose server is not
       // running has a problem to see, and a two-minute attract sequence in
       // front of the message telling them about it is the wrong order.
-      this.app.say("no server — check that it is running on :5390");
+      this.app.say(t("boot.noServer"));
       return void this.app.go(new LoginScene(this.app), "none");
     }
 
     const token = this.app.client.token;
     if (token) {
-      this.step = "resuming your session";
+      this.step = t("boot.resuming");
       try {
         const user = await this.app.client.resume(token);
         this.app.addressLabel = user.address;
@@ -72,10 +77,11 @@ export class BootScene implements Scene {
       }
     }
     // Nobody is logged in and nobody is being resumed: this is a cold start at
-    // the front of the game, which is exactly where an attract sequence goes.
-    // Any key or click inside it goes straight to the login screen, so the cost
-    // to a player who has seen it is one keystroke.
-    void this.app.go(new StoryScene(this.app), "none");
+    // the front of the game, which is where the cabinet's title card goes. It
+    // *waits* — the opening is asked for rather than played at somebody — and
+    // a player who has already watched it goes from there straight to the
+    // login screen. See `scenes/title.ts`.
+    void this.app.go(new TitleScene(this.app), "none");
   }
 
   update(dt: number): void {

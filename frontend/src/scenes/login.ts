@@ -19,6 +19,18 @@
  * a canvas cannot take a paste. It is `autocomplete="off"`, never read except
  * on submit, and cleared the moment the derivation succeeds.
  *
+ * It is also **masked**, from the first keystroke and not only afterwards.
+ * Twelve words legible across a cafe is the one moment this screen can cost
+ * somebody everything they have, and a phrase that is only hidden once it has
+ * been typed was never hidden at all. `REVEAL` lifts it, because a mistyped
+ * word is the normal reason somebody cannot get in and they have to be able to
+ * look; the button says which state it is in rather than relying on the dots.
+ *
+ * The **new-wallet panel is deliberately the opposite**. Those twelve words are
+ * drawn on the canvas, in the code face, at reading size, unmasked, because the
+ * entire purpose of that panel is that they get copied onto paper. Masking it
+ * would be security theatre that breaks the one thing it is for.
+ *
  * The screen also *hands out* a phrase, which is the difference between a game
  * you can start and one you cannot. Before this the only field on the only
  * reachable screen was "twelve words, or 0x + 64 hex" and nothing anywhere in
@@ -57,10 +69,11 @@ import {
   unlock,
 } from "../wallet/wallet";
 import { LandsScene } from "./lands";
+import { LOCALES, locale, nextLocale, setLocale, t } from "../i18n";
 import { StoryScene } from "./story";
 
 /** The empty field's own instructions, restored whenever it is handed back. */
-const FIELD_HINT = "twelve words, or 0x + 64 hex";
+const FIELD_HINT = (): string => t("login.fieldHint");
 
 /**
  * How many rows a set of labels wraps to inside `width`, at the same gap
@@ -86,6 +99,11 @@ function rowsFor(
   return rows;
 }
 
+/** The active language, named in itself, for the button that cycles it. */
+function localeInfoLabel(): string {
+  return LOCALES.find((l) => l.id === locale())?.label ?? "ENGLISH";
+}
+
 export class LoginScene implements Scene {
   readonly name = "login";
   readonly mood = "title" as const;
@@ -96,6 +114,13 @@ export class LoginScene implements Scene {
   private preview = "";
   private status = "";
   private busy = false;
+  /**
+   * Whether the player has asked to see what they typed. Never remembered:
+   * a preference that outlived the screen would mean the next person to open
+   * the game gets an unmasked seed field, which is the whole defect back
+   * again with a setting in front of it.
+   */
+  private revealed = false;
   /**
    * A freshly generated phrase, while it is being shown. Key material: it is
    * held here and nowhere else, and `leave()` drops it.
@@ -118,7 +143,10 @@ export class LoginScene implements Scene {
     el.autocapitalize = "off";
     el.autocomplete = "off";
     el.setAttribute("autocorrect", "off");
-    el.placeholder = FIELD_HINT;
+    // Masked before it can hold anything, so there is no frame in which a
+    // pasted phrase is legible.
+    el.classList.add("cwb-masked");
+    el.placeholder = FIELD_HINT();
     // The preview is derived on every keystroke so the player sees the address
     // they are about to become before committing to it. It never leaves here.
     el.addEventListener("input", () => this.derivePreview());
@@ -141,6 +169,8 @@ export class LoginScene implements Scene {
   leave(): void {
     // Whatever is in the box is key material. It does not outlive the screen.
     this.field.value = "";
+    this.revealed = false;
+    this.field.classList.add("cwb-masked");
     this.minted = null;
     this.stopWait?.(false);
     this.overlay.destroy();
@@ -185,7 +215,7 @@ export class LoginScene implements Scene {
     const client = this.app.client;
     if (client.state === "open" || client.state === "authed") return Promise.resolve(true);
     this.waiting = true;
-    this.status = "the server is not answering — you will be signed in the moment it does";
+    this.status = t("login.waitingServer");
     return new Promise<boolean>((resolve) => {
       let off: (() => void) | null = null;
       const done = (ok: boolean) => {
@@ -235,7 +265,7 @@ export class LoginScene implements Scene {
     if (this.busy) return;
     const text = this.field.value.trim();
     if (!text) {
-      this.status = "type a seed phrase first";
+      this.status = t("login.needPhrase");
       return;
     }
     await this.signIn(text);
@@ -263,8 +293,7 @@ export class LoginScene implements Scene {
           if (!minted || !LoginScene.transient(e)) return;
         }
       }
-      this.status =
-        "the server is still not reachable — your words are still here, press the button again";
+      this.status = t("login.stillUnreachable");
     } finally {
       this.busy = false;
     }
@@ -277,22 +306,22 @@ export class LoginScene implements Scene {
     // it for a fresh anonymous connection first — that is what "log in as
     // somebody else" means at the wire level.
     if (this.app.client.state === "authed") {
-      this.status = "closing the old session";
+      this.status = t("login.closingOld");
       await this.app.client.restart();
     }
-    this.status = "deriving";
+    this.status = t("login.deriving");
     const address = unlock(text);
     // The textarea is emptied before a single byte goes near the socket.
     this.field.value = "";
     this.preview = address.eip55;
 
-    this.status = "asking for a challenge";
+    this.status = t("login.challenging");
     const challenge = await this.app.client.challenge(address.eip55);
 
-    this.status = "signing";
+    this.status = t("login.signing");
     const signature = signMessage(challenge.message);
 
-    this.status = "logging in";
+    this.status = t("login.loggingIn");
     const user = await this.app.client.login(address.eip55, signature);
     this.app.addressLabel = user.address;
     // Past the point of no return for the phrase, and the screen is leaving.
@@ -309,16 +338,33 @@ export class LoginScene implements Scene {
   private report(e: unknown): void {
     if (e instanceof WireError) {
       console.warn("auth failed:", e.payload.code, e.payload.message, e.payload.detail);
-      this.status = LoginScene.transient(e)
-        ? "the server is not reachable — waiting for it"
-        : playerText(e.payload.code);
+      this.status = LoginScene.transient(e) ? t("login.unreachable") : playerText(e.payload.code);
       // §3.3's table: a spent or expired nonce is retryable as-is, and saying
       // "log in again" about it would be a lie.
-      if (e.action === "rechallenge") this.status += " — press ENTER";
+      if (e.action === "rechallenge") this.status += t("login.pressEnter");
     } else {
-      this.status = e instanceof Error ? e.message : "that did not work";
+      this.status = e instanceof Error ? e.message : t("login.failed");
     }
     this.app.chip.fail();
+  }
+
+  /**
+   * Show or hide what is in the field.
+   *
+   * The caret goes back where it was: `classList` does not move a selection,
+   * but focus does, and somebody who pressed REVEAL mid-phrase to check a word
+   * wants to carry on typing rather than hunt for their place.
+   */
+  private toggleReveal(): void {
+    this.revealed = !this.revealed;
+    this.field.classList.toggle("cwb-masked", !this.revealed);
+    const at = this.field.selectionStart;
+    this.field.focus();
+    try {
+      this.field.setSelectionRange(at, this.field.selectionEnd);
+    } catch {
+      /* a field that will not take a range still takes the focus */
+    }
   }
 
   controls(): Buttons[] {
@@ -344,12 +390,18 @@ export class LoginScene implements Scene {
       this.minted = null;
       this.preview = "";
       this.field.value = "";
-      this.field.placeholder = FIELD_HINT;
+      this.field.placeholder = FIELD_HINT();
     }
     if (hit.id === "clear") {
       this.field.value = "";
       this.preview = "";
       this.field.focus();
+    }
+    if (hit.id === "reveal") this.toggleReveal();
+    if (hit.id === "lang") {
+      const next = nextLocale();
+      void setLocale(next);
+      this.status = "";
     }
   }
 
@@ -421,7 +473,7 @@ export class LoginScene implements Scene {
       g.fillRect(0, 0, layout.vw, layout.vh);
     }
 
-    header(g, this.app, "LOGIN");
+    header(g, this.app, t("login.title"));
     this.buttons.reset();
 
     const colW = Math.min(layout.vw - Math.round(32 * s), Math.round(560 * s));
@@ -461,13 +513,7 @@ export class LoginScene implements Scene {
       printf(g, fonts.small, this.status, colX, bottom + Math.round(8 * s), colW, "center");
     }
 
-    footer(
-      g,
-      layout,
-      this.minted
-        ? "ENTER  I HAVE WRITTEN IT DOWN AND I AM GOING IN      F1  ORIENTATION"
-        : "ENTER  LOG IN      F1  ORIENTATION",
-    );
+    footer(g, layout, this.minted ? t("login.footerMinted") : t("login.footer"));
   }
 
   /**
@@ -489,10 +535,12 @@ export class LoginScene implements Scene {
     // for one row and drawn with two puts its last button outside itself, which
     // leaves its last button outside its own panel.
     const btnRows = rowsFor(fonts.button, w - Math.round(24 * s), [
-      "ENTER",
-      "NEW WALLET",
-      "STORY",
-      "CLEAR",
+      t("login.enter"),
+      t("login.newWallet"),
+      t("login.story"),
+      this.revealed ? t("login.hide") : t("login.reveal"),
+      t("login.clear"),
+      localeInfoLabel(),
     ]);
     const cardH =
       Math.round(30 * s) +
@@ -505,7 +553,7 @@ export class LoginScene implements Scene {
       (btnRows - 1) * Math.round(fonts.button.size * 0.5) +
       pad;
 
-    const card = titledPanel(g, [x, y, w, cardH], "SEED PHRASE OR PRIVATE KEY", RUST);
+    const card = titledPanel(g, [x, y, w, cardH], t("login.cardTitle"), RUST);
     well(g, card[0], card[1], card[2], fieldH);
     this.fieldRect = [card[0] + 4, card[1] + 4, card[2] - 8, fieldH - 8];
     if (this.rightIn.finished) this.overlay.place(this.fieldRect, fonts.small.size);
@@ -513,7 +561,19 @@ export class LoginScene implements Scene {
 
     let cy = card[1] + fieldH + pad;
     g.fillStyle = css(Theme.cyan);
-    printf(g, fonts.stationSm, "YOU WILL BE", card[0], cy, card[2], "left");
+    printf(g, fonts.stationSm, t("login.youWillBe"), card[0], cy, card[2], "left");
+    // Said on the right of the same line, so the state of the field is
+    // readable without typing into it to find out.
+    g.fillStyle = css(this.revealed ? Theme.red : Theme.dim);
+    printf(
+      g,
+      fonts.stationSm,
+      this.revealed ? t("login.phraseVisible") : t("login.phraseHidden"),
+      card[0],
+      cy,
+      card[2],
+      "right",
+    );
     cy += fonts.stationSm.height + Math.round(4 * s);
     g.fillStyle = css(this.preview ? Theme.coin : Theme.dim);
     printf(g, fonts.small, this.preview || "—", card[0], cy, card[2], "left");
@@ -525,12 +585,25 @@ export class LoginScene implements Scene {
       fonts.button,
       [card[0], cy, card[2], btnH * btnRows],
       [
-        { id: "enter", label: this.busy ? "…" : "ENTER", dim: this.busy, primary: !this.busy },
-        { id: "new", label: "NEW WALLET" },
+        {
+          id: "enter",
+          label: this.busy ? "…" : t("login.enter"),
+          dim: this.busy,
+          primary: !this.busy,
+        },
+        { id: "new", label: t("login.newWallet") },
         // The opening, on demand. It plays once at a cold boot and then gets
         // out of the way; this is how somebody watches it again on purpose.
-        { id: "story", label: "STORY" },
-        { id: "clear", label: "CLEAR" },
+        { id: "story", label: t("login.story") },
+        // The words are dots by default. This is the way back to them, and it
+        // says which state it is about to put the field in.
+        { id: "reveal", label: this.revealed ? t("login.hide") : t("login.reveal") },
+        { id: "clear", label: t("login.clear") },
+        // The language, named in itself. The title card has the full row; by
+        // the time somebody is on the login screen they have usually already
+        // chosen, so this cycles rather than taking six buttons' worth of a
+        // card that is sized to its contents.
+        { id: "lang", label: localeInfoLabel() },
       ],
       layout.minTouchH(),
     );
@@ -556,11 +629,8 @@ export class LoginScene implements Scene {
     const rows = Math.ceil(words.length / cols);
     const rowH = fonts.code.height + Math.round(10 * s);
     const gridH = rows * rowH + pad * 2;
-    const warnLines = wrap(
-      fonts.small,
-      "This is the only copy. There is no reset: nobody can give it back to you, not this tab and not the server.",
-      w - Math.round(24 * s),
-    ).length;
+    const warn = t("login.mintWarning");
+    const warnLines = wrap(fonts.small, warn, w - Math.round(24 * s)).length;
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
     const btnRows = layout.isPortrait() ? 2 : 1;
     const cardH =
@@ -576,7 +646,7 @@ export class LoginScene implements Scene {
       (btnRows - 1) * Math.round(fonts.button.size * 0.5) +
       pad;
 
-    const card = titledPanel(g, [x, y, w, cardH], "WRITE THESE TWELVE WORDS DOWN", Theme.coin);
+    const card = titledPanel(g, [x, y, w, cardH], t("login.mintTitle"), Theme.coin);
     well(g, card[0], card[1], card[2], gridH);
 
     const cellW = (card[2] - pad * 2) / cols;
@@ -607,18 +677,10 @@ export class LoginScene implements Scene {
 
     let cy = card[1] + gridH + pad;
     g.fillStyle = css(Theme.coin);
-    printf(
-      g,
-      fonts.small,
-      "This is the only copy. There is no reset: nobody can give it back to you, not this tab and not the server.",
-      card[0],
-      cy,
-      card[2],
-      "center",
-    );
+    printf(g, fonts.small, warn, card[0], cy, card[2], "center");
     cy += warnLines * fonts.small.height + pad;
     g.fillStyle = css(Theme.cyan);
-    printf(g, fonts.stationSm, "YOU WILL BE", card[0], cy, card[2], "left");
+    printf(g, fonts.stationSm, t("login.youWillBe"), card[0], cy, card[2], "left");
     cy += fonts.stationSm.height + Math.round(4 * s);
     g.fillStyle = css(Theme.coin);
     printf(g, fonts.small, this.preview || "—", card[0], cy, card[2], "left");
@@ -630,17 +692,13 @@ export class LoginScene implements Scene {
       [
         {
           id: "keep",
-          label: this.waiting
-            ? "WAITING FOR THE SERVER"
-            : this.busy
-              ? "…"
-              : "I HAVE WRITTEN IT DOWN",
+          label: this.waiting ? t("login.mintWaiting") : this.busy ? "…" : t("login.mintKeep"),
           dim: this.busy,
           primary: !this.busy,
         },
         // Live while we wait, and only while we wait: giving up has to be
         // possible, and it is the only thing that throws the words away.
-        { id: "discard", label: "CANCEL", dim: this.busy && !this.waiting },
+        { id: "discard", label: t("login.mintCancel"), dim: this.busy && !this.waiting },
       ],
       layout.minTouchH(),
     );
@@ -659,7 +717,7 @@ export class LoginScene implements Scene {
   private drawCustody(g: Ctx, x: number, y: number, w: number): void {
     const s = this.app.layout.uiScale();
     const fonts = ensureFonts(s);
-    const copy = "The phrase never leaves this tab. The server only ever sees a signature.";
+    const copy = t("login.custody");
     const inner = w - Math.round(24 * s);
     const lines = wrap(fonts.codeSm, copy, inner);
     const h = lines.length * fonts.codeSm.height + Math.round(16 * s);

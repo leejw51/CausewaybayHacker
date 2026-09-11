@@ -18,6 +18,7 @@
  *     are comparable — see `normalise`.
  */
 import type { SearchHit, SearchMode } from "../net/protocol";
+import { t } from "../i18n";
 
 /** Which index or indexes produced this hit. */
 export type Found = "both" | "text" | "meaning" | "neither";
@@ -41,20 +42,20 @@ export function foundBy(hit: Pick<SearchHit, "bm25" | "cosine">): Found {
  */
 export function foundLine(hit: Pick<SearchHit, "bm25" | "cosine">, mode: SearchMode): string {
   const found = foundBy(hit);
-  if (mode === "bm25") return "WORD MATCH";
-  if (mode === "semantic") return "MEANING MATCH";
+  if (mode === "bm25") return t("rank.wordMatch");
+  if (mode === "semantic") return t("rank.meaningMatch");
   switch (found) {
     case "both":
-      return "BOTH INDEXES AGREE";
+      return t("rank.both");
     case "text":
-      return "WORDS ONLY";
+      return t("rank.wordsOnly");
     case "meaning":
-      return "MEANING ONLY";
+      return t("rank.meaningOnly");
     case "neither":
       // Not reachable from a server that fills the components in, and drawn
       // rather than hidden if it happens: a hit with no explanation is still a
       // hit, and pretending it is not is worse than admitting we cannot say.
-      return "FUSED";
+      return t("rank.fused");
   }
 }
 

@@ -2,8 +2,18 @@
 //!
 //! Wall-clock timeout with a SIGTERM grace then SIGKILL, an output byte cap
 //! enforced **while draining** rather than after, `setrlimit` where the
-//! platform actually provides it, and its own process group so a fork bomb
-//! dies with its parent.
+//! platform actually provides it, and its own process group.
+//!
+//! The process group alone is not enough and used not to say so: a grandchild
+//! that calls `setsid` or spawns with `process_group(0)` is not in the group
+//! the kill is aimed at, and outlived it. So the group kill is now one of
+//! three layers — see `reap.rs` for the descendant sweep that backs it up and,
+//! more importantly, for the exact hole that is left.
+//!
+//! The other thing a runaway descendant used to do is hold the stdout pipe it
+//! inherited, so `run` waited for it and a submission could set its own
+//! wall clock by spawning something long-lived. The drain threads are now
+//! joined with a bound.
 //!
 //! This is not a sandbox and does not pretend to be one. It is the set of
 //! limits that stops an honest mistake — an infinite loop, a runaway
@@ -14,6 +24,8 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+use crate::reap::Tracker;
 
 /// Called with (`"compile"` | `"stdout"` | `"stderr"`, chunk) as output
 /// arrives, so the player watches `rustc` think instead of a spinner (§5.4).
@@ -68,6 +80,11 @@ pub struct Outcome {
     pub elapsed_ms: u64,
     /// Bytes the child actually produced, before the cap threw the rest away.
     pub stdout_produced: usize,
+    /// Descendants that were still alive when the attempt ended and had to be
+    /// killed by pid — the ones `killpg` could not reach because they had left
+    /// the process group, plus anything a clean exit left behind. Zero for the
+    /// overwhelming majority of attempts.
+    pub strays_killed: usize,
 }
 
 impl Outcome {
@@ -164,31 +181,62 @@ pub fn run(
         )
     });
 
+    // Watch the process table for the life of the attempt, so that a
+    // descendant which leaves the process group is still on a list when the
+    // time comes to kill it (`reap.rs`).
+    let mut tracker = Tracker::new(pid);
+
     let mut timed_out = false;
     let status = loop {
+        // Before `try_wait`, always: once the child is reaped its pid is free
+        // to be handed to somebody else, and a sample taken after that could
+        // record a stranger.
+        tracker.sample_if_due();
         if let Some(status) = child.try_wait()? {
             break Some(status);
         }
         if overflow.load(Ordering::Relaxed) {
             // The cap is enforced the moment it is crossed, not after the
             // child has finished writing a gigabyte into memory.
-            kill_group(pid);
+            stop_and_kill(&mut tracker, pid);
             break child.wait().ok();
         }
         if started.elapsed() >= limits.timeout {
             timed_out = true;
-            kill_group(pid);
+            stop_and_kill(&mut tracker, pid);
             break child.wait().ok();
         }
         std::thread::sleep(Duration::from_millis(5));
     };
 
-    if let Some(handle) = stdout_handle {
-        let _ = handle.join();
+    // On every path, including a clean exit: a submission that returned 0
+    // having left `sleep 120` behind has still left it behind, and it is
+    // holding the pipe this function is about to wait on.
+    let strays_killed = tracker.kill_strays();
+    if strays_killed > 0 {
+        // Worth a line in `logs/server.jsonl`: it is the only evidence that
+        // something outran the group kill, and the number is 0 for every
+        // ordinary attempt.
+        tracing::warn!(
+            pid,
+            strays_killed,
+            incomplete = tracker.overflowed(),
+            "the attempt left processes behind and they were killed by pid"
+        );
     }
-    if let Some(handle) = stderr_handle {
-        let _ = handle.join();
-    }
+
+    // Bounded, and that is the point. The drain threads end when the *last*
+    // holder of the write end closes it, which is not necessarily the child —
+    // anything it spawned inherited the same pipe. Waiting for them without a
+    // bound let a submission choose its own wall clock, which is the opposite
+    // of what §5.3 promises. The buffers are shared, so what did arrive is
+    // already in them; an abandoned thread writes into an `Arc` nobody reads.
+    // One deadline for both, not one each: the promise is that `run` returns
+    // within half a second of the kill, and two sequential half-seconds would
+    // make it a whole one.
+    let drained_by = Instant::now() + Duration::from_millis(500);
+    join_bounded(stdout_handle, drained_by);
+    join_bounded(stderr_handle, drained_by);
 
     let exit_code = status.as_ref().and_then(|s| s.code());
     let signal = signal_of(status.as_ref());
@@ -205,7 +253,39 @@ pub fn run(
         stdout_overflow: overflow.load(Ordering::Relaxed),
         elapsed_ms: started.elapsed().as_millis() as u64,
         stdout_produced: produced.load(Ordering::Relaxed),
+        strays_killed,
     })
+}
+
+/// The kill, in the order that survives a process which is still forking.
+///
+/// 1. Stop the descendants that have left the process group, so they cannot
+///    fork while the rest of this runs.
+/// 2. The documented path for the group itself: SIGTERM, 500 ms of grace,
+///    SIGKILL (SPEC §5.3). In-group processes are deliberately *not* stopped
+///    first — a stopped process does not handle SIGTERM, so stopping them
+///    would delete the grace the spec promises.
+/// 3. The stopped escapees are killed by `kill_strays` on the way out. SIGKILL
+///    is delivered to a stopped process, so freezing them first costs nothing.
+fn stop_and_kill(tracker: &mut Tracker, pid: i32) {
+    tracker.freeze_escapees();
+    kill_group(pid);
+}
+
+/// Join a drain thread, or give up on it and let it run detached.
+fn join_bounded(handle: Option<std::thread::JoinHandle<()>>, deadline: Instant) {
+    let Some(handle) = handle else { return };
+    while Instant::now() < deadline {
+        if handle.is_finished() {
+            let _ = handle.join();
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    // Dropped, not joined: the thread is blocked in `read` on a pipe somebody
+    // we could not kill is still holding, and this function has a promise to
+    // keep about when it returns.
+    drop(handle);
 }
 
 fn drain<R: Read + Send + 'static>(

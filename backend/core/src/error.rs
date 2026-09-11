@@ -100,6 +100,13 @@ pub fn locked(m: impl Into<String>) -> Error {
 pub fn unavailable(m: impl Into<String>, milestone: u32) -> Error {
     Error::new(Code::Unavailable, m).with_detail(serde_json::json!({ "milestone": milestone }))
 }
+/// Too many, too fast. **Always** carries `detail.retry_after_ms` — PROTOCOL
+/// §3.3 tells a client to "back off; `detail.retry_after_ms`", and a client
+/// that is told to back off but not for how long either hammers or gives up.
+pub fn rate_limited(m: impl Into<String>, retry_after_ms: u64) -> Error {
+    Error::new(Code::RateLimited, m)
+        .with_detail(serde_json::json!({ "retry_after_ms": retry_after_ms }))
+}
 pub fn internal(m: impl Into<String>) -> Error {
     Error::new(Code::Internal, m)
 }
