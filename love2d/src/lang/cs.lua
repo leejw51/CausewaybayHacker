@@ -211,7 +211,7 @@ return {
   -- are `docs/story.md` §2's own, and the translations are the browser
   -- client's — one voice across the two clients, rather than two.
   ["PRESS SPACE"] = "STISKNI MEZERNÍK",
-  ["— or any key, or a click —"] = "— nebo jakoukoli klávesu, nebo klikni —",
+  ["— or click the plate —"] = "— nebo klikni na štítek —",
   ["SPACE start   F10 story   L language"] = "SPACE start   F10 příběh   L jazyk",
   ["ANY KEY  SKIP"] = "JAKÁKOLI KLÁVESA  PŘESKOČIT",
   ["PRESS ANY KEY"] = "STISKNI JAKOUKOLI KLÁVESU",

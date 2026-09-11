@@ -61,6 +61,14 @@ add({ until_ = function(app)
     end, timeout = 3 })
 add({ shot = "S1-title.png" })
 
+-- Only SPACE starts. A stray key on the card must leave it exactly where it
+-- was: the card is there to wait, and a key a hand brushes is not a decision.
+add({ key = "x", note = "a stray key" })
+add({ wait = 0.3 })
+add({ until_ = function(app)
+      check(app.scene_name == "title", "a stray key started the game — on " .. tostring(app.scene_name))
+      return true
+    end, timeout = 3 })
 add({ note = "SPACE" })
 add({ key = "space" })
 add({ wait = 0.4 })

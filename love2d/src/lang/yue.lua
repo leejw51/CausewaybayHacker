@@ -196,7 +196,7 @@ return {
   -- are `docs/story.md` §2's own, and the translations are the browser
   -- client's — one voice across the two clients, rather than two.
   ["PRESS SPACE"] = "撳空白鍵",
-  ["— or any key, or a click —"] = "— 撳邊個掣都得，撳一下都得 —",
+  ["— or click the plate —"] = "— 或者撳一下呢塊牌 —",
   ["SPACE start   F10 story   L language"] = "SPACE 開始   F10 故事   L 語言",
   ["ANY KEY  SKIP"] = "任何掣  跳過",
   ["PRESS ANY KEY"] = "撳任何掣",

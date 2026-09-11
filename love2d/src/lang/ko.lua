@@ -190,7 +190,7 @@ return {
   -- are `docs/story.md` §2's own, and the translations are the browser
   -- client's — one voice across the two clients, rather than two.
   ["PRESS SPACE"] = "스페이스를 누르세요",
-  ["— or any key, or a click —"] = "— 아무 키나, 클릭도 됩니다 —",
+  ["— or click the plate —"] = "— 또는 판을 클릭 —",
   ["SPACE start   F10 story   L language"] = "SPACE 시작   F10 이야기   L 언어",
   ["ANY KEY  SKIP"] = "아무 키  건너뛰기",
   ["PRESS ANY KEY"] = "아무 키나 누르세요",

@@ -192,7 +192,7 @@ return {
   -- are `docs/story.md` §2's own, and the translations are the browser
   -- client's — one voice across the two clients, rather than two.
   ["PRESS SPACE"] = "スペースキーを押す",
-  ["— or any key, or a click —"] = "— どのキーでも、クリックでも —",
+  ["— or click the plate —"] = "— またはプレートをクリック —",
   ["SPACE start   F10 story   L language"] = "SPACE スタート   F10 ストーリー   L 言語",
   ["ANY KEY  SKIP"] = "どれかのキー  スキップ",
   ["PRESS ANY KEY"] = "どれかのキーを押してください",

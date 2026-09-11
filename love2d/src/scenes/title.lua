@@ -11,12 +11,13 @@
 --
 --   * **It waits.** `src/scenes/story.lua` is forty seconds of somebody
 --     else's morning. It is asked for, not played at a cold boot.
---   * **"PRESS SPACE", and it means any key.** The words are what a 16-bit
---     game says; the behaviour is what a person expects. Any key, any click,
---     anywhere. (`F`, `F1`, `F11`, `F12` and `L` are the display and language
---     controls and are taken by `main.lua` before this screen sees them —
---     changing the language must not also start the game, which is the same
---     call the browser made and for the same reason.)
+--   * **"PRESS SPACE", and it means SPACE.** It used to mean any key, and
+--     that was withdrawn: a card that starts the game on whichever key a
+--     hand brushes is a card that has been skipped by accident, and the one
+--     thing it exists to do is wait. SPACE, or a click on the plate itself.
+--     Every other key is ignored here, and `F`, `F1`, `F11`, `F12` and `L`
+--     never arrive at all — `main.lua` takes the display and language
+--     controls first, so changing the language cannot also start the game.
 --   * **It does not stand between a returning player and their work.** The
 --     first press plays the opening; every press after that goes straight
 --     on, because `Store.story_seen()` is remembered. A player whose session
@@ -176,7 +177,7 @@ function Title:draw()
     Theme.withAlpha(Theme.cream, 0.6 + 0.4 * pulse), "center", bw)
   self.start_rect = { x = bx, y = by, w = bw, h = bh }
 
-  UI.text(I18n.t("— or any key, or a click —"), 0, by + bh + 18, 8,
+  UI.text(I18n.t("— or click the plate —"), 0, by + bh + 18, 8,
     Theme.withAlpha(Theme.cream, 0.7), "center", w)
 
   -- The way into the opening for somebody the card would otherwise send
@@ -195,30 +196,35 @@ function Title:draw()
   self.app:footer(I18n.t("SPACE start   F10 story   L language"))
 end
 
+local function inside(r, x, y)
+  return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
+end
+
 function Title:keypressed(key)
-  -- Any key. `main.lua` has already taken the display and language keys, so
-  -- what reaches here is somebody asking to start — except F10, which asks
-  -- for the opening by name.
+  -- SPACE starts; F10 asks for the opening by name. Nothing else does
+  -- anything, and it returns true so `App:keypressed` does not treat ESC as
+  -- "back" from a screen that has nowhere to go back to.
+  if key == "space" then
+    self:start(false)
+    return true
+  end
   if key == "f10" then
     self:watch_story()
     return true
   end
-  self:start(false)
   return true
 end
 
 function Title:mousepressed(x, y)
-  -- Anywhere, not only on the plate. The plate exists so that a thumb and an
-  -- automated run have something specific to aim at, not to make the rest of
-  -- the screen dead. A press on the footer's display controls never gets
-  -- here: `App:mousepressed` tests those first and consumes them. The one
-  -- exception is the STORY plate, which means the opening rather than start.
-  local r = self.story_rect
-  if r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h then
+  -- The two plates, and nothing else. The rest of the card is a picture; a
+  -- press on it is not a decision, and the card's job is to wait for one. A
+  -- press on the footer's display controls never gets here: `App:mousepressed`
+  -- tests those first and consumes them.
+  if inside(self.story_rect, x, y) then
     self:watch_story()
-    return
+  elseif inside(self.start_rect, x, y) then
+    self:start(false)
   end
-  self:start(false)
 end
 
 return Title

@@ -35,7 +35,10 @@ add({ until_ = function(app)
       end
       return app.scene_name == "lands"
     end, timeout = 5 })
-add({ key = "space", note = "skip the opening if it is up" })
+-- Conditional, not unconditional: on `lands` SPACE means "go", and a press
+-- meant for an opening that never appeared walked the run into `categories`.
+add({ key = "space", note = "skip the opening if it is up",
+      when = function(app) return app.scene_name == "story" end })
 add({ until_ = scene("lands"), note = "the map, not a login prompt", timeout = 6 })
 add({ shot = "R2-lands-after-title.png" })
 add({ until_ = function()
