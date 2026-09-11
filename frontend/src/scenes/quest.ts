@@ -321,7 +321,9 @@ export class QuestScene implements Scene {
       const aw = street.naturalWidth * scale;
       const ah = street.naturalHeight * scale;
       g.globalAlpha = 0.85;
-      g.drawImage(street, (layout.vw - aw) / 2, (layout.vh - ah) / 2, aw, ah);
+      clipped(g, 0, 0, layout.vw, layout.vh, () =>
+        g.drawImage(street, (layout.vw - aw) / 2, (layout.vh - ah) / 2, aw, ah),
+      );
       g.globalAlpha = 1;
       fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.55);
     }

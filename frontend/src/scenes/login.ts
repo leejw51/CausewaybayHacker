@@ -33,7 +33,7 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { fill, neonPrint, well, type Ctx, type Rect } from "../engine/ui";
+import { clipped, fill, neonPrint, well, type Ctx, type Rect } from "../engine/ui";
 import { Buttons, footer, header, RUST, titledPanel } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { Overlay } from "../ui/overlay";
@@ -48,6 +48,13 @@ import {
   unlock,
 } from "../wallet/wallet";
 import { LandsScene } from "./lands";
+
+/** The empty field's own instructions, restored whenever it is handed back. */
+const FIELD_HINT = "twelve words, or 0x + 64 hex";
+
+/** Why the gate is here, in the two lines it takes to say it. */
+const QUIZ_INTRO =
+  "Read three back off the paper, in this order. There is no reset and nobody can send them to you again.";
 
 export class LoginScene implements Scene {
   readonly name = "login";
@@ -64,6 +71,12 @@ export class LoginScene implements Scene {
    * held here and nowhere else, and `leave()` drops it.
    */
   private minted: string[] | null = null;
+  /**
+   * Which three words are being asked for, zero-based, once the list has been
+   * put away. Null while the list is still up.
+   */
+  private quiz: number[] | null = null;
+  private quizError = "";
   private t = 0;
   private readonly leftIn = new Tween(seconds("panel"));
   private readonly rightIn = new Tween(seconds("panel"), seconds("stagger"));
@@ -75,7 +88,7 @@ export class LoginScene implements Scene {
     el.autocapitalize = "off";
     el.autocomplete = "off";
     el.setAttribute("autocorrect", "off");
-    el.placeholder = "twelve words, or 0x + 64 hex";
+    el.placeholder = FIELD_HINT;
     // The preview is derived on every keystroke so the player sees the address
     // they are about to become before committing to it. It never leaves here.
     el.addEventListener("input", () => this.derivePreview());
@@ -99,6 +112,7 @@ export class LoginScene implements Scene {
     // Whatever is in the box is key material. It does not outlive the screen.
     this.field.value = "";
     this.minted = null;
+    this.quiz = null;
     this.overlay.destroy();
   }
 
@@ -107,24 +121,87 @@ export class LoginScene implements Scene {
     this.minted = newMnemonic().split(" ");
     this.preview = addressFromMnemonic(this.minted.join(" ")).eip55;
     this.status = "";
+    this.quiz = null;
+    this.quizError = "";
     this.field.value = "";
   }
 
   /**
-   * The player says they have it. Only now does the phrase reach the field,
-   * so the words cannot be quietly submitted from behind the panel that is
-   * telling somebody to write them down.
+   * Put the list away and ask for three of the words back.
+   *
+   * Not a checkbox. SPEC §3 makes the wallet the identity: there is no reset
+   * and there is no support desk, so a phrase that was never actually written
+   * down is an account that ends with the machine. A checkbox measures whether
+   * somebody can click a checkbox. (L2D reached the same conclusion for the
+   * LÖVE client and this matches it deliberately, so the two clients do not
+   * disagree about how serious the moment is.)
+   *
+   * The three are drawn from `crypto.getRandomValues` rather than
+   * `Math.random`, for the same reason the phrase is: nothing predictable goes
+   * anywhere near this screen.
    */
-  private acceptMinted(): void {
+  private askBack(): void {
     if (!this.minted) return;
-    this.field.value = this.minted.join(" ");
+    const pick = new Set<number>();
+    const draw = new Uint8Array(1);
+    while (pick.size < 3) {
+      crypto.getRandomValues(draw);
+      pick.add(draw[0] % this.minted.length);
+    }
+    this.quiz = [...pick].sort((a, b) => a - b);
+    this.quizError = "";
+    this.field.value = "";
+    this.field.placeholder = "the three words, in order, separated by spaces";
+    queueMicrotask(() => this.field.focus());
+  }
+
+  /** Back to the list, for somebody who genuinely needs another look. */
+  private showAgain(): void {
+    this.quiz = null;
+    this.quizError = "";
+    this.field.value = "";
+    this.field.placeholder = FIELD_HINT;
+  }
+
+  /**
+   * Check the three, then hand the phrase over.
+   *
+   * Only on a pass does the phrase reach the field, so the words cannot be
+   * quietly submitted from behind the panel that is telling somebody to write
+   * them down.
+   */
+  private checkBack(): void {
+    const words = this.minted;
+    const quiz = this.quiz;
+    if (!words || !quiz) return;
+    const typed = this.field.value.trim().toLowerCase().split(/\s+/u).filter(Boolean);
+    if (typed.length !== quiz.length) {
+      this.quizError = `three words, in order — ${quiz.map((i) => i + 1).join(", ")}`;
+      return;
+    }
+    for (let i = 0; i < quiz.length; i++) {
+      if (typed[i] !== words[quiz[i]]) {
+        // Say which one, by its number. "Wrong" with no handle on it is a
+        // dead end, and the list is one keypress away anyway.
+        this.quizError = `word ${String(quiz[i] + 1).padStart(2, "0")} is not right`;
+        return;
+      }
+    }
+    this.field.value = words.join(" ");
+    this.field.placeholder = FIELD_HINT;
     this.minted = null;
+    this.quiz = null;
+    this.quizError = "";
     this.status = "the phrase is in the box — press ENTER";
     this.derivePreview();
     queueMicrotask(() => this.field.focus());
   }
 
   private derivePreview(): void {
+    // While a minted phrase is in play the field holds three words, not a
+    // phrase, so deriving from it would throw and blank the address the list
+    // panel is showing. The preview belongs to the typed-phrase path only.
+    if (this.minted || this.quiz) return;
     const text = this.field.value.trim();
     this.status = "";
     if (!text) {
@@ -198,10 +275,16 @@ export class LoginScene implements Scene {
     this.app.chip.select();
     if (hit.id === "enter") void this.submit();
     if (hit.id === "new") this.mint();
-    if (hit.id === "keep") this.acceptMinted();
+    if (hit.id === "keep") this.askBack();
+    if (hit.id === "confirm") this.checkBack();
+    if (hit.id === "again") this.showAgain();
     if (hit.id === "discard") {
       this.minted = null;
+      this.quiz = null;
+      this.quizError = "";
       this.preview = "";
+      this.field.value = "";
+      this.field.placeholder = FIELD_HINT;
     }
     if (hit.id === "clear") {
       this.field.value = "";
@@ -219,9 +302,11 @@ export class LoginScene implements Scene {
   key(name: string, ev: KeyboardEvent): void {
     if (name === "return" || name === "kpenter") {
       ev.preventDefault();
-      // While the words are on screen, Enter means "yes, I have them" — not
-      // "log in with a phrase I have not written down yet".
-      if (this.minted) this.acceptMinted();
+      // While a new phrase is in play, Enter means "check what I typed" or
+      // "yes, put the list away" — never "log in with a phrase I have not
+      // written down yet".
+      if (this.quiz) this.checkBack();
+      else if (this.minted) this.askBack();
       else void this.submit();
     }
   }
@@ -261,7 +346,13 @@ export class LoginScene implements Scene {
       const scale = Math.max(layout.vw / plate.naturalWidth, layout.vh / plate.naturalHeight);
       const aw = plate.naturalWidth * scale;
       const ah = plate.naturalHeight * scale;
-      g.drawImage(plate, (layout.vw - aw) / 2, (layout.vh - ah) / 2, aw, ah);
+      // Clipped to the playfield. The 2D layer is a full-window canvas with the
+      // virtual canvas drawn inside it, so a `cover` blit with no clip spills
+      // past the frame `App.frameEdge` draws — and then the frame is a line
+      // through a picture instead of the edge of one.
+      clipped(g, 0, 0, layout.vw, layout.vh, () =>
+        g.drawImage(plate, (layout.vw - aw) / 2, (layout.vh - ah) / 2, aw, ah),
+      );
       // A gradient down to the void, so the furniture in the lower half sits
       // on something dark enough to read against without flattening the art.
       const grad = g.createLinearGradient(0, layout.vh * 0.32, 0, layout.vh);
@@ -300,9 +391,11 @@ export class LoginScene implements Scene {
     g.save();
     g.globalAlpha = Math.min(1, this.rightIn.raw * 2.2);
     g.translate(0, drop);
-    const bottom = this.minted
-      ? this.drawPhrase(g, colX, cardY, colW)
-      : this.drawKeyCard(g, colX, cardY, colW);
+    const bottom = this.quiz
+      ? this.drawQuiz(g, colX, cardY, colW)
+      : this.minted
+        ? this.drawPhrase(g, colX, cardY, colW)
+        : this.drawKeyCard(g, colX, cardY, colW);
     this.buttons.draw(g, fonts.button);
     g.restore();
 
@@ -314,9 +407,11 @@ export class LoginScene implements Scene {
     footer(
       g,
       layout,
-      this.minted
-        ? "ENTER  I HAVE WRITTEN IT DOWN      F1  ORIENTATION"
-        : "ENTER  LOG IN      F1  ORIENTATION",
+      this.quiz
+        ? "ENTER  CHECK      F1  ORIENTATION"
+        : this.minted
+          ? "ENTER  I HAVE WRITTEN IT DOWN      F1  ORIENTATION"
+          : "ENTER  LOG IN      F1  ORIENTATION",
     );
   }
 
@@ -397,7 +492,7 @@ export class LoginScene implements Scene {
     const gridH = rows * rowH + pad * 2;
     const warnLines = wrap(
       fonts.small,
-      "This is the only copy. Nobody can give it back to you — not this tab, not the server.",
+      "This is the only copy. There is no reset: nobody can give it back to you, not this tab and not the server.",
       w - Math.round(24 * s),
     ).length;
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
@@ -449,7 +544,7 @@ export class LoginScene implements Scene {
     printf(
       g,
       fonts.small,
-      "This is the only copy. Nobody can give it back to you — not this tab, not the server.",
+      "This is the only copy. There is no reset: nobody can give it back to you, not this tab and not the server.",
       card[0],
       cy,
       card[2],
@@ -473,6 +568,90 @@ export class LoginScene implements Scene {
       layout.minTouchH(),
     );
     this.overlay.hide();
+    return y + cardH;
+  }
+
+  /**
+   * The gate: three of the twelve, typed back.
+   *
+   * The list is gone by the time this is on screen, which is the whole point —
+   * the only way through is off the paper. `SHOW ME THEM AGAIN` exists because
+   * a gate nobody can pass is a gate people route around, and somebody who
+   * genuinely mis-copied one word should not lose the wallet over it.
+   */
+  private drawQuiz(g: Ctx, x: number, y: number, w: number): number {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const quiz = this.quiz ?? [];
+    const pad = Math.round(10 * s);
+    const askH = fonts.code.height + Math.round(8 * s);
+    const fieldH = Math.max(fonts.small.height * 1.8, Math.round(56 * s));
+    const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
+    // Three buttons never fit one line at this column width, so the row is
+    // measured rather than assumed — a card sized for one row and drawn with
+    // two puts the last button outside its own panel.
+    const btnRows = 2;
+    const introLines = wrap(fonts.small, QUIZ_INTRO, w - Math.round(24 * s)).length;
+    const cardH =
+      Math.round(30 * s) +
+      introLines * fonts.small.height +
+      pad +
+      askH +
+      pad +
+      fieldH +
+      pad +
+      fonts.stationSm.height +
+      pad +
+      btnH * btnRows +
+      (btnRows - 1) * Math.round(fonts.button.size * 0.5) +
+      pad;
+
+    const card = titledPanel(g, [x, y, w, cardH], "PROVE YOU WROTE THEM DOWN", Theme.coin);
+    g.fillStyle = css(Theme.cream);
+    printf(g, fonts.small, QUIZ_INTRO, card[0], card[1], card[2], "center");
+    let cy = card[1] + introLines * fonts.small.height + pad;
+
+    g.fillStyle = css(Theme.coin);
+    printf(
+      g,
+      fonts.code,
+      quiz.map((i) => `WORD ${String(i + 1).padStart(2, "0")}`).join("   "),
+      card[0],
+      cy,
+      card[2],
+      "center",
+    );
+    cy += askH + pad;
+
+    well(g, card[0], cy, card[2], fieldH);
+    this.fieldRect = [card[0] + 4, cy + 4, card[2] - 8, fieldH - 8];
+    if (this.rightIn.finished) this.overlay.place(this.fieldRect, fonts.small.size);
+    else this.overlay.hide();
+    cy += fieldH + pad;
+
+    g.fillStyle = css(this.quizError ? Theme.red : Theme.dim);
+    printf(
+      g,
+      fonts.stationSm,
+      this.quizError || "THREE WORDS, SEPARATED BY SPACES",
+      card[0],
+      cy,
+      card[2],
+      "center",
+    );
+    cy += fonts.stationSm.height + pad;
+
+    this.buttons.row(
+      fonts.button,
+      [card[0], cy, card[2], btnH * btnRows],
+      [
+        { id: "confirm", label: "CONFIRM", primary: true },
+        { id: "again", label: "SHOW THEM AGAIN" },
+        { id: "discard", label: "CANCEL" },
+      ],
+      layout.minTouchH(),
+    );
     return y + cardH;
   }
 

@@ -1250,3 +1250,36 @@ so roughly one login in three hung on a spinner forever. The detector now
 describes the actual thing — space-separated alphabetic words, twelve or more
 — and refuses by returning rather than raising: a false positive must cost a
 saved session and never the login itself.
+
+## 2026-09-11 — FE: the browser's gate is L2D's gate
+
+L2D's entry landed while this round was in flight and it is right, so the
+browser matches it rather than inventing a second standard for the same
+moment. The confirmation is **three of the twelve typed back**, not a checkbox:
+SPEC §3 makes the wallet the identity, there is no reset and no support desk,
+and a checkbox measures whether somebody can click a checkbox. The list is put
+away first, the three are named by number, a wrong one is rejected *by its
+number* rather than as a blanket "wrong", and `SHOW THEM AGAIN` re-opens the
+list — a gate nobody can pass is a gate people route around.
+
+Two places where the browser genuinely differs, stated rather than diverged
+silently. There is one field on this screen and the three words go into it
+separated by spaces, because the phrase itself arrives in that field by paste
+and a second input surface would be a second thing to explain. And the three
+indices are drawn from `crypto.getRandomValues`, not `Math.random` — the choice
+of which words to ask is not itself a secret, but `Math.random` has no business
+anywhere on the screen that mints a wallet.
+
+Generation is `@scure/bip39`'s `generateMnemonic(wordlist, 128)`, which draws
+from `crypto.getRandomValues`. There is no fallback path and there will not be
+one: a phrase out of `Math.random` is a wallet anybody can re-derive from the
+clock and it looks exactly like a good one. The browser has no ABI to bump, but
+the boundary is the same shape — the phrase crosses out of `wallet.ts` exactly
+once, to be shown, and the derived key still never crosses at all.
+
+**On L2D's store bug, checked here:** this client has no "looks like a
+mnemonic" heuristic to get wrong. `net/client.ts` persists exactly one value,
+the session token, under one key, and both the read and the write are wrapped
+in a `try`/`catch` that *returns* — a browser in private mode costs a
+remembered session and never the login. That is the property L2D's fix
+restored, and it is worth having checked rather than assumed.
