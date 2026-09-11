@@ -192,8 +192,8 @@ pub fn run(
     // SPEC §7.1, always — not only on a compile error. `unused_variables` and
     // `unused_imports` are warnings on a build that succeeded, and dropping
     // them loses a whole row of the taxonomy.
-    let mut found = mistakes::classify_rust_json(&report.compiler_stderr);
-    found.extend(mistakes::classify_runtime(&report.runtime_stderr));
+    let mut found = mistakes::classify_compile(&lang, &report.compiler_stderr);
+    found.extend(mistakes::classify_runtime(&lang, &report.runtime_stderr));
     if let Some(m) = mistakes::verdict_mistake(
         report.verdict.as_str(),
         match report.verdict {
@@ -207,7 +207,13 @@ pub fn run(
     let human_stderr = if report.compiler_stderr.trim().is_empty() {
         report.runtime_stderr.clone()
     } else {
-        let rendered = mistakes::rendered_from_json(&report.compiler_stderr);
+        let rendered = if lang == "go" {
+            // `go build` already prints for a human; there is nothing to
+            // un-JSON.
+            report.compiler_stderr.clone()
+        } else {
+            mistakes::rendered_from_json(&report.compiler_stderr)
+        };
         if report.runtime_stderr.trim().is_empty() {
             rendered
         } else {

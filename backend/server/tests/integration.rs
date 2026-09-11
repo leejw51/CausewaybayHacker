@@ -283,12 +283,15 @@ async fn the_star_cascade_matches_the_spec_across_real_submissions() {
     // §6.3's middle rung. Two is the boundary — "≤2 failed attempts" — so
     // this is the case that catches an off-by-one in either direction.
     for i in 0..2 {
-        let failed = alice.submit(SUM, &wrong_but_valid(&format!("sum{i}"))).await;
+        let failed = alice
+            .submit(SUM, &wrong_but_valid(&format!("sum{i}")))
+            .await;
         assert_eq!(failed["verdict"], "wrong_answer", "attempt {i}");
         assert_eq!(failed["cleared"], false);
         assert_eq!(failed["stars"], 0, "a failed attempt earns no stamp");
         assert_eq!(
-            alice.node(SUM).await["state"], "open",
+            alice.node(SUM).await["state"],
+            "open",
             "a failed attempt must not clear the node"
         );
     }
@@ -336,7 +339,11 @@ async fn the_star_cascade_matches_the_spec_across_real_submissions() {
         "cleared",
         "a cleared node never goes back (SPEC §0: stamped CLEARED, for good)"
     );
-    assert_eq!(alice.node(SHADOWING).await["stars"], 1, "and keeps its star");
+    assert_eq!(
+        alice.node(SHADOWING).await["stars"],
+        1,
+        "and keeps its star"
+    );
 
     // The summary agrees with the map, which is the thing the player reads.
     let summary = alice.ok("stats.summary", json!({})).await;
@@ -501,7 +508,9 @@ async fn a_cleared_quest_survives_the_server_being_put_down_and_brought_back() {
 
     // And the rotated token from the resume is the live one.
     let mut second = Client::connect(server.port).await;
-    let again = second.ok("auth.resume", json!({ "token": new_token })).await;
+    let again = second
+        .ok("auth.resume", json!({ "token": new_token }))
+        .await;
     assert_eq!(again["user"]["address"].as_str(), Some(address.as_str()));
 
     server.stop().await;
@@ -619,7 +628,9 @@ async fn clearing_a_node_unlocks_exactly_the_next_one_and_announces_it() {
     assert_eq!(update["payload"]["unlocked"], json!([SHADOWING]));
     assert_eq!(update["payload"]["cleared_total"], 2);
 
-    alice.submit(SHADOWING, &quest_field(SHADOWING, "solution")).await;
+    alice
+        .submit(SHADOWING, &quest_field(SHADOWING, "solution"))
+        .await;
     let lands = alice.ok("world.lands", json!({})).await;
     let basic = lands["lands"]
         .as_array()
@@ -668,10 +679,7 @@ async fn two_players_on_one_quest_at_the_same_time_stay_separate() {
     let wrong = wrong_but_valid("bob");
     // Not `join!` on two `&mut` borrows of one client — two clients, two
     // sockets, two futures, genuinely in flight together.
-    let (a, b) = tokio::join!(
-        alice.submit(HELLO, &right),
-        bob.submit(HELLO, &wrong)
-    );
+    let (a, b) = tokio::join!(alice.submit(HELLO, &right), bob.submit(HELLO, &wrong));
 
     assert_eq!(a["verdict"], "accepted", "alice's answer was correct");
     assert_eq!(b["verdict"], "wrong_answer", "bob's was not");
@@ -735,8 +743,14 @@ async fn two_players_on_one_quest_at_the_same_time_stay_separate() {
     // spells it.
     let alice_dir = users.join(alice_addr.to_lowercase()).join("attempts");
     let bob_dir = users.join(bob_addr.to_lowercase()).join("attempts");
-    assert!(alice_dir.join(&a_id).is_dir(), "alice's attempt is not filed under alice");
-    assert!(bob_dir.join(&b_id).is_dir(), "bob's attempt is not filed under bob");
+    assert!(
+        alice_dir.join(&a_id).is_dir(),
+        "alice's attempt is not filed under alice"
+    );
+    assert!(
+        bob_dir.join(&b_id).is_dir(),
+        "bob's attempt is not filed under bob"
+    );
     assert!(
         !alice_dir.join(&b_id).exists(),
         "bob's attempt is in alice's directory"
@@ -780,7 +794,9 @@ async fn a_submission_that_times_out_is_still_recorded() {
     assert_eq!(attempt["cleared"], false);
     assert_eq!(alice.node(HELLO).await["state"], "open", "still to do");
 
-    let history = alice.ok("stats.history", json!({ "quest_id": HELLO })).await;
+    let history = alice
+        .ok("stats.history", json!({ "quest_id": HELLO }))
+        .await;
     let rows = history["attempts"].as_array().unwrap();
     assert_eq!(rows.len(), 1, "the timeout was not recorded at all");
     assert_eq!(rows[0]["verdict"], "timeout");
@@ -790,7 +806,9 @@ async fn a_submission_that_times_out_is_still_recorded() {
     );
 
     // And a compile error, the other verdict §4.9 calls out by name.
-    let broken = alice.submit(HELLO, "fn main() { let x: i32 = \"nope\"; }").await;
+    let broken = alice
+        .submit(HELLO, "fn main() { let x: i32 = \"nope\"; }")
+        .await;
     assert_eq!(broken["verdict"], "compile_error");
     assert!(
         !broken["mistakes"].as_array().unwrap().is_empty(),
@@ -807,7 +825,9 @@ async fn a_submission_that_times_out_is_still_recorded() {
         "E0308 should classify as type-mismatch, got {kinds:?}"
     );
 
-    let history = alice.ok("stats.history", json!({ "quest_id": HELLO })).await;
+    let history = alice
+        .ok("stats.history", json!({ "quest_id": HELLO }))
+        .await;
     assert_eq!(
         history["attempts"].as_array().unwrap().len(),
         2,

@@ -279,9 +279,10 @@ fn doctor(home: &Path) -> Result<()> {
                 println!("{label:<11} {}", text.trim());
             }
             _ => {
-                // Go and node are milestone 2 and the frontend's problem; a
-                // missing rustc is the one that stops the slice working.
-                let fatal = matches!(label, "rustc" | "cargo");
+                // Both lands compile and run now, so a missing `go` is half
+                // the map gone; node is the frontend's build and not the
+                // server's problem.
+                let fatal = matches!(label, "rustc" | "cargo" | "go");
                 println!(
                     "{label:<11} MISSING{}",
                     if fatal { "  (required)" } else { "" }

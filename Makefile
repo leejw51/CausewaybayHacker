@@ -29,6 +29,23 @@ SHELL := /bin/bash
 # Override any of these: `make start BACK_PORT=6000`
 BACK_PORT  ?= 5390
 WEB_PORT   ?= 5291
+
+# What the server listens on. 0.0.0.0 so a phone on the tailnet (or the LAN)
+# can reach it; `make start LOCAL=1` pins it back to loopback.
+#
+# Read this before leaving it open: the server compiles and runs the code
+# submitted to it, on this machine, as you (SPEC §5.3). On a tailnet that is
+# your own devices. On a network you do not control it is a remote shell with
+# extra steps. `start` prints what is reachable every time, so the state is
+# never a surprise.
+BIND       ?= $(if $(LOCAL),127.0.0.1,0.0.0.0)
+
+# Tailscale has no CLI on PATH in the macOS app build; the binary inside the
+# bundle is the same program. Failing that, a 100.x address on an interface is
+# the tailnet by CGNAT convention.
+TS_BIN     := $(firstword $(shell command -v tailscale) /Applications/Tailscale.app/Contents/MacOS/Tailscale)
+TS_IP       = $$($(TS_BIN) ip -4 2>/dev/null | head -1 || ifconfig 2>/dev/null | grep -oE 'inet 100\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | cut -d' ' -f2)
+LAN_IP      = $$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
 HOME_DIR   ?= $(HOME)/.causewaybayhacker
 RUN        := .run
 BACK_BIN   := backend/target/debug/cwbhacker
@@ -44,7 +61,7 @@ WAIT_SECS  ?= 90
 held = p=$$(lsof -nP -iTCP:$(1) -sTCP:LISTEN -t 2>/dev/null | head -1); \
        [ -n "$$p" ] && ps -o comm= -p $$p 2>/dev/null | grep -qE '$(2)'
 
-.PHONY: help start stop restart status logs serve web build test test-be test-fe \
+.PHONY: help start stop restart status logs remote serve web build test test-be test-fe \
         test-love test-e2e smoke fmt lint doctor clean clean-home
 
 ##@ Running
@@ -55,8 +72,8 @@ help: ## what you can do
 	  /^[a-z][a-z-]*:.*##/ { printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2 }' \
 	  $(MAKEFILE_LIST)
 	@echo ""
-	@echo "  the game        http://127.0.0.1:$(WEB_PORT)   (hot reload)"
-	@echo "  the server      ws://127.0.0.1:$(BACK_PORT)/ws"
+	@echo "  the game        http://127.0.0.1:$(BACK_PORT)   (and from a phone, see: make remote)"
+	@echo "  hot reload      http://127.0.0.1:$(WEB_PORT)   (this machine only)"
 	@echo "  your progress   $(HOME_DIR)"
 	@echo ""
 
@@ -69,17 +86,22 @@ start: ## start both servers in the background
 	@echo "building the backend (the first one is slow)…"
 	@cd backend && cargo build -p cwbhacker 2>&1 | tail -3
 	@if [ ! -x "$(VITE)" ]; then echo "installing frontend deps…"; cd frontend && npm install; fi
-	@CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) nohup $(BACK_BIN) serve --bind 127.0.0.1:$(BACK_PORT) \
+	@if [ ! -f frontend/dist/index.html ]; then \
+	  echo "building the frontend (the server serves it on $(BACK_PORT))…"; \
+	  cd frontend && npm run build >/dev/null 2>&1 || { echo "  frontend build failed — run 'cd frontend && npm run build'"; exit 1; }; \
+	fi
+	@CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) nohup $(BACK_BIN) serve --bind $(BIND):$(BACK_PORT) \
 	  < /dev/null > $(RUN)/backend.log 2>&1 & echo $$! > $(RUN)/backend.pid
 	@$(MAKE) -s _wait PORT=$(BACK_PORT) WHAT=backend LOG=$(RUN)/backend.log
 	@( cd frontend && exec ../$(VITE) --host --port $(WEB_PORT) ) \
 	  < /dev/null > $(RUN)/web.log 2>&1 & echo $$! > $(RUN)/web.pid
 	@$(MAKE) -s _wait PORT=$(WEB_PORT) WHAT=frontend LOG=$(RUN)/web.log
 	@echo ""
-	@echo "  play        http://127.0.0.1:$(WEB_PORT)"
-	@echo "  server      ws://127.0.0.1:$(BACK_PORT)/ws   (also serves the built app on /)"
-	@echo "  logs        make logs"
-	@echo "  stop        make stop"
+	@echo "  play here     http://127.0.0.1:$(BACK_PORT)"
+	@echo "  hot reload    http://127.0.0.1:$(WEB_PORT)   (this machine only — see below)"
+	@$(MAKE) -s remote
+	@echo "  logs          make logs"
+	@echo "  stop          make stop"
 
 stop: ## stop both servers
 	@$(MAKE) -s _stop-one WHAT=frontend PIDFILE=$(RUN)/web.pid PORT=$(WEB_PORT) MATCH=node
@@ -101,11 +123,24 @@ status: ## what is up, and on which port
 	  else echo "down"; fi
 	@printf "  %-10s %s\n" home "$(HOME_DIR)"
 
+remote: ## the addresses a phone or another machine can use
+	@ts=$(TS_IP); lan=$(LAN_IP); \
+	if [ "$(BIND)" = "127.0.0.1" ]; then \
+	  echo "  remote        none — bound to loopback (drop LOCAL=1 to open it up)"; \
+	else \
+	  [ -n "$$ts" ]  && echo "  on tailscale  http://$$ts:$(BACK_PORT)"   || echo "  on tailscale  not connected"; \
+	  [ -n "$$lan" ] && echo "  on this LAN   http://$$lan:$(BACK_PORT)"  || true; \
+	  echo "  ⚠ this port compiles and runs submitted code as you. Fine on your"; \
+	  echo "    own tailnet; not fine on a network you do not control."; \
+	fi
+	@echo "  note          use $(BACK_PORT) from a phone, not $(WEB_PORT): the page and the"
+	@echo "                websocket must share an origin, and $(WEB_PORT) is dev-only."
+
 logs: ## follow both logs (ctrl-C to stop following; the servers stay up)
 	@tail -f $(RUN)/backend.log $(RUN)/web.log
 
 serve: ## the backend in the foreground, for a stack trace
-	cd backend && CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) cargo run -p cwbhacker -- serve --bind 127.0.0.1:$(BACK_PORT)
+	cd backend && CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) cargo run -p cwbhacker -- serve --bind $(BIND):$(BACK_PORT)
 
 web: ## the frontend in the foreground
 	cd frontend && npm run dev

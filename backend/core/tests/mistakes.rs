@@ -112,7 +112,7 @@ fn the_rendered_text_is_recovered_for_the_player() {
 #[test]
 fn a_runtime_panic_is_classified() {
     let stderr = "thread 'main' panicked at main.rs:3:5:\nindex out of bounds: the len is 3 but the index is 7\n";
-    let found = mistakes::classify_runtime(stderr);
+    let found = mistakes::classify_runtime("rust", stderr);
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].kind, "index-range");
 }
@@ -193,6 +193,10 @@ fn the_rollup_counts_clean_attempts() {
 // assumed rustc emits.
 // ---------------------------------------------------------------------------
 
+/// `classify_compile` and `classify_runtime` have the same shape on purpose:
+/// the fixture says which one a case wants, and the test picks it.
+type Classifier = fn(&str, &str) -> Vec<mistakes::Mistake>;
+
 fn vectors_dir() -> Option<std::path::PathBuf> {
     let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()?
@@ -202,7 +206,7 @@ fn vectors_dir() -> Option<std::path::PathBuf> {
 }
 
 #[test]
-fn the_captured_rustc_diagnostics_classify_as_qa_expects() {
+fn the_captured_compiler_output_classifies_as_qa_expects() {
     let Some(dir) = vectors_dir() else {
         eprintln!("no tests/vectors/mistakes yet — nothing to check");
         return;
@@ -211,22 +215,27 @@ fn the_captured_rustc_diagnostics_classify_as_qa_expects() {
         serde_json::from_str(&std::fs::read_to_string(dir.join("expected.json")).unwrap())
             .expect("expected.json is JSON");
 
-    let mut checked = 0;
+    let mut checked = (0, 0);
     let mut missing = Vec::new();
-    let groups = ["cases", "content_starter_cases"];
-    for group in groups {
+    for group in ["cases", "content_starter_cases"] {
         for case in expected[group].as_array().into_iter().flatten() {
-            if case["lang"].as_str() != Some("rust")
-                || !case["assert_me"].as_bool().unwrap_or(false)
-                || !case["compile_time"].as_bool().unwrap_or(false)
-            {
+            if !case["assert_me"].as_bool().unwrap_or(false) {
                 continue;
             }
-            let Some(captured) = case["captured"].as_str() else {
+            let lang = case["lang"].as_str().unwrap_or("rust");
+            let compile_time = case["compile_time"].as_bool().unwrap_or(false);
+            // A compile-time case is judged on what the compiler said; a
+            // runtime one on what the program said as it died.
+            let (key, classify): (&str, Classifier) = if compile_time {
+                ("captured", mistakes::classify_compile)
+            } else {
+                ("captured_runtime", mistakes::classify_runtime)
+            };
+            let Some(captured) = case[key].as_str() else {
                 continue;
             };
             let path = dir.join(captured);
-            let Ok(stderr) = std::fs::read_to_string(&path) else {
+            let Ok(text) = std::fs::read_to_string(&path) else {
                 missing.push(captured.to_string());
                 continue;
             };
@@ -237,10 +246,10 @@ fn the_captured_rustc_diagnostics_classify_as_qa_expects() {
             let want_kind = case["kind"].as_str().unwrap();
             let want_code = case["code"].as_str();
 
-            let found = mistakes::classify_rust_json(&stderr);
+            let found = classify(lang, &text);
             assert!(
                 !found.is_empty(),
-                "{label}: the classifier found nothing in real rustc output"
+                "{label}: the classifier found nothing in real {lang} output"
             );
             assert!(
                 found.iter().any(|m| m.kind == want_kind),
@@ -252,15 +261,113 @@ fn the_captured_rustc_diagnostics_classify_as_qa_expects() {
                     found
                         .iter()
                         .any(|m| m.kind == want_kind && m.code.as_deref() == Some(want_code)),
-                    "{label}: the code '{want_code}' was not kept beside the kind"
+                    "{label}: expected the identity '{want_code}', got {:?}",
+                    found.iter().map(|m| (&m.kind, &m.code)).collect::<Vec<_>>()
                 );
             }
-            checked += 1;
+            if lang == "rust" {
+                checked.0 += 1;
+            } else {
+                checked.1 += 1;
+            }
         }
     }
     assert!(missing.is_empty(), "captures named but absent: {missing:?}");
-    assert!(checked >= 10, "only {checked} rust cases were checked");
-    println!("classified {checked} captured rustc outputs");
+    assert!(
+        checked.0 >= 10,
+        "only {} rust cases were checked",
+        checked.0
+    );
+    assert!(checked.1 >= 8, "only {} go cases were checked", checked.1);
+    println!(
+        "classified {} captured rustc outputs and {} captured go outputs",
+        checked.0, checked.1
+    );
+}
+
+/// Go has no error codes, so the identity is made from the message's shape —
+/// and the player's own identifiers must never reach it, or "your top mistake"
+/// becomes a list of one-offs.
+#[test]
+fn a_go_identity_keeps_the_shape_and_drops_the_names() {
+    assert_eq!(mistakes::go_identity("missing return"), "go:missing-return");
+    assert_eq!(
+        mistakes::go_identity("undefined: tolal"),
+        mistakes::go_identity("undefined: subtotal"),
+        "two players misspelling different names made the same mistake"
+    );
+    // Two players, two names, one mistake — one identity.
+    assert_eq!(
+        mistakes::go_identity("not enough arguments in call to sum"),
+        mistakes::go_identity("not enough arguments in call to total"),
+    );
+    assert!(!mistakes::go_identity("undefined: tolal").contains("tolal"));
+    // A bare identifier stops the slug rather than being baked into it.
+    assert_eq!(
+        mistakes::go_identity("cannot convert x (variable of type float64) to type string"),
+        "go:cannot-convert"
+    );
+    assert!(!mistakes::go_identity("invalid operation: Widget + int").contains("widget"));
+}
+
+#[test]
+fn an_unrecognised_go_message_is_other_with_its_identity_kept() {
+    let stderr = "# command-line-arguments\n./main.go:11:1: missing return\n";
+    let found = mistakes::classify_go_build(stderr);
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].kind, "other");
+    assert_eq!(found[0].code.as_deref(), Some("go:missing-return"));
+    assert_eq!(found[0].line, Some(11));
+    assert_eq!(found[0].col, Some(1));
+    assert_eq!(found[0].message, "missing return");
+}
+
+#[test]
+fn go_build_noise_is_not_a_mistake() {
+    // The package header, the indented detail lines of a signature mismatch,
+    // and the truncation notice are all things `go build` prints that nobody
+    // did wrong.
+    let stderr = "# command-line-arguments\n\
+        ./main.go:9:14: undefined: tolal\n\
+        \thave (int)\n\
+        \twant (string)\n\
+        too many errors\n";
+    let found = mistakes::classify_go_build(stderr);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].kind, "unknown-name");
+    assert_eq!(found[0].code.as_deref(), Some("go:undefined"));
+    assert_eq!(found[0].message, "undefined: tolal");
+}
+
+#[test]
+fn a_go_panic_carries_the_players_line_not_the_runtimes() {
+    let stderr = "panic: runtime error: index out of range [5] with length 3\n\n\
+        goroutine 1 [running]:\n\
+        main.main()\n\t<work>/main.go:12 +0x8c\n";
+    let found = mistakes::classify_runtime("go", stderr);
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].kind, "index-range");
+    assert_eq!(found[0].code.as_deref(), Some("go:index-out-of-range"));
+    assert_eq!(found[0].line, Some(12));
+}
+
+/// The same english word, two lands, two wordings: Rust says "index out of
+/// bounds" and Go says "index out of range". One dispatcher rather than one
+/// pattern list that half-matches both.
+#[test]
+fn the_two_lands_runtime_wordings_do_not_cross() {
+    let rust_panic = "thread 'main' panicked at main.rs:3:5:\nindex out of bounds: the len is 3 but the index is 7\n";
+    let go_panic = "panic: runtime error: index out of range [5] with length 3\n";
+    assert_eq!(
+        mistakes::classify_runtime("rust", rust_panic)[0].kind,
+        "index-range"
+    );
+    assert_eq!(
+        mistakes::classify_runtime("go", go_panic)[0].kind,
+        "index-range"
+    );
+    assert!(mistakes::classify_runtime("go", rust_panic).is_empty());
+    assert!(mistakes::classify_runtime("rust", go_panic).is_empty());
 }
 
 /// §7.1 as amended: `E0277` is two lessons. Sending a player who dropped an

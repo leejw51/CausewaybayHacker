@@ -1,9 +1,9 @@
 //! SPEC §9.4 and §9.5 against whatever is in `content/` right now: every
-//! reference solution must be accepted, and no starter may be.
+//! reference solution must be accepted, and no starter may be. Both lands.
 //!
-//! Ignored by default — it compiles every quest in the repository and takes
-//! about half a minute. Run it with `cargo test -- --ignored` when the content
-//! changes, or from the content CI. A quest whose own answer no longer
+//! Ignored by default — it compiles every quest in the repository, twice, and
+//! takes a couple of minutes. Run it with `cargo test -- --ignored` when the
+//! content changes, or from the content CI. A quest whose own answer no longer
 //! compiles has no other way of being found.
 
 use std::path::PathBuf;
@@ -11,17 +11,27 @@ use std::path::PathBuf;
 use cwbhacker_core::content::Pack;
 use cwbhacker_runner::{Submission, TestSpec, Verdict};
 
-fn content_root() -> Option<PathBuf> {
+fn content_root(land: &str) -> Option<PathBuf> {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let root = manifest.parent()?.parent()?.join("content/rust");
+    let root = manifest.parent()?.parent()?.join("content").join(land);
     root.is_dir().then_some(root)
 }
 
 #[test]
 #[ignore = "compiles every quest in content/rust; run it with --ignored"]
 fn every_rust_reference_solution_is_accepted_and_no_starter_is() {
-    let Some(root) = content_root() else {
-        eprintln!("no content/rust yet — nothing to check");
+    check_land("rust");
+}
+
+#[test]
+#[ignore = "compiles every quest in content/go; run it with --ignored"]
+fn every_go_reference_solution_is_accepted_and_no_starter_is() {
+    check_land("go");
+}
+
+fn check_land(land: &str) {
+    let Some(root) = content_root(land) else {
+        eprintln!("no content/{land} yet — nothing to check");
         return;
     };
     let tmp = tempfile::tempdir().unwrap();
@@ -45,11 +55,25 @@ fn every_rust_reference_solution_is_accepted_and_no_starter_is() {
                     continue;
                 }
             };
-            let solution = run(&quest.id, &quest.solution, &spec, tmp.path(), "solution");
+            let solution = run(
+                land,
+                &quest.id,
+                &quest.solution,
+                &spec,
+                tmp.path(),
+                "solution",
+            );
             if solution != Verdict::Accepted {
                 broken.push(format!("{}: its own solution is {solution:?}", quest.id));
             }
-            let starter = run(&quest.id, &quest.starter, &spec, tmp.path(), "starter");
+            let starter = run(
+                land,
+                &quest.id,
+                &quest.starter,
+                &spec,
+                tmp.path(),
+                "starter",
+            );
             if starter == Verdict::Accepted {
                 broken.push(format!(
                     "{}: the starter passes — the map clears itself",
@@ -58,14 +82,21 @@ fn every_rust_reference_solution_is_accepted_and_no_starter_is() {
             }
         }
     }
-    println!("checked {checked} rust quests");
+    println!("checked {checked} {land} quests");
     assert!(broken.is_empty(), "\n{}", broken.join("\n"));
 }
 
-fn run(id: &str, source: &str, spec: &TestSpec, tmp: &std::path::Path, tag: &str) -> Verdict {
+fn run(
+    land: &str,
+    id: &str,
+    source: &str,
+    spec: &TestSpec,
+    tmp: &std::path::Path,
+    tag: &str,
+) -> Verdict {
     let submission = Submission {
         attempt_id: id,
-        lang: "rust",
+        lang: land,
         source,
         spec,
         workdir: tmp.join(format!("{id}-{tag}")),

@@ -221,9 +221,8 @@ fn primary_span(value: &serde_json::Value) -> (Option<i64>, Option<i64>) {
     }
 }
 
-/// Mistakes that are not compiler codes: a runtime panic, or the verdict
-/// itself (§7.1's `wrong-answer` and `timeout` rows).
-pub fn classify_runtime(stderr: &str) -> Vec<Mistake> {
+/// Rust's runtime failures: a panic that made it out of `main`.
+pub fn classify_rust_runtime(stderr: &str) -> Vec<Mistake> {
     let mut out = Vec::new();
     let lower = stderr.to_ascii_lowercase();
     if lower.contains("index out of bounds") {
@@ -257,6 +256,213 @@ pub fn classify_runtime(stderr: &str) -> Vec<Mistake> {
         });
     }
     out
+}
+
+// ---------------------------------------------------------------------------
+// Go (SPEC §7.1's second column)
+//
+// Rust hands over `E0382` in JSON. Go hands over prose with a file, a line, a
+// column and the player's own identifiers in it. So the identity has to be
+// *made*: the message is normalized down to its shape, and the shape is what
+// becomes `mistakes.code` — `go:undefined`, `go:cannot-use-as`. The player's
+// variable name belongs in `mistakes.message`, never in the identity, or
+// "your top mistake" becomes a list of one-offs.
+// ---------------------------------------------------------------------------
+
+/// `./main.go:7:14: cannot use "42" (…) as int value` → the kind and the
+/// identity. `None` where nothing in §7.1 matches, and the caller then makes
+/// an identity out of the message shape rather than dropping it.
+pub fn go_kind(message: &str) -> Option<(&'static str, &'static str)> {
+    let lower = message.to_ascii_lowercase();
+    // Ordered by how specific the phrase is, not alphabetically: "declared and
+    // not used: x" and "x declared and not used" are both real wordings across
+    // Go versions, so match on the phrase rather than the position.
+    if lower.starts_with("syntax error") {
+        return Some(("syntax", "go:syntax"));
+    }
+    if lower.starts_with("undefined:") {
+        return Some(("unknown-name", "go:undefined"));
+    }
+    if lower.starts_with("cannot use ") {
+        return Some(("type-mismatch", "go:cannot-use-as"));
+    }
+    if lower.contains("imported and not used") {
+        return Some(("unused", "go:imported-not-used"));
+    }
+    if lower.contains("declared and not used") {
+        return Some(("unused", "go:declared-not-used"));
+    }
+    None
+}
+
+/// An identity for a message §7.1 does not name, made out of its shape.
+///
+/// Everything variable goes first — quoted text, parenthesised asides, the
+/// player's identifiers after a colon, numbers — and what is left is the
+/// sentence Go would have printed for anybody. "missing return" stays
+/// `go:missing-return`; the identifier in "undefined: tolal" never reaches it.
+pub fn go_identity(message: &str) -> String {
+    let mut cleaned = String::with_capacity(message.len());
+    let mut depth = 0usize;
+    let mut quoted = false;
+    for ch in message.chars() {
+        match ch {
+            '(' | '[' => depth += 1,
+            ')' | ']' if depth > 0 => depth -= 1,
+            '"' | '`' | '\'' => quoted = !quoted,
+            _ if depth == 0 && !quoted => cleaned.push(ch),
+            _ => {}
+        }
+    }
+    // Anything after a colon is the thing the message is *about*.
+    let head = cleaned.split(':').next().unwrap_or("");
+    let mut slug: Vec<String> = Vec::new();
+    for word in head.split(|c: char| !c.is_ascii_alphanumeric()) {
+        if word.is_empty() {
+            continue;
+        }
+        // Stop at the first word that looks like something the player named
+        // rather than something Go always says: a single letter, or anything
+        // with a capital in it. Better a coarse identity two mistakes share
+        // than a fine one that splits a mistake into one row per variable.
+        if word.len() == 1 || word.chars().any(|c| c.is_ascii_uppercase()) {
+            break;
+        }
+        slug.push(word.to_ascii_lowercase());
+        if slug.len() == 4 {
+            break;
+        }
+    }
+    if slug.is_empty() {
+        "go:other".to_string()
+    } else {
+        format!("go:{}", slug.join("-"))
+    }
+}
+
+/// Classify the output of `go build`.
+pub fn classify_go_build(stderr: &str) -> Vec<Mistake> {
+    let mut out = Vec::new();
+    for line in stderr.lines() {
+        // `# command-line-arguments` is the package header, and an indented
+        // line is the previous error's detail ("have …" / "want …").
+        if line.starts_with('#') || line.starts_with('\t') || line.starts_with("    ") {
+            continue;
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed == "too many errors" {
+            continue;
+        }
+        let (line_no, col_no, message) = split_go_location(trimmed);
+        if message.is_empty() {
+            continue;
+        }
+        let (kind, code) = match go_kind(message) {
+            Some((kind, code)) => (kind.to_string(), code.to_string()),
+            // Never dropped: an unrecognized message keeps whatever identity
+            // can be made of it, so the taxonomy grows out of real data.
+            None => ("other".to_string(), go_identity(message)),
+        };
+        out.push(Mistake {
+            kind,
+            code: Some(code),
+            message: normalize_message(message),
+            line: line_no,
+            col: col_no,
+        });
+    }
+    out
+}
+
+/// `./main.go:7:14: message` → `(7, 14, "message")`. Tolerant of the
+/// `file:line: message` form and of anything that is neither.
+fn split_go_location(line: &str) -> (Option<i64>, Option<i64>, &str) {
+    let parts: Vec<&str> = line.splitn(4, ':').collect();
+    let numeric = |s: &str| s.trim().parse::<i64>().ok();
+    match parts.as_slice() {
+        [_file, line_no, col_no, rest] => match (numeric(line_no), numeric(col_no)) {
+            (Some(l), Some(c)) => (Some(l), Some(c), rest.trim()),
+            // `undefined: tolal` has a colon of its own; if the second field
+            // is not a number this was never a location.
+            _ => match numeric(line_no) {
+                Some(l) => (
+                    Some(l),
+                    None,
+                    line[line.find(':').map(|i| i + 1).unwrap_or(0)..].trim(),
+                ),
+                None => (None, None, line),
+            },
+        },
+        [_file, line_no, rest] => match numeric(line_no) {
+            Some(l) => (Some(l), None, rest.trim()),
+            None => (None, None, line),
+        },
+        _ => (None, None, line),
+    }
+}
+
+/// Go's runtime failures. These are the §7.1 rows with no compiler code at
+/// all: the program built, ran, and died saying what it died of.
+pub fn classify_go_runtime(stderr: &str) -> Vec<Mistake> {
+    const PATTERNS: &[(&str, &str, &str)] = &[
+        (
+            "invalid memory address or nil pointer dereference",
+            "nil-deref",
+            "go:nil-deref",
+        ),
+        ("index out of range", "index-range", "go:index-out-of-range"),
+        ("all goroutines are asleep", "deadlock", "go:deadlock"),
+        ("WARNING: DATA RACE", "data-race", "go:data-race"),
+    ];
+    let mut out = Vec::new();
+    for (needle, kind, code) in PATTERNS {
+        let needle_lower = needle.to_ascii_lowercase();
+        let hit = stderr
+            .lines()
+            .find(|l| l.to_ascii_lowercase().contains(&needle_lower));
+        if let Some(hit) = hit {
+            out.push(Mistake {
+                kind: (*kind).to_string(),
+                code: Some((*code).to_string()),
+                message: normalize_message(hit),
+                line: go_panic_line(stderr),
+                col: None,
+            });
+        }
+    }
+    out
+}
+
+/// The first `main.go:N` in a panic trace — the line the player wrote, rather
+/// than the one inside the runtime.
+fn go_panic_line(stderr: &str) -> Option<i64> {
+    for line in stderr.lines() {
+        if let Some(rest) = line.split("main.go:").nth(1) {
+            let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            if let Ok(n) = digits.parse::<i64>() {
+                return Some(n);
+            }
+        }
+    }
+    None
+}
+
+/// Compile diagnostics, whichever land they came from.
+pub fn classify_compile(lang: &str, stderr: &str) -> Vec<Mistake> {
+    match lang {
+        "go" => classify_go_build(stderr),
+        _ => classify_rust_json(stderr),
+    }
+}
+
+/// Runtime output, whichever land it came from. Rust says "index out of
+/// bounds" and Go says "index out of range"; one dispatcher beats one
+/// pattern list that half-matches both.
+pub fn classify_runtime(lang: &str, stderr: &str) -> Vec<Mistake> {
+    match lang {
+        "go" => classify_go_runtime(stderr),
+        _ => classify_rust_runtime(stderr),
+    }
 }
 
 pub fn verdict_mistake(verdict: &str, detail: &str) -> Option<Mistake> {

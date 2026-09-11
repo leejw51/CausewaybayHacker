@@ -1,0 +1,95 @@
+{
+  "neon_signs": {
+    "file": "neon_signs.png",
+    "frames": 6,
+    "fw": 85,
+    "fh": 256,
+    "note": "Six flat neon hues, measured from the delivered sprite. Each sign is a light tube colour over a darker face of the same hue, so a palette cycle can rotate the six hue_deg values between frames and the tube/face relationship survives. No other colour on the sprite carries hue.",
+    "hues": [
+      {
+        "i": 0,
+        "tube": [
+          177,
+          2,
+          25
+        ],
+        "face": [
+          167,
+          0,
+          26
+        ],
+        "hue_deg": 352
+      },
+      {
+        "i": 1,
+        "tube": [
+          5,
+          90,
+          191
+        ],
+        "face": [
+          3,
+          86,
+          182
+        ],
+        "hue_deg": 213
+      },
+      {
+        "i": 2,
+        "tube": [
+          13,
+          168,
+          32
+        ],
+        "face": [
+          13,
+          139,
+          31
+        ],
+        "hue_deg": 127
+      },
+      {
+        "i": 3,
+        "tube": [
+          227,
+          180,
+          10
+        ],
+        "face": [
+          204,
+          147,
+          4
+        ],
+        "hue_deg": 47
+      },
+      {
+        "i": 4,
+        "tube": [
+          222,
+          94,
+          5
+        ],
+        "face": [
+          199,
+          78,
+          7
+        ],
+        "hue_deg": 25
+      },
+      {
+        "i": 5,
+        "tube": [
+          120,
+          14,
+          165
+        ],
+        "face": [
+          111,
+          13,
+          152
+        ],
+        "hue_deg": 282
+      }
+    ]
+  }
+}

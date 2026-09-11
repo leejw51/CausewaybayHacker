@@ -73,6 +73,63 @@ def knockout(im):
 
 
 
+
+def drop_trapped_backdrop(im, max_share=0.10):
+    """
+    Remove magenta the border-seeded flood fill could not reach.
+
+    `knockout` is seeded from the edges, which is what protects pink *inside* a
+    sprite. The cost is that backdrop the silhouette encloses — the gap between
+    a whiteboard's legs and its board, the slot in a turnstile, the space under
+    a raised arm — stays magenta, and at the 32-64px the map actually draws
+    these at, a magenta pocket reads as a rendering fault.
+
+    Flatness does not separate the two cases: fx_ribbon's painted cloth came
+    back *flatter* (stdev 5.3) than the trapped pockets (8.6-13.4), because a
+    trapped pocket has the sprite's own edge bleeding into it. Size does
+    separate them, and it is the honest reason too — a hole in a silhouette is
+    small, a sprite whose body is pink is not. Measured on this set the gap is
+    the gap is wide: trapped pockets measured 0.2%-3.8% of the ink across this
+    set, fx_ribbon's cloth is 33%. The cut is at 10% — above every pocket seen,
+    and still a 3x margin under the one region that is genuinely art.
+    """
+    w, h = im.size
+    px = im.load()
+
+    def strong(x, y):
+        r, g, b, a = px[x, y]
+        # Tighter than is_bg on purpose: only the studio magenta itself, so an
+        # ordinary pink is never even a candidate.
+        return a > 127 and r > 170 and b > 120 and g < r - 60 and g < b - 20
+
+    ink = sum(1 for y in range(h) for x in range(w) if px[x, y][3] > 127)
+    if ink == 0:
+        return im
+    limit = ink * max_share
+    seen = bytearray(w * h)
+    for y in range(h):
+        for x in range(w):
+            if seen[y * w + x] or not strong(x, y):
+                continue
+            q, cells, touches = deque([(x, y)]), [], False
+            seen[y * w + x] = 1
+            while q:
+                cx, cy = q.popleft()
+                cells.append((cx, cy))
+                if cx == 0 or cy == 0 or cx == w - 1 or cy == h - 1:
+                    touches = True
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = cx + dx, cy + dy
+                    if 0 <= nx < w and 0 <= ny < h and not seen[ny * w + nx] and strong(nx, ny):
+                        seen[ny * w + nx] = 1
+                        q.append((nx, ny))
+            if touches or len(cells) > limit:
+                continue
+            for cx, cy in cells:
+                px[cx, cy] = (0, 0, 0, 0)
+    return im
+
+
 def defringe(im, passes=3):
     """
     Strip the magenta halo off the silhouette.
@@ -121,7 +178,7 @@ def ink_bounds(im, thresh=31):
 
 
 def make_sprite(src, dst, tw, th, pad=0.055, anchor="feet"):
-    im = defringe(knockout(Image.open(src)))
+    im = defringe(drop_trapped_backdrop(knockout(Image.open(src))))
     bb = ink_bounds(im)
     if bb is None:
         raise SystemExit(f"{src}: the knockout removed everything — re-roll it")

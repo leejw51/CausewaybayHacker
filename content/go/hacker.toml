@@ -21,7 +21,7 @@ time_limit_s = 600
 story        = "Same room, same first question, and this time they ask for it in Go."
 concepts     = ["hashing", "complexity", "slices"]
 requires     = []
-map          = { x = 0.88, y = 0.84, kind = "quest" }
+map          = { x = 0.046, y = 0.135, kind = "quest" }
 brief        = '''
 Line one is `n target`. Line two is `n` integers.
 
@@ -129,7 +129,7 @@ time_limit_s = 900
 story        = "How few consecutive stops cover the distance. They want the number of stops, and then where it starts."
 concepts     = ["two-pointers", "complexity", "slices"]
 requires     = ["go.hacker.01.two-sum"]
-map          = { x = 0.72, y = 0.74, kind = "quest" }
+map          = { x = 0.282, y = 0.050, kind = "quest" }
 brief        = '''
 Line one is `n s`. Line two is `n` **positive** integers.
 
@@ -248,7 +248,7 @@ time_limit_s = 900
 story        = "The Lucky Mac rota again, and the question is still which hours are actually covered."
 concepts     = ["intervals", "sorting", "complexity"]
 requires     = ["go.hacker.02.window"]
-map          = { x = 0.56, y = 0.82, kind = "quest" }
+map          = { x = 0.387, y = 0.141, kind = "quest" }
 brief        = '''
 Line one is `n`. The next `n` lines are `<start> <end>` with `start <= end`.
 
@@ -374,7 +374,7 @@ time_limit_s = 1200
 story        = "A plan of the neighbourhood on the whiteboard. Count the blocks, then tell them which one is biggest."
 concepts     = ["graphs", "stacks-queues", "complexity"]
 requires     = ["go.hacker.03.intervals"]
-map          = { x = 0.42, y = 0.68, kind = "quest" }
+map          = { x = 0.603, y = 0.055, kind = "quest" }
 brief        = '''
 Line one is `r c`. The next `r` lines are the plan: `#` is building, `.` is
 street.
@@ -526,7 +526,7 @@ time_limit_s = 900
 story        = "A config file on the projector and the interviewer asking not whether it is broken but which character broke it."
 concepts     = ["stacks-queues", "strings", "complexity"]
 requires     = ["go.hacker.04.islands"]
-map          = { x = 0.54, y = 0.52, kind = "quest" }
+map          = { x = 0.711, y = 0.143, kind = "quest" }
 brief        = '''
 One line made only of `(`, `)`, `[`, `]`, `{`, `}`.
 
@@ -649,7 +649,7 @@ time_limit_s = 900
 story        = "The Island Line timetable starts at the wrong station and wraps around, and they still want a lookup in log time."
 concepts     = ["binary-search", "complexity", "slices"]
 requires     = ["go.hacker.05.brackets"]
-map          = { x = 0.40, y = 0.40, kind = "quest" }
+map          = { x = 0.940, y = 0.050, kind = "quest" }
 brief        = '''
 Line one is `n target`. Line two is `n` distinct integers: a list that was
 sorted ascending and then rotated left by some amount (possibly zero).
@@ -783,7 +783,7 @@ time_limit_s = 1200
 story        = "A page of stop names with the letters shaken. Group the ones that are the same name."
 concepts     = ["hashing", "sorting", "strings"]
 requires     = ["go.hacker.06.rotated"]
-map          = { x = 0.24, y = 0.46, kind = "quest" }
+map          = { x = 0.888, y = 0.403, kind = "quest" }
 brief        = '''
 Line one is `n`. Line two is `n` lowercase words separated by spaces.
 
@@ -901,17 +901,17 @@ cases = [
   { name = "streets", stdin = "4\nmtr tram rat art\n",        expect = "art rat\nmtr\ntram\nGROUPS 3\n",        visible = false },
 ]
 
-# ---------------------------------------------------------------- 08  BOSS
+# ---------------------------------------------------------------- 08
 [[quest]]
 id           = "go.hacker.08.kth-largest"
 node         = 8
-title        = "THE CLOCK"
-difficulty   = 5
-time_limit_s = 1200
-story        = "Same room, last question, and the clock on the wall is the one they replaced with a shorter one."
+title        = "THE K-TH BIGGEST"
+difficulty   = 4
+time_limit_s = 900
+story        = "Warm-up round, and they still want the heap rather than the sort."
 concepts     = ["stacks-queues", "sorting", "complexity"]
 requires     = ["go.hacker.07.anagrams", "go.hacker.01.two-sum"]
-map          = { x = 0.10, y = 0.24, kind = "boss" }
+map          = { x = 0.773, y = 0.331, kind = "quest" }
 brief        = '''
 Line one is `n k`, with `1 <= k <= n`. Line two is `n` integers, which may
 repeat.
@@ -1044,4 +1044,2444 @@ cases = [
   { name = "dupes",   stdin = "9 4\n3 2 3 1 2 4 5 5 6\n",   expect = "4\nHEAP 4\n", visible = false },
   { name = "single",  stdin = "1 1\n7\n",                   expect = "7\nHEAP 1\n", visible = false },
   { name = "all-k",   stdin = "5 5\n9 9 9 9 9\n",           expect = "9\nHEAP 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id           = "go.hacker.09.linked-list"
+node         = 9
+title        = "THE CHAIN"
+difficulty   = 4
+time_limit_s = 900
+story        = "They want it without a slice. Nodes that point at nodes, because that is the shape the question is really about."
+concepts     = ["linked-lists", "two-pointers", "structs"]
+requires     = ["go.hacker.08.kth-largest"]
+map          = { x = 0.557, y = 0.407, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers, in order.
+
+Build a singly linked list of `*Node` from them — no slice in the answer —
+then print three lines:
+
+1. the list reversed, space separated
+2. the value at the middle node (for an even `n`, the second of the two)
+3. `LEN <n>` counted by walking the list
+
+```
+input:  5
+        1 2 3 4 5
+output: 5 4 3 2 1
+        3
+        LEN 5
+```
+
+The middle is the runner: one pointer one step at a time, one two steps at a
+time, and when the fast one runs out the slow one is there. One pass, and the
+same two pointers detect a cycle if you are ever asked.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type Node struct {
+	Value int64
+	Next  *Node
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	values := make([]int64, n)
+	for i := range values {
+		fmt.Fscan(reader, &values[i])
+	}
+
+	var head *Node
+
+	// build the list, find the middle with two pointers, then reverse it
+	_ = head
+	_ = values
+	fmt.Println("?")
+	fmt.Println(0)
+	fmt.Println("LEN 0")
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+type Node struct {
+	Value int64
+	Next  *Node
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	values := make([]int64, n)
+	for i := range values {
+		fmt.Fscan(reader, &values[i])
+	}
+
+	// build back to front, so each new node points at what we had
+	var head *Node
+	for i := len(values) - 1; i >= 0; i-- {
+		head = &Node{Value: values[i], Next: head}
+	}
+
+	length := 0
+	for walk := head; walk != nil; walk = walk.Next {
+		length++
+	}
+
+	slow, fast := head, head
+	for fast != nil && fast.Next != nil {
+		slow = slow.Next
+		fast = fast.Next.Next
+	}
+	var middle int64
+	if slow != nil {
+		middle = slow.Value
+	}
+
+	// reverse by moving nodes off the front of one list onto the front of another
+	var reversed *Node
+	for cursor := head; cursor != nil; {
+		next := cursor.Next
+		cursor.Next = reversed
+		reversed = cursor
+		cursor = next
+	}
+
+	out := make([]string, 0, length)
+	for walk := reversed; walk != nil; walk = walk.Next {
+		out = append(out, strconv.FormatInt(walk.Value, 10))
+	}
+
+	fmt.Println(strings.Join(out, " "))
+	fmt.Println(middle)
+	fmt.Printf("LEN %d\n", length)
+}
+'''
+hints = [
+  "Building back to front is the easy direction: each new node takes the old head as its Next.",
+  "Save cursor.Next before you overwrite it, or the rest of the list is gone.",
+  "Advance slow once for every two steps fast manages; when fast or fast.Next is nil, stop.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "odd",    stdin = "5\n1 2 3 4 5\n",   expect = "5 4 3 2 1\n3\nLEN 5\n",   visible = true },
+  { name = "even",   stdin = "4\n7 8 9 10\n",    expect = "10 9 8 7\n9\nLEN 4\n",    visible = false },
+  { name = "single", stdin = "1\n42\n",          expect = "42\n42\nLEN 1\n",         visible = false },
+  { name = "signed", stdin = "3\n-1 0 1\n",      expect = "1 0 -1\n0\nLEN 3\n",      visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id           = "go.hacker.10.tree-walk"
+node         = 10
+title        = "THREE WAYS ROUND A TREE"
+difficulty   = 4
+time_limit_s = 900
+story        = "A tree on the whiteboard and the question nobody should have to think about twice: name the three orders."
+concepts     = ["trees", "recursion", "stacks-queues"]
+requires     = ["go.hacker.09.linked-list"]
+map          = { x = 0.448, y = 0.337, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` values in **level order**, where `-1` means
+"no node here" — so the tree is stored the way a heap is: the children of
+index `i` are `2i+1` and `2i+2`.
+
+Print four lines: the **preorder**, **inorder** and **postorder** walks, each
+space separated, and then `DEPTH <d>` — the number of nodes on the longest
+root-to-leaf path.
+
+```
+input:  5
+        1 2 3 -1 4
+output: 1 2 4 3
+        2 4 1 3
+        4 2 3 1
+        DEPTH 3
+```
+
+Preorder is node, left, right. Inorder is left, node, right. Postorder is
+left, right, node. One recursive function does all three; only the position of
+the append moves.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func present(tree []int64, i int) bool {
+	return i < len(tree) && tree[i] != -1
+}
+
+func walk(tree []int64, i, order int, out *[]int64) {
+	// order 0 = preorder, 1 = inorder, 2 = postorder
+	_ = present(tree, i)
+	_ = out
+}
+
+func depth(tree []int64, i int) int {
+	_ = tree
+	_ = i
+	return 0
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	tree := make([]int64, n)
+	for i := range tree {
+		fmt.Fscan(reader, &tree[i])
+	}
+
+	for order := 0; order < 3; order++ {
+		out := make([]int64, 0, n)
+		walk(tree, 0, order, &out)
+		fmt.Println(join(out))
+	}
+	fmt.Printf("DEPTH %d\n", depth(tree, 0))
+}
+
+func join(values []int64) string {
+	s := ""
+	for i, v := range values {
+		if i > 0 {
+			s += " "
+		}
+		s += fmt.Sprint(v)
+	}
+	return s
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func present(tree []int64, i int) bool {
+	return i < len(tree) && tree[i] != -1
+}
+
+func walk(tree []int64, i, order int, out *[]int64) {
+	if !present(tree, i) {
+		return
+	}
+	if order == 0 {
+		*out = append(*out, tree[i])
+	}
+	walk(tree, 2*i+1, order, out)
+	if order == 1 {
+		*out = append(*out, tree[i])
+	}
+	walk(tree, 2*i+2, order, out)
+	if order == 2 {
+		*out = append(*out, tree[i])
+	}
+}
+
+func depth(tree []int64, i int) int {
+	if !present(tree, i) {
+		return 0
+	}
+	left := depth(tree, 2*i+1)
+	right := depth(tree, 2*i+2)
+	if left > right {
+		return 1 + left
+	}
+	return 1 + right
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	tree := make([]int64, n)
+	for i := range tree {
+		fmt.Fscan(reader, &tree[i])
+	}
+
+	for order := 0; order < 3; order++ {
+		out := make([]int64, 0, n)
+		walk(tree, 0, order, &out)
+		fmt.Println(join(out))
+	}
+	fmt.Printf("DEPTH %d\n", depth(tree, 0))
+}
+
+func join(values []int64) string {
+	s := ""
+	for i, v := range values {
+		if i > 0 {
+			s += " "
+		}
+		s += fmt.Sprint(v)
+	}
+	return s
+}
+'''
+hints = [
+  "out is a *[]int64 because append may reallocate — a plain []int64 parameter would lose the writes.",
+  "The base case is both conditions at once: past the end of the slice, or sitting on a -1.",
+  "Depth is 1 + the deeper child, and 0 for a missing node.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n1 2 3 -1 4\n",        expect = "1 2 4 3\n2 4 1 3\n4 2 3 1\nDEPTH 3\n", visible = true },
+  { name = "leaf",   stdin = "1\n9\n",                 expect = "9\n9\n9\nDEPTH 1\n",                   visible = false },
+  { name = "left",   stdin = "7\n1 2 -1 3 -1 -1 -1\n", expect = "1 2 3\n3 2 1\n3 2 1\nDEPTH 3\n",       visible = false },
+  { name = "full",   stdin = "7\n4 2 6 1 3 5 7\n",     expect = "4 2 1 3 6 5 7\n1 2 3 4 5 6 7\n1 3 2 5 7 6 4\nDEPTH 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id           = "go.hacker.11.bst"
+node         = 11
+title        = "IS IT ACTUALLY A BST"
+difficulty   = 4
+time_limit_s = 900
+story        = "The follow-up. Everyone checks the two children and everyone is wrong the first time."
+concepts     = ["trees", "recursion", "binary-search"]
+requires     = ["go.hacker.10.tree-walk"]
+map          = { x = 0.229, y = 0.380, kind = "quest" }
+brief        = '''
+Same level-order encoding as the last quest: `-1` is a missing node, children
+of `i` are `2i+1` and `2i+2`.
+
+Line one is `n q`. Line two is the `n` tree values. Line three is `q` query
+values.
+
+Print `VALID` or `INVALID` — every value in the left subtree strictly smaller
+than the node, every value in the right strictly larger. Then one line per
+query: `<value> FOUND <depth>` with the root at depth 1, or `<value> ABSENT`.
+
+```
+input:  7 2
+        4 2 6 1 3 5 7
+        3 8
+output: VALID
+        3 FOUND 3
+        8 ABSENT
+```
+
+Checking `left < node < right` at each node **is not enough** — a value deep
+in the left subtree can still be larger than an ancestor. Carry the open
+interval down instead.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"math"
+	"os"
+)
+
+func present(tree []int64, i int) bool {
+	return i < len(tree) && tree[i] != -1
+}
+
+func valid(tree []int64, i int, low, high int64) bool {
+	// the node must sit strictly inside (low, high), and each child
+	// inherits a narrower window
+	_ = present(tree, i)
+	_ = low
+	_ = high
+	return true
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, q int
+	fmt.Fscan(reader, &n, &q)
+	tree := make([]int64, n)
+	for i := range tree {
+		fmt.Fscan(reader, &tree[i])
+	}
+	queries := make([]int64, q)
+	for i := range queries {
+		fmt.Fscan(reader, &queries[i])
+	}
+
+	if valid(tree, 0, math.MinInt64, math.MaxInt64) {
+		fmt.Println("VALID")
+	} else {
+		fmt.Println("INVALID")
+	}
+	for _, target := range queries {
+		fmt.Printf("%d ABSENT\n", target)
+	}
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"math"
+	"os"
+)
+
+func present(tree []int64, i int) bool {
+	return i < len(tree) && tree[i] != -1
+}
+
+func valid(tree []int64, i int, low, high int64) bool {
+	if !present(tree, i) {
+		return true
+	}
+	value := tree[i]
+	if value <= low || value >= high {
+		return false
+	}
+	return valid(tree, 2*i+1, low, value) && valid(tree, 2*i+2, value, high)
+}
+
+func find(tree []int64, target int64) int {
+	i, depth := 0, 1
+	for present(tree, i) {
+		if tree[i] == target {
+			return depth
+		}
+		if target < tree[i] {
+			i = 2*i + 1
+		} else {
+			i = 2*i + 2
+		}
+		depth++
+	}
+	return -1
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, q int
+	fmt.Fscan(reader, &n, &q)
+	tree := make([]int64, n)
+	for i := range tree {
+		fmt.Fscan(reader, &tree[i])
+	}
+	queries := make([]int64, q)
+	for i := range queries {
+		fmt.Fscan(reader, &queries[i])
+	}
+
+	if valid(tree, 0, math.MinInt64, math.MaxInt64) {
+		fmt.Println("VALID")
+	} else {
+		fmt.Println("INVALID")
+	}
+	for _, target := range queries {
+		if depth := find(tree, target); depth > 0 {
+			fmt.Printf("%d FOUND %d\n", target, depth)
+		} else {
+			fmt.Printf("%d ABSENT\n", target)
+		}
+	}
+}
+'''
+hints = [
+  "Pass an open interval down. The root gets the whole int64 range; a left child gets (low, node), a right child gets (node, high).",
+  "A missing node is vacuously valid — the base case returns true.",
+  "The lookup is the binary search: smaller goes left, otherwise right, and the depth is how many hops it took.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "7 2\n4 2 6 1 3 5 7\n3 8\n",  expect = "VALID\n3 FOUND 3\n8 ABSENT\n",  visible = true },
+  { name = "sneaky",    stdin = "7 1\n5 1 7 -1 6 -1 -1\n6\n", expect = "INVALID\n6 ABSENT\n",           visible = false },
+  { name = "root",      stdin = "1 1\n10\n10\n",              expect = "VALID\n10 FOUND 1\n",           visible = false },
+  { name = "left-only", stdin = "3 2\n8 4 -1\n4 8\n",         expect = "VALID\n4 FOUND 2\n8 FOUND 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id           = "go.hacker.12.heap"
+node         = 12
+title        = "K SORTED QUEUES"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Every Lucky Mac branch sends its dockets already in order. Merge them into one line without sorting the lot again."
+concepts     = ["heaps", "sorting", "complexity"]
+requires     = ["go.hacker.11.bst"]
+map          = { x = 0.119, y = 0.333, kind = "quest" }
+brief        = '''
+Line one is `k`. Then `k` lines, each a count followed by that many integers,
+already sorted ascending.
+
+Print all of them merged into one ascending line, space separated, then
+`POPS <total count>`.
+
+```
+input:  3
+        3 1 4 5
+        2 1 3
+        2 2 6
+output: 1 1 2 3 4 5 6
+        POPS 7
+```
+
+The heap holds one entry per list, not one per element, so it stays at size
+`k` however long the lists are. Each entry has to remember which list it came
+from, or you cannot refill after popping it.
+
+`container/heap` is five methods on a slice type. `Len`, `Less` and `Swap`
+take a value receiver; `Push` and `Pop` take a pointer receiver because they
+change the length.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"container/heap"
+	"fmt"
+	"os"
+)
+
+type entry struct {
+	value int64
+	which int
+	at    int
+}
+
+type minHeap []entry
+
+func (h minHeap) Len() int           { return len(h) }
+func (h minHeap) Less(i, j int) bool { return h[i].value < h[j].value }
+func (h minHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *minHeap) Push(x any) {
+	// append the entry
+}
+
+func (h *minHeap) Pop() any {
+	// take the last entry off and return it
+	return entry{}
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var k int
+	fmt.Fscan(reader, &k)
+	lists := make([][]int64, k)
+	for i := range lists {
+		var count int
+		fmt.Fscan(reader, &count)
+		lists[i] = make([]int64, count)
+		for j := range lists[i] {
+			fmt.Fscan(reader, &lists[i][j])
+		}
+	}
+
+	h := &minHeap{}
+	heap.Init(h)
+
+	// seed with the head of each list, then pop and refill from the same list
+	_ = lists
+	fmt.Println("?")
+	fmt.Println("POPS 0")
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"container/heap"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+type entry struct {
+	value int64
+	which int
+	at    int
+}
+
+type minHeap []entry
+
+func (h minHeap) Len() int           { return len(h) }
+func (h minHeap) Less(i, j int) bool { return h[i].value < h[j].value }
+func (h minHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *minHeap) Push(x any) {
+	*h = append(*h, x.(entry))
+}
+
+func (h *minHeap) Pop() any {
+	old := *h
+	last := len(old) - 1
+	value := old[last]
+	*h = old[:last]
+	return value
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var k int
+	fmt.Fscan(reader, &k)
+	lists := make([][]int64, k)
+	total := 0
+	for i := range lists {
+		var count int
+		fmt.Fscan(reader, &count)
+		lists[i] = make([]int64, count)
+		for j := range lists[i] {
+			fmt.Fscan(reader, &lists[i][j])
+		}
+		total += count
+	}
+
+	h := &minHeap{}
+	heap.Init(h)
+	for which, list := range lists {
+		if len(list) > 0 {
+			heap.Push(h, entry{value: list[0], which: which, at: 0})
+		}
+	}
+
+	out := make([]string, 0, total)
+	for h.Len() > 0 {
+		next := heap.Pop(h).(entry)
+		out = append(out, strconv.FormatInt(next.value, 10))
+		if next.at+1 < len(lists[next.which]) {
+			heap.Push(h, entry{
+				value: lists[next.which][next.at+1],
+				which: next.which,
+				at:    next.at + 1,
+			})
+		}
+	}
+
+	fmt.Println(strings.Join(out, " "))
+	fmt.Printf("POPS %d\n", len(out))
+}
+'''
+hints = [
+  "heap.Pop returns any, so the type assertion back to entry is part of the idiom.",
+  "Skip empty lists when seeding, or the first pop reads past the end of one.",
+  "Push the next element of a list only when you pop one of its elements — that keeps the heap at k.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3\n3 1 4 5\n2 1 3\n2 2 6\n", expect = "1 1 2 3 4 5 6\nPOPS 7\n", visible = true },
+  { name = "one",    stdin = "1\n3 -5 0 5\n",              expect = "-5 0 5\nPOPS 3\n",         visible = false },
+  { name = "ragged", stdin = "3\n1 9\n0\n4 1 2 3 4\n",     expect = "1 2 3 4 9\nPOPS 5\n",      visible = false },
+  { name = "dupes",  stdin = "2\n2 2 2\n2 2 2\n",          expect = "2 2 2 2\nPOPS 4\n",        visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id           = "go.hacker.13.permutations"
+node         = 13
+title        = "EVERY ORDER"
+difficulty   = 4
+time_limit_s = 900
+story        = "List every order the riders could go out in. All of them, in dictionary order, and do not repeat one."
+concepts     = ["backtracking", "recursion", "slices"]
+requires     = ["go.hacker.12.heap"]
+map          = { x = 0.041, y = 0.667, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` distinct integers **already in ascending
+order**.
+
+Print every permutation, one per line, values space separated, in
+**lexicographic** order. Then print `PERMS <n!>`.
+
+```
+input:  3
+        1 2 3
+output: 1 2 3
+        1 3 2
+        2 1 3
+        2 3 1
+        3 1 2
+        3 2 1
+        PERMS 6
+```
+
+Because the input is already ascending, choosing the unused values in index
+order produces dictionary order for free — no sorting of the output.
+
+Mark used, recurse, **unmark**. The unmark is the part people leave out, and
+the symptom is only ever seeing one permutation.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func build(nums []int64, used []bool, chosen []int64, out *[]string) {
+	// when chosen is full, record it; otherwise take each unused value in
+	// index order, recurse, and put it back
+	_ = nums
+	_ = used
+	_ = chosen
+	_ = out
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	out := make([]string, 0)
+	build(nums, make([]bool, n), make([]int64, 0, n), &out)
+
+	for _, line := range out {
+		fmt.Println(line)
+	}
+	fmt.Printf("PERMS %d\n", len(out))
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+func build(nums []int64, used []bool, chosen []int64, out *[]string) {
+	if len(chosen) == len(nums) {
+		parts := make([]string, len(chosen))
+		for i, v := range chosen {
+			parts[i] = strconv.FormatInt(v, 10)
+		}
+		*out = append(*out, strings.Join(parts, " "))
+		return
+	}
+	for i := range nums {
+		if used[i] {
+			continue
+		}
+		used[i] = true
+		build(nums, used, append(chosen, nums[i]), out)
+		used[i] = false
+	}
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	out := make([]string, 0)
+	build(nums, make([]bool, n), make([]int64, 0, n), &out)
+
+	for _, line := range out {
+		fmt.Println(line)
+	}
+	fmt.Printf("PERMS %d\n", len(out))
+}
+'''
+hints = [
+  "used[i] = true, recurse, used[i] = false. That is try-recurse-undo, and the undo is not optional.",
+  "chosen is built with append and passed down; the capacity was reserved up front so the append does not surprise you.",
+  "The base case is len(chosen) == len(nums) — a full arrangement, not an empty one.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n", expect = "1 2 3\n1 3 2\n2 1 3\n2 3 1\n3 1 2\n3 2 1\nPERMS 6\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",     expect = "5\nPERMS 1\n",                                        visible = false },
+  { name = "two",   stdin = "2\n-1 4\n",  expect = "-1 4\n4 -1\nPERMS 2\n",                               visible = false },
+  { name = "four",  stdin = "4\n1 2 3 4\n", expect = "1 2 3 4\n1 2 4 3\n1 3 2 4\n1 3 4 2\n1 4 2 3\n1 4 3 2\n2 1 3 4\n2 1 4 3\n2 3 1 4\n2 3 4 1\n2 4 1 3\n2 4 3 1\n3 1 2 4\n3 1 4 2\n3 2 1 4\n3 2 4 1\n3 4 1 2\n3 4 2 1\n4 1 2 3\n4 1 3 2\n4 2 1 3\n4 2 3 1\n4 3 1 2\n4 3 2 1\nPERMS 24\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id           = "go.hacker.14.word-search"
+node         = 14
+title        = "IS THE WORD IN THE GRID"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A board of letters and a name. They want to know whether the name is written in it, and they want the count of dead ends."
+concepts     = ["backtracking", "matrix", "graphs"]
+requires     = ["go.hacker.13.permutations"]
+map          = { x = 0.273, y = 0.598, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are a grid of lowercase letters. The
+last line is the word.
+
+The word is in the grid if you can spell it by moving up, down, left or right
+between **adjacent** cells, never using the same cell twice in one attempt.
+
+Print `FOUND` or `ABSENT`, then `STARTS <k>`: how many cells hold the word's
+first letter.
+
+```
+input:  3 4
+        abce
+        sfcs
+        adee
+        abcced
+output: FOUND
+        STARTS 2
+```
+
+Mark the cell used on the way in and **unmark it on the way out**. A cell
+that stays marked after a failed branch makes later branches fail for a reason
+that is not in the grid.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func search(grid [][]byte, r, c int, word []byte, at int) bool {
+	_ = grid
+	_ = r
+	_ = c
+	_ = word
+	_ = at
+	return false
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var rows, cols int
+	fmt.Fscan(reader, &rows, &cols)
+	grid := make([][]byte, rows)
+	for i := range grid {
+		var line string
+		fmt.Fscan(reader, &line)
+		grid[i] = []byte(line)
+	}
+	var word string
+	fmt.Fscan(reader, &word)
+
+	starts := 0
+	_ = search(grid, 0, 0, []byte(word), 0)
+	_ = cols
+
+	fmt.Println("ABSENT")
+	fmt.Printf("STARTS %d\n", starts)
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func search(grid [][]byte, r, c int, word []byte, at int) bool {
+	if grid[r][c] != word[at] {
+		return false
+	}
+	if at+1 == len(word) {
+		return true
+	}
+
+	here := grid[r][c]
+	grid[r][c] = '#'
+	defer func() { grid[r][c] = here }()
+
+	rows, cols := len(grid), len(grid[0])
+	if r > 0 && search(grid, r-1, c, word, at+1) {
+		return true
+	}
+	if r+1 < rows && search(grid, r+1, c, word, at+1) {
+		return true
+	}
+	if c > 0 && search(grid, r, c-1, word, at+1) {
+		return true
+	}
+	if c+1 < cols && search(grid, r, c+1, word, at+1) {
+		return true
+	}
+	return false
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var rows, cols int
+	fmt.Fscan(reader, &rows, &cols)
+	grid := make([][]byte, rows)
+	for i := range grid {
+		var line string
+		fmt.Fscan(reader, &line)
+		grid[i] = []byte(line)
+	}
+	var word string
+	fmt.Fscan(reader, &word)
+	letters := []byte(word)
+
+	starts := 0
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			if grid[r][c] == letters[0] {
+				starts++
+			}
+		}
+	}
+
+	found := false
+	for r := 0; r < rows && !found; r++ {
+		for c := 0; c < cols && !found; c++ {
+			if search(grid, r, c, letters, 0) {
+				found = true
+			}
+		}
+	}
+
+	if found {
+		fmt.Println("FOUND")
+	} else {
+		fmt.Println("ABSENT")
+	}
+	fmt.Printf("STARTS %d\n", starts)
+}
+'''
+hints = [
+  "defer is the tidy way to guarantee the unmark happens on every return path out of the function.",
+  "Count the starting letters in a separate pass before you search, or the '#' marks will confuse the count.",
+  "The success base case is at+1 == len(word) — checked after matching this cell, not before.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3 4\nabce\nsfcs\nadee\nabcced\n", expect = "FOUND\nSTARTS 2\n",  visible = true },
+  { name = "absent", stdin = "3 4\nabce\nsfcs\nadee\nabcb\n",   expect = "ABSENT\nSTARTS 2\n", visible = false },
+  { name = "reuse",  stdin = "1 3\naba\naba\n",                 expect = "FOUND\nSTARTS 2\n",  visible = false },
+  { name = "single", stdin = "1 1\na\na\n",                     expect = "FOUND\nSTARTS 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id           = "go.hacker.15.topo-sort"
+node         = 15
+title        = "WHAT ORDER DOES IT BUILD IN"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Eleven packages and a dependency graph. Name a build order, or name the fact that there is not one."
+concepts     = ["graphs", "stacks-queues", "sorting"]
+requires     = ["go.hacker.14.word-search"]
+map          = { x = 0.378, y = 0.681, kind = "quest" }
+brief        = '''
+Line one is `n m`: `n` tasks numbered `0..n-1` and `m` edges. The next `m`
+lines are `<a> <b>`, meaning `a` must be built before `b`.
+
+Print a build order on one line, space separated. When several tasks are ready
+at once, take the **lowest numbered** one, so the answer is unique. If no
+order exists, print `CYCLE` instead. Then print `DONE <how many you ordered>`.
+
+```
+input:  4 4
+        0 1
+        0 2
+        1 3
+        2 3
+output: 0 1 2 3
+        DONE 4
+```
+
+Kahn's algorithm: count how many things each task waits on, start with the
+ones waiting on nothing, and when you take a task, decrement its dependents.
+If you finish with tasks left over, those tasks are in a cycle.
+
+The ready set is kept sorted here because `n` is small and it reads clearly.
+A heap is the answer for a real `n`, and node 12 already built one.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, m int
+	fmt.Fscan(reader, &n, &m)
+
+	after := make([][]int, n)
+	waiting := make([]int, n)
+	for e := 0; e < m; e++ {
+		var a, b int
+		fmt.Fscan(reader, &a, &b)
+		after[a] = append(after[a], b)
+		waiting[b]++
+	}
+
+	order := make([]int, 0, n)
+
+	// seed with everything waiting on nothing, always take the smallest
+	_ = after
+	_ = waiting
+
+	fmt.Println("CYCLE")
+	fmt.Printf("DONE %d\n", len(order))
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, m int
+	fmt.Fscan(reader, &n, &m)
+
+	after := make([][]int, n)
+	waiting := make([]int, n)
+	for e := 0; e < m; e++ {
+		var a, b int
+		fmt.Fscan(reader, &a, &b)
+		after[a] = append(after[a], b)
+		waiting[b]++
+	}
+
+	ready := make([]int, 0, n)
+	for task := 0; task < n; task++ {
+		if waiting[task] == 0 {
+			ready = append(ready, task)
+		}
+	}
+
+	order := make([]int, 0, n)
+	for len(ready) > 0 {
+		sort.Ints(ready)
+		task := ready[0]
+		ready = ready[1:]
+		order = append(order, task)
+		for _, next := range after[task] {
+			waiting[next]--
+			if waiting[next] == 0 {
+				ready = append(ready, next)
+			}
+		}
+	}
+
+	if len(order) < n {
+		fmt.Println("CYCLE")
+	} else {
+		parts := make([]string, len(order))
+		for i, task := range order {
+			parts[i] = strconv.Itoa(task)
+		}
+		fmt.Println(strings.Join(parts, " "))
+	}
+	fmt.Printf("DONE %d\n", len(order))
+}
+'''
+hints = [
+  "waiting[b] is the in-degree of b — how many edges point at it.",
+  "A plain queue gives *an* order; taking the smallest ready task gives *the* order the statement asks for.",
+  "You never detect the cycle directly. You notice that fewer than n tasks came out.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "diamond", stdin = "4 4\n0 1\n0 2\n1 3\n2 3\n", expect = "0 1 2 3\nDONE 4\n",   visible = true },
+  { name = "cycle",   stdin = "3 3\n0 1\n1 2\n2 0\n",      expect = "CYCLE\nDONE 0\n",     visible = false },
+  { name = "loose",   stdin = "3 0\n",                     expect = "0 1 2\nDONE 3\n",     visible = false },
+  { name = "chain",   stdin = "5 4\n4 3\n3 2\n2 1\n1 0\n", expect = "4 3 2 1 0\nDONE 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id           = "go.hacker.16.union-find"
+node         = 16
+title        = "WHO IS CONNECTED TO WHOM"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The tram network, the MTR and the minibus routes on one sheet. How many separate networks are there really."
+concepts     = ["disjoint-set", "graphs", "complexity"]
+requires     = ["go.hacker.15.topo-sort"]
+map          = { x = 0.617, y = 0.585, kind = "quest" }
+brief        = '''
+Line one is `n m`: `n` stops numbered `0..n-1`, `m` undirected links. The next
+`m` lines are `<a> <b>`.
+
+Print three lines: how many separate networks there are, the size of the
+largest, and `REDUNDANT <k>` — how many links joined two stops that were
+already connected.
+
+```
+input:  6 4
+        0 1
+        1 2
+        3 4
+        0 2
+output: 3
+        3
+        REDUNDANT 1
+```
+
+Union-find: every stop points at a parent, `find` walks to the root, `union`
+points one root at the other. Compress the path on the way back out of `find`
+and it is effectively constant time per query.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func find(parent []int, x int) int {
+	// walk to the root, and flatten what you walked over
+	_ = parent
+	return x
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, m int
+	fmt.Fscan(reader, &n, &m)
+
+	parent := make([]int, n)
+	size := make([]int, n)
+	for i := range parent {
+		parent[i] = i
+		size[i] = 1
+	}
+	redundant := 0
+
+	for e := 0; e < m; e++ {
+		var a, b int
+		fmt.Fscan(reader, &a, &b)
+		_ = find(parent, a)
+		_ = find(parent, b)
+	}
+
+	fmt.Println(n)
+	fmt.Println(1)
+	fmt.Printf("REDUNDANT %d\n", redundant)
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func find(parent []int, x int) int {
+	root := x
+	for parent[root] != root {
+		root = parent[root]
+	}
+	// path compression: point everything we walked over straight at the root
+	for parent[x] != root {
+		next := parent[x]
+		parent[x] = root
+		x = next
+	}
+	return root
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, m int
+	fmt.Fscan(reader, &n, &m)
+
+	parent := make([]int, n)
+	size := make([]int, n)
+	for i := range parent {
+		parent[i] = i
+		size[i] = 1
+	}
+	groups := n
+	redundant := 0
+
+	for e := 0; e < m; e++ {
+		var a, b int
+		fmt.Fscan(reader, &a, &b)
+		ra, rb := find(parent, a), find(parent, b)
+		if ra == rb {
+			redundant++
+			continue
+		}
+		// hang the smaller tree under the bigger one
+		if size[ra] < size[rb] {
+			ra, rb = rb, ra
+		}
+		parent[rb] = ra
+		size[ra] += size[rb]
+		groups--
+	}
+
+	largest := 0
+	for i := 0; i < n; i++ {
+		if parent[i] == i && size[i] > largest {
+			largest = size[i]
+		}
+	}
+
+	fmt.Println(groups)
+	fmt.Println(largest)
+	fmt.Printf("REDUNDANT %d\n", redundant)
+}
+'''
+hints = [
+  "Start with every stop as its own parent and n groups; each successful union drops the count by one.",
+  "An edge whose two ends already have the same root is the redundant one — count it and move on.",
+  "Only a root's size entry is meaningful, so read the largest off the roots, not off every index.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "6 4\n0 1\n1 2\n3 4\n0 2\n", expect = "3\n3\nREDUNDANT 1\n", visible = true },
+  { name = "islands",   stdin = "4 0\n",                     expect = "4\n1\nREDUNDANT 0\n", visible = false },
+  { name = "one-net",   stdin = "3 2\n0 1\n1 2\n",           expect = "1\n3\nREDUNDANT 0\n", visible = false },
+  { name = "all-dupes", stdin = "2 3\n0 1\n0 1\n1 0\n",      expect = "1\n2\nREDUNDANT 2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id           = "go.hacker.17.coins"
+node         = 17
+title        = "EXACT CHANGE"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The Percival Street till has three coin trays and a customer who will not take a note."
+concepts     = ["dynamic-programming", "complexity", "slices"]
+requires     = ["go.hacker.16.union-find"]
+map          = { x = 0.723, y = 0.665, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` coin values, each available in
+unlimited quantity.
+
+Print the smallest number of coins that makes `target` exactly, or `-1` if it
+cannot be made. Then print `REACH <k>`: how many of the amounts `0..target`
+can be made at all, counting `0`.
+
+```
+input:  3 11
+        1 2 5
+output: 3
+        REACH 12
+```
+
+The hidden cases are small, so what they catch is wrongness rather than
+slowness — and one of them catches the usual wrong answer. Greedy, taking the
+biggest coin that fits and repeating, makes `6` out of `3 4` by grabbing the
+`4` and then failing, and there is a case for exactly that.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, target int
+	fmt.Fscan(reader, &n, &target)
+	coins := make([]int, n)
+	for i := range coins {
+		fmt.Fscan(reader, &coins[i])
+	}
+
+	const unreachable = 1 << 30
+	best := make([]int, target+1)
+
+	// best[0] is 0; every other amount is one more than the cheapest
+	// reachable amount a coin below it
+	_ = best
+	_ = coins
+	fmt.Println(-1)
+	fmt.Println("REACH 0")
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, target int
+	fmt.Fscan(reader, &n, &target)
+	coins := make([]int, n)
+	for i := range coins {
+		fmt.Fscan(reader, &coins[i])
+	}
+
+	const unreachable = 1 << 30
+	best := make([]int, target+1)
+	for i := range best {
+		best[i] = unreachable
+	}
+	best[0] = 0
+
+	for amount := 1; amount <= target; amount++ {
+		for _, coin := range coins {
+			if coin <= amount && best[amount-coin] != unreachable {
+				if candidate := best[amount-coin] + 1; candidate < best[amount] {
+					best[amount] = candidate
+				}
+			}
+		}
+	}
+
+	reach := 0
+	for _, v := range best {
+		if v != unreachable {
+			reach++
+		}
+	}
+
+	if best[target] == unreachable {
+		fmt.Println(-1)
+	} else {
+		fmt.Println(best[target])
+	}
+	fmt.Printf("REACH %d\n", reach)
+}
+'''
+hints = [
+  "best[0] = 0, and best[a] is one more than the cheapest best[a - coin] over every coin that fits.",
+  "Guard against reading an unreachable cell before you add one to it.",
+  "REACH is how many cells of the finished table are not still marked unreachable.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "3 11\n1 2 5\n", expect = "3\nREACH 12\n", visible = true },
+  { name = "impossible", stdin = "1 3\n2\n",      expect = "-1\nREACH 2\n", visible = false },
+  { name = "not-greedy", stdin = "2 6\n3 4\n",    expect = "2\nREACH 4\n",  visible = false },
+  { name = "zero",       stdin = "3 0\n1 2 5\n",  expect = "0\nREACH 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id           = "go.hacker.18.kadane"
+node         = 18
+title        = "THE BEST STRETCH"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A year of daily profit and loss. Which run of consecutive days made the most, and how many runs broke exactly even."
+concepts     = ["dynamic-programming", "prefix-sums", "complexity"]
+requires     = ["go.hacker.17.coins"]
+map          = { x = 0.939, y = 0.580, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers, which may be negative.
+
+Print three lines:
+
+1. the largest sum of a **non-empty** contiguous run
+2. `AT <start> <end>`, the 1-based bounds of that run — if several tie, the
+   one that is found first scanning left to right
+3. `ZERO <k>`, how many contiguous runs sum to exactly `0`
+
+```
+input:  9
+        -2 1 -3 4 -1 2 1 -5 4
+output: 6
+        AT 4 7
+        ZERO 3
+```
+
+Two different one-pass ideas in one quest. The maximum run is Kadane: carry a
+running sum, and throw it away the moment it goes negative, because a negative
+prefix can only hurt whatever comes next.
+
+The zero-sum count is **not** a window — negative values mean a run that is
+too big cannot be fixed by shrinking it. It is prefix sums: a run sums to zero
+exactly when two prefix sums are equal, so count the repeats. Seed the map
+with `0` seen once, for runs that start at the beginning.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	seen := map[int64]int{0: 1}
+
+	// Kadane for the best run; prefix sums and `seen` for the zero count
+	_ = seen
+	_ = nums
+	fmt.Println(0)
+	fmt.Println("AT 0 0")
+	fmt.Println("ZERO 0")
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	best, bestStart, bestEnd := nums[0], 0, 0
+	current, currentStart := nums[0], 0
+	for i := 1; i < n; i++ {
+		if current < 0 {
+			current = nums[i]
+			currentStart = i
+		} else {
+			current += nums[i]
+		}
+		if current > best {
+			best = current
+			bestStart = currentStart
+			bestEnd = i
+		}
+	}
+
+	seen := map[int64]int{0: 1}
+	var prefix int64
+	zero := 0
+	for _, value := range nums {
+		prefix += value
+		zero += seen[prefix]
+		seen[prefix]++
+	}
+
+	fmt.Println(best)
+	fmt.Printf("AT %d %d\n", bestStart+1, bestEnd+1)
+	fmt.Printf("ZERO %d\n", zero)
+}
+'''
+hints = [
+  "Start Kadane at nums[0], not at 0, or an all-negative list answers 0 and the run is empty.",
+  "Reset the run start whenever you throw the running sum away, and only record the bounds when you strictly beat the best.",
+  "For the zero count, look the prefix up before you record it, or every prefix finds itself.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "9\n-2 1 -3 4 -1 2 1 -5 4\n", expect = "6\nAT 4 7\nZERO 3\n",  visible = true },
+  { name = "all-neg",  stdin = "1\n-5\n",                    expect = "-5\nAT 1 1\nZERO 0\n", visible = false },
+  { name = "zeroes",   stdin = "3\n0 0 0\n",                 expect = "0\nAT 1 1\nZERO 6\n",  visible = false },
+  { name = "all-pos",  stdin = "5\n1 2 3 4 5\n",             expect = "15\nAT 1 5\nZERO 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id           = "go.hacker.19.edit-distance"
+node         = 19
+title        = "HOW FAR APART"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Two spellings of the same street on two different signs. How many single-character edits between them."
+concepts     = ["dynamic-programming", "strings", "matrix"]
+requires     = ["go.hacker.18.kadane"]
+map          = { x = 0.894, y = 0.925, kind = "quest" }
+brief        = '''
+Two lines, one lowercase word each.
+
+Print the **edit distance**: the fewest single-character insertions,
+deletions or substitutions that turn the first into the second. Then print
+`LCS <k>`, the length of their longest common subsequence.
+
+```
+input:  horse
+        ros
+output: 3
+        LCS 2
+```
+
+Two tables over the same two strings, both the same three-line recurrence with
+a different tie-break. Row `0` and column `0` are not zero for the edit table —
+they are the cost of deleting or inserting everything.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var first, second string
+	fmt.Fscan(reader, &first)
+	fmt.Fscan(reader, &second)
+	a, b := []byte(first), []byte(second)
+
+	edit := make([][]int, len(a)+1)
+	lcs := make([][]int, len(a)+1)
+	for i := range edit {
+		edit[i] = make([]int, len(b)+1)
+		lcs[i] = make([]int, len(b)+1)
+	}
+
+	// fill both tables; the answers are the bottom-right corners
+	_ = edit
+	_ = lcs
+	fmt.Println(0)
+	fmt.Println("LCS 0")
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func min3(a, b, c int) int {
+	if b < a {
+		a = b
+	}
+	if c < a {
+		a = c
+	}
+	return a
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var first, second string
+	fmt.Fscan(reader, &first)
+	fmt.Fscan(reader, &second)
+	a, b := []byte(first), []byte(second)
+
+	edit := make([][]int, len(a)+1)
+	lcs := make([][]int, len(a)+1)
+	for i := range edit {
+		edit[i] = make([]int, len(b)+1)
+		lcs[i] = make([]int, len(b)+1)
+	}
+	for i := 0; i <= len(a); i++ {
+		edit[i][0] = i
+	}
+	for j := 0; j <= len(b); j++ {
+		edit[0][j] = j
+	}
+
+	for i := 1; i <= len(a); i++ {
+		for j := 1; j <= len(b); j++ {
+			if a[i-1] == b[j-1] {
+				edit[i][j] = edit[i-1][j-1]
+				lcs[i][j] = lcs[i-1][j-1] + 1
+				continue
+			}
+			edit[i][j] = 1 + min3(edit[i-1][j-1], edit[i-1][j], edit[i][j-1])
+			if lcs[i-1][j] > lcs[i][j-1] {
+				lcs[i][j] = lcs[i-1][j]
+			} else {
+				lcs[i][j] = lcs[i][j-1]
+			}
+		}
+	}
+
+	fmt.Println(edit[len(a)][len(b)])
+	fmt.Printf("LCS %d\n", lcs[len(a)][len(b)])
+}
+'''
+hints = [
+  "edit[i][0] = i and edit[0][j] = j: turning a prefix into nothing costs one deletion per character.",
+  "Matching characters cost nothing and step diagonally; a mismatch costs one and takes the cheapest of the three neighbours.",
+  "LCS is the same walk with max instead of min, and no diagonal step on a mismatch.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "horse\nros\n",         expect = "3\nLCS 2\n", visible = true },
+  { name = "same",    stdin = "causeway\ncauseway\n", expect = "0\nLCS 8\n", visible = false },
+  { name = "nothing", stdin = "abc\nxyz\n",           expect = "3\nLCS 0\n", visible = false },
+  { name = "insert",  stdin = "mtr\nmetro\n",         expect = "2\nLCS 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id           = "go.hacker.20.lis"
+node         = 20
+title        = "THE LONGEST RUN UP"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A year of daily takings again. This time they want the longest stretch of improving days, and they do not have to be consecutive."
+concepts     = ["dynamic-programming", "binary-search", "complexity"]
+requires     = ["go.hacker.19.edit-distance"]
+map          = { x = 0.778, y = 0.876, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+Print the length of the longest **strictly increasing subsequence** — order
+kept, adjacency not required. Then print `TAILS <k>`, the same number read off
+the pile count.
+
+```
+input:  8
+        10 9 2 5 3 7 101 18
+output: 4
+        TAILS 4
+```
+
+The `O(n²)` table is the one to be able to write cold. The `O(n log n)` one
+keeps, for each length, the smallest value a subsequence of that length can
+end on — a slice that is always sorted, so placing a new value is a binary
+search. Either passes here; the cases are small and say so. Write the second
+one anyway, because the follow-up is always "and faster?".
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	tails := make([]int64, 0, n)
+
+	// for each value, find where it belongs among the pile tops and put it there
+	_ = tails
+	_ = nums
+	fmt.Println(0)
+	fmt.Println("TAILS 0")
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	// tails[i] = the smallest value an increasing subsequence of length i+1
+	// can end on. It is sorted, always.
+	tails := make([]int64, 0, n)
+	for _, value := range nums {
+		low, high := 0, len(tails)
+		for low < high {
+			mid := low + (high-low)/2
+			if tails[mid] < value {
+				low = mid + 1
+			} else {
+				high = mid
+			}
+		}
+		if low == len(tails) {
+			tails = append(tails, value)
+		} else {
+			tails[low] = value
+		}
+	}
+
+	fmt.Println(len(tails))
+	fmt.Printf("TAILS %d\n", len(tails))
+}
+'''
+hints = [
+  "tails is not a subsequence. Its length is the answer; its contents are only the best ending values.",
+  "Strictly increasing means you replace the first tail that is >= value, so the search condition is tails[mid] < value.",
+  "Running off the end of tails means this value extends the longest run so far — append it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "8\n10 9 2 5 3 7 101 18\n", expect = "4\nTAILS 4\n", visible = true },
+  { name = "descending", stdin = "4\n5 4 3 2\n",             expect = "1\nTAILS 1\n", visible = false },
+  { name = "flat",       stdin = "5\n7 7 7 7 7\n",           expect = "1\nTAILS 1\n", visible = false },
+  { name = "ascending",  stdin = "6\n1 2 3 4 5 6\n",         expect = "6\nTAILS 6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id           = "go.hacker.21.bits"
+node         = 21
+title        = "THE ONE THAT IS ALONE"
+difficulty   = 4
+time_limit_s = 900
+story        = "Every docket is scanned twice except one. They will not let you use a map and they will not let you sort."
+concepts     = ["bit-manipulation", "math", "complexity"]
+requires     = ["go.hacker.20.lis"]
+map          = { x = 0.553, y = 0.921, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` non-negative integers, in which every value
+appears exactly twice except one.
+
+Print four lines:
+
+1. the value that appears once, found with **xor** and constant extra space
+2. how many `1` bits are set in it
+3. `POW2 YES` if it is a power of two, `POW2 NO` otherwise (`0` is not)
+4. the value with its lowest set bit cleared, or `0` if it has none
+
+```
+input:  5
+        4 1 2 1 2
+output: 4
+        1
+        POW2 YES
+        0
+```
+
+`x ^ x == 0` and `x ^ 0 == x`, and xor does not care what order it happens in.
+That is the whole first line. `x & (x - 1)` clears the lowest set bit, which
+gives the third and fourth lines for free.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	nums := make([]uint64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	var alone uint64
+
+	// xor everything together, then read the bits off the result
+	_ = nums
+	fmt.Println(alone)
+	fmt.Println(0)
+	fmt.Println("POW2 NO")
+	fmt.Println(0)
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	nums := make([]uint64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	var alone uint64
+	for _, value := range nums {
+		alone ^= value
+	}
+
+	bits := 0
+	for walk := alone; walk != 0; walk &= walk - 1 {
+		bits++
+	}
+
+	powerOfTwo := alone != 0 && alone&(alone-1) == 0
+	var cleared uint64
+	if alone != 0 {
+		cleared = alone & (alone - 1)
+	}
+
+	fmt.Println(alone)
+	fmt.Println(bits)
+	if powerOfTwo {
+		fmt.Println("POW2 YES")
+	} else {
+		fmt.Println("POW2 NO")
+	}
+	fmt.Println(cleared)
+}
+'''
+hints = [
+  "The pairs cancel themselves out whatever order they arrive in, so one fold over the slice is enough.",
+  "Counting bits by clearing the lowest one each time runs once per set bit, not once per bit width.",
+  "A power of two has exactly one bit set, so clearing the lowest leaves zero — and zero itself has to be excluded by hand.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n4 1 2 1 2\n",    expect = "4\n1\nPOW2 YES\n0\n",    visible = true },
+  { name = "seven",  stdin = "3\n7 9 9\n",        expect = "7\n3\nPOW2 NO\n6\n",     visible = false },
+  { name = "single", stdin = "1\n0\n",            expect = "0\n0\nPOW2 NO\n0\n",     visible = false },
+  { name = "big",    stdin = "5\n1024 5 5 8 8\n", expect = "1024\n1\nPOW2 YES\n0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id           = "go.hacker.22.matrix"
+node         = 22
+title        = "TURN THE FLOOR PLAN"
+difficulty   = 4
+time_limit_s = 900
+story        = "The plan is the wrong way up and there is no room on the table for a second copy of it."
+concepts     = ["matrix", "slices", "iteration"]
+requires     = ["go.hacker.21.bits"]
+map          = { x = 0.453, y = 0.879, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are an `n × n` grid of integers.
+
+Print the grid rotated **90° clockwise**, `n` lines of space-separated values.
+Then print the original grid's values in **spiral order** — outer ring
+clockwise from the top left, inwards — on one line.
+
+```
+input:  3
+        1 2 3
+        4 5 6
+        7 8 9
+output: 7 4 1
+        8 5 2
+        9 6 3
+        1 2 3 6 9 8 7 4 5
+```
+
+The rotation is the one to do in place: transpose, then reverse each row.
+Naming that out loud is half the question.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	grid := make([][]int64, n)
+	for r := range grid {
+		grid[r] = make([]int64, n)
+		for c := range grid[r] {
+			fmt.Fscan(reader, &grid[r][c])
+		}
+	}
+
+	// transpose, reverse each row, print; then walk the spiral of the original
+	_ = grid
+	for i := 0; i < n; i++ {
+		fmt.Println("?")
+	}
+	fmt.Println("?")
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	original := make([][]int64, n)
+	for r := range original {
+		original[r] = make([]int64, n)
+		for c := range original[r] {
+			fmt.Fscan(reader, &original[r][c])
+		}
+	}
+
+	grid := make([][]int64, n)
+	for r := range grid {
+		grid[r] = append([]int64(nil), original[r]...)
+	}
+	for r := 0; r < n; r++ {
+		for c := r + 1; c < n; c++ {
+			grid[r][c], grid[c][r] = grid[c][r], grid[r][c]
+		}
+	}
+	for r := range grid {
+		for i, j := 0, n-1; i < j; i, j = i+1, j-1 {
+			grid[r][i], grid[r][j] = grid[r][j], grid[r][i]
+		}
+	}
+	for _, row := range grid {
+		parts := make([]string, n)
+		for i, v := range row {
+			parts[i] = strconv.FormatInt(v, 10)
+		}
+		fmt.Println(strings.Join(parts, " "))
+	}
+
+	spiral := make([]string, 0, n*n)
+	top, bottom, left, right := 0, n-1, 0, n-1
+	for top <= bottom && left <= right {
+		for c := left; c <= right; c++ {
+			spiral = append(spiral, strconv.FormatInt(original[top][c], 10))
+		}
+		top++
+		for r := top; r <= bottom; r++ {
+			spiral = append(spiral, strconv.FormatInt(original[r][right], 10))
+		}
+		right--
+		if top <= bottom {
+			for c := right; c >= left; c-- {
+				spiral = append(spiral, strconv.FormatInt(original[bottom][c], 10))
+			}
+			bottom--
+		}
+		if left <= right {
+			for r := bottom; r >= top; r-- {
+				spiral = append(spiral, strconv.FormatInt(original[r][left], 10))
+			}
+			left++
+		}
+	}
+	fmt.Println(strings.Join(spiral, " "))
+}
+'''
+hints = [
+  "Transpose by swapping only above the diagonal — c starting at r + 1 — or you swap everything back.",
+  "The spiral wants the original grid, so copy before you rotate. append([]int64(nil), row...) is the one-line row copy.",
+  "The two `if` guards inside the spiral loop are what stop a single middle row or column being walked twice.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n4 5 6\n7 8 9\n", expect = "7 4 1\n8 5 2\n9 6 3\n1 2 3 6 9 8 7 4 5\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",                   expect = "5\n5\n",                                   visible = false },
+  { name = "two",   stdin = "2\n1 2\n3 4\n",            expect = "3 1\n4 2\n1 2 4 3\n",                      visible = false },
+  { name = "four",  stdin = "4\n1 2 3 4\n5 6 7 8\n9 10 11 12\n13 14 15 16\n", expect = "13 9 5 1\n14 10 6 2\n15 11 7 3\n16 12 8 4\n1 2 3 4 8 12 16 15 14 13 9 5 6 7 11 10\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id           = "go.hacker.23.trie"
+node         = 23
+title        = "THE PREFIX BOX"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Autocomplete for the stop board — the honest kind, that only completes what is actually on the list."
+concepts     = ["tries", "strings", "collections"]
+requires     = ["go.hacker.22.matrix"]
+map          = { x = 0.212, y = 0.929, kind = "quest" }
+brief        = '''
+Line one is `n q`. The next `n` lines are lowercase words to insert. The next
+`q` lines are queries, each `WORD <s>` or `PREFIX <s>`.
+
+Build a trie and answer:
+
+* `WORD <s>` → `YES` if `s` was inserted, `NO` otherwise
+* `PREFIX <s>` → how many inserted words start with `s`
+
+Then print `NODES <k>`, the number of nodes including the root.
+
+```
+input:  3 3
+        tram
+        tramway
+        train
+        WORD tram
+        PREFIX tra
+        WORD tra
+output: YES
+        3
+        NO
+        NODES 10
+```
+
+Keep a count on every node of how many inserted words pass through it, and
+`PREFIX` is a walk with no counting at the end.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type node struct {
+	children [26]int
+	through  int
+	terminal bool
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, q int
+	fmt.Fscan(reader, &n, &q)
+
+	// index 0 is the root; 0 in `children` means "no child", since the root
+	// can never be a child
+	nodes := []node{{}}
+
+	for i := 0; i < n; i++ {
+		var word string
+		fmt.Fscan(reader, &word)
+		// walk down, creating nodes as needed, bumping `through`
+	}
+
+	for i := 0; i < q; i++ {
+		var kind, text string
+		fmt.Fscan(reader, &kind, &text)
+		fmt.Println("NO")
+	}
+	fmt.Printf("NODES %d\n", len(nodes))
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type node struct {
+	children [26]int
+	through  int
+	terminal bool
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, q int
+	fmt.Fscan(reader, &n, &q)
+
+	// index 0 is the root; 0 in `children` means "no child", since the root
+	// can never be a child
+	nodes := []node{{}}
+
+	for i := 0; i < n; i++ {
+		var word string
+		fmt.Fscan(reader, &word)
+		at := 0
+		for j := 0; j < len(word); j++ {
+			slot := word[j] - 'a'
+			next := nodes[at].children[slot]
+			if next == 0 {
+				nodes = append(nodes, node{})
+				next = len(nodes) - 1
+				nodes[at].children[slot] = next
+			}
+			nodes[next].through++
+			at = next
+		}
+		nodes[at].terminal = true
+	}
+
+	for i := 0; i < q; i++ {
+		var kind, text string
+		fmt.Fscan(reader, &kind, &text)
+
+		at, alive := 0, true
+		for j := 0; j < len(text) && alive; j++ {
+			next := nodes[at].children[text[j]-'a']
+			if next == 0 {
+				alive = false
+				break
+			}
+			at = next
+		}
+
+		if kind == "WORD" {
+			if alive && nodes[at].terminal {
+				fmt.Println("YES")
+			} else {
+				fmt.Println("NO")
+			}
+			continue
+		}
+		if alive {
+			fmt.Println(nodes[at].through)
+		} else {
+			fmt.Println(0)
+		}
+	}
+
+	fmt.Printf("NODES %d\n", len(nodes))
+}
+'''
+hints = [
+  "One slice of nodes, children holding indices into it. Index 0 is the root, so 0 doubles as `no child`.",
+  "`through` is bumped on the node you step onto, so the root never counts itself.",
+  "A query that falls off the trie answers NO and 0 without a special case — carry a flag and stop walking.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 3\ntram\ntramway\ntrain\nWORD tram\nPREFIX tra\nWORD tra\n", expect = "YES\n3\nNO\nNODES 10\n", visible = true },
+  { name = "missing", stdin = "1 2\nmtr\nPREFIX z\nWORD mtr\n",                               expect = "0\nYES\nNODES 4\n",      visible = false },
+  { name = "nested",  stdin = "2 2\na\nab\nPREFIX a\nWORD a\n",                               expect = "2\nYES\nNODES 3\n",      visible = false },
+  { name = "shared",  stdin = "2 1\nhku\nhk\nPREFIX hk\n",                                    expect = "2\nNODES 4\n",           visible = false },
+]
+
+# ---------------------------------------------------------------- 24  BOSS
+[[quest]]
+id           = "go.hacker.24.lru"
+node         = 24
+title        = "THE CLOCK"
+difficulty   = 5
+time_limit_s = 1800
+story        = "Same room, last question, and the clock on the wall is the one they replaced with a shorter one."
+concepts     = ["collections", "linked-lists", "complexity"]
+requires     = ["go.hacker.23.trie", "go.hacker.12.heap"]
+map          = { x = 0.111, y = 0.884, kind = "boss" }
+brief        = '''
+Line one is `cap q`. The next `q` lines are `PUT <key> <value>` or
+`GET <key>`.
+
+Implement a fixed-capacity cache that evicts the **least recently used** entry
+when it is full. A `GET` and a `PUT` both count as using a key.
+
+For each `GET` print the value, or `-1` if it is absent. At the end print the
+surviving keys, most-recently-used first, space separated — or `-` if the
+cache is empty — then `EVICTED <k>`.
+
+```
+input:  2 6
+        PUT 1 10
+        PUT 2 20
+        GET 1
+        PUT 3 30
+        GET 2
+        GET 3
+output: 10
+        -1
+        30
+        3 1
+        EVICTED 1
+```
+
+Follow the sample through: `GET 1` makes `1` recent again, so when `PUT 3`
+needs room it is `2` that goes. `GET 2` misses. `GET 3` hits and makes `3` the
+most recent, which is why the survivors print as `3 1`.
+
+The textbook answer is a hash map into a **doubly linked list**, and Go has
+one in the standard library: `container/list`. `PushFront`, `MoveToFront`,
+`Back` and `Remove` are all O(1), so every operation here is O(1) and you can
+say so without hedging. The map holds `*list.Element`; the element's `Value`
+holds the key as well as the value, because eviction starts from the list and
+has to know which map entry to delete.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"container/list"
+	"fmt"
+	"os"
+)
+
+type pair struct {
+	key   int64
+	value int64
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var capacity, q int
+	fmt.Fscan(reader, &capacity, &q)
+
+	recent := list.New()
+	where := map[int64]*list.Element{}
+	evicted := 0
+
+	for i := 0; i < q; i++ {
+		var op string
+		var key int64
+		fmt.Fscan(reader, &op, &key)
+		if op == "GET" {
+			fmt.Println(-1)
+			continue
+		}
+		var value int64
+		fmt.Fscan(reader, &value)
+	}
+
+	_ = recent
+	_ = where
+	_ = capacity
+	fmt.Println("-")
+	fmt.Printf("EVICTED %d\n", evicted)
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"container/list"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+type pair struct {
+	key   int64
+	value int64
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var capacity, q int
+	fmt.Fscan(reader, &capacity, &q)
+
+	recent := list.New() // front is the most recently used
+	where := map[int64]*list.Element{}
+	evicted := 0
+
+	for i := 0; i < q; i++ {
+		var op string
+		var key int64
+		fmt.Fscan(reader, &op, &key)
+
+		if op == "GET" {
+			element, ok := where[key]
+			if !ok {
+				fmt.Println(-1)
+				continue
+			}
+			recent.MoveToFront(element)
+			fmt.Println(element.Value.(*pair).value)
+			continue
+		}
+
+		var value int64
+		fmt.Fscan(reader, &value)
+
+		if element, ok := where[key]; ok {
+			element.Value.(*pair).value = value
+			recent.MoveToFront(element)
+			continue
+		}
+		if recent.Len() == capacity {
+			oldest := recent.Back()
+			delete(where, oldest.Value.(*pair).key)
+			recent.Remove(oldest)
+			evicted++
+		}
+		where[key] = recent.PushFront(&pair{key: key, value: value})
+	}
+
+	if recent.Len() == 0 {
+		fmt.Println("-")
+	} else {
+		keys := make([]string, 0, recent.Len())
+		for element := recent.Front(); element != nil; element = element.Next() {
+			keys = append(keys, strconv.FormatInt(element.Value.(*pair).key, 10))
+		}
+		fmt.Println(strings.Join(keys, " "))
+	}
+	fmt.Printf("EVICTED %d\n", evicted)
+}
+'''
+hints = [
+  "The element's Value has to carry the key, or eviction from the back cannot find the map entry to delete.",
+  "Overwriting a key that is already present is not an eviction — check the map before you decide the cache is full.",
+  "Walking Front to Back is already most-recent-first, so the last line needs no sort.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "2 6\nPUT 1 10\nPUT 2 20\nGET 1\nPUT 3 30\nGET 2\nGET 3\n", expect = "10\n-1\n30\n3 1\nEVICTED 1\n", visible = true },
+  { name = "overwrite", stdin = "1 3\nPUT 5 1\nPUT 5 2\nGET 5\n",                           expect = "2\n5\nEVICTED 0\n",           visible = false },
+  { name = "miss",      stdin = "2 2\nGET 9\nGET 8\n",                                      expect = "-1\n-1\n-\nEVICTED 0\n",      visible = false },
+  { name = "churn",     stdin = "1 4\nPUT 1 1\nPUT 2 2\nPUT 3 3\nGET 1\n",                  expect = "-1\n3\nEVICTED 2\n",          visible = false },
 ]

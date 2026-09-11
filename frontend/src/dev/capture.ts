@@ -41,6 +41,17 @@ export interface CaptureApi {
   virtual(): [number, number];
   /** Device-pixel size of both canvases, for checking they actually match. */
   backing(): { game: [number, number]; fx: [number, number] };
+  /**
+   * Frames per second, averaged over the last two seconds of *real* frames.
+   *
+   * Read it in a separate call from whatever set the screen up, and never while
+   * frozen. A driver that navigates and then measures in the same evaluation
+   * gets the frame rate of a starved tab, which is a number that says nothing
+   * about the machine.
+   */
+  fps(): number;
+  /** Turn the tube on or off from a script, for a shot of each. */
+  crt(on?: boolean): boolean;
 }
 
 /**
@@ -152,6 +163,13 @@ export function install(app: App): void {
       game: [app.canvas.width, app.canvas.height],
       fx: [app.fx.width, app.fx.height],
     }),
+    fps: () => app.fps(),
+    crt: (on?: boolean) => {
+      if (on !== undefined && on !== app.crt.enabled) app.toggleCrt();
+      else if (on === undefined) app.toggleCrt();
+      if (app.isFrozen) app.tick(STEP);
+      return app.crt.enabled;
+    },
   };
 
   (globalThis as Record<string, unknown>).__cwbCapture = api;

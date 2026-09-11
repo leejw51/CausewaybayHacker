@@ -20,6 +20,19 @@
 #   * NEVER ask for lettering. Grok cannot spell. Every word the player reads
 #     is printed by the engine in Press Start 2P, over the art, including the
 #     word on the CLEARED stamp — see docs/design-review.md.
+#   * NEVER ask for magenta, hot pink, fuchsia or rose IN THE ARTWORK of a
+#     sprite. Learned the hard way on `neon_signs` and `fg_wires`: asked for a
+#     hot pink sign, Grok painted it in (252,35,176) — the studio backdrop's
+#     own colour — and the knockout removed it, because those are the same
+#     pixels and no predicate can tell them apart. A sprite that wants a pink
+#     uses crimson or violet, or the whole thing is shot on the lime backdrop
+#     that process.py also keys (`is_bg`). Backgrounds are unaffected: they are
+#     never keyed.
+#   * A STRIP is one render, cut up afterwards. `walk_mei` is four figures in a
+#     single 3:2 image; art/tools/strip.py takes the largest N ink components
+#     left to right and bottom-aligns them on a common row. Asking Grok for a
+#     neat grid does not work; asking for "a row, evenly spaced, never
+#     touching, identical height and colours" does.
 #
 # `rerolls` is how many generations that asset took before one was accepted.
 # It is the useful number for whoever runs the next batch.
@@ -82,9 +95,9 @@ kind = "bg"
 aspect = "2:3"
 size = [768, 1152]
 generated = "2026-09-11"
-rerolls = 1
+rerolls = 2
 prompt = """\
-16-bit SNES overworld world map in the style of the Super Mario World world map screen, TALL PORTRAIT composition, three-quarter top-down bird's eye view of a night-time toy diorama town. CRITICAL: the entire image is one CONTINUOUS GROUND SURFACE of paving, road and grass, seen from above. There is NO flat background colour showing anywhere between the buildings — every single gap between two buildings is filled with street, pavement, grass, kerb or rooftop. NO water, NO sea, NO sky, NO void, NO empty coloured field, right out to all four edges and into all four corners. The ground is cool blue-grey paving and dark green grass lit from below by cyan and turquoise neon and warm yellow shop windows, deep and moody but every surface clearly lit and visible, never black. Scattered densely over the whole surface: a cutaway MTR station platform with a cyan-lit train, glowing turquoise station entrances, a late-night fast-food kitchen with warm lit windows, racks of delivery bikes, dense clusters of neon night market stalls with coloured canopies, a concrete footbridge, small parks of round dark trees, rooftop water tanks, low concrete blocks. A wide winding pale concrete walkway snakes the full height of the map from the top right down to the bottom left, curving in smooth S-bends and folding back through the middle, unbroken and clearly visible. Chunky hard-edged pixels, heavy dithering, strong dark outlines, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere. Painted 16-bit console game art, not 3D rendered, not photographic."""
+16-bit SNES overworld world map in the style of the Super Mario World world map screen, TALL PORTRAIT, three-quarter top-down bird's eye view of a night-time toy diorama town, HIGH CONTRAST AND RICHLY COLOURED. CRITICAL: one continuous ground surface covers the whole image to all four edges — paved streets, deep green grass verges and rooftops fill every gap, with NO flat empty background colour, NO water, NO sky, NO void. The ground is warm mid-grey paving and saturated deep green grass, clearly lit, never black. Packed densely everywhere: a cutaway MTR station with a brightly cyan-lit train, glowing turquoise station entrances, a late-night kitchen with hot orange windows, racks of red and blue delivery bikes, many neon night-market stalls with saturated red pink orange and green canopies, a concrete footbridge, parks of round green trees, rooftop water tanks, shophouses with warm yellow lit windows. A wide winding PALE CREAM concrete walkway snakes the full height of the map from the top right down to the bottom left in smooth S-bends, bright against the darker ground and unbroken. Saturated Super Mario World candy colours at night, strong warm-cool contrast. Chunky hard-edged pixels, heavy dithering, bold dark outline all the way round, flat blocks of colour, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit SNES console game sprite, not 3D rendered, not photographic."""
 
 [[asset]]
 name = "bg_street"
@@ -132,9 +145,9 @@ kind = "bg"
 aspect = "3:2"
 size = [1152, 768]
 generated = "2026-09-11"
-rerolls = 1
+rerolls = 3
 prompt = """\
-16-bit SNES pixel art painted background, seen straight on from the front of the room. An empty university interview room in Hong Kong, late afternoon. AUSTERE AND INSTITUTIONAL: plain flat off-white and pale grey painted walls with NO murals, NO rainbow colours, NO decoration, NO posters of any kind. A very large white whiteboard, completely clean and blank, an aluminium pen tray with two dried-up markers and a grey eraser, a plain round white wall clock with black hands, a single humming fluorescent tube, a tall window on the left with a slatted grey blind half raised showing a slice of green hillside and a distant grey tower block, scuffed pale grey vinyl floor with a long scuff mark. The mood is quiet, still, cold and slightly oppressive — an exam room, not a classroom. Muted greys, off-whites and cold daylight, one small warm note from the fluorescent. In the lower part of the frame two rows of plain pale wooden desks with grey steel-framed chairs seen from behind, and one lone chair pulled out at an angle facing the whiteboard. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Chunky hard-edged pixels, heavy dithering, strong dark outlines, no anti-aliasing, no soft gradients, no drop shadow, no bevel. Absolutely no text, no letters, no words, no numbers, no writing, no drawing, no diagram on the whiteboard or anywhere else — every surface is completely blank. Painted 16-bit console game art, not 3D rendered, not photographic."""
+TRUE PIXEL ART with LARGE VISIBLE SQUARE PIXELS and a strictly LIMITED PALETTE of about thirty colours. Every surface is flat blocks of solid colour with hard stepped edges and CHECKERBOARD DITHERING where one tone meets another. Visible chunky pixel grid, thick dark outlines on every object, aggressive contrast between light and shadow. This is a Super Nintendo background from 1994. NOT smooth, NOT airbrushed, NOT soft, NOT vector, NOT 3D rendered, NOT photographic, NO gradients. An austere university interview room in Hong Kong, seen straight on. Plain flat pale sage-grey walls with no decoration and no posters, a very large white whiteboard completely clean and blank in an aluminium frame with a pen tray holding two markers and a grey eraser, a plain round wall clock with black hands, one fluorescent tube, a tall window on the left with a grey slatted blind half raised showing a slice of steep green hillside and a distant pale tower block, pale wooden desks with grey steel chairs seen from behind and one lone chair pulled out at an angle, scuffed pale grey vinyl floor. Cold, still, slightly oppressive — an exam room, not a classroom. Muted sage greens, cool greys, bone white, one warm amber note from the fluorescent, and deep grey-blue shadows for contrast. Absolutely no text, no letters, no words, no numbers, no writing or drawing on the whiteboard or anywhere. The floor is flat and level across the bottom fifth of the frame."""
 
 [[asset]]
 name = "bg_room732_p"
@@ -142,9 +155,9 @@ kind = "bg"
 aspect = "2:3"
 size = [768, 1152]
 generated = "2026-09-11"
-rerolls = 1
+rerolls = 2
 prompt = """\
-16-bit SNES pixel art painted background, TALL PORTRAIT composition, seen straight on from the front of the room. An empty university interview room in Hong Kong, late afternoon. AUSTERE AND INSTITUTIONAL: plain flat off-white and pale grey painted walls with NO murals, NO rainbow colours, NO decoration, NO posters of any kind. A very large white whiteboard, completely clean and blank, an aluminium pen tray with two dried-up markers and a grey eraser, a plain round white wall clock with black hands, a single humming fluorescent tube, a tall window on the left with a slatted grey blind half raised showing a slice of green hillside and a distant grey tower block, scuffed pale grey vinyl floor with a long scuff mark. The mood is quiet, still, cold and slightly oppressive — an exam room, not a classroom. Muted greys, off-whites and cold daylight, one small warm note from the fluorescent. The blank whiteboard fills the upper half of the tall frame with the clock high on the right above it; the lower half holds two rows of plain pale wooden desks with grey steel-framed chairs seen from behind and one lone chair pulled out at an angle. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Chunky hard-edged pixels, heavy dithering, strong dark outlines, no anti-aliasing, no soft gradients, no drop shadow, no bevel. Absolutely no text, no letters, no words, no numbers, no writing, no drawing, no diagram on the whiteboard or anywhere else — every surface is completely blank. Painted 16-bit console game art, not 3D rendered, not photographic."""
+TRUE PIXEL ART with LARGE VISIBLE SQUARE PIXELS and a strictly LIMITED PALETTE of about thirty colours. Every surface is flat blocks of solid colour with hard stepped edges and CHECKERBOARD DITHERING where one tone meets another. Visible chunky pixel grid, thick dark outlines on every object, aggressive contrast between light and shadow. This is a Super Nintendo background from 1994. NOT smooth, NOT airbrushed, NOT soft, NOT vector, NOT 3D rendered, NOT photographic, NO gradients. TALL PORTRAIT composition. An austere university interview room in Hong Kong, seen straight on. Plain flat pale sage-grey walls with no decoration and no posters, a very large white whiteboard completely clean and blank in an aluminium frame with a pen tray holding two markers and a grey eraser, a plain round wall clock with black hands, one fluorescent tube, a tall window on the left with a grey slatted blind half raised showing a slice of steep green hillside and a distant pale tower block, pale wooden desks with grey steel chairs seen from behind and one lone chair pulled out at an angle, scuffed pale grey vinyl floor. Cold, still, slightly oppressive — an exam room, not a classroom. Muted sage greens, cool greys, bone white, one warm amber note from the fluorescent, and deep grey-blue shadows for contrast. Absolutely no text, no letters, no words, no numbers, no writing or drawing on the whiteboard or anywhere. The blank whiteboard fills the upper half of the tall frame with the clock above it; the lower half holds the desks and chairs and the lone pulled-out chair. The floor is flat and level across the bottom fifth of the frame."""
 
 [[asset]]
 name = "bg_datacentre"
@@ -214,9 +227,9 @@ kind = "sprite"
 aspect = "1:1"
 size = [128, 128]
 generated = "2026-09-11"
-rerolls = 0
+rerolls = 1
 prompt = """\
-16-bit SNES pixel art BOSS enemy sprite, large and imposing, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The boss is a street phone kiosk that has come alive and become hostile: a tall narrow dark metal kiosk cabinet on a concrete base, its big front screen filled edge to edge with rows of flat featureless grey bars like blank suggested lines of ghost text, a cracked corner, two long segmented cable arms reaching out from its sides ending in blunt grabbing clamps, a single cold red lens above the screen like an eye, a halo of pale grey ghost-bars leaking out around it. Menacing and patient. Dark greys and gunmetal with a cold red eye and pale grey ghost bars. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no symbols, no writing on any screen or sign — every screen and panel is blank. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+16-bit SNES pixel art BOSS enemy sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the subject). The subject is one solid shape with no gaps or holes showing the background through it. THE SILHOUETTE IS ONE HUGE SCREEN. A tall dark street kiosk that is almost entirely a single enormous glowing screen filling the upper three quarters of the picture, in a slim dark bezel on a narrow dark pedestal base. Across the screen are SIX thick flat horizontal grey bars of different lengths, evenly spaced, like blank unfinished lines waiting to be filled in — chunky and few, not fine, each bar clearly separate. One cold red pinpoint eye sits in the bezel above the screen. Two thin dark cable arms hang down at the sides. It must read instantly at thumbnail size as A SCREEN FULL OF BLANK GREY LINES. Dark gunmetal bezel, near-black screen, pale grey bars, one red pinpoint. Chunky hard-edged pixels, heavy dithering, bold dark outline all the way round, flat blocks of colour, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit SNES console game sprite, not 3D rendered, not photographic."""
 
 [[asset]]
 name = "boss_deadlock"
@@ -224,9 +237,9 @@ kind = "sprite"
 aspect = "1:1"
 size = [128, 128]
 generated = "2026-09-11"
-rerolls = 0
+rerolls = 1
 prompt = """\
-16-bit SNES pixel art BOSS enemy sprite, large and imposing, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The boss is a hostile machine built out of a building plant room: a squat riveted iron pressure vessel body on two stubby braced legs, TWO enormous brass padlocks hanging on heavy chains from its shoulders, one on the left and one on the right, the chains crossing each other in front of its body in an X, two grimy pressure dials for eyes with the dial faces completely blank, a seized escalator step jutting from its back, dribbles of rust and a wisp of steam from a relief valve. Heavy, stuck, immovable. Iron grey, rust brown, tarnished brass and a cold amber pilot light. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no digits, no symbols, no writing on any screen, dial, board or sign — every screen and panel is completely blank. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+16-bit SNES pixel art BOSS enemy sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the subject). The subject is one solid shape with no gaps or holes showing the background through it. THE SILHOUETTE IS TWO ENORMOUS PADLOCKS. Two huge bright brass padlocks, each as big as a barrel, hang side by side and fill most of the picture, their shackles hooked over a short heavy iron crossbeam. A single thick black iron chain runs from one padlock to the other and crosses itself in a clear X between them. Below, two stubby riveted iron feet. Each padlock has one round dark keyhole low on its face and one cold red pinpoint light above it. Clean, bold, simple shapes — it must read instantly as TWO LOCKED PADLOCKS at thumbnail size, not as a robot and not as a machine. Bright brass gold and iron grey with black chain and two red pinpoints. NOT brown, NOT olive, NOT mossy, NOT rusty. Chunky hard-edged pixels, heavy dithering, bold dark outline all the way round, flat blocks of colour, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit SNES console game sprite, not 3D rendered, not photographic."""
 
 [[asset]]
 name = "boss_nullptr"
@@ -348,3 +361,174 @@ generated = "2026-09-11"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art user interface panel frame, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no magenta anywhere inside its outline. A single rectangular game dialogue box frame seen flat-on, filling most of the image: a thick dark brown outer border, a bright gold bevelled inner edge, four small gold corner studs one in each corner, and a flat plain cream parchment face filling the whole middle that is completely blank and empty with absolutely nothing on it. Just the box and nothing else. Chunky hard-edged pixels, bold dark outline all the way round, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no digits, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "open_flat"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered — plain floor, plain ground or plain shadow — so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A small cramped walk-up flat above a Hong Kong market lane at 06:40 in the morning, seen from inside. A cheap wooden desk against a window, an open laptop on it with its screen glowing pale blue-white, a cold mug of tea, a stack of paperbacks, a desk lamp still on. Through the window, the narrow lane below is still blue-dark with the first peach light on the tops of the tenements opposite and a tram wire crossing. A drying rack of laundry, a bare bulb, cracked plaster, a small electric fan. Nobody in the room yet. Deep blue-greys and cold shadow with two warm amber light sources. Quiet, still, ordinary, before anything has happened."""
+
+[[asset]]
+name = "open_flat_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TALL PORTRAIT composition, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A cramped walk-up flat above a Hong Kong market lane at 06:40, seen from inside looking at a tall narrow window that runs most of the height of the frame. Through the window, the tenement opposite rises the full height — shuttered windows, air-conditioner boxes, a drying pole, bamboo scaffolding — with a slot of peach dawn sky at the very top and the dark lane far below. In front of the window a cheap wooden desk with an open laptop glowing pale blue-white, a cold mug, a stack of paperbacks, a desk lamp still on. A drying rack, a bare bulb, cracked plaster, a small electric fan. Nobody in the room yet. Deep blue-greys and cold shadow with two warm amber light sources. Quiet, still, ordinary."""
+
+[[asset]]
+name = "open_cursor"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered — plain floor, plain ground or plain shadow — so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. Extreme close view of a laptop screen in a dark room, filling the frame, seen straight on. The screen is a deep near-black blue-grey and COMPLETELY EMPTY — no writing of any kind — except for one single small bright white rectangular block cursor sitting alone in the upper left, and one thin pale horizontal rule below it. Around the screen a slim dark laptop bezel, the edge of a keyboard at the bottom, a hand's shadow falling across it. The screen's pale glow lights nothing but dust in the air. Cold blue-white light against deep navy dark. Empty, waiting, slightly menacing."""
+
+[[asset]]
+name = "open_cursor_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TALL PORTRAIT composition, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A laptop seen straight on from close up in a dark room, its screen filling the upper two thirds of the tall frame and the keyboard filling the lower third. The screen is deep near-black blue-grey and COMPLETELY EMPTY — no writing of any kind — except for one single small bright white rectangular block cursor sitting alone near the top left, and one thin pale horizontal rule below it. A slim dark bezel, the keys picked out in dark grey below, a hand's shadow falling across them. The pale glow lights nothing but dust. Cold blue-white against deep navy. Empty, waiting, slightly menacing."""
+
+[[asset]]
+name = "open_ghost"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered — plain floor, plain ground or plain shadow — so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. Extreme close view of the same laptop screen in a dark room, filling the frame, seen straight on. The screen is deep near-black blue-grey. In the upper left sit THREE tiny bright white blocks, and running away to the right from them a LONG FLAT PALE GREY BAR — a single solid featureless grey rectangle, like a line finished by something else. Below it three more flat grey bars of different lengths, evenly spaced, all completely blank and featureless. The grey bars glow faintly and sicklier than the white. A slim dark bezel, the edge of a keyboard, two fingers resting still on the keys, not typing. Cold blue-white and sick grey against deep navy. The grey is doing the work and the person is not."""
+
+[[asset]]
+name = "open_ghost_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TALL PORTRAIT composition, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A laptop seen straight on from close up in a dark room, its screen filling the upper two thirds of the tall frame and the keyboard filling the lower third. The screen is deep near-black blue-grey. Near the top left sit THREE tiny bright white blocks, and running away to the right from them a LONG FLAT PALE GREY BAR — one solid featureless grey rectangle, like a line finished by something else. Below it four more flat grey bars of different lengths, evenly spaced, completely blank and featureless, glowing faintly sicker than the white. Below the screen, two fingers rest still on the keys, not typing. Cold blue-white and sick grey against deep navy."""
+
+[[asset]]
+name = "open_face"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered — plain floor, plain ground or plain shadow — so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A tight close portrait of one woman's face and shoulders, filling the frame, lit only from below by the cold blue-white glow of a laptop screen just out of shot. Mei Cheung, a Hong Kong Chinese woman in her thirties: short black bob haircut, round wire-frame glasses, a rust-orange zip hoodie over a plain cream tee, dark jeans. Flat, unimpressed, tired expression — never smiling, never heroic. Her eyes are wide and still behind the round glasses and fixed on something off-frame; her mouth is a flat line. The realisation is arriving and she is not enjoying it. The pale glow catches her glasses, her cheekbone and her jaw and leaves the rest in deep blue shadow; the dark room falls away behind her. Cold blue-white key light, deep navy shadow, one warm amber rim from a lamp behind. Still, quiet, cold."""
+
+[[asset]]
+name = "open_face_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TALL PORTRAIT composition, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A tall close portrait of one woman, head and shoulders filling the upper two thirds of the frame, lit only from below by the cold blue-white glow of a laptop screen just out of shot at the bottom. Mei Cheung, a Hong Kong Chinese woman in her thirties: short black bob haircut, round wire-frame glasses, a rust-orange zip hoodie over a plain cream tee, dark jeans. Flat, unimpressed, tired expression — never smiling, never heroic. Her eyes are wide and still behind the round glasses, fixed on something off-frame; her mouth is a flat line. The realisation is arriving and she is not enjoying it. The glow catches her glasses, cheekbone and jaw and leaves the rest in deep blue shadow; the dark room falls away above and behind her, with one warm amber lamp glow high in the corner. Cold blue-white key light, deep navy shadow. Still, quiet, cold."""
+
+[[asset]]
+name = "open_tills"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered — plain floor, plain ground or plain shadow — so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A Hong Kong market lane at dawn, seen straight on down the lane. Roller shutters are half up on shop after shop, stallholders are setting out crates of oranges and greens under striped awnings, bamboo scaffolding climbs the tenements, blank shop sign panels hang overhead. In every single shopfront a till screen and a small monitor face the lane, and EVERY ONE of them shows the identical thing: a dark panel carrying four or five FLAT PALE GREY HORIZONTAL BARS, completely blank and featureless, glowing the same sick grey. The people are working around the screens and not looking at them. Warm peach dawn light on the street, and the same cold sick grey repeating in every screen down the whole lane."""
+
+[[asset]]
+name = "open_tills_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TALL PORTRAIT composition, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A narrow Hong Kong market lane at dawn seen straight on down its length, the tenements rising the full height of the tall frame above the shops with bamboo scaffolding, air-conditioner boxes and blank hanging sign panels, and a slot of peach dawn sky far above. At street level in the lower half, roller shutters half up on shop after shop, stallholders setting out crates of oranges and greens under striped awnings. In every shopfront a till screen faces the lane and EVERY ONE shows the identical thing: a dark panel carrying four or five FLAT PALE GREY HORIZONTAL BARS, completely blank and featureless, glowing the same sick grey. The people work around the screens and do not look at them. Warm peach dawn light on the street, the same cold sick grey repeating in every screen."""
+
+[[asset]]
+name = "open_stairs"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered — plain floor, plain ground or plain shadow — so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A narrow dim Hong Kong tenement stairwell seen from partway up, looking down. Mei Cheung, a Hong Kong Chinese woman in her thirties: short black bob haircut, round wire-frame glasses, a rust-orange zip hoodie over a plain cream tee, dark jeans. Flat, unimpressed, tired expression — never smiling, never heroic. She is halfway down the worn tiled steps with a closed laptop under one arm and a canvas messenger bag on her shoulder, one hand on a painted iron handrail, her back mostly to us and her head turned toward the bright doorway at the bottom. Cracked green-painted plaster, a bank of dented metal letterboxes, a bare bulb, tangled cabling, a mop in a bucket. At the bottom of the stairs a doorway opens onto the market lane in warm peach dawn light, blown out and bright against the dim stairwell. Deep green-greys and shadow above, warm gold below. She is going somewhere and does not have a plan."""
+
+[[asset]]
+name = "open_stairs_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TALL PORTRAIT composition, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A narrow Hong Kong tenement stairwell shaft seen from above, looking steeply down the full height of the tall frame, flights of worn tiled steps folding back on themselves past cracked green-painted plaster, dented metal letterboxes, bare bulbs, tangled cabling and painted iron handrails. Mei Cheung, a Hong Kong Chinese woman in her thirties: short black bob haircut, round wire-frame glasses, a rust-orange zip hoodie over a plain cream tee, dark jeans. Flat, unimpressed, tired expression — never smiling, never heroic. She is a small figure well down the shaft on one of the lower flights, a closed laptop under one arm and a canvas messenger bag on her shoulder, one hand on the rail, her head turned toward the bright doorway at the very bottom that opens onto the market lane in warm peach dawn light, blown out and bright against the dim green stairwell. Deep green-greys and shadow above, warm gold far below."""
+
+[[asset]]
+name = "open_lands"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered — plain floor, plain ground or plain shadow — so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A single image split cleanly down the middle into two halves by a dark vertical seam. LEFT HALF: a sunlit Hong Kong tram street in warm gold morning light — a blue double-decker tram on its rails, coral tenements with gold bamboo scaffolding, striped market awnings, blank shop sign panels, a banyan tree, saturated warm amber and green. RIGHT HALF: the same city at night underground and cool — an MTR platform in turquoise tile with a cyan-lit train, neon night-market canopies, delivery bikes, a footbridge, saturated cyan turquoise and deep indigo. The two halves are equally weighted and equally inviting, like two roads offered. No map, no paths, no markers, no route, no nodes, no icons of any kind."""
+
+[[asset]]
+name = "open_lands_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES cutscene still, TALL PORTRAIT composition, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. One strong clear read at a glance. The lower fifth of the frame is quiet and uncluttered so a caption box can sit over it. Absolutely no text, no letters, no words, no numbers, no code, no writing, no lettering anywhere in the image on any screen, sign, book or poster. A single tall image split cleanly across the middle into two halves by a dark horizontal seam. TOP HALF: a sunlit Hong Kong tram street in warm gold morning light — a blue double-decker tram on its rails, coral tenements with gold bamboo scaffolding, striped market awnings, blank shop sign panels, a banyan tree, saturated warm amber and green. BOTTOM HALF: the same city at night underground and cool — an MTR platform in turquoise tile with a cyan-lit train, neon night-market canopies, delivery bikes, saturated cyan turquoise and deep indigo. The two halves are equally weighted and equally inviting, like two roads offered. No map, no paths, no markers, no route, no nodes, no icons of any kind."""
+
+[[asset]]
+name = "walk_mei"
+kind = "strip"
+aspect = "3:2"
+size = [256, 96]
+rerolls = 0
+generated = "2026-09-11"
+note = "Four frames in one 3:2 render, then cut apart by art/tools/strip.py: the largest four ink components, left to right, each bottom-aligned on a common row so the cycle does not bob. Grok will not lay frames on an even grid, so the slicer does not assume one."
+prompt = """\
+16-bit SNES pixel art character sprite sheet on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not a character). FOUR separate full-body figures of THE SAME WOMAN standing in a single evenly spaced horizontal row, all four exactly the same height and drawn in exactly the same colours and the same style, with a clear band of plain magenta between each one so they never touch or overlap. She is seen from the SIDE, in profile, walking to the right. The character every time: a Hong Kong Chinese woman in her thirties, short black bob haircut, round wire-frame glasses, a rust-orange zip hoodie over a cream tee, dark jeans, white trainers, a canvas messenger bag on her shoulder. The four figures are the four frames of one walking cycle, left to right: FRAME 1 contact, front leg forward and heel down, arms swung opposite; FRAME 2 passing, legs together under the body, standing tall; FRAME 3 contact mirrored, the other leg forward, arms swung the other way; FRAME 4 passing again, legs together, standing tall. Her head, body size and clothing are identical in all four. Chunky hard-edged pixels, bold dark outline round each figure, flat cel shading, saturated Super Mario World colours, no anti-aliasing, no soft gradient, no drop shadow, no ground shadow. Absolutely no text, no letters, no words, no numbers, no frame borders, no grid lines, no boxes round the figures."""
+
+[[asset]]
+name = "fg_wires"
+kind = "sprite"
+aspect = "3:2"
+size = [1152, 384]
+generated = "2026-09-11"
+rerolls = 1
+prompt = """\
+16-bit SNES pixel art foreground overlay layer, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Objects hang down from the TOP EDGE only and SPREAD EVENLY ACROSS THE WHOLE WIDTH OF THE FRAME, reaching right out to the far left edge and the far right edge with nothing bunched in the middle and no empty stretch at either end; the BOTTOM HALF of the picture is left completely empty plain magenta. Spanning the full width: a web of black overhead tram wires and thinner span wires strung from edge to edge with small dark ceramic insulators, two leaning wooden utility poles with crossarms, one near the left edge and one near the right, a dark green banyan branch with hanging aerial roots reaching in from the top right corner, a red-and-white striped awning edge jutting in from the top left corner, and FOUR blank rectangular hanging sign panels on brackets spaced across the width. EVERY sign panel is filled edge to edge with ONE solid flat saturated colour — hot pink, jade green, cyan, gold — with a dark outline; NO sign is white, empty, hollow, pale or see-through. Chunky hard-edged pixels, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradient, no drop shadow. Absolutely no text, no letters, no words, no numbers, no writing on the sign panels."""
+
+[[asset]]
+name = "neon_signs"
+kind = "sprite"
+aspect = "3:2"
+size = [512, 256]
+generated = "2026-09-11"
+rerolls = 2
+prompt = """\
+16-bit SNES pixel art sprite row, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not a sign). CRITICAL COLOUR RULE: nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone and must appear nowhere on any sign. SIX separate tall narrow vertical Hong Kong neon shop signs in an evenly spaced horizontal row with plain magenta between them so they never touch. Each sign is a plain rectangle on a short dark grey metal bracket, edged with a thick bright glowing neon tube outline, the panel face inside the tube filled with a darker shade of that same colour. Each sign is ONE colour only, left to right: 1 DEEP CRIMSON RED, 2 CYAN BLUE, 3 LIME GREEN, 4 GOLD YELLOW, 5 ORANGE, 6 DEEP VIOLET PURPLE. All six must be strong and saturated — no white signs, no pale signs, no grey signs, no two the same. Flat pure hues, no blending, no gradient, no soft glow halo, no blur. Chunky hard-edged pixels, bold dark outlines, no anti-aliasing. Absolutely no text, no letters, no words, no numbers, no symbols — every panel face is completely blank."""

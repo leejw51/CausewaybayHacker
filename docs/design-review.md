@@ -439,8 +439,92 @@ vectors by `ui/chrome.ts:211-215`, at any size the layout asks for. A 48×48
 bitmap is strictly worse than that — it has one correct scale — so the budget
 went to the six bosses instead, none of which existed in any form.
 
+## The opening sequence — second round
+
+`docs/story.md` §2 is the script and it is already shot-listed; I cut it into
+**seven beats**, each delivered in both orientations (14 files, `open_*` and
+`open_*_p`):
+
+| beat | what it is |
+| --- | --- |
+| `open_flat` | the walk-up above the bazaar at 06:40 — desk, laptop, dawn not yet up |
+| `open_cursor` | the screen, empty but for one block cursor |
+| `open_ghost` | three characters typed, and a long grey bar finishing the line |
+| `open_face` | Mei, lit from below by the screen, understanding it |
+| `open_tills` | the lane at dawn, every till showing the same grey panel |
+| `open_stairs` | going down into the bazaar with a laptop and no plan |
+| `open_lands` | the two lands offered, as a promise |
+
+**Both orientations are composed, not cropped.** A 3:2 master centre-cropped to
+2:3 keeps 44% of its width, which would have made the cutscene exactly the thing
+§13 of this review complains about. So each beat was written twice — the tall
+version of `open_lands` splits top/bottom where the wide one splits left/right;
+the tall `open_tills` sends the tenements up the frame where the wide one sends
+the lane away from you. Every panel keeps its **lower fifth quiet** — plain
+floor, plain ground, plain shadow — because an SNES cutscene is a still held
+under a caption box, and there has to be somewhere to put it.
+
+**No lettering, and the constraint made the sequence better.** `open_cursor` and
+`open_ghost` are the two panels that had to show code without showing code. What
+they show is one white block cursor, then three white blocks and a long flat
+grey bar running away from them with four more bars beneath. No glyphs, nothing
+to misread, nothing to translate — and it says *something else finished your
+line* more plainly than legible code would have. The same grey-bar language then
+repeats across every till screen in `open_tills`, which is what ties the private
+moment to the street.
+
+**Skynet's side is not a new panel.** `bg_datacentre` from the first round is
+already that image — racks serving the whole island, indifferent, no face — and
+the opening should not spend a beat on the ending's location. Use it if the
+sequence wants an eighth card.
+
+## For the technique round
+
+Three assets aimed at what FE is building rather than at another still:
+
+* **`walk_mei`** — a four-frame walk cycle, 64×96 per frame, 256×96 strip, side
+  profile, feet on one line. The manifest carries `frames`, `fw`, `fh` and a
+  **box per frame**, so the renderer can place each frame by its own feet.
+  Generated as one image of four figures and cut apart by `art/tools/strip.py`,
+  which takes the largest four ink components left to right — Grok will not lay
+  frames on an even grid, so nothing assumes one.
+* **`fg_wires`** — a 1152×384 near-parallax overlay for the Mode-7 plane: tram
+  wires, insulators, two poles, a banyan branch with aerial roots, an awning
+  edge and four hanging sign panels, all hanging from the top with the lower
+  half transparent. Scroll it faster than the plane.
+* **`neon_signs`** — six vertical signs, each one flat hue over a darker face of
+  the same hue, for palette cycling. `art/palette.json` carries the measured
+  tube/face pair and `hue_deg` for all six (352°, 213°, 127°, 47°, 25°, 282°),
+  so the cycle can rotate hues without eyedropping the PNG.
+
+## Two pipeline findings from this round
+
+**Trapped backdrop was showing on five sprites, and I missed it last round.**
+The knockout is seeded from the border, which is what protects pink *inside* a
+sprite — but backdrop the silhouette *encloses* (under a whiteboard's board,
+inside a turnstile's display slot, between two padlocks) was never reachable and
+stayed magenta. At 128px I read it as intentional pink; at the 32–64px the map
+actually draws these at, it is plainly a rendering fault. `process.py` now drops
+enclosed magenta components under 10% of the ink area. Flatness does not
+separate the two cases — `fx_ribbon`'s painted cloth came back *flatter* than
+the pockets — but size does, by 20×: pockets ran 0.2–3.8% of ink, the ribbon's
+cloth is 33%. This fixed five existing sprites with no new generations.
+
+**Never ask for magenta-family colour in a sprite's artwork.** Asked for a hot
+pink neon sign, Grok painted it in (252,35,176) — the studio backdrop's own
+colour — and the knockout removed it, correctly, because they are the same
+pixels. No predicate can separate them; this is a prompt rule, not a tuning
+problem. Sprites that want a pink use crimson or violet. Both rules are now in
+`art/prompts.toml`'s header.
+
 ## The art, and what is in it
 
+49 assets in `art/` — 27 backgrounds and story panels, 21 sprites and one
+animation strip — from 66 generations across two rounds, so 17 re-rolls. The
+first round's figures were 32 assets from 40 generations; this round added 17
+new assets and re-rolled 5 existing ones.
+
+Superseded numbers below refer to the first round and are kept as written:
 32 assets in `art/` — 13 backgrounds and 19 sprites — from 40 generations, so 8
 re-rolls. `art/manifest.json` is in `CausewaybayGolang`'s shape with all 19
 sprite boxes measured from the actual alpha: `art/tools/manifest.py` calls the

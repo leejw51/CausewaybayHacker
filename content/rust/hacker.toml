@@ -25,7 +25,7 @@ time_limit_s = 600
 story        = "Room 7-32. The first question is the one everybody gets, and the clock starts on the way in."
 concepts     = ["hashing", "complexity", "slices"]
 requires     = []
-map          = { x = 0.10, y = 0.88, kind = "quest" }
+map          = { x = 0.044, y = 0.146, kind = "quest" }
 brief        = '''
 Line one is `n target`. Line two is `n` integers.
 
@@ -121,7 +121,7 @@ time_limit_s = 900
 story        = "The second question is on the board before you have put the marker down."
 concepts     = ["two-pointers", "strings", "complexity"]
 requires     = ["rust.hacker.01.two-sum"]
-map          = { x = 0.24, y = 0.76, kind = "quest" }
+map          = { x = 0.275, y = 0.058, kind = "quest" }
 brief        = '''
 One line of text, no spaces.
 
@@ -216,7 +216,7 @@ time_limit_s = 900
 story        = "They hand you the Lucky Mac rota and ask which hours are actually covered."
 concepts     = ["intervals", "sorting", "complexity"]
 requires     = ["rust.hacker.02.window"]
-map          = { x = 0.40, y = 0.82, kind = "quest" }
+map          = { x = 0.389, y = 0.132, kind = "quest" }
 brief        = '''
 Line one is `n`. The next `n` lines are `<start> <end>` with `start <= end`.
 
@@ -323,7 +323,7 @@ time_limit_s = 1200
 story        = "A floor plan on the whiteboard, a fire door at the far corner, and the interviewer watching the clock rather than the marker."
 concepts     = ["graphs", "stacks-queues", "complexity"]
 requires     = ["rust.hacker.03.intervals"]
-map          = { x = 0.54, y = 0.68, kind = "quest" }
+map          = { x = 0.602, y = 0.065, kind = "quest" }
 brief        = '''
 Line one is `r c`. The next `r` lines are the floor: `.` is open, `#` is wall.
 
@@ -451,7 +451,7 @@ time_limit_s = 900
 story        = "The depot wants the smallest van that clears the day's dockets in the days they have. They will not tell you which van; they will tell you if one you name is too small."
 concepts     = ["binary-search", "complexity", "slices"]
 requires     = ["rust.hacker.04.grid"]
-map          = { x = 0.42, y = 0.52, kind = "quest" }
+map          = { x = 0.716, y = 0.137, kind = "quest" }
 brief        = '''
 Line one is `n d`. Line two is `n` package weights, in the order they must be
 loaded — the order cannot change.
@@ -568,7 +568,7 @@ time_limit_s = 900
 story        = "A column of fares on the board and one question: for each of them, which is the next one after it that is bigger."
 concepts     = ["stacks-queues", "slices", "complexity"]
 requires     = ["rust.hacker.05.binary-search"]
-map          = { x = 0.56, y = 0.38, kind = "quest" }
+map          = { x = 0.962, y = 0.054, kind = "quest" }
 brief        = '''
 Line one is `n`. Line two is `n` integers.
 
@@ -671,7 +671,7 @@ time_limit_s = 1200
 story        = "The Percival Street till has three coin trays and a customer who will not take a note."
 concepts     = ["dynamic-programming", "complexity", "slices"]
 requires     = ["rust.hacker.06.stack"]
-map          = { x = 0.72, y = 0.44, kind = "quest" }
+map          = { x = 0.898, y = 0.393, kind = "quest" }
 brief        = '''
 Line one is `n target`. Line two is `n` coin values. Every coin is available
 in unlimited quantity.
@@ -775,17 +775,17 @@ cases = [
   { name = "zero",      stdin = "3 0\n1 2 5\n",  expect = "0\nREACH 1\n",  visible = false },
 ]
 
-# ---------------------------------------------------------------- 08  BOSS
+# ---------------------------------------------------------------- 08
 [[quest]]
 id           = "rust.hacker.08.top-k"
 node         = 8
-title        = "THE WHITEBOARD"
-difficulty   = 5
-time_limit_s = 1200
-story        = "Room 7-32, last question, and the interviewer turns the monitor off. No highlighting, no completion, a clock."
+title        = "FIVE MOST ASKED"
+difficulty   = 4
+time_limit_s = 900
+story        = "Warm-up round. They ask for the five words that came up most in last year's tickets, and they time it anyway."
 concepts     = ["hashing", "sorting", "complexity"]
 requires     = ["rust.hacker.07.coins", "rust.hacker.01.two-sum"]
-map          = { x = 0.86, y = 0.22, kind = "boss" }
+map          = { x = 0.785, y = 0.329, kind = "quest" }
 brief        = '''
 Line one is `n k`. Line two is `n` words separated by spaces.
 
@@ -866,4 +866,2079 @@ cases = [
   { name = "one",     stdin = "4 1\na b a c\n",                   expect = "a\nDISTINCT 3\n",         visible = false },
   { name = "ties",    stdin = "5 3\nx y z x y\n",                 expect = "x\ny\nz\nDISTINCT 3\n",   visible = false },
   { name = "k-too-big", stdin = "3 5\nq q q\n",                   expect = "q\nDISTINCT 1\n",         visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id           = "rust.hacker.09.linked-list"
+node         = 9
+title        = "THE CHAIN"
+difficulty   = 4
+time_limit_s = 900
+story        = "They want it without a Vec. Nodes that point at nodes, because that is the shape the question is really about."
+concepts     = ["linked-lists", "two-pointers", "smart-pointers"]
+requires     = ["rust.hacker.08.top-k"]
+map          = { x = 0.557, y = 0.405, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers, in order.
+
+Build a singly linked list from them — `Option<Box<Node>>`, no `Vec` in the
+answer — then print three lines:
+
+1. the list reversed, space separated
+2. the value at the middle node (for an even `n`, the second of the two)
+3. `LEN <n>` counted by walking the list, not by trusting the input
+
+```
+input:  5
+        1 2 3 4 5
+output: 5 4 3 2 1
+        3
+        LEN 5
+```
+
+The middle is the runner: one pointer one step at a time, one two steps at a
+time, and when the fast one runs out the slow one is there. One pass.
+'''
+starter      = '''
+use std::io::Read;
+
+struct Node {
+    value: i64,
+    next: Option<Box<Node>>,
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let head: Option<Box<Node>> = None;
+
+    // build the list, reverse it, find the middle by walking twice as fast
+    let _ = (head, values);
+    println!("?");
+    println!("0");
+    println!("LEN 0");
+}
+'''
+solution     = '''
+use std::io::Read;
+
+struct Node {
+    value: i64,
+    next: Option<Box<Node>>,
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    // build it back to front, so each new node points at what we had
+    let mut head: Option<Box<Node>> = None;
+    for &value in values.iter().rev() {
+        head = Some(Box::new(Node { value, next: head }));
+    }
+
+    // walk it to count, and run a second pointer at half speed for the middle
+    let mut length = 0usize;
+    let mut slow: Option<&Box<Node>> = head.as_ref();
+    let mut fast: Option<&Box<Node>> = head.as_ref();
+    while let Some(node) = fast {
+        length += 1;
+        fast = node.next.as_ref();
+        if let Some(node) = fast {
+            length += 1;
+            fast = node.next.as_ref();
+            slow = slow.and_then(|s| s.next.as_ref());
+        }
+    }
+    let middle = slow.map(|node| node.value).unwrap_or(0);
+
+    // reverse by moving nodes off the front of one list onto the front of another
+    let mut reversed: Option<Box<Node>> = None;
+    let mut cursor = head;
+    while let Some(mut node) = cursor {
+        cursor = node.next.take();
+        node.next = reversed;
+        reversed = Some(node);
+    }
+
+    let mut out: Vec<String> = Vec::new();
+    let mut walk = reversed.as_ref();
+    while let Some(node) = walk {
+        out.push(node.value.to_string());
+        walk = node.next.as_ref();
+    }
+
+    println!("{}", out.join(" "));
+    println!("{}", middle);
+    println!("LEN {}", length);
+}
+'''
+hints = [
+  "Building back to front is the easy direction: each new node takes the old head as its next.",
+  "node.next.take() leaves None behind and hands you the tail, which is what lets you move a node between lists without cloning.",
+  "For the middle, advance slow only on the steps where fast managed two.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "odd",    stdin = "5\n1 2 3 4 5\n",   expect = "5 4 3 2 1\n3\nLEN 5\n",   visible = true },
+  { name = "even",   stdin = "4\n7 8 9 10\n",    expect = "10 9 8 7\n9\nLEN 4\n",    visible = false },
+  { name = "single", stdin = "1\n42\n",          expect = "42\n42\nLEN 1\n",         visible = false },
+  { name = "signed", stdin = "3\n-1 0 1\n",      expect = "1 0 -1\n0\nLEN 3\n",      visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id           = "rust.hacker.10.tree-walk"
+node         = 10
+title        = "THREE WAYS ROUND A TREE"
+difficulty   = 4
+time_limit_s = 900
+story        = "A tree on the whiteboard and the question nobody should have to think about twice: name the three orders."
+concepts     = ["trees", "recursion", "stacks-queues"]
+requires     = ["rust.hacker.09.linked-list"]
+map          = { x = 0.447, y = 0.347, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` values in **level order**, where `-1` means
+"no node here" — so the tree is stored the way a heap is: the children of
+index `i` are `2i+1` and `2i+2`.
+
+Print four lines: the **preorder**, **inorder** and **postorder** walks, each
+space separated, and then `DEPTH <d>` — the number of nodes on the longest
+root-to-leaf path.
+
+```
+input:  5
+        1 2 3 -1 4
+output: 1 2 4 3
+        2 4 1 3
+        4 2 3 1
+        DEPTH 3
+```
+
+Preorder is node, left, right. Inorder is left, node, right. Postorder is
+left, right, node. The recursion is the same three lines each time and only
+the position of the `push` moves.
+'''
+starter      = '''
+use std::io::Read;
+
+fn walk(tree: &[i64], i: usize, order: usize, out: &mut Vec<i64>) {
+    let _ = (tree, i, order, out);
+    // order 0 = preorder, 1 = inorder, 2 = postorder
+}
+
+fn depth(tree: &[i64], i: usize) -> usize {
+    let _ = (tree, i);
+    0
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let tree: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    for order in 0..3 {
+        let mut out: Vec<i64> = Vec::new();
+        walk(&tree, 0, order, &mut out);
+        let line: Vec<String> = out.iter().map(|v| v.to_string()).collect();
+        println!("{}", line.join(" "));
+    }
+    println!("DEPTH {}", depth(&tree, 0));
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn present(tree: &[i64], i: usize) -> bool {
+    i < tree.len() && tree[i] != -1
+}
+
+fn walk(tree: &[i64], i: usize, order: usize, out: &mut Vec<i64>) {
+    if !present(tree, i) {
+        return;
+    }
+    if order == 0 {
+        out.push(tree[i]);
+    }
+    walk(tree, 2 * i + 1, order, out);
+    if order == 1 {
+        out.push(tree[i]);
+    }
+    walk(tree, 2 * i + 2, order, out);
+    if order == 2 {
+        out.push(tree[i]);
+    }
+}
+
+fn depth(tree: &[i64], i: usize) -> usize {
+    if !present(tree, i) {
+        return 0;
+    }
+    1 + depth(tree, 2 * i + 1).max(depth(tree, 2 * i + 2))
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let tree: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    for order in 0..3 {
+        let mut out: Vec<i64> = Vec::new();
+        walk(&tree, 0, order, &mut out);
+        let line: Vec<String> = out.iter().map(|v| v.to_string()).collect();
+        println!("{}", line.join(" "));
+    }
+    println!("DEPTH {}", depth(&tree, 0));
+}
+'''
+hints = [
+  "One recursive function with the push in three possible places beats three near-identical functions.",
+  "The base case is both conditions at once: past the end of the array, or sitting on a -1.",
+  "Depth is 1 + the deeper of the two children, and 0 for a missing node.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n1 2 3 -1 4\n",      expect = "1 2 4 3\n2 4 1 3\n4 2 3 1\nDEPTH 3\n", visible = true },
+  { name = "leaf",   stdin = "1\n9\n",               expect = "9\n9\n9\nDEPTH 1\n",                   visible = false },
+  { name = "left",   stdin = "7\n1 2 -1 3 -1 -1 -1\n", expect = "1 2 3\n3 2 1\n3 2 1\nDEPTH 3\n",     visible = false },
+  { name = "full",   stdin = "7\n4 2 6 1 3 5 7\n",   expect = "4 2 1 3 6 5 7\n1 2 3 4 5 6 7\n1 3 2 5 7 6 4\nDEPTH 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id           = "rust.hacker.11.bst"
+node         = 11
+title        = "IS IT ACTUALLY A BST"
+difficulty   = 4
+time_limit_s = 900
+story        = "The follow-up. Everyone checks the two children and everyone is wrong the first time."
+concepts     = ["trees", "recursion", "binary-search"]
+requires     = ["rust.hacker.10.tree-walk"]
+map          = { x = 0.222, y = 0.381, kind = "quest" }
+brief        = '''
+Same level-order encoding as the last quest: `-1` is a missing node, children
+of `i` are `2i+1` and `2i+2`.
+
+Line one is `n q`. Line two is the `n` tree values. Line three is `q` query
+values.
+
+Print `VALID` or `INVALID` — is this a binary search tree, with every value in
+the left subtree strictly smaller than the node and every value in the right
+strictly larger? Then one line per query: `<value> FOUND <depth>` if it is in
+the tree, `<value> ABSENT` if not, where the root is depth 1.
+
+```
+input:  7 2
+        4 2 6 1 3 5 7
+        3 8
+output: VALID
+        3 FOUND 3
+        8 ABSENT
+```
+
+Checking `left < node < right` at each node **is not enough** — a value deep
+in the left subtree can still be larger than an ancestor. Carry the open
+interval down instead.
+'''
+starter      = '''
+use std::io::Read;
+
+fn present(tree: &[i64], i: usize) -> bool {
+    i < tree.len() && tree[i] != -1
+}
+
+fn valid(tree: &[i64], i: usize, low: i64, high: i64) -> bool {
+    // the node must sit strictly inside (low, high), and each child
+    // inherits a narrower window
+    let _ = (tree, i, low, high);
+    true
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let q = values[1] as usize;
+    let tree = &values[2..2 + n];
+    let queries = &values[2 + n..2 + n + q];
+
+    println!("{}", if valid(tree, 0, i64::MIN, i64::MAX) { "VALID" } else { "INVALID" });
+    for &target in queries {
+        let _ = (target, present(tree, 0));
+        println!("{} ABSENT", target);
+    }
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn present(tree: &[i64], i: usize) -> bool {
+    i < tree.len() && tree[i] != -1
+}
+
+fn valid(tree: &[i64], i: usize, low: i64, high: i64) -> bool {
+    if !present(tree, i) {
+        return true;
+    }
+    let value = tree[i];
+    if value <= low || value >= high {
+        return false;
+    }
+    valid(tree, 2 * i + 1, low, value) && valid(tree, 2 * i + 2, value, high)
+}
+
+fn find(tree: &[i64], target: i64) -> Option<usize> {
+    let mut i = 0usize;
+    let mut depth = 1usize;
+    while present(tree, i) {
+        if tree[i] == target {
+            return Some(depth);
+        }
+        i = if target < tree[i] { 2 * i + 1 } else { 2 * i + 2 };
+        depth += 1;
+    }
+    None
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let q = values[1] as usize;
+    let tree = &values[2..2 + n];
+    let queries = &values[2 + n..2 + n + q];
+
+    println!("{}", if valid(tree, 0, i64::MIN, i64::MAX) { "VALID" } else { "INVALID" });
+    for &target in queries {
+        match find(tree, target) {
+            Some(depth) => println!("{} FOUND {}", target, depth),
+            None => println!("{} ABSENT", target),
+        }
+    }
+}
+'''
+hints = [
+  "Pass an open interval (low, high) down. The root gets the whole range; a left child gets (low, node), a right child gets (node, high).",
+  "A missing node is vacuously valid — that is the base case, and it returns true, not false.",
+  "The lookup is the binary search: smaller goes left, otherwise right, and the depth is how many hops it took.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "7 2\n4 2 6 1 3 5 7\n3 8\n",      expect = "VALID\n3 FOUND 3\n8 ABSENT\n",  visible = true },
+  { name = "sneaky",  stdin = "7 1\n5 1 7 -1 6 -1 -1\n6\n",     expect = "INVALID\n6 ABSENT\n",           visible = false },
+  { name = "root",    stdin = "1 1\n10\n10\n",                  expect = "VALID\n10 FOUND 1\n",           visible = false },
+  { name = "left-only", stdin = "3 2\n8 4 -1\n4 8\n",           expect = "VALID\n4 FOUND 2\n8 FOUND 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id           = "rust.hacker.12.heap"
+node         = 12
+title        = "K SORTED QUEUES"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Every Lucky Mac branch sends its dockets already in order. Merge them into one line without sorting the lot again."
+concepts     = ["heaps", "sorting", "complexity"]
+requires     = ["rust.hacker.11.bst"]
+map          = { x = 0.116, y = 0.342, kind = "quest" }
+brief        = '''
+Line one is `k`. Then `k` lines, each a count followed by that many integers,
+already sorted ascending.
+
+Print all of them merged into one ascending line, space separated, then
+`POPS <total count>`.
+
+```
+input:  3
+        3 1 4 5
+        2 1 3
+        2 2 6
+output: 1 1 2 3 4 5 6
+        POPS 7
+```
+
+A `BinaryHeap` is a **max**-heap. To use it as a min-heap, push
+`std::cmp::Reverse(x)` and unwrap the `Reverse` on the way out — that is the
+whole Rust-specific trick, and it is what the question is checking.
+
+The heap holds one entry per list, not one per element, so it stays at size
+`k` however long the lists are.
+'''
+starter      = '''
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut values = input.split_whitespace().map(|t| t.parse::<i64>().unwrap());
+    let k = values.next().unwrap() as usize;
+
+    let mut lists: Vec<Vec<i64>> = Vec::with_capacity(k);
+    for _ in 0..k {
+        let count = values.next().unwrap() as usize;
+        lists.push((0..count).map(|_| values.next().unwrap()).collect());
+    }
+
+    let heap: BinaryHeap<Reverse<(i64, usize, usize)>> = BinaryHeap::new();
+
+    // seed the heap with the head of each list, then pop and refill
+    let _ = (heap, lists);
+    println!("?");
+    println!("POPS 0");
+}
+'''
+solution     = '''
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut values = input.split_whitespace().map(|t| t.parse::<i64>().unwrap());
+    let k = values.next().unwrap() as usize;
+
+    let mut lists: Vec<Vec<i64>> = Vec::with_capacity(k);
+    for _ in 0..k {
+        let count = values.next().unwrap() as usize;
+        lists.push((0..count).map(|_| values.next().unwrap()).collect());
+    }
+
+    // (value, which list, how far into it)
+    let mut heap: BinaryHeap<Reverse<(i64, usize, usize)>> = BinaryHeap::new();
+    for (which, list) in lists.iter().enumerate() {
+        if let Some(&first) = list.first() {
+            heap.push(Reverse((first, which, 0)));
+        }
+    }
+
+    let mut out: Vec<String> = Vec::new();
+    while let Some(Reverse((value, which, at))) = heap.pop() {
+        out.push(value.to_string());
+        if at + 1 < lists[which].len() {
+            heap.push(Reverse((lists[which][at + 1], which, at + 1)));
+        }
+    }
+
+    println!("{}", out.join(" "));
+    println!("POPS {}", out.len());
+}
+'''
+hints = [
+  "The heap entry has to carry where the value came from, or you cannot refill after popping it.",
+  "Reverse((value, which, at)) orders by value first, which is exactly what you want.",
+  "Push the next element of a list only when you pop one of its elements — that keeps the heap at k.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3\n3 1 4 5\n2 1 3\n2 2 6\n", expect = "1 1 2 3 4 5 6\nPOPS 7\n", visible = true },
+  { name = "one",    stdin = "1\n3 -5 0 5\n",              expect = "-5 0 5\nPOPS 3\n",         visible = false },
+  { name = "ragged", stdin = "3\n1 9\n0\n4 1 2 3 4\n",     expect = "1 2 3 4 9\nPOPS 5\n",      visible = false },
+  { name = "dupes",  stdin = "2\n2 2 2\n2 2 2\n",          expect = "2 2 2 2\nPOPS 4\n",        visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id           = "rust.hacker.13.backtracking"
+node         = 13
+title        = "EVERY COMBINATION"
+difficulty   = 4
+time_limit_s = 900
+story        = "List every way the shop could be laid out. All of them, in a fixed order, and do not print the same one twice."
+concepts     = ["backtracking", "recursion", "slices"]
+requires     = ["rust.hacker.12.heap"]
+map          = { x = 0.045, y = 0.664, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` distinct integers **already in ascending
+order**.
+
+Print every subset, one per line, values space separated, the empty subset as
+`-`. Order them the way the obvious recursion produces them: at each position,
+first the branch that **takes** the element, then the branch that skips it.
+Then print `SUBSETS <2^n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 2 3
+        1 2
+        1 3
+        1
+        2 3
+        2
+        3
+        -
+        SUBSETS 8
+```
+
+Push, recurse, **pop**. The pop is the part people leave out, and the symptom
+is every line after the first being too long.
+'''
+starter      = '''
+use std::io::Read;
+
+fn build(nums: &[i64], at: usize, chosen: &mut Vec<i64>, out: &mut Vec<String>) {
+    let _ = (nums, at, chosen, out);
+    // at the end of the list, record `chosen`; otherwise take it, recurse,
+    // undo, then skip it and recurse
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let mut chosen: Vec<i64> = Vec::new();
+    let mut out: Vec<String> = Vec::new();
+    build(&nums, 0, &mut chosen, &mut out);
+
+    for line in &out {
+        println!("{}", line);
+    }
+    println!("SUBSETS {}", out.len());
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn build(nums: &[i64], at: usize, chosen: &mut Vec<i64>, out: &mut Vec<String>) {
+    if at == nums.len() {
+        if chosen.is_empty() {
+            out.push("-".to_string());
+        } else {
+            let parts: Vec<String> = chosen.iter().map(|v| v.to_string()).collect();
+            out.push(parts.join(" "));
+        }
+        return;
+    }
+
+    chosen.push(nums[at]);
+    build(nums, at + 1, chosen, out);
+    chosen.pop();
+
+    build(nums, at + 1, chosen, out);
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let mut chosen: Vec<i64> = Vec::new();
+    let mut out: Vec<String> = Vec::new();
+    build(&nums, 0, &mut chosen, &mut out);
+
+    for line in &out {
+        println!("{}", line);
+    }
+    println!("SUBSETS {}", out.len());
+}
+'''
+hints = [
+  "Two recursive calls per element: one with it pushed, one without. Take first, and the order in the sample falls out.",
+  "chosen.pop() goes between the two calls. That is the `undo` in try-recurse-undo.",
+  "The base case is at == nums.len(), and the empty selection there is the empty subset, which still counts.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n", expect = "1 2 3\n1 2\n1 3\n1\n2 3\n2\n3\n-\nSUBSETS 8\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",     expect = "5\n-\nSUBSETS 2\n",                             visible = false },
+  { name = "two",   stdin = "2\n-1 4\n",  expect = "-1 4\n-1\n4\n-\nSUBSETS 4\n",                   visible = false },
+  { name = "none",  stdin = "0\n\n",      expect = "-\nSUBSETS 1\n",                                visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id           = "rust.hacker.14.word-search"
+node         = 14
+title        = "IS THE WORD IN THE GRID"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A board of letters and a name. They want to know whether the name is written in it, and they want the count of dead ends."
+concepts     = ["backtracking", "matrix", "graphs"]
+requires     = ["rust.hacker.13.backtracking"]
+map          = { x = 0.287, y = 0.588, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are a grid of lowercase letters. The
+last line is the word.
+
+The word is in the grid if you can spell it by moving up, down, left or right
+between **adjacent** cells, never using the same cell twice in one attempt.
+
+Print `FOUND` or `ABSENT`, then `STARTS <k>`: how many cells hold the word's
+first letter.
+
+```
+input:  3 4
+        abce
+        sfcs
+        adee
+        abcced
+output: FOUND
+        STARTS 2
+```
+
+Mark the cell used on the way in and **unmark it on the way out**. A cell
+that stays marked after a failed branch makes later branches fail for a reason
+that is not in the grid.
+'''
+starter      = '''
+use std::io::Read;
+
+fn search(grid: &mut Vec<Vec<u8>>, r: usize, c: usize, word: &[u8], at: usize) -> bool {
+    let _ = (grid, r, c, word, at);
+    false
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut header = lines.next().unwrap().split_whitespace();
+    let rows: usize = header.next().unwrap().parse().unwrap();
+    let _cols: usize = header.next().unwrap().parse().unwrap();
+    let mut grid: Vec<Vec<u8>> = (0..rows)
+        .map(|_| lines.next().unwrap().as_bytes().to_vec())
+        .collect();
+    let word = lines.next().unwrap().as_bytes().to_vec();
+
+    let starts = 0usize;
+    let _ = search(&mut grid, 0, 0, &word, 0);
+
+    println!("ABSENT");
+    println!("STARTS {}", starts);
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn search(grid: &mut Vec<Vec<u8>>, r: usize, c: usize, word: &[u8], at: usize) -> bool {
+    if grid[r][c] != word[at] {
+        return false;
+    }
+    if at + 1 == word.len() {
+        return true;
+    }
+
+    let here = grid[r][c];
+    grid[r][c] = b'#';
+
+    let rows = grid.len();
+    let cols = grid[0].len();
+    let mut found = false;
+    if r > 0 && search(grid, r - 1, c, word, at + 1) {
+        found = true;
+    }
+    if !found && r + 1 < rows && search(grid, r + 1, c, word, at + 1) {
+        found = true;
+    }
+    if !found && c > 0 && search(grid, r, c - 1, word, at + 1) {
+        found = true;
+    }
+    if !found && c + 1 < cols && search(grid, r, c + 1, word, at + 1) {
+        found = true;
+    }
+
+    grid[r][c] = here;
+    found
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut header = lines.next().unwrap().split_whitespace();
+    let rows: usize = header.next().unwrap().parse().unwrap();
+    let cols: usize = header.next().unwrap().parse().unwrap();
+    let mut grid: Vec<Vec<u8>> = (0..rows)
+        .map(|_| lines.next().unwrap().as_bytes().to_vec())
+        .collect();
+    let word = lines.next().unwrap().as_bytes().to_vec();
+
+    let mut starts = 0usize;
+    let mut found = false;
+    for r in 0..rows {
+        for c in 0..cols {
+            if grid[r][c] == word[0] {
+                starts += 1;
+            }
+        }
+    }
+    for r in 0..rows {
+        for c in 0..cols {
+            if search(&mut grid, r, c, &word, 0) {
+                found = true;
+            }
+        }
+    }
+
+    println!("{}", if found { "FOUND" } else { "ABSENT" });
+    println!("STARTS {}", starts);
+}
+'''
+hints = [
+  "Overwrite the cell with a character the word cannot contain, recurse, then put the original back.",
+  "Count the starting letters in a separate pass before you search, or the '#' marks will confuse the count.",
+  "The success base case is `at + 1 == word.len()` — checked after matching this cell, not before.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 4\nabce\nsfcs\nadee\nabcced\n", expect = "FOUND\nSTARTS 2\n",  visible = true },
+  { name = "absent",  stdin = "3 4\nabce\nsfcs\nadee\nabcb\n",   expect = "ABSENT\nSTARTS 2\n", visible = false },
+  { name = "reuse",   stdin = "1 3\naba\naba\n",                 expect = "FOUND\nSTARTS 2\n",  visible = false },
+  { name = "single",  stdin = "1 1\na\na\n",                     expect = "FOUND\nSTARTS 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id           = "rust.hacker.15.topo-sort"
+node         = 15
+title        = "WHAT ORDER DOES IT BUILD IN"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Eleven crates and a dependency graph. Name a build order, or name the cycle that means there is not one."
+concepts     = ["graphs", "stacks-queues", "sorting"]
+requires     = ["rust.hacker.14.word-search"]
+map          = { x = 0.391, y = 0.690, kind = "quest" }
+brief        = '''
+Line one is `n m`: `n` tasks numbered `0..n-1` and `m` edges. The next `m`
+lines are `<a> <b>`, meaning `a` must be built before `b`.
+
+Print a build order on one line, space separated. When several tasks are ready
+at once, take the **lowest numbered** one, so the answer is unique. If no
+order exists, print `CYCLE` instead. Then print `DONE <how many you ordered>`.
+
+```
+input:  4 4
+        0 1
+        0 2
+        1 3
+        2 3
+output: 0 1 2 3
+        DONE 4
+```
+
+Kahn's algorithm: count how many things each task waits on, start with the
+ones waiting on nothing, and when you take a task, decrement its dependents.
+If you finish with tasks left over, those tasks are the cycle.
+'''
+starter      = '''
+use std::collections::BinaryHeap;
+use std::cmp::Reverse;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<usize> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0];
+    let m = values[1];
+
+    let mut after: Vec<Vec<usize>> = vec![Vec::new(); n];
+    let mut waiting = vec![0usize; n];
+    for e in 0..m {
+        let a = values[2 + 2 * e];
+        let b = values[3 + 2 * e];
+        after[a].push(b);
+        waiting[b] += 1;
+    }
+
+    let ready: BinaryHeap<Reverse<usize>> = BinaryHeap::new();
+
+    // start with everything waiting on nothing, take the smallest each time
+    let _ = (ready, after, waiting);
+    println!("CYCLE");
+    println!("DONE 0");
+}
+'''
+solution     = '''
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<usize> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0];
+    let m = values[1];
+
+    let mut after: Vec<Vec<usize>> = vec![Vec::new(); n];
+    let mut waiting = vec![0usize; n];
+    for e in 0..m {
+        let a = values[2 + 2 * e];
+        let b = values[3 + 2 * e];
+        after[a].push(b);
+        waiting[b] += 1;
+    }
+
+    let mut ready: BinaryHeap<Reverse<usize>> = BinaryHeap::new();
+    for task in 0..n {
+        if waiting[task] == 0 {
+            ready.push(Reverse(task));
+        }
+    }
+
+    let mut order: Vec<usize> = Vec::new();
+    while let Some(Reverse(task)) = ready.pop() {
+        order.push(task);
+        for &next in &after[task] {
+            waiting[next] -= 1;
+            if waiting[next] == 0 {
+                ready.push(Reverse(next));
+            }
+        }
+    }
+
+    if order.len() < n {
+        println!("CYCLE");
+    } else {
+        let line: Vec<String> = order.iter().map(|v| v.to_string()).collect();
+        println!("{}", line.join(" "));
+    }
+    println!("DONE {}", order.len());
+}
+'''
+hints = [
+  "waiting[b] is the in-degree of b — how many edges point at it.",
+  "A plain queue gives *an* order; a min-heap gives *the* order the statement asks for.",
+  "You never detect the cycle directly. You notice that fewer than n tasks came out, and the ones left are in it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "diamond", stdin = "4 4\n0 1\n0 2\n1 3\n2 3\n", expect = "0 1 2 3\nDONE 4\n", visible = true },
+  { name = "cycle",   stdin = "3 3\n0 1\n1 2\n2 0\n",      expect = "CYCLE\nDONE 0\n",   visible = false },
+  { name = "loose",   stdin = "3 0\n",                     expect = "0 1 2\nDONE 3\n",   visible = false },
+  { name = "chain",   stdin = "5 4\n4 3\n3 2\n2 1\n1 0\n", expect = "4 3 2 1 0\nDONE 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id           = "rust.hacker.16.union-find"
+node         = 16
+title        = "WHO IS CONNECTED TO WHOM"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The tram network, the MTR and the minibus routes on one sheet. How many separate networks are there really."
+concepts     = ["disjoint-set", "graphs", "complexity"]
+requires     = ["rust.hacker.15.topo-sort"]
+map          = { x = 0.619, y = 0.601, kind = "quest" }
+brief        = '''
+Line one is `n m`: `n` stops numbered `0..n-1`, `m` undirected links. The next
+`m` lines are `<a> <b>`.
+
+Print three lines: how many separate networks there are, the size of the
+largest, and `REDUNDANT <k>` — how many of the links joined two stops that
+were already connected.
+
+```
+input:  6 4
+        0 1
+        1 2
+        3 4
+        0 2
+output: 3
+        3
+        REDUNDANT 1
+```
+
+Union-find: every stop points at a parent, `find` walks to the root, `union`
+points one root at the other. Compress the path on the way back out of `find`
+and the whole thing is effectively constant time per query.
+'''
+starter      = '''
+use std::io::Read;
+
+fn find(parent: &mut Vec<usize>, x: usize) -> usize {
+    // walk to the root, and flatten what you walked over
+    let _ = parent;
+    x
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<usize> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0];
+    let m = values[1];
+
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut size = vec![1usize; n];
+    let redundant = 0usize;
+
+    for e in 0..m {
+        let a = values[2 + 2 * e];
+        let b = values[3 + 2 * e];
+        let _ = (find(&mut parent, a), find(&mut parent, b), &mut size);
+    }
+
+    println!("{}", n);
+    println!("1");
+    println!("REDUNDANT {}", redundant);
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn find(parent: &mut Vec<usize>, x: usize) -> usize {
+    let mut root = x;
+    while parent[root] != root {
+        root = parent[root];
+    }
+    // path compression: point everything we walked over straight at the root
+    let mut walk = x;
+    while parent[walk] != root {
+        let next = parent[walk];
+        parent[walk] = root;
+        walk = next;
+    }
+    root
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<usize> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0];
+    let m = values[1];
+
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut size = vec![1usize; n];
+    let mut groups = n;
+    let mut redundant = 0usize;
+
+    for e in 0..m {
+        let a = find(&mut parent, values[2 + 2 * e]);
+        let b = find(&mut parent, values[3 + 2 * e]);
+        if a == b {
+            redundant += 1;
+            continue;
+        }
+        // hang the smaller tree under the bigger one
+        let (big, small) = if size[a] >= size[b] { (a, b) } else { (b, a) };
+        parent[small] = big;
+        size[big] += size[small];
+        groups -= 1;
+    }
+
+    let largest = (0..n)
+        .filter(|&x| parent[x] == x)
+        .map(|x| size[x])
+        .max()
+        .unwrap_or(0);
+
+    println!("{}", groups);
+    println!("{}", largest);
+    println!("REDUNDANT {}", redundant);
+}
+'''
+hints = [
+  "Start with every stop as its own parent and n groups; each successful union drops the count by one.",
+  "An edge whose two ends already have the same root is the redundant one — count it and move on.",
+  "Only a root's size entry is meaningful, so read the largest off the roots, not off every index.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "6 4\n0 1\n1 2\n3 4\n0 2\n", expect = "3\n3\nREDUNDANT 1\n", visible = true },
+  { name = "islands",   stdin = "4 0\n",                     expect = "4\n1\nREDUNDANT 0\n", visible = false },
+  { name = "one-net",   stdin = "3 2\n0 1\n1 2\n",           expect = "1\n3\nREDUNDANT 0\n", visible = false },
+  { name = "all-dupes", stdin = "2 3\n0 1\n0 1\n1 0\n",      expect = "1\n2\nREDUNDANT 2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id           = "rust.hacker.17.lis"
+node         = 17
+title        = "THE LONGEST RUN UP"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A year of daily takings. They want the longest stretch of improving days, and they do not have to be consecutive."
+concepts     = ["dynamic-programming", "binary-search", "complexity"]
+requires     = ["rust.hacker.16.union-find"]
+map          = { x = 0.719, y = 0.687, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+Print the length of the longest **strictly increasing subsequence** — the
+values keep their order but need not be adjacent. Then print
+`TAILS <k>` where `k` is that same length, read off the patience-sorting pile
+count.
+
+```
+input:  8
+        10 9 2 5 3 7 101 18
+output: 4
+        TAILS 4
+```
+
+The `O(n²)` table is the answer you should be able to write cold. The `O(n log n)`
+one keeps, for each length, the smallest value a subsequence of that length can
+end on — a list that is always sorted, so the position of a new value is a
+binary search. Either passes here; the cases are small and say so. Write the
+second one anyway, because the follow-up is always "and faster?".
+'''
+starter      = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let tails: Vec<i64> = Vec::new();
+
+    // for each value, find where it belongs among the pile tops and put it there
+    let _ = (tails, nums);
+    println!("0");
+    println!("TAILS 0");
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    // tails[i] = the smallest value an increasing subsequence of length i+1
+    // can end on. It is sorted, always.
+    let mut tails: Vec<i64> = Vec::new();
+    for &value in &nums {
+        let mut low = 0usize;
+        let mut high = tails.len();
+        while low < high {
+            let mid = low + (high - low) / 2;
+            if tails[mid] < value {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+        if low == tails.len() {
+            tails.push(value);
+        } else {
+            tails[low] = value;
+        }
+    }
+
+    println!("{}", tails.len());
+    println!("TAILS {}", tails.len());
+}
+'''
+hints = [
+  "tails is not a subsequence. Its length is the answer; its contents are only the best ending values.",
+  "Strictly increasing means you replace the first tail that is >= value, so the binary search looks for tails[mid] < value.",
+  "Running off the end of tails means this value extends the longest run so far — push it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "8\n10 9 2 5 3 7 101 18\n", expect = "4\nTAILS 4\n", visible = true },
+  { name = "descending", stdin = "4\n5 4 3 2\n",             expect = "1\nTAILS 1\n", visible = false },
+  { name = "flat",       stdin = "5\n7 7 7 7 7\n",           expect = "1\nTAILS 1\n", visible = false },
+  { name = "ascending",  stdin = "6\n1 2 3 4 5 6\n",         expect = "6\nTAILS 6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id           = "rust.hacker.18.edit-distance"
+node         = 18
+title        = "HOW FAR APART"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Two spellings of the same street on two different signs. How many single-character edits between them."
+concepts     = ["dynamic-programming", "strings", "matrix"]
+requires     = ["rust.hacker.17.lis"]
+map          = { x = 0.949, y = 0.601, kind = "quest" }
+brief        = '''
+Two lines, one word each, lowercase.
+
+Print the **edit distance**: the fewest single-character insertions,
+deletions or substitutions that turn the first into the second. Then print
+`LCS <k>`, the length of their longest common subsequence.
+
+```
+input:  horse
+        ros
+output: 3
+        LCS 2
+```
+
+Two tables over the same two strings, and both are the same three-line
+recurrence with a different tie-break. Fill row by row; the answer is the far
+corner. Row `0` and column `0` are not zero for the edit table — they are the
+cost of deleting or inserting everything.
+'''
+starter      = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let a: Vec<u8> = lines.next().unwrap().trim().as_bytes().to_vec();
+    let b: Vec<u8> = lines.next().unwrap().trim().as_bytes().to_vec();
+
+    let edit = vec![vec![0usize; b.len() + 1]; a.len() + 1];
+    let lcs = vec![vec![0usize; b.len() + 1]; a.len() + 1];
+
+    // fill both tables; the answers are the bottom-right corners
+    let _ = (edit, lcs);
+    println!("0");
+    println!("LCS 0");
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let a: Vec<u8> = lines.next().unwrap().trim().as_bytes().to_vec();
+    let b: Vec<u8> = lines.next().unwrap().trim().as_bytes().to_vec();
+
+    let mut edit = vec![vec![0usize; b.len() + 1]; a.len() + 1];
+    for i in 0..=a.len() {
+        edit[i][0] = i;
+    }
+    for j in 0..=b.len() {
+        edit[0][j] = j;
+    }
+    for i in 1..=a.len() {
+        for j in 1..=b.len() {
+            edit[i][j] = if a[i - 1] == b[j - 1] {
+                edit[i - 1][j - 1]
+            } else {
+                1 + edit[i - 1][j - 1].min(edit[i - 1][j]).min(edit[i][j - 1])
+            };
+        }
+    }
+
+    let mut lcs = vec![vec![0usize; b.len() + 1]; a.len() + 1];
+    for i in 1..=a.len() {
+        for j in 1..=b.len() {
+            lcs[i][j] = if a[i - 1] == b[j - 1] {
+                lcs[i - 1][j - 1] + 1
+            } else {
+                lcs[i - 1][j].max(lcs[i][j - 1])
+            };
+        }
+    }
+
+    println!("{}", edit[a.len()][b.len()]);
+    println!("LCS {}", lcs[a.len()][b.len()]);
+}
+'''
+hints = [
+  "edit[i][0] = i and edit[0][j] = j: turning a prefix into nothing costs one deletion per character.",
+  "Matching characters cost nothing and step diagonally; a mismatch costs one and takes the cheapest of the three neighbours.",
+  "LCS is the same walk with max instead of min, and no diagonal step on a mismatch.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "horse\nros\n",         expect = "3\nLCS 2\n", visible = true },
+  { name = "same",    stdin = "causeway\ncauseway\n", expect = "0\nLCS 8\n", visible = false },
+  { name = "nothing", stdin = "abc\nxyz\n",           expect = "3\nLCS 0\n", visible = false },
+  { name = "insert",  stdin = "mtr\nmetro\n",         expect = "2\nLCS 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id           = "rust.hacker.19.knapsack"
+node         = 19
+title        = "WHAT FITS IN THE BAG"
+difficulty   = 5
+time_limit_s = 1200
+story        = "One rider, one bag, and a board of orders each with a weight and a tip. Greedy picks the wrong ones."
+concepts     = ["dynamic-programming", "greedy", "slices"]
+requires     = ["rust.hacker.18.edit-distance"]
+map          = { x = 0.899, y = 0.915, kind = "quest" }
+brief        = '''
+Line one is `n cap`. The next `n` lines are `<weight> <value>`. Each item can
+be taken at most **once**.
+
+Print the best total value that fits in `cap`, then `GREEDY <v>`: what you
+would get by repeatedly taking the item with the best value-per-weight that
+still fits.
+
+```
+input:  3 10
+        6 10
+        5 7
+        5 7
+output: 14
+        GREEDY 10
+```
+
+The two numbers being different is the whole point of the quest, and the
+sample shows it: the best value-per-weight is the `6 10` item at `1.67`, and
+taking it leaves four units of room that nothing fits into. Passing on it and
+taking both `5 7` items is worth `14`. The hidden cases are small, so what
+they check is that you got both numbers right, not that the table is fast.
+'''
+starter      = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let cap = values[1] as usize;
+    let items: Vec<(usize, i64)> = (0..n)
+        .map(|i| (values[2 + 2 * i] as usize, values[3 + 2 * i]))
+        .collect();
+
+    let best = vec![0i64; cap + 1];
+
+    // one row per item, capacities walked downwards so each item is used once
+    let _ = (best, items);
+    println!("0");
+    println!("GREEDY 0");
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let cap = values[1] as usize;
+    let items: Vec<(usize, i64)> = (0..n)
+        .map(|i| (values[2 + 2 * i] as usize, values[3 + 2 * i]))
+        .collect();
+
+    let mut best = vec![0i64; cap + 1];
+    for &(weight, value) in &items {
+        // downwards, so this item cannot be picked up twice in one pass
+        for room in (weight..=cap).rev() {
+            let candidate = best[room - weight] + value;
+            if candidate > best[room] {
+                best[room] = candidate;
+            }
+        }
+    }
+
+    let mut order: Vec<(usize, i64)> = items.clone();
+    order.sort_by(|a, b| {
+        let left = b.1 * a.0 as i64;
+        let right = a.1 * b.0 as i64;
+        left.cmp(&right).then(a.0.cmp(&b.0))
+    });
+    let mut room = cap;
+    let mut greedy = 0i64;
+    for &(weight, value) in &order {
+        if weight <= room {
+            room -= weight;
+            greedy += value;
+        }
+    }
+
+    println!("{}", best[cap]);
+    println!("GREEDY {}", greedy);
+}
+'''
+hints = [
+  "Walking the capacities downwards is what makes it 0/1 instead of unbounded. Upwards lets the same item be reused.",
+  "Compare ratios without dividing: b.value * a.weight against a.value * b.weight, so there is no floating point in the answer.",
+  "The greedy pass is a straight loop over the sorted items — no backtracking, which is exactly why it is wrong.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "3 10\n6 10\n5 7\n5 7\n", expect = "14\nGREEDY 10\n", visible = true },
+  { name = "no-room",  stdin = "2 1\n5 100\n9 900\n",    expect = "0\nGREEDY 0\n",   visible = false },
+  { name = "takes-all", stdin = "3 10\n1 1\n2 2\n3 3\n", expect = "6\nGREEDY 6\n",   visible = false },
+  { name = "one",      stdin = "1 4\n4 9\n",             expect = "9\nGREEDY 9\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id           = "rust.hacker.20.bits"
+node         = 20
+title        = "THE ONE THAT IS ALONE"
+difficulty   = 4
+time_limit_s = 900
+story        = "Every docket is scanned twice except one. They will not let you use a hash map and they will not let you sort."
+concepts     = ["bit-manipulation", "math", "complexity"]
+requires     = ["rust.hacker.19.knapsack"]
+map          = { x = 0.773, y = 0.865, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` non-negative integers, in which every value
+appears exactly twice except one.
+
+Print four lines:
+
+1. the value that appears once, found with **xor** and constant extra space
+2. how many `1` bits are set in it
+3. `POW2 YES` if it is a power of two, `POW2 NO` otherwise (`0` is not)
+4. the value with its lowest set bit cleared, or `0` if it has none
+
+```
+input:  5
+        4 1 2 1 2
+output: 4
+        1
+        POW2 YES
+        0
+```
+
+`x ^ x == 0` and `x ^ 0 == x`, and xor does not care what order it happens in.
+That is the whole first line. `x & (x - 1)` clears the lowest set bit, which
+gives you the third and fourth lines for free.
+'''
+starter      = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<u64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let alone: u64 = 0;
+
+    // xor everything together, then read the bits off the result
+    let _ = nums;
+    println!("{}", alone);
+    println!("0");
+    println!("POW2 NO");
+    println!("0");
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<u64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let mut alone: u64 = 0;
+    for &value in &nums {
+        alone ^= value;
+    }
+
+    let mut bits = 0u32;
+    let mut walk = alone;
+    while walk != 0 {
+        walk &= walk - 1;
+        bits += 1;
+    }
+
+    let power_of_two = alone != 0 && alone & (alone - 1) == 0;
+    let cleared = if alone == 0 { 0 } else { alone & (alone - 1) };
+
+    println!("{}", alone);
+    println!("{}", bits);
+    println!("POW2 {}", if power_of_two { "YES" } else { "NO" });
+    println!("{}", cleared);
+}
+'''
+hints = [
+  "The pairs cancel themselves out whatever order they arrive in, so one fold over the list is enough.",
+  "Counting bits by clearing the lowest one each time runs once per set bit, not once per bit width.",
+  "A power of two has exactly one bit set, so clearing the lowest one leaves zero — and zero itself has to be excluded by hand.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n4 1 2 1 2\n",      expect = "4\n1\nPOW2 YES\n0\n",  visible = true },
+  { name = "seven",  stdin = "3\n7 9 9\n",          expect = "7\n3\nPOW2 NO\n6\n",   visible = false },
+  { name = "single", stdin = "1\n0\n",              expect = "0\n0\nPOW2 NO\n0\n",   visible = false },
+  { name = "big",    stdin = "5\n1024 5 5 8 8\n",   expect = "1024\n1\nPOW2 YES\n0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id           = "rust.hacker.21.matrix"
+node         = 21
+title        = "TURN THE FLOOR PLAN"
+difficulty   = 4
+time_limit_s = 900
+story        = "The plan is the wrong way up and there is no room on the table for a second copy of it."
+concepts     = ["matrix", "slices", "iteration"]
+requires     = ["rust.hacker.20.bits"]
+map          = { x = 0.565, y = 0.925, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are an `n × n` grid of integers.
+
+Print the grid rotated **90° clockwise**, `n` lines of space-separated values.
+Then print its values in **spiral order** — outer ring clockwise from the top
+left, inwards — on one line.
+
+```
+input:  3
+        1 2 3
+        4 5 6
+        7 8 9
+output: 7 4 1
+        8 5 2
+        9 6 3
+        1 2 3 6 9 8 7 4 5
+```
+
+The rotation is the one to do in place: transpose, then reverse each row.
+Naming that out loud is half the question.
+'''
+starter      = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let mut grid: Vec<Vec<i64>> = (0..n)
+        .map(|r| (0..n).map(|c| values[1 + r * n + c]).collect())
+        .collect();
+
+    // transpose, reverse each row, print; then walk the spiral
+    let _ = &mut grid;
+    for _ in 0..n {
+        println!("?");
+    }
+    println!("?");
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let original: Vec<Vec<i64>> = (0..n)
+        .map(|r| (0..n).map(|c| values[1 + r * n + c]).collect())
+        .collect();
+
+    let mut grid = original.clone();
+    for r in 0..n {
+        for c in (r + 1)..n {
+            let swap = grid[r][c];
+            grid[r][c] = grid[c][r];
+            grid[c][r] = swap;
+        }
+    }
+    for row in grid.iter_mut() {
+        row.reverse();
+    }
+    for row in &grid {
+        let line: Vec<String> = row.iter().map(|v| v.to_string()).collect();
+        println!("{}", line.join(" "));
+    }
+
+    let mut spiral: Vec<String> = Vec::new();
+    let (mut top, mut bottom) = (0isize, n as isize - 1);
+    let (mut left, mut right) = (0isize, n as isize - 1);
+    while top <= bottom && left <= right {
+        for c in left..=right {
+            spiral.push(original[top as usize][c as usize].to_string());
+        }
+        top += 1;
+        for r in top..=bottom {
+            spiral.push(original[r as usize][right as usize].to_string());
+        }
+        right -= 1;
+        if top <= bottom {
+            for c in (left..=right).rev() {
+                spiral.push(original[bottom as usize][c as usize].to_string());
+            }
+            bottom -= 1;
+        }
+        if left <= right {
+            for r in (top..=bottom).rev() {
+                spiral.push(original[r as usize][left as usize].to_string());
+            }
+            left += 1;
+        }
+    }
+    println!("{}", spiral.join(" "));
+}
+'''
+hints = [
+  "Transpose by swapping only above the diagonal — c starting at r + 1 — or you swap everything back.",
+  "The spiral wants the original grid, so keep a copy before you rotate in place.",
+  "The two `if` guards inside the spiral loop are what stop a single middle row or column being walked twice.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n4 5 6\n7 8 9\n", expect = "7 4 1\n8 5 2\n9 6 3\n1 2 3 6 9 8 7 4 5\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",                   expect = "5\n5\n",                                   visible = false },
+  { name = "two",   stdin = "2\n1 2\n3 4\n",            expect = "3 1\n4 2\n1 2 4 3\n",                      visible = false },
+  { name = "four",  stdin = "4\n1 2 3 4\n5 6 7 8\n9 10 11 12\n13 14 15 16\n", expect = "13 9 5 1\n14 10 6 2\n15 11 7 3\n16 12 8 4\n1 2 3 4 8 12 16 15 14 13 9 5 6 7 11 10\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id           = "rust.hacker.22.trie"
+node         = 22
+title        = "THE PREFIX BOX"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Autocomplete for the stop board — the honest kind, that only completes what is actually on the list."
+concepts     = ["tries", "strings", "collections"]
+requires     = ["rust.hacker.21.matrix"]
+map          = { x = 0.449, y = 0.867, kind = "quest" }
+brief        = '''
+Line one is `n q`. The next `n` lines are lowercase words to insert. The next
+`q` lines are queries, each `WORD <s>` or `PREFIX <s>`.
+
+Build a trie — a tree of nodes each holding up to 26 children — and answer:
+
+* `WORD <s>` → `YES` if `s` was inserted, `NO` otherwise
+* `PREFIX <s>` → how many inserted words start with `s`
+
+Then print `NODES <k>`, the number of nodes in the trie including the root.
+
+```
+input:  3 3
+        tram
+        tramway
+        train
+        WORD tram
+        PREFIX tra
+        WORD tra
+output: YES
+        3
+        NO
+        NODES 10
+```
+
+Keep a count on every node of how many inserted words pass through it, and
+`PREFIX` is a walk with no counting at the end.
+'''
+starter      = '''
+use std::io::Read;
+
+struct Node {
+    children: [Option<usize>; 26],
+    through: usize,
+    terminal: bool,
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut header = lines.next().unwrap().split_whitespace();
+    let n: usize = header.next().unwrap().parse().unwrap();
+    let q: usize = header.next().unwrap().parse().unwrap();
+
+    let mut nodes: Vec<Node> = vec![Node { children: [None; 26], through: 0, terminal: false }];
+
+    for _ in 0..n {
+        let _word = lines.next().unwrap();
+        // walk down, creating nodes as needed, bumping `through`
+    }
+
+    for _ in 0..q {
+        let _query = lines.next().unwrap();
+        println!("NO");
+    }
+    let _ = &mut nodes;
+    println!("NODES 1");
+}
+'''
+solution     = '''
+use std::io::Read;
+
+struct Node {
+    children: [Option<usize>; 26],
+    through: usize,
+    terminal: bool,
+}
+
+fn blank() -> Node {
+    Node { children: [None; 26], through: 0, terminal: false }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut header = lines.next().unwrap().split_whitespace();
+    let n: usize = header.next().unwrap().parse().unwrap();
+    let q: usize = header.next().unwrap().parse().unwrap();
+
+    let mut nodes: Vec<Node> = vec![blank()];
+
+    for _ in 0..n {
+        let word = lines.next().unwrap().trim();
+        let mut at = 0usize;
+        for byte in word.bytes() {
+            let slot = (byte - b'a') as usize;
+            let next = match nodes[at].children[slot] {
+                Some(index) => index,
+                None => {
+                    nodes.push(blank());
+                    let index = nodes.len() - 1;
+                    nodes[at].children[slot] = Some(index);
+                    index
+                }
+            };
+            nodes[next].through += 1;
+            at = next;
+        }
+        nodes[at].terminal = true;
+    }
+
+    for _ in 0..q {
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        let kind = parts.next().unwrap();
+        let text = parts.next().unwrap_or("");
+
+        let mut at = Some(0usize);
+        for byte in text.bytes() {
+            let slot = (byte - b'a') as usize;
+            at = at.and_then(|index| nodes[index].children[slot]);
+        }
+
+        match kind {
+            "WORD" => {
+                let hit = at.map(|index| nodes[index].terminal).unwrap_or(false);
+                println!("{}", if hit { "YES" } else { "NO" });
+            }
+            _ => {
+                println!("{}", at.map(|index| nodes[index].through).unwrap_or(0));
+            }
+        }
+    }
+
+    println!("NODES {}", nodes.len());
+}
+'''
+hints = [
+  "Store the nodes in one Vec and let children hold indices. Box-per-node fights the borrow checker for no benefit here.",
+  "`through` is bumped on the node you step *onto*, so the root never counts itself.",
+  "A query that falls off the trie gives None, and None answers NO and 0 without a special case.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 3\ntram\ntramway\ntrain\nWORD tram\nPREFIX tra\nWORD tra\n", expect = "YES\n3\nNO\nNODES 10\n", visible = true },
+  { name = "missing", stdin = "1 2\nmtr\nPREFIX z\nWORD mtr\n",                              expect = "0\nYES\nNODES 4\n",     visible = false },
+  { name = "nested",  stdin = "2 2\na\nab\nPREFIX a\nWORD a\n",                              expect = "2\nYES\nNODES 3\n",     visible = false },
+  { name = "empty-q", stdin = "2 1\nhku\nhk\nPREFIX hk\n",                                   expect = "2\nNODES 4\n",          visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id           = "rust.hacker.23.prefix-sums"
+node         = 23
+title        = "HOW MANY WAYS TO HIT THE TARGET"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A day of takings and a number the auditor wants to see. How many runs of consecutive hours add up to exactly that."
+concepts     = ["prefix-sums", "hashing", "complexity"]
+requires     = ["rust.hacker.22.trie"]
+map          = { x = 0.218, y = 0.924, kind = "quest" }
+brief        = '''
+Line one is `n k`. Line two is `n` integers, which may be negative.
+
+Print how many contiguous runs sum to exactly `k`, then `RANGE <s>`, the sum
+of the whole list, read off the last prefix sum rather than by adding again.
+
+```
+input:  5 3
+        1 2 3 -3 3
+output: 5
+        RANGE 6
+```
+
+Negative values kill the sliding window — a window that is too big cannot be
+fixed by shrinking it. What survives is prefix sums: a run `i..j` sums to `k`
+exactly when `prefix[j] - prefix[i] == k`, so count how many earlier prefixes
+equal `prefix[j] - k`. Seed the map with `0 → 1` for runs that start at the
+beginning.
+'''
+starter      = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let k = values[1];
+    let nums = &values[2..2 + n];
+
+    let mut seen: HashMap<i64, i64> = HashMap::new();
+    seen.insert(0, 1);
+
+    // running prefix; for each one, how many earlier prefixes were prefix - k
+    let _ = (seen, nums, k);
+    println!("0");
+    println!("RANGE 0");
+}
+'''
+solution     = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let k = values[1];
+    let nums = &values[2..2 + n];
+
+    let mut seen: HashMap<i64, i64> = HashMap::new();
+    seen.insert(0, 1);
+
+    let mut prefix = 0i64;
+    let mut runs = 0i64;
+    for &value in nums {
+        prefix += value;
+        runs += *seen.get(&(prefix - k)).unwrap_or(&0);
+        *seen.entry(prefix).or_insert(0) += 1;
+    }
+
+    println!("{}", runs);
+    println!("RANGE {}", prefix);
+}
+'''
+hints = [
+  "Look the earlier prefix up *before* you record the current one, or a run of length zero counts itself when k is 0.",
+  "seen.insert(0, 1) up front is what lets a run that starts at index 0 be found at all.",
+  "The final prefix is the total, so the second line costs nothing extra.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "5 3\n1 2 3 -3 3\n", expect = "5\nRANGE 6\n",  visible = true },
+  { name = "zeroes",   stdin = "3 0\n0 0 0\n",      expect = "6\nRANGE 0\n",  visible = false },
+  { name = "none",     stdin = "3 9\n1 1 1\n",      expect = "0\nRANGE 3\n",  visible = false },
+  { name = "negative", stdin = "4 -2\n-1 -1 2 -2\n", expect = "3\nRANGE -2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24  BOSS
+[[quest]]
+id           = "rust.hacker.24.lru"
+node         = 24
+title        = "THE WHITEBOARD"
+difficulty   = 5
+time_limit_s = 1800
+story        = "Room 7-32, last question, and the interviewer turns the monitor off. No highlighting, no completion, a clock."
+concepts     = ["collections", "linked-lists", "complexity"]
+requires     = ["rust.hacker.23.prefix-sums", "rust.hacker.12.heap"]
+map          = { x = 0.106, y = 0.876, kind = "boss" }
+brief        = '''
+Line one is `cap q`. The next `q` lines are `PUT <key> <value>` or
+`GET <key>`.
+
+Implement a fixed-capacity cache that evicts the **least recently used** entry
+when it is full. A `GET` and a `PUT` both count as using a key.
+
+For each `GET` print the value, or `-1` if it is not there. At the end print
+the surviving keys, most-recently-used first, space separated — or `-` if the
+cache is empty — and then `EVICTED <k>`.
+
+```
+input:  2 6
+        PUT 1 10
+        PUT 2 20
+        GET 1
+        PUT 3 30
+        GET 2
+        GET 3
+output: 10
+        -1
+        30
+        3 1
+        EVICTED 1
+```
+
+Follow the sample through: `GET 1` makes `1` recent again, so when `PUT 3`
+needs room it is `2` that goes. `GET 2` misses. `GET 3` hits and makes `3` the
+most recent, which is why the survivors print as `3 1`.
+
+The textbook answer is a hash map into a doubly linked list. In Rust, without
+`unsafe` or `Rc<RefCell<_>>`, the honest version is a `HashMap<i64, (i64, u64)>`
+carrying a monotonically increasing stamp, and eviction scans for the oldest.
+That is O(cap) per eviction rather than O(1), and saying so out loud is worth
+more in the room than pretending otherwise.
+'''
+starter      = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut header = lines.next().unwrap().split_whitespace();
+    let cap: usize = header.next().unwrap().parse().unwrap();
+    let q: usize = header.next().unwrap().parse().unwrap();
+
+    // key -> (value, last used stamp)
+    let mut cache: HashMap<i64, (i64, u64)> = HashMap::new();
+    let evicted = 0usize;
+
+    for _ in 0..q {
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        match parts.next().unwrap() {
+            "GET" => println!("-1"),
+            _ => {}
+        }
+    }
+
+    let _ = (&mut cache, cap);
+    println!("-");
+    println!("EVICTED {}", evicted);
+}
+'''
+solution     = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut header = lines.next().unwrap().split_whitespace();
+    let cap: usize = header.next().unwrap().parse().unwrap();
+    let q: usize = header.next().unwrap().parse().unwrap();
+
+    // key -> (value, the clock reading when it was last used)
+    let mut cache: HashMap<i64, (i64, u64)> = HashMap::new();
+    let mut clock = 0u64;
+    let mut evicted = 0usize;
+
+    for _ in 0..q {
+        clock += 1;
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        let op = parts.next().unwrap();
+        let key: i64 = parts.next().unwrap().parse().unwrap();
+
+        if op == "GET" {
+            match cache.get_mut(&key) {
+                Some(entry) => {
+                    entry.1 = clock;
+                    println!("{}", entry.0);
+                }
+                None => println!("-1"),
+            }
+            continue;
+        }
+
+        let value: i64 = parts.next().unwrap().parse().unwrap();
+        if !cache.contains_key(&key) && cache.len() == cap {
+            let oldest = cache
+                .iter()
+                .min_by_key(|(_, entry)| entry.1)
+                .map(|(k, _)| *k)
+                .unwrap();
+            cache.remove(&oldest);
+            evicted += 1;
+        }
+        cache.insert(key, (value, clock));
+    }
+
+    let mut alive: Vec<(i64, u64)> = cache.iter().map(|(k, e)| (*k, e.1)).collect();
+    alive.sort_by(|a, b| b.1.cmp(&a.1));
+    if alive.is_empty() {
+        println!("-");
+    } else {
+        let line: Vec<String> = alive.iter().map(|(k, _)| k.to_string()).collect();
+        println!("{}", line.join(" "));
+    }
+    println!("EVICTED {}", evicted);
+}
+'''
+hints = [
+  "One clock that ticks per operation, and every touched key records the reading. Recency is then just a number to sort on.",
+  "Overwriting a key that is already present is not an eviction — check contains_key before you decide the cache is full.",
+  "The final line is sorted by stamp descending, so the key touched last comes first.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "2 6\nPUT 1 10\nPUT 2 20\nGET 1\nPUT 3 30\nGET 2\nGET 3\n", expect = "10\n-1\n30\n3 1\nEVICTED 1\n", visible = true },
+  { name = "overwrite", stdin = "1 3\nPUT 5 1\nPUT 5 2\nGET 5\n",                          expect = "2\n5\nEVICTED 0\n",            visible = false },
+  { name = "miss",     stdin = "2 2\nGET 9\nGET 8\n",                                      expect = "-1\n-1\n-\nEVICTED 0\n",       visible = false },
+  { name = "churn",    stdin = "1 4\nPUT 1 1\nPUT 2 2\nPUT 3 3\nGET 1\n",                  expect = "-1\n3\nEVICTED 2\n",           visible = false },
 ]

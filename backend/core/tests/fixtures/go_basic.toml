@@ -45,3 +45,37 @@ match        = "trim"
 cases = [
   { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
 ]
+
+[[quest]]
+id          = "go.basic.02.testing"
+node        = 2
+title       = "A HARNESS NOBODY BUILT"
+difficulty  = 1
+story       = "Some doors are drawn on the map before they are cut."
+concepts    = ["functions", "error-handling"]
+requires    = []
+map         = { x = 0.25, y = 0.66, kind = "quest" }
+brief       = '''
+This quest declares the `gotest` harness, which this build cannot run. It
+exists so the "refuse without recording anything" rule stays tested now that
+the Go land itself works.
+'''
+starter     = '''
+package main
+
+func main() {}
+'''
+solution    = '''
+package main
+
+func main() {}
+'''
+hints = []
+
+[quest.tests]
+harness      = "gotest"
+timeout_ms   = 5000
+match        = "trim"
+cases = [
+  { name = "runs", stdin = "", expect = "ok\n", visible = true },
+]

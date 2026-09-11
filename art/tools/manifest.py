@@ -25,7 +25,22 @@ ORDER = [
     "boss_race", "boss_whiteboard", "boss_clock",
     "node_quest", "node_boss", "node_locked",
     "stamp_cleared", "fx_ribbon", "fx_medal", "fx_trophy", "ui_panel",
+    # The opening (docs/story.md §2), in the order the sequence plays.
+    "open_flat", "open_flat_p",
+    "open_cursor", "open_cursor_p",
+    "open_ghost", "open_ghost_p",
+    "open_face", "open_face_p",
+    "open_tills", "open_tills_p",
+    "open_stairs", "open_stairs_p",
+    "open_lands", "open_lands_p",
+    # For the technique round: an animation strip, a near-parallax overlay,
+    # and a palette-cycling source.
+    "walk_mei", "fg_wires", "neon_signs",
 ]
+
+# Assets that are not one picture. `walk_mei` is four frames in a row; the
+# renderer needs the frame size and a box per frame, not one box for the sheet.
+STRIPS = {"walk_mei": 4}
 
 root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 art = []
@@ -37,9 +52,19 @@ for name in ORDER:
         im = Image.open(path)
         e = {"name": name, "file": f"{name}.{ext}", "w": im.width, "h": im.height}
         if ext == "png":
-            b = box_of(im.convert("RGBA"))
-            if b:
-                e["box"] = b
+            if name in STRIPS:
+                n = STRIPS[name]
+                e["frames"] = n
+                e["fw"] = im.width // n
+                e["fh"] = im.height
+                e["boxes"] = [
+                    box_of(im.convert("RGBA").crop((i * e["fw"], 0, (i + 1) * e["fw"], im.height)))
+                    for i in range(n)
+                ]
+            else:
+                b = box_of(im.convert("RGBA"))
+                if b:
+                    e["box"] = b
         art.append(e)
         break
     else:

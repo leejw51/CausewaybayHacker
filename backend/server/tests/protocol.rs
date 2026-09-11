@@ -350,13 +350,11 @@ async fn a_clear_reaches_the_users_other_window() {
     server.handle.abort();
 }
 
-/// A submission this build cannot judge is refused **before anything is
-/// written**. An attempt row carries a verdict, a verdict carries mistakes,
-/// and `mistake_stats` is what the drills teach from (SPEC §7) — a fabricated
-/// entry there would teach the player to fix something they never did, and
-/// afterwards there is no way to tell it from a real mistake.
+/// The Go land runs. Same wire, same verdict shape, same persistence as Rust —
+/// the point of building it was that 30 of the 60 shipped quests were
+/// unplayable.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn a_go_submission_is_unavailable_and_records_nothing() {
+async fn a_go_submission_is_compiled_run_and_recorded() {
     let server = start_with_go().await;
     let mut socket = connect(server.port).await;
     login(&mut socket).await;
@@ -365,7 +363,102 @@ async fn a_go_submission_is_unavailable_and_records_nothing() {
         &mut socket,
         json!({ "v":1, "id":"c-5", "type":"quest.submit", "payload": {
             "quest_id": "go.basic.01.hello", "lang": "go",
-            "source": "package main\nimport \"fmt\"\nfunc main() { fmt.Println(\"hello, causewaybay\") }\n" } }),
+            "source": "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"hello, causewaybay\")\n}\n" } }),
+    )
+    .await;
+
+    let mut stages = Vec::new();
+    let reply = loop {
+        let frame = next_json(&mut socket).await;
+        match frame["type"].as_str() {
+            Some("run.stage") => {
+                stages.push(frame["payload"]["stage"].as_str().unwrap().to_string())
+            }
+            Some("quest.submit.ok") => break frame,
+            Some("quest.submit.err") => panic!("the Go land is built and this failed: {frame}"),
+            _ => continue,
+        }
+    };
+    let attempt = &reply["payload"]["attempt"];
+    assert_eq!(attempt["verdict"].as_str(), Some("accepted"), "{attempt}");
+    assert_eq!(attempt["cleared"].as_bool(), Some(true));
+    assert_eq!(attempt["tests_passed"], attempt["tests_total"]);
+    assert!(stages.contains(&"compiling".to_string()), "{stages:?}");
+
+    // And it is in the record, which is what the drills read.
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-6", "type":"stats.history", "payload": {} }),
+    )
+    .await;
+    let history = next_json(&mut socket).await;
+    assert_eq!(
+        history["payload"]["attempts"][0]["quest_id"].as_str(),
+        Some("go.basic.01.hello")
+    );
+    server.handle.abort();
+}
+
+/// A Go compile error is classified by SPEC §7.1's Go column, which has no
+/// error codes in it — the identity is made from the message's shape.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_go_compile_error_is_classified_over_the_wire() {
+    let server = start_with_go().await;
+    let mut socket = connect(server.port).await;
+    login(&mut socket).await;
+
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-5", "type":"quest.submit", "payload": {
+            "quest_id": "go.basic.01.hello", "lang": "go",
+            "source": "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(tolal)\n}\n" } }),
+    )
+    .await;
+    let reply = loop {
+        let frame = next_json(&mut socket).await;
+        if frame["type"].as_str() == Some("quest.submit.ok") {
+            break frame;
+        }
+    };
+    let attempt = &reply["payload"]["attempt"];
+    assert_eq!(attempt["verdict"].as_str(), Some("compile_error"));
+    let kinds: Vec<&str> = attempt["mistakes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["kind"].as_str().unwrap())
+        .collect();
+    assert!(kinds.contains(&"unknown-name"), "{attempt}");
+    assert_eq!(
+        attempt["mistakes"][0]["code"].as_str(),
+        Some("go:undefined"),
+        "the identity Go never gave us has to be made and kept"
+    );
+    assert!(
+        attempt["stderr"].as_str().unwrap().contains("undefined"),
+        "the player should see what go build said"
+    );
+    server.handle.abort();
+}
+
+/// A submission this build cannot judge is refused **before anything is
+/// written**. An attempt row carries a verdict, a verdict carries mistakes,
+/// and `mistake_stats` is what the drills teach from (SPEC §7) — a fabricated
+/// entry there would teach the player to fix something they never did, and
+/// afterwards there is no way to tell it from a real mistake.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn an_unjudgeable_submission_records_nothing() {
+    let server = start_with_go().await;
+    let mut socket = connect(server.port).await;
+    login(&mut socket).await;
+
+    // `go.basic.02.testing` declares the `gotest` harness, which this build
+    // does not run. The language is fine; the harness is the gap.
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-5", "type":"quest.submit", "payload": {
+            "quest_id": "go.basic.02.testing", "lang": "go",
+            "source": "package main\n\nfunc main() {}\n" } }),
     )
     .await;
     let reply = next_json(&mut socket).await;
@@ -411,7 +504,7 @@ async fn a_go_submission_is_unavailable_and_records_nothing() {
     )
     .await;
     let map = next_json(&mut socket).await;
-    assert_eq!(map["payload"]["nodes"][0]["attempts"].as_i64(), Some(0));
+    assert_eq!(map["payload"]["nodes"][1]["attempts"].as_i64(), Some(0));
 
     // And the connection is fine — an application error is never a close.
     send(

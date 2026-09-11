@@ -15,27 +15,54 @@ asserts nothing — which is the failure mode this file exists to prevent.
 ```
 tests/
 ├── PLAN.md              this file
+├── run-all.mjs          every suite, one command, an honest summary
 ├── vectors/             the shared fixtures (SPEC §9.1, §9.2, §9.7)
 ├── content/             the pack verifier and the packs it must refuse (§9.4, §9.5)
 └── smoke/               the PROTOCOL.md §8 contract checker (§9.8 and most of §6)
-e2e/                     playwright: the M1 journey, both orientations
+e2e/                     playwright: the journey, both orientations
+backend/runner/tests/limits.rs        SPEC §9.6, the rows nothing else covers
+backend/server/tests/integration.rs   behaviour over time, over the wire
 ```
+
+## One command
+
+```bash
+node tests/run-all.mjs          # everything
+node tests/run-all.mjs --list   # what would run, and why anything would not
+node tests/run-all.mjs --json   # machine-readable
+```
+
+It starts a server on a **throwaway home** (`--home <tmpdir>`, SPEC §1's
+first precedence) serving `frontend/dist-e2e`, runs the suites that need one
+against it, and stops it — including on `^C`. Nothing touches the
+developer's own `~/.causewaybayhacker`, and every run starts from an empty
+database, which is what makes "node 1 is open" true twice in a row.
+
+Exit 0 only if every suite that ran passed. **A skip is never a pass**: the
+summary names every skipped suite, the reason, and the command that would
+make it runnable — and a suite that passed while skipping something *inside*
+itself says so too (the LÖVE layout tests need a real window; §8.12's
+keepalive check runs over 6 s rather than §1.1's 70 s unless `--slow`).
 
 ## Status at a glance
 
 | suite | runs today | green | note |
-| --- | --- | --- | --- |
+| --- | --- | --- | --- | 
 | `tests/vectors/` | yes | yes | 3 fixture files, all generated from real tools |
 | `tests/vectors/mistakes/` | yes | 33/33 verified | 1 documented gap (go `unhandled-error`) |
+| `backend` (`cargo test --workspace`) | yes | yes | 70 of BE's own + **13 of QA's** (7 runner limits, 6+1 integration) |
+| `frontend` (`vitest`) | yes | yes | FE's own; QA does not write there |
+| `love2d` (`make test-headless`) | yes | 136 cases, 827 assertions | reads QA's `addresses.json` and `signatures.json`; its layout suite needs a real window |
 | `tests/content/verify_pack.py` | yes | **60/60 quests** | every solution passes, every starter rejected |
 | `tests/smoke/selftest.mjs` | yes | 20/20 | proves the checker catches 19 injected faults |
-| `tests/smoke/contract.mjs` | **yes — against the real backend** | **11/12** | one real divergence (§8.1), documented below |
-| `e2e/` | needs the frontend hooks | — | 24 tests, all skipping; the hooks do not exist yet |
+| `tests/smoke/contract.mjs` | yes, against the real backend | **12/12** | BE fixed the §8.1 divergence |
+| `e2e/` | **yes — 18/18** | **green** | 9 tests × 2 orientations, driving the real UI |
 
 Nothing above is green by assumption. `verify_pack.py` really compiled 60
 quests; the mistake fixtures really ran `rustc` and `go`; the smoke checker
-really caught 19 deliberately-broken servers, **and has now run against BE's
-real server on :5390**.
+really caught 19 deliberately-broken servers and now scores 12/12 against
+BE's real server; the browser suite really clicks through a real game against
+a real backend and checks the answer **on the wire**.
 
 ### What the first real run found
 
@@ -195,27 +222,70 @@ six are real teaching material and now feed §9.7 (below).
 
 ## SPEC §9.6 — Runner limits
 
-> Infinite loop → `timeout`. Huge output → `output_limit`. Fork bomb → killed,
-> server alive. `GOPROXY=off` → a quest that tries to fetch fails cleanly.
+> Infinite loop → `timeout`. Huge output → `output_limit`. Fork bomb →
+> killed, server alive. `GOPROXY=off` → a quest that tries to fetch fails
+> cleanly.
 
-**Blocked on the runner.** These cannot be faked: what is asserted is that a
-SIGKILL happened and the server is still up, which needs a real runner and a
-real server. Every case below is specified and none is written.
+**No longer blocked.** The runner exists, BE covered three of the nine rows
+in `backend/runner/tests/rust_runner.rs`, and QA wrote the rest into
+`backend/runner/tests/limits.rs` and `backend/server/tests/integration.rs`.
 
-| # | case | setup → action → assertion | suite | status |
-| --- | --- | --- | --- | --- |
-| 9.6.a | infinite loop | submit `fn main(){loop{}}` → verdict `timeout` within `timeout_ms` + the 500 ms SIGTERM grace, and the process is gone | BE runner | blocked |
-| 9.6.b | huge output | a program printing 1 GiB → verdict `output_limit`, stdout capped at `max_stdout_bytes`, the stream truncated with §4.18's final chunk | BE runner | blocked |
-| 9.6.c | fork bomb | a fork bomb → killed with its process group, **the server answers `ping` afterwards** | BE runner | blocked |
-| 9.6.d | `GOPROXY=off` | a Go quest importing `github.com/…` → `compile_error` naming the proxy, not a hang | BE runner | blocked |
-| 9.6.e | address-space rlimit | allocate 4 GiB → `runtime_error`, not the host swapping | BE runner | blocked |
-| 9.6.f | file-size rlimit | write 1 GiB to a file → killed, nothing outside the home written | BE runner | blocked |
-| 9.6.g | nothing outside the home | snapshot the tree before and after a submit → only `$CAUSEWAYBAY_HACKER_HOME` changed, no `/tmp`, no project dir | BE runner | blocked |
-| 9.6.h | a timeout is still recorded | after 9.6.a → `stats.history` shows the attempt (PROTOCOL.md §4.9: "always recorded") | **smoke** | **writable now, not written** — needs a quest that can loop |
-| 9.6.i | the server survives all of it | run 9.6.a–f in sequence → `ping` still answers | **smoke** | not written |
+The point of this table is that **no row is counted twice**: each names the
+one test that owns it.
 
-9.6.h and 9.6.i are the two QA can own, through the wire, once a runner
-exists. The rest are in-process and belong to BE.
+| # | case | owner | status |
+| --- | --- | --- | --- |
+| 9.6.a | infinite loop → `timeout` | **BE** `rust_runner.rs::an_infinite_loop_times_out_and_does_not_hang_the_runner` | green |
+| 9.6.b | huge output → `output_limit` | **BE** `rust_runner.rs::too_much_output_is_an_output_limit_not_a_full_disk` | green |
+| 9.6.c (half) | a child dies with the process group | **BE** `rust_runner.rs::a_child_that_outlives_the_parent_dies_with_the_process_group` | green |
+| 9.6.c (half) | **and the runner is still alive afterwards** | **QA** `limits.rs::the_runner_still_works_after_every_limit_has_fired` | green |
+| 9.6.d | `GOPROXY=off` | — | **not writable, and not faked** |
+| 9.6.e | `RLIMIT_AS` 1 GiB | **QA** `limits.rs::a_program_that_wants_more_memory_than_the_limit_dies_rather_than_the_host` | green |
+| 9.6.f | `RLIMIT_FSIZE` 64 MiB | **QA** `limits.rs::a_program_that_writes_a_huge_file_is_stopped_by_the_file_size_limit` | green |
+| 9.6.g | nothing outside the home | **QA** three tests, see below | green, with a correction |
+| 9.6.h | a timeout is still recorded | **QA** `limits.rs::a_timeout_is_a_verdict_and_not_a_lost_attempt` (runner) + `integration.rs::a_submission_that_times_out_is_still_recorded` (server) | green |
+| 9.6.i | the server survives all of it | **QA** `limits.rs::the_runner_still_works_after_every_limit_has_fired` | green |
+
+### 9.6.d cannot be written, and will not be faked
+
+It wants `GOPROXY=off` to make a Go quest that fetches the internet fail
+cleanly. There is no Go runner in this build —
+`cwbhacker_runner::unsupported("go", …)` returns a reason instead of a
+judgement, and a Go submission comes back `unavailable` with
+`detail.milestone: 2`. A test pointed at it today would pass **because Go is
+unsupported**, not because the proxy was off. That is a test that goes green
+for the wrong reason, which is worse than no test.
+
+### 9.6.g was written wrong first, and the correction is the finding
+
+The obvious test — "a submission cannot write outside the home" — **fails**,
+and it should. SPEC §5.3 says so in as many words: *"This is not a sandbox.
+Causewaybay Hacker compiles and runs code you typed, on your machine, as
+you."* A submission using an absolute path or `..` reaches anywhere the
+person running the server can reach. That was confirmed, not assumed: the
+first version of this test wrote to a sibling directory and succeeded.
+
+SPEC §1's flat sentence — *"**Nothing outside the home is written.** No
+`/tmp`, no project directory"* — reads as a containment promise and is not
+one. It describes **the runner**, not the code the runner runs. So the row is
+three tests, each asserting something true:
+
+* `the_runner_itself_writes_only_under_the_home_it_was_given` — the runner's
+  own footprint. Catches a `CARGO_HOME` left unset, which would warm the
+  *developer's* `~/.cargo` and make one machine's run differ from another's
+  invisibly.
+* `a_submission_runs_in_a_stripped_environment_pointed_at_the_build_dir` —
+  SPEC §5.3's environment. This is the half that **is** enforceable without a
+  sandbox: ordinary code doing ordinary things lands somewhere harmless, and
+  whatever secrets the shell that started the server was carrying are not
+  readable by every submission.
+* `it_is_not_a_sandbox_and_this_test_says_so_out_loud` — asserts the *weak*
+  thing on purpose, and fails loudly the day somebody adds a real sandbox,
+  with instructions to rewrite it into the assertion everyone would prefer.
+  A test claiming containment that does not exist would be the most dangerous
+  file in the repository.
+
+Raised in `docs/decisions.md`.
 
 ## SPEC §9.7 — Mistake classification
 
@@ -373,86 +443,70 @@ implementation of that in the test tree is the drift §9.1 exists to prevent.
 
 ## The end-to-end journey — `e2e/`
 
-The milestone-1 loop in a real browser, in **both orientations** (two
-Playwright projects, 1280×720 and 720×1280, over one spec — SPEC §10 makes
-both first-class on every screen, so the journey is the assertion rather than
-a separate "does it look right in portrait" test).
+**Off the ground. 9 tests × 2 orientations = 18, all passing**, against a
+real backend serving the real bundle.
 
-**24 tests. All skipping. Every skip names what has to exist.** Nothing here
-has ever passed, and nothing here will pass vacuously: the preflight refuses
-to run a browser at all until both ports answer, and the fixture stops with a
-`fixme` until the frontend publishes the hooks.
+```
+login → train → logout → login as a second wallet
+→ that wallet's own progress, and nothing of the first's
+```
 
-**Verified, not assumed.** The suite was pointed at the backend's own
-`frontend/dist` on :5390 (PROTOCOL.md §1: one port, no CORS), which loads and
-boots. The page exposes `__THREE__` and nothing else — no `data-state`
-attribute, no `window.__cwb`, and none with `?e2e=1` either. So the 24 skips
-are the correct answer today and the hook contract below is the whole gap.
+### The hook that landed was the other half, and it was the better half
 
-**The flow is six screens, not seven.** FE merged land select and category
-select into one `LandsScene` — a 2×3 grid, lands down and categories across
-in the fixed order `basic`, `advanced`, `hacker` — and SPEC §10 was amended
-to match. `boot → login → lands → map → quest → result`. A test that waits
-for a `categories` screen waits forever, so `SCREENS` in `fixtures.ts` no
-longer contains one.
+QA asked FE for a *driving* API — `view()`, `login()`, `setSource()`,
+`submit()`. What landed was `frontend/src/dev/capture.ts`: a
+**freeze-and-capture** hook built for screenshots, giving `scene()` (the six
+screen names, exactly), `settle()`, `step()`, `freeze()`, `orient()` and
+`png()`.
 
-**No answer is hard-coded.** `quest.tests.visible[0].expect` arrives with the
-quest (PROTOCOL.md §4.8), so the right-answer test composes a source that
-prints it. Content is PM's; a suite that hard-codes a string breaks the day
-one changes.
+That turned out to be the half worth having. `settle()` runs the game at a
+fixed 1/60 step until every transition finishes — so a canvas game becomes
+**deterministic**, which is the thing a browser test genuinely cannot do for
+itself. The driving half was not needed: the seed field is a real
+`<textarea class="cwb-field">`, the editor is CodeMirror with real DOM lines,
+and every screen is reachable by keyboard or a click.
 
-| test | asserts | blocked on |
+So the suite **drives the game the way a person does, and verifies on the
+wire** — a second websocket session, opened as the same wallet, asks the
+server what it actually believes. That is a stronger assertion than any view
+model FE could have exposed: a frontend that draws CLEARED over a server that
+never heard about it fails here and passes every unit test on both sides.
+
+### Two things that cost real time, written down so nobody pays twice
+
+* **`settle()` freezes the loop.** Reading the scene with it and then
+  carrying on leaves the app frozen for ever, so the `quest.get` reply is
+  never drawn and the editor stays `hidden` — which surfaces thirty seconds
+  later as a locator timeout on `.cm-content`. `scene()` settles, reads, then
+  `resume()`s. The one test that wants a still frame settles without
+  resuming, on purpose.
+* **Category selection is pointer-only and canvas-drawn.** `lands.key()`
+  handles the land toggle and nothing else, so there is no selector and no
+  key. `pickFirstCategory` scans down the right-hand panel. It originally
+  started at 28% of the canvas height, which is *inside the ADVANCED row* —
+  so the browser silently trained on `rust.advanced.01.threads` while the
+  test asserted against `rust.basic.01.first-light`, and the symptom was
+  "expected cleared, got open" on a quest the UI never opened. The rows begin
+  at ≈18%, measured. There is now an assertion that names this failure when
+  it recurs.
+
+### The tests
+
+| test | asserts | verified by |
 | --- | --- | --- |
-| boots to login | `html[data-state="login"]`, no address yet | frontend |
-| a mnemonic logs in | the address is the one `addresses.json` says — §9.1 observed from outside | frontend + backend |
-| **the mnemonic never crosses the wire** | every sent websocket frame, and `localStorage`, scanned for the phrase and for `mnemonic`/`private_key`/`seed` fields | frontend + backend |
-| RUST → BASIC → map | 3+ nodes, node 1 `open`, the rest `locked` | content + backend |
-| a wrong answer | `wrong_answer`, node stays `open`, `tests_passed < tests_total` | runner |
-| the right answer | `accepted`, `cleared`, 1–2 stars (not 3 — there was a failed attempt), the node stamps, node 2 unlocks, **and a reload keeps it** | the whole stack |
-| the stamp is on screen | the canvas fills this orientation's viewport, screenshot attached for a human | frontend |
-| a double submit | `busy` visible to the client, the first attempt still finishes | backend |
-| a dropped socket | `auth.resume` puts the player back without re-asking for the key | frontend |
-| an unknown `v` | `proto_version` reaches the client and the page carries on | frontend |
-| **the console paints mid-run** | a slow-compiling source → console text appears **before** `data-state` becomes `result` | frontend |
-| **a Go submission** | says "not built yet", not "the server broke" | the M2 gap |
+| boots to login | the seed field is there and empty | DOM |
+| a seed logs in | the address is the one `CausewaybayWallet` derives (SPEC §9.1) | fixture + wire |
+| **the seed never crosses the wire** | every sent frame and `localStorage` scanned for the key, the phrase, and the field names; the field is emptied on submit | websocket frames |
+| RUST × BASIC | node 1 open, the rest locked | wire |
+| a wrong answer | recorded, node stays open, 0 stars | wire |
+| the right answer | cleared, **3 stars**, and still cleared after a reload without re-asking for the seed | wire |
+| **logout → second wallet** | the first wallet's address is gone from storage, the second's map is untouched, the second's history is empty, the first's is intact, and a reload does not resume as the first | wire, both wallets |
+| the screen fills the viewport | canvas ≥ 90% of each axis, **and the WebGL layer and the pixel layer are the same size** (the bug that shows up as parallax sliding out from under the art); PNG attached for a human | capture hook |
+| both orientations | flipping mid-session three times keeps the screen, the virtual size follows, and the game still works afterwards | capture hook |
 
-Two of those close holes neither implementation could confirm from the inside:
-
-* **The mid-run streaming console has never been seen working.** FE
-  unit-tested it and could not confirm it visually — headless RAF starvation
-  defeated its timing attempts. SPEC §5.4 is explicit about why it matters:
-  "so the player watches `rustc` think instead of a spinner". A console that
-  only fills in once the verdict lands is a spinner with extra steps, and
-  every unit test on both sides still passes. The test races the console
-  against the screen change over a deliberately slow-to-compile source (deep
-  generic nesting, which costs `rustc` real time and still compiles, so the
-  attempt is genuine rather than a syntax error that fails instantly).
-* **A Go submission surfaces as `internal_error`**, which PROTOCOL.md §3.3
-  tells a client to render as "the server broke — show a retry, log the
-  trace_id". A player who picks GO on day one gets a crash report for a
-  feature that was never built. `search.query` already has the right shape:
-  `not_found` with `detail: {"milestone": 2}`. The test asserts what exists
-  and records the complaint as a Playwright annotation rather than a false
-  failure.
-
-**What has to exist for it to go green**, in order:
-
-1. A server on 5390 and a frontend on 5291. The suite starts **neither** —
-   four agents share this tree and a Playwright-owned server would fight
-   whatever build is in flight.
-2. `<html data-state>` publishing the current screen, one of
-   `boot | login | lands | categories | map | quest | result`.
-3. `window.__cwb` with `view()`, `login(secret)`, `setSource(text)`,
-   `submit()`, `forget()` — gated on `import.meta.env.DEV ||
-   location.search.includes("e2e=1")` so a shipped bundle carries no "log me
-   in" function. The full contract, with the view model's fields, is in
-   `e2e/fixtures.ts`; it is proposed to FE in `docs/decisions.md`.
-4. `window.__cwbSocket` for the two resilience tests, which need to kill a
-   socket and forge a frame — there is no button for "your wifi died".
-
-A canvas has no DOM to query and no text to read: Playwright cannot see a
-sprite. The sibling repo (`CausewaybayGolang/typescript`) solved this the
-same way, and its suite is readable because of it.
+Every account is **freshly derived per test** (index 2,000,000+ off the
+published BIP-39 all-zero mnemonic), because the server persists and this
+suite runs twice per invocation against one database.
 
 ## Content CI — `tests/content/`
 
@@ -473,6 +527,44 @@ printing a literal backslash-n, so the corruption destroys the lesson silently.
 has to scan the raw bytes for `starter =`/`solution =` followed by `"""`.
 
 ---
+
+# Integration — behaviour over time
+
+`tests/smoke/contract.mjs` proves the *protocol*. `ws_flow.rs` proves the
+slice runs once. Neither can show what happens across several submissions,
+several sessions and a restart — and that is where the rules a player
+actually feels live.
+
+**Audited first, written second.** BE already had most of the coordinator's
+list, and the names overstate what some of them assert, so each row below
+says what was already there and what was genuinely missing.
+
+`backend/server/tests/integration.rs`, 7 tests, all green:
+
+| what | already covered | what was missing, and is now written |
+| --- | --- | --- |
+| **the star cascade** (SPEC §6.3) | `store.rs::stars_follow_the_spec_and_never_regress` asserts `stars_for(failures, hints)` as a **function** and `record_clear` as a **store call** | the arithmetic driven through a real compiler: 3 for a clean clear, **2 for exactly two failures** (the ≤2 boundary, where an off-by-one in either direction lives), 1 for three. Plus: a re-clear reports `cleared: false` and does not restamp — neither downward *nor upward*, which would let a player farm three stars by resubmitting the answer they were shown — and `stats.summary.stars` agrees with the map |
+| **a hint costs a star** | `stars_for(9, 2) == 2` in `store.rs`; `ws_flow.rs` takes a hint and reads its text | nothing connected `quest.hint` to the stamp. Now: a hint on an *otherwise perfect* clear yields 2, re-reading hint 0 does not charge twice, the count survives, and an index past the end is `not_found` rather than a blank box |
+| **a restart** | `store.rs::a_clear_survives_a_restart_and_a_reimport`, at the store level | the server really torn down (graceful shutdown, joined) and brought back on the same home: the map still says cleared with the same stars, the unlock survives, **both** attempts are still on record, the mistake is still there, and `auth.resume` works across the process boundary so the player is not asked for their seed every time the server restarts |
+| **the unlock cascade** | `store.rs::locked_nodes_open_as_their_requirements_clear` | the **event**: `progress.update.unlocked` names node 2 and *only* node 2, and the map fetched afterwards agrees with the event the server just sent — two different code paths that a client trusts equally. Plus `locked` carrying `detail.requires` |
+| **two users, one quest** | `store.rs::two_users_do_not_leak_into_each_other` (queries); `contract.mjs` (over the wire, sequential) | genuine **concurrency** — both submissions in the compiler at once via `tokio::join!`, which is where a shared workdir or a binary cached by quest rather than by attempt would show up. And the half the wire cannot see: `users/<address>/attempts/<id>/` on disk, neither directory holding the other's work |
+| **§9.6.h** | — | a timeout and a compile error both reach `stats.history`, and the compile error carries a classified mistake (PROTOCOL.md §4.9: "always recorded. That is the curriculum") |
+| **the address spelling** | — | `auth.login`, `auth.resume` in-process, `profile.update` and `auth.resume` **after a restart** all spell the address the same way. The last one is the interesting case: that is when the server stops having the string the client sent and must read it back out of `users`, whose primary key is the *lowercase* form (SPEC §3.4). It passes — the server is right |
+
+**Not repeated here** because they are already covered and duplicating them
+would mean two tests to update and two places to be wrong:
+`a_clear_reaches_the_users_other_window` (protocol.rs), the store-level
+cascade and isolation (store.rs), the first-clear slice (ws_flow.rs).
+
+### One thing this round proved about the tests themselves
+
+The restart test failed on its first run with *"the resumed session is the
+same player: expected `0x9d8A62…`, got `0x9d8a62…`"* — which looks exactly
+like a server bug and is not one. The helper returned the address it had
+**claimed** (`eth::address_from_pubkey`, the lowercase storage form) rather
+than the one the server **echoed** (EIP-55, per PROTOCOL.md §2.4). The test
+was asserting its own helper. It now returns the server's spelling, and the
+reason is a comment on the function.
 
 # What §9 does not list, and should
 

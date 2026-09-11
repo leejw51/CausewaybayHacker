@@ -1283,3 +1283,281 @@ the session token, under one key, and both the read and the write are wrapped
 in a `try`/`catch` that *returns* — a browser in private mode costs a
 remembered session and never the login. That is the property L2D's fix
 restored, and it is worth having checked rather than assumed.
+
+## 2026-09-11 — BE: the Go land runs
+
+`go build -o prog main.go` and the same stdio harness Rust uses. Both lands
+now compile and run, and all 60 shipped quests are playable.
+
+**The harness is shared, not copied.** `runner/src/harness.rs` holds the case
+loop — run, compare, verdict — and `rust.rs` and `go.rs` each do only their
+own compile step before handing over. Two copies of that loop would drift, and
+a `trim` that forgave a trailing newline in one land and not the other is
+exactly the difference a player reads as the server being unfair.
+
+**The Go build environment** (SPEC §5.1): `GOCACHE`, `GOMODCACHE` and `GOPATH`
+under `build/go/`, `GOFLAGS=-mod=mod`, `GOPROXY=off`. Two more than §5.1 lists,
+both to stop a network fetch that `GOPROXY=off` would then fail confusingly:
+`GOTOOLCHAIN=local`, so a `go.mod` naming a newer toolchain does not send `go`
+to the internet, and `CGO_ENABLED=0`, so a quest cannot depend on the host
+having a C compiler. A quest that imports a non-stdlib package fails as a
+compile error in under a second, which is SPEC §9.6's `GOPROXY=off` case and
+is asserted in `runner/tests/go_runner.rs`.
+
+**Which §7.1 Go rows this build can actually produce.** Go gives prose, not
+codes, so the identity is *made* from the message's shape and kept in
+`mistakes.code`:
+
+| row | identity | where it comes from |
+| --- | --- | --- |
+| `type-mismatch` | `go:cannot-use-as` | `go build` |
+| `unknown-name` | `go:undefined` | `go build` |
+| `unused` | `go:declared-not-used`, `go:imported-not-used` | `go build` |
+| `syntax` | `go:syntax` | `go build` |
+| `nil-deref` | `go:nil-deref` | runtime panic |
+| `index-range` | `go:index-out-of-range` | runtime panic |
+| `deadlock` | `go:deadlock` | runtime `fatal error` |
+| `other` | `go:<shape of the message>` | anything else |
+| `data-race` | `go:data-race` | **recognised, not reachable — see below** |
+| `unhandled-error` | — | **unpopulated for Go — see below** |
+
+All of them are asserted against QA's captured `go1.27.1` output rather than
+against my idea of what Go says: 11 Go fixtures and 21 Rust ones, in
+`core/tests/mistakes.rs`.
+
+**The player's identifiers never reach the identity.** `undefined: tolal` and
+`undefined: subtotal` are one mistake, so `go_identity` strips quoted text,
+parenthesised asides and everything after the colon, and stops at the first
+word that looks like a name — a single letter or anything with a capital in
+it. Better a coarse identity two mistakes share than a fine one that splits a
+mistake into one row per variable. The full text is still in
+`mistakes.message`.
+
+**`data-race` is recognised but not reachable in this build, and no shipped
+quest needs it to be.** A race only shows up under `-race`, which is a
+different build: on darwin/arm64 it wants cgo, it costs 2–10× in run time, and
+it is non-deterministic by nature — three runs of QA's own race fixture
+detected it zero times out of three. `content/go/advanced.10.race` declares
+`harness = "stdio"` and is judged on its output, which is the right way to
+teach it: the fixed program is deterministic and the broken one is not.
+`classify_go_runtime` recognises a `WARNING: DATA RACE` report if one ever
+appears in stderr, so the row costs nothing and is ready. **Proposal:** when
+the `gotest` harness is built, it takes a `race = true` flag in the test spec
+and that is the only place `-race` is used.
+
+**`unhandled-error` stays unpopulated for Go.** Established earlier with QA:
+plain `go vet` is silent on a discarded error (exit 0, empty output, captured
+in the fixtures); that check is `errcheck`, which is not in the Go
+distribution. SPEC §5.3's environment gets no new toolchain dependency for one
+taxonomy row.
+
+**Still refused, and now the only things that are:** the `cargo` and `gotest`
+harnesses. No shipped quest declares either — all 60 are `stdio` — and both
+answer `unavailable` with `detail.milestone = 2` *before* an attempt row is
+written, which keeps the "nothing untrue enters the curriculum" rule tested
+now that Go itself works
+(`backend/server/tests/protocol.rs::an_unjudgeable_submission_records_nothing`).
+
+**`cwbhacker doctor` now treats a missing `go` as fatal,** alongside `rustc`.
+Half the map cannot be played without it.
+
+### Two notes for other agents
+
+**QA — `tests/smoke/contract.mjs` asserts the old gap.** Its Go case expects
+`unavailable` with `detail.milestone = 2` and no attempt row. Go now compiles,
+runs and records, so that assertion is correctly stale. I have not touched the
+file; the coordinator is routing the change.
+
+**QA — `backend/runner/tests/limits.rs` has a flaky assertion.**
+`the_runner_itself_writes_only_under_the_home_it_was_given` snapshots the
+*parent* of its temp home before and after, and the other six tests in the
+same binary create their own `tempfile::tempdir()` in that same `$TMPDIR`
+while it runs — so a sibling's directory shows up as "the runner created
+`.tmpXXXX`". It failed once for me and passed on the next two runs, serial and
+parallel. The fix is to give the harness its own parent directory
+(`tempdir()` → `home/` inside it) and snapshot that, rather than `$TMPDIR`.
+The property it asserts is a good one and worth keeping — I added the Go half
+of it in `runner/tests/go_runner.rs`, which checks the developer's own
+`~/Library/Caches/go-build` and `~/go` are not conjured up by a build.
+
+## 2026-09-11 — QA: `make test-all`, and the Makefile lines to wire in
+
+`node tests/run-all.mjs` runs every suite and prints a summary that names
+what ran, what passed, and **what was skipped and why**. It starts a server
+on a throwaway home (`--home <tmpdir>`, SPEC §1's first precedence) serving
+`frontend/dist-e2e`, runs the suites that need one against it, and stops it —
+including on `^C`. Nothing touches the developer's own
+`~/.causewaybayhacker`, and every run starts from an empty database, which is
+what makes "node 1 is open" true on the second run as well as the first.
+
+Exit 0 only if every suite that ran passed. A skip is never counted as a
+pass, and a suite that passed while skipping something *inside* itself says
+so too — the LÖVE suite's layout tests need a real window, and the smoke
+checker's keepalive check runs over 6 s rather than §1.1's 70 s unless
+`--slow`.
+
+**For the root Makefile** (QA does not edit it):
+
+```make
+test-all: ## every suite, one command, with an honest summary of what was skipped
+	node tests/run-all.mjs
+
+test-all-list: ## what test-all would run, and why anything would not
+	node tests/run-all.mjs --list
+```
+
+`make test` is best left as it is. `test-all` takes about six minutes — the
+content CI compiles 60 quests, the runner limits compile eight pathological
+programs, and the browser suite does two real logins and a `rustc` per
+orientation.
+
+## 2026-09-11 — QA: SPEC §1's "nothing outside the home is written" is not a containment promise
+
+Writing SPEC §9.6.g the obvious way produced a failing test, and the failure
+is the finding.
+
+A submission that uses an absolute path, or `..`, can write anywhere the
+person running the server can write. That was confirmed rather than assumed:
+the first version of the test wrote to a sibling directory and succeeded.
+
+This is not a bug. SPEC §5.3 says it in as many words: *"**This is not a
+sandbox.** Causewaybay Hacker compiles and runs code you typed, on your
+machine, as you. It is a single-trusted-user local trainer."* But SPEC §1's
+flat sentence — *"**Nothing outside the home is written.** No `/tmp`, no
+project directory"* — reads as a containment guarantee, and somebody will
+eventually quote it as one.
+
+**Proposal to PM:** §1 gains a clause. Something like "Nothing outside the
+home is written *by the server*. Code a player submits runs as the player —
+see §5.3." One sentence, and it stops the two paragraphs contradicting each
+other.
+
+The row is now three tests, each asserting something true:
+
+* the **runner's own** footprint stays under the home it was given — which
+  catches a `CARGO_HOME` left unset, warming the developer's `~/.cargo` and
+  making one machine's run differ from another's invisibly;
+* the submission's **environment** is stripped to `PATH`, `HOME` pointed at
+  the build dir and the toolchain vars (SPEC §5.3). This is the half that
+  *is* enforceable without a sandbox: ordinary code doing ordinary things
+  lands somewhere harmless, and whatever the shell that started the server
+  was carrying is not readable by every submission;
+* `it_is_not_a_sandbox_and_this_test_says_so_out_loud`, which asserts the
+  *weak* thing deliberately and fails the day somebody adds a real sandbox,
+  with instructions to rewrite it. A test claiming containment that does not
+  exist would be the most dangerous file in the repository.
+
+## 2026-09-11 — QA: §9.6.d cannot be written yet, and is not being faked
+
+SPEC §9.6 wants `GOPROXY=off` to make a Go quest that fetches the internet
+fail cleanly. There is no Go runner in this build: `unsupported("go", …)`
+returns a reason rather than a judgement, and a Go submission comes back
+`unavailable` with `detail.milestone: 2`.
+
+A test pointed at it today would pass **because Go is unsupported**, not
+because the proxy was off — green for the wrong reason, which is worse than
+no test. It stays unwritten, with the reason in
+`backend/runner/tests/limits.rs`'s module docs and in `tests/PLAN.md` §9.6's
+ownership table, so nobody counts it as covered.
+
+Related, and also not faked: `RLIMIT_NPROC` is deliberately unset (it is
+per-user on macOS, so setting it would throttle the whole machine rather
+than the child). So "fork bomb" is really "the child dies with the process
+group", which is what the tests assert — not an NPROC behaviour that is not
+there.
+
+## 2026-09-11 — QA: the e2e suite is off the ground, and the capture hook was the right half
+
+FE shipped `frontend/src/dev/capture.ts` — freeze, settle, step, orient, png,
+scene — instead of the driving API QA asked for. That turned out better.
+
+`settle()` runs the game at a fixed 1/60 step until every transition has
+finished, which makes a canvas game **deterministic**. That is the thing a
+browser test genuinely cannot do for itself. The driving half was not needed:
+the seed field is a real `<textarea class="cwb-field">`, the editor is
+CodeMirror with real DOM lines, and every screen is reachable by keyboard or
+a click. So the suite drives the game the way a person does — and **verifies
+on the wire**, through a second websocket session opened as the same wallet.
+
+That is a stronger assertion than any view model could have supported: a
+frontend that draws CLEARED over a server that never heard about it fails
+here and passes every unit test on both sides.
+
+**9 tests × 2 orientations, all green**, including the journey the user
+asked for: login → train → logout → login as a second wallet → that wallet's
+own map, its own empty history, and the first wallet's address gone from
+local storage.
+
+Three things worth knowing, because each cost real time:
+
+1. **`settle()` freezes the loop.** Reading the scene with it and carrying on
+   leaves the app frozen for ever, so the `quest.get` reply is never drawn,
+   the editor stays `hidden`, and the symptom arrives thirty seconds later as
+   a locator timeout on `.cm-content`. The helper settles, reads, then
+   `resume()`s.
+2. **Category selection is pointer-only and canvas-drawn.** `lands.key()`
+   handles the land toggle and nothing else. The scan originally started at
+   28% of the canvas height — *inside the ADVANCED row* — so the browser
+   trained on `rust.advanced.01.threads` while the test asserted against
+   `rust.basic.01.first-light`, and the symptom was "expected cleared, got
+   open" on a quest the UI never opened. There is now an assertion that names
+   that failure when it recurs.
+3. **The same scan then failed in portrait**, because it swept one x column
+   at 72% of the width and portrait stacks the panel elsewhere. It is a grid
+   now.
+
+**A request to FE, small and worth it:** a stable hit-test hook for the
+canvas buttons — even just `__cwbCapture.buttons()` returning
+`{id, rect}[]` — would delete the scan and with it a whole class of
+silent-wrong-row failures. Not urgent; the grid works. But every time that
+panel moves, this suite finds out the slow way.
+
+## 2026-09-11 — QA: a test that asserts its own helper
+
+Worth recording because it looked exactly like a server bug for ten minutes.
+
+The restart integration test failed with *"the resumed session is the same
+player: expected `0x9d8A62…`, got `0x9d8a62…`"*. The obvious reading is that
+`auth.resume` spells the address differently from `auth.login` after a
+restart — which would be a real §3.4 hazard, since that is precisely when the
+server stops having the string the client sent and must read it back out of
+`users`, whose primary key is the lowercase form.
+
+It was not. The test helper returned the address it had **claimed**
+(`eth::address_from_pubkey`, the lowercase storage form) rather than the one
+the server **echoed** (EIP-55, per PROTOCOL.md §2.4). The test was asserting
+its own helper.
+
+The helper now returns the server's spelling, the reason is a comment on the
+function, and there is a test — `every_reply_spells_the_address_the_same_way`
+— that checks all four places the address arrives, including after a
+restart. The server is right in all four.
+
+## 2026-09-11 — The server binds 0.0.0.0, and says so every time
+
+Asked for, so a phone on the tailnet can play. `BIND` defaults to `0.0.0.0`;
+`make start LOCAL=1` pins it back to loopback.
+
+Two things make this defensible rather than careless. First, `make start` and
+`make remote` print exactly what is reachable — the tailnet address, the LAN
+address, and one line saying the port compiles and runs submitted code as the
+user. A machine whose exposure you have to go and check is a machine whose
+exposure you will get wrong. Second, the intended path is Tailscale, which is
+the user's own devices, not the open internet.
+
+**Use 5390 from a phone, not 5291.** The page and the websocket must share an
+origin: `net/endpoint.ts` derives the socket from `location.host` in a
+production build, so the bundle served by the Rust server on 5390 connects to
+the right place from any address it was loaded from. The vite dev server on
+5291 reads `VITE_WS_URL` from `.env.development`, which is pinned to
+`127.0.0.1` — loaded on a phone, that resolves to the *phone's* loopback and
+fails. Rather than teach the dev server about tailnets, `start` builds
+`frontend/dist` if it is missing so the one-origin path is always the one on
+offer, and prints the note.
+
+Verified over `100.93.166.76`: `GET /` 200, `GET /art/manifest.json` 200, and a
+full login → map → wrong answer → compile error → accepted → cleared with a
+fresh wallet.
+
+**README needs amending** — it currently says "do not expose the port to a
+network", which is no longer the default. PM owns it.

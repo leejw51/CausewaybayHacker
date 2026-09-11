@@ -69,6 +69,21 @@ export function motionScale(): number {
 }
 
 /**
+ * Whether the player asked for less motion.
+ *
+ * `seconds()` scales *durations*, which covers everything that arrives and
+ * settles. It does not cover an amplitude or a rate — how far the screen
+ * shakes, how fast a tram crosses, how long a line of story dwells before the
+ * next one — and those are exactly the things this round added. Without a
+ * public accessor the only way to honour the preference for them would be for
+ * six modules to each call `matchMedia` themselves, which is how a setting
+ * ends up half-respected.
+ */
+export function reducedMotion(): boolean {
+  return scale < 1;
+}
+
+/**
  * A one-shot animation: starts at 0, walks to 1 over `duration`, and stays
  * there. `at` applies the curve; `raw` is the linear progress for anything
  * that needs its own shape.

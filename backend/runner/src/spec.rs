@@ -12,6 +12,19 @@ pub enum Harness {
     Gotest,
 }
 
+impl Harness {
+    /// The spelling the content pack uses, which is also the one a message to
+    /// a player should use. `Debug` would say `Cargo`, and `harness = "Cargo"`
+    /// is not a thing anybody can type into a TOML file.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Harness::Stdio => "stdio",
+            Harness::Cargo => "cargo",
+            Harness::Gotest => "gotest",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MatchMode {
     Exact,

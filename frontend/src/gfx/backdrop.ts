@@ -38,6 +38,7 @@ import {
 import type { Land } from "../net/protocol";
 import { Chase, Tween, seconds } from "../engine/motion";
 import { farBand, glowTexture, midBand, nearBand, type Band } from "./skyline";
+import { Mode7, type Viewport } from "./mode7";
 
 export type Mood = "title" | "lands" | "map" | "quest" | "result";
 
@@ -148,6 +149,13 @@ export class Backdrop {
   private readonly glowMat: MeshBasicMaterial;
   private glowTween = new Tween(1.2, 0, true);
 
+  /**
+   * The overworld plane. It lives here rather than in the map scene because
+   * there is exactly one WebGL renderer and it belongs to this object; a second
+   * one on the same page is a second GPU context for one screen.
+   */
+  readonly map = new Mode7();
+
   private t = 0;
   private scroll = 0;
   private land: Land = "rust";
@@ -158,6 +166,8 @@ export class Backdrop {
   private readonly dim = new Chase(MOODS.title.dim, "scene");
   private readonly skyMix = new Chase(0, "scene");
   private skyFrom: Land = "rust";
+  private dw = 1;
+  private dh = 1;
 
   static create(canvas: HTMLCanvasElement): Backdrop | null {
     try {
@@ -238,6 +248,8 @@ export class Backdrop {
 
     this.renderer.setClearColor(0x0b1030, 1);
     this.applyMood(true);
+    this.dw = this.renderer.domElement.width;
+    this.dh = this.renderer.domElement.height;
   }
 
   // -- what a scene says to it ---------------------------------------------
@@ -277,6 +289,8 @@ export class Backdrop {
   // -- the frame -----------------------------------------------------------
 
   resize(dw: number, dh: number): void {
+    this.dw = dw;
+    this.dh = dh;
     this.renderer.setPixelRatio(1);
     // `false` so three does not write a CSS size back onto the element — the
     // canvas is already stretched to the window by the stylesheet, and the
@@ -292,7 +306,23 @@ export class Backdrop {
     }
   }
 
+  /**
+   * Ask for the overworld plane this frame, in the plate it should fill.
+   *
+   * It has to be asked for every frame, and the asking is cleared by `update`,
+   * because the map plane must vanish the instant the map screen is not the
+   * thing being looked at. A leftover ground plane showing through the quest
+   * screen's transparent background is the exact failure a persistent flag
+   * would produce.
+   */
+  showMap(art: HTMLImageElement, aw: number, ah: number, plate: Viewport): void {
+    this.map.setImage(art, aw, ah);
+    this.map.setViewport(plate);
+    this.map.wanted = true;
+  }
+
   update(dt: number): void {
+    this.map.update(dt);
     this.t += dt;
     this.drift.update(dt);
     this.lift.update(dt);
@@ -334,7 +364,10 @@ export class Backdrop {
   }
 
   render(): void {
+    this.renderer.setViewport(0, 0, this.dw, this.dh);
     this.renderer.render(this.scene, this.camera);
+    // Second pass, over the sky and inside the plate: see `mode7.ts`.
+    this.map.render(this.renderer);
   }
 
   dispose(): void {
@@ -343,6 +376,7 @@ export class Backdrop {
       l.mat.dispose();
       l.mesh.geometry.dispose();
     }
+    this.map.dispose();
     this.glowMat.map?.dispose();
     this.glowMat.dispose();
     this.sky.dispose();

@@ -9,6 +9,7 @@ use std::sync::Arc;
 use serde::Serialize;
 
 pub mod go;
+pub mod harness;
 pub mod proc;
 pub mod rust;
 pub mod spec;
@@ -131,21 +132,27 @@ impl Report {
 /// is derived from that table (SPEC §7), so nothing may enter it that did not
 /// really happen.
 pub fn unsupported(lang: &str, spec: &TestSpec) -> Option<String> {
-    match lang {
-        "go" => Some("the Go runner is not in this build yet (SPEC §5.1)".into()),
-        "rust" => match spec.harness {
-            Harness::Stdio => None,
-            Harness::Cargo => Some("the cargo harness is not in this build yet (SPEC §5.1)".into()),
-            Harness::Gotest => Some("the gotest harness is not a rust harness (SPEC §5.2)".into()),
-        },
-        other => Some(format!("there is no runner for '{other}'")),
+    match (lang, spec.harness) {
+        // Both lands compile and run now. What is still missing is the two
+        // harnesses no shipped quest declares.
+        ("rust" | "go", Harness::Stdio) => None,
+        ("rust", Harness::Cargo) => {
+            Some("the cargo harness is not in this build yet (SPEC §5.1)".into())
+        }
+        ("go", Harness::Gotest) => {
+            Some("the gotest harness is not in this build yet (SPEC §5.1)".into())
+        }
+        ("rust", Harness::Gotest) => {
+            Some("the gotest harness is not a rust harness (SPEC §5.2)".into())
+        }
+        ("go", Harness::Cargo) => Some("the cargo harness is not a go harness (SPEC §5.2)".into()),
+        (other, _) => Some(format!("there is no runner for '{other}'")),
     }
 }
 
-/// Dispatch on the land. Go is milestone 2; it answers with an
-/// `internal_error` report carrying the reason rather than panicking. The
-/// server refuses such a submission before it gets here — this arm is the
-/// backstop for a caller that did not ask [`unsupported`] first.
+/// Dispatch on the land. A language or harness this build cannot judge comes
+/// back as an `internal_error` report rather than a panic — though the server
+/// refuses one before it gets here, having asked [`unsupported`] first.
 pub fn run(sub: &Submission) -> Report {
     match sub.lang {
         "rust" => rust::run(sub),

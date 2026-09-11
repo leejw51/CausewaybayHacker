@@ -282,7 +282,7 @@ fn a_panic_is_a_runtime_error() {
         ])),
     );
     assert_eq!(report.verdict, Verdict::RuntimeError);
-    let found = cwbhacker_core::mistakes::classify_runtime(&report.runtime_stderr);
+    let found = cwbhacker_core::mistakes::classify_runtime("rust", &report.runtime_stderr);
     assert!(found.iter().any(|m| m.kind == "index-range"), "{found:?}");
 }
 
@@ -297,16 +297,20 @@ fn the_compiler_streams_while_it_works() {
     assert!(logs > 0, "no run.log chunks were emitted while compiling");
 }
 
+/// The Go land has its own suite now (`go_runner.rs`). What is still refused
+/// is the `cargo` harness, and it refuses cleanly rather than compiling the
+/// wrong thing and calling the answer wrong.
 #[test]
-fn the_go_runner_refuses_cleanly_rather_than_panicking() {
+fn an_unbuilt_harness_refuses_cleanly_rather_than_panicking() {
     let h = harness();
-    let spec = stdio(serde_json::json!([
-        { "name": "any", "stdin": "", "expect": "", "visible": true }
-    ]));
+    let spec = spec(serde_json::json!({
+        "harness": "cargo",
+        "cases": [ { "name": "any", "stdin": "", "expect": "x", "visible": true } ]
+    }));
     let submission = Submission {
-        attempt_id: "att_go",
-        lang: "go",
-        source: "package main",
+        attempt_id: "att_cargo",
+        lang: "rust",
+        source: "fn main() {}",
         spec: &spec,
         workdir: h.workdir.clone(),
         cache_root: h.cache.clone(),
@@ -314,7 +318,7 @@ fn the_go_runner_refuses_cleanly_rather_than_panicking() {
     };
     let report = cwbhacker_runner::run(&submission);
     assert_eq!(report.verdict, Verdict::InternalError);
-    assert!(report.runtime_stderr.contains("milestone 2"));
+    assert!(report.runtime_stderr.contains("cargo harness"));
 }
 
 /// The capability check the server asks **before** it creates an attempt.
@@ -327,8 +331,8 @@ fn unsupported_names_what_this_build_cannot_judge() {
     ]));
     assert_eq!(cwbhacker_runner::unsupported("rust", &stdio_spec), None);
 
-    let go = cwbhacker_runner::unsupported("go", &stdio_spec).expect("go is milestone 2");
-    assert!(go.contains("Go runner"), "{go}");
+    // Both lands are built; the gate is open for stdio in either.
+    assert_eq!(cwbhacker_runner::unsupported("go", &stdio_spec), None);
 
     let cargo_spec = spec(serde_json::json!({
         "harness": "cargo",

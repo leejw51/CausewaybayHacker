@@ -235,24 +235,40 @@ export async function pickFirstCategory(page: Page): Promise<void> {
   await atScreen(page, "lands");
   const box = await page.locator("canvas#game").boundingBox();
   if (!box) throw new Error("the game canvas has no box");
-  const x = box.x + box.width * 0.72; // the right-hand panel
-  // Measured, not guessed: the first row's band starts around 0.18 of the
-  // canvas height in landscape. Starting the scan below it silently selects
-  // ADVANCED, and the only symptom is a quest that will not clear — which
-  // took a while to work out once, hence the low start and the fine step.
-  for (let i = 0; i < 40; i++) {
-    const fy = 0.12 + i * 0.01;
-    if (fy > 0.95) break;
-    await page.mouse.click(x, box.y + box.height * fy);
-    if ((await sceneNow(page)) === "map") {
-      await atScreen(page, "map");
-      return;
+
+  // A grid, not a column.
+  //
+  // The first version scanned one x at 72% of the width, which is where the
+  // category panel sits in *landscape*. Portrait stacks the layout, so the
+  // panel is somewhere else entirely and the scan found nothing — and the
+  // failure arrived four minutes into a matrix run, in the project that runs
+  // second. Two fifths of the width apart covers both shapes without caring
+  // which one this is.
+  //
+  // Rows are scanned top-to-bottom and the first hit wins, which is BASIC:
+  // the three rows are drawn in the fixed order `basic`, `advanced`,
+  // `hacker`. Starting the y sweep too low silently selects ADVANCED, and
+  // the only symptom is a quest that will not clear — so it starts above the
+  // first row (measured at ≈0.18 in landscape) and steps finely.
+  const xs = [0.72, 0.5, 0.3].map((f) => box.x + box.width * f);
+  for (let i = 0; i < 46; i++) {
+    const fy = 0.10 + i * 0.01;
+    if (fy > 0.96) break;
+    const y = box.y + box.height * fy;
+    for (const x of xs) {
+      await page.mouse.click(x, y);
+      if ((await sceneNow(page)) === "map") {
+        await atScreen(page, "map");
+        return;
+      }
     }
   }
   throw new Error(
-    "no click in the right-hand panel opened a map. The category rows are " +
-      "canvas-drawn and pointer-only (`lands.key` handles the land toggle " +
-      "and nothing else), so this scan is the only way in — see e2e/README.md.",
+    `no click anywhere on the lands screen opened a map (canvas ${box.width}×` +
+      `${box.height}). The category rows are canvas-drawn and pointer-only — ` +
+      "`lands.key` handles the land toggle and nothing else — so this scan is " +
+      "the only way in. If the panel has moved, the scan needs to move with " +
+      "it; see e2e/README.md.",
   );
 }
 

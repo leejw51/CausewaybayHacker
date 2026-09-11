@@ -212,7 +212,12 @@ fn the_runner_itself_writes_only_under_the_home_it_was_given() {
         r#"fn main() { println!("hello, causewaybay"); }"#,
         &spec(60_000, "hello, causewaybay\n"),
     );
-    assert_eq!(report.verdict, Verdict::Accepted, "{:?}", report.compiler_stderr);
+    assert_eq!(
+        report.verdict,
+        Verdict::Accepted,
+        "{:?}",
+        report.compiler_stderr
+    );
 
     let after = listing(&outside);
     let added: Vec<&String> = after.iter().filter(|p| !before.contains(*p)).collect();
@@ -274,9 +279,22 @@ fn main() {
     println!("reported");
 }
 "#;
-    let report = run_in(&h, "att_env", source, &spec(30_000, "reported
-"));
-    assert_eq!(report.verdict, Verdict::Accepted, "{:?}", report.compiler_stderr);
+    let report = run_in(
+        &h,
+        "att_env",
+        source,
+        &spec(
+            30_000,
+            "reported
+",
+        ),
+    );
+    assert_eq!(
+        report.verdict,
+        Verdict::Accepted,
+        "{:?}",
+        report.compiler_stderr
+    );
 
     let line = |prefix: &str| {
         report
@@ -288,7 +306,11 @@ fn main() {
     };
 
     let home = line("HOME");
-    assert!(!home.is_empty(), "HOME was not set at all: {:?}", report.runtime_stderr);
+    assert!(
+        !home.is_empty(),
+        "HOME was not set at all: {:?}",
+        report.runtime_stderr
+    );
     let real_home = std::env::var("HOME").unwrap_or_default();
     assert_ne!(
         home, real_home,
@@ -354,8 +376,15 @@ fn it_is_not_a_sandbox_and_this_test_says_so_out_loud() {
 }}"#,
         reachable.display()
     );
-    let report = run_in(&h, "att_not_a_sandbox", &source, &spec(30_000, "reached
-"));
+    let report = run_in(
+        &h,
+        "att_not_a_sandbox",
+        &source,
+        &spec(
+            30_000, "reached
+",
+        ),
+    );
 
     let escaped = reachable.exists();
     let _ = std::fs::remove_file(&reachable);
@@ -391,7 +420,11 @@ fn the_runner_still_works_after_every_limit_has_fired() {
     let h = harness();
 
     let hostile: [(&str, &str, u64); 4] = [
-        ("att_after_loop", "fn main() { loop { std::hint::spin_loop(); } }", 1_000),
+        (
+            "att_after_loop",
+            "fn main() { loop { std::hint::spin_loop(); } }",
+            1_000,
+        ),
         (
             "att_after_flood",
             r#"fn main() { let line = "x".repeat(4096); loop { println!("{line}"); } }"#,

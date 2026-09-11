@@ -14,8 +14,10 @@ import { Assets } from "./engine/assets";
 import { ensureFonts, printf, remeasure } from "./engine/text";
 import { css, Theme } from "./engine/theme";
 import { btnBox, fill, inRect, panel, pixBtn, type Ctx, type Rect } from "./engine/ui";
-import { seconds, Tween } from "./engine/motion";
+import { seconds, reducedMotion, Tween } from "./engine/motion";
+import { expInOut } from "./engine/ease";
 import { Backdrop, type Mood } from "./gfx/backdrop";
+import { Crt } from "./gfx/crt";
 import { Client } from "./net/client";
 import type { Land } from "./net/protocol";
 import { Chip } from "./audio/sfx";
@@ -45,9 +47,27 @@ export interface Scene {
 
 /** Where the player's chosen orientation is kept. A preference, not a secret. */
 const ORIENT_KEY = "cwbhacker.orientation";
+/** And whether they want the tube. Default on; the choice is theirs to keep. */
+const CRT_KEY = "cwbhacker.crt";
+
+/**
+ * How fast a screen stops shaking, in trauma per second.
+ *
+ * The shake is `trauma²` rather than `trauma`, which is the Vlambeer trick: the
+ * square makes a big hit feel disproportionately bigger than a small one and
+ * makes the tail-off die away rather than trail.
+ */
+const TRAUMA_DECAY = 1.9;
 
 /** A screen change, in the direction of travel. */
 export type Direction = "forward" | "back" | "none";
+
+/**
+ * How the change is drawn. `slide` carries both screens across together;
+ * `iris` closes a circle on a point, swaps, and opens it again — which is what
+ * a 16-bit game does when you step into a door, and the map's nodes are doors.
+ */
+type TransitionKind = "slide" | "iris";
 
 interface Modal {
   title: string;
@@ -66,6 +86,8 @@ export class App {
   readonly g: Ctx;
   readonly chip = new Chip();
   readonly backdrop: Backdrop | null;
+  /** The tube. Drawn last, on `#game`, which is under the editor's own layer. */
+  readonly crt = new Crt();
   assets: Assets | null = null;
 
   /** Set at login, cleared at logout. Display only, and the logout button. */
@@ -84,6 +106,17 @@ export class App {
   private outgoing: Scene | null = null;
   private transition: Tween | null = null;
   private direction: Direction = "none";
+  private kind: TransitionKind = "slide";
+  /** Where the iris closes, in virtual pixels. */
+  private irisAt: [number, number] = [0, 0];
+
+  /** Screen shake, 0..1, and its own clock. Never `Math.random` — see `shake`. */
+  private trauma = 0;
+  private shakeT = 0;
+
+  /** The last two seconds of frame times, for `__cwbCapture.fps()`. */
+  private readonly frames = new Float32Array(120);
+  private frameAt = 0;
 
   private last = 0;
   private raf = 0;
@@ -113,6 +146,11 @@ export class App {
 
     const saved = localStorage.getItem(ORIENT_KEY);
     if (saved === "portrait" || saved === "landscape") this.layout.pin(saved as Orientation);
+    try {
+      this.crt.enabled = localStorage.getItem(CRT_KEY) !== "off";
+    } catch {
+      /* a browser with storage blocked still gets the default, which is on */
+    }
 
     addEventListener("resize", () => this.measure());
     addEventListener("orientationchange", () => this.measure());
@@ -145,6 +183,11 @@ export class App {
       // the scene a sixty-second `dt` and teleport everything.
       const dt = Math.min(0.05, (t - this.last) / 1000);
       this.last = t;
+      // Measured here rather than inside `tick`, because the capture hook also
+      // calls `tick` — at a fixed 1/60 — and a frame rate averaged over
+      // synthetic steps is a number that means nothing.
+      this.frames[this.frameAt] = dt;
+      this.frameAt = (this.frameAt + 1) % this.frames.length;
       this.tick(dt);
     };
     this.raf = requestAnimationFrame(frame);
@@ -159,7 +202,8 @@ export class App {
    * drive the whole game at a fixed step and get the same picture every run.
    */
   tick(dt: number): void {
-    this.backdrop?.update(dt);
+    this.shakeT += dt;
+    this.trauma = Math.max(0, this.trauma - dt * TRAUMA_DECAY);
     if (this.transition) {
       this.transition.update(dt);
       this.outgoing?.update?.(dt);
@@ -175,7 +219,59 @@ export class App {
       if (this.toast.left <= 0) this.toast = null;
     }
     this.scene?.update?.(dt);
+    // After the scenes, not before: the overworld plane has to be asked for
+    // again every frame (`Backdrop.showMap`) and this is the call that both
+    // consumes the request and clears it. Updating the city first would put a
+    // frame of lag between "the map screen is gone" and "the ground is gone",
+    // and that one frame is a ground plane showing through the quest screen.
+    this.backdrop?.update(dt);
+    this.crt.update(dt);
     this.render();
+  }
+
+  /**
+   * Which scene, if any, is entitled to the WebGL ground plane this frame.
+   *
+   * Only one screen can be on the GPU at a time, so during a slide — where two
+   * screens are on the canvas at once, at two different offsets — nobody gets
+   * it and the map falls back to the flat blit it has always had. During an
+   * iris only one screen is visible at a time, so the answer is simply which
+   * half of the iris we are in.
+   */
+  get mapLayerScene(): Scene | null {
+    if (!this.transition) return this.scene;
+    if (this.kind === "iris") {
+      return this.transition.raw < 0.5 ? (this.outgoing ?? this.scene) : this.scene;
+    }
+    return null;
+  }
+
+  /**
+   * Hit the screen.
+   *
+   * `amount` is 0..1 and accumulates, so three small failures in a row build
+   * rather than each cancelling the last. It is driven by `shakeT`, which is
+   * the accumulated `dt` — sine of a clock the capture hook controls, not
+   * `Math.random`, so a shaken frame is the same shaken frame every run.
+   *
+   * It refuses to fire while the DOM overlay has anything in it. The editor and
+   * the seed field are real elements stacked above the canvas and they are not
+   * shaken by a canvas transform: a screen that trembled around a perfectly
+   * still block of code would read as a rendering fault, not as impact.
+   */
+  shake(amount: number): void {
+    if (this.overlay.childElementCount > 0) return;
+    if (reducedMotion()) amount *= 0.3;
+    this.trauma = Math.min(1, this.trauma + amount);
+  }
+
+  private shakeOffset(): [number, number] {
+    if (this.trauma <= 0.001) return [0, 0];
+    const k = this.trauma * this.trauma * 9 * this.layout.uiScale();
+    return [
+      Math.round(Math.sin(this.shakeT * 37.1) * k),
+      Math.round(Math.sin(this.shakeT * 51.7) * k * 0.8),
+    ];
   }
 
   /** Dev/e2e only: stop the loop so a screenshot has something still to take. */
@@ -193,7 +289,16 @@ export class App {
     return this.frozen;
   }
 
-  async go(next: Scene, direction: Direction = "forward"): Promise<void> {
+  /**
+   * @param iris the virtual point the transition should close on. Given, the
+   * change is an iris out of that point and back in; omitted, the two screens
+   * slide past each other as they always have.
+   */
+  async go(
+    next: Scene,
+    direction: Direction = "forward",
+    iris?: [number, number],
+  ): Promise<void> {
     const old = this.scene;
     old?.leave?.();
     // The outgoing screen keeps being drawn — its DOM overlay is already gone,
@@ -201,6 +306,8 @@ export class App {
     // a bug rather than a transition.
     this.outgoing = direction === "none" ? null : old;
     this.direction = direction;
+    this.kind = iris && direction !== "none" ? "iris" : "slide";
+    if (iris) this.irisAt = iris;
     this.transition = direction === "none" ? null : new Tween(seconds("scene"));
     this.scene = next;
     this.backdrop?.setMood(next.mood, next.land ?? "rust");
@@ -218,7 +325,15 @@ export class App {
     layout.begin(g);
     g.imageSmoothingEnabled = false;
 
-    if (this.transition && this.outgoing) {
+    const [sx, sy] = this.shakeOffset();
+    if (sx || sy) g.translate(sx, sy);
+
+    if (this.transition && this.kind === "iris") {
+      // One screen at a time. The swap happens at the midpoint, where the hole
+      // is closed and there is nothing to see through it.
+      const shown = this.mapLayerScene;
+      shown?.draw(g);
+    } else if (this.transition && this.outgoing) {
       // Both screens travel on the same expo curve, so the pair moves as one
       // object rather than as two things that happen to be sliding.
       const t = this.transition.inOut;
@@ -229,9 +344,80 @@ export class App {
       this.scene?.draw(g);
     }
 
+    if (sx || sy) g.translate(-sx, -sy);
     this.drawToast(g);
     this.drawModal(g);
     this.frameEdge();
+    this.drawIris();
+    this.crt.draw(g, layout.dw, layout.dh, layout.scale);
+  }
+
+  /**
+   * The hole.
+   *
+   * Drawn in device space over the whole canvas, bands included, because an
+   * iris that stops at the edge of the playfield is a circle on a picture
+   * rather than a shutter in front of one. Two expo halves: closed to nothing,
+   * then open again from the same point.
+   */
+  private drawIris(): void {
+    const t = this.transition;
+    if (!t || this.kind !== "iris") return;
+    const { g, layout } = this;
+    const { ox, oy, scale, dw, dh } = layout;
+    const cx = this.irisAt[0] * scale + ox;
+    const cy = this.irisAt[1] * scale + oy;
+    const reach = Math.max(
+      Math.hypot(cx, cy),
+      Math.hypot(dw - cx, cy),
+      Math.hypot(cx, dh - cy),
+      Math.hypot(dw - cx, dh - cy),
+    );
+    const raw = t.raw;
+    const k = raw < 0.5 ? 1 - expInOut(raw * 2) : expInOut((raw - 0.5) * 2);
+    const r = Math.max(0, reach * k);
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = "rgba(6,6,20,1)";
+    g.beginPath();
+    g.rect(0, 0, dw, dh);
+    g.arc(cx, cy, r, 0, Math.PI * 2, true);
+    g.fill("evenodd");
+    // A rim on the shutter, so the circle reads as an aperture rather than as
+    // a hole punched in a flat fill.
+    if (r > 2) {
+      g.strokeStyle = "rgba(248,208,48,0.35)";
+      g.lineWidth = Math.max(1, 2 * scale);
+      g.beginPath();
+      g.arc(cx, cy, r, 0, Math.PI * 2);
+      g.stroke();
+      g.lineWidth = 1;
+    }
+    g.restore();
+  }
+
+  /** Frames per second, averaged over the ring. Zero before it has filled. */
+  fps(): number {
+    let sum = 0;
+    let n = 0;
+    for (const v of this.frames) {
+      if (v > 0) {
+        sum += v;
+        n++;
+      }
+    }
+    return n > 0 ? Math.round(n / sum) : 0;
+  }
+
+  /** Turn the tube on or off, and remember which. */
+  toggleCrt(): boolean {
+    this.crt.enabled = !this.crt.enabled;
+    try {
+      localStorage.setItem(CRT_KEY, this.crt.enabled ? "on" : "off");
+    } catch {
+      /* the choice still holds for this session */
+    }
+    return this.crt.enabled;
   }
 
   /**
@@ -306,6 +492,7 @@ export class App {
     this.fx.width = this.layout.dw;
     this.fx.height = this.layout.dh;
     this.backdrop?.resize(this.layout.dw, this.layout.dh);
+    this.crt.resized();
     this.scene?.resized?.();
   }
 
@@ -316,6 +503,7 @@ export class App {
     this.fx.width = this.layout.dw;
     this.fx.height = this.layout.dh;
     this.backdrop?.resize(this.layout.dw, this.layout.dh);
+    this.crt.resized();
     this.scene?.resized?.();
   }
 
@@ -539,6 +727,14 @@ export class App {
         localStorage.setItem(ORIENT_KEY, this.layout.isPortrait() ? "portrait" : "landscape");
         this.remeasure();
         this.say(`orientation: ${this.layout.isPortrait() ? "portrait" : "landscape"}`);
+        return;
+      }
+      // F2 is the tube. On by default and remembered, because a scanline mask
+      // is a taste and somebody reading code through it for an hour may not
+      // share ours.
+      if (name === "f2") {
+        ev.preventDefault();
+        this.say(`crt: ${this.toggleCrt() ? "on" : "off"}`);
         return;
       }
       // F3 logs out from anywhere, including mid-quest. It is on a function
