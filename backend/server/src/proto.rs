@@ -23,12 +23,11 @@ pub struct ClientFrame {
     pub id: Option<String>,
     #[serde(rename = "type")]
     pub kind: String,
-    #[serde(default = "empty_object")]
+    /// Required, and required to be an object. PROTOCOL §2: "never absent.
+    /// Use `{}`". Accepting an absent one is the same failure as silently
+    /// ignoring an unknown key — a client ships a bug that looks like it
+    /// works and breaks against the next server.
     pub payload: serde_json::Value,
-}
-
-fn empty_object() -> serde_json::Value {
-    serde_json::Value::Object(Default::default())
 }
 
 #[derive(Debug, Clone, Serialize)]

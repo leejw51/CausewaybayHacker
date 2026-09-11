@@ -335,3 +335,56 @@ fn stderr_is_truncated_on_a_character_boundary() {
     assert!(truncated.contains("…truncated"));
     assert!(truncated.len() < noisy.len() + 64);
 }
+
+/// SPEC §9.3: the FTS5 check is an **assertion**, not a log line.
+///
+/// The bundled amalgamation always has FTS5, so the way to prove the check is
+/// load-bearing is to make the smoke test fail and watch startup refuse: a
+/// plain table sitting where the virtual one goes shadows it, and nothing
+/// after it runs.
+#[test]
+fn a_database_without_working_fts5_refuses_to_start() {
+    let conn = rusqlite::Connection::open_in_memory().unwrap();
+    conn.execute_batch("CREATE TABLE temp.fts5_smoke (x);")
+        .unwrap();
+
+    let err = cwbhacker_core::db::prepare(&conn)
+        .expect_err("startup must refuse a database whose FTS5 does not work");
+    assert!(
+        err.message.contains("FTS5"),
+        "the failure should name FTS5, not leave an operator guessing: {}",
+        err.message
+    );
+
+    // And it refused *before* migrating: a half-built database is worse than
+    // no database, and 0001 itself creates a `USING fts5` table.
+    let version: i64 = conn
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(version, 0, "migrations ran despite the failed assertion");
+    let tables: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'quests'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(tables, 0);
+}
+
+/// The healthy path, for contrast: a real home gets a working FTS5 index.
+#[test]
+fn a_healthy_database_has_a_working_fts5_index() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = content_dir(tmp.path(), PACK);
+    let store = open_and_import(&tmp.path().join("home"), &src);
+    let conn = store.conn();
+    let hits: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quest_fts WHERE quest_fts MATCH 'causewaybay'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(hits >= 1, "the importer's rows never reached the FTS index");
+}

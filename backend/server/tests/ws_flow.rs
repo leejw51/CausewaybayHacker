@@ -588,10 +588,26 @@ async fn a_stale_nonce_and_a_forged_signature_are_both_refused() {
         Some("auth_bad_signature")
     );
 
-    // And the nonce is burned, so the real signature cannot use it either.
+    // The challenge is still live: a rejected signature does not cost the
+    // player a round trip, and a mistyped mnemonic is the common case.
     let honest = sign(&alice, &message);
+    let reply = client
+        .call(
+            "auth.login",
+            json!({ "address": address, "signature": honest.clone(), "nonce": challenge["nonce"] }),
+        )
+        .await;
     assert_eq!(
-        client
+        reply["type"].as_str(),
+        Some("auth.login.ok"),
+        "a good signature after a bad one must still work: {reply}"
+    );
+
+    // Success spends it. A replay of the same signature is `auth_nonce_used`
+    // — "used", not "expired", because those are different instructions.
+    let mut replay = Client::connect(server.port).await;
+    assert_eq!(
+        replay
             .call(
                 "auth.login",
                 json!({ "address": address, "signature": honest, "nonce": challenge["nonce"] })

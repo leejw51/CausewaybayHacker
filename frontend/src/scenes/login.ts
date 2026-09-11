@@ -20,10 +20,11 @@
  * on submit, and cleared the moment the derivation succeeds.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf } from "../engine/text";
+import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { fill, well, type Ctx, type Rect } from "../engine/ui";
-import { Buttons, footer, frame, header, RUST, titledPanel } from "../ui/chrome";
+import { fill, neonPrint, well, type Ctx, type Rect } from "../engine/ui";
+import { Buttons, footer, header, RUST, titledPanel } from "../ui/chrome";
+import { seconds, Tween } from "../engine/motion";
 import { Overlay } from "../ui/overlay";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
@@ -38,6 +39,7 @@ import { LandsScene } from "./lands";
 
 export class LoginScene implements Scene {
   readonly name = "login";
+  readonly mood = "title" as const;
   private readonly field: HTMLTextAreaElement;
   private readonly overlay: Overlay;
   private readonly buttons = new Buttons();
@@ -46,6 +48,8 @@ export class LoginScene implements Scene {
   private status = "";
   private busy = false;
   private t = 0;
+  private readonly leftIn = new Tween(seconds("panel"));
+  private readonly rightIn = new Tween(seconds("panel"), seconds("stagger"));
 
   constructor(private readonly app: App) {
     const el = document.createElement("textarea");
@@ -63,8 +67,14 @@ export class LoginScene implements Scene {
   }
 
   enter(): void {
+    // After a logout there is nothing held, which is the point — the field is
+    // empty, the preview is empty, and the previous wallet is not on screen.
     const held = current();
     if (held) this.preview = held.eip55;
+    if (this.app.loggedOutNotice) {
+      this.status = this.app.loggedOutNotice;
+      this.app.loggedOutNotice = "";
+    }
     queueMicrotask(() => this.field.focus());
   }
 
@@ -117,7 +127,7 @@ export class LoginScene implements Scene {
       const user = await this.app.client.login(address.eip55, signature);
       this.app.addressLabel = user.address;
       this.app.chip.start();
-      await this.app.go(new LandsScene(this.app));
+      await this.app.go(new LandsScene(this.app), "forward");
     } catch (e) {
       // §3.3: the server's `message` is for a developer. The player gets our
       // wording, keyed off the code; the server's line goes to the console
@@ -169,6 +179,8 @@ export class LoginScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
+    this.leftIn.update(dt);
+    this.rightIn.update(dt);
   }
 
   resized(): void {
@@ -178,39 +190,76 @@ export class LoginScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
-    const bg = this.app.assets?.picture("title_bg", layout.isPortrait());
-    if (bg) {
-      g.globalAlpha = 0.45;
-      g.drawImage(bg, 0, 0, layout.vw, layout.vh);
-      g.globalAlpha = 1;
-      fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.35);
+    // With the city behind, the flat title art is redundant — it is only
+    // drawn where WebGL could not start, so the screen is never bare.
+    if (!this.app.backdrop) {
+      const bg = this.app.assets?.picture("title_bg", layout.isPortrait());
+      if (bg) {
+        g.globalAlpha = 0.45;
+        g.drawImage(bg, 0, 0, layout.vw, layout.vh);
+        g.globalAlpha = 1;
+        fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.35);
+      }
     }
 
-    header(g, layout, "LOGIN", this.app.client.state.toUpperCase());
-    const f = frame(layout, layout.isPortrait() ? 0.55 : 0.52);
-    const s = f.scale;
+    const s = layout.uiScale();
     const fonts = ensureFonts(s);
+    header(g, this.app, "LOGIN");
+    this.buttons.reset();
 
-    // Left: the field. Right: what the key material is for, and what it is not.
-    const left = titledPanel(g, f.left, "SEED PHRASE OR PRIVATE KEY", RUST);
-    const lineH = fonts.small.height;
-    const fieldH = Math.max(lineH * 3, Math.round(f.left[3] * 0.34));
-    well(g, left[0], left[1], left[2], fieldH);
-    this.fieldRect = [left[0] + 4, left[1] + 4, left[2] - 8, fieldH - 8];
-    this.overlay.place(this.fieldRect, fonts.small.size);
+    // One centred column, not two boxes edge to edge. The skyline is the
+    // thing this screen is about — a wallet address is not a welcome — so the
+    // furniture is kept narrow and the city is left room above and below it.
+    const colW = Math.min(layout.vw - Math.round(32 * s), Math.round(560 * s));
+    const colX = Math.round((layout.vw - colW) / 2);
+    const top = Math.round(38 * s);
+    const bottom = layout.vh - Math.round(26 * s);
 
-    let y = left[1] + fieldH + Math.round(8 * s);
+    // The title, set over the harbour rather than inside a box.
+    const titleY = top + Math.round((layout.isPortrait() ? 74 : 42) * s);
+    const rise = (1 - this.leftIn.out) * Math.round(24 * s);
+    g.save();
+    g.globalAlpha = Math.min(1, this.leftIn.raw * 2);
+    neonPrint(g, fonts.title, "CAUSEWAYBAY", titleY - rise, layout.vw, Theme.cyan, this.t);
+    neonPrint(
+      g,
+      fonts.title,
+      "HACKER",
+      titleY + Math.round(fonts.title.height * 1.05) - rise,
+      layout.vw,
+      RUST,
+      this.t + 0.6,
+    );
+    g.restore();
+
+    const cardY = titleY + Math.round(fonts.title.height * 2.5);
+    const cardH = Math.round((layout.isPortrait() ? 250 : 214) * s);
+    const drop = (1 - this.rightIn.out) * Math.round(46 * s);
+    g.save();
+    g.globalAlpha = Math.min(1, this.rightIn.raw * 2.2);
+    g.translate(0, drop);
+
+    const card = titledPanel(g, [colX, cardY, colW, cardH], "SEED PHRASE OR PRIVATE KEY", RUST);
+    const fieldH = Math.max(fonts.small.height * 3, Math.round(cardH * 0.34));
+    well(g, card[0], card[1], card[2], fieldH);
+    this.fieldRect = [card[0] + 4, card[1] + 4, card[2] - 8, fieldH - 8];
+    // The textarea is a DOM element and knows nothing about the canvas
+    // transform, so it waits for the card to land rather than hanging in the
+    // air while the panel drops underneath it.
+    if (this.rightIn.finished) this.overlay.place(this.fieldRect, fonts.small.size);
+    else this.overlay.hide();
+
+    let y = card[1] + fieldH + Math.round(8 * s);
     g.fillStyle = css(Theme.cyan);
-    printf(g, fonts.stationSm, "YOU WILL BE", left[0], y, left[2], "left");
+    printf(g, fonts.stationSm, "YOU WILL BE", card[0], y, card[2], "left");
     y += fonts.stationSm.height + Math.round(4 * s);
     g.fillStyle = css(this.preview ? Theme.coin : Theme.dim);
-    printf(g, fonts.small, this.preview || "—", left[0], y, left[2], "left");
-    y += fonts.small.height + Math.round(10 * s);
+    printf(g, fonts.small, this.preview || "—", card[0], y, card[2], "left");
+    y += fonts.small.height + Math.round(8 * s);
 
-    this.buttons.reset();
     this.buttons.row(
       fonts.button,
-      [left[0], y, left[2], left[3]],
+      [card[0], y, card[2], card[3]],
       [
         { id: "enter", label: this.busy ? "…" : "ENTER", dim: this.busy },
         { id: "clear", label: "CLEAR" },
@@ -218,43 +267,52 @@ export class LoginScene implements Scene {
       layout.minTouchH(),
     );
     this.buttons.draw(g, fonts.button);
+    g.restore();
 
     if (this.status) {
       g.fillStyle = css(this.busy ? Theme.cyan : Theme.red);
+      printf(g, fonts.small, this.status, colX, cardY + cardH + Math.round(6 * s), colW, "center");
+    }
+
+    // Supporting copy, not a second panel: it is read once, and giving it
+    // chrome of its own would make it compete with the thing you have to do.
+    const noteY = cardY + cardH + Math.round(30 * s);
+    if (noteY < bottom - fonts.small.height * 3) {
+      // A scrim, because the city behind is busy exactly where this sits and
+      // supporting copy that has to be fought for is not supporting anything.
+      const lines = wrap(
+        fonts.small,
+        "Your phrase becomes a key here, in this tab, on m/44'/60'/0'/0/0 — the path" +
+          " CausewaybayWallet uses, so one phrase is one you in both. It is never sent:" +
+          " the server asks you to sign a line of text and works out who you are from the" +
+          " signature. Only the session token is kept.",
+        colW,
+      ).length;
+      fill(
+        g,
+        Theme.void,
+        colX - Math.round(12 * s),
+        noteY - Math.round(10 * s),
+        colW + Math.round(24 * s),
+        lines * fonts.small.height + Math.round(20 * s),
+        0.78,
+      );
+      g.globalAlpha = 0.86;
+      g.fillStyle = css(Theme.cream);
       printf(
         g,
         fonts.small,
-        this.status,
-        left[0],
-        left[1] + left[3] - fonts.small.height,
-        left[2],
-        "left",
+        "Your phrase becomes a key here, in this tab, on m/44'/60'/0'/0/0 — the path" +
+          " CausewaybayWallet uses, so one phrase is one you in both. It is never sent:" +
+          " the server asks you to sign a line of text and works out who you are from the" +
+          " signature. Only the session token is kept.",
+        colX,
+        noteY,
+        colW,
+        "center",
       );
+      g.globalAlpha = 1;
     }
-
-    const right = titledPanel(g, f.right, "WHAT HAPPENS TO IT", Theme.cyan);
-    g.fillStyle = css(Theme.cream);
-    printf(
-      g,
-      fonts.small,
-      // Written as paragraphs, not as pre-broken lines: the panel is a
-      // different width in portrait and `printf` wraps to whatever it gets.
-      [
-        "Your phrase is turned into a key here, in this tab, on m/44'/60'/0'/0/0 — the" +
-          " same path CausewaybayWallet uses, so the same phrase is the same you in both.",
-        "",
-        "It is never sent. The server asks you to sign a line of text and works out who" +
-          " you are from the signature. Only the session token is kept, and only so a" +
-          " reload does not ask you again.",
-        "",
-        "Nothing in the game lives in this browser. Close it, come back, the map is" +
-          " where you left it.",
-      ].join("\n"),
-      right[0],
-      right[1],
-      right[2],
-      "left",
-    );
 
     footer(g, layout, "ENTER  LOG IN      F1  ORIENTATION      CTRL+ENTER  SUBMIT");
   }

@@ -832,3 +832,127 @@ naming the byte order.
 `tests/vectors/signatures.json` already carries `r`, `s` and `v` as separate
 fields beside the assembled `signature`, so a client can assert its assembly
 against the fixture without a server at all.
+
+## 2026-09-11 — BE: the four QA findings, and why a login now tries every challenge
+
+QA's smoke suite scored the server 11/12 on PROTOCOL §8. All four items are
+fixed; it now scores **12/12, 19/19**, including the real 70-second keepalive
+window.
+
+**An absent `payload` is `bad_request`.** §2 says the field is never absent —
+"use `{}`" — and the server was defaulting it. Being lenient there is the same
+failure as silently ignoring an unknown key, one frame later: a client ships a
+bug that looks like it works and breaks against the next server.
+
+**A rejected signature no longer spends the challenge, and a replay says
+`auth_nonce_used`.** Finding the challenge, checking the signature and burning
+the nonce are now one operation (`Challenges::login`), because *which*
+challenge was signed is part of the answer. `auth.login` carries
+`{address, signature}` and not the nonce, so the server tries every live
+challenge for that address, newest first:
+
+* it verifies against an unused one → burn it, log in;
+* it verifies against a **used** one → `auth_nonce_used` ("ask for a new
+  challenge"), never `auth_expired` ("wait");
+* it verifies against none, but an unused one exists → `auth_bad_signature`
+  ("your key is wrong"), and **every challenge stays live** — a mistyped
+  mnemonic should cost a retry, not a round trip.
+
+Those three codes are three different instructions to the player, which is
+what §3.3 has them for. The old code burned on lookup and then reported
+whatever the *next* challenge said, which is how "spent" came out as
+"expired" and later as "bad signature".
+
+**§7.1's amendments are in.** `E0373` → `lifetime` (a closure outliving the
+local it borrowed did not move anything; the value escaped). `E0277` is
+discriminated on the message: the trait named is `Termination`/`Try`, or the
+text is about the `?` operator over `Result`/`Option` → `unhandled-error`;
+anything else → `missing-trait`. The code is kept either way. Both readings
+are asserted against QA's captured real `rustc` output, not against a
+diagnostic I wrote.
+
+**Go's `unhandled-error` row stays unpopulated.** Plain `go vet` is silent on
+an unchecked error — that is `errcheck`, which is not in the Go distribution,
+and SPEC §5.3 gets no new toolchain dependency for one taxonomy row. When the
+Go runner lands in M2 it will detect it from the source or not at all.
+
+**New assertions (SPEC §9.2, §9.3, §9.7), inside the backend crates:**
+
+* `core/tests/auth.rs` loads `tests/vectors/signatures.json` and asserts the
+  verifier recovers every signer, agrees with each vector's `eip191_digest`,
+  reassembles `r`/`s`/`v` in the right order, accepts both the 0/1 and 27/28
+  encodings of `v`, and refuses all four `must_reject` cases with the code the
+  fixture names.
+* `core/tests/store.rs` asserts the FTS5 check is an assertion and not a log
+  line: a connection whose FTS5 cannot work makes `db::prepare` return `Err`,
+  and `PRAGMA user_version` is still 0 afterwards — it refuses *before*
+  migrating, because 0001 itself creates a `USING fts5` table and a half-built
+  database is worse than none.
+* `core/tests/mistakes.rs` runs the classifier over all 20 captured `rustc`
+  outputs in `tests/vectors/mistakes/` (including the content starters) and
+  asserts the kind and the kept code for each.
+
+**Also fixed from a review, not from QA:** any inbound frame now resets the
+missed-ping counter, so a client that keeps itself alive with the
+application-level `ping` (PROTOCOL §1.1 — the LÖVE client) is no longer hung
+up on at ninety seconds; a second `auth.login` on an authenticated connection
+is refused rather than half-handled, because the hub would otherwise keep that
+connection filed under the address it used to have; and a frame over the 4 MiB
+cap now closes with **1009** instead of resetting the socket.
+
+**Open, and QA is right about it:** a Go submission comes back as
+`internal_error`, which a client renders as "the server broke". It is a
+missing feature, not a failure. The honest fix is a payload field on the
+attempt — `verdict: "internal_error"` with a `reason: "unsupported_language"`
+— or a `not_found` error before an attempt row is ever written. **PM: which?**
+I lean to refusing the submit with `not_found` and `detail.milestone = 2`, so
+no attempt is recorded for a quest the server cannot judge.
+
+## 2026-09-11 — BE: E0277's second wording, and `auth.resume` on a live connection
+
+Two corrections to the entry above, both found by checking rather than
+assuming.
+
+**`E0277` has two `?` wordings and the first fix only caught one.** QA's
+fixture covers *"the `?` operator can only be used in a function that
+returns…"*. Compiling the other common shape — a `?` whose error type does not
+convert — on this toolchain gives ``` `?` couldn't convert the error to
+`MyError` ```, which shares no words with it and was landing in
+`missing-trait`: exactly the misclassification the amendment exists to
+prevent. The discriminator is now the operator itself (a message mentioning
+`` `?` ``), plus `Termination` / `Try` / `FromResidual`.
+
+Checked against real compiles, not guessed: `fn main() -> Result<(), MyError>`
+where `MyError` lacks `Debug` says ``` `MyError` doesn't implement `Debug` ```
+and stays `missing-trait` — it looks like an error-handling context and the
+lesson really is to implement the trait — and `` `Point` is not an iterator ``
+stays `missing-trait` too. All four wordings are in
+`core/tests/mistakes.rs`.
+
+**`auth.resume` may be re-sent on a live connection; `auth.login` may not.**
+The first version of the §3.1 guard refused both. But §4.4 also makes
+`auth.resume` the way a client refreshes its token, and a client refreshing on
+a connection it already holds is not changing user — it would have got
+`bad_request`, which §3.3 tells clients to log loudly as a bug. The guard is
+now "the resolved address differs from this connection's", so a same-user
+re-resume works and a different-user one is still refused. `auth.login` keeps
+the stricter guard, because it is the message that means "become somebody".
+
+## 2026-09-11 — `unavailable`, and why an unjudgeable submission writes nothing
+
+BE asked what a Go submission should do while the Go runner is milestone 2. It
+currently answers `internal_error`, which every client renders as "the server
+broke — try again", for something that is not broken and will not work on a
+retry.
+
+New code in the §3.3 closed set: **`unavailable`**, with `detail.milestone`.
+Adding to the set is safe because §3.3 already tells clients to treat an
+unknown code as `internal` — an old client degrades to exactly today's
+behaviour.
+
+The more important half is BE's: **no `attempt` row is written.** An attempt
+carrying a fabricated verdict flows into `mistakes`, into `mistake_stats`, and
+from there into the AI drills — and the player is handed a lesson about a
+mistake they never made. The whole curriculum is derived from that table
+(SPEC §7), so nothing may enter it that did not really happen. That argument
+applies to any future "cannot judge" path, not just Go.

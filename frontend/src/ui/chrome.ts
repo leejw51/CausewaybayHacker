@@ -22,6 +22,8 @@ import {
   type Rect,
 } from "../engine/ui";
 import type { Layout } from "../engine/layout";
+import type { App } from "../app";
+import type { Tween } from "../engine/motion";
 
 export const RUST: RGBA = [0.95, 0.47, 0.16, 1];
 export const GO: RGBA = Theme.cyan;
@@ -44,9 +46,13 @@ export interface Frame {
  * the margins are in virtual pixels scaled by the UI scale, so they stay the
  * same size to the eye whether the canvas grew or shrank.
  */
-export function frame(layout: Layout, split = 0.5): Frame {
+export function frame(layout: Layout, split = 0.5, inset = 0): Frame {
   const s = layout.uiScale();
-  const pad = Math.round(10 * s);
+  // `inset` holds the panels off the edges as a fraction of the body, so a
+  // screen can let the city breathe around it. The working screens — map and
+  // quest — pass nothing and stay full-bleed, because room to read beats
+  // room to look.
+  const pad = Math.round(10 * s) + Math.round(inset * layout.vw * 0.5);
   const headerH = Math.round(38 * s);
   const footerH = Math.round(26 * s);
   const x = pad;
@@ -81,8 +87,18 @@ export function frame(layout: Layout, split = 0.5): Frame {
   };
 }
 
-/** The status bar: where you are on the left, who you are on the right. */
-export function header(g: Ctx, layout: Layout, title: string, right = ""): void {
+/**
+ * The status bar: where you are on the left, who you are on the right — and
+ * the way out.
+ *
+ * The address doubles as the logout control. That is not a trick: the wallet
+ * *is* the account (SPEC §3), so "the thing showing who you are" and "the
+ * thing that stops being you" are the same object, and putting LOG OUT
+ * somewhere else would mean inventing a settings screen for one verb. It
+ * registers its own hit box on `App`, so no scene has to remember to wire it.
+ */
+export function header(g: Ctx, app: App, title: string): void {
+  const { layout } = app;
   const s = layout.uiScale();
   const h = Math.round(38 * s);
   fill(g, Theme.navy, 0, 0, layout.vw, h);
@@ -92,19 +108,26 @@ export function header(g: Ctx, layout: Layout, title: string, right = ""): void 
   const ty = Math.round((h - 3 - f.height) / 2);
   g.fillStyle = css(Theme.cream);
   printf(g, f, title, Math.round(8 * s), ty, layout.vw, "left");
-  if (right) {
-    const sm = ensureFonts(s).stationSm;
-    g.fillStyle = css(Theme.cyan);
-    printf(
-      g,
-      sm,
-      right,
-      0,
-      Math.round((h - 3 - sm.height) / 2),
-      layout.vw - Math.round(8 * s),
-      "right",
-    );
-  }
+
+  app.logoutRect = null;
+  if (!app.addressLabel) return;
+
+  const sm = ensureFonts(s).stationSm;
+  // The address is abbreviated because the full forty hex characters is not
+  // information anybody reads — the ends are what you check against a wallet.
+  const who = `${app.addressLabel.slice(0, 6)}…${app.addressLabel.slice(-4)}`;
+  const label = `${who}  LOG OUT`;
+  const pad = Math.round(8 * s);
+  const w = width(sm, label) + pad * 2;
+  const bx = layout.vw - w - Math.round(6 * s);
+  const by = Math.round((h - 3 - sm.height) / 2) - Math.round(4 * s);
+  const bh = sm.height + Math.round(8 * s);
+  const hot = app.logoutHover;
+  fill(g, hot ? Theme.red : Theme.ink, bx, by, w, bh, hot ? 0.95 : 0.5);
+  fill(g, hot ? Theme.coin : Theme.dim, bx, by + bh - 2, w, 2);
+  g.fillStyle = css(hot ? Theme.cream : Theme.cyan);
+  printf(g, sm, label, bx, by + Math.round(4 * s), w, "center");
+  app.logoutRect = [bx, by, w, bh];
 }
 
 /** The key hints along the bottom. Also where F1 is advertised. */
@@ -264,6 +287,34 @@ export function titledPanel(
   printf(g, f, title, x + 6, y + 8 + Math.round((barH - f.height) / 2), w - 12, "center");
   const inset = 8;
   return [x + 6 + inset, y + 8 + barH + inset, w - 12 - inset * 2, h - 14 - barH - inset * 2];
+}
+
+/**
+ * Where a panel is while it is still arriving, in virtual pixels.
+ *
+ * Panels come in from the edge they are nearest — left box from the left,
+ * right box from the right, and in portrait top from the top and bottom from
+ * the bottom. Coming from the outside is what makes them read as part of the
+ * furniture sliding into place; anything that grows out of the middle reads as
+ * a popup, which is a different kind of object with different rules.
+ */
+export function arriveFrom(f: Frame, which: "left" | "right", t: Tween): [number, number] {
+  const k = 1 - t.out;
+  if (k <= 0.0005) return [0, 0];
+  const reach = f.portrait ? f.body[3] * 0.5 : f.body[2] * 0.6;
+  const sign = which === "left" ? -1 : 1;
+  return f.portrait ? [0, sign * reach * k] : [sign * reach * k, 0];
+}
+
+/** Run `body` translated, for a panel that has not finished arriving. */
+export function arriving(g: Ctx, f: Frame, which: "left" | "right", t: Tween, body: () => void) {
+  const [dx, dy] = arriveFrom(f, which, t);
+  if (dx === 0 && dy === 0) return body();
+  g.save();
+  g.globalAlpha = Math.min(1, t.raw * 2.2);
+  g.translate(Math.round(dx), Math.round(dy));
+  body();
+  g.restore();
 }
 
 export { shadowText };

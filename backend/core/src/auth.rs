@@ -88,10 +88,46 @@ impl Challenges {
         })
     }
 
-    /// Burn a nonce and hand back the message it was issued with.
+    /// Look a challenge up without spending it, and hand back the message it
+    /// was issued with.
     ///
-    /// A replay inside the window is `auth_nonce_used`; one after it, or a
-    /// nonce nobody issued, is `auth_expired` (§3.2).
+    /// Spending is a separate step ([`Challenges::burn`]) so that a signature
+    /// that fails to verify leaves the challenge live: a mistyped mnemonic
+    /// should cost the player a retry, not a round trip for a new nonce. The
+    /// challenge still dies on success, and still dies at `expires_at`.
+    pub fn peek(&self, address: &str, nonce: &str) -> Result<String> {
+        let address = normalize_address(address)?;
+        let mut entries = self.entries.lock().unwrap();
+        sweep(&mut entries);
+        let entry = entries
+            .get(nonce)
+            .ok_or_else(|| Error::new(Code::AuthExpired, "the challenge expired"))?;
+        if entry.expires_at <= now() {
+            return Err(Error::new(Code::AuthExpired, "the challenge expired"));
+        }
+        if entry.used {
+            return Err(Error::new(Code::AuthNonceUsed, "the challenge was used"));
+        }
+        if entry.address != address {
+            return Err(Error::new(
+                Code::AuthBadSignature,
+                "the challenge was issued for another address",
+            ));
+        }
+        Ok(entry.message.clone())
+    }
+
+    /// Spend a challenge. Called only once a signature has verified.
+    pub fn burn(&self, nonce: &str) {
+        let mut entries = self.entries.lock().unwrap();
+        if let Some(entry) = entries.get_mut(nonce) {
+            entry.used = true;
+        }
+    }
+
+    /// Look a challenge up **and** spend it, whatever happens next. Kept for
+    /// the tests that assert §3.2's single-use rule directly; the login path
+    /// uses [`Challenges::peek`] and [`Challenges::burn`].
     pub fn redeem(&self, address: &str, nonce: &str) -> Result<String> {
         let address = normalize_address(address)?;
         let mut entries = self.entries.lock().unwrap();
@@ -121,8 +157,19 @@ impl Challenges {
     /// A client that does send a `nonce` gets exactly that one, which is what
     /// a test harness wants.
     pub fn redeem_for(&self, address: &str, nonce: Option<&str>) -> Result<String> {
+        let (nonce, message) = self.peek_for(address, nonce)?;
+        self.burn(&nonce);
+        Ok(message)
+    }
+
+    /// The newest live challenge for an address, or the one a client named.
+    /// `auth.login`'s payload is `{address, signature}` (PROTOCOL §4.3) — it
+    /// does not carry the nonce back, so the server remembers which challenge
+    /// it issued. A client that does send a `nonce` gets exactly that one,
+    /// which is what a test harness wants.
+    pub fn peek_for(&self, address: &str, nonce: Option<&str>) -> Result<(String, String)> {
         if let Some(nonce) = nonce {
-            return self.redeem(address, nonce);
+            return Ok((nonce.to_string(), self.peek(address, nonce)?));
         }
         let address = normalize_address(address)?;
         let newest = {
@@ -135,11 +182,93 @@ impl Challenges {
                 .map(|(nonce, _)| nonce.clone())
         };
         match newest {
-            Some(nonce) => self.redeem(&address, &nonce),
+            Some(nonce) => {
+                let message = self.peek(&address, &nonce)?;
+                Ok((nonce, message))
+            }
             None => Err(Error::new(
                 Code::AuthExpired,
                 "no live challenge for that address",
             )),
+        }
+    }
+
+    /// The whole of PROTOCOL §4.3's step 4: find the challenge this signature
+    /// is over, check it, and spend it — in that order.
+    ///
+    /// `auth.login` carries `{address, signature}` and **not** the nonce, so
+    /// the server has to work out which of its outstanding challenges the
+    /// client signed. Trying them all rather than assuming the newest is what
+    /// makes the refusal honest: a replay of a signature over a spent
+    /// challenge is `auth_nonce_used`, not `auth_bad_signature`, and those are
+    /// two different instructions to the player — "ask for a new challenge"
+    /// against "your key is wrong".
+    ///
+    /// A signature that verifies against nothing leaves every challenge live.
+    /// A mistyped mnemonic should cost a retry, not a round trip.
+    pub fn login(&self, claimed: &str, signature_hex: &str, nonce: Option<&str>) -> Result<String> {
+        let address = normalize_address(claimed)?;
+        if let Some(nonce) = nonce {
+            // A client that named a nonce gets exactly that one's verdict.
+            let message = self.peek(&address, nonce)?;
+            let who = verify_login(&address, &message, signature_hex)?;
+            self.burn(nonce);
+            return Ok(who);
+        }
+
+        let mut candidates: Vec<(String, String, bool)> = {
+            let mut entries = self.entries.lock().unwrap();
+            sweep(&mut entries);
+            let mut live: Vec<_> = entries
+                .iter()
+                .filter(|(_, e)| e.address == address)
+                .map(|(nonce, e)| (nonce.clone(), e.message.clone(), e.used, e.expires_at))
+                .collect();
+            // Newest first: the challenge a client just asked for is the one
+            // it is most likely to have signed.
+            live.sort_by_key(|entry| std::cmp::Reverse(entry.3));
+            live.into_iter()
+                .map(|(nonce, message, used, _)| (nonce, message, used))
+                .collect()
+        };
+        if candidates.is_empty() {
+            return Err(Error::new(
+                Code::AuthExpired,
+                "no live challenge for that address",
+            ));
+        }
+
+        let mut any_unused = false;
+        for (nonce, message, used) in candidates.drain(..) {
+            if !used {
+                any_unused = true;
+            }
+            match recover_address(&message, signature_hex) {
+                Ok(recovered) if recovered.eq_ignore_ascii_case(&address) => {
+                    if used {
+                        return Err(Error::new(Code::AuthNonceUsed, "the challenge was used"));
+                    }
+                    self.burn(&nonce);
+                    return Ok(address);
+                }
+                // A malformed signature is malformed whichever challenge it is
+                // held against, so there is no point trying the rest.
+                Err(e)
+                    if e.code == Code::AuthBadSignature
+                        && !signature_is_wellformed(signature_hex) =>
+                {
+                    return Err(e)
+                }
+                _ => continue,
+            }
+        }
+        if any_unused {
+            Err(Error::new(
+                Code::AuthBadSignature,
+                "the signature does not belong to that address",
+            ))
+        } else {
+            Err(Error::new(Code::AuthNonceUsed, "the challenge was used"))
         }
     }
 
@@ -159,6 +288,18 @@ impl Challenges {
 fn sweep(entries: &mut HashMap<String, Entry>) {
     let cutoff = now();
     entries.retain(|_, e| e.expires_at > cutoff);
+}
+
+/// A 65-byte hex blob with a recovery byte this code understands. Used to
+/// tell "the client sent nonsense" apart from "the client signed the wrong
+/// message", which get different answers.
+fn signature_is_wellformed(signature_hex: &str) -> bool {
+    let cleaned = signature_hex.trim();
+    let cleaned = cleaned.strip_prefix("0x").unwrap_or(cleaned);
+    match hex::decode(cleaned) {
+        Ok(bytes) => bytes.len() == 65,
+        Err(_) => false,
+    }
 }
 
 /// Step 4 of §3.2: recover, compare case-insensitively, and hand back the

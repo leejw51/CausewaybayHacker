@@ -27,11 +27,17 @@ pub struct Mistake {
 
 /// SPEC §7.1, the rust column. Returning `None` means "not in the table", and
 /// the caller stores `other` with the code intact.
+///
+/// `E0277` is absent here on purpose: it is two different lessons and needs
+/// the message to tell them apart. See [`rust_kind_with_message`].
 pub fn rust_kind(code: &str) -> Option<&'static str> {
     Some(match code {
         "E0382" | "E0505" => "borrow-after-move",
         "E0499" | "E0502" => "borrow-conflict",
-        "E0106" | "E0597" | "E0621" => "lifetime",
+        // E0373 is a closure that may outlive the function whose local it
+        // borrowed. Nothing was moved — the value escaped — so it is a
+        // lifetime lesson, not an ownership one.
+        "E0106" | "E0597" | "E0621" | "E0373" => "lifetime",
         "E0308" => "type-mismatch",
         "E0425" | "E0433" => "unknown-name",
         "E0277" => "missing-trait",
@@ -39,6 +45,36 @@ pub fn rust_kind(code: &str) -> Option<&'static str> {
         "unused_variables" | "unused_imports" | "unused_mut" => "unused",
         _ => return None,
     })
+}
+
+/// `E0277` fires both for "you forgot to implement `Display`" and for "you
+/// ignored a `Result`", and the two want opposite advice: one sends the player
+/// to read about traits, the other to read about error handling. Discriminate
+/// on the unsatisfied trait the message names.
+pub fn rust_kind_with_message(code: &str, message: &str) -> Option<&'static str> {
+    if code == "E0277" && mentions_error_handling(message) {
+        return Some("unhandled-error");
+    }
+    rust_kind(code)
+}
+
+fn mentions_error_handling(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    // `?` is the discriminator, and rustc has two wordings for it, both seen
+    // on this toolchain:
+    //
+    //   "the `?` operator can only be used in a function that returns …"
+    //   "`?` couldn't convert the error to `MyError`"
+    //
+    // Matching the operator itself rather than one sentence catches both, and
+    // an E0277 that mentions `?` at all is about carrying an error. The
+    // trait-bound wordings — "`Point` is not an iterator", "`MyError` doesn't
+    // implement `Debug`" — never do, even the one on `fn main() -> Result`,
+    // and those really are "go and implement the trait".
+    lower.contains("`?`")
+        || lower.contains("termination")
+        || lower.contains("`try`")
+        || lower.contains("fromresidual")
 }
 
 /// The lint names §7.1 lists under `unused` arrive as warnings, not errors. A
@@ -123,7 +159,9 @@ pub fn classify_rust_json(stderr: &str) -> Vec<Mistake> {
             }
         }
         let kind = match code.as_deref() {
-            Some(c) => rust_kind(c).unwrap_or("other").to_string(),
+            Some(c) => rust_kind_with_message(c, message)
+                .unwrap_or("other")
+                .to_string(),
             None if looks_like_parse_error(message) => "syntax".to_string(),
             None => "other".to_string(),
         };

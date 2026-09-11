@@ -29,15 +29,28 @@ impl Session {
     }
 
     /// PROTOCOL §3.1: a connection never goes back to ANONYMOUS, and to change
-    /// user you open a new one. Logging in twice on one socket would leave it
-    /// registered in the hub under the address it used to have, so the old
-    /// user's windows would hear about the new user's clears. Refused as a
-    /// client bug rather than half-handled.
+    /// user you open a new one. Authenticating twice on one socket would leave
+    /// it registered in the hub under the address it used to have, so the old
+    /// user's windows would hear about the new user's clears.
     pub fn must_be_anonymous(&self) -> Result<()> {
         match self.address {
             None => Ok(()),
             Some(_) => Err(bad_request(
                 "this connection is already authenticated; open a new one to change user",
+            )),
+        }
+    }
+
+    /// The same rule for `auth.resume`, which §4.4 also lets a client use to
+    /// refresh its token. Re-resuming as **the same** user is that refresh and
+    /// is allowed; resuming as a different one is the connection changing
+    /// user, which is the thing §3.1 forbids.
+    pub fn must_not_change_user(&self, address: &str) -> Result<()> {
+        match self.address.as_deref() {
+            None => Ok(()),
+            Some(current) if current.eq_ignore_ascii_case(address) => Ok(()),
+            Some(_) => Err(bad_request(
+                "this connection belongs to another address; open a new one to change user",
             )),
         }
     }
@@ -89,8 +102,12 @@ pub fn auth_login(
     let signature = str_field(payload, "signature")?;
     let name = opt_str_field(payload, "name");
     let nonce = opt_str_field(payload, "nonce");
-    let message = state.challenges.redeem_for(&address, nonce.as_deref())?;
-    let address = auth::verify_login(&address, &message, &signature)?;
+    // Finding the challenge, checking the signature and spending the nonce are
+    // one operation, because which challenge was signed is part of the answer
+    // (PROTOCOL §4.3).
+    let address = state
+        .challenges
+        .login(&address, &signature, nonce.as_deref())?;
 
     let conn = state.store.conn();
     let user = users::upsert_named(&conn, &address, name.as_deref())?;
@@ -109,10 +126,10 @@ pub fn auth_resume(
     session: &mut Session,
     payload: &serde_json::Value,
 ) -> Result<serde_json::Value> {
-    session.must_be_anonymous()?;
     let token = str_field(payload, "token")?;
     let conn = state.store.conn();
     let (address, fresh) = auth::rotate_session(&conn, &token)?;
+    session.must_not_change_user(&address)?;
     let user = users::upsert(&conn, &address)?;
     let user = user_json(&conn, &user)?;
     drop(conn);

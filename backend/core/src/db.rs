@@ -26,8 +26,7 @@ pub fn open(path: &Path) -> Result<Connection> {
     // file in the home is 0600, and the -wal/-shm pair is the one that gets
     // forgotten because it appears only after the first write.
     tighten(path)?;
-    assert_fts5(&conn)?;
-    migrate(&conn)?;
+    prepare(&conn)?;
     tighten(path)?;
     Ok(conn)
 }
@@ -37,9 +36,21 @@ pub fn open(path: &Path) -> Result<Connection> {
 pub fn open_memory() -> Result<Connection> {
     let conn = Connection::open_in_memory()?;
     configure(&conn)?;
-    assert_fts5(&conn)?;
-    migrate(&conn)?;
+    prepare(&conn)?;
     Ok(conn)
+}
+
+/// Everything between "there is a connection" and "the schema is usable".
+///
+/// The FTS5 assertion comes **before** the migrations on purpose: 0001 creates
+/// a `USING fts5` virtual table, so a build without FTS5 would otherwise fail
+/// halfway through a migration and leave a half-built database behind. And it
+/// is an error, not a warning — a server that starts without FTS5 is a server
+/// whose search is broken in a way nobody notices until someone types in the
+/// box (SPEC §9.3).
+pub fn prepare(conn: &Connection) -> Result<()> {
+    assert_fts5(conn)?;
+    migrate(conn)
 }
 
 fn configure(conn: &Connection) -> Result<()> {

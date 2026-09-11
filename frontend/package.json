@@ -7,6 +7,7 @@
     "dev": "vite --host --port 5291",
     "dev:mock": "vite --host --port 5291 --mode mock",
     "build": "tsc --noEmit && vite build",
+    "build:e2e": "VITE_E2E=1 vite build --outDir dist-e2e",
     "preview": "vite preview --host --port 5291",
     "test": "vitest run",
     "test:watch": "vitest",

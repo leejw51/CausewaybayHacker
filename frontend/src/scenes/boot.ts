@@ -16,6 +16,7 @@ import { LoginScene } from "./login";
 
 export class BootScene implements Scene {
   readonly name = "boot";
+  readonly mood = "title" as const;
   private t = 0;
   private step = "waking up";
 
@@ -46,7 +47,7 @@ export class BootScene implements Scene {
       await this.app.client.waitFor("open");
     } catch {
       this.app.say("no server — check that it is running on :5390");
-      return void this.app.go(new LoginScene(this.app));
+      return void this.app.go(new LoginScene(this.app), "none");
     }
 
     const token = this.app.client.token;
@@ -55,14 +56,14 @@ export class BootScene implements Scene {
       try {
         const user = await this.app.client.resume(token);
         this.app.addressLabel = user.address;
-        return void this.app.go(new LandsScene(this.app));
+        return void this.app.go(new LandsScene(this.app), "forward");
       } catch {
         // A dead token is not an error worth a banner: the login screen is
         // exactly what the player would do about it anyway.
         this.app.client.forgetToken();
       }
     }
-    void this.app.go(new LoginScene(this.app));
+    void this.app.go(new LoginScene(this.app), "none");
   }
 
   update(dt: number): void {

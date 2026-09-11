@@ -187,10 +187,26 @@ player. A client renders its own text from `code`. `detail` is always present,
 | `locked` | the quest's `requires` are not cleared | show the lock, name the blocker |
 | `rate_limited` | too many requests | back off; `detail.retry_after_ms` |
 | `busy` | a submission is already in flight | disable the submit button |
+| `unavailable` | real, but not built yet | say so in the story's voice; `detail.milestone` |
 | `internal` | the server broke | show a retry; log `detail.trace_id` |
 
 A code not in this table is a server bug. A client encountering one should
-treat it as `internal`.
+treat it as `internal`. That rule is also what makes this set safely
+extensible: a code added later degrades in an old client to exactly the
+behaviour it has today.
+
+**`unavailable` is not `internal`.** A feature that is real, specified and
+merely unbuilt — the GO land before its runner exists, `search.query` before
+its index does — answers `unavailable` with `detail.milestone`, and a client
+says *"the GO land opens in the next chapter"*. Reporting it as `internal`
+tells the player their machine is broken and invites them to retry something
+that will never work.
+
+An `unavailable` request must also leave **no trace in the player's record**.
+A Go submission the server cannot judge must not write an `attempt` row: an
+attempt with a fabricated verdict lands in `mistakes` and then in the AI
+drills, and the player is taught to fix a mistake they did not make. The
+curriculum is built from this table, so what goes into it has to be true.
 
 ---
 

@@ -1,14 +1,22 @@
 /**
  * Entry point. Picks a transport, builds the app, starts at boot.
  *
- * The transport choice is the only place the mock exists as far as the build is
- * concerned, and it is behind `import.meta.env.DEV` inside `net/endpoint.ts`
- * so a production bundle contains no trace of it.
+ * Two things here are dev-only and must not reach a production bundle: the
+ * stand-in server (`net/endpoint.ts` chooses it) and the capture hook. Both
+ * are reached through a dynamic `import()` behind a build-time constant that
+ * Vite folds to `false`, so Rollup drops the chunk entirely. There is a
+ * `grep` over `dist/` in the build notes that proves it.
  */
 import { App } from "./app";
 import { Client } from "./net/client";
 import { chooseTransport } from "./net/endpoint";
 import { BootScene } from "./scenes/boot";
+
+/**
+ * Dev, or a build made for the end-to-end suite. QA needs the capture hook in
+ * a *built* bundle, which is why this is not `import.meta.env.DEV` alone.
+ */
+const CAPTURE = import.meta.env.DEV || import.meta.env.VITE_E2E === "1";
 
 async function main(): Promise<void> {
   const canvas = document.getElementById("game") as HTMLCanvasElement | null;
@@ -23,16 +31,9 @@ async function main(): Promise<void> {
   console.info(`[causewaybay hacker] talking to ${label}`);
   app.start(new BootScene(app));
 
-  // A dev-only peephole, for the e2e suite and for a human debugging a scene
-  // transition. Folded out of a production build with everything else behind
-  // `import.meta.env.DEV`, and it exposes only names — never the app object,
-  // and never anything that could reach the wallet module.
-  if (import.meta.env.DEV) {
-    (globalThis as Record<string, unknown>).__cwb = {
-      scene: () => app.currentScene?.name ?? null,
-      orientation: () => (app.layout.isPortrait() ? "portrait" : "landscape"),
-      virtual: () => [app.layout.vw, app.layout.vh],
-    };
+  if (CAPTURE) {
+    const { install } = await import("./dev/capture");
+    install(app);
   }
 }
 

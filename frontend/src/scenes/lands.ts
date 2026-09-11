@@ -11,7 +11,8 @@ import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { fill, type Ctx } from "../engine/ui";
-import { Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import { seconds, Tween } from "../engine/motion";
 import type { Category, CategorySummary, Land, Responses } from "../net/protocol";
 import { MapScene } from "./map";
 
@@ -25,14 +26,18 @@ const BLURB: Record<Land, string> = {
 
 export class LandsScene implements Scene {
   readonly name = "lands";
+  readonly mood = "lands" as const;
   private lands: Lands = [];
-  private land: Land = "rust";
+  /** Read by `App` to tint the city behind the screen. */
+  land: Land = "rust";
   /** Two lists: the land buttons are painted by the shared pixel-button
    *  painter, the category rows paint themselves and only need a hit box. */
   private readonly landBtns = new Buttons();
   private readonly catBtns = new Buttons();
   private t = 0;
   private error = "";
+  private readonly leftIn = new Tween(seconds("panel"));
+  private readonly rightIn = new Tween(seconds("panel"), seconds("stagger"));
 
   constructor(private readonly app: App) {}
 
@@ -52,6 +57,8 @@ export class LandsScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
+    this.leftIn.update(dt);
+    this.rightIn.update(dt);
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
@@ -69,7 +76,7 @@ export class LandsScene implements Scene {
     }
     if (hit.id.startsWith("cat:")) {
       const category = hit.id.slice(4) as Category;
-      void this.app.go(new MapScene(this.app, this.land, category));
+      void this.app.go(new MapScene(this.app, this.land, category), "forward");
     }
   }
 
@@ -83,132 +90,137 @@ export class LandsScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
-    const bg = this.app.assets?.picture("bg_night", layout.isPortrait());
-    if (bg) {
-      g.globalAlpha = 0.5;
-      g.drawImage(bg, 0, 0, layout.vw, layout.vh);
-      g.globalAlpha = 1;
+    if (!this.app.backdrop) {
+      const bg = this.app.assets?.picture("bg_night", layout.isPortrait());
+      if (bg) {
+        g.globalAlpha = 0.5;
+        g.drawImage(bg, 0, 0, layout.vw, layout.vh);
+        g.globalAlpha = 1;
+      }
     }
-    header(g, layout, "CHOOSE YOUR LAND", this.app.addressLabel);
-    const f = frame(layout, layout.isPortrait() ? 0.42 : 0.4);
+    header(g, this.app, "CHOOSE YOUR LAND");
+    const f = frame(layout, layout.isPortrait() ? 0.46 : 0.34, 0.07);
     const s = f.scale;
     const fonts = ensureFonts(s);
     this.landBtns.reset();
     this.catBtns.reset();
 
     // --- the two lands -----------------------------------------------------
-    const left = titledPanel(g, f.left, "LAND", this.land === "rust" ? RUST : GO);
-    this.landBtns.row(
-      fonts.button,
-      [left[0], left[1], left[2], left[3]],
-      [
-        { id: "land:rust", label: "RUST" },
-        { id: "land:go", label: "GO" },
-      ],
-      layout.minTouchH(),
-    );
+    arriving(g, f, "left", this.leftIn, () => {
+      const left = titledPanel(g, f.left, "LAND", this.land === "rust" ? RUST : GO);
+      this.landBtns.row(
+        fonts.button,
+        [left[0], left[1], left[2], left[3]],
+        [
+          { id: "land:rust", label: "RUST" },
+          { id: "land:go", label: "GO" },
+        ],
+        layout.minTouchH(),
+      );
 
-    // The blurb is measured before the sprite is placed, so the sprite gets
-    // whatever is genuinely left rather than a guess — a three-line blurb in a
-    // narrow portrait panel would otherwise run off the bottom of the frame.
-    const blurbLines = wrap(fonts.small, BLURB[this.land], left[2]).length;
-    const blurbH = blurbLines * fonts.small.height;
-    const blurbY = left[1] + left[3] - blurbH;
+      // The blurb is measured before the sprite is placed, so the sprite gets
+      // whatever is genuinely left rather than a guess — a three-line blurb in a
+      // narrow portrait panel would otherwise run off the bottom of the frame.
+      const blurbLines = wrap(fonts.small, BLURB[this.land], left[2]).length;
+      const blurbH = blurbLines * fonts.small.height;
+      const blurbY = left[1] + left[3] - blurbH;
 
-    const sprite = this.app.assets?.picture(NPC[this.land]);
-    const spriteTop = left[1] + Math.round(fonts.button.height + 34 * s);
-    const room = blurbY - Math.round(10 * s) - spriteTop;
-    if (sprite && room > 20) {
-      // The `box` metadata from the art manifest is what lets a sprite stand on
-      // its feet instead of on the bottom of its transparent margin.
-      const box = this.app.assets?.box.get(NPC[this.land]);
-      const h = Math.min(room, left[2] * 0.8);
-      const scale = h / sprite.naturalHeight;
-      const w = sprite.naturalWidth * scale;
-      const bob = Math.sin(this.t * 2.2) * 2 * s;
-      const feet = box ? box.feet * scale : h;
-      g.drawImage(sprite, left[0] + (left[2] - w) / 2, spriteTop + (room - feet) + bob, w, h);
-    }
+      const sprite = this.app.assets?.picture(NPC[this.land]);
+      const spriteTop = left[1] + Math.round(fonts.button.height + 34 * s);
+      const room = blurbY - Math.round(10 * s) - spriteTop;
+      if (sprite && room > 20) {
+        // The `box` metadata from the art manifest is what lets a sprite stand on
+        // its feet instead of on the bottom of its transparent margin.
+        const box = this.app.assets?.box.get(NPC[this.land]);
+        const h = Math.min(room, left[2] * 0.8);
+        const scale = h / sprite.naturalHeight;
+        const w = sprite.naturalWidth * scale;
+        const bob = Math.sin(this.t * 2.2) * 2 * s;
+        const feet = box ? box.feet * scale : h;
+        g.drawImage(sprite, left[0] + (left[2] - w) / 2, spriteTop + (room - feet) + bob, w, h);
+      }
 
-    g.fillStyle = css(Theme.cream);
-    printf(g, fonts.small, BLURB[this.land], left[0], blurbY, left[2], "center");
+      g.fillStyle = css(Theme.cream);
+      printf(g, fonts.small, BLURB[this.land], left[0], blurbY, left[2], "center");
+      this.landBtns.draw(g, fonts.button);
+    });
 
     // --- the three categories ---------------------------------------------
-    const right = titledPanel(g, f.right, `${this.land.toUpperCase()} — CATEGORY`, Theme.coin);
-    const row = this.lands.find((l) => l.land === this.land);
-    // A fixed order, not the server's. `world.lands` does not promise one, and
-    // a map whose rows move between sessions is a map you cannot learn.
-    const ORDER: Category[] = ["basic", "advanced", "hacker"];
-    const cats: CategorySummary[] = row
-      ? ORDER.map((c) => row.categories.find((x) => x.category === c)).filter(
-          (c): c is CategorySummary => c !== undefined,
-        )
-      : ORDER.map((category) => ({
-          category,
-          total: 0,
-          cleared: 0,
-          stars: 0,
-          open: false,
-        }));
+    arriving(g, f, "right", this.rightIn, () => {
+      const right = titledPanel(g, f.right, `${this.land.toUpperCase()} — CATEGORY`, Theme.coin);
+      const row = this.lands.find((l) => l.land === this.land);
+      // A fixed order, not the server's. `world.lands` does not promise one, and
+      // a map whose rows move between sessions is a map you cannot learn.
+      const ORDER: Category[] = ["basic", "advanced", "hacker"];
+      const cats: CategorySummary[] = row
+        ? ORDER.map((c) => row.categories.find((x) => x.category === c)).filter(
+            (c): c is CategorySummary => c !== undefined,
+          )
+        : ORDER.map((category) => ({
+            category,
+            total: 0,
+            cleared: 0,
+            stars: 0,
+            open: false,
+          }));
 
-    const rowH = Math.max(layout.minTouchH(), Math.round(fonts.button.height + 30 * s));
-    let y = right[1];
-    for (const c of cats) {
-      // §4.6: `open` is false while the category's first node is locked. A
-      // category with content you cannot start yet is not the same as an empty
-      // one, and the row says which.
-      const empty = c.total === 0 || !c.open;
-      const barW = right[2];
-      fill(g, empty ? Theme.dim : Theme.navy, right[0], y, barW, rowH, empty ? 0.35 : 0.9);
-      fill(g, empty ? Theme.dim : Theme.coin, right[0], y + rowH - 3, barW, 3, empty ? 0.4 : 1);
-      // The cleared bar: the map's own progress, read straight off the server.
-      if (c.total > 0) {
-        fill(g, Theme.admit, right[0], y + rowH - 3, Math.round((barW * c.cleared) / c.total), 3);
+      const rowH = Math.max(layout.minTouchH(), Math.round(fonts.button.height + 52 * s));
+      let y = right[1];
+      for (const c of cats) {
+        // §4.6: `open` is false while the category's first node is locked. A
+        // category with content you cannot start yet is not the same as an empty
+        // one, and the row says which.
+        const empty = c.total === 0 || !c.open;
+        const barW = right[2];
+        fill(g, empty ? Theme.dim : Theme.navy, right[0], y, barW, rowH, empty ? 0.35 : 0.9);
+        fill(g, empty ? Theme.dim : Theme.coin, right[0], y + rowH - 3, barW, 3, empty ? 0.4 : 1);
+        // The cleared bar: the map's own progress, read straight off the server.
+        if (c.total > 0) {
+          fill(g, Theme.admit, right[0], y + rowH - 3, Math.round((barW * c.cleared) / c.total), 3);
+        }
+        g.fillStyle = css(empty ? Theme.dim : Theme.cream);
+        printf(
+          g,
+          fonts.button,
+          c.category.toUpperCase(),
+          right[0] + Math.round(10 * s),
+          y + Math.round((rowH - fonts.button.height) / 2),
+          barW,
+          "left",
+        );
+        g.fillStyle = css(empty ? Theme.dim : Theme.coin);
+        printf(
+          g,
+          fonts.stationSm,
+          c.total === 0 ? "EMPTY" : empty ? "LOCKED" : `${c.cleared}/${c.total}  ★${c.stars}`,
+          right[0],
+          y + Math.round((rowH - fonts.stationSm.height) / 2),
+          barW - Math.round(10 * s),
+          "right",
+        );
+        this.catBtns.add({
+          id: `cat:${c.category}`,
+          rect: [right[0], y, barW, rowH],
+          label: "",
+          dim: empty,
+        });
+        y += rowH + Math.round(8 * s);
       }
-      g.fillStyle = css(empty ? Theme.dim : Theme.cream);
-      printf(
-        g,
-        fonts.button,
-        c.category.toUpperCase(),
-        right[0] + Math.round(10 * s),
-        y + Math.round((rowH - fonts.button.height) / 2),
-        barW,
-        "left",
-      );
-      g.fillStyle = css(empty ? Theme.dim : Theme.coin);
-      printf(
-        g,
-        fonts.stationSm,
-        c.total === 0 ? "EMPTY" : empty ? "LOCKED" : `${c.cleared}/${c.total}  ★${c.stars}`,
-        right[0],
-        y + Math.round((rowH - fonts.stationSm.height) / 2),
-        barW - Math.round(10 * s),
-        "right",
-      );
-      this.catBtns.add({
-        id: `cat:${c.category}`,
-        rect: [right[0], y, barW, rowH],
-        label: "",
-        dim: empty,
-      });
-      y += rowH + Math.round(8 * s);
-    }
 
-    this.landBtns.draw(g, fonts.button);
+      if (this.error) {
+        g.fillStyle = css(Theme.red);
+        printf(
+          g,
+          fonts.small,
+          this.error,
+          right[0],
+          right[1] + right[3] - fonts.small.height,
+          right[2],
+          "left",
+        );
+      }
+    });
 
-    if (this.error) {
-      g.fillStyle = css(Theme.red);
-      printf(
-        g,
-        fonts.small,
-        this.error,
-        right[0],
-        right[1] + right[3] - fonts.small.height,
-        right[2],
-        "left",
-      );
-    }
-
-    footer(g, layout, "←→  LAND      CLICK  CATEGORY      F1  ORIENTATION");
+    footer(g, layout, "←→  LAND   CLICK  CATEGORY   F1  ORIENTATION   F3  LOG OUT");
   }
 }

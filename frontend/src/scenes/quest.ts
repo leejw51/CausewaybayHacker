@@ -15,7 +15,8 @@ import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
-import { Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import { seconds, Tween } from "../engine/motion";
 import { Editor } from "../ui/editor";
 import { Overlay } from "../ui/overlay";
 import { WireError } from "../net/client";
@@ -39,6 +40,7 @@ function show(text: string): string {
 
 export class QuestScene implements Scene {
   readonly name = "quest";
+  readonly mood = "quest" as const;
   private quest: Quest | null = null;
   private editor: Editor | null = null;
   private overlay: Overlay | null = null;
@@ -62,6 +64,8 @@ export class QuestScene implements Scene {
   private briefScroll = 0;
   private briefOverflow = 0;
   private briefRect: Rect = [0, 0, 0, 0];
+  private readonly briefIn = new Tween(seconds("panel"));
+  private readonly benchIn = new Tween(seconds("panel"), seconds("stagger"));
   private readonly offs: Array<() => void> = [];
 
   constructor(
@@ -151,11 +155,16 @@ export class QuestScene implements Scene {
         console.warn("submit failed:", e.payload.code, e.payload.message, e.payload.detail);
       }
       // §3.3 again: our words on screen, the server's in the console.
+      const goGap = this.land === "go" && e instanceof WireError && e.payload.code === "internal";
       this.error = dropped
         ? "the connection dropped — that attempt is still running on the server"
-        : e instanceof WireError
-          ? playerText(e.payload.code)
-          : "the run failed";
+        : goGap
+          ? // The Go runner arrives in the next milestone. Reporting that as a
+            // server fault teaches the player to distrust a working server.
+            "the GO land opens in the next chapter"
+          : e instanceof WireError
+            ? playerText(e.payload.code)
+            : "the run failed";
     }
   }
 
@@ -196,8 +205,18 @@ export class QuestScene implements Scene {
   // -- input ---------------------------------------------------------------
 
   key(name: string, ev: KeyboardEvent): void {
+    // The console is where a compiler error lives, and a compiler error is
+    // routinely taller than the drawer. Wheel-only scrollback means anyone on
+    // a keyboard cannot read the top of their own error.
+    if (this.consoleOpen) {
+      const page = 8;
+      if (name === "pageup") return void (this.logScroll += page);
+      if (name === "pagedown") return void (this.logScroll = Math.max(0, this.logScroll - page));
+      if (name === "home") return void (this.logScroll = 9999);
+      if (name === "end") return void (this.logScroll = 0);
+    }
     if (name === "escape") {
-      void this.app.go(new MapScene(this.app, this.land, this.category));
+      void this.app.go(new MapScene(this.app, this.land, this.category), "back");
       return;
     }
     if ((name === "return" || name === "kpenter") && (ev.metaKey || ev.ctrlKey)) {
@@ -229,13 +248,15 @@ export class QuestScene implements Scene {
         this.consoleOpen = !this.consoleOpen;
         break;
       case "back":
-        void this.app.go(new MapScene(this.app, this.land, this.category));
+        void this.app.go(new MapScene(this.app, this.land, this.category), "back");
         break;
     }
   }
 
   update(dt: number): void {
     this.t += dt;
+    this.briefIn.update(dt);
+    this.benchIn.update(dt);
     // Clamped here rather than in the wheel handler: the overflow is only
     // known after a frame has measured the text at the current width, and the
     // width changes with the orientation.
@@ -266,13 +287,12 @@ export class QuestScene implements Scene {
 
     header(
       g,
-      layout,
+      this.app,
       this.quest ? `${String(this.quest.node).padStart(2, "0")} ${this.quest.title}` : "LOADING",
-      this.app.addressLabel,
     );
 
-    this.drawBrief(g, f.left, accent);
-    this.drawWorkbench(g, f.right, accent);
+    arriving(g, f, "left", this.briefIn, () => this.drawBrief(g, f.left, accent));
+    arriving(g, f, "right", this.benchIn, () => this.drawWorkbench(g, f.right, accent));
 
     this.buttons.draw(g, fonts.button);
     if (this.error) {
@@ -287,7 +307,11 @@ export class QuestScene implements Scene {
         "left",
       );
     }
-    footer(g, layout, "CTRL+ENTER  RUN      ESC  MAP      F1  ORIENTATION");
+    footer(
+      g,
+      layout,
+      "CTRL+ENTER  RUN   ESC  MAP   PGUP/PGDN  LOG   F1  ORIENTATION   F3  LOG OUT",
+    );
   }
 
   private drawBrief(g: Ctx, rect: Rect, accent: readonly [number, number, number, number]): void {
@@ -401,7 +425,10 @@ export class QuestScene implements Scene {
 
     well(g, inner[0], inner[1], inner[2], editorH);
     const editorRect: Rect = [inner[0] + 4, inner[1] + 4, inner[2] - 8, editorH - 8];
-    if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size);
+    // CodeMirror is a DOM element outside the canvas transform, so it waits
+    // for its well to land rather than hanging in the air while the panel
+    // slides in underneath it.
+    if (this.editor && this.benchIn.finished) this.overlay?.place(editorRect, fonts.codeSm.size);
     else this.overlay?.hide();
 
     const rowY = inner[1] + editorH + Math.round(8 * s);

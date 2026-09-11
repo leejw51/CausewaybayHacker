@@ -16,17 +16,9 @@ import { css, Theme } from "../engine/theme";
 import { clipped, fill, type Ctx, type Rect } from "../engine/ui";
 import { burstPlan, type Plan } from "../engine/burst";
 import { cosine, expOut } from "../engine/ease";
-import {
-  Buttons,
-  clearedStamp,
-  footer,
-  frame,
-  GO,
-  header,
-  RUST,
-  stars as drawStars,
-  titledPanel,
-} from "../ui/chrome";
+import { seconds, Tween } from "../engine/motion";
+import { star as starAt } from "../engine/ui";
+import { Buttons, clearedStamp, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
 import type { Attempt, Category, Land } from "../net/protocol";
 import { MapScene } from "./map";
 import { QuestScene } from "./quest";
@@ -43,9 +35,22 @@ const VERDICT_TEXT: Record<Attempt["verdict"], string> = {
 
 export class ResultScene implements Scene {
   readonly name = "result";
+  readonly mood = "result" as const;
   private t = 0;
   private readonly buttons = new Buttons();
   private confetti: Plan | null = null;
+
+  /**
+   * The verdict is a sequence, not a screen that appears. Word, then stars one
+   * at a time, then the stamp coming down, then the panel of detail. Each
+   * beat is on the arrival curve and each waits for the one before it, which
+   * is what turns four facts into a moment.
+   */
+  private readonly word = new Tween(seconds("verdict"));
+  private readonly starIn: Tween[] = [];
+  private readonly stamp = new Tween(seconds("stamp"), seconds("verdict") * 0.55);
+  private readonly detail = new Tween(seconds("panel"), seconds("verdict") * 0.4);
+  private stampRung = false;
 
   constructor(
     private readonly app: App,
@@ -56,6 +61,11 @@ export class ResultScene implements Scene {
   ) {}
 
   enter(): void {
+    for (let i = 0; i < 3; i++) {
+      this.starIn.push(
+        new Tween(seconds("star"), seconds("verdict") * 0.35 + seconds("starStagger") * i),
+      );
+    }
     if (this.passed) {
       const { vw, vh } = this.app.layout;
       this.confetti = burstPlan(vw / 2, vh * 0.35, 90);
@@ -73,6 +83,17 @@ export class ResultScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
+    this.word.update(dt);
+    this.stamp.update(dt);
+    this.detail.update(dt);
+    for (const t of this.starIn) t.update(dt);
+    // The chip and the glow fire on the frame the stamp lands, not on entry —
+    // a fanfare that plays before the thing it is celebrating arrives is just
+    // a noise.
+    if (!this.stampRung && this.passed && this.stamp.raw >= 1) {
+      this.stampRung = true;
+      this.app.backdrop?.pulse(this.attempt.cleared ? 0xf8d030 : 0x50d8f8);
+    }
   }
 
   key(name: string): void {
@@ -94,11 +115,11 @@ export class ResultScene implements Scene {
   }
 
   private toMap(): void {
-    void this.app.go(new MapScene(this.app, this.land, this.category));
+    void this.app.go(new MapScene(this.app, this.land, this.category), "back");
   }
 
   private retry(): void {
-    void this.app.go(new QuestScene(this.app, this.land, this.category, this.questId));
+    void this.app.go(new QuestScene(this.app, this.land, this.category, this.questId), "back");
   }
 
   draw(g: Ctx): void {
@@ -108,41 +129,64 @@ export class ResultScene implements Scene {
     const accent = this.land === "rust" ? RUST : GO;
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
-    header(
-      g,
-      layout,
-      this.attempt.cleared ? "STREET CLEARED" : ok ? "STILL GOOD" : "NOT YET",
-      this.app.addressLabel,
-    );
-    const f = frame(layout, layout.isPortrait() ? 0.42 : 0.42);
+    header(g, this.app, this.attempt.cleared ? "STREET CLEARED" : ok ? "STILL GOOD" : "NOT YET");
+    const f = frame(layout, 0.42, 0.05);
     this.buttons.reset();
 
     // --- the verdict plate --------------------------------------------------
     const left = titledPanel(g, f.left, "VERDICT", ok ? Theme.admit : Theme.red);
     let y = left[1];
+    // The word arrives oversized and settles to its place: expo makes that
+    // read as an impact rather than a zoom.
+    const wordScale = 1 + (1 - this.word.out) * 1.4;
+    g.save();
+    g.globalAlpha = Math.min(1, this.word.raw * 2);
+    g.translate(left[0] + left[2] / 2, y + fonts.title.height / 2);
+    g.scale(wordScale, wordScale);
+    g.translate(-(left[0] + left[2] / 2), -(y + fonts.title.height / 2));
     g.fillStyle = css(ok ? Theme.admit : Theme.red);
-    y +=
-      printf(g, fonts.title, VERDICT_TEXT[this.attempt.verdict], left[0], y, left[2], "center") *
-      fonts.title.height;
+    const lines = printf(
+      g,
+      fonts.title,
+      VERDICT_TEXT[this.attempt.verdict],
+      left[0],
+      y,
+      left[2],
+      "center",
+    );
+    g.restore();
+    y += lines * fonts.title.height;
     y += Math.round(8 * s);
 
     if (ok) {
-      drawStars(
-        g,
-        left[0] + left[2] / 2 - Math.round(24 * s),
-        y + Math.round(14 * s),
-        Math.round(11 * s),
-        this.attempt.stars,
-        3,
-      );
+      const r = Math.round(11 * s);
+      for (let i = 0; i < 3; i++) {
+        const pop = this.starIn[i]?.out ?? 1;
+        if (pop <= 0.001) continue;
+        starAt(
+          g,
+          left[0] + left[2] / 2 - Math.round(24 * s) + i * r * 2.4,
+          y + Math.round(14 * s),
+          r * pop,
+          i < this.attempt.stars ? Theme.coin : Theme.dim,
+        );
+      }
       y += Math.round(34 * s);
-      clearedStamp(
-        g,
-        left[0] + left[2] / 2,
-        y + Math.round(28 * s),
-        Math.min(left[2] * 0.7, 260 * s),
-        -0.12,
-      );
+      // Three times the size, falling to one: a stamp is an impact, and expo
+      // spends almost all of its time at the two ends of that.
+      const land = this.stamp.out;
+      if (this.stamp.raw > 0) {
+        g.save();
+        g.globalAlpha = Math.min(1, this.stamp.raw * 3);
+        const cx = left[0] + left[2] / 2;
+        const cy = y + Math.round(28 * s);
+        const k = 1 + (1 - land) * 2;
+        g.translate(cx, cy);
+        g.scale(k, k);
+        g.translate(-cx, -cy);
+        clearedStamp(g, cx, cy, Math.min(left[2] * 0.7, 260 * s), -0.12 - (1 - land) * 0.5);
+        g.restore();
+      }
       y += Math.round(70 * s);
     }
 
@@ -263,7 +307,7 @@ export class ResultScene implements Scene {
       layout.minTouchH(),
     );
     this.buttons.draw(g, fonts.button);
-    footer(g, layout, "ENTER  MAP      R  TRY AGAIN      F1  ORIENTATION");
+    footer(g, layout, "ENTER  MAP   R  TRY AGAIN   F1  ORIENTATION   F3  LOG OUT");
   }
 
   /**

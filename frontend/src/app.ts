@@ -1,22 +1,30 @@
 /**
- * The shell: one layout, one loop, one scene at a time.
+ * The shell: one layout, one loop, one scene at a time, one city behind them.
  *
  * Everything a scene is allowed to touch hangs off `App`. Notably absent from
  * that list is any game state — no progress, no quest list, no cleared set.
- * A scene asks the server, draws the answer and forgets it, which is what makes
- * "a reload loses nothing" true rather than aspirational (SPEC §6.4).
+ * A scene asks the server, draws the answer and forgets it, which is what
+ * makes "a reload loses nothing" true rather than aspirational (SPEC §6.4),
+ * and what makes logging out a matter of dropping two references rather than
+ * hunting for caches.
  */
 import { Layout, type Orientation } from "./engine/layout";
 import { Input, loveKey } from "./engine/input";
 import { Assets } from "./engine/assets";
-import { ensureFonts, remeasure } from "./engine/text";
-import { Theme } from "./engine/theme";
-import type { Ctx } from "./engine/ui";
+import { ensureFonts, printf, remeasure } from "./engine/text";
+import { css, Theme } from "./engine/theme";
+import { btnBox, fill, inRect, panel, pixBtn, type Ctx, type Rect } from "./engine/ui";
+import { seconds, Tween } from "./engine/motion";
+import { Backdrop, type Mood } from "./gfx/backdrop";
 import { Client } from "./net/client";
+import type { Land } from "./net/protocol";
 import { Chip } from "./audio/sfx";
+import { wipe as wipeKey } from "./wallet/wallet";
 
 export interface Scene {
   readonly name: string;
+  /** What the city does behind this screen. */
+  readonly mood: Mood;
   enter?(): void | Promise<void>;
   leave?(): void;
   update?(dt: number): void;
@@ -29,26 +37,63 @@ export interface Scene {
   wheel?(dy: number, x: number, y: number): void;
   /** The window changed shape or orientation; rebuild anything cached. */
   resized?(): void;
+  /** True when leaving would throw away something the player typed. */
+  unsaved?(): boolean;
+  /** Which land the city should be tinted for, if the screen knows. */
+  land?: Land;
 }
 
 /** Where the player's chosen orientation is kept. A preference, not a secret. */
 const ORIENT_KEY = "cwbhacker.orientation";
+
+/** A screen change, in the direction of travel. */
+export type Direction = "forward" | "back" | "none";
+
+interface Modal {
+  title: string;
+  body: string;
+  confirm: string;
+  cancel: string;
+  resolve: (ok: boolean) => void;
+  tween: Tween;
+  rects: { confirm: Rect; cancel: Rect } | null;
+  hover: "confirm" | "cancel" | null;
+}
 
 export class App {
   readonly layout: Layout;
   readonly input = new Input();
   readonly g: Ctx;
   readonly chip = new Chip();
+  readonly backdrop: Backdrop | null;
   assets: Assets | null = null;
 
-  /** Set by the login scene and read by the header. Display only. */
+  /** Set at login, cleared at logout. Display only, and the logout button. */
   addressLabel = "";
+  /**
+   * Where the header drew its logout chip this frame, and whether the pointer
+   * is over it. The header is app-level furniture on every authed screen, so
+   * the hit test lives here — a scene that forgot to wire it would be a screen
+   * you cannot log out of, which is exactly the bug this is replacing.
+   */
+  logoutRect: Rect | null = null;
+  logoutHover = false;
 
   private scene: Scene | null = null;
+  /** The screen being slid off, drawn until the transition finishes. */
+  private outgoing: Scene | null = null;
+  private transition: Tween | null = null;
+  private direction: Direction = "none";
+
   private last = 0;
   private raf = 0;
+  private frozen = false;
+  private modal: Modal | null = null;
   /** A one-line banner for anything the player needs told: errors, reconnects. */
-  private toast: { text: string; until: number } | null = null;
+  private toast: { text: string; left: number; tween: Tween } | null = null;
+
+  /** Set by `logout()` so the login screen can say why it is being shown. */
+  loggedOutNotice = "";
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -61,6 +106,7 @@ export class App {
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) throw new Error("this browser has no 2d canvas");
     this.g = ctx;
+    this.backdrop = Backdrop.create(fx);
 
     const saved = localStorage.getItem(ORIENT_KEY);
     if (saved === "portrait" || saved === "landscape") this.layout.pin(saved as Orientation);
@@ -74,7 +120,7 @@ export class App {
     // The connection banner is the app's, not a scene's: it has to be visible
     // on whichever screen the player happens to be on when the server goes.
     client.onState((s) => {
-      if (s === "offline") this.say("connection lost — retrying");
+      if (s === "offline") this.say("connection lost — reconnecting");
       if (s === "authed") this.toast = null;
     });
     client.on("server.bye", (p) => this.say(p.reason));
@@ -84,16 +130,16 @@ export class App {
 
   start(scene: Scene): void {
     this.measure();
-    void this.go(scene);
+    void this.go(scene, "none");
     this.last = performance.now();
     const frame = (t: number) => {
       this.raf = requestAnimationFrame(frame);
+      if (this.frozen) return;
       // Clamped: a tab that was in the background for a minute must not hand
       // the scene a sixty-second `dt` and teleport everything.
       const dt = Math.min(0.05, (t - this.last) / 1000);
       this.last = t;
-      this.scene?.update?.(dt);
-      this.render();
+      this.tick(dt);
     };
     this.raf = requestAnimationFrame(frame);
   }
@@ -102,9 +148,56 @@ export class App {
     cancelAnimationFrame(this.raf);
   }
 
-  async go(next: Scene): Promise<void> {
-    this.scene?.leave?.();
+  /**
+   * One update and one frame. Split out from the loop so the capture hook can
+   * drive the whole game at a fixed step and get the same picture every run.
+   */
+  tick(dt: number): void {
+    this.backdrop?.update(dt);
+    if (this.transition) {
+      this.transition.update(dt);
+      this.outgoing?.update?.(dt);
+      if (this.transition.finished) {
+        this.transition = null;
+        this.outgoing = null;
+      }
+    }
+    this.modal?.tween.update(dt);
+    this.toast?.tween.update(dt);
+    if (this.toast) {
+      this.toast.left -= dt;
+      if (this.toast.left <= 0) this.toast = null;
+    }
+    this.scene?.update?.(dt);
+    this.render();
+  }
+
+  /** Dev/e2e only: stop the loop so a screenshot has something still to take. */
+  freeze(): void {
+    this.frozen = true;
+  }
+
+  resume(): void {
+    if (!this.frozen) return;
+    this.frozen = false;
+    this.last = performance.now();
+  }
+
+  get isFrozen(): boolean {
+    return this.frozen;
+  }
+
+  async go(next: Scene, direction: Direction = "forward"): Promise<void> {
+    const old = this.scene;
+    old?.leave?.();
+    // The outgoing screen keeps being drawn — its DOM overlay is already gone,
+    // which is correct: an editor that slid across the screen would look like
+    // a bug rather than a transition.
+    this.outgoing = direction === "none" ? null : old;
+    this.direction = direction;
+    this.transition = direction === "none" ? null : new Tween(seconds("scene"));
     this.scene = next;
+    this.backdrop?.setMood(next.mood, next.land ?? "rust");
     await next.enter?.();
   }
 
@@ -115,17 +208,175 @@ export class App {
   private render(): void {
     const { g, layout } = this;
     ensureFonts(layout.uiScale());
+    this.backdrop?.render();
     layout.begin(g);
     g.imageSmoothingEnabled = false;
-    this.scene?.draw(g);
+
+    if (this.transition && this.outgoing) {
+      // Both screens travel on the same expo curve, so the pair moves as one
+      // object rather than as two things that happen to be sliding.
+      const t = this.transition.inOut;
+      const away = this.direction === "back" ? layout.vw : -layout.vw;
+      this.drawShifted(this.outgoing, away * t);
+      this.drawShifted(this.scene, -away * (1 - t));
+    } else {
+      this.scene?.draw(g);
+    }
+
     this.drawToast(g);
+    this.drawModal(g);
+  }
+
+  private drawShifted(scene: Scene | null, dx: number): void {
+    if (!scene) return;
+    const g = this.g;
+    g.save();
+    g.translate(Math.round(dx), 0);
+    scene.draw(g);
+    g.restore();
   }
 
   private measure(): void {
-    if (this.layout.measure()) {
-      remeasure();
-      this.scene?.resized?.();
+    if (!this.layout.measure()) return;
+    remeasure();
+    // The WebGL canvas gets the same backing store as the 2D one. Left to
+    // itself it keeps the browser's default 300x150 and is stretched to the
+    // window by CSS, which is a quarter-resolution backdrop in the wrong place.
+    this.fx.width = this.layout.dw;
+    this.fx.height = this.layout.dh;
+    this.backdrop?.resize(this.layout.dw, this.layout.dh);
+    this.scene?.resized?.();
+  }
+
+  /** Re-read the window on demand — the orientation toggle and the capture hook. */
+  remeasure(): void {
+    this.layout.measure();
+    remeasure();
+    this.fx.width = this.layout.dw;
+    this.fx.height = this.layout.dh;
+    this.backdrop?.resize(this.layout.dw, this.layout.dh);
+    this.scene?.resized?.();
+  }
+
+  setOrientation(mode: Orientation): void {
+    this.layout.pin(mode);
+    localStorage.setItem(ORIENT_KEY, mode);
+    this.remeasure();
+  }
+
+  // -- the session ---------------------------------------------------------
+
+  /**
+   * Log out, from any screen.
+   *
+   * The order matters. The key is wiped first, because that is the part that
+   * must happen even if something below throws. Then the token, then the
+   * socket — a connection is authenticated for its whole life (PROTOCOL §3.1)
+   * and never goes back to anonymous, so the only way to stop being this user
+   * is to close it and open another.
+   *
+   * Nothing else needs clearing, and that is by design: no scene holds
+   * progress, so the second wallet cannot see the first one's map.
+   */
+  async logout(reason = ""): Promise<boolean> {
+    if (this.scene?.unsaved?.()) {
+      const ok = await this.ask({
+        title: "LOG OUT?",
+        body: "The code in the editor is not saved. Logging out throws it away.",
+        confirm: "LOG OUT",
+        cancel: "KEEP WRITING",
+      });
+      if (!ok) return false;
     }
+    wipeKey();
+    this.client.forgetToken();
+    this.client.close();
+    this.addressLabel = "";
+    this.loggedOutNotice = reason;
+    this.chip.music("stop");
+    // A fresh connection, anonymous, ready for whoever logs in next.
+    this.client.connect();
+    const { LoginScene } = await import("./scenes/login");
+    await this.go(new LoginScene(this), "back");
+    return true;
+  }
+
+  // -- a question the player has to answer ---------------------------------
+
+  ask(q: { title: string; body: string; confirm: string; cancel: string }): Promise<boolean> {
+    // A second question while one is open would stack two modals; the first
+    // one wins and the second is declined, which is the safe answer for a
+    // dialogue whose only job is to stop something destructive.
+    if (this.modal) return Promise.resolve(false);
+    return new Promise<boolean>((resolve) => {
+      this.modal = {
+        ...q,
+        resolve,
+        tween: new Tween(seconds("panel")),
+        rects: null,
+        hover: null,
+      };
+    });
+  }
+
+  private answer(ok: boolean): void {
+    const m = this.modal;
+    if (!m) return;
+    this.modal = null;
+    this.chip.select();
+    m.resolve(ok);
+  }
+
+  get modalOpen(): boolean {
+    return this.modal !== null;
+  }
+
+  private drawModal(g: Ctx): void {
+    const m = this.modal;
+    if (!m) return;
+    const { layout } = this;
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const t = m.tween.out;
+
+    fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.72 * t);
+
+    const w = Math.min(layout.vw - 40 * s, 520 * s);
+    const h = Math.round(190 * s);
+    const x = Math.round((layout.vw - w) / 2);
+    // The dialogue drops in and settles rather than fading up, so it reads as
+    // something that arrived to stop you rather than something that was
+    // always there.
+    const y = Math.round((layout.vh - h) / 2 - (1 - t) * 60 * s);
+    panel(g, x, y, w, h, Theme.paper);
+
+    g.fillStyle = css(Theme.coin);
+    printf(g, fonts.station, m.title, x, y + Math.round(22 * s), w, "center");
+    g.fillStyle = css(Theme.cream);
+    printf(
+      g,
+      fonts.small,
+      m.body,
+      x + Math.round(20 * s),
+      y + Math.round(56 * s),
+      w - Math.round(40 * s),
+      "center",
+    );
+
+    const [bw, bh] = btnBox(
+      fonts.button,
+      [m.confirm, m.cancel],
+      0,
+      fonts.button.size * 2,
+      layout.minTouchH(),
+    );
+    const gap = Math.round(12 * s);
+    const by = y + h - bh - Math.round(18 * s);
+    const cancelRect: Rect = [Math.round(x + w / 2 - bw - gap / 2), by, bw, bh];
+    const confirmRect: Rect = [Math.round(x + w / 2 + gap / 2), by, bw, bh];
+    m.rects = { cancel: cancelRect, confirm: confirmRect };
+    pixBtn(g, fonts.button, ...cancelRect, m.cancel, { hover: m.hover === "cancel" });
+    pixBtn(g, fonts.button, ...confirmRect, m.confirm, { hover: m.hover === "confirm" });
   }
 
   // -- input ---------------------------------------------------------------
@@ -134,6 +385,33 @@ export class App {
     const send = (ev: PointerEvent, phase: "down" | "move" | "up") => {
       const v = this.layout.toVirtual(ev.clientX, ev.clientY);
       if (!v) return;
+      const m = this.modal;
+      if (m) {
+        // A modal eats the screen underneath it. Anything else would let a
+        // player press RUN through the dialogue asking whether to discard it.
+        if (!m.rects) return;
+        if (phase === "move") {
+          m.hover = inRect(v[0], v[1], m.rects.confirm)
+            ? "confirm"
+            : inRect(v[0], v[1], m.rects.cancel)
+              ? "cancel"
+              : null;
+          return;
+        }
+        if (phase !== "down") return;
+        if (inRect(v[0], v[1], m.rects.confirm)) this.answer(true);
+        else if (inRect(v[0], v[1], m.rects.cancel)) this.answer(false);
+        return;
+      }
+      if (this.logoutRect) {
+        const over = inRect(v[0], v[1], this.logoutRect);
+        if (phase === "move") this.logoutHover = over;
+        if (over && phase === "down") {
+          this.chip.select();
+          void this.logout();
+          return;
+        }
+      }
       this.scene?.pointer?.(v[0], v[1], phase);
     };
     this.canvas.addEventListener("pointerdown", (ev) => {
@@ -149,7 +427,7 @@ export class App {
       "wheel",
       (ev) => {
         const v = this.layout.toVirtual(ev.clientX, ev.clientY);
-        if (!v) return;
+        if (!v || this.modal) return;
         // The page cannot scroll — there is nothing to scroll — so the wheel
         // belongs to whatever the cursor is over.
         ev.preventDefault();
@@ -163,17 +441,32 @@ export class App {
     addEventListener("keydown", (ev) => {
       const name = loveKey(ev);
       if (!name) return;
+
+      if (this.modal) {
+        if (name === "escape") this.answer(false);
+        if (name === "return" || name === "kpenter") this.answer(true);
+        ev.preventDefault();
+        return;
+      }
+
       // F1 pins the orientation, everywhere, on every screen — the spec calls
       // both orientations first-class, so the toggle cannot belong to the map.
       if (name === "f1") {
         ev.preventDefault();
         this.layout.toggleOrientation();
         localStorage.setItem(ORIENT_KEY, this.layout.isPortrait() ? "portrait" : "landscape");
-        remeasure();
-        this.scene?.resized?.();
+        this.remeasure();
         this.say(`orientation: ${this.layout.isPortrait() ? "portrait" : "landscape"}`);
         return;
       }
+      // F3 logs out from anywhere, including mid-quest. It is on a function
+      // key rather than a letter because every letter belongs to the editor.
+      if (name === "f3") {
+        ev.preventDefault();
+        if (this.client.state === "authed") void this.logout();
+        return;
+      }
+
       this.input.track(name, true);
       // A key typed into the editor or a login field belongs to that field, not
       // to the scene — with one exception. An accelerator (anything held with
@@ -198,22 +491,21 @@ export class App {
 
   // -- the banner ----------------------------------------------------------
 
-  say(text: string, seconds = 4): void {
-    this.toast = { text, until: performance.now() + seconds * 1000 };
+  say(text: string, secs = 4): void {
+    this.toast = { text, left: secs, tween: new Tween(seconds("panel")) };
   }
 
   private drawToast(g: Ctx): void {
-    if (!this.toast) return;
-    if (performance.now() > this.toast.until) {
-      this.toast = null;
-      return;
-    }
+    const toast = this.toast;
+    if (!toast) return;
     const { vw } = this.layout;
     const s = this.layout.uiScale();
     const h = Math.round(26 * s);
     // Under the header, not over it: the header says where you are, and a
-    // banner that covers it trades one piece of information for another.
-    const top = Math.round(38 * s);
+    // banner that covers it trades one piece of information for another. It
+    // slides down out of the header rather than appearing, so the eye is
+    // brought to it instead of having to notice it.
+    const top = Math.round(38 * s) - Math.round((1 - toast.tween.out) * h);
     g.fillStyle = "rgba(216,40,0,0.92)";
     g.fillRect(0, top, vw, h);
     g.fillStyle = "rgba(40,24,16,1)";
@@ -223,16 +515,22 @@ export class App {
     g.textBaseline = "middle";
     g.textAlign = "center";
     g.fillStyle = "rgba(252,236,200,1)";
-    g.fillText(this.toast.text.toUpperCase(), vw / 2, top + h / 2);
+    g.fillText(toast.text.toUpperCase(), vw / 2, top + h / 2);
     g.textBaseline = "top";
     g.textAlign = "left";
   }
 
-  /** The backdrop every screen starts from, so nothing is ever drawn on stale pixels. */
-  clear(g: Ctx, r = Theme.void): void {
-    g.fillStyle = `rgba(${Math.round(r[0] * 255)},${Math.round(r[1] * 255)},${Math.round(
-      r[2] * 255,
-    )},1)`;
+  /**
+   * The ground a screen draws on. With the city behind, that is *nothing* —
+   * painting an opaque colour over the backdrop is how the three.js layer
+   * ended up only ever being visible on the map.
+   */
+  clear(g: Ctx, fallback = Theme.void): void {
+    if (this.backdrop) {
+      g.clearRect(0, 0, this.layout.vw, this.layout.vh);
+      return;
+    }
+    g.fillStyle = css(fallback, 1);
     g.fillRect(0, 0, this.layout.vw, this.layout.vh);
   }
 }

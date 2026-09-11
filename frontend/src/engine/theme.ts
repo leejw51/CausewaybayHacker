@@ -26,7 +26,11 @@ export const Theme = {
   ink: c(40, 24, 16),
   admit: c(0, 168, 68),
   dim: c(120, 104, 88),
-  paper: [0.12, 0.1, 0.28, 0.94] as RGBA,
+  // Causewaybay Hacker change: the panel face was 0.94 opaque, which was right
+  // when there was nothing behind it. With the city on the WebGL layer the
+  // panels are glass over neon — enough to read text on, not so much that the
+  // three.js work is invisible on every screen but the map.
+  paper: [0.1, 0.09, 0.24, 0.84] as RGBA,
 
   landW: 1280,
   landH: 720,

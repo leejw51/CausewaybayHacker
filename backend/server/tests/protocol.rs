@@ -147,6 +147,31 @@ async fn an_unknown_top_level_key_is_refused() {
     server.handle.abort();
 }
 
+/// §2: `payload` is never absent. "Use `{}`" is an instruction, not a
+/// suggestion — accepting a missing one is the same failure as ignoring an
+/// unknown key, one frame later.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_absent_payload_is_refused() {
+    let server = start().await;
+    let mut socket = connect(server.port).await;
+    send(&mut socket, json!({ "v":1, "id":"c-1", "type":"ping" })).await;
+    let reply = next_json(&mut socket).await;
+    assert_eq!(reply["type"].as_str(), Some("ping.err"), "{reply}");
+    assert_eq!(reply["payload"]["code"].as_str(), Some("bad_request"));
+
+    // With `{}` it works, and the connection never died in between.
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-2", "type":"ping", "payload":{} }),
+    )
+    .await;
+    assert_eq!(
+        next_json(&mut socket).await["type"].as_str(),
+        Some("ping.ok")
+    );
+    server.handle.abort();
+}
+
 /// §2: `payload` is always an object, never a bare value.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_payload_that_is_not_an_object_is_refused() {

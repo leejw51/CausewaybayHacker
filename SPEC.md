@@ -431,7 +431,9 @@ An error payload is always:
 
 Codes are a closed set: `proto_version`, `bad_request`, `unauthorized`,
 `auth_expired`, `auth_nonce_used`, `auth_bad_signature`, `not_found`, `locked`,
-`rate_limited`, `busy`, `internal`.
+`rate_limited`, `busy`, `unavailable`, `internal`. See PROTOCOL.md §3.3 —
+in particular why an unbuilt feature is `unavailable` and never `internal`,
+and why it must not write an `attempt` row.
 
 ### 6.2 Message catalogue
 

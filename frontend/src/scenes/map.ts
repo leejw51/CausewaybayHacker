@@ -25,22 +25,40 @@ import {
   GO,
   RUST,
 } from "../ui/chrome";
+import { Chase, seconds, Tween } from "../engine/motion";
 import type { Category, Land, MapNode } from "../net/protocol";
-import { MapFx } from "./mapfx";
 import { LandsScene } from "./lands";
 import { QuestScene } from "./quest";
 
+/**
+ * How far the camera travels, as a fraction of the plate, for a node at the
+ * very edge of the map. Small on purpose: enough that the eye follows the
+ * move, never so much that a corner node pushes its neighbours out of sight.
+ */
+const CAM_REACH = 0.16;
+
 export class MapScene implements Scene {
   readonly name = "map";
+  readonly mood = "map" as const;
   private nodes: MapNode[] = [];
   /** Pairs of quest ids (PROTOCOL §4.7), given so a client never infers them. */
   private edges: Array<[string, string]> = [];
   private selected = 0;
   private t = 0;
   private status = "";
-  private fx: MapFx | null = null;
-  private pan: [number, number] = [0, 0];
   private plate: Rect = [0, 0, 1, 1];
+  /**
+   * The camera. The selected street drifts toward the middle of the plate
+   * rather than jumping there, on the expo curve — almost still, then quick,
+   * then almost still, which is what makes it read as a camera being moved by
+   * somebody rather than as the map being redrawn.
+   */
+  private readonly camX = new Chase(0, "camera");
+  private readonly camY = new Chase(0, "camera");
+  /** Each node's arrival, staggered, so the overworld assembles itself. */
+  private pops: Tween[] = [];
+  private readonly plateIn = new Tween(seconds("panel"));
+  private readonly infoIn = new Tween(seconds("panel"), seconds("stagger") * 2);
   private offProgress: (() => void) | null = null;
   private offState: (() => void) | null = null;
 
@@ -57,8 +75,6 @@ export class MapScene implements Scene {
     this.offState = this.app.client.onState((s) => {
       if (s === "authed") void this.refresh();
     });
-    this.fx = MapFx.create(this.app.fx);
-    this.fx?.setLand(this.land);
     // A clear landing while the player is looking at the map is the moment the
     // stamp should appear, so the map listens rather than re-fetching.
     // PROTOCOL §4.19 carries `unlocked`, so a clear updates the overworld in
@@ -83,12 +99,6 @@ export class MapScene implements Scene {
   leave(): void {
     this.offProgress?.();
     this.offState?.();
-    this.fx?.dispose();
-    this.fx = null;
-    // The WebGL canvas keeps its last frame otherwise, and it would show
-    // through every screen that is not the map.
-    this.app.fx.width = 1;
-    this.app.fx.height = 1;
     this.app.chip.music("stop");
   }
 
@@ -98,8 +108,16 @@ export class MapScene implements Scene {
         land: this.land,
         category: this.category,
       });
+      const first = this.nodes.length === 0;
       this.nodes = res.nodes.slice().sort((a, b) => a.node - b.node);
       this.edges = res.edges;
+      // Only the first load pops the nodes in. A refresh after a clear should
+      // change one stamp, not replay the whole opening.
+      if (first) {
+        this.pops = this.nodes.map(
+          (_, i) => new Tween(seconds("node"), seconds("nodeStagger") * i),
+        );
+      }
       this.status = this.nodes.length === 0 ? "no streets here yet" : "";
       if (this.selected >= this.nodes.length) this.selected = 0;
     } catch {
@@ -109,16 +127,24 @@ export class MapScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
-    if (this.fx) {
-      this.fx.resize(this.app.layout.dw, this.app.layout.dh);
-      this.fx.render(this.t, this.pan[0], this.pan[1]);
+    this.plateIn.update(dt);
+    this.infoIn.update(dt);
+    for (const p of this.pops) p.update(dt);
+    const n = this.nodes[this.selected];
+    if (n) {
+      // A third of the offset, capped: enough that the eye follows the move,
+      // never so much that a corner node pushes its neighbours off the plate.
+      this.camX.to(Math.max(-0.5, Math.min(0.5, n.x - 0.5)) * CAM_REACH);
+      this.camY.to(Math.max(-0.5, Math.min(0.5, n.y - 0.5)) * CAM_REACH * 0.75);
     }
+    this.camX.update(dt);
+    this.camY.update(dt);
   }
 
   // -- input ---------------------------------------------------------------
 
   key(name: string): void {
-    if (name === "escape") return void this.app.go(new LandsScene(this.app));
+    if (name === "escape") return void this.app.go(new LandsScene(this.app), "back");
     if (this.nodes.length === 0) return;
     if (name === "left" || name === "up" || name === "a" || name === "w") {
       this.selected = (this.selected + this.nodes.length - 1) % this.nodes.length;
@@ -132,8 +158,6 @@ export class MapScene implements Scene {
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
-    const [px, py, pw, ph] = this.plate;
-    this.pan = [((x - px) / Math.max(1, pw)) * 2 - 1, ((y - py) / Math.max(1, ph)) * 2 - 1];
     const r = this.nodeRadius();
     for (let i = 0; i < this.nodes.length; i++) {
       const [nx, ny] = this.nodeAt(this.nodes[i]);
@@ -158,7 +182,7 @@ export class MapScene implements Scene {
       return;
     }
     this.app.chip.select();
-    void this.app.go(new QuestScene(this.app, this.land, this.category, n.quest_id));
+    void this.app.go(new QuestScene(this.app, this.land, this.category, n.quest_id), "forward");
   }
 
   // -- geometry ------------------------------------------------------------
@@ -180,7 +204,11 @@ export class MapScene implements Scene {
 
   private nodeAt(n: MapNode): [number, number] {
     const [x, y, w, h] = this.plate;
-    return [x + n.x * w, y + n.y * h];
+    // The camera offset is in plate fractions and is applied to the art and
+    // the nodes identically — `x`/`y` are fractions *of the map image*
+    // (PROTOCOL §5.2), so a node that parallaxed away from its landmark would
+    // simply be in the wrong place.
+    return [x + (n.x - this.camX.value) * w, y + (n.y - this.camY.value) * h];
   }
 
   private nodeRadius(): number {
@@ -199,19 +227,26 @@ export class MapScene implements Scene {
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
 
+    // The plate drops in from above and the detail slides up from below, so
+    // the overworld assembles around the middle rather than appearing.
+    const plateLift = (1 - this.plateIn.out) * Math.round(40 * s);
+    g.save();
+    g.globalAlpha = Math.min(1, this.plateIn.raw * 2.2);
+    g.translate(0, -plateLift);
     this.drawPlate(g);
     clipped(g, this.plate[0], this.plate[1], this.plate[2], this.plate[3], () => {
       this.drawEdges(g);
       this.drawNodes(g);
     });
+    g.restore();
 
-    header(
-      g,
-      layout,
-      `${this.land.toUpperCase()} · ${this.category.toUpperCase()}`,
-      this.app.addressLabel,
-    );
+    header(g, this.app, `${this.land.toUpperCase()} · ${this.category.toUpperCase()}`);
+    const infoDrop = (1 - this.infoIn.out) * Math.round(60 * s);
+    g.save();
+    g.globalAlpha = Math.min(1, this.infoIn.raw * 2.2);
+    g.translate(0, infoDrop);
     this.drawInfo(g, accent);
+    g.restore();
 
     if (this.status) {
       g.fillStyle = css(Theme.cream);
@@ -225,7 +260,7 @@ export class MapScene implements Scene {
         "center",
       );
     }
-    footer(g, layout, "←→  STREET      ENTER  GO IN      ESC  BACK      F1  ORIENTATION");
+    footer(g, layout, "←→  STREET   ENTER  GO IN   ESC  BACK   F1  ORIENTATION   F3  LOG OUT");
   }
 
   /** The map's own frame, plus the background art if it arrived. */
@@ -238,11 +273,21 @@ export class MapScene implements Scene {
         // Cover, not stretch: the art is 3:2 and the plate is whatever the
         // window left over, and a squashed overworld looks broken rather than
         // stylised.
-        const scale = Math.max(w / art.naturalWidth, h / art.naturalHeight);
+        // Over-scaled by the camera's reach, so panning never exposes the
+        // plate behind the art. `CAM_REACH` is the largest offset `update`
+        // can ask for, doubled because it pans both ways.
+        const over = 1 + CAM_REACH * 2.2;
+        const scale = Math.max(w / art.naturalWidth, h / art.naturalHeight) * over;
         const aw = art.naturalWidth * scale;
         const ah = art.naturalHeight * scale;
         g.globalAlpha = 0.72;
-        g.drawImage(art, x + (w - aw) / 2, y + (h - ah) / 2, aw, ah);
+        g.drawImage(
+          art,
+          x + (w - aw) / 2 - this.camX.value * w,
+          y + (h - ah) / 2 - this.camY.value * h,
+          aw,
+          ah,
+        );
         g.globalAlpha = 1;
       });
     } else {
@@ -293,8 +338,10 @@ export class MapScene implements Scene {
       const n = this.nodes[i];
       const [x, y] = this.nodeAt(n);
       const chosen = i === this.selected;
+      const pop = this.pops[i]?.out ?? 1;
+      if (pop <= 0.001) continue;
       const pulse = chosen ? 1 + 0.08 * Math.sin(this.t * 6) : 1;
-      const rr = r * pulse;
+      const rr = r * pulse * pop;
 
       const face =
         n.state === "cleared" ? Theme.admit : n.state === "open" ? Theme.coin : Theme.dim;
