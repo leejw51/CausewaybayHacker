@@ -214,8 +214,24 @@ def structural(pack, path, vocab):
             continue
         if m.group(1) != land or m.group(2) != cat:
             errs.append(f"{qid}: id land/category disagrees with pack")
-        if int(m.group(3)) != q["node"]:
-            errs.append(f"{qid}: id node {m.group(3)} != node {q['node']}")
+        # The number in an id is **the node the quest was created at**, and
+        # SPEC §12 no longer requires it to match where the quest sits today.
+        #
+        # This check used to be here and was wrong. §4.1 has always said the
+        # id is "stable forever … so a reordered map does not renumber
+        # someone's cleared list into nonsense"; §12 said the number had to
+        # equal `node`. The two contradicted each other, and enforcing this
+        # one cost four boss quests their ids on three separate occasions —
+        # each rename a delete-and-insert that discards whoever had cleared
+        # them, which is precisely what §4.1 exists to prevent.
+        #
+        # Both hacker packs now exercise the resolved rule deliberately: the
+        # LRU boss keeps `*.hacker.28.lru` while sitting at node 34. `node`
+        # is the authority on position; the id is an identity.
+        #
+        # Everything around this still holds — the id's *shape*, its land and
+        # category, and uniqueness within the pack — and those are checked
+        # above and below.
         if not 1 <= q["difficulty"] <= 5:
             errs.append(f"{qid}: difficulty out of 1..5")
         if not q.get("story", "").strip():

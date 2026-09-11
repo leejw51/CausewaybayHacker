@@ -55,7 +55,12 @@ enum Pending {
     },
     Run,
     Submit,
-    Format,
+    /// §4.9d. Like `Reset`, the path travels with the request: the reply is
+    /// what has to reach the player's file, and a message that says
+    /// "formatted" without writing it is worse than no formatter at all.
+    Format {
+        path: std::path::PathBuf,
+    },
     Hint,
     /// §4.11 gives the starter back; the path is remembered so the reply knows
     /// which of the player's files to put it in.
@@ -90,6 +95,15 @@ pub struct App {
     pub focus: Pane,
     pub help: bool,
     pub quit: bool,
+    /// `R` overwrites the player's file. It sits one shift key away from `r`,
+    /// which runs, so it takes two presses and says so in between. Command
+    /// mode asks the same question with a y/N prompt; the file is the
+    /// player's and a stray keystroke must not be able to take an afternoon
+    /// of it.
+    pub confirm_reset: bool,
+    /// A quest id the store remembers for the map being fetched, applied once
+    /// the nodes arrive.
+    restore: Option<String>,
     streams: LogStreams,
     /// §4.18's buffer: the tail of a compile line that has not ended yet.
     compile_tail: String,
@@ -176,6 +190,8 @@ pub async fn run(ctx: &Ctx, land: &str, category: &str) -> Result<()> {
         focus: Pane::Map,
         help: false,
         quit: false,
+        confirm_reset: false,
+        restore: None,
         streams: LogStreams::default(),
         compile_tail: String::new(),
         pending: HashMap::new(),
@@ -194,6 +210,11 @@ pub async fn run(ctx: &Ctx, land: &str, category: &str) -> Result<()> {
         Pending::Lands,
     )
     .await?;
+    app.restore = ctx
+        .store
+        .load()?
+        .map_pos(&ctx.server, &app.land, &app.category)
+        .map(str::to_string);
     refetch_map(&mut session, &mut app).await?;
 
     let mut tick = tokio::time::interval(Duration::from_millis(16));
@@ -236,6 +257,12 @@ pub async fn run(ctx: &Ctx, land: &str, category: &str) -> Result<()> {
         }
     }
 
+    // SPEC §1.1: "where each map was left". One record per session, on the way
+    // out, rather than one per keypress.
+    if let Some(node) = app.node() {
+        ctx.store
+            .set_map_pos(&ctx.server, &app.land, &app.category, &node.quest_id)?;
+    }
     session.close().await;
     Ok(())
 }
@@ -390,7 +417,19 @@ fn on_frame(app: &mut App, frame: &Frame) {
             if let Ok(world) = serde_json::from_value::<WorldMap>(frame.payload.clone()) {
                 app.land = land;
                 app.category = category;
-                app.selected = app.selected.min(world.nodes.len().saturating_sub(1));
+                // Where this map was last left (SPEC §1.1), if the store
+                // remembers and the node is still on the map. A renumbered
+                // pack simply means it is not found, and the cursor starts at
+                // the top, which is the right answer rather than an error.
+                if let Some(wanted) = app.restore.take() {
+                    app.selected = world
+                        .nodes
+                        .iter()
+                        .position(|n| n.quest_id == wanted)
+                        .unwrap_or(0);
+                } else {
+                    app.selected = app.selected.min(world.nodes.len().saturating_sub(1));
+                }
                 app.nodes = world.nodes;
             }
         }
@@ -452,21 +491,20 @@ fn on_frame(app: &mut App, frame: &Frame) {
                 app.say(format!("    stream gap: {gap}"));
             }
         }
-        Pending::Format => {
+        Pending::Format { path } => {
             app.busy = None;
             if let Ok(reply) = serde_json::from_value::<causewaybay_hacker_cli::proto::FormatReply>(
                 frame.payload.clone(),
             ) {
                 match (&reply.problem, reply.changed) {
-                    // §4.9d: unparsable source is not an error and the buffer
-                    // is left alone.
+                    // §4.9d: unparsable source is not an error, the reply is
+                    // `.ok`, and the buffer is left exactly as it was.
                     (Some(problem), _) => app.say(format!("  not formatted: {problem}")),
                     (None, false) => app.say("  already tidy"),
-                    (None, true) => {
-                        // The formatted source was written by the key handler's
-                        // own path, which is the one the player edits.
-                        app.say("  formatted (written to your file)")
-                    }
+                    (None, true) => match workspace::write_private(&path, &reply.source) {
+                        Ok(()) => app.say(format!("  formatted — {} rewritten", path.display())),
+                        Err(e) => app.status = render::explain(&e),
+                    },
                 }
             }
         }
@@ -550,6 +588,11 @@ async fn on_key(
     if app.help && !matches!(key.code, KeyCode::Char('?')) {
         app.help = false;
         return Ok(());
+    }
+    // A pending `R` survives only its own second press.
+    if app.confirm_reset && !matches!(key.code, KeyCode::Char('R')) {
+        app.confirm_reset = false;
+        app.status.clear();
     }
     match key.code {
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => app.quit = true,
@@ -699,7 +742,7 @@ async fn on_key(
                 app,
                 "code.format",
                 serde_json::json!({ "lang": quest.lang(), "source": source }),
-                Pending::Format,
+                Pending::Format { path },
             )
             .await?;
         }

@@ -273,7 +273,7 @@ fn help(frame: &mut Frame, area: Rect) {
         Line::from("  h             take a hint (this costs stars)"),
         Line::from("  [ ]           previous / next land and category"),
         Line::from("  ⇥             move focus between the map and the output"),
-        Line::from("  R             put the starter back (progress untouched)"),
+        Line::from("  R R           put the starter back — twice, it overwrites"),
         Line::from("  c             clear the output"),
         Line::from("  q / esc       leave"),
         Line::from(""),

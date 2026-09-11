@@ -62,6 +62,21 @@ export interface CaptureApi {
   orientation(): string;
   virtual(): [number, number];
   backing(): { game: [number, number]; fx: [number, number] };
+  /**
+   * Every button the current scene hit-tests against, with `client` in CSS
+   * pixels ready for `page.mouse.click`. The rects are the same objects the
+   * game checks a click against, so this cannot drift from what clicking
+   * actually does.
+   */
+  buttons(): Array<{
+    id: string;
+    label: string;
+    dim: boolean;
+    rect: [number, number, number, number];
+    client: [number, number, number, number];
+  }>;
+  /** The middle of one button in CSS pixels, or null if it is not on screen. */
+  buttonAt(id: string): [number, number] | null;
 }
 
 declare global {
@@ -177,6 +192,53 @@ export async function atScreen(page: Page, want: Screen, timeout = 60_000): Prom
     .toBe(want);
 }
 
+/**
+ * Click a button by id.
+ *
+ * This replaces two geometric scans and the whole class of failure they
+ * produced. The scans cost four runs between them — the lands panel at the
+ * wrong x, then the wrong y range, then the wrong land because a stray click
+ * toggled it, then SUBMIT moving onto a second line when FORMAT was added —
+ * and every one of those failed by silently doing *something else* rather
+ * than by failing where the mistake was.
+ *
+ * `buttons()` reads the same rects the scene hit-tests against, so it cannot
+ * disagree with what a click does. Nothing here is a guess any more.
+ */
+export async function clickButton(page: Page, id: string, timeout = 30_000): Promise<void> {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    const found = await page.evaluate((wanted) => {
+      const api = window.__cwbCapture;
+      if (!api?.buttons) return { has: false, ids: [] as string[], at: null };
+      const all = api.buttons();
+      return {
+        has: true,
+        ids: all.map((b) => b.id),
+        at: api.buttonAt(wanted),
+      };
+    }, id);
+
+    if (!found.has)
+      throw new Error(
+        "the page does not expose `__cwbCapture.buttons()`. Build the e2e " +
+          "bundle (`npm run build:e2e` in frontend/) — a plain `dist` does " +
+          "not carry the capture hook.",
+      );
+    if (found.at) {
+      await page.mouse.click(found.at[0], found.at[1]);
+      return;
+    }
+    if (Date.now() > deadline)
+      throw new Error(
+        `no button \`${id}\` on this screen. The scene offers: ` +
+          `${found.ids.join(", ") || "(none)"}. Button ids are listed per ` +
+          `scene in FE's entry in docs/decisions.md.`,
+      );
+    await page.waitForTimeout(250);
+  }
+}
+
 /** Type into the seed field and submit it the way the scene expects. */
 export async function login(page: Page, account: Account): Promise<void> {
   await atScreen(page, "login");
@@ -213,30 +275,16 @@ export async function logout(page: Page): Promise<void> {
  * The hit point is returned so a retry can click the *same* place instead of
  * sweeping again — see `enterRustQuest` for why that matters.
  */
-export async function pickFirstCategory(page: Page): Promise<{ x: number; y: number }> {
+export async function pickCategory(page: Page, category = "basic"): Promise<void> {
   await atScreen(page, "lands");
-  const box = await page.locator("canvas#game").boundingBox();
-  if (!box) throw new Error("the game canvas has no box");
+  await clickButton(page, `cat:${category}`);
+  await atScreen(page, "map");
+}
 
-  const xs = [0.5, 0.72, 0.25];
-  for (let fy = 0.08; fy <= 0.95; fy += 0.012) {
-    const y = box.y + box.height * fy;
-    for (const fx of xs) {
-      const x = box.x + box.width * fx;
-      await page.mouse.click(x, y);
-      if ((await sceneNow(page)) === "map") {
-        await atScreen(page, "map");
-        return { x, y };
-      }
-    }
-  }
-  throw new Error(
-    `no click anywhere on the lands screen opened a map (canvas ${box.width}×` +
-      `${box.height}). The category rows are canvas-drawn and pointer-only — ` +
-      "`lands.key` handles the land toggle and nothing else — so this scan is " +
-      "the only way in. If the panel has moved, the scan needs to move with " +
-      "it; see e2e/README.md.",
-  );
+/** Choose the land. `land:rust` / `land:go` — a click, not a blind toggle. */
+export async function pickLand(page: Page, land: "rust" | "go"): Promise<void> {
+  await atScreen(page, "lands");
+  await clickButton(page, `land:${land}`);
 }
 
 /**
@@ -362,38 +410,19 @@ export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string 
  * land and at most one flip is ever needed.
  */
 export async function enterRustQuest(page: Page, wire: Wire): Promise<string> {
-  let hit: { x: number; y: number } | null = null;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    if (hit === null) {
-      hit = await pickFirstCategory(page);
-    } else {
-      await page.mouse.click(hit.x, hit.y);
-      await atScreen(page, "map");
-    }
-    await openSelectedNode(page);
-    const id = await identifyOpenQuest(page, wire);
-    // A RUST quest the wire could not name is still a RUST quest, and the
-    // map opens on node 1, so this is almost always a content edit rather
-    // than a wrong-land click. Fall back to the map's first node rather than
-    // failing the whole journey on an identification detail.
-    if (id === "rust.unknown") {
-      const first = (await wire.mapOf("rust")).sort((a, b) => a.node - b.node)[0];
-      if (first) return first.quest_id;
-    }
-    if (id && id.startsWith("rust.")) return id;
-
-    await page.keyboard.press("Escape"); // quest → map
-    await atScreen(page, "map");
-    await page.keyboard.press("Escape"); // map → lands
-    await atScreen(page, "lands");
-    await page.keyboard.press("ArrowRight"); // toggle the land
-  }
-  throw new Error(
-    "could not reach a RUST quest in four attempts. `identifyOpenQuest` " +
-      "matches the editor's starter against the wire's quests; if it is " +
-      "returning null, the editor is empty or the starter no longer matches " +
-      "what `quest.get` sends.",
-  );
+  // Was a four-attempt retry loop that clicked its way across the plate and
+  // flipped the land when it guessed wrong. `buttons()` makes it three
+  // clicks, and the land is *chosen* rather than toggled toward.
+  await pickLand(page, "rust");
+  await pickCategory(page, "basic");
+  await openSelectedNode(page);
+  const id = await identifyOpenQuest(page, wire);
+  if (id && id.startsWith("rust.")) return id;
+  // Still worth asking the wire rather than trusting the click: a content
+  // edit can leave the editor showing a starter the map does not name.
+  const first = (await wire.mapOf("rust")).sort((a, b) => a.node - b.node)[0];
+  if (first) return first.quest_id;
+  throw new Error("the rust/basic map is empty");
 }
 
 /** Replace the editor's contents. CodeMirror is not a `<textarea>`. */
@@ -436,45 +465,24 @@ export async function run(page: Page): Promise<void> {
  * `result`, so a click that reaches the result screen was the right click by
  * definition. A stray RUN on the way costs a compile and nothing else.
  */
-export async function submit(page: Page, timeout = 180_000): Promise<void> {
-  const box = await page.locator("canvas#game").boundingBox();
-  if (!box) throw new Error("the game canvas has no box");
+export async function submit(page: Page): Promise<void> {
+  // Two independent ways in, and the test takes the button because that is
+  // what a player does. `Ctrl/Cmd+Shift+Enter` is the other — the RUN key
+  // with SHIFT — and it exists because a primary action reachable only with
+  // a mouse is an accessibility gap, not merely a test problem.
+  await clickButton(page, "submit");
+  // Submitting is a decision, so it asks first; `App` answers a modal with
+  // Enter. Harmless when there is no modal.
+  await page.keyboard.press("Enter");
+  await atScreen(page, "result", 180_000);
+}
 
-  // The action row sits along the bottom of the plate in both orientations.
-  const points: [number, number][] = [];
-  for (const fy of [0.93, 0.88, 0.83, 0.96, 0.78]) {
-    for (const fx of [0.88, 0.72, 0.5, 0.3, 0.12]) points.push([fx, fy]);
-  }
-
-  const deadline = Date.now() + timeout;
-  for (const [fx, fy] of points) {
-    if (Date.now() > deadline) break;
-    await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
-    // SUBMIT raises a confirmation first — "submitting is a decision" — and
-    // `App` answers a modal with Enter. Without this the click lands, the
-    // dialogue goes up, the scene stays `quest`, and every later click in the
-    // scan hits the modal instead of the plate. That is what a scan over the
-    // whole bottom of the canvas finding nothing looked like.
-    await page.keyboard.press("Enter");
-    // A submit compiles before it navigates, so give it a real window — but
-    // only on the clicks that might have been it.
-    for (let i = 0; i < 8; i++) {
-      if ((await sceneNow(page)) === "result") {
-        await atScreen(page, "result");
-        return;
-      }
-      if ((await sceneNow(page)) !== "quest") break; // it went somewhere else
-      await page.waitForTimeout(1_000);
-    }
-  }
-  throw new Error(
-    "no click on the quest plate reached the result screen. SUBMIT is a " +
-      "canvas-drawn button with no keyboard shortcut (`quest.ts`: the reflex " +
-      "key is RUN), so this scan is the only way to press it. If the action " +
-      "row has moved, the scan needs to move with it — and this is the third " +
-      "time a canvas control has cost a run, so the hit-test hook requested " +
-      "in docs/decisions.md is worth more than it looks.",
-  );
+/** The keyboard route to the same thing, so the binding itself is tested. */
+export async function submitByKey(page: Page): Promise<void> {
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("ControlOrMeta+Shift+Enter");
+  await page.keyboard.press("Enter");
+  await atScreen(page, "result", 180_000);
 }
 
 // -------------------------------------------------------- the wire verifier

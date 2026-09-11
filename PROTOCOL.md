@@ -881,6 +881,29 @@ type SearchHit = {
 };
 ```
 
+### 5.11 `InterviewSession` and `InterviewReport`
+
+```ts
+type InterviewSession = {
+  id: string;                            // "int_" + 16 hex
+  quest: Quest;                          // solution and hints withheld
+  opened_at: string; deadline_at: string | null;
+  approach: string | null;               // null until written
+  approach_at: string | null;            // the editor unlocks after this
+  finished_at: string | null;
+};
+
+type InterviewReport = {
+  session_id: string; quest_id: string;
+  cleared: boolean; within_limit: boolean | null;
+  took_ms: number; limit_ms: number | null;
+  approach: string | null;
+  reference_summary: string;             // what the reference answer does
+  attempts: AttemptBrief[];
+  mistakes: { kind: string; label: string; count: number }[];
+};
+```
+
 ### 5.10 `Award`
 
 ```ts

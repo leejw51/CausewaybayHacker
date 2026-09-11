@@ -7,7 +7,7 @@ import {
   openSelectedNode,
   login,
   logout,
-  pickFirstCategory,
+  pickCategory,
   run,
   sourceThatPrints,
   scene,
@@ -129,7 +129,7 @@ test("RUST × BASIC opens a map, and every node on it is playable", async ({ pag
   // first.
   const account = freshAccount();
   await login(page, account);
-  await pickFirstCategory(page);
+  await pickCategory(page);
   await atScreen(page, "map");
 
   // Verified on the wire, because the map is pixels.
@@ -167,8 +167,7 @@ test("a wrong answer is rejected and the node stays open", async ({ page }) => {
   await toQuest(page, account, wire);
 
   await setSource(page, WRONG_SOURCE);
-  await submit(page);
-  await atScreen(page, "result", 180_000); // the first rustc of a run is slow
+  await submit(page); // waits for the result screen itself
 
   try {
     const history = await wire.history();
@@ -209,7 +208,6 @@ test("the right answer clears it, and the clear survives a reload", async ({ pag
 
     await setSource(page, source!);
     await submit(page);
-    await atScreen(page, "result", 180_000);
 
     // Which quest did the browser actually submit to? If the lands scan
     // picked the wrong category row, the symptom without this line is
@@ -273,7 +271,6 @@ test("logout, then a second wallet sees its own map and none of the first's", as
 
     await setSource(page, source!);
     await submit(page);
-    await atScreen(page, "result", 180_000);
     expect((await firstWire.node(node.quest_id))?.state).toBe("cleared");
 
     // ---- and logs out ------------------------------------------------
@@ -297,7 +294,7 @@ test("logout, then a second wallet sees its own map and none of the first's", as
 
     // ---- the second wallet logs in -----------------------------------
     await login(page, second);
-    await pickFirstCategory(page);
+    await pickCategory(page);
     await atScreen(page, "map");
 
     // The assertion, from the server: the second wallet's map is untouched.
@@ -339,7 +336,7 @@ test("the screen fills this orientation, and the two canvases agree", async ({
   // picture is attached for a human.
   const account = freshAccount();
   await login(page, account);
-  await pickFirstCategory(page);
+  await pickCategory(page);
   await atScreen(page, "map");
 
   const size = page.viewportSize()!;
@@ -376,7 +373,7 @@ test("both orientations reach the same screen", async ({ page }) => {
   // its layout once at construction breaks.
   const account = freshAccount();
   await login(page, account);
-  await pickFirstCategory(page);
+  await pickCategory(page);
   await atScreen(page, "map");
 
   for (const mode of ["portrait", "landscape", "portrait"] as const) {

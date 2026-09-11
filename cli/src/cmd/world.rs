@@ -125,16 +125,6 @@ pub async fn map(ctx: &Ctx, land: &str, category: &str) -> Result<()> {
         paint.dim("cwbh quest <id> to read one; any node is playable")
     );
 
-    ctx.store.set_map_pos(
-        &ctx.server,
-        land,
-        category,
-        &world
-            .nodes
-            .first()
-            .map(|n| n.quest_id.clone())
-            .unwrap_or_default(),
-    )?;
     session.close().await;
     Ok(())
 }

@@ -4162,3 +4162,51 @@ After an orientation change (`__cwbCapture.orient()`, and presumably F1) a dark
 rectangle roughly 0.6 × 0.6 of the canvas is left in the top-left of `#game`.
 It is on the **lands** screen too, so it predates these three and is not in FE2's
 files — most likely a buffer in `gfx/crt.ts` that is not resized. Flagging only.
+
+## 2026-09-11 — One more thing the shared cargo target directory taught us
+
+`CARGO_TARGET_DIR` is shared across attempts by §5.1's design, and cargo's
+artifact filenames hash the **package** name. With a fixed `name = "quest"`,
+two attempts compiling at the same moment write the same
+`target/debug/deps/quest-…` and one player can be judged against the other's
+code. The generated manifest therefore carries the attempt id in the package
+name — `quest-att_01J…` — while the *library* target stays `quest`, so a
+quest's own tests still say `use quest::add;`.
+
+This was not reasoned out in advance; it is what the harness's own test suite
+did the first hour it shared a target directory, and two people submitting at
+the same time is an ordinary Tuesday for a server. The Go side is immune by
+construction: `go test -c -o prog` writes the binary into the attempt's own
+directory.
+
+A related note for whoever reads a flaky timeout in CI: `timeout_ms` is a real
+wall clock. Nineteen toolchains running at once on one laptop can starve a test
+binary of five seconds without it executing anything, which is why the
+two-binary tests in `cargo_harness.rs` are given a budget that is not a claim
+about speed. On the server, §3.2's one-execution-per-connection keeps this far
+away from a player.
+
+## 2026-09-11 — Interview mode: the half that is not typing
+
+The user's north star, restated: *"to prepare for live coding interview."*
+`docs/coverage.md` §5 item 8 has named the gap since PM's audit — **"a live
+screen is half explanation and nothing here rehearses producing it out loud."**
+Everything built so far teaches a topic. Nothing rehearses the hour.
+
+PROTOCOL §4.9e. A session picks an uncleared quest, starts the clock, and
+**withholds `solution` and `hints` for the whole session** — a screen does not
+come with hints, and rate-limiting them would be a softer version of a rule
+that should simply be absent.
+
+**The approach box is the feature.** Before the editor unlocks, the player
+writes what they are going to do and what it costs. The server keeps it, never
+grades it, and hands it back at the end beside what the reference actually
+does. Rehearsing that sentence is the point; scoring it would be inventing a
+judgement the server cannot make.
+
+RUN still works, because candidates run code on a real screen. The clock still
+does not stop anyone — running out is information, not a wall, and a trainer
+that locks you out at the buzzer teaches panic rather than finishing.
+
+The report is the product, not the verdict: time against the limit, what you
+said you would do, what the reference does, your attempts, your mistakes.
