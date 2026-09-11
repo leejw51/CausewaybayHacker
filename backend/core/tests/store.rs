@@ -388,3 +388,190 @@ fn a_healthy_database_has_a_working_fts5_index() {
         .unwrap();
     assert!(hits >= 1, "the importer's rows never reached the FTS index");
 }
+
+// ---------------------------------------------------------------------------
+// Re-importing a pack that CHANGED SHAPE.
+//
+// The importer was tested against unchanged content, which is why this got
+// through: a quest removed from a pack was left stranded on a parked node, and
+// the *next* import then collided with it and failed — for good. Half the
+// packs stopped importing and the server went on serving yesterday's map with
+// a WARN line nobody reads.
+// ---------------------------------------------------------------------------
+
+/// A rust/basic pack with exactly these `(node, slug)` quests, so a test can
+/// say "and now the content looks like this instead".
+fn pack_of(quests: &[(i64, &str)]) -> String {
+    let mut out =
+        String::from("pack = \"rust.basic\"\nland = \"rust\"\ncategory = \"basic\"\nversion = 1\n");
+    for (node, slug) in quests {
+        out.push_str(&format!(
+            r#"
+[[quest]]
+id          = "rust.basic.{node:02}.{slug}"
+node        = {node}
+title       = "{slug}"
+difficulty  = 1
+story       = "a street"
+concepts    = ["io"]
+requires    = []
+map         = {{ x = 0.1, y = 0.1, kind = "quest" }}
+brief       = '''
+Print `{slug}`.
+'''
+starter     = '''
+fn main() {{}}
+'''
+solution    = '''
+fn main() {{ println!("{slug}"); }}
+'''
+hints = []
+
+[quest.tests]
+harness      = "stdio"
+timeout_ms   = 5000
+match        = "trim"
+cases = [
+  {{ name = "says", stdin = "", expect = "{slug}\n", visible = true }},
+]
+"#
+        ));
+    }
+    out
+}
+
+fn ids_and_nodes(store: &Store) -> Vec<(String, i64)> {
+    let conn = store.conn();
+    let mut stmt = conn
+        .prepare("SELECT id, node FROM quests WHERE land='rust' AND category='basic' ORDER BY node")
+        .unwrap();
+    stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap()
+}
+
+fn reimport(home: &Path, root: &Path, pack: &str) -> Store {
+    let src = content_dir(root, pack);
+    let store = Store::open(home).expect("store opens");
+    {
+        let conn = store.conn();
+        let report = content::import_dir(&conn, store.home(), &src).expect("import ran");
+        assert!(
+            report.failures.is_empty(),
+            "the pack failed to import: {:?}",
+            report.failures
+        );
+    }
+    store
+}
+
+#[test]
+fn a_pack_that_changed_shape_reconciles_exactly() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+
+    // Yesterday's content.
+    let v1 = pack_of(&[(1, "alpha"), (2, "beta"), (3, "gamma")]);
+    let store = reimport(&home, tmp.path(), &v1);
+    {
+        let conn = store.conn();
+        users::upsert(&conn, ALICE).unwrap();
+        progress::record_clear(&conn, ALICE, "rust.basic.01.alpha", 10).unwrap();
+        progress::record_clear(&conn, ALICE, "rust.basic.02.beta", 10).unwrap();
+    }
+    drop(store);
+
+    // Today's: `beta` is gone, `gamma` moved down into its place, and `delta`
+    // is new at the end. Every kind of change at once, which is what an edit
+    // actually looks like.
+    let v2 = pack_of(&[(1, "alpha"), (2, "gamma"), (3, "delta")]);
+    let store = reimport(&home, tmp.path(), &v2);
+
+    assert_eq!(
+        ids_and_nodes(&store),
+        vec![
+            ("rust.basic.01.alpha".to_string(), 1),
+            ("rust.basic.02.gamma".to_string(), 2),
+            ("rust.basic.03.delta".to_string(), 3),
+        ],
+        "the database does not match the file it was imported from"
+    );
+
+    {
+        let conn = store.conn();
+        // SPEC §2.2: an edit does not cost a player their progress.
+        assert!(
+            progress::get(&conn, ALICE, "rust.basic.01.alpha")
+                .unwrap()
+                .cleared,
+            "a surviving quest lost its progress"
+        );
+        // A quest that no longer exists takes its progress with it — there is
+        // nothing left for it to be progress on.
+        let ghosts: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM progress WHERE quest_id = 'rust.basic.02.beta'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(ghosts, 0, "a removed quest's progress survived it");
+        let stranded: i64 = conn
+            .query_row("SELECT count(*) FROM quests WHERE node < 1", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(stranded, 0, "a quest was left parked off the map");
+    }
+    drop(store);
+
+    // The bug's real shape: the *second* import after a change is the one that
+    // died, because the first left something stranded on a parked node.
+    let store = reimport(&home, tmp.path(), &v2);
+    assert_eq!(ids_and_nodes(&store).len(), 3);
+    drop(store);
+
+    // And it goes back the other way — a quest can return, renumbered.
+    let store = reimport(&home, tmp.path(), &v1);
+    assert_eq!(
+        ids_and_nodes(&store),
+        vec![
+            ("rust.basic.01.alpha".to_string(), 1),
+            ("rust.basic.02.beta".to_string(), 2),
+            ("rust.basic.03.gamma".to_string(), 3),
+        ]
+    );
+    let conn = store.conn();
+    assert!(
+        progress::get(&conn, ALICE, "rust.basic.01.alpha")
+            .unwrap()
+            .cleared,
+        "three imports later, the clear is still there"
+    );
+    // `beta` came back as a new quest, not as a resurrected clear.
+    assert!(
+        !progress::get(&conn, ALICE, "rust.basic.02.beta")
+            .unwrap()
+            .cleared
+    );
+}
+
+/// Two quests swapping places in one edit — the case that cannot be done one
+/// statement at a time, because either order passes through a node the other
+/// still holds.
+#[test]
+fn two_quests_can_swap_nodes_in_one_import() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let store = reimport(&home, tmp.path(), &pack_of(&[(1, "alpha"), (2, "beta")]));
+    drop(store);
+    let store = reimport(&home, tmp.path(), &pack_of(&[(1, "beta"), (2, "alpha")]));
+    assert_eq!(
+        ids_and_nodes(&store),
+        vec![
+            ("rust.basic.01.beta".to_string(), 1),
+            ("rust.basic.02.alpha".to_string(), 2),
+        ]
+    );
+}

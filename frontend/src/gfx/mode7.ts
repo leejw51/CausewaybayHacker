@@ -44,11 +44,17 @@ import { Chase, reducedMotion } from "../engine/motion";
 const FOV = 34;
 
 /**
- * How far the plane is tilted away from square-on, in radians. About eleven
- * degrees. Every degree past this makes the painted buildings look like they
- * are falling over, because they were painted with their own projection.
+ * How far the plane is tilted away from square-on, in radians. Just under six
+ * degrees.
+ *
+ * It started at eleven and that was too much, for two reasons that both showed
+ * up in the first frame. The painted buildings have their own projection baked
+ * in and they start to lean. And the plane is *finite*: a tilted rectangle is a
+ * trapezoid, so the two far corners of the plate come away from the frame, and
+ * at eleven degrees those wedges were fifty pixels of nothing. At six they are
+ * a bevel, and the pass below fills them with ground shadow rather than sky.
  */
-const TILT = 0.2;
+const TILT = 0.1;
 
 /** A plate rectangle, in device pixels, with the canvas height it sits in. */
 export interface Viewport {
@@ -257,6 +263,18 @@ export class Mode7 {
     return this.live;
   }
 
+  /**
+   * Where the camera is currently looking, in 0..1 map coordinates.
+   *
+   * The near-parallax overlay needs it: `fg_wires` hangs in front of the plate
+   * and has to slide *further* than the ground does, which is the whole
+   * definition of parallax and cannot be worked out from the plate rectangle
+   * because the plate does not move.
+   */
+  lean(): [number, number] {
+    return [this.fu.value, this.fv.value];
+  }
+
   /** The second pass, over the sky, inside the plate. */
   render(renderer: WebGLRenderer): void {
     if (!this.live) return;
@@ -268,6 +286,15 @@ export class Mode7 {
     renderer.setViewport(x, gy, w, h);
     renderer.setScissor(x, gy, w, h);
     renderer.setScissorTest(true);
+    // Wipe the plate to a floor colour before the ground goes down. The plane
+    // is a finite rectangle seen at an angle, so its two far corners do not
+    // reach the frame; without this the city's sky and stars show through the
+    // gaps and the overworld looks like it is floating in the night.
+    const clear = renderer.getClearColor(new Color());
+    const alpha = renderer.getClearAlpha();
+    renderer.setClearColor(0x090c1c, 1);
+    renderer.clear(true, false, false);
+    renderer.setClearColor(clear, alpha);
     renderer.render(this.scene, this.camera);
     renderer.setScissorTest(false);
     renderer.autoClear = true;

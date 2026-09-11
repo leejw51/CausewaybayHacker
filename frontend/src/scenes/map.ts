@@ -443,6 +443,7 @@ export class MapScene implements Scene {
       this.drawEdges(g);
       this.drawNodes(g);
       this.drawMei(g);
+      this.drawWires(g);
     });
     g.restore();
 
@@ -643,6 +644,51 @@ export class MapScene implements Scene {
   }
 
   /**
+   * The near layer: tram wires, poles, a banyan branch and four hanging signs,
+   * strung across the top of the plate.
+   *
+   * It is drawn last inside the plate's clip, over the nodes, because it is in
+   * front of the street — that is the point of it. It slides further than the
+   * camera leans, which is the only reason it is here at all: a static overlay
+   * would be a decal, and a decal does not make a picture into a place.
+   *
+   * Only the **top third of the source** is used, and that is a decision
+   * against the brief rather than a shortcut. `fg_wires` is a 3:1 strip, so
+   * stretching all of it across a plate this wide makes it half the plate
+   * tall — and the bottom two thirds of it are four hanging sign panels the
+   * size of shop awnings, which sat squarely over nodes 1 to 9. The wires, the
+   * insulators, the pole tops, the awning corner and the head of the banyan
+   * are the part that belongs in front of a map. The signs are used at full
+   * size on the lands screen instead, where there is sky to hang them in.
+   */
+  private drawWires(g: Ctx): void {
+    const art = this.app.assets?.picture("fg_wires");
+    if (!art) return;
+    const [px, py, pw] = this.plate;
+    const gl = this.app.backdrop?.map;
+    const [lu] = gl?.active ? gl.lean() : [0.5];
+    const srcH = Math.round(art.naturalHeight * 0.34);
+    // Wider than the plate, so there is something to slide.
+    const w = pw * 1.16;
+    const h = (w * srcH) / art.naturalWidth;
+    const slide = (0.5 - lu) * pw * 0.2;
+    g.save();
+    g.globalAlpha = 0.9;
+    g.drawImage(
+      art,
+      0,
+      0,
+      art.naturalWidth,
+      srcH,
+      px + (pw - w) / 2 + slide,
+      py - Math.round(h * 0.06),
+      w,
+      h,
+    );
+    g.restore();
+  }
+
+  /**
    * Mei, standing where the player has got to.
    *
    * She has no walk cycle — there is one frame of her in the art set — so the
@@ -654,7 +700,9 @@ export class MapScene implements Scene {
   private drawMei(g: Ctx): void {
     if (this.nodes.length === 0) return;
     const s = this.app.layout.uiScale();
-    const sprite = this.app.assets?.picture("sprite_mei");
+    const strip = this.app.assets?.strip("walk_mei");
+    const sheet = strip ? this.app.assets?.picture("walk_mei") : null;
+    const sprite = sheet ?? this.app.assets?.picture("sprite_mei");
     const [x, y] = this.at(this.mei[0], this.mei[1]);
     const depth = this.app.backdrop?.map.active
       ? this.app.backdrop.map.scaleAt(this.mei[0], this.mei[1])
@@ -664,7 +712,9 @@ export class MapScene implements Scene {
     // The step is driven by the walk's own progress, not by wall time, so a
     // captured frame is the same frame every run.
     const phase = walking ? (this.walk as { tween: Tween }).tween.raw * 14 : this.t * 2.2;
-    const bob = walking ? Math.abs(Math.sin(phase)) * h * 0.1 : Math.sin(phase) * h * 0.03;
+    // With a real four-frame cycle the body does not need a bob; the sprite has
+    // one in it. The lozenge fallback still gets one, and so does standing.
+    const bob = strip && walking ? 0 : walking ? Math.abs(Math.sin(phase)) * h * 0.1 : Math.sin(phase) * h * 0.03;
 
     // The shadow first: an ellipse on the ground at her feet.
     g.save();
@@ -679,6 +729,39 @@ export class MapScene implements Scene {
       // never simply missing while a PNG is in flight.
       g.fillStyle = css(Theme.cream);
       g.fillRect(x - 3 * s, y - h + bob, 6 * s, h * 0.8);
+      return;
+    }
+    if (strip && sheet) {
+      // `walk_mei`: four frames on a fixed 64x96 grid, feet on a common row.
+      // Aligned on the cell rather than on each frame's ink, because the cutter
+      // already normalised the figures into their cells — per-frame bounds
+      // would reintroduce exactly the jitter that normalising removed.
+      //
+      // Frames 2 and 4 are both passing poses and are not identical, so a slow
+      // cycle reads as a limp. Ten a second is fast enough that it reads as a
+      // walk at map size; standing rests on frame 2, which is the upright one.
+      const n = strip.frames;
+      const i = walking ? Math.floor(phase * 1.4) % n : 1;
+      const bx = strip.boxes[i] ?? strip.boxes[0];
+      const cellH = strip.fh;
+      const scale = h / cellH;
+      const feet = (bx ? bx.feet : cellH) * scale;
+      const cw = strip.fw * scale;
+      g.save();
+      g.translate(x, y - feet - bob);
+      if (this.facing < 0) g.scale(-1, 1);
+      g.drawImage(
+        sheet,
+        i * strip.fw,
+        0,
+        strip.fw,
+        strip.fh,
+        -cw / 2,
+        0,
+        cw,
+        cellH * scale,
+      );
+      g.restore();
       return;
     }
     const box = this.app.assets?.box.get("sprite_mei");

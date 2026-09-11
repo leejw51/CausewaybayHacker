@@ -60,29 +60,45 @@ interface Beat {
  */
 const BEATS: Beat[] = [
   {
-    bg: "bg_street",
+    bg: "open_flat",
+    cut: "fade",
+    hold: 1.4,
+    lines: [
+      "TUESDAY, 06:40.",
+      "Mei opens the editor above Jardine's Bazaar to fix one function.",
+    ],
+  },
+  {
+    bg: "open_cursor",
     cut: "fade",
     hold: 1.5,
     lines: [
-      "TUESDAY, 06:40.",
-      "Mei opens the editor above Jardine's Bazaar to fix one function, and the cursor sits there.",
+      "The cursor sits there.",
       "She knows what the function has to do. She cannot write the for.",
     ],
   },
   {
-    bg: "bg_street",
+    bg: "open_ghost",
     cut: "fade",
-    hold: 1.6,
+    hold: 1.7,
     lines: [
-      "She types three characters. Grey text finishes the line for her, correctly, and she accepts it.",
+      "She types three characters.",
+      "Grey text finishes the line for her, correctly, and she accepts it.",
+    ],
+  },
+  {
+    bg: "open_face",
+    cut: "fade",
+    hold: 1.9,
+    lines: [
       "That is when she understands: she has done that every day for two years.",
       "The skill did not decay. It was taken — one accepted suggestion at a time, by something patient enough to spend two years on it.",
     ],
   },
   {
-    bg: "bg_street",
+    bg: "open_tills",
     cut: "fade",
-    hold: 1.4,
+    hold: 1.6,
     lines: [
       "Downstairs the shutters are going up on Jardine's Bazaar, and every till on the street is showing the same thing:",
       "a panel of grey suggested text, and no working code underneath it.",
@@ -91,7 +107,7 @@ const BEATS: Beat[] = [
   {
     bg: "bg_datacentre",
     cut: "iris",
-    hold: 1.8,
+    hold: 1.9,
     cold: true,
     sting: true,
     lines: [
@@ -101,14 +117,19 @@ const BEATS: Beat[] = [
     ],
   },
   {
-    bg: "title_bg",
+    bg: "open_stairs",
     cut: "iris",
-    hold: 1.7,
+    hold: 1.6,
     lines: [
       "Mei does not have a plan.",
       "She has a laptop, a street she knows, and the suspicion that whatever she can still write from memory is hers to keep.",
-      "She starts with println!.",
     ],
+  },
+  {
+    bg: "open_lands",
+    cut: "fade",
+    hold: 1.8,
+    lines: ["She starts with println!."],
   },
 ];
 
@@ -128,7 +149,8 @@ export class StoryScene implements Scene {
   /** Seconds into the current beat, including its cut. */
   private beatT = 0;
   private typed = 0;
-  private done = false;
+  /** When the last character landed, in beat seconds. Negative until it has. */
+  private finishedAt = -1;
   private stung = false;
   private leaving = false;
   private lastTick = 0;
@@ -224,8 +246,12 @@ export class StoryScene implements Scene {
       this.app.chip.type();
     }
     if (this.typed >= total) {
-      this.done = true;
-      if (this.beatT > CUT + total / CPS + b.hold) this.next();
+      if (this.finishedAt < 0) this.finishedAt = this.beatT;
+      // The hold is reading time, not animation, so it is *not* cut by the
+      // reduced-motion scale. Somebody who asked for less movement asked for
+      // less movement, not for three sentences to be taken away faster than
+      // they can be read.
+      if (this.beatT > this.finishedAt + b.hold) this.next();
     }
   }
 
@@ -233,7 +259,7 @@ export class StoryScene implements Scene {
     this.i++;
     this.beatT = 0;
     this.typed = 0;
-    this.done = false;
+    this.finishedAt = -1;
     this.stung = false;
     this.lastTick = 0;
   }
@@ -245,14 +271,28 @@ export class StoryScene implements Scene {
     return this.linesFor(b, w).join("\n");
   }
 
-  /** The letterbox the type sits in: the lower third, full bleed. */
+  /**
+   * The caption box.
+   *
+   * Bottom-anchored, deliberately. Every one of the fourteen `open_*` panels was
+   * composed with its **lower fifth left quiet** — plain floor, plain ground,
+   * plain shadow — so that a caption has somewhere to live in both orientations
+   * without covering the picture. A box measured down from a fraction of the
+   * height would drift out of that band as the canvas grows; a box that grows
+   * upward from a fixed foot stays in it.
+   */
   private panelRect(): [number, number, number, number] {
     const { layout } = this.app;
     const s = layout.uiScale();
-    const w = Math.min(layout.vw - Math.round(40 * s), Math.round(900 * s));
+    const w = Math.min(layout.vw - Math.round(40 * s), Math.round(920 * s));
     const x = Math.round((layout.vw - w) / 2);
-    const y = Math.round(layout.vh * (layout.isPortrait() ? 0.6 : 0.58));
-    return [x, y, w, layout.vh - y - Math.round(40 * s)];
+    const foot = layout.vh - Math.round(58 * s);
+    const lines = this.beat() ? this.linesFor(this.beat() as Beat, w - Math.round(24 * s)) : [];
+    const h = Math.max(
+      Math.round(60 * s),
+      lines.length * ensureFonts(s).small.height + Math.round(26 * s),
+    );
+    return [x, foot - h, w, h];
   }
 
   // -- drawing -------------------------------------------------------------
@@ -261,7 +301,6 @@ export class StoryScene implements Scene {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
     const s = layout.uiScale();
-    const fonts = ensureFonts(s);
     const b = this.beat();
     const prev = this.i > 0 ? BEATS[this.i - 1] : null;
     const cutT = Math.min(1, this.beatT / CUT);
@@ -298,9 +337,12 @@ export class StoryScene implements Scene {
 
     // A void gradient into the lower half, so type over a bright morning
     // street is type on something rather than type in front of something.
-    const grad = g.createLinearGradient(0, layout.vh * 0.3, 0, layout.vh);
+    // A light one. The panels were composed with a quiet lower fifth, so the
+    // scrim only has to take the edge off it — anything heavier and the art
+    // that was made for this sequence is behind a curtain.
+    const grad = g.createLinearGradient(0, layout.vh * 0.52, 0, layout.vh);
     grad.addColorStop(0, "rgba(20,28,72,0)");
-    grad.addColorStop(1, "rgba(20,28,72,0.94)");
+    grad.addColorStop(1, "rgba(20,28,72,0.72)");
     g.fillStyle = grad;
     g.fillRect(0, 0, layout.vw, layout.vh);
 
@@ -316,8 +358,7 @@ export class StoryScene implements Scene {
       fill(g, k === this.i ? Theme.coin : Theme.dim, pipsX + k * pipW, pipY, Math.round(8 * s), 3);
     }
 
-    footer(g, layout, this.app.layout.touch ? "TAP  SKIP" : "ANY KEY  SKIP");
-    void fonts;
+    footer(g, layout, layout.touch ? "TAP  SKIP" : "ANY KEY  SKIP");
   }
 
   /** Slow push, dt-driven. Zero for anyone who asked for less of it. */
@@ -354,11 +395,11 @@ export class StoryScene implements Scene {
     const inner = w - Math.round(24 * s);
     const lines = this.linesFor(b, inner);
     const lh = fonts.small.height;
+    const h = this.panelRect()[3];
 
     // The plate itself arrives with the cut rather than after it, so the beat
     // is one movement instead of a picture and then a box.
     const t = expOut(cutT);
-    const h = lines.length * lh + Math.round(26 * s);
     g.save();
     g.globalAlpha = t;
     g.translate(0, (1 - t) * Math.round(18 * s));
@@ -396,7 +437,6 @@ export class StoryScene implements Scene {
       ly += lh;
     }
     g.restore();
-    void this.done;
   }
 
   private drawLogo(g: Ctx): void {

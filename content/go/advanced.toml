@@ -22,7 +22,7 @@ difficulty  = 3
 story       = "12:30. Eight bikes, forty orders, and the dispatcher still calling them out one at a time."
 concepts    = ["concurrency", "channels", "closures"]
 requires    = []
-map         = { x = 0.86, y = 0.14, kind = "quest" }
+map          = { x = 0.046, y = 0.135, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -143,7 +143,7 @@ difficulty  = 3
 story       = "The dispatcher reads the board before the last rider has checked in, and the board is half empty."
 concepts    = ["concurrency", "slices", "closures"]
 requires    = ["go.advanced.01.goroutines"]
-map         = { x = 0.72, y = 0.22, kind = "quest" }
+map          = { x = 0.282, y = 0.050, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` words.
 
@@ -256,7 +256,7 @@ difficulty  = 3
 story       = "The kitchen hatch stays open after the last order and the counter stands there waiting for one more."
 concepts    = ["channels", "iteration", "concurrency"]
 requires    = ["go.advanced.02.waitgroup"]
-map         = { x = 0.58, y = 0.14, kind = "quest" }
+map          = { x = 0.387, y = 0.141, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -379,7 +379,7 @@ difficulty  = 4
 story       = "Platform 1 and platform 2 both feed the same concourse counter, and the counter can only look at one of them at a time."
 concepts    = ["channels", "control-flow", "concurrency"]
 requires    = ["go.advanced.03.close"]
-map         = { x = 0.44, y = 0.24, kind = "quest" }
+map          = { x = 0.603, y = 0.055, kind = "quest" }
 brief       = '''
 Standard input is two integers `a` and `b`.
 
@@ -522,7 +522,7 @@ difficulty  = 4
 story       = "Both tills take cash out of the same drawer and at close of business the drawer disagrees with both of them."
 concepts    = ["shared-state", "concurrency", "structs"]
 requires    = ["go.advanced.04.select"]
-map         = { x = 0.30, y = 0.16, kind = "quest" }
+map          = { x = 0.711, y = 0.143, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -672,7 +672,7 @@ difficulty  = 4
 story       = "Every rider's app opens the depot connection on startup, and the depot now has forty connections and one socket."
 concepts    = ["shared-state", "data-races", "concurrency"]
 requires    = ["go.advanced.05.mutex"]
-map         = { x = 0.16, y = 0.30, kind = "quest" }
+map          = { x = 0.940, y = 0.050, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -806,7 +806,7 @@ difficulty  = 4
 story       = "The customer closed the app three streets ago and the kitchen is still cooking their order."
 concepts    = ["cancellation", "channels", "concurrency"]
 requires    = ["go.advanced.06.atomic"]
-map         = { x = 0.26, y = 0.46, kind = "quest" }
+map          = { x = 0.888, y = 0.537, kind = "quest" }
 brief       = '''
 Standard input is two integers, `n` and `k`.
 
@@ -931,7 +931,7 @@ difficulty  = 4
 story       = "Forty orders and eight bikes. Nobody wants forty bikes; they want the eight never standing still."
 concepts    = ["concurrency", "channels", "collections"]
 requires    = ["go.advanced.07.context"]
-map         = { x = 0.42, y = 0.54, kind = "quest" }
+map          = { x = 0.773, y = 0.465, kind = "quest" }
 brief       = '''
 Standard input is two integers `w` and `n`, then `n` values.
 
@@ -1081,7 +1081,7 @@ difficulty  = 5
 story       = "Forty dockets parsed at once and one of them is a handwritten note about congee."
 concepts    = ["concurrency", "error-handling", "channels"]
 requires    = ["go.advanced.08.worker-pool"]
-map         = { x = 0.58, y = 0.64, kind = "quest" }
+map          = { x = 0.557, y = 0.540, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines, each supposed to be an integer.
 
@@ -1218,16 +1218,967 @@ cases = [
   { name = "all-bad", stdin = "2\nhello\nworld\n", expect = "BAD hello\nBAD world\nSUM 0\nERRORS 2\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 10  BOSS
+# ---------------------------------------------------------------- 10
 [[quest]]
-id          = "go.advanced.10.race"
+id          = "go.advanced.10.context-tree"
 node        = 10
+title       = "IT CANCELS DOWNWARDS"
+difficulty  = 4
+story       = "One customer closes the app and nine things upstream are still cooking, dispatching and charging."
+concepts    = ["cancellation", "channels", "error-handling"]
+requires    = ["go.advanced.09.errors-in-flight"]
+map          = { x = 0.448, y = 0.470, kind = "quest" }
+brief       = '''
+Standard input is one integer `n`.
+
+Make a parent context with `context.WithCancel`. Derive `n` children from it:
+the **even**-numbered ones with `context.WithCancel(parent)`, the
+**odd**-numbered ones with `context.WithDeadline(parent, <one hour ago>)`.
+
+Start one goroutine per child that waits on `<-child.Done()` and reports its
+index and `child.Err().Error()`. Cancel the parent, collect all `n` reports,
+print them sorted by index. Then print the parent's own error and
+`IS_CANCELED YES` if `errors.Is(parent.Err(), context.Canceled)`.
+
+```
+input:  3
+output: 0 context canceled
+        1 context deadline exceeded
+        2 context canceled
+        PARENT context canceled
+        IS_CANCELED YES
+```
+
+Cancellation flows **down** a context tree and never up. A child whose
+deadline has already passed is dead the moment it is made, whatever the parent
+does — which is why the odd ones report a different error and why the output
+is the same on every run rather than a race.
+
+`defer cancel()` on every context you create is not politeness. A context you
+never cancel keeps its parent's child list growing, and that is a leak with no
+goroutine in it.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"os"
+	"time"
+)
+
+type report struct {
+	index int
+	err   string
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+
+	parent, cancel := context.WithCancel(context.Background())
+	done := make(chan report, n)
+
+	// derive n children: even ones WithCancel, odd ones WithDeadline in the past
+	// one goroutine each, waiting on Done and reporting Err
+	_ = done
+	_ = time.Hour
+
+	cancel()
+	fmt.Println("PARENT ?")
+	fmt.Println("IS_CANCELED NO")
+	_ = parent
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"sort"
+	"time"
+)
+
+type report struct {
+	index int
+	err   string
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+
+	parent, cancel := context.WithCancel(context.Background())
+	done := make(chan report, n)
+
+	for i := 0; i < n; i++ {
+		var child context.Context
+		var stop context.CancelFunc
+		if i%2 == 0 {
+			child, stop = context.WithCancel(parent)
+		} else {
+			child, stop = context.WithDeadline(parent, time.Now().Add(-time.Hour))
+		}
+		defer stop()
+
+		go func(index int, ctx context.Context) {
+			<-ctx.Done()
+			done <- report{index: index, err: ctx.Err().Error()}
+		}(i, child)
+	}
+
+	cancel()
+
+	got := make([]report, 0, n)
+	for i := 0; i < n; i++ {
+		got = append(got, <-done)
+	}
+	sort.Slice(got, func(a, b int) bool { return got[a].index < got[b].index })
+	for _, r := range got {
+		fmt.Printf("%d %s\n", r.index, r.err)
+	}
+
+	fmt.Printf("PARENT %s\n", parent.Err().Error())
+	if errors.Is(parent.Err(), context.Canceled) {
+		fmt.Println("IS_CANCELED YES")
+	} else {
+		fmt.Println("IS_CANCELED NO")
+	}
+}
+'''
+hints = [
+  "Buffer `done` to n so a child whose deadline already passed can report without waiting for a receiver.",
+  "Cancel the parent before you start collecting, or the even children are still waiting when you block on the channel.",
+  "ctx.Err() is context.Canceled or context.DeadlineExceeded, and errors.Is is how you tell them apart rather than comparing the strings.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n", expect = "0 context canceled\n1 context deadline exceeded\n2 context canceled\nPARENT context canceled\nIS_CANCELED YES\n", visible = true },
+  { name = "one",   stdin = "1\n", expect = "0 context canceled\nPARENT context canceled\nIS_CANCELED YES\n", visible = false },
+  { name = "pair",  stdin = "2\n", expect = "0 context canceled\n1 context deadline exceeded\nPARENT context canceled\nIS_CANCELED YES\n", visible = false },
+  { name = "none",  stdin = "0\n", expect = "PARENT context canceled\nIS_CANCELED YES\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "go.advanced.11.rwmutex"
+node        = 11
+title       = "THREE HUNDRED READERS"
+difficulty  = 4
+story       = "The Hysan directory is read three hundred times a minute and changed twice a day, and a plain Mutex makes the readers queue behind each other for nothing."
+concepts    = ["shared-state", "collections", "concurrency"]
+requires    = ["go.advanced.10.context-tree"]
+map          = { x = 0.229, y = 0.513, kind = "quest" }
+brief       = '''
+Line one is `n q`. The next line is `n` words to store, the one after it `q`
+words to look up.
+
+Build a `Directory` around a `map[string]int` and a `sync.RWMutex`. `Set`
+takes the write lock; `Get` and `Size` take the **read** lock. Store each word
+against its position, sequentially — a later duplicate overwrites an earlier
+one. Then run all `q` lookups **concurrently**, collect them, and print in
+query order `<word> <index>` or `<word> MISSING`, then `SIZE <k>`.
+
+```
+input:  3 2
+        tram bus mtr
+        bus zzz
+output: bus 1
+        zzz MISSING
+        SIZE 3
+```
+
+`RLock` may be held by any number of readers at once and blocks only against a
+writer. That is the entire reason it exists, and it is worth nothing at all if
+a reader takes `Lock`.
+
+The writes are sequential on purpose: concurrent `Set` calls for the same word
+would make the stored index whichever goroutine happened to go last, and a
+quest with a scheduler-dependent answer is a quest that fails at random.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"sync"
+)
+
+type Directory struct {
+	mu    sync.RWMutex
+	slots map[string]int
+}
+
+func NewDirectory() *Directory {
+	return &Directory{slots: map[string]int{}}
+}
+
+func (d *Directory) Set(word string, index int) {
+	// write lock
+}
+
+func (d *Directory) Get(word string) (int, bool) {
+	// read lock
+	return 0, false
+}
+
+func (d *Directory) Size() int {
+	// read lock
+	return 0
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, q int
+	fmt.Fscan(reader, &n, &q)
+	words := make([]string, n)
+	for i := range words {
+		fmt.Fscan(reader, &words[i])
+	}
+	queries := make([]string, q)
+	for i := range queries {
+		fmt.Fscan(reader, &queries[i])
+	}
+
+	dir := NewDirectory()
+	for i, word := range words {
+		dir.Set(word, i)
+	}
+
+	// look every query up concurrently, then print in query order
+	var wg sync.WaitGroup
+	_ = wg
+	_ = queries
+	fmt.Printf("SIZE %d\n", dir.Size())
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"sync"
+)
+
+type Directory struct {
+	mu    sync.RWMutex
+	slots map[string]int
+}
+
+func NewDirectory() *Directory {
+	return &Directory{slots: map[string]int{}}
+}
+
+func (d *Directory) Set(word string, index int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.slots[word] = index
+}
+
+func (d *Directory) Get(word string) (int, bool) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	index, ok := d.slots[word]
+	return index, ok
+}
+
+func (d *Directory) Size() int {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return len(d.slots)
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, q int
+	fmt.Fscan(reader, &n, &q)
+	words := make([]string, n)
+	for i := range words {
+		fmt.Fscan(reader, &words[i])
+	}
+	queries := make([]string, q)
+	for i := range queries {
+		fmt.Fscan(reader, &queries[i])
+	}
+
+	dir := NewDirectory()
+	for i, word := range words {
+		dir.Set(word, i)
+	}
+
+	answers := make([]string, q)
+	var wg sync.WaitGroup
+	for i, word := range queries {
+		wg.Add(1)
+		go func(slot int, target string) {
+			defer wg.Done()
+			if index, ok := dir.Get(target); ok {
+				answers[slot] = fmt.Sprintf("%s %d", target, index)
+				return
+			}
+			answers[slot] = fmt.Sprintf("%s MISSING", target)
+		}(i, word)
+	}
+	wg.Wait()
+
+	for _, line := range answers {
+		fmt.Println(line)
+	}
+	fmt.Printf("SIZE %d\n", dir.Size())
+}
+'''
+hints = [
+  "RLock/RUnlock for the readers, Lock/Unlock for the writer. Mixing them up compiles and quietly removes the benefit.",
+  "Each goroutine writes answers[slot] and no two share a slot, so the slice needs no lock of its own.",
+  "The comma-ok form of a map read is what separates `missing` from `present and zero`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "3 2\ntram bus mtr\nbus zzz\n", expect = "bus 1\nzzz MISSING\nSIZE 3\n",     visible = true },
+  { name = "one",       stdin = "1 1\na\na\n",                  expect = "a 0\nSIZE 1\n",                    visible = false },
+  { name = "overwrite", stdin = "4 3\na b a c\na b q\n",        expect = "a 2\nb 1\nq MISSING\nSIZE 3\n",    visible = false },
+  { name = "no-query",  stdin = "2 0\nx y\n",                   expect = "SIZE 2\n",                         visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "go.advanced.12.chan-directions"
+node        = 12
+title       = "WHICH WAY DOES IT GO"
+difficulty  = 3
+story       = "The producer received from its own output channel for a week, and it compiled, because nobody had written the arrow down."
+concepts    = ["channels", "types", "functions"]
+requires    = ["go.advanced.11.rwmutex"]
+map          = { x = 0.119, y = 0.467, kind = "quest" }
+brief       = '''
+Line one is `n b`, with `b` at least `n`.
+
+Make a channel with buffer `b`. `produce(out chan<- int, n int)` sends
+`0..n-1` and closes it. `consume(in <-chan int) int` ranges and returns the
+sum. Print:
+
+```
+input:  3 5
+output: CAP 5
+        LEN 3
+        SUM 3
+        LEN_AFTER 0
+```
+
+`CAP` and `LEN` are `cap(ch)` and `len(ch)` taken **after** producing and
+before consuming: `cap` is the buffer size, `len` is how much is sitting in it.
+
+The starter does not compile. `consume` takes a `<-chan int` — receive-only —
+and tries to send on it. The direction is part of the **type**, checked at
+compile time, and converting a bidirectional channel to a directed one is
+free and one-way. It is the cheapest documentation in the language: a
+signature that says which end of the pipe this function is holding.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func produce(out chan<- int, n int) {
+	for i := 0; i < n; i++ {
+		out <- i
+	}
+	close(out)
+}
+
+func consume(in <-chan int) int {
+	sum := 0
+	in <- 0
+	for v := range in {
+		sum += v
+	}
+	return sum
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, b int
+	fmt.Fscan(reader, &n, &b)
+
+	ch := make(chan int, b)
+	produce(ch, n)
+
+	fmt.Printf("CAP %d\n", cap(ch))
+	fmt.Printf("LEN %d\n", len(ch))
+	fmt.Printf("SUM %d\n", consume(ch))
+	fmt.Printf("LEN_AFTER %d\n", len(ch))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func produce(out chan<- int, n int) {
+	for i := 0; i < n; i++ {
+		out <- i
+	}
+	close(out)
+}
+
+func consume(in <-chan int) int {
+	sum := 0
+	for v := range in {
+		sum += v
+	}
+	return sum
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, b int
+	fmt.Fscan(reader, &n, &b)
+
+	ch := make(chan int, b)
+	produce(ch, n)
+
+	fmt.Printf("CAP %d\n", cap(ch))
+	fmt.Printf("LEN %d\n", len(ch))
+	fmt.Printf("SUM %d\n", consume(ch))
+	fmt.Printf("LEN_AFTER %d\n", len(ch))
+}
+'''
+hints = [
+  "The error names it exactly: invalid operation, cannot send to receive-only channel. Delete the line.",
+  "produce can run on the main goroutine here only because the buffer is big enough to hold everything; with b < n it would block forever.",
+  "range over a closed, drained channel ends — which is why produce closing it is what lets consume return at all.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3 5\n", expect = "CAP 5\nLEN 3\nSUM 3\nLEN_AFTER 0\n", visible = true },
+  { name = "empty",  stdin = "0 1\n", expect = "CAP 1\nLEN 0\nSUM 0\nLEN_AFTER 0\n", visible = false },
+  { name = "exact",  stdin = "4 4\n", expect = "CAP 4\nLEN 4\nSUM 6\nLEN_AFTER 0\n", visible = false },
+  { name = "roomy",  stdin = "1 9\n", expect = "CAP 9\nLEN 1\nSUM 0\nLEN_AFTER 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "go.advanced.13.select-default"
+node        = 13
+title       = "TRY, AND DO NOT WAIT"
+difficulty  = 4
+story       = "The metrics channel is full and the till is not going to stop serving customers to wait for it."
+concepts    = ["channels", "control-flow", "zero-values"]
+requires    = ["go.advanced.12.chan-directions"]
+map          = { x = 0.041, y = 0.934, kind = "quest" }
+brief       = '''
+Line one is `b n`: a channel with buffer `b`, and `n` values to offer it.
+
+Offer `1..n` with a **non-blocking** send — a `select` with a `default` that
+gives up instead of waiting. Then drain with non-blocking receives, then try
+one more. Print:
+
+```
+input:  2 5
+output: SENT 2
+        DROPPED 3
+        GOT 2
+        EMPTY yes
+```
+
+`select` with a `default` never blocks: if no other case is ready this
+instant, `default` runs. That turns "send" into "try to send", which is how a
+metrics or log channel is supposed to behave — full means drop, not stall.
+
+With `b = 0` and nobody receiving, **every** send is dropped, because an
+unbuffered send is only ready when a receiver is already waiting.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var b, n int
+	fmt.Fscan(reader, &b, &n)
+
+	ch := make(chan int, b)
+	sent, dropped, got := 0, 0, 0
+
+	// non-blocking sends of 1..n, then non-blocking receives until empty,
+	// then one more to prove it is empty
+	_ = ch
+
+	fmt.Printf("SENT %d\n", sent)
+	fmt.Printf("DROPPED %d\n", dropped)
+	fmt.Printf("GOT %d\n", got)
+	fmt.Println("EMPTY no")
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var b, n int
+	fmt.Fscan(reader, &b, &n)
+
+	ch := make(chan int, b)
+	sent, dropped, got := 0, 0, 0
+
+	for i := 1; i <= n; i++ {
+		select {
+		case ch <- i:
+			sent++
+		default:
+			dropped++
+		}
+	}
+
+	draining := true
+	for draining {
+		select {
+		case <-ch:
+			got++
+		default:
+			draining = false
+		}
+	}
+
+	empty := "no"
+	select {
+	case <-ch:
+	default:
+		empty = "yes"
+	}
+
+	fmt.Printf("SENT %d\n", sent)
+	fmt.Printf("DROPPED %d\n", dropped)
+	fmt.Printf("GOT %d\n", got)
+	fmt.Printf("EMPTY %s\n", empty)
+}
+'''
+hints = [
+  "A select with a default and one case is the whole non-blocking idiom; there is no TrySend function.",
+  "Drain with the same shape: receive while a value is ready, and let default end the loop.",
+  "Do not close the channel to test emptiness — a receive on a closed channel is always ready and would report `no`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "overflow",   stdin = "2 5\n", expect = "SENT 2\nDROPPED 3\nGOT 2\nEMPTY yes\n", visible = true },
+  { name = "unbuffered", stdin = "0 3\n", expect = "SENT 0\nDROPPED 3\nGOT 0\nEMPTY yes\n", visible = false },
+  { name = "roomy",      stdin = "5 2\n", expect = "SENT 2\nDROPPED 0\nGOT 2\nEMPTY yes\n", visible = false },
+  { name = "exact",      stdin = "1 1\n", expect = "SENT 1\nDROPPED 0\nGOT 1\nEMPTY yes\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "go.advanced.14.happens-before"
+node        = 14
+title       = "WHY IS THIS ONE SAFE"
+difficulty  = 5
+story       = "Four snippets on the whiteboard. Three are correctly synchronised and one is not, and the race detector agrees."
+concepts    = ["thread-safety", "data-races", "channels"]
+requires    = ["go.advanced.13.select-default"]
+map          = { x = 0.273, y = 0.864, kind = "quest" }
+brief       = '''
+Standard input is one integer `n`.
+
+Build four correctly synchronised things and print what each one produced:
+
+1. `CHAN <v>` — a goroutine writes a plain `int` and **then** sends on a
+   channel; the receive is what makes the write visible. Write `42`.
+2. `ONCE <k>` — `n` goroutines all call one `sync.Once`; `k` is how many times
+   the function actually ran.
+3. `MUTEX <k>` — `n` goroutines increment a counter under a `sync.Mutex`.
+4. `WG <k>` — `n` goroutines each write their own slot of a slice, and
+   `wg.Wait()` is what makes all `n` writes visible to the reader.
+
+```
+input:  4
+output: CHAN 42
+        ONCE 1
+        MUTEX 4
+        WG 4
+```
+
+Every one of these is a *happens-before* edge, and they are the only four
+shapes you need: a send happens before the corresponding receive completes;
+`Once.Do` returns only after the one call has finished; an unlock happens
+before the next lock; `wg.Wait` returns only after the matching `Done` calls.
+
+Nothing here is safe because of timing. Take any one edge away and `-race`
+finds it, on a machine that never once produced the wrong number.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"sync"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+
+	var once sync.Once
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// 1. write a plain int in a goroutine, publish it with a channel send
+	// 2. n goroutines, one sync.Once, count the runs
+	// 3. n goroutines, one counter, one mutex
+	// 4. n goroutines, one slot each, wg.Wait before reading
+	_ = once
+	_ = mu
+	_ = wg
+
+	fmt.Println("CHAN 0")
+	fmt.Println("ONCE 0")
+	fmt.Println("MUTEX 0")
+	fmt.Println("WG 0")
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"sync"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+
+	// 1. the send is the edge: the write to `published` happens before it
+	published := 0
+	ready := make(chan struct{})
+	go func() {
+		published = 42
+		close(ready)
+	}()
+	<-ready
+	fmt.Printf("CHAN %d\n", published)
+
+	// 2. Once.Do returns only after the one call has finished
+	var once sync.Once
+	runs := 0
+	var wgOnce sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wgOnce.Add(1)
+		go func() {
+			defer wgOnce.Done()
+			once.Do(func() { runs++ })
+		}()
+	}
+	wgOnce.Wait()
+	fmt.Printf("ONCE %d\n", runs)
+
+	// 3. an unlock happens before the next lock
+	var mu sync.Mutex
+	counter := 0
+	var wgMutex sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wgMutex.Add(1)
+		go func() {
+			defer wgMutex.Done()
+			mu.Lock()
+			counter++
+			mu.Unlock()
+		}()
+	}
+	wgMutex.Wait()
+	fmt.Printf("MUTEX %d\n", counter)
+
+	// 4. Wait returns only after every matching Done
+	slots := make([]int, n)
+	var wgSlots sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wgSlots.Add(1)
+		go func(slot int) {
+			defer wgSlots.Done()
+			slots[slot] = 1
+		}(i)
+	}
+	wgSlots.Wait()
+	written := 0
+	for _, v := range slots {
+		written += v
+	}
+	fmt.Printf("WG %d\n", written)
+}
+'''
+hints = [
+  "close(ready) then <-ready is the cheapest publication edge in Go, and it carries every write the goroutine made before it.",
+  "runs++ inside once.Do needs no lock of its own — Once already guarantees it happens exactly once and before every other Do returns.",
+  "Each goroutine owns one slot, so no two ever touch the same memory; the only edge needed is the Wait before reading them all.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",  stdin = "4\n", expect = "CHAN 42\nONCE 1\nMUTEX 4\nWG 4\n", visible = true },
+  { name = "one",   stdin = "1\n", expect = "CHAN 42\nONCE 1\nMUTEX 1\nWG 1\n", visible = false },
+  { name = "none",  stdin = "0\n", expect = "CHAN 42\nONCE 0\nMUTEX 0\nWG 0\n", visible = false },
+  { name = "seven", stdin = "7\n", expect = "CHAN 42\nONCE 1\nMUTEX 7\nWG 7\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "go.advanced.15.generic-constraints"
+node        = 15
+title       = "WHAT THE TYPE HAS TO PROMISE"
+difficulty  = 4
+story       = "Three helpers, three different promises, and only one of them cares what the type can do."
+concepts    = ["generics", "interfaces", "dispatch"]
+requires    = ["go.advanced.14.happens-before"]
+map          = { x = 0.378, y = 0.947, kind = "quest" }
+brief       = '''
+Line one is `n`. Line two is `n` lowercase words.
+
+Write three generic helpers, each with a different kind of constraint:
+
+* `Names[T Named](xs []T) []string` — a constraint with a **method**
+* `Max[T Ordered](xs []T) T` — a constraint that is a **type set**,
+  `~string | ~int64`
+* `Distinct[T comparable](xs []T) int` — the built-in constraint
+
+Wrap each word in a `Stop` with a `Name() string` method. Print the names
+joined by spaces, then `MAX <w>` (the lexicographically largest word) and
+`DISTINCT <k>`.
+
+```
+input:  3
+        tram bus mtr
+output: tram bus mtr
+        MAX tram
+        DISTINCT 3
+```
+
+A constraint is an interface used in a type-parameter position, and it can
+hold two things an ordinary interface cannot: a **type set** (`~string`
+matches any type whose underlying type is `string`) and the predeclared
+`comparable`.
+
+The difference from an `interface{ Name() string }` **parameter** is the one
+worth saying out loud: `Names[T Named]` is monomorphised and the call is
+static, and it needs no boxing. `func Names(xs []Named)` would need a
+different slice built by hand at every call site.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+)
+
+type Named interface {
+	Name() string
+}
+
+type Ordered interface {
+	~string | ~int64
+}
+
+type Stop struct {
+	Label string
+}
+
+func (s Stop) Name() string {
+	return s.Label
+}
+
+func Names[T Named](xs []T) []string {
+	return nil
+}
+
+func Max[T Ordered](xs []T) T {
+	var zero T
+	return zero
+}
+
+func Distinct[T comparable](xs []T) int {
+	return 0
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	words := make([]string, n)
+	stops := make([]Stop, n)
+	for i := range words {
+		fmt.Fscan(reader, &words[i])
+		stops[i] = Stop{Label: words[i]}
+	}
+
+	fmt.Println(strings.Join(Names(stops), " "))
+	fmt.Printf("MAX %s\n", Max(words))
+	fmt.Printf("DISTINCT %d\n", Distinct(words))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+)
+
+type Named interface {
+	Name() string
+}
+
+type Ordered interface {
+	~string | ~int64
+}
+
+type Stop struct {
+	Label string
+}
+
+func (s Stop) Name() string {
+	return s.Label
+}
+
+func Names[T Named](xs []T) []string {
+	out := make([]string, 0, len(xs))
+	for _, x := range xs {
+		out = append(out, x.Name())
+	}
+	return out
+}
+
+func Max[T Ordered](xs []T) T {
+	var best T
+	for i, x := range xs {
+		if i == 0 || x > best {
+			best = x
+		}
+	}
+	return best
+}
+
+func Distinct[T comparable](xs []T) int {
+	seen := make(map[T]struct{}, len(xs))
+	for _, x := range xs {
+		seen[x] = struct{}{}
+	}
+	return len(seen)
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	words := make([]string, n)
+	stops := make([]Stop, n)
+	for i := range words {
+		fmt.Fscan(reader, &words[i])
+		stops[i] = Stop{Label: words[i]}
+	}
+
+	fmt.Println(strings.Join(Names(stops), " "))
+	fmt.Printf("MAX %s\n", Max(words))
+	fmt.Printf("DISTINCT %d\n", Distinct(words))
+}
+'''
+hints = [
+  "In Names, x.Name() type-checks because the constraint promised the method — that is what a method constraint buys.",
+  "Max can use > only because Ordered is a type set of types that support it; `any` would not compile.",
+  "map[T]struct{} needs T to be comparable, which is exactly the constraint, and struct{} is the zero-width value that says `set, not map`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\ntram bus mtr\n", expect = "tram bus mtr\nMAX tram\nDISTINCT 3\n", visible = true },
+  { name = "one",    stdin = "1\nhku\n",          expect = "hku\nMAX hku\nDISTINCT 1\n",           visible = false },
+  { name = "repeat", stdin = "4\na b a c\n",      expect = "a b a c\nMAX c\nDISTINCT 3\n",         visible = false },
+  { name = "same",   stdin = "2\nzz zz\n",        expect = "zz zz\nMAX zz\nDISTINCT 1\n",          visible = false },
+]
+
+# ---------------------------------------------------------------- 16  BOSS
+[[quest]]
+id          = "go.advanced.16.race"
+node        = 16
 title       = "THE RACE"
 difficulty  = 5
 story       = "Causeway Bay interchange, platform 2. Two counters, one number, and the number is wrong by an amount nobody can reproduce twice."
 concepts    = ["data-races", "shared-state", "concurrency", "control-flow"]
-requires    = ["go.advanced.09.errors-in-flight", "go.advanced.05.mutex"]
-map         = { x = 0.76, y = 0.80, kind = "boss" }
+requires    = ["go.advanced.15.generic-constraints", "go.advanced.05.mutex"]
+map          = { x = 0.617, y = 0.851, kind = "boss" }
 brief       = '''
 Standard input is a count `n`, then `n` lines of `<IN|OUT> <K>`.
 

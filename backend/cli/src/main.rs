@@ -312,6 +312,44 @@ fn doctor(home: &Path) -> Result<()> {
             );
             println!("fts5        present");
             println!("content     {quests} quests, {users} users");
+
+            // The check that would have caught half the packs going stale.
+            match content::audit_dir(&conn, &repo_root().join("content")) {
+                Ok(audits) if audits.is_empty() => println!("packs       (no content directory)"),
+                Ok(audits) => {
+                    for audit in &audits {
+                        let name = if audit.pack.is_empty() {
+                            audit.path.as_str()
+                        } else {
+                            audit.pack.as_str()
+                        };
+                        match &audit.unreadable {
+                            Some(reason) => {
+                                println!("packs       {name:<16} UNREADABLE: {reason}");
+                                bad += 1;
+                            }
+                            None if audit.agrees() => println!(
+                                "packs       {name:<16} {:>3} quests, in step",
+                                audit.in_file
+                            ),
+                            None => {
+                                println!(
+                                    "packs       {name:<16} DRIFT: file {} / db {} ({} missing, {} stale)",
+                                    audit.in_file,
+                                    audit.in_db,
+                                    audit.missing.len(),
+                                    audit.stale.len()
+                                );
+                                bad += 1;
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("packs       CANNOT AUDIT: {e}");
+                    bad += 1;
+                }
+            }
         }
         Err(e) => {
             println!("database    BROKEN: {e}");

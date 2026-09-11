@@ -312,7 +312,7 @@ function Login:draw()
   end
 
   local hints = {
-    signin = "TAB field   F2 reveal   N new wallet   ENTER sign in",
+    signin = "TAB field   F2 reveal   N new wallet   ENTER sign in   F11 fullscreen",
     new_show = "ENTER continue   C copy   ESC cancel",
     new_confirm = "TAB field   B show the words again   ENTER confirm",
   }

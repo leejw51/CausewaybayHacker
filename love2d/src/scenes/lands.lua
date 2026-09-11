@@ -132,7 +132,7 @@ function Lands:draw()
       Theme.withAlpha(Theme.cream, 0.7), "center", vw)
   end
 
-  self.app:footer("ARROWS choose   ENTER go   F1 orientation")
+  self.app:footer("ARROWS choose   ENTER go")
 end
 
 function Lands:draw_card(x, y, w, h, land, fallback, selected, s)

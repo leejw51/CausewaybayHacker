@@ -250,13 +250,23 @@ export async function pickFirstCategory(page: Page): Promise<void> {
   // `hacker`. Starting the y sweep too low silently selects ADVANCED, and
   // the only symptom is a quest that will not clear — so it starts above the
   // first row (measured at ≈0.18 in landscape) and steps finely.
-  const xs = [0.72, 0.5, 0.3].map((f) => box.x + box.width * f);
-  for (let i = 0; i < 46; i++) {
-    const fy = 0.10 + i * 0.01;
-    if (fy > 0.96) break;
+  // Sweep the whole plate, in both axes.
+  //
+  // Measured, twice, because guessing cost two matrix runs:
+  //   landscape — the rows are a right-hand panel, y ≈ 0.18 … 0.46
+  //   portrait  — the rows are full width and *low*, y ≈ 0.65 … 0.80
+  // The first version swept one x at 0.72 (landscape's panel) and the second
+  // capped its loop at y ≈ 0.55, so portrait's rows were never reached at
+  // all. The range is computed from the bounds now rather than from an
+  // iteration count somebody has to keep in step with them.
+  const xs = [0.5, 0.72, 0.25];
+  const TOP = 0.08;
+  const BOTTOM = 0.95;
+  const STEP = 0.012;
+  for (let fy = TOP; fy <= BOTTOM; fy += STEP) {
     const y = box.y + box.height * fy;
-    for (const x of xs) {
-      await page.mouse.click(x, y);
+    for (const fx of xs) {
+      await page.mouse.click(box.x + box.width * fx, y);
       if ((await sceneNow(page)) === "map") {
         await atScreen(page, "map");
         return;
@@ -295,6 +305,76 @@ export async function openSelectedNode(page: Page): Promise<void> {
     "Enter never opened a node. Either the map is still empty (`world.map` " +
       "did not answer) or the selected node is locked — `map.open()` refuses " +
       "a locked node with 'clear the street before it first'.",
+  );
+}
+
+/** Whatever the editor is showing, as text. */
+export async function editorText(page: Page): Promise<string> {
+  return page.evaluate(() =>
+    Array.from(document.querySelectorAll(".cm-line"))
+      .map((l) => (l.textContent ?? "").replace(/\u200b/g, ""))
+      .join("\n"),
+  );
+}
+
+/**
+ * Which quest did the UI just open?
+ *
+ * The scan in `pickFirstCategory` clicks its way down the lands plate, and
+ * some of those clicks land on the **land** buttons, which toggle RUST/GO.
+ * Nothing on the page reports the current land, so the scan can arrive at a
+ * perfectly good map of the wrong land — and the symptom, before this
+ * existed, was a submission to `go.basic.01.package-main` while the test
+ * asserted against `rust.basic.01.first-light`.
+ *
+ * The editor's contents are the answer: it opens with the quest's `starter`
+ * (SPEC §12), and starters differ between quests and certainly between
+ * languages. So: ask the wire for the starters of everything that is open,
+ * and match. This turns "I hope the click went where I meant" into a fact.
+ */
+export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string | null> {
+  const shown = (await editorText(page)).trim();
+  if (!shown) return null;
+  for (const land of ["rust", "go"] as const) {
+    for (const node of await wire.mapOf(land)) {
+      if (node.state === "locked") continue;
+      const got = await wire.ok("quest.get", { quest_id: node.quest_id });
+      const starter = String((got.quest as { starter?: string }).starter ?? "").trim();
+      if (starter && starter === shown) return node.quest_id;
+    }
+  }
+  return null;
+}
+
+/**
+ * Reach an open RUST quest, whatever the lands scan does on the way.
+ *
+ * Rather than insisting the scan lands on RUST — which it cannot be made to
+ * do reliably while the category rows are canvas-drawn and the land buttons
+ * are in the sweep — this opens a quest, asks which one it actually is, and
+ * toggles the land and tries again if it is the wrong one. Two attempts is
+ * enough: there are two lands.
+ */
+export async function enterRustQuest(page: Page, wire: Wire): Promise<string> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await pickFirstCategory(page);
+    await openSelectedNode(page);
+    const id = await identifyOpenQuest(page, wire);
+    if (id?.startsWith("rust.")) return id;
+    // Back to the lands plate and flip the land. `lands.key` toggles on
+    // left/right and there is no way to *set* it, which is why this is a
+    // retry rather than a calculation.
+    await page.keyboard.press("Escape"); // quest → map
+    await atScreen(page, "map");
+    await page.keyboard.press("Escape"); // map → lands
+    await atScreen(page, "lands");
+    await page.keyboard.press("ArrowRight");
+  }
+  throw new Error(
+    "could not reach a RUST quest in three attempts. The lands scan opens a " +
+      "map and `identifyOpenQuest` matches the editor's starter against the " +
+      "wire's quests; if that is returning null, the editor is empty or the " +
+      "starter no longer matches what `quest.get` sends.",
   );
 }
 
@@ -392,8 +472,12 @@ export class Wire {
 
   /** The whole rust/basic map, as the server has it for this wallet. */
   async map(): Promise<MapNode[]> {
-    const p = await this.ok("world.map", { land: "rust", category: "basic" });
-    return p.nodes as MapNode[];
+    return this.mapOf("rust");
+  }
+
+  async mapOf(land: "rust" | "go", category = "basic"): Promise<MapNode[]> {
+    const p = await this.ok("world.map", { land, category });
+    return (p.nodes ?? []) as MapNode[];
   }
 
   async node(questId: string): Promise<MapNode | undefined> {

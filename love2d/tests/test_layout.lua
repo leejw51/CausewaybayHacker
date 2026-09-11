@@ -124,11 +124,88 @@ return function()
     T.eq(pw, 720 - 32); T.eq(ph, 1280 - 32)
   end)
 
-  T.case("isPortrait follows the mode, not the window", function()
+  T.case("a pinned orientation ignores the window's shape", function()
+    Layout.pinned = true
     at("portrait", 1600, 900)
-    T.eq(Layout.isPortrait(), true)
+    T.eq(Layout.isPortrait(), true, "a pinned portrait survives a wide window")
+    T.eq(Layout.mode, "portrait")
     at("landscape", 400, 900)
-    T.eq(Layout.isPortrait(), false)
+    T.eq(Layout.isPortrait(), false, "and a pinned landscape survives a tall one")
+    T.eq(Layout.mode, "landscape")
+  end)
+
+  T.section("layout — pinned vs inferred orientation")
+
+  T.case("orientationFor is the rule, and it has a dead zone", function()
+    T.eq(Layout.orientationFor(1280, 720), "landscape")
+    T.eq(Layout.orientationFor(720, 1280), "portrait")
+    T.eq(Layout.orientationFor(2560, 1440), "landscape")
+    T.eq(Layout.orientationFor(1080, 1920), "portrait")
+    -- Square-ish stays landscape: the authored layout is 1280x720 and a slow
+    -- drag of a window border must not thrash the whole UI at 1.01:1.
+    T.eq(Layout.orientationFor(900, 900), "landscape")
+    T.eq(Layout.orientationFor(900, 940), "landscape")
+    T.eq(Layout.orientationFor(900, 950), "portrait", "5% past square flips")
+    T.eq(Layout.orientationFor(0, 0), "landscape", "a degenerate size is not a crash")
+    T.eq(Layout.orientationFor(nil, nil), "landscape")
+  end)
+
+  T.case("an unpinned orientation follows the window, including into fullscreen", function()
+    Layout.pinned = false
+    Layout.mode = "landscape"
+    at("landscape", 1280, 720)
+    T.eq(Layout.mode, "landscape")
+    -- The player drags the window tall, or goes fullscreen on a rotated
+    -- monitor. Nothing was pinned, so the layout follows.
+    at(Layout.mode, 900, 1600)
+    T.eq(Layout.mode, "portrait", "a tall window re-derives portrait")
+    T.eq(Layout.isPortrait(), true)
+    at(Layout.mode, 2560, 1440)
+    T.eq(Layout.mode, "landscape", "and back again")
+  end)
+
+  T.case("the fullscreen transition re-measures rather than keeping a stale canvas", function()
+    Layout.pinned = false
+    local windowed = at("landscape", 1280, 720)
+    T.eq(windowed.vw, 1280)
+    T.eq(windowed.vh, 720)
+    -- A 16:10 display, entering desktop fullscreen.
+    local full = at(Layout.mode, 1920, 1200)
+    T.eq(Layout.mode, "landscape")
+    T.ok(full.vw ~= windowed.vw or full.vh ~= windowed.vh, "the canvas was re-measured")
+    T.ok(full.vh >= 720)
+    T.ok(math.abs(full.vw * full.scale - 1920) < 2 or math.abs(full.vh * full.scale - 1200) < 2,
+      "fullscreen fills at least one axis — no double letterbox")
+    -- A portrait display, entering fullscreen, unpinned: portrait wins.
+    at(Layout.mode, 1200, 1920)
+    T.eq(Layout.mode, "portrait")
+  end)
+
+  T.case("a pin made in a window survives the fullscreen transition", function()
+    -- The case worth being sure about: the player pressed F1 for portrait in
+    -- a windowed session and then hit F11 on a landscape display. The pin is
+    -- theirs and the display does not get to overrule it.
+    Layout.pinned = false
+    at("landscape", 1280, 720)
+    Layout.setOrientation("portrait", true)
+    T.eq(Layout.pinned, true)
+    at(Layout.mode, 2560, 1440)
+    T.eq(Layout.mode, "portrait", "the pin survived fullscreen on a wide display")
+    T.ok(Layout.vw < Layout.vh, "and the canvas is still taller than it is wide")
+  end)
+
+  T.case("the fullscreen type is desktop unless somebody asks otherwise", function()
+    local saved = Layout.fullscreenPref
+    Layout.fullscreenPref = nil
+    T.eq(Layout.fullscreenType(), "desktop",
+      "exclusive changes the display mode and is not a default")
+    Layout.fullscreenPref = "exclusive"
+    T.eq(Layout.fullscreenType(), "exclusive")
+    Layout.fullscreenPref = "EXCLUSIVE"
+    T.eq(Layout.fullscreenType(), "exclusive", "case does not matter")
+    Layout.fullscreenPref = "nonsense"
+    T.eq(Layout.fullscreenType(), "desktop", "an unknown value falls back rather than failing")
+    Layout.fullscreenPref = saved
   end)
 
   T.section("scenes — every screen constructs in both orientations")

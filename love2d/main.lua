@@ -86,8 +86,21 @@ end
 function love.keypressed(key)
   if testing or not app then return end
   -- The global bindings, before the scene sees the key.
-  if key == "f11" then Layout.toggleFullscreen(); return end
-  if key == "f1" then Layout.toggleOrientation(); return end
+  --
+  -- `f11` and `f` both, matching `CausewaybayRaiden`'s README ("F / F11 |
+  -- Toggle window / fullscreen"), so a player who has used either sibling
+  -- already knows the key. `f` is swallowed here only when no screen is
+  -- typing: the editor, the login fields and the confirm fields all need the
+  -- letter, and a fullscreen toggle in the middle of a word would be far
+  -- worse than one extra key to remember.
+  if key == "f11" or (key == "f" and not app:typing()) then
+    app:toast(Layout.toggleFullscreen() and "fullscreen" or "window")
+    return
+  end
+  if key == "f1" then
+    app:toast("orientation: " .. Layout.cycleOrientation())
+    return
+  end
   if key == "f4" then
     app:toast(SFX.toggle() and "sound on" or "sound off")
     return

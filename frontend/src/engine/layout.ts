@@ -32,6 +32,18 @@ const TOUCH_BOOST_MAX = 1.5;
 /** The smallest thing a finger can be expected to hit, in CSS pixels. */
 const TOUCH_TARGET = 40;
 
+/**
+ * How lopsided a window has to be before its shape is an *answer* rather than
+ * a preference.
+ *
+ * Causewaybay Hacker change. At 1.2 a window half again as tall as it is wide
+ * — a phone, or a browser window dragged into a column — is unambiguously
+ * portrait, and a 16:9 desktop window is unambiguously landscape. Between the
+ * two, near square, the window is not saying anything and whatever was chosen
+ * stands.
+ */
+const DECISIVE = 1.2;
+
 export type Orientation = "landscape" | "portrait";
 
 export class Layout {
@@ -61,6 +73,26 @@ export class Layout {
   private pinned = false;
 
   /**
+   * The window the choice was made in, in device pixels — and the Causewaybay
+   * Hacker change that this file exists to carry.
+   *
+   * The ported version had one flag and no memory, so a pin was permanent and
+   * a *restored* pin was as strong as a pressed one. That is the bug the user
+   * hit: F1 pressed once in a wide window, saved to localStorage, and from
+   * then on every session in every window was landscape — including a browser
+   * window 1080 wide and 1730 tall, where the landscape layout is squeezed
+   * into a 1075x907 band with 47% of the window left over.
+   *
+   * So a choice now remembers the window it was made in. It holds for as long
+   * as that window holds. The moment the window is a different shape *and*
+   * that shape is decisive, the choice is stale — it was an answer to a
+   * question nobody is asking any more — and the layout goes back to following
+   * the window. Pressing F1 again re-answers it, in the window that is
+   * actually on screen.
+   */
+  private pinnedShape: [number, number] | null = null;
+
+  /**
    * @param touch whether this is a screen that is tapped rather than clicked.
    * A phone is held closer and hit with a finger, so type is boosted and
    * buttons get a floor under their height; a small desktop window gets
@@ -73,10 +105,34 @@ export class Layout {
     if (window.innerHeight > window.innerWidth) this.mode = "portrait";
   }
 
-  /** Restore a saved orientation, which counts as the player having chosen. */
-  pin(mode: Orientation): void {
+  /**
+   * Restore a saved orientation.
+   *
+   * @param shape the window it was chosen in, if that was recorded. Without
+   * one — a preference saved by an older build — the choice loses to the first
+   * decisive window that disagrees with it, which is the safe direction: the
+   * cost of being wrong is a layout the player can fix with one key, and the
+   * cost of the other direction is a game rendering into 40% of the screen.
+   */
+  pin(mode: Orientation, shape?: [number, number] | null): void {
     this.mode = mode;
     this.pinned = true;
+    this.pinnedShape = shape ?? null;
+  }
+
+  /** The window the current choice was made in, for saving alongside it. */
+  get choiceShape(): [number, number] {
+    return [this.dw, this.dh];
+  }
+
+  /**
+   * What the window itself says, when it says anything. Null when it is close
+   * enough to square that its shape is not an argument.
+   */
+  private decisive(ww: number, wh: number): Orientation | null {
+    if (wh >= ww * DECISIVE) return "portrait";
+    if (ww >= wh * DECISIVE) return "landscape";
+    return null;
   }
 
   private base(): [number, number] {
@@ -92,6 +148,9 @@ export class Layout {
   toggleOrientation(): void {
     this.mode = this.mode === "landscape" ? "portrait" : "landscape";
     this.pinned = true;
+    // The choice is about *this* window. Recorded before `measure`, because
+    // `dw`/`dh` still hold the window the key was pressed in.
+    this.pinnedShape = [this.dw, this.dh];
     this.measure();
   }
 
@@ -136,8 +195,21 @@ export class Layout {
     const ww = Math.max(1, Math.round(cw * dpr));
     const wh = Math.max(1, Math.round(ch * dpr));
     // A phone that was turned on its side, or a window dragged into a new
-    // shape: follow it, unless the player has said which way they want it.
-    if (!this.pinned) this.mode = wh > ww ? "portrait" : "landscape";
+    // shape: follow it, unless the player has said which way they want it —
+    // in this window. A choice made in a different window that this one
+    // decisively contradicts is not a preference any more, it is a stale
+    // answer, and honouring it is how the game ends up in a band across the
+    // top of a column-shaped browser with the rest of it empty.
+    const says = this.decisive(ww, wh);
+    if (this.pinned && says && says !== this.mode) {
+      const sameWindow =
+        this.pinnedShape !== null && this.pinnedShape[0] === ww && this.pinnedShape[1] === wh;
+      if (!sameWindow) {
+        this.pinned = false;
+        this.pinnedShape = null;
+      }
+    }
+    if (!this.pinned) this.mode = says ?? (wh > ww ? "portrait" : "landscape");
     const [bw, bh] = this.base();
 
     // The fit is worked out in CSS pixels, not device pixels: a Retina

@@ -145,12 +145,12 @@
       "h": 128,
       "box": {
         "cx": 63.5,
-        "feet": 108.0,
-        "h": 89.0,
+        "feet": 106.0,
+        "h": 84.0,
         "minx": 7,
-        "miny": 19,
+        "miny": 22,
         "maxx": 120,
-        "maxy": 107
+        "maxy": 105
       }
     },
     {
@@ -159,12 +159,12 @@
       "w": 128,
       "h": 128,
       "box": {
-        "cx": 63.0,
+        "cx": 63.5,
         "feet": 121.0,
         "h": 114.0,
-        "minx": 15,
+        "minx": 12,
         "miny": 7,
-        "maxx": 111,
+        "maxx": 115,
         "maxy": 120
       }
     },
@@ -174,12 +174,12 @@
       "w": 128,
       "h": 128,
       "box": {
-        "cx": 63.0,
+        "cx": 63.5,
         "feet": 121.0,
-        "h": 114.0,
-        "minx": 8,
-        "miny": 7,
-        "maxx": 118,
+        "h": 90.0,
+        "minx": 7,
+        "miny": 31,
+        "maxx": 120,
         "maxy": 120
       }
     },
@@ -361,6 +361,167 @@
         "miny": 12,
         "maxx": 120,
         "maxy": 83
+      }
+    },
+    {
+      "name": "open_flat",
+      "file": "open_flat.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "open_flat_p",
+      "file": "open_flat_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "open_cursor",
+      "file": "open_cursor.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "open_cursor_p",
+      "file": "open_cursor_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "open_ghost",
+      "file": "open_ghost.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "open_ghost_p",
+      "file": "open_ghost_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "open_face",
+      "file": "open_face.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "open_face_p",
+      "file": "open_face_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "open_tills",
+      "file": "open_tills.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "open_tills_p",
+      "file": "open_tills_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "open_stairs",
+      "file": "open_stairs.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "open_stairs_p",
+      "file": "open_stairs_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "open_lands",
+      "file": "open_lands.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "open_lands_p",
+      "file": "open_lands_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "walk_mei",
+      "file": "walk_mei.png",
+      "w": 256,
+      "h": 96,
+      "frames": 4,
+      "fw": 64,
+      "fh": 96,
+      "boxes": [
+        {
+          "cx": 31.0,
+          "feet": 90.0,
+          "h": 84.0,
+          "minx": 13,
+          "miny": 6,
+          "maxx": 49,
+          "maxy": 89
+        },
+        {
+          "cx": 31.0,
+          "feet": 90.0,
+          "h": 84.0,
+          "minx": 13,
+          "miny": 6,
+          "maxx": 49,
+          "maxy": 89
+        },
+        {
+          "cx": 31.0,
+          "feet": 90.0,
+          "h": 84.0,
+          "minx": 13,
+          "miny": 6,
+          "maxx": 49,
+          "maxy": 89
+        },
+        {
+          "cx": 31.0,
+          "feet": 90.0,
+          "h": 84.0,
+          "minx": 13,
+          "miny": 6,
+          "maxx": 49,
+          "maxy": 89
+        }
+      ]
+    },
+    {
+      "name": "fg_wires",
+      "file": "fg_wires.png",
+      "w": 1152,
+      "h": 384,
+      "box": {
+        "cx": 575.0,
+        "feet": 342.0,
+        "h": 300.0,
+        "minx": 63,
+        "miny": 42,
+        "maxx": 1087,
+        "maxy": 341
+      }
+    },
+    {
+      "name": "neon_signs",
+      "file": "neon_signs.png",
+      "w": 512,
+      "h": 256,
+      "box": {
+        "cx": 255.5,
+        "feet": 236.0,
+        "h": 217.0,
+        "minx": 28,
+        "miny": 19,
+        "maxx": 483,
+        "maxy": 235
       }
     }
   ]

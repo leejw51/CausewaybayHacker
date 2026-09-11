@@ -20,7 +20,7 @@ difficulty  = 1
 story       = "Tin Hau exit A. Alex hands you a laptop with a file on it that has a package line and nothing under it."
 concepts    = ["io", "imports"]
 requires    = []
-map         = { x = 0.06, y = 0.22, kind = "quest" }
+map          = { x = 0.046, y = 0.135, kind = "quest" }
 brief       = '''
 Print exactly:
 
@@ -73,7 +73,7 @@ difficulty  = 1
 story       = "The reader at Tin Hau shows the balance and then two blanks where the day cap and the deposit used to be."
 concepts    = ["bindings", "types", "io"]
 requires    = ["go.basic.01.package-main"]
-map         = { x = 0.18, y = 0.30, kind = "quest" }
+map          = { x = 0.282, y = 0.050, kind = "quest" }
 brief       = '''
 Read one integer `n` from standard input.
 
@@ -151,7 +151,7 @@ difficulty  = 2
 story       = "The Causeway Bay concourse board is supposed to say which service is due. It says the number of the minute instead, every minute."
 concepts    = ["control-flow", "functions", "io"]
 requires    = ["go.basic.02.vars"]
-map         = { x = 0.28, y = 0.20, kind = "quest" }
+map          = { x = 0.387, y = 0.141, kind = "quest" }
 brief       = '''
 Read one integer `n`. For every `i` from `1` to `n`, print one line:
 
@@ -247,7 +247,7 @@ difficulty  = 2
 story       = "Platform 2 counts who boards first and who boards last and loses everybody in between."
 concepts    = ["slices", "iteration", "control-flow"]
 requires    = ["go.basic.03.control-flow"]
-map         = { x = 0.40, y = 0.28, kind = "quest" }
+map          = { x = 0.603, y = 0.055, kind = "quest" }
 brief       = '''
 Standard input is a count `n` on the first line and then `n` integers on the
 second, separated by spaces.
@@ -342,7 +342,7 @@ difficulty  = 3
 story       = "Causeway Bay interchange at nine. The announcement board wants the ranking and a map has no order."
 concepts    = ["collections", "sorting", "iteration"]
 requires    = ["go.basic.04.slices"]
-map         = { x = 0.52, y = 0.20, kind = "quest" }
+map          = { x = 0.711, y = 0.143, kind = "quest" }
 brief       = '''
 Read the whole of standard input and split it on whitespace.
 
@@ -448,7 +448,7 @@ difficulty  = 2
 story       = "The exit-B directory truncates 銅鑼灣 at three and gets one and a half characters and a question mark."
 concepts    = ["strings", "iteration", "types"]
 requires    = ["go.basic.05.maps"]
-map         = { x = 0.63, y = 0.31, kind = "quest" }
+map          = { x = 0.940, y = 0.050, kind = "quest" }
 brief       = '''
 Read one line. Print three lines:
 
@@ -541,7 +541,7 @@ difficulty  = 3
 story       = "Lucky Mac's counter adds a line to the order and the line is gone by the next one. The method took a copy."
 concepts    = ["structs", "functions", "mutability"]
 requires    = ["go.basic.06.strings"]
-map         = { x = 0.72, y = 0.45, kind = "quest" }
+map          = { x = 0.888, y = 0.537, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines of `<ITEM> <CENTS>`.
 
@@ -682,7 +682,7 @@ difficulty  = 3
 story       = "The Hysan Place directory and the tram stop outside it are printed by two different programs, and neither of them fits in the other's list."
 concepts    = ["interfaces", "structs", "pattern-matching"]
 requires    = ["go.basic.07.structs"]
-map         = { x = 0.60, y = 0.55, kind = "quest" }
+map          = { x = 0.773, y = 0.465, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines, each either
 
@@ -844,7 +844,7 @@ difficulty  = 3
 story       = "The rider log comes back from the depot with somebody's lunch order in the middle of the column."
 concepts    = ["error-handling", "functions", "types"]
 requires    = ["go.basic.08.interfaces"]
-map         = { x = 0.47, y = 0.62, kind = "quest" }
+map          = { x = 0.557, y = 0.540, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines. Each line is supposed to be an
 integer.
@@ -971,7 +971,7 @@ difficulty  = 3
 story       = "Lucky Mac counts who walks in and who walks out, and the manager wants the number at closing whatever happens in between."
 concepts    = ["closures", "functions", "control-flow"]
 requires    = ["go.basic.09.errors"]
-map         = { x = 0.34, y = 0.55, kind = "quest" }
+map          = { x = 0.448, y = 0.470, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines, each `IN` or `OUT`.
 
@@ -1097,7 +1097,7 @@ difficulty  = 4
 story       = "Alex has written Sum four times — for orders, for riders, for minutes and for cents — and the fifth one is due."
 concepts    = ["generics", "functions", "closures", "slices"]
 requires    = ["go.basic.10.closures"]
-map         = { x = 0.22, y = 0.66, kind = "quest" }
+map          = { x = 0.229, y = 0.513, kind = "quest" }
 brief       = '''
 Standard input is one line of integers separated by spaces.
 
@@ -1243,16 +1243,850 @@ cases = [
   { name = "negatives", stdin = "-3 20 20\n",   expect = "-6 40 40\n37\n2\n",   visible = false },
 ]
 
-# ---------------------------------------------------------------- 12  BOSS
+# ---------------------------------------------------------------- 12
 [[quest]]
-id          = "go.basic.12.nil-and-order"
+id          = "go.basic.12.defer-panic-recover"
 node        = 12
+title       = "IT FELL OVER AND GOT BACK UP"
+difficulty  = 3
+story       = "One bad docket used to take the whole till down and lose the shift with it."
+concepts    = ["panics", "functions", "control-flow"]
+requires    = ["go.basic.11.generics"]
+map          = { x = 0.119, y = 0.467, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines. Each is an integer, the word
+`BOOM`, or something else.
+
+Write `run(text string) (out string)` that returns the value doubled, or
+`BAD <text>` if it does not parse — and **panics** on `BOOM`, recovering in a
+deferred function so the caller gets `RECOVERED boom` instead of a dead
+program. Print one line per input, and at the end, from a `defer` in `main`,
+print `CLOSED <n>`.
+
+```
+input:  4
+        21
+        BOOM
+        xx
+        -4
+output: 42
+        RECOVERED boom
+        BAD xx
+        -8
+        CLOSED 4
+```
+
+Three facts, and all three are the question: `recover` only does anything
+inside a deferred function; a **named** return value is what lets the deferred
+function change what gets returned after the panic; and `defer` in `main` runs
+at return, so `CLOSED` is last however the loop went.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+func run(text string) (out string) {
+	// recover in a deferred func, panic on BOOM, otherwise double or BAD
+	_ = strings.TrimSpace(text)
+	_ = strconv.Atoi
+	return "?"
+}
+
+func main() {
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Scan()
+	n, _ := strconv.Atoi(strings.TrimSpace(sc.Text()))
+
+	done := 0
+	for i := 0; i < n; i++ {
+		sc.Scan()
+		fmt.Println(run(sc.Text()))
+		done++
+	}
+	fmt.Printf("CLOSED %d\n", done)
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+func run(text string) (out string) {
+	defer func() {
+		if r := recover(); r != nil {
+			out = fmt.Sprintf("RECOVERED %v", r)
+		}
+	}()
+
+	text = strings.TrimSpace(text)
+	if text == "BOOM" {
+		panic("boom")
+	}
+	value, err := strconv.ParseInt(text, 10, 64)
+	if err != nil {
+		return "BAD " + text
+	}
+	return strconv.FormatInt(value*2, 10)
+}
+
+func main() {
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Scan()
+	n, _ := strconv.Atoi(strings.TrimSpace(sc.Text()))
+
+	done := 0
+	defer func() {
+		fmt.Printf("CLOSED %d\n", done)
+	}()
+
+	for i := 0; i < n; i++ {
+		sc.Scan()
+		fmt.Println(run(sc.Text()))
+		done++
+	}
+}
+'''
+hints = [
+  "The return value has to be named — out string — or the deferred function has nothing to assign to.",
+  "recover() returns nil when there was no panic, so the if is how you tell the two paths apart.",
+  "The deferred closure in main reads `done` when it runs, not when it was written, so it sees the final count.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed", stdin = "4\n21\nBOOM\nxx\n-4\n", expect = "42\nRECOVERED boom\nBAD xx\n-8\nCLOSED 4\n", visible = true },
+  { name = "boom",  stdin = "1\nBOOM\n",             expect = "RECOVERED boom\nCLOSED 1\n",                 visible = false },
+  { name = "clean", stdin = "2\n0\n5\n",             expect = "0\n10\nCLOSED 2\n",                          visible = false },
+  { name = "junk",  stdin = "1\nzz\n",               expect = "BAD zz\nCLOSED 1\n",                         visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "go.basic.13.zero-values"
+node        = 13
+title       = "NOTHING IS NOT NOTHING"
+difficulty  = 3
+story       = "The rota map was never made and the code read from it all morning without complaining once."
+concepts    = ["zero-values", "collections", "slices"]
+requires    = ["go.basic.12.defer-panic-recover"]
+map          = { x = 0.041, y = 0.934, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` words.
+
+Print four lines, in order:
+
+1. `READ <v>` — what a **nil** map gives you for a key it does not have
+2. `LEN <k>` — the length after appending all `n` words to a **nil** slice
+3. `WRITE <ok|panic>` — whether assigning into that nil map panicked
+   (recover it; do not let the program die)
+4. `FOUND <k>` — how many of the words are keys of an *initialised* map seeded
+   with `a` and `b`
+
+```
+input:  3
+        a b c
+output: READ 0
+        LEN 3
+        WRITE panic
+        FOUND 2
+```
+
+A nil map and a nil slice are not the same kind of nothing. Reading a nil map
+is legal and gives the value type's zero; writing to one panics, because there
+is no table to write into. `append` to a nil slice is legal and allocates —
+which is why `var s []T` is the idiomatic empty slice and `var m map[K]V` is
+not the idiomatic empty map.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func writeToNil(m map[string]int) (result string) {
+	// assign into m and report "ok", or recover and report "panic"
+	_ = m
+	return "?"
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	words := make([]string, n)
+	for i := range words {
+		fmt.Fscan(reader, &words[i])
+	}
+
+	var empty map[string]int
+	var list []string
+	seeded := map[string]int{"a": 1, "b": 2}
+
+	_ = empty
+	_ = list
+	_ = seeded
+	_ = writeToNil(nil)
+	fmt.Println("READ 0")
+	fmt.Println("LEN 0")
+	fmt.Println("WRITE ok")
+	fmt.Println("FOUND 0")
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func writeToNil(m map[string]int) (result string) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = "panic"
+		}
+	}()
+	m["anything"] = 1
+	return "ok"
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	words := make([]string, n)
+	for i := range words {
+		fmt.Fscan(reader, &words[i])
+	}
+
+	var empty map[string]int
+	fmt.Printf("READ %d\n", empty["missing"])
+
+	var list []string
+	for _, word := range words {
+		list = append(list, word)
+	}
+	fmt.Printf("LEN %d\n", len(list))
+
+	fmt.Printf("WRITE %s\n", writeToNil(empty))
+
+	seeded := map[string]int{"a": 1, "b": 2}
+	found := 0
+	for _, word := range words {
+		if _, ok := seeded[word]; ok {
+			found++
+		}
+	}
+	fmt.Printf("FOUND %d\n", found)
+}
+'''
+hints = [
+  "empty[\"missing\"] on a nil map is not an error — it is the zero value of int, which is 0.",
+  "append handles a nil slice: it allocates the first backing array for you, which is why you never need make() just to start.",
+  "The write has to happen inside a function with a deferred recover, or the panic ends the program before line four.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\na b c\n",   expect = "READ 0\nLEN 3\nWRITE panic\nFOUND 2\n", visible = true },
+  { name = "miss",   stdin = "1\nz\n",       expect = "READ 0\nLEN 1\nWRITE panic\nFOUND 0\n", visible = false },
+  { name = "none",   stdin = "0\n",          expect = "READ 0\nLEN 0\nWRITE panic\nFOUND 0\n", visible = false },
+  { name = "repeat", stdin = "4\na a b q\n", expect = "READ 0\nLEN 4\nWRITE panic\nFOUND 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "go.basic.14.embedding"
+node        = 14
+title       = "IT INHERITED NOTHING"
+difficulty  = 3
+story       = "A terminus is a stop with extra. Alex wrote it twice, which is once too many."
+concepts    = ["structs", "interfaces", "dispatch"]
+requires    = ["go.basic.13.zero-values"]
+map          = { x = 0.273, y = 0.864, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines, each `STOP <NAME>` or
+`TERM <NAME> <LINES>`.
+
+Give `Stop` a `Describe() string` returning its name. Make `Terminus`
+**embed** `Stop` and add `Lines int`, and give it its own `Describe` that
+calls the embedded one and adds `(<lines> lines)`.
+
+Print each one's `Describe()`, then `TERMINI <k>` counted with a type switch
+over a `[]Describer`.
+
+```
+input:  3
+        STOP CAUSEWAY
+        TERM KENNEDY 2
+        STOP TINHAU
+output: CAUSEWAY
+        KENNEDY (2 lines)
+        TINHAU
+        TERMINI 1
+```
+
+Embedding is not inheritance. `Terminus` does not *become* a `Stop`; it
+contains one, and the contained value's methods are **promoted** to the outer
+type unless the outer type declares its own. `t.Stop.Describe()` is how you
+reach the one you shadowed, and there is no `super`.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type Describer interface {
+	Describe() string
+}
+
+type Stop struct {
+	Name string
+}
+
+type Terminus struct {
+	Stop
+	Lines int
+}
+
+// Stop needs Describe; Terminus needs its own that calls the embedded one.
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+
+	var all []Describer
+	for i := 0; i < n; i++ {
+		var kind, name string
+		fmt.Fscan(reader, &kind, &name)
+		if kind == "TERM" {
+			var lines int
+			fmt.Fscan(reader, &lines)
+			_ = Terminus{Stop: Stop{Name: name}, Lines: lines}
+			continue
+		}
+		_ = Stop{Name: name}
+	}
+
+	_ = all
+	fmt.Println("TERMINI 0")
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type Describer interface {
+	Describe() string
+}
+
+type Stop struct {
+	Name string
+}
+
+func (s Stop) Describe() string {
+	return s.Name
+}
+
+type Terminus struct {
+	Stop
+	Lines int
+}
+
+func (t Terminus) Describe() string {
+	return fmt.Sprintf("%s (%d lines)", t.Stop.Describe(), t.Lines)
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+
+	all := make([]Describer, 0, n)
+	for i := 0; i < n; i++ {
+		var kind, name string
+		fmt.Fscan(reader, &kind, &name)
+		if kind == "TERM" {
+			var lines int
+			fmt.Fscan(reader, &lines)
+			all = append(all, Terminus{Stop: Stop{Name: name}, Lines: lines})
+			continue
+		}
+		all = append(all, Stop{Name: name})
+	}
+
+	termini := 0
+	for _, d := range all {
+		fmt.Println(d.Describe())
+		if _, ok := d.(Terminus); ok {
+			termini++
+		}
+	}
+	fmt.Printf("TERMINI %d\n", termini)
+}
+'''
+hints = [
+  "The embedded field has no name of its own — it is spelled `Stop` inside the literal and inside t.Stop.Describe().",
+  "Terminus satisfies Describer because of its own Describe; without one it would satisfy it through the promoted Stop method instead.",
+  "d.(Terminus) with the comma-ok form is the type assertion; a type switch does the same job when there are more than two.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed", stdin = "3\nSTOP CAUSEWAY\nTERM KENNEDY 2\nSTOP TINHAU\n", expect = "CAUSEWAY\nKENNEDY (2 lines)\nTINHAU\nTERMINI 1\n", visible = true },
+  { name = "one",   stdin = "1\nTERM SHEUNGWAN 1\n",                           expect = "SHEUNGWAN (1 lines)\nTERMINI 1\n",                  visible = false },
+  { name = "stops", stdin = "2\nSTOP A\nSTOP B\n",                             expect = "A\nB\nTERMINI 0\n",                                 visible = false },
+  { name = "terms", stdin = "2\nTERM X 0\nTERM Y 9\n",                         expect = "X (0 lines)\nY (9 lines)\nTERMINI 2\n",             visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "go.basic.15.variadics"
+node        = 15
+title       = "HOWEVER MANY YOU HAVE"
+difficulty  = 2
+story       = "Sometimes it is two orders and sometimes it is the whole rack, and the function should not care."
+concepts    = ["functions", "slices", "types"]
+requires    = ["go.basic.14.embedding"]
+map          = { x = 0.378, y = 0.947, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` integers.
+
+Write `total(values ...int64) (sum int64, count int)` — variadic, with named
+return values — and call it three ways. Print:
+
+1. `ALL <sum> <count>` — the whole slice, spread with `...`
+2. `NONE <sum> <count>` — called with no arguments at all
+3. `TWO <sum> <count>` — the first two values passed individually, or as many
+   as there are
+
+```
+input:  4
+        1 2 3 4
+output: ALL 10 4
+        NONE 0 0
+        TWO 3 2
+```
+
+Inside the function `values` is an ordinary `[]int64`, and with no arguments
+it is `nil` — which `range` and `len` both handle without a special case.
+`total(list...)` passes the existing slice rather than copying it into a new
+one; `total(list)` would not compile, and knowing why is the question.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func total(values ...int64) (sum int64, count int) {
+	// named returns: assign to sum and count, then a bare return
+	_ = values
+	return
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	list := make([]int64, n)
+	for i := range list {
+		fmt.Fscan(reader, &list[i])
+	}
+
+	// ALL (spread the slice), NONE (no arguments), TWO (the first two)
+	_ = total
+	_ = list
+	fmt.Println("ALL 0 0")
+	fmt.Println("NONE 0 0")
+	fmt.Println("TWO 0 0")
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func total(values ...int64) (sum int64, count int) {
+	for _, v := range values {
+		sum += v
+	}
+	count = len(values)
+	return
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	list := make([]int64, n)
+	for i := range list {
+		fmt.Fscan(reader, &list[i])
+	}
+
+	sum, count := total(list...)
+	fmt.Printf("ALL %d %d\n", sum, count)
+
+	sum, count = total()
+	fmt.Printf("NONE %d %d\n", sum, count)
+
+	head := list
+	if len(head) > 2 {
+		head = head[:2]
+	}
+	sum, count = total(head...)
+	fmt.Printf("TWO %d %d\n", sum, count)
+}
+'''
+hints = [
+  "A bare `return` with named results returns whatever sum and count currently hold.",
+  "total(list...) spreads; total(list) tries to pass a []int64 as a single int64 and does not compile.",
+  "With no arguments values is nil, and len(nil slice) is 0 — no guard needed.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",  stdin = "4\n1 2 3 4\n",       expect = "ALL 10 4\nNONE 0 0\nTWO 3 2\n",   visible = true },
+  { name = "one",   stdin = "1\n7\n",             expect = "ALL 7 1\nNONE 0 0\nTWO 7 1\n",    visible = false },
+  { name = "empty", stdin = "0\n",                expect = "ALL 0 0\nNONE 0 0\nTWO 0 0\n",    visible = false },
+  { name = "mixed", stdin = "5\n-1 -2 10 0 3\n",  expect = "ALL 10 5\nNONE 0 0\nTWO -3 2\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "go.basic.16.json"
+node        = 16
+title       = "THE TAG IS THE CONTRACT"
+difficulty  = 3
+story       = "The depot's API sends lowercase keys and Go exports uppercase fields, and for a week nobody could see why every order was empty."
+concepts    = ["serialization", "structs", "error-handling"]
+requires    = ["go.basic.15.variadics"]
+map          = { x = 0.617, y = 0.851, kind = "quest" }
+brief       = '''
+Standard input is one line: a JSON array of orders, each with an `item` string
+and a `cents` number.
+
+Unmarshal it, print one line per order as `<ITEM> <CENTS>`, then marshal and
+print a summary object with exactly the keys `count` and `total`, in that
+order. If the input is not valid JSON, print `BAD JSON` and nothing else.
+
+```
+input:  [{"item":"SET","cents":2800},{"item":"PIE","cents":900}]
+output: SET 2800
+        PIE 900
+        {"count":2,"total":3700}
+```
+
+A field has to be **exported** for `encoding/json` to see it at all — a
+lowercase field is invisible to the marshaller, silently. The struct tag then
+says what it is called on the wire. `Marshal` writes the fields in declaration
+order, so the summary's key order is yours to decide, not the map's.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+)
+
+type Order struct {
+	Item  string
+	Cents int64
+}
+
+type Summary struct {
+	Count int
+	Total int64
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	line, _ := reader.ReadString('\n')
+	line = strings.TrimRight(line, "\r\n")
+
+	// unmarshal into []Order, print each, then marshal a Summary
+	var orders []Order
+	_ = orders
+	_ = line
+	_ = Summary{}
+	fmt.Println("BAD JSON")
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+)
+
+type Order struct {
+	Item  string `json:"item"`
+	Cents int64  `json:"cents"`
+}
+
+type Summary struct {
+	Count int   `json:"count"`
+	Total int64 `json:"total"`
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	line, _ := reader.ReadString('\n')
+	line = strings.TrimRight(line, "\r\n")
+
+	var orders []Order
+	if err := json.Unmarshal([]byte(line), &orders); err != nil {
+		fmt.Println("BAD JSON")
+		return
+	}
+
+	summary := Summary{Count: len(orders)}
+	for _, order := range orders {
+		fmt.Printf("%s %d\n", order.Item, order.Cents)
+		summary.Total += order.Cents
+	}
+
+	encoded, err := json.Marshal(summary)
+	if err != nil {
+		fmt.Println("BAD JSON")
+		return
+	}
+	fmt.Println(string(encoded))
+}
+'''
+hints = [
+  "The tag goes in backticks after the type: Item string `json:\"item\"`.",
+  "Unmarshal takes a pointer to the destination — &orders, not orders — or it has nothing to fill in.",
+  "Check the error from Unmarshal. On bad input orders is left empty and a program that ignores the error prints a cheerful zero summary.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two",   stdin = "[{\"item\":\"SET\",\"cents\":2800},{\"item\":\"PIE\",\"cents\":900}]\n", expect = "SET 2800\nPIE 900\n{\"count\":2,\"total\":3700}\n", visible = true },
+  { name = "empty", stdin = "[]\n",                                       expect = "{\"count\":0,\"total\":0}\n",            visible = false },
+  { name = "one",   stdin = "[{\"item\":\"TEA\",\"cents\":1200}]\n",      expect = "TEA 1200\n{\"count\":1,\"total\":1200}\n", visible = false },
+  { name = "junk",  stdin = "not json\n",                                 expect = "BAD JSON\n",                            visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "go.basic.17.testing"
+node        = 17
+title       = "PROVE IT YOURSELF"
+difficulty  = 3
+story       = "Nobody is going to check this for you at 06:40. The table is right there; make it green."
+concepts    = ["testing", "functions", "slices"]
+requires    = ["go.basic.16.json"]
+map          = { x = 0.723, y = 0.932, kind = "quest" }
+brief       = '''
+The program holds a table of four known-good `(km, fare)` cases and checks
+`fare` against every one, printing `<name> ok` or
+`<name> FAIL got <g> want <w>`, then `PASSED <k>/4`. Finally it reads one
+distance from standard input and prints `FARE <x>`.
+
+`fare(km)` should be `500 + 100 * km`. The starter's is wrong, and the table
+catches it — which is the whole point.
+
+```
+input:  4
+output: zero ok
+        one ok
+        four ok
+        ten ok
+        PASSED 4/4
+        FARE 900
+```
+
+Do not touch the table; it is the specification. This **is** the Go
+table-driven test, minus the harness: in a real package it is
+`func TestFare(t *testing.T)` with `for _, c := range cases` and
+`t.Run(c.name, ...)`, and `go test` runs it. The table is the same either way.
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func fare(km int64) int64 {
+	return 500 + 10*km
+}
+
+type testCase struct {
+	name string
+	km   int64
+	want int64
+}
+
+var cases = []testCase{
+	{"zero", 0, 500},
+	{"one", 1, 600},
+	{"four", 4, 900},
+	{"ten", 10, 1500},
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var km int64
+	fmt.Fscan(reader, &km)
+
+	passed := 0
+	for _, c := range cases {
+		got := fare(c.km)
+		if got == c.want {
+			passed++
+			fmt.Printf("%s ok\n", c.name)
+			continue
+		}
+		fmt.Printf("%s FAIL got %d want %d\n", c.name, got, c.want)
+	}
+	fmt.Printf("PASSED %d/%d\n", passed, len(cases))
+	fmt.Printf("FARE %d\n", fare(km))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func fare(km int64) int64 {
+	return 500 + 100*km
+}
+
+type testCase struct {
+	name string
+	km   int64
+	want int64
+}
+
+var cases = []testCase{
+	{"zero", 0, 500},
+	{"one", 1, 600},
+	{"four", 4, 900},
+	{"ten", 10, 1500},
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var km int64
+	fmt.Fscan(reader, &km)
+
+	passed := 0
+	for _, c := range cases {
+		got := fare(c.km)
+		if got == c.want {
+			passed++
+			fmt.Printf("%s ok\n", c.name)
+			continue
+		}
+		fmt.Printf("%s FAIL got %d want %d\n", c.name, got, c.want)
+	}
+	fmt.Printf("PASSED %d/%d\n", passed, len(cases))
+	fmt.Printf("FARE %d\n", fare(km))
+}
+'''
+hints = [
+  "The table is the specification. The function is the thing that is wrong.",
+  "Three of the four cases fail and the one that passes is km = 0, which is exactly why one test case proves nothing.",
+  "In a package this is func TestFare(t *testing.T) with t.Run(c.name, func(t *testing.T){ ... }) so a failure names itself.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4\n",  expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 900\n",  visible = true },
+  { name = "zero", stdin = "0\n",  expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 500\n",  visible = false },
+  { name = "long", stdin = "20\n", expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 2500\n", visible = false },
+  { name = "back", stdin = "-2\n", expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 300\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 18  BOSS
+[[quest]]
+id          = "go.basic.18.nil-and-order"
+node        = 18
 title       = "NULLPTR"
 difficulty  = 4
 story       = "11:55 at the Lucky Mac front till. Every order goes through and some of them do not exist, and the till reads them anyway."
 concepts    = ["sorting", "structs", "slices", "control-flow"]
-requires    = ["go.basic.11.generics", "go.basic.09.errors"]
-map         = { x = 0.14, y = 0.84, kind = "boss" }
+requires    = ["go.basic.17.testing", "go.basic.13.zero-values"]
+map          = { x = 0.939, y = 0.846, kind = "boss" }
 brief       = '''
 Standard input is a count `n`, then `n` lines. Each is either
 `<NAME> <CENTS>` or a single `-`, which means the order never arrived: a nil

@@ -24,6 +24,24 @@ interface Entry {
   w: number;
   h: number;
   box?: Box;
+  /** A strip: several frames of one animation in a single image. */
+  frames?: number;
+  fw?: number;
+  fh?: number;
+  /**
+   * One box per frame, and note the plural — a strip carries `boxes` and a
+   * single sprite carries `box`. Reading `box` on `walk_mei` returns undefined
+   * and puts the character's feet at the bottom of her transparent margin.
+   */
+  boxes?: Box[];
+}
+
+/** What a caller needs to blit one frame out of a strip. */
+export interface Strip {
+  frames: number;
+  fw: number;
+  fh: number;
+  boxes: Box[];
 }
 
 export interface Box {
@@ -104,6 +122,21 @@ export class Assets {
       void this.fetch(entry);
     }
     return null;
+  }
+
+  /**
+   * The frame grid of a strip, or null if this asset is not one.
+   *
+   * The cells are a fixed grid — `art/tools/strip.py` normalises each figure
+   * into its own cell rather than cropping to its ink — so a frame is
+   * `fw`-wide at `i * fw` and every frame's feet are on the same row. That is
+   * what stops a four-frame walk from bobbing, and it is the reason to align
+   * on the cell and not on per-frame bounds.
+   */
+  strip(name: string): Strip | null {
+    const e = this.entries.get(name);
+    if (!e || !e.frames || !e.fw || !e.fh) return null;
+    return { frames: e.frames, fw: e.fw, fh: e.fh, boxes: e.boxes ?? [] };
   }
 
   /** Ask for a background ahead of time, so it is there when the street opens. */

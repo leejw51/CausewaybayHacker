@@ -21,6 +21,7 @@ local PURE = {
   "tests.test_runlog",
   "tests.test_client",
   "tests.test_session",
+  "tests.test_display",
   "tests.test_editor",
   "tests.test_wallet",
 }

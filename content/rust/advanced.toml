@@ -22,7 +22,7 @@ difficulty  = 3
 story       = "The Times Square branch opens its second till at noon and the queue finally moves. Nothing else about the shop changed."
 concepts    = ["concurrency", "closures", "ownership"]
 requires    = []
-map         = { x = 0.12, y = 0.18, kind = "quest" }
+map          = { x = 0.044, y = 0.146, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -112,7 +112,7 @@ difficulty  = 3
 story       = "Alex hands a rider the address on the only copy of the docket and then asks the counter to read it back."
 concepts    = ["ownership", "concurrency", "closures"]
 requires    = ["rust.advanced.01.threads"]
-map         = { x = 0.26, y = 0.26, kind = "quest" }
+map          = { x = 0.275, y = 0.058, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines of text.
 
@@ -203,7 +203,7 @@ difficulty  = 3
 story       = "Forty riders, one hatch at the back of the Times Square kitchen. Everything goes through the hatch and the hatch never jams."
 concepts    = ["channels", "concurrency", "iteration"]
 requires    = ["rust.advanced.02.move"]
-map         = { x = 0.38, y = 0.16, kind = "quest" }
+map          = { x = 0.389, y = 0.132, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -303,7 +303,7 @@ difficulty  = 4
 story       = "Both tills take cash out of the same drawer and at close of business the drawer disagrees with both of them."
 concepts    = ["shared-state", "smart-pointers", "concurrency"]
 requires    = ["rust.advanced.03.channels"]
-map         = { x = 0.50, y = 0.27, kind = "quest" }
+map          = { x = 0.602, y = 0.065, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -408,7 +408,7 @@ difficulty  = 4
 story       = "The Hysan Place directory is read three hundred times a minute and changed twice a day, and the lock does not know the difference."
 concepts    = ["shared-state", "collections", "smart-pointers"]
 requires    = ["rust.advanced.04.mutex"]
-map         = { x = 0.62, y = 0.18, kind = "quest" }
+map          = { x = 0.716, y = 0.137, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` words.
 
@@ -527,7 +527,7 @@ difficulty  = 4
 story       = "The departures board keeps a view of the timetable rather than a copy of it, and nobody wrote down when the timetable gets thrown away."
 concepts    = ["lifetimes", "borrowing", "structs", "strings"]
 requires    = ["rust.advanced.05.rwlock"]
-map         = { x = 0.74, y = 0.32, kind = "quest" }
+map          = { x = 0.962, y = 0.054, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines.
 
@@ -659,7 +659,7 @@ difficulty  = 4
 story       = "Alex has written largest four times — for fares, for minutes, for riders and for stop names — and the fifth one is due before the shift ends."
 concepts    = ["generics", "traits", "types"]
 requires    = ["rust.advanced.06.lifetimes"]
-map         = { x = 0.66, y = 0.48, kind = "quest" }
+map          = { x = 0.898, y = 0.526, kind = "quest" }
 brief       = '''
 Standard input is two lines: integers on the first, words on the second.
 
@@ -810,7 +810,7 @@ difficulty  = 4
 story       = "The tram lists every stop from Shau Kei Wan to Kennedy Town and does not keep a list of them anywhere."
 concepts    = ["traits", "iteration", "structs"]
 requires    = ["rust.advanced.07.generics"]
-map         = { x = 0.52, y = 0.57, kind = "quest" }
+map          = { x = 0.785, y = 0.463, kind = "quest" }
 brief       = '''
 Standard input is three integers: `start`, `step`, `count`.
 
@@ -930,7 +930,7 @@ difficulty  = 5
 story       = "Chef Bo's night kitchen runs as a line: one station squares the order, the next one keeps the running count, and nobody waits for the whole batch."
 concepts    = ["channels", "concurrency", "closures"]
 requires    = ["rust.advanced.08.iterator"]
-map         = { x = 0.36, y = 0.64, kind = "quest" }
+map          = { x = 0.557, y = 0.538, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -1037,16 +1037,967 @@ cases = [
   { name = "repeat", stdin = "4\n0 2 2 2\n",  expect = "0 0\n4 4\n4 8\n4 12\nPIPE 4\n",   visible = false },
 ]
 
-# ---------------------------------------------------------------- 10  BOSS
+# ---------------------------------------------------------------- 10
 [[quest]]
-id          = "rust.advanced.10.deadlock"
+id          = "rust.advanced.10.async"
 node        = 10
+title       = "WHERE DOES ASYNC ACTUALLY RUN"
+difficulty  = 5
+story       = "Mei has written async Rust for four years and has never once seen the thing that drives it."
+concepts    = ["async", "concurrency", "traits"]
+requires    = ["rust.advanced.09.pipeline"]
+map          = { x = 0.447, y = 0.480, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+There is no runtime here — no tokio, no crates at all. Write the executor.
+
+Finish `block_on`, which polls a future until it is `Ready` and returns the
+value **and how many times it polled**. Then `block_on` an `async` block that
+awaits `double(v)` for each value in order, printing each result, and print
+`SUM <total>` and `POLLS <k>`.
+
+`double` yields once before returning, so each value costs one extra poll:
+`POLLS` is `n + 1`.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        POLLS 4
+```
+
+An `async fn` is a state machine that implements `Future`, and `.await` is
+"poll the inner one; if it is `Pending`, return `Pending` and remember where I
+was". Nothing runs until something polls it. That something is thirty lines,
+and writing it once is worth more than reading about it five times.
+'''
+starter     = '''
+use std::future::Future;
+use std::io::Read;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll, Wake, Waker};
+
+struct Nudge;
+
+impl Wake for Nudge {
+    fn wake(self: Arc<Self>) {}
+}
+
+/// Returns Pending the first time and Ready after that.
+struct YieldOnce {
+    done: bool,
+}
+
+impl Future for YieldOnce {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        let this = self.get_mut();
+        if this.done {
+            return Poll::Ready(());
+        }
+        this.done = true;
+        cx.waker().wake_by_ref();
+        Poll::Pending
+    }
+}
+
+async fn double(value: i64) -> i64 {
+    YieldOnce { done: false }.await;
+    value * 2
+}
+
+fn block_on<F: Future>(future: F) -> (F::Output, usize) {
+    let _waker = Waker::from(Arc::new(Nudge));
+    // pin the future, build a Context from the waker, and poll in a loop
+    // until it is Ready — counting the polls
+    let _ = future;
+    todo!()
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let (sum, polls) = block_on(async move {
+        let mut sum = 0i64;
+        for value in nums {
+            let doubled = double(value).await;
+            println!("{}", doubled);
+            sum += doubled;
+        }
+        sum
+    });
+
+    println!("SUM {}", sum);
+    println!("POLLS {}", polls);
+}
+'''
+solution    = '''
+use std::future::Future;
+use std::io::Read;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll, Wake, Waker};
+
+struct Nudge;
+
+impl Wake for Nudge {
+    fn wake(self: Arc<Self>) {}
+}
+
+/// Returns Pending the first time and Ready after that.
+struct YieldOnce {
+    done: bool,
+}
+
+impl Future for YieldOnce {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        let this = self.get_mut();
+        if this.done {
+            return Poll::Ready(());
+        }
+        this.done = true;
+        cx.waker().wake_by_ref();
+        Poll::Pending
+    }
+}
+
+async fn double(value: i64) -> i64 {
+    YieldOnce { done: false }.await;
+    value * 2
+}
+
+fn block_on<F: Future>(future: F) -> (F::Output, usize) {
+    let waker = Waker::from(Arc::new(Nudge));
+    let mut cx = Context::from_waker(&waker);
+    let mut future = Box::pin(future);
+
+    let mut polls = 0usize;
+    loop {
+        polls += 1;
+        match future.as_mut().poll(&mut cx) {
+            Poll::Ready(value) => return (value, polls),
+            Poll::Pending => continue,
+        }
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let (sum, polls) = block_on(async move {
+        let mut sum = 0i64;
+        for value in nums {
+            let doubled = double(value).await;
+            println!("{}", doubled);
+            sum += doubled;
+        }
+        sum
+    });
+
+    println!("SUM {}", sum);
+    println!("POLLS {}", polls);
+}
+'''
+hints = [
+  "Box::pin gives you a Pin<Box<F>> without any unsafe, and .as_mut() turns it into the Pin<&mut F> that poll wants.",
+  "Context::from_waker(&waker) is the whole ceremony — the Waker is what a real runtime would use to reschedule you.",
+  "This executor busy-loops on Pending. A real one would park the thread until the waker fired, and that is the only interesting difference.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n",   expect = "2\n4\n6\nSUM 12\nPOLLS 4\n",       visible = true },
+  { name = "one",   stdin = "1\n5\n",       expect = "10\nSUM 10\nPOLLS 2\n",            visible = false },
+  { name = "mixed", stdin = "2\n0 -3\n",    expect = "0\n-6\nSUM -6\nPOLLS 3\n",         visible = false },
+  { name = "four",  stdin = "4\n1 1 1 1\n", expect = "2\n2\n2\n2\nSUM 8\nPOLLS 5\n",     visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "rust.advanced.11.send-sync"
+node        = 11
+title       = "WHY WILL IT NOT CROSS"
+difficulty  = 4
+story       = "The same code, the same Vec, one word different, and one of the two will not compile. Say which word and why."
+concepts    = ["thread-safety", "concurrency", "smart-pointers"]
+requires    = ["rust.advanced.10.async"]
+map          = { x = 0.222, y = 0.514, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Sum them across two threads through one shared total, then print:
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        SEND ARC OK
+        SYNC MUTEX OK
+```
+
+The last two lines are printed only if `assert_send` and `assert_sync` accept
+the handle — and those two functions do nothing at runtime. They are
+`fn assert_send<T: Send>(_: &T) {}`: the check is the bound, and it happens at
+compile time or not at all.
+
+The starter does not compile, and the error is the lesson. `Rc` is not `Send`
+because its refcount is a plain non-atomic integer — two threads cloning one
+`Rc` would race on it, so the compiler refuses to let an `Rc` cross a thread
+boundary at all. `Arc` is the same thing with an atomic count, and is `Send`.
+
+`Sync` is the other half: `T` is `Sync` when `&T` is `Send`. `Mutex<T>` is
+`Sync` for any `T: Send`, because the lock is what makes shared access safe.
+'''
+starter     = '''
+use std::io::Read;
+use std::rc::Rc;
+use std::sync::Mutex;
+use std::thread;
+
+fn assert_send<T: Send>(_: &T) {}
+fn assert_sync<T: Sync>(_: &T) {}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let total = Rc::new(Mutex::new(0i64));
+    let mid = nums.len() / 2;
+    let (left, right) = (nums[..mid].to_vec(), nums[mid..].to_vec());
+
+    let mut handles = Vec::new();
+    for half in [left, right] {
+        let total = Rc::clone(&total);
+        handles.push(thread::spawn(move || {
+            let mut guard = total.lock().unwrap();
+            for value in half {
+                *guard += value;
+            }
+        }));
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("TOTAL {}", *total.lock().unwrap());
+    assert_send(&total);
+    println!("SEND ARC OK");
+    assert_sync(&*total);
+    println!("SYNC MUTEX OK");
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn assert_send<T: Send>(_: &T) {}
+fn assert_sync<T: Sync>(_: &T) {}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let total = Arc::new(Mutex::new(0i64));
+    let mid = nums.len() / 2;
+    let (left, right) = (nums[..mid].to_vec(), nums[mid..].to_vec());
+
+    let mut handles = Vec::new();
+    for half in [left, right] {
+        let total = Arc::clone(&total);
+        handles.push(thread::spawn(move || {
+            let mut guard = total.lock().unwrap();
+            for value in half {
+                *guard += value;
+            }
+        }));
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("TOTAL {}", *total.lock().unwrap());
+    assert_send(&total);
+    println!("SEND ARC OK");
+    assert_sync(&*total);
+    println!("SYNC MUTEX OK");
+}
+'''
+hints = [
+  "The error is E0277: `Rc<Mutex<i64>>` cannot be sent between threads safely. One type name changes, and one import with it.",
+  "Rc's refcount is a plain usize; Arc's is an AtomicUsize. That single difference is the whole of why one is Send and the other is not.",
+  "assert_sync(&*total) asks about the Mutex itself rather than the Arc around it — Mutex<T> is Sync whenever T is Send.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",   stdin = "4\n1 2 3 4\n", expect = "TOTAL 10\nSEND ARC OK\nSYNC MUTEX OK\n", visible = true },
+  { name = "single", stdin = "1\n-5\n",      expect = "TOTAL -5\nSEND ARC OK\nSYNC MUTEX OK\n", visible = false },
+  { name = "same",   stdin = "3\n7 7 7\n",   expect = "TOTAL 21\nSEND ARC OK\nSYNC MUTEX OK\n", visible = false },
+  { name = "zero",   stdin = "2\n0 0\n",     expect = "TOTAL 0\nSEND ARC OK\nSYNC MUTEX OK\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "rust.advanced.12.dispatch"
+node        = 12
+title       = "NOW OR LATER"
+difficulty  = 4
+story       = "Same two shopfronts, same rendering, and the interviewer wants both spellings on the board at once."
+concepts    = ["dispatch", "traits", "generics"]
+requires    = ["rust.advanced.11.send-sync"]
+map          = { x = 0.116, y = 0.476, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `SHOP <NAME> <FLOOR>` or
+`STOP <ROUTE>`.
+
+Render every sign **twice**: once through
+`render_static<T: Sign>(sign: &T)` and once through
+`render_dynamic(sign: &dyn Sign)`, in that order — all the static ones, then
+all the dynamic ones. Then print `DYNAMIC <k>`, the length of the
+`Vec<Box<dyn Sign>>`.
+
+```
+input:  3
+        SHOP HYSAN 4
+        STOP 2
+        SHOP SOGO 1
+output: HYSAN / F4
+        TRAM 2
+        SOGO / F1
+        HYSAN / F4
+        TRAM 2
+        SOGO / F1
+        DYNAMIC 3
+```
+
+The two produce identical text and are not the same thing. `render_static` is
+monomorphised: the compiler stamps out one copy per concrete type and the call
+is direct and inlinable — but the type has to be known **at the call site**,
+which is why the static pass has to happen inside the parsing branch where you
+still know what you built.
+
+`render_dynamic` takes a fat pointer — data plus vtable — looks the method up
+at run time, and does not care what it is holding. That is the only reason a
+single `Vec` can hold both.
+'''
+starter     = '''
+use std::io::Read;
+
+trait Sign {
+    fn render(&self) -> String;
+}
+
+struct Shop {
+    name: String,
+    floor: i64,
+}
+
+struct Stop {
+    route: String,
+}
+
+impl Sign for Shop {
+    fn render(&self) -> String {
+        format!("{} / F{}", self.name, self.floor)
+    }
+}
+
+impl Sign for Stop {
+    fn render(&self) -> String {
+        format!("TRAM {}", self.route)
+    }
+}
+
+fn render_static<T: Sign>(sign: &T) {
+    let _ = sign;
+    // monomorphised: one copy per concrete T
+}
+
+fn render_dynamic(sign: &dyn Sign) {
+    let _ = sign;
+    // one copy, method looked up through the vtable
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let signs: Vec<Box<dyn Sign>> = Vec::new();
+    let _ = (&mut lines, n, render_static::<Shop>, render_dynamic);
+    println!("DYNAMIC {}", signs.len());
+}
+'''
+solution    = '''
+use std::io::Read;
+
+trait Sign {
+    fn render(&self) -> String;
+}
+
+struct Shop {
+    name: String,
+    floor: i64,
+}
+
+struct Stop {
+    route: String,
+}
+
+impl Sign for Shop {
+    fn render(&self) -> String {
+        format!("{} / F{}", self.name, self.floor)
+    }
+}
+
+impl Sign for Stop {
+    fn render(&self) -> String {
+        format!("TRAM {}", self.route)
+    }
+}
+
+fn render_static<T: Sign>(sign: &T) {
+    println!("{}", sign.render());
+}
+
+fn render_dynamic(sign: &dyn Sign) {
+    println!("{}", sign.render());
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut signs: Vec<Box<dyn Sign>> = Vec::new();
+    for _ in 0..n {
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        match parts.next().unwrap() {
+            "SHOP" => {
+                let name = parts.next().unwrap().to_string();
+                let floor: i64 = parts.next().unwrap().parse().unwrap();
+                let shop = Shop { name, floor };
+                // the concrete type is known here, and only here
+                render_static(&shop);
+                signs.push(Box::new(shop));
+            }
+            _ => {
+                let route = parts.next().unwrap().to_string();
+                let stop = Stop { route };
+                render_static(&stop);
+                signs.push(Box::new(stop));
+            }
+        }
+    }
+
+    for sign in &signs {
+        render_dynamic(sign.as_ref());
+    }
+    println!("DYNAMIC {}", signs.len());
+}
+'''
+hints = [
+  "render_static has to be called where the concrete type is still visible — inside the match arm, before the value is boxed.",
+  "sign.as_ref() turns &Box<dyn Sign> into &dyn Sign; passing the box itself would need a second deref.",
+  "Both functions have the same one-line body. The difference is entirely in the signature, and entirely in where the method lookup happens.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\nSHOP HYSAN 4\nSTOP 2\nSHOP SOGO 1\n", expect = "HYSAN / F4\nTRAM 2\nSOGO / F1\nHYSAN / F4\nTRAM 2\nSOGO / F1\nDYNAMIC 3\n", visible = true },
+  { name = "one",   stdin = "1\nSTOP 116\n",                          expect = "TRAM 116\nTRAM 116\nDYNAMIC 1\n",                                          visible = false },
+  { name = "shops", stdin = "2\nSHOP A 0\nSHOP B 9\n",                expect = "A / F0\nB / F9\nA / F0\nB / F9\nDYNAMIC 2\n",                              visible = false },
+  { name = "none",  stdin = "0\n",                                    expect = "DYNAMIC 0\n",                                                              visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "rust.advanced.13.interior-mutability"
+node        = 13
+title       = "MUTATING THROUGH A SHARED REFERENCE"
+difficulty  = 4
+story       = "The counter on the door has to go up while four different bits of code are only looking at it."
+concepts    = ["interior-mutability", "smart-pointers", "mutability"]
+requires    = ["rust.advanced.12.dispatch"]
+map          = { x = 0.045, y = 0.931, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Print three lines:
+
+1. `CELL <k>` — a `Cell<usize>` bumped once per value, read back with `.get()`,
+   all through a plain `&` reference
+2. `REF <sum>` — a `RefCell<Vec<i64>>` filled with the values and summed
+3. `DOUBLE panic` — take two `borrow_mut()` on the same `RefCell` at the same
+   time, deliberately, and catch the panic with `std::panic::catch_unwind`
+
+```
+input:  3
+        1 2 3
+output: CELL 3
+        REF 6
+        DOUBLE panic
+```
+
+`&T` normally means nobody can change it. `Cell` and `RefCell` are the
+sanctioned exception, and they pay for it in different currency: `Cell` only
+moves whole values in and out, so it needs no checking at all; `RefCell` hands
+out real references and therefore has to enforce the borrow rules — at run
+time, with a panic, instead of at compile time with an error.
+
+That panic is not a bug in the quest. It is the price, and seeing it once is
+the point.
+'''
+starter     = '''
+use std::cell::{Cell, RefCell};
+use std::io::Read;
+use std::panic::{catch_unwind, AssertUnwindSafe};
+
+fn bump(counter: &Cell<usize>) {
+    let _ = counter;
+    // increment through a shared reference
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let counter = Cell::new(0usize);
+    let ledger = RefCell::new(Vec::<i64>::new());
+
+    let _ = (&counter, &ledger, &nums, bump);
+    let _ = catch_unwind(AssertUnwindSafe(|| {}));
+    println!("CELL 0");
+    println!("REF 0");
+    println!("DOUBLE ok");
+}
+'''
+solution    = '''
+use std::cell::{Cell, RefCell};
+use std::io::Read;
+use std::panic::{catch_unwind, AssertUnwindSafe};
+
+fn bump(counter: &Cell<usize>) {
+    counter.set(counter.get() + 1);
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let counter = Cell::new(0usize);
+    let ledger = RefCell::new(Vec::<i64>::new());
+
+    for &value in &nums {
+        bump(&counter);
+        ledger.borrow_mut().push(value);
+    }
+
+    println!("CELL {}", counter.get());
+    println!("REF {}", ledger.borrow().iter().sum::<i64>());
+
+    let outcome = catch_unwind(AssertUnwindSafe(|| {
+        let _first = ledger.borrow_mut();
+        let _second = ledger.borrow_mut();
+    }));
+    println!("DOUBLE {}", if outcome.is_err() { "panic" } else { "ok" });
+}
+'''
+hints = [
+  "Cell has no borrow(): you get() a copy out and set() a whole value in. That is why it needs no runtime bookkeeping.",
+  "ledger.borrow_mut().push(v) as one statement lets the guard drop at the semicolon, which is what keeps the loop legal.",
+  "catch_unwind needs AssertUnwindSafe around the closure because it captures a &RefCell; the panic message still goes to stderr, which the tests do not read.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n",        expect = "CELL 3\nREF 6\nDOUBLE panic\n",    visible = true },
+  { name = "one",   stdin = "1\n-5\n",           expect = "CELL 1\nREF -5\nDOUBLE panic\n",   visible = false },
+  { name = "none",  stdin = "0\n",               expect = "CELL 0\nREF 0\nDOUBLE panic\n",    visible = false },
+  { name = "four",  stdin = "4\n10 20 30 40\n",  expect = "CELL 4\nREF 100\nDOUBLE panic\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "rust.advanced.14.custom-error"
+node        = 14
+title       = "AN ERROR OF YOUR OWN"
+difficulty  = 4
+story       = "Four layers of the fare service each invented their own failure type and none of them will convert."
+concepts    = ["error-handling", "traits", "types"]
+requires    = ["rust.advanced.13.interior-mutability"]
+map          = { x = 0.287, y = 0.854, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines, each meant to be a distance in
+km.
+
+Define `enum FareError { NotANumber, Negative(i64) }`, implement `Display`
+and `std::error::Error` for it, and implement
+`From<std::num::ParseIntError> for FareError` so that `?` converts on its own.
+
+`fare(text) -> Result<i64, FareError>` parses with `?`, rejects a negative
+distance, and otherwise returns `500 + 100 * km`. Print each result or the
+error's `Display` text, then `ERRORS <k>`.
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative distance: -2
+        ERRORS 2
+```
+
+The starter does not compile. `?` does not merely propagate — it calls
+`From::from` on the way out, and without that impl there is no route from a
+`ParseIntError` to your type. Implementing `From` is what makes `?` work
+across a layer boundary, and it is the entire reason error enums are worth
+having.
+
+`map_err` is the other half of the answer, for when you want to attach context
+rather than convert a type. Mention it if they ask; it is not needed here.
+'''
+starter     = '''
+use std::fmt;
+use std::io::Read;
+
+#[derive(Debug)]
+enum FareError {
+    NotANumber,
+    Negative(i64),
+}
+
+impl fmt::Display for FareError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FareError::NotANumber => write!(f, "not a number"),
+            FareError::Negative(km) => write!(f, "negative distance: {}", km),
+        }
+    }
+}
+
+impl std::error::Error for FareError {}
+
+// the From impl that `?` needs is missing
+
+fn fare(text: &str) -> Result<i64, FareError> {
+    let km: i64 = text.trim().parse()?;
+    if km < 0 {
+        return Err(FareError::Negative(km));
+    }
+    Ok(500 + 100 * km)
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut errors = 0usize;
+    for _ in 0..n {
+        match fare(lines.next().unwrap_or("")) {
+            Ok(value) => println!("{}", value),
+            Err(err) => {
+                errors += 1;
+                println!("{}", err);
+            }
+        }
+    }
+    println!("ERRORS {}", errors);
+}
+'''
+solution    = '''
+use std::fmt;
+use std::io::Read;
+use std::num::ParseIntError;
+
+#[derive(Debug)]
+enum FareError {
+    NotANumber,
+    Negative(i64),
+}
+
+impl fmt::Display for FareError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FareError::NotANumber => write!(f, "not a number"),
+            FareError::Negative(km) => write!(f, "negative distance: {}", km),
+        }
+    }
+}
+
+impl std::error::Error for FareError {}
+
+impl From<ParseIntError> for FareError {
+    fn from(_: ParseIntError) -> FareError {
+        FareError::NotANumber
+    }
+}
+
+fn fare(text: &str) -> Result<i64, FareError> {
+    let km: i64 = text.trim().parse()?;
+    if km < 0 {
+        return Err(FareError::Negative(km));
+    }
+    Ok(500 + 100 * km)
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut errors = 0usize;
+    for _ in 0..n {
+        match fare(lines.next().unwrap_or("")) {
+            Ok(value) => println!("{}", value),
+            Err(err) => {
+                errors += 1;
+                println!("{}", err);
+            }
+        }
+    }
+    println!("ERRORS {}", errors);
+}
+'''
+hints = [
+  "The error is E0277 on the `?`: the trait From<ParseIntError> is not implemented for FareError.",
+  "Six lines: impl From<ParseIntError> for FareError with fn from returning FareError::NotANumber.",
+  "Display is what {} prints; Debug is what {:?} prints; the Error trait is what lets it go into a Box<dyn Error>. All three are worth having and only one is needed here.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",    stdin = "3\n4\nxx\n-2\n",   expect = "900\nnot a number\nnegative distance: -2\nERRORS 2\n", visible = true },
+  { name = "clean",    stdin = "1\n0\n",           expect = "500\nERRORS 0\n",                                      visible = false },
+  { name = "all-junk", stdin = "2\nzz\nyy\n",      expect = "not a number\nnot a number\nERRORS 2\n",               visible = false },
+  { name = "negative", stdin = "1\n-1\n",          expect = "negative distance: -1\nERRORS 1\n",                    visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "rust.advanced.15.atomics"
+node        = 15
+title       = "ONE WORD, NO LOCK"
+difficulty  = 4
+story       = "The turnstile count does not need a lock. Everything else in the plant room does, and telling them apart is the job."
+concepts    = ["shared-state", "thread-safety", "ownership"]
+requires    = ["rust.advanced.14.custom-error"]
+map          = { x = 0.391, y = 0.950, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Spawn one thread per value. Each adds its value to a shared `AtomicI64` and
+bumps a shared `AtomicUsize` by one — no `Mutex` anywhere. Join them all and
+print `TOTAL <sum>` and `HITS <n>`.
+
+Then: declare two `Guard` values at the **top** of `main`, named `first` and
+`second`, whose `Drop` prints `DROP <name>`. They run at the end of `main`,
+after everything else, in reverse declaration order.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+        DROP second
+        DROP first
+```
+
+An atomic is not a cheaper mutex; it is a different tool, for one machine word
+read-modify-written in a single instruction. The moment you need two fields to
+agree with each other, the lock comes back — there is no atomic for "these two
+things, together".
+
+`Ordering::Relaxed` is enough here because nothing depends on *when* these
+increments become visible relative to any other write, only that none are
+lost. That sentence is the follow-up question, and it is the whole of what
+`Relaxed` means.
+'''
+starter     = '''
+use std::io::Read;
+use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::thread;
+
+struct Guard {
+    name: &'static str,
+}
+
+// Guard needs a Drop that prints DROP <name>
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let _first = Guard { name: "first" };
+    let _second = Guard { name: "second" };
+
+    let total = Arc::new(AtomicI64::new(0));
+    let hits = Arc::new(AtomicUsize::new(0));
+
+    // one thread per value; add to total, bump hits, join them all
+    let _ = (&total, &hits, nums, Ordering::Relaxed, thread::yield_now);
+
+    println!("TOTAL {}", total.load(Ordering::Relaxed));
+    println!("HITS {}", hits.load(Ordering::Relaxed));
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::thread;
+
+struct Guard {
+    name: &'static str,
+}
+
+impl Drop for Guard {
+    fn drop(&mut self) {
+        println!("DROP {}", self.name);
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let _first = Guard { name: "first" };
+    let _second = Guard { name: "second" };
+
+    let total = Arc::new(AtomicI64::new(0));
+    let hits = Arc::new(AtomicUsize::new(0));
+
+    let mut handles = Vec::new();
+    for value in nums {
+        let total = Arc::clone(&total);
+        let hits = Arc::clone(&hits);
+        handles.push(thread::spawn(move || {
+            total.fetch_add(value, Ordering::Relaxed);
+            hits.fetch_add(1, Ordering::Relaxed);
+        }));
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("TOTAL {}", total.load(Ordering::Relaxed));
+    println!("HITS {}", hits.load(Ordering::Relaxed));
+}
+'''
+hints = [
+  "fetch_add returns the previous value and applies the addition atomically; there is no lock and no guard.",
+  "The Arc is still needed — the atomic makes the *access* safe, not the *sharing*.",
+  "Drop runs in reverse declaration order, so `second` goes first. Binding them as _first and _second keeps them alive to the end of main; a bare `_` would drop them immediately.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",   stdin = "4\n1 2 3 4\n", expect = "TOTAL 10\nHITS 4\nDROP second\nDROP first\n", visible = true },
+  { name = "single", stdin = "1\n-5\n",      expect = "TOTAL -5\nHITS 1\nDROP second\nDROP first\n", visible = false },
+  { name = "same",   stdin = "3\n7 7 7\n",   expect = "TOTAL 21\nHITS 3\nDROP second\nDROP first\n", visible = false },
+  { name = "none",   stdin = "0\n",          expect = "TOTAL 0\nHITS 0\nDROP second\nDROP first\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 16  BOSS
+[[quest]]
+id          = "rust.advanced.16.deadlock"
+node        = 16
 title       = "DEADLOCK"
 difficulty  = 5
 story       = "The Times Square plant room, two floors down. Two locks, two threads, and both escalators stopped in the same second."
 concepts    = ["deadlock", "shared-state", "concurrency", "smart-pointers"]
-requires    = ["rust.advanced.09.pipeline", "rust.advanced.04.mutex"]
-map         = { x = 0.20, y = 0.80, kind = "boss" }
+requires    = ["rust.advanced.15.atomics", "rust.advanced.04.mutex"]
+map          = { x = 0.619, y = 0.868, kind = "boss" }
 brief       = '''
 Two accounts, `A` and `B`, each an `Arc<Mutex<i64>>`.
 

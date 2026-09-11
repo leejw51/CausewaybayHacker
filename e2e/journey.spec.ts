@@ -2,11 +2,13 @@ import {
   atScreen,
   expect,
   fixtureAccount,
+  enterRustQuest,
   freshAccount,
+  openSelectedNode,
   login,
   logout,
-  openSelectedNode,
   pickFirstCategory,
+  sourceThatPrints,
   scene,
   setSource,
   submit,
@@ -40,11 +42,17 @@ import {
 
 test.describe.configure({ mode: "serial" });
 
-/** Walk from the login screen to an open quest, driving the real UI. */
-async function toQuest(page: import("@playwright/test").Page, account: Account) {
+/**
+ * Walk from the login screen to an open RUST quest, driving the real UI, and
+ * report which quest the browser actually opened.
+ */
+async function toQuest(
+  page: import("@playwright/test").Page,
+  account: Account,
+  wire: Wire,
+): Promise<string> {
   await login(page, account);
-  await pickFirstCategory(page); // RUST is the default land; BASIC the first row
-  await openSelectedNode(page);
+  return enterRustQuest(page, wire);
 }
 
 test("boots to the login screen and asks for a seed", async ({ page }) => {
@@ -131,13 +139,13 @@ test("RUST × BASIC opens a map, and only the first node is open", async ({ page
 
 test("a wrong answer is rejected and the node stays open", async ({ page }) => {
   const account = freshAccount();
-  await toQuest(page, account);
+  const wire = await Wire.as(test.info().project.use.baseURL!, account);
+  await toQuest(page, account, wire);
 
   await setSource(page, WRONG_SOURCE);
   await submit(page);
   await atScreen(page, "result", 180_000); // the first rustc of a run is slow
 
-  const wire = await Wire.as(test.info().project.use.baseURL!, account);
   try {
     const history = await wire.history();
     expect(history.length, "the attempt was not recorded").toBe(1);
@@ -158,10 +166,24 @@ test("the right answer clears it, and the clear survives a reload", async ({ pag
     // The answer comes from the quest's own visible case, over the wire —
     // content is PM's, and a suite that hard-codes a string breaks the day
     // one changes.
-    const { node, source } = await wire.answerable();
+    // Whatever quest the browser opens is the one this test is about — the
+    // lands scan is a click sweep and a test that insisted on one quest id
+    // would be asserting the panel's geometry rather than the game.
+    const opened = await toQuest(page, account, wire);
+    const got = await wire.ok("quest.get", { quest_id: opened });
+    const source = sourceThatPrints(
+      (got.quest as { tests?: { visible?: { stdin?: string; expect?: string }[] } }).tests
+        ?.visible?.[0],
+    );
+    expect(
+      source,
+      `the browser opened ${opened}, whose visible case cannot be answered by ` +
+        `printing a constant — it reads stdin, and that quest is teaching ` +
+        `something this suite should not shortcut`,
+    ).not.toBeNull();
+    const node = { quest_id: opened };
 
-    await toQuest(page, account);
-    await setSource(page, source);
+    await setSource(page, source!);
     await submit(page);
     await atScreen(page, "result", 180_000);
 
@@ -215,11 +237,17 @@ test("logout, then a second wallet sees its own map and none of the first's", as
   const firstWire = await Wire.as(test.info().project.use.baseURL!, first);
   const secondWire = await Wire.as(test.info().project.use.baseURL!, second);
   try {
-    const { node, source } = await firstWire.answerable();
-
     // ---- the first wallet trains -------------------------------------
-    await toQuest(page, first);
-    await setSource(page, source);
+    const opened = await toQuest(page, first, firstWire);
+    const got = await firstWire.ok("quest.get", { quest_id: opened });
+    const source = sourceThatPrints(
+      (got.quest as { tests?: { visible?: { stdin?: string; expect?: string }[] } }).tests
+        ?.visible?.[0],
+    );
+    expect(source, `${opened} cannot be answered by printing a constant`).not.toBeNull();
+    const node = { quest_id: opened };
+
+    await setSource(page, source!);
     await submit(page);
     await atScreen(page, "result", 180_000);
     expect((await firstWire.node(node.quest_id))?.state).toBe("cleared");

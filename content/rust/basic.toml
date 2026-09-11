@@ -20,7 +20,7 @@ difficulty  = 1
 story       = "06:40 above Jardine's Bazaar. The cursor sits there and the grey text is gone. Whatever you can still type from memory is yours."
 concepts    = ["io", "strings"]
 requires    = []
-map         = { x = 0.08, y = 0.86, kind = "quest" }
+map          = { x = 0.044, y = 0.146, kind = "quest" }
 brief       = '''
 Print exactly:
 
@@ -64,7 +64,7 @@ difficulty  = 1
 story       = "The tram-stop board on Percival Street shows one number and then two blanks where the day rate and the monthly used to be."
 concepts    = ["io", "bindings", "types"]
 requires    = ["rust.basic.01.first-light"]
-map         = { x = 0.20, y = 0.80, kind = "quest" }
+map          = { x = 0.275, y = 0.058, kind = "quest" }
 brief       = '''
 Read one integer `n` from standard input.
 
@@ -130,7 +130,7 @@ difficulty  = 2
 story       = "The Sogo crossing kiosk holds the price as text, as a number and as money, and it calls all three of them price."
 concepts    = ["bindings", "types", "strings"]
 requires    = ["rust.basic.02.bindings"]
-map         = { x = 0.31, y = 0.88, kind = "quest" }
+map          = { x = 0.389, y = 0.132, kind = "quest" }
 brief       = '''
 Read one line: an amount in cents, as digits.
 
@@ -207,7 +207,7 @@ difficulty  = 2
 story       = "The Lucky Mac till prints the receipt and then cannot say thank you, because it handed the name over with the paper."
 concepts    = ["ownership", "borrowing", "strings"]
 requires    = ["rust.basic.03.shadowing"]
-map         = { x = 0.44, y = 0.79, kind = "quest" }
+map          = { x = 0.602, y = 0.065, kind = "quest" }
 brief       = '''
 Read one line: a customer name. Print two lines:
 
@@ -282,7 +282,7 @@ difficulty  = 2
 story       = "Forty people outside Hysan Place. The counter can see the front and the back of the line and nothing in between."
 concepts    = ["slices", "iteration", "control-flow"]
 requires    = ["rust.basic.04.the-move"]
-map         = { x = 0.55, y = 0.68, kind = "quest" }
+map          = { x = 0.716, y = 0.137, kind = "quest" }
 brief       = '''
 Standard input is a count `n` on the first line and then `n` integers on the
 second, separated by spaces.
@@ -364,7 +364,7 @@ difficulty  = 2
 story       = "The Times Square directory truncates 銅鑼灣 at three characters and gets one and a half."
 concepts    = ["strings", "iteration", "types"]
 requires    = ["rust.basic.05.slices"]
-map         = { x = 0.45, y = 0.57, kind = "quest" }
+map          = { x = 0.962, y = 0.054, kind = "quest" }
 brief       = '''
 Read one line. Print three lines:
 
@@ -438,7 +438,7 @@ difficulty  = 3
 story       = "Lucky Mac's front counter keeps every line of the order in one place, or it did before the suggestion replaced the struct with a comment."
 concepts    = ["structs", "functions", "mutability"]
 requires    = ["rust.basic.06.strings"]
-map         = { x = 0.32, y = 0.50, kind = "quest" }
+map          = { x = 0.898, y = 0.526, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines of `<ITEM> <CENTS>`.
 
@@ -567,7 +567,7 @@ difficulty  = 3
 story       = "The Causeway Bay gate charges every card the adult fare, including the ones that are not adults and the one that is not a card."
 concepts    = ["enums", "pattern-matching", "functions"]
 requires    = ["rust.basic.07.structs"]
-map         = { x = 0.40, y = 0.38, kind = "quest" }
+map          = { x = 0.785, y = 0.463, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines of `<TYPE> <KM>`.
 
@@ -698,7 +698,7 @@ difficulty  = 3
 story       = "Jardine's Bazaar at nine: every stall calling something, and the sign board wants the ranking."
 concepts    = ["collections", "imports", "iteration", "sorting"]
 requires    = ["rust.basic.08.enums"]
-map         = { x = 0.55, y = 0.33, kind = "quest" }
+map          = { x = 0.557, y = 0.538, kind = "quest" }
 brief       = '''
 Read the whole of standard input and split it on whitespace.
 
@@ -773,7 +773,7 @@ difficulty  = 3
 story       = "The Victoria Park meter reader hands in a column of numbers with somebody's lunch order in the middle of it."
 concepts    = ["error-handling", "pattern-matching", "types"]
 requires    = ["rust.basic.09.maps"]
-map         = { x = 0.70, y = 0.40, kind = "quest" }
+map          = { x = 0.447, y = 0.480, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines. Each line is supposed to be an
 integer.
@@ -876,7 +876,7 @@ difficulty  = 4
 story       = "Alex says you can do it with three for loops. You have met the Yee Wo Street traffic; you get one pass."
 concepts    = ["iteration", "closures", "collections"]
 requires    = ["rust.basic.10.errors"]
-map         = { x = 0.83, y = 0.29, kind = "quest" }
+map          = { x = 0.222, y = 0.514, kind = "quest" }
 brief       = '''
 Standard input is one line of integers separated by spaces.
 
@@ -963,16 +963,670 @@ cases = [
   { name = "negatives", stdin = "-4 -2 0 11\n",       expect = "-6\n22\n4\n",       visible = false },
 ]
 
-# ---------------------------------------------------------------- 12  BOSS
+# ---------------------------------------------------------------- 12
 [[quest]]
-id          = "rust.basic.12.traits"
+id          = "rust.basic.12.str-and-string"
 node        = 12
+title       = "THE FIRST QUESTION"
+difficulty  = 2
+story       = "Every Rust interview in Hong Kong opens with it, and Mei has answered it badly twice."
+concepts    = ["strings", "ownership", "borrowing"]
+requires    = ["rust.basic.11.iterators"]
+map          = { x = 0.116, y = 0.476, kind = "quest" }
+brief       = '''
+Read one line. Print three lines:
+
+1. its first whitespace-separated word, as a **borrowed** `&str` — no
+   allocation, no `to_string()`
+2. that word uppercased, which has to be an owned `String`, because the
+   uppercase version is not a slice of anything that already exists
+3. `SAME YES` if the two compare equal, `SAME NO` otherwise
+
+```
+input:  lucky mac
+output: lucky
+        LUCKY
+        SAME NO
+```
+
+`&str` is a view into text somebody else owns. `String` owns a buffer it can
+grow. `first_word` returns a view, so its return type borrows from its
+argument and it allocates nothing — that is the whole answer to the question
+they are actually asking.
+'''
+starter     = '''
+use std::io::Read;
+
+fn first_word(text: &str) -> &str {
+    // the first whitespace-separated word, or "" if there is none
+    let _ = text;
+    ""
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+
+    let word = first_word(&input);
+    // print the word, then its uppercase String, then SAME YES / SAME NO
+    let _ = word;
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn first_word(text: &str) -> &str {
+    text.split_whitespace().next().unwrap_or("")
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+
+    let word: &str = first_word(&input);
+    println!("{}", word);
+
+    let shouted: String = word.to_uppercase();
+    println!("{}", shouted);
+
+    println!("SAME {}", if word == shouted { "YES" } else { "NO" });
+}
+'''
+hints = [
+  "split_whitespace().next() gives Option<&str>, and unwrap_or on it turns an empty line into an empty word.",
+  "to_uppercase returns String, not &str — it has to allocate, because the result is not a piece of the input.",
+  "&str and String compare directly; the standard library implements equality between them, so you do not need as_str().",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-words",  stdin = "lucky mac\n",     expect = "lucky\nLUCKY\nSAME NO\n",   visible = true },
+  { name = "shouted",    stdin = "MTR\n",           expect = "MTR\nMTR\nSAME YES\n",      visible = false },
+  { name = "padded",     stdin = "  spaced out \n", expect = "spaced\nSPACED\nSAME NO\n", visible = false },
+  { name = "one-letter", stdin = "A\n",             expect = "A\nA\nSAME YES\n",          visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "rust.basic.13.combinators"
+node        = 13
+title       = "WITHOUT A SINGLE UNWRAP"
+difficulty  = 3
+story       = "Alex keeps saying the Rust one is all unwrap. Write the column reader again with no unwrap in the part that can fail."
+concepts    = ["error-handling", "closures", "panics"]
+requires    = ["rust.basic.12.str-and-string"]
+map          = { x = 0.045, y = 0.931, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines, each supposed to be an integer.
+
+For each line print the value doubled, or `-1` if it does not parse. Then
+print `SOME <k>`, how many parsed, and `FIRST <v>` — the first value that
+parsed — or `FIRST NONE`.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        -1
+        -8
+        SOME 2
+        FIRST 21
+```
+
+Do it with combinators: `.ok()` turns a `Result` into an `Option`,
+`.map(|v| v * 2)` acts only on the value that is there, and `.unwrap_or(-1)`
+supplies the answer when it is not. `find_map` gives you the last line in one
+pass.
+
+`unwrap()` would also "work" on the lines that parse, and then take the whole
+program down on `xx`. `unwrap_or` cannot panic. Knowing which is which is the
+quest.
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+    let rows: Vec<&str> = (0..n).map(|_| lines.next().unwrap_or("")).collect();
+
+    // for each row: parse, .ok(), .map(double), .unwrap_or(-1)
+    // then SOME <how many parsed> and FIRST <the first that parsed>
+    let _ = rows;
+    println!("SOME 0");
+    println!("FIRST NONE");
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+    let rows: Vec<&str> = (0..n).map(|_| lines.next().unwrap_or("")).collect();
+
+    for row in &rows {
+        let doubled = row.trim().parse::<i64>().ok().map(|v| v * 2).unwrap_or(-1);
+        println!("{}", doubled);
+    }
+
+    let parsed = rows
+        .iter()
+        .filter(|row| row.trim().parse::<i64>().is_ok())
+        .count();
+    println!("SOME {}", parsed);
+
+    let first = rows.iter().find_map(|row| row.trim().parse::<i64>().ok());
+    match first {
+        Some(value) => println!("FIRST {}", value),
+        None => println!("FIRST NONE"),
+    }
+}
+'''
+hints = [
+  "parse::<i64>() needs the turbofish here, because nothing downstream pins the type for the compiler.",
+  ".ok() throws the error away on purpose — you are not reporting why it failed, only that it did.",
+  "find_map runs the closure until one returns Some, so it stops at the first line that parses.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",   stdin = "3\n21\nxx\n-4\n",   expect = "42\n-1\n-8\nSOME 2\nFIRST 21\n", visible = true },
+  { name = "zero",    stdin = "1\n0\n",            expect = "0\nSOME 1\nFIRST 0\n",           visible = false },
+  { name = "all-bad", stdin = "2\nhello\nworld\n", expect = "-1\n-1\nSOME 0\nFIRST NONE\n",   visible = false },
+  { name = "clean",   stdin = "2\n7\n8\n",         expect = "14\n16\nSOME 2\nFIRST 7\n",      visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "rust.basic.14.matching"
+node        = 14
+title       = "THE SHAPE OF THE THING"
+difficulty  = 3
+story       = "The delivery app takes four commands and the old code checked them with nine nested ifs."
+concepts    = ["pattern-matching", "control-flow", "enums"]
+requires    = ["rust.basic.13.combinators"]
+map          = { x = 0.287, y = 0.854, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines, each `<COMMAND>` or
+`<COMMAND> <ARG>`.
+
+For each line print:
+
+* `FORWARD <n>` for `GO <n>` with `n` greater than zero
+* `STAY` for `GO <n>` with `n` at or below zero
+* `HALT` for `STOP`
+* `UNKNOWN <COMMAND>` for anything else
+
+Then print `MOVED <total>`, the sum of everything you went forward.
+
+```
+input:  4
+        GO 3
+        GO -1
+        STOP
+        JUMP 9
+output: FORWARD 3
+        STAY
+        HALT
+        UNKNOWN JUMP
+        MOVED 3
+```
+
+One `match` on the split line, with a **guard** on the `GO` arm to separate
+the two cases without a second branch. Matching a slice pattern —
+`["GO", arg]` — makes the arity of the line part of the pattern instead of a
+length check you wrote by hand.
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut moved = 0i64;
+    for _ in 0..n {
+        let line = lines.next().unwrap_or("");
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        // match parts.as_slice(): ["GO", arg] with a guard, ["STOP"], then the rest
+        let _ = parts;
+    }
+    let _ = &mut moved;
+    println!("MOVED {}", moved);
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut moved = 0i64;
+    for _ in 0..n {
+        let line = lines.next().unwrap_or("");
+        let parts: Vec<&str> = line.split_whitespace().collect();
+
+        match parts.as_slice() {
+            ["GO", arg] if arg.parse::<i64>().unwrap_or(0) > 0 => {
+                let steps: i64 = arg.parse().unwrap_or(0);
+                moved += steps;
+                println!("FORWARD {}", steps);
+            }
+            ["GO", _] => println!("STAY"),
+            ["STOP"] => println!("HALT"),
+            [command, ..] => println!("UNKNOWN {}", command),
+            [] => println!("UNKNOWN"),
+        }
+    }
+    println!("MOVED {}", moved);
+}
+'''
+hints = [
+  "parts.as_slice() is what turns the Vec into something a slice pattern can match against.",
+  "An `if` after the pattern is a match guard — it separates two arms that share a shape.",
+  "`[command, ..]` binds the first element and ignores the rest; `[]` is the empty line you still have to cover.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4\nGO 3\nGO -1\nSTOP\nJUMP 9\n", expect = "FORWARD 3\nSTAY\nHALT\nUNKNOWN JUMP\nMOVED 3\n", visible = true },
+  { name = "stop", stdin = "1\nSTOP\n",                      expect = "HALT\nMOVED 0\n",                                visible = false },
+  { name = "zero", stdin = "2\nGO 0\nGO 10\n",               expect = "STAY\nFORWARD 10\nMOVED 10\n",                   visible = false },
+  { name = "bare", stdin = "1\nWAIT\n",                      expect = "UNKNOWN WAIT\nMOVED 0\n",                        visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "rust.basic.15.modules"
+node        = 15
+title       = "WHO IS ALLOWED TO SEE THIS"
+difficulty  = 3
+story       = "The fare table leaked into three files and got changed in two of them. Put it behind a door."
+concepts    = ["imports", "functions", "types"]
+requires    = ["rust.basic.14.matching"]
+map          = { x = 0.391, y = 0.950, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` distances in km.
+
+Organise the fare logic into a module:
+
+* `mod fares` with a **public** `adult(km) -> i64` and a **private** `base(km)`
+  that `adult` calls — `500 + 100 * km`
+* a nested `mod fares::pass` with a public `monthly() -> i64` returning `50000`
+
+Print one adult fare per distance, then `MONTHLY <x>`.
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        MONTHLY 50000
+```
+
+The starter does not compile: the items exist but nothing is `pub`, and a
+module's contents are private to it by default. That default is the feature —
+`base` is not part of the interface, and the compiler is the thing that keeps
+it that way. A nested module needs its own `pub` on the `mod` line, not only
+on the function inside it.
+'''
+starter     = '''
+use std::io::Read;
+
+mod fares {
+    fn base(km: i64) -> i64 {
+        500 + 100 * km
+    }
+
+    fn adult(km: i64) -> i64 {
+        base(km)
+    }
+
+    mod pass {
+        fn monthly() -> i64 {
+            50000
+        }
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let distances: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    for km in distances {
+        println!("{}", fares::adult(km));
+    }
+    println!("MONTHLY {}", fares::pass::monthly());
+}
+'''
+solution    = '''
+use std::io::Read;
+
+mod fares {
+    fn base(km: i64) -> i64 {
+        500 + 100 * km
+    }
+
+    pub fn adult(km: i64) -> i64 {
+        base(km)
+    }
+
+    pub mod pass {
+        pub fn monthly() -> i64 {
+            50000
+        }
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let distances: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    for km in distances {
+        println!("{}", fares::adult(km));
+    }
+    println!("MONTHLY {}", fares::pass::monthly());
+}
+'''
+hints = [
+  "The error is E0603: the item exists, it is just private. Three pub keywords fix the whole file.",
+  "base stays private on purpose — it is the one thing in here that is nobody else's business.",
+  "Making the function public does not make the door public: `mod pass` needs pub as well.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",    stdin = "3\n1 2 3\n", expect = "600\n700\n800\nMONTHLY 50000\n", visible = true },
+  { name = "zero-km",  stdin = "1\n0\n",     expect = "500\nMONTHLY 50000\n",           visible = false },
+  { name = "long",     stdin = "2\n10 20\n", expect = "1500\n2500\nMONTHLY 50000\n",    visible = false },
+  { name = "negative", stdin = "1\n-1\n",    expect = "400\nMONTHLY 50000\n",           visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "rust.basic.16.smart-pointers"
+node        = 16
+title       = "TWO HANDLES, ONE LEDGER"
+difficulty  = 3
+story       = "The morning till and the evening till write into the same book, and neither of them owns it."
+concepts    = ["smart-pointers", "interior-mutability", "collections"]
+requires    = ["rust.basic.15.modules"]
+map          = { x = 0.619, y = 0.868, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` integers.
+
+Hold one ledger as `Rc<RefCell<Vec<i64>>>` and take **two** handles to it.
+Through the first, push every even value. Through the second, push every odd
+one. Then print:
+
+1. the ledger's contents in the order they were pushed, space separated
+2. `RC <k>`, the strong count while both handles are alive
+3. `BOX <sum>`, the total, computed through a `Box<i64>`
+
+```
+input:  5
+        1 2 3 4 5
+output: 2 4 1 3 5
+        RC 2
+        BOX 15
+```
+
+`Rc` is shared ownership. `RefCell` is the borrow check, moved to runtime.
+Neither is a `Mutex` and neither is thread safe — that is the next map.
+Together they are how one value gets two owners that can both change it.
+'''
+starter     = '''
+use std::cell::RefCell;
+use std::io::Read;
+use std::rc::Rc;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let ledger: Rc<RefCell<Vec<i64>>> = Rc::new(RefCell::new(Vec::new()));
+
+    // take a second handle, push the evens through one and the odds through
+    // the other, then print the ledger, the strong count and the boxed sum
+    let _ = (ledger, nums);
+    println!("?");
+    println!("RC 0");
+    println!("BOX 0");
+}
+'''
+solution    = '''
+use std::cell::RefCell;
+use std::io::Read;
+use std::rc::Rc;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let morning: Rc<RefCell<Vec<i64>>> = Rc::new(RefCell::new(Vec::new()));
+    let evening = Rc::clone(&morning);
+
+    for &value in &nums {
+        if value % 2 == 0 {
+            morning.borrow_mut().push(value);
+        }
+    }
+    for &value in &nums {
+        if value % 2 != 0 {
+            evening.borrow_mut().push(value);
+        }
+    }
+
+    let entries = morning.borrow();
+    let line: Vec<String> = entries.iter().map(|v| v.to_string()).collect();
+    println!("{}", line.join(" "));
+    println!("RC {}", Rc::strong_count(&morning));
+
+    let total: Box<i64> = Box::new(entries.iter().sum());
+    println!("BOX {}", *total);
+}
+'''
+hints = [
+  "Rc::clone(&handle) is the second handle. It is spelled that way rather than .clone() so a reader can see it is cheap.",
+  "borrow_mut() hands you a RefMut; hold two at once and the program panics at runtime instead of failing to compile. Let each one end at the end of its statement.",
+  "Rc::strong_count counts live handles, so it reads 2 while both are in scope.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",     stdin = "5\n1 2 3 4 5\n", expect = "2 4 1 3 5\nRC 2\nBOX 15\n", visible = true },
+  { name = "one-odd",   stdin = "1\n7\n",         expect = "7\nRC 2\nBOX 7\n",          visible = false },
+  { name = "all-even",  stdin = "2\n2 4\n",       expect = "2 4\nRC 2\nBOX 6\n",        visible = false },
+  { name = "negatives", stdin = "3\n-1 -2 0\n",   expect = "-2 0 -1\nRC 2\nBOX -3\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "rust.basic.17.testing"
+node        = 17
+title       = "PROVE IT YOURSELF"
+difficulty  = 3
+story       = "Nobody is going to check this for you at 06:40. The table is right there; make it green."
+concepts    = ["testing", "functions", "control-flow"]
+requires    = ["rust.basic.16.smart-pointers"]
+map          = { x = 0.719, y = 0.950, kind = "quest" }
+brief       = '''
+The program holds a table of four known-good `(km, fare)` pairs and checks
+`fare` against every one of them, printing `<name> ok` or
+`<name> FAIL got <g> want <w>`, then `PASSED <k>/4`. Finally it reads one
+distance from standard input and prints `FARE <x>`.
+
+`fare(km)` should be `500 + 100 * km`. The starter's is wrong, and the table
+catches it — which is the whole point.
+
+```
+input:  4
+output: zero ok
+        one ok
+        four ok
+        ten ok
+        PASSED 4/4
+        FARE 900
+```
+
+Do not touch the table; it is the specification. In a real crate it lives in a
+`#[cfg(test)] mod tests` and `cargo test` runs it. The table is the same
+either way — the harness is the only thing that changes, and a table you can
+read is worth more than a harness you cannot.
+'''
+starter     = '''
+use std::io::Read;
+
+fn fare(km: i64) -> i64 {
+    500 + 10 * km
+}
+
+const CASES: [(&str, i64, i64); 4] = [
+    ("zero", 0, 500),
+    ("one", 1, 600),
+    ("four", 4, 900),
+    ("ten", 10, 1500),
+];
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let km: i64 = input.trim().parse().unwrap();
+
+    let mut passed = 0;
+    for (name, arg, want) in CASES {
+        let got = fare(arg);
+        if got == want {
+            passed += 1;
+            println!("{} ok", name);
+        } else {
+            println!("{} FAIL got {} want {}", name, got, want);
+        }
+    }
+    println!("PASSED {}/{}", passed, CASES.len());
+    println!("FARE {}", fare(km));
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn fare(km: i64) -> i64 {
+    500 + 100 * km
+}
+
+const CASES: [(&str, i64, i64); 4] = [
+    ("zero", 0, 500),
+    ("one", 1, 600),
+    ("four", 4, 900),
+    ("ten", 10, 1500),
+];
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let km: i64 = input.trim().parse().unwrap();
+
+    let mut passed = 0;
+    for (name, arg, want) in CASES {
+        let got = fare(arg);
+        if got == want {
+            passed += 1;
+            println!("{} ok", name);
+        } else {
+            println!("{} FAIL got {} want {}", name, got, want);
+        }
+    }
+    println!("PASSED {}/{}", passed, CASES.len());
+    println!("FARE {}", fare(km));
+}
+'''
+hints = [
+  "The table is the specification. The function is the thing that is wrong.",
+  "Three of the four cases fail and the one that passes is km = 0, which is exactly why one test case proves nothing.",
+  "In a crate this is #[cfg(test)] mod tests with #[test] fn fares() and assert_eq!(fare(arg), want).",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4\n",  expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 900\n",  visible = true },
+  { name = "zero", stdin = "0\n",  expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 500\n",  visible = false },
+  { name = "long", stdin = "20\n", expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 2500\n", visible = false },
+  { name = "back", stdin = "-2\n", expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 300\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 18  BOSS
+[[quest]]
+id          = "rust.basic.18.traits"
+node        = 18
 title       = "THE AUTOCOMPLETE"
 difficulty  = 4
 story       = "The Percival Street phone kiosk finishes every line before you have one. It has no completion for a trait you named yourself."
 concepts    = ["traits", "structs", "smart-pointers", "pattern-matching"]
-requires    = ["rust.basic.11.iterators", "rust.basic.10.errors"]
-map         = { x = 0.91, y = 0.13, kind = "boss" }
+requires    = ["rust.basic.17.testing", "rust.basic.13.combinators"]
+map          = { x = 0.949, y = 0.868, kind = "boss" }
 brief       = '''
 Standard input is a count `n`, then `n` lines, each either
 

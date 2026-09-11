@@ -34,6 +34,7 @@ import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { clipped, fill, neonPrint, well, type Ctx, type Rect } from "../engine/ui";
+import { btnBox } from "../engine/ui";
 import { Buttons, footer, header, RUST, titledPanel } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { Overlay } from "../ui/overlay";
@@ -48,6 +49,7 @@ import {
   unlock,
 } from "../wallet/wallet";
 import { LandsScene } from "./lands";
+import { StoryScene } from "./story";
 
 /** The empty field's own instructions, restored whenever it is handed back. */
 const FIELD_HINT = "twelve words, or 0x + 64 hex";
@@ -55,6 +57,26 @@ const FIELD_HINT = "twelve words, or 0x + 64 hex";
 /** Why the gate is here, in the two lines it takes to say it. */
 const QUIZ_INTRO =
   "Read three back off the paper, in this order. There is no reset and nobody can send them to you again.";
+
+/**
+ * How many rows a set of labels wraps to inside `width`, at the same gap
+ * `Buttons.row` uses. Kept next to the one screen that needs it rather than in
+ * `chrome.ts`, because the answer depends on the exact label list.
+ */
+function rowsFor(f: { size: number; css: string; height: number }, width: number, labels: string[]) {
+  const gap = Math.round(f.size * 0.5);
+  let rows = 1;
+  let x = 0;
+  for (const label of labels) {
+    const [bw] = btnBox(f, [label], 0, f.size * 2, 0);
+    if (x > 0 && x + bw > width) {
+      rows++;
+      x = 0;
+    }
+    x += bw + gap;
+  }
+  return rows;
+}
 
 export class LoginScene implements Scene {
   readonly name = "login";
@@ -275,6 +297,7 @@ export class LoginScene implements Scene {
     this.app.chip.select();
     if (hit.id === "enter") void this.submit();
     if (hit.id === "new") this.mint();
+    if (hit.id === "story") void this.app.go(new StoryScene(this.app, true), "forward");
     if (hit.id === "keep") this.askBack();
     if (hit.id === "confirm") this.checkBack();
     if (hit.id === "again") this.showAgain();
@@ -429,8 +452,15 @@ export class LoginScene implements Scene {
     const pad = Math.round(10 * s);
     const fieldH = Math.max(fonts.small.height * 2.6, Math.round(78 * s));
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
-    // Two rows of buttons in portrait, where three across will not fit.
-    const btnRows = layout.isPortrait() ? 2 : 1;
+    // Measured, not guessed. `Buttons.row` wraps when a label will not fit, so
+    // the card has to be told how many rows that turns out to be — a card sized
+    // for one row and drawn with two puts its last button outside itself, which
+    // is the bug the quiz card already had.
+    const btnRows = rowsFor(
+      fonts.button,
+      w - Math.round(24 * s),
+      ["ENTER", "NEW WALLET", "STORY", "CLEAR"],
+    );
     const cardH =
       Math.round(30 * s) +
       fieldH +
@@ -464,6 +494,9 @@ export class LoginScene implements Scene {
       [
         { id: "enter", label: this.busy ? "…" : "ENTER", dim: this.busy, primary: !this.busy },
         { id: "new", label: "NEW WALLET" },
+        // The opening, on demand. It plays once at a cold boot and then gets
+        // out of the way; this is how somebody watches it again on purpose.
+        { id: "story", label: "STORY" },
         { id: "clear", label: "CLEAR" },
       ],
       layout.minTouchH(),

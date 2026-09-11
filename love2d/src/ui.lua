@@ -209,12 +209,27 @@ function UI.bar(x, y, w, h, fraction, color)
 end
 
 --- The status strip every screen carries along its bottom edge.
-function UI.footer(lines, connection)
+---
+--- Three zones: the scene's own hint on the left, the display keys in the
+--- middle, the connection on the right. The display keys live here rather
+--- than in each scene's hint string because they are global — they work on
+--- every screen, so they should be legible on every screen without each
+--- scene having to remember to say so.
+function UI.footer(lines, connection, display)
   local h = 22
   local y = Layout.vh - h
   UI.setColor(Theme.ink, 0.8)
   love.graphics.rectangle("fill", 0, y, Layout.vw, h)
   UI.text(lines or "", 10, y + 7, 8, Theme.withAlpha(Theme.cream, 0.85))
+  if display then
+    local w = UI.textWidth(display, 8)
+    local right = Layout.vw - 10 - (connection and (UI.textWidth("CONNECTING", 8) + 14) or 0)
+    -- Only when there is honest room; a hint that collides with the
+    -- connection badge is worse than one that is not there.
+    if right - w > UI.textWidth(lines or "", 8) + 24 then
+      UI.text(display, right - w, y + 7, 8, Theme.withAlpha(Theme.cream, 0.55))
+    end
+  end
   if connection then
     local color = Theme.dim
     if connection == "open" then color = Theme.admit

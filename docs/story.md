@@ -96,7 +96,7 @@ started at any time. Neither is a sequel to the other.
 | --- | --- | --- |
 | **BASIC** | the morning walk | Re-learning to read. Every node is a shopfront, a kiosk or a till whose code is a Skynet suggestion with nothing underneath it. Mei writes the underneath. |
 | **ADVANCED** | the lunch rush | 12:30. Two tills on one counter, riders on shared bikes, an MTR interchange. Nothing fails because it is hard; it fails because two of it happened at the same time. |
-| **HACKER** | the interview | HKU, Chow Yei Ching Building, a room with a clock on the wall. Skynet's last defence is the thing it convinced everyone they could no longer do without help: solve a stated problem, under time, alone. |
+| **HACKER** | the interview | HKU, Chow Yei Ching Building, a room with a clock on the wall. Twenty-four questions a real interview draws from — hashing, windows, trees, heaps, backtracking, graphs, DP, bits — worked alone, under time. Skynet's last defence is the thing it convinced everyone they could no longer do without help: solve a stated problem, under time, alone. |
 
 `BASIC` is untimed on purpose — the point is reading, not speed. `HACKER`
 carries `time_limit_s`, because the clock is the antagonist of that road.
@@ -109,12 +109,12 @@ One per map, always the last node, `map.kind = "boss"`.
 
 | map | node | boss | what it is |
 | --- | --- | --- | --- |
-| `rust.basic` | 12 | **THE AUTOCOMPLETE** | The ghost text itself, at the Percival Street phone kiosk. It finishes every line before Mei has one. Beaten by writing something it has no completion for: a trait she named herself. |
-| `rust.advanced` | 10 | **DEADLOCK** | Under Times Square, in the plant room. Two locks, two threads, and the escalators stopped. Beaten by ordering. |
-| `rust.hacker` | 8 | **THE WHITEBOARD** | Room 7-32, HKU. No syntax highlighting, no completion, a clock. |
-| `go.basic` | 12 | **NULLPTR** | Lucky Mac's front till at 11:55. Every order goes through and none of them exist. |
-| `go.advanced` | 10 | **THE RACE** | Causeway Bay interchange, platform 2. Two counters, one number, and the number is wrong by an amount nobody can reproduce. |
-| `go.hacker` | 8 | **THE CLOCK** | The second interview. Same room, and this time the clock is shorter. |
+| `rust.basic` | 18 | **THE AUTOCOMPLETE** | The ghost text itself, at the Percival Street phone kiosk. It finishes every line before Mei has one. Beaten by writing something it has no completion for: a trait she named herself. |
+| `rust.advanced` | 16 | **DEADLOCK** | Under Times Square, in the plant room. Two locks, two threads, and the escalators stopped. Beaten by ordering. |
+| `rust.hacker` | 24 | **THE WHITEBOARD** | Room 7-32, HKU. No syntax highlighting, no completion, a clock — and a cache that has to evict the right thing. |
+| `go.basic` | 18 | **NULLPTR** | Lucky Mac's front till at 11:55. Every order goes through and none of them exist. |
+| `go.advanced` | 16 | **THE RACE** | Causeway Bay interchange, platform 2. Two counters, one number, and the number is wrong by an amount nobody can reproduce. |
+| `go.hacker` | 24 | **THE CLOCK** | The second interview. Same room, and this time the clock is shorter. |
 
 A boss node is a quest like any other — harder, `difficulty` 4–5, and the story
 line is the only thing that says it is a boss. There is no separate boss

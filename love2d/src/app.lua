@@ -232,6 +232,20 @@ function App:wheelmoved(dx, dy)
   if self.scene and self.scene.wheelmoved then self.scene:wheelmoved(dx, dy) end
 end
 
+--- True when the current screen is taking text, so a bare letter key must
+--- not be stolen for a global shortcut.
+---
+--- The quest screen is always typing (the editor has focus by default and a
+--- letter belongs to the program); the login screen is typing whenever its
+--- fields are live. Everything else is navigation, where `F` is free.
+function App:typing()
+  local scene = self.scene
+  if not scene then return false end
+  if self.scene_name == "quest" then return true end
+  if self.scene_name == "login" then return self.wallet_lib ~= nil end
+  return false
+end
+
 --- The status strip, drawn by every scene so the connection is never a
 --- mystery.
 function App:footer(hint)
@@ -239,7 +253,9 @@ function App:footer(hint)
   if self.session and self.session.authed then
     left = ("%s  %s   %s"):format(self.session:display_name(), self.session:short_address(), left)
   end
-  UI.footer(left, self.client and self.client.state or "idle")
+  local display = ("F %s   F1 %s"):format(
+    Layout.fullscreen and "WINDOW" or "FULL", Layout.orientationLabel():upper())
+  UI.footer(left, self.client and self.client.state or "idle", display)
 end
 
 return App

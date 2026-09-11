@@ -155,12 +155,17 @@ without touching content. Six layouts exist today:
 
 | pack | nodes | shape |
 | --- | --- | --- |
-| `rust.basic` | 12 | bottom-left up to top-right, an S with a fold back through the middle |
-| `rust.advanced` | 10 | a zigzag along the top, then a long descent to the boss bottom-left |
-| `rust.hacker` | 8 | a climb up the right |
-| `go.basic` | 12 | right to left along the top, then down the left side |
-| `go.advanced` | 10 | right to left, then a sweep down to bottom-right |
-| `go.hacker` | 8 | bottom-right up to top-left |
+| `rust.basic` | 18 | three rows, serpentine, left to right and back |
+| `rust.advanced` | 16 | three rows, serpentine |
+| `rust.hacker` | 24 | four rows, serpentine, boss bottom-left |
+| `go.basic` | 18 | three rows, serpentine, mirrored from Rust Land |
+| `go.advanced` | 16 | three rows, serpentine, mirrored |
+| `go.hacker` | 24 | four rows, serpentine, mirrored |
+
+Every layout is generated and then checked against the same rules the content
+verifier enforces: inside `0..1`, no two nodes closer than `0.06`, real spread
+on both axes, and a direction change at more than half the interior nodes — so
+the path winds rather than queueing. The 24-node maps turn 22 times.
 
 The path between nodes is drawn by the engine, not painted into the plate —
 three.js carries the parallax layers and the effects (SPEC §10) and the path is

@@ -40,16 +40,31 @@ database, the build caches.
 
 ```bash
 make dev        # server on :5390, frontend with hot reload
+make start      # server on :5390, serving the built frontend, reachable from your devices
+make remote     # the addresses a phone can use
 make test       # everything
 make help       # the rest
 ```
 
 Needs Rust, Go and Node. `make doctor` says which of them it cannot find.
 
-> ⚠️ **This is a local, single-trusted-user trainer, not a sandbox.** It
-> compiles and runs the code you type, on your machine, as you, with a timeout
-> and an output cap and not much else. Do not expose the port to a network, and
-> do not paste in code you would not run in your own shell.
+**From a phone, use port 5390 — not the dev server's 5291.** The page and the
+websocket have to share an origin: the built bundle derives the socket from the
+address it was loaded from, so it works from anywhere. The vite dev server is
+pinned to `127.0.0.1`, which on a phone means the *phone's* own loopback, and
+fails. `make start` builds `frontend/dist` if it is missing, so the
+one-origin path is always the one on offer, and prints the addresses on the way
+up. `make remote` prints them again.
+
+> ⚠️ **This is a single-trusted-user trainer, not a sandbox.** It compiles and
+> runs the code that is typed into it, on this machine, as you, with a timeout
+> and an output cap and not much else. Since you asked to play it on your phone,
+> it listens on every interface — so anything that can reach port 5390 can run
+> code here. A tailnet is your own devices and that is the point. A café
+> network, a hotel, a shared office VLAN is not: `make start LOCAL=1` pins it
+> back to loopback, and `make start` and `make remote` both print exactly which
+> addresses are live so you never have to guess. And do not paste in code you
+> would not run in your own shell — the trainer will run it.
 
 ## The parts
 

@@ -13,6 +13,7 @@ import { css, Theme } from "../engine/theme";
 import { neonPrint, type Ctx } from "../engine/ui";
 import { LandsScene } from "./lands";
 import { LoginScene } from "./login";
+import { StoryScene } from "./story";
 
 export class BootScene implements Scene {
   readonly name = "boot";
@@ -50,6 +51,9 @@ export class BootScene implements Scene {
     try {
       await this.app.client.waitFor("open");
     } catch {
+      // Straight to login, not to the story. Somebody whose server is not
+      // running has a problem to see, and a two-minute attract sequence in
+      // front of the message telling them about it is the wrong order.
       this.app.say("no server — check that it is running on :5390");
       return void this.app.go(new LoginScene(this.app), "none");
     }
@@ -67,7 +71,11 @@ export class BootScene implements Scene {
         this.app.client.forgetToken();
       }
     }
-    void this.app.go(new LoginScene(this.app), "none");
+    // Nobody is logged in and nobody is being resumed: this is a cold start at
+    // the front of the game, which is exactly where an attract sequence goes.
+    // Any key or click inside it goes straight to the login screen, so the cost
+    // to a player who has seen it is one keystroke.
+    void this.app.go(new StoryScene(this.app), "none");
   }
 
   update(dt: number): void {

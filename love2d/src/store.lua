@@ -8,7 +8,7 @@
 -- on macOS):
 --
 --   session.json   { token, address, name, server }
---   display.json   { mode, fullscreen }
+--   display.json   { mode, pinned, fullscreen }
 --
 -- `address` and `name` are here so the login screen can say "resume as Mei"
 -- rather than an opaque token, and because the address is public by
@@ -147,8 +147,15 @@ function Store.load_display()
   return read(DISPLAY)
 end
 
+--- `pinned` is written alongside `mode`, and it is the field that matters:
+--- without it a restored mode cannot be told from a chosen one, and the
+--- client can never re-derive an orientation again. See `src/layout.lua`.
 function Store.save_display(record)
-  return write(DISPLAY, { mode = record.mode, fullscreen = record.fullscreen })
+  return write(DISPLAY, {
+    mode = record.mode,
+    pinned = record.pinned and true or false,
+    fullscreen = record.fullscreen,
+  })
 end
 
 --- Where the save directory is, for the footer and for a bug report.

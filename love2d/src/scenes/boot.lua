@@ -58,7 +58,7 @@ function Boot:draw()
   UI.text(line:upper() .. "  " .. self.app.server, 0, h * 0.62,
     math.floor(10 * s), Theme.withAlpha(Theme.cream, pulse), "center", w)
 
-  self.app:footer("F1 orientation   F11 fullscreen")
+  self.app:footer("ENTER sign in")
 end
 
 function Boot:keypressed(key)

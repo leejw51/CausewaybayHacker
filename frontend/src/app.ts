@@ -144,8 +144,7 @@ export class App {
     this.g = ctx;
     this.backdrop = Backdrop.create(fx);
 
-    const saved = localStorage.getItem(ORIENT_KEY);
-    if (saved === "portrait" || saved === "landscape") this.layout.pin(saved as Orientation);
+    this.restoreOrientation();
     try {
       this.crt.enabled = localStorage.getItem(CRT_KEY) !== "off";
     } catch {
@@ -442,11 +441,16 @@ export class App {
     g.setTransform(1, 0, 0, 1, 0, 0);
     const w = dw - ox * 2;
     const h = dh - oy * 2;
-    const reach = Math.max(24, Math.min(ox || dw, oy || dh) * 0.9);
+    // Per axis. One `reach` taken from the smaller of the two offsets meant
+    // that a window with a two-pixel side band and a four-hundred-pixel top
+    // band treated the top band with a two-pixel gradient, which is no
+    // treatment at all — the case a column-shaped window lands in.
+    const reachX = Math.max(24, ox * 0.9);
+    const reachY = Math.max(24, oy * 0.9);
     if (ox > 0) {
       for (const [x0, x1, x, wide] of [
-        [ox, ox - reach, 0, ox],
-        [dw - ox, dw - ox + reach, dw - ox, ox],
+        [ox, ox - reachX, 0, ox],
+        [dw - ox, dw - ox + reachX, dw - ox, ox],
       ] as const) {
         const grad = g.createLinearGradient(x0, 0, x1, 0);
         grad.addColorStop(0, "rgba(20,28,72,0.35)");
@@ -457,8 +461,8 @@ export class App {
     }
     if (oy > 0) {
       for (const [y0, y1, y, tall] of [
-        [oy, oy - reach, 0, oy],
-        [dh - oy, dh - oy + reach, dh - oy, oy],
+        [oy, oy - reachY, 0, oy],
+        [dh - oy, dh - oy + reachY, dh - oy, oy],
       ] as const) {
         const grad = g.createLinearGradient(0, y0, 0, y1);
         grad.addColorStop(0, "rgba(20,28,72,0.35)");
@@ -508,9 +512,45 @@ export class App {
   }
 
   setOrientation(mode: Orientation): void {
-    this.layout.pin(mode);
-    localStorage.setItem(ORIENT_KEY, mode);
+    this.layout.pin(mode, null);
     this.remeasure();
+    this.saveOrientation();
+  }
+
+  /**
+   * Read back the saved orientation, and the window it was chosen in.
+   *
+   * The shape is the whole point. A preference with no shape attached is what
+   * put the landscape layout into a window 1080 wide and 1730 tall and left
+   * nearly half of it empty: the choice outlived the window it was an answer
+   * to. Stored as `mode,w,h`; the older bare `portrait`/`landscape` still
+   * loads, and loses to the first window that decisively disagrees with it.
+   */
+  private restoreOrientation(): void {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(ORIENT_KEY);
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    const [mode, w, h] = raw.split(",");
+    if (mode !== "portrait" && mode !== "landscape") return;
+    const shape: [number, number] | null =
+      w && h && Number.isFinite(+w) && Number.isFinite(+h) ? [+w, +h] : null;
+    this.layout.pin(mode as Orientation, shape);
+  }
+
+  private saveOrientation(): void {
+    try {
+      const [w, h] = this.layout.choiceShape;
+      localStorage.setItem(
+        ORIENT_KEY,
+        `${this.layout.isPortrait() ? "portrait" : "landscape"},${w},${h}`,
+      );
+    } catch {
+      /* the choice still holds for this session */
+    }
   }
 
   // -- the session ---------------------------------------------------------
@@ -724,8 +764,8 @@ export class App {
       if (name === "f1") {
         ev.preventDefault();
         this.layout.toggleOrientation();
-        localStorage.setItem(ORIENT_KEY, this.layout.isPortrait() ? "portrait" : "landscape");
         this.remeasure();
+        this.saveOrientation();
         this.say(`orientation: ${this.layout.isPortrait() ? "portrait" : "landscape"}`);
         return;
       }

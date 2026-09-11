@@ -12,6 +12,7 @@ import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { fill, type Ctx, type Rect } from "../engine/ui";
 import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import { reducedMotion } from "../engine/motion";
 import { Chase, seconds, Tween } from "../engine/motion";
 import type { Category, CategorySummary, Land, Responses } from "../net/protocol";
 import { MapScene } from "./map";
@@ -19,6 +20,21 @@ import { MapScene } from "./map";
 type Lands = Responses["world.lands"]["lands"];
 
 const NPC: Record<Land, string> = { rust: "sprite_ferris", go: "sprite_gogo" };
+
+/**
+ * The neon row's frame grid.
+ *
+ * Six signs across a 512x256 sheet at 85 wide — measured and recorded in
+ * `art/palette.json`, which also carries each sign's tube/face colour pair and
+ * its hue. None of that colour data is needed here, and that is the point: the
+ * six signs are the same shape in six hues, so *rotating which frame is drawn
+ * in which slot is a hue rotation*. That is palette cycling as the hardware did
+ * it — indices moving under fixed pixels — rather than six tinted copies of one
+ * texture, which is what it would cost to do it the modern way.
+ */
+const NEON = { frames: 6, fw: 85, fh: 256 };
+/** Seconds per index step. A rate, so reduced motion stops it. */
+const NEON_STEP = 0.9;
 const BLURB: Record<Land, string> = {
   rust: "Ownership, borrows, lifetimes. The craft you had before the machine wrote it for you.",
   go: "Goroutines, channels, the small language that fits in a head.",
@@ -58,14 +74,39 @@ export class LandsScene implements Scene {
     const fonts = ensureFonts(s);
     const accent = land === "rust" ? RUST : GO;
     const inner = titledPanel(g, rect, land.toUpperCase(), chosen ? accent : Theme.dim);
+    const rec = this.record(land);
     if (!chosen) {
+      // A closed plate is still a *land*, not an empty box with an instruction
+      // in the middle of it. It keeps its mascot, its record and its colour —
+      // everything except the sentence — so the two plates read as two places
+      // of which one is open, which is what they are.
+      const sprite = this.app.assets?.picture(NPC[land]);
+      const footH = fonts.stationSm.height + Math.round(10 * s);
+      const room = inner[3] - footH;
+      if (sprite && room > 16) {
+        const box = this.app.assets?.box.get(NPC[land]);
+        const hh = Math.min(room, inner[2] * 0.46);
+        const sc = hh / sprite.naturalHeight;
+        const ww = sprite.naturalWidth * sc;
+        const feet = box ? box.feet * sc : hh;
+        g.save();
+        g.globalAlpha = 0.68;
+        g.drawImage(
+          sprite,
+          inner[0] + (inner[2] - ww) / 2,
+          inner[1] + (room - feet) + Math.sin(this.t * 2.2) * 2 * s,
+          ww,
+          hh,
+        );
+        g.restore();
+      }
       g.fillStyle = css(Theme.dim);
       printf(
         g,
-        fonts.small,
-        "press to switch",
+        fonts.stationSm,
+        rec.total > 0 ? `${rec.cleared}/${rec.total}  ★${rec.stars}` : "PRESS TO SWITCH",
         inner[0],
-        inner[1] + Math.round((inner[3] - fonts.small.height) / 2),
+        inner[1] + inner[3] - fonts.stationSm.height,
         inner[2],
         "center",
       );
@@ -91,6 +132,88 @@ export class LandsScene implements Scene {
 
     g.fillStyle = css(Theme.cream);
     printf(g, fonts.small, BLURB[land], inner[0], blurbY, inner[2], "center");
+  }
+
+  /** One land's totals, added up off the server's own category rows. */
+  private record(land: Land): { cleared: number; total: number; stars: number } {
+    const row = this.lands.find((l) => l.land === land);
+    const out = { cleared: 0, total: 0, stars: 0 };
+    for (const c of row?.categories ?? []) {
+      out.cleared += c.cleared;
+      out.total += c.total;
+      out.stars += c.stars;
+    }
+    return out;
+  }
+
+  /**
+   * The night-market strip across the top of the right column.
+   *
+   * This corner of the screen was empty, and an empty corner on the screen
+   * where the game asks its one real question reads as unfinished. It is not
+   * filled with another panel: it is filled with the street the land is made
+   * of, plus the one fact a player coming back to this screen wants, which is
+   * how far into it they are.
+   */
+  private drawNeon(g: Ctx, rect: Rect, land: Land): void {
+    const s = this.app.layout.uiScale();
+    const fonts = ensureFonts(s);
+    const [x, yTop, w, hAvail] = rect;
+    const accent = land === "rust" ? RUST : GO;
+    const sheet = this.app.assets?.picture("neon_signs");
+    const barH = fonts.stationSm.height + Math.round(10 * s);
+    const signH = Math.min(hAvail - barH - Math.round(18 * s), Math.round(118 * s));
+    // The strip takes only the room it uses and sits on top of the category
+    // panel. Whatever is left above it is left as the city, which is the best
+    // thing on this screen and was being covered by a scrim for no reason.
+    const h = Math.round(14 * s) + signH + Math.round(8 * s) + barH;
+    const y = yTop + hAvail - h;
+    // A scrim, not a box.
+    fill(g, Theme.ink, x, y, w, h, 0.3);
+    // The rail the signs hang from.
+    fill(g, Theme.ink, x, y + Math.round(6 * s), w, Math.round(3 * s), 0.9);
+
+    if (sheet && signH > 12) {
+      const sw = Math.round((signH * NEON.fw) / NEON.fh);
+      const gap = Math.round(18 * s);
+      const fit = Math.max(1, Math.min(NEON.frames, Math.floor((w - gap) / (sw + gap))));
+      // The rotation. Indices move, pixels do not.
+      const step = reducedMotion() ? 0 : Math.floor(this.t / NEON_STEP);
+      const left = x + Math.round((w - (fit * (sw + gap) - gap)) / 2);
+      for (let j = 0; j < fit; j++) {
+        const frame = (j + step) % NEON.frames;
+        // Each sign hangs a little differently, so the row is a street and not
+        // a toolbar. The offsets are fixed, not random: a screenshot of this
+        // screen has to be the same screenshot twice.
+        const drop = [0, 3, 1, 4, 2, 5][j % 6] * Math.round(3 * s);
+        const sx = left + j * (sw + gap);
+        const sy = y + Math.round(8 * s) + drop;
+        // The bracket, so a sign is hung on the rail rather than floating.
+        fill(g, Theme.ink, sx + sw / 2 - 1, y + Math.round(6 * s), 2, drop + Math.round(4 * s));
+        g.drawImage(sheet, frame * NEON.fw, 0, NEON.fw, NEON.fh, sx, sy, sw, signH);
+      }
+    }
+
+    const rec = this.record(land);
+    const by = y + h - barH;
+    fill(g, Theme.navy, x, by, w, barH, 0.9);
+    fill(g, accent, x, by, Math.round(3 * s), barH);
+    g.fillStyle = css(Theme.cream);
+    printf(
+      g,
+      fonts.stationSm,
+      rec.total > 0
+        ? `${land.toUpperCase()}  ${rec.cleared}/${rec.total} CLEARED  ★${rec.stars}`
+        : `${land.toUpperCase()}`,
+      x + Math.round(10 * s),
+      by + Math.round(5 * s),
+      w - Math.round(20 * s),
+      "left",
+    );
+    if (rec.total > 0) {
+      const bw = Math.round((w - Math.round(20 * s)) * (rec.cleared / rec.total));
+      fill(g, Theme.admit, x, by + barH - 2, bw, 2);
+    }
   }
 
   async enter(): Promise<void> {
@@ -213,15 +336,28 @@ export class LandsScene implements Scene {
             open: false,
           }));
 
-      const rowH = Math.max(layout.minTouchH(), Math.round(fonts.button.height + 52 * s));
       const gap = Math.round(8 * s);
       // Sized to the three rows it holds, then centred in the space — a box
       // stretched to the viewport with its contents at the top reads as
       // unfinished, which is what this screen read as.
       const titleH = fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9) + 16;
-      const needed = titleH + cats.length * (rowH + gap) + Math.round(18 * s);
-      const panelH = Math.min(f.right[3], needed);
-      const panelY = f.right[1] + Math.round((f.right[3] - panelH) / 2);
+      const minRowH = Math.max(layout.minTouchH(), Math.round(fonts.button.height + 52 * s));
+      const needed = titleH + cats.length * (minRowH + gap) + Math.round(18 * s);
+      // The column is filled by two things and nothing is left over: a band of
+      // street across the top, and the categories under it taking the rest.
+      // In portrait the column is nearly twice as tall as the rows need, and
+      // the previous answer — size the panel to its contents and centre it —
+      // left three hundred pixels of navy in the middle of the screen.
+      const band = Math.max(0, Math.min(Math.round(190 * s), f.right[3] - needed - gap));
+      const panelH = f.right[3] - (band > 0 ? band + gap : 0);
+      const panelY = f.right[1] + f.right[3] - panelH;
+      const rowH = Math.max(
+        minRowH,
+        Math.floor((panelH - titleH - Math.round(18 * s)) / cats.length) - gap,
+      );
+      if (band > Math.round(54 * s)) {
+        this.drawNeon(g, [f.right[0], f.right[1], f.right[2], band], this.land);
+      }
       const right = titledPanel(
         g,
         [f.right[0], panelY, f.right[2], panelH],
@@ -278,7 +414,7 @@ export class LandsScene implements Scene {
           fonts.small,
           this.error,
           f.right[0],
-          panelY + panelH + Math.round(8 * s),
+          f.right[1] + Math.round(8 * s),
           f.right[2],
           "center",
         );

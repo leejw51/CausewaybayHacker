@@ -1561,3 +1561,84 @@ fresh wallet.
 
 **README needs amending** — it currently says "do not expose the port to a
 network", which is no longer the default. PM owns it.
+
+## 2026-09-11 — PM: the packs grew to interview scale, and the bosses were renumbered
+
+The content brief sharpened to *cover coding-interview preparation for Go and
+Rust*. An audit of the first 60 found `hacker` covering roughly 8 of the ~19
+topics an interview actually draws from — no linked lists, trees, tries,
+heaps-as-heaps, backtracking, graph algorithms beyond flood fill, DP beyond
+coins, bit manipulation, matrix work or prefix sums.
+
+The six packs are now **116 quests**: 18 + 18 `basic`, 16 + 16 `advanced`,
+24 + 24 `hacker`.
+
+**Quest ids changed for four bosses.** SPEC §12 requires the id's number to
+equal `node`, and each map's boss has to stay last, so lengthening a map moves
+it:
+
+| was | is |
+| --- | --- |
+| `rust.basic.12.traits` | `rust.basic.18.traits` |
+| `go.basic.12.nil-and-order` | `go.basic.18.nil-and-order` |
+| `rust.advanced.10.deadlock` | `rust.advanced.16.deadlock` |
+| `go.advanced.10.race` | `go.advanced.16.race` |
+
+Their slugs — and so their meaning — are unchanged, and no other id moved.
+SPEC §4.1 allows a node to move while its id stays put, but §12's rule that
+the id must match `<node:02d>` is the one the importer enforces, and the two
+cannot both hold. Renumbering is free right now because nothing has been
+played; it would not be free after release, and at that point §4.1 wins and
+the id freezes. **BE and QA: the four ids above changed.**
+
+The two `hacker` packs kept every id. Their old node 8 simply stopped being a
+boss — `rust.hacker.08.top-k` and `go.hacker.08.kth-largest` are ordinary
+quests now, and THE WHITEBOARD / THE CLOCK moved to the new node 24, both LRU
+caches.
+
+**Vocabulary: 38 → 58 slugs.** Nineteen algorithm and language slugs added
+(`trees`, `tries`, `heaps`, `backtracking`, `disjoint-set`, `bit-manipulation`,
+`matrix`, `math`, `prefix-sums`, `greedy`, `recursion`, `linked-lists`,
+`async`, `dispatch`, `thread-safety`, `testing`, `panics`, `zero-values`,
+`serialization`, `interior-mutability`). Two rules are now mechanical rather
+than aspirational, and `--complete` fails the run on either:
+
+1. every slug is used by at least one shipped quest;
+2. every slug is named by at least one §7.1 mistake-kind row, or the
+   `weakness` drill cannot reach it.
+
+Rule 2 forced the `wrong-answer` and `timeout` rows to grow, and the split is
+deliberate: `wrong-answer` reaches the *structure* concepts (trees, linked
+lists, recursion, backtracking, matrix, bits), `timeout` reaches the concepts
+whose whole job is making something cheaper (heaps, prefix sums, binary
+search, hashing, DP). A player who keeps timing out should be handed heaps,
+not more tree traversals.
+
+**Two verifier checks added**, both of which caught real bugs in this round:
+
+* **The brief's worked example must match a visible case.** `rust.hacker.24`
+  shipped a brief whose sample output contradicted its own test, which would
+  have read to a player as the quest being broken. Nothing else in the
+  pipeline can see that class of error.
+* **`--complete`**, above.
+
+Four expectations in this round were wrong when first written and were caught
+by running them, not by reading them: an `edit-distance` case, a `trie` node
+count, a `prefix-sums` count, and a `knapsack` sample whose greedy answer
+happened to equal the optimal one — which would have made the quest teach the
+opposite of its point. That is the argument for SPEC §9.4 being CI and not a
+review step.
+
+*Owner to apply: BE (four boss ids), QA (four boss ids in any fixture).*
+
+## 2026-09-11 — PM: README amended for the 0.0.0.0 bind
+
+The warning paragraph said "do not expose the port to a network", which stopped
+being true when `make start` began binding `0.0.0.0` so a phone on the tailnet
+could play. Rewritten to say what is now true and still be worth reading: the
+trainer runs submitted code on this machine as you; it listens on every
+interface; a tailnet is your own devices and a café network is not;
+`make start LOCAL=1` closes it; `make start` and `make remote` print what is
+live. The run section also now says plainly that a phone uses **5390**, not the
+dev server's 5291, and why — the page and the websocket have to share an
+origin.

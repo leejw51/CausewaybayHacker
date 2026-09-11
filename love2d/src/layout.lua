@@ -25,7 +25,13 @@ local Theme = require("src.theme")
 
 local Layout = {
   mode = "landscape",
+  --- True only when the *player* chose this orientation — F1, or CWBH_ORIENT.
+  --- False means the mode was inferred from the window's shape and should be
+  --- inferred again the next time that shape changes. See `orientationFor`.
+  pinned = false,
   fullscreen = false,
+  --- Overrides CWBH_FULLSCREEN when set. "desktop" | "exclusive".
+  fullscreenPref = nil,
   pendingWindow = false,
   vw = Theme.landW,
   vh = Theme.landH,
@@ -41,6 +47,33 @@ local Layout = {
 -- Extra virtual pixels allowed past the design size so fullscreen does not
 -- sit in a tiny letterbox.
 local MAX_STRETCH = 1.5
+
+local FULLSCREEN_TYPES = { desktop = true, exclusive = true }
+
+--- `desktop` or `exclusive`.
+---
+--- **`desktop` by default, deliberately.** `exclusive` changes the display
+--- mode, and a player who ends up in it at the wrong resolution — or whose
+--- game exits badly while in it — is left with a rearranged desktop. The
+--- override exists for anyone who wants the real thing, and matches the
+--- sibling's `GOSET_FULLSCREEN` (`CausewaybayGolang/love2d/src/layout.lua`).
+function Layout.fullscreenType()
+  local want = tostring(Layout.fullscreenPref or os.getenv("CWBH_FULLSCREEN") or ""):lower()
+  if FULLSCREEN_TYPES[want] then return want end
+  return "desktop"
+end
+
+--- Which orientation a window of `w x h` wants, when the player has not
+--- pinned one.
+---
+--- A pure function, so the rule can be asserted without a window. Square-ish
+--- windows keep landscape: the authored 1280x720 layout is the one every
+--- screen was drawn against, and flipping to portrait at 1.01:1 would make a
+--- slow drag of a window border thrash the whole UI.
+function Layout.orientationFor(w, h)
+  if not w or not h or w < 1 or h < 1 then return "landscape" end
+  return (h > w * 1.05) and "portrait" or "landscape"
+end
 
 local function highdpi()
   return true
@@ -62,6 +95,11 @@ local function windowedFlags()
   return {
     fullscreen = false,
     fullscreentype = "desktop",
+    -- Resizable **even when this is used for a fullscreen window**. SDL only
+    -- puts a resizable window into a native macOS fullscreen Space; a
+    -- fixed-size one falls back to legacy fullscreen at
+    -- CGShieldingWindowLevel, which paints over the Shift-Command-5 capture
+    -- UI and hides it. (`CausewaybayRaiden/love2d/src/display.lua`.)
     resizable = true,
     vsync = vsync(),
     msaa = 0,
@@ -84,21 +122,32 @@ local function fitWindow(wantW, wantH)
 end
 
 function Layout.applyWindow()
+  -- A window change while a canvas is bound throws that canvas away
+  -- mid-draw, so unbind first. `Layout.flush` normally keeps this off the
+  -- draw path entirely.
   if love.graphics.getCanvas() then
     love.graphics.setCanvas()
   end
   if Layout.fullscreen then
-    local dw, dh = love.window.getDesktopDimensions()
+    local want = Layout.fullscreenType()
     local _, _, cur = love.window.getMode()
-    if not (cur.fullscreen and cur.fullscreentype == "desktop") then
-      love.window.setMode(dw, dh, {
-        fullscreen = true,
-        fullscreentype = "desktop",
-        vsync = vsync(),
-        msaa = 0,
-        highdpi = highdpi(),
-        resizable = false,
-      })
+    if not (cur.fullscreen and cur.fullscreentype == want) then
+      if love.window.isOpen() then
+        -- `setFullscreen`, not `setMode`. Two reasons, both from
+        -- `CausewaybayRaiden/love2d/src/display.lua`:
+        --
+        --   * `setMode` can recreate the window, which on macOS drops it out
+        --     of its native fullscreen Space and back to legacy fullscreen;
+        --   * `setFullscreen` keeps the window and its flags, so the Space
+        --     — and the player's other windows — stay where they were.
+        love.window.setFullscreen(true, want)
+      else
+        local dw, dh = love.window.getDesktopDimensions()
+        local flags = windowedFlags()
+        flags.fullscreen = true
+        flags.fullscreentype = want
+        love.window.setMode(dw, dh, flags)
+      end
     end
   else
     local w, h
@@ -108,10 +157,20 @@ function Layout.applyWindow()
       w, h = fitWindow(Theme.landW, Theme.landH)
     end
     local cw, ch, cur = love.window.getMode()
-    if cur.fullscreen or math.abs(cw - w) > 8 or math.abs(ch - h) > 8 then
+    if cur.fullscreen then
+      -- Leaving fullscreen the same way it was entered, so the Space closes
+      -- rather than the window being replaced underneath it.
+      love.window.setFullscreen(false)
+      cw, ch = love.window.getMode()
+    end
+    if math.abs(cw - w) > 8 or math.abs(ch - h) > 8 then
       love.window.setMode(w, h, windowedFlags())
     end
   end
+  -- `love.resize` is not guaranteed to fire after `setMode`/`setFullscreen`
+  -- (Raiden's `display.lua` says the same), so the viewport is re-measured
+  -- here rather than waited for. `Layout.begin` re-measures every frame too,
+  -- which covers the frames drawn during the macOS fullscreen animation.
   Layout.updateViewport()
 end
 
@@ -125,7 +184,15 @@ end
 
 function Layout.save()
   if Layout.storage and Layout.storage.save then
-    Layout.storage.save({ mode = Layout.mode, fullscreen = Layout.fullscreen })
+    Layout.storage.save({
+      mode = Layout.mode,
+      -- **Persisted, and this is the point.** Without it, a mode restored
+      -- from disk is indistinguishable from one the player pressed, and the
+      -- client can never re-evaluate the orientation again for the life of
+      -- the install. See `Layout.load`.
+      pinned = Layout.pinned,
+      fullscreen = Layout.fullscreen,
+    })
   end
 end
 
@@ -138,6 +205,17 @@ function Layout.load()
     Layout.mode = rec.mode
     applied = true
   end
+  -- A restored *pin* is as strong as a pressed one — that is what a pin
+  -- means. A restored *inference* is not a pin at all, and must be inferred
+  -- again from whatever shape the window has this time.
+  --
+  -- Treating the two the same is the bug the browser client hit: a landscape
+  -- that was merely inferred once, saved, and then restored as though the
+  -- player had insisted on it, surviving into a window shaped like a
+  -- portrait and never re-evaluating. A record written before this field
+  -- existed has no `pinned`, and is read as "not pinned" — the safe side,
+  -- because an unpinned mode is re-derived and a wrongly-pinned one is not.
+  Layout.pinned = rec.pinned == true
   if type(rec.fullscreen) == "boolean" then
     Layout.fullscreen = rec.fullscreen
     applied = true
@@ -145,23 +223,86 @@ function Layout.load()
   return applied
 end
 
+--- F / F11. Returns the new state, for the caller's toast.
+---
+--- The transition touches nothing but this module: no scene is rebuilt, no
+--- buffer is reloaded, no request is re-sent. A toggle that lost the source
+--- a player had half-written would be worse than having no toggle.
 function Layout.toggleFullscreen()
-  Layout.fullscreen = not Layout.fullscreen
+  Layout.setFullscreen(not Layout.fullscreen)
+  return Layout.fullscreen
+end
+
+function Layout.setFullscreen(on)
+  on = on and true or false
+  if Layout.fullscreen == on then return end
+  Layout.fullscreen = on
   Layout.pendingWindow = true
   Layout.save()
 end
 
-function Layout.toggleOrientation()
-  Layout.setOrientation(Layout.mode == "landscape" and "portrait" or "landscape")
+--- F1 cycles: landscape (pinned) -> portrait (pinned) -> automatic.
+---
+--- Three states rather than two, because "automatic" has to be reachable.
+--- Once a player has pressed F1 even once, a two-way toggle leaves them
+--- pinned forever with no way back to the behaviour they started with — and
+--- in fullscreen, where the window's shape is the display's and not theirs,
+--- automatic is usually the right answer.
+---
+--- Returns a short label for the caller's toast.
+function Layout.cycleOrientation()
+  if not Layout.pinned then
+    Layout.setOrientation("landscape", true)
+    return "landscape"
+  end
+  if Layout.mode == "landscape" then
+    Layout.setOrientation("portrait", true)
+    return "portrait"
+  end
+  Layout.unpinOrientation()
+  return "automatic"
 end
 
-function Layout.setOrientation(mode)
+--- The old two-way toggle, kept because the drive scripts and the tests ask
+--- for a specific orientation by name rather than by counting presses.
+function Layout.toggleOrientation()
+  Layout.setOrientation(Layout.mode == "landscape" and "portrait" or "landscape", true)
+end
+
+--- `pin` defaults to true: anything that names an orientation is a choice.
+--- `updateViewport` passes false when it is only inferring one.
+function Layout.setOrientation(mode, pin)
   if mode ~= "portrait" and mode ~= "landscape" then return end
-  if Layout.mode == mode then return end
+  if pin ~= false then Layout.pinned = true end
+  if Layout.mode == mode then
+    Layout.save()
+    return
+  end
   Layout.mode = mode
   Layout.pendingWindow = true
   Layout.save()
   if Layout.on_change then Layout.on_change(mode) end
+end
+
+--- Hand the orientation back to the window's shape.
+function Layout.unpinOrientation()
+  Layout.pinned = false
+  Layout.save()
+  -- Re-derive immediately rather than waiting for the next resize, so the
+  -- press has a visible effect.
+  local want = Layout.orientationFor(love.graphics.getDimensions())
+  if want ~= Layout.mode then
+    Layout.mode = want
+    Layout.pendingWindow = true
+    if Layout.on_change then Layout.on_change(want) end
+  end
+  Layout.updateViewport()
+end
+
+--- A one-word description of the orientation state, for the footer.
+function Layout.orientationLabel()
+  if not Layout.pinned then return "auto" end
+  return Layout.mode
 end
 
 local function baseSize()
@@ -189,6 +330,18 @@ function Layout.updateViewport()
   local ww, wh = love.graphics.getDimensions()
   if ww < 1 then ww = Theme.landW end
   if wh < 1 then wh = Theme.landH end
+
+  -- Not pinned? The window's shape decides, every time it changes — which
+  -- includes the fullscreen transition, where the shape stops being one this
+  -- program chose.
+  if not Layout.pinned then
+    local want = Layout.orientationFor(ww, wh)
+    if want ~= Layout.mode then
+      Layout.mode = want
+      if Layout.on_change then Layout.on_change(want) end
+    end
+  end
+
   local bw, bh = baseSize()
   local s = math.min(ww / bw, wh / bh)
   if s >= 2 then
@@ -215,13 +368,21 @@ end
 
 function Layout.init(preferred)
   local dw, dh = love.window.getDesktopDimensions()
-  -- First run on a portrait display: start in portrait. A saved record, and
-  -- then an explicit preference, override it.
-  if dh > dw then Layout.mode = "portrait" end
+  -- First run: infer from the display, and do **not** call it a pin. A
+  -- rotated monitor should open the game in portrait; a player who then
+  -- moves it to a landscape screen should get landscape back, not a
+  -- decision this program made once and then defended forever.
+  Layout.mode = Layout.orientationFor(dw, dh)
+  Layout.pinned = false
+
   Layout.load()
+
+  -- `CWBH_ORIENT` is somebody asking, in as many words, so it pins.
   if preferred == "portrait" or preferred == "landscape" then
     Layout.mode = preferred
+    Layout.pinned = true
   end
+
   Layout.updateViewport()
   Layout.applyWindow()
 end

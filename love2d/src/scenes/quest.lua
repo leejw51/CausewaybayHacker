@@ -282,7 +282,7 @@ function Quest:draw()
   end
 
   self.app:footer(
-    "F5 submit   F6 reset   F7 hint   F8 log   F9 $EDITOR   TAB pane   ESC map")
+    "F5 submit   F6 reset   F7 hint   F8 log   F9 $EDITOR   F11 fullscreen   ESC map")
 end
 
 function Quest:draw_brief(rect, tint)

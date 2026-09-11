@@ -101,6 +101,9 @@ pub struct PackReport {
     pub quests: usize,
     pub inserted: usize,
     pub updated: usize,
+    /// Quests the pack no longer has. Their progress goes with them: there is
+    /// nothing left for it to be progress *on*.
+    pub removed: usize,
 }
 
 /// Walk `dir` for `*.toml` and import each one.
@@ -167,8 +170,9 @@ pub fn import_file(conn: &Connection, home: &Home, path: &Path) -> Result<PackRe
         path: path.display().to_string(),
         pack: pack.pack,
         quests: pack.quests.len(),
-        inserted: counts.0,
-        updated: counts.1,
+        inserted: counts.inserted,
+        updated: counts.updated,
+        removed: counts.removed,
     })
 }
 
@@ -226,12 +230,18 @@ pub const CONCEPT_VOCABULARY: &[&str] = &[
     "traits",
     "interfaces",
     "generics",
-    // memory and aliasing — Rust only
+    "dispatch",
+    "panics",
+    "zero-values",
+    "testing",
+    "serialization",
+    // memory and aliasing — rust only
     "ownership",
     "borrowing",
     "lifetimes",
     "mutability",
     "smart-pointers",
+    "interior-mutability",
     // concurrency
     "concurrency",
     "channels",
@@ -239,7 +249,9 @@ pub const CONCEPT_VOCABULARY: &[&str] = &[
     "cancellation",
     "data-races",
     "deadlock",
-    // algorithms — the hacker road
+    "async",
+    "thread-safety",
+    // algorithms — the `hacker` road
     "hashing",
     "two-pointers",
     "binary-search",
@@ -249,6 +261,18 @@ pub const CONCEPT_VOCABULARY: &[&str] = &[
     "intervals",
     "dynamic-programming",
     "complexity",
+    "recursion",
+    "linked-lists",
+    "trees",
+    "tries",
+    "heaps",
+    "backtracking",
+    "disjoint-set",
+    "bit-manipulation",
+    "matrix",
+    "math",
+    "prefix-sums",
+    "greedy",
 ];
 
 /// SPEC §12's rules, all of them, before a single row is written.
@@ -431,102 +455,254 @@ pub fn checksum(quest: &QuestDef) -> Result<String> {
     Ok(hex::encode(hasher.finalize()))
 }
 
-fn apply(conn: &Connection, pack: &Pack) -> Result<(usize, usize)> {
-    let before: i64 = conn.query_row(
-        "SELECT count(*) FROM quests WHERE pack = ?1",
-        params![pack.pack],
-        |r| r.get(0),
-    )?;
+/// Reconcile a pack with the database, in one transaction.
+///
+/// Three things have to be true at once, and the obvious implementation gets
+/// the third wrong:
+///
+/// 1. **Progress survives an edit.** SPEC §2.2: a quest whose checksum changed
+///    keeps its `progress` rows. So this is an upsert by `quests.id`, never a
+///    delete-and-reinsert — `progress.quest_id` cascades.
+/// 2. **A quest removed from the pack is removed.** Its progress goes with it;
+///    there is nothing left for it to be progress *on*, and a row left behind
+///    shows up on the map as a node the content no longer has.
+/// 3. **Node numbers move without colliding.** `UNIQUE (land, category, node)`
+///    is checked per statement, so inserting a new quest at node 5 while the
+///    old node 5 still exists fails, and so does any renumbering that passes
+///    through an occupied slot.
+///
+/// The third is what broke: the previous version parked nodes at `-node` and
+/// tried to put back whatever the pack no longer mentioned, which left a
+/// removed quest stranded on a negative node — and the *next* import then
+/// collided with it and failed, every time, for good. Half the packs stopped
+/// importing and the server served yesterday's content with a `WARN`.
+///
+/// So: delete what is gone first (which frees its node), park every survivor
+/// somewhere nothing can collide with, then write the real numbers.
+fn apply(conn: &Connection, pack: &Pack) -> Result<PackCounts> {
+    let ids: Vec<String> = pack.quests.iter().map(|q| q.id.clone()).collect();
     conn.execute_batch("BEGIN")?;
-    let result = (|| -> Result<usize> {
-        // UNIQUE(land, category, node): if two quests swap places, upserting
-        // them one at a time collides mid-way. Park this pack's nodes on
-        // negative numbers first so the real values are free, then put back
-        // anything the pack no longer mentions.
-        conn.execute(
-            "UPDATE quests SET node = -node WHERE pack = ?1 AND node > 0",
-            params![pack.pack],
-        )?;
-        for quest in &pack.quests {
-            let sum = checksum(quest)?;
-            conn.execute(
-                "INSERT INTO quests (id, pack, land, category, node, title, brief, story,
-                                     difficulty, time_limit_s, starter, solution, hints,
-                                     concepts, tests, checksum, map_x, map_y, map_kind)
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)
-                 ON CONFLICT(id) DO UPDATE SET
-                   pack=?2, land=?3, category=?4, node=?5, title=?6, brief=?7, story=?8,
-                   difficulty=?9, time_limit_s=?10, starter=?11, solution=?12, hints=?13,
-                   concepts=?14, tests=?15, checksum=?16, map_x=?17, map_y=?18, map_kind=?19",
-                params![
-                    quest.id,
-                    pack.pack,
-                    pack.land,
-                    pack.category,
-                    quest.node,
-                    quest.title,
-                    quest.brief,
-                    quest.story,
-                    quest.difficulty,
-                    quest.time_limit_s,
-                    quest.starter,
-                    quest.solution,
-                    serde_json::to_string(&quest.hints)?,
-                    serde_json::to_string(&quest.concepts)?,
-                    serde_json::to_string(&tests_json(quest)?)?,
-                    sum,
-                    quest.map.x,
-                    quest.map.y,
-                    quest.map.kind,
-                ],
-            )?;
-        }
-        // Quests dropped from the pack keep their rows (and their progress);
-        // they just get their node back. OR IGNORE because the pack may have
-        // taken that node over.
-        conn.execute(
-            "UPDATE OR IGNORE quests SET node = -node WHERE pack = ?1 AND node < 0",
-            params![pack.pack],
-        )?;
-        // Dependency edges are pack-owned and cheap to rebuild. They carry no
-        // user state, unlike the quest rows themselves.
-        for quest in &pack.quests {
-            conn.execute(
-                "DELETE FROM quest_deps WHERE quest_id = ?1",
-                params![quest.id],
-            )?;
-            for requires in &quest.requires {
-                let known: i64 = conn.query_row(
-                    "SELECT count(*) FROM quests WHERE id = ?1",
-                    params![requires],
-                    |r| r.get(0),
-                )?;
-                if known == 0 {
-                    return Err(bad_request(format!(
-                        "quest '{}' requires '{requires}', which no pack supplies",
-                        quest.id
-                    )));
-                }
-                conn.execute(
-                    "INSERT OR IGNORE INTO quest_deps (quest_id, requires_id) VALUES (?1, ?2)",
-                    params![quest.id, requires],
-                )?;
-            }
-        }
-        Ok(pack.quests.len())
-    })();
+    let result = reconcile(conn, pack, &ids);
     match result {
-        Ok(_) => conn.execute_batch("COMMIT")?,
+        Ok(counts) => {
+            conn.execute_batch("COMMIT")?;
+            Ok(counts)
+        }
         Err(e) => {
             let _ = conn.execute_batch("ROLLBACK");
-            return Err(e);
+            Err(e)
         }
     }
-    let after: i64 = conn.query_row(
-        "SELECT count(*) FROM quests WHERE pack = ?1",
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct PackCounts {
+    inserted: usize,
+    updated: usize,
+    removed: usize,
+}
+
+fn reconcile(conn: &Connection, pack: &Pack, ids: &[String]) -> Result<PackCounts> {
+    let mut stmt = conn.prepare("SELECT id FROM quests WHERE pack = ?1")?;
+    let existing: Vec<String> = stmt
+        .query_map(params![pack.pack], |r| r.get(0))?
+        .collect::<rusqlite::Result<Vec<String>>>()?;
+    drop(stmt);
+    let mut counts = PackCounts::default();
+
+    // 1. Whatever the pack no longer has. Deleting it first also frees the
+    //    node it was sitting on, which is half of why the renumbering below
+    //    has room to work.
+    for gone in existing.iter().filter(|id| !ids.contains(id)) {
+        conn.execute("DELETE FROM quests WHERE id = ?1", params![gone])?;
+        counts.removed += 1;
+    }
+
+    // 2. Park every surviving row of this pack somewhere no incoming node can
+    //    reach. `-1_000_000 - rowid` is unique per row (rowid is), is far
+    //    outside the 1-based range content uses, and — unlike the old `-node`
+    //    — cannot collide with a row an earlier buggy import left stranded.
+    conn.execute(
+        "UPDATE quests SET node = -1000000 - rowid WHERE pack = ?1",
+        params![pack.pack],
+    )?;
+
+    // 3. The real numbers, now that nothing is standing on them.
+    for quest in &pack.quests {
+        let sum = checksum(quest)?;
+        let changed = conn.execute(
+            "INSERT INTO quests (id, pack, land, category, node, title, brief, story,
+                                 difficulty, time_limit_s, starter, solution, hints,
+                                 concepts, tests, checksum, map_x, map_y, map_kind)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)
+             ON CONFLICT(id) DO UPDATE SET
+               pack=?2, land=?3, category=?4, node=?5, title=?6, brief=?7, story=?8,
+               difficulty=?9, time_limit_s=?10, starter=?11, solution=?12, hints=?13,
+               concepts=?14, tests=?15, checksum=?16, map_x=?17, map_y=?18, map_kind=?19",
+            params![
+                quest.id,
+                pack.pack,
+                pack.land,
+                pack.category,
+                quest.node,
+                quest.title,
+                quest.brief,
+                quest.story,
+                quest.difficulty,
+                quest.time_limit_s,
+                quest.starter,
+                quest.solution,
+                serde_json::to_string(&quest.hints)?,
+                serde_json::to_string(&quest.concepts)?,
+                serde_json::to_string(&tests_json(quest)?)?,
+                sum,
+                quest.map.x,
+                quest.map.y,
+                quest.map.kind,
+            ],
+        );
+        match changed {
+            Ok(_) => {}
+            Err(e) => {
+                // The only way this still fails is another pack holding the
+                // same land/category/node. Say which quest and why, rather
+                // than handing an operator a raw constraint name.
+                return Err(bad_request(format!(
+                    "quest '{}' cannot take {}.{} node {}: another pack already holds it ({e})",
+                    quest.id, pack.land, pack.category, quest.node
+                )));
+            }
+        }
+        if existing.contains(&quest.id) {
+            counts.updated += 1;
+        } else {
+            counts.inserted += 1;
+        }
+    }
+
+    // 4. Nothing may be left parked. If this fires, the reconciliation above
+    //    has a hole in it and the right thing is to refuse the import rather
+    //    than leave a node the map cannot draw.
+    let stranded: i64 = conn.query_row(
+        "SELECT count(*) FROM quests WHERE pack = ?1 AND node < 1",
         params![pack.pack],
         |r| r.get(0),
     )?;
-    let inserted = (after - before).max(0) as usize;
-    Ok((inserted, pack.quests.len().saturating_sub(inserted)))
+    if stranded != 0 {
+        return Err(internal(format!(
+            "{stranded} quest(s) in '{}' were left without a node",
+            pack.pack
+        )));
+    }
+
+    // Dependency edges are pack-owned and cheap to rebuild. They carry no user
+    // state, unlike the quest rows themselves.
+    for quest in &pack.quests {
+        conn.execute(
+            "DELETE FROM quest_deps WHERE quest_id = ?1",
+            params![quest.id],
+        )?;
+        for requires in &quest.requires {
+            let known: i64 = conn.query_row(
+                "SELECT count(*) FROM quests WHERE id = ?1",
+                params![requires],
+                |r| r.get(0),
+            )?;
+            if known == 0 {
+                return Err(bad_request(format!(
+                    "quest '{}' requires '{requires}', which no pack supplies",
+                    quest.id
+                )));
+            }
+            conn.execute(
+                "INSERT OR IGNORE INTO quest_deps (quest_id, requires_id) VALUES (?1, ?2)",
+                params![quest.id, requires],
+            )?;
+        }
+    }
+    Ok(counts)
+}
+
+/// What the database holds for one pack, against what the file says.
+///
+/// A pack that fails to import leaves the server running on the content it
+/// loaded last time, and a `WARN` line is not enough — that is exactly how
+/// half the packs went stale without anybody noticing. This is the check that
+/// says so out loud, and `cwbhacker doctor` fails on it.
+#[derive(Debug, Clone, Serialize)]
+pub struct PackAudit {
+    pub path: String,
+    pub pack: String,
+    pub in_file: usize,
+    pub in_db: usize,
+    /// Quest ids the file has and the database does not.
+    pub missing: Vec<String>,
+    /// Quest ids the database still holds for this pack and the file no longer
+    /// names — a deleted quest that never got cleaned up.
+    pub stale: Vec<String>,
+    /// The file could not even be read or parsed.
+    pub unreadable: Option<String>,
+}
+
+impl PackAudit {
+    pub fn agrees(&self) -> bool {
+        self.unreadable.is_none() && self.missing.is_empty() && self.stale.is_empty()
+    }
+}
+
+pub fn audit_dir(conn: &Connection, dir: &Path) -> Result<Vec<PackAudit>> {
+    let mut out = Vec::new();
+    if !dir.exists() {
+        return Ok(out);
+    }
+    let mut files = Vec::new();
+    collect_toml(dir, &mut files)?;
+    files.sort();
+    for path in files {
+        out.push(audit_file(conn, &path)?);
+    }
+    Ok(out)
+}
+
+pub fn audit_file(conn: &Connection, path: &Path) -> Result<PackAudit> {
+    let unreadable = |reason: String| PackAudit {
+        path: path.display().to_string(),
+        pack: String::new(),
+        in_file: 0,
+        in_db: 0,
+        missing: Vec::new(),
+        stale: Vec::new(),
+        unreadable: Some(reason),
+    };
+    let text = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(e) => return Ok(unreadable(e.to_string())),
+    };
+    let pack: Pack = match toml::from_str(&text) {
+        Ok(pack) => pack,
+        Err(e) => return Ok(unreadable(e.to_string())),
+    };
+    let want: Vec<String> = pack.quests.iter().map(|q| q.id.clone()).collect();
+    let mut stmt =
+        conn.prepare("SELECT id FROM quests WHERE pack = ?1 OR (land = ?2 AND category = ?3)")?;
+    let have: Vec<String> = stmt
+        .query_map(params![pack.pack, pack.land, pack.category], |r| r.get(0))?
+        .collect::<rusqlite::Result<Vec<String>>>()?;
+    Ok(PackAudit {
+        path: path.display().to_string(),
+        in_file: want.len(),
+        in_db: have.len(),
+        missing: want
+            .iter()
+            .filter(|id| !have.contains(id))
+            .cloned()
+            .collect(),
+        stale: have
+            .iter()
+            .filter(|id| !want.contains(id))
+            .cloned()
+            .collect(),
+        pack: pack.pack,
+        unreadable: None,
+    })
 }
