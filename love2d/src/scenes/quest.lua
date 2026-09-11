@@ -439,8 +439,14 @@ function Quest:draw()
     self:draw_run_overlay()
   end
 
-  self.app:footer(
-    "F5 run   F10 submit   F2 format   F6 reset   F7 hint   F8 log   ESC map")
+  -- **Not** a second listing of F5, F10 and F2. Those three are printed on
+  -- the buttons they belong to, a few centimetres above this line — `RUN F5`,
+  -- `SUBMIT F10`, `FORMAT F2` — so repeating them here bought nothing and
+  -- cost the four keys that have no button at all, which is what got clipped
+  -- in portrait once the display controls took the right-hand end of the
+  -- strip. What is left is exactly the keys the screen does not otherwise
+  -- say out loud.
+  self.app:footer("F6 reset   F7 hint   F8 log   F9 $EDITOR   ESC map")
 end
 
 --- The clock (PROTOCOL §4.8b), on the header band.
@@ -578,9 +584,11 @@ function Quest:draw_editor(rect, tint)
   UI.well(rect.x, rect.y, rect.w, rect.h,
     self.focus == "editor" and Theme.coin or tint)
 
-  local scale = Layout.uiScale()
-  local size = math.floor(18 * scale)
-  local font = Assets.mono(size)
+  -- The player's type-size step, through one function both code panes call.
+  -- Before `Layout.codeSize` this expression was written out here and again
+  -- in `src/scenes/playground.lua`, which is how the two would have drifted
+  -- the first time either was tuned.
+  local font = Assets.mono(Layout.codeSize(18))
   local line_h = font:getHeight()
   -- The trailing space is not decoration: `%4d` right-aligns, so without
   -- it the last digit of the line number touches the first character of an
@@ -768,7 +776,9 @@ function Quest:draw_run_overlay()
 
   UI.bar(x + 12, y + 26, w - 24, 6, stage_index / 4, Theme.coin)
 
-  local font = Assets.mono(16)
+  -- The compiler's own words, at the player's step: this is code too, and
+  -- somebody who made the editor bigger did it because 18px was hard to read.
+  local font = Assets.mono(Layout.codeSize(16))
   love.graphics.setFont(font)
   local line_h = font:getHeight()
   local top = y + 40

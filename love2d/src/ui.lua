@@ -208,15 +208,186 @@ function UI.bar(x, y, w, h, fraction, color)
   love.graphics.setColor(1, 1, 1, 1)
 end
 
+-- ------------------------------------------------------ the display controls
+
+--- The footer strip's height, and the controls that live in its right end.
+UI.FOOTER_H = 22
+
+--- Space kept clear for the connection badge, measured against the *longest*
+--- state rather than the current one.
+---
+--- A reserve that tracked the live string would move the three display
+--- buttons sideways every time the socket went from `open` to `connecting`,
+--- and a control that walks away from the pointer is worse than one that is
+--- slightly further from the edge than it needs to be.
+local function badge_reserve()
+  return UI.textWidth("CONNECTING", 8) + 16
+end
+
+local CHIP_H = 18
+local GLYPH_W = 13
+local CHIP_PAD = 6
+local CHIP_GAP = 5
+local LABEL = 7
+
+--- The three chips, in order, with their labels already decided.
+---
+--- **Each one says the state it is in, not the state it would move to.** A
+--- toggle whose current value is invisible gets pressed twice: once to find
+--- out, once to put it back. So the window button says WINDOW when it is a
+--- window, the orientation button says LAND, PORT or AUTO, and the type-size
+--- button says which of its four steps is live.
+---
+--- AUTO is the one that needs two things said at once — it is a *state* the
+--- player chose, and it has *resolved* to a shape they should be able to see
+--- — so the word says AUTO and the glyph draws the shape it landed on,
+--- hollow rather than filled to say that nothing is pinned.
+local function chips(state)
+  return {
+    {
+      id = "fullscreen",
+      label = state.fullscreen and "FULL" or "WINDOW",
+      glyph = "screen",
+    },
+    {
+      id = "orient",
+      label = (state.orientation == "auto") and "AUTO"
+        or (state.orientation == "portrait" and "PORT" or "LAND"),
+      glyph = "orient",
+    },
+    {
+      id = "font",
+      label = state.font_label or "1/4",
+      glyph = "type",
+    },
+  }
+end
+
+local function chip_width(chip)
+  return CHIP_PAD + GLYPH_W + 4 + UI.textWidth(chip.label, LABEL) + CHIP_PAD
+end
+
+--- How wide the cluster is, so the footer can keep the hint out of it.
+function UI.displayReserve(state)
+  local total = 0
+  for i, chip in ipairs(chips(state)) do
+    total = total + chip_width(chip) + (i > 1 and CHIP_GAP or 0)
+  end
+  return total + badge_reserve() + 10
+end
+
+--- A small screen, filled when the game owns the whole one.
+local function glyph_screen(x, y, full, ink)
+  UI.setColor(ink)
+  if full then
+    love.graphics.rectangle("fill", x, y + 2, GLYPH_W, 9)
+  else
+    love.graphics.setLineWidth(1)
+    love.graphics.rectangle("line", x + 0.5, y + 2.5, GLYPH_W - 1, 8)
+    love.graphics.rectangle("fill", x + 3, y + 5, GLYPH_W - 7, 4)
+  end
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
+--- A wide box or a tall one — the shape you are actually in. Filled when it
+--- is pinned, hollow when the window is deciding.
+local function glyph_orient(x, y, portrait, pinned, ink)
+  local w, h = 12, 9
+  if portrait then w, h = 8, 13 end
+  local gx = x + (GLYPH_W - w) / 2
+  local gy = y + (CHIP_H - 4 - h) / 2
+  UI.setColor(ink)
+  if pinned then
+    love.graphics.rectangle("fill", gx, gy, w, h)
+  else
+    love.graphics.setLineWidth(1)
+    love.graphics.rectangle("line", gx + 0.5, gy + 0.5, w - 1, h - 1)
+  end
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
+--- An `A`, drawn at the step it selects. The control shows its own effect.
+local function glyph_type(x, y, step, ink)
+  local size = 6 + 2 * math.max(1, math.min(4, step or 1))
+  local font = Assets.font(size)
+  love.graphics.setFont(font)
+  UI.setColor(ink)
+  love.graphics.print("A", x + (GLYPH_W - font:getWidth("A")) / 2,
+    y + (CHIP_H - 4 - font:getHeight()) / 2)
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
+--- Where the pointer is, in virtual coordinates, or nil.
+---
+--- Nil under a drive script and in any frame where the pointer is outside
+--- the letterbox, which is why every caller treats nil as "not hot" rather
+--- than as an error.
+local function pointer()
+  if not (love.mouse and love.mouse.getPosition) then return nil end
+  local ok, mx, my = pcall(love.mouse.getPosition)
+  if not ok then return nil end
+  return Layout.toVirtual(mx, my)
+end
+
+--- Draw the cluster and return the rectangles it drew, for the hit test.
+---
+--- **The same three controls, in the same corner, on every screen** — the
+--- title card included. They are drawn from `App:footer`, which every scene
+--- already calls, so a new scene gets them without knowing they exist and
+--- cannot forget them. The keys still work; these are the visible half.
+function UI.displayControls(state)
+  local list = chips(state)
+  local total = 0
+  for i, chip in ipairs(list) do
+    chip.w = chip_width(chip)
+    total = total + chip.w + (i > 1 and CHIP_GAP or 0)
+  end
+
+  local y = Layout.vh - UI.FOOTER_H + (UI.FOOTER_H - CHIP_H) / 2
+  local x = Layout.vw - 10 - badge_reserve() - total
+  local px, py = pointer()
+
+  local rects = {}
+  for _, chip in ipairs(list) do
+    local hot = px and px >= x and px <= x + chip.w and py >= y and py <= y + CHIP_H
+    local ink = hot and Theme.ink or Theme.cream
+    UI.setColor(hot and Theme.coin or Theme.withAlpha(Theme.panel, 0.9))
+    love.graphics.rectangle("fill", x, y, chip.w, CHIP_H)
+    love.graphics.setLineWidth(1)
+    UI.setColor(Theme.withAlpha(hot and Theme.ink or Theme.cream, hot and 0.9 or 0.35))
+    love.graphics.rectangle("line", x + 0.5, y + 0.5, chip.w - 1, CHIP_H - 1)
+    love.graphics.setColor(1, 1, 1, 1)
+
+    local gx = x + CHIP_PAD
+    if chip.glyph == "screen" then
+      glyph_screen(gx, y, state.fullscreen, ink)
+    elseif chip.glyph == "orient" then
+      glyph_orient(gx, y, state.shape == "portrait", state.orientation ~= "auto", ink)
+    else
+      glyph_type(gx, y, state.font, ink)
+    end
+
+    UI.text(chip.label, gx + GLYPH_W + 4, y + (CHIP_H - LABEL) / 2 - 1, LABEL, ink)
+    rects[chip.id] = { x = x, y = y, w = chip.w, h = CHIP_H }
+    x = x + chip.w + CHIP_GAP
+  end
+  return rects
+end
+
 --- The status strip every screen carries along its bottom edge.
 ---
---- Three zones: the scene's own hint on the left, the display keys in the
---- middle, the connection on the right. The display keys live here rather
---- than in each scene's hint string because they are global — they work on
---- every screen, so they should be legible on every screen without each
---- scene having to remember to say so.
-function UI.footer(lines, connection, display)
-  local h = 22
+--- Three zones: the scene's own hint on the left, the connection on the
+--- right, and between them the display controls (`UI.displayControls`).
+--- Those live here rather than in each scene because they are global — they
+--- work on every screen, so they should be reachable on every screen without
+--- each scene having to remember to draw them.
+---
+--- `reserve` is how much of the right-hand end is spoken for. It is taken out
+--- **before** the hint is measured, not after: the controls are the feature
+--- and cannot be conditional on there being room, so it is the hint that
+--- gives way. (It already had to once — see below.)
+function UI.footer(lines, connection, reserve)
+  local h = UI.FOOTER_H
   local y = Layout.vh - h
   UI.setColor(Theme.ink, 0.8)
   love.graphics.rectangle("fill", 0, y, Layout.vw, h)
@@ -227,23 +398,14 @@ function UI.footer(lines, connection, display)
   -- on top of each other. Two steps, in order: try a size smaller, then clip.
   -- A hint that is cut off mid-word still reads; one with `OPEN` printed
   -- through it does not.
-  local badge = connection and (UI.textWidth(connection:upper(), 8) + 16) or 0
-  local room = Layout.vw - 20 - badge
+  local keep = math.max(reserve or 0, connection and badge_reserve() or 0)
+  local room = Layout.vw - 20 - keep
   local text = lines or ""
   local size = (UI.textWidth(text, 8) > room) and 7 or 8
-  love.graphics.setScissor(0, y, math.max(0, Layout.vw - badge - 8), h)
+  love.graphics.setScissor(0, y, math.max(0, Layout.vw - keep - 8), h)
   UI.text(text, 10, y + 7 + (8 - size), size, Theme.withAlpha(Theme.cream, 0.85))
   love.graphics.setScissor()
 
-  if display then
-    local w = UI.textWidth(display, 8)
-    local right = Layout.vw - 10 - (connection and (UI.textWidth("CONNECTING", 8) + 14) or 0)
-    -- Only when there is honest room; a hint that collides with the
-    -- connection badge is worse than one that is not there.
-    if right - w > UI.textWidth(text, size) + 24 then
-      UI.text(display, right - w, y + 7, 8, Theme.withAlpha(Theme.cream, 0.55))
-    end
-  end
   if connection then
     local color = Theme.dim
     if connection == "open" then color = Theme.admit

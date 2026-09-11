@@ -1,4 +1,4 @@
--- The LÖVE client's own store: `~/.causewaybayhackerlove2d`, SPEC §1.1.
+-- The LÖVE client's own store: `~/.causewaybaylove2d`, SPEC §1.1.
 --
 -- `~/.causewaybayhacker` is the **server's**. This client is a separate
 -- program that may be talking to a server on another machine entirely, so it
@@ -43,6 +43,24 @@
 -- why `src/wallet.lua`'s library grew a `secure` op — the file holds a
 -- credential and `0600` is not decorative.
 
+-- ## Where it lives, and the one it used to live in
+--
+-- Resolved the way `CausewaybayWallet` resolves its own home
+-- (`rustcli/core/src/paths.rs`), because a family of programs that each
+-- invent their own precedence is a family nobody can script:
+--
+--   1. an explicit `--home <PATH>` flag
+--   2. the `CWBH_LOVE2D_HOME` environment variable
+--   3. `~/.causewaybaylove2d`
+--
+-- The default used to be `~/.causewaybayhackerlove2d`, and somebody is
+-- playing in there right now. **A store found at the old path is copied
+-- across once, and the old directory is left exactly as it was** — see
+-- `Store.copy_store`. That is the same promise `Store.migrate` made when this
+-- client moved out of LÖVE's own save directory, for the same reason: a
+-- rename that silently starts a player fresh is a self-inflicted version of
+-- the thing this game keeps warning them about.
+
 local json = require("src.json")
 
 local Store = {}
@@ -52,7 +70,9 @@ local Store = {}
 Store.SCHEMA = 1
 
 Store.DIR_ENV = "CWBH_LOVE2D_HOME"
-Store.DEFAULT_DIR = ".causewaybayhackerlove2d"
+Store.DEFAULT_DIR = ".causewaybaylove2d"
+--- Where the default used to be. Read once, on first launch, never written.
+Store.OLD_DEFAULT_DIR = ".causewaybayhackerlove2d"
 Store.FILE = "state.jsonl"
 
 Store.DEFAULT_SERVER = "ws://127.0.0.1:5390/ws"
@@ -69,6 +89,12 @@ local path = nil
 local dir = nil
 local secure = nil       -- function(path, is_directory) -> ok
 local warned_perms = false
+--- True when `Store.open` *resolved* the home and landed on the default.
+---
+--- Read by `App:load` to decide whether the other migration — the one out of
+--- LÖVE's own save directory — should run. One place decides what "the
+--- default home" means; `src/app.lua` must not re-derive the precedence.
+local resolved_default = false
 
 -- ------------------------------------------------------------------- secrets
 
@@ -122,12 +148,56 @@ end
 
 -- --------------------------------------------------------------------- paths
 
-function Store.home()
-  local override = os.getenv(Store.DIR_ENV)
-  if override and override ~= "" then return override end
+--- Expand a leading `~`, which a shell would have done for an unquoted path.
+---
+--- `CausewaybayWallet`'s `paths.rs` carries this for a stated reason and the
+--- reason applies here: without it, `--home '~/games'` silently creates a
+--- directory literally named `~` in whatever the working directory happens to
+--- be. Only a leading `~/` counts; `~user/x` is somebody else's home and this
+--- cannot resolve it, so it is left alone.
+local function expand_tilde(text)
+  local home = os.getenv("HOME") or os.getenv("USERPROFILE")
+  if not home or home == "" then return text end
+  if text == "~" then return home end
+  local rest = text:match("^~/(.*)$")
+  if rest then return home .. "/" .. rest end
+  return text
+end
+
+Store.expand_tilde = expand_tilde
+
+local function under_home(name)
   local home = os.getenv("HOME") or os.getenv("USERPROFILE")
   if not home or home == "" then return nil end
-  return home .. "/" .. Store.DEFAULT_DIR
+  return home .. "/" .. name
+end
+
+--- `~/.causewaybaylove2d`, with nothing consulted.
+function Store.default_home()
+  return under_home(Store.DEFAULT_DIR)
+end
+
+--- `~/.causewaybayhackerlove2d` — the name this store had before the rename.
+function Store.old_home()
+  return under_home(Store.OLD_DEFAULT_DIR)
+end
+
+--- The home, in SPEC §1.1's precedence: flag, then env, then the default.
+---
+--- `explicit` is the `--home` flag, parsed in `main.lua`. It wins outright:
+--- a flag that loses to an environment variable somebody set last month is a
+--- flag that does nothing on the machine where it matters most.
+function Store.home(explicit)
+  if type(explicit) == "string" then
+    explicit = explicit:match("^%s*(.-)%s*$")
+    if explicit ~= "" then return expand_tilde(explicit) end
+  end
+  local override = os.getenv(Store.DIR_ENV)
+  if override then
+    override = override:match("^%s*(.-)%s*$")
+    if override ~= "" then return expand_tilde(override) end
+  end
+  return Store.default_home()
 end
 
 function Store.where()
@@ -197,6 +267,12 @@ function Store.read_lines(file_path)
   return out
 end
 
+--- A stored `fullscreen`, preserving a `false` that really was stored.
+local function stored_fullscreen(record)
+  if type(record.fullscreen) == "boolean" then return record.fullscreen end
+  return nil
+end
+
 --- Fold a list of records into live state.
 ---
 --- A pure function of the records, so the replay can be tested without a
@@ -207,7 +283,8 @@ function Store.replay(records)
     display = nil,
     server = nil,
     map = {},           -- "land.category" -> quest_id
-    migrated = false,
+    migrated = false,   -- out of LÖVE's save directory
+    moved_from = nil,   -- out of an older home directory
     lines = 0,
   }
   for _, record in ipairs(records or {}) do
@@ -227,7 +304,18 @@ function Store.replay(records)
         mode = (record.mode == "portrait" or record.mode == "landscape")
           and record.mode or nil,
         pinned = record.pinned == true,
-        fullscreen = type(record.fullscreen) == "boolean" and record.fullscreen or nil,
+        -- **Not** `type(x) == "boolean" and x or nil`. That idiom folds a
+        -- stored `false` to `nil`, because `false or nil` is `nil` — so a
+        -- player who quit in a window had `"fullscreen":false` on disk and
+        -- read back "no opinion". It survived only because
+        -- `Layout.fullscreen` happens to start false, which is the worst
+        -- kind of correct.
+        fullscreen = stored_fullscreen(record),
+        -- The type-size step. One field on the record the orientation and
+        -- the fullscreen pin already travel on, rather than a second write
+        -- path: they are one setting — "how this window is set up" — and two
+        -- records would mean two ways for them to disagree.
+        font = tonumber(record.font),
       }
     elseif kind == "server.set" and type(record.url) == "string" then
       folded.server = record.url
@@ -238,7 +326,19 @@ function Store.replay(records)
       -- by `tests/test_store.lua`, which is the entire reason it exists.
       folded.map[record.map] = type(record.quest_id) == "string" and record.quest_id or nil
     elseif kind == "migrated" then
-      folded.migrated = true
+      -- **Two different migrations write this kind, and they are not the
+      -- same fact.** The first moved this store out of LÖVE's own save
+      -- directory; the second moved it out of `~/.causewaybayhackerlove2d`
+      -- when the default was renamed. A record copied across by the second
+      -- carries the first's `from`, so folding both into one boolean would
+      -- make an arriving store claim a migration it has never run — the same
+      -- shape as reading a restored *inference* as a *pin*, which this
+      -- client already has a bug report about.
+      if record.from == nil or record.from == "love.filesystem" then
+        folded.migrated = true
+      else
+        folded.moved_from = tostring(record.from)
+      end
     end
   end
   return folded
@@ -313,14 +413,93 @@ function Store.fold(record)
   elseif record.kind == "map.cursor" then
     state.map[record.map] = folded.map[record.map]
   elseif record.kind == "migrated" then
-    state.migrated = true
+    local one = Store.replay({ record })
+    if one.migrated then state.migrated = true end
+    if one.moved_from then state.moved_from = one.moved_from end
   end
   state.lines = state.lines + 1
+end
+
+-- ------------------------------------------------------- moving house, once
+
+--- How many bytes a file holds, or nil when there is no file.
+local function size_of(file_path)
+  local fh = io.open(file_path, "rb")
+  if not fh then return nil end
+  local size = fh:seek("end")
+  fh:close()
+  return size
+end
+
+--- Copy `old_dir/state.jsonl` to `new_dir/state.jsonl`, **once**, verbatim.
+---
+--- Returns the number of lines copied, or `nil` and a reason.
+---
+--- Three rules, and the first one is the whole gate:
+---
+---   * **the new store must not exist.** That single condition is "migrate
+---     once", "do not migrate twice" and "never overwrite a store that is
+---     already there", all three, and it is the only condition that can be
+---     checked without trusting a flag — because a flag saying the migration
+---     already happened could only ever live inside the file being written.
+---   * **the old directory is not touched.** Not deleted, not renamed, not
+---     truncated, not even appended to. If this goes wrong the evidence is
+---     still sitting there, which is the difference between a bad launch and
+---     a lost account.
+---   * **the bytes are copied, not replayed.** A replay-and-rewrite would
+---     fold 72 `display.set` lines into one and restamp every record with
+---     today's date — losing the history, and quietly dropping any line this
+---     binary cannot parse or whose `schema` is newer than it understands.
+---     SPEC §1.1 says such lines are skipped on *read*; nothing says they may
+---     be thrown away on a move. A verbatim copy keeps them.
+---
+--- A torn last line comes across as a torn last line, which costs nothing:
+--- `read_lines` discards it and `append`'s newline guard refuses to splice
+--- onto it, exactly as it would have in the old file.
+function Store.copy_store(old_dir, new_dir)
+  if type(old_dir) ~= "string" or type(new_dir) ~= "string" then return nil end
+  if old_dir == new_dir then return nil end
+
+  local from = old_dir .. "/" .. Store.FILE
+  local to = new_dir .. "/" .. Store.FILE
+
+  local old_size = size_of(from)
+  if not old_size or old_size == 0 then return nil, "nothing at the old path" end
+  -- Zero length is "absent": an empty file is what a failed create leaves.
+  local new_size = size_of(to)
+  if new_size and new_size > 0 then return nil, "there is already a store here" end
+
+  local source = io.open(from, "rb")
+  if not source then return nil, "cannot read " .. from end
+  local body = source:read("*a")
+  source:close()
+
+  local sink, err = io.open(to, "wb")
+  if not sink then return nil, tostring(err) end
+  sink:write(body)
+  sink:close()
+  -- `append` only sets the mode on a file it created itself, so a file that
+  -- arrives by copy has to be tightened here or it sits behind the umask
+  -- until the first write. It holds a session token; `0600` is the point.
+  make_private(to, false)
+
+  local lines = 0
+  for _ in body:gmatch("[^\n]+") do lines = lines + 1 end
+  return lines
 end
 
 -- --------------------------------------------------------------------- open
 
 --- Open (and create) the store. `opts.secure` is `function(path, is_dir)`.
+---
+--- `opts.home` is the `--home` flag; `opts.dir` is a directory handed in
+--- whole, which is how the tests get a scratch store.
+---
+--- **The migration only runs for a home this function resolved to the
+--- default.** A directory passed as `opts.dir`, or named by `--home` or
+--- `CWBH_LOVE2D_HOME`, is exactly the directory that was asked for — copying
+--- somebody's real session into a scratch path because a test opened a store
+--- would be a far worse bug than the one the migration fixes.
 function Store.open(opts)
   opts = opts or {}
   secure = opts.secure
@@ -329,7 +508,15 @@ function Store.open(opts)
   -- store would write to the player's own file, which is worse than a
   -- failing test.
   dir = opts.dir
-  if dir == nil then dir = Store.home() end
+  local move_from = nil
+  resolved_default = false
+  if dir == nil then
+    dir = Store.home(opts.home)
+    if dir and dir == Store.default_home() then
+      resolved_default = true
+      move_from = Store.old_home()
+    end
+  end
   if not dir then
     -- No home: run in memory, and say so. The game still works; nothing
     -- survives the process.
@@ -340,7 +527,19 @@ function Store.open(opts)
   end
   path = dir .. "/" .. Store.FILE
   make_private(dir, true)
+
+  local copied = move_from and Store.copy_store(move_from, dir) or nil
+
   state = Store.replay(Store.read_lines(path))
+
+  if copied then
+    -- Evidence, appended *after* the copy so it lands on the new store's own
+    -- last line. `from` is the old directory, which is what tells this
+    -- record apart from the `love.filesystem` one it was copied alongside.
+    Store.append({ kind = "migrated", from = move_from, lines = copied })
+    print(("store: moved %d lines from %s to %s — the old directory is untouched")
+      :format(copied, move_from, dir))
+  end
   return state
 end
 
@@ -348,9 +547,23 @@ function Store.state()
   return state
 end
 
+--- Did this `open` resolve the home, and land on the default?
+---
+--- **Both migrations ask this, and that is the point.** A home named by
+--- `--home` or by `CWBH_LOVE2D_HOME` is exactly the home that was named:
+--- nothing is copied into it from the old directory, and nothing is imported
+--- into it from LÖVE's save directory either. Without the second half,
+--- `--home $(mktemp -d)` would mean "a fresh store, plus whatever session
+--- was lying in LÖVE's sandbox" — which is not a fresh store, and is the
+--- opposite of what a throwaway home is for.
+function Store.resolved_default()
+  return resolved_default
+end
+
 --- Close and forget, for tests.
 function Store.reset()
   state, path, dir, secure = nil, nil, nil, nil
+  resolved_default = false
 end
 
 -- ------------------------------------------------------------------ sessions
@@ -403,6 +616,7 @@ function Store.save_display(record)
     mode = record.mode,
     pinned = record.pinned and true or false,
     fullscreen = record.fullscreen,
+    font = record.font,
   })
 end
 

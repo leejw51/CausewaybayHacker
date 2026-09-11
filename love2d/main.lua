@@ -5,6 +5,7 @@
 -- sends what the player did.
 --
 --   love .                       play
+--   love . --home ~/somewhere    put this client's store there (SPEC §1.1)
 --   CWBH_TEST=1 love . --test    run the suite and quit
 --   CWBH_DRIVE=script.lua love . replay a scripted session (screenshots)
 --   CWBH_SERVER=ws://…/ws        point at another server
@@ -30,6 +31,22 @@ local function wants_tests(args)
   return false
 end
 
+--- `--home <PATH>` or `--home=PATH`, SPEC §1.1's first step of precedence.
+---
+--- It is parsed here rather than read from the environment inside the store,
+--- because a flag is the one control a person can use on a machine whose
+--- shell profile they do not own. It wins over `CWBH_LOVE2D_HOME`; a flag
+--- that loses to an environment variable somebody exported last month is a
+--- flag that does nothing.
+local function home_flag(args)
+  for i, a in ipairs(args or {}) do
+    local inline = a:match("^%-%-home=(.*)$")
+    if inline then return inline end
+    if a == "--home" then return (args or {})[i + 1] end
+  end
+  return nil
+end
+
 function love.load(args)
   if wants_tests(args) then
     testing = true
@@ -45,18 +62,26 @@ function love.load(args)
   -- character per press and typing feels broken.
   love.keyboard.setKeyRepeat(true)
 
-  app = App.new()
+  app = App.new({ home = home_flag(args) })
   app:load()
 
   local script = os.getenv("CWBH_DRIVE")
   if script and script ~= "" then
-    drive = require("src.drive").load(script)
     -- A Lua error under a drive script must *fail*, not hang. LÖVE's default
     -- handler replaces the update and draw callbacks with its blue screen and
     -- waits for a human, so an unattended run stops making progress and the
     -- script never times out — which reads as "still going" for as long as
     -- anybody is willing to wait. This one prints the traceback and exits
     -- non-zero, which is what a test harness needs.
+    --
+    -- **Installed before `Drive.load`, not after.** `loadfile` resolves
+    -- `CWBH_DRIVE` against the *process's* working directory, so running the
+    -- client from the repository root instead of from `love2d/` raises here —
+    -- and the handler that exists to stop exactly this from hanging was
+    -- installed on the line below the one that raised. The blue screen then
+    -- waited for a human who was not there, and the run had to be found with
+    -- `pgrep` and killed. The one error this handler is most likely to meet
+    -- was the one error it was not yet installed for.
     function love.errorhandler(message)
       io.stderr:write("drive: the client crashed\n")
       io.stderr:write(tostring(message) .. "\n")
@@ -64,6 +89,7 @@ function love.load(args)
       return function() return 1 end
     end
     love.errhand = love.errorhandler
+    drive = require("src.drive").load(script)
   end
 end
 
@@ -99,6 +125,15 @@ function love.keypressed(key)
   end
   if key == "f1" then
     app:toast("orientation: " .. Layout.cycleOrientation())
+    return
+  end
+  -- The type size. It belongs with F1 and F11 — the three controls that
+  -- decide how this window is set up — and is the only one of them that had
+  -- no key at all until the buttons arrived. F12 is free on every screen for
+  -- the same reason F1 is: nothing here takes a function key as text.
+  if key == "f12" then
+    Layout.cycleFont()
+    app:toast("code size " .. Layout.fontLabel())
     return
   end
   if key == "f4" then

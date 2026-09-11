@@ -89,7 +89,7 @@ append-only JSONL, state derived by replaying the log.
 Resolved in the same precedence order `CausewaybayWallet` uses, because a
 family of programs that each invent their own is a family nobody can script:
 
-1. an explicit flag
+1. `--home <PATH>`
 2. the `CWBH_LOVE2D_HOME` environment variable
 3. `~/.causewaybaylove2d`
 
@@ -120,7 +120,8 @@ These are `CausewaybayWallet`'s conventions, and its `rustcli/core/src/store.rs`
 is the reference implementation if a detail is ever in doubt.
 
 It holds only what a client owns: the session token, the chosen server, the
-orientation and fullscreen pins, and where each map was left. **No key
+orientation and fullscreen pins, the code-size step, and where each map was
+left. **No key
 material, ever** — not the mnemonic, not the private key, not the seed.
 
 **The token is stored per server.** A session token is minted by one server

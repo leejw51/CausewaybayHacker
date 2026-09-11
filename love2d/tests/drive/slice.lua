@@ -1,12 +1,18 @@
 -- Milestone 1, end to end, against a real server.
 --
 --   cd backend && cargo run -p cwbhacker -- serve
---   rm -f ~/Library/Application\ Support/LOVE/causewaybay-hacker/session.json
---   make -C love2d drive SCRIPT=tests/drive/slice.lua
+--   make -C love2d drive SCRIPT=tests/drive/slice.lua ARGS="--home $(mktemp -d)"
 --
--- The stored session is cleared first on purpose: this script signs in as one
--- specific wallet, and a token left by an earlier run would resume a
--- different player before the login screen ever appeared.
+-- **The `--home` is not optional.** This script signs in as one specific
+-- wallet, and a token left by an earlier run resumes a different player
+-- before the login screen ever appears — which shows up as a timeout on step
+-- three and reads like the client is broken.
+--
+-- It used to say `rm -f ~/Library/…/LOVE/causewaybay-hacker/session.json`,
+-- and that stopped being where the session lived two moves ago: first out of
+-- LÖVE's save directory, then out of `~/.causewaybayhackerlove2d` (SPEC
+-- §1.1). A throwaway home is better than either, because it proves the run
+-- from nothing and deletes none of the player's own state.
 --
 -- PLAN.md's slice, one step per line:
 --

@@ -49,17 +49,27 @@ official release from GitHub instead, and `make run` will use a `love` on
 | variable | default | |
 | --- | --- | --- |
 | `CWBH_SERVER` | — | a launch-time override; wins for that run |
-| `CWBH_LOVE2D_HOME` | `~/.causewaybayhackerlove2d` | this client's own store |
+| `CWBH_LOVE2D_HOME` | `~/.causewaybaylove2d` | this client's own store |
 | `CWBH_ORIENT` | — | `portrait` or `landscape` to start pinned that way |
 | `CWBH_FULLSCREEN` | `desktop` | `exclusive` for a real display-mode change |
 | `CWBH_FFI_LIB` | — | an explicit path to `libcwbh_ffi.dylib` |
 | `CWBH_TEST` | — | `1` runs the suite and quits |
 | `CWBH_DRIVE` | — | a scripted session (`tests/drive/*.lua`) |
 
+The store's home is resolved the way the rest of this family resolves theirs
+(SPEC §1.1): **`--home <PATH>` first, then `CWBH_LOVE2D_HOME`, then
+`~/.causewaybaylove2d`**. A flag that lost to an environment variable
+somebody exported last month would be a flag that does nothing.
+
+```bash
+love . --home ~/somewhere-else       # or --home=~/somewhere-else
+```
+
 | key | |
 | --- | --- |
 | **F** / **F11** | window ⇄ fullscreen — the same binding as `CausewaybayRaiden` |
 | **F1** | orientation: landscape → portrait → automatic |
+| **F12** | code size: four steps, then back to the first |
 | **F3** / **F4** | scanlines · sound |
 | **F5** / **F10** | in a quest: **RUN** · **SUBMIT** — see below |
 | **F2** | in a quest: **FORMAT** (`rustfmt` / `gofmt`, on the server) |
@@ -210,25 +220,76 @@ ease-in-out: almost still, then fast, then almost still. It is capped at
 0.85 s however far the jump, and **any key lands her immediately** — a player
 who picked a node wants the quest, not the animation.
 
+### The display controls
+
+Three buttons, in the bottom-right corner of the footer, on **every screen** —
+the title card included:
+
+| | shows | does |
+| --- | --- | --- |
+| ▭ `WINDOW` / `FULL` | a small screen, or a filled one | window ⇄ fullscreen |
+| ▯ `LAND` / `PORT` / `AUTO` | the shape you are in; filled when pinned, hollow when the window decides | cycles the three orientation states |
+| `A 1/4` | the `A` is drawn at the step it selects | cycles four code sizes |
+
+**Each one says the state it is in, not the state it would move to.** A toggle
+whose current value is invisible gets pressed twice: once to find out, once to
+put it back. `AUTO` is the one that has to say two things at once — it is a
+state the player chose *and* it has resolved to a shape — so the word says
+`AUTO` and the glyph draws the shape it landed on, hollow rather than filled.
+
+They are drawn by `App:footer`, which every scene already calls, so a screen
+added tomorrow gets them without knowing they exist and cannot forget them —
+`tests/test_screens.lua` asserts that every scene does call it. A press is
+tested before the scene sees the click and is consumed, so changing the type
+size can never also open a quest.
+
+The keys are unchanged and still work: **F**/**F11**, **F1**, **F12**. The
+buttons are an addition, because a key nobody can see is not a feature — the
+same reasoning that put the land and category switches on the map itself.
+
 ### Window and fullscreen
 
-`F` or `F11` toggles at any time, from any screen, **without losing your
-place** — including mid-quest with half-written source in the editor. The
-virtual canvas is re-measured across the transition and the scene is not
-touched.
+`F`, `F11` or the **WINDOW** button toggles at any time, from any screen,
+**without losing your place** — including mid-quest with half-written source
+in the editor. The virtual canvas is re-measured across the transition and the
+scene is not touched.
 
 Fullscreen is **`desktop`** by default: `exclusive` changes the display mode,
 and a game that exits badly while in it leaves the desktop rearranged. Set
 `CWBH_FULLSCREEN=exclusive` if you want the real thing — the same override the
 sibling spells `GOSET_FULLSCREEN`.
 
-**F1 cycles three states, not two.** Landscape and portrait are *pins*: you
+**F1 — and the middle button — cycles three states, not two.** Landscape and portrait are *pins*: you
 asked, so the window's shape does not get a vote. The third state is
 automatic, where the orientation follows the window — which is usually what
 you want in fullscreen, since the shape there is the display's and not yours.
 The footer always says which one you are in.
 
-Both the fullscreen state and the orientation are remembered across restarts,
+### The code size
+
+**F12**, or the `A n/4` button. Four steps, and it is a cycle rather than a
+slider: a slider in a pixel-art header has no legible current value, no
+keyboard equivalent and eleven positions nobody wants, where four named steps
+have one state each and say which one is live.
+
+**It moves the code face, not the chrome.** The screen it exists for is the
+editor — a forty-line interview answer on a laptop panel is where bigger type
+pays, and it is the one surface here somebody reads for an hour at a time. So
+the step scales `Assets.mono`: both code panes, the run log, the playground's
+output and the stderr on the result screen. It deliberately does *not* rescale
+every label, which would reflow eleven screens authored against a fixed grid
+to help the one screen that is not made of labels.
+
+One function decides it — `Layout.codeSize` — because the quest screen and the
+playground each used to derive the same expression themselves, which is how
+the two panes would have drifted the first time either was tuned.
+`tests/drive/typesize.lua` drives the largest step through both panes, both
+orientations and fullscreen, and asserts the pane still has rows, the caret is
+still on screen, the gutter has not eaten the pane and the buffer is byte for
+byte what it was.
+
+Both the fullscreen state, the orientation and the code size are remembered
+across restarts,
 **including whether the orientation was a pin**. A mode that was merely
 inferred from last week's window comes back as a starting guess and is
 re-derived; a mode you pressed F1 for comes back as a pin. Those are different
@@ -250,11 +311,22 @@ run; otherwise the saved field; otherwise `ws://127.0.0.1:5390/ws`. Editing
 the field always saves — and when an override is active the screen says so,
 rather than pretending to apply something it will not.
 
-State lives in **`~/.causewaybayhackerlove2d`** (SPEC §1.1), not in LÖVE's
-save directory: `0700` directory, `0600` files, append-only JSONL, state
-derived by replaying the log. It holds the session token, the chosen server,
-the orientation and fullscreen pins, and where each map was left — and **no
-key material, ever**. An existing LÖVE save is migrated across once.
+State lives in **`~/.causewaybaylove2d`** (SPEC §1.1), not in LÖVE's save
+directory: `0700` directory, `0600` files, append-only JSONL, state derived by
+replaying the log. It holds the session token, the chosen server, the
+orientation, fullscreen and code-size settings, and where each map was left —
+and **no key material, ever**.
+
+**Two migrations have run into this directory, and neither deletes anything.**
+An existing LÖVE save is brought across once; and a store at the old default
+`~/.causewaybayhackerlove2d` is **copied** across once, byte for byte, the
+first time a launch finds the new path empty. The old directory is left
+exactly as it was — not deleted, not renamed, not even appended to — so if the
+move ever goes wrong the evidence is still sitting there. The gate is simply
+"is there already a store at the new path", which is *migrate once*, *do not
+migrate twice* and *never overwrite* in a single condition, and the only one
+that can be checked without trusting a flag that could only live inside the
+file being written.
 
 **The token is stored per server.** A token minted by one server means
 nothing to another, so pointing the client at a new address asks you to sign
@@ -295,11 +367,14 @@ src/
   layout.lua          the virtual canvas        (ported, see the header)
   theme.lua ease.lua crt.lua                    (ported)
   assets.lua ui.lua sfx.lua                     art, chrome, chip audio
+                      ui.lua also owns the three display controls
   editor.lua          the code editor's model — pure, no love
   codepane.lua        the mouse and the bracket overlay, shared by two scenes
   external.lua        the $EDITOR escape hatch
   wallet.lua          the LuaJIT binding to libcwbh_ffi
-  store.lua           the session token, and nothing else, on disk
+  store.lua           ~/.causewaybaylove2d: the token, the server, the
+                      display settings and the map cursors — and the
+                      one-time move out of the old home
   session.lua         auth, the token, and what a reconnect does
   json.lua            vendored, see the header
   net/

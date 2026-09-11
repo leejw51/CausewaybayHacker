@@ -409,9 +409,7 @@ function Playground:draw_code(rect)
   UI.well(rect.x, rect.y, rect.w, rect.h,
     self.focus == "editor" and Theme.coin or Theme.cyan)
 
-  local scale = Layout.uiScale()
-  local size = math.floor(18 * scale)
-  local font = Assets.mono(size)
+  local font = Assets.mono(Layout.codeSize(18))
   local line_h = font:getHeight()
   -- The trailing space is not decoration: `%4d` right-aligns, so without
   -- it the last digit of the line number touches the first character of an
@@ -514,7 +512,7 @@ end
 --- says.
 function Playground:draw_output(rect)
   UI.well(rect.x, rect.y, rect.w, rect.h, Theme.cyan)
-  local font = Assets.mono(16)
+  local font = Assets.mono(Layout.codeSize(16))
   local line_h = font:getHeight()
   local y = rect.y + 8
 

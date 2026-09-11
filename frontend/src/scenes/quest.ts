@@ -12,7 +12,7 @@
  * editor's box as a drawer that opens when a run starts.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, wrap } from "../engine/text";
+import { ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { btnBox, rowsIn, clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
 import {
@@ -956,13 +956,21 @@ export class QuestScene implements Scene {
         g.fillStyle = css(Theme.cyan);
         printf(g, fonts.stationSm, t("quest.sample", { name: c.name }), tx, ty, tw, "left");
         ty += fonts.stationSm.height + Math.round(4 * s);
+        // IN and OUT line up on a measured column, not on spaces: 輸入 and
+        // 輸出 are the same width as each other but not as `in`/`out`, and
+        // Czech `vstup`/`výstup` differ from each other by a character.
+        const labW =
+          Math.max(width(fonts.code, t("quest.in")), width(fonts.code, t("quest.out"))) +
+          Math.round(10 * s);
         if (c.stdin) {
           g.fillStyle = css(Theme.dim);
-          printf(g, fonts.code, `${t("quest.in")}   ${show(c.stdin)}`, tx, ty, tw, "left");
+          printf(g, fonts.code, t("quest.in"), tx, ty, labW, "left");
+          printf(g, fonts.code, show(c.stdin), tx + labW, ty, tw - labW, "left");
           ty += fonts.code.height;
         }
         g.fillStyle = css(Theme.grass);
-        printf(g, fonts.code, `${t("quest.out")}  ${show(c.expect)}`, tx, ty, tw, "left");
+        printf(g, fonts.code, t("quest.out"), tx, ty, labW, "left");
+        printf(g, fonts.code, show(c.expect), tx + labW, ty, tw - labW, "left");
         yy += wellH + Math.round(8 * s);
       }
       if (tests.hidden_count > 0) {

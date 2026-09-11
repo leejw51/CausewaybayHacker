@@ -216,6 +216,74 @@ return function()
     T.ok(code:find("—", 1, true) ~= nil, "absence has its own mark")
   end)
 
+  T.section("screens — the display controls are on every one of them")
+
+  T.case("every scene draws the footer, which is what carries them", function()
+    -- The three display buttons — window/fullscreen, orientation, type size —
+    -- are drawn by `App:footer` and nowhere else, so "on every screen" is
+    -- exactly "every scene calls `app:footer`". A scene added tomorrow gets
+    -- them for free and this case is what notices if one does not.
+    --
+    -- The title card is in the list on purpose: a player who wants to play in
+    -- portrait should not have to sign in first to be allowed to ask.
+    local scenes = {
+      "boot", "login", "lands", "categories", "map", "quest", "result",
+      "search", "stats", "ai", "playground",
+    }
+    for _, name in ipairs(scenes) do
+      local path = "src/scenes/" .. name .. ".lua"
+      local _, code = strings_of(path)
+      if code then
+        T.ok(code:find("app:footer(", 1, true) ~= nil,
+          path .. " draws the footer, so it has the display controls")
+      else
+        T.skip(path, "not readable from this working directory")
+      end
+    end
+  end)
+
+  T.case("the app draws the cluster and tests it before the scene", function()
+    local _, code = strings_of("src/app.lua")
+    if not code then return end
+    T.ok(code:find("UI.displayControls", 1, true) ~= nil,
+      "the buttons are drawn from the one place every screen already calls")
+    T.ok(code:find("UI.displayReserve", 1, true) ~= nil,
+      "and the footer hint is measured against what is left, not clipped after")
+    -- A press on global chrome that also reached the scene underneath would
+    -- open a quest while the player was changing the type size.
+    local order = code:find("self:display_pressed", 1, true)
+    local scene = code:find("self.scene:mousepressed", 1, true)
+    T.ok(order ~= nil and scene ~= nil and order < scene,
+      "the display rects are tested before the scene sees the click")
+  end)
+
+  T.case("each control says the state it is in, not the one it moves to", function()
+    local _, code = strings_of("src/ui.lua")
+    if not code then return end
+    -- A toggle whose current value is invisible gets pressed twice: once to
+    -- find out, once to put it back.
+    for _, label in ipairs({ "FULL", "WINDOW", "AUTO", "PORT", "LAND" }) do
+      T.ok(code:find('"' .. label .. '"', 1, true) ~= nil,
+        "the cluster can say " .. label)
+    end
+    -- AUTO is a state *and* a resolved shape, and the glyph says the second.
+    T.ok(code:find("state.shape", 1, true) ~= nil,
+      "automatic still shows which shape it landed on")
+    T.ok(code:find("font_label", 1, true) ~= nil,
+      "and the type size says which of its steps is live")
+  end)
+
+  T.case("the keys still work, and are still the ones the README names", function()
+    local _, main = strings_of("main.lua")
+    if not main then return end
+    T.ok(main:find('key == "f11"', 1, true) ~= nil)
+    T.ok(main:find('key == "f1"', 1, true) ~= nil)
+    T.ok(main:find('key == "f12"', 1, true) ~= nil, "the type size has a key too")
+    T.ok(main:find("Layout.toggleFullscreen", 1, true) ~= nil)
+    T.ok(main:find("Layout.cycleOrientation", 1, true) ~= nil)
+    T.ok(main:find("Layout.cycleFont", 1, true) ~= nil)
+  end)
+
   T.case("the FTS5 snippet markup is stripped rather than shown", function()
     local _, code = strings_of("src/scenes/search.lua")
     if not code then return end

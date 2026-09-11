@@ -43,7 +43,13 @@ Drive.__index = Drive
 function Drive.load(path)
   local chunk, err = loadfile(path)
   if not chunk then
-    error("CWBH_DRIVE: " .. tostring(err))
+    -- The path is resolved against the process's working directory, not the
+    -- game directory, so the usual way to get here is running from the
+    -- repository root instead of from `love2d/`. Say that, rather than
+    -- repeating LuaJIT's "No such file or directory" and leaving somebody to
+    -- work out which directory it looked in.
+    error(("CWBH_DRIVE: %s\n  (resolved against the working directory — "
+      .. "run from love2d/, or give an absolute path)"):format(tostring(err)))
   end
   local steps = chunk()
   assert(type(steps) == "table", "CWBH_DRIVE script must return a list of steps")

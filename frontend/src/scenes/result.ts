@@ -18,7 +18,17 @@ import { burstPlan, type Plan } from "../engine/burst";
 import { cosine, expOut } from "../engine/ease";
 import { seconds, Tween } from "../engine/motion";
 import { star as starAt } from "../engine/ui";
-import { Buttons, clearedStamp, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import {
+  Buttons,
+  clearedStamp,
+  footer,
+  frame,
+  GO,
+  header,
+  keyRows,
+  RUST,
+  titledPanel,
+} from "../ui/chrome";
 import type { Attempt, Category, Land } from "../net/protocol";
 import { MapScene } from "./map";
 import { QuestScene } from "./quest";
@@ -345,16 +355,16 @@ export class ResultScene implements Scene {
     // Four facts, and only the ones that are facts about *this* run. `exit`
     // appears when it is not zero, because on a screen whose headline is that
     // something went wrong, "exit 0" is noise that contradicts the headline.
-    const rows = [
-      `${t("result.tests")}   ${this.attempt.tests_passed}/${this.attempt.tests_total}`,
-      `${t("result.compileMs")} ${this.attempt.compile_ms} ms`,
-      `${t("result.runMs")}     ${this.attempt.run_ms} ms`,
+    const rows: [string, string][] = [
+      [t("result.tests"), `${this.attempt.tests_passed}/${this.attempt.tests_total}`],
+      [t("result.compileMs"), `${this.attempt.compile_ms} ms`],
+      [t("result.runMs"), `${this.attempt.run_ms} ms`],
     ];
     if (this.attempt.exit_code !== null && this.attempt.exit_code !== 0) {
-      rows.push(`${t("result.exit")}    ${this.attempt.exit_code}`);
+      rows.push([t("result.exit"), String(this.attempt.exit_code)]);
     }
     g.fillStyle = css(Theme.cream);
-    printf(g, fonts.small, rows.join("\n"), left[0], y, left[2], "left");
+    keyRows(g, fonts.small, rows, left[0], y, left[2], Math.round(10 * s));
 
     // The attempt id is a log handle, not a result. It sits at the foot of the
     // panel in the smallest type on the screen, where somebody who needs it can

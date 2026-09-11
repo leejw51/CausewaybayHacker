@@ -198,19 +198,37 @@ export function tn(key: string, n: number, vars?: Record<string, string | number
  * the system stack", which is exactly what `engine/text.ts` does when no family
  * is named.
  */
+/**
+ * Which families this module has actually added, by name.
+ *
+ * **Not** `document.fonts.check()`, and that distinction cost a round of
+ * screenshots. `FontFaceSet.check()` answers "can this text be rendered without
+ * waiting for a font that is still loading" — and a family the set has never
+ * heard of has nothing to wait for, so it answers **true**. Used as a
+ * did-I-already-load-this guard it returns true on the very first call, the
+ * fetch is skipped, the family is named to `engine/text.ts`, the browser cannot
+ * supply it, and every CJK glyph quietly comes out of the system stack. Four
+ * languages looked translated and none of them was in the pixel face.
+ *
+ * A set we write ourselves cannot lie about that.
+ */
+const loaded = new Set<string>();
+
 async function loadFont(info: LocaleInfo): Promise<boolean> {
   if (!info.font) return false;
+  const { family, file } = info.font;
+  if (loaded.has(family)) return true;
   try {
     if (typeof FontFace === "undefined" || !document.fonts) return false;
-    const { family, file } = info.font;
-    // Already resident from an earlier switch: `check` is cheap and a second
-    // `FontFace` for the same family would fetch the same 900 KB again.
-    if (document.fonts.check(`16px "${family}"`)) return true;
     const face = new FontFace(family, `url(${file})`, { display: "swap" });
     await face.load();
     document.fonts.add(face);
+    loaded.add(family);
     return true;
   } catch {
+    // A face that will not download is a cosmetic failure: the system CJK
+    // stack behind it still renders the words. It must not stop somebody
+    // changing language.
     return false;
   }
 }

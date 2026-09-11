@@ -321,7 +321,10 @@ function Login:draw()
   end
 
   local hints = {
-    signin = "TAB field   F2 reveal   N new wallet   ENTER apply/sign in   F11 fullscreen",
+    -- No "F11 fullscreen" any more: that control is a button in the corner
+    -- of this very strip now, with its state written on it, so listing its
+    -- key here spent the room that the four keys with no button need.
+    signin = "TAB field   F2 reveal   N new wallet   ENTER apply/sign in",
     new_show = "ENTER create and sign in   C copy   ESC cancel",
   }
   self.app:footer(hints[self.mode] or "")

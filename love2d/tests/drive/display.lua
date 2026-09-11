@@ -8,6 +8,13 @@
 -- the buffer is worse than no toggle at all, so this types a program, toggles
 -- fullscreen twice, cycles the orientation through all three states, and
 -- asserts the bytes are identical to what was typed.
+--
+-- It then does the whole thing again **through the buttons**, because a key
+-- nobody can see is not a feature and a button nobody has driven is not
+-- tested. The clicks are aimed at `app.display_rects`, not at coordinates,
+-- so the same script works in either orientation and at any scale — and
+-- aiming at the rectangle the draw actually recorded is what makes the test
+-- about the control rather than about the arithmetic in the test.
 
 local SOURCE = 'fn main() {\nlet n = 42;\nprintln!("{}", n);'
 
@@ -21,6 +28,24 @@ local function add(t) steps[#steps + 1] = t end
 
 --- Print and remember what the layout looks like right now.
 local seen = {}
+
+--- The cluster is drawn by `App:footer`, which every scene calls, so this is
+--- the "on every screen" claim proved rather than asserted. Declared up here
+--- because the login and land screens are passed through long before the
+--- quest screen the buttons are exercised on.
+local function has_cluster_early(where)
+  return function(app)
+    local r = app.display_rects
+    if not (r and r.fullscreen and r.orient and r.font) then
+      print("FAIL: no display controls on " .. where)
+      return false
+    end
+    seen["cluster-" .. where] = true
+    print(("cluster on %-10s x=%d..%d  y=%d"):format(
+      where, r.fullscreen.x, r.font.x + r.font.w, r.font.y))
+    return true
+  end
+end
 local function snapshot(tag)
   return function(app)
     local L = require("src.layout")
@@ -42,12 +67,17 @@ end
 
 add({ orient = "landscape" })
 add({ wait = 0.6 })
+-- The title card, before anything has been signed into. A player who wants
+-- to play in portrait should not have to sign in first to be allowed to ask.
+add({ until_ = has_cluster_early("title"), timeout = 8 })
 add({ until_ = function(app) return app.scene_name == "login" or app.session.authed end,
       timeout = 15 })
+add({ until_ = has_cluster_early("login"), when = on_login, timeout = 5 })
 add({ text = "legal winner thank year wave sausage worth useful legal winner thank yellow",
       when = on_login })
 add({ key = "return", when = on_login })
 add({ until_ = scene("lands"), note = "signed in", timeout = 25 })
+add({ until_ = has_cluster_early("lands"), timeout = 5 })
 -- Straight to the map, rather than through the land and category screens.
 --
 -- Not a shortcut for its own sake: `world.lands` currently disagrees with
@@ -85,6 +115,7 @@ add({ until_ = function(app)
         tostring(first and first.quest_id), tostring(first and first.state)))
       return true
     end, note = "world.map, for the same land and category", timeout = 10 })
+add({ until_ = has_cluster_early("map"), timeout = 5 })
 add({ until_ = function(app)
       -- Land on something playable.
       for i, n in ipairs(app.scene.nodes) do
@@ -128,6 +159,72 @@ add({ key = "f11" })
 add({ wait = 1.6 })
 add({ until_ = snapshot("windowed"), timeout = 5 })
 add({ shot = "D4-quest-windowed-again.png" })
+
+-- ---------------------------------------------------------------- the buttons
+
+--- The centre of one of the three footer chips, as the draw recorded it.
+local function chip(name)
+  return function(app)
+    local rect = app.display_rects and app.display_rects[name]
+    assert(rect, "no display rect for " .. name .. " — the cluster was not drawn")
+    return { rect.x + rect.w / 2, rect.y + rect.h / 2 }
+  end
+end
+
+add({ note = "the same three controls, clicked instead of typed" })
+add({ until_ = has_cluster_early("quest"), timeout = 5 })
+add({ until_ = snapshot("before-clicks"), timeout = 5 })
+
+add({ note = "click WINDOW -> fullscreen" })
+add({ click = chip("fullscreen") })
+add({ wait = 1.6 })
+add({ until_ = snapshot("click-full"), timeout = 5 })
+add({ shot = "D5-click-fullscreen.png" })
+
+add({ note = "click the orientation chip three times: LAND -> PORT -> AUTO -> LAND" })
+add({ click = chip("orient") })
+add({ wait = 0.9 })
+add({ until_ = snapshot("click-orient-1"), timeout = 5 })
+add({ shot = "D6-click-portrait.png" })
+add({ click = chip("orient") })
+add({ wait = 0.9 })
+add({ until_ = snapshot("click-orient-2"), timeout = 5 })
+-- The third state, which is the one a two-way toggle could never reach and
+-- the one a label alone could never describe: the word says AUTO and the
+-- glyph says which shape the window handed it.
+add({ shot = "D6b-click-automatic.png" })
+add({ click = chip("orient") })
+add({ wait = 0.9 })
+add({ until_ = snapshot("click-orient-3"), timeout = 5 })
+
+add({ note = "click the type-size chip through all four steps and back" })
+add({ until_ = function(app)
+      local L = require("src.layout")
+      seen.font_start = L.font
+      seen.font_sizes = { L.codeSize(18) }
+      return true
+    end, timeout = 3 })
+for i = 1, 4 do
+  add({ click = chip("font") })
+  add({ wait = 0.4 })
+  add({ until_ = function(app)
+        local L = require("src.layout")
+        seen.font_sizes[#seen.font_sizes + 1] = L.codeSize(18)
+        print(("font step %d/%d -> code %dpx   rows=%s   bytes=%s"):format(
+          L.font, #L.FONT_STEPS, L.codeSize(18),
+          tostring(app.scene.visible_rows),
+          tostring(#(app.scene.editor and app.scene.editor:text() or ""))))
+        return true
+      end, timeout = 3 })
+  if i == 3 then add({ shot = "D7-largest-type.png" }) end
+end
+add({ until_ = snapshot("click-font"), timeout = 5 })
+
+add({ note = "click FULL -> back to a window" })
+add({ click = chip("fullscreen") })
+add({ wait = 1.6 })
+add({ until_ = snapshot("click-window"), timeout = 5 })
+add({ shot = "D8-click-windowed.png" })
 
 -- The whole point.
 add({ until_ = function(app)
@@ -180,9 +277,69 @@ add({ until_ = function(app)
       print("FAIL: pinning portrait did not re-measure the canvas")
       ok = false
     end
+    -- ---- and now the same claims about the button path ----
+    if not seen["click-full"].full then
+      print("FAIL: clicking the window chip did not enter fullscreen")
+      ok = false
+    end
+    if seen["click-window"].full then
+      print("FAIL: clicking it again did not leave fullscreen")
+      ok = false
+    end
+    if seen["click-full"].vw == seen["before-clicks"].vw
+      and seen["click-full"].vh == seen["before-clicks"].vh then
+      print("FAIL: the canvas was not re-measured on the clicked transition")
+      ok = false
+    end
+    -- The cycle, clicked: pinned landscape -> pinned portrait -> automatic
+    -- -> pinned landscape. A *restored* pin is weaker than a pressed one and
+    -- a clicked one is a pressed one.
+    if not (seen["click-orient-1"].pinned and seen["click-orient-1"].mode == "portrait") then
+      print(("FAIL: the first click should pin portrait, got mode=%s pinned=%s")
+        :format(seen["click-orient-1"].mode, tostring(seen["click-orient-1"].pinned)))
+      ok = false
+    end
+    if seen["click-orient-2"].pinned then
+      print("FAIL: the second click should hand the orientation back to automatic")
+      ok = false
+    end
+    if not (seen["click-orient-3"].pinned and seen["click-orient-3"].mode == "landscape") then
+      print("FAIL: the third click should pin landscape again")
+      ok = false
+    end
+    -- Four steps, each strictly bigger than the last, wrapping to the first.
+    local sizes = seen.font_sizes or {}
+    for i = 2, 4 do
+      if not (sizes[i] and sizes[i] > sizes[i - 1]) then
+        print(("FAIL: type step %d (%s) is not larger than step %d (%s)")
+          :format(i, tostring(sizes[i]), i - 1, tostring(sizes[i - 1])))
+        ok = false
+      end
+    end
+    if sizes[5] ~= sizes[1] then
+      print(("FAIL: the type cycle did not wrap: %s then %s")
+        :format(tostring(sizes[1]), tostring(sizes[5])))
+      ok = false
+    end
+    -- And the cluster was actually on every screen this run passed through.
+    --
+    -- The login screen is **conditional on purpose**: a run whose stored
+    -- token still resumes never sees it (PROTOCOL §4.4), and demanding it
+    -- would make this script fail for the one reason that is not a bug. It
+    -- is checked when it is there and reported when it is not.
+    for _, where in ipairs({ "title", "lands", "map", "quest" }) do
+      if not seen["cluster-" .. where] then
+        print("FAIL: no display controls seen on " .. where)
+        ok = false
+      end
+    end
+    print(seen["cluster-login"]
+      and "cluster on login: yes"
+      or "cluster on login: not visited this run (the stored token resumed)")
     if ok then
-      print(("PASS: %d bytes and the cursor survived two fullscreen transitions "
-        .. "and three orientation changes"):format(#(text or "")))
+      print(("PASS: %d bytes and the cursor survived four fullscreen transitions, "
+        .. "six orientation changes and four type sizes — by key and by button")
+        :format(#(text or "")))
     end
     return ok
   end, note = "the buffer, the cursor and the scene all survived", timeout = 5 })

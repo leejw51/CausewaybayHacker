@@ -416,6 +416,41 @@ export function titledPanel(
 }
 
 /**
+ * A label/value column, aligned in pixels rather than in spaces.
+ *
+ * The obvious way to write `tests   3/5` is to put three spaces in the string,
+ * and it holds exactly as long as every label is English and the font is
+ * monospaced. It is neither. `compile` is `kompilace` in Czech and `コンパイル`
+ * in Japanese, and in VT323 a CJK glyph is close to twice the advance of a
+ * Latin one — so a column padded to eight characters is ragged in Czech and
+ * nowhere near a column in Korean. Measure the labels, take the widest, and
+ * start every value after it.
+ *
+ * Returns the height used, so the caller can put something underneath.
+ */
+export function keyRows(
+  g: Ctx,
+  f: Font,
+  rows: readonly (readonly [string, string])[],
+  x: number,
+  y: number,
+  limit: number,
+  gap: number,
+): number {
+  let keyW = 0;
+  for (const [k] of rows) keyW = Math.max(keyW, width(f, k));
+  // If the labels have eaten the panel there is nothing to align to, and a
+  // value pushed off the right edge is worse than a ragged column.
+  const off = Math.min(keyW + gap, Math.max(limit * 0.6, limit - gap));
+  let dy = y;
+  for (const [k, v] of rows) {
+    printf(g, f, k, x, dy, off, "left");
+    dy += printf(g, f, v, x + off, dy, limit - off, "left") * f.height;
+  }
+  return dy - y;
+}
+
+/**
  * Where a panel is while it is still arriving, in virtual pixels.
  *
  * Panels come in from the edge they are nearest — left box from the left,

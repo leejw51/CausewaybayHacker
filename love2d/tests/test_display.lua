@@ -193,9 +193,89 @@ return function()
     T.eq(Layout.orientationLabel(), "landscape")
   end)
 
+  T.section("display — the type-size step")
+
+  T.case("the step cycles and wraps, and says which one it is in", function()
+    Layout.storage = memory_storage()
+    Layout.font = 1
+    T.eq(Layout.fontLabel(), "1/4")
+    T.eq(Layout.fontScale(), 1.0, "step 1 is the size this client always drew")
+    local seen = {}
+    for _ = 1, #Layout.FONT_STEPS do seen[#seen + 1] = Layout.cycleFont() end
+    T.same(seen, { 2, 3, 4, 1 }, "four steps and back to the start")
+    -- A cycle, not a slider: every step has a name, and the control can be
+    -- pressed past the end without getting stuck at it.
+    T.eq(Layout.font, 1)
+    for i = 1, #Layout.FONT_STEPS do
+      Layout.setFont(i)
+      T.eq(Layout.fontLabel(), i .. "/4")
+      T.ok(Layout.fontScale() >= 1.0)
+    end
+  end)
+
+  T.case("the steps only ever get bigger", function()
+    -- A control whose middle step was smaller than its first would be
+    -- unreadable as "1 2 3 4".
+    local last = 0
+    for _, step in ipairs(Layout.FONT_STEPS) do
+      T.ok(step > last, "step " .. tostring(step) .. " is larger than the one before")
+      last = step
+    end
+  end)
+
+  T.case("the step survives a restart, on the same record as the pins", function()
+    local storage = memory_storage()
+    Layout.storage = storage
+    Layout.mode, Layout.pinned, Layout.fullscreen = "portrait", true, true
+    Layout.setFont(3)
+    T.eq(storage.peek().font, 3, "one record carries all three")
+    T.eq(storage.peek().pinned, true)
+
+    Layout.font, Layout.mode, Layout.pinned, Layout.fullscreen =
+      1, "landscape", false, false
+    Layout.load()
+    T.eq(Layout.font, 3, "somebody who prefers big type wants it every launch")
+    T.eq(Layout.mode, "portrait")
+    T.eq(Layout.pinned, true)
+  end)
+
+  T.case("a step this binary does not have falls back rather than indexing off the end", function()
+    Layout.storage = memory_storage({ mode = "landscape", pinned = true, font = 9 })
+    Layout.font = 2
+    Layout.load()
+    T.eq(Layout.font, 2, "a step from a newer client is ignored, not applied")
+    T.eq(Layout.fontScale(), Layout.FONT_STEPS[2])
+
+    Layout.storage = memory_storage({ mode = "landscape", pinned = true, font = "big" })
+    Layout.load()
+    T.eq(Layout.font, 2)
+    Layout.setFont(0)
+    T.eq(Layout.font, 2, "and nothing can set it out of range either")
+    Layout.setFont(#Layout.FONT_STEPS + 1)
+    T.eq(Layout.font, 2)
+  end)
+
+  T.case("codeSize is the one place both code panes ask", function()
+    Layout.storage = memory_storage()
+    -- `uiScale` is 1 at the authored size, so the step is the whole factor.
+    Layout.vw, Layout.vh, Layout.mode = 1280, 720, "landscape"
+    Layout.setFont(1)
+    T.eq(Layout.codeSize(18), 18)
+    T.eq(Layout.codeSize(16), 16)
+    Layout.setFont(4)
+    T.eq(Layout.codeSize(18), math.floor(18 * Layout.FONT_STEPS[4]))
+    T.ok(Layout.codeSize(18) > 18, "the largest step is visibly larger")
+    -- Never small enough to be unreadable, whatever it is handed.
+    T.ok(Layout.codeSize(1) >= 8)
+    T.eq(Layout.codeSize(), Layout.codeSize(18), "18 is the default base")
+    Layout.setFont(1)
+  end)
+
   -- Leave the module as the rest of the suite expects to find it.
   Layout.storage = nil
   Layout.pinned = false
   Layout.fullscreen = false
+  Layout.font = 1
+  Layout.vw, Layout.vh = 1280, 720
   Layout.mode = "landscape"
 end

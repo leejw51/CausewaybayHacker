@@ -1,4 +1,4 @@
--- The client's own store: `~/.causewaybayhackerlove2d`, SPEC §1.1.
+-- The client's own store: `~/.causewaybaylove2d`, SPEC §1.1.
 --
 -- The four properties `CausewaybayWallet`'s own suite tests, because they are
 -- the ones that decide whether an append-only log is a feature or a way to
@@ -236,6 +236,149 @@ return function()
     wipe(dir)
   end)
 
+  T.section("store — SPEC §1.1: where the home comes from")
+
+  T.case("flag beats environment beats default", function()
+    local saved = os.getenv(Store.DIR_ENV)
+    local home = os.getenv("HOME")
+    T.eq(Store.home("/tmp/explicit"), "/tmp/explicit",
+      "a flag that lost to an environment variable would be a flag that does nothing")
+    -- The env var, when there is no flag. `os.setenv` does not exist in
+    -- LuaJIT, so this asserts the two ends that can be asserted without it:
+    -- the flag wins outright, and with neither the default is the default.
+    T.eq(Store.home(), saved and saved ~= "" and saved or (home .. "/" .. Store.DEFAULT_DIR))
+    T.eq(Store.default_home(), home .. "/.causewaybaylove2d")
+    T.eq(Store.old_home(), home .. "/.causewaybayhackerlove2d")
+    T.ne(Store.default_home(), Store.old_home())
+    -- Blank is not a value: an exported-but-empty variable must not send the
+    -- store to `/state.jsonl`.
+    T.eq(Store.home("   "), Store.home(), "whitespace is not a path")
+  end)
+
+  T.case("a leading ~ is expanded, and only a leading one", function()
+    local home = os.getenv("HOME")
+    T.eq(Store.expand_tilde("~/games"), home .. "/games")
+    T.eq(Store.expand_tilde("~"), home)
+    -- Without this, `--home '~/x'` makes a directory literally called `~` in
+    -- whatever the working directory happens to be. `CausewaybayWallet`'s
+    -- `paths.rs` carries the same three cases.
+    T.eq(Store.expand_tilde("/tmp/x"), "/tmp/x")
+    T.eq(Store.expand_tilde("./~/x"), "./~/x")
+    T.eq(Store.expand_tilde("~user/x"), "~user/x")
+  end)
+
+  T.section("store — SPEC §1.1: the move out of the old home")
+
+  T.case("the old store is copied across once, verbatim", function()
+    local old_dir, new_dir = scratch(), scratch()
+
+    -- A store with history in it, including the two things a replay would
+    -- have destroyed: repeated `display.set` lines, and a line this binary
+    -- cannot read.
+    Store.open({ dir = old_dir })
+    Store.save_session("token-old", { address = "0xaaa", name = "mei" },
+      "ws://127.0.0.1:5390/ws")
+    Store.save_display({ mode = "portrait", pinned = true, fullscreen = false })
+    Store.save_display({ mode = "landscape", pinned = true, fullscreen = false })
+    Store.set_map_cursor("rust.basic", "rust.basic.05.slices")
+    Store.reset()
+    raw_append(old_dir, json.encode({
+      schema = Store.SCHEMA + 1, kind = "server.set", url = "ws://future:1/ws" }) .. "\n")
+    raw_append(old_dir, "this line is not json\n")
+    local before = lines_of(old_dir)
+
+    local copied = Store.copy_store(old_dir, new_dir)
+    T.eq(copied, #before, "every line came across, including the two unreadable ones")
+
+    local after = lines_of(new_dir)
+    T.eq(#after, #before)
+    for i = 1, #before do
+      T.eq(after[i], before[i], "line " .. i .. " is byte-identical")
+    end
+
+    -- And the old one is exactly as it was. Not deleted, not truncated, not
+    -- appended to: if the move goes wrong, the evidence is still there.
+    T.same(lines_of(old_dir), before, "the old store was not touched")
+
+    Store.open({ dir = new_dir })
+    T.eq(Store.load_session("ws://127.0.0.1:5390/ws").token, "token-old")
+    T.eq(Store.map_cursor("rust.basic"), "rust.basic.05.slices")
+    T.eq(Store.load_display().mode, "landscape")
+    Store.reset()
+
+    -- A second copy refuses: the new store is already there.
+    T.eq(Store.copy_store(old_dir, new_dir), nil,
+      "migrating twice would overwrite whatever has happened since")
+    wipe(old_dir); wipe(new_dir)
+  end)
+
+  T.case("a store that is already at the new path is never overwritten", function()
+    local old_dir, new_dir = scratch(), scratch()
+    Store.open({ dir = old_dir })
+    Store.set_server("ws://old:1/ws")
+    Store.reset()
+    Store.open({ dir = new_dir })
+    Store.set_server("ws://new:1/ws")
+    Store.reset()
+
+    T.eq(Store.copy_store(old_dir, new_dir), nil)
+    Store.open({ dir = new_dir })
+    T.eq(Store.saved_server(), "ws://new:1/ws", "the newer store won, untouched")
+    Store.reset()
+    wipe(old_dir); wipe(new_dir)
+  end)
+
+  T.case("nothing at the old path is not an error", function()
+    local old_dir, new_dir = scratch(), scratch()
+    T.eq(Store.copy_store(old_dir, new_dir), nil, "no old store at all")
+    raw_append(old_dir, "")
+    T.eq(Store.copy_store(old_dir, new_dir), nil, "an empty file is absent, not a store")
+    T.eq(Store.copy_store(nil, new_dir), nil)
+    T.eq(Store.copy_store(new_dir, new_dir), nil, "and a store never moves onto itself")
+    wipe(old_dir); wipe(new_dir)
+  end)
+
+  T.case("a torn last line survives the move and costs only itself", function()
+    local old_dir, new_dir = scratch(), scratch()
+    Store.open({ dir = old_dir })
+    Store.set_server("ws://a:1/ws")
+    Store.reset()
+    raw_append(old_dir, '{"schema":1,"kind":"server.set","url":"ws://b:53')
+
+    T.ok(Store.copy_store(old_dir, new_dir) ~= nil)
+    Store.open({ dir = new_dir })
+    T.eq(Store.saved_server(), "ws://a:1/ws", "the fragment is skipped, as it was before")
+    Store.set_server("ws://c:1/ws")
+    Store.reset()
+    Store.open({ dir = new_dir })
+    T.eq(Store.saved_server(), "ws://c:1/ws", "and the next append did not splice onto it")
+    Store.reset()
+    wipe(old_dir); wipe(new_dir)
+  end)
+
+  T.case("the two migrations are two different facts", function()
+    -- The real store at the old path carries `{"kind":"migrated",
+    -- "from":"love.filesystem"}` from the first move. Copying it across must
+    -- not make the arriving store claim the *second* migration has run, and
+    -- the second's own record must not claim the first. One boolean for both
+    -- is the same shape as reading a restored inference as a pin.
+    local folded = Store.replay({
+      { kind = "migrated", from = "love.filesystem", brought = 2 },
+    })
+    T.eq(folded.migrated, true)
+    T.eq(folded.moved_from, nil)
+
+    local moved = Store.replay({
+      { kind = "migrated", from = "/home/x/.causewaybayhackerlove2d", lines = 116 },
+    })
+    T.eq(moved.migrated, false, "a directory move says nothing about love.filesystem")
+    T.eq(moved.moved_from, "/home/x/.causewaybayhackerlove2d")
+
+    -- An ancient record with no `from` at all is the love.filesystem one:
+    -- that migration predates the field.
+    T.eq(Store.replay({ { kind = "migrated" } }).migrated, true)
+  end)
+
   T.case("a missing or unreadable old save is not an error", function()
     local dir = scratch()
     Store.open({ dir = dir })
@@ -277,6 +420,48 @@ return function()
     wipe(dir)
   end)
 
+  T.case("a stored `false` fullscreen comes back as false, not as nil", function()
+    -- `type(x) == "boolean" and x or nil` folds a stored `false` to `nil`,
+    -- because `false or nil` is `nil`. The bug was invisible only because
+    -- `Layout.fullscreen` happens to start false — which is the worst kind
+    -- of correct, and stops being correct the moment anything else reads it.
+    local dir = scratch()
+    Store.open({ dir = dir })
+    Store.save_display({ mode = "landscape", pinned = true, fullscreen = false })
+    Store.reset()
+    Store.open({ dir = dir })
+    T.eq(Store.load_display().fullscreen, false, "the player did have an opinion")
+    Store.reset()
+    wipe(dir)
+  end)
+
+  T.case("the type-size step rides on the same record", function()
+    -- One record, not two: the orientation, the fullscreen pin and the type
+    -- size are one setting — how this window is set up — and two write paths
+    -- would be two ways for them to disagree.
+    local dir = scratch()
+    Store.open({ dir = dir })
+    Store.save_display({ mode = "portrait", pinned = true, fullscreen = false, font = 3 })
+    T.eq(#lines_of(dir), 1, "one append, not one per field")
+    Store.reset()
+    Store.open({ dir = dir })
+    local d = Store.load_display()
+    T.eq(d.font, 3)
+    T.eq(d.mode, "portrait")
+    T.eq(d.pinned, true)
+    Store.reset()
+
+    -- A store written before this control existed has no `font`, and that
+    -- reads as "no opinion" rather than as step zero.
+    Store.open({ dir = dir })
+    Store.save_display({ mode = "portrait", pinned = true })
+    Store.reset()
+    Store.open({ dir = dir })
+    T.eq(Store.load_display().font, nil)
+    Store.reset()
+    wipe(dir)
+  end)
+
   T.section("store — replay is a pure fold")
 
   T.case("replay can be driven with no filesystem at all", function()
@@ -292,6 +477,53 @@ return function()
     T.eq(folded.sessions["ws://a:1/ws"], nil)
     T.eq(folded.map["rust.basic"], "rust.basic.02.bindings")
     T.eq(folded.lines, 6)
+  end)
+
+  T.case("a home that was named is never migrated into", function()
+    -- Both migrations ask this one question, and they must give the same
+    -- answer. A directory handed in whole, or named by `--home` or by
+    -- `CWBH_LOVE2D_HOME`, is exactly the directory that was asked for: the
+    -- old home is not copied into it and LÖVE's save directory is not
+    -- imported into it. Without the second half, `--home $(mktemp -d)` means
+    -- "a fresh store, plus whatever session was lying in LÖVE's sandbox" —
+    -- which is not a fresh store, and `tests/drive/slice.lua` depends on it
+    -- being one.
+    local dir = scratch()
+    Store.open({ dir = dir })
+    T.eq(Store.resolved_default(), false, "a directory handed in is not the default")
+    Store.reset()
+    T.eq(Store.resolved_default(), false, "and reset forgets it")
+
+    Store.open({ home = "/tmp/definitely-not-the-default-home-" .. os.time() })
+    T.eq(Store.resolved_default(), false, "nor is one named by --home")
+    Store.reset()
+
+    Store.open({ dir = false })
+    T.eq(Store.resolved_default(), false, "nor is running with no home at all")
+    Store.reset()
+    wipe(dir)
+  end)
+
+  T.case("the app asks before importing LÖVE's save directory", function()
+    -- The guard lives at the call site because `Store.migrate` is called
+    -- directly by these tests against a scratch directory, and has to keep
+    -- working there. So the assertion is that `src/app.lua` asks.
+    local fh = io.open("src/app.lua", "r")
+    if not fh then T.skip("src/app.lua", "not readable"); return end
+    local body = fh:read("*a")
+    fh:close()
+    local asks = body:find("Store.resolved_default()", 1, true)
+    local migrates = body:find("Store.migrate(", 1, true)
+    T.ok(asks ~= nil and migrates ~= nil and asks < migrates,
+      "the guard is asked before the migration runs")
+  end)
+
+  T.case("the store itself never touches love", function()
+    -- The rule the headless run rests on. It matters more here than almost
+    -- anywhere: `love.filesystem` is sandboxed to LÖVE's own save directory
+    -- and this path is deliberately outside it, so a single `love.` in this
+    -- file would be both a layering break and a store in the wrong place.
+    T.no_love("src/store.lua")
   end)
 
   T.case("with no home the store runs in memory rather than failing", function()

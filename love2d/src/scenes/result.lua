@@ -202,7 +202,7 @@ function Result:draw()
   if a.stderr and a.stderr ~= "" then
     cy = cy + 6
     cy = cy + UI.text("STDERR", cx, cy, 9, Theme.withAlpha(Theme.cream, 0.7)) + 6
-    local font = Assets.mono(16)
+    local font = Assets.mono(Layout.codeSize(16))
     love.graphics.setFont(font)
     UI.setColor(Theme.withAlpha(Theme.cream, 0.85))
     for line in (a.stderr .. "\n"):gmatch("(.-)\n") do

@@ -492,6 +492,12 @@ async function main() {
     // The CJK face is ~900 KB and is fetched on the switch; the frame that
     // matters is the one after it has landed.
     await page.waitForTimeout(2500);
+    // And then check, because the failure mode is silent and expensive. If the
+    // cycle falls a press short, `group` swallows it, prints a skip line, and
+    // every shot from here to the end of the run is captured in whatever
+    // language we happened to stop on — a whole English set, quietly Cantonese.
+    const got = await page.evaluate(() => localStorage.getItem("cwbhacker.locale"));
+    if (got !== id) throw new Error(`language(${id}) landed on ${got}`);
   };
 
   await group("language-title", async () => {
@@ -531,6 +537,14 @@ async function main() {
     await settle(2);
     await shot("75-quest-korean-portrait");
     await size(LAND);
+    await page.waitForTimeout(400);
+    // The verdict panel's facts column, in a language whose labels are
+    // full-width. It used to be padded with spaces to column eight, which is a
+    // column only in English.
+    await press("submit", 1200);
+    await at("result", 60000);
+    await page.waitForTimeout(1500);
+    await shot("80-result-korean");
   });
 
   await group("language-czech", async () => {
@@ -543,11 +557,18 @@ async function main() {
     await shot("76-lands-czech");
     await press("cat:basic", 2500);
     await at("map", 25000);
+    await settle(3);
     await page.keyboard.press("Enter");
     await at("quest", 30000);
     await page.waitForTimeout(2500);
     await settle(2.5);
     await shot("77-quest-czech");
+    // Czech is the other half of the same check: `kompilace` and `běh` differ
+    // by six characters, so a space-padded column is visibly ragged.
+    await press("submit", 1200);
+    await at("result", 60000);
+    await page.waitForTimeout(1500);
+    await shot("79-result-czech");
   });
 
   await group("language-cantonese", async () => {
@@ -561,10 +582,12 @@ async function main() {
   });
 
   // Back to English, so every shot after this one is the source language.
-  await group("language-back", async () => {
-    await ready();
-    await language("en");
-  });
+  //
+  // Deliberately *not* inside `group`: everything below depends on this having
+  // worked, and a skip line would let the run finish green with two thirds of
+  // the set in the wrong language. This one is allowed to stop the run.
+  await ready();
+  await language("en");
 
   // ---- a quest, and what comes out of it ---------------------------------
   const openQuest = async (category = "cat:basic") => {
@@ -614,8 +637,13 @@ async function main() {
     await openQuest();
     await settle(2);
     await press("submit", 1200);
-    // The confirm dialogue, then the compile.
-    await page.keyboard.press("Enter");
+    // No Enter here, and the comment that used to say "the confirm dialogue"
+    // was wrong: SUBMIT asks nothing, it submits. The stray keystroke was
+    // harmless only while the compile was slow enough that it landed on the
+    // quest screen and did nothing — the moment `rustc` answered inside a
+    // second it landed on the *verdict* screen, where ENTER means "back to
+    // the map", and this group reported "still on map" for a screen it had
+    // reached and then left.
     await at("result", 60000);
     await page.waitForTimeout(1200);
     await shot("50-result-rejected");

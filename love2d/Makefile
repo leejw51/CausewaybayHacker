@@ -77,27 +77,40 @@ test-headless: check-layering ## The suite under a bare luajit, no window
 test-all: ffi-test test-headless test ## Everything: Rust, headless Lua, LÖVE
 
 # The structural rule the headless suite rests on: the codec, the JSON, the
-# editor model and the FFI binding must not touch LÖVE. `T.no_love` asserts
-# the same thing from inside the suite; this is the version that works even
-# when the suite cannot start.
-check-layering: ## Assert src/net, json, editor and wallet never touch love
+# editor model, the store, the two clocks and the FFI binding must not touch
+# LÖVE. `T.no_love` asserts the same thing from inside the suite; this is the
+# version that works even when the suite cannot start.
+#
+# Comments are stripped, and so are string literals. The second one stopped
+# being optional when `src/store.lua` grew a record tagged
+# `from = "love.filesystem"` — the directory the first migration moved out
+# of, a name that is in every existing player's log and cannot be renamed to
+# please a grep. A quoted word is data, not a call.
+LAYERED := src/json.lua src/editor.lua src/wallet.lua src/store.lua \
+           src/anim.lua src/clock.lua src/net/*.lua
+
+check-layering: ## Assert net, json, editor, wallet, store, anim and clock never touch love
 	@bad=""; \
-	for f in src/json.lua src/editor.lua src/wallet.lua src/net/*.lua; do \
-		hit=$$(sed 's/--.*$$//' "$$f" \
+	for f in $(LAYERED); do \
+		hit=$$(sed -e 's/--.*$$//' -e 's/"[^"]*"/""/g' -e "s/'[^']*'/''/g" "$$f" \
 			| grep -nE '(^|[^[:alnum:]_])love[[:space:]]*\.' || true); \
 		if [ -n "$$hit" ]; then bad="$$bad\n$$f: $$hit"; fi; \
 	done; \
 	if [ -n "$$bad" ]; then \
 		printf "these files must not reference love:%b\n" "$$bad"; exit 1; \
 	fi; \
-	echo "  layering ok: src/net, json, editor and wallet are LÖVE-free"
+	echo "  layering ok: net, json, editor, wallet, store, anim and clock are LÖVE-free"
 
 # -------------------------------------------------------------------- drive
 
-drive: ## Replay a script: make drive SCRIPT=tests/drive/slice.lua
+# `ARGS` is passed straight to the client, which is how a script that needs a
+# signed-out player gets one without deleting somebody's store:
+#
+#   make drive SCRIPT=tests/drive/slice.lua ARGS="--home $$(mktemp -d)"
+drive: ## Replay a script: make drive SCRIPT=tests/drive/slice.lua [ARGS=...]
 	@test -n "$(SCRIPT)" || { echo "usage: make drive SCRIPT=tests/drive/slice.lua"; exit 1; }
 	@test -n "$(LOVE)" || { echo "no love binary; see 'make love-bin'"; exit 1; }
-	CWBH_SERVER="$(CWBH_SERVER)" CWBH_DRIVE="$(SCRIPT)" "$(LOVE)" "$(GAME_DIR)"
+	CWBH_SERVER="$(CWBH_SERVER)" CWBH_DRIVE="$(SCRIPT)" "$(LOVE)" "$(GAME_DIR)" $(ARGS)
 	@echo "  screenshots: $$HOME/Library/Application Support/LOVE/causewaybay-hacker"
 
 shots: ## Screenshot every screen in both orientations

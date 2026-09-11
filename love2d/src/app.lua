@@ -91,8 +91,12 @@ function App.check_server(url)
   return true
 end
 
-function App.new()
+--- `opts.home` is `main.lua`'s `--home` flag — SPEC §1.1's first step of
+--- precedence, ahead of `CWBH_LOVE2D_HOME` and the default.
+function App.new(opts)
+  opts = opts or {}
   local self = setmetatable({
+    home = opts.home,
     scene = nil,
     scene_name = nil,
     toast_text = nil,
@@ -161,17 +165,35 @@ function App:load()
   self.wallet_lib = lib
   self.wallet_error = why
 
+  -- Opening the store is also what brings an older one across: if
+  -- `~/.causewaybayhackerlove2d` holds a store and the new home does not,
+  -- `Store.open` copies it, once, and leaves the old directory alone.
   Store.open({
+    home = self.home,
     secure = lib and function(target, is_directory)
       return Wallet.secure(lib, target, is_directory)
     end or nil,
   })
-  -- Bring LÖVE's old save directory across, once, rather than starting fresh
-  -- on somebody who is mid-game.
-  Store.migrate(function(name)
-    if love.filesystem.getInfo(name) then return love.filesystem.read(name) end
-    return nil
-  end, App.DEFAULT_SERVER)
+  -- And the migration before that one: LÖVE's own save directory, which is
+  -- where this client kept its session for exactly one release.
+  --
+  -- **Gated on the same question the directory copy is gated on**, and it was
+  -- not, which is a bug this round introduced and caught by looking at the
+  -- file: a store opened with `--home` or `CWBH_LOVE2D_HOME` was getting a
+  -- session token and a display record injected into it out of LÖVE's
+  -- sandbox. `--home $(mktemp -d)` is documented as the way to drive a run
+  -- from nothing — `tests/drive/slice.lua` depends on it for the login
+  -- screen — and it would have meant "a fresh store, plus somebody's old
+  -- session", which is the same script passing for the wrong reason.
+  --
+  -- The question is asked of the store, not re-derived here: one place
+  -- decides what the default home is.
+  if Store.resolved_default() then
+    Store.migrate(function(name)
+      if love.filesystem.getInfo(name) then return love.filesystem.read(name) end
+      return nil
+    end, App.DEFAULT_SERVER)
+  end
 
   self.server, self.server_from = self:resolve_server()
   self:log("info", ("server %s (%s); store %s")
@@ -376,6 +398,9 @@ end
 function App:mousepressed(x, y, button)
   local vx, vy = Layout.toVirtual(x, y)
   if not vx then return end
+  -- The footer's display controls are global chrome and are tested first; a
+  -- press that lands on one is consumed and never reaches the scene.
+  if button == 1 and self:display_pressed(vx, vy) then return end
   if self.scene and self.scene.mousepressed then self.scene:mousepressed(vx, vy, button) end
 end
 
@@ -421,16 +446,79 @@ function App:typing()
   return false
 end
 
+-- --------------------------------------------------------- display controls
+
+--- What the three footer buttons have to show.
+---
+--- One function, read by the draw and by the click, so the label a player is
+--- looking at and the action a press performs can never come from two
+--- different ideas of the state.
+function App:display_state()
+  return {
+    fullscreen = Layout.fullscreen,
+    -- "auto" | "portrait" | "landscape" — the *state*, pin included.
+    orientation = Layout.orientationLabel(),
+    -- And the shape it actually resolved to, which is the half `auto` would
+    -- otherwise not say.
+    shape = Layout.mode,
+    font = Layout.font,
+    font_label = Layout.fontLabel(),
+  }
+end
+
+--- A press on one of the display buttons. True when it was taken.
+---
+--- Tested **before** the scene sees the click, and it returns rather than
+--- falling through: a press on the footer must not also land on whatever the
+--- scene has underneath it.
+---
+--- Each button does exactly what its key does — the same `Layout` call and
+--- the same toast — so the two paths cannot drift into meaning different
+--- things. The keys are not replaced; this is the half of the feature a
+--- player can see.
+function App:display_pressed(x, y)
+  local rects = self.display_rects
+  if not rects then return false end
+  local function inside(r)
+    return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
+  end
+  if inside(rects.fullscreen) then
+    SFX.play("select")
+    self:toast(Layout.toggleFullscreen() and "fullscreen" or "window")
+    return true
+  end
+  if inside(rects.orient) then
+    SFX.play("select")
+    self:toast("orientation: " .. Layout.cycleOrientation())
+    return true
+  end
+  if inside(rects.font) then
+    SFX.play("select")
+    Layout.cycleFont()
+    self:toast("code size " .. Layout.fontLabel())
+    return true
+  end
+  return false
+end
+
 --- The status strip, drawn by every scene so the connection is never a
---- mystery.
+--- mystery — and, in its right-hand end, the three display controls.
+---
+--- They are drawn from here rather than from each scene for the same reason
+--- the connection badge is: they work on every screen, so they belong in the
+--- one piece of chrome every screen already draws. A scene added tomorrow
+--- gets them by calling `app:footer`, which it has to do anyway, and cannot
+--- forget them. `tests/test_screens.lua` asserts that every scene does.
 function App:footer(hint)
   local left = hint or ""
   if self.session and self.session.authed then
     left = ("%s  %s   %s"):format(self.session:display_name(), self.session:short_address(), left)
   end
-  local display = ("F %s   F1 %s"):format(
-    Layout.fullscreen and "WINDOW" or "FULL", Layout.orientationLabel():upper())
-  UI.footer(left, self.client and self.client.state or "idle", display)
+  local state = self:display_state()
+  -- The reserve first, so the hint is measured against what is actually left
+  -- rather than being clipped by the buttons after the fact.
+  UI.footer(left, self.client and self.client.state or "idle", UI.displayReserve(state))
+  self.display_rects = UI.displayControls(state)
 end
 
 return App

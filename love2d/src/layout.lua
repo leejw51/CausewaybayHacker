@@ -30,6 +30,9 @@ local Layout = {
   --- inferred again the next time that shape changes. See `orientationFor`.
   pinned = false,
   fullscreen = false,
+  --- The type-size step, an index into `FONT_STEPS`. Scales the **code**
+  --- face and nothing else — see `Layout.codeSize`.
+  font = 1,
   --- Overrides CWBH_FULLSCREEN when set. "desktop" | "exclusive".
   fullscreenPref = nil,
   pendingWindow = false,
@@ -47,6 +50,18 @@ local Layout = {
 -- Extra virtual pixels allowed past the design size so fullscreen does not
 -- sit in a tiny letterbox.
 local MAX_STRETCH = 1.5
+
+--- The type-size steps, as multipliers on the authored code size.
+---
+--- **Four steps and a cycle, not a slider.** A slider in a pixel-art header
+--- is the wrong instrument: it has no legible current value, no keyboard
+--- equivalent, and eleven positions nobody wants. Four named steps have one
+--- state each, say which one they are in, and the whole control is one
+--- button that a player can hit without aiming.
+---
+--- Step 1 is the size this client has always drawn, so a store written
+--- before this control existed comes back looking exactly as it did.
+Layout.FONT_STEPS = { 1.0, 1.25, 1.55, 1.9 }
 
 local FULLSCREEN_TYPES = { desktop = true, exclusive = true }
 
@@ -192,6 +207,10 @@ function Layout.save()
       -- the install. See `Layout.load`.
       pinned = Layout.pinned,
       fullscreen = Layout.fullscreen,
+      -- On the same record as the other two, because they are one setting —
+      -- "how this window is set up". Two records would be two ways for them
+      -- to disagree, and a migration would have to carry both.
+      font = Layout.font,
     })
   end
 end
@@ -218,6 +237,14 @@ function Layout.load()
   Layout.pinned = rec.pinned == true
   if type(rec.fullscreen) == "boolean" then
     Layout.fullscreen = rec.fullscreen
+    applied = true
+  end
+  -- Somebody who prefers big type wants it every launch, not once. An
+  -- out-of-range step from a newer client falls back to the authored size
+  -- rather than indexing off the end of the table.
+  local step = tonumber(rec.font)
+  if step and Layout.FONT_STEPS[math.floor(step)] then
+    Layout.font = math.floor(step)
     applied = true
   end
   return applied
@@ -261,6 +288,52 @@ function Layout.cycleOrientation()
   end
   Layout.unpinOrientation()
   return "automatic"
+end
+
+--- The type-size cycle: step 1 → 2 → 3 → 4 → 1. Returns the new step.
+---
+--- **It moves the code face, not the chrome.** The screen this exists for is
+--- the editor: a forty-line interview answer on a laptop panel is where
+--- bigger type pays, and it is the one surface in this client a player reads
+--- for an hour at a time. Scaling every label with it would reflow eleven
+--- screens that were authored against a fixed grid — the node card, the
+--- award shelf, the stats table — to help the one screen that is not made of
+--- labels. So this is a code-size control and the report says so.
+---
+--- Nothing here touches the window: no `pendingWindow`, no scene rebuild, no
+--- request. The next draw measures rows from the new line height and the
+--- editor's own `ensure_visible` keeps the caret on screen.
+function Layout.cycleFont()
+  Layout.setFont(Layout.font % #Layout.FONT_STEPS + 1)
+  return Layout.font
+end
+
+function Layout.setFont(step)
+  step = math.floor(tonumber(step) or 1)
+  if not Layout.FONT_STEPS[step] then return end
+  Layout.font = step
+  Layout.save()
+end
+
+--- The multiplier for the current step.
+function Layout.fontScale()
+  return Layout.FONT_STEPS[Layout.font] or 1
+end
+
+--- "2/4", for the button that has to say which state it is in.
+function Layout.fontLabel()
+  return ("%d/%d"):format(Layout.font, #Layout.FONT_STEPS)
+end
+
+--- The size to draw code at: the authored size, through the virtual canvas's
+--- own scale, times the player's step.
+---
+--- **One function, called by both editors and by everything that prints a
+--- program's output.** `src/scenes/quest.lua` and `src/scenes/playground.lua`
+--- each derived this expression themselves, which is how the two panes would
+--- have drifted the first time one of them was tuned.
+function Layout.codeSize(base)
+  return math.max(8, math.floor((base or 18) * Layout.uiScale() * Layout.fontScale()))
 end
 
 --- The old two-way toggle, kept because the drive scripts and the tests ask

@@ -4552,6 +4552,19 @@ shift-click asked `love.keyboard.isDown("lshift")`, so extending a selection
 with the right-hand shift key quietly placed the caret instead. Both shifts
 now, in both scenes.
 
+### For PM — two lines §1.1 needs
+
+SPEC §1.1 enumerates what the client's store holds as "the session token, the
+chosen server, the orientation and fullscreen pins, and where each map was
+left". It now also holds a **code-size step**, on the same `display.set`
+record as the two pins. And §1.1's precedence says "an explicit flag" without
+naming it; this client's is `--home <PATH>`, matching the wallet's spelling.
+Neither is a disagreement with the contract yet — the section simply does not
+mention them — but §1.1 is the contract three clients are written against, and
+an implementation that persists a field the spec does not list is a bug by
+that document's own first paragraph. Two words in an enumeration and one in a
+list.
+
 ### Numbers
 
 `make test-headless` 233 cases / 4714 assertions → **265 / 4841**. Under LÖVE,
@@ -4943,3 +4956,475 @@ written against that file and none of them against this one.
 
 219 → 244 passing, 0 failing (`cd backend && cargo test --workspace`), clippy
 and `cargo fmt --check` clean.
+
+---
+
+## 2026-09-11 — L2D: the store moves to `~/.causewaybaylove2d`, and three display controls you can see
+
+### The move, and why the migration is the feature
+
+SPEC §1.1 now names `~/.causewaybaylove2d`, resolved the way
+`CausewaybayWallet`'s `rustcli/core/src/paths.rs` resolves its own home:
+**`--home <PATH>`, then `CWBH_LOVE2D_HOME`, then the default**. The flag is
+wired for real — parsed in `main.lua`, threaded through `App.new{home=…}` to
+`Store.open{home=…}` — because a documented flag that nothing reads is a
+README that lies, and a flag that lost to an environment variable somebody
+exported last month would be a flag that does nothing on the machine where it
+matters. `~` is expanded, for `paths.rs`'s stated reason: without it
+`--home '~/x'` makes a directory literally called `~` in the working
+directory.
+
+There was real data at the old path — 116 lines, 17 KB, 39 `session.set`,
+72 `display.set`, 3 `server.set`, one `session.clear` and the
+`{"from":"love.filesystem"}` record from the *first* migration. (No
+`map.cursor` records, despite the brief expecting them: this player has only
+ever been on `rust/basic`, and the cursor is only written when a map is left
+on a node.)
+
+Three decisions in `Store.copy_store`, and each one is the answer to a
+different way of getting this wrong:
+
+**The gate is "is there already a store at the new path".** That single
+condition is *migrate once*, *do not migrate twice* and *never overwrite*, all
+three — and it is the only gate that can be checked without trusting a flag,
+because a flag saying the migration already ran could only ever live inside
+the file being written. Zero length counts as absent.
+
+**The bytes are copied, not replayed.** A replay-and-rewrite would have folded
+72 `display.set` lines into one and restamped every record with today's date,
+and would have silently dropped any line this binary cannot parse or whose
+`schema` is newer than it understands. §1.1 says such lines are skipped on
+*read*; nothing says they may be thrown away on a move. A torn last line comes
+across as a torn last line and costs exactly itself, because `read_lines`
+discards it and `append`'s newline guard refuses to splice onto it — the same
+as it would have in the old file. The copied file is `chmod 600`'d explicitly:
+`append` only sets the mode on a file it created itself, so one that arrives
+by copy would otherwise sit behind the umask holding a session token.
+
+**The old directory is not touched.** Not deleted, not renamed, not appended
+to. Proven rather than asserted: `state.jsonl` at the old path is
+`b8b4ed37…`, 17034 bytes, mtime `Sep 11 18:15:03`, before and after, and the
+first 116 lines of the new store `diff` clean against it.
+
+```
+drwx------  .causewaybayhackerlove2d/     -rw-------  state.jsonl  17034   (unchanged)
+drwx------  .causewaybaylove2d/           -rw-------  state.jsonl  21219
+line 117: {"from":"/Users/…/.causewaybayhackerlove2d","kind":"migrated","lines":116,…}
+```
+
+**Two migrations must not share one boolean.** `Store.replay` set
+`folded.migrated = true` for any `kind == "migrated"`, and the record the
+first migration wrote is *inside the file the second one copies*. Folding both
+into one flag would make an arriving store claim a migration it has never run.
+That is the same shape as reading a restored *inference* as a *pin*, which
+this client already has a bug report about, so the fold is keyed on `from`:
+absent or `love.filesystem` is the old flag, a directory path is the new one.
+
+**Hermeticity.** The migration runs only for a home `Store.open` *resolved to
+the default*. A directory passed as `opts.dir`, or named by `--home` or
+`CWBH_LOVE2D_HOME`, is exactly the directory that was asked for. Without that,
+every existing case that opens a scratch store under `$TMPDIR` would have
+copied a live session token into it — a far worse bug than the one the
+migration fixes.
+
+### Three controls, in one corner, on every screen
+
+Window ⇄ fullscreen, orientation, and — added mid-round — code size. They live
+in the right-hand end of the footer, drawn by `App:footer`, which every scene
+already calls. That is the whole of "on every screen": a scene added tomorrow
+gets them without knowing they exist and cannot forget them, and
+`tests/test_screens.lua` asserts that all eleven scenes call it. The title
+card is included on purpose — a player who wants portrait should not have to
+sign in first to be allowed to ask.
+
+**Each says the state it is in, not the state it would move to**, because a
+toggle whose current value is invisible gets pressed twice: once to find out,
+once to put it back. `WINDOW`/`FULL` with a screen glyph that is inset or
+filled; `LAND`/`PORT`/`AUTO` with a glyph that is the shape you are actually
+in, filled when pinned and hollow when the window is deciding; `A n/4` with
+the `A` drawn at the step it selects. `AUTO` is the one that has to say two
+things at once — a state the player chose, *and* a shape it resolved to — so
+the word says one and the glyph says the other.
+
+A press is tested in `App:mousepressed` **before** the scene and is consumed,
+or changing the type size could also open a quest. Each button calls the same
+`Layout` function and fires the same toast as its key, so the two paths cannot
+drift. The keys are unchanged and F12 joins them for the new control.
+
+`UI.footer` now takes a *reserve* rather than a display string, and takes it
+out **before** measuring the hint: the buttons are the feature and cannot be
+conditional on there being room, so it is the hint that gives way. The quest
+screen's hint gave way by four keys in portrait, so it was trimmed of `F5`,
+`F10` and `F2` — all three are printed on the buttons they belong to a few
+centimetres above, and repeating them cost the four keys that have no button
+at all.
+
+### The code size moves the code, not the chrome
+
+Four steps and a cycle, not a slider: a slider in a pixel-art header has no
+legible current value, no keyboard equivalent, and eleven positions nobody
+wants. Step 1 is the size this client has always drawn, so an existing store
+comes back looking exactly as it did.
+
+It scales `Assets.mono` — both code panes, the run log, the playground's
+output, the result screen's stderr — and deliberately not every label.
+Rescaling the chrome would reflow eleven screens authored against a fixed grid
+to help the one screen that is not made of labels, and the screen this exists
+for is the editor. One function decides it, `Layout.codeSize`, because
+`quest.lua` and `playground.lua` each derived `math.floor(18 * uiScale())`
+themselves — which is how the two panes would have drifted the first time
+either was tuned. It persists on the *same* `display.set` record as the
+orientation and fullscreen pins: one setting, one write path, one thing to
+migrate.
+
+`tests/drive/typesize.lua` drives the largest step through both panes, both
+orientations and fullscreen against the live server, and asserts what a bigger
+font actually breaks — the pane still has rows (`math.max(1, …)` would hide a
+zero as one row of a forty-line program), the caret is still on screen, the
+gutter has not eaten the pane, and the buffer is byte for byte what it was:
+
+```
+playground/4 port full  step=4 code=51px portrait full=true  1080x1920 rows=17 caret=true
+quest/4 port full       step=4 code=51px portrait full=true  1080x1920 rows=23 caret=true
+PASS: rows, caret, gutter and buffer all intact
+```
+
+### Three things found by looking, that no test caught
+
+**`false or nil` is `nil`.** `Store.replay` folded a stored fullscreen with
+`type(x) == "boolean" and x or nil`, so a player who quit in a *window* had
+`"fullscreen":false` on disk and read back "no opinion". It was invisible only
+because `Layout.fullscreen` happens to start false — the worst kind of
+correct, and it stops being correct the moment anything else reads the field.
+The existing round-trip case only ever stored `true`.
+
+**`make check-layering` did not check what it said it checked.** The brief
+named seven files; the Makefile loop covered four — `store.lua`, `anim.lua`
+and `clock.lua` were never in it (the suite's own `T.no_love` covered the last
+two, and nothing covered the store). They are in it now. Adding the store
+broke the check immediately, and for the right reason: it contains the string
+`"love.filesystem"`, the migration tag that is in every existing player's log
+and therefore cannot be renamed to please a grep. The checker stripped
+comments but not string literals, on a documented assumption that had just
+stopped being true. Both the Makefile and `T.no_love` now strip strings too,
+and the check was verified by breaking it on purpose.
+
+**The two migrations were gated differently, and the ungated one leaked a
+session token into every named home.** `copy_store` was correctly gated on
+"the home was resolved to the default"; `Store.migrate` — the older move, out
+of LÖVE's own save directory — was gated only on its own `migrated` flag,
+which is false in any fresh store. So `--home /tmp/x` produced a store
+containing somebody's old session and display record, three lines and 424
+bytes, rather than nothing.
+
+It matters because this round also documented `ARGS="--home $(mktemp -d)"` as
+the way to drive a run from nothing, and `tests/drive/slice.lua` depends on
+that giving it the *login screen*. It reached the login screen only because
+the injected token happened to be expired; a valid one would have resumed and
+timed out on step three — the same script passing for the wrong reason, which
+is the failure shape this log has a standing complaint about. The evidence was
+in the round's own output twice and was labelled as the opposite: "424 bytes
+… (each should be tiny — no migration into a named home)", and a login
+screenshot on a throwaway home reading *the stored session is no longer
+valid*, which only appears when a token was loaded and rejected.
+
+The gate is `Store.resolved_default()`, asked at the call site — `app.lua`
+must not re-derive the precedence, for the same reason `copy_store` does not.
+Both migrations now answer the same question: **a home that was named is
+exactly that home, and nothing is imported into it.**
+
+**The drive harness's own crash handler was installed one line too late.**
+Found by running the client from the repository root instead of from
+`love2d/`: `CWBH_DRIVE` is resolved against the *process's* working directory,
+`Drive.load` raised, and `love.errorhandler` — the handler that exists
+precisely so an unattended run fails instead of hanging on LÖVE's blue screen
+— was assigned on the line *below* the call that raised. The run sat there
+until it was found with `pgrep` and killed. The one error that handler is most
+likely to meet was the one error it was not installed for. It is installed
+first now, and the message says which directory the path was resolved against.
+
+**`tests/drive/slice.lua`'s documented precondition had been wrong for two
+moves.** Its header said to `rm` LÖVE's save-directory `session.json` before
+running, because the script signs in as one specific wallet and a resumed
+token skips the login screen it needs. That file has not held the session
+since the first migration. The stale instruction reads as "the client is
+broken" — a timeout on step three — rather than as "clear the session", which
+is what it cost while this round was being tested. The fix uses the flag this
+round added: `make drive SCRIPT=… ARGS="--home $(mktemp -d)"` proves the run
+from nothing and deletes none of the player's own state. `ARGS` is new on the
+`drive` target for that.
+
+**`T.no_love("src/store.lua")` did not exist.** Of all the files in the
+LÖVE-free set this is the one where a stray `love.` would be two bugs at once
+— a layering break *and* a store written into LÖVE's sandboxed save directory,
+which is the exact thing the first migration existed to undo. It is asserted
+now.
+
+### Numbers
+
+`make -C love2d test-headless` 286 cases / 4958 assertions, 0 failed (was
+265 / 4841). `make -C love2d test` under LÖVE 301 / 5055. All four `--home` precedence
+cases driven for real (flag, `--home=~/…` with the environment variable also
+set, environment only, neither) — the flag wins, `~` expands, every home is
+`0700`, and a home named by flag or environment is never migrated into. `make lint` and
+`make check-layering` clean. `tests/drive/display.lua` and
+`tests/drive/typesize.lua` both PASS against the live server; `tests/drive/
+tour.lua` screenshots all fourteen screens in both orientations with no
+collision in the footer.
+
+---
+
+## FE — the seed field is a password now, and the capture hook knew it before the screenshots did
+
+The mnemonic field renders masked from the first keystroke — `-webkit-text-security:
+disc` on the existing `<textarea class="cwb-field">`, with `REVEAL` / `HIDE` on the
+card and a `PHRASE HIDDEN` / `PHRASE VISIBLE` line beside the address so the state
+is readable without typing into it to find out. Where the property is not
+implemented (Firefox before 118) the text is **blurred** instead: a shoulder cannot
+read it, the caret and the selection still work, and REVEAL still clears it.
+
+Three things about it are load-bearing and none of them is the CSS:
+
+* **The element did not change.** `input[type=password]` is the obvious answer and
+  it is off the table: `e2e/fixtures.ts:264` and three places in `journey.spec.ts`
+  find this field as `textarea.cwb-field`, and swapping the tag would have taken
+  the whole suite with it. The tag stays; only the ink changes.
+* **`dev/capture.ts` had to be told.** `paintOverlay` draws `el.value` verbatim,
+  so masking the screen and not the hook would have put twelve legible words into
+  `frontend/shots/` and into whatever review they land in — a worse leak than the
+  one being fixed, because it is durable. It reads the computed
+  `-webkit-text-security` (and the class, for the blur path) and paints bullets.
+  The rule it implements is "the hook paints what is on screen", not "the hook
+  knows about the login screen", so the next masked field is covered without
+  anybody remembering.
+* **The NEW WALLET panel is deliberately untouched.** Those twelve words are
+  canvas-drawn, in the code face, at reading size, in the clear. The entire
+  purpose of that panel is that they are copied onto paper; masking it would be
+  theatre that breaks the one thing it exists for. `10-login-landscape.png` and
+  `11-login-phrase.png` are the two halves of that, side by side.
+
+The reveal state is never persisted. A preference that outlived the screen would
+mean the next person to open the game gets an unmasked seed field, which is the
+defect back again with a setting in front of it.
+
+---
+
+## FE — a title card that waits, and the fifteen seconds that are a compromise
+
+`scenes/title.ts`. The game rests on **PRESS SPACE** over the Percival Street
+plate and waits. Any key, any click, any tap; there is a real button under the
+words (`start`) so a thumb and an automated run have something to aim at. On the
+first press it plays the opening; on every press after that it goes straight to
+the login screen, because `story.seen` is remembered — set when the opening
+*ends* and when it is *skipped*, since both mean the player has had their chance
+at it.
+
+Left alone it gives up after fifteen seconds and hands over to the login screen.
+That is not what a cabinet does and the reason is worth recording rather than
+rediscovering: `e2e/fixtures.ts` boots the game and polls for the login screen,
+so a card with no exit is a suite that hangs. Going to the *story* on idle would
+be more faithful and costs the budget — a cold boot reaches login in ~42 s through
+the opening against a 90 s poll, and idle→story→login is nearer 60 s. So: nobody
+is watching, the cabinet does not perform, and it puts up the screen a returning
+player's hands are already on. `STORY` on the login screen plays it on purpose.
+
+`tools/shots.mjs` grew `pastTitle()` and `forgetSession()` for this, and the
+second one found a stale bug in the first run: half the groups reported "still on
+lands" because `boot.ts` correctly resumes a stored token past both the card and
+the login screen. Only the token is removed — the orientation and the language
+are the machine's preferences and a screenshot run has no business editing them.
+
+**And a real bug the same run exposed.** The `result` group pressed ENTER after
+SUBMIT for "the confirm dialogue", and there is no confirm dialogue — SUBMIT
+submits. The stray keystroke was harmless only while the compile was slow enough
+to land on the quest screen. The moment `rustc` answered inside a second it landed
+on the *verdict* screen, where ENTER means "back to the map", and the group
+reported "still on map" for a screen it had reached and then left. Deleted.
+
+---
+
+## FE — the quest screen's toolbar: leaving, the clipboard, and how big the code is
+
+A strip between the header and the panels, in the small station face, in three
+groups: `BACK TO MAP` · `LOBBY` — `COPY BRIEF` · `COPY CODE` · `COPY OUTPUT` ·
+`PASTE` — `BRIEF: SIDE/TOP` · `A-` · `A+`.
+
+* **The two ways out are at the top, and `MAP` is gone from the bench row.** It
+  used to sit one gap from SUBMIT. A control that abandons the quest has no
+  business sharing a row with the control that spends an attempt, and "it has not
+  been mis-clicked yet" is not a design. Both ask before leaving if
+  `unsaved()` — the same buffer-against-starter test `App.logout` uses, so undoing
+  back to the starter produces no question. `ESC` routes through the same path
+  now; it did not, which meant F3 was more careful with a player's code than the
+  button next to it.
+* **The clipboard buttons are not a convenience.** Canvas text is pixels; there
+  is nothing on this screen to select with a mouse, so these are the only way any
+  of it leaves the screen at all. `ui/clip.ts` never throws and never returns
+  `void`: every call comes back `ok` / `denied` / `empty` / `unsupported`, and
+  every one of those becomes a line on the message bar. A copy that worked and
+  showed nothing is indistinguishable from one that did not.
+* **PASTE is undoable rather than confirmed.** `Editor.replaceAll` narrows the
+  change and dispatches one edit, so CodeMirror's history puts the buffer back in
+  a single Ctrl+Z — verified in the browser: starter → paste → one undo → starter,
+  byte for byte. It **focuses the editor** afterwards, and that is load-bearing:
+  the message promises CTRL+Z and CodeMirror only hears a keystroke it has the
+  focus for, so a paste that did not hand it over would make the screen's own
+  promise false. The case where the clipboard already matches the buffer is called
+  out — `narrowEdit` correctly does nothing, and a button that correctly does
+  nothing is indistinguishable from a broken one.
+* **Both view controls are remembered.** `BRIEF: SIDE / TOP` says what it
+  controls rather than which axis it is, because F1 is already the orientation
+  and two buttons that both read as "vertical" are two buttons nobody can tell
+  apart. `frame()` took a `stack` override and a `reserve` for this — the reserve
+  is a parameter rather than each screen subtracting afterwards, because a box
+  whose height is adjusted after the split has its *contents* laid out against
+  the wrong height.
+
+One collision found by taking the frame, and it is the same class as the two
+already recorded here: `App.say`'s banner slides down out of the header into
+exactly the band the new toolbar occupies, so "connection lost" painted across
+BACK TO MAP and PASTE. `App.toastBand()` reports the height and the quest screen
+gives it up, the way the message bar at the bottom of the same screen already
+does. Everything else on that screen is unaffected and does not have to know.
+
+---
+
+## FE — six languages, and the font that is the whole problem
+
+`src/i18n/`. English is the source; Korean, Cantonese, Chinese, Japanese and Czech
+are translated from it. 442 keys, `tests/i18n.test.ts` fails if a locale is short
+one, carries a key English does not, drops a `{placeholder}` or is missing a plural
+form. That test caught a real regression on its first run — `search.readyHead` had
+been keyed to the wrong English value and the coach's own test saw it.
+
+**The quests are not translated and the quest screen says so.** The 138 briefs in
+`content/` belong elsewhere and translating them is a different, much larger job.
+So a Korean player gets a Korean interface around an English brief, with one cyan
+line at the top of the panel saying which half is which. Without that line it
+reads as a translation somebody abandoned; with it, it is a stated fact costing
+one line. `74-quest-korean.png` is what a player actually sees.
+
+### What was wrong with the fonts, precisely
+
+The `cmap` tables say Press Start 2P and VT323 have no Hangul, no kana and no Han,
+and full Czech in both cases — upper and lower, every diacritic, `Ě Ř Ů` included.
+So Czech needs nothing. **But the symptom is not tofu on most machines**, and that
+matters for how the fix is described: rendered in a browser on this laptop, Korean,
+Japanese and Chinese all come out legible today, because the browser quietly
+substitutes Hiragino or Malgun behind the pixel Latin. What it looks like is a
+smooth anti-aliased sentence next to crisp pixel type. Tofu is what a machine
+*without* system CJK fonts shows — a bare container, most Linux CI images.
+
+### What was chosen, and what it costs
+
+**Fusion Pixel 12px** (OFL-1.1, TakWolf, built on Ark Pixel, Cubic 11 and Galmuri;
+all four licences sit beside the fonts in `public/fonts/fusion-pixel/`, as the two
+existing faces already do). A bitmap pixel face covering Hangul, both kana and both
+simplified and traditional Han, so the 16-bit look survives instead of breaking.
+
+Four regional builds are shipped — `ja`, `ko`, `zh_hans`, `zh_hant` — because the
+same Han character is drawn differently in Japanese and Chinese and a Japanese
+player reading Chinese forms notices. **Each is ~900 KB as woff2 and only the one
+in use is ever fetched**: English and Czech download nothing at all, and switching
+to Korean costs one 903 KB file, once, cached after. In the repo and in `dist` the
+four together are 3.6 MB against `art/`'s 24 MB. The bundle itself grew 148 KB, all
+of it the six catalogues.
+
+Each build gets its **own `font-family` name** (`FusionPixelKO`, `FusionPixelJA`,
+`FusionPixelHans`, `FusionPixelHant`). One name across four files invites the
+browser to keep whichever it loaded first.
+
+The system CJK stack that was already in `engine/text.ts` **stays**, behind the
+pixel face. It is the floor: it works offline, costs nothing, and an anti-aliased
+Korean sentence is a far better failure than a row of boxes.
+
+Two things this forced, both of which would have been silent bugs:
+
+* `ensureFonts` cached on the UI scale alone. The active CJK family is part of the
+  key now — without it, switching language hands back the record built for the
+  previous one and every string is measured, and drawn, in a stack that cannot
+  render it.
+* `setLocale` swaps the table synchronously and loads the face asynchronously, and
+  names the family to the text engine **only once it has landed**. `boot.ts` waits
+  on `localeReady()` alongside the two Latin faces, for the reason it already
+  documents for them: a panel measured against the fallback and re-measured when
+  the real font arrives visibly jumps.
+
+### How a player changes it
+
+A row of six names, each written in its own script, on the title card — a key
+binding is no answer for somebody who has just opened a game they cannot read.
+**F7** cycles from any screen, next to F1 and F2, with a banner naming the new
+language in that language. The choice is remembered; failing a remembered one,
+`navigator.language` is asked, and a Hong Kong browser asking for `zh-HK` gets
+Cantonese rather than simplified, which is the right answer in the one city this
+game is about.
+
+The active language is drawn **lit**, not dimmed, and that is a small thing worth
+recording: `dim` is the right answer on the aux strip where the labels are large,
+and at eight pixels dim ink on a dim face is a button with nothing legible in it —
+which is exactly what a Korean player saw looking for the language they were in.
+
+### Cantonese, and the fork that had to be named
+
+Written Cantonese has two registers. `yue.ts` is **colloquial written Cantonese**
+in traditional characters — 嘅 咗 唔 係 喺 撳 冇 — because the narrator is somebody
+from the neighbourhood, and because Standard Written Chinese in traditional
+characters would differ from `zh.ts` only in glyph shape and a player would
+rightly ask why the game offers the same language twice. The one place the
+colloquial register stops is the jargon: Hong Kong developers say 提交, 編譯 and
+格式化 in Cantonese speech, and inventing a colloquial word for "compile" would be
+worse than borrowing the standard one.
+
+`大陸` is avoided in both Chinese catalogues — in Hong Kong it means the mainland,
+not "a land in a game". Both use 領地 / 领地.
+
+### What is not confident, stated rather than smoothed over
+
+* **Czech is the weakest of the five.** The grammar is sound and the plural rule
+  (1 / 2–4 / 5+) is implemented properly, but a native reviewer should check
+  the technical vocabulary in particular: *zadání* for a brief, *ulice* for a
+  quest node, *splněno* for cleared, *trénink* / *police* / *deník* for the three
+  stats tabs, and *ODESLAT* versus *POSLAT* for SUBMIT. None of it is wrong that I
+  can see; some of it may be unidiomatic.
+* **Cantonese colloquial register.** The connective prose is confident; what wants
+  a Hong Kong reviewer is whether the register is right for a *tool* rather than
+  for a comic — 大佬 for BOSS and 收工 for FINISH are deliberate and are the two
+  most likely to be judged too casual.
+* **Korean, Japanese and Chinese I am confident in**, including the story prose.
+
+Everything measured in characters rather than pixels was the risk, and it broke in
+the direction nobody expects: CJK is *shorter* in the chrome font (Press Start 2P
+is full-width, so N Han characters take the same room as N Latin ones and say
+three times as much), and **Czech is the one that overflows**. `76-lands-czech.png`
+and `77-quest-czech.png` are the proof, and the quest bench wraps to two rows there
+exactly as `rowsIn` says it should.
+
+### The bug that made all four CJK languages a lie, and how it hid
+
+`loadFont` guarded against re-fetching with `document.fonts.check('16px "FusionPixelKO"')`.
+That call answers a different question than it looks like it answers: *can this
+text be rendered right now without waiting for a font that is still loading*. A
+family the set has never heard of has nothing to wait for, so it answers **true**.
+
+So on the very first switch the guard returned true, the 900 KB was never
+fetched, the family was named to `engine/text.ts`, the browser could not supply
+it, and every Hangul, kana and Han glyph came quietly out of the system stack.
+
+It hid because of exactly the thing that makes the whole feature worth doing:
+system CJK on this machine renders, so the screens *looked* translated. Six
+screenshots were taken and reviewed in that state. What caught it was not reading
+the code again — it was watching the network on the built bundle and finding that
+switching to Korean fetched nothing. The fix is a `Set` this module writes itself;
+a set we keep cannot lie about what we loaded.
+
+Measured afterwards, on `dist` served by the backend: English and Czech fetch **no
+woff2 at all**, each of `ko` / `zh_hant` / `zh_hans` / `ja` fetches exactly one file
+the first time it is chosen, and a second lap through all six fetches nothing. The
+language shots were retaken; `72-lands-korean.png` is the pixel face and the one
+before it was Malgun in a costume.
+
+The rule worth keeping: **a capability that degrades gracefully cannot be verified
+by looking at it.** The fallback was doing its job perfectly, which is precisely
+why the screen could not be trusted to report whether the thing in front of it was
+working.

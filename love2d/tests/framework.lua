@@ -127,12 +127,20 @@ end
 --- Assert that a source file contains no *code* reference to `love`.
 ---
 --- The structural rule the whole headless suite rests on: nothing under
---- `src/net/`, `src/json.lua`, `src/editor.lua` or `src/wallet.lua` may touch
---- LÖVE, so all of it runs under a bare `luajit`.
+--- `src/net/`, `src/json.lua`, `src/editor.lua`, `src/wallet.lua`,
+--- `src/store.lua`, `src/anim.lua` or `src/clock.lua` may touch LÖVE, so all
+--- of it runs under a bare `luajit`.
 ---
 --- Comments are stripped first — these files talk about the rule in prose,
 --- and a grep that cannot tell a sentence from a call would fail on the
 --- documentation of the very thing it is checking.
+---
+--- **String literals are stripped too, and that stopped being optional.**
+--- This used to say they never contain "love." and it was true right up
+--- until `src/store.lua` grew a record tagged `from = "love.filesystem"` —
+--- the name of the directory the first migration moved out of, which is
+--- written into every existing player's log and therefore cannot be renamed
+--- to please a grep. A quoted word is data, not a call.
 function F.no_love(path)
   local fh = io.open(path, "r")
   if not fh then
@@ -141,14 +149,13 @@ function F.no_love(path)
   end
   local body = fh:read("*a")
   fh:close()
-  -- Long comments first, then line comments; string literals in these files
-  -- never contain "love." so there is no need to lex properly.
   body = body:gsub("%-%-%[%[.-%]%]", " ")
   local code = {}
   for line in (body .. "\n"):gmatch("(.-)\n") do
     code[#code + 1] = line:gsub("%-%-.*$", "")
   end
   local stripped = table.concat(code, "\n")
+  stripped = stripped:gsub('"[^"\n]*"', '""'):gsub("'[^'\n]*'", "''")
   local hit = stripped:match("[^%w_]love%s*%.%s*[%w_]+")
   record(hit == nil, path .. " must not reference love, but does: " .. tostring(hit))
 end
