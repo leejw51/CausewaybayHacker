@@ -96,11 +96,17 @@ export class LandsScene implements Scene {
     const blurbY = inner[1] + inner[3] - recH - blurbH;
     const room = blurbY - Math.round(8 * s) - inner[1];
 
-    const sprite = this.app.assets?.picture(NPC[land]);
+    // Which sprite: the land's mascot at rest, or — while a road is under the
+    // cursor and this is the land it belongs to — that road's mascot doing the
+    // thing the road is about. Ferris works two tills when you hover ADVANCED.
+    const hovering = chosen ? this.catBtns.hovered : null;
+    const act = hovering?.startsWith("cat:") ? `mascot_${land}_${hovering.slice(4)}` : null;
+    const name = (act && this.app.assets?.picture(act) ? act : null) ?? NPC[land];
+    const sprite = this.app.assets?.picture(name);
     if (sprite && room > 20) {
       // The `box` metadata from the art manifest is what lets a sprite stand on
       // its feet instead of on the bottom of its transparent margin.
-      const box = this.app.assets?.box.get(NPC[land]);
+      const box = this.app.assets?.box.get(name);
       const hh = Math.min(room, inner[2] * 0.62);
       const scale = hh / sprite.naturalHeight;
       const ww = sprite.naturalWidth * scale;
@@ -381,8 +387,43 @@ export class LandsScene implements Scene {
           fill(g, Theme.admit, rx, y + rowH - 3, Math.round((barW * c.cleared) / c.total), 3);
         }
 
+        // The emblem band. DESIGN composed these 3:1 with a quiet left quarter
+        // and the pipeline then cropped to the ink, so the ink fills the cell:
+        // it is drawn from the manifest `box`, inset, and it owns the right of
+        // the row while the words own the left. Nothing overlaps.
+        const art = this.app.assets?.picture(`emblem_${this.land}_${c.category}`);
+        const abox = this.app.assets?.box.get(`emblem_${this.land}_${c.category}`);
+        let textW = barW;
+        if (art && !empty) {
+          const inset = Math.round(8 * s);
+          const bandH = rowH - inset * 2;
+          const k = bandH / Math.max(1, abox ? abox.maxy - abox.miny : art.naturalHeight);
+          const iw = (abox ? abox.maxx - abox.minx : art.naturalWidth) * k;
+          const bw = Math.min(iw, barW * 0.44);
+          const bx = rx + barW - bw - inset;
+          g.save();
+          g.globalAlpha = 0.55 + 0.45 * lit;
+          if (abox) {
+            g.drawImage(
+              art,
+              abox.minx,
+              abox.miny,
+              abox.maxx - abox.minx,
+              abox.maxy - abox.miny,
+              bx,
+              y + inset,
+              bw,
+              bandH,
+            );
+          } else {
+            g.drawImage(art, bx, y + inset, bw, bandH);
+          }
+          g.restore();
+          textW = bx - rx - inset;
+        }
+
         const tx = rx + Math.round(14 * s);
-        const tw = barW - Math.round(28 * s);
+        const tw = Math.max(Math.round(120 * s), textW - Math.round(28 * s));
         const lineH = fonts.small.height;
         const titleY = y + Math.round(12 * s);
         g.fillStyle = css(empty ? Theme.dim : Theme.cream);
@@ -390,18 +431,34 @@ export class LandsScene implements Scene {
         // What the road is, from the bible. Only when the row is tall enough
         // to hold it — in a short portrait window the count is what matters.
         const lineY = titleY + fonts.button.height + Math.round(6 * s);
-        if (rowH > fonts.button.height + lineH * 2 + Math.round(24 * s)) {
+        // Only the lines that fit inside the row. In portrait the text column
+        // is narrow and this wraps to four; a row that let the fourth spill
+        // over its own bottom edge was the first thing the eye found.
+        const fits = Math.floor((y + rowH - Math.round(10 * s) - lineY) / lineH);
+        if (fits >= 1) {
+          const all = wrap(fonts.small, CAT_LINE[c.category], tw);
+          const use = all.slice(0, fits);
+          if (all.length > use.length && use.length > 0) {
+            use[use.length - 1] = use[use.length - 1].replace(/.{0,2}$/u, "…");
+          }
           g.fillStyle = css(Theme.cream, empty ? 0.3 : 0.55 + 0.35 * lit);
-          printf(g, fonts.small, CAT_LINE[c.category], tx, lineY, tw, "left");
+          let ly = lineY;
+          for (const line of use) {
+            printf(g, fonts.small, line, tx, ly, tw, "left");
+            ly += lineH;
+          }
         }
+        // Under the title, not across the row: the right of the row belongs to
+        // the emblem now, and a count floating over it read as a caption for
+        // the picture rather than as the score for the road.
         g.fillStyle = css(empty ? Theme.dim : Theme.coin);
         printf(
           g,
           fonts.stationSm,
           empty ? "EMPTY" : `${c.cleared}/${c.total}  ★${c.stars}`,
-          rx,
+          tx + Math.round(4 * s),
           titleY + Math.round(2 * s),
-          barW - Math.round(14 * s),
+          tw,
           "right",
         );
         // The chevron that says a row is a door. It only exists while the row
@@ -448,7 +505,7 @@ export class LandsScene implements Scene {
       printf(
         g,
         fonts.small,
-        "write anything · nothing here is scored",
+        "nothing here is scored",
         right[0] + pbw + Math.round(12 * s),
         pby + Math.round((playH - fonts.small.height) / 2),
         right[2] - pbw - Math.round(12 * s),

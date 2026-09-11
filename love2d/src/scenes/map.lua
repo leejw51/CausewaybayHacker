@@ -27,6 +27,7 @@ local Assets = require("src.assets")
 local UI = require("src.ui")
 local SFX = require("src.sfx")
 local Ease = require("src.ease")
+local Anim = require("src.anim")
 
 local Map = {}
 Map.__index = Map
@@ -66,6 +67,11 @@ function Map.new(app)
     -- Mei, standing on a node or walking between two.
     at = nil,       -- the node index she is standing on
     walk = nil,     -- { from, to, elapsed, duration, path }
+    picked_at = 0,  -- when the cursor last landed, for the node pulse
+    -- The iris out of the selected node into the quest screen: the most
+    -- "game" thing available for the least work, because it says the two
+    -- screens are the same place in a way a cut never can.
+    iris = nil,     -- { started, x, y, quest_id }
   }, Map)
 end
 
@@ -269,9 +275,23 @@ function Map:open_node()
   end
   local node = self:node_at(self.cursor)
   if not node then return end
+  if self.iris then return end
   SFX.play("select")
-  self.app.quest_id = node.quest_id
-  self.app:go("quest", { quest_id = node.quest_id, land = self.land, category = self.category })
+  -- The iris closes on the node, then the quest screen opens. `update` does
+  -- the handover, so a player who presses again lands immediately (see
+  -- `keypressed`) rather than waiting out an animation they did not ask for.
+  local x, y = self:node_xy(node)
+  self.iris = { started = Anim.now(), x = x, y = y, quest_id = node.quest_id }
+end
+
+--- Go now, wherever the iris had got to.
+function Map:enter_quest()
+  local target = self.iris and self.iris.quest_id or
+    (self:node_at(self.cursor) or {}).quest_id
+  if not target then return end
+  self.iris = nil
+  self.app.quest_id = target
+  self.app:go("quest", { quest_id = target, land = self.land, category = self.category })
 end
 
 -- How long the walk takes.
@@ -290,6 +310,9 @@ Map.WALK_MIN_S = 0.34
 Map.WALK_MAX_S = 0.85
 Map.WALK_REF_PX = 260          -- the distance WALK_MAX_S is tuned for
 Map.WALK_FPS = 7               -- see the note in `draw_mei`
+-- Short. An iris is punctuation, not an event; long enough to read as a
+-- camera and short enough that nobody waits for it.
+Map.IRIS_S = 0.26
 
 --- Declared with a dot rather than a colon: it uses nothing from `self`, and
 --- the headless test calls it without building a Map.
@@ -409,6 +432,9 @@ function Map:update(dt)
       self.walk = nil
     end
   end
+  if self.iris and Anim.iris_done(Anim.now() - self.iris.started, Map.IRIS_S) then
+    self:enter_quest()
+  end
 end
 
 -- ------------------------------------------------------------------ drawing
@@ -446,6 +472,8 @@ function Map:draw()
       Theme.withAlpha(Theme.cream, 0.7), "center", vw)
   end
 
+  self:draw_iris()
+
   self.app:footer(self.walk
     and "ANY KEY skip"
     or "ARROWS node   ENTER play   TAB land   Q category   S search   T stats   ESC back")
@@ -458,6 +486,31 @@ end
 --- cost a trip out to two other screens. `CausewaybayGolang` puts "the three
 --- big buttons" for its language tracks on its map for the same reason; these
 --- are the same idea with this game's two lands and three categories.
+--- The iris: everything outside a shrinking circle goes to ink.
+---
+--- Drawn with a stencil rather than a shader, because a shader is another
+--- thing to fail on somebody's driver and this needs to work everywhere.
+--- The circle closes on the node that was pressed, so the quest screen opens
+--- out of the place on the map the player was looking at.
+function Map:draw_iris()
+  if not self.iris then return end
+  local fraction = Anim.iris(Anim.now() - self.iris.started, Map.IRIS_S)
+  if not fraction then return end
+  local vw, vh = Layout.vw, Layout.vh
+  -- Big enough at fraction 1 to clear the corners from anywhere on screen.
+  local full = math.sqrt(vw * vw + vh * vh)
+  local radius = math.max(0, fraction * full)
+
+  love.graphics.stencil(function()
+    love.graphics.circle("fill", self.iris.x, self.iris.y, radius, 64)
+  end, "replace", 1)
+  love.graphics.setStencilTest("equal", 0)
+  UI.setColor(Theme.void, 1)
+  love.graphics.rectangle("fill", 0, 0, vw, vh)
+  love.graphics.setStencilTest()
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
 function Map:draw_header()
   local vw = Layout.vw
   local scale = Layout.uiScale()
@@ -578,10 +631,25 @@ function Map:draw_nodes()
     local x, y = self:node_xy(node)
     local selected = i == self.cursor
     local base = (node.kind == "boss" and 44 or 34) * scale
+    -- Every node breathes, a little, on its own phase; the selected one
+    -- breathes harder. A board of perfectly still markers is the same
+    -- "this is a menu" signal as a perfectly still mascot.
+    local bob = Anim.bob(self.t, {
+      amount = selected and 3 or 1.2,
+      period = selected and 1.1 or 2.4,
+      phase = (i % 7) / 7,
+    })
     local size = base
     if selected then
       size = size + 4 * scale * Ease.cosine((self.t * 1.6) % 1)
     end
+
+    -- A shadow grounds it. Without one a bobbing marker looks like it is
+    -- sliding rather than lifting.
+    UI.setColor(Theme.ink, 0.30)
+    love.graphics.ellipse("fill", x, y + size * 0.34, size * 0.30, size * 0.10)
+    love.graphics.setColor(1, 1, 1, 1)
+    y = y + bob
 
     local drew = Assets.marker(marker_for(node), x, y, size)
     if not drew then
@@ -764,6 +832,7 @@ function Map:step(dx, dy)
   end
   if best then
     self.cursor = best
+    self.picked_at = Anim.now()
     SFX.play("move")
     self:walk_to(best)
   end
@@ -773,6 +842,11 @@ function Map:keypressed(key)
   -- **Any key lands her immediately.** Not just the one that started it: a
   -- player reaching for the next thing has already decided, and an animation
   -- that eats that keystroke is a toll.
+  -- An iris in flight: any key lands now rather than waiting it out.
+  if self.iris then
+    self:enter_quest()
+    return true
+  end
   if self.walk and key ~= "escape" then
     self:skip_walk()
     if key == "return" or key == "kpenter" or key == "space" then return true end

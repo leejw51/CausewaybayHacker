@@ -9,6 +9,7 @@ local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
 local SFX = require("src.sfx")
+local Anim = require("src.anim")
 
 local Lands = {}
 Lands.__index = Lands
@@ -21,7 +22,13 @@ local BLURB = {
 }
 
 function Lands.new(app)
-  return setmetatable({ app = app, lands = nil, cursor = 1, error = nil, t = 0 }, Lands)
+  return setmetatable({
+    app = app, lands = nil, cursor = 1, error = nil, t = 0,
+    -- When the cursor last landed here, so the chosen card can lift, and
+    -- when it was pressed, so it can push in.
+    picked_at = 0,
+    pressed_at = nil,
+  }, Lands)
 end
 
 function Lands:enter()
@@ -76,6 +83,7 @@ end
 function Lands:choose()
   local land = self:land_at(self.cursor)
   if not land then return end
+  self.pressed_at = Anim.now()
   SFX.play("select")
   self.app.land = land.land
   self.app:go("categories", { land = land.land, categories = land.categories })
@@ -83,6 +91,11 @@ end
 
 function Lands:update(dt)
   self.t = self.t + dt
+end
+
+--- Seconds since this card became the selected one.
+function Lands:selected_age()
+  return Anim.now() - self.picked_at
 end
 
 function Lands:draw()
@@ -104,11 +117,11 @@ function Lands:draw()
   if portrait then
     gap = 14
     cw = vw - pad * 2
-    ch = math.min(280, (bottom - top - gap * (n - 1)) / n)
+    ch = math.min(300, (bottom - top - gap * (n - 1)) / n)
   else
     gap = 18
     cw = math.min(420, (vw - pad * 2 - gap * (n - 1)) / n)
-    ch = math.min(360, bottom - top)
+    ch = math.min(292, bottom - top)
   end
 
   for i = 1, n do
@@ -135,39 +148,74 @@ function Lands:draw()
   self.app:footer("ARROWS choose   ENTER go")
 end
 
+--- One land, as a card.
+---
+--- The user's note was "add more sprites in each button — not fun", and this
+--- is the answer: the land's own mascot on top, and every category row
+--- carrying the little action sprite for that land *and* that category
+--- (`art/mascot_<land>_<category>.png` — Ferris up a crate, Ferris working
+--- two tills, Ferris stuck at a blank board). A column of identical text was
+--- the problem; eight drawn characters and a progress rule are not.
 function Lands:draw_card(x, y, w, h, land, fallback, selected, s)
   local key = land and land.land or fallback
   local tint = Theme.land[key] or Theme.dim
+  local t = Anim.now()
+
+  -- The selected card lifts. Physical rather than merely outlined: the eye
+  -- reads height before it reads a border colour.
+  local lift = selected and Anim.lift(self:selected_age()) * 4 or 0
+  local push = (selected and self.pressed_at) and Anim.press(t - self.pressed_at) * 3 or 0
+  y = y - lift + push
+
+  if selected then
+    -- A shadow under the raised card, so a lift is a lift and not a jump.
+    UI.setColor(Theme.ink, 0.30)
+    love.graphics.rectangle("fill", x + 4, y + h + 2, w - 8, 3 + lift)
+    love.graphics.setColor(1, 1, 1, 1)
+  end
+
   UI.panel(x, y, w, h, {
-    fill = Theme.withAlpha(Theme.navy, 0.92),
+    fill = Theme.withAlpha(Theme.navy, selected and 0.95 or 0.88),
     tint = selected and Theme.coin or tint,
   })
 
-  -- Placed on her feet with the measured `box`, not on the corner of the
-  -- transparent canvas (art/manifest.json).
-  if not Assets.sprite(MASCOT[key], x + w / 2, y + 124, 96) then
-    Assets.fit(MASCOT[key], x + w / 2 - 56, y + 16, 112, 112, 1)
-  end
+  -- The land mascot, idling on her feet with the measured `box`.
+  local bob = Anim.bob(t, { amount = selected and 3 or 1.5, phase = key == "go" and 0.5 or 0 })
+  Assets.sprite(MASCOT[key], x + w / 2, y + 118 + bob, 88)
 
-  UI.text((key or "?"):upper() .. " LAND", x, y + 130, math.floor(14 * s), tint, "center", w)
-  UI.text(BLURB[key] or "", x, y + 152, 8, Theme.withAlpha(Theme.cream, 0.7), "center", w)
+  UI.text((key or "?"):upper() .. " LAND", x, y + 124, math.floor(14 * s), tint, "center", w)
+  UI.text(BLURB[key] or "", x, y + 144, 8, Theme.withAlpha(Theme.cream, 0.7), "center", w)
 
-  local row = y + 176
+  local row = y + 168
+  local rh = 32
   if land then
-    for _, cat in ipairs(land.categories) do
+    for i, cat in ipairs(land.categories) do
       local color = cat.open and Theme.cream or Theme.dim
-      local label = ("%-9s %2d/%-2d"):format(cat.category:upper(), cat.cleared, cat.total)
-      UI.text(label, x + 18, row, 9, color)
-      -- The old version drew `stars / 4` as a 0..3 star row, which is a third
-      -- scale in the same gold glyph and means nothing (design review §4).
-      -- A category's star total is a number, so it is drawn as one.
-      local total = ("%d\u{2605}"):format(cat.stars or 0)
-      UI.text(total, x + w - 18 - UI.textWidth(total, 9), row, 9,
-        cat.open and Theme.coin or Theme.dim)
-      if not cat.open then
-        UI.text("LOCKED", x + w - 60, row + 12, 7, Theme.dim)
+      -- Each row's own action sprite, on its own phase so the three do not
+      -- bob in lockstep — a row of synchronised sprites reads as mechanical.
+      local sprite = ("mascot_%s_%s"):format(key, cat.category)
+      local rbob = Anim.bob(t, { amount = 1.4, period = 1.9, phase = 0.17 * i })
+      Assets.sprite(sprite, x + 28, row + 26 + rbob, 28,
+        { alpha = cat.open and 1 or 0.4 })
+
+      UI.text(cat.category:upper(), x + 48, row + 2, 9, color)
+      local count = ("%d/%d"):format(cat.cleared, cat.total)
+      UI.text(count, x + w - 20 - UI.textWidth(count, 9), row + 2, 9, color)
+
+      UI.bar(x + 48, row + 17, w - 72, 5,
+        cat.total > 0 and cat.cleared / cat.total or 0,
+        cat.open and Theme.admit or Theme.dim)
+
+      -- The badges. `badge_cleared` when a whole category is done;
+      -- `badge_locked` **only** when it genuinely cannot be entered — nothing
+      -- on the map is locked any more (§4.7), and a decorative padlock is the
+      -- exact lie that change existed to remove.
+      if cat.total > 0 and cat.cleared >= cat.total then
+        Assets.marker("badge_cleared", x + w - 24, row + 14, 22)
+      elseif not cat.open then
+        Assets.marker("badge_locked", x + w - 24, row + 14, 20, { alpha = 0.85 })
       end
-      row = row + 26
+      row = row + rh
     end
   else
     UI.text("…", x, row, 10, Theme.dim, "center", w)
@@ -185,11 +233,13 @@ function Lands:keypressed(key)
   local n = math.max(1, self.lands and #self.lands or 2)
   if key == "left" or key == "up" then
     self.cursor = ((self.cursor - 2) % n) + 1
+    self.picked_at = Anim.now()
     SFX.play("move")
     return true
   end
   if key == "right" or key == "down" then
     self.cursor = (self.cursor % n) + 1
+    self.picked_at = Anim.now()
     SFX.play("move")
     return true
   end
@@ -208,11 +258,11 @@ function Lands:mousepressed(x, y)
   local pad, top, bottom = 16, 70, vh - 60
   local cw, ch, gap
   if portrait then
-    gap = 14; cw = vw - pad * 2; ch = math.min(280, (bottom - top - gap * (n - 1)) / n)
+    gap = 14; cw = vw - pad * 2; ch = math.min(300, (bottom - top - gap * (n - 1)) / n)
   else
     gap = 18
     cw = math.min(420, (vw - pad * 2 - gap * (n - 1)) / n)
-    ch = math.min(360, bottom - top)
+    ch = math.min(292, bottom - top)
   end
   for i = 1, n do
     local cx, cy
@@ -224,7 +274,14 @@ function Lands:mousepressed(x, y)
       cy = top + (bottom - top - ch) / 2
     end
     if x >= cx and x <= cx + cw and y >= cy and y <= cy + ch then
-      self.cursor = i
+      -- First click selects, second opens: on a card that lifts, the lift is
+      -- the feedback that says which one the next click will take.
+      if self.cursor ~= i then
+        self.cursor = i
+        self.picked_at = Anim.now()
+        SFX.play("move")
+        return
+      end
       self:choose()
       return
     end

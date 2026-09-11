@@ -156,7 +156,7 @@ impl Client {
     }
 }
 
-fn table_counts(server: &Server) -> (i64, i64, i64, i64) {
+fn table_counts(server: &Server) -> (i64, i64, i64, i64, i64) {
     let conn = server.store.conn();
     let one = |sql: &str| conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap();
     (
@@ -164,6 +164,7 @@ fn table_counts(server: &Server) -> (i64, i64, i64, i64) {
         one("SELECT count(*) FROM mistakes"),
         one("SELECT count(*) FROM mistake_stats"),
         one("SELECT count(*) FROM progress"),
+        one("SELECT count(*) FROM awards"),
     )
 }
 
@@ -197,7 +198,7 @@ async fn a_playground_run_prints_and_records_nothing() {
     assert_eq!(
         table_counts(&server),
         before,
-        "a playground run touched attempts / mistakes / mistake_stats / progress"
+        "a playground run touched attempts / mistakes / mistake_stats / progress / awards"
     );
 }
 
@@ -227,7 +228,7 @@ async fn a_broken_playground_run_is_diagnosed_but_never_recorded() {
     assert_eq!(
         table_counts(&server),
         before,
-        "a playground mistake reached the curriculum"
+        "a playground mistake reached the curriculum, or earned something"
     );
     // Nor through the wire's own view of it.
     assert!(client.ok("stats.mistakes", json!({})).await["mistakes"]

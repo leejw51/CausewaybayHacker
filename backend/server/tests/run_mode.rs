@@ -418,3 +418,108 @@ async fn a_clean_run_does_not_advance_cleared_since() {
     assert_eq!(after["mistakes"][0]["cleared_since"].as_i64(), Some(1));
     server.handle.abort();
 }
+
+/// The reward loop (PROTOCOL §4.20). A clear fires the stamp *and* whatever it
+/// earned, and the shelf remembers it afterwards.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_clear_earns_something_and_the_shelf_remembers() {
+    let server = start().await;
+    let mut client = Client::connect(server.port).await;
+    client.login().await;
+
+    assert!(
+        client.ok("stats.awards", json!({})).await["awards"]
+            .as_array()
+            .unwrap()
+            .is_empty(),
+        "a fresh player's shelf is empty"
+    );
+
+    client
+        .execute("quest.submit", "rust.basic.01.hello", HELLO)
+        .await;
+
+    let awarded: Vec<(String, String)> = client
+        .events
+        .iter()
+        .filter(|e| e["type"] == "award")
+        .map(|e| {
+            (
+                e["payload"]["kind"].as_str().unwrap().to_string(),
+                e["payload"]["id"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect();
+    assert!(
+        awarded.contains(&("stamp".into(), "cleared".into())),
+        "the node did not turn gold: {awarded:?}"
+    );
+    assert!(
+        awarded.contains(&("badge".into(), "first-clear".into())),
+        "a first clear earned no badge: {awarded:?}"
+    );
+    assert!(
+        awarded.iter().any(|(kind, _)| kind == "level"),
+        "75 xp is level 2 and nobody said so: {awarded:?}"
+    );
+
+    // The shelf, for a client that missed the fanfare.
+    let shelf = client.ok("stats.awards", json!({})).await;
+    let ids: Vec<&str> = shelf["awards"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["id"].as_str().unwrap())
+        .collect();
+    assert!(ids.contains(&"first-clear"), "{shelf}");
+    assert!(ids.contains(&"level-2"), "{shelf}");
+    // The per-clear stamp is not on the shelf: it fires every time a node
+    // turns gold, and is not something a player "has".
+    assert!(!ids.contains(&"cleared"), "{shelf}");
+
+    // Clearing it again earns nothing new.
+    let before = shelf["awards"].as_array().unwrap().len();
+    client.events.clear();
+    client
+        .execute("quest.submit", "rust.basic.01.hello", HELLO)
+        .await;
+    assert_eq!(
+        client.ok("stats.awards", json!({})).await["awards"]
+            .as_array()
+            .unwrap()
+            .len(),
+        before,
+        "a re-clear handed out a badge twice"
+    );
+
+    // And the user's level and xp travel with them.
+    let user = client.ok("profile.update", json!({})).await["user"].clone();
+    assert_eq!(user["xp"].as_i64(), Some(75), "{user}");
+    assert_eq!(user["level"].as_i64(), Some(2));
+    assert!(user["xp_into_level"].is_number());
+    server.handle.abort();
+}
+
+/// A RUN earns nothing. It is not a considered answer, and a badge for one
+/// would make every other badge mean less.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_run_earns_nothing() {
+    let server = start().await;
+    let mut client = Client::connect(server.port).await;
+    client.login().await;
+
+    for _ in 0..3 {
+        client
+            .execute("quest.run", "rust.basic.01.hello", HELLO)
+            .await;
+    }
+    assert!(
+        !client.events.iter().any(|e| e["type"] == "award"),
+        "a run fired an award"
+    );
+    assert!(client.ok("stats.awards", json!({})).await["awards"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    server.handle.abort();
+}

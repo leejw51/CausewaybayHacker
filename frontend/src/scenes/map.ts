@@ -349,26 +349,37 @@ export class MapScene implements Scene {
         return [x, y, bw, bh] as Rect;
       });
     const oneLine = sum(landW) + split + sum(catW) + split + menuW <= wide;
+    // The rects come back in the order the labels are drawn in — lands, then
+    // categories, then the two way-out buttons — whatever line they land on.
+    // They did not, once, and ALL MAPS was drawn on top of PLAYGROUND.
     if (oneLine) {
       const total = sum(landW) + split + sum(catW) + split + menuW;
       const left = x0 + Math.round((wide - total) / 2);
-      const rows = lay(landW, 0, left);
       const catLeft = left + sum(landW) + split;
-      rows.push(...lay(catW, 0, catLeft));
       const tailLeft = catLeft + sum(catW) + split;
-      rows.push([tailLeft, 0, w(MENU_LABEL), bh]);
-      rows.push([tailLeft + w(MENU_LABEL) + gap, 0, w(PLAY_LABEL), bh]);
-      return { h: bh, rows };
+      return {
+        h: bh,
+        rows: [
+          ...lay(landW, 0, left),
+          ...lay(catW, 0, catLeft),
+          [tailLeft, 0, w(MENU_LABEL), bh] as Rect,
+          [tailLeft + w(MENU_LABEL) + gap, 0, w(PLAY_LABEL), bh] as Rect,
+        ],
+      };
     }
-    // Two lines: the land and the way out on top, the three roads under them.
+    // Two lines: the land and the two ways out on top, the three roads under.
     const topTotal = sum(landW) + split + menuW;
     const topLeft = x0 + Math.round((wide - topTotal) / 2);
-    const rows = lay(landW, 0, topLeft);
     const tail = topLeft + sum(landW) + split;
-    rows.push([tail, 0, w(MENU_LABEL), bh]);
-    rows.push([tail + w(MENU_LABEL) + gap, 0, w(PLAY_LABEL), bh]);
-    rows.push(...lay(catW, bh + gap, x0 + Math.round((wide - sum(catW)) / 2)));
-    return { h: bh * 2 + gap, rows };
+    return {
+      h: bh * 2 + gap,
+      rows: [
+        ...lay(landW, 0, topLeft),
+        ...lay(catW, bh + gap, x0 + Math.round((wide - sum(catW)) / 2)),
+        [tail, 0, w(MENU_LABEL), bh] as Rect,
+        [tail + w(MENU_LABEL) + gap, 0, w(PLAY_LABEL), bh] as Rect,
+      ],
+    };
   }
 
   /**

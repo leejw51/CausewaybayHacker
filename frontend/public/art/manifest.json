@@ -523,6 +523,216 @@
         "maxx": 483,
         "maxy": 235
       }
+    },
+    {
+      "name": "emblem_rust_basic",
+      "file": "emblem_rust_basic.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 52,
+        "miny": 7,
+        "maxx": 330,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_rust_advanced",
+      "file": "emblem_rust_advanced.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 79,
+        "miny": 7,
+        "maxx": 303,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_rust_hacker",
+      "file": "emblem_rust_hacker.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 44,
+        "miny": 7,
+        "maxx": 338,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_go_basic",
+      "file": "emblem_go_basic.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 24,
+        "miny": 7,
+        "maxx": 359,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_go_advanced",
+      "file": "emblem_go_advanced.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 47,
+        "miny": 7,
+        "maxx": 335,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_go_hacker",
+      "file": "emblem_go_hacker.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 86,
+        "miny": 7,
+        "maxx": 297,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_rust_basic",
+      "file": "mascot_rust_basic.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 17,
+        "miny": 7,
+        "maxx": 110,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_rust_advanced",
+      "file": "mascot_rust_advanced.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 102.0,
+        "minx": 7,
+        "miny": 19,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_rust_hacker",
+      "file": "mascot_rust_hacker.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 81.0,
+        "minx": 7,
+        "miny": 40,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_go_basic",
+      "file": "mascot_go_basic.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 13,
+        "miny": 7,
+        "maxx": 114,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_go_advanced",
+      "file": "mascot_go_advanced.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 13,
+        "miny": 7,
+        "maxx": 113,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_go_hacker",
+      "file": "mascot_go_hacker.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 10,
+        "miny": 7,
+        "maxx": 116,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "badge_cleared",
+      "file": "badge_cleared.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 10,
+        "miny": 5,
+        "maxx": 84,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "badge_locked",
+      "file": "badge_locked.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 16,
+        "miny": 5,
+        "maxx": 78,
+        "maxy": 89
+      }
     }
   ]
 }

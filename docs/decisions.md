@@ -2598,3 +2598,197 @@ worse than one that repeats itself.
 
 L2D was right to implement from the sentence plus the wallet's source and flag
 the gap rather than guess at what §1.2 might have said.
+
+---
+
+## FE — a correction to the orientation entry above
+
+The entry that says the vertical/horizontal fault "was not a CSS or a
+canvas-sizing fault" and that one F1 press stranded every later session is
+**wrong about the user's screenshot**, and this is the retraction.
+
+The coordinator measured it: a restored pin does *not* survive a disagreeing
+window in the shipped client, so that mechanism cannot have produced the
+landscape band the user photographed. What the window-scoped pin and the
+three-state F1 actually are is a correctness and usability improvement —
+"restored" and "chosen" really are different stored values now, and the third
+state really is reachable — and they should stay. They are not the fix for the
+screenshot.
+
+The defect in that screenshot was composition on the no-WebGL lands screen: a
+background blitted with `drawImage(bg, 0, 0, vw, vh)` (a 2.3× vertical stretch
+at 1080×1750, which is why it read as three rooms tiled down the page), a neon
+strip of six untextured slabs, two land plates of different sizes, and a record
+line drawn on the panel border. Those are fixed and photographed at 1080×1750.
+
+The rule I am taking from it: when a bug arrives as a picture, reproduce the
+picture at the reported size before naming a cause. I named a plausible
+mechanism from the code, and a plausible mechanism that is not the one in the
+photograph is a wrong answer that reads like a right one.
+
+---
+
+## FE — the twelve words are never thrown away
+
+`I HAVE WRITTEN IT DOWN` used to take the phrase, null it, and then start the
+login. When the socket was down — which is what the user's screenshot caught,
+with `CONNECTION LOST — RECONNECTING` across the top — that sequence dropped the
+player back on the login form having destroyed the only copy of the key they had
+just been told to write down. The screen's own warning says "there is no reset:
+nobody can give it back to you"; losing it to a transient socket error is the
+worst thing this screen can do, and it was doing it.
+
+Now: the words are held until the login *succeeds* (at which point the screen is
+gone) or the player presses CANCEL (at which point it is their decision). A
+sign-in that cannot reach the server parks on `reachable()`, which resolves when
+the client's own reconnect gets back to `open`, and then goes — the button means
+"sign me in as soon as you can". Five goes for a minted phrase; one for a typed
+one, because a typed phrase still exists on paper and its owner is standing in
+front of a form they can press ENTER on again.
+
+Verified in the browser, against a socket deliberately pointed at a dead port:
+the twelve words stay on screen, CANCEL stays live while WAITING FOR THE SERVER
+is dim, the status wraps rather than clipping, and when the port comes back the
+login completes on its own with no second press. A double press one frame apart
+still produces exactly one `auth.challenge` and one `auth.login` — `busy` is set
+synchronously before the first await, so the second press finds it already set.
+
+The save/run split on the playground is the same lesson applied early: an
+autosave failure and a run failure have separate lines, because the first
+overwrote the second within two seconds of typing and the player could not see
+why their program had not run.
+
+---
+
+## FE — the six maps, reachable from any one of them
+
+TAB switches land, Q and E step the category, and the same six choices are on
+screen as buttons — RUST | GO, BASIC | ADVANCED | HACKER — with ALL MAPS and
+PLAYGROUND at the end. Keys and buttons ship together because a binding nobody
+can see is not a feature, and a button is what the player who does not yet know
+where anything is will find. The lit land wears its own colour (the orange and
+cyan the lands screen and the map haze already use) and the lit category wears
+gold, with a coin pip under each so the answer survives a colour-blind eye.
+
+Switching **cuts**. Mei is standing on a street in Rust Land and the next frame
+she is standing on a different street in Go Land, which is not a journey anybody
+can animate honestly; the plate and the nodes replay their arrival instead. Each
+of the six remembers where it was left, keyed by land and category, so going to
+look at GO·HACKER and coming back costs nothing — which is the point of removing
+the gates in the first place. Somebody with an interview on Thursday can be on
+the dynamic-programming street in one keystroke.
+
+One bug worth recording because it is a class: `barLayout` returned its rects
+grouped by *line* while `drawBar` consumed them in *label* order, so on a narrow
+window ALL MAPS was painted on top of PLAYGROUND. Two orders that are equal in
+the common case and different in the rare one is a bug that ships. The layout
+now returns rects in label order whatever line they land on.
+
+---
+
+## FE — measure the row before you reserve its height
+
+The quest bench reserved one button row's height and drew the console drawer
+under it. At 1280 across, RESET wraps onto a second line — and that second line
+was painted straight through the run report, taking its first line off the
+screen. It is the same fault as the phrase card that was sized for one row and
+drawn with two, in a different file, three weeks apart.
+
+So `rowsIn(font, labels, width, minH)` now lives in `engine/ui.ts` next to
+`btnBox`, does exactly the arithmetic `Buttons.row` does, and anything that puts
+something below a button row asks it first.
+
+The run report is clamped twice on top of that: at most three lines, and never
+more than three fifths of the drawer. `expected` and `got` are arbitrary program
+output, so a program that prints a paragraph would otherwise size the strip off
+the bottom of the panel. And the hidden-case count is on *both* paths now — the
+failing one especially, because that is exactly when somebody might think they
+have seen the worst of it.
+
+TRY AGAIN carries the source back into the quest screen. It used to reload the
+starter, which threw away the attempt the player had just made in order to show
+them the verdict on it.
+
+---
+
+## FE — the rows are places now
+
+The user's word was "not fun", and the diagnosis was right: three large blue
+slabs holding a word, a count and a hundred and thirty pixels of nothing read as
+a settings menu, not as three roads out of town.
+
+Four things, in order of how much they changed it:
+
+* **DESIGN's six emblems.** 3:1 bands, drawn from the manifest `box` and inset,
+  owning the right of each row while the words own the left. The counts moved
+  under the title to make that clean: a count floating over the picture read as
+  a caption for it rather than as the score for the road. `emblem_rust_advanced`
+  — the one DESIGN flagged as its weakest — reads fine in situ; the two tills
+  are distinguishable at 1280 and at 900 portrait.
+* **The mascot follows the cursor.** Hover ADVANCED and Ferris is working two
+  tills; hover HACKER and he is stuck at a blank board. It ties the two columns
+  together and it is the cheapest "this is a game" signal on the screen.
+* **A line from the bible per road** (`docs/story.md` §4), clamped to the lines
+  that actually fit — in portrait it wraps to four and the fourth was spilling
+  over the row's own bottom edge.
+* **Selection with weight.** The hovered row slides, takes the land's colour at
+  a whisper, grows a chevron, and blips once on arrival rather than once per
+  mouse-move event. The chosen land's mascot has an idle with a hop every few
+  seconds, a shadow that tightens as he leaves the ground and a squash on the
+  landing; the other land's mascot is still, which is the difference between
+  "not selected" and "not drawn yet".
+
+`LOCKED` is gone from this screen too. §4.7 says nothing is locked, so `open` is
+no longer consulted; only a genuinely empty pack is dimmed, and it says EMPTY.
+`badge_locked` therefore stays unused, which is the right outcome for it.
+
+---
+
+## FE — the playground, and why its rule is the opposite one
+
+`scenes/playground.ts`. Write Rust or Go, press RUN, see what it prints. No
+quest, no tests, no verdict, and — stated on the screen, where it cannot be
+missed — **nothing here is part of your record**. That is deliberately the
+opposite of the quest RUN rule, and the player has to be told which of the two
+screens they are standing on, because a scratchpad is exactly where somebody
+writes something broken on purpose to see what the compiler says.
+
+The text is the whole point and there is no starter to fall back on, so it is
+saved three times over: a debounced `playground.save` 2.5 s after the last
+keystroke, a save on window blur, a save on leaving the screen — and a mirror
+into `localStorage` on every keystroke, so a reload, a dropped socket or a
+server that has not shipped §4.9c yet cannot cost work either. Identical content
+is never sent at all; an autosave timer that posts the same bytes every two
+seconds is a denial of service with good intentions.
+
+There is a stdin box, which matters here in a way it never does on a quest
+screen: there is no test case to supply the input, so without it there is no way
+to write a program that reads anything.
+
+Today the server answers `not_found` to `playground.run`, `list`, `load` and
+`save`. The screen says so in plain words — "this server does not have the
+playground yet", "snippets are not kept on this server yet — saved in this
+browser" — rather than showing an empty list and pretending. Nothing is faked.
+
+---
+
+## FE — two notes for whoever takes the next screenshot
+
+**The dev server serves a copy of the art.** `frontend/public/art/` is what
+`:5291` reads; `art/` is the source of truth. DESIGN's fourteen new assets were
+committed to `art/` and were simply not there for the browser until I rsynced
+them across, and the symptom is an emblem that silently does not draw — the
+manifest the page fetched has 49 entries while the repo's has 63. Worth
+automating; until then, `rsync -a --exclude tools/ art/ frontend/public/art/`.
+
+**A WebGL screenshot has to be read in the same task as the frame.** The context
+is not `preserveDrawingBuffer`, so `__cwbCapture.png()` called after an `await`
+composites an empty `#fx` — the Mode 7 ground and the whole city backdrop go
+missing and the picture looks like a rendering bug that is not there. The
+capture that works is `freeze(); step(1); png()` with nothing between them, and
+that is also the deterministic one. Several of the shots I took earlier today
+are wrong for exactly this reason and have been retaken.
+
+`app.setOrientation` no longer persists a preference, either. It is the capture
+hook's entry point, and a screenshot run was writing `chosen,landscape,…` into
+whatever machine took the shots. The capture hook is not the player.

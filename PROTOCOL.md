@@ -426,6 +426,32 @@ the quest).
 A submission is **always recorded**, including a compile error, including a
 timeout. That is the curriculum (SPEC §7).
 
+### 4.8b The clock
+
+A `hacker` quest carries `time_limit_s` — the player's clock, not the runner's
+(SPEC §12). **The server owns it**, not the client.
+
+The first `quest.get` for a timed quest stamps `opened_at` and returns it with
+`deadline_at`. Every later `quest.get` for the same quest returns **the same
+pair**, so a reload, a reconnect, or opening the quest in a second window shows
+one clock rather than a fresh one. `quest.reset` does not restart it — resetting
+the editor is not a new attempt at the interview.
+
+`Attempt` gains `within_limit: boolean | null` — `null` on an untimed quest,
+otherwise whether the **submit** arrived before `deadline_at`. A run never
+changes it.
+
+**The clock does not block anything.** Time runs out and the quest stays open,
+the countdown keeps going, and a submit after the deadline is judged exactly as
+one before it — it simply is not `within_limit`. This is a trainer: stopping
+someone mid-thought teaches them nothing, and the fact worth recording is
+whether they *would* have finished in time, which is exactly what the flag says.
+
+It is server-owned for one reason. A client-side timer cannot support a claim
+like "cleared inside the limit" — a page reload would reset it and the claim
+would mean nothing. A fact the game asserts about a player has to be one the
+game actually knows.
+
 ### 4.9b `quest.run`
 
 The same shape as `quest.submit`, and deliberately so — a client should be able
@@ -708,6 +734,8 @@ type Quest = {
   node: number; title: string; brief: string; story: string;
   difficulty: 1|2|3|4|5;
   time_limit_s: number | null;           // null = untimed
+  opened_at: string | null;              // §4.8b — server time the clock started
+  deadline_at: string | null;            // opened_at + time_limit_s
   starter: string;
   concepts: string[];
   hints_total: number;                   // the text comes from quest.hint
@@ -741,6 +769,7 @@ type Attempt = {
     name: string; passed: boolean; visible: boolean;
     stdin?: string; expect?: string; got?: string;   // only when visible
   }[];
+  within_limit: boolean | null;          // §4.8b — null when untimed
   mistakes: {
     kind: string;                        // SPEC §7.1 taxonomy slug
     code: string | null;                 // "E0382", "go:undefined", null

@@ -84,7 +84,15 @@ export class PlaygroundScene implements Scene {
   private attemptId: string | null = null;
   private log = new LogBuffer("");
   private result: PlaygroundRun | null = null;
+  /** What the *run* said. The output panel is its and nothing else's. */
   private status = "";
+  /**
+   * What *saving* said, kept apart from `status` on purpose: an autosave that
+   * fires two seconds after a keystroke must never overwrite the reason a run
+   * did not work, which is exactly what it did the first time these shared a
+   * line.
+   */
+  private saveNote = "";
   private t = 0;
   private readonly benchIn = new Tween(seconds("panel"));
   private readonly listIn = new Tween(seconds("panel"), seconds("stagger"));
@@ -193,7 +201,7 @@ export class PlaygroundScene implements Scene {
       // this tab's until the calls land. Say so rather than showing nothing.
       this.snippets = [];
       if (e instanceof WireError && e.payload.code === "not_found") {
-        this.status = "this server does not keep snippets yet — your work is saved in this browser";
+        this.saveNote = "snippets are not kept on this server yet — saved in this browser";
       }
     }
   }
@@ -249,16 +257,16 @@ export class PlaygroundScene implements Scene {
       this.savedSource = source;
       this.savedLang = this.held.lang;
       this.dirty = false;
-      this.status = "saved";
+      this.saveNote = "saved";
       this.writeLocal();
       void this.refreshList();
     } catch (e) {
       // Not a disaster: the local mirror holds the text and the next timer
       // will try again. It is still said out loud, because "saved" and "not
       // saved" must never look the same.
-      this.status =
+      this.saveNote =
         e instanceof WireError && e.payload.code === "not_found"
-          ? "this server does not keep snippets yet — kept in this browser"
+          ? "not kept on this server yet — kept in this browser"
           : "could not save to the server — kept in this browser";
     } finally {
       this.saving = false;
@@ -340,10 +348,10 @@ export class PlaygroundScene implements Scene {
     try {
       await this.app.client.request("playground.delete", { id });
       this.held.id = null;
-      this.status = "deleted";
+      this.saveNote = "deleted";
       void this.refreshList();
     } catch (e) {
-      this.status = e instanceof WireError ? playerText(e.payload.code) : "could not delete it";
+      this.saveNote = e instanceof WireError ? playerText(e.payload.code) : "could not delete it";
     }
   }
 
@@ -477,6 +485,18 @@ export class PlaygroundScene implements Scene {
       if (this.snippets.length === 0) {
         g.fillStyle = css(Theme.dim);
         printf(g, fonts.small, "nothing saved yet", inner[0], y + pad, inner[2], "center");
+      }
+      if (this.saveNote) {
+        g.fillStyle = css(Theme.coin, 0.85);
+        printf(
+          g,
+          fonts.small,
+          this.saveNote,
+          inner[0],
+          y + room - wrap(fonts.small, this.saveNote, inner[2]).length * fonts.small.height,
+          inner[2],
+          "left",
+        );
       }
     });
 

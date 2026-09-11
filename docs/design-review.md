@@ -649,3 +649,209 @@ re-rolled from that file.
 4. **§3** — point the map at `map_rust` / `map_go`. The lands become two places.
 5. **§7** — size panels to content. It is the change that most makes the game
    stop looking unfinished.
+
+---
+
+# Second review — 2026-09-11, against the 32-shot capture set
+
+A lot has shipped. `title_bg` is the login backdrop (§6 closed), `NEW WALLET`
+exists (§1 closed), the custody paragraph is two lines (§1's copy note taken),
+difficulty is a segmented bar and no longer a star row (§4 closed), the plate is
+no longer cropped (§13 closed), the quest screen has split `RUN` from `SUBMIT`
+and `HINT 2` has become `3 HINTS LEFT` (§16 closed), and the category rows carry
+emblems and a line of prose. The screen the user called "not fun" now reads as a
+place.
+
+**Seen:** the 32 captures timestamped 15:50 in `frontend/shots/`, both
+orientations, including the `no-webgl` and portrait variants.
+**Read:** `scenes/{lands,map}.ts`, `ui/editor.ts`, `dev/capture.ts`.
+
+**Still not judged, third time of asking.** `dev/capture.ts:67` still says it
+plainly: *"This is a rendering of the overlay, not a screengrab of it — the
+caret, …"*. The editor in every quest capture is re-drawn text, so **nothing
+below reviews the editor's rendered colours, caret, selection or active-line
+band.** What is new is that those things now exist in source, so §2.5 reviews
+the *palette as written* — that is READ evidence, and it is not the same as
+seeing it.
+
+---
+
+## 2.1 Nodes float in open sky on both landscape overworlds — DESIGN (mine, fixed this round)
+
+SEEN `32-map-walk-a.png`: Mei is standing on a gold marker in open blue sky at
+the top left, in front of a floating striped awning, with the skyline behind
+her. MEASURED: `map_rust`'s top-left 15%×30% region was 81% sky-blue, and
+`rust.basic` node 1 at (0.044, 0.146) sampled rgb(65,114,173) — water.
+
+This is §13 of the first review happening again **in my own plate**. I asked for
+"land fills the entire frame" in the prompt, looked at the picture, and called
+it done. The prompt said it; the picture did not do it; nobody checked the one
+thing that mattered, which is whether the authored node coordinates land on
+ground.
+
+**A prompt is not a test.** `art/tools/checknodes.py` is now the test: it reads
+every `map = { x, y }` out of `content/*/*.toml`, samples the plate around each
+one and fails on any node whose neighbourhood has no structure in it.
+
+Hue does not work as the measure — `map_go` is a night plate whose *ground* is
+indigo, and a blue-dominance test called a lit platform and a neon stall
+"water". **Local variance** does work and is hue-independent: ground has roofs,
+kerbs and outlines and measures 20–40; open sky and water measure 0.2–0.9. The
+cut is at 4.0, an order of magnitude clear of both sides, calibrated against
+crops of every borderline case.
+
+Both landscape plates were re-rolled with an absolute corner-to-corner
+constraint. All **120 node placements across 6 packs × 2 orientations now
+pass**, and the check is a script anyone can run before shipping a plate.
+
+## 2.2 The quest brief panel clips its own text, mid-glyph — FE
+
+SEEN `43-quest-portrait.png`: the line `input:  3` is sliced horizontally
+through its middle by the panel's bottom edge — not hidden, not scrolled away,
+cut through the letterforms. SEEN `40-quest-landscape.png`: the brief's third
+line ends `Join them in` hard against the right border with the next word gone.
+
+There is a scrollbar, so the overflow is known about; what is wrong is where the
+cut falls. A panel that ends mid-glyph reads as a broken renderer, and this is
+the panel carrying the thing the player has to do.
+
+**Do:** clip to a whole line — floor the visible height to a multiple of
+`font.height` — and give the text a right inset so a glyph never touches the
+border. In portrait, the proportions are also backwards: the editor gets ~900px
+for fifteen lines while the brief gets ~350px and overflows. The brief is what a
+player reads before they can type anything; give it the room in portrait.
+
+## 2.3 The game's name is the lowest-contrast text on its own first screen — FE
+
+SEEN `10-login-landscape.png`. MEASURED: the title glyph rgb(202,236,248)
+against the sky behind it is **8.26:1**; against the pink tenement it crosses,
+**2.25:1**. It has a glow but no plate and no ink outline, so its legibility
+changes across its own length — which is why it reads as patchy rather than
+simply dim.
+
+This is the cost of §6 being fixed: the painted backdrop is now real art with
+real contrast range, and type that sat fine on a flat procedural sky no longer
+does.
+
+**Do:** the 16-bit answer is an ink outline — 2px `Theme.ink`, offset in all
+four directions — which is what every SNES title does and what keeps the glow.
+If you would rather not outline, I will make a title plate; say which and it is
+one asset.
+
+## 2.4 The emblem bands are squashed, not scaled down — FE
+
+SEEN `20-lands-landscape.png`. READ `scenes/lands.ts:398-402`:
+
+```
+const k  = bandH / (abox.maxy - abox.miny);   // scale chosen from HEIGHT only
+const iw = (abox.maxx - abox.minx) * k;
+const bw = Math.min(iw, barW * 0.44);          // width clamped independently
+g.drawImage(art, …src…, bx, y + inset, bw, bandH);
+```
+
+`bw` is clamped while `bandH` is not, so any band whose proportional width
+exceeds 44% of the row is drawn into a narrower box at unchanged height —
+compressed, not fitted. MEASURED in the capture: the BASIC emblem displays at
+322×145 (2.22:1) where its ink is 384×114 (3.37:1) — **66% of its correct
+width**. It is most visible on the tram, which is tall and narrow instead of
+long and low.
+
+**Do:** take the scale from both constraints at once —
+`k = Math.min(bandH / inkH, (barW * 0.44) / inkW)` — then `bw = inkW * k`,
+`bh = inkH * k`, and bottom-align in the row. The comment above this block
+describes the right intent; only the arithmetic disagrees with it.
+
+## 2.5 The editor's syntax palette: two collisions and two thin contrasts — FE
+
+READ `ui/editor.ts:49-59`. Contrast computed against the effective quest-panel
+background — `paper` at α 0.84 over the night city, ≈ rgb(25,24,63):
+
+| role | token | contrast |
+| --- | --- | --- |
+| name / property / macro | `cream` | 14.49:1 |
+| operator | `panel` | 11.58:1 |
+| typeName / class | `coin` | 11.33:1 |
+| number / bool / null | `coin` | 11.33:1 |
+| function | `cyan` | 10.09:1 |
+| keyword | `pink` | 6.64:1 |
+| string | `grass` | 5.32:1 |
+| **invalid** | `red` | **3.40:1** |
+| **comment / meta** | `dim` | **3.16:1** |
+
+Most of it is strong, and choosing the palette from `Theme` rather than from a
+stock editor theme was right. Four things to change:
+
+1. **`coin` is both a type and a number.** In `let n: u32 = 32;` the `u32` and
+   the `32` render in the same colour. That is the one place in the game where
+   precision is the entire point. Move numbers to `Theme.brick` or `Theme.pink`.
+2. **`comment` is `Theme.dim` at 3.16:1** — and `dim` is the token that
+   everywhere else in this game means *disabled or locked*. The starter code's
+   comment (`// your code here`) is the first instruction a player reads, and it
+   is set in the colour reserved for things you cannot use.
+3. **`invalid` at 3.40:1** makes the error token nearly the least visible thing
+   on the screen. Errors should be the most visible.
+4. **`operator` is `Theme.panel`** — a *surface* token used as a foreground. It
+   happens to work on a dark panel; it stops working the moment a panel is
+   light. Use an ink-family token.
+
+## 2.6 An unearned star reads as an earned one at a glance — FE
+
+SEEN `32-map-walk-a.png`. I read the info strip at full-screen scale as three
+gold stars on a node with `TRIES 0`, went to write it up as a bug, magnified
+the region, and found three *dim* stars — no bug. `scenes/map.ts:1218-1226` is
+correct.
+
+The misreading is the finding. Filled-dim and filled-gold share shape, size and
+weight and differ only in fill, so at a glance the row says "three stars" in
+both states. If three rounds of staring at this palette did not save me, it will
+not save a player.
+
+**Do:** draw an unearned star as an **outline** — `Theme.dim` stroke, no fill.
+Empty and full then differ in ink, not just in hue, which survives both a glance
+and a colour-blind viewer.
+
+## 2.7 `fg_wires` has nothing to hang from on a top-down map — FE + DESIGN
+
+SEEN `32-map-walk-a.png`. READ `scenes/map.ts:1004`, `gfx/mode7.ts:303`.
+
+I built `fg_wires` as a near-parallax layer for a *street* — things that hang
+from above, with the lower half empty. The overworld is a top-down diorama, so
+"above" is open sky, and the awning corner and the utility pole now float
+unattached over the map's top edge. The wires themselves came back dark maroon
+rather than black and read purple against blue.
+
+**Do (FE):** clip the overlay to the plate and keep only the wire layer on the
+map, or drop it there and save it for a street scene, which is what it is for.
+**Do (DESIGN):** if it stays, I will re-roll it as wires and insulators only —
+no awning, no pole, no signs — in near-black. Say which and it is one asset.
+
+## 2.8 The character layer is invisible on a phone — FE
+
+READ `scenes/lands.ts:103`:
+`const act = hovering?.startsWith("cat:") ? \`mascot_${land}_${hovering.slice(4)}\` : null;`
+
+The mascot action sprites are gated on hover, and hover does not exist on touch.
+The half of last round's work that was aimed squarely at "not fun" is therefore
+absent on the device where the screen is most likely to be read.
+
+Putting them in the land plate rather than the row was a better idea than the
+one I had — it gives the mascot somewhere to live and keeps the row clean. It
+just needs a non-hover trigger: the **selected** category, falling back to the
+default pose, so a touch user sees the character change as they move through the
+list.
+
+## 2.9 Smaller things — FE, all SEEN
+
+* **`that is not there any more`** (`41-quest-run-report-fail.png`) — a toast in
+  `Theme.red` that names neither what was missing nor what to do. An error
+  should say what happened and how to fix it.
+* **The map's top bar puts three kinds of control in one row**
+  (`30-map-landscape.png`): `RUST` `GO` are a land toggle, `BASIC` `ADVANCED`
+  `HACKER` are a category toggle, and `ALL MAPS` `PLAYGROUND` are destinations —
+  seven identical buttons, separated only by a gap. Group them: toggles as
+  segmented controls, destinations set apart in weight, not just in spacing.
+* **A node labelled `?`** sits among numbered siblings (`30-map-landscape.png`)
+  and reads as a missing value rather than as a deliberate state.
+* **`CLEAR` is orphaned onto its own row** under `ENTER` / `NEW WALLET` /
+  `STORY` (`10-login-landscape.png`). Four buttons wrapping 3+1 looks like a
+  layout accident; `CLEAR` is also the least important of the four.

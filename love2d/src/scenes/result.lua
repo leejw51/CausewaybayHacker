@@ -13,6 +13,7 @@ local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
 local Ease = require("src.ease")
+local Anim = require("src.anim")
 
 local Result = {}
 Result.__index = Result
@@ -36,6 +37,12 @@ function Result:enter(params)
   self.quest = params.quest
   self.log = params.log
   self.t = 0
+  self.started = Anim.now()
+end
+
+--- Seconds since this verdict arrived.
+function Result:age()
+  return Anim.now() - (self.started or Anim.now())
 end
 
 function Result:update(dt)
@@ -68,9 +75,18 @@ function Result:draw()
   local is_run = a.mode == "run"
   local color = is_run and Theme.cyan or (Theme.verdict[a.verdict] or Theme.dim)
 
-  -- The banner drops in (docs/art.md §7's clear sequence, in miniature).
+  -- The banner drops in (docs/art.md §7's clear sequence, in miniature), and
+  -- a verdict that is not an acceptance shakes as it lands. Small: this is
+  -- punctuation on a rejection, not a punishment, and the panel below it
+  -- holds still so the compiler's words stay readable.
   local drop = Ease.expOut(math.min(1, self.t / 0.45))
   local by = -40 + drop * 84
+  local sx, sy = 0, 0
+  if not accepted and not is_run then
+    sx, sy = Anim.shake(self:age(), { duration = 0.34, amount = 5 })
+  end
+  love.graphics.push()
+  love.graphics.translate(sx, sy)
   UI.setColor(color, 0.92)
   love.graphics.rectangle("fill", 0, by, vw, 56)
   UI.setColor(Theme.ink)
@@ -79,6 +95,7 @@ function Result:draw()
   love.graphics.setColor(1, 1, 1, 1)
   UI.text(is_run and "SAMPLE RUN" or (VERDICT_LABEL[a.verdict] or a.verdict:upper()),
     0, by + 18, math.floor(18 * s), Theme.cream, "center", vw)
+  love.graphics.pop()
 
   local pad = Layout.isPortrait() and 14 or 60
   local x = pad
@@ -110,8 +127,24 @@ function Result:draw()
   elseif a.cleared then
     UI.setColor(Theme.admit, 0.25)
     love.graphics.rectangle("fill", cx, cy, w - 32, 34)
-    UI.text("CLEARED", cx + 10, cy + 11, 12, Theme.admit)
-    UI.stars(cx + w - 32 - 3 * 15, cy + 9, a.stars or 0, 12)
+    -- **The beat.** `Anim.stamp` returns nil for the first fifth of a second
+    -- and then lands the word oversize and settles it. An instant stamp
+    -- reads as a state change; a held one reads as a verdict, which is what
+    -- it is.
+    local stamp_scale, stamp_alpha = Anim.stamp(self:age(), { hold = 0.26 })
+    if stamp_scale then
+      local label = "CLEARED"
+      local font_size = 12
+      local lw = UI.textWidth(label, font_size)
+      love.graphics.push()
+      love.graphics.translate(cx + 10 + lw / 2, cy + 17)
+      love.graphics.scale(stamp_scale, stamp_scale)
+      UI.text(label, -lw / 2, -7, font_size, Theme.withAlpha(Theme.admit, stamp_alpha))
+      love.graphics.pop()
+      if stamp_scale <= 1.2 then
+        UI.stars(cx + w - 32 - 3 * 15, cy + 9, a.stars or 0, 12)
+      end
+    end
     cy = cy + 42
   elseif accepted then
     cy = cy + UI.text("already cleared — stars keep the best run", cx, cy, 8,

@@ -9,6 +9,7 @@ local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
 local SFX = require("src.sfx")
+local Anim = require("src.anim")
 
 local Categories = {}
 Categories.__index = Categories
@@ -36,8 +37,13 @@ local function ordered(categories)
   return out
 end
 
+local MASCOT = { rust = "sprite_ferris", go = "sprite_gogo" }
+
 function Categories.new(app)
-  return setmetatable({ app = app, cursor = 1, categories = nil, error = nil }, Categories)
+  return setmetatable({
+    app = app, cursor = 1, categories = nil, error = nil,
+    picked_at = 0, pressed_at = nil,
+  }, Categories)
 end
 
 function Categories:enter(params)
@@ -64,45 +70,108 @@ function Categories:choose()
     self.app:toast("clear the category before it first")
     return
   end
+  self.pressed_at = Anim.now()
   SFX.play("select")
   self.app.category = cat.category
   self.app:go("map", { land = self.land, category = cat.category })
 end
 
+--- The three category bands of one land.
+---
+--- Each row is `art/emblem_<land>_<category>.png`, a 384x128 band drawn
+--- full-width.
+---
+--- **The trap, and it is worth stating.** DESIGN composed these with an empty
+--- left quarter for the label, and `art/tools/process.py` then cropped to the
+--- ink and re-centred — right for every other sprite in the pack, wrong for
+--- these. The manifest's `box` proves it: `emblem_go_basic` has ink from
+--- x=24 to x=359 of 384, so the reserved quarter is gone and the art now
+--- fills the cell. So the label does not sit *on* the band; the band is inset
+--- to the right of it, and the counts sit clear on the other side. Assuming
+--- the empty quarter was still there would have put the word CATEGORY on top
+--- of a crate of oranges.
 function Categories:draw()
   local vw, vh = Layout.vw, Layout.vh
   Assets.cover(Assets.pick("bg_times", "bg_flat"), 0, 0, vw, vh)
-  love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.66)
+  love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.7)
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
 
   local s = Layout.uiScale()
   local tint = Theme.land[self.land] or Theme.coin
-  UI.text(self.land:upper() .. " LAND", 0, 22, math.floor(18 * s), tint, "center", vw)
+  local t = Anim.now()
+
+  -- The land's own mascot beside the title, idling, so the screen says which
+  -- land it is without reading.
+  Assets.sprite(MASCOT[self.land], 40, 52 + Anim.bob(t, { amount = 2 }), 44)
+  UI.text(self.land:upper() .. " LAND", 72, 22, math.floor(16 * s), tint)
 
   local rows = self.categories or {}
-  local pad = Layout.isPortrait() and 16 or 80
+  local pad = Layout.isPortrait() and 12 or 60
   local w = vw - pad * 2
-  local rh = math.min(96, math.max(64, (vh - 140) / math.max(1, #rows) - 12))
-  local y = 68
+  local rh = math.min(104, math.max(76, (vh - 140) / math.max(1, #rows) - 12))
+  local y = 70
 
   for i, cat in ipairs(rows) do
     local selected = i == self.cursor
-    UI.panel(pad, y, w, rh, {
-      fill = Theme.withAlpha(cat.open and Theme.navy or Theme.ink, 0.9),
+    local lift = selected and Anim.lift(Anim.now() - self.picked_at) * 5 or 0
+    local push = (selected and self.pressed_at) and Anim.press(t - self.pressed_at) * 4 or 0
+    local ry = y - lift + push
+
+    if selected then
+      UI.setColor(Theme.ink, 0.32)
+      love.graphics.rectangle("fill", pad + 4, ry + rh + 2, w - 8, 3 + lift)
+      love.graphics.setColor(1, 1, 1, 1)
+    end
+
+    UI.panel(pad, ry, w, rh, {
+      fill = Theme.withAlpha(cat.open and Theme.navy or Theme.ink, selected and 0.95 or 0.86),
       tint = selected and Theme.coin or tint,
     })
-    local color = cat.open and Theme.cream or Theme.dim
-    UI.text(cat.category:upper(), pad + 16, y + 12, math.floor(14 * s), color)
-    UI.text(BLURB[cat.category] or "", pad + 16, y + 12 + 20, 8,
-      Theme.withAlpha(color, 0.75))
-    local progress = ("%d / %d"):format(cat.cleared, cat.total)
-    UI.text(progress, pad + w - 16 - UI.textWidth(progress, 10), y + 14, 10, color)
-    UI.bar(pad + 16, y + rh - 20, w - 32, 8,
-      cat.total > 0 and cat.cleared / cat.total or 0, cat.open and Theme.admit or Theme.dim)
-    if not cat.open then
-      UI.text("LOCKED", pad + w - 16 - UI.textWidth("LOCKED", 8), y + rh - 34, 8, Theme.dim)
+
+    -- The label gutter on the left, then the band, then the counts.
+    local gutter = math.floor(math.min(150, w * 0.28))
+    local right = 96
+    local band_x = pad + gutter
+    local band_w = w - gutter - right
+    local emblem = ("emblem_%s_%s"):format(self.land, cat.category)
+    if band_w > 40 then
+      love.graphics.setScissor(band_x, ry + 4, band_w, rh - 8)
+      if not Assets.cover(emblem, band_x, ry + 4, band_w, rh - 8) then
+        -- No art: the mascot alone rather than a coloured hole.
+        Assets.sprite(("mascot_%s_%s"):format(self.land, cat.category),
+          band_x + band_w / 2, ry + rh - 8, rh - 20)
+      end
+      love.graphics.setScissor()
+      -- A short gradient-ish fade at the label edge, so the band does not cut
+      -- against the word.
+      for k = 0, 10 do
+        UI.setColor(Theme.navy, 0.9 - k * 0.09)
+        love.graphics.rectangle("fill", band_x + k * 2, ry + 4, 2, rh - 8)
+      end
+      love.graphics.setColor(1, 1, 1, 1)
     end
+
+    local color = cat.open and Theme.cream or Theme.dim
+    UI.text(cat.category:upper(), pad + 14, ry + 12, math.floor(13 * s), color)
+    UI.text(BLURB[cat.category] or "", pad + 14, ry + 32, 7,
+      Theme.withAlpha(color, 0.7))
+
+    local progress = ("%d / %d"):format(cat.cleared, cat.total)
+    UI.text(progress, pad + w - 14 - UI.textWidth(progress, 10), ry + 12, 10, color)
+    UI.bar(pad + w - 14 - 76, ry + 30, 76, 7,
+      cat.total > 0 and cat.cleared / cat.total or 0,
+      cat.open and Theme.admit or Theme.dim)
+
+    if cat.total > 0 and cat.cleared >= cat.total then
+      Assets.marker("badge_cleared", pad + w - 40, ry + rh - 22, 30)
+    elseif not cat.open then
+      -- Only a category that genuinely cannot be entered. Nothing on the map
+      -- is locked (§4.7); this is for a pack that failed to import.
+      Assets.marker("badge_locked", pad + w - 40, ry + rh - 22, 26, { alpha = 0.85 })
+      UI.text("UNAVAILABLE", pad + 14, ry + rh - 18, 7, Theme.dim)
+    end
+
     y = y + rh + 12
   end
 
@@ -117,10 +186,12 @@ end
 function Categories:keypressed(key)
   local n = math.max(1, self.categories and #self.categories or 1)
   if key == "up" or key == "left" then
-    self.cursor = ((self.cursor - 2) % n) + 1; SFX.play("move"); return true
+    self.cursor = ((self.cursor - 2) % n) + 1
+    self.picked_at = Anim.now(); SFX.play("move"); return true
   end
   if key == "down" or key == "right" then
-    self.cursor = (self.cursor % n) + 1; SFX.play("move"); return true
+    self.cursor = (self.cursor % n) + 1
+    self.picked_at = Anim.now(); SFX.play("move"); return true
   end
   if key == "return" or key == "kpenter" or key == "space" then self:choose(); return true end
   return false
@@ -130,11 +201,16 @@ function Categories:mousepressed(x, y)
   local rows = self.categories or {}
   local pad = Layout.isPortrait() and 16 or 80
   local w = Layout.vw - pad * 2
-  local rh = math.min(96, math.max(64, (Layout.vh - 140) / math.max(1, #rows) - 12))
-  local ry = 68
+  local rh = math.min(104, math.max(76, (Layout.vh - 140) / math.max(1, #rows) - 12))
+  local ry = 70
   for i = 1, #rows do
     if x >= pad and x <= pad + w and y >= ry and y <= ry + rh then
-      self.cursor = i
+      if self.cursor ~= i then
+        self.cursor = i
+        self.picked_at = Anim.now()
+        SFX.play("move")
+        return
+      end
       self:choose()
       return
     end

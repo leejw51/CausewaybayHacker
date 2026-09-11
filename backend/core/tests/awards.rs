@@ -31,6 +31,9 @@ fn store_with(quests: &[(&str, &str, &str, i64)]) -> (tempfile::TempDir, Store) 
     (tmp, store)
 }
 
+/// Takes the connection briefly and gives it straight back. `Store::conn` is a
+/// plain mutex guard and is not reentrant, so a helper that locks must never
+/// be called while a caller is holding one.
 fn submit(store: &Store, address: &str, quest: &str, verdict: &str) -> String {
     let conn = store.conn();
     let id = cwbhacker_core::ids::attempt_id();
@@ -253,70 +256,51 @@ fn polyglot_needs_both_lands_and_a_finished_map_needs_the_whole_map() {
 #[test]
 fn taming_a_mistake_needs_both_halves() {
     let (_tmp, store) = store_with(&[("rust.basic.01.a", "rust", "basic", 1)]);
-    let conn = store.conn();
-    let mistake = |kind: &str| mistakes::Mistake {
-        kind: kind.into(),
+    let mistake = mistakes::Mistake {
+        kind: "borrow-after-move".into(),
         code: Some("E0382".into()),
         message: "m".into(),
         line: None,
         col: None,
     };
+    let made = |store: &Store, kinds: &[mistakes::Mistake]| {
+        let verdict = if kinds.is_empty() {
+            "accepted"
+        } else {
+            "compile_error"
+        };
+        let id = submit(store, ALICE, "rust.basic.01.a", verdict);
+        let conn = store.conn();
+        mistakes::record(
+            &conn,
+            &id,
+            ALICE,
+            "rust.basic.01.a",
+            kinds,
+            attempts::Mode::Submit,
+        )
+        .unwrap();
+    };
 
     // Made it four times: not yet a habit worth a badge for breaking.
     for _ in 0..4 {
-        let id = submit(&store, ALICE, "rust.basic.01.a", "compile_error");
-        mistakes::record(
-            &conn,
-            &id,
-            ALICE,
-            "rust.basic.01.a",
-            &[mistake("borrow-after-move")],
-            attempts::Mode::Submit,
-        )
-        .unwrap();
+        made(&store, std::slice::from_ref(&mistake));
     }
     for _ in 0..6 {
-        let id = submit(&store, ALICE, "rust.basic.01.a", "accepted");
-        mistakes::record(
-            &conn,
-            &id,
-            ALICE,
-            "rust.basic.01.a",
-            &[],
-            attempts::Mode::Submit,
-        )
-        .unwrap();
+        made(&store, &[]);
     }
-    let fresh = awards::evaluate(&conn, ALICE).unwrap();
+    let fresh = awards::evaluate(&store.conn(), ALICE).unwrap();
     assert!(
         !fresh.iter().any(|a| a.id.starts_with("tamed-")),
         "four times is not a habit: {fresh:?}"
     );
 
     // The fifth makes it one, and five clean submits after that break it.
-    let id = submit(&store, ALICE, "rust.basic.01.a", "compile_error");
-    mistakes::record(
-        &conn,
-        &id,
-        ALICE,
-        "rust.basic.01.a",
-        &[mistake("borrow-after-move")],
-        attempts::Mode::Submit,
-    )
-    .unwrap();
+    made(&store, std::slice::from_ref(&mistake));
     for _ in 0..5 {
-        let id = submit(&store, ALICE, "rust.basic.01.a", "accepted");
-        mistakes::record(
-            &conn,
-            &id,
-            ALICE,
-            "rust.basic.01.a",
-            &[],
-            attempts::Mode::Submit,
-        )
-        .unwrap();
+        made(&store, &[]);
     }
-    let fresh = awards::evaluate(&conn, ALICE).unwrap();
+    let fresh = awards::evaluate(&store.conn(), ALICE).unwrap();
     assert!(
         fresh.iter().any(|a| a.id == "tamed-borrow-after-move"),
         "{fresh:?}"

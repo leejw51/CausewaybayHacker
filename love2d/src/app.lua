@@ -22,6 +22,7 @@ local UI = require("src.ui")
 local CRT = require("src.crt")
 local SFX = require("src.sfx")
 local Store = require("src.store")
+local Anim = require("src.anim")
 local Wallet = require("src.wallet")
 local Session = require("src.session")
 local netclient = require("src.net.client")
@@ -138,6 +139,11 @@ end
 function App:load()
   Assets.load()
   SFX.load()
+
+  -- The motion layer's clock. `src/anim.lua` is pure and has no clock of its
+  -- own; the game gives it this one, and a drive script can pin it so a
+  -- screenshot of a bobbing mascot is the same screenshot every run.
+  Anim.set_clock(function() return love.timer.getTime() end)
 
   -- The key library first: `src/store.lua` wants its `secure` op for the
   -- `0700`/`0600` SPEC §1.1 asks for, and a store that opened before the

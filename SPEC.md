@@ -175,6 +175,7 @@ CREATE TABLE progress (
   best_ms       INTEGER,                      -- fastest clear, wall clock
   attempts      INTEGER NOT NULL DEFAULT 0,
   hints_used    INTEGER NOT NULL DEFAULT 0,
+  opened_at     TEXT,                    -- PROTOCOL §4.8b: when the clock started
   first_clear_at TEXT,
   updated_at    TEXT NOT NULL,
   PRIMARY KEY (address, quest_id)
@@ -199,6 +200,7 @@ CREATE TABLE attempts (
   stderr        TEXT NOT NULL DEFAULT '',  -- truncated to 64 KiB
   tests_passed  INTEGER NOT NULL DEFAULT 0,
   tests_total   INTEGER NOT NULL DEFAULT 0,
+  within_limit  INTEGER,                 -- PROTOCOL §4.8b; NULL when untimed
   created_at    TEXT NOT NULL
 );
 CREATE INDEX attempts_by_user ON attempts(address, created_at DESC);

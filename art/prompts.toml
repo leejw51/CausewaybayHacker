@@ -673,3 +673,33 @@ generated = "2026-09-11"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing anywhere. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A single chunky closed brass padlock seen flat-on, centred, filling the picture: a fat rounded brass body with a thick dark steel shackle closed over the top, one round dark keyhole low on the face, heavy dark outline, a couple of dithered highlights on the brass. Two short links of dark heavy chain hang from the shackle. Dull, heavy and shut. Muted brass gold and dark grey-brown only, deliberately desaturated and lifeless compared to a lit icon. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the subject). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "map_rust"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges. The TOP-LEFT CORNER, the TOP-RIGHT CORNER, the BOTTOM-LEFT CORNER and the BOTTOM-RIGHT CORNER each contain buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere — every part of the picture has roofs, kerbs, trees, streets or stalls in it. Causeway Bay Hong Kong shrunk to a miniature in warm gold morning light, saturated green grass and warm tan paving everywhere, terracotta and amber roofs, Super Mario World candy colours. Packed densely across every part of the map: a blue double-decker tram on a curving track, coral and mint tenement blocks with gold bamboo scaffolding, market lanes with red and white striped awnings, parks of round green trees, a squat mall, tiled-roof temples, flower beds, low shophouses, rooftop water tanks. A wide winding tan paved road snakes across the whole map from the bottom left corner to the top right corner in smooth S-bends, folding back through the middle, unbroken and clearly visible over the grass."""
+
+[[asset]]
+name = "map_go"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges. The TOP-LEFT CORNER, the TOP-RIGHT CORNER, the BOTTOM-LEFT CORNER and the BOTTOM-RIGHT CORNER each contain buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere — every part of the picture has roofs, kerbs, trees, streets or stalls in it. The Hong Kong MTR Island Line at night shrunk to a miniature. The ground is warm mid-grey paving and saturated deep green grass, clearly lit by cyan and turquoise neon and warm amber windows — moody but every surface visible, never black and never empty. Packed densely across every part of the map: a cutaway MTR station with a brightly cyan-lit train, glowing turquoise station entrances, late-night kitchens with hot orange windows, racks of red and blue delivery bikes, many neon night-market stalls with saturated red pink orange and green canopies, a concrete footbridge, parks of round green trees, rooftop water tanks, shophouses with warm yellow lit windows. A wide winding PALE CREAM concrete walkway snakes across the whole map from the top right corner down to the bottom left corner in smooth S-bends, bright against the darker ground and unbroken."""
+
+[[asset]]
+name = "bg_playground"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. Warm ambers, soft greens and worn creams with deep comfortable shadow. Absolutely no text, no letters, no words, no numbers, no writing on the calendar, the postcard, the books, the screen or anywhere else — every surface is blank. The same small walk-up flat above a Hong Kong market lane that the game opens in, but now in the middle of a warm afternoon and lived in. A cheap wooden desk against the window with an open laptop on it, a half-drunk mug of milk tea, a stack of dog-eared paperbacks, a desk lamp, a jar of pens, a small electric fan turning, a pot plant, a drying rack with a shirt on it, a bare bulb, cracked plaster, a taped-up postcard and a wall calendar that is completely blank. Through the window the lane opposite in warm afternoon light — shuttered tenements, air-conditioner boxes, drying poles, a tram wire. Nobody in the room. Calm, ordinary, safe, unhurried — a room that belongs to somebody, with no clock and no deadline in it. Seen straight on from across the room, the desk and window centred, the floor flat and level across the bottom fifth of the frame."""
