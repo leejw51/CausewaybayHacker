@@ -1,0 +1,47 @@
+# A throwaway pack for the backend's own tests: the Go land exists in the
+# content and cannot be judged by this build, which is the case the server has
+# to refuse cleanly. NOT the shipped content.
+pack = "go.basic"
+land = "go"
+category = "basic"
+version = 1
+
+[[quest]]
+id          = "go.basic.01.hello"
+node        = 1
+title       = "ANOTHER STREET"
+difficulty  = 1
+story       = "A different alphabet, the same city."
+concepts    = ["io", "strings"]
+requires    = []
+map         = { x = 0.15, y = 0.70, kind = "quest" }
+brief       = '''
+Print `hello, causewaybay` and nothing else.
+'''
+starter     = '''
+package main
+
+func main() {
+	// your code here
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("hello, causewaybay")
+}
+'''
+hints = [
+  "`fmt.Println` adds the newline for you.",
+]
+
+[quest.tests]
+harness      = "stdio"
+timeout_ms   = 5000
+match        = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]

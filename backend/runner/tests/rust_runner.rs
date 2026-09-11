@@ -316,3 +316,25 @@ fn the_go_runner_refuses_cleanly_rather_than_panicking() {
     assert_eq!(report.verdict, Verdict::InternalError);
     assert!(report.runtime_stderr.contains("milestone 2"));
 }
+
+/// The capability check the server asks **before** it creates an attempt.
+/// Getting this wrong is not a runner bug, it is a curriculum bug: an attempt
+/// that should never have existed carries a verdict into `mistake_stats`.
+#[test]
+fn unsupported_names_what_this_build_cannot_judge() {
+    let stdio_spec = stdio(serde_json::json!([
+        { "name": "any", "stdin": "", "expect": "x", "visible": true }
+    ]));
+    assert_eq!(cwbhacker_runner::unsupported("rust", &stdio_spec), None);
+
+    let go = cwbhacker_runner::unsupported("go", &stdio_spec).expect("go is milestone 2");
+    assert!(go.contains("Go runner"), "{go}");
+
+    let cargo_spec = spec(serde_json::json!({
+        "harness": "cargo",
+        "cases": [ { "name": "any", "stdin": "", "expect": "x", "visible": true } ]
+    }));
+    assert!(cwbhacker_runner::unsupported("rust", &cargo_spec).is_some());
+
+    assert!(cwbhacker_runner::unsupported("cobol", &stdio_spec).is_some());
+}

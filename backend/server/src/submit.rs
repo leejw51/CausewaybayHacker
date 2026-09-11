@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use cwbhacker_core::error::{bad_request, Result};
+use cwbhacker_core::error::{bad_request, unavailable, Result};
 use cwbhacker_core::{attempts, ids, mistakes, progress, quests, world};
 use cwbhacker_runner::{Event, Submission, TestSpec, Verdict};
 use serde_json::json;
@@ -143,6 +143,16 @@ pub fn run(
         )));
     }
     let spec = TestSpec::parse(&quest.tests)?;
+
+    // Refused before anything is written. A submission this build cannot judge
+    // must leave no attempt row behind: an attempt carries a verdict, a
+    // verdict carries mistakes, and `mistake_stats` is what the drills teach
+    // from (SPEC §7). A fabricated verdict there teaches the player to fix
+    // something they never did, and there is no way to tell it afterwards
+    // from something they really got wrong.
+    if let Some(reason) = cwbhacker_runner::unsupported(&lang, &spec) {
+        return Err(unavailable(reason, 2));
+    }
 
     let attempt_id = ids::attempt_id();
     {

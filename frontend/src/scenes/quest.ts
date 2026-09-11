@@ -127,6 +127,17 @@ export class QuestScene implements Scene {
 
   // -- actions -------------------------------------------------------------
 
+  /**
+   * Whether walking away throws work away. Compared against the starter rather
+   * than tracked with a dirty flag, because typing something and then undoing
+   * it back to the starter is not unsaved work, and being asked about it would
+   * teach the player to dismiss the question without reading it.
+   */
+  unsaved(): boolean {
+    if (!this.editor || !this.quest) return false;
+    return this.editor.source.trim() !== this.quest.starter.trim();
+  }
+
   private async submit(): Promise<void> {
     if (!this.quest || !this.editor || this.stage !== "idle") return;
     this.attemptId = null;

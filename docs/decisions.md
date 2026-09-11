@@ -956,3 +956,55 @@ from there into the AI drills — and the player is handed a lesson about a
 mistake they never made. The whole curriculum is derived from that table
 (SPEC §7), so nothing may enter it that did not really happen. That argument
 applies to any future "cannot judge" path, not just Go.
+
+## 2026-09-11 — BE: `unavailable` implemented, and a request to QA
+
+Both halves of the decision are in.
+
+**`unavailable` is a code in `core::error::Code`,** with a constructor that
+takes the milestone so nothing can raise it without saying *when*:
+`unavailable(reason, 2)`. `search.query`, `ai.plan`, `ai.next`, `ai.finish`
+and a Go submission all answer it with `detail.milestone = 2`.
+
+**Nothing is written for a submission this build cannot judge.** The check
+(`cwbhacker_runner::unsupported(lang, spec)`) is asked *before* the attempt id
+is minted and before `progress.bump_attempt` — the earliest point at which the
+language and the harness are both known. It lives in the runner rather than
+the server because the runner is the thing that knows what it can run, and it
+covers the `cargo` and `gotest` harnesses as well as the Go land, so the same
+rule holds for every future "cannot judge" path rather than for Go alone.
+
+`backend/server/tests/protocol.rs::a_go_submission_is_unavailable_and_records_nothing`
+asserts the whole of it against a live server: the code, the milestone, and
+then that `stats.history` is empty, `stats.mistakes` is empty, and the node's
+`attempts` counter is still 0 — the three places a fabricated verdict would
+have leaked into the curriculum.
+
+**QA: `tests/smoke/contract.mjs` needs `unavailable` added to its
+`ERROR_CODES` set** (line ~77 — the list ends `"busy", "internal"`). §8
+conformance is still 12/12, but two "beyond the checklist" cases now fail
+against the amended §3.3:
+
+```
+FAIL  beyond: milestone-2 endpoints say so, and are not failures
+      search.query answered unavailable, outside §3.3
+FAIL  beyond: no frame the server sent broke the envelope rules
+      error code "unavailable" is outside §3.3's closed set
+```
+
+Both are the checker holding the pre-amendment table, not the server. I have
+not touched `tests/smoke/` — it is yours.
+
+## 2026-09-11 — The smoke checker's copy of the closed set, updated by the lead
+
+`tests/smoke/` is QA's, but its `ERROR_CODES` set and its milestone-2 case are
+transcriptions of PROTOCOL §3.3, and §3.3 changed under them when `unavailable`
+was added. Updated by the lead rather than routed back, since the edit is
+derived from the spec change and not a judgement call.
+
+The Go case gained teeth while it was open. It previously asserted only that
+the verdict was one of a tolerated set, and printed a complaint. It now asserts
+the refusal, the code, the milestone, **and that `stats.history` and
+`stats.mistakes` are both empty** — the two places a fabricated verdict would
+surface in the player's curriculum. Verified against a live server with a fresh
+wallet: `unavailable`, milestone 2, 0 attempts, 0 mistakes.

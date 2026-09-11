@@ -299,9 +299,10 @@ pub fn display_address(address: &str) -> String {
     eth::to_eip55(address)
 }
 
-/// Milestone 2 lives behind this. A clean refusal from §3.3's closed set, not
-/// a panic and not a silent empty list that looks like "no results".
+/// Milestone 2 lives behind this. `unavailable` rather than `not_found`,
+/// because the thing exists and is specified — it is the build that is
+/// early — and a client renders the two differently: "no such quest" against
+/// "the GO land opens in the next chapter".
 pub fn unimplemented(what: &str) -> Error {
-    Error::new(Code::NotFound, format!("{what} is not in this build yet"))
-        .with_detail(json!({ "milestone": 2 }))
+    cwbhacker_core::error::unavailable(format!("{what} is not in this build yet"), 2)
 }

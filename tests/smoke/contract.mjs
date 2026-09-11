@@ -76,6 +76,10 @@ const ERROR_CODES = new Set([
   "locked",
   "rate_limited",
   "busy",
+  // Real and specified, but not built yet — carries detail.milestone. Never
+  // `internal`, which tells the player their machine is broken and invites a
+  // retry that cannot work.
+  "unavailable",
   "internal",
 ]);
 
@@ -1508,9 +1512,12 @@ check(null, "beyond: two users never see each other's progress or attempts", asy
 
 check(null, "beyond: milestone-2 endpoints say so, and are not failures", async () => {
   // `search.query` and `ai.*` are SPEC §8 and §7.3, and PLAN.md puts both in
-  // milestone 2. They answer `not_found` with `detail: {"milestone": 2}`,
+  // milestone 2. They answer `unavailable` with `detail: {"milestone": 2}`,
   // which is the right shape: a closed-set code plus a machine-readable
   // reason, so a client can grey the button out instead of showing an error.
+  // `unavailable` rather than `not_found` because the endpoint is real and
+  // specified — it is not built yet, which is a different sentence to say to
+  // a player than "no such thing".
   //
   // This is a PENDING check, not a failing one. What it asserts is that the
   // gap is *declared* — the day either ships, this check starts failing and
@@ -1534,7 +1541,7 @@ check(null, "beyond: milestone-2 endpoints say so, and are not failures", async 
         ERROR_CODES.has(r.payload.code),
         `${type} answered ${r.payload.code}, outside §3.3`,
       );
-      assertEq(r.payload.code, "not_found", `${type} while unimplemented`);
+      assertEq(r.payload.code, "unavailable", `${type} while unimplemented`);
       assertEq(
         r.payload.detail?.milestone,
         2,
@@ -1550,10 +1557,11 @@ check(null, "beyond: milestone-2 endpoints say so, and are not failures", async 
           `and the search rows of SPEC §8).`,
       );
 
-    // A Go submission is the other declared M2 gap. It currently comes back
-    // `internal_error`, which reads to a player as "the server broke — try
-    // again" for something that is simply not built. Asserted as it is, with
-    // the complaint recorded rather than swallowed.
+    // A Go submission is the other declared M2 gap, and the one with teeth:
+    // the server must refuse it *without recording anything*. An attempt row
+    // carrying a fabricated verdict flows into `mistakes`, then into the AI
+    // drills, and the player is taught to fix a mistake they never made — so
+    // this asserts the three places that leak would show up, not just the code.
     const goMap = await cl.send("world.map", { land: "go", category: "basic" });
     const goNode = goMap.payload.nodes?.find((n) => n.state === "open");
     if (goNode) {
@@ -1562,20 +1570,25 @@ check(null, "beyond: milestone-2 endpoints say so, and are not failures", async 
         lang: "go",
         source: 'package main\n\nimport "fmt"\n\nfunc main() { fmt.Println("x") }\n',
       });
-      const verdict = r.type.endsWith(".ok") ? r.payload.attempt.verdict : r.payload.code;
       assert(
-        ["internal_error", "not_found", "internal", "locked"].includes(verdict),
-        `a Go submission gave ${verdict}; expected the declared M2 gap`,
+        r.type.endsWith(".err"),
+        `a Go submission was accepted for judging; the runner cannot judge it yet`,
       );
-      // Not a failure — a note. See docs/decisions.md.
-      if (verdict === "internal_error" && !AS_JSON)
-        console.log(
-          dim(
-            "      note: a Go submission surfaces as `internal_error`, which a " +
-              "client renders as \"the server broke\". A known gap deserves a " +
-              "better code — raised in docs/decisions.md.",
-          ),
-        );
+      assertEq(r.payload.code, "unavailable", "a Go submission while the runner is M2");
+      assertEq(r.payload.detail?.milestone, 2, "a Go submission must say when");
+
+      const hist = await cl.send("stats.history", { quest_id: goNode.quest_id });
+      assertEq(
+        (hist.payload.attempts ?? []).length,
+        0,
+        "an unjudgeable submission wrote an attempt row",
+      );
+      const mis = await cl.send("stats.mistakes", {});
+      assertEq(
+        (mis.payload.mistakes ?? []).length,
+        0,
+        "an unjudgeable submission put a mistake the player never made into the curriculum",
+      );
     }
   } finally {
     cl.close();

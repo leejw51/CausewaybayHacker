@@ -123,8 +123,29 @@ impl Report {
     }
 }
 
+/// Why this build cannot judge a submission, if it cannot.
+///
+/// Asked **before** an attempt is created. An attempt whose verdict the server
+/// invented flows into `mistakes`, then `mistake_stats`, then the drills, and
+/// the player is taught to fix something they never did — the whole curriculum
+/// is derived from that table (SPEC §7), so nothing may enter it that did not
+/// really happen.
+pub fn unsupported(lang: &str, spec: &TestSpec) -> Option<String> {
+    match lang {
+        "go" => Some("the Go runner is not in this build yet (SPEC §5.1)".into()),
+        "rust" => match spec.harness {
+            Harness::Stdio => None,
+            Harness::Cargo => Some("the cargo harness is not in this build yet (SPEC §5.1)".into()),
+            Harness::Gotest => Some("the gotest harness is not a rust harness (SPEC §5.2)".into()),
+        },
+        other => Some(format!("there is no runner for '{other}'")),
+    }
+}
+
 /// Dispatch on the land. Go is milestone 2; it answers with an
-/// `internal_error` report carrying the reason rather than panicking.
+/// `internal_error` report carrying the reason rather than panicking. The
+/// server refuses such a submission before it gets here — this arm is the
+/// backstop for a caller that did not ask [`unsupported`] first.
 pub fn run(sub: &Submission) -> Report {
     match sub.lang {
         "rust" => rust::run(sub),

@@ -13,6 +13,7 @@ use tokio_tungstenite::tungstenite::Message;
 use cwbhacker_core::{content, eth, Store};
 
 const PACK: &str = include_str!("../../core/tests/fixtures/rust_basic.toml");
+const GO_PACK: &str = include_str!("../../core/tests/fixtures/go_basic.toml");
 const ALICE_KEY: &str = "4646464646464646464646464646464646464646464646464646464646464646";
 
 type Socket =
@@ -25,10 +26,25 @@ struct Server {
 }
 
 async fn start() -> Server {
+    start_inner(false).await
+}
+
+/// The same, with a Go pack imported: the land exists in the content and
+/// cannot be judged by this build.
+async fn start_with_go() -> Server {
+    start_inner(true).await
+}
+
+async fn start_inner(with_go: bool) -> Server {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("content-src/rust");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("basic.toml"), PACK).unwrap();
+    if with_go {
+        let go = tmp.path().join("content-src/go");
+        std::fs::create_dir_all(&go).unwrap();
+        std::fs::write(go.join("basic.toml"), GO_PACK).unwrap();
+    }
 
     let store = Arc::new(Store::open(&tmp.path().join("home")).unwrap());
     {
@@ -331,5 +347,81 @@ async fn a_clear_reaches_the_users_other_window() {
         Some("rust.basic.01.hello")
     );
     assert_eq!(update["payload"]["unlocked"], json!(["rust.basic.02.sum"]));
+    server.handle.abort();
+}
+
+/// A submission this build cannot judge is refused **before anything is
+/// written**. An attempt row carries a verdict, a verdict carries mistakes,
+/// and `mistake_stats` is what the drills teach from (SPEC §7) — a fabricated
+/// entry there would teach the player to fix something they never did, and
+/// afterwards there is no way to tell it from a real mistake.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_go_submission_is_unavailable_and_records_nothing() {
+    let server = start_with_go().await;
+    let mut socket = connect(server.port).await;
+    login(&mut socket).await;
+
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-5", "type":"quest.submit", "payload": {
+            "quest_id": "go.basic.01.hello", "lang": "go",
+            "source": "package main\nimport \"fmt\"\nfunc main() { fmt.Println(\"hello, causewaybay\") }\n" } }),
+    )
+    .await;
+    let reply = next_json(&mut socket).await;
+    assert_eq!(reply["type"].as_str(), Some("quest.submit.err"), "{reply}");
+    assert_eq!(
+        reply["payload"]["code"].as_str(),
+        Some("unavailable"),
+        "not `internal` — the server did not break — and not `not_found`: {reply}"
+    );
+    assert_eq!(reply["payload"]["detail"]["milestone"].as_i64(), Some(2));
+
+    // Nothing was recorded: no attempt, no mistake, and the node's attempt
+    // counter did not move.
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-6", "type":"stats.history", "payload": {} }),
+    )
+    .await;
+    let history = next_json(&mut socket).await;
+    assert!(
+        history["payload"]["attempts"]
+            .as_array()
+            .unwrap()
+            .is_empty(),
+        "an unjudgeable submission left an attempt behind: {history}"
+    );
+
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-7", "type":"stats.mistakes", "payload": {} }),
+    )
+    .await;
+    let mistakes = next_json(&mut socket).await;
+    assert!(mistakes["payload"]["mistakes"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-8", "type":"world.map",
+                "payload": { "land": "go", "category": "basic" } }),
+    )
+    .await;
+    let map = next_json(&mut socket).await;
+    assert_eq!(map["payload"]["nodes"][0]["attempts"].as_i64(), Some(0));
+
+    // And the connection is fine — an application error is never a close.
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-9", "type":"ping", "payload": {} }),
+    )
+    .await;
+    assert_eq!(
+        next_json(&mut socket).await["type"].as_str(),
+        Some("ping.ok")
+    );
     server.handle.abort();
 }

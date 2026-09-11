@@ -429,14 +429,18 @@ async fn the_whole_slice_end_to_end() {
     assert!(profile["user"]["level"].is_number());
     assert!(profile["user"]["xp"].is_number());
 
-    // Milestone 2 refuses cleanly rather than panicking the connection.
+    // Milestone 2 refuses cleanly rather than panicking the connection, and
+    // says *not yet* rather than *no such thing*.
     assert_eq!(
         alice.err("search.query", json!({ "q": "ownership" })).await,
-        "not_found"
+        "unavailable"
     );
+    let ai = alice.call("ai.plan", json!({ "mode": "weakness" })).await;
+    assert_eq!(ai["payload"]["code"].as_str(), Some("unavailable"));
     assert_eq!(
-        alice.err("ai.plan", json!({ "mode": "weakness" })).await,
-        "not_found"
+        ai["payload"]["detail"]["milestone"].as_i64(),
+        Some(2),
+        "a client should be able to say *when*, not only *no*"
     );
     assert!(alice.ok("ping", json!({})).await["t"].is_string());
 

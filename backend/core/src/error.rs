@@ -14,6 +14,12 @@ pub enum Code {
     AuthNonceUsed,
     AuthBadSignature,
     NotFound,
+    /// Real, specified, and not built yet. Distinct from `Internal` ("the
+    /// server broke, a retry might help") and from `NotFound` ("no such
+    /// thing"): a client renders it in the story's voice rather than as a
+    /// failure. PROTOCOL §3.3 tells a client to treat an unknown code as
+    /// `internal`, so an old client degrades to exactly the old behaviour.
+    Unavailable,
     Locked,
     RateLimited,
     Busy,
@@ -30,6 +36,7 @@ impl Code {
             Code::AuthNonceUsed => "auth_nonce_used",
             Code::AuthBadSignature => "auth_bad_signature",
             Code::NotFound => "not_found",
+            Code::Unavailable => "unavailable",
             Code::Locked => "locked",
             Code::RateLimited => "rate_limited",
             Code::Busy => "busy",
@@ -87,6 +94,11 @@ pub fn not_found(m: impl Into<String>) -> Error {
 }
 pub fn locked(m: impl Into<String>) -> Error {
     Error::new(Code::Locked, m)
+}
+/// Specified, not built. Always carries the milestone it is waiting on, so a
+/// client can say *when* rather than only *no*.
+pub fn unavailable(m: impl Into<String>, milestone: u32) -> Error {
+    Error::new(Code::Unavailable, m).with_detail(serde_json::json!({ "milestone": milestone }))
 }
 pub fn internal(m: impl Into<String>) -> Error {
     Error::new(Code::Internal, m)
