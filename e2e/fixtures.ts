@@ -576,7 +576,22 @@ export const test = base.extend<{ ready: void }>({
       const errors: string[] = [];
       page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
       page.on("pageerror", (e) => errors.push(String(e)));
-      (test.info() as unknown as { _errors: string[] })._errors = errors;
+
+      // Every websocket frame the page sends, collected **before** the page
+      // is navigated.
+      //
+      // `page.on("websocket")` fires when a socket is *created*. The client
+      // connects during boot, so a listener attached inside a test body
+      // misses that socket entirely and the test sees zero frames — which,
+      // for the "no key material on the wire" check, is a pass by vacuum.
+      // It cost one confusing red before it was caught, and it would have
+      // cost far more as a silent green.
+      const sent: string[] = [];
+      page.on("websocket", (ws) => ws.on("framesent", (f) => sent.push(String(f.payload))));
+
+      const info = test.info() as unknown as { _errors: string[]; _sent: string[] };
+      info._errors = errors;
+      info._sent = sent;
 
       await page.goto("/");
       await page

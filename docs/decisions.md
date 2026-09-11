@@ -2108,3 +2108,28 @@ project tree.
 **All 116 quests pass, with `--complete`**: 58 rust + 58 go, every reference
 solution accepted and every starter rejected through the real runner, 58 of 58
 concept slugs reachable.
+
+## 2026-09-11 — RUN and SUBMIT are two different things
+
+The HackerRank split, asked for directly. RUN compiles and runs against the
+**visible** cases as often as you like; SUBMIT judges against all of them and
+is the one that counts.
+
+New message `quest.run` (PROTOCOL §4.9b), same payload shape as `quest.submit`
+so a client can send either down one path. A run never clears a node, never
+awards stars, never unlocks, does not count toward the node's `attempts`, and
+is excluded from `stats.summary.accuracy` — otherwise iterating honestly would
+look like failing repeatedly.
+
+**But a run is still recorded, and its mistakes still enter the curriculum.**
+`attempts.mode` is `'run'` or `'submit'`. A borrow-checker error is the same
+lesson whichever button produced it, and the errors made while iterating are
+the truest record of what someone is actually struggling with. SPEC §7 builds
+the drills from that table, so discarding runs would mean training on the
+tidied-up version of the player's week. The failure modes are symmetric and
+both are easy: a query that forgets `mode` overstates how often someone fails,
+and one that filters runs out of `mistakes` understates what they need to
+practise.
+
+`mode` defaults to `'submit'`, so every row written before today reads
+correctly.

@@ -623,6 +623,59 @@ cd e2e && npm install && npx playwright install chromium && npx playwright test
 vector generator, the smoke checker and the mock all shell out to rather than
 reimplementing secp256k1.
 
+# Coverage, stated as holes rather than as a number
+
+A percentage would be a worse answer than this list. These are the things a
+reader of this suite should not assume are covered.
+
+## Not tested at all
+
+| what | why it is not, and what it would take |
+| --- | --- |
+| **SPEC §9.6.d — `GOPROXY=off`** | Writable now that Go runs, and **not yet written**. The pack fixtures are all `stdio` with no imports, so a quest that tries to fetch has to be constructed. One test, in `backend/runner/tests/limits.rs`, importing `github.com/…` and asserting a clean `compile_error` naming the proxy rather than a hang |
+| **§7.2's rollup over time** | `mistakes.rs` has `the_rollup_counts_clean_attempts`. Nothing drives five consecutive clean attempts through the wire and asserts a kind leaves the AI priority list at `cleared_since >= 5` without being deleted. That is the mechanism the whole training loop rests on |
+| **`search.query`, `ai.*`** | Milestone 2. The only assertion is that they declare themselves `unavailable` with `detail.milestone` — which starts failing the day either ships, and that is the signal |
+| **The two-missed-ping rule** | `--slow` proves the server does **not** drop a keepalive-only connection (70.1 s, passed). Proving it *does* drop a silent one needs a client that deliberately stops answering pongs |
+| **`rate_limited`** | In §3.3's closed set, never provoked. Nothing in the suite knows what the limit is |
+| **`server.bye` for real** | The frame is injected and handled correctly, but no test makes a server actually shut down and say goodbye first |
+| **The LÖVE client's layout** | Its own suite skips those without `love.graphics`; `make -C love2d test` runs them under a window, which CI cannot do |
+| **Anything visual** | The e2e suite attaches a PNG per orientation and asserts the canvas fills the viewport and that the two layers agree in size. Nobody has *looked*. A sprite drawn off-screen in portrait passes everything here |
+| **Concurrency beyond two** | Two users, two windows, two submissions. Nothing tests ten |
+| **The database under corruption** | No test opens a truncated `hacker.db`, a WAL from a killed process, or a schema from a future version |
+
+## Tested, but weakly
+
+* **The lands scan.** `pickFirstCategory` clicks its way across a canvas
+  because the category rows are canvas-drawn and pointer-only. It has broken
+  three times — wrong column, wrong y range, wrong land — each time silently
+  selecting something and each time costing a full run to diagnose. A
+  `__cwbCapture.buttons()` returning `{id, rect}[]` would delete it and a
+  whole class of failures with it. **Requested from FE in `docs/decisions.md`;
+  until it lands, treat an e2e failure in `enterRustQuest` as "the panel
+  moved" before believing it is a product bug.**
+* **The mid-run streaming console.** SPEC §5.4 exists so the player watches
+  `rustc` think. The text is canvas-drawn: no DOM, no view model. FE could
+  not confirm it from inside (headless RAF starvation) and this suite cannot
+  read it either. The nearest honest check — two `png()` captures during one
+  compile, asserting the images differ while the screen is still `quest` — is
+  **not written**. It is coarse and it is more than nothing.
+* **The e2e suite against a moving bundle.** It passed 18/18 twice against a
+  stable `dist-e2e`. It fails intermittently while FE is rebuilding
+  underneath it, which is a true statement about the tree and not about the
+  product. `node tests/run-all.mjs --build` rebuilds first, which is the
+  reliable way to run it.
+* **`--slow` and the content CI are not in anybody's habit.** Both are in
+  `test-all`; `--slow` is not.
+
+## Tested well enough to rely on
+
+The address and signature vectors (three independent implementations agree),
+the §7.1 taxonomy against real compiler output, all 116 reference solutions
+and starters through the real runner, PROTOCOL.md §8 at 12/12 with a selftest
+that proves the checker catches 19 real faults, the runner's limits, the
+importer against content that changed shape, and the journey a player
+actually takes.
+
 # Known gaps, stated plainly
 
 1. **§9.1, §9.2 and §9.3 have no assertion QA can write.** They live inside

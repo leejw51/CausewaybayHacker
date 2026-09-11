@@ -90,8 +90,10 @@ test("the seed never crosses the wire", async ({ page }) => {
   // Not a convenience, not negotiable, and not something a unit test on
   // either side can see on its own.
   const account = freshAccount();
-  const sent: string[] = [];
-  page.on("websocket", (ws) => ws.on("framesent", (f) => sent.push(String(f.payload))));
+  // Collected by the fixture, before the page was navigated — the client
+  // opens its socket during boot, so a listener attached here would miss it
+  // and the test would pass by seeing nothing at all.
+  const sent = (test.info() as unknown as { _sent: string[] })._sent;
 
   await login(page, account);
 

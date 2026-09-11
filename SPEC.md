@@ -150,6 +150,8 @@ CREATE TABLE attempts (
   address       TEXT NOT NULL REFERENCES users(address) ON DELETE CASCADE,
   quest_id      TEXT NOT NULL REFERENCES quests(id) ON DELETE CASCADE,
   lang          TEXT NOT NULL CHECK (lang IN ('rust','go')),
+  mode          TEXT NOT NULL DEFAULT 'submit'
+                  CHECK (mode IN ('run','submit')),  -- PROTOCOL §4.9b
   source        TEXT NOT NULL,             -- the whole file, verbatim
   verdict       TEXT NOT NULL CHECK (verdict IN
                   ('accepted','wrong_answer','compile_error','runtime_error',
@@ -231,6 +233,14 @@ CREATE TABLE sessions (
 * Every timestamp is RFC3339 UTC with seconds: `2026-09-11T04:12:33Z`.
 * `attempts.source` is stored verbatim, including trailing whitespace. It is
   the record of what the player actually typed.
+* **A `run` is an attempt too.** `mode` separates the two: only `submit` rows
+  move `progress`, count toward a node's `attempts`, or enter
+  `stats.summary.accuracy`. Both kinds feed `mistakes` — the errors a player
+  makes while iterating are the truest record of what they are struggling
+  with, and SPEC §7's drills would otherwise train on a tidied-up version of
+  the week. A query that forgets to filter on `mode` will overstate how often
+  someone fails; a query that filters it out of `mistakes` will understate
+  what they need to practise.
 * `attempts.stderr` is truncated at 64 KiB with a trailing
   `\n…truncated N bytes` line. The untruncated copy is on disk (§1).
 * A quest whose `checksum` changed keeps its `progress` rows. Content is edited

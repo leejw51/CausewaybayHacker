@@ -410,6 +410,40 @@ the quest).
 A submission is **always recorded**, including a compile error, including a
 timeout. That is the curriculum (SPEC §7).
 
+### 4.9b `quest.run`
+
+The same shape as `quest.submit`, and deliberately so — a client should be able
+to send either through one code path.
+
+```json
+→ payload: { "quest_id": "…", "lang": "rust", "source": "fn main() { … }" }
+← payload: { "attempt": Attempt }        with `mode: "run"`
+```
+
+**What differs from a submit**, and all of it follows from one idea — *a run is
+for the player, a submit is for the record*:
+
+* Only the **visible** cases run. `tests_total` counts those, and
+  `hidden_count` is untouched. A run cannot tell you whether the hidden cases
+  pass, because that is what submitting is for.
+* It **never clears a node**, never awards stars, never unlocks anything.
+  `cleared` is always `false` and no `progress.update` follows.
+* It does not count against the node's `attempts`, and it is excluded from
+  `stats.summary.accuracy` — otherwise iterating honestly would look like
+  failing repeatedly.
+* `run.stage` and `run.log` stream exactly as they do for a submit.
+
+**What is the same, and this is the part worth getting right:** a run is still
+recorded, with `mode: "run"`, and **its mistakes still enter the curriculum**.
+A borrow-checker error is the same lesson whether the player pressed RUN or
+SUBMIT, and the errors made while iterating are the truest record of what they
+are actually struggling with. SPEC §7 builds the drills from that table, so
+throwing runs away would mean training on the tidied-up version of the player's
+week.
+
+Runs and submits share the one-execution-per-connection rule (§3.2): a second
+of either while one is in flight is `busy`.
+
 ### 4.10 `quest.hint`
 
 ```json
@@ -637,6 +671,7 @@ type Quest = {
 type Attempt = {
   id: string;                            // "att_" + 16 hex
   quest_id: string;
+  mode: "run" | "submit";                // §4.9b — a run never clears
   verdict: "accepted" | "wrong_answer" | "compile_error" | "runtime_error"
          | "timeout" | "output_limit" | "internal_error";
   tests_passed: number; tests_total: number;
