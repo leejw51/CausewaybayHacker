@@ -714,13 +714,39 @@ export class MapScene implements Scene {
    * stretching the overworld or cropping it, and a crop is what divorced the
    * nodes from the ground they were authored against.
    */
+  /**
+   * How tall the street plate under the map has to be.
+   *
+   * It was `108 * s` in landscape and `150 * s` in portrait — numbers tuned by
+   * eye against the old type sizes, which is fine right up until the type
+   * changes. When the chrome grew, the last line of the plate ("ENTER and go
+   * in") slid under the footer bar in Korean. This is `drawInfo`'s own
+   * arithmetic, run ahead of it, so the two cannot drift again.
+   */
+  private infoH(): number {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const f = ensureFonts(s);
+    const facts = Math.max(difficultyH(), f.stationSm.height + f8(s) + f.small.height);
+    return (
+      Math.round(14 * s) +
+      f.station.height +
+      Math.round(10 * s) +
+      facts +
+      Math.round(12 * s) +
+      f.small.height +
+      Math.round(14 * s) +
+      (layout.isPortrait() ? Math.round(30 * s) : 0)
+    );
+  }
+
   private mapPlate(): Rect {
     const { layout } = this.app;
     const s = layout.uiScale();
     const portrait = layout.isPortrait();
     const top = Math.round(38 * s) + Math.round(8 * s) + this.barLayout().h + Math.round(10 * s);
     const bottom = layout.vh - footerH(layout) - Math.round(8 * s);
-    const infoH = Math.round((portrait ? 150 : 108) * s);
+    const infoH = this.infoH();
     const availX = Math.round(8 * s);
     const availW = layout.vw - Math.round(16 * s);
     const availH = Math.max(40, bottom - top - infoH - Math.round(8 * s));

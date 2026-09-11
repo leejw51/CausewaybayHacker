@@ -5795,3 +5795,42 @@ one CJK line-breaking rule a reader notices immediately.
 three panels behind F4/F5/F6 — which had no shots at all, in any language, and
 are the three densest screens in the game. They have them now, in English and in
 Korean.
+
+### Three more things the bigger type broke, and one it exposed
+
+Raising the chrome moved every height that had been written down as a number
+rather than measured. Three of them were wrong and are now derived:
+
+- **The footer bar** (`footerH`) was `26 * s` repeated in six files. In Korean
+  portrait the hints ran off the bottom of the window. It is now the height of
+  the line in it, asked for in one place — and the line itself is *shrunk to
+  fit on one row* rather than wrapped, because half the screens reserve space
+  against that bar and because dropping hints off the end is how a player stops
+  learning the keyboard.
+- **The street plate under the map** was `108 * s` landscape, `150 * s`
+  portrait. The last line of it — the one that says ENTER and go in — slid
+  under the footer. `infoH()` is now `drawInfo`'s own arithmetic run ahead of
+  it.
+- **The verdict panel's facts column** was padded with spaces to column eight,
+  which is a column only in English: `kompilace` and `běh` differ by six
+  characters and a Korean label is full-width. `keyRows` in `ui/chrome.ts`
+  measures the labels and aligns the values in pixels.
+
+And the one it exposed, which was always wrong: **Korean was being broken per
+syllable.** Chinese and Japanese are written without spaces, so every ideograph
+is a break opportunity — but Korean is spaced, and treating it the same way
+split `봅니다` across two lines on the login screen. Hangul is out of
+`isBreakable` now; it wraps on spaces like Latin, and `wrap()` breaks inside a
+word only when one word is wider than the whole line.
+
+### What the sibling's Czech actually gave us
+
+The reviewed `cs.lua` is quest *content*, so the UI vocabulary barely overlaps:
+`ZADÁNÍ`, `ODESLAT`, `SPLNĚNO`, `TRÉNINK`, `POLICE` and `DENÍK` do not appear in
+it at all. Two terms do. `STREET CLEAR!` is `ULICE HOTOVA!` there, so
+`result.streetCleared` is theirs now rather than mine. `CLEARED` is `HOTOVO`
+there and stays `SPLNĚNO` here, deliberately: a street is *finished*, a quest
+node is *passed*, and this catalogue has to say both. Japanese and Chinese
+fared much better — 実行 / ログ / クリア and 运行 / 日志 / 通关 / 提交 are all
+the sibling's, arrived at independently, which is the closest thing to a review
+either of them has had.
