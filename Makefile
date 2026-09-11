@@ -72,8 +72,8 @@ start: ## start both servers in the background
 	@CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) nohup $(BACK_BIN) serve --bind 127.0.0.1:$(BACK_PORT) \
 	  < /dev/null > $(RUN)/backend.log 2>&1 & echo $$! > $(RUN)/backend.pid
 	@$(MAKE) -s _wait PORT=$(BACK_PORT) WHAT=backend LOG=$(RUN)/backend.log
-	@cd frontend && nohup ../$(VITE) --host --port $(WEB_PORT) \
-	  < /dev/null > ../$(RUN)/web.log 2>&1 & echo $$! > $(RUN)/web.pid
+	@( cd frontend && exec ../$(VITE) --host --port $(WEB_PORT) ) \
+	  < /dev/null > $(RUN)/web.log 2>&1 & echo $$! > $(RUN)/web.pid
 	@$(MAKE) -s _wait PORT=$(WEB_PORT) WHAT=frontend LOG=$(RUN)/web.log
 	@echo ""
 	@echo "  play        http://127.0.0.1:$(WEB_PORT)"
@@ -82,7 +82,7 @@ start: ## start both servers in the background
 	@echo "  stop        make stop"
 
 stop: ## stop both servers
-	@$(MAKE) -s _stop-one WHAT=frontend PIDFILE=$(RUN)/web.pid PORT=$(WEB_PORT) MATCH=vite
+	@$(MAKE) -s _stop-one WHAT=frontend PIDFILE=$(RUN)/web.pid PORT=$(WEB_PORT) MATCH=node
 	@$(MAKE) -s _stop-one WHAT=backend  PIDFILE=$(RUN)/backend.pid PORT=$(BACK_PORT) MATCH=cwbhacker
 	@echo "stopped"
 
