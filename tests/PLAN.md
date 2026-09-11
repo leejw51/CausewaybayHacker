@@ -651,9 +651,17 @@ reader of this suite should not assume are covered.
   is the narrowest at 3.2×, so it is the first thing to watch if CI ever
   moves to faster hardware, and a spurious pass there means the quest has
   stopped teaching complexity.
-* **`verify_pack.py` hardcodes a 180 s compile timeout** and ignores each
-  quest's declared `compile_timeout_ms`, which the runner genuinely honours.
-  Harmless today; it means CI is not testing the number the runner will use.
+* **`verify_pack.py` re-implements the runner in Python.** It shells out to
+  `rustc`/`go build` itself and hardcodes a 180 s compile timeout, ignoring
+  each quest's declared `compile_timeout_ms`. Every shipped quest is `stdio`
+  so nothing is missed today — but now that the `cargo` and `gotest`
+  harnesses exist, such a quest would be *verified* by a different code path
+  from the one that will *judge* it, which is precisely the shape of bug this
+  script exists to catch. It should delegate to the real runner.
+* **The Go side of the real-content mistake fixtures rests on one quest.**
+  `go.advanced.12.chan-directions` is the only Go starter in 138 that still
+  fails to compile. If it is ever fixed, that row must be replaced rather
+  than dropped, or the classifier loses its only real Go input.
 * **The mid-run streaming console — now tested, and it works.** Nobody had
   ever seen this: FE unit-tested the console and could not confirm it
   visually (headless RAF starvation), so `run.log` painting *while* rustc

@@ -106,10 +106,23 @@ CONTENT_CASES = [
     # quietly checking a file nobody ships any more.
     #
     # `chan-directions` is the replacement: the only Go starter in the shipped
-    # content that still fails to compile today. Its error is a type error on
-    # a directional channel, which §7.1 files under `type-mismatch` — Go's
-    # E0308 row.
-    ("go.advanced.12.chan-directions", "go/advanced", "type-mismatch", "go:cannot-use-as"),
+    # content that still fails to compile today (its brief says so outright).
+    #
+    # It classifies as **`other`**, not `type-mismatch`, and that is correct.
+    # Its message is `invalid operation: cannot send to receive-only channel`,
+    # and §7.1's Go column for `type-mismatch` is specifically
+    # `cannot use … as … value` — a different message shape. §7.1 says an
+    # unmatched code is stored as `other` **with the code kept**, and the
+    # classifier does exactly that.
+    #
+    # The first version of this row claimed `type-mismatch` because it read
+    # like one to a human. BE's classifier disagreed, the fixture went red,
+    # and the classifier was right — which is the fixture earning its keep in
+    # the direction that matters least often and costs most when it is missed.
+    # Whether the taxonomy *should* have a row for a directional-channel
+    # misuse is a question for PM; see docs/decisions.md. Until it does, this
+    # asserts what really happens.
+    ("go.advanced.12.chan-directions", "go/advanced", "other", "go:invalid-operation"),
 ]
 
 # Rows of the §7.1 table that no fixture can honestly cover. Written into
@@ -332,14 +345,9 @@ def verify(case: dict, res: dict) -> tuple[bool, str]:
             ok = any(d["code"] == code for d in res["diagnostics"])
             return ok, "" if ok else f"{code} not among {observed_identity(lang, res)}"
         blob = res["raw_compile_stderr"]
-        if code == "go:cannot-use-as":
-            ok = "cannot use" in blob or "invalid operation" in blob
-            return ok, "" if ok else "no type error in the build output"
         needle = {
-            # Two shapes of the same lesson: `cannot use X as Y value`, and
-            # the directional-channel form `invalid operation: cannot send to
-            # receive-only channel`. Both are §7.1's type-mismatch row.
-            "go:cannot-use-as": None,
+            "go:cannot-use-as": "cannot use",
+            "go:invalid-operation": "invalid operation",
             "go:undefined": "undefined:",
             "go:declared-not-used": "declared and not used",
             "go:imported-not-used": "imported and not used",

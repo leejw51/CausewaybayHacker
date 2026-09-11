@@ -4725,3 +4725,62 @@ Worth knowing for whoever edits Go content next: the classifier's real-input
 coverage on the Go side now rests on that one quest. If its starter is ever
 fixed too, the six-case set loses its Go half and the row should be replaced
 rather than dropped.
+
+## 2026-09-11 — QA: the Go starter fixture, and a taxonomy row §7.1 does not have
+
+The six real-content mistake fixtures read their `starter` out of `content/**`
+**at generate time** rather than copying it, so a content edit surfaces as a
+stale claim rather than a test quietly checking a file nobody ships. That
+design paid for itself twice in one afternoon.
+
+**First**, the Go reviewer fixed `go.advanced.09.errors-in-flight` — its
+starter was being rejected with `"fmt" imported and not used`, an *incidental*
+compile error rather than the quest's lesson. Correct fix; the fixture went
+`verified: false` the moment it landed, which is what should happen.
+
+**Second**, and more interesting: the replacement,
+`go.advanced.12.chan-directions` — now the only Go starter in the shipped
+content that still fails to compile — was filed here as `type-mismatch`,
+because `invalid operation: cannot send to receive-only channel` reads like a
+type error to a human. **BE's classifier said `other` with
+`code: "go:invalid-operation"`, and BE is right.** §7.1's Go column for
+`type-mismatch` is specifically `cannot use … as … value`; this is a different
+message shape, and §7.1's rule for an unmatched one is *"stored as `other`
+with its code kept — **never drop a code you did not recognize**"*.
+
+The fixture is now the truth rather than the guess, and both sides are green.
+
+**Proposal to PM:** §7.1 has no row for a directional-channel misuse, and
+`chan-directions` is a quest specifically *about* that lesson. A player who
+gets it wrong is told their mistake is `other`, which teaches nothing and
+cannot be drilled. Either `type-mismatch` grows a second Go message shape, or
+the table grows a `channel-direction` row. No code change is implied — the
+classifier already keeps the code, which is what makes the decision
+recoverable later.
+
+Worth knowing for whoever edits Go content next: the classifier's real-input
+coverage on the Go side now rests on that single quest. If its starter is ever
+fixed too, the row should be replaced rather than dropped.
+
+## 2026-09-11 — QA: `verify_pack.py` no longer races another agent
+
+`SCRATCH` defaulted to one fixed temp path that the script `rmtree`s at
+startup. Fine alone; a race the moment two agents verify packs at once — the
+second run's wipe deletes the first run's build directory mid-compile and the
+first dies with a `FileNotFoundError` that looks like nothing to do with
+content. That happened to the Go reviewer.
+
+`SCRATCH` is per-process now (`run-<pid>`). `CACHE` stays **shared** on
+purpose: it is the toolchain cache, the first Go build is the slow one, and
+there is no reason for it to be the slow one once per process — `go` and
+`cargo` both lock their own caches, so sharing that is safe in a way that
+sharing a scratch directory is not. `CWBHACKER_CI_SCRATCH` and
+`CWBHACKER_CI_CACHE` still override both.
+
+**Still outstanding in that script, now that the harnesses have landed:** it
+re-implements `go build` in Python and hardcodes a 180 s compile timeout,
+ignoring each quest's declared `compile_timeout_ms`. Every shipped quest is
+`stdio` today so nothing is missed, but a `cargo` or `gotest` quest would be
+verified by a different code path from the one that will judge it — which is
+the exact shape of bug this script exists to catch. It should delegate to the
+real runner. Noted in `tests/PLAN.md` as a known hole rather than fixed here.

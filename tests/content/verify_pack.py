@@ -33,7 +33,21 @@ _root = (
     if _home
     else pathlib.Path(tempfile.gettempdir()) / "cwbhacker-content-ci"
 )
-SCRATCH = pathlib.Path(os.environ.get("CWBHACKER_CI_SCRATCH", _root / "run"))
+#
+# SCRATCH is **per process**. It used to default to one fixed path that the
+# script `rmtree`s at startup, which is fine alone and a race the moment two
+# agents run packs at the same time: the second run's wipe deletes the first
+# run's build directory mid-compile, and the first dies with a
+# `FileNotFoundError` that looks like nothing to do with content. That
+# happened. The PID keeps runs out of each other's way without needing a lock.
+#
+# CACHE is deliberately **shared**: it is the toolchain cache, the first Go
+# build is the slow one, and there is no reason for it to be the slow one
+# once per process. `go` and `cargo` both lock their own caches, so sharing
+# it is safe in a way that sharing a scratch directory is not.
+SCRATCH = pathlib.Path(
+    os.environ.get("CWBHACKER_CI_SCRATCH", _root / f"run-{os.getpid()}")
+)
 CACHE = pathlib.Path(os.environ.get("CWBHACKER_CI_CACHE", _root / "cache"))
 
 ID_RE = re.compile(r"^(rust|go)\.(basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")

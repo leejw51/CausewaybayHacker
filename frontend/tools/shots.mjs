@@ -219,22 +219,54 @@ async function main() {
   });
 
   await group("login-offline", async () => {
-    await size(LAND);
-    // A socket that will not open, so the phrase card has to hold the words
-    // rather than throwing them away. This is the screenshot the "the twelve
-    // words are never thrown away" entry is about.
-    // Only the game's own socket. Routing everything takes Vite's hot-reload
-    // channel with it, and the page then spends the shot printing about that
-    // instead of about the phrase.
-    await page.routeWebSocket(/\/ws(\?|$)/, (ws) => ws.close());
-    await page.goto(`${BASE}/`);
-    await at("login", 45000);
-    await settle(2.5);
-    await press("new", 1600);
-    await press("keep", 2500).catch(() => {});
-    await settle(2.5);
-    await shot("12-login-phrase-held-offline");
-    await page.unrouteAll();
+    // Its own page, and that is not fussiness. A websocket route survives
+    // `unrouteAll` badly enough that the first run of this script signed in
+    // against a socket that was still being closed under it, and every group
+    // after this one reported "still on login". A page that is thrown away
+    // cannot leak a route into the rest of the run.
+    const dead = await browser.newPage({ viewport: { width: LAND[0], height: LAND[1] } });
+    try {
+      // Only the game's own socket: routing everything takes Vite's
+      // hot-reload channel with it and the page spends the shot complaining
+      // about that instead of holding the phrase.
+      await dead.routeWebSocket(/\/ws(\?|$)/, (ws) => ws.close());
+      await dead.goto(`${BASE}/`);
+      const on = async (name, ms = 45000) => {
+        const until = Date.now() + ms;
+        for (;;) {
+          const now = await dead.evaluate(() => window.__cwbCapture?.scene?.() ?? null);
+          if (now === name) return;
+          if (Date.now() > until) throw new Error(`still on ${now}, wanted ${name}`);
+          await dead.waitForTimeout(200);
+        }
+      };
+      await on("login");
+      await dead.evaluate(() => window.__cwbCapture.settle(2.5));
+      const hit = await dead.evaluate(() => window.__cwbCapture.buttonAt("new"));
+      if (!hit) throw new Error("no NEW WALLET button");
+      await dead.mouse.click(hit[0], hit[1]);
+      await dead.waitForTimeout(1600);
+      const keep = await dead.evaluate(() => window.__cwbCapture.buttonAt("keep"));
+      if (keep) {
+        await dead.mouse.click(keep[0], keep[1]);
+        await dead.waitForTimeout(2500);
+      }
+      await dead.evaluate(() => window.__cwbCapture.settle(2.5));
+      const url = await dead.evaluate(() => {
+        const api = window.__cwbCapture;
+        api.freeze();
+        api.step(1);
+        return api.png();
+      });
+      const name = "12-login-phrase-held-offline";
+      if (wanted(name) && url) {
+        writeFileSync(resolve(OUT, `${name}.png`), Buffer.from(url.split(",")[1], "base64"));
+        taken.push(`${name}.png`);
+        process.stdout.write(`  ${name}.png\n`);
+      }
+    } finally {
+      await dead.close();
+    }
   });
 
   // ---- signed in ---------------------------------------------------------
