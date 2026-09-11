@@ -4111,3 +4111,633 @@ cases = [
   { name = "miss",      stdin = "2 2\nGET 9\nGET 8\n",                                      expect = "-1\n-1\n-\nEVICTED 0\n",      visible = false },
   { name = "churn",     stdin = "1 4\nPUT 1 1\nPUT 2 2\nPUT 3 3\nGET 1\n",                  expect = "-1\n3\nEVICTED 2\n",          visible = false },
 ]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id           = "go.hacker.29.dijkstra"
+node         = 28
+title        = "NOT EVERY STREET IS THE SAME LENGTH"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Every map you have cleared so far counted hops. The tram does not care how many stops there are; it cares how long they take."
+concepts     = ["graphs", "heaps", "complexity"]
+requires     = ["go.hacker.27.commands"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Standard input is `n m seed`: `n` stops, `m` undirected weighted edges. Build
+the graph yourself, with **exactly** this generator, in `uint64` (which wraps
+in Go without any ceremony):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for i in 1..n:                  # a spanning tree first, so it is connected
+    p = next() % i
+    w = next() % 1000 + 1
+    edge (p, i, w)
+for the remaining m - (n-1) edges:
+    a = next() % n
+    b = next() % n
+    w = next() % 1000 + 1
+    edge (a, b, w)
+```
+
+Print the sum of the shortest distances from stop `0` to every reachable stop
+(including `0` itself, which is `0`), then `MAX <the largest of them>`.
+
+```
+input:  6 8 1
+output: 4594
+        MAX 1582
+```
+
+**The complexity here is enforced.** One hidden case is `n = 100000`,
+`m = 200000`. Dijkstra is the right algorithm either way; what the clock
+decides is the priority queue. Scanning every unvisited node for the minimum
+is `O(V²)` — `10^10` comparisons, and it does not finish in the five second
+run limit. A binary heap makes it `O((V + E) log V)` and it finishes in about
+twenty milliseconds. Both measured on this machine, with the two programs that
+ship in this quest: the starter is the scanning version.
+
+`container/heap` over a slice of `{dist, node}`, ordered by `dist`. There is
+no decrease-key and you do not need one: push the improved distance as a new
+entry and skip any entry you pop whose distance is already worse than the one
+you have recorded. That stale-entry skip is the line people forget.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type rng struct{ x uint64 }
+
+func (r *rng) next() uint64 {
+	r.x = r.x*6364136223846793005 + 1442695040888963407
+	return r.x >> 33
+}
+
+type edge struct {
+	to int
+	w  int64
+}
+
+func build(n, m int, seed uint64) [][]edge {
+	r := &rng{seed}
+	g := make([][]edge, n)
+	add := func(a, b int, w int64) {
+		g[a] = append(g[a], edge{b, w})
+		g[b] = append(g[b], edge{a, w})
+	}
+	for i := 1; i < n; i++ {
+		p := int(r.next()) % i
+		w := int64(r.next()%1000 + 1)
+		add(p, i, w)
+	}
+	extra := m - (n - 1)
+	for e := 0; e < extra; e++ {
+		a := int(r.next()) % n
+		b := int(r.next()) % n
+		w := int64(r.next()%1000 + 1)
+		add(a, b, w)
+	}
+	return g
+}
+
+const inf = int64(1) << 62
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, m int
+	var seed uint64
+	fmt.Fscan(reader, &n, &m, &seed)
+
+	g := build(n, m, seed)
+	dist := make([]int64, n)
+	done := make([]bool, n)
+	for i := range dist {
+		dist[i] = inf
+	}
+	dist[0] = 0
+
+	// correct, and far too slow: the minimum is found by scanning every node
+	for k := 0; k < n; k++ {
+		best, bestDist := -1, inf
+		for u := 0; u < n; u++ {
+			if !done[u] && dist[u] < bestDist {
+				bestDist = dist[u]
+				best = u
+			}
+		}
+		if best < 0 {
+			break
+		}
+		done[best] = true
+		for _, e := range g[best] {
+			if bestDist+e.w < dist[e.to] {
+				dist[e.to] = bestDist + e.w
+			}
+		}
+	}
+
+	var sum, max int64
+	for _, d := range dist {
+		if d < inf {
+			sum += d
+			if d > max {
+				max = d
+			}
+		}
+	}
+	fmt.Println(sum)
+	fmt.Printf("MAX %d\n", max)
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"container/heap"
+	"fmt"
+	"os"
+)
+
+type rng struct{ x uint64 }
+
+func (r *rng) next() uint64 {
+	r.x = r.x*6364136223846793005 + 1442695040888963407
+	return r.x >> 33
+}
+
+type edge struct {
+	to int
+	w  int64
+}
+
+func build(n, m int, seed uint64) [][]edge {
+	r := &rng{seed}
+	g := make([][]edge, n)
+	add := func(a, b int, w int64) {
+		g[a] = append(g[a], edge{b, w})
+		g[b] = append(g[b], edge{a, w})
+	}
+	for i := 1; i < n; i++ {
+		p := int(r.next()) % i
+		w := int64(r.next()%1000 + 1)
+		add(p, i, w)
+	}
+	extra := m - (n - 1)
+	for e := 0; e < extra; e++ {
+		a := int(r.next()) % n
+		b := int(r.next()) % n
+		w := int64(r.next()%1000 + 1)
+		add(a, b, w)
+	}
+	return g
+}
+
+type item struct {
+	dist int64
+	node int
+}
+
+type pq []item
+
+func (p pq) Len() int            { return len(p) }
+func (p pq) Less(i, j int) bool  { return p[i].dist < p[j].dist }
+func (p pq) Swap(i, j int)       { p[i], p[j] = p[j], p[i] }
+func (p *pq) Push(x any)         { *p = append(*p, x.(item)) }
+func (p *pq) Pop() any {
+	old := *p
+	last := len(old) - 1
+	v := old[last]
+	*p = old[:last]
+	return v
+}
+
+const inf = int64(1) << 62
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, m int
+	var seed uint64
+	fmt.Fscan(reader, &n, &m, &seed)
+
+	g := build(n, m, seed)
+	dist := make([]int64, n)
+	for i := range dist {
+		dist[i] = inf
+	}
+	dist[0] = 0
+
+	q := &pq{{0, 0}}
+	heap.Init(q)
+	for q.Len() > 0 {
+		cur := heap.Pop(q).(item)
+		// a stale entry: we already found a shorter way to cur.node
+		if cur.dist > dist[cur.node] {
+			continue
+		}
+		for _, e := range g[cur.node] {
+			if cur.dist+e.w < dist[e.to] {
+				dist[e.to] = cur.dist + e.w
+				heap.Push(q, item{dist[e.to], e.to})
+			}
+		}
+	}
+
+	var sum, max int64
+	for _, d := range dist {
+		if d < inf {
+			sum += d
+			if d > max {
+				max = d
+			}
+		}
+	}
+	fmt.Println(sum)
+	fmt.Printf("MAX %d\n", max)
+}
+'''
+hints = [
+  "Less compares dist, so container/heap gives you a min-heap directly — no Reverse needed, unlike Rust's BinaryHeap.",
+  "`if cur.dist > dist[cur.node] { continue }` is the stale-entry skip. Without it the algorithm is still correct and the heap fills with obsolete entries.",
+  "The spanning-tree half of the generator guarantees every node is reachable, so the inf filter never removes anything — keep it anyway, because the unreachable-node version is the follow-up.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "6 8 1\n",           expect = "4594\nMAX 1582\n",      visible = true },
+  { name = "pair",   stdin = "2 1 5\n",           expect = "774\nMAX 774\n",        visible = false },
+  { name = "ten",    stdin = "10 12 3\n",         expect = "12277\nMAX 2237\n",     visible = false },
+  { name = "big",    stdin = "100000 200000 7\n", expect = "249521722\nMAX 6142\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id           = "go.hacker.30.range-queries"
+node         = 29
+title        = "TOTALS THAT KEEP CHANGING"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Four million till operations from one day across the whole chain, half of them corrections, and somebody wants the running totals."
+concepts     = ["prefix-sums", "complexity", "collections"]
+requires     = ["go.hacker.29.dijkstra"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Standard input is `n q seed`. Build an array of `n` values and then run `q`
+operations, all from the same generator:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+values[i] = next() % 1000            for i in 0..n
+
+for each of the q operations:
+    a = next(); b = next(); c = next()
+    if a % 2 == 0:   UPDATE  values[b % n] += (c % 1000) + 1
+    else:            QUERY   l = b % n, r = c % n, swap them if l > r,
+                             and add sum(values[l..r] inclusive) to a running total
+```
+
+Print the running total of every query answer, then `UPDATES <k>`.
+
+```
+input:  8 6 1
+output: 4112
+        UPDATES 3
+```
+
+**The complexity here is enforced, and it took some doing.** The naive answer
+— loop over the range for every query — is `O(n)` per query, and the compiler
+turns that loop into something startlingly fast. Small cases will not catch
+it. So the big hidden case is `n = 500000, q = 4000000`, where the naive
+answer touches on the order of `10^11` elements and does not finish in the
+five second run limit, while a Fenwick tree does the whole thing in about a
+tenth of a second. Both measured, with the two programs in this quest.
+
+*Point update, range sum* is the exact shape a Fenwick tree exists for. Three
+short methods — add, prefix, and range as the difference of two prefixes — and
+`i & -i` is how you step by the lowest set bit.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type rng struct{ x uint64 }
+
+func (r *rng) next() uint64 {
+	r.x = r.x*6364136223846793005 + 1442695040888963407
+	return r.x >> 33
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, q int
+	var seed uint64
+	fmt.Fscan(reader, &n, &q, &seed)
+
+	r := &rng{seed}
+	values := make([]int64, n)
+	for i := range values {
+		values[i] = int64(r.next() % 1000)
+	}
+
+	var total int64
+	updates := 0
+	for k := 0; k < q; k++ {
+		a, b, c := r.next(), r.next(), r.next()
+		if a%2 == 0 {
+			values[int(b)%n] += int64(c%1000 + 1)
+			updates++
+			continue
+		}
+		l, rr := int(b)%n, int(c)%n
+		if l > rr {
+			l, rr = rr, l
+		}
+		// correct, and far too slow at four million operations
+		for i := l; i <= rr; i++ {
+			total += values[i]
+		}
+	}
+
+	fmt.Println(total)
+	fmt.Printf("UPDATES %d\n", updates)
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type rng struct{ x uint64 }
+
+func (r *rng) next() uint64 {
+	r.x = r.x*6364136223846793005 + 1442695040888963407
+	return r.x >> 33
+}
+
+// Fenwick tree, 1-based internally. Add and Prefix are both O(log n).
+type Fenwick struct {
+	tree []int64
+}
+
+func NewFenwick(n int) *Fenwick {
+	return &Fenwick{tree: make([]int64, n+1)}
+}
+
+func (f *Fenwick) Add(index int, delta int64) {
+	for i := index + 1; i < len(f.tree); i += i & -i {
+		f.tree[i] += delta
+	}
+}
+
+func (f *Fenwick) Prefix(upto int) int64 {
+	var sum int64
+	for i := upto; i > 0; i -= i & -i {
+		sum += f.tree[i]
+	}
+	return sum
+}
+
+func (f *Fenwick) Range(l, r int) int64 {
+	return f.Prefix(r+1) - f.Prefix(l)
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, q int
+	var seed uint64
+	fmt.Fscan(reader, &n, &q, &seed)
+
+	r := &rng{seed}
+	fen := NewFenwick(n)
+	for i := 0; i < n; i++ {
+		fen.Add(i, int64(r.next()%1000))
+	}
+
+	var total int64
+	updates := 0
+	for k := 0; k < q; k++ {
+		a, b, c := r.next(), r.next(), r.next()
+		if a%2 == 0 {
+			fen.Add(int(b)%n, int64(c%1000+1))
+			updates++
+			continue
+		}
+		l, rr := int(b)%n, int(c)%n
+		if l > rr {
+			l, rr = rr, l
+		}
+		total += fen.Range(l, rr)
+	}
+
+	fmt.Println(total)
+	fmt.Printf("UPDATES %d\n", updates)
+}
+'''
+hints = [
+  "Build the tree by calling Add once per initial value. The O(n) bottom-up build is a nice optimisation and is not what the clock is testing.",
+  "i & -i isolates the lowest set bit. Adding it walks up the tree; subtracting it walks down.",
+  "Range(l, r) is Prefix(r+1) - Prefix(l), and getting that pair of off-by-ones right is most of the debugging.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 6 1\n",            expect = "4112\nUPDATES 3\n",                 visible = true },
+  { name = "no-ups", stdin = "5 4 9\n",            expect = "4458\nUPDATES 0\n",                 visible = false },
+  { name = "mid",    stdin = "1000 2000 3\n",      expect = "249603264\nUPDATES 987\n",          visible = false },
+  { name = "big",    stdin = "500000 4000000 7\n", expect = "500026173039045\nUPDATES 2001469\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id           = "go.hacker.31.palindrome"
+node         = 30
+title        = "THE SAME BACKWARDS"
+difficulty   = 4
+time_limit_s = 1200
+story        = "Top-twenty question, asked in some form in most screens, and the one most people have written once and never understood."
+concepts     = ["strings", "two-pointers", "complexity"]
+requires     = ["go.hacker.30.range-queries"]
+map          = { x = 0.0, y = 0.0, kind = "quest" }
+brief        = '''
+Standard input is `n alphabet seed`. Build the string yourself:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+s[i] = 'a' + (next() % alphabet)      for i in 0..n
+```
+
+Print the length of the longest palindromic substring, then `AT <index>` — the
+0-based start of the **leftmost** one of that length.
+
+```
+input:  12 3 5
+output: 5
+        AT 1
+```
+
+Expand around each centre. There are `2n - 1` centres, not `n`: every
+character is a centre for the odd-length palindromes, and every gap between
+two characters is a centre for the even-length ones. Forgetting the gaps is
+why a correct-looking solution returns `1` on `abba`.
+
+**What the tests do and do not enforce**, plainly. One hidden case is
+`n = 20000` over a two-letter alphabet: that rejects the `O(n³)` answer —
+check every substring, test each for being a palindrome — which does not
+finish in five seconds. Another is `n = 20000` over a **one**-letter alphabet,
+which is the worst case for expand-around-centre and makes it do its full
+`O(n²)` work; it takes a fraction of a second and passes comfortably.
+
+So: the tests reject cubic and accept quadratic. They do **not** demand
+Manacher's algorithm, which is the `O(n)` answer. Know that it exists, because
+"and can you do better than quadratic?" is the follow-up this question is
+usually asked to set up.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type rng struct{ x uint64 }
+
+func (r *rng) next() uint64 {
+	r.x = r.x*6364136223846793005 + 1442695040888963407
+	return r.x >> 33
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	var alphabet, seed uint64
+	fmt.Fscan(reader, &n, &alphabet, &seed)
+
+	r := &rng{seed}
+	s := make([]byte, n)
+	for i := range s {
+		s[i] = byte('a' + r.next()%alphabet)
+	}
+
+	// only the odd centres, so every even-length palindrome is invisible
+	bestLen, bestStart := 0, 0
+	for centre := 0; centre < n; centre++ {
+		i, j := centre, centre
+		for i >= 0 && j < n && s[i] == s[j] {
+			i--
+			j++
+		}
+		if length := j - i - 1; length > bestLen {
+			bestLen = length
+			bestStart = i + 1
+		}
+	}
+
+	fmt.Println(bestLen)
+	fmt.Printf("AT %d\n", bestStart)
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type rng struct{ x uint64 }
+
+func (r *rng) next() uint64 {
+	r.x = r.x*6364136223846793005 + 1442695040888963407
+	return r.x >> 33
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	var alphabet, seed uint64
+	fmt.Fscan(reader, &n, &alphabet, &seed)
+
+	r := &rng{seed}
+	s := make([]byte, n)
+	for i := range s {
+		s[i] = byte('a' + r.next()%alphabet)
+	}
+
+	bestLen, bestStart := 0, 0
+	expand := func(i, j int) {
+		for i >= 0 && j < n && s[i] == s[j] {
+			i--
+			j++
+		}
+		// i and j have each stepped one too far
+		start, length := i+1, j-i-1
+		if length > bestLen {
+			bestLen = length
+			bestStart = start
+		}
+	}
+
+	for centre := 0; centre < n; centre++ {
+		expand(centre, centre)   // odd length: one character at the middle
+		expand(centre, centre+1) // even length: the gap to the right of it
+	}
+
+	fmt.Println(bestLen)
+	fmt.Printf("AT %d\n", bestStart)
+}
+'''
+hints = [
+  "Two calls per centre: (c, c) for odd lengths and (c, c+1) for even ones. The starter is missing the second.",
+  "When the loop stops, i and j have both moved one past the palindrome — so it starts at i+1 and its length is j-i-1.",
+  "Only update on a strictly longer palindrome, and the leftmost of each length is the one you keep, which is what AT is asking for.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "12 3 5\n",    expect = "5\nAT 1\n",     visible = true },
+  { name = "one",     stdin = "1 4 2\n",     expect = "1\nAT 0\n",     visible = false },
+  { name = "random",  stdin = "20000 2 9\n", expect = "41\nAT 2166\n", visible = false },
+  { name = "all-one", stdin = "20000 1 9\n", expect = "20000\nAT 0\n", visible = false },
+]

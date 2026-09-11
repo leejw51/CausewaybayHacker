@@ -253,25 +253,77 @@ function startServer() {
   return server;
 }
 
-async function waitForServer(seconds = 240) {
+/**
+ * Wait until the server can actually be *used*.
+ *
+ * An HTTP 200 is not enough. The thing every server-needing suite talks to is
+ * the websocket, and there is a window where the static files are served and
+ * `/ws` is not yet. A cold start on a fresh `--home` also has to build the
+ * workspace and import **126 quests across six packs**, which is minutes, not
+ * seconds — so this waits on the handshake and gives it room.
+ */
+async function waitForServer(seconds = 600) {
   const until = Date.now() + seconds * 1000;
+  let lastError = "";
   while (Date.now() < until) {
     if (server.child.exitCode !== null)
       throw new Error(
-        `the server exited with ${server.child.exitCode}:\n${server.log.join("").slice(-2000)}`,
+        `the server exited with ${server.child.exitCode}:\n${server.log.join("").slice(-3000)}`,
       );
-    try {
-      const res = await fetch(server.url, { signal: AbortSignal.timeout(2000) });
-      if (res.status < 500) return;
-    } catch {
-      /* not up yet */
-    }
-    await new Promise((r) => setTimeout(r, 500));
+    const ok = await new Promise((resolve) => {
+      let ws;
+      const done = (v, why = "") => {
+        lastError = why || lastError;
+        try {
+          ws?.close();
+        } catch {
+          /* already gone */
+        }
+        resolve(v);
+      };
+      try {
+        ws = new WebSocket(`ws://127.0.0.1:${server.port}/ws`);
+      } catch (e) {
+        return done(false, String(e));
+      }
+      const timer = setTimeout(() => done(false, "handshake timed out"), 3000);
+      ws.addEventListener("open", () => (clearTimeout(timer), done(true)));
+      ws.addEventListener("error", () => (clearTimeout(timer), done(false, "refused")));
+    });
+    if (ok) return;
+    await new Promise((r) => setTimeout(r, 1000));
   }
   throw new Error(
-    `the server did not answer on ${server.url} within ${seconds}s:\n` +
-      server.log.join("").slice(-2000),
+    `the websocket at ws://127.0.0.1:${server.port}/ws never opened within ` +
+      `${seconds}s (last: ${lastError}). A cold start builds the workspace and ` +
+      `imports 126 quests, so this is slow the first time. The server said:\n` +
+      server.log.join("").slice(-3000),
   );
+}
+
+/** Is it still there? Suites run for minutes; a server that died is not a bug
+ *  in the suite that happens to be next. */
+async function serverAlive() {
+  if (!server || server.child.exitCode !== null) return false;
+  return new Promise((resolve) => {
+    let ws;
+    const done = (v) => {
+      try {
+        ws?.close();
+      } catch {
+        /* already gone */
+      }
+      resolve(v);
+    };
+    try {
+      ws = new WebSocket(`ws://127.0.0.1:${server.port}/ws`);
+    } catch {
+      return done(false);
+    }
+    const timer = setTimeout(() => done(false), 5000);
+    ws.addEventListener("open", () => (clearTimeout(timer), done(true)));
+    ws.addEventListener("error", () => (clearTimeout(timer), done(false)));
+  });
 }
 
 function stopServer() {
@@ -331,6 +383,10 @@ function tail(text, n = 18) {
 }
 
 async function main() {
+  // Server-needing suites first. `smoke-selftest` spawns twenty mock servers
+  // over about nine minutes, and putting that between starting the server and
+  // using it is how `smoke` ended up reporting "nothing answered".
+  SUITES.sort((a, b) => Number(!!b.server) - Number(!!a.server));
   let selected = SUITES;
   if (ONLY) selected = selected.filter((s) => s.name.includes(ONLY));
   if (SKIP) selected = selected.filter((s) => !s.name.includes(SKIP));
@@ -388,6 +444,23 @@ async function main() {
       results.push({ name: suite.name, what: suite.what, status: "skip", detail: skip });
       if (!AS_JSON) console.log(`${yellow("skip")}  ${suite.name.padEnd(15)} ${dim(skip)}`);
       continue;
+    }
+    // A suite that needs the server checks it is still there, because the
+    // ones before it can run for ten minutes and a dead server is not a bug
+    // in whatever happened to be next. `smoke` reporting "nothing answered"
+    // and twenty skips is what that looked like.
+    if (suite.server && !(await serverAlive())) {
+      if (!AS_JSON) console.log(dim(`      the server is gone; starting another …`));
+      stopServer();
+      try {
+        startServer();
+        await waitForServer();
+      } catch (err) {
+        const why = `the server would not start: ${err.message.split("\n")[0]}`;
+        results.push({ name: suite.name, what: suite.what, status: "skip", detail: why });
+        if (!AS_JSON) console.log(`${yellow("skip")}  ${suite.name.padEnd(15)} ${dim(why)}`);
+        continue;
+      }
     }
     if (!AS_JSON) process.stdout.write(`${dim("run ")}  ${suite.name.padEnd(15)}`);
     const r = runSuite(suite);

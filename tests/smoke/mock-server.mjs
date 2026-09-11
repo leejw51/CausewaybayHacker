@@ -159,6 +159,33 @@ const QUESTS = [
   },
 ];
 
+/**
+ * One Go quest, because the checker asserts that Go is judged now that BE
+ * built the runner (§4.9b, and "what is not built says so, and what is built
+ * is judged"). A mock with an empty GO map made that check fail for a reason
+ * that was about the mock and not about any server.
+ */
+const GO_QUESTS = [
+  {
+    id: "go.basic.01.package-main",
+    node: 1,
+    title: "FIRST LIGHT",
+    difficulty: 1,
+    kind: "quest",
+    x: 0.12,
+    y: 0.74,
+    requires: [],
+    starter: 'package main\n\nfunc main() {\n}\n',
+    solution: 'package main\n\nimport "fmt"\n\nfunc main() { fmt.Println("hello, causewaybay") }\n',
+    expect: "hello, causewaybay\n",
+    hints: [],
+  },
+];
+
+const questsOf = (land) => (land === "go" ? GO_QUESTS : QUESTS);
+const findQuest = (id) => [...QUESTS, ...GO_QUESTS].find((q) => q.id === id);
+const langOf = (id) => (id.startsWith("go.") ? "go" : "rust");
+
 // --------------------------------------------------------------------- state
 
 const users = new Map(); // lower -> User
@@ -412,7 +439,17 @@ wss.on("connection", (ws) => {
             },
             {
               land: "go",
-              categories: [empty("basic"), empty("advanced"), empty("hacker")],
+              categories: [
+                {
+                  category: "basic",
+                  total: GO_QUESTS.length,
+                  cleared: 0,
+                  stars: 0,
+                  open: true,
+                },
+                empty("advanced"),
+                empty("hacker"),
+              ],
             },
           ],
         });
@@ -421,12 +458,12 @@ wss.on("connection", (ws) => {
       // ---------------------------------------------------------- §4.7
       case "world.map": {
         const { land, category } = payload;
-        if (land !== "rust" || category !== "basic")
+        if (category !== "basic" || (land !== "rust" && land !== "go"))
           return reply(id, "world.map.ok", { land, category, nodes: [], edges: [] });
         return reply(id, "world.map.ok", {
           land,
           category,
-          nodes: QUESTS.map((q) => ({
+          nodes: questsOf(land).map((q) => ({
             quest_id: q.id,
             node: q.node,
             title: q.title,
@@ -437,20 +474,27 @@ wss.on("connection", (ws) => {
             y: q.y,
             kind: q.kind,
             requires: q.requires,
-            attempts: (attempts.get(me) ?? []).filter((a) => a.quest_id === q.id).length,
+            // §4.9b: a node's `attempts` counts **submits only**. Counting
+            // runs here is exactly the invariant `contract.mjs` asserts —
+            // iterating honestly must not look like failing repeatedly — and
+            // the selftest caught this mock getting it wrong, which is the
+            // selftest doing its job.
+            attempts: (attempts.get(me) ?? []).filter(
+              (a) => a.quest_id === q.id && a.mode !== "run",
+            ).length,
           })),
-          edges: QUESTS.flatMap((q) => q.requires.map((r) => [r, q.id])),
+          edges: questsOf(land).flatMap((q) => q.requires.map((r) => [r, q.id])),
         });
       }
 
       // ---------------------------------------------------------- §4.8
       case "quest.get": {
-        const q = QUESTS.find((x) => x.id === payload.quest_id);
+        const q = findQuest(payload.quest_id);
         if (!q) return err(id, type, "not_found", "no such quest");
         const state = stateOf(me, q);
         const quest = {
           id: q.id,
-          land: "rust",
+          land: langOf(q.id),
           category: "basic",
           node: q.node,
           title: q.title,
@@ -480,9 +524,9 @@ wss.on("connection", (ws) => {
       case "quest.run":
       case "quest.submit": {
         const isRun = type === "quest.run";
-        const q = QUESTS.find((x) => x.id === payload.quest_id);
+        const q = findQuest(payload.quest_id);
         if (!q) return err(id, type, "not_found", "no such quest");
-        if (payload.lang !== "rust")
+        if (payload.lang !== langOf(q.id))
           return err(id, type, "bad_request", "lang does not match the quest's land");
         // §3.2: one in flight per CONNECTION, not per user.
         const isBusy = broke("busy-per-user")
@@ -514,7 +558,51 @@ wss.on("connection", (ws) => {
           }
 
           // "Judging": does the source print what the visible case expects?
-          const printed = /println!\("([^"]*)"\)/.exec(String(payload.source ?? ""))?.[1];
+          const src = String(payload.source ?? "");
+          const isGo = langOf(q.id) === "go";
+          // The mock has no compiler. It recognises one shape of compile
+          // error — a bare identifier where a value is printed — because the
+          // checker asserts that `undefined: tolal` classifies as
+          // `unknown-name` with a code that does not carry the identifier.
+          const bare = isGo
+            ? /Println\(\s*([A-Za-z_]\w*)\s*\)/.exec(src)?.[1]
+            : null;
+          if (bare && !["true", "false", "nil"].includes(bare)) {
+            const attemptId = "att_" + randomBytes(8).toString("hex");
+            const attempt = {
+              id: attemptId,
+              quest_id: q.id,
+              verdict: "compile_error",
+              tests_passed: 0,
+              tests_total: 1,
+              compile_ms: 90,
+              run_ms: 0,
+              exit_code: 1,
+              stderr: `./main.go:5:14: undefined: ${bare}`,
+              cases: [],
+              mistakes: [
+                {
+                  kind: "unknown-name",
+                  // Normalised: the identifier is stripped, so two spellings
+                  // of one lesson are one row (§7.2's rollup).
+                  code: "go:undefined",
+                  message: "undefined name",
+                  line: 5,
+                  col: 14,
+                },
+              ],
+              stars: 0,
+              cleared: false,
+              mode: isRun ? "run" : "submit",
+              created_at: now(),
+            };
+            push(attempts, me, attempt);
+            push(mistakes, me, { kind: "unknown-name", code: "go:undefined", message: "undefined name" });
+            return reply(id, `${type}.ok`, { attempt });
+          }
+          const printed = isGo
+            ? /Println\("([^"]*)"\)/.exec(src)?.[1]
+            : /println!\("([^"]*)"\)/.exec(src)?.[1];
           const ok = printed !== undefined && `${printed}\n` === q.expect;
           const had = progress.get(`${me}|${q.id}`);
           const firstClear = ok && had?.state !== "cleared";
@@ -649,10 +737,15 @@ wss.on("connection", (ws) => {
         return reply(id, "stats.summary.ok", {
           cleared,
           total: QUESTS.length,
-          attempts: rows.length,
-          accuracy: rows.length
-            ? rows.filter((a) => a.verdict === "accepted").length / rows.length
-            : 0,
+          // §4.9b: submits only.
+          attempts: rows.filter((a) => a.mode !== "run").length,
+          // §4.9b: runs are excluded from accuracy for the same reason.
+          accuracy: (() => {
+            const submits = rows.filter((a) => a.mode !== "run");
+            return submits.length
+              ? submits.filter((a) => a.verdict === "accepted").length / submits.length
+              : 0;
+          })(),
           streak_days: 0,
           stars: starsOf(who),
           by_land: [

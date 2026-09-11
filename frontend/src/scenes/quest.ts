@@ -571,24 +571,28 @@ export class QuestScene implements Scene {
     // writing and it earns its place, but it does not earn being the loudest
     // thing on a screen a player is trying to code in.
     const top = inner[1] - this.briefScroll;
+    // A permanent gutter for the scrollbar. Reserved whether or not it is
+    // showing: a width that changed when the bar appeared would reflow the
+    // text that decided whether the bar appears.
+    const textW = inner[2] - Math.round(8 * s);
     let yy = top;
     clipped(g, inner[0], inner[1], inner[2], inner[3], () => {
       // `brief` is markdown (SPEC §2.1); the canvas draws the flattening.
       for (const b of blocks(this.quest!.brief)) {
         if (b.kind === "code") {
-          const lines = wrap(fonts.code, b.text, inner[2] - Math.round(10 * s));
+          const lines = wrap(fonts.code, b.text, textW - Math.round(10 * s));
           const h = lines.length * fonts.code.height + Math.round(8 * s);
-          fill(g, Theme.ink, inner[0], yy, inner[2], h, 0.45);
+          fill(g, Theme.ink, inner[0], yy, textW, h, 0.45);
           g.fillStyle = css(Theme.grass);
           let cy = yy + Math.round(4 * s);
           for (const line of lines) {
-            printf(g, fonts.code, line, inner[0] + Math.round(6 * s), cy, inner[2], "left");
+            printf(g, fonts.code, line, inner[0] + Math.round(6 * s), cy, textW, "left");
             cy += fonts.code.height;
           }
           yy += h + Math.round(6 * s);
         } else {
           g.fillStyle = css(Theme.cream);
-          yy += printf(g, fonts.small, b.text, inner[0], yy, inner[2], "left") * fonts.small.height;
+          yy += printf(g, fonts.small, b.text, inner[0], yy, textW, "left") * fonts.small.height;
           yy += Math.round(6 * s);
         }
       }
@@ -600,9 +604,9 @@ export class QuestScene implements Scene {
       for (const c of tests.visible) {
         const rows = (c.stdin ? 1 : 0) + 1;
         const wellH = fonts.stationSm.height + rows * fonts.code.height + Math.round(20 * s);
-        well(g, inner[0], yy, inner[2], wellH);
+        well(g, inner[0], yy, textW, wellH);
         const tx = inner[0] + Math.round(8 * s);
-        const tw = inner[2] - Math.round(16 * s);
+        const tw = textW - Math.round(16 * s);
         let ty = yy + Math.round(8 * s);
         g.fillStyle = css(Theme.cyan);
         printf(g, fonts.stationSm, `SAMPLE · ${c.name}`, tx, ty, tw, "left");
@@ -619,25 +623,25 @@ export class QuestScene implements Scene {
       if (tests.hidden_count > 0) {
         // The count only — never the data (SPEC §5.2).
         g.fillStyle = css(Theme.dim);
-        printf(g, fonts.stationSm, `+${tests.hidden_count} HIDDEN`, inner[0], yy, inner[2], "left");
+        printf(g, fonts.stationSm, `+${tests.hidden_count} HIDDEN`, inner[0], yy, textW, "left");
         yy += fonts.stationSm.height + Math.round(8 * s);
       }
 
       for (const h of this.hints) {
         g.fillStyle = css(Theme.coin);
         yy +=
-          printf(g, fonts.small, `HINT: ${h}`, inner[0], yy, inner[2], "left") * fonts.small.height;
+          printf(g, fonts.small, `HINT: ${h}`, inner[0], yy, textW, "left") * fonts.small.height;
         yy += Math.round(6 * s);
       }
 
       if (this.quest!.story) {
         // Set apart by a rule, not by size.
         yy += Math.round(6 * s);
-        fill(g, Theme.dim, inner[0], yy, inner[2], 1, 0.5);
+        fill(g, Theme.dim, inner[0], yy, textW, 1, 0.5);
         yy += Math.round(8 * s);
         g.fillStyle = css(Theme.cyan, 0.62);
         yy +=
-          printf(g, fonts.codeSm, `“${this.quest!.story}”`, inner[0], yy, inner[2], "left") *
+          printf(g, fonts.codeSm, `“${this.quest!.story}”`, inner[0], yy, textW, "left") *
           fonts.codeSm.height;
         yy += Math.round(6 * s);
       }
