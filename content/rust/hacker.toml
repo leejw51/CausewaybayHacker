@@ -1,0 +1,863 @@
+# RUST LAND — HACKER. HKU, Chow Yei Ching Building, Room 7-32. A clock on the
+# wall, hidden tests, and nothing on the screen that finishes your sentences.
+#
+# Every quest here carries `time_limit_s` — the player's clock for the whole
+# quest, not the per-run `timeout_ms` — and at least one hidden case.
+# See docs/decisions.md, 2026-09-11, for where that key lives in the TOML.
+#
+# Sizing: the limit is what a competent coder needs with the idea in hand, plus
+# room to compile twice. It is not a speed-typing test and it is not generous.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+
+pack = "rust.hacker"
+land = "rust"
+category = "hacker"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id           = "rust.hacker.01.two-sum"
+node         = 1
+title        = "TWO FARES"
+difficulty   = 3
+time_limit_s = 600
+story        = "Room 7-32. The first question is the one everybody gets, and the clock starts on the way in."
+concepts     = ["hashing", "complexity", "slices"]
+requires     = []
+map          = { x = 0.10, y = 0.88, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` integers.
+
+Print the **1-based** indices `i j` of two different entries that add up to
+`target`, as `i j` with `i < j`. If more than one pair works, give the one
+whose second index is smallest; if that still ties, the smallest first index.
+If no pair works, print `-1`.
+
+```
+input:  4 9
+        2 7 11 15
+output: 1 2
+```
+
+`n` goes to 200000. The nested loop is the wrong answer here even when it
+prints the right numbers: the hidden cases are sized so that it does not
+finish.
+'''
+starter      = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let target = values[1];
+    let nums = &values[2..2 + n];
+
+    let _seen: HashMap<i64, usize> = HashMap::new();
+    let _ = (nums, target);
+    println!("-1");
+}
+'''
+solution     = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let target = values[1];
+    let nums = &values[2..2 + n];
+
+    let mut seen: HashMap<i64, usize> = HashMap::new();
+    for (j, &x) in nums.iter().enumerate() {
+        if let Some(&i) = seen.get(&(target - x)) {
+            println!("{} {}", i + 1, j + 1);
+            return;
+        }
+        seen.entry(x).or_insert(j);
+    }
+    println!("-1");
+}
+'''
+hints = [
+  "One pass. For each value ask whether target minus it has already been seen.",
+  "entry(x).or_insert(j) keeps the first index of a repeated value, which is the tie-break the statement asks for.",
+  "Print and return the moment you find it — the first hit as you scan is already the smallest second index.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "4 9\n2 7 11 15\n",      expect = "1 2\n",  visible = true },
+  { name = "late",    stdin = "5 10\n1 2 3 4 6\n",     expect = "4 5\n",  visible = false },
+  { name = "none",    stdin = "3 100\n1 2 3\n",        expect = "-1\n",   visible = false },
+  { name = "signed",  stdin = "6 0\n-3 4 3 90 -1 1\n", expect = "1 3\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id           = "rust.hacker.02.window"
+node         = 2
+title        = "NO REPEATS"
+difficulty   = 4
+time_limit_s = 900
+story        = "The second question is on the board before you have put the marker down."
+concepts     = ["two-pointers", "strings", "complexity"]
+requires     = ["rust.hacker.01.two-sum"]
+map          = { x = 0.24, y = 0.76, kind = "quest" }
+brief        = '''
+One line of text, no spaces.
+
+Print the length of the longest run of characters with no repeat in it, then
+the run itself. If several runs tie, print the leftmost.
+
+```
+input:  abcabcbb
+output: 3
+        abc
+```
+
+The window only ever moves right. If you find yourself rescanning from the
+start after a repeat, you have written the quadratic one.
+'''
+starter      = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let chars: Vec<char> = input.trim().chars().collect();
+
+    let _last: HashMap<char, usize> = HashMap::new();
+    let _ = chars;
+
+    // print the best length, then the run itself
+    println!("0");
+    println!("?");
+}
+'''
+solution     = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let chars: Vec<char> = input.trim().chars().collect();
+
+    let mut last: HashMap<char, usize> = HashMap::new();
+    let mut start = 0usize;
+    let mut best_len = 0usize;
+    let mut best_start = 0usize;
+
+    for (i, &c) in chars.iter().enumerate() {
+        if let Some(&previous) = last.get(&c) {
+            if previous >= start {
+                start = previous + 1;
+            }
+        }
+        last.insert(c, i);
+        let len = i - start + 1;
+        if len > best_len {
+            best_len = len;
+            best_start = start;
+        }
+    }
+
+    println!("{}", best_len);
+    let run: String = chars[best_start..best_start + best_len].iter().collect();
+    println!("{}", run);
+}
+'''
+hints = [
+  "Keep the index where each character was last seen, and the index the window starts at.",
+  "A repeat only matters if its last position is inside the current window — that is the `previous >= start` test.",
+  "Record the best length *and* where it started, or you cannot print the run at the end.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "abcabcbb\n",   expect = "3\nabc\n",       visible = true },
+  { name = "one",     stdin = "bbbbb\n",      expect = "1\nb\n",         visible = false },
+  { name = "middle",  stdin = "pwwkew\n",     expect = "3\nwke\n",       visible = false },
+  { name = "street",  stdin = "causewaybay\n", expect = "7\nusewayb\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id           = "rust.hacker.03.intervals"
+node         = 3
+title        = "THE SHIFT ROTA"
+difficulty   = 4
+time_limit_s = 900
+story        = "They hand you the Lucky Mac rota and ask which hours are actually covered."
+concepts     = ["intervals", "sorting", "complexity"]
+requires     = ["rust.hacker.02.window"]
+map          = { x = 0.40, y = 0.82, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are `<start> <end>` with `start <= end`.
+
+Merge every pair that overlaps or touches, and print the result in increasing
+order, one `<start> <end>` per line, then `COUNT <k>`.
+
+```
+input:  4
+        1 3
+        2 6
+        8 10
+        15 18
+output: 1 6
+        8 10
+        15 18
+        COUNT 3
+```
+
+Touching counts as overlapping: `1 4` and `4 5` merge into `1 5`.
+'''
+starter      = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+
+    let mut spans: Vec<(i64, i64)> = Vec::with_capacity(n);
+    for i in 0..n {
+        spans.push((values[1 + 2 * i], values[2 + 2 * i]));
+    }
+
+    // sort, sweep, merge, print, then COUNT <k>
+    println!("COUNT {}", spans.len());
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+
+    let mut spans: Vec<(i64, i64)> = Vec::with_capacity(n);
+    for i in 0..n {
+        spans.push((values[1 + 2 * i], values[2 + 2 * i]));
+    }
+    spans.sort();
+
+    let mut merged: Vec<(i64, i64)> = Vec::new();
+    for (start, end) in spans {
+        match merged.last_mut() {
+            Some(last) if start <= last.1 => {
+                if end > last.1 {
+                    last.1 = end;
+                }
+            }
+            _ => merged.push((start, end)),
+        }
+    }
+
+    for (start, end) in &merged {
+        println!("{} {}", start, end);
+    }
+    println!("COUNT {}", merged.len());
+}
+'''
+hints = [
+  "Sort by start first. After that one left-to-right pass is enough and you never look backwards more than one interval.",
+  "Extend the last merged interval when the new start is <= its end; otherwise push a new one.",
+  "Extend to max(last.end, end) — a short interval swallowed by a long one must not shrink it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "4\n1 3\n2 6\n8 10\n15 18\n", expect = "1 6\n8 10\n15 18\nCOUNT 3\n", visible = true },
+  { name = "touching", stdin = "2\n1 4\n4 5\n",              expect = "1 5\nCOUNT 1\n",              visible = false },
+  { name = "point",    stdin = "1\n5 5\n",                   expect = "5 5\nCOUNT 1\n",              visible = false },
+  { name = "unsorted", stdin = "3\n5 6\n1 2\n3 4\n",         expect = "1 2\n3 4\n5 6\nCOUNT 3\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id           = "rust.hacker.04.grid"
+node         = 4
+title        = "OUT OF THE BUILDING"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A floor plan on the whiteboard, a fire door at the far corner, and the interviewer watching the clock rather than the marker."
+concepts     = ["graphs", "stacks-queues", "complexity"]
+requires     = ["rust.hacker.03.intervals"]
+map          = { x = 0.54, y = 0.68, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are the floor: `.` is open, `#` is wall.
+
+Start at the top-left `(0,0)` and reach the bottom-right `(r-1, c-1)`, moving
+up, down, left or right through open cells only.
+
+Print the number of **steps** on a shortest route, or `-1` if there is none.
+Then print `REACHED <k>`: how many open cells are reachable from the start,
+counting the start itself.
+
+```
+input:  3 3
+        ...
+        .#.
+        ...
+output: 4
+        REACHED 8
+```
+
+Breadth first, not depth first. A depth-first walk finds *a* route; the
+question asks for the shortest one.
+'''
+starter      = '''
+use std::collections::VecDeque;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut header = lines.next().unwrap().split_whitespace();
+    let rows: usize = header.next().unwrap().parse().unwrap();
+    let cols: usize = header.next().unwrap().parse().unwrap();
+    let grid: Vec<Vec<u8>> = (0..rows)
+        .map(|_| lines.next().unwrap().as_bytes().to_vec())
+        .collect();
+
+    let _queue: VecDeque<(usize, usize)> = VecDeque::new();
+    let _ = (grid, cols);
+
+    // print the shortest step count or -1, then REACHED <k>
+    println!("-1");
+    println!("REACHED 0");
+}
+'''
+solution     = '''
+use std::collections::VecDeque;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut header = lines.next().unwrap().split_whitespace();
+    let rows: usize = header.next().unwrap().parse().unwrap();
+    let cols: usize = header.next().unwrap().parse().unwrap();
+    let grid: Vec<Vec<u8>> = (0..rows)
+        .map(|_| lines.next().unwrap().as_bytes().to_vec())
+        .collect();
+
+    let mut dist = vec![vec![-1i64; cols]; rows];
+    let mut queue: VecDeque<(usize, usize)> = VecDeque::new();
+    let mut reached = 0usize;
+
+    if grid[0][0] == b'.' {
+        dist[0][0] = 0;
+        queue.push_back((0, 0));
+        reached = 1;
+    }
+
+    while let Some((r, c)) = queue.pop_front() {
+        let here = dist[r][c];
+        let mut step = |nr: usize, nc: usize, q: &mut VecDeque<(usize, usize)>,
+                        d: &mut Vec<Vec<i64>>, seen: &mut usize| {
+            if grid[nr][nc] == b'.' && d[nr][nc] < 0 {
+                d[nr][nc] = here + 1;
+                *seen += 1;
+                q.push_back((nr, nc));
+            }
+        };
+        if r > 0 {
+            step(r - 1, c, &mut queue, &mut dist, &mut reached);
+        }
+        if r + 1 < rows {
+            step(r + 1, c, &mut queue, &mut dist, &mut reached);
+        }
+        if c > 0 {
+            step(r, c - 1, &mut queue, &mut dist, &mut reached);
+        }
+        if c + 1 < cols {
+            step(r, c + 1, &mut queue, &mut dist, &mut reached);
+        }
+    }
+
+    println!("{}", dist[rows - 1][cols - 1]);
+    println!("REACHED {}", reached);
+}
+'''
+hints = [
+  "A VecDeque used as a queue is the whole difference between BFS and DFS here.",
+  "Mark a cell when you push it, not when you pop it, or it goes into the queue several times.",
+  "The distance grid doubles as the visited set: -1 means not seen yet, so you need no second structure.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 3\n...\n.#.\n...\n",              expect = "4\nREACHED 8\n",   visible = true },
+  { name = "blocked", stdin = "2 2\n.#\n#.\n",                     expect = "-1\nREACHED 1\n",  visible = false },
+  { name = "single",  stdin = "1 1\n.\n",                          expect = "0\nREACHED 1\n",   visible = false },
+  { name = "maze",    stdin = "4 5\n.....\n###.#\n.....\n.#.#.\n", expect = "7\nREACHED 14\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id           = "rust.hacker.05.binary-search"
+node         = 5
+title        = "HOW BIG A VAN"
+difficulty   = 4
+time_limit_s = 900
+story        = "The depot wants the smallest van that clears the day's dockets in the days they have. They will not tell you which van; they will tell you if one you name is too small."
+concepts     = ["binary-search", "complexity", "slices"]
+requires     = ["rust.hacker.04.grid"]
+map          = { x = 0.42, y = 0.52, kind = "quest" }
+brief        = '''
+Line one is `n d`. Line two is `n` package weights, in the order they must be
+loaded — the order cannot change.
+
+Find the smallest van capacity that ships all `n` packages in at most `d`
+days, loading in order and never splitting a package.
+
+Print the capacity, then `MAX <heaviest package>`.
+
+```
+input:  10 5
+        1 2 3 4 5 6 7 8 9 10
+output: 15
+        MAX 10
+```
+
+You are not searching the list. You are searching the **answer**: the
+capacities from `max(weight)` to `sum(weights)`, on which "does it fit in `d`
+days" is false, false, false, then true forever. Binary search that.
+'''
+starter      = '''
+use std::io::Read;
+
+fn days_needed(weights: &[i64], capacity: i64) -> i64 {
+    let _ = (weights, capacity);
+    // how many days does this capacity take, loading in order?
+    0
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let days = values[1];
+    let weights = &values[2..2 + n];
+
+    let _ = (days, days_needed(weights, 0));
+    println!("0");
+    println!("MAX {}", weights.iter().max().unwrap());
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn days_needed(weights: &[i64], capacity: i64) -> i64 {
+    let mut days = 1i64;
+    let mut load = 0i64;
+    for &w in weights {
+        if load + w > capacity {
+            days += 1;
+            load = 0;
+        }
+        load += w;
+    }
+    days
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let days = values[1];
+    let weights = &values[2..2 + n];
+
+    let mut low = *weights.iter().max().unwrap();
+    let mut high = weights.iter().sum::<i64>();
+    while low < high {
+        let mid = low + (high - low) / 2;
+        if days_needed(weights, mid) <= days {
+            high = mid;
+        } else {
+            low = mid + 1;
+        }
+    }
+
+    println!("{}", low);
+    println!("MAX {}", weights.iter().max().unwrap());
+}
+'''
+hints = [
+  "The lower bound is the heaviest single package — anything smaller can never carry it.",
+  "The upper bound is the total: one day, everything on it.",
+  "low + (high - low) / 2, and move `high` down to `mid` on success so you keep the smallest capacity that worked.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5\n1 2 3 4 5 6 7 8 9 10\n", expect = "15\nMAX 10\n", visible = true },
+  { name = "tight",  stdin = "3 3\n3 2 2\n",                 expect = "3\nMAX 3\n",   visible = false },
+  { name = "spread", stdin = "5 4\n1 2 3 1 1\n",             expect = "3\nMAX 3\n",   visible = false },
+  { name = "one",    stdin = "1 1\n7\n",                     expect = "7\nMAX 7\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id           = "rust.hacker.06.stack"
+node         = 6
+title        = "THE NEXT BIGGER ONE"
+difficulty   = 4
+time_limit_s = 900
+story        = "A column of fares on the board and one question: for each of them, which is the next one after it that is bigger."
+concepts     = ["stacks-queues", "slices", "complexity"]
+requires     = ["rust.hacker.05.binary-search"]
+map          = { x = 0.56, y = 0.38, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+For each entry print the first entry **to its right** that is strictly
+greater, or `-1` if there is none. Put them on one line, space separated. Then
+print `NONE <k>`, how many of them were `-1`.
+
+```
+input:  4
+        2 1 2 4
+output: 4 2 4 -1
+        NONE 1
+```
+
+Keep a stack of positions whose answer is still unknown, and it stays
+decreasing from the bottom up. Each position is pushed once and popped once,
+so the whole thing is one pass however it looks.
+'''
+starter      = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let nums = &values[1..1 + n];
+
+    let answer = vec![-1i64; n];
+    let _pending: Vec<usize> = Vec::new();
+    let _ = nums;
+
+    let line: Vec<String> = answer.iter().map(|v| v.to_string()).collect();
+    println!("{}", line.join(" "));
+    println!("NONE {}", n);
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let nums = &values[1..1 + n];
+
+    let mut answer = vec![-1i64; n];
+    let mut pending: Vec<usize> = Vec::new();
+
+    for i in 0..n {
+        while let Some(&top) = pending.last() {
+            if nums[top] < nums[i] {
+                answer[top] = nums[i];
+                pending.pop();
+            } else {
+                break;
+            }
+        }
+        pending.push(i);
+    }
+
+    let line: Vec<String> = answer.iter().map(|v| v.to_string()).collect();
+    println!("{}", line.join(" "));
+    println!("NONE {}", answer.iter().filter(|v| **v == -1).count());
+}
+'''
+hints = [
+  "The stack holds indices that are still waiting for their answer, not values.",
+  "When the new value beats the value at the top of the stack, that index's answer is the new value — and keep popping, it may beat several.",
+  "Strictly greater, so equal values do not resolve each other; they stack up and resolve together later.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "4\n2 1 2 4\n",     expect = "4 2 4 -1\nNONE 1\n",        visible = true },
+  { name = "descending", stdin = "3\n5 4 3\n",       expect = "-1 -1 -1\nNONE 3\n",        visible = false },
+  { name = "ascending",  stdin = "5\n1 2 3 4 5\n",   expect = "2 3 4 5 -1\nNONE 1\n",      visible = false },
+  { name = "plateau",    stdin = "6\n2 2 2 1 3 1\n", expect = "3 3 3 3 -1 -1\nNONE 2\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id           = "rust.hacker.07.coins"
+node         = 7
+title        = "EXACT CHANGE"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The Percival Street till has three coin trays and a customer who will not take a note."
+concepts     = ["dynamic-programming", "complexity", "slices"]
+requires     = ["rust.hacker.06.stack"]
+map          = { x = 0.72, y = 0.44, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` coin values. Every coin is available
+in unlimited quantity.
+
+Print the smallest number of coins that makes `target` exactly, or `-1` if it
+cannot be made. Then print `REACH <k>`: how many of the amounts `0..=target`
+can be made at all, counting `0`.
+
+```
+input:  3 11
+        1 2 5
+output: 3
+        REACH 12
+```
+
+`target` goes to 100000. The greedy answer — take the biggest coin that fits,
+repeat — is wrong on `3 6 / 3 4`, and the recursive answer without a table
+recomputes the same amount thousands of times.
+'''
+starter      = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let target = values[1] as usize;
+    let coins = &values[2..2 + n];
+
+    let best = vec![i64::MAX; target + 1];
+    let _ = coins;
+
+    // fill the table bottom up, then print the answer and REACH <k>
+    let _ = best;
+    println!("-1");
+    println!("REACH 0");
+}
+'''
+solution     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let values: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let n = values[0] as usize;
+    let target = values[1] as usize;
+    let coins = &values[2..2 + n];
+
+    let unreachable = i64::MAX;
+    let mut best = vec![unreachable; target + 1];
+    best[0] = 0;
+
+    for amount in 1..=target {
+        for &coin in coins {
+            let coin = coin as usize;
+            if coin <= amount && best[amount - coin] != unreachable {
+                let candidate = best[amount - coin] + 1;
+                if candidate < best[amount] {
+                    best[amount] = candidate;
+                }
+            }
+        }
+    }
+
+    if best[target] == unreachable {
+        println!("-1");
+    } else {
+        println!("{}", best[target]);
+    }
+    println!("REACH {}", best.iter().filter(|v| **v != unreachable).count());
+}
+'''
+hints = [
+  "best[0] = 0, and best[a] is one more than the cheapest best[a - coin] over every coin that fits.",
+  "Guard against reading an unreachable cell before you add one to it, or it overflows.",
+  "REACH is just how many cells of the finished table are not still marked unreachable.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "3 11\n1 2 5\n", expect = "3\nREACH 12\n", visible = true },
+  { name = "impossible", stdin = "1 3\n2\n",     expect = "-1\nREACH 2\n", visible = false },
+  { name = "not-greedy", stdin = "2 6\n3 4\n",   expect = "2\nREACH 4\n",  visible = false },
+  { name = "zero",      stdin = "3 0\n1 2 5\n",  expect = "0\nREACH 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 08  BOSS
+[[quest]]
+id           = "rust.hacker.08.top-k"
+node         = 8
+title        = "THE WHITEBOARD"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Room 7-32, last question, and the interviewer turns the monitor off. No highlighting, no completion, a clock."
+concepts     = ["hashing", "sorting", "complexity"]
+requires     = ["rust.hacker.07.coins", "rust.hacker.01.two-sum"]
+map          = { x = 0.86, y = 0.22, kind = "boss" }
+brief        = '''
+Line one is `n k`. Line two is `n` words separated by spaces.
+
+Print the `k` most frequent words, most frequent first, ties broken by the
+word ascending, one per line. If there are fewer than `k` distinct words,
+print all of them. Then print `DISTINCT <d>`.
+
+```
+input:  6 2
+        tram tram bus bus bus mtr
+output: bus
+        tram
+        DISTINCT 3
+```
+
+Count with a hash map, then rank. The tie-break is not decoration — a sort
+that is not stable on it gives a different answer on a different machine, and
+this is the question where that gets noticed.
+'''
+starter      = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let tokens: Vec<&str> = input.split_whitespace().collect();
+    let k: usize = tokens[1].parse().unwrap();
+    let words = &tokens[2..];
+
+    let counts: HashMap<&str, i64> = HashMap::new();
+    let _ = (words, k);
+
+    // count, rank by count descending then word ascending, print k of them,
+    // then DISTINCT <d>
+    println!("DISTINCT {}", counts.len());
+}
+'''
+solution     = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let tokens: Vec<&str> = input.split_whitespace().collect();
+    let k: usize = tokens[1].parse().unwrap();
+    let words = &tokens[2..];
+
+    let mut counts: HashMap<&str, i64> = HashMap::new();
+    for word in words {
+        *counts.entry(word).or_insert(0) += 1;
+    }
+
+    let mut ranked: Vec<(&str, i64)> = counts.into_iter().collect();
+    ranked.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+
+    for (word, _) in ranked.iter().take(k) {
+        println!("{}", word);
+    }
+    println!("DISTINCT {}", ranked.len());
+}
+'''
+hints = [
+  "One pass to count, one sort to rank. Do not try to keep the ranking up to date while counting.",
+  "b.1.cmp(&a.1) is count descending; .then(a.0.cmp(b.0)) is the word ascending tie-break.",
+  "take(k) is safe when there are fewer than k — it stops at the end instead of panicking.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "6 2\ntram tram bus bus bus mtr\n", expect = "bus\ntram\nDISTINCT 3\n", visible = true },
+  { name = "one",     stdin = "4 1\na b a c\n",                   expect = "a\nDISTINCT 3\n",         visible = false },
+  { name = "ties",    stdin = "5 3\nx y z x y\n",                 expect = "x\ny\nz\nDISTINCT 3\n",   visible = false },
+  { name = "k-too-big", stdin = "3 5\nq q q\n",                   expect = "q\nDISTINCT 1\n",         visible = false },
+]

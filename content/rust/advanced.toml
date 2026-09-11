@@ -1,0 +1,1196 @@
+# RUST LAND — ADVANCED. 12:30, and everything happens at once. Threads,
+# move closures, channels, Arc<Mutex>, RwLock, lifetimes, generics, a custom
+# Iterator, a pipeline, and DEADLOCK in the Times Square plant room.
+#
+# Every quest here has a deterministic answer on purpose: results are joined in
+# order, collected and sorted, or piped. A quest whose output depends on the
+# scheduler is a quest that fails CI at random, and that is not a lesson.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+
+pack = "rust.advanced"
+land = "rust"
+category = "advanced"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "rust.advanced.01.threads"
+node        = 1
+title       = "TWO TILLS, ONE COUNTER"
+difficulty  = 3
+story       = "The Times Square branch opens its second till at noon and the queue finally moves. Nothing else about the shop changed."
+concepts    = ["concurrency", "closures", "ownership"]
+requires    = []
+map         = { x = 0.12, y = 0.18, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Spawn one thread per value that computes its square. Join them **in the order
+you spawned them** and print each result on its own line, then `THREADS <n>`.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+Joining in order is what makes the output the same every run. A thread that
+prints for itself would not be.
+'''
+starter     = '''
+use std::io::Read;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let handles: Vec<thread::JoinHandle<i64>> = Vec::new();
+
+    // spawn one thread per value, then join them in order and print
+    let _ = (nums, handles);
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let mut handles: Vec<thread::JoinHandle<i64>> = Vec::new();
+    for value in nums {
+        handles.push(thread::spawn(move || value * value));
+    }
+
+    let count = handles.len();
+    for handle in handles {
+        println!("{}", handle.join().unwrap());
+    }
+    println!("THREADS {}", count);
+}
+'''
+hints = [
+  "thread::spawn returns a JoinHandle<T> where T is whatever the closure returns.",
+  "join() gives you Result<T, _> — the Err is the panic, and unwrap is honest here.",
+  "Take the count before the loop; the Vec is consumed by iterating it by value.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n2 3 4\n",       expect = "4\n9\n16\nTHREADS 3\n",        visible = true },
+  { name = "single", stdin = "1\n-5\n",          expect = "25\nTHREADS 1\n",              visible = false },
+  { name = "wide",   stdin = "4\n0 1 10 100\n",  expect = "0\n1\n100\n10000\nTHREADS 4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "rust.advanced.02.move"
+node        = 2
+title       = "TAKE IT WITH YOU"
+difficulty  = 3
+story       = "Alex hands a rider the address on the only copy of the docket and then asks the counter to read it back."
+concepts    = ["ownership", "concurrency", "closures"]
+requires    = ["rust.advanced.01.threads"]
+map         = { x = 0.26, y = 0.26, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of text.
+
+Spawn one thread per line that returns the line uppercased. Join in order,
+print each, then `DONE`.
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        DONE
+```
+
+The starter does not compile: the closure borrows `line`, and `thread::spawn`
+has no idea how long the thread will run, so the borrow cannot be proved to
+outlive it. Give the thread the string instead of a view of it.
+'''
+starter     = '''
+use std::io::Read;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut handles = Vec::new();
+    for _ in 0..n {
+        let line = lines.next().unwrap().to_string();
+        handles.push(thread::spawn(|| line.to_uppercase()));
+    }
+
+    for handle in handles {
+        println!("{}", handle.join().unwrap());
+    }
+    println!("DONE");
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut handles = Vec::new();
+    for _ in 0..n {
+        let line = lines.next().unwrap().to_string();
+        handles.push(thread::spawn(move || line.to_uppercase()));
+    }
+
+    for handle in handles {
+        println!("{}", handle.join().unwrap());
+    }
+    println!("DONE");
+}
+'''
+hints = [
+  "The error is E0373: closure may outlive the current function.",
+  "One keyword in front of the closure changes it from borrowing to owning.",
+  "line is already a fresh String per iteration, so giving it away costs nothing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-lines", stdin = "2\nlucky mac\npercival\n", expect = "LUCKY MAC\nPERCIVAL\nDONE\n", visible = true },
+  { name = "one",       stdin = "1\nhku\n",                 expect = "HKU\nDONE\n",                 visible = false },
+  { name = "three",     stdin = "3\na\nb\nc\n",             expect = "A\nB\nC\nDONE\n",             visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "rust.advanced.03.channels"
+node        = 3
+title       = "ONE WINDOW, MANY RIDERS"
+difficulty  = 3
+story       = "Forty riders, one hatch at the back of the Times Square kitchen. Everything goes through the hatch and the hatch never jams."
+concepts    = ["channels", "concurrency", "iteration"]
+requires    = ["rust.advanced.02.move"]
+map         = { x = 0.38, y = 0.16, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Spawn one thread per value. Each sends `(index, value * 10)` down a single
+`mpsc` channel. The main thread receives all of them, sorts by index, prints
+`<index> <value>` one per line, then `RECV <n>`.
+
+```
+input:  3
+        1 2 3
+output: 0 10
+        1 20
+        2 30
+        RECV 3
+```
+
+Receiving by iterating `rx` ends when **every** sender has been dropped — and
+the one `main` is still holding counts. Drop it, or the program never finishes.
+'''
+starter     = '''
+use std::io::Read;
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let (tx, rx) = mpsc::channel::<(usize, i64)>();
+
+    // spawn a thread per value that sends (index, value * 10),
+    // drop the sender main is holding, then collect, sort and print
+    let _ = (nums, tx, rx);
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let (tx, rx) = mpsc::channel::<(usize, i64)>();
+    for (index, value) in nums.into_iter().enumerate() {
+        let tx = tx.clone();
+        thread::spawn(move || {
+            tx.send((index, value * 10)).unwrap();
+        });
+    }
+    drop(tx);
+
+    let mut received: Vec<(usize, i64)> = rx.iter().collect();
+    received.sort();
+
+    for (index, value) in &received {
+        println!("{} {}", index, value);
+    }
+    println!("RECV {}", received.len());
+}
+'''
+hints = [
+  "Each thread needs its own Sender: tx.clone() before the move closure.",
+  "drop(tx) after the loop. Without it the receiver waits forever for a sender that is sitting in main.",
+  "rx.iter() yields until the channel is closed, so collect() is the whole receive loop.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n1 2 3\n",     expect = "0 10\n1 20\n2 30\nRECV 3\n",            visible = true },
+  { name = "single", stdin = "1\n7\n",         expect = "0 70\nRECV 1\n",                        visible = false },
+  { name = "dupes",  stdin = "4\n0 -1 5 5\n",  expect = "0 0\n1 -10\n2 50\n3 50\nRECV 4\n",      visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "rust.advanced.04.mutex"
+node        = 4
+title       = "ONE DRAWER, EIGHT HANDS"
+difficulty  = 4
+story       = "Both tills take cash out of the same drawer and at close of business the drawer disagrees with both of them."
+concepts    = ["shared-state", "smart-pointers", "concurrency"]
+requires    = ["rust.advanced.03.channels"]
+map         = { x = 0.50, y = 0.27, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Spawn one thread per value that adds it to **one shared total**. Join them all,
+then print `TOTAL <sum>` and `THREADS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        THREADS 4
+```
+
+The starter compiles and is wrong: `i64` is `Copy`, so each `move` closure got
+its own private total and threw it away. Share one, and lock it.
+'''
+starter     = '''
+use std::io::Read;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let count = nums.len();
+
+    let mut total = 0i64;
+    let mut handles = Vec::new();
+    for value in nums {
+        handles.push(thread::spawn(move || {
+            total += value;
+        }));
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("TOTAL {}", total);
+    println!("THREADS {}", count);
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let count = nums.len();
+
+    let total = Arc::new(Mutex::new(0i64));
+    let mut handles = Vec::new();
+    for value in nums {
+        let total = Arc::clone(&total);
+        handles.push(thread::spawn(move || {
+            let mut guard = total.lock().unwrap();
+            *guard += value;
+        }));
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("TOTAL {}", *total.lock().unwrap());
+    println!("THREADS {}", count);
+}
+'''
+hints = [
+  "Arc is the shared ownership; Mutex is the exclusive access. You need both, in that order: Arc<Mutex<i64>>.",
+  "Arc::clone(&total) inside the loop, before the move closure — the clone is what each thread takes.",
+  "The guard from lock() derefs to the value; *guard += value, and the guard unlocks when it goes out of scope.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",   stdin = "4\n1 2 3 4\n",                  expect = "TOTAL 10\nTHREADS 4\n",      visible = true },
+  { name = "single", stdin = "1\n-5\n",                       expect = "TOTAL -5\nTHREADS 1\n",      visible = false },
+  { name = "big",    stdin = "3\n1000000 1000000 1000000\n",  expect = "TOTAL 3000000\nTHREADS 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "rust.advanced.05.rwlock"
+node        = 5
+title       = "MANY READERS, ONE WRITER"
+difficulty  = 4
+story       = "The Hysan Place directory is read three hundred times a minute and changed twice a day, and the lock does not know the difference."
+concepts    = ["shared-state", "collections", "smart-pointers"]
+requires    = ["rust.advanced.04.mutex"]
+map         = { x = 0.62, y = 0.18, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` words.
+
+Hold `Arc<RwLock<HashMap<String, i64>>>`. Spawn one thread per word that takes
+the **write** lock and increments that word's count. Join them all, then take
+one **read** lock and print each `<word> <count>` sorted by word, then
+`TOTAL <sum>`.
+
+```
+input:  3
+        tram
+        bus
+        tram
+output: bus 1
+        tram 2
+        TOTAL 3
+```
+
+The starter does not compile. It takes the read lock and tries to write
+through it, and a `RwLockReadGuard` will not give you `&mut`.
+'''
+starter     = '''
+use std::collections::HashMap;
+use std::io::Read;
+use std::sync::{Arc, RwLock};
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let words: Vec<String> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|w| w.to_string())
+        .collect();
+
+    let counts: Arc<RwLock<HashMap<String, i64>>> = Arc::new(RwLock::new(HashMap::new()));
+    let mut handles = Vec::new();
+    for word in words {
+        let counts = Arc::clone(&counts);
+        handles.push(thread::spawn(move || {
+            let guard = counts.read().unwrap();
+            *guard.entry(word).or_insert(0) += 1;
+        }));
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    // read the map once, print it sorted, then TOTAL
+}
+'''
+solution    = '''
+use std::collections::HashMap;
+use std::io::Read;
+use std::sync::{Arc, RwLock};
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let words: Vec<String> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|w| w.to_string())
+        .collect();
+
+    let counts: Arc<RwLock<HashMap<String, i64>>> = Arc::new(RwLock::new(HashMap::new()));
+    let mut handles = Vec::new();
+    for word in words {
+        let counts = Arc::clone(&counts);
+        handles.push(thread::spawn(move || {
+            let mut guard = counts.write().unwrap();
+            *guard.entry(word).or_insert(0) += 1;
+        }));
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    let guard = counts.read().unwrap();
+    let mut rows: Vec<(&String, &i64)> = guard.iter().collect();
+    rows.sort();
+
+    for (word, count) in &rows {
+        println!("{} {}", word, count);
+    }
+    let total: i64 = rows.iter().map(|(_, count)| **count).sum();
+    println!("TOTAL {}", total);
+}
+'''
+hints = [
+  "write() returns a guard that derefs to &mut; read() returns one that only derefs to &.",
+  "Sorting Vec<(&String, &i64)> sorts by the word first, which is what the output wants.",
+  "Hold the read guard in a binding while you iterate it, or the temporary is dropped before you are done with it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tram",   stdin = "3\ntram\nbus\ntram\n", expect = "bus 1\ntram 2\nTOTAL 3\n", visible = true },
+  { name = "single", stdin = "1\nmtr\n",             expect = "mtr 1\nTOTAL 1\n",         visible = false },
+  { name = "skewed", stdin = "4\na\na\na\nb\n",      expect = "a 3\nb 1\nTOTAL 4\n",      visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "rust.advanced.06.lifetimes"
+node        = 6
+title       = "HOW LONG IS THAT GOOD FOR"
+difficulty  = 4
+story       = "The departures board keeps a view of the timetable rather than a copy of it, and nobody wrote down when the timetable gets thrown away."
+concepts    = ["lifetimes", "borrowing", "structs", "strings"]
+requires    = ["rust.advanced.05.rwlock"]
+map         = { x = 0.74, y = 0.32, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines.
+
+Build a `Board` that holds **borrowed** `&str` slices of the input — no
+`String`, no copy — and give it `longest()` (first line wins a tie) and
+`bytes()`.
+
+Print the longest line, then how many lines there are, then their total byte
+length.
+
+```
+input:  3
+        tram
+        percival street
+        mtr
+output: percival street
+        3
+        22
+```
+
+The starter does not compile: a struct that holds a reference must say how
+long that reference is good for. That is E0106, and the fix is a lifetime
+parameter on the struct, on the `impl`, and on what `longest` returns.
+'''
+starter     = '''
+use std::io::Read;
+
+struct Board {
+    lines: Vec<&str>,
+}
+
+impl Board {
+    fn new(text: &str, n: usize) -> Board {
+        Board {
+            lines: text.lines().skip(1).take(n).collect(),
+        }
+    }
+
+    fn longest(&self) -> &str {
+        let mut best = self.lines[0];
+        for line in &self.lines {
+            if line.len() > best.len() {
+                best = *line;
+            }
+        }
+        best
+    }
+
+    fn bytes(&self) -> usize {
+        self.lines.iter().map(|line| line.len()).sum()
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let n: usize = input.lines().next().unwrap().trim().parse().unwrap();
+
+    let board = Board::new(&input, n);
+    println!("{}", board.longest());
+    println!("{}", board.lines.len());
+    println!("{}", board.bytes());
+}
+'''
+solution    = '''
+use std::io::Read;
+
+struct Board<'a> {
+    lines: Vec<&'a str>,
+}
+
+impl<'a> Board<'a> {
+    fn new(text: &'a str, n: usize) -> Board<'a> {
+        Board {
+            lines: text.lines().skip(1).take(n).collect(),
+        }
+    }
+
+    fn longest(&self) -> &'a str {
+        let mut best = self.lines[0];
+        for line in &self.lines {
+            if line.len() > best.len() {
+                best = *line;
+            }
+        }
+        best
+    }
+
+    fn bytes(&self) -> usize {
+        self.lines.iter().map(|line| line.len()).sum()
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let n: usize = input.lines().next().unwrap().trim().parse().unwrap();
+
+    let board = Board::new(&input, n);
+    println!("{}", board.longest());
+    println!("{}", board.lines.len());
+    println!("{}", board.bytes());
+}
+'''
+hints = [
+  "struct Board<'a> { lines: Vec<&'a str> } — the struct is now generic over a lifetime.",
+  "impl<'a> Board<'a> — declare it before you use it, the same as a type parameter.",
+  "longest returns &'a str, not &str: the answer outlives the borrow of self, it belongs to the input.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\ntram\npercival street\nmtr\n", expect = "percival street\n3\n22\n", visible = true },
+  { name = "single", stdin = "1\nhku\n",                        expect = "hku\n1\n3\n",              visible = false },
+  { name = "tie",    stdin = "2\nab\ncd\n",                     expect = "ab\n2\n4\n",               visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "rust.advanced.07.generics"
+node        = 7
+title       = "WRITE IT ONCE"
+difficulty  = 4
+story       = "Alex has written largest four times — for fares, for minutes, for riders and for stop names — and the fifth one is due before the shift ends."
+concepts    = ["generics", "traits", "types"]
+requires    = ["rust.advanced.06.lifetimes"]
+map         = { x = 0.66, y = 0.48, kind = "quest" }
+brief       = '''
+Standard input is two lines: integers on the first, words on the second.
+
+Write **one** `largest` that works on both, and a generic `Pair<T>` with
+`larger()` and `smaller()`.
+
+Print the largest integer, the largest word, then
+`PAIR <larger> <smaller>` for a `Pair` of the first two integers. A tie counts
+as `a` being the larger.
+
+```
+input:  4 8 15 16
+        tram bus mtr
+output: 16
+        tram
+        PAIR 8 4
+```
+
+The starter does not compile: `largest` is nailed to `i64`, so passing it the
+words is E0308.
+'''
+starter     = '''
+use std::io::Read;
+
+fn largest(xs: &[i64]) -> i64 {
+    let mut best = xs[0];
+    for &x in xs {
+        if x > best {
+            best = x;
+        }
+    }
+    best
+}
+
+struct Pair<T> {
+    a: T,
+    b: T,
+}
+
+impl<T> Pair<T> {
+    fn larger(&self) -> &T {
+        &self.a
+    }
+
+    fn smaller(&self) -> &T {
+        &self.b
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let nums: Vec<i64> = lines
+        .next()
+        .unwrap()
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let words: Vec<&str> = lines.next().unwrap().split_whitespace().collect();
+
+    println!("{}", largest(&nums));
+    println!("{}", largest(&words));
+
+    let pair = Pair { a: nums[0], b: nums[1] };
+    println!("PAIR {} {}", pair.larger(), pair.smaller());
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {
+    let mut best = xs[0];
+    for &x in xs {
+        if x > best {
+            best = x;
+        }
+    }
+    best
+}
+
+struct Pair<T> {
+    a: T,
+    b: T,
+}
+
+impl<T: PartialOrd> Pair<T> {
+    fn larger(&self) -> &T {
+        if self.a >= self.b {
+            &self.a
+        } else {
+            &self.b
+        }
+    }
+
+    fn smaller(&self) -> &T {
+        if self.a >= self.b {
+            &self.b
+        } else {
+            &self.a
+        }
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let nums: Vec<i64> = lines
+        .next()
+        .unwrap()
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let words: Vec<&str> = lines.next().unwrap().split_whitespace().collect();
+
+    println!("{}", largest(&nums));
+    println!("{}", largest(&words));
+
+    let pair = Pair { a: nums[0], b: nums[1] };
+    println!("PAIR {} {}", pair.larger(), pair.smaller());
+}
+'''
+hints = [
+  "largest<T: PartialOrd + Copy> — PartialOrd to compare, Copy because the loop takes values out of the slice.",
+  "&str is Copy and PartialOrd, so the same function takes the word list unchanged.",
+  "The bound belongs on the impl block, not the struct: impl<T: PartialOrd> Pair<T>.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",     stdin = "4 8 15 16\ntram bus mtr\n", expect = "16\ntram\nPAIR 8 4\n",   visible = true },
+  { name = "negatives", stdin = "-3 -9\nz a\n",              expect = "-3\nz\nPAIR -3 -9\n",    visible = false },
+  { name = "tie",       stdin = "5 5 1\nhku hku\n",          expect = "5\nhku\nPAIR 5 5\n",     visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "rust.advanced.08.iterator"
+node        = 8
+title       = "YOUR OWN FOR LOOP"
+difficulty  = 4
+story       = "The tram lists every stop from Shau Kei Wan to Kennedy Town and does not keep a list of them anywhere."
+concepts    = ["traits", "iteration", "structs"]
+requires    = ["rust.advanced.07.generics"]
+map         = { x = 0.52, y = 0.57, kind = "quest" }
+brief       = '''
+Standard input is three integers: `start`, `step`, `count`.
+
+Implement `Iterator` for `Stops` so it yields `count` values beginning at
+`start` and advancing by `step`. Print each on its own line, then `SUM <total>`
+computed with the iterator's own `sum()`.
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+Once `next` exists you get `for`, `sum`, `map`, `take` and the rest for free.
+That is what implementing a trait buys.
+'''
+starter     = '''
+use std::io::Read;
+
+struct Stops {
+    current: i64,
+    step: i64,
+    left: usize,
+}
+
+impl Iterator for Stops {
+    type Item = i64;
+
+    fn next(&mut self) -> Option<i64> {
+        todo!()
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let parts: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (start, step, count) = (parts[0], parts[1], parts[2] as usize);
+
+    for value in (Stops { current: start, step, left: count }) {
+        println!("{}", value);
+    }
+    let sum: i64 = (Stops { current: start, step, left: count }).sum();
+    println!("SUM {}", sum);
+}
+'''
+solution    = '''
+use std::io::Read;
+
+struct Stops {
+    current: i64,
+    step: i64,
+    left: usize,
+}
+
+impl Iterator for Stops {
+    type Item = i64;
+
+    fn next(&mut self) -> Option<i64> {
+        if self.left == 0 {
+            return None;
+        }
+        let value = self.current;
+        self.current += self.step;
+        self.left -= 1;
+        Some(value)
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let parts: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (start, step, count) = (parts[0], parts[1], parts[2] as usize);
+
+    for value in (Stops { current: start, step, left: count }) {
+        println!("{}", value);
+    }
+    let sum: i64 = (Stops { current: start, step, left: count }).sum();
+    println!("SUM {}", sum);
+}
+'''
+hints = [
+  "next returns None when there is nothing left, and that None is what ends the for loop.",
+  "Save the value you are about to return before you advance, or you are off by one step.",
+  "left is the countdown; decrement it every time you hand a value out.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",     stdin = "2 3 5\n",   expect = "2\n5\n8\n11\n14\nSUM 40\n", visible = true },
+  { name = "flat",     stdin = "0 0 3\n",   expect = "0\n0\n0\nSUM 0\n",          visible = false },
+  { name = "backward", stdin = "10 -4 4\n", expect = "10\n6\n2\n-2\nSUM 16\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "rust.advanced.09.pipeline"
+node        = 9
+title       = "THE LINE COOK"
+difficulty  = 5
+story       = "Chef Bo's night kitchen runs as a line: one station squares the order, the next one keeps the running count, and nobody waits for the whole batch."
+concepts    = ["channels", "concurrency", "closures"]
+requires    = ["rust.advanced.08.iterator"]
+map         = { x = 0.36, y = 0.64, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Build a two-stage pipeline with two `mpsc` channels and two threads:
+
+1. stage one sends each value squared
+2. stage two receives those, keeps a running total, and sends `(square, total)`
+
+`main` prints each pair it receives as `<square> <total>`, then `PIPE <n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+Each stage's sender is **moved into** its thread, so it is dropped when the
+thread ends, so the next stage's `for` loop finishes. Keep a copy anywhere and
+the program hangs.
+'''
+starter     = '''
+use std::io::Read;
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let count = nums.len();
+
+    let (tx1, rx1) = mpsc::channel::<i64>();
+    let (tx2, rx2) = mpsc::channel::<(i64, i64)>();
+
+    // stage one: square each value and send it on tx1
+    // stage two: receive from rx1, keep a running total, send (square, total) on tx2
+    // main: print each pair from rx2, then PIPE <n>
+    let _ = (nums, count, tx1, rx1, tx2, rx2);
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let count = nums.len();
+
+    let (tx1, rx1) = mpsc::channel::<i64>();
+    let (tx2, rx2) = mpsc::channel::<(i64, i64)>();
+
+    let squarer = thread::spawn(move || {
+        for value in nums {
+            tx1.send(value * value).unwrap();
+        }
+    });
+
+    let running = thread::spawn(move || {
+        let mut total = 0i64;
+        for square in rx1 {
+            total += square;
+            tx2.send((square, total)).unwrap();
+        }
+    });
+
+    for (square, total) in rx2 {
+        println!("{} {}", square, total);
+    }
+
+    squarer.join().unwrap();
+    running.join().unwrap();
+    println!("PIPE {}", count);
+}
+'''
+hints = [
+  "Take the count before you move nums into the first thread.",
+  "for square in rx1 inside the second thread is a receive loop that ends when stage one drops tx1.",
+  "main's loop over rx2 ends when the second thread ends, which is why joining afterwards does not hang.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n1 2 3\n",    expect = "1 1\n4 5\n9 14\nPIPE 3\n",        visible = true },
+  { name = "single", stdin = "1\n-3\n",       expect = "9 9\nPIPE 1\n",                   visible = false },
+  { name = "repeat", stdin = "4\n0 2 2 2\n",  expect = "0 0\n4 4\n4 8\n4 12\nPIPE 4\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 10  BOSS
+[[quest]]
+id          = "rust.advanced.10.deadlock"
+node        = 10
+title       = "DEADLOCK"
+difficulty  = 5
+story       = "The Times Square plant room, two floors down. Two locks, two threads, and both escalators stopped in the same second."
+concepts    = ["deadlock", "shared-state", "concurrency", "smart-pointers"]
+requires    = ["rust.advanced.09.pipeline", "rust.advanced.04.mutex"]
+map         = { x = 0.20, y = 0.80, kind = "boss" }
+brief       = '''
+Two accounts, `A` and `B`, each an `Arc<Mutex<i64>>`.
+
+Standard input is the starting balances on line one, a count `n` on line two,
+and then `n` lines of `<FROM> <TO> <AMOUNT>` with `FROM`/`TO` in `{A, B}`.
+
+Run every transfer on its own thread, join them all, then print
+`A <balance>`, `B <balance>`, `MOVED <n>`.
+
+```
+input:  100 100
+        2
+        A B 30
+        B A 10
+output: A 80
+        B 120
+        MOVED 2
+```
+
+Two things are wrong with the starter and only one of them shows up in the
+output. It debits the source and never credits the destination — that is the
+visible bug. The other is the shape: locking *the source first* means two
+opposite transfers can each hold one lock and wait for the other, forever.
+
+Take both locks, **always in the same global order** — `A` then `B`,
+whichever way the money is going — and the cycle cannot form.
+'''
+starter     = '''
+use std::io::Read;
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn transfer(a: &Arc<Mutex<i64>>, b: &Arc<Mutex<i64>>, from_a: bool, amount: i64) {
+    // locks whichever side the money leaves, and only that side
+    if from_a {
+        let mut source = a.lock().unwrap();
+        *source -= amount;
+    } else {
+        let mut source = b.lock().unwrap();
+        *source -= amount;
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut first = lines.next().unwrap().split_whitespace();
+    let a0: i64 = first.next().unwrap().parse().unwrap();
+    let b0: i64 = first.next().unwrap().parse().unwrap();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let a = Arc::new(Mutex::new(a0));
+    let b = Arc::new(Mutex::new(b0));
+
+    let mut handles = Vec::new();
+    for _ in 0..n {
+        let line = lines.next().unwrap().to_string();
+        let a = Arc::clone(&a);
+        let b = Arc::clone(&b);
+        handles.push(thread::spawn(move || {
+            let mut parts = line.split_whitespace();
+            let from = parts.next().unwrap().to_string();
+            let _to = parts.next().unwrap();
+            let amount: i64 = parts.next().unwrap().parse().unwrap();
+            transfer(&a, &b, from == "A", amount);
+        }));
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("A {}", *a.lock().unwrap());
+    println!("B {}", *b.lock().unwrap());
+    println!("MOVED {}", n);
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn transfer(a: &Arc<Mutex<i64>>, b: &Arc<Mutex<i64>>, from_a: bool, amount: i64) {
+    // A is always locked before B, whichever direction the money goes.
+    // One global order over the locks, so no cycle, so no deadlock.
+    let mut guard_a = a.lock().unwrap();
+    let mut guard_b = b.lock().unwrap();
+    if from_a {
+        *guard_a -= amount;
+        *guard_b += amount;
+    } else {
+        *guard_b -= amount;
+        *guard_a += amount;
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut first = lines.next().unwrap().split_whitespace();
+    let a0: i64 = first.next().unwrap().parse().unwrap();
+    let b0: i64 = first.next().unwrap().parse().unwrap();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let a = Arc::new(Mutex::new(a0));
+    let b = Arc::new(Mutex::new(b0));
+
+    let mut handles = Vec::new();
+    for _ in 0..n {
+        let line = lines.next().unwrap().to_string();
+        let a = Arc::clone(&a);
+        let b = Arc::clone(&b);
+        handles.push(thread::spawn(move || {
+            let mut parts = line.split_whitespace();
+            let from = parts.next().unwrap().to_string();
+            let _to = parts.next().unwrap();
+            let amount: i64 = parts.next().unwrap().parse().unwrap();
+            transfer(&a, &b, from == "A", amount);
+        }));
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("A {}", *a.lock().unwrap());
+    println!("B {}", *b.lock().unwrap());
+    println!("MOVED {}", n);
+}
+'''
+hints = [
+  "Lock both accounts before you touch either balance, and always in the same order.",
+  "The direction of the money decides which guard gets the minus, not which lock is taken first.",
+  "The two guards drop at the end of transfer, in reverse order, which is fine — it is the acquire order that matters.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "both-ways",  stdin = "100 100\n2\nA B 30\nB A 10\n",           expect = "A 80\nB 120\nMOVED 2\n",  visible = true },
+  { name = "overdraw",   stdin = "0 0\n1\nA B 5\n",                        expect = "A -5\nB 5\nMOVED 1\n",    visible = false },
+  { name = "round-trip", stdin = "50 50\n4\nA B 1\nB A 1\nA B 1\nB A 1\n", expect = "A 50\nB 50\nMOVED 4\n",   visible = false },
+]

@@ -1,0 +1,2 @@
+# command-line-arguments
+./main.go:7:14: cannot use "42" (untyped string constant) as int value in variable declaration

@@ -1,0 +1,24 @@
+[package]
+name = "cwbhacker-runner"
+description = "Compiling and running one submission under SPEC §5's limits, streaming its output while it goes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "cwbhacker_runner"
+path = "src/lib.rs"
+
+[dependencies]
+cwbhacker-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+serde_json.workspace = true

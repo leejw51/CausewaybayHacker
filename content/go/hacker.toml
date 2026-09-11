@@ -1,0 +1,1044 @@
+# GO LAND — HACKER. The second interview, same room, shorter clock.
+#
+# Every quest here carries `time_limit_s` — the player's clock for the whole
+# quest, not the per-run `timeout_ms` — and at least one hidden case.
+# See docs/decisions.md, 2026-09-11, for where that key lives in the TOML.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+
+pack = "go.hacker"
+land = "go"
+category = "hacker"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id           = "go.hacker.01.two-sum"
+node         = 1
+title        = "TWO FARES"
+difficulty   = 3
+time_limit_s = 600
+story        = "Same room, same first question, and this time they ask for it in Go."
+concepts     = ["hashing", "complexity", "slices"]
+requires     = []
+map          = { x = 0.88, y = 0.84, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` integers.
+
+Print the **1-based** indices `i j` of two different entries that add up to
+`target`, as `i j` with `i < j`. If more than one pair works, give the one
+whose second index is smallest; if that still ties, the smallest first index.
+If no pair works, print `-1`.
+
+```
+input:  4 9
+        2 7 11 15
+output: 1 2
+```
+
+`n` goes to 200000. The nested loop is the wrong answer here even when it
+prints the right numbers.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	var target int64
+	fmt.Fscan(reader, &n, &target)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	seen := make(map[int64]int, n)
+	_ = seen
+	_ = nums
+	_ = target
+	fmt.Println(-1)
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	var target int64
+	fmt.Fscan(reader, &n, &target)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	seen := make(map[int64]int, n)
+	for j, x := range nums {
+		if i, ok := seen[target-x]; ok {
+			fmt.Printf("%d %d\n", i+1, j+1)
+			return
+		}
+		if _, ok := seen[x]; !ok {
+			seen[x] = j
+		}
+	}
+	fmt.Println(-1)
+}
+'''
+hints = [
+  "One pass. For each value ask the map whether target minus it has already been seen.",
+  "Only record the first index of a repeated value — that is the tie-break the statement asks for.",
+  "The comma-ok form is the whole idiom: i, ok := seen[k].",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "4 9\n2 7 11 15\n",      expect = "1 2\n", visible = true },
+  { name = "late",   stdin = "5 10\n1 2 3 4 6\n",     expect = "4 5\n", visible = false },
+  { name = "none",   stdin = "3 100\n1 2 3\n",        expect = "-1\n",  visible = false },
+  { name = "signed", stdin = "6 0\n-3 4 3 90 -1 1\n", expect = "1 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id           = "go.hacker.02.window"
+node         = 2
+title        = "THE SHORTEST RUN"
+difficulty   = 4
+time_limit_s = 900
+story        = "How few consecutive stops cover the distance. They want the number of stops, and then where it starts."
+concepts     = ["two-pointers", "complexity", "slices"]
+requires     = ["go.hacker.01.two-sum"]
+map          = { x = 0.72, y = 0.74, kind = "quest" }
+brief        = '''
+Line one is `n s`. Line two is `n` **positive** integers.
+
+Find the shortest contiguous run whose sum is at least `s`. Print its length,
+then its 1-based start index. If several runs are equally short, take the
+leftmost. If no run reaches `s`, print `0` and `0`.
+
+```
+input:  6 7
+        2 3 1 2 4 3
+output: 2
+        5
+```
+
+Both ends only move right, so every element is added once and removed once.
+Recomputing a sum inside the inner loop turns this back into the quadratic
+answer.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	var s int64
+	fmt.Fscan(reader, &n, &s)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	bestLen, bestStart := 0, 0
+
+	// walk `right` forward, pull `left` up while the window still reaches s
+	_ = nums
+	_ = s
+
+	fmt.Println(bestLen)
+	fmt.Println(bestStart)
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	var s int64
+	fmt.Fscan(reader, &n, &s)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	bestLen, bestStart := 0, 0
+	left := 0
+	var sum int64
+
+	for right := 0; right < n; right++ {
+		sum += nums[right]
+		for left < right && sum-nums[left] >= s {
+			sum -= nums[left]
+			left++
+		}
+		if sum >= s {
+			length := right - left + 1
+			if bestLen == 0 || length < bestLen {
+				bestLen = length
+				bestStart = left + 1
+			}
+		}
+	}
+
+	fmt.Println(bestLen)
+	fmt.Println(bestStart)
+}
+'''
+hints = [
+  "Keep a running sum. Add nums[right] once per step and never recompute it.",
+  "Shrink from the left while dropping the leftmost element would still leave the window at or above s.",
+  "Record a new best only on a strictly shorter run, so the leftmost of each length is the one you keep.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "6 7\n2 3 1 2 4 3\n",     expect = "2\n5\n", visible = true },
+  { name = "one",    stdin = "1 4\n4\n",               expect = "1\n1\n", visible = false },
+  { name = "never",  stdin = "3 11\n1 1 1\n",          expect = "0\n0\n", visible = false },
+  { name = "tail",   stdin = "8 15\n1 2 3 4 5 6 7 8\n", expect = "2\n7\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id           = "go.hacker.03.intervals"
+node         = 3
+title        = "THE SHIFT ROTA"
+difficulty   = 4
+time_limit_s = 900
+story        = "The Lucky Mac rota again, and the question is still which hours are actually covered."
+concepts     = ["intervals", "sorting", "complexity"]
+requires     = ["go.hacker.02.window"]
+map          = { x = 0.56, y = 0.82, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are `<start> <end>` with `start <= end`.
+
+Merge every pair that overlaps or touches, and print the result in increasing
+order, one `<start> <end>` per line, then `COUNT <k>`.
+
+```
+input:  4
+        1 3
+        2 6
+        8 10
+        15 18
+output: 1 6
+        8 10
+        15 18
+        COUNT 3
+```
+
+Touching counts as overlapping: `1 4` and `4 5` merge into `1 5`.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type span struct {
+	start int64
+	end   int64
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	spans := make([]span, n)
+	for i := range spans {
+		fmt.Fscan(reader, &spans[i].start, &spans[i].end)
+	}
+
+	// sort by start, sweep once, merge, print, then COUNT <k>
+	fmt.Printf("COUNT %d\n", len(spans))
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"sort"
+)
+
+type span struct {
+	start int64
+	end   int64
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	fmt.Fscan(reader, &n)
+	spans := make([]span, n)
+	for i := range spans {
+		fmt.Fscan(reader, &spans[i].start, &spans[i].end)
+	}
+
+	sort.Slice(spans, func(i, j int) bool {
+		if spans[i].start != spans[j].start {
+			return spans[i].start < spans[j].start
+		}
+		return spans[i].end < spans[j].end
+	})
+
+	merged := make([]span, 0, n)
+	for _, s := range spans {
+		last := len(merged) - 1
+		if last >= 0 && s.start <= merged[last].end {
+			if s.end > merged[last].end {
+				merged[last].end = s.end
+			}
+			continue
+		}
+		merged = append(merged, s)
+	}
+
+	for _, s := range merged {
+		fmt.Printf("%d %d\n", s.start, s.end)
+	}
+	fmt.Printf("COUNT %d\n", len(merged))
+}
+'''
+hints = [
+  "Sort by start first. After that one left-to-right pass is enough.",
+  "merged[last].end is addressable because merged is a slice of structs, not of pointers — assign straight into it.",
+  "Extend to the larger of the two ends; a short interval inside a long one must not shrink it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "4\n1 3\n2 6\n8 10\n15 18\n", expect = "1 6\n8 10\n15 18\nCOUNT 3\n", visible = true },
+  { name = "touching", stdin = "2\n1 4\n4 5\n",              expect = "1 5\nCOUNT 1\n",              visible = false },
+  { name = "point",    stdin = "1\n5 5\n",                   expect = "5 5\nCOUNT 1\n",              visible = false },
+  { name = "unsorted", stdin = "3\n5 6\n1 2\n3 4\n",         expect = "1 2\n3 4\n5 6\nCOUNT 3\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id           = "go.hacker.04.islands"
+node         = 4
+title        = "HOW MANY BLOCKS"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A plan of the neighbourhood on the whiteboard. Count the blocks, then tell them which one is biggest."
+concepts     = ["graphs", "stacks-queues", "complexity"]
+requires     = ["go.hacker.03.intervals"]
+map          = { x = 0.42, y = 0.68, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are the plan: `#` is building, `.` is
+street.
+
+Two `#` cells are in the same block if they touch up, down, left or right —
+not diagonally.
+
+Print how many blocks there are, then how many cells the largest one has.
+An empty plan is `0` and `0`.
+
+```
+input:  4 5
+        ##...
+        ##...
+        ..#..
+        ...##
+output: 3
+        4
+```
+
+Walk every cell once. When you find an unvisited `#`, flood the whole block
+from it with a queue and count it as you go.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var rows, cols int
+	fmt.Fscan(reader, &rows, &cols)
+	grid := make([]string, rows)
+	for i := range grid {
+		fmt.Fscan(reader, &grid[i])
+	}
+
+	seen := make([][]bool, rows)
+	for i := range seen {
+		seen[i] = make([]bool, cols)
+	}
+
+	blocks, largest := 0, 0
+
+	// for each unvisited '#', flood it with a queue and count the cells
+	_ = grid
+	_ = seen
+
+	fmt.Println(blocks)
+	fmt.Println(largest)
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+type cell struct {
+	r int
+	c int
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var rows, cols int
+	fmt.Fscan(reader, &rows, &cols)
+	grid := make([]string, rows)
+	for i := range grid {
+		fmt.Fscan(reader, &grid[i])
+	}
+
+	seen := make([][]bool, rows)
+	for i := range seen {
+		seen[i] = make([]bool, cols)
+	}
+
+	blocks, largest := 0, 0
+	steps := []cell{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
+
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			if grid[r][c] != '#' || seen[r][c] {
+				continue
+			}
+			blocks++
+			size := 0
+			queue := []cell{{r, c}}
+			seen[r][c] = true
+			for len(queue) > 0 {
+				here := queue[0]
+				queue = queue[1:]
+				size++
+				for _, s := range steps {
+					nr, nc := here.r+s.r, here.c+s.c
+					if nr < 0 || nr >= rows || nc < 0 || nc >= cols {
+						continue
+					}
+					if grid[nr][nc] != '#' || seen[nr][nc] {
+						continue
+					}
+					seen[nr][nc] = true
+					queue = append(queue, cell{nr, nc})
+				}
+			}
+			if size > largest {
+				largest = size
+			}
+		}
+	}
+
+	fmt.Println(blocks)
+	fmt.Println(largest)
+}
+'''
+hints = [
+  "Mark a cell seen when you push it, not when you pop it, or it lands in the queue several times.",
+  "queue = queue[1:] is a fine dequeue here — the backing array is dropped once the whole block is done.",
+  "grid[r][c] indexes a string, so it is a byte: compare against '#', not \"#\".",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "4 5\n##...\n##...\n..#..\n...##\n", expect = "3\n4\n", visible = true },
+  { name = "empty",    stdin = "1 1\n.\n",                          expect = "0\n0\n", visible = false },
+  { name = "ring",     stdin = "3 3\n###\n#.#\n###\n",              expect = "1\n8\n", visible = false },
+  { name = "scatter",  stdin = "2 4\n#.#.\n.#.#\n",                 expect = "4\n1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id           = "go.hacker.05.brackets"
+node         = 5
+title        = "WHERE IT BROKE"
+difficulty   = 4
+time_limit_s = 900
+story        = "A config file on the projector and the interviewer asking not whether it is broken but which character broke it."
+concepts     = ["stacks-queues", "strings", "complexity"]
+requires     = ["go.hacker.04.islands"]
+map          = { x = 0.54, y = 0.52, kind = "quest" }
+brief        = '''
+One line made only of `(`, `)`, `[`, `]`, `{`, `}`.
+
+Print `VALID` and then `0` if every bracket is closed by its own kind in the
+right order.
+
+Otherwise print `INVALID` and then the **1-based index** of the offending
+character:
+
+* a closer that does not match what is open — the closer's own index
+* a closer with nothing open — the closer's own index
+* something still open at the end of the line — the index of the last
+  still-open bracket
+
+```
+input:  ([]{})
+output: VALID
+        0
+```
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"os"
+	"strings"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	line, _ := reader.ReadString('\n')
+	line = strings.TrimRight(line, "\r\n")
+
+	var stack []int
+
+	// push opener indices, pop on a matching closer, report the first failure
+	_ = stack
+	_ = line
+
+	os.Stdout.WriteString("VALID\n0\n")
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	line, _ := reader.ReadString('\n')
+	line = strings.TrimRight(line, "\r\n")
+
+	opener := map[byte]byte{')': '(', ']': '[', '}': '{'}
+	var stack []int
+
+	fail := func(index int) {
+		fmt.Println("INVALID")
+		fmt.Println(index + 1)
+	}
+
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		if c == '(' || c == '[' || c == '{' {
+			stack = append(stack, i)
+			continue
+		}
+		want, isCloser := opener[c]
+		if !isCloser {
+			fail(i)
+			return
+		}
+		if len(stack) == 0 || line[stack[len(stack)-1]] != want {
+			fail(i)
+			return
+		}
+		stack = stack[:len(stack)-1]
+	}
+
+	if len(stack) > 0 {
+		fail(stack[len(stack)-1])
+		return
+	}
+
+	fmt.Println("VALID")
+	fmt.Println(0)
+}
+'''
+hints = [
+  "Push the index of each opener, not the character — you need the index to report it.",
+  "A closer is wrong when the stack is empty, or when the character at the top index is not its partner.",
+  "If the loop finishes with anything left on the stack, the top of it is the last unclosed bracket.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "([]{})\n", expect = "VALID\n0\n",     visible = true },
+  { name = "crossed",  stdin = "([)]\n",   expect = "INVALID\n3\n",   visible = false },
+  { name = "unclosed", stdin = "(((\n",    expect = "INVALID\n3\n",   visible = false },
+  { name = "orphan",   stdin = ")\n",      expect = "INVALID\n1\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id           = "go.hacker.06.rotated"
+node         = 6
+title        = "THE LINE THAT WRAPS"
+difficulty   = 4
+time_limit_s = 900
+story        = "The Island Line timetable starts at the wrong station and wraps around, and they still want a lookup in log time."
+concepts     = ["binary-search", "complexity", "slices"]
+requires     = ["go.hacker.05.brackets"]
+map          = { x = 0.40, y = 0.40, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` distinct integers: a list that was
+sorted ascending and then rotated left by some amount (possibly zero).
+
+Print the **1-based** index of `target`, or `-1` if it is not there. Then
+print `PIVOT <p>`, the 1-based index of the smallest value.
+
+```
+input:  7 0
+        4 5 6 7 0 1 2
+output: 5
+        PIVOT 5
+```
+
+Two binary searches, or one clever one. Either way, a linear scan is the
+answer to a different question.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	var target int64
+	fmt.Fscan(reader, &n, &target)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	pivot := 0
+
+	// binary search for the pivot, then binary search the half that can hold target
+	_ = nums
+	_ = target
+
+	fmt.Println(-1)
+	fmt.Printf("PIVOT %d\n", pivot+1)
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n int
+	var target int64
+	fmt.Fscan(reader, &n, &target)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	lo, hi := 0, n-1
+	for lo < hi {
+		mid := lo + (hi-lo)/2
+		if nums[mid] > nums[hi] {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	pivot := lo
+
+	search := func(lo, hi int) int {
+		for lo <= hi {
+			mid := lo + (hi-lo)/2
+			switch {
+			case nums[mid] == target:
+				return mid
+			case nums[mid] < target:
+				lo = mid + 1
+			default:
+				hi = mid - 1
+			}
+		}
+		return -1
+	}
+
+	found := search(pivot, n-1)
+	if found < 0 {
+		found = search(0, pivot-1)
+	}
+
+	if found < 0 {
+		fmt.Println(-1)
+	} else {
+		fmt.Println(found + 1)
+	}
+	fmt.Printf("PIVOT %d\n", pivot+1)
+}
+'''
+hints = [
+  "The pivot is the only place where a value is greater than the one after it — compare mid against hi, not against lo.",
+  "After the pivot loop, lo == hi and that is the smallest value's index; a list that was not rotated gives 0.",
+  "Each half is plain sorted, so the second search is an ordinary binary search run at most twice.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "7 0\n4 5 6 7 0 1 2\n", expect = "5\nPIVOT 5\n",  visible = true },
+  { name = "missing",   stdin = "7 3\n4 5 6 7 0 1 2\n", expect = "-1\nPIVOT 5\n", visible = false },
+  { name = "single",    stdin = "1 1\n1\n",             expect = "1\nPIVOT 1\n",  visible = false },
+  { name = "unrotated", stdin = "5 5\n5 6 7 8 9\n",     expect = "1\nPIVOT 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id           = "go.hacker.07.anagrams"
+node         = 7
+title        = "SAME LETTERS"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A page of stop names with the letters shaken. Group the ones that are the same name."
+concepts     = ["hashing", "sorting", "strings"]
+requires     = ["go.hacker.06.rotated"]
+map          = { x = 0.24, y = 0.46, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` lowercase words separated by spaces.
+
+Group the words that are anagrams of each other. Print each group on one line,
+its words sorted ascending and joined by single spaces. Order the groups by
+their first word, ascending. Then print `GROUPS <k>`.
+
+A repeated word stays in its group twice.
+
+```
+input:  6
+        eat tea tan ate nat bat
+output: ate eat tea
+        bat
+        nat tan
+        GROUPS 3
+```
+
+The key is the word with its letters sorted. Two words are anagrams exactly
+when their keys are equal, and that is a map lookup rather than a comparison
+against everything seen so far.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Split(bufio.ScanWords)
+	sc.Scan()
+	var n int
+	fmt.Sscan(sc.Text(), &n)
+	words := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		sc.Scan()
+		words = append(words, sc.Text())
+	}
+
+	groups := map[string][]string{}
+
+	// key every word by its sorted letters, then sort inside and between groups
+	_ = words
+	fmt.Printf("GROUPS %d\n", len(groups))
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+)
+
+func key(word string) string {
+	letters := []byte(word)
+	sort.Slice(letters, func(i, j int) bool { return letters[i] < letters[j] })
+	return string(letters)
+}
+
+func main() {
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Split(bufio.ScanWords)
+	sc.Scan()
+	var n int
+	fmt.Sscan(sc.Text(), &n)
+	words := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		sc.Scan()
+		words = append(words, sc.Text())
+	}
+
+	groups := map[string][]string{}
+	for _, word := range words {
+		k := key(word)
+		groups[k] = append(groups[k], word)
+	}
+
+	lines := make([]string, 0, len(groups))
+	for _, members := range groups {
+		sort.Strings(members)
+		lines = append(lines, strings.Join(members, " "))
+	}
+	sort.Strings(lines)
+
+	for _, line := range lines {
+		fmt.Println(line)
+	}
+	fmt.Printf("GROUPS %d\n", len(lines))
+}
+'''
+hints = [
+  "sort.Slice over []byte(word) then string(...) back gives you the key.",
+  "Appending to groups[k] works on a missing key: the zero value of a slice is nil and append handles nil.",
+  "Sorting the joined lines sorts by first word, because the first word is where each line starts.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "6\neat tea tan ate nat bat\n", expect = "ate eat tea\nbat\nnat tan\nGROUPS 3\n", visible = true },
+  { name = "one",     stdin = "1\nhku\n",                     expect = "hku\nGROUPS 1\n",                       visible = false },
+  { name = "repeat",  stdin = "3\nab ba ab\n",                expect = "ab ab ba\nGROUPS 1\n",                  visible = false },
+  { name = "streets", stdin = "4\nmtr tram rat art\n",        expect = "art rat\nmtr\ntram\nGROUPS 3\n",        visible = false },
+]
+
+# ---------------------------------------------------------------- 08  BOSS
+[[quest]]
+id           = "go.hacker.08.kth-largest"
+node         = 8
+title        = "THE CLOCK"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Same room, last question, and the clock on the wall is the one they replaced with a shorter one."
+concepts     = ["stacks-queues", "sorting", "complexity"]
+requires     = ["go.hacker.07.anagrams", "go.hacker.01.two-sum"]
+map          = { x = 0.10, y = 0.24, kind = "boss" }
+brief        = '''
+Line one is `n k`, with `1 <= k <= n`. Line two is `n` integers, which may
+repeat.
+
+Print the `k`-th largest **value** — duplicates count, so in `3 3 1` the
+2nd largest is `3`. Then print `HEAP <size>`, the number of elements you were
+holding when you finished.
+
+```
+input:  6 2
+        3 2 1 5 6 4
+output: 5
+        HEAP 2
+```
+
+Sorting the whole list answers it in `n log n`. The answer they are looking
+for keeps a **min-heap of size k** — push each value, pop when the heap grows
+past `k`, and the root is the answer at the end. `container/heap` is five
+methods on a slice type: `Len`, `Less`, `Swap`, `Push`, `Pop`. `Push` and
+`Pop` take a pointer receiver; the other three do not, and that asymmetry is
+the thing everyone gets wrong under a clock.
+'''
+starter      = '''
+package main
+
+import (
+	"bufio"
+	"container/heap"
+	"fmt"
+	"os"
+)
+
+type minHeap []int64
+
+func (h minHeap) Len() int           { return len(h) }
+func (h minHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h minHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *minHeap) Push(x any) {
+	// append the value
+}
+
+func (h *minHeap) Pop() any {
+	// take the last element off and return it
+	return int64(0)
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, k int
+	fmt.Fscan(reader, &n, &k)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	h := &minHeap{}
+	heap.Init(h)
+	_ = nums
+	_ = k
+
+	fmt.Println(0)
+	fmt.Printf("HEAP %d\n", h.Len())
+}
+'''
+solution     = '''
+package main
+
+import (
+	"bufio"
+	"container/heap"
+	"fmt"
+	"os"
+)
+
+type minHeap []int64
+
+func (h minHeap) Len() int           { return len(h) }
+func (h minHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h minHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *minHeap) Push(x any) {
+	*h = append(*h, x.(int64))
+}
+
+func (h *minHeap) Pop() any {
+	old := *h
+	last := len(old) - 1
+	value := old[last]
+	*h = old[:last]
+	return value
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	var n, k int
+	fmt.Fscan(reader, &n, &k)
+	nums := make([]int64, n)
+	for i := range nums {
+		fmt.Fscan(reader, &nums[i])
+	}
+
+	h := &minHeap{}
+	heap.Init(h)
+	for _, v := range nums {
+		heap.Push(h, v)
+		if h.Len() > k {
+			heap.Pop(h)
+		}
+	}
+
+	fmt.Println((*h)[0])
+	fmt.Printf("HEAP %d\n", h.Len())
+}
+'''
+hints = [
+  "Push and Pop are the raw slice operations — append and chop the tail. heap.Push and heap.Pop are the ones that sift.",
+  "Never call h.Push directly; call heap.Push(h, v), or the heap invariant is not restored.",
+  "After the loop the smallest of the k largest is at index 0, and that is the k-th largest overall.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "6 2\n3 2 1 5 6 4\n",         expect = "5\nHEAP 2\n", visible = true },
+  { name = "dupes",   stdin = "9 4\n3 2 3 1 2 4 5 5 6\n",   expect = "4\nHEAP 4\n", visible = false },
+  { name = "single",  stdin = "1 1\n7\n",                   expect = "7\nHEAP 1\n", visible = false },
+  { name = "all-k",   stdin = "5 5\n9 9 9 9 9\n",           expect = "9\nHEAP 5\n", visible = false },
+]

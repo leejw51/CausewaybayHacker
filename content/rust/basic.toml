@@ -1,0 +1,1111 @@
+# RUST LAND — BASIC. The morning walk, Jardine's Bazaar to the Percival Street
+# kiosk. Grammar only: bindings, ownership, slices, strings, structs, enums,
+# collections, errors, iterators, traits. Nothing here is timed.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Every solution and starter in this file is run by
+# tools/verify_pack.py and by CI (SPEC §9.4, §9.5).
+
+pack = "rust.basic"
+land = "rust"
+category = "basic"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "rust.basic.01.first-light"
+node        = 1
+title       = "FIRST LIGHT"
+difficulty  = 1
+story       = "06:40 above Jardine's Bazaar. The cursor sits there and the grey text is gone. Whatever you can still type from memory is yours."
+concepts    = ["io", "strings"]
+requires    = []
+map         = { x = 0.08, y = 0.86, kind = "quest" }
+brief       = '''
+Print exactly:
+
+```
+hello, causewaybay
+```
+
+Lowercase, one comma, one space, one line. Nothing else.
+'''
+starter     = '''
+fn main() {
+    // your code here
+}
+'''
+solution    = '''
+fn main() {
+    println!("hello, causewaybay");
+}
+'''
+hints = [
+  "println! is a macro, so it keeps the exclamation mark.",
+  "The string is exact: lowercase, one comma, one space after it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "rust.basic.02.bindings"
+node        = 2
+title       = "THE FARE BOARD"
+difficulty  = 1
+story       = "The tram-stop board on Percival Street shows one number and then two blanks where the day rate and the monthly used to be."
+concepts    = ["io", "bindings", "types"]
+requires    = ["rust.basic.01.first-light"]
+map         = { x = 0.20, y = 0.80, kind = "quest" }
+brief       = '''
+Read one integer `n` from standard input.
+
+Print three lines: `n`, then `n` doubled, then `n` multiplied by itself.
+
+`n` fits in an `i64` and may be negative.
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let _n: i64 = input.trim().parse().unwrap();
+
+    // print n, then n * 2, then n * n — one per line
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let n: i64 = input.trim().parse().unwrap();
+
+    println!("{}", n);
+    println!("{}", n * 2);
+    println!("{}", n * n);
+}
+'''
+hints = [
+  "The reading is done for you. Drop the underscore off _n and use it.",
+  "println! takes a format string: println!(\"{}\", n).",
+  "A negative n squared is positive. The test knows.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "twelve",   stdin = "12\n", expect = "12\n24\n144\n", visible = true },
+  { name = "negative", stdin = "-3\n", expect = "-3\n-6\n9\n",   visible = false },
+  { name = "zero",     stdin = "0\n",  expect = "0\n0\n0\n",     visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "rust.basic.03.shadowing"
+node        = 3
+title       = "THREE NAMES, ONE NAME"
+difficulty  = 2
+story       = "The Sogo crossing kiosk holds the price as text, as a number and as money, and it calls all three of them price."
+concepts    = ["bindings", "types", "strings"]
+requires    = ["rust.basic.02.bindings"]
+map         = { x = 0.31, y = 0.88, kind = "quest" }
+brief       = '''
+Read one line: an amount in cents, as digits.
+
+Print three lines:
+
+1. how many characters the trimmed text has
+2. the amount as a number
+3. the amount as dollars with exactly two decimals
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+The amount is non-negative and fits in an `i64`. Do it with one name,
+shadowed twice — `&str`, then `i64`, then `String`.
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let cents = input.trim();
+
+    // 1. the character count of `cents`
+    // 2. shadow `cents` with its i64 value, and print it
+    // 3. shadow `cents` again with the formatted dollars, and print it
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+
+    let cents = input.trim();
+    println!("{}", cents.chars().count());
+
+    let cents: i64 = cents.parse().unwrap();
+    println!("{}", cents);
+
+    let cents = format!("{}.{:02}", cents / 100, cents % 100);
+    println!("{}", cents);
+}
+'''
+hints = [
+  "A second `let cents = ...` does not assign; it makes a new binding that hides the old one, and it may have a different type.",
+  "That is why shadowing is not `mut`: `mut` keeps the type, shadowing does not.",
+  "Two decimals with a leading zero is the {:02} width flag.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "dollars",  stdin = "1234\n", expect = "4\n1234\n12.34\n", visible = true },
+  { name = "five-cents", stdin = "5\n",  expect = "1\n5\n0.05\n",     visible = false },
+  { name = "round",    stdin = "100\n",  expect = "3\n100\n1.00\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "rust.basic.04.the-move"
+node        = 4
+title       = "ONE RECEIPT"
+difficulty  = 2
+story       = "The Lucky Mac till prints the receipt and then cannot say thank you, because it handed the name over with the paper."
+concepts    = ["ownership", "borrowing", "strings"]
+requires    = ["rust.basic.03.shadowing"]
+map         = { x = 0.44, y = 0.79, kind = "quest" }
+brief       = '''
+Read one line: a customer name. Print two lines:
+
+```
+input:  MEI
+output: RECEIPT: MEI
+        THANK YOU, MEI
+```
+
+The starter does not compile. `receipt` takes the name **by value**, so after
+the call `main` no longer owns it and cannot print it again.
+
+Fix it by letting `receipt` *look at* the name instead of taking it. Do not
+clone.
+'''
+starter     = '''
+use std::io::Read;
+
+fn receipt(name: String) {
+    println!("RECEIPT: {}", name);
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let name = input.trim().to_string();
+
+    receipt(name);
+    println!("THANK YOU, {}", name);
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn receipt(name: &str) {
+    println!("RECEIPT: {}", name);
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let name = input.trim().to_string();
+
+    receipt(&name);
+    println!("THANK YOU, {}", name);
+}
+'''
+hints = [
+  "The error is E0382: borrow of moved value. The move happened at the call, not at the print.",
+  "A parameter of type &str borrows; a parameter of type String takes.",
+  "Change the signature first, then the call site needs an &.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mei",   stdin = "MEI\n",     expect = "RECEIPT: MEI\nTHANK YOU, MEI\n", visible = true },
+  { name = "bo",    stdin = "Chef Bo\n", expect = "RECEIPT: Chef Bo\nTHANK YOU, Chef Bo\n", visible = false },
+  { name = "alex",  stdin = "Alex\n",    expect = "RECEIPT: Alex\nTHANK YOU, Alex\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "rust.basic.05.slices"
+node        = 5
+title       = "THE MIDDLE OF THE QUEUE"
+difficulty  = 2
+story       = "Forty people outside Hysan Place. The counter can see the front and the back of the line and nothing in between."
+concepts    = ["slices", "iteration", "control-flow"]
+requires    = ["rust.basic.04.the-move"]
+map         = { x = 0.55, y = 0.68, kind = "quest" }
+brief       = '''
+Standard input is a count `n` on the first line and then `n` integers on the
+second, separated by spaces.
+
+Print three lines: the first value, the last value, and the sum of everything
+strictly between them. With fewer than three values that sum is `0`.
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    // print nums[0], the last element, then the sum of the middle slice
+    let _ = nums;
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .skip(1)
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    println!("{}", nums[0]);
+    println!("{}", nums[nums.len() - 1]);
+
+    let middle: i64 = if nums.len() > 2 {
+        nums[1..nums.len() - 1].iter().sum()
+    } else {
+        0
+    };
+    println!("{}", middle);
+}
+'''
+hints = [
+  "nums[1..nums.len() - 1] is a slice of the Vec, not a copy of it.",
+  "With one or two values that range would be empty or backwards — guard it with an if before you index.",
+  "An iterator of &i64 sums straight into an i64.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",   stdin = "5\n4 8 15 16 23\n", expect = "4\n23\n39\n", visible = true },
+  { name = "single", stdin = "1\n7\n",            expect = "7\n7\n0\n",   visible = false },
+  { name = "pair",   stdin = "2\n3 9\n",          expect = "3\n9\n0\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "rust.basic.06.strings"
+node        = 6
+title       = "BYTES ARE NOT LETTERS"
+difficulty  = 2
+story       = "The Times Square directory truncates 銅鑼灣 at three characters and gets one and a half."
+concepts    = ["strings", "iteration", "types"]
+requires    = ["rust.basic.05.slices"]
+map         = { x = 0.45, y = 0.57, kind = "quest" }
+brief       = '''
+Read one line. Print three lines:
+
+1. its length in **bytes**
+2. its length in **characters**
+3. the line with its characters reversed
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+The line may contain characters outside ASCII, and then the first two numbers
+are not the same. That is the point.
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let line = input.trim_end_matches('\n');
+
+    // 1. bytes
+    // 2. characters
+    // 3. the characters, reversed, as one String
+    let _ = line;
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let line = input.trim_end_matches('\n');
+
+    println!("{}", line.len());
+    println!("{}", line.chars().count());
+
+    let reversed: String = line.chars().rev().collect();
+    println!("{}", reversed);
+}
+'''
+hints = [
+  "str::len is the byte length. It always was.",
+  "chars() walks scalar values, so chars().count() is the other number.",
+  "chars().rev().collect::<String>() reverses safely; reversing the bytes would not.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "ascii",   stdin = "causeway\n",  expect = "8\n8\nyawesuac\n",   visible = true },
+  { name = "cantonese", stdin = "銅鑼灣\n", expect = "9\n3\n灣鑼銅\n",     visible = false },
+  { name = "spaced",  stdin = "Lucky Mac\n", expect = "9\n9\ncaM ykcuL\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "rust.basic.07.structs"
+node        = 7
+title       = "THE TILL"
+difficulty  = 3
+story       = "Lucky Mac's front counter keeps every line of the order in one place, or it did before the suggestion replaced the struct with a comment."
+concepts    = ["structs", "functions", "mutability"]
+requires    = ["rust.basic.06.strings"]
+map         = { x = 0.32, y = 0.50, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<ITEM> <CENTS>`.
+
+Build a `Till` that collects the items, then print each item back as
+`<ITEM> <CENTS>`, one per line, in the order it arrived, and finally
+`TOTAL <sum>`.
+
+```
+input:  2
+        HASHBROWN 600
+        SET 2800
+output: HASHBROWN 600
+        SET 2800
+        TOTAL 3400
+```
+
+`n` may be `0`, and then the only line is `TOTAL 0`.
+'''
+starter     = '''
+use std::io::Read;
+
+struct Till {
+    // what does a till have to remember?
+}
+
+impl Till {
+    fn new() -> Till {
+        todo!()
+    }
+
+    fn add(&mut self, name: &str, cents: i64) {
+        let _ = (name, cents);
+        todo!()
+    }
+
+    fn total(&self) -> i64 {
+        todo!()
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut till = Till::new();
+    for _ in 0..n {
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        let name = parts.next().unwrap();
+        let cents: i64 = parts.next().unwrap().parse().unwrap();
+        till.add(name, cents);
+    }
+
+    // print each item, then TOTAL
+    println!("TOTAL {}", till.total());
+}
+'''
+solution    = '''
+use std::io::Read;
+
+struct Till {
+    items: Vec<(String, i64)>,
+}
+
+impl Till {
+    fn new() -> Till {
+        Till { items: Vec::new() }
+    }
+
+    fn add(&mut self, name: &str, cents: i64) {
+        self.items.push((name.to_string(), cents));
+    }
+
+    fn total(&self) -> i64 {
+        self.items.iter().map(|(_, cents)| cents).sum()
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut till = Till::new();
+    for _ in 0..n {
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        let name = parts.next().unwrap();
+        let cents: i64 = parts.next().unwrap().parse().unwrap();
+        till.add(name, cents);
+    }
+
+    for (name, cents) in &till.items {
+        println!("{} {}", name, cents);
+    }
+    println!("TOTAL {}", till.total());
+}
+'''
+hints = [
+  "A Vec of (String, i64) is enough. The struct is there so the till owns its own lines.",
+  "add changes the till, so it takes &mut self; total only reads, so it takes &self.",
+  "Iterating &till.items borrows, which is what you want — printing should not empty the till.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-items", stdin = "2\nHASHBROWN 600\nSET 2800\n", expect = "HASHBROWN 600\nSET 2800\nTOTAL 3400\n", visible = true },
+  { name = "empty",     stdin = "0\n", expect = "TOTAL 0\n", visible = false },
+  { name = "repeats",   stdin = "3\nTEA 1200\nTEA 1200\nPIE 900\n", expect = "TEA 1200\nTEA 1200\nPIE 900\nTOTAL 3300\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "rust.basic.08.enums"
+node        = 8
+title       = "WHO IS RIDING"
+difficulty  = 3
+story       = "The Causeway Bay gate charges every card the adult fare, including the ones that are not adults and the one that is not a card."
+concepts    = ["enums", "pattern-matching", "functions"]
+requires    = ["rust.basic.07.structs"]
+map         = { x = 0.40, y = 0.38, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<TYPE> <KM>`.
+
+The base fare is `500 + 100 * KM` cents. For each line print one of:
+
+* `ADULT` — the base fare
+* `STUDENT` — half the base fare, integer division
+* `SENIOR` — always `200`
+* anything else — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+Model the rider as an `enum` with four variants, one of which carries the
+unrecognised tag, and decide the fare with a single `match`.
+'''
+starter     = '''
+use std::io::Read;
+
+enum Rider {
+    Adult,
+    Student,
+    Senior,
+    // one more variant, and it has to carry the tag it did not recognise
+}
+
+fn classify(tag: &str) -> Rider {
+    let _ = tag;
+    todo!()
+}
+
+fn fare(rider: &Rider, km: i64) -> String {
+    let _base = 500 + 100 * km;
+    let _ = rider;
+    todo!()
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    for _ in 0..n {
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        let tag = parts.next().unwrap();
+        let km: i64 = parts.next().unwrap().parse().unwrap();
+        println!("{}", fare(&classify(tag), km));
+    }
+}
+'''
+solution    = '''
+use std::io::Read;
+
+enum Rider {
+    Adult,
+    Student,
+    Senior,
+    Other(String),
+}
+
+fn classify(tag: &str) -> Rider {
+    match tag {
+        "ADULT" => Rider::Adult,
+        "STUDENT" => Rider::Student,
+        "SENIOR" => Rider::Senior,
+        other => Rider::Other(other.to_string()),
+    }
+}
+
+fn fare(rider: &Rider, km: i64) -> String {
+    let base = 500 + 100 * km;
+    match rider {
+        Rider::Adult => base.to_string(),
+        Rider::Student => (base / 2).to_string(),
+        Rider::Senior => "200".to_string(),
+        Rider::Other(tag) => format!("UNKNOWN {}", tag),
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    for _ in 0..n {
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        let tag = parts.next().unwrap();
+        let km: i64 = parts.next().unwrap().parse().unwrap();
+        println!("{}", fare(&classify(tag), km));
+    }
+}
+'''
+hints = [
+  "A variant can carry data: Other(String) holds the tag that did not match.",
+  "The last arm of a match on &str binds everything left over: `other => ...`.",
+  "Matching on &Rider gives you &String in the Other arm — format! is happy with that.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-kinds", stdin = "3\nADULT 4\nSTUDENT 4\nSENIOR 4\n", expect = "900\n450\n200\n", visible = true },
+  { name = "tourist",     stdin = "2\nSTUDENT 0\nTOURIST 9\n", expect = "250\nUNKNOWN TOURIST\n", visible = false },
+  { name = "long-ride",   stdin = "1\nADULT 12\n", expect = "1700\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "rust.basic.09.maps"
+node        = 9
+title       = "WHAT THE BAZAAR SHOUTS"
+difficulty  = 3
+story       = "Jardine's Bazaar at nine: every stall calling something, and the sign board wants the ranking."
+concepts    = ["collections", "imports", "iteration", "sorting"]
+requires    = ["rust.basic.08.enums"]
+map         = { x = 0.55, y = 0.33, kind = "quest" }
+brief       = '''
+Read the whole of standard input and split it on whitespace.
+
+Print each distinct word once, as `<word> <count>`, ordered by count
+descending, and ties broken by the word ascending.
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+'''
+starter     = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+
+    let counts: HashMap<&str, i64> = HashMap::new();
+
+    // count every word, then print them ranked
+    let _ = counts;
+}
+'''
+solution    = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+
+    let mut counts: HashMap<&str, i64> = HashMap::new();
+    for word in input.split_whitespace() {
+        *counts.entry(word).or_insert(0) += 1;
+    }
+
+    let mut rows: Vec<(&str, i64)> = counts.into_iter().collect();
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+
+    for (word, count) in rows {
+        println!("{} {}", word, count);
+    }
+}
+'''
+hints = [
+  "*counts.entry(word).or_insert(0) += 1 is the whole counting loop.",
+  "A HashMap has no order. Collect it into a Vec before you print.",
+  "Ordering::then chains the tie-break: count descending, then word ascending.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tram",   stdin = "tram tram bus\n", expect = "tram 2\nbus 1\n", visible = true },
+  { name = "ties",   stdin = "a b a c b a\n",   expect = "a 3\nb 2\nc 1\n", visible = false },
+  { name = "single", stdin = "one\n",           expect = "one 1\n",         visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "rust.basic.10.errors"
+node        = 10
+title       = "THE LINE THAT IS NOT A NUMBER"
+difficulty  = 3
+story       = "The Victoria Park meter reader hands in a column of numbers with somebody's lunch order in the middle of it."
+concepts    = ["error-handling", "pattern-matching", "types"]
+requires    = ["rust.basic.09.maps"]
+map         = { x = 0.70, y = 0.40, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines. Each line is supposed to be an
+integer.
+
+For each line print either the value doubled, or `BAD <line>` if it does not
+parse. Finally print `SUM <total>`, where the total is the sum of the values
+you printed.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+Write a `fn double(text: &str) -> Result<i64, ParseIntError>` that uses `?`,
+and handle the two outcomes with a `match` in `main`.
+'''
+starter     = '''
+use std::io::Read;
+use std::num::ParseIntError;
+
+fn double(text: &str) -> Result<i64, ParseIntError> {
+    let _ = text;
+    todo!()
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let sum = 0i64;
+    for _ in 0..n {
+        let line = lines.next().unwrap_or("");
+        let _ = (line, &double);
+        // print the doubled value or BAD <line>, and keep a running total
+    }
+    println!("SUM {}", sum);
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::num::ParseIntError;
+
+fn double(text: &str) -> Result<i64, ParseIntError> {
+    let n: i64 = text.trim().parse()?;
+    Ok(n * 2)
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut sum = 0i64;
+    for _ in 0..n {
+        let line = lines.next().unwrap_or("");
+        match double(line) {
+            Ok(value) => {
+                println!("{}", value);
+                sum += value;
+            }
+            Err(_) => println!("BAD {}", line.trim()),
+        }
+    }
+    println!("SUM {}", sum);
+}
+'''
+hints = [
+  "`?` on a Result returns the error out of the function for you, so double's body is two lines.",
+  "match double(line) has exactly two arms, Ok(value) and Err(_).",
+  "SUM is the sum of what you printed — the doubled values, not the originals.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",   stdin = "3\n21\nxx\n-4\n", expect = "42\nBAD xx\n-8\nSUM 34\n", visible = true },
+  { name = "zero",    stdin = "1\n0\n",          expect = "0\nSUM 0\n",               visible = false },
+  { name = "all-bad", stdin = "2\nhello\nworld\n", expect = "BAD hello\nBAD world\nSUM 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "rust.basic.11.iterators"
+node        = 11
+title       = "ONE PASS DOWN YEE WO STREET"
+difficulty  = 4
+story       = "Alex says you can do it with three for loops. You have met the Yee Wo Street traffic; you get one pass."
+concepts    = ["iteration", "closures", "collections"]
+requires    = ["rust.basic.10.errors"]
+map         = { x = 0.83, y = 0.29, kind = "quest" }
+brief       = '''
+Standard input is one line of integers separated by spaces.
+
+Print three lines:
+
+1. the sum of the even values (`0` if there are none)
+2. every value greater than `10`, doubled, in order, joined by single spaces —
+   or `-` if there are none
+3. how many distinct values there are
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+Use iterator adapters — `filter`, `map`, `sum`, `collect` — not index loops.
+'''
+starter     = '''
+use std::collections::HashSet;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    // 1. sum of the even ones
+    // 2. the ones over 10, doubled, joined by spaces, or "-"
+    // 3. how many distinct values
+    let _: Option<HashSet<&i64>> = None;
+    let _ = nums;
+}
+'''
+solution    = '''
+use std::collections::HashSet;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+
+    let even_sum: i64 = nums.iter().filter(|n| *n % 2 == 0).sum();
+    println!("{}", even_sum);
+
+    let big: Vec<String> = nums
+        .iter()
+        .filter(|n| **n > 10)
+        .map(|n| (n * 2).to_string())
+        .collect();
+    if big.is_empty() {
+        println!("-");
+    } else {
+        println!("{}", big.join(" "));
+    }
+
+    let distinct: HashSet<&i64> = nums.iter().collect();
+    println!("{}", distinct.len());
+}
+'''
+hints = [
+  "nums.iter() yields &i64, so a filter closure gets &&i64 — dereference until the comparison type-checks.",
+  "join needs strings, so map each number with to_string() before you collect into a Vec<String>.",
+  "A HashSet built straight from the iterator gives you the distinct count with len().",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",     stdin = "1 2 3 4 12 12 30\n", expect = "60\n24 24 60\n6\n", visible = true },
+  { name = "no-big",    stdin = "1 3 5\n",            expect = "0\n-\n3\n",         visible = false },
+  { name = "negatives", stdin = "-4 -2 0 11\n",       expect = "-6\n22\n4\n",       visible = false },
+]
+
+# ---------------------------------------------------------------- 12  BOSS
+[[quest]]
+id          = "rust.basic.12.traits"
+node        = 12
+title       = "THE AUTOCOMPLETE"
+difficulty  = 4
+story       = "The Percival Street phone kiosk finishes every line before you have one. It has no completion for a trait you named yourself."
+concepts    = ["traits", "structs", "smart-pointers", "pattern-matching"]
+requires    = ["rust.basic.11.iterators", "rust.basic.10.errors"]
+map         = { x = 0.91, y = 0.13, kind = "boss" }
+brief       = '''
+Standard input is a count `n`, then `n` lines, each either
+
+* `SHOP <NAME> <FLOOR>` — renders as `<NAME> / F<FLOOR>`
+* `STOP <ROUTE>` — renders as `TRAM <ROUTE>`
+
+Print every sign rendered, in order, and then `SIGNS <n>`.
+
+```
+input:  3
+        SHOP HYSAN 4
+        STOP 2
+        SHOP SOGO 1
+output: HYSAN / F4
+        TRAM 2
+        SOGO / F1
+        SIGNS 3
+```
+
+Declare a trait `Sign` with `fn render(&self) -> String`, implement it for two
+different structs, and keep them in one `Vec<Box<dyn Sign>>`. One list, two
+types, no `match` at print time.
+'''
+starter     = '''
+use std::io::Read;
+
+trait Sign {
+    fn render(&self) -> String;
+}
+
+struct Shop {
+    name: String,
+    floor: i64,
+}
+
+struct Stop {
+    route: String,
+}
+
+// impl Sign for Shop { ... }
+// impl Sign for Stop { ... }
+
+fn show(signs: &[Box<dyn Sign>]) {
+    let _ = signs;
+    todo!()
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let signs: Vec<Box<dyn Sign>> = Vec::new();
+    let _ = (&mut lines, n, &Shop { name: String::new(), floor: 0 }, &Stop { route: String::new() });
+    show(&signs);
+}
+'''
+solution    = '''
+use std::io::Read;
+
+trait Sign {
+    fn render(&self) -> String;
+}
+
+struct Shop {
+    name: String,
+    floor: i64,
+}
+
+struct Stop {
+    route: String,
+}
+
+impl Sign for Shop {
+    fn render(&self) -> String {
+        format!("{} / F{}", self.name, self.floor)
+    }
+}
+
+impl Sign for Stop {
+    fn render(&self) -> String {
+        format!("TRAM {}", self.route)
+    }
+}
+
+fn show(signs: &[Box<dyn Sign>]) {
+    for sign in signs {
+        println!("{}", sign.render());
+    }
+    println!("SIGNS {}", signs.len());
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut signs: Vec<Box<dyn Sign>> = Vec::new();
+    for _ in 0..n {
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        match parts.next().unwrap() {
+            "SHOP" => {
+                let name = parts.next().unwrap().to_string();
+                let floor: i64 = parts.next().unwrap().parse().unwrap();
+                signs.push(Box::new(Shop { name, floor }));
+            }
+            _ => {
+                let route = parts.next().unwrap().to_string();
+                signs.push(Box::new(Stop { route }));
+            }
+        }
+    }
+
+    show(&signs);
+}
+'''
+hints = [
+  "impl Sign for Shop goes outside the struct; the trait says what, the impl says how.",
+  "Box<dyn Sign> is how two different types live in one Vec — the size is the box's, not theirs.",
+  "show does not need to know which is which. That is the whole reason the trait is there.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-signs", stdin = "3\nSHOP HYSAN 4\nSTOP 2\nSHOP SOGO 1\n", expect = "HYSAN / F4\nTRAM 2\nSOGO / F1\nSIGNS 3\n", visible = true },
+  { name = "one-stop",    stdin = "1\nSTOP 116\n", expect = "TRAM 116\nSIGNS 1\n", visible = false },
+  { name = "two-shops",   stdin = "2\nSHOP LUCKYMAC 0\nSHOP TIMES 9\n", expect = "LUCKYMAC / F0\nTIMES / F9\nSIGNS 2\n", visible = false },
+]

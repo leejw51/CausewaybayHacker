@@ -1,0 +1,106 @@
+/* The page is furniture around the canvas, nothing more: no scrolling, no
+   selection, no browser chrome leaking into a 16-bit screen. */
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1030;
+  color: #fcecc8;
+  font-family: "VT323", ui-monospace, monospace;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+#fx,
+#game,
+#overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+#fx {
+  z-index: 0;
+}
+#game {
+  z-index: 1;
+  /* Pixel art must not be smoothed on the way to the screen. */
+  image-rendering: pixelated;
+  touch-action: none;
+}
+#overlay {
+  z-index: 2;
+  /* The overlay is a coordinate space, not a surface: only its children take
+     pointer events, so a click that misses the editor still reaches the game. */
+  pointer-events: none;
+}
+#overlay > * {
+  position: absolute;
+  pointer-events: auto;
+}
+
+@font-face {
+  font-family: "PressStart2P";
+  src: url("/fonts/PressStart2P-Regular.ttf") format("truetype");
+  font-display: block;
+}
+@font-face {
+  font-family: "VT323";
+  src: url("/fonts/VT323-Regular.ttf") format("truetype");
+  font-display: block;
+}
+
+/* --- the retro chrome the DOM bits borrow from the canvas panels --- */
+.cwb-field {
+  background: rgba(10, 8, 26, 0.96);
+  color: #fcecc8;
+  border: 0;
+  outline: 0;
+  resize: none;
+  padding: 6px 8px;
+  font-family: "VT323", ui-monospace, monospace;
+  caret-color: #50d8f8;
+  letter-spacing: 0.02em;
+}
+.cwb-field::placeholder {
+  color: #786858;
+}
+.cwb-editor {
+  overflow: hidden;
+  background: rgba(10, 8, 26, 0.96);
+}
+.cwb-editor .cm-editor {
+  height: 100%;
+  background: transparent;
+  color: #fcecc8;
+}
+.cwb-editor .cm-scroller {
+  font-family: "VT323", ui-monospace, monospace;
+  line-height: 1.15;
+}
+.cwb-editor .cm-gutters {
+  background: rgba(28, 36, 92, 0.9);
+  color: #786858;
+  border-right: 2px solid #281810;
+}
+.cwb-editor .cm-activeLine {
+  background: rgba(80, 216, 248, 0.07);
+}
+.cwb-editor .cm-activeLineGutter {
+  background: rgba(80, 216, 248, 0.12);
+}
+.cwb-editor .cm-cursor {
+  border-left-color: #50d8f8;
+  border-left-width: 2px;
+}
+.cwb-editor .cm-selectionBackground,
+.cwb-editor .cm-content ::selection {
+  background: rgba(248, 120, 168, 0.35) !important;
+}
+.cwb-hidden {
+  display: none !important;
+}

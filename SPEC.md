@@ -399,6 +399,11 @@ spinner. The final verdict arrives as the response to the original request.
 
 ## 6. The wire
 
+> **[`PROTOCOL.md`](PROTOCOL.md) is the authority for the wire.** This section
+> is the summary; where the two differ, `PROTOCOL.md` is right. Every client —
+> the browser, the LÖVE desktop client, the smoke harness — implements it, and
+> its §8 conformance checklist is what "the client works" means.
+
 WebSocket at `ws://127.0.0.1:5390/ws`. Text frames. One JSON object per frame.
 The HTTP server also serves the built frontend from `/` and the art from
 `/art/…`, so there is one port and no CORS.
@@ -696,6 +701,9 @@ backend/            Rust workspace
   runner/           compile + run, rust and go, limits and streaming
   server/           axum, the websocket, the message catalogue, static files
   cli/              `cwbhacker`: serve, import, prune, doctor
+love2d/             LÖVE 11.5 desktop client, same protocol
+  src/              scenes, layout, the websocket and JSON in Lua
+  ffi/              a small Rust cdylib: bip39/bip32/secp256k1 for LuaJIT
 frontend/           vite + ts + three.js
   src/engine/       layout, text, ui, input, assets, particles  (ported)
   src/net/          the websocket client, typed against §6
@@ -716,6 +724,7 @@ Ownership, so two people do not edit one file:
 | --- | --- |
 | `backend/**` | BE |
 | `frontend/**` | FE |
+| `love2d/**` | L2D |
 | `content/**`, `docs/**`, `SPEC.md`, `README.md` | PM |
 | `tests/**`, `e2e/**`, `backend/*/tests/**` | QA |
 

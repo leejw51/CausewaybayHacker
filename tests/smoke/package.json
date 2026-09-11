@@ -1,0 +1,13 @@
+{
+  "name": "causewaybay-hacker-smoke",
+  "private": true,
+  "type": "module",
+  "description": "The SPEC §6 contract checker, and the mock server that proves it works.",
+  "scripts": {
+    "check": "node contract.mjs",
+    "selftest": "node selftest.mjs"
+  },
+  "devDependencies": {
+    "ws": "^8.18.0"
+  }
+}

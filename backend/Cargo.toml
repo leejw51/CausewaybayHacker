@@ -1,0 +1,57 @@
+# Causewaybay Hacker — the Rust workspace (SPEC §11).
+#
+#   core/    cwbhacker-core    domain: home layout, sqlite store, content packs,
+#                              auth, progress, mistakes. No terminal, no axum,
+#                              no process exit — every operation is a function
+#                              returning data, the way CausewaybayWallet's core
+#                              is built.
+#   runner/  cwbhacker-runner  compiling and running a submission under limits,
+#                              streaming its output back through a callback.
+#   server/  cwbhacker-server  axum: the websocket, the §6 message catalogue,
+#                              the static frontend.
+#   cli/     cwbhacker         the binary: serve, import, doctor, prune.
+
+[workspace]
+resolver = "2"
+members = ["core", "runner", "server", "cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+
+[workspace.dependencies]
+cwbhacker-core = { path = "core", version = "0.1.0" }
+cwbhacker-runner = { path = "runner", version = "0.1.0" }
+cwbhacker-server = { path = "server", version = "0.1.0" }
+
+anyhow = "1"
+axum = { version = "0.8", features = ["ws", "macros"] }
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+clap = { version = "4", features = ["derive", "env"] }
+futures-util = { version = "0.3", default-features = false, features = ["std", "sink"] }
+hex = "0.4"
+k256 = { version = "0.13", features = ["ecdsa", "arithmetic"] }
+libc = "0.2"
+rand = "0.8"
+# The bundled amalgamation with FTS5 compiled in: the build must not depend on
+# whatever SQLite the host happens to ship (SPEC §2).
+rusqlite = { version = "0.37", features = ["bundled", "backup"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+# Ethereum's keccak256 is the original Keccak padding, not FIPS SHA3.
+sha3 = "0.10"
+tempfile = "3"
+thiserror = "2"
+tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "process", "io-util", "net"] }
+toml = "0.9"
+tower-http = { version = "0.6", features = ["fs", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+[profile.release]
+strip = true

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="color-scheme" content="dark" />
+    <title>Causewaybay Hacker</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- Three stacked layers, all the same size and all driven by one Layout:
+         the WebGL parallax behind, the pixel-art 2D canvas over it, and the DOM
+         overlay on top for the things a canvas is bad at — the editor, and any
+         field somebody has to paste twelve words into. -->
+    <canvas id="fx"></canvas>
+    <canvas id="game"></canvas>
+    <div id="overlay"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

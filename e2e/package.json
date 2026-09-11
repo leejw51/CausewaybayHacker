@@ -1,0 +1,18 @@
+{
+  "name": "causewaybay-hacker-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The milestone-1 journey, in a real browser, in both orientations.",
+  "scripts": {
+    "test": "playwright test",
+    "test:landscape": "playwright test --project=landscape",
+    "test:portrait": "playwright test --project=portrait",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@types/node": "^22.20.2",
+    "typescript": "^5.9.2"
+  }
+}

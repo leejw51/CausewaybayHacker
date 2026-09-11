@@ -1,0 +1,122 @@
+# A throwaway pack for the backend's own tests. NOT the shipped content —
+# `content/rust/basic.toml` belongs to the PM and this file must never be a
+# reason to touch it.
+pack = "rust.basic"
+land = "rust"
+category = "basic"
+version = 1
+
+[[quest]]
+id          = "rust.basic.01.hello"
+node        = 1
+title       = "FIRST LIGHT"
+difficulty  = 1
+story       = "The terminal blinks. You used to know this one."
+concepts    = ["io", "macros"]
+requires    = []
+map         = { x = 0.12, y = 0.74, kind = "quest" }
+brief       = """
+Print `hello, causewaybay` and nothing else.
+"""
+starter     = """
+fn main() {
+    // your code here
+}
+"""
+solution    = """
+fn main() {
+    println!("hello, causewaybay");
+}
+"""
+hints = [
+  "`println!` is a macro, so it takes a `!`.",
+  "The string is exact: lowercase, one comma, one space.",
+]
+
+[quest.tests]
+harness      = "stdio"
+timeout_ms   = 5000
+match        = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]
+
+[[quest]]
+id          = "rust.basic.02.sum"
+node        = 2
+title       = "COUNTING AGAIN"
+difficulty  = 2
+story       = "Numbers on a wall. Add them up."
+concepts    = ["io", "iterators"]
+requires    = ["rust.basic.01.hello"]
+map         = { x = 0.31, y = 0.62, kind = "quest" }
+brief       = """
+Read `n`, then `n` integers on the next line. Print their sum.
+"""
+starter     = """
+fn main() {
+    // your code here
+}
+"""
+solution    = """
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut parts = input.split_whitespace();
+    let n: usize = parts.next().unwrap().parse().unwrap();
+    let total: i64 = parts.take(n).map(|t| t.parse::<i64>().unwrap()).sum();
+    println!("{total}");
+}
+"""
+hints = [
+  "Read the whole of stdin, then split on whitespace.",
+]
+
+[quest.tests]
+harness      = "stdio"
+timeout_ms   = 5000
+match        = "trim"
+cases = [
+  { name = "sample", stdin = "3\n1 2 3\n", expect = "6\n", visible = true },
+  { name = "bigger", stdin = "5\n10 20 30 40 50\n", expect = "150\n", visible = false },
+]
+
+[[quest]]
+id          = "rust.basic.03.shadowing"
+node        = 3
+title       = "THE SAME NAME TWICE"
+difficulty  = 2
+story       = "It is the same name, and it is not the same value."
+concepts    = ["shadowing", "bindings"]
+requires    = ["rust.basic.02.sum"]
+map         = { x = 0.48, y = 0.55, kind = "quest" }
+brief       = """
+Print `12` and nothing else.
+"""
+starter     = """
+fn main() {
+    let x = 5;
+    // your code here
+    println!("{x}");
+}
+"""
+solution    = """
+fn main() {
+    let x = 5;
+    let x = x + 7;
+    println!("{x}");
+}
+"""
+hints = [
+  "`let` a second time with the same name is shadowing, not assignment.",
+]
+
+[quest.tests]
+harness      = "stdio"
+timeout_ms   = 5000
+match        = "trim"
+cases = [
+  { name = "twelve", stdin = "", expect = "12\n", visible = true },
+]

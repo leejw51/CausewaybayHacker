@@ -1,0 +1,5 @@
+fatal error: all goroutines are asleep - deadlock!
+
+goroutine 1 [chan receive]:
+main.main()
+	/private/var/folders/h7/9b4cpxgd14ggbxbw55gsf44w0000gp/T/cwbhacker-mistake-tmdb6gbs/main.go:8 +0x34
