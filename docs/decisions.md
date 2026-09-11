@@ -2482,3 +2482,22 @@ memory: came back to node 5, where it was left
   `Attempt` and were labelled as proving the rendering and not the wire;
   `R5-run-failed.png` and `R6-run-passes.png` are the same screen from real
   server replies.
+
+## 2026-09-11 — The playground, and why it is the opposite of RUN
+
+A scratchpad: any Rust or Go, run it, see what it prints. No quest, no tests,
+no verdict. Snippets are saved server-side per user so the same scratchpad
+opens in the browser and in LÖVE.
+
+**A playground run is not recorded and does not feed the curriculum** — which
+reads as inconsistent with §4.9b, where a quest RUN *does*. The difference is
+the join. A quest RUN is an attempt at a known problem, so its errors say
+something about what the player cannot do yet, and §7.3's `weakness` drill
+reaches them through that quest's `concepts`. A playground has no quest and
+therefore no concepts: a `mistakes` row from it could never be joined to
+anything, and would be dead weight in the table the entire curriculum is
+derived from.
+
+The second reason is about what a scratchpad is *for*. It is where somebody
+deliberately writes something broken to find out what the compiler says. That
+is the last thing that should be counted against them.

@@ -267,6 +267,39 @@ function Client:schedule_retry()
   self.log("info", ("reconnecting in %.1fs (attempt %d)"):format(base * jitter, self.attempt))
 end
 
+--- Point this client at a different server.
+---
+--- Drops whatever connection exists and comes back on the new address. The
+--- teardown answers every in-flight request locally (a scene waiting on a
+--- callback that never comes is a scene that spins forever), so nothing is
+--- left hanging across the move.
+---
+--- Returns true, or nil and a message when the URL is not one this client can
+--- speak — in which case the old one is untouched and still connected.
+function Client:set_url(url)
+  local parsed, why = M.parse_url(url)
+  if not parsed then return nil, why end
+  if url == self.url then return true end
+
+  local resume = self.auto_reconnect
+  -- Suppressed across the teardown so the backoff timer does not race the
+  -- new connection and bring the *old* server back.
+  self.auto_reconnect = false
+  self:teardown("switching to " .. url)
+  self.auto_reconnect = resume
+
+  self.url = url
+  self.host, self.port, self.path = parsed.host, parsed.port, parsed.path
+  self.attempt = 0
+  self.retry_at = nil
+  self.counter = 0
+  self.sent_types = {}
+  self.unknown_types = {}
+  self.log("info", "server is now " .. url)
+  self:connect()
+  return true
+end
+
 function Client:close(code, reason)
   self.auto_reconnect = false
   if self.state == "open" and self.conn then

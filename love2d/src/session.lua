@@ -49,7 +49,10 @@ function M.new(opts)
     last_error = nil,
   }, Session)
 
-  local stored = store.load_session()
+  -- SPEC §1.1: the token is stored per server, so which server this session
+  -- is for is part of the session's identity, not an afterthought.
+  self.server = opts.client.url
+  local stored = store.load_session(self.server)
   if stored then
     self.token = stored.token
     self.remembered = { address = stored.address, name = stored.name }
@@ -172,7 +175,7 @@ function Session:adopt(token, user)
   -- that cannot write (a full disk, a read-only home, a refusal from
   -- `check_no_secrets`) costs the player a re-login next launch and nothing
   -- now, so it is reported and stepped over rather than thrown.
-  local ok, why = pcall(self.store.save_session, token, user, self.client.url)
+  local ok, why = pcall(self.store.save_session, token, user, self.server or self.client.url)
   if not ok then
     self.log("error", "could not persist the session: " .. tostring(why))
   end
@@ -182,7 +185,7 @@ function Session:forget_token(why)
   self.token = nil
   self.user = nil
   self.authed = false
-  self.store.clear_session()
+  self.store.clear_session(self.server or self.client.url)
   self.last_error = why
   self:fire("need_login", { message = why })
 end
@@ -268,6 +271,25 @@ function Session:login(secret, index, name, cb)
       cb(true, nil)
     end)
   end)
+end
+
+--- Point the session at a different server.
+---
+--- SPEC §1.1: **the token is stored per server.** A token minted by one
+--- server means nothing to another, so this does not carry the old one
+--- across — it forgets the live session and picks up whatever token is
+--- stored for the new address, which may be none. Switching away and back
+--- therefore leaves the player signed in to both.
+function Session:rebind(url)
+  self.server = url
+  self.user = nil
+  self.authed = false
+  self.resuming = false
+  self.last_error = nil
+  local stored = self.store.load_session(url)
+  self.token = stored and stored.token or nil
+  self.remembered = stored and { address = stored.address, name = stored.name } or nil
+  self:fire("server", { url = url, have_token = self.token ~= nil })
 end
 
 --- Sign out: forget the token here and on disk. The server keeps the session

@@ -14,7 +14,7 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { btnBox, clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, rowsIn, clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
 import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { Editor } from "../ui/editor";
@@ -550,7 +550,30 @@ export class QuestScene implements Scene {
     const consoleH = this.consoleOpen
       ? Math.round(inner[3] * (layout.isPortrait() ? 0.36 : 0.32))
       : 0;
-    const editorH = Math.max(40, inner[3] - btnH - consoleH - Math.round(16 * s));
+    // `hints_used` comes back on `quest.get` (§5.3) and on every `quest.hint`,
+    // so leaving a quest and coming back does not offer a hint already paid for.
+    const hintsLeft = this.quest ? this.quest.hints_total - this.quest.hints_used : 0;
+    const hintLabel =
+      hintsLeft === 0 ? "NO HINTS" : hintsLeft === 1 ? "1 HINT LEFT" : `${hintsLeft} HINTS LEFT`;
+    // SUBMIT is laid out first and taken out of the row's width, so it sits at
+    // the far end of the bench and the everyday buttons flow up to it. It is
+    // the one control on this screen that spends an attempt, and a control that
+    // can be hit on the way to RUN is a control that will be.
+    const [subW] = btnBox(fonts.button, ["SUBMIT"], 0, fonts.button.size * 2, layout.minTouchH());
+    const gap = Math.round(fonts.button.size * 1.6);
+    const rowW = inner[2] - subW - gap;
+    // Measured, not assumed. At 1280 across, RESET wraps onto a second line,
+    // and a band sized for one row put that button straight through the run
+    // report underneath it — the report lost its first line to a button.
+    const rowGap = Math.round(fonts.button.size * 0.5);
+    const rows = rowsIn(
+      fonts.button,
+      ["RUN", hintLabel, this.consoleOpen ? "HIDE LOG" : "LOG", "MAP", "RESET"],
+      rowW,
+      layout.minTouchH(),
+    );
+    const bandH = rows * btnH + (rows - 1) * rowGap;
+    const editorH = Math.max(40, inner[3] - bandH - consoleH - Math.round(16 * s));
 
     well(g, inner[0], inner[1], inner[2], editorH);
     const editorRect: Rect = [inner[0] + 4, inner[1] + 4, inner[2] - 8, editorH - 8];
@@ -561,18 +584,9 @@ export class QuestScene implements Scene {
     else this.overlay?.hide();
 
     const rowY = inner[1] + editorH + Math.round(8 * s);
-    // SUBMIT is laid out first and taken out of the row's width, so it sits at
-    // the far end of the bench and the everyday buttons flow up to it. It is
-    // the one control on this screen that spends an attempt, and a control that
-    // can be hit on the way to RUN is a control that will be.
-    const [subW] = btnBox(fonts.button, ["SUBMIT"], 0, fonts.button.size * 2, layout.minTouchH());
-    const gap = Math.round(fonts.button.size * 1.6);
-    // `hints_used` comes back on `quest.get` (§5.3) and on every `quest.hint`,
-    // so leaving a quest and coming back does not offer a hint already paid for.
-    const hintsLeft = this.quest ? this.quest.hints_total - this.quest.hints_used : 0;
     this.buttons.row(
       fonts.button,
-      [inner[0], rowY, inner[2] - subW - gap, btnH],
+      [inner[0], rowY, rowW, bandH],
       // RUN is filled and first; RESET is the destructive one and sits at the
       // far end, where it cannot be hit on the way to anything else. And the
       // hint button says how many are left rather than which one is next —
@@ -584,16 +598,7 @@ export class QuestScene implements Scene {
           dim: this.stage !== "idle",
           primary: this.stage === "idle",
         },
-        {
-          id: "hint",
-          label:
-            hintsLeft === 0
-              ? "NO HINTS"
-              : hintsLeft === 1
-                ? "1 HINT LEFT"
-                : `${hintsLeft} HINTS LEFT`,
-          dim: hintsLeft <= 0,
-        },
+        { id: "hint", label: hintLabel, dim: hintsLeft <= 0 },
         { id: "console", label: this.consoleOpen ? "HIDE LOG" : "LOG" },
         { id: "back", label: "MAP" },
         { id: "reset", label: "RESET" },
@@ -609,7 +614,7 @@ export class QuestScene implements Scene {
     });
 
     if (consoleH > 0) {
-      const cy = rowY + btnH + Math.round(8 * s);
+      const cy = rowY + bandH + Math.round(8 * s);
       const ch = Math.max(24, inner[1] + inner[3] - cy);
       this.drawConsole(g, [inner[0], cy, inner[2], ch]);
     }

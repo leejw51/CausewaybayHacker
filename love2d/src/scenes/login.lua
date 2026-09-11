@@ -44,6 +44,7 @@ local Assets = require("src.assets")
 local UI = require("src.ui")
 local SFX = require("src.sfx")
 local Wallet = require("src.wallet")
+local App = require("src.app")
 
 local Login = {}
 Login.__index = Login
@@ -252,7 +253,7 @@ function Login:panel_rect()
   -- landscape and two of six in portrait, so the panel is shorter in the
   -- orientation with more room across; the confirmation step that used to
   -- need the extra height is gone.
-  local ph = math.min(vh - 48, portrait and (tall and 560 or 520) or (tall and 330 or 400))
+  local ph = math.min(vh - 48, portrait and (tall and 560 or 560) or (tall and 330 or 460))
   return (vw - pw) / 2, (vh - ph) / 2 - (portrait and 30 or 0), pw, ph
 end
 
@@ -295,7 +296,7 @@ function Login:draw()
   end
 
   local hints = {
-    signin = "TAB field   F2 reveal   N new wallet   ENTER sign in   F11 fullscreen",
+    signin = "TAB field   F2 reveal   N new wallet   ENTER apply/sign in   F11 fullscreen",
     new_show = "ENTER create and sign in   C copy   ESC cancel",
   }
   self.app:footer(hints[self.mode] or "")
@@ -323,8 +324,32 @@ function Login:draw_signin(inner, ph)
   UI.text("m/44'/60'/0'/0/0", inner - UI.textWidth("m/44'/60'/0'/0/0", 8), 168, 8,
     Theme.withAlpha(Theme.cream, 0.5))
 
+  -- The server. On this screen because `CWBH_SERVER` is not discoverable
+  -- from inside the game, and the backend now runs on `0.0.0.0` so a phone
+  -- on the same tailnet is a real thing somebody wants to point at.
+  local override = self.app.server_override
+  field_box(196, inner, 30, "SERVER  (ENTER APPLIES)",
+    self.server, self.focus == 3, App.DEFAULT_SERVER)
+  self.server_box = { y = 196, h = 30 }
+
+  if self.server_error then
+    UI.text(self.server_error, 0, 230, 7, Theme.red)
+  elseif override then
+    -- Precedence, said out loud. The field still saves; it just does not win
+    -- this run, and pretending otherwise would make the control a lie.
+    for i, line in ipairs(UI.wrap(
+      ("CWBH_SERVER=%s is overriding this run — the field is saved for next launch")
+        :format(override), inner, 7)) do
+      if i <= 2 then UI.text(line, 0, 230 + (i - 1) * 9, 7, Theme.coin) end
+    end
+  else
+    local live = self.app.client and self.app.client.state or "idle"
+    UI.text(("in use: %s  [%s]"):format(self.app.server, live), 0, 230, 7,
+      Theme.withAlpha(Theme.cream, 0.5))
+  end
+
   local bh = 32
-  local by = 188
+  local by = 248
   UI.button(0, by, inner, bh, self.busy and "SIGNING…" or "SIGN IN  [ENTER]",
     self:can_submit() and "hot" or "disabled")
   self.signin_button = { y = by, h = bh }
@@ -335,10 +360,8 @@ function Login:draw_signin(inner, ph)
   local ny = by + bh + 10
   UI.button(0, ny, inner, bh, "NEW WALLET  [N]", self.busy and "disabled" or "normal")
   self.new_button = { y = ny, h = bh }
-  UI.text("no phrase yet? this makes one, offline, on this machine.",
-    0, ny + bh + 8, 7, Theme.withAlpha(Theme.cream, 0.55))
   UI.text("nothing typed here is ever sent. only a signature leaves this machine.",
-    0, ny + bh + 19, 7, Theme.withAlpha(Theme.cream, 0.55))
+    0, ny + bh + 8, 7, Theme.withAlpha(Theme.cream, 0.55))
 end
 
 function Login:draw_new_show(inner, ph)
@@ -437,6 +460,7 @@ function Login:textinput(text)
   if self.mode ~= "signin" then return end
   local name = self:field()
   self[name] = self[name] .. text
+  if name == "server" then self.server_error = nil end
 end
 
 function Login:keypressed(key, mods)
@@ -468,7 +492,7 @@ function Login:keypressed(key, mods)
   end
 
   -- -------------------------------------------------------------- signin
-  if key == "n" and self.secret == "" then
+  if key == "n" and self.secret == "" and self:field() ~= "server" then
     self:new_wallet()
     return true
   end
@@ -498,7 +522,11 @@ function Login:keypressed(key, mods)
     return true
   end
   if key == "return" or key == "kpenter" then
-    self:submit()
+    if self:field() == "server" then
+      self:apply_server()
+    else
+      self:submit()
+    end
     return true
   end
   if key == "escape" then
@@ -525,6 +553,7 @@ function Login:mousepressed(x, y)
 
   if ly >= 70 and ly <= 104 then self.focus = 1 end
   if ly >= 132 and ly <= 162 then self.focus = 2 end
+  if ly >= 196 and ly <= 226 then self.focus = 3 end
   if hit(self.signin_button) then self:submit() end
   if hit(self.new_button) then self:new_wallet() end
 end

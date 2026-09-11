@@ -96,6 +96,29 @@ export function btnBox(
   return [Math.max(minW, w + padW), Math.max(minH, font.height + BTN_FRAME + BTN_AIR)];
 }
 
+/**
+ * How many lines a row of buttons will wrap onto in `w` — the same arithmetic
+ * `Buttons.row` uses to lay them out.
+ *
+ * A caller that reserves one row's height and is handed two paints its last
+ * button over whatever is underneath, so anything that puts something *below*
+ * a button row has to ask this first.
+ */
+export function rowsIn(font: Font, labels: string[], w: number, minH = 0): number {
+  const gap = Math.round(font.size * 0.5);
+  let x = 0;
+  let rows = 1;
+  for (const label of labels) {
+    const [bw] = btnBox(font, [label], 0, font.size * 2, minH);
+    if (x > 0 && x + bw > w) {
+      rows++;
+      x = 0;
+    }
+    x += bw + gap;
+  }
+  return rows;
+}
+
 /** One chunky button. `dim` is shown but out of reach. */
 export function pixBtn(
   g: Ctx,

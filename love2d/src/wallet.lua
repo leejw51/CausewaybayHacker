@@ -33,10 +33,11 @@ local M = {}
 --- The ABI this binding was written against. A library reporting anything
 --- else is refused rather than guessed at.
 ---
---- 2 is the contract with `generate` in it. The login screen's NEW WALLET
---- button depends on it, and a binding that loaded an ABI-1 library would
---- offer the button and fail on the press.
-M.ABI_VERSION = 2
+--- 3 is the contract with `generate` and `secure` in it. The login screen's
+--- NEW WALLET button depends on the first and `src/store.lua`'s `0600` on the
+--- second; a binding that loaded an older library would offer both and fail
+--- on use.
+M.ABI_VERSION = 3
 
 -- Kept byte-identical to love2d/ffi/include/cwbh.h.
 M.CDEF = [[
@@ -209,6 +210,19 @@ end
 --- good one.
 function M.generate(lib, words)
   return M.execute(lib, { op = "generate", words = words or 12 })
+end
+
+--- `0700` a directory, or `0600` a file (SPEC §1.1).
+---
+--- Not cryptography, and it is here for one reason: LÖVE has no `chmod`, and
+--- `src/store.lua` writes a file holding a session token. Returns true, or
+--- false and a message — a store that cannot set a mode still has to work.
+function M.secure(lib, target, is_directory)
+  local out, err = M.execute(lib, {
+    op = "secure", path = target, directory = is_directory and true or false,
+  })
+  if not out then return false, err end
+  return true, out.mode
 end
 
 --- Is this a well-formed mnemonic? Cheap, and the login screen calls it on

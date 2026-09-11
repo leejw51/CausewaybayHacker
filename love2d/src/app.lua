@@ -45,6 +45,48 @@ local SCENES = {
 
 App.DEFAULT_SERVER = "ws://127.0.0.1:5390/ws"
 
+--- Is a URL one this client can actually open?
+---
+--- Shape first, then capability, and the message says which — "failing to
+--- connect for unexplained reasons" is the thing this exists to prevent.
+--- Returns true, or nil and a sentence.
+function App.check_server(url)
+  url = tostring(url or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  if url == "" then return nil, "type a server address" end
+  local scheme = url:match("^(%a[%w+.-]*)://")
+  if not scheme then
+    return nil, "needs a scheme: ws://host:port/ws"
+  end
+  scheme = scheme:lower()
+  if scheme == "http" or scheme == "https" then
+    return nil, ("this is a websocket address — try ws%s://…")
+      :format(scheme == "https" and "s" or "")
+  end
+  if scheme == "wss" then
+    -- Honest rather than mysterious: LuaSocket has no TLS, so this client
+    -- genuinely cannot open one, and a tailnet or an SSH tunnel is the
+    -- answer rather than a scheme change.
+    return nil, "wss:// needs TLS, which this client does not have — use ws:// over a tailnet"
+  end
+  if scheme ~= "ws" then
+    return nil, ("scheme %q is not ws://"):format(scheme)
+  end
+  local rest = url:sub(#scheme + 4)
+  local hostport = rest:match("^([^/]+)") or ""
+  if hostport == "" then return nil, "no host" end
+  local host, port = hostport:match("^(.*):(%d+)$")
+  if not host then
+    return nil, "needs a port: ws://host:5390/ws"
+  end
+  if host == "" then return nil, "no host before the port" end
+  port = tonumber(port)
+  if port < 1 or port > 65535 then return nil, "the port is out of range" end
+  if not rest:find("/") then
+    return nil, "needs a path: ws://host:5390/ws"
+  end
+  return true
+end
+
 function App.new()
   local self = setmetatable({
     scene = nil,
@@ -52,7 +94,16 @@ function App.new()
     toast_text = nil,
     toast_left = 0,
     log_lines = {},
-    server = os.getenv("CWBH_SERVER") or App.DEFAULT_SERVER,
+    -- Resolved in `load`, once the store is open.
+    server = App.DEFAULT_SERVER,
+    -- `CWBH_SERVER`, if it is set. A launch-time override wins for the run
+    -- (see `App:resolve_server`) and the login screen says so rather than
+    -- silently ignoring what the player typed.
+    server_override = (function()
+      local value = os.getenv("CWBH_SERVER")
+      if value and value ~= "" then return value end
+      return nil
+    end)(),
     -- What the player picked on the way down; the map and quest screens read
     -- it, and `back` walks it up again.
     land = nil,
@@ -70,19 +121,53 @@ function App:log(level, message)
   if #self.log_lines > 200 then table.remove(self.log_lines, 1) end
 end
 
+--- Which server this run talks to, and why.
+---
+--- **Precedence, written down because a control that is silently ignored is
+--- a lie:** `CWBH_SERVER` is a launch-time override and wins for this run;
+--- otherwise the field the player saved; otherwise the default. Editing the
+--- field always persists, and when an override is active the login screen
+--- says the saved value takes effect next launch instead of pretending.
+function App:resolve_server()
+  if self.server_override then return self.server_override, "CWBH_SERVER" end
+  local saved = Store.saved_server()
+  if saved and App.check_server(saved) then return saved, "saved" end
+  return App.DEFAULT_SERVER, "default"
+end
+
 function App:load()
   Assets.load()
   SFX.load()
 
-  Layout.storage = { save = Store.save_display, load = Store.load_display }
-  Layout.init(os.getenv("CWBH_ORIENT"))
-
-  -- The key library. A failure here is *not* fatal: the login screen renders
-  -- the reason and the build command, because "run `make -C love2d ffi`" is
-  -- a thing a person can act on and a crash is not.
+  -- The key library first: `src/store.lua` wants its `secure` op for the
+  -- `0700`/`0600` SPEC §1.1 asks for, and a store that opened before the
+  -- library would create its file behind the umask.
   local lib, why = Wallet.load(love.filesystem.getSource())
   self.wallet_lib = lib
   self.wallet_error = why
+
+  Store.open({
+    secure = lib and function(target, is_directory)
+      return Wallet.secure(lib, target, is_directory)
+    end or nil,
+  })
+  -- Bring LÖVE's old save directory across, once, rather than starting fresh
+  -- on somebody who is mid-game.
+  Store.migrate(function(name)
+    if love.filesystem.getInfo(name) then return love.filesystem.read(name) end
+    return nil
+  end, App.DEFAULT_SERVER)
+
+  self.server, self.server_from = self:resolve_server()
+  self:log("info", ("server %s (%s); store %s")
+    :format(self.server, self.server_from, tostring(Store.where())))
+
+  Layout.storage = { save = Store.save_display, load = Store.load_display }
+  Layout.init(os.getenv("CWBH_ORIENT"))
+
+  -- A missing key library is *not* fatal: the login screen renders the
+  -- reason and the build command, because "run `make -C love2d ffi`" is a
+  -- thing a person can act on and a crash is not.
   if lib then
     self:log("info", "key library loaded, ABI " .. Wallet.ABI_VERSION)
   else
@@ -133,6 +218,33 @@ function App:load()
 
   self:go("boot")
   self.client:connect()
+end
+
+--- Point the whole client at a different server.
+---
+--- Validates, persists, rebinds the session to that server's own token
+--- (SPEC §1.1), and drops the connection so the next one goes to the new
+--- address. Returns true, or nil and a sentence for the screen.
+function App:set_server(url)
+  url = tostring(url or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  local ok, why = App.check_server(url)
+  if not ok then return nil, why end
+
+  Store.set_server(url)
+
+  if self.server_override then
+    -- Persisted, and honestly described. Applying it now would contradict
+    -- the precedence this program just wrote down.
+    return true, ("saved — CWBH_SERVER is overriding this run (%s)"):format(self.server_override)
+  end
+  if url == self.server then return true, "already connected to that" end
+
+  self.server = url
+  self.session:rebind(url)
+  local moved, move_why = self.client:set_url(url)
+  if not moved then return nil, move_why end
+  self:toast("connecting to " .. url)
+  return true
 end
 
 function App:go(name, params)

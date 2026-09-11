@@ -94,7 +94,7 @@ return function()
     local d = wallet.describe(lib)
     T.ok(d ~= nil)
     T.eq(d.abi, wallet.ABI_VERSION)
-    T.eq(d.abi, 2, "2 is the contract with `generate` in it")
+    T.eq(d.abi, 3, "3 is the contract with `generate` and `secure` in it")
     T.eq(d.path_template, "m/44'/60'/0'/0/{index}")
     -- A private key and a seed never come back. A generated mnemonic does,
     -- exactly once, and the library says so rather than leaving it implicit.
@@ -151,6 +151,42 @@ return function()
     T.same(keys, { "address", "address_lower", "mnemonic", "ok", "path", "words" })
     -- And the phrase really is a phrase, not a key.
     T.nope(wallet.looks_like_private_key(out.mnemonic))
+  end)
+
+  T.case("secure sets 0700 on a directory and 0600 on a file", function()
+    -- SPEC §1.1. Not cryptography — it is here because LÖVE has no `chmod`
+    -- and `src/store.lua` writes a file holding a session token.
+    local base = os.getenv("TMPDIR") or "/tmp"
+    local dir = ("%s/cwbh-secure-%d"):format(base:gsub("/$", ""), os.time())
+    local ok, mode = wallet.secure(lib, dir, true)
+    T.eq(ok, true, tostring(mode))
+    T.eq(mode, "700")
+
+    local file = dir .. "/state.jsonl"
+    local fh = io.open(file, "w")
+    T.ok(fh ~= nil)
+    if fh then fh:write("{}\n"); fh:close() end
+    local fok, fmode = wallet.secure(lib, file, false)
+    T.eq(fok, true, tostring(fmode))
+    T.eq(fmode, "600")
+
+    -- And it really is on disk, not just reported.
+    local listed = io.popen(("ls -ld %q %q 2>/dev/null"):format(dir, file))
+    local text = listed and listed:read("*a") or ""
+    if listed then listed:close() end
+    T.ok(text:find("drwx------", 1, true) ~= nil, "the directory is 0700: " .. text)
+    T.ok(text:find("-rw-------", 1, true) ~= nil, "the file is 0600: " .. text)
+    os.remove(file)
+    os.execute(("rmdir %q 2>/dev/null"):format(dir))
+  end)
+
+  T.case("secure refuses a missing path rather than pretending", function()
+    local ok, err = wallet.secure(lib, "", false)
+    T.eq(ok, false)
+    T.ok(type(err) == "string")
+    local ok2, err2 = wallet.secure(lib, "/definitely/not/here/state.jsonl", false)
+    T.eq(ok2, false)
+    T.ok(type(err2) == "string" and err2:find("state.jsonl") ~= nil)
   end)
 
   T.case("a word count BIP-39 does not have is refused, with no phrase", function()

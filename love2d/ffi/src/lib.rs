@@ -27,6 +27,18 @@
 //! improvising a phrase, or a client improvising a CSPRNG, and both are worse
 //! than one audited exit. The private key derived from it still never crosses.
 
+//! ## The one operation here that is not cryptography
+//!
+//! `secure` creates a directory `0700` and sets a file `0600`. It is in a key
+//! library because LÖVE has no `chmod` and its `love.filesystem` is sandboxed
+//! to a save directory this client does not use (SPEC §1.1) — and the file it
+//! is protecting holds a session token. The alternative is spawning `chmod`
+//! through `os.execute` on every write, which is a process per line and a
+//! shell quoting problem in a program that must never have one.
+//!
+//! It touches no key material, reads nothing back, and returns only whether
+//! the mode was set.
+
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
@@ -44,9 +56,10 @@ pub mod evm;
 /// operations. **2 adds `generate`**, which is the only op that returns key
 /// material, so a binding written against 1 must not be handed a library that
 /// has it — and a login screen written against 2 must not silently lose its
-/// NEW WALLET button to an older library. A mismatch is refused rather than
-/// guessed at.
-pub const ABI_VERSION: i32 = 2;
+/// NEW WALLET button to an older library. **3 adds `secure`**, which is not
+/// about keys at all — see below. A mismatch is refused rather than guessed
+/// at.
+pub const ABI_VERSION: i32 = 3;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -74,6 +87,12 @@ struct Request {
     /// `generate` only: how many words. 12, 15, 18, 21 or 24; default 12.
     #[serde(default)]
     words: Option<usize>,
+    /// `secure` only: an absolute path.
+    #[serde(default)]
+    path: Option<String>,
+    /// `secure` only: create it as a directory first.
+    #[serde(default)]
+    directory: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -158,7 +177,9 @@ pub fn describe() -> serde_json::Value {
               "out": ["digest","message_len"] },
             { "op": "sign",
               "in": ["mnemonic|private_key", "index?", "passphrase?", "message|message_hex"],
-              "out": ["address","signature","digest","v","recovery_id"] }
+              "out": ["address","signature","digest","v","recovery_id"] },
+            { "op": "secure", "in": ["path", "directory?"], "out": ["mode"],
+              "note": "0700 a directory or 0600 a file; no key material involved" }
         ],
         "never_returns": ["private_key", "seed"],
         "returns_key_material_once": ["generate.mnemonic"]
@@ -218,6 +239,46 @@ fn run(request_json: &str) -> Result<serde_json::Value, String> {
                 "address_lower": acct.address_lower,
                 "path": acct.path,
             }))
+        }
+
+        // SPEC §1.1: the client's store is `0700`, its files `0600`, and that
+        // is not decorative — one of those files holds a session token.
+        //
+        // The mode is applied to something that already exists rather than at
+        // creation, because the Lua side opens the file with `io.open`; so
+        // there is a window between create and chmod. It is narrowed by
+        // calling `secure` immediately after the first `io.open`, and it is
+        // the same window `umask 077` would close for good. A caller that
+        // wants no window at all should create the file here instead.
+        "secure" => {
+            let path = req
+                .path
+                .as_deref()
+                .ok_or_else(|| "no `path` given".to_string())?;
+            if path.is_empty() {
+                return Err("`path` is empty".to_string());
+            }
+            let as_directory = req.directory.unwrap_or(false);
+            let mode: u32 = if as_directory { 0o700 } else { 0o600 };
+
+            if as_directory {
+                std::fs::create_dir_all(path)
+                    .map_err(|e| format!("cannot create {path}: {e}"))?;
+            }
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
+                    .map_err(|e| format!("cannot set the mode on {path}: {e}"))?;
+                Ok(json!({ "ok": true, "mode": format!("{mode:o}"), "path": path }))
+            }
+            #[cfg(not(unix))]
+            {
+                // Windows has no mode bits worth pretending about. Saying so
+                // is better than reporting a `0600` that does not exist.
+                Ok(json!({ "ok": true, "mode": serde_json::Value::Null, "path": path }))
+            }
         }
 
         "derive" => {

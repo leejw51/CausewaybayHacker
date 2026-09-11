@@ -460,6 +460,49 @@ week.
 Runs and submits share the one-execution-per-connection rule (§3.2): a second
 of either while one is in flight is `busy`.
 
+### 4.9c The playground
+
+A scratchpad. No quest, no tests, no verdict — you write whatever you like in
+Rust or Go, run it, and it prints what it prints.
+
+```json
+→ playground.run  payload: { "lang": "rust", "source": "fn main(){…}", "stdin": "3\n" }
+← payload: { "run": PlaygroundRun }      §5.9
+```
+
+`run.stage` and `run.log` stream as they do for a quest, under the same
+`attempt_id` field (the id is still minted, so a client can correlate the
+stream; it simply is not stored).
+
+**A playground run is not recorded and does not feed the curriculum.** No
+`attempts` row, no `mistakes` row, no effect on `progress`, `stars` or
+`accuracy`.
+
+This is deliberately the *opposite* of the RUN/SUBMIT rule in §4.9b, and the
+difference is worth stating because it looks inconsistent until you see it: a
+quest RUN is an attempt at a known problem, so its errors say something about
+what the player cannot yet do, and SPEC §7's drills reach them through the
+quest's `concepts`. A playground has no quest and therefore no concepts — a
+`mistakes` row from it could never be joined to anything and would be dead
+weight in the table the whole curriculum is derived from. It is also where
+somebody *deliberately* writes something broken to see what the compiler says,
+which is the last thing that should be counted against them.
+
+The limits in SPEC §5.3 apply unchanged — the playground is the same runner.
+
+**Snippets** are saved per user, server-side, so the same scratchpad opens in
+the browser and in the LÖVE client.
+
+```json
+→ playground.save  payload: { "id": "pg_…", "name": "borrow ideas", "lang": "rust", "source": "…" }
+← payload: { "snippet": Snippet }
+```
+
+`id` omitted creates one; `name` omitted on create is assigned from the date.
+`playground.save` is what a client calls on an autosave timer, so it must be
+cheap and idempotent: saving identical content returns the same
+`updated_at` rather than churning a new version.
+
 ### 4.10 `quest.hint`
 
 ```json
@@ -713,6 +756,31 @@ type Attempt = {
 `cleared` answers "did this submission just clear the node", not "is the node
 cleared" — re-solving a cleared quest reports `verdict: "accepted"` with
 `cleared: false`.
+
+### 5.9 `PlaygroundRun` and `Snippet`
+
+```ts
+type PlaygroundRun = {
+  attempt_id: string;                    // for correlating the stream only
+  lang: "rust" | "go";
+  outcome: "ok" | "compile_error" | "runtime_error" | "timeout" | "output_limit";
+  compile_ms: number; run_ms: number;
+  exit_code: number | null;
+  stdout: string;                        // what it printed, capped
+  stderr: string;                        // capped, truncation marked
+  diagnostics: {                         // shown, never stored
+    kind: string; code: string | null; message: string;
+    line: number | null; col: number | null;
+  }[];
+};
+
+type Snippet = {
+  id: string;                            // "pg_" + 16 hex
+  name: string; lang: "rust" | "go"; source: string;
+  created_at: string; updated_at: string;
+};
+type SnippetBrief = Omit<Snippet, "source"> & { bytes: number };
+```
 
 ### 5.5 `SearchHit`
 

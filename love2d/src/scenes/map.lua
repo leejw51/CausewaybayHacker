@@ -42,7 +42,16 @@ local MASCOT = { rust = "sprite_ferris", go = "sprite_gogo" }
 --- time the map is entered and "come back to where I was" has to survive
 --- that. The same idea as `CausewaybayGolang`'s `Game.trackQuest`, which
 --- remembers the quest last visited in each language track.
-Map.last_node = {}
+--- Seeded from the store on first use, so "where was I" survives a restart
+--- and not just a scene rebuild.
+Map.last_node = nil
+
+local function remembered()
+  if not Map.last_node then
+    Map.last_node = require("src.store").map_cursors()
+  end
+  return Map.last_node
+end
 
 function Map.new(app)
   return setmetatable({
@@ -102,7 +111,10 @@ function Map:switch(land, category)
 
   -- Remember where the player was on the map being left.
   local here = self:node_at(self.cursor)
-  if here then Map.last_node[self:key()] = here.quest_id end
+  if here then
+    remembered()[self:key()] = here.quest_id
+    require("src.store").set_map_cursor(self:key(), here.quest_id)
+  end
 
   self.land, self.category = land, category
   self.app.land, self.app.category = land, category
@@ -185,8 +197,8 @@ function Map:refresh()
       -- here before; otherwise the earliest one not yet cleared, which is
       -- where the suggested route has got to.
       self.cursor = 1
-      local remembered = Map.last_node[self:key()]
-      local found = remembered and self.by_id[remembered]
+      local was = remembered()[self:key()]
+      local found = was and self.by_id[was]
       if found then
         self.cursor = found
       else

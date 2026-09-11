@@ -212,6 +212,21 @@ CREATE TABLE mistake_stats (
   PRIMARY KEY (address, kind)
 );
 
+-- ---------- the playground (PROTOCOL §4.9c) ----------
+-- Snippets are kept; playground *runs* are not. A run has no quest, so it has
+-- no concepts, so a mistake from it could never be joined to a drill — it
+-- would be dead weight in the table §7 derives the whole curriculum from.
+CREATE TABLE snippets (
+  id            TEXT PRIMARY KEY,          -- 'pg_' + 16 hex
+  address       TEXT NOT NULL REFERENCES users(address) ON DELETE CASCADE,
+  name          TEXT NOT NULL,
+  lang          TEXT NOT NULL CHECK (lang IN ('rust','go')),
+  source        TEXT NOT NULL,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+CREATE INDEX snippets_by_user ON snippets(address, updated_at DESC);
+
 -- ---------- AI drill sessions ----------
 CREATE TABLE drills (
   id            TEXT PRIMARY KEY,          -- 'drl_' + 16 hex
