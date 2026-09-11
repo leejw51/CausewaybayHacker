@@ -231,6 +231,61 @@ export class App {
 
     this.drawToast(g);
     this.drawModal(g);
+    this.frameEdge();
+  }
+
+  /**
+   * Treat the seam.
+   *
+   * The WebGL city is sized to the whole window while the game is drawn into a
+   * virtual canvas inset within it, so on most window shapes there are bands of
+   * city down the sides or across the top. Letting them run is the right
+   * instinct — black bars would be worse — but untreated they make the play
+   * area's edge read as a crop: the header's rule and the footer bar simply
+   * stop, with a lit skyline continuing behind them.
+   *
+   * So the bands are pushed back with a soft fall-off and the playfield gets a
+   * hard ink rule around it. That is the 16-bit way of saying "the game is in
+   * here", and it costs two gradients.
+   */
+  private frameEdge(): void {
+    const { g, layout } = this;
+    const { ox, oy, dw, dh } = layout;
+    if (ox <= 0 && oy <= 0) return;
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    const w = dw - ox * 2;
+    const h = dh - oy * 2;
+    const reach = Math.max(24, Math.min(ox || dw, oy || dh) * 0.9);
+    if (ox > 0) {
+      for (const [x0, x1, x, wide] of [
+        [ox, ox - reach, 0, ox],
+        [dw - ox, dw - ox + reach, dw - ox, ox],
+      ] as const) {
+        const grad = g.createLinearGradient(x0, 0, x1, 0);
+        grad.addColorStop(0, "rgba(20,28,72,0.35)");
+        grad.addColorStop(1, "rgba(20,28,72,0.9)");
+        g.fillStyle = grad;
+        g.fillRect(x, 0, wide, dh);
+      }
+    }
+    if (oy > 0) {
+      for (const [y0, y1, y, tall] of [
+        [oy, oy - reach, 0, oy],
+        [dh - oy, dh - oy + reach, dh - oy, oy],
+      ] as const) {
+        const grad = g.createLinearGradient(0, y0, 0, y1);
+        grad.addColorStop(0, "rgba(20,28,72,0.35)");
+        grad.addColorStop(1, "rgba(20,28,72,0.9)");
+        g.fillStyle = grad;
+        g.fillRect(0, y, dw, tall);
+      }
+    }
+    g.strokeStyle = css(Theme.ink);
+    g.lineWidth = 2;
+    g.strokeRect(ox - 1, oy - 1, w + 2, h + 2);
+    g.lineWidth = 1;
+    g.restore();
   }
 
   private drawShifted(scene: Scene | null, dx: number): void {
@@ -392,8 +447,18 @@ export class App {
     const cancelRect: Rect = [Math.round(x + w / 2 - bw - gap / 2), by, bw, bh];
     const confirmRect: Rect = [Math.round(x + w / 2 + gap / 2), by, bw, bh];
     m.rects = { cancel: cancelRect, confirm: confirmRect };
-    pixBtn(g, fonts.button, ...cancelRect, m.cancel, { hover: m.hover === "cancel" });
-    pixBtn(g, fonts.button, ...confirmRect, m.confirm, { hover: m.hover === "confirm" });
+    // The safe answer is the lit one. Every `ask()` in this game is asking
+    // before something destructive, so the button that keeps the player's work
+    // gets the weight and the one that throws it away has to be chosen on
+    // purpose.
+    pixBtn(g, fonts.button, ...cancelRect, m.cancel, {
+      hover: m.hover === "cancel",
+      lit: m.hover !== "confirm",
+    });
+    pixBtn(g, fonts.button, ...confirmRect, m.confirm, {
+      hover: m.hover === "confirm",
+      quiet: m.hover !== "confirm",
+    });
   }
 
   // -- input ---------------------------------------------------------------

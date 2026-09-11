@@ -1,77 +1,79 @@
 -- Fonts and images, loaded once and never at draw time.
 --
--- The art is placeholder, copied into `love2d/assets/` from
--- `CausewaybayGolang/love2d/assets/` per `docs/art.md` §4–§7, which lists
--- which sibling asset stands in for which of this game's. Nothing is loaded
--- from another repository at runtime: a game that reaches outside its own
--- directory is a game that only runs on the machine it was written on.
+-- ## Two sources, in order
 --
--- Every name here is *optional*. A missing file is a nil texture and a scene
--- that draws a coloured rectangle instead, because a placeholder art pack
--- going missing should not stop a player from finishing a quest.
+-- 1. **`art/`**, at the root of this repository — the 32 assets PM generated,
+--    listed in `art/manifest.json` in `CausewaybayGolang`'s shape, with a
+--    measured `box` on every sprite. This is the real art and it wins.
+-- 2. **`love2d/assets/`** — the placeholder set copied from
+--    `CausewaybayGolang/love2d/assets/`, still there for the handful of names
+--    `art/` does not carry (`fx_star`, `fx_confetti`, `ui_coin`,
+--    `sprite_clerk`, `bg_flat`). Those are JPEGs on a magenta screen with no
+--    alpha channel, so they go through `knockout`.
+--
+-- **The `art/` assets are pre-processed to binary alpha and must not go
+-- through `knockout`.** Flooding a correctly-cut sprite would eat any dark
+-- pixel connected to the border, and on `node_locked` — a padlock with a
+-- black outline — that is the padlock.
+--
+-- ## Reading `art/`
+--
+-- `love.filesystem` is rooted at the game directory and cannot see `../art`,
+-- so the loader tries, in order: `art/…` inside the game (where a packaged
+-- build would carry a copy), then the real path `<source>/../art/…` through
+-- plain `io.open`, wrapped in a `FileData`. `art/` is this repository's own
+-- directory, not another project's, and it is static.
+--
+-- Every name is *optional*. A missing file is a nil texture and a scene that
+-- draws a coloured rectangle instead: placeholder art going missing should
+-- not stop a player from finishing a quest.
 
 local Theme = require("src.theme")
+local json = require("src.json")
 
-local A = { images = {}, fonts = {}, missing = {} }
+local A = { images = {}, box = {}, fonts = {}, missing = {}, sources = {} }
 
--- name -> file. The names are this game's (art.md §4.1's left column); the
--- files are the stand-ins.
-local IMAGES = {
-  title_bg = "assets/title_bg.png",
-  title_bg_p = "assets/title_bg_p.png",
-  map_bg = "assets/map_bg.png",
-  map_bg_p = "assets/map_bg_p.png",
-  bg_street = "assets/bg_street.png",
-  bg_times = "assets/bg_times.png",
-  bg_mtr = "assets/bg_mtr.png",
+-- Placeholder files under `love2d/assets/`. A name here is used only when
+-- `art/manifest.json` does not carry it.
+local PLACEHOLDERS = {
   bg_flat = "assets/bg_flat.png",
   bg_night = "assets/bg_night.png",
-  sprite_mei = "assets/sprite_mei.png",       -- the player (docs/story.md §1)
-  sprite_alex = "assets/sprite_hero.png",     -- stand-in, art.md §4.1
-  sprite_ferris = "assets/sprite_ferris.png",
-  sprite_gogo = "assets/sprite_gogo.png",
   sprite_clerk = "assets/sprite_clerk.png",
-  stamp_cleared = "assets/stamp_served.png",  -- stand-in until art.md §7 lands
-  fx_ribbon = "assets/fx_ribbon.png",
-  fx_medal = "assets/fx_medal.png",
   fx_star = "assets/fx_star.png",
   fx_confetti = "assets/fx_confetti.png",
-  ui_panel = "assets/ui_panel.png",
   ui_coin = "assets/ui_coin.png",
+  -- Kept as a fallback for `map_rust` / `map_go` if `art/` is not readable.
+  map_bg = "assets/map_bg.png",
+  map_bg_p = "assets/map_bg_p.png",
 }
 
--- Sprites and effects are cut out of their background; full-bleed plates are
--- not. See `knockout` below for why this list exists at all.
+-- The placeholders that need the magenta screen flooded out. Nothing from
+-- `art/` is in this list, and nothing from `art/` ever should be.
 local KNOCKOUT = {
-  sprite_mei = true, sprite_alex = true, sprite_ferris = true,
-  sprite_gogo = true, sprite_clerk = true, stamp_cleared = true,
-  fx_ribbon = true, fx_medal = true, fx_star = true, fx_confetti = true,
-  ui_panel = true, ui_coin = true,
+  sprite_clerk = true, fx_star = true, fx_confetti = true, ui_coin = true,
 }
 
 local FONT_FILE = "assets/fonts/PressStart2P-Regular.ttf"
 local MONO_FILE = "assets/fonts/VT323-Regular.ttf"
 
+-- ------------------------------------------------------------------ knockout
+
 --- Flood the background out of a sprite, from the edges inward.
 ---
 --- The placeholder sprites carried over from `CausewaybayGolang/love2d/assets`
 --- are JPEGs — no alpha channel at all — drawn on a magenta screen. Blitted
---- as they are, Ferris arrives sitting on a hot-pink rectangle, which is
---- exactly what the first screenshot of the login screen showed.
+--- as they are, a sprite arrives sitting on a hot-pink rectangle.
 ---
 --- Ported from that repo's `src/assets.lua`. Flooding from the edges rather
 --- than testing every pixel is the point: a magenta pixel *inside* the sprite
---- (an eye highlight, a sign) is part of the art and must survive, and only
---- background connected to the border is a background.
+--- is part of the art and must survive, and only background connected to the
+--- border is a background.
 local function knockout(data)
   local w, h = data:getWidth(), data:getHeight()
   local function is_bg(x, y)
     local r, g, b, a = data:getPixel(x, y)
     if a < 0.12 then return true end
-    -- The magenta screen. A JPEG round trip drags it toward hot pink, so the
-    -- test is generous rather than exact.
     if r > 0.55 and b > 0.30 and g < 0.45 and b < r + 0.2 then return true end
-    -- And the lime some of the older plates used.
     if g > 0.62 and r < 0.50 and b < 0.50 then return true end
     return false
   end
@@ -102,35 +104,132 @@ end
 
 A.knockout = knockout
 
-function A.load()
-  love.graphics.setDefaultFilter("nearest", "nearest")
-  for name, path in pairs(IMAGES) do
-    if love.filesystem.getInfo(path) then
-      local ok, image = pcall(function()
-        if KNOCKOUT[name] then
-          local data = love.image.newImageData(path)
-          return love.graphics.newImage(knockout(data))
-        end
-        return love.graphics.newImage(path)
-      end)
-      if ok and image then
+-- --------------------------------------------------------------- art/ files
+
+--- Where `art/` is on disk, from the game's own source directory.
+local function art_root()
+  local source = love.filesystem.getSource()
+  if not source or source == "" then return nil end
+  -- The game may be a directory or a .love; only the directory case can have
+  -- a sibling `art/`.
+  return source .. "/../art"
+end
+
+A.art_root = art_root
+
+--- Read a file from `art/`, whichever of the two places it is in.
+---
+--- Returns the bytes, or nil. `love.filesystem` first so a packaged build
+--- that carries `art/` inside the archive needs no special case.
+local function read_art(name)
+  if love.filesystem.getInfo("art/" .. name) then
+    return love.filesystem.read("art/" .. name), "love.filesystem"
+  end
+  local root = art_root()
+  if not root then return nil end
+  local fh = io.open(root .. "/" .. name, "rb")
+  if not fh then return nil end
+  local bytes = fh:read("*a")
+  fh:close()
+  return bytes, root
+end
+
+A.read_art = read_art
+
+local function image_from_bytes(bytes, name)
+  local ok, image = pcall(function()
+    local file_data = love.filesystem.newFileData(bytes, name)
+    return love.graphics.newImage(file_data)
+  end)
+  if not ok then return nil end
+  return image
+end
+
+--- Load everything `art/manifest.json` lists. Returns how many landed.
+function A.load_art()
+  local body, where = read_art("manifest.json")
+  if not body then
+    A.art_where = nil
+    return 0
+  end
+  local manifest = json.try_decode(body)
+  if type(manifest) ~= "table" or type(manifest.art) ~= "table" then
+    A.art_where = nil
+    return 0
+  end
+  A.art_where = where
+
+  local loaded = 0
+  for _, entry in ipairs(manifest.art) do
+    local name, file = entry.name, entry.file
+    if type(name) == "string" and type(file) == "string" then
+      local bytes = read_art(file)
+      local image = bytes and image_from_bytes(bytes, file)
+      if image then
+        -- Nearest everywhere: this is pixel art and a linear filter is what
+        -- turns it into mush at 1.5×.
         image:setFilter("nearest", "nearest")
         A.images[name] = image
+        A.sources[name] = "art/" .. file
+        -- `box` places a sprite on its feet rather than on the corner of its
+        -- transparent canvas. Measured by `art/tools/manifest.py` from the
+        -- actual alpha, so it is not a guess and is not re-derived here.
+        if type(entry.box) == "table" then A.box[name] = entry.box end
+        loaded = loaded + 1
+      else
+        A.missing[name] = "art/" .. file
+      end
+    end
+  end
+  return loaded
+end
+
+-- ---------------------------------------------------------------- the loader
+
+function A.load()
+  love.graphics.setDefaultFilter("nearest", "nearest")
+  local from_art = A.load_art()
+
+  for name, path in pairs(PLACEHOLDERS) do
+    if not A.images[name] then
+      if love.filesystem.getInfo(path) then
+        local ok, image = pcall(function()
+          if KNOCKOUT[name] then
+            return love.graphics.newImage(knockout(love.image.newImageData(path)))
+          end
+          return love.graphics.newImage(path)
+        end)
+        if ok and image then
+          image:setFilter("nearest", "nearest")
+          A.images[name] = image
+          A.sources[name] = path
+        else
+          A.missing[name] = path
+        end
       else
         A.missing[name] = path
       end
-    else
-      A.missing[name] = path
     end
   end
+
+  print(("assets: %d from %s, %d placeholders")
+    :format(from_art, tostring(A.art_where or "art/ (not found)"),
+      A.count() - from_art))
 end
+
+function A.count()
+  local n = 0
+  for _ in pairs(A.images) do n = n + 1 end
+  return n
+end
+
+-- --------------------------------------------------------------------- fonts
 
 --- A Press Start 2P face at `size`, cached.
 ---
---- Press Start 2P has no CJK coverage and no lowercase kerning to speak of;
---- it is the game's voice and it is used for every label. The code editor
---- uses `A.mono` instead, because a player has to read their own program in
---- it and an 8×8 pixel face at 11px is not that.
+--- Press Start 2P is the game's voice and is used for every label. The code
+--- editor uses `A.mono` instead, because a player has to read their own
+--- program in it and an 8×8 pixel face at 11px is not that.
 function A.font(size)
   size = math.max(6, math.floor(size))
   local key = "p" .. size
@@ -160,8 +259,19 @@ function A.mono(size)
   return A.fonts[key]
 end
 
+-- ------------------------------------------------------------------ drawing
+
 function A.image(name)
   return A.images[name]
+end
+
+--- The first of `names` that exists, so a caller can name the real asset and
+--- its fallback in one place.
+function A.pick(...)
+  for _, name in ipairs({ ... }) do
+    if A.images[name] then return name end
+  end
+  return nil
 end
 
 --- Draw an image to cover `w × h`, cropped rather than squashed.
@@ -184,7 +294,7 @@ function A.cover(name, x, y, w, h, tint)
   return true
 end
 
---- Draw an image centred in a box at the largest whole-pixel scale that fits.
+--- Draw an image centred in a box at the largest scale that fits.
 function A.fit(name, x, y, w, h, max_scale)
   local image = A.images[name]
   if not image then return false end
@@ -192,6 +302,45 @@ function A.fit(name, x, y, w, h, max_scale)
   local s = math.min(w / iw, h / ih, max_scale or 8)
   love.graphics.setColor(1, 1, 1, 1)
   love.graphics.draw(image, x + (w - iw * s) / 2, y + (h - ih * s) / 2, 0, s, s)
+  return true
+end
+
+--- Draw a sprite standing on `(x, y)`, using its measured `box`.
+---
+--- This is the whole reason `box` is in the manifest: `feet` is the row the
+--- ink stands on and `cx` its horizontal centre of mass, so a character is
+--- placed by where she touches the ground rather than by the corner of a
+--- transparent canvas. `height` is the ink height wanted on screen, so two
+--- sprites asked for the same height *look* the same height even when one has
+--- more empty canvas above it than the other.
+function A.sprite(name, x, y, height, opts)
+  opts = opts or {}
+  local image = A.images[name]
+  if not image then return false end
+  local iw, ih = image:getDimensions()
+  local box = A.box[name]
+  local ink = (box and box.h and box.h > 0) and box.h or ih
+  local s = (height or ih) / ink
+  local ox = box and box.cx or (iw * 0.5)
+  local oy = box and box.feet or ih
+  love.graphics.setColor(opts.color or { 1, 1, 1, opts.alpha or 1 })
+  love.graphics.draw(image, x, y, opts.rotation or 0,
+    (opts.flip and -s or s), s, ox, oy)
+  love.graphics.setColor(1, 1, 1, 1)
+  return true
+end
+
+--- Draw a marker centred on `(x, y)` at `size` pixels across — for the map's
+--- node art, which is square and wants its middle on the path, not its feet.
+function A.marker(name, x, y, size, opts)
+  opts = opts or {}
+  local image = A.images[name]
+  if not image then return false end
+  local iw, ih = image:getDimensions()
+  local s = size / math.max(iw, ih)
+  love.graphics.setColor(opts.color or { 1, 1, 1, opts.alpha or 1 })
+  love.graphics.draw(image, x, y, 0, s, s, iw * 0.5, ih * 0.5)
+  love.graphics.setColor(1, 1, 1, 1)
   return true
 end
 

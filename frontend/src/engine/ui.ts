@@ -105,15 +105,23 @@ export function pixBtn(
   w: number,
   h: number,
   label: string,
-  opts: { lit?: boolean; hover?: boolean; dim?: boolean } = {},
+  opts: { lit?: boolean; hover?: boolean; dim?: boolean; quiet?: boolean } = {},
 ): void {
+  // `quiet` is the other half of a primary action: when one button on a row is
+  // filled, the rest step back to a dark face so the eye has somewhere to go.
+  // A row where every button is the same weight is a row with no answer in it.
   const face = opts.dim
     ? Theme.dim
     : opts.lit || opts.hover
       ? Theme.coin
-      : Theme.panel;
+      : opts.quiet
+        ? Theme.navy
+        : Theme.panel;
   panel(g, x, y, w, h, face);
-  g.fillStyle = css(Theme.ink, opts.dim ? 0.5 : 1);
+  g.fillStyle = css(
+    opts.quiet && !opts.hover && !opts.dim ? Theme.cream : Theme.ink,
+    opts.dim ? 0.5 : 1,
+  );
   // Centre the ink inside the panel's inner face, not the whole box.
   const ty = y + 8 + Math.floor((h - BTN_FRAME - font.height) * 0.5);
   printf(g, font, label, x, ty, w, "center");

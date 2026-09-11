@@ -30,7 +30,11 @@ export const Theme = {
   // when there was nothing behind it. With the city on the WebGL layer the
   // panels are glass over neon — enough to read text on, not so much that the
   // three.js work is invisible on every screen but the map.
-  paper: [0.1, 0.09, 0.24, 0.84] as RGBA,
+  //
+  // It is `navy` at 0.84 rather than a hand-mixed float triple. This is the
+  // surface every panel in the game is built on, so it is the last colour that
+  // should have come from a picker instead of from the palette.
+  paper: c(28, 36, 92, 0.84),
 
   landW: 1280,
   landH: 720,
@@ -41,8 +45,11 @@ export const Theme = {
 /** Each track's colour on the map buttons, and the haze over the overworld. */
 export const TRACK_COL: Record<string, RGBA> = {
   go: Theme.cyan,
-  rust: [0.95, 0.47, 0.16, 1],
-  python: [0.36, 0.62, 0.92, 1],
+  // On the 8-per-channel grid the rest of the palette sits on, and still
+  // unmistakably Ferris. The previous 242,120,41 was off-grid and it was the
+  // identity colour of a whole land.
+  rust: c(248, 152, 56),
+  python: c(92, 158, 236),
 };
 
 export const TRACK_HAZE: Record<string, RGBA> = {

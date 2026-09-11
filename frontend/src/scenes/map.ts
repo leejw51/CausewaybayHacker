@@ -1,41 +1,58 @@
 /**
  * The overworld.
  *
- * Nodes come from `world.map` with `x`/`y` as fractions of the map image
- * (SPEC §6.3), which is what lets the art be replaced without touching
- * content — and, more usefully here, lets the same node positions work in both
- * orientations: the fractions are mapped onto whatever rectangle the layout
- * hands over, portrait or landscape.
+ * Nodes come from `world.map` with `x`/`y` as fractions **of the map image**
+ * (SPEC §6.3). That wording is the whole geometry of this screen: the plate is
+ * sized to the art's aspect ratio and the art is drawn to fill it exactly, so
+ * a fraction is a place on the picture and node 1 stands where it was authored
+ * to stand. Mapping those fractions onto whatever rectangle the layout happened
+ * to leave over — which is what this did before — spreads the nodes across a
+ * crop of the picture, and in portrait that put node 1 in the harbour.
  *
- * The paths are drawn from `edges`, as a Super Mario World map draws them:
- * a thick ink line, a lighter core, and a row of dots along it. An edge into a
- * node that is still locked is drawn faint, so the shape of the map is visible
- * before the streets are.
+ * The paths are drawn from `edges`, as a Super Mario World map draws them: a
+ * thick ink line, a lighter core, and a row of dots along it. They bend, by a
+ * fixed perpendicular offset that alternates with the edge index, because a
+ * straight chord between two points on a drawn landscape is a wire and a map
+ * of a place is a walk.
  */
 import type { App, Scene } from "../app";
 import { ensureFonts, printf } from "../engine/text";
-import { css, Theme } from "../engine/theme";
+import { css, Theme, TRACK_HAZE } from "../engine/theme";
 import { clipped, fill, panel, type Ctx, type Rect } from "../engine/ui";
 import {
   clearRibbon,
   clearedStamp,
+  difficulty as drawDifficulty,
   footer,
   header,
   stars as drawStars,
   GO,
   RUST,
 } from "../ui/chrome";
-import { Chase, seconds, Tween } from "../engine/motion";
+import { seconds, Tween } from "../engine/motion";
 import type { Category, Land, MapNode } from "../net/protocol";
 import { LandsScene } from "./lands";
 import { QuestScene } from "./quest";
 
+/** The overworld art, per land. Two places, not one plate and a tint. */
+const PLATE: Record<Land, string> = { rust: "map_rust", go: "map_go" };
+
 /**
- * How far the camera travels, as a fraction of the plate, for a node at the
- * very edge of the map. Small on purpose: enough that the eye follows the
- * move, never so much that a corner node pushes its neighbours out of sight.
+ * The face at the end of each category, keyed by the quest it guards.
+ *
+ * By quest id rather than by node number: the number is a position in a pack
+ * and the art is a portrait of one specific antagonist. THE AUTOCOMPLETE is
+ * node 12 of rust/basic today and the sprite should follow the quest if that
+ * ever changes.
  */
-const CAM_REACH = 0.16;
+const BOSS: Record<string, string> = {
+  "rust.basic.12.traits": "boss_autocomplete",
+  "rust.advanced.10.deadlock": "boss_deadlock",
+  "rust.hacker.08.top-k": "boss_whiteboard",
+  "go.basic.12.nil-and-order": "boss_nullptr",
+  "go.advanced.10.race": "boss_race",
+  "go.hacker.08.kth-largest": "boss_clock",
+};
 
 export class MapScene implements Scene {
   readonly name = "map";
@@ -47,14 +64,6 @@ export class MapScene implements Scene {
   private t = 0;
   private status = "";
   private plate: Rect = [0, 0, 1, 1];
-  /**
-   * The camera. The selected street drifts toward the middle of the plate
-   * rather than jumping there, on the expo curve — almost still, then quick,
-   * then almost still, which is what makes it read as a camera being moved by
-   * somebody rather than as the map being redrawn.
-   */
-  private readonly camX = new Chase(0, "camera");
-  private readonly camY = new Chase(0, "camera");
   /** Each node's arrival, staggered, so the overworld assembles itself. */
   private pops: Tween[] = [];
   private readonly plateIn = new Tween(seconds("panel"));
@@ -130,15 +139,6 @@ export class MapScene implements Scene {
     this.plateIn.update(dt);
     this.infoIn.update(dt);
     for (const p of this.pops) p.update(dt);
-    const n = this.nodes[this.selected];
-    if (n) {
-      // A third of the offset, capped: enough that the eye follows the move,
-      // never so much that a corner node pushes its neighbours off the plate.
-      this.camX.to(Math.max(-0.5, Math.min(0.5, n.x - 0.5)) * CAM_REACH);
-      this.camY.to(Math.max(-0.5, Math.min(0.5, n.y - 0.5)) * CAM_REACH * 0.75);
-    }
-    this.camX.update(dt);
-    this.camY.update(dt);
   }
 
   // -- input ---------------------------------------------------------------
@@ -187,28 +187,39 @@ export class MapScene implements Scene {
 
   // -- geometry ------------------------------------------------------------
 
-  /** The rectangle the 0..1 node coordinates are mapped onto. */
+  /**
+   * The rectangle the 0..1 node coordinates are mapped onto — which is also,
+   * exactly, the rectangle the art is drawn into.
+   *
+   * The plate takes the art's aspect ratio and is centred in whatever the
+   * layout left over. Letting it take the whole area instead would mean either
+   * stretching the overworld or cropping it, and a crop is what divorced the
+   * nodes from the ground they were authored against.
+   */
   private mapPlate(): Rect {
     const { layout } = this.app;
     const s = layout.uiScale();
+    const portrait = layout.isPortrait();
     const top = Math.round(38 * s) + Math.round(8 * s);
     const bottom = layout.vh - Math.round(26 * s) - Math.round(8 * s);
-    const infoH = Math.round((layout.isPortrait() ? 150 : 96) * s);
-    return [
-      Math.round(8 * s),
-      top,
-      layout.vw - Math.round(16 * s),
-      Math.max(40, bottom - top - infoH - Math.round(8 * s)),
-    ];
+    const infoH = Math.round((portrait ? 150 : 108) * s);
+    const availX = Math.round(8 * s);
+    const availW = layout.vw - Math.round(16 * s);
+    const availH = Math.max(40, bottom - top - infoH - Math.round(8 * s));
+    // From the manifest, not from a loaded image: the JPEG arrives late and a
+    // plate that resized when it landed would move every node under the cursor.
+    const size = this.app.assets?.size(PLATE[this.land], portrait) ?? { w: 3, h: 2 };
+    const scale = Math.min(availW / size.w, availH / size.h);
+    const w = Math.max(40, Math.round(size.w * scale));
+    const h = Math.max(40, Math.round(size.h * scale));
+    return [availX + Math.round((availW - w) / 2), top + Math.round((availH - h) / 2), w, h];
   }
 
   private nodeAt(n: MapNode): [number, number] {
     const [x, y, w, h] = this.plate;
-    // The camera offset is in plate fractions and is applied to the art and
-    // the nodes identically — `x`/`y` are fractions *of the map image*
-    // (PROTOCOL §5.2), so a node that parallaxed away from its landmark would
-    // simply be in the wrong place.
-    return [x + (n.x - this.camX.value) * w, y + (n.y - this.camY.value) * h];
+    // `x`/`y` are fractions of the map image (PROTOCOL §5.2) and the plate *is*
+    // the map image, so this is the whole mapping.
+    return [x + n.x * w, y + n.y * h];
   }
 
   private nodeRadius(): number {
@@ -268,29 +279,17 @@ export class MapScene implements Scene {
   private drawPlate(g: Ctx): void {
     const [x, y, w, h] = this.plate;
     fill(g, Theme.ink, x - 4, y - 4, w + 8, h + 8);
-    const art = this.app.assets?.picture("map_bg", this.app.layout.isPortrait());
+    const art = this.app.assets?.picture(PLATE[this.land], this.app.layout.isPortrait());
     if (art) {
-      clipped(g, x, y, w, h, () => {
-        // Cover, not stretch: the art is 3:2 and the plate is whatever the
-        // window left over, and a squashed overworld looks broken rather than
-        // stylised.
-        // Over-scaled by the camera's reach, so panning never exposes the
-        // plate behind the art. `CAM_REACH` is the largest offset `update`
-        // can ask for, doubled because it pans both ways.
-        const over = 1 + CAM_REACH * 2.2;
-        const scale = Math.max(w / art.naturalWidth, h / art.naturalHeight) * over;
-        const aw = art.naturalWidth * scale;
-        const ah = art.naturalHeight * scale;
-        g.globalAlpha = 0.72;
-        g.drawImage(
-          art,
-          x + (w - aw) / 2 - this.camX.value * w,
-          y + (h - ah) / 2 - this.camY.value * h,
-          aw,
-          ah,
-        );
-        g.globalAlpha = 1;
-      });
+      // The plate already has the art's aspect ratio, so this is a plain
+      // stretch onto a rectangle of the same shape — no crop, no letterbox,
+      // and every node fraction still means what it meant to the author.
+      g.drawImage(art, x, y, w, h);
+      // The haze: the land's own colour laid over the ground, which is what
+      // ties the panel borders and the accent to the place they frame. It was
+      // specified in `theme.ts` and never applied to anything until now.
+      const haze = TRACK_HAZE[this.land];
+      if (haze) fill(g, haze, x, y, w, h, haze[3]);
     } else {
       fill(g, Theme.navy, x, y, w, h, 0.7);
     }
@@ -301,34 +300,62 @@ export class MapScene implements Scene {
   private drawEdges(g: Ctx): void {
     const byId = new Map(this.nodes.map((n) => [n.quest_id, n]));
     const s = this.app.layout.uiScale();
-    for (const [from, to] of this.edges) {
+    for (let e = 0; e < this.edges.length; e++) {
+      const [from, to] = this.edges[e];
       const a = byId.get(from);
       const b = byId.get(to);
       if (!a || !b) continue;
       const [ax, ay] = this.nodeAt(a);
       const [bx, by] = this.nodeAt(b);
+      // One control point, offset perpendicular to the midpoint, its sign
+      // alternating with the edge index. Four lines, and every chord becomes
+      // an arc that reads as a street rather than as a cable.
+      const dx = bx - ax;
+      const dy = by - ay;
+      const len = Math.hypot(dx, dy) || 1;
+      const bow = len * 0.12 * (e % 2 === 0 ? 1 : -1);
+      const cx = (ax + bx) / 2 - (dy / len) * bow;
+      const cy = (ay + by) / 2 + (dx / len) * bow;
       const walked = a.state === "cleared";
+      const path = () => {
+        g.beginPath();
+        g.moveTo(ax, ay);
+        g.quadraticCurveTo(cx, cy, bx, by);
+      };
       g.lineCap = "round";
       g.strokeStyle = css(Theme.ink, 0.9);
       g.lineWidth = 7 * s;
-      g.beginPath();
-      g.moveTo(ax, ay);
-      g.lineTo(bx, by);
+      path();
       g.stroke();
       g.strokeStyle = css(walked ? Theme.coin : Theme.cream, walked ? 1 : 0.5);
       g.lineWidth = 4 * s;
+      path();
       g.stroke();
-      // The dots: a step every eight virtual pixels, so a long street reads as
-      // a walk rather than a wire.
-      const len = Math.hypot(bx - ax, by - ay);
+      // The dots: a step every nine virtual pixels along the *curve*, so the
+      // walk and the line it is drawn on are the same shape.
       const steps = Math.max(1, Math.floor(len / (9 * s)));
       g.fillStyle = css(walked ? Theme.cream : Theme.dim, walked ? 0.9 : 0.4);
       for (let i = 1; i < steps; i++) {
         const u = i / steps;
-        g.fillRect(ax + (bx - ax) * u - s, ay + (by - ay) * u - s, 2 * s, 2 * s);
+        const k = 1 - u;
+        const px = k * k * ax + 2 * k * u * cx + u * u * bx;
+        const py = k * k * ay + 2 * k * u * cy + u * u * by;
+        g.fillRect(px - s, py - s, 2 * s, 2 * s);
       }
       g.lineWidth = 1;
     }
+  }
+
+  /**
+   * The marker a node wears.
+   *
+   * Silhouette carries the meaning, not colour: a padlock disc for locked, a
+   * spiked gear for a boss, a plain coin for an ordinary street. Node 12 is
+   * THE AUTOCOMPLETE and it used to be drawn exactly like node 5.
+   */
+  private markerFor(n: MapNode): string {
+    if (n.state === "locked") return "node_locked";
+    return n.kind === "boss" ? "node_boss" : "node_quest";
   }
 
   private drawNodes(g: Ctx): void {
@@ -343,43 +370,53 @@ export class MapScene implements Scene {
       if (pop <= 0.001) continue;
       const pulse = chosen ? 1 + 0.08 * Math.sin(this.t * 6) : 1;
       const rr = r * pulse * pop;
+      // A boss is bigger than a street, because it is.
+      const scale = n.kind === "boss" ? 1.3 : 1;
+      const mark = this.app.assets?.picture(this.markerFor(n)) ?? null;
 
-      const face =
-        n.state === "cleared" ? Theme.admit : n.state === "open" ? Theme.coin : Theme.dim;
-      g.fillStyle = css(Theme.ink);
-      g.beginPath();
-      g.arc(x, y, rr + 3 * s, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = css(face, n.state === "locked" ? 0.6 : 1);
-      g.beginPath();
-      g.arc(x, y, rr, 0, Math.PI * 2);
-      g.fill();
-      // The highlight: a 16-bit sphere is a circle with a dot in the top left.
-      g.fillStyle = "rgba(255,255,255,0.35)";
-      g.beginPath();
-      g.arc(x - rr * 0.3, y - rr * 0.35, rr * 0.3, 0, Math.PI * 2);
-      g.fill();
+      if (mark) {
+        const d = rr * 2.3 * scale;
+        g.save();
+        if (n.state === "locked") g.globalAlpha = 0.75;
+        g.drawImage(mark, x - d / 2, y - d / 2, d, d);
+        g.restore();
+      } else {
+        // Until the markers arrive, the old discs — the map must be playable
+        // on the first frame, not only once the art has downloaded.
+        const face =
+          n.state === "cleared" ? Theme.admit : n.state === "open" ? Theme.coin : Theme.dim;
+        g.fillStyle = css(Theme.ink);
+        g.beginPath();
+        g.arc(x, y, rr + 3 * s, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = css(face, n.state === "locked" ? 0.6 : 1);
+        g.beginPath();
+        g.arc(x, y, rr, 0, Math.PI * 2);
+        g.fill();
+      }
 
-      g.fillStyle = css(Theme.ink);
-      printf(
-        g,
-        fonts.stationSm,
-        String(n.node),
-        x - r,
-        y - fonts.stationSm.height / 2,
-        r * 2,
-        "center",
-      );
+      // The number rides on the marker at `ui` size. At `stationSm` — an 8px
+      // pixel font — it was a smudge inside an 18px circle.
+      const nf = n.kind === "boss" ? fonts.stationSm : fonts.ui;
+      // On a locked node the number sits low, so the padlock's shackle stays
+      // visible above it — the lock is the whole reason the marker is there.
+      const ny = y - nf.height / 2 + (n.state === "locked" ? rr * 0.22 : 0);
+      g.fillStyle = css(Theme.ink, 0.85);
+      printf(g, nf, String(n.node), x - r + 1, ny + 1, r * 2, "center");
+      // Cream on every state: a padlock marker is busy and a dim number on it
+      // is a number nobody can read, which defeats numbering the map at all.
+      g.fillStyle = css(Theme.cream, n.state === "locked" ? 0.85 : 1);
+      printf(g, nf, String(n.node), x - r, ny, r * 2, "center");
 
       if (n.state === "cleared") {
-        clearRibbon(g, x, y, r * 2.6);
-        drawStars(g, x - r * 1.2, y + r * 2.1, r * 0.42, n.stars, 3);
+        clearRibbon(g, x, y + rr * 0.75, r * 2.6);
+        drawStars(g, x - r * 1.2, y + r * 2.3, r * 0.42, n.stars, 3);
       }
       if (chosen) {
         g.strokeStyle = css(Theme.cyan, 0.8 + 0.2 * Math.sin(this.t * 8));
         g.lineWidth = 2 * s;
         g.beginPath();
-        g.arc(x, y, rr + 6 * s, 0, Math.PI * 2);
+        g.arc(x, y, rr * 1.25 * scale + 4 * s, 0, Math.PI * 2);
         g.stroke();
         g.lineWidth = 1;
       }
@@ -401,41 +438,82 @@ export class MapScene implements Scene {
     const n = this.nodes[this.selected];
     const ix = x + Math.round(14 * s);
     const iw = w - Math.round(28 * s);
-    let iy = top + Math.round(16 * s);
+    let iy = top + Math.round(14 * s);
     if (!n) {
       g.fillStyle = css(Theme.dim);
       printf(g, fonts.small, "nothing here yet", ix, iy, iw, "center");
       return;
     }
-    if (n.state === "cleared") {
-      // The stamp the milestone asks for, at a size it can actually be read at.
-      clearedStamp(g, x + w - Math.round(90 * s), top + h / 2, Math.round(150 * s), -0.14);
+    const stampW = Math.round(104 * s);
+    // The boss gets a face on the plate before you go in, and the stamp takes
+    // its place once it is beaten. Six antagonists exist as art and none of
+    // them had ever been on screen.
+    const boss =
+      n.state === "cleared" ? null : (this.app.assets?.picture(BOSS[n.quest_id] ?? "") ?? null);
+    if (boss) {
+      const d = Math.min(h - Math.round(12 * s), Math.round(96 * s));
+      const box = this.app.assets?.box.get(BOSS[n.quest_id] ?? "");
+      const scale = d / boss.naturalHeight;
+      const feet = box ? box.feet * scale : d;
+      g.save();
+      if (n.state === "locked") g.globalAlpha = 0.45;
+      g.drawImage(
+        boss,
+        x + w - Math.round(20 * s) - boss.naturalWidth * scale,
+        top + h - Math.round(6 * s) - feet,
+        boss.naturalWidth * scale,
+        d,
+      );
+      g.restore();
     }
+    if (n.state === "cleared") {
+      // On its own ground at the end of the plate, not dropped across the
+      // stars: the payoff and the score are two facts, not one collision.
+      clearedStamp(g, this.app, x + w - stampW * 0.72, top + h / 2, stampW, -0.14);
+    }
+    const textW = n.state === "cleared" || boss ? iw - stampW : iw;
+
     g.fillStyle = css(accent);
-    printf(g, fonts.station, `${String(n.node).padStart(2, "0")}  ${n.title}`, ix, iy, iw, "left");
-    iy += fonts.station.height + Math.round(6 * s);
-    drawStars(
-      g,
-      ix + Math.round(6 * s),
-      iy + fonts.small.height * 0.4,
-      Math.round(6 * s),
-      n.difficulty,
-      5,
-    );
-    g.fillStyle = css(Theme.cream);
     printf(
       g,
-      fonts.small,
-      n.state === "cleared"
-        ? `CLEARED · ${n.stars}/3 STARS`
-        : n.state === "locked"
-          ? "LOCKED — clear the street before it"
-          : "OPEN",
-      ix + Math.round(90 * s),
+      fonts.station,
+      `${String(n.node).padStart(2, "0")}  ${n.title}${n.kind === "boss" ? "  ·  BOSS" : ""}`,
+      ix,
       iy,
-      iw - Math.round(90 * s),
+      textW,
       "left",
     );
+    iy += fonts.station.height + Math.round(10 * s);
+
+    // Difficulty is a property of the street; stars are what the player did.
+    // They are on separate rows in separate glyphs for exactly that reason.
+    const barW = Math.min(Math.round(120 * s), Math.round(textW * 0.4));
+    drawDifficulty(g, ix, iy, barW, n.difficulty, 5);
+
+    const sx = ix + barW + Math.round(24 * s);
+    if (n.state === "cleared") {
+      g.fillStyle = css(Theme.dim);
+      printf(g, fonts.stationSm, "STARS", sx, iy, textW, "left");
+      drawStars(
+        g,
+        sx + Math.round(8 * s),
+        iy + fonts.stationSm.height + Math.round(10 * s),
+        Math.round(7 * s),
+        n.stars,
+        3,
+      );
+    } else {
+      g.fillStyle = css(n.state === "locked" ? Theme.dim : Theme.coin);
+      printf(
+        g,
+        fonts.small,
+        n.state === "locked" ? "LOCKED — clear the street before it" : "OPEN",
+        sx,
+        iy + Math.round(2 * s),
+        textW - (sx - ix),
+        "left",
+      );
+    }
   }
 
   resized(): void {

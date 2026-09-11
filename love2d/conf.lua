@@ -11,6 +11,7 @@
 function love.conf(t)
   local testing = os.getenv("CWBH_TEST") == "1"
   local portrait = os.getenv("CWBH_ORIENT") == "portrait"
+  local driving = (os.getenv("CWBH_DRIVE") or "") ~= ""
 
   t.identity = "causewaybay-hacker"
   t.version = "11.5"
@@ -30,7 +31,12 @@ function love.conf(t)
   t.window.resizable = true
   t.window.fullscreen = false
   t.window.fullscreentype = "desktop"
-  t.window.vsync = 1
+  -- Vsync off while a drive script is running. macOS stalls the display link
+  -- for a window nobody can see, and a vsynced loop then runs at nearly zero
+  -- frames — which stops `love.update`, which stops the script, and the run
+  -- hangs rather than failing. Unthrottled it finishes whether the window is
+  -- on screen or behind everything.
+  t.window.vsync = (testing or driving) and 0 or 1
   t.window.msaa = 0
   t.window.highdpi = true
 

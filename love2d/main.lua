@@ -51,6 +51,19 @@ function love.load(args)
   local script = os.getenv("CWBH_DRIVE")
   if script and script ~= "" then
     drive = require("src.drive").load(script)
+    -- A Lua error under a drive script must *fail*, not hang. LÖVE's default
+    -- handler replaces the update and draw callbacks with its blue screen and
+    -- waits for a human, so an unattended run stops making progress and the
+    -- script never times out — which reads as "still going" for as long as
+    -- anybody is willing to wait. This one prints the traceback and exits
+    -- non-zero, which is what a test harness needs.
+    function love.errorhandler(message)
+      io.stderr:write("drive: the client crashed\n")
+      io.stderr:write(tostring(message) .. "\n")
+      io.stderr:write(debug.traceback("", 2) .. "\n")
+      return function() return 1 end
+    end
+    love.errhand = love.errorhandler
   end
 end
 

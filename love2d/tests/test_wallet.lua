@@ -94,8 +94,55 @@ return function()
     local d = wallet.describe(lib)
     T.ok(d ~= nil)
     T.eq(d.abi, wallet.ABI_VERSION)
+    T.eq(d.abi, 2, "2 is the contract with `generate` in it")
     T.eq(d.path_template, "m/44'/60'/0'/0/{index}")
-    T.same(d.never_returns, { "mnemonic", "private_key", "seed" })
+    -- A private key and a seed never come back. A generated mnemonic does,
+    -- exactly once, and the library says so rather than leaving it implicit.
+    T.same(d.never_returns, { "private_key", "seed" })
+    T.same(d.returns_key_material_once, { "generate.mnemonic" })
+  end)
+
+  T.section("wallet — NEW WALLET, the way in for a first-time player")
+
+  T.case("a generated phrase is twelve valid words with a real address", function()
+    local out, err = wallet.generate(lib, 12)
+    T.ok(out ~= nil, tostring(err))
+    if not out then return end
+    T.eq(out.words, 12)
+    local words = {}
+    for word in out.mnemonic:gmatch("%S+") do words[#words + 1] = word end
+    T.eq(#words, 12)
+    T.eq(out.path, "m/44'/60'/0'/0/0")
+    T.eq(#out.address, 42)
+    T.eq(out.address:sub(1, 2), "0x")
+    T.eq(wallet.validate(lib, out.mnemonic), true)
+
+    -- The address on the WRITE THIS DOWN screen has to be the account the
+    -- player actually logs into, or they write down one wallet and use
+    -- another.
+    local derived = wallet.derive(lib, out.mnemonic, 0)
+    T.eq(derived.address, out.address)
+    local signed = wallet.sign(lib, out.mnemonic, 0, "Causewaybay Hacker login\ntest")
+    T.eq(signed.address, out.address)
+    T.eq(#signed.signature, 132)
+  end)
+
+  T.case("two generations never collide", function()
+    local seen = {}
+    for i = 1, 24 do
+      local out = wallet.generate(lib, 12)
+      T.ok(out ~= nil)
+      if out then
+        T.eq(seen[out.mnemonic], nil, ("generation %d repeated an earlier phrase"):format(i))
+        seen[out.mnemonic] = true
+      end
+    end
+  end)
+
+  T.case("a word count BIP-39 does not have is refused, with no phrase", function()
+    local out, err = wallet.generate(lib, 13)
+    T.eq(out, nil)
+    T.ok(type(err) == "string" and err:find("13") ~= nil)
   end)
 
   local dir = vectors_dir()

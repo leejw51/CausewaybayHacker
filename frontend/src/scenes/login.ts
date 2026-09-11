@@ -18,6 +18,17 @@
  * The field itself is a DOM textarea, because twelve words arrive by paste and
  * a canvas cannot take a paste. It is `autocomplete="off"`, never read except
  * on submit, and cleared the moment the derivation succeeds.
+ *
+ * The screen also *hands out* a phrase, which is the difference between a game
+ * you can start and one you cannot. Before this the only field on the only
+ * reachable screen was "twelve words, or 0x + 64 hex" and nothing anywhere in
+ * the project could produce twelve words — a player who had never run
+ * `CausewaybayWallet` was simply locked out of the front door.
+ *
+ * A generated phrase is shown once, on a panel that says so, and the player has
+ * to say they have written it down before it goes anywhere near the field. It
+ * lives in one field on this scene, is wiped in `leave()`, and is never logged,
+ * never stored and never sent.
  */
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
@@ -32,6 +43,7 @@ import {
   addressFromMnemonic,
   addressFromPrivateKeyHex,
   current,
+  newMnemonic,
   signMessage,
   unlock,
 } from "../wallet/wallet";
@@ -47,6 +59,11 @@ export class LoginScene implements Scene {
   private preview = "";
   private status = "";
   private busy = false;
+  /**
+   * A freshly generated phrase, while it is being shown. Key material: it is
+   * held here and nowhere else, and `leave()` drops it.
+   */
+  private minted: string[] | null = null;
   private t = 0;
   private readonly leftIn = new Tween(seconds("panel"));
   private readonly rightIn = new Tween(seconds("panel"), seconds("stagger"));
@@ -81,7 +98,30 @@ export class LoginScene implements Scene {
   leave(): void {
     // Whatever is in the box is key material. It does not outlive the screen.
     this.field.value = "";
+    this.minted = null;
     this.overlay.destroy();
+  }
+
+  /** Twelve new words, shown once. Nothing is sent and nothing is stored. */
+  private mint(): void {
+    this.minted = newMnemonic().split(" ");
+    this.preview = addressFromMnemonic(this.minted.join(" ")).eip55;
+    this.status = "";
+    this.field.value = "";
+  }
+
+  /**
+   * The player says they have it. Only now does the phrase reach the field,
+   * so the words cannot be quietly submitted from behind the panel that is
+   * telling somebody to write them down.
+   */
+  private acceptMinted(): void {
+    if (!this.minted) return;
+    this.field.value = this.minted.join(" ");
+    this.minted = null;
+    this.status = "the phrase is in the box — press ENTER";
+    this.derivePreview();
+    queueMicrotask(() => this.field.focus());
   }
 
   private derivePreview(): void {
@@ -157,6 +197,12 @@ export class LoginScene implements Scene {
     if (!hit) return;
     this.app.chip.select();
     if (hit.id === "enter") void this.submit();
+    if (hit.id === "new") this.mint();
+    if (hit.id === "keep") this.acceptMinted();
+    if (hit.id === "discard") {
+      this.minted = null;
+      this.preview = "";
+    }
     if (hit.id === "clear") {
       this.field.value = "";
       this.preview = "";
@@ -173,7 +219,10 @@ export class LoginScene implements Scene {
   key(name: string, ev: KeyboardEvent): void {
     if (name === "return" || name === "kpenter") {
       ev.preventDefault();
-      void this.submit();
+      // While the words are on screen, Enter means "yes, I have them" — not
+      // "log in with a phrase I have not written down yet".
+      if (this.minted) this.acceptMinted();
+      else void this.submit();
     }
   }
 
@@ -190,33 +239,47 @@ export class LoginScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
-    // With the city behind, the flat title art is redundant — it is only
-    // drawn where WebGL could not start, so the screen is never bare.
-    if (!this.app.backdrop) {
-      const bg = this.app.assets?.picture("title_bg", layout.isPortrait());
-      if (bg) {
-        g.globalAlpha = 0.45;
-        g.drawImage(bg, 0, 0, layout.vw, layout.vh);
-        g.globalAlpha = 1;
-        fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.35);
-      }
-    }
-
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
+
+    // The establishing shot.
+    //
+    // The review asked for the painted plate *behind* the generated parallax
+    // bands. That is not buildable as written — the WebGL canvas is behind the
+    // 2D one, so the only way under the bands is to make the plate a texture
+    // inside `gfx/backdrop.ts` — and it would not work if it were: `title_bg`
+    // is a bright morning street and the bands are night silhouettes, so
+    // compositing them reads as a mistake rather than as depth.
+    //
+    // So on this one screen the painting wins outright and the bands are
+    // suppressed (`Mood.title` dims them to nothing). The generated city is a
+    // good middle distance and a poor establishing shot; the first screen a
+    // player ever sees should be a tram on Percival Street, not a blue skyline
+    // that could be any city at night.
+    const plate = this.app.assets?.picture("title_bg", layout.isPortrait());
+    if (plate) {
+      const scale = Math.max(layout.vw / plate.naturalWidth, layout.vh / plate.naturalHeight);
+      const aw = plate.naturalWidth * scale;
+      const ah = plate.naturalHeight * scale;
+      g.drawImage(plate, (layout.vw - aw) / 2, (layout.vh - ah) / 2, aw, ah);
+      // A gradient down to the void, so the furniture in the lower half sits
+      // on something dark enough to read against without flattening the art.
+      const grad = g.createLinearGradient(0, layout.vh * 0.32, 0, layout.vh);
+      grad.addColorStop(0, "rgba(20,28,72,0)");
+      grad.addColorStop(1, "rgba(20,28,72,0.92)");
+      g.fillStyle = grad;
+      g.fillRect(0, 0, layout.vw, layout.vh);
+    }
+
     header(g, this.app, "LOGIN");
     this.buttons.reset();
 
-    // One centred column, not two boxes edge to edge. The skyline is the
-    // thing this screen is about — a wallet address is not a welcome — so the
-    // furniture is kept narrow and the city is left room above and below it.
     const colW = Math.min(layout.vw - Math.round(32 * s), Math.round(560 * s));
     const colX = Math.round((layout.vw - colW) / 2);
     const top = Math.round(38 * s);
-    const bottom = layout.vh - Math.round(26 * s);
 
-    // The title, set over the harbour rather than inside a box.
-    const titleY = top + Math.round((layout.isPortrait() ? 74 : 42) * s);
+    // The title, set over the street rather than inside a box.
+    const titleY = top + Math.round((layout.isPortrait() ? 60 : 34) * s);
     const rise = (1 - this.leftIn.out) * Math.round(24 * s);
     g.save();
     g.globalAlpha = Math.min(1, this.leftIn.raw * 2);
@@ -232,88 +295,207 @@ export class LoginScene implements Scene {
     );
     g.restore();
 
-    const cardY = titleY + Math.round(fonts.title.height * 2.5);
-    const cardH = Math.round((layout.isPortrait() ? 250 : 214) * s);
+    const cardY = titleY + Math.round(fonts.title.height * 2.4);
     const drop = (1 - this.rightIn.out) * Math.round(46 * s);
     g.save();
     g.globalAlpha = Math.min(1, this.rightIn.raw * 2.2);
     g.translate(0, drop);
-
-    const card = titledPanel(g, [colX, cardY, colW, cardH], "SEED PHRASE OR PRIVATE KEY", RUST);
-    const fieldH = Math.max(fonts.small.height * 3, Math.round(cardH * 0.34));
-    well(g, card[0], card[1], card[2], fieldH);
-    this.fieldRect = [card[0] + 4, card[1] + 4, card[2] - 8, fieldH - 8];
-    // The textarea is a DOM element and knows nothing about the canvas
-    // transform, so it waits for the card to land rather than hanging in the
-    // air while the panel drops underneath it.
-    if (this.rightIn.finished) this.overlay.place(this.fieldRect, fonts.small.size);
-    else this.overlay.hide();
-
-    let y = card[1] + fieldH + Math.round(8 * s);
-    g.fillStyle = css(Theme.cyan);
-    printf(g, fonts.stationSm, "YOU WILL BE", card[0], y, card[2], "left");
-    y += fonts.stationSm.height + Math.round(4 * s);
-    g.fillStyle = css(this.preview ? Theme.coin : Theme.dim);
-    printf(g, fonts.small, this.preview || "—", card[0], y, card[2], "left");
-    y += fonts.small.height + Math.round(8 * s);
-
-    this.buttons.row(
-      fonts.button,
-      [card[0], y, card[2], card[3]],
-      [
-        { id: "enter", label: this.busy ? "…" : "ENTER", dim: this.busy },
-        { id: "clear", label: "CLEAR" },
-      ],
-      layout.minTouchH(),
-    );
+    const bottom = this.minted
+      ? this.drawPhrase(g, colX, cardY, colW)
+      : this.drawKeyCard(g, colX, cardY, colW);
     this.buttons.draw(g, fonts.button);
     g.restore();
 
     if (this.status) {
-      g.fillStyle = css(this.busy ? Theme.cyan : Theme.red);
-      printf(g, fonts.small, this.status, colX, cardY + cardH + Math.round(6 * s), colW, "center");
+      g.fillStyle = css(this.busy ? Theme.cyan : this.minted ? Theme.coin : Theme.red);
+      printf(g, fonts.small, this.status, colX, bottom + Math.round(8 * s), colW, "center");
     }
 
-    // Supporting copy, not a second panel: it is read once, and giving it
-    // chrome of its own would make it compete with the thing you have to do.
-    const noteY = cardY + cardH + Math.round(30 * s);
-    if (noteY < bottom - fonts.small.height * 3) {
-      // A scrim, because the city behind is busy exactly where this sits and
-      // supporting copy that has to be fought for is not supporting anything.
-      const lines = wrap(
-        fonts.small,
-        "Your phrase becomes a key here, in this tab, on m/44'/60'/0'/0/0 — the path" +
-          " CausewaybayWallet uses, so one phrase is one you in both. It is never sent:" +
-          " the server asks you to sign a line of text and works out who you are from the" +
-          " signature. Only the session token is kept.",
-        colW,
-      ).length;
-      fill(
+    footer(
+      g,
+      layout,
+      this.minted
+        ? "ENTER  I HAVE WRITTEN IT DOWN      F1  ORIENTATION"
+        : "ENTER  LOG IN      F1  ORIENTATION",
+    );
+  }
+
+  /**
+   * The key card: the field, who it makes you, and the way in.
+   *
+   * Sized to what is in it, not to the window. A panel stretched to the
+   * viewport with its contents at the top reads as unfinished, and this is the
+   * first screen anybody sees.
+   */
+  private drawKeyCard(g: Ctx, x: number, y: number, w: number): number {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const pad = Math.round(10 * s);
+    const fieldH = Math.max(fonts.small.height * 2.6, Math.round(78 * s));
+    const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
+    // Two rows of buttons in portrait, where three across will not fit.
+    const btnRows = layout.isPortrait() ? 2 : 1;
+    const cardH =
+      Math.round(30 * s) +
+      fieldH +
+      pad +
+      fonts.stationSm.height +
+      fonts.small.height +
+      pad * 2 +
+      btnH * btnRows +
+      (btnRows - 1) * Math.round(fonts.button.size * 0.5) +
+      pad;
+
+    const card = titledPanel(g, [x, y, w, cardH], "SEED PHRASE OR PRIVATE KEY", RUST);
+    well(g, card[0], card[1], card[2], fieldH);
+    this.fieldRect = [card[0] + 4, card[1] + 4, card[2] - 8, fieldH - 8];
+    if (this.rightIn.finished) this.overlay.place(this.fieldRect, fonts.small.size);
+    else this.overlay.hide();
+
+    let cy = card[1] + fieldH + pad;
+    g.fillStyle = css(Theme.cyan);
+    printf(g, fonts.stationSm, "YOU WILL BE", card[0], cy, card[2], "left");
+    cy += fonts.stationSm.height + Math.round(4 * s);
+    g.fillStyle = css(this.preview ? Theme.coin : Theme.dim);
+    printf(g, fonts.small, this.preview || "—", card[0], cy, card[2], "left");
+    cy += fonts.small.height + pad;
+
+    // NEW WALLET is the answer to "I do not have one of these", which is the
+    // first question this screen has to answer and the one it never did.
+    this.buttons.row(
+      fonts.button,
+      [card[0], cy, card[2], btnH * btnRows],
+      [
+        { id: "enter", label: this.busy ? "…" : "ENTER", dim: this.busy, primary: !this.busy },
+        { id: "new", label: "NEW WALLET" },
+        { id: "clear", label: "CLEAR" },
+      ],
+      layout.minTouchH(),
+    );
+
+    this.drawCustody(g, x, y + cardH + Math.round(14 * s), w);
+    return y + cardH;
+  }
+
+  /**
+   * Twelve words, once.
+   *
+   * This is the whole sign-up, so it is allowed to be the loudest thing on the
+   * screen while it is up. The words are set in the code face at reading size
+   * because they will be copied down by hand onto paper.
+   */
+  private drawPhrase(g: Ctx, x: number, y: number, w: number): number {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const words = this.minted ?? [];
+    const pad = Math.round(10 * s);
+    const cols = layout.isPortrait() ? 2 : 3;
+    const rows = Math.ceil(words.length / cols);
+    const rowH = fonts.code.height + Math.round(10 * s);
+    const gridH = rows * rowH + pad * 2;
+    const warnLines = wrap(
+      fonts.small,
+      "This is the only copy. Nobody can give it back to you — not this tab, not the server.",
+      w - Math.round(24 * s),
+    ).length;
+    const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
+    const btnRows = layout.isPortrait() ? 2 : 1;
+    const cardH =
+      Math.round(30 * s) +
+      gridH +
+      pad +
+      warnLines * fonts.small.height +
+      pad +
+      fonts.stationSm.height +
+      fonts.small.height +
+      pad +
+      btnH * btnRows +
+      (btnRows - 1) * Math.round(fonts.button.size * 0.5) +
+      pad;
+
+    const card = titledPanel(g, [x, y, w, cardH], "WRITE THESE TWELVE WORDS DOWN", Theme.coin);
+    well(g, card[0], card[1], card[2], gridH);
+
+    const cellW = (card[2] - pad * 2) / cols;
+    for (let i = 0; i < words.length; i++) {
+      const cx = card[0] + pad + (i % cols) * cellW;
+      const cyy = card[1] + pad + Math.floor(i / cols) * rowH;
+      g.fillStyle = css(Theme.dim);
+      printf(
         g,
-        Theme.void,
-        colX - Math.round(12 * s),
-        noteY - Math.round(10 * s),
-        colW + Math.round(24 * s),
-        lines * fonts.small.height + Math.round(20 * s),
-        0.78,
+        fonts.stationSm,
+        String(i + 1).padStart(2, "0"),
+        cx,
+        cyy + Math.round(6 * s),
+        cellW,
+        "left",
       );
-      g.globalAlpha = 0.86;
       g.fillStyle = css(Theme.cream);
       printf(
         g,
-        fonts.small,
-        "Your phrase becomes a key here, in this tab, on m/44'/60'/0'/0/0 — the path" +
-          " CausewaybayWallet uses, so one phrase is one you in both. It is never sent:" +
-          " the server asks you to sign a line of text and works out who you are from the" +
-          " signature. Only the session token is kept.",
-        colX,
-        noteY,
-        colW,
-        "center",
+        fonts.code,
+        words[i],
+        cx + Math.round(26 * s),
+        cyy,
+        cellW - Math.round(26 * s),
+        "left",
       );
-      g.globalAlpha = 1;
     }
 
-    footer(g, layout, "ENTER  LOG IN      F1  ORIENTATION      CTRL+ENTER  SUBMIT");
+    let cy = card[1] + gridH + pad;
+    g.fillStyle = css(Theme.coin);
+    printf(
+      g,
+      fonts.small,
+      "This is the only copy. Nobody can give it back to you — not this tab, not the server.",
+      card[0],
+      cy,
+      card[2],
+      "center",
+    );
+    cy += warnLines * fonts.small.height + pad;
+    g.fillStyle = css(Theme.cyan);
+    printf(g, fonts.stationSm, "YOU WILL BE", card[0], cy, card[2], "left");
+    cy += fonts.stationSm.height + Math.round(4 * s);
+    g.fillStyle = css(Theme.coin);
+    printf(g, fonts.small, this.preview || "—", card[0], cy, card[2], "left");
+    cy += fonts.small.height + pad;
+
+    this.buttons.row(
+      fonts.button,
+      [card[0], cy, card[2], btnH * btnRows],
+      [
+        { id: "keep", label: "I HAVE WRITTEN IT DOWN", primary: true },
+        { id: "discard", label: "CANCEL" },
+      ],
+      layout.minTouchH(),
+    );
+    this.overlay.hide();
+    return y + cardH;
+  }
+
+  /**
+   * Two lines about custody, framed.
+   *
+   * It used to be six lines of unframed prose on a screen where everything
+   * else is a hard-edged 16-bit panel, and it explained *custody* to somebody
+   * who did not yet have a key to be custodial about. The screen's first job is
+   * to say what to do; this is the footnote to that.
+   */
+  private drawCustody(g: Ctx, x: number, y: number, w: number): void {
+    const s = this.app.layout.uiScale();
+    const fonts = ensureFonts(s);
+    const copy = "The phrase never leaves this tab. The server only ever sees a signature.";
+    const inner = w - Math.round(24 * s);
+    const lines = wrap(fonts.codeSm, copy, inner);
+    const h = lines.length * fonts.codeSm.height + Math.round(16 * s);
+    if (y + h > this.app.layout.vh - Math.round(30 * s)) return;
+    fill(g, Theme.ink, x, y, w, h, 0.72);
+    fill(g, Theme.dim, x, y, w, 1, 0.5);
+    fill(g, Theme.dim, x, y + h - 1, w, 1, 0.5);
+    g.fillStyle = css(Theme.cream, 0.8);
+    printf(g, fonts.codeSm, copy, x + Math.round(12 * s), y + Math.round(8 * s), inner, "center");
   }
 }

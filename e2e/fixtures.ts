@@ -171,6 +171,19 @@ export async function scene(page: Page): Promise<string | null> {
 }
 
 /**
+ * The screen, without settling.
+ *
+ * `settle()` ticks 150 frames synchronously, which is the right price to pay
+ * for an assertion and the wrong one to pay forty times inside a scan. The
+ * name is correct either way — a scene is swapped in one go — so the only
+ * thing skipping the settle costs is that a transition may still be playing,
+ * which a probe does not care about.
+ */
+export async function sceneNow(page: Page): Promise<string | null> {
+  return page.evaluate(() => window.__cwbCapture?.scene() ?? null);
+}
+
+/**
  * Wait for a screen.
  *
  * Every poll settles first, which is what stops the flake: without it the
@@ -231,7 +244,10 @@ export async function pickFirstCategory(page: Page): Promise<void> {
     const fy = 0.12 + i * 0.01;
     if (fy > 0.95) break;
     await page.mouse.click(x, box.y + box.height * fy);
-    if ((await scene(page)) === "map") return;
+    if ((await sceneNow(page)) === "map") {
+      await atScreen(page, "map");
+      return;
+    }
   }
   throw new Error(
     "no click in the right-hand panel opened a map. The category rows are " +

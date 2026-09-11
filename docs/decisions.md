@@ -1121,3 +1121,132 @@ earned row, and nothing tells the player they are different scales; and an
 internal `attempt att_…` id is on the victory screen.
 
 None of these are visible in the source. All of them are obvious in a PNG.
+
+## 2026-09-11 — FE: the front door was locked, and now it opens
+
+Nothing in the project could produce a BIP-39 phrase. The login screen offered
+one field placeheld "twelve words, or 0x + 64 hex" and two buttons, so a player
+who had never run `CausewaybayWallet` had nothing to type and no way to get
+anything to type. Everything else in a design review is decoration next to
+that.
+
+`wallet/newMnemonic()` is `@scure/bip39`'s `generateMnemonic(wordlist, 128)` —
+128 bits from `crypto.getRandomValues`, nothing reseeded and nothing
+post-processed. The login screen's `NEW WALLET` shows the twelve words on a
+panel that says they are the only copy, and the phrase does not reach the field
+until the player says they have written it down. It lives in one field on that
+scene, `leave()` drops it, and it is never logged, never stored and never sent —
+the same rules as a phrase that was typed.
+
+The custody paragraph went from six unframed lines above the fold to two framed
+ones below it. The first screen's job is to say what to do; why it is safe is
+the footnote to that, and it was answering the second question before the
+first.
+
+## 2026-09-11 — FE: VT323 stays, and it was a choice
+
+`docs/art.md` §1 says "Type is Press Start 2P" and warns that a hacker-terminal
+look "is the one thing that would make it feel like homework". All body copy in
+this client is set in VT323, a DEC VT220 face. Nobody had written down which one
+won, so: VT323 stays, for the brief and the quest text, and Press Start 2P keeps
+every piece of chrome — headers, buttons, labels, the stamp.
+
+The reason is measure. A quest brief is sixty characters to a line and Press
+Start 2P at a legible size gives about twenty-five. Setting the brief in the
+pixel face would mean either three words a line or type too small to read, and
+the screen a player stares at longest is the one that has to be comfortable.
+The register is held by the chrome, the palette and the art, which is where a
+16-bit game actually keeps it.
+
+The twelve-size ladder the review objected to is not rebuilt here — renaming
+and re-scaling twelve fonts touches every measured panel in every scene, and a
+half-migrated ladder is worse than the one we have. The two places where the
+ladder was visibly wrong are fixed: the map's node numbers came off the 8px
+pixel font onto `ui`, and the sample input/output — the most load-bearing text
+on the quest screen and previously the smallest — is set in `code`.
+
+## 2026-09-11 — FE: the overworld is the picture, not a crop of it
+
+SPEC §6.3 says node `x`/`y` are fractions **of the map image**. The map drew the
+art `cover` — scaled to fill and centre-cropped — while spreading the node
+fractions across the whole plate, so the nodes were laid out against a picture
+that was not the one on screen. In portrait the crop took about 30% off the
+sides and node 1 came down in the harbour.
+
+The plate now takes the art's aspect ratio from the manifest, is centred in
+whatever the layout leaves over, and the art is drawn into it exactly. A
+fraction is a place on the picture again, in both orientations, with no content
+change. The aspect comes from the manifest rather than from `naturalWidth`
+because backgrounds are fetched lazily and a plate that resized when the JPEG
+landed would move every node out from under the cursor.
+
+The camera pan went with it. Panning existed to look around a crop; with the
+whole picture on screen there is nothing to pan to, and the over-scan that kept
+the pan from exposing the plate's edge went too.
+
+## 2026-09-11 — FE: what the art is used for, and what it is not
+
+DESIGN's set is 32 assets. Wired up this round: both overworlds, the title
+plate, six per-street backdrops on the quest screen, three node markers, the
+`CLEARED` ring, six boss portraits on the map's info plate, the two mascots, the
+victory ribbon, and the medal.
+
+Four are deliberately not drawn, and it is worth saying why rather than leaving
+them looking forgotten. `fx_trophy` would be a third award on a screen that
+already has a stamp, a ribbon and three stars — Chanel's rule, take one thing
+off. `sprite_mei`, `sprite_alex` and `agent_skynet` are the cast, and `content/`
+carries no speaker on a quest's `story` line: choosing a portrait by looking for
+a name in the prose would be wrong exactly when it mattered. That is a content
+schema question, not a rendering one.
+
+The `box` metadata is what makes a sprite stand on its feet rather than on the
+bottom of its transparent margin, and it is used for the mascots and the boss
+portraits. Per DESIGN's note, nothing anchors a panel frame to `feet`.
+
+## 2026-09-11 — L2D: `generate` is the one op that returns key material
+
+The design review's §1 is right and it applied to the LÖVE client as much as
+to the browser: a player who does not already own a BIP-39 phrase had no way
+into the game, and the README invited them to bring one as though phrases
+appear from somewhere.
+
+The LÖVE client now has a **NEW WALLET** path, and the generation is in the
+Rust cdylib (`love2d/ffi`) rather than in Lua. `rand::rngs::OsRng` into 128
+bits of entropy, checksummed to 12 words. There is deliberately no Lua
+fallback: a phrase out of `math.random` is a wallet anybody can re-derive from
+the clock, and it looks exactly like a good one.
+
+**This breaks the rule that nothing returns key material, and the break is
+deliberate and bounded.** The ABI went 1 → 2 for it, so a binding cannot
+silently get the wrong contract either way. The generated phrase crosses the
+boundary exactly once, to be shown; it is not stored in the library, not
+written to disk, not logged, and not sent. The private key derived from it
+still never crosses. `describe()` says so in data — `never_returns` is now
+`["private_key", "seed"]` and `returns_key_material_once` is
+`["generate.mnemonic"]` — so the exception is auditable rather than folklore.
+
+**The confirmation is three words typed back, not a checkbox.** SPEC §3 makes
+the wallet the identity: there is no reset and no support desk, so a phrase
+that was never actually written down is an account that ends with the machine.
+A checkbox measures clicking a checkbox. `B` re-shows the list for somebody
+who needs it, because a gate nobody can pass is a gate people route around.
+
+*FE may want the same wording and the same confirmation; the browser side is
+FE's to build, and this entry is here so the two clients do not disagree about
+how serious the moment is.*
+
+**Also from the review, in `love2d/`:** difficulty (1..5) and earned stars
+(0..3) no longer share the gold star glyph — difficulty is a segmented bar in
+`brick`, stars stay stars, and the category rows stopped drawing a third scale
+(`stars / 4`) as a star row too. The 32 `art/` assets are wired in, including
+the per-land overworlds, the boss portraits, and `node_quest` / `node_boss` /
+`node_locked` in place of coloured circles.
+
+**One bug worth naming, because it was mine and it was in the safety code.**
+`store.lua` refused to persist "a value that looks like a mnemonic" using a
+heuristic that counted runs of letters. A base64url session token has twelve
+such runs often enough, and the refusal *raised*, through the reply handler,
+so roughly one login in three hung on a spinner forever. The detector now
+describes the actual thing — space-separated alphabetic words, twelve or more
+— and refuses by returning rather than raising: a false positive must cost a
+saved session and never the login itself.

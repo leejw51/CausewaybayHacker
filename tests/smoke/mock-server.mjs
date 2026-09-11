@@ -701,14 +701,20 @@ wss.on("connection", (ws) => {
       }
 
       // ----------------------------------------------------- milestone 2
+      //
+      // `unavailable`, not `not_found`: PROTOCOL.md §3.3 gained the code
+      // precisely for this — a feature that is real and specified but not
+      // built. `not_found` says "no such thing", which is a different
+      // sentence to say to a player, and `internal` would tell them their
+      // machine is broken and invite a retry that cannot work.
       case "search.query":
-        return err(id, type, "not_found", "search (SPEC §8) is not in this build yet", {
+        return err(id, type, "unavailable", "search (SPEC §8) is not in this build yet", {
           milestone: 2,
         });
       case "ai.plan":
       case "ai.next":
       case "ai.finish":
-        return err(id, type, "not_found", "AI drills (SPEC §7.3) are not in this build yet", {
+        return err(id, type, "unavailable", "AI drills (SPEC §7.3) are not in this build yet", {
           milestone: 2,
         });
 

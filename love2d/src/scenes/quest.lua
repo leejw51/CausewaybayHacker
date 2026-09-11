@@ -29,6 +29,21 @@ Quest.__index = Quest
 
 local STAGES = { queued = 1, compiling = 2, running = 3, judging = 4 }
 
+--- Which plate stands behind a quest. `docs/art.md` §5's table, using the
+--- `art/` names; `Assets.pick` falls through to a placeholder when `art/` is
+--- not readable.
+function Quest.backdrop(land, category)
+  if category == "hacker" then
+    return Assets.pick("bg_room732", "bg_flat", "bg_night")
+  end
+  if land == "go" then
+    return Assets.pick(category == "advanced" and "bg_mtr" or "bg_till",
+      "bg_mtr", "bg_flat")
+  end
+  return Assets.pick(category == "advanced" and "bg_times" or "bg_street",
+    "bg_street", "bg_flat")
+end
+
 function Quest.new(app)
   return setmetatable({
     app = app,
@@ -234,7 +249,8 @@ end
 function Quest:draw()
   local vw, vh = Layout.vw, Layout.vh
   local land = (self.quest and self.quest.land) or self.app.land or "rust"
-  Assets.cover(land == "go" and "bg_mtr" or "bg_street", 0, 0, vw, vh)
+  Assets.cover(Quest.backdrop(land, self.quest and self.quest.category
+    or self.app.category), 0, 0, vw, vh)
   love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.78)
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
@@ -247,9 +263,14 @@ function Quest:draw()
   UI.text(title, 12, 10, 13, tint)
   UI.text(self.quest_id or "", 12, 30, 7, Theme.withAlpha(Theme.cream, 0.55))
   if self.quest then
-    UI.stars(vw - 12 - 3 * 13, 12, self.quest.stars or 0, 10)
-    local diff = ("DIFFICULTY %d"):format(self.quest.difficulty or 1)
-    UI.text(diff, vw - 12 - UI.textWidth(diff, 8), 32, 8, Theme.withAlpha(Theme.cream, 0.7))
+    -- Earned stars get the star; difficulty gets pips (design review §4).
+    UI.text("STARS", vw - 12 - 3 * 13 - UI.textWidth("STARS ", 7), 12, 7,
+      Theme.withAlpha(Theme.cream, 0.6))
+    UI.stars(vw - 12 - 3 * 13, 10, self.quest.stars or 0, 10)
+    local pw = UI.pipsWidth(5)
+    UI.text("DIFFICULTY", vw - 12 - pw - UI.textWidth("DIFFICULTY ", 7), 32, 7,
+      Theme.withAlpha(Theme.cream, 0.6))
+    UI.pips(vw - 12 - pw, 30, self.quest.difficulty or 1, 5)
   end
 
   local brief, code = self:panes()

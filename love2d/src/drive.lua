@@ -13,6 +13,9 @@
 --   { key = "return" }                 love.keypressed (+ textinput for a
 --                                      single printable character)
 --   { text = "fn main() {" }           love.textinput, one character at a time
+--                                      (or a function(app) -> string, for
+--                                      text the script cannot know in
+--                                      advance — a freshly generated word)
 --   { click = { x, y } }               a click in virtual coordinates
 --   { orient = "portrait" }            pin the orientation
 --   { resize = { w, h } }              resize the window
@@ -70,7 +73,9 @@ function Drive:fire(step, app)
     press(step.key, step.mods)
     require("src.app").mods_override = nil
   elseif step.text then
-    for _, ch in ipairs(Drive.chars(step.text)) do
+    local text = step.text
+    if type(text) == "function" then text = text(app) end
+    for _, ch in ipairs(Drive.chars(tostring(text))) do
       if ch == "\n" then love.keypressed("return") else love.textinput(ch) end
     end
   elseif step.click then

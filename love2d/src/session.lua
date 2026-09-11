@@ -168,7 +168,14 @@ function Session:adopt(token, user)
   self.user = user
   self.authed = true
   self.last_error = nil
-  self.store.save_session(token, user, self.client.url)
+  -- Persistence is a convenience; the session is live either way. A store
+  -- that cannot write (a full disk, a read-only home, a refusal from
+  -- `check_no_secrets`) costs the player a re-login next launch and nothing
+  -- now, so it is reported and stepped over rather than thrown.
+  local ok, why = pcall(self.store.save_session, token, user, self.client.url)
+  if not ok then
+    self.log("error", "could not persist the session: " .. tostring(why))
+  end
 end
 
 function Session:forget_token(why)

@@ -11,9 +11,9 @@
  * drill you on later (SPEC §7).
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf } from "../engine/text";
+import { ensureFonts, printf, width } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { clipped, fill, type Ctx, type Rect } from "../engine/ui";
+import { clipped, fill, well, type Ctx, type Rect } from "../engine/ui";
 import { burstPlan, type Plan } from "../engine/burst";
 import { cosine, expOut } from "../engine/ease";
 import { seconds, Tween } from "../engine/motion";
@@ -137,6 +137,39 @@ export class ResultScene implements Scene {
     void this.app.go(new QuestScene(this.app, this.land, this.category, this.questId), "back");
   }
 
+  /** What the verdict plate needs, before it is drawn. */
+  private leftHeight(s: number, fonts: ReturnType<typeof ensureFonts>, ok: boolean): number {
+    const rows = 3 + (this.attempt.exit_code ? 1 : 0);
+    return (
+      Math.round(52 * s) +
+      fonts.stamp.height +
+      (ok ? Math.round(52 * s) + Math.min(Math.round(300 * s) * 0.42, 128 * s) : 0) +
+      rows * fonts.small.height +
+      Math.round(30 * s) +
+      fonts.stationSm.height
+    );
+  }
+
+  /**
+   * What the case table needs. It mirrors the arithmetic in `draw` rather than
+   * sharing it, because the drawing walks the same list in the same order —
+   * the pair is checked by eye on the two screens it produces.
+   */
+  private rightHeight(s: number, fonts: ReturnType<typeof ensureFonts>): number {
+    let h = Math.round(52 * s);
+    const rowH = Math.max(fonts.small.height, fonts.stationSm.height);
+    for (const c of this.attempt.cases) {
+      h += fonts.small.height;
+      if (c.visible && !c.passed) h += rowH * 2 + Math.round(32 * s);
+    }
+    if (this.attempt.mistakes.length > 0) {
+      h += fonts.stationSm.height + Math.round(14 * s);
+      h += this.attempt.mistakes.length * (fonts.small.height + fonts.codeSm.height);
+    }
+    if (this.attempt.stderr) h += fonts.codeSm.height * 2 + Math.round(8 * s);
+    return h;
+  }
+
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
@@ -145,25 +178,52 @@ export class ResultScene implements Scene {
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
     header(g, this.app, this.attempt.cleared ? "STREET CLEARED" : ok ? "STILL GOOD" : "NOT YET");
-    const f = frame(layout, 0.42, 0.05);
+    const full = frame(layout, 0.42, 0.05);
+    // Sized to what is on it. A 50/50 split stretched to the window, holding
+    // five short rows on one side and one line on the other, reads as a screen
+    // that has not been finished rather than as one that is breathing.
+    const want = Math.max(this.leftHeight(s, fonts, ok), this.rightHeight(s, fonts));
+    const h = Math.min(full.body[3], Math.max(want, Math.round(full.body[3] * 0.45)));
+    const dy = layout.isPortrait() ? 0 : Math.round((full.body[3] - h) / 2);
+    const f: typeof full = layout.isPortrait()
+      ? full
+      : {
+          ...full,
+          left: [full.left[0], full.left[1] + dy, full.left[2], h],
+          right: [full.right[0], full.right[1] + dy, full.right[2], h],
+        };
     this.buttons.reset();
 
     // --- the verdict plate --------------------------------------------------
     const left = titledPanel(g, f.left, "VERDICT", ok ? Theme.admit : Theme.red);
     let y = left[1];
-    // The word arrives oversized and settles to its place: expo makes that
-    // read as an impact rather than a zoom.
+    // Half the size it was. The coloured title bar above already carries the
+    // verdict, so a 40px headline was saying it a second time and pushing the
+    // thing the player actually needs — what went wrong — down the screen.
+    const wordFont = fonts.stamp;
     const wordScale = 1 + (1 - this.word.out) * 1.4;
     g.save();
     g.globalAlpha = Math.min(1, this.word.raw * 2);
-    g.translate(left[0] + left[2] / 2, y + fonts.title.height / 2);
+    g.translate(left[0] + left[2] / 2, y + wordFont.height / 2);
     g.scale(wordScale, wordScale);
-    g.translate(-(left[0] + left[2] / 2), -(y + fonts.title.height / 2));
-    g.fillStyle = css(ok ? Theme.admit : Theme.red);
-    const lines = printf(g, fonts.title, this.verdictWord(), left[0], y, left[2], "center");
+    g.translate(-(left[0] + left[2] / 2), -(y + wordFont.height / 2));
+    // A win gets the ribbon behind its word: in this register a headline is
+    // framed or it is not a headline. A failure does not — a banner around
+    // "WRONG ANSWER" would be celebrating it.
+    const ribbon = ok ? (this.app.assets?.picture("fx_ribbon") ?? null) : null;
+    if (ribbon) {
+      // Sized to the word, not to the column. The cloth between the sprite's
+      // two tails is about two thirds of its width, so a banner cut to the
+      // column leaves the word hanging off both ends of its own ribbon.
+      const rw = Math.min(left[2], width(wordFont, this.verdictWord()) / 0.6 + 24);
+      const rh = (rw * ribbon.naturalHeight) / ribbon.naturalWidth;
+      g.drawImage(ribbon, left[0] + (left[2] - rw) / 2, y + wordFont.height / 2 - rh / 2, rw, rh);
+    }
+    g.fillStyle = css(ribbon ? Theme.ink : ok ? Theme.admit : Theme.red);
+    const lines = printf(g, wordFont, this.verdictWord(), left[0], y, left[2], "center");
     g.restore();
-    y += lines * fonts.title.height;
-    y += Math.round(8 * s);
+    y += lines * wordFont.height;
+    y += Math.round(10 * s);
 
     if (ok) {
       const r = Math.round(11 * s);
@@ -178,38 +238,60 @@ export class ResultScene implements Scene {
           i < this.attempt.stars ? Theme.coin : Theme.dim,
         );
       }
-      y += Math.round(34 * s);
+      // The medal is for three of three and nothing else. An award handed out
+      // for every pass is not an award.
+      const medal = this.attempt.stars >= 3 ? (this.app.assets?.picture("fx_medal") ?? null) : null;
+      if (medal) {
+        const d = Math.round(46 * s);
+        g.drawImage(medal, left[0] + left[2] / 2 + Math.round(44 * s), y - d * 0.2, d, d);
+      }
+      y += Math.round(38 * s);
       // Three times the size, falling to one: a stamp is an impact, and expo
       // spends almost all of its time at the two ends of that.
+      //
+      // It gets its own row. Landing it on the stars was the review's point:
+      // the payoff of the loop read as a collision between two of its parts.
+      const stampW = Math.min(left[2] * 0.42, 128 * s);
       const land = this.stamp.out;
       if (this.stamp.raw > 0) {
         g.save();
         g.globalAlpha = Math.min(1, this.stamp.raw * 3);
         const cx = left[0] + left[2] / 2;
-        const cy = y + Math.round(28 * s);
+        const cy = y + stampW / 2;
         const k = 1 + (1 - land) * 2;
         g.translate(cx, cy);
         g.scale(k, k);
         g.translate(-cx, -cy);
-        clearedStamp(g, cx, cy, Math.min(left[2] * 0.7, 260 * s), -0.12 - (1 - land) * 0.5);
+        clearedStamp(g, this.app, cx, cy, stampW, -0.12 - (1 - land) * 0.5);
         g.restore();
       }
-      y += Math.round(70 * s);
+      y += stampW + Math.round(14 * s);
     }
 
+    // Four facts, and only the ones that are facts about *this* run. `exit`
+    // appears when it is not zero, because on a screen whose headline is that
+    // something went wrong, "exit 0" is noise that contradicts the headline.
+    const rows = [
+      `tests   ${this.attempt.tests_passed}/${this.attempt.tests_total}`,
+      `compile ${this.attempt.compile_ms} ms`,
+      `run     ${this.attempt.run_ms} ms`,
+    ];
+    if (this.attempt.exit_code !== null && this.attempt.exit_code !== 0) {
+      rows.push(`exit    ${this.attempt.exit_code}`);
+    }
     g.fillStyle = css(Theme.cream);
+    printf(g, fonts.small, rows.join("\n"), left[0], y, left[2], "left");
+
+    // The attempt id is a log handle, not a result. It sits at the foot of the
+    // panel in the smallest type on the screen, where somebody who needs it can
+    // find it and nobody else has to read it at the moment of winning.
+    g.fillStyle = css(Theme.dim);
     printf(
       g,
-      fonts.small,
-      [
-        `tests   ${this.attempt.tests_passed}/${this.attempt.tests_total}`,
-        `compile ${this.attempt.compile_ms} ms`,
-        `run     ${this.attempt.run_ms} ms`,
-        `attempt ${this.attempt.id}`,
-        this.attempt.exit_code === null ? "" : `exit    ${this.attempt.exit_code}`,
-      ].join("\n"),
+      fonts.stationSm,
+      this.attempt.id,
       left[0],
-      y,
+      left[1] + left[3] - fonts.stationSm.height,
       left[2],
       "left",
     );
@@ -234,28 +316,29 @@ export class ResultScene implements Scene {
         ry += lineH;
         // Hidden cases report pass/fail and nothing else (SPEC §5.2), so there
         // is deliberately no `else` branch printing the data.
+        //
+        // This pair *is* the failure. It used to be set in the dimmest colour
+        // on the screen, smaller than the decoration above it, which meant the
+        // screen shouted that something had happened and whispered what.
         if (c.visible && !c.passed) {
+          const want = JSON.stringify(c.expect ?? "");
+          const got = JSON.stringify(c.got ?? "");
+          const labelW = width(fonts.stationSm, "EXPECTED") + Math.round(10 * s);
+          const rowH = Math.max(fonts.small.height, fonts.stationSm.height);
+          const wellH = rowH * 2 + Math.round(24 * s);
+          well(g, right[0], ry, right[2], wellH);
+          const tx = right[0] + Math.round(10 * s);
+          const ty = ry + Math.round(10 * s);
+          const tw = right[2] - Math.round(20 * s);
           g.fillStyle = css(Theme.dim);
-          ry +=
-            printf(
-              g,
-              fonts.codeSm,
-              `expected ${JSON.stringify(c.expect ?? "")}`,
-              right[0],
-              ry,
-              right[2],
-              "left",
-            ) * fonts.codeSm.height;
-          ry +=
-            printf(
-              g,
-              fonts.codeSm,
-              `got      ${JSON.stringify(c.got ?? "")}`,
-              right[0],
-              ry,
-              right[2],
-              "left",
-            ) * fonts.codeSm.height;
+          printf(g, fonts.stationSm, "EXPECTED", tx, ty + Math.round(4 * s), labelW, "left");
+          printf(g, fonts.stationSm, "GOT", tx, ty + rowH + Math.round(4 * s), labelW, "left");
+          g.fillStyle = css(Theme.cream);
+          printf(g, fonts.small, want, tx + labelW, ty, tw - labelW, "left");
+          // The one that is wrong is the one that is coloured.
+          g.fillStyle = css(Theme.red);
+          printf(g, fonts.small, got, tx + labelW, ty + rowH, tw - labelW, "left");
+          ry += wellH + Math.round(8 * s);
         }
       }
 

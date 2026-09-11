@@ -1,0 +1,458 @@
+#!/usr/bin/env node
+/**
+ * Everything, once, with an honest summary.
+ *
+ *     node tests/run-all.mjs                 # the lot
+ *     node tests/run-all.mjs --only smoke    # substring filter on the suite name
+ *     node tests/run-all.mjs --skip e2e      # the same, inverted
+ *     node tests/run-all.mjs --list          # what it would run, and why not
+ *     node tests/run-all.mjs --json          # machine-readable
+ *
+ * Exit 0 only if every suite that ran passed. Exit 1 if anything failed.
+ * **A skip is never a pass**: the summary prints every skipped suite with the
+ * reason and the command that would make it runnable, because a suite that
+ * hides its skips is how "all green" stops meaning anything.
+ *
+ * ## What it starts, and where it writes
+ *
+ * The smoke checker and the browser suite both need a live server. This
+ * starts one — with `--home <tmpdir>` (SPEC §1's first precedence) and
+ * `--static frontend/dist-e2e`, so:
+ *
+ * * nothing is written into the developer's own `~/.causewaybayhacker`,
+ * * every run starts from an empty database, so "node 1 is open" is true,
+ * * the page carries the capture hook, which a plain `dist` build does not.
+ *
+ * It stops the server afterwards, including on `^C`.
+ *
+ * ## What it deliberately does not do
+ *
+ * It does not rebuild the frontend unless asked (`--build`), because several
+ * agents share this tree and a build that lands mid-edit is somebody else's
+ * afternoon. It says so and skips the browser suite instead.
+ */
+
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import process from "node:process";
+
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
+const args = process.argv.slice(2);
+const has = (f) => args.includes(`--${f}`);
+const val = (f) => {
+  const i = args.indexOf(`--${f}`);
+  return i >= 0 && args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : null;
+};
+
+const ONLY = val("only");
+const SKIP = val("skip");
+const AS_JSON = has("json");
+const LIST = has("list");
+const BUILD = has("build");
+const KEEP = has("keep-home");
+
+const tty = process.stdout.isTTY && !AS_JSON;
+const c = (n, s) => (tty ? `\x1b[${n}m${s}\x1b[0m` : s);
+const green = (s) => c("32", s);
+const red = (s) => c("31", s);
+const yellow = (s) => c("33", s);
+const dim = (s) => c("2", s);
+const bold = (s) => c("1", s);
+
+// ------------------------------------------------------------ what we have
+
+const which = (bin) => spawnSync("command", ["-v", bin], { shell: true }).status === 0;
+
+const WALLET =
+  process.env.CWBWALLET ?? join(ROOT, "..", "CausewaybayWallet/rustcli/target/debug/cwbwallet");
+
+const env = {
+  cargo: which("cargo"),
+  node: true,
+  npm: which("npm"),
+  python: which("python3"),
+  go: which("go"),
+  rustc: which("rustc"),
+  luajit: which("luajit"),
+  love: which("love") || existsSync(join(ROOT, "love2d/build/love.app/Contents/MacOS/love")),
+  wallet: existsSync(WALLET),
+  e2eBundle: existsSync(join(ROOT, "frontend/dist-e2e/index.html")),
+  playwright: existsSync(join(ROOT, "e2e/node_modules/@playwright/test")),
+  frontendDeps: existsSync(join(ROOT, "frontend/node_modules")),
+  smokeDeps: existsSync(join(ROOT, "tests/smoke/node_modules/ws")),
+};
+
+// ------------------------------------------------------------- the suites
+//
+// `needs` is checked before anything runs, so a missing toolchain is a
+// reasoned skip rather than a crash forty seconds in.
+
+/** @type {{name:string, what:string, cwd:string, cmd:string[], needs:[boolean,string][], server?:boolean, slow?:boolean, note?:string}[]} */
+const SUITES = [
+  {
+    name: "vectors",
+    what: "the shared fixtures are what the tools produce (SPEC §9.1, §9.2)",
+    cwd: ROOT,
+    cmd: ["python3", "tests/vectors/generate.py", "--check"],
+    needs: [
+      [env.python, "python3 is not on PATH"],
+      [env.wallet, `no CausewaybayWallet binary at ${WALLET} — set $CWBWALLET`],
+    ],
+  },
+  {
+    name: "mistakes",
+    what: "every §7.1 taxonomy fixture still compiles to the code it claims",
+    cwd: ROOT,
+    cmd: ["python3", "tests/vectors/mistakes/generate.py", "--check"],
+    needs: [
+      [env.python, "python3 is not on PATH"],
+      [env.rustc, "rustc is not on PATH"],
+      [env.go, "go is not on PATH"],
+    ],
+    slow: true,
+  },
+  {
+    name: "backend-unit",
+    what: "the Rust workspace: core, runner, server, cli",
+    cwd: join(ROOT, "backend"),
+    cmd: ["cargo", "test", "--workspace"],
+    needs: [
+      [env.cargo, "cargo is not on PATH"],
+      [env.rustc, "rustc is not on PATH — the runner tests compile real programs"],
+    ],
+    slow: true,
+  },
+  {
+    name: "frontend-unit",
+    what: "vitest over the scenes, the wallet derivation and the wire client",
+    cwd: join(ROOT, "frontend"),
+    cmd: ["npm", "test", "--silent"],
+    needs: [
+      [env.npm, "npm is not on PATH"],
+      [env.frontendDeps, "frontend/node_modules is missing — run `npm ci` in frontend/"],
+    ],
+  },
+  {
+    name: "love2d",
+    what: "the LÖVE client's suite, headless",
+    cwd: join(ROOT, "love2d"),
+    cmd: ["make", "test-headless"],
+    needs: [
+      [env.luajit, "luajit is not on PATH (`brew install luajit`)"],
+      [existsSync(join(ROOT, "love2d/Makefile")), "love2d/ has no Makefile"],
+    ],
+    // Headless means no `love.graphics`, so the suite skips its own layout
+    // tests and says so in its output. `make -C love2d test` runs them under
+    // a real LÖVE window — which CI cannot do and a person can.
+    note: env.love
+      ? "headless: the layout suite is skipped inside it (`make -C love2d test` for those)"
+      : "headless: the layout suite is skipped inside it, and LÖVE is not installed to run it",
+  },
+  {
+    name: "content",
+    what: "every reference solution is accepted and no starter is (SPEC §9.4, §9.5)",
+    cwd: ROOT,
+    cmd: [
+      "python3",
+      "tests/content/verify_pack.py",
+      "content/rust/basic.toml",
+      "content/rust/advanced.toml",
+      "content/rust/hacker.toml",
+      "content/go/basic.toml",
+      "content/go/advanced.toml",
+      "content/go/hacker.toml",
+    ],
+    needs: [
+      [env.python, "python3 is not on PATH"],
+      [env.rustc, "rustc is not on PATH"],
+      [env.go, "go is not on PATH"],
+    ],
+    slow: true,
+  },
+  {
+    name: "smoke-selftest",
+    what: "the contract checker catches 19 deliberately-broken servers",
+    cwd: join(ROOT, "tests/smoke"),
+    cmd: ["node", "selftest.mjs"],
+    needs: [
+      [env.wallet, `no CausewaybayWallet binary at ${WALLET} — set $CWBWALLET`],
+      [env.smokeDeps, "tests/smoke/node_modules is missing — run `npm install` there"],
+    ],
+    slow: true,
+  },
+  {
+    name: "smoke",
+    what: "PROTOCOL.md §8 conformance against the real server",
+    cwd: ROOT,
+    cmd: ["node", "tests/smoke/contract.mjs"],
+    needs: [[env.wallet, `no CausewaybayWallet binary at ${WALLET} — set $CWBWALLET`]],
+    server: true,
+    // §8.12's default window is six seconds; §1.1's real one is seventy.
+    note: "keepalive is checked over 6s, not §1.1's 70s — `node tests/smoke/contract.mjs --slow`",
+  },
+  {
+    name: "e2e",
+    what: "the journey in a real browser, both orientations",
+    cwd: join(ROOT, "e2e"),
+    cmd: ["npx", "playwright", "test"],
+    needs: [
+      [env.playwright, "e2e/node_modules is missing — run `npm install && npx playwright install chromium` in e2e/"],
+      [
+        env.e2eBundle || BUILD,
+        "frontend/dist-e2e is missing. It is the only build that carries the " +
+          "capture hook (VITE_E2E=1). Run `npm run build:e2e` in frontend/, or " +
+          "pass --build to have this script do it",
+      ],
+      [env.wallet, `no CausewaybayWallet binary at ${WALLET} — set $CWBWALLET`],
+    ],
+    server: true,
+    slow: true,
+  },
+];
+
+// --------------------------------------------------------------- the server
+
+let server = null;
+let home = null;
+
+function startServer() {
+  home = mkdtempSync(join(tmpdir(), "cwbhacker-testall-"));
+  const port = 5400 + Math.floor(Math.random() * 120);
+  const child = spawn(
+    "cargo",
+    [
+      "run",
+      "-q",
+      "-p",
+      "cwbhacker",
+      "--",
+      "serve",
+      "--bind",
+      `127.0.0.1:${port}`,
+      "--home",
+      home,
+      "--static",
+      join(ROOT, "frontend/dist-e2e"),
+    ],
+    { cwd: join(ROOT, "backend"), stdio: ["ignore", "pipe", "pipe"] },
+  );
+  const log = [];
+  child.stdout.on("data", (d) => log.push(String(d)));
+  child.stderr.on("data", (d) => log.push(String(d)));
+  server = { child, port, log, url: `http://127.0.0.1:${port}` };
+  return server;
+}
+
+async function waitForServer(seconds = 240) {
+  const until = Date.now() + seconds * 1000;
+  while (Date.now() < until) {
+    if (server.child.exitCode !== null)
+      throw new Error(
+        `the server exited with ${server.child.exitCode}:\n${server.log.join("").slice(-2000)}`,
+      );
+    try {
+      const res = await fetch(server.url, { signal: AbortSignal.timeout(2000) });
+      if (res.status < 500) return;
+    } catch {
+      /* not up yet */
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(
+    `the server did not answer on ${server.url} within ${seconds}s:\n` +
+      server.log.join("").slice(-2000),
+  );
+}
+
+function stopServer() {
+  if (server?.child && server.child.exitCode === null) {
+    try {
+      server.child.kill("SIGTERM");
+    } catch {
+      /* already gone */
+    }
+  }
+  if (home && !KEEP) {
+    try {
+      rmSync(home, { recursive: true, force: true });
+    } catch {
+      /* best effort */
+    }
+  }
+  server = null;
+}
+process.on("SIGINT", () => (stopServer(), process.exit(130)));
+process.on("SIGTERM", () => (stopServer(), process.exit(143)));
+process.on("exit", stopServer);
+
+// ------------------------------------------------------------------- run
+
+function runSuite(suite) {
+  const started = Date.now();
+  const extra = suite.server
+    ? {
+        SMOKE_WS_URL: `ws://127.0.0.1:${server.port}/ws`,
+        E2E_BASE_URL: server.url,
+        CWBHACKER_HOME: home,
+      }
+    : {};
+  const out = spawnSync(suite.cmd[0], suite.cmd.slice(1), {
+    cwd: suite.cwd,
+    encoding: "utf8",
+    env: { ...process.env, CWBWALLET: WALLET, ...extra },
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  return {
+    status: out.status === 0 ? "pass" : "fail",
+    code: out.status,
+    ms: Date.now() - started,
+    stdout: out.stdout ?? "",
+    stderr: out.stderr ?? "",
+  };
+}
+
+/** The last few lines that actually say something, for a failure. */
+function tail(text, n = 18) {
+  return text
+    .split("\n")
+    .filter((l) => l.trim())
+    .slice(-n)
+    .join("\n");
+}
+
+async function main() {
+  let selected = SUITES;
+  if (ONLY) selected = selected.filter((s) => s.name.includes(ONLY));
+  if (SKIP) selected = selected.filter((s) => !s.name.includes(SKIP));
+  if (selected.length === 0) {
+    console.error(`no suite matches --only ${ONLY} --skip ${SKIP}`);
+    return 2;
+  }
+
+  // Every reason to skip is known before anything runs.
+  const plan = selected.map((suite) => {
+    const missing = suite.needs.filter(([ok]) => !ok).map(([, why]) => why);
+    return { suite, skip: missing.length ? missing.join("; ") : null };
+  });
+
+  if (LIST) {
+    for (const { suite, skip } of plan)
+      console.log(
+        `${skip ? yellow("skip") : green("run ")}  ${suite.name.padEnd(15)} ${suite.what}` +
+          (skip ? `\n      ${dim(skip)}` : ""),
+      );
+    return 0;
+  }
+
+  if (BUILD && plan.some(({ suite, skip }) => suite.name === "e2e" && !skip)) {
+    if (!AS_JSON) console.log(dim("building frontend/dist-e2e …"));
+    const b = spawnSync("npm", ["run", "build:e2e"], {
+      cwd: join(ROOT, "frontend"),
+      encoding: "utf8",
+    });
+    if (b.status !== 0) {
+      console.error(red("the e2e build failed:"), tail(b.stdout + b.stderr));
+      return 1;
+    }
+  }
+
+  const needsServer = plan.some(({ suite, skip }) => suite.server && !skip);
+  if (needsServer) {
+    if (!AS_JSON) console.log(dim("starting a server on a throwaway home …"));
+    try {
+      startServer();
+      await waitForServer();
+      if (!AS_JSON) console.log(dim(`  ${server.url}   home ${home}\n`));
+    } catch (err) {
+      // Not fatal: the suites that do not need it still run, and the ones
+      // that do are recorded as skipped with this reason.
+      const why = `the server would not start: ${err.message.split("\n")[0]}`;
+      for (const row of plan) if (row.suite.server) row.skip = row.skip ?? why;
+      stopServer();
+    }
+  }
+
+  const results = [];
+  for (const { suite, skip } of plan) {
+    if (skip) {
+      results.push({ name: suite.name, what: suite.what, status: "skip", detail: skip });
+      if (!AS_JSON) console.log(`${yellow("skip")}  ${suite.name.padEnd(15)} ${dim(skip)}`);
+      continue;
+    }
+    if (!AS_JSON) process.stdout.write(`${dim("run ")}  ${suite.name.padEnd(15)}`);
+    const r = runSuite(suite);
+    results.push({ name: suite.name, what: suite.what, note: suite.note, ...r });
+    if (!AS_JSON) {
+      const mark = r.status === "pass" ? green("pass") : red("FAIL");
+      process.stdout.write(`\r${mark}  ${suite.name.padEnd(15)} ${dim(`${(r.ms / 1000).toFixed(1)}s`)}\n`);
+      if (r.status === "fail") {
+        console.log(dim(`      ${suite.cmd.join(" ")}  (in ${suite.cwd})`));
+        for (const line of tail(r.stdout + "\n" + r.stderr).split("\n"))
+          console.log(`      ${line}`);
+      }
+    }
+  }
+
+  stopServer();
+
+  const by = (s) => results.filter((r) => r.status === s);
+  if (AS_JSON) {
+    console.log(
+      JSON.stringify(
+        {
+          pass: by("pass").length,
+          fail: by("fail").length,
+          skip: by("skip").length,
+          results: results.map(({ name, what, status, detail, note, ms }) => ({
+            name,
+            what,
+            status,
+            detail,
+            note,
+            ms,
+          })),
+        },
+        null,
+        2,
+      ),
+    );
+  } else {
+    console.log(`\n${bold("summary")}`);
+    for (const r of results) {
+      const mark =
+        r.status === "pass" ? green("pass") : r.status === "fail" ? red("FAIL") : yellow("skip");
+      console.log(`  ${mark}  ${r.name.padEnd(15)} ${r.what}`);
+      if (r.status === "skip") console.log(`        ${dim(`why: ${r.detail}`)}`);
+      // A suite that passed while skipping something inside itself is the
+      // subtlest way for a green build to be a lie, so it says so here too.
+      if (r.status === "pass" && r.note) console.log(`        ${yellow(`note: ${r.note}`)}`);
+    }
+    const skipped = by("skip");
+    console.log(
+      `\n${by("pass").length} passed, ` +
+        (by("fail").length ? red(`${by("fail").length} failed`) : "0 failed") +
+        `, ${skipped.length} skipped`,
+    );
+    if (skipped.length)
+      console.log(
+        yellow(
+          `\n${skipped.length} suite(s) did not run. This is not a green build — ` +
+            `it is a partial one, and the reasons are above.`,
+        ),
+      );
+  }
+
+  return by("fail").length > 0 ? 1 : 0;
+}
+
+main().then(
+  (code) => process.exit(code),
+  (err) => {
+    stopServer();
+    console.error(red("the runner itself fell over:"), err);
+    process.exit(2);
+  },
+);

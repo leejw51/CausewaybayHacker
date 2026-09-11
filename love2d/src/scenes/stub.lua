@@ -46,7 +46,7 @@ end
 
 function Stub:draw()
   local vw, vh = Layout.vw, Layout.vh
-  Assets.cover("bg_flat", 0, 0, vw, vh)
+  Assets.cover(Assets.pick("bg_datacentre", "bg_flat"), 0, 0, vw, vh)
   love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.82)
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)

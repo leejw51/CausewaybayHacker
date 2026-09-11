@@ -8,7 +8,7 @@
  * columns; in portrait it is one, taller. A screen that only ever draws into
  * the boxes it is handed cannot be landscape-only by accident.
  */
-import { css, Theme, type RGBA } from "../engine/theme";
+import { css, Theme, TRACK_COL, type RGBA } from "../engine/theme";
 import { ensureFonts, font, printf, width, type Font } from "../engine/text";
 import {
   btnBox,
@@ -25,8 +25,9 @@ import type { Layout } from "../engine/layout";
 import type { App } from "../app";
 import type { Tween } from "../engine/motion";
 
-export const RUST: RGBA = [0.95, 0.47, 0.16, 1];
-export const GO: RGBA = Theme.cyan;
+// One definition per land, taken from the palette rather than restated here.
+export const RUST: RGBA = TRACK_COL.rust;
+export const GO: RGBA = TRACK_COL.go;
 
 export interface Frame {
   /** The whole playfield, inset by the safe margin. */
@@ -152,6 +153,8 @@ export interface Button {
   rect: Rect;
   label: string;
   dim?: boolean;
+  /** The one action the screen is for. Filled, not outlined. */
+  primary?: boolean;
 }
 
 export class Buttons {
@@ -171,7 +174,7 @@ export class Buttons {
   row(
     f: Font,
     rect: Rect,
-    labels: Array<{ id: string; label: string; dim?: boolean }>,
+    labels: Array<{ id: string; label: string; dim?: boolean; primary?: boolean }>,
     minH = 0,
   ): void {
     const [x, y, w] = rect;
@@ -186,17 +189,27 @@ export class Buttons {
         cy += lineH + gap;
         lineH = 0;
       }
-      this.add({ id: item.id, rect: [cx, cy, bw, bh], label: item.label, dim: item.dim });
+      this.add({
+        id: item.id,
+        rect: [cx, cy, bw, bh],
+        label: item.label,
+        dim: item.dim,
+        primary: item.primary,
+      });
       cx += bw + gap;
       lineH = Math.max(lineH, bh);
     }
   }
 
   draw(g: Ctx, f: Font): void {
+    // If the row names a primary action, everything else on it goes quiet.
+    const hasPrimary = this.items.some((b) => b.primary);
     for (const b of this.items) {
       pixBtn(g, f, b.rect[0], b.rect[1], b.rect[2], b.rect[3], b.label, {
         hover: this.hovered === b.id,
         dim: b.dim,
+        lit: b.primary,
+        quiet: hasPrimary && !b.primary,
       });
     }
   }
@@ -207,11 +220,44 @@ export class Buttons {
   }
 }
 
-/** Difficulty, as the map draws it: filled stars up to `n` of five. */
+/**
+ * Stars **earned**, and nothing else. Three of them, gold.
+ *
+ * The star glyph is reserved for the score on purpose: difficulty used to be
+ * drawn with the same glyph on the same row, and a player reading `★☆☆☆☆` next
+ * to `1/3 STARS` has no way to tell that one of those is a property of the
+ * street and the other is their own result.
+ */
 export function stars(g: Ctx, x: number, y: number, r: number, n: number, of = 3): void {
   for (let i = 0; i < of; i++) {
     star(g, x + i * r * 2.4, y, r, i < n ? Theme.coin : Theme.dim);
   }
+}
+
+/**
+ * Difficulty, which is not a score: a segmented bar in the brick colour, under
+ * its own word. A bar cannot be mistaken for a tally of anything the player
+ * did, which is the whole reason it is not five stars.
+ */
+export function difficulty(g: Ctx, x: number, y: number, w: number, n: number, of = 5): void {
+  const f = font("stationSm");
+  g.fillStyle = css(Theme.dim);
+  printf(g, f, "DIFFICULTY", x, y, w, "left");
+  const by = y + f.height + Math.round(f.size * 0.4);
+  const gap = Math.max(2, Math.round(f.size * 0.3));
+  const seg = (w - gap * (of - 1)) / of;
+  const h = Math.max(4, Math.round(f.size * 0.7));
+  for (let i = 0; i < of; i++) {
+    const sx = x + i * (seg + gap);
+    fill(g, Theme.ink, sx, by, seg, h, 0.7);
+    fill(g, i < n ? Theme.brick : Theme.dim, sx + 1, by + 1, seg - 2, h - 2, i < n ? 1 : 0.3);
+  }
+}
+
+/** How tall `difficulty` draws, so a caller can lay out around it. */
+export function difficultyH(): number {
+  const f = font("stationSm");
+  return f.height + Math.round(f.size * 0.4) + Math.max(4, Math.round(f.size * 0.7));
 }
 
 /**
@@ -232,7 +278,9 @@ export function clearRibbon(g: Ctx, cx: number, cy: number, w: number): void {
   const bh = f.height + f.size * 0.5;
   g.fillStyle = css(Theme.ink);
   g.fillRect(-bw / 2 - 2, -bh / 2 - 2, bw + 4, bh + 4);
-  g.fillStyle = css(Theme.red);
+  // Green, not red. This banner is the payoff of the loop and it used to be
+  // painted in the colour that means you failed two screens earlier.
+  g.fillStyle = css(Theme.admit);
   g.fillRect(-bw / 2, -bh / 2, bw, bh);
   g.fillStyle = css(Theme.cream);
   printf(g, f, label, -bw / 2, -f.height / 2, bw, "center");
@@ -240,33 +288,54 @@ export function clearRibbon(g: Ctx, cx: number, cy: number, w: number): void {
 }
 
 /**
- * The `CLEARED` stamp: rotated, slightly off-square, with the ink ring around
- * it. Drawn rather than blitted so it can be any size it is given.
+ * The `CLEARED` stamp: the ring from `art/stamp_cleared.png` with the word
+ * printed over it at runtime.
+ *
+ * The word is not baked into the sprite for two reasons. A generator cannot be
+ * trusted to spell seven letters, and a printed word can be translated while a
+ * painted one cannot. `CausewaybayGolang` does the same thing with
+ * `stamp_served`, so the two projects' stamps stay the same object.
+ *
+ * Green and gold, never red — this is the one moment the whole loop exists to
+ * produce.
  */
-export function clearedStamp(g: Ctx, cx: number, cy: number, w: number, angle = -0.18): void {
+export function clearedStamp(
+  g: Ctx,
+  app: App,
+  cx: number,
+  cy: number,
+  w: number,
+  angle = -0.18,
+): void {
   const f = font("stamp");
   const label = "CLEARED";
-  const tw = width(f, label);
-  const scale = (w * 0.82) / Math.max(1, tw);
+  const tw = Math.max(1, width(f, label));
+  const ring = app.assets?.picture("stamp_cleared") ?? null;
   g.save();
   g.translate(cx, cy);
   g.rotate(angle);
+  if (ring) {
+    g.drawImage(ring, -w / 2, -w / 2, w, w);
+  } else {
+    // No art yet: a drawn ring, so the moment still lands on the first clear
+    // of a cold cache rather than showing a bare word.
+    g.lineWidth = Math.max(3, w * 0.07);
+    g.strokeStyle = css(Theme.coin);
+    g.fillStyle = css(Theme.admit, 0.9);
+    g.beginPath();
+    g.arc(0, 0, w * 0.46, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    g.lineWidth = 1;
+  }
+  // The word is sized to the ring's inner field, not to the box it is in.
+  const scale = (w * 0.6) / tw;
   g.scale(scale, scale);
-  const bw = tw + f.size * 1.2;
-  const bh = f.height + f.size * 0.9;
-  g.lineWidth = Math.max(3, f.size * 0.22);
-  g.strokeStyle = css(Theme.red, 0.92);
-  g.strokeRect(-bw / 2, -bh / 2, bw, bh);
-  g.strokeRect(
-    -bw / 2 + g.lineWidth * 1.6,
-    -bh / 2 + g.lineWidth * 1.6,
-    bw - g.lineWidth * 3.2,
-    bh - g.lineWidth * 3.2,
-  );
-  g.fillStyle = css(Theme.red, 0.92);
-  printf(g, f, label, -bw / 2, -f.height / 2, bw, "center");
+  g.fillStyle = css(Theme.ink, 0.55);
+  printf(g, f, label, -tw / 2 + 2, -f.height / 2 + 2, tw, "center");
+  g.fillStyle = css(Theme.cream);
+  printf(g, f, label, -tw / 2, -f.height / 2, tw, "center");
   g.restore();
-  g.lineWidth = 1;
 }
 
 /** A titled panel with its face inset returned, so callers draw inside it. */

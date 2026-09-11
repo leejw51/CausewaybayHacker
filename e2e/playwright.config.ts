@@ -31,7 +31,10 @@ const PORTRAIT = { width: 720, height: 1280 };
 export default defineConfig({
   testDir: ".",
   globalSetup: "./global-setup.ts",
-  timeout: 120_000, // a cold `rustc` is the slow part, not the browser
+  // Two logins, two real `rustc` invocations and a reload fit inside one
+  // test (the logout journey), and the first compile of a run is cold. The
+  // browser is never the slow part.
+  timeout: 300_000,
   expect: { timeout: 30_000 },
   fullyParallel: false,
   retries: 0,

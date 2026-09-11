@@ -1,7 +1,12 @@
 -- Milestone 1, end to end, against a real server.
 --
 --   cd backend && cargo run -p cwbhacker -- serve
+--   rm -f ~/Library/Application\ Support/LOVE/causewaybay-hacker/session.json
 --   make -C love2d drive SCRIPT=tests/drive/slice.lua
+--
+-- The stored session is cleared first on purpose: this script signs in as one
+-- specific wallet, and a token left by an earlier run would resume a
+-- different player before the login screen ever appeared.
 --
 -- PLAN.md's slice, one step per line:
 --

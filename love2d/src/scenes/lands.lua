@@ -87,7 +87,7 @@ end
 
 function Lands:draw()
   local vw, vh = Layout.vw, Layout.vh
-  Assets.cover("bg_street", 0, 0, vw, vh)
+  Assets.cover(Assets.pick("bg_street", "bg_flat"), 0, 0, vw, vh)
   love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.6)
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
@@ -143,7 +143,11 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected, s)
     tint = selected and Theme.coin or tint,
   })
 
-  Assets.fit(MASCOT[key], x + w / 2 - 56, y + 16, 112, 112, 1)
+  -- Placed on her feet with the measured `box`, not on the corner of the
+  -- transparent canvas (art/manifest.json).
+  if not Assets.sprite(MASCOT[key], x + w / 2, y + 124, 96) then
+    Assets.fit(MASCOT[key], x + w / 2 - 56, y + 16, 112, 112, 1)
+  end
 
   UI.text((key or "?"):upper() .. " LAND", x, y + 130, math.floor(14 * s), tint, "center", w)
   UI.text(BLURB[key] or "", x, y + 152, 8, Theme.withAlpha(Theme.cream, 0.7), "center", w)
@@ -154,7 +158,12 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected, s)
       local color = cat.open and Theme.cream or Theme.dim
       local label = ("%-9s %2d/%-2d"):format(cat.category:upper(), cat.cleared, cat.total)
       UI.text(label, x + 18, row, 9, color)
-      UI.stars(x + w - 18 - 3 * 11, row, math.min(3, math.floor((cat.stars or 0) / 4)), 8)
+      -- The old version drew `stars / 4` as a 0..3 star row, which is a third
+      -- scale in the same gold glyph and means nothing (design review §4).
+      -- A category's star total is a number, so it is drawn as one.
+      local total = ("%d\u{2605}"):format(cat.stars or 0)
+      UI.text(total, x + w - 18 - UI.textWidth(total, 9), row, 9,
+        cat.open and Theme.coin or Theme.dim)
       if not cat.open then
         UI.text("LOCKED", x + w - 60, row + 12, 7, Theme.dim)
       end

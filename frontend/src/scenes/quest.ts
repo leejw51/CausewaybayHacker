@@ -38,6 +38,23 @@ function show(text: string): string {
   return JSON.stringify(text);
 }
 
+/**
+ * The street this quest happens on, as a painted backdrop.
+ *
+ * Six briefs, six places. Before this the quest screen had no backdrop at all
+ * — the panels sat straight on the WebGL skyline, so Jardine's Bazaar at 06:40,
+ * an MTR platform and a seminar room were the same night city. It is the screen
+ * with the most dwell time in the game and it had the least sense of place.
+ */
+const STREET: Record<string, string> = {
+  "rust/basic": "bg_street",
+  "rust/advanced": "bg_room732",
+  "rust/hacker": "bg_datacentre",
+  "go/basic": "bg_mtr",
+  "go/advanced": "bg_times",
+  "go/hacker": "bg_till",
+};
+
 export class QuestScene implements Scene {
   readonly name = "quest";
   readonly mood = "quest" as const;
@@ -57,6 +74,8 @@ export class QuestScene implements Scene {
   private elapsedMs = 0;
   private hints: string[] = [];
   private error = "";
+  /** True when `error` is news rather than a fault; it changes the colour. */
+  private notice = false;
   private t = 0;
   private consoleOpen = false;
   private logScroll = 0;
@@ -145,6 +164,7 @@ export class QuestScene implements Scene {
     this.stage = "queued";
     this.consoleOpen = true;
     this.error = "";
+    this.notice = false;
     try {
       const res = await this.app.client.request("quest.submit", {
         quest_id: this.quest.id,
@@ -167,6 +187,7 @@ export class QuestScene implements Scene {
       }
       // §3.3 again: our words on screen, the server's in the console.
       const goGap = this.land === "go" && e instanceof WireError && e.payload.code === "internal";
+      this.notice = goGap;
       this.error = dropped
         ? "the connection dropped — that attempt is still running on the server"
         : goGap
@@ -289,6 +310,21 @@ export class QuestScene implements Scene {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
     const accent = this.land === "rust" ? RUST : GO;
+    const street = this.app.assets?.picture(
+      STREET[`${this.land}/${this.category}`] ?? "bg_street",
+      layout.isPortrait(),
+    );
+    if (street) {
+      // Cover, then a scrim: the place has to be legible behind the panels
+      // without competing with the code in front of them.
+      const scale = Math.max(layout.vw / street.naturalWidth, layout.vh / street.naturalHeight);
+      const aw = street.naturalWidth * scale;
+      const ah = street.naturalHeight * scale;
+      g.globalAlpha = 0.85;
+      g.drawImage(street, (layout.vw - aw) / 2, (layout.vh - ah) / 2, aw, ah);
+      g.globalAlpha = 1;
+      fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.55);
+    }
     // In portrait the brief is read once and the editor is lived in, so the
     // split is not the same number as landscape.
     const f = frame(layout, layout.isPortrait() ? 0.26 : 0.34);
@@ -309,19 +345,21 @@ export class QuestScene implements Scene {
     if (this.error) {
       // A bar rather than a loose line: the message crosses both panels, and
       // bare text laid over a panel border is unreadable at the seam.
+      //
+      // Red is failure and only failure. "The GO land opens in the next
+      // chapter" is news, not a fault, and painting news in the failure colour
+      // is how a colour ends up meaning three things and therefore nothing.
       const barH = fonts.small.height + Math.round(8 * s);
       const barY = f.body[1] + f.body[3] - barH;
-      g.fillStyle = "rgba(24,6,10,0.92)";
-      g.fillRect(f.body[0], barY, f.body[2], barH);
-      g.fillStyle = css(Theme.red);
-      g.fillRect(f.body[0], barY, f.body[2], Math.max(1, Math.round(s)));
+      const tone = this.notice ? Theme.coin : Theme.red;
+      fill(g, Theme.ink, f.body[0], barY, f.body[2], barH, 0.92);
+      fill(g, tone, f.body[0], barY, f.body[2], Math.max(1, Math.round(s)));
+      g.fillStyle = css(this.notice ? Theme.cream : Theme.red);
       printf(g, fonts.small, this.error, f.body[0], barY + Math.round(4 * s), f.body[2], "center");
     }
-    footer(
-      g,
-      layout,
-      "CTRL+ENTER  RUN   ESC  MAP   PGUP/PGDN  LOG   F1  ORIENTATION   F3  LOG OUT",
-    );
+    // The keys that are *only* keys. `ESC MAP` used to sit under a button that
+    // already said MAP, which is the footer explaining the screen to itself.
+    footer(g, layout, "CTRL+ENTER  RUN   PGUP/PGDN  LOG   F1  ORIENTATION   F3  LOG OUT");
   }
 
   private drawBrief(g: Ctx, rect: Rect, accent: readonly [number, number, number, number]): void {
@@ -338,28 +376,26 @@ export class QuestScene implements Scene {
     // A brief is longer than the panel on most quests and in every portrait
     // window, so it scrolls rather than being silently cut off — a clipped
     // sample case is the one thing a player cannot work around.
+    //
+    // The order is the order somebody *working* needs, which is the reverse of
+    // the order it used to be in. The job first, the sample output in the
+    // panel's only well, then the hints, and the story line last: it is good
+    // writing and it earns its place, but it does not earn being the loudest
+    // thing on a screen a player is trying to code in.
     const top = inner[1] - this.briefScroll;
     let yy = top;
     clipped(g, inner[0], inner[1], inner[2], inner[3], () => {
-      if (this.quest!.story) {
-        g.fillStyle = css(Theme.cyan);
-        yy +=
-          printf(g, fonts.small, `“${this.quest!.story}”`, inner[0], yy, inner[2], "left") *
-          fonts.small.height;
-        yy += Math.round(6 * s);
-      }
-
       // `brief` is markdown (SPEC §2.1); the canvas draws the flattening.
       for (const b of blocks(this.quest!.brief)) {
         if (b.kind === "code") {
-          const lines = wrap(fonts.codeSm, b.text, inner[2] - Math.round(10 * s));
-          const h = lines.length * fonts.codeSm.height + Math.round(8 * s);
+          const lines = wrap(fonts.code, b.text, inner[2] - Math.round(10 * s));
+          const h = lines.length * fonts.code.height + Math.round(8 * s);
           fill(g, Theme.ink, inner[0], yy, inner[2], h, 0.45);
           g.fillStyle = css(Theme.grass);
           let cy = yy + Math.round(4 * s);
           for (const line of lines) {
-            printf(g, fonts.codeSm, line, inner[0] + Math.round(6 * s), cy, inner[2], "left");
-            cy += fonts.codeSm.height;
+            printf(g, fonts.code, line, inner[0] + Math.round(6 * s), cy, inner[2], "left");
+            cy += fonts.code.height;
           }
           yy += h + Math.round(6 * s);
         } else {
@@ -370,35 +406,51 @@ export class QuestScene implements Scene {
       }
 
       // SPEC §5.2 and §12: at least one case is `visible` precisely so "a
-      // player is never guessing blind about the output format".
+      // player is never guessing blind about the output format". It was the
+      // smallest type on the panel; it is the most load-bearing fact on it.
       const tests = this.quest!.tests;
       for (const c of tests.visible) {
+        const rows = (c.stdin ? 1 : 0) + 1;
+        const wellH = fonts.stationSm.height + rows * fonts.code.height + Math.round(20 * s);
+        well(g, inner[0], yy, inner[2], wellH);
+        const tx = inner[0] + Math.round(8 * s);
+        const tw = inner[2] - Math.round(16 * s);
+        let ty = yy + Math.round(8 * s);
         g.fillStyle = css(Theme.cyan);
-        printf(g, fonts.stationSm, `SAMPLE · ${c.name}`, inner[0], yy, inner[2], "left");
-        yy += fonts.stationSm.height + Math.round(3 * s);
+        printf(g, fonts.stationSm, `SAMPLE · ${c.name}`, tx, ty, tw, "left");
+        ty += fonts.stationSm.height + Math.round(4 * s);
         if (c.stdin) {
           g.fillStyle = css(Theme.dim);
-          yy +=
-            printf(g, fonts.codeSm, `in   ${show(c.stdin)}`, inner[0], yy, inner[2], "left") *
-            fonts.codeSm.height;
+          printf(g, fonts.code, `in   ${show(c.stdin)}`, tx, ty, tw, "left");
+          ty += fonts.code.height;
         }
         g.fillStyle = css(Theme.grass);
-        yy +=
-          printf(g, fonts.codeSm, `out  ${show(c.expect)}`, inner[0], yy, inner[2], "left") *
-          fonts.codeSm.height;
-        yy += Math.round(6 * s);
+        printf(g, fonts.code, `out  ${show(c.expect)}`, tx, ty, tw, "left");
+        yy += wellH + Math.round(8 * s);
       }
       if (tests.hidden_count > 0) {
         // The count only — never the data (SPEC §5.2).
         g.fillStyle = css(Theme.dim);
         printf(g, fonts.stationSm, `+${tests.hidden_count} HIDDEN`, inner[0], yy, inner[2], "left");
-        yy += fonts.stationSm.height + Math.round(6 * s);
+        yy += fonts.stationSm.height + Math.round(8 * s);
       }
 
       for (const h of this.hints) {
         g.fillStyle = css(Theme.coin);
         yy +=
           printf(g, fonts.small, `HINT: ${h}`, inner[0], yy, inner[2], "left") * fonts.small.height;
+        yy += Math.round(6 * s);
+      }
+
+      if (this.quest!.story) {
+        // Set apart by a rule, not by size.
+        yy += Math.round(6 * s);
+        fill(g, Theme.dim, inner[0], yy, inner[2], 1, 0.5);
+        yy += Math.round(8 * s);
+        g.fillStyle = css(Theme.cyan, 0.62);
+        yy +=
+          printf(g, fonts.codeSm, `“${this.quest!.story}”`, inner[0], yy, inner[2], "left") *
+          fonts.codeSm.height;
         yy += Math.round(6 * s);
       }
     });
@@ -448,12 +500,30 @@ export class QuestScene implements Scene {
     this.buttons.row(
       fonts.button,
       [inner[0], rowY, inner[2], btnH],
+      // RUN is filled and first; RESET is the destructive one and sits at the
+      // far end, where it cannot be hit on the way to anything else. And the
+      // hint button says how many are left rather than which one is next —
+      // `HINT 2` reads as "hint number two", which is not what it means.
       [
-        { id: "run", label: this.stage === "idle" ? "RUN" : "…", dim: this.stage !== "idle" },
-        { id: "hint", label: `HINT ${hintsLeft}`, dim: hintsLeft <= 0 },
-        { id: "reset", label: "RESET" },
+        {
+          id: "run",
+          label: this.stage === "idle" ? "RUN" : "…",
+          dim: this.stage !== "idle",
+          primary: this.stage === "idle",
+        },
+        {
+          id: "hint",
+          label:
+            hintsLeft === 0
+              ? "NO HINTS"
+              : hintsLeft === 1
+                ? "1 HINT LEFT"
+                : `${hintsLeft} HINTS LEFT`,
+          dim: hintsLeft <= 0,
+        },
         { id: "console", label: this.consoleOpen ? "HIDE LOG" : "LOG" },
         { id: "back", label: "MAP" },
+        { id: "reset", label: "RESET" },
       ],
       layout.minTouchH(),
     );

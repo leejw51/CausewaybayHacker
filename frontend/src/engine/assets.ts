@@ -114,4 +114,19 @@ export class Assets {
   has(name: string): boolean {
     return this.images.has(name);
   }
+
+  /**
+   * The authored pixel size of an asset, from the manifest rather than from a
+   * loaded image.
+   *
+   * Backgrounds arrive late, so a layout that measured `naturalWidth` would be
+   * computed against nothing on the first frames and then reflow when the JPEG
+   * lands — which on the overworld means every node jumping to a new place the
+   * moment the picture appears. The manifest knows the size before the bytes
+   * do.
+   */
+  size(name: string, portrait = false): { w: number; h: number } | null {
+    const e = (portrait ? this.entries.get(`${name}_p`) : null) ?? this.entries.get(name);
+    return e ? { w: e.w, h: e.h } : null;
+  }
 }

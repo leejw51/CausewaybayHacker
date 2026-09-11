@@ -1,356 +1,367 @@
 {
- "$comment": "The art convention lifted from CausewaybayGolang/typescript/public/art/: one entry per file, `name` is what the code asks for, `_p` is a portrait variant of a background, and `box` is the opaque bounds of a sprite's ink \u2014 `cx`/`feet` are what let it stand on its feet rather than on the bottom of its transparent margin. THE IMAGE FILES ARE PLACEHOLDERS copied from that repo so the screens have something to draw; PM owns the real art (docs/art.md).",
- "art": [
-  {
-   "name": "title_bg",
-   "file": "title_bg.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "title_bg_p",
-   "file": "title_bg_p.jpg",
-   "w": 768,
-   "h": 1152
-  },
-  {
-   "name": "bg_flat",
-   "file": "bg_flat.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "bg_street",
-   "file": "bg_street.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "bg_mtr",
-   "file": "bg_mtr.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "bg_times",
-   "file": "bg_times.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "bg_mall",
-   "file": "bg_mall.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "bg_queue",
-   "file": "bg_queue.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "bg_till",
-   "file": "bg_till.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "bg_kitchen",
-   "file": "bg_kitchen.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "bg_set",
-   "file": "bg_set.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "bg_night",
-   "file": "bg_night.jpg",
-   "w": 1152,
-   "h": 864
-  },
-  {
-   "name": "bg_lab",
-   "file": "bg_lab.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "bg_market",
-   "file": "bg_market.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "map_bg",
-   "file": "map_bg.jpg",
-   "w": 1152,
-   "h": 768
-  },
-  {
-   "name": "map_bg_p",
-   "file": "map_bg_p.jpg",
-   "w": 768,
-   "h": 1152
-  },
-  {
-   "name": "sprite_hero",
-   "file": "sprite_hero.png",
-   "w": 32,
-   "h": 48,
-   "box": {
-    "cx": 15.5,
-    "feet": 48.0,
-    "h": 48.0,
-    "minx": 4,
-    "miny": 0,
-    "maxx": 26,
-    "maxy": 47
-   }
-  },
-  {
-   "name": "sprite_clerk",
-   "file": "sprite_clerk.png",
-   "w": 32,
-   "h": 48,
-   "box": {
-    "cx": 15.5,
-    "feet": 48.0,
-    "h": 48.0,
-    "minx": 4,
-    "miny": 0,
-    "maxx": 26,
-    "maxy": 47
-   }
-  },
-  {
-   "name": "sprite_mei",
-   "file": "sprite_mei.png",
-   "w": 32,
-   "h": 48,
-   "box": {
-    "cx": 15.5,
-    "feet": 48.0,
-    "h": 48.0,
-    "minx": 4,
-    "miny": 0,
-    "maxx": 26,
-    "maxy": 47
-   }
-  },
-  {
-   "name": "sprite_cook",
-   "file": "sprite_cook.png",
-   "w": 32,
-   "h": 48,
-   "box": {
-    "cx": 15.5,
-    "feet": 48.0,
-    "h": 48.0,
-    "minx": 5,
-    "miny": 0,
-    "maxx": 25,
-    "maxy": 47
-   }
-  },
-  {
-   "name": "item_hashbrown",
-   "file": "item_hashbrown.png",
-   "w": 128,
-   "h": 128,
-   "box": {
-    "cx": 64.0,
-    "feet": 105.0,
-    "h": 81.0,
-    "minx": 22,
-    "miny": 24,
-    "maxx": 106,
-    "maxy": 104
-   }
-  },
-  {
-   "name": "item_set",
-   "file": "item_set.png",
-   "w": 128,
-   "h": 128,
-   "box": {
-    "cx": 63.5,
-    "feet": 101.0,
-    "h": 78.0,
-    "minx": 10,
-    "miny": 23,
-    "maxx": 117,
-    "maxy": 100
-   }
-  },
-  {
-   "name": "ui_coin",
-   "file": "ui_coin.png",
-   "w": 48,
-   "h": 48,
-   "box": {
-    "cx": 23.5,
-    "feet": 39.0,
-    "h": 29.0,
-    "minx": 12,
-    "miny": 10,
-    "maxx": 35,
-    "maxy": 38
-   }
-  },
-  {
-   "name": "ui_panel",
-   "file": "ui_panel.png",
-   "w": 128,
-   "h": 96,
-   "box": {
-    "cx": 64.0,
-    "feet": 80.0,
-    "h": 67.0,
-    "minx": 4,
-    "miny": 13,
-    "maxx": 124,
-    "maxy": 79
-   }
-  },
-  {
-   "name": "stamp_served",
-   "file": "stamp_served.png",
-   "w": 96,
-   "h": 96,
-   "box": {
-    "cx": 48.0,
-    "feet": 86.0,
-    "h": 77.0,
-    "minx": 10,
-    "miny": 9,
-    "maxx": 86,
-    "maxy": 85
-   }
-  },
-  {
-   "name": "sprite_monty",
-   "file": "sprite_monty.png",
-   "w": 128,
-   "h": 128,
-   "box": {
-    "cx": 63.0,
-    "feet": 107.0,
-    "h": 81.0,
-    "minx": 30,
-    "miny": 26,
-    "maxx": 96,
-    "maxy": 106
-   }
-  },
-  {
-   "name": "sprite_ferris",
-   "file": "sprite_ferris.png",
-   "w": 128,
-   "h": 128,
-   "box": {
-    "cx": 64.0,
-    "feet": 85.0,
-    "h": 41.0,
-    "minx": 32,
-    "miny": 44,
-    "maxx": 96,
-    "maxy": 84
-   }
-  },
-  {
-   "name": "sprite_gogo",
-   "file": "sprite_gogo.png",
-   "w": 128,
-   "h": 128,
-   "box": {
-    "cx": 62.0,
-    "feet": 110.0,
-    "h": 88.0,
-    "minx": 25,
-    "miny": 22,
-    "maxx": 99,
-    "maxy": 109
-   }
-  },
-  {
-   "name": "fx_star",
-   "file": "fx_star.png",
-   "w": 48,
-   "h": 48,
-   "box": {
-    "cx": 24.0,
-    "feet": 41.0,
-    "h": 33.0,
-    "minx": 8,
-    "miny": 8,
-    "maxx": 40,
-    "maxy": 40
-   }
-  },
-  {
-   "name": "fx_confetti",
-   "file": "fx_confetti.png",
-   "w": 24,
-   "h": 24,
-   "box": {
-    "cx": 12.0,
-    "feet": 19.0,
-    "h": 13.0,
-    "minx": 3,
-    "miny": 6,
-    "maxx": 21,
-    "maxy": 18
-   }
-  },
-  {
-   "name": "fx_ribbon",
-   "file": "fx_ribbon.png",
-   "w": 512,
-   "h": 512,
-   "box": {
-    "cx": 256.5,
-    "feet": 320.0,
-    "h": 126.0,
-    "minx": 17,
-    "miny": 194,
-    "maxx": 496,
-    "maxy": 319
-   }
-  },
-  {
-   "name": "fx_trophy",
-   "file": "fx_trophy.png",
-   "w": 192,
-   "h": 192,
-   "box": {
-    "cx": 95.5,
-    "feet": 157.0,
-    "h": 114.0,
-    "minx": 35,
-    "miny": 43,
-    "maxx": 156,
-    "maxy": 156
-   }
-  },
-  {
-   "name": "fx_medal",
-   "file": "fx_medal.png",
-   "w": 160,
-   "h": 160,
-   "box": {
-    "cx": 80.0,
-    "feet": 136.0,
-    "h": 108.0,
-    "minx": 36,
-    "miny": 28,
-    "maxx": 124,
-    "maxy": 135
-   }
-  }
- ]
+  "art": [
+    {
+      "name": "title_bg",
+      "file": "title_bg.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "title_bg_p",
+      "file": "title_bg_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "map_rust",
+      "file": "map_rust.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "map_rust_p",
+      "file": "map_rust_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "map_go",
+      "file": "map_go.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "map_go_p",
+      "file": "map_go_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "bg_street",
+      "file": "bg_street.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_times",
+      "file": "bg_times.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_till",
+      "file": "bg_till.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_mtr",
+      "file": "bg_mtr.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_room732",
+      "file": "bg_room732.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_room732_p",
+      "file": "bg_room732_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "bg_datacentre",
+      "file": "bg_datacentre.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "sprite_mei",
+      "file": "sprite_mei.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 40,
+        "miny": 7,
+        "maxx": 86,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "sprite_alex",
+      "file": "sprite_alex.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 33,
+        "miny": 7,
+        "maxx": 94,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "sprite_ferris",
+      "file": "sprite_ferris.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 84.0,
+        "minx": 7,
+        "miny": 37,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "sprite_gogo",
+      "file": "sprite_gogo.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 20,
+        "miny": 7,
+        "maxx": 107,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "agent_skynet",
+      "file": "agent_skynet.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 108.0,
+        "h": 89.0,
+        "minx": 7,
+        "miny": 19,
+        "maxx": 120,
+        "maxy": 107
+      }
+    },
+    {
+      "name": "boss_autocomplete",
+      "file": "boss_autocomplete.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 15,
+        "miny": 7,
+        "maxx": 111,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "boss_deadlock",
+      "file": "boss_deadlock.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 8,
+        "miny": 7,
+        "maxx": 118,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "boss_nullptr",
+      "file": "boss_nullptr.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 24,
+        "miny": 7,
+        "maxx": 103,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "boss_race",
+      "file": "boss_race.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 62.5,
+        "feet": 121.0,
+        "h": 105.0,
+        "minx": 7,
+        "miny": 16,
+        "maxx": 118,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "boss_whiteboard",
+      "file": "boss_whiteboard.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 108.0,
+        "minx": 7,
+        "miny": 13,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "boss_clock",
+      "file": "boss_clock.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 12,
+        "miny": 7,
+        "maxx": 115,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "node_quest",
+      "file": "node_quest.png",
+      "w": 64,
+      "h": 64,
+      "box": {
+        "cx": 31.0,
+        "feet": 60.0,
+        "h": 57.0,
+        "minx": 3,
+        "miny": 3,
+        "maxx": 59,
+        "maxy": 59
+      }
+    },
+    {
+      "name": "node_boss",
+      "file": "node_boss.png",
+      "w": 64,
+      "h": 64,
+      "box": {
+        "cx": 31.5,
+        "feet": 60.0,
+        "h": 57.0,
+        "minx": 4,
+        "miny": 3,
+        "maxx": 59,
+        "maxy": 59
+      }
+    },
+    {
+      "name": "node_locked",
+      "file": "node_locked.png",
+      "w": 64,
+      "h": 64,
+      "box": {
+        "cx": 31.0,
+        "feet": 60.0,
+        "h": 57.0,
+        "minx": 3,
+        "miny": 3,
+        "maxx": 59,
+        "maxy": 59
+      }
+    },
+    {
+      "name": "stamp_cleared",
+      "file": "stamp_cleared.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 5,
+        "miny": 5,
+        "maxx": 89,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "fx_ribbon",
+      "file": "fx_ribbon.png",
+      "w": 512,
+      "h": 256,
+      "box": {
+        "cx": 255.5,
+        "feet": 175.0,
+        "h": 94.0,
+        "minx": 28,
+        "miny": 81,
+        "maxx": 483,
+        "maxy": 174
+      }
+    },
+    {
+      "name": "fx_medal",
+      "file": "fx_medal.png",
+      "w": 160,
+      "h": 160,
+      "box": {
+        "cx": 79.0,
+        "feet": 151.0,
+        "h": 142.0,
+        "minx": 34,
+        "miny": 9,
+        "maxx": 124,
+        "maxy": 150
+      }
+    },
+    {
+      "name": "fx_trophy",
+      "file": "fx_trophy.png",
+      "w": 192,
+      "h": 192,
+      "box": {
+        "cx": 95.5,
+        "feet": 181.0,
+        "h": 171.0,
+        "minx": 26,
+        "miny": 10,
+        "maxx": 165,
+        "maxy": 180
+      }
+    },
+    {
+      "name": "ui_panel",
+      "file": "ui_panel.png",
+      "w": 128,
+      "h": 96,
+      "box": {
+        "cx": 63.5,
+        "feet": 84.0,
+        "h": 72.0,
+        "minx": 7,
+        "miny": 12,
+        "maxx": 120,
+        "maxy": 83
+      }
+    }
+  ]
 }

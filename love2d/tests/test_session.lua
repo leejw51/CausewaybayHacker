@@ -135,6 +135,61 @@ return function()
     end
   end)
 
+  T.case("the secret detector knows a mnemonic from a session token", function()
+    -- The regression that hung a login: `auth.resume` hands back a base64url
+    -- token, and roughly one in several has twelve runs of letters and no `-`
+    -- or `_`. The first version of this check called that a mnemonic,
+    -- refused to store it, and raised — through the reply handler, so the
+    -- login spinner never stopped. The detector now describes the actual
+    -- thing: space-separated alphabetic words, twelve or more.
+    local Store = require("src.store")
+    local mnemonic =
+      "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+    T.eq(Store.looks_like_a_mnemonic(mnemonic), true)
+    T.eq(Store.looks_like_a_mnemonic(
+      "legal winner thank year wave sausage worth useful legal winner thank yellow"), true)
+
+    for _, token in ipairs({
+      "4cibqBtjjk-62gP823-B_pPSBlf1KUQbx2hN4Hd-8eI",
+      "kR3aBcDeFgHiJkLmNoPqRsTuVwXyZaBcDeFgHiJkLmN",   -- no punctuation at all
+      "aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcdefg",
+      "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
+      "ws://127.0.0.1:5390/ws",
+      "hacker-9858Ef",
+      "",
+    }) do
+      T.eq(Store.looks_like_a_mnemonic(token), false,
+        ("%q must not read as a mnemonic"):format(token))
+    end
+
+    -- The record the client actually persists passes, and a record carrying
+    -- a phrase does not.
+    T.eq(Store.check_no_secrets({
+      token = "kR3aBcDeFgHiJkLmNoPqRsTuVwXyZaBcDeFgHiJkLmN",
+      address = "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
+      name = "mei",
+      server = "ws://127.0.0.1:5390/ws",
+    }), true)
+    T.eq(Store.check_no_secrets({ token = "t", note = mnemonic }), nil)
+    T.eq(Store.check_no_secrets({ mnemonic = "x" }), nil)
+    T.eq(Store.check_no_secrets({ settings = { private_key = "0x00" } }), nil)
+  end)
+
+  T.case("a store that refuses to write does not take the session down", function()
+    local refusing = {
+      load_session = function() return nil end,
+      clear_session = function() end,
+      save_session = function() error("the disk is full", 0) end,
+    }
+    local h = harness({ store = refusing })
+    h.client:connect(); h.client:update()
+    -- No stored token, so this one logs in the long way round: fake the
+    -- adopt directly, which is what the reply handler does.
+    h.session:adopt("t1", { address = "0x9858Ef", name = "mei" })
+    T.eq(h.session.authed, true, "the session is live even though nothing was written")
+    T.eq(h.session.token, "t1")
+  end)
+
   T.section("session — §8.9 / §6.5: a mid-session drop resumes and refetches")
 
   T.case("the map scene is told to refetch after a reconnect", function()

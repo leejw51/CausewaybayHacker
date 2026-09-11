@@ -32,7 +32,11 @@ local M = {}
 
 --- The ABI this binding was written against. A library reporting anything
 --- else is refused rather than guessed at.
-M.ABI_VERSION = 1
+---
+--- 2 is the contract with `generate` in it. The login screen's NEW WALLET
+--- button depends on it, and a binding that loaded an ABI-1 library would
+--- offer the button and fail on the press.
+M.ABI_VERSION = 2
 
 -- Kept byte-identical to love2d/ffi/include/cwbh.h.
 M.CDEF = [[
@@ -189,6 +193,22 @@ end
 
 function M.describe(lib)
   return M.execute(lib, { op = "describe" })
+end
+
+--- Generate a fresh 12-word mnemonic.
+---
+--- **The one call in this client that receives key material.** The phrase is
+--- returned so it can be shown to the player once, on paper; it is not
+--- persisted, not logged, and not sent. `src/scenes/login.lua` holds it only
+--- while the WRITE THIS DOWN screen is on the display, and drops it with
+--- `M.forget` the moment the player confirms.
+---
+--- The randomness is the operating system's, inside the Rust library. There
+--- is deliberately no Lua fallback: a mnemonic from `math.random` is a wallet
+--- anybody can re-derive from the clock, and it would look exactly like a
+--- good one.
+function M.generate(lib, words)
+  return M.execute(lib, { op = "generate", words = words or 12 })
 end
 
 --- Is this a well-formed mnemonic? Cheap, and the login screen calls it on

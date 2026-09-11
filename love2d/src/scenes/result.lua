@@ -44,8 +44,11 @@ end
 
 function Result:draw()
   local vw, vh = Layout.vw, Layout.vh
+  -- The quest's own plate, dimmed (docs/art.md §5), so the result reads as
+  -- the same place rather than a new screen.
   local land = (self.quest and self.quest.land) or self.app.land or "rust"
-  Assets.cover(land == "go" and "bg_mtr" or "bg_street", 0, 0, vw, vh)
+  Assets.cover(require("src.scenes.quest").backdrop(land,
+    (self.quest and self.quest.category) or self.app.category), 0, 0, vw, vh)
   love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.82)
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)

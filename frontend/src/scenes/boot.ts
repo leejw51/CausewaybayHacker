@@ -37,6 +37,10 @@ export class BootScene implements Scene {
     }
     try {
       this.app.assets = await Assets.load("art");
+      // The title plate is the first thing anybody sees and it is a lazily
+      // fetched background, so it is asked for here rather than on the frame
+      // the login screen first tries to draw it.
+      this.app.assets.prefetch("title_bg", this.app.layout.isPortrait());
     } catch {
       this.app.say("the art did not load — carrying on without it");
     }

@@ -16,7 +16,7 @@
  * `tests/wallet.test.ts`.
  */
 import { HDKey } from "@scure/bip32";
-import { mnemonicToSeedSync, validateMnemonic } from "@scure/bip39";
+import { generateMnemonic, mnemonicToSeedSync, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
@@ -60,6 +60,23 @@ function privateKeyFromMnemonic(phrase: string, index: number, passphrase: strin
  */
 export function normalizeMnemonic(phrase: string): string {
   return phrase.normalize("NFKD").trim().split(/\s+/u).join(" ");
+}
+
+/**
+ * Twelve new words, from the browser's CSPRNG.
+ *
+ * The game had no way to make one of these, which meant a player who had never
+ * run `CausewaybayWallet` had nothing to type into the only field on the only
+ * screen they could reach. A seed phrase is the account (SPEC §3), so handing
+ * one out *is* the sign-up.
+ *
+ * 128 bits, which is what twelve words carries; `@scure/bip39` draws it from
+ * `crypto.getRandomValues` and nothing here reseeds or post-processes it. The
+ * caller is expected to show it to exactly one person and then forget it — it
+ * is never logged, never stored, and it does not go near the socket.
+ */
+export function newMnemonic(): string {
+  return generateMnemonic(wordlist, 128);
 }
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@ import {
   addressFromMnemonic,
   addressFromPrivateKeyHex,
   eip191Hash,
+  newMnemonic,
   normalizeMnemonic,
   signHash,
   signMessage,
@@ -155,5 +156,26 @@ describe("EIP-191, the shape SPEC §3.2 signs", () => {
     expect(surface).not.toContain("junk");
     wipe();
     expect(() => signMessage(message)).toThrow();
+  });
+});
+
+describe("a phrase the game hands out", () => {
+  it("is twelve words from the wordlist, and a different one each time", () => {
+    const a = newMnemonic();
+    const b = newMnemonic();
+    expect(a.split(" ")).toHaveLength(12);
+    expect(a).not.toBe(b);
+    // If it were not valid BIP-39 the player could not log in with it, and if
+    // it were not derivable it would not be an account.
+    expect(() => addressFromMnemonic(a)).not.toThrow();
+    expect(addressFromMnemonic(a).eip55).not.toBe(addressFromMnemonic(b).eip55);
+  });
+
+  it("is a real 128-bit draw, not a stub", () => {
+    // Twenty phrases, sixty distinct words at the very least: a generator
+    // stuck on one entropy source would fail this immediately.
+    const words = new Set<string>();
+    for (let i = 0; i < 20; i++) for (const w of newMnemonic().split(" ")) words.add(w);
+    expect(words.size).toBeGreaterThan(60);
   });
 });

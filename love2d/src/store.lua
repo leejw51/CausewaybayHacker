@@ -47,31 +47,62 @@ local function write(name, value)
   return ok
 end
 
---- Raise if `record` carries anything that looks like key material.
+--- True when `text` is shaped like a BIP-39 phrase.
 ---
---- A belt-and-braces check on the one rule in this program that cannot be
---- walked back: a mnemonic written to disk is a mnemonic on somebody's
---- backup, and no later fix removes it.
-function Store.assert_no_secrets(record)
+--- **Space-separated** lowercase alphabetic words, twelve or more of them.
+---
+--- The first version of this counted runs of letters with `%a+` and demanded
+--- no punctuation, which is not a description of a mnemonic — it is a
+--- description of quite a lot of strings. The session token is base64url, 43
+--- characters, and roughly one token in several has twelve letter-runs and
+--- happens to contain neither `-` nor `_`. Those tokens were refused, the
+--- refusal was raised through the reply handler, and the player's login hung
+--- on a spinner forever. A heuristic guarding the most important rule in the
+--- program has to be a heuristic about the actual thing.
+local function looks_like_a_mnemonic(text)
+  if #text < 30 then return false end
+  local words = 0
+  for word in text:gmatch("%S+") do
+    if not word:match("^%a%a+$") then return false end
+    words = words + 1
+  end
+  return words >= 12
+end
+
+Store.looks_like_a_mnemonic = looks_like_a_mnemonic
+
+--- Check `record` for anything that looks like key material.
+---
+--- Returns true, or `nil, message`. A belt-and-braces check on the one rule
+--- in this program that cannot be walked back: a mnemonic written to disk is
+--- a mnemonic on somebody's backup, and no later fix removes it.
+---
+--- It reports rather than raising, because a false positive here must cost a
+--- persisted session and nothing more — never the login itself.
+function Store.check_no_secrets(record)
   for key, value in pairs(record or {}) do
     local lowered = tostring(key):lower()
     for _, bad in ipairs(FORBIDDEN) do
       if lowered:find(bad, 1, true) then
-        error("store: refusing to persist a field named " .. tostring(key), 2)
+        return nil, "refusing to persist a field named " .. tostring(key)
       end
     end
     if type(value) == "table" then
-      Store.assert_no_secrets(value)
+      local ok, why = Store.check_no_secrets(value)
+      if not ok then return nil, why end
     end
-    -- A twelve-word string is a mnemonic no matter what the key is called.
-    if type(value) == "string" then
-      local words = 0
-      for _ in value:gmatch("%a+") do words = words + 1 end
-      if words >= 12 and not value:find("[%p]") and #value > 40 then
-        error("store: refusing to persist a value that looks like a mnemonic", 2)
-      end
+    -- A twelve-word phrase is a mnemonic no matter what the key is called.
+    if type(value) == "string" and looks_like_a_mnemonic(value) then
+      return nil, ("refusing to persist a %s that looks like a mnemonic"):format(tostring(key))
     end
   end
+  return true
+end
+
+--- The raising form, for a caller that wants the program to stop.
+function Store.assert_no_secrets(record)
+  local ok, why = Store.check_no_secrets(record)
+  if not ok then error("store: " .. why, 2) end
   return true
 end
 
@@ -96,7 +127,13 @@ function Store.save_session(token, user, server)
     name = user and user.name or nil,
     server = server,
   }
-  Store.assert_no_secrets(record)
+  local ok, why = Store.check_no_secrets(record)
+  if not ok then
+    -- Loud, and not fatal. Refusing to write is the safe half; taking the
+    -- session down with it is not.
+    print("store: " .. why .. " — the session was NOT saved")
+    return false, why
+  end
   return write(SESSION, record)
 end
 

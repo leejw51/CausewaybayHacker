@@ -18,6 +18,14 @@
 //! the key exists in memory for as long as it takes to sign and nowhere else.
 //! Secrets are held in `Zeroizing` buffers so the copy in freed memory is
 //! wiped rather than left for a realloc, a swap file or a core dump.
+//!
+//! **`generate` is the single exception, and it is deliberate.** A first-time
+//! player owns no BIP-39 phrase, and without a generator there is no way into
+//! the game at all. So a freshly generated mnemonic comes back across the ABI
+//! exactly **once**, to be written on paper — it is not stored here, it is not
+//! written to disk, and it is never sent anywhere. The alternative is a player
+//! improvising a phrase, or a client improvising a CSPRNG, and both are worse
+//! than one audited exit. The private key derived from it still never crosses.
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -32,10 +40,13 @@ pub mod evm;
 
 /// The ABI this library speaks.
 ///
-/// 1 is: `{op, ...}` in, `{ok, ...}` or `{ok:false, error}` out, the five
-/// operations below. A different number means the Lua binding and this
-/// library were built from different trees, and the binding refuses to load.
-pub const ABI_VERSION: i32 = 1;
+/// 1 was: `{op, ...}` in, `{ok, ...}` or `{ok:false, error}` out, five
+/// operations. **2 adds `generate`**, which is the only op that returns key
+/// material, so a binding written against 1 must not be handed a library that
+/// has it — and a login screen written against 2 must not silently lose its
+/// NEW WALLET button to an older library. A mismatch is refused rather than
+/// guessed at.
+pub const ABI_VERSION: i32 = 2;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -60,6 +71,9 @@ struct Request {
     /// the server's string is signed byte-for-byte, so both doors exist.
     #[serde(default)]
     message_hex: Option<String>,
+    /// `generate` only: how many words. 12, 15, 18, 21 or 24; default 12.
+    #[serde(default)]
+    words: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -134,6 +148,8 @@ pub fn describe() -> serde_json::Value {
         "ops": [
             { "op": "describe", "in": [], "out": ["library","version","abi","ops"] },
             { "op": "validate", "in": ["mnemonic"], "out": ["valid"] },
+            { "op": "generate", "in": ["words?"], "out": ["mnemonic","words","address"],
+              "note": "the only op that returns key material; shown once, never stored" },
             { "op": "derive",
               "in": ["mnemonic|private_key", "index?", "passphrase?"],
               "out": ["address","address_lower","public_key_compressed","path"] },
@@ -144,7 +160,8 @@ pub fn describe() -> serde_json::Value {
               "in": ["mnemonic|private_key", "index?", "passphrase?", "message|message_hex"],
               "out": ["address","signature","digest","v","recovery_id"] }
         ],
-        "never_returns": ["mnemonic", "private_key", "seed"]
+        "never_returns": ["private_key", "seed"],
+        "returns_key_material_once": ["generate.mnemonic"]
     })
 }
 
@@ -178,6 +195,29 @@ fn run(request_json: &str) -> Result<serde_json::Value, String> {
                 Ok(_) => Ok(json!({ "ok": true, "valid": true })),
                 Err(e) => Ok(json!({ "ok": true, "valid": false, "reason": e })),
             }
+        }
+
+        // The one exception to `never_returns`, and the reason a first-time
+        // player can start at all. The phrase is handed back once, with the
+        // address it derives so the screen can show both without a second
+        // call, and nothing here keeps a copy.
+        "generate" => {
+            let words = req.words.unwrap_or(12);
+            let phrase = bip39::generate(words)?;
+            let path = bip32::ethereum_path(0);
+            let seed = bip39::to_seed(&phrase, "");
+            let master = bip32::ExtendedPrivateKey::from_seed(&seed[..])?;
+            let child = master.derive_path(&path)?;
+            let key = Zeroizing::new(child.key);
+            let acct = account_of(&key, Some(path))?;
+            Ok(json!({
+                "ok": true,
+                "mnemonic": phrase.as_str(),
+                "words": words,
+                "address": acct.address,
+                "address_lower": acct.address_lower,
+                "path": acct.path,
+            }))
         }
 
         "derive" => {
@@ -317,6 +357,53 @@ mod tests {
         assert_eq!(v["ok"], true);
         assert_eq!(v["address"], "0x9858EfFD232B4033E47d90003D41EC34EcaEda94");
         assert_eq!(v["path"], "m/44'/60'/0'/0/0");
+    }
+
+    #[test]
+    fn a_generated_phrase_derives_a_real_address() {
+        let v = call(json!({ "op": "generate" }));
+        assert_eq!(v["ok"], true);
+        assert_eq!(v["words"], 12);
+        let phrase = v["mnemonic"].as_str().unwrap();
+        assert_eq!(phrase.split(' ').count(), 12);
+        assert_eq!(v["path"], "m/44'/60'/0'/0/0");
+
+        // The address `generate` reports must be the one `derive` gets from
+        // the same phrase — otherwise the screen shows one account and the
+        // player logs into another.
+        let derived = call(json!({ "op": "derive", "mnemonic": phrase, "index": 0 }));
+        assert_eq!(derived["ok"], true);
+        assert_eq!(derived["address"], v["address"]);
+        assert_eq!(v["address"].as_str().unwrap().len(), 42);
+
+        // And it can sign, which is the only thing a login actually needs.
+        let signed = call(json!({ "op": "sign", "mnemonic": phrase, "message": "hello" }));
+        assert_eq!(signed["ok"], true);
+        assert_eq!(signed["address"], v["address"]);
+        assert_eq!(signed["signature"].as_str().unwrap().len(), 132);
+
+        // `validate` agrees with `generate`.
+        assert_eq!(call(json!({ "op": "validate", "mnemonic": phrase }))["valid"], true);
+    }
+
+    #[test]
+    fn generate_never_repeats() {
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..32 {
+            let v = call(json!({ "op": "generate" }));
+            assert!(
+                seen.insert(v["mnemonic"].as_str().unwrap().to_string()),
+                "two generations collided — the RNG is not what it claims"
+            );
+        }
+    }
+
+    #[test]
+    fn generate_refuses_a_word_count_bip39_does_not_have() {
+        let v = call(json!({ "op": "generate", "words": 13 }));
+        assert_eq!(v["ok"], false);
+        assert!(v["error"].as_str().unwrap().contains("13"));
+        assert!(v.get("mnemonic").is_none());
     }
 
     #[test]

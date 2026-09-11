@@ -10,9 +10,9 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { fill, type Ctx } from "../engine/ui";
+import { fill, type Ctx, type Rect } from "../engine/ui";
 import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
-import { seconds, Tween } from "../engine/motion";
+import { Chase, seconds, Tween } from "../engine/motion";
 import type { Category, CategorySummary, Land, Responses } from "../net/protocol";
 import { MapScene } from "./map";
 
@@ -39,7 +39,59 @@ export class LandsScene implements Scene {
   private readonly leftIn = new Tween(seconds("panel"));
   private readonly rightIn = new Tween(seconds("panel"), seconds("stagger"));
 
+  /**
+   * Which plate is open, 0 for RUST and 1 for GO, eased between the two. It is
+   * one number rather than two because the plates share a column: whatever one
+   * gives up the other takes, which is what makes the swap read as a single
+   * movement instead of two panels resizing at once.
+   */
+  private readonly open = new Chase(0, "panel");
+
   constructor(private readonly app: App) {}
+
+  /**
+   * One land, as a plate. Closed it is a name and a rule; open it holds the
+   * mascot and the sentence that says what the land is for.
+   */
+  private drawLandPlate(g: Ctx, rect: Rect, land: Land, chosen: boolean): void {
+    const s = this.app.layout.uiScale();
+    const fonts = ensureFonts(s);
+    const accent = land === "rust" ? RUST : GO;
+    const inner = titledPanel(g, rect, land.toUpperCase(), chosen ? accent : Theme.dim);
+    if (!chosen) {
+      g.fillStyle = css(Theme.dim);
+      printf(
+        g,
+        fonts.small,
+        "press to switch",
+        inner[0],
+        inner[1] + Math.round((inner[3] - fonts.small.height) / 2),
+        inner[2],
+        "center",
+      );
+      return;
+    }
+    const blurbLines = wrap(fonts.small, BLURB[land], inner[2]).length;
+    const blurbH = blurbLines * fonts.small.height;
+    const blurbY = inner[1] + inner[3] - blurbH;
+
+    const sprite = this.app.assets?.picture(NPC[land]);
+    const room = blurbY - Math.round(10 * s) - inner[1];
+    if (sprite && room > 20) {
+      // The `box` metadata from the art manifest is what lets a sprite stand on
+      // its feet instead of on the bottom of its transparent margin.
+      const box = this.app.assets?.box.get(NPC[land]);
+      const hh = Math.min(room, inner[2] * 0.62);
+      const scale = hh / sprite.naturalHeight;
+      const ww = sprite.naturalWidth * scale;
+      const bob = Math.sin(this.t * 2.2) * 2 * s;
+      const feet = box ? box.feet * scale : hh;
+      g.drawImage(sprite, inner[0] + (inner[2] - ww) / 2, inner[1] + (room - feet) + bob, ww, hh);
+    }
+
+    g.fillStyle = css(Theme.cream);
+    printf(g, fonts.small, BLURB[land], inner[0], blurbY, inner[2], "center");
+  }
 
   async enter(): Promise<void> {
     this.app.chip.music("title");
@@ -59,6 +111,12 @@ export class LandsScene implements Scene {
     this.t += dt;
     this.leftIn.update(dt);
     this.rightIn.update(dt);
+    this.open.update(dt);
+    // The overworld is a megabyte of JPEG and the player is one click from it.
+    this.app.assets?.prefetch(
+      this.land === "rust" ? "map_rust" : "map_go",
+      this.app.layout.isPortrait(),
+    );
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
@@ -72,6 +130,7 @@ export class LandsScene implements Scene {
     this.app.chip.select();
     if (hit.id.startsWith("land:")) {
       this.land = hit.id.slice(5) as Land;
+      this.open.to(this.land === "rust" ? 0 : 1);
       return;
     }
     if (hit.id.startsWith("cat:")) {
@@ -83,6 +142,7 @@ export class LandsScene implements Scene {
   key(name: string): void {
     if (name === "left" || name === "right" || name === "a" || name === "d") {
       this.land = this.land === "rust" ? "go" : "rust";
+      this.open.to(this.land === "rust" ? 0 : 1);
       this.app.chip.blip();
     }
   }
@@ -91,11 +151,15 @@ export class LandsScene implements Scene {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
     if (!this.app.backdrop) {
-      const bg = this.app.assets?.picture("bg_night", layout.isPortrait());
+      // `bg_night` went away with the old art set; this is the same job done
+      // by a picture that still exists. Without it the flat path is a blank
+      // navy field, which is the regression this branch is here to prevent.
+      const bg = this.app.assets?.picture("bg_times", layout.isPortrait());
       if (bg) {
         g.globalAlpha = 0.5;
         g.drawImage(bg, 0, 0, layout.vw, layout.vh);
         g.globalAlpha = 1;
+        fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.45);
       }
     }
     header(g, this.app, "CHOOSE YOUR LAND");
@@ -106,48 +170,33 @@ export class LandsScene implements Scene {
     this.catBtns.reset();
 
     // --- the two lands -----------------------------------------------------
+    // The choice *is* the panel. It used to be two small buttons in the corner
+    // of a box with three hundred pixels of nothing under them, which made the
+    // single most important decision in the game look like an afterthought.
+    // Now the chosen land opens to hold its mascot and its sentence, and the
+    // other stays a closed plate — on the house curve, so the swap reads as
+    // one thing making room for another.
     arriving(g, f, "left", this.leftIn, () => {
-      const left = titledPanel(g, f.left, "LAND", this.land === "rust" ? RUST : GO);
-      this.landBtns.row(
-        fonts.button,
-        [left[0], left[1], left[2], left[3]],
-        [
-          { id: "land:rust", label: "RUST" },
-          { id: "land:go", label: "GO" },
-        ],
-        layout.minTouchH(),
-      );
-
-      // The blurb is measured before the sprite is placed, so the sprite gets
-      // whatever is genuinely left rather than a guess — a three-line blurb in a
-      // narrow portrait panel would otherwise run off the bottom of the frame.
-      const blurbLines = wrap(fonts.small, BLURB[this.land], left[2]).length;
-      const blurbH = blurbLines * fonts.small.height;
-      const blurbY = left[1] + left[3] - blurbH;
-
-      const sprite = this.app.assets?.picture(NPC[this.land]);
-      const spriteTop = left[1] + Math.round(fonts.button.height + 34 * s);
-      const room = blurbY - Math.round(10 * s) - spriteTop;
-      if (sprite && room > 20) {
-        // The `box` metadata from the art manifest is what lets a sprite stand on
-        // its feet instead of on the bottom of its transparent margin.
-        const box = this.app.assets?.box.get(NPC[this.land]);
-        const h = Math.min(room, left[2] * 0.8);
-        const scale = h / sprite.naturalHeight;
-        const w = sprite.naturalWidth * scale;
-        const bob = Math.sin(this.t * 2.2) * 2 * s;
-        const feet = box ? box.feet * scale : h;
-        g.drawImage(sprite, left[0] + (left[2] - w) / 2, spriteTop + (room - feet) + bob, w, h);
+      const gap = Math.round(8 * s);
+      const [lx, ly, lw, lh] = f.left;
+      const k = this.open.value;
+      const big = Math.round((lh - gap) * 0.74);
+      const small = lh - gap - big;
+      const heights: Record<Land, number> = {
+        rust: Math.round(big + (small - big) * k),
+        go: Math.round(small + (big - small) * k),
+      };
+      let y = ly;
+      for (const land of ["rust", "go"] as Land[]) {
+        const h = heights[land];
+        this.drawLandPlate(g, [lx, y, lw, h], land, land === this.land);
+        this.landBtns.add({ id: `land:${land}`, rect: [lx, y, lw, h], label: "" });
+        y += h + gap;
       }
-
-      g.fillStyle = css(Theme.cream);
-      printf(g, fonts.small, BLURB[this.land], left[0], blurbY, left[2], "center");
-      this.landBtns.draw(g, fonts.button);
     });
 
     // --- the three categories ---------------------------------------------
     arriving(g, f, "right", this.rightIn, () => {
-      const right = titledPanel(g, f.right, `${this.land.toUpperCase()} — CATEGORY`, Theme.coin);
       const row = this.lands.find((l) => l.land === this.land);
       // A fixed order, not the server's. `world.lands` does not promise one, and
       // a map whose rows move between sessions is a map you cannot learn.
@@ -165,6 +214,21 @@ export class LandsScene implements Scene {
           }));
 
       const rowH = Math.max(layout.minTouchH(), Math.round(fonts.button.height + 52 * s));
+      const gap = Math.round(8 * s);
+      // Sized to the three rows it holds, then centred in the space — a box
+      // stretched to the viewport with its contents at the top reads as
+      // unfinished, which is what this screen read as.
+      const titleH = fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9) + 16;
+      const needed = titleH + cats.length * (rowH + gap) + Math.round(18 * s);
+      const panelH = Math.min(f.right[3], needed);
+      const panelY = f.right[1] + Math.round((f.right[3] - panelH) / 2);
+      const right = titledPanel(
+        g,
+        [f.right[0], panelY, f.right[2], panelH],
+        `${this.land.toUpperCase()} — CATEGORY`,
+        Theme.coin,
+      );
+
       let y = right[1];
       for (const c of cats) {
         // §4.6: `open` is false while the category's first node is locked. A
@@ -204,7 +268,7 @@ export class LandsScene implements Scene {
           label: "",
           dim: empty,
         });
-        y += rowH + Math.round(8 * s);
+        y += rowH + gap;
       }
 
       if (this.error) {
@@ -213,10 +277,10 @@ export class LandsScene implements Scene {
           g,
           fonts.small,
           this.error,
-          right[0],
-          right[1] + right[3] - fonts.small.height,
-          right[2],
-          "left",
+          f.right[0],
+          panelY + panelH + Math.round(8 * s),
+          f.right[2],
+          "center",
         );
       }
     });

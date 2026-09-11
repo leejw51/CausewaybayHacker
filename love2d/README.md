@@ -5,6 +5,11 @@ protocol, same account: sign in with the same mnemonic here and in the browser
 and you are the same player, because the address is the identity (SPEC §3) and
 both clients derive it the same way.
 
+**No wallet yet?** The login screen's **NEW WALLET** button makes one: twelve
+words from the operating system's CSPRNG, generated offline inside
+`love2d/ffi`, shown once to write down, and confirmed by typing three of them
+back before the account is used. Nothing about it touches the network.
+
 ```
     love2d (LuaJIT)                  server (Rust)               host
     ───────────────                  ─────────────               ────
@@ -104,6 +109,21 @@ ffi/                  the Rust cdylib: bip39 + bip32 + secp256k1 + keccak
 tests/                the suite, the fake server, the drive scripts
 assets/               placeholder art, per docs/art.md
 ```
+
+## The art
+
+`art/`, at the root of this repository, holds the 32 generated assets and
+`art/manifest.json` in `CausewaybayGolang`'s shape, with a measured `box` on
+every sprite so a character stands on her feet. `src/assets.lua` reads that
+manifest — `love.filesystem` first, then the real path beside the game — and
+**does not** run those files through the magenta knockout: they already carry
+binary alpha, and flooding a correctly-cut sprite would eat the padlock off
+`node_locked`.
+
+`love2d/assets/` keeps the handful of placeholders `art/` does not carry
+(`fx_star`, `fx_confetti`, `ui_coin`, `sprite_clerk`, `bg_flat`, and the old
+overworld as a fallback). Those are magenta-screen JPEGs and those *do* go
+through the knockout.
 
 ## The key
 

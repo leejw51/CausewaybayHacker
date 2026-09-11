@@ -46,12 +46,24 @@ local function highdpi()
   return true
 end
 
+--- Vsync, as `conf.lua` chose it.
+---
+--- `applyWindow` re-creates the window on every orientation and fullscreen
+--- change, and a hard-coded `vsync = 1` here would put it back on halfway
+--- through a drive script — which is exactly the stall `conf.lua` turns it
+--- off to avoid.
+local function vsync()
+  if os.getenv("CWBH_TEST") == "1" then return 0 end
+  if (os.getenv("CWBH_DRIVE") or "") ~= "" then return 0 end
+  return 1
+end
+
 local function windowedFlags()
   return {
     fullscreen = false,
     fullscreentype = "desktop",
     resizable = true,
-    vsync = 1,
+    vsync = vsync(),
     msaa = 0,
     minwidth = 640,
     minheight = 400,
@@ -82,7 +94,7 @@ function Layout.applyWindow()
       love.window.setMode(dw, dh, {
         fullscreen = true,
         fullscreentype = "desktop",
-        vsync = 1,
+        vsync = vsync(),
         msaa = 0,
         highdpi = highdpi(),
         resizable = false,

@@ -149,7 +149,35 @@ function UI.button(x, y, w, h, label, state, size)
   love.graphics.setColor(1, 1, 1, 1)
 end
 
---- 0..3 stars, SPEC §6.3.
+--- Difficulty, 1..5 — as **pips, not stars**.
+---
+--- `docs/design-review.md` §4 is the reason this function exists separately:
+--- difficulty (1..5, authored in the content pack) and stars (0..3, earned,
+--- SPEC §6.3) are two different scales, and drawing both with the same gold
+--- star glyph a few centimetres apart makes a player read their difficulty as
+--- their score. The star belongs exclusively to earned stars. Difficulty is a
+--- segmented bar in `brick` over `dim`, read by position and by length, and
+--- it cannot be mistaken for a score because nothing else in the game is
+--- shaped like it.
+function UI.pips(x, y, level, size, total)
+  total = total or 5
+  size = size or 6
+  local gap = 2
+  for i = 1, total do
+    local filled = i <= (level or 0)
+    UI.setColor(filled and Theme.brick or Theme.withAlpha(Theme.dim, 0.55))
+    love.graphics.rectangle("fill", x + (i - 1) * (size + gap), y, size, size * 2)
+  end
+  love.graphics.setColor(1, 1, 1, 1)
+  return total * (size + gap) - gap
+end
+
+function UI.pipsWidth(size, total)
+  return (total or 5) * ((size or 6) + 2) - 2
+end
+
+--- 0..3 **earned** stars, SPEC §6.3. Never used for difficulty — see
+--- `UI.pips` above.
 function UI.stars(x, y, count, size, total)
   total = total or 3
   size = size or 10
