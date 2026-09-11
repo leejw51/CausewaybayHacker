@@ -105,23 +105,30 @@ export function pixBtn(
   w: number,
   h: number,
   label: string,
-  opts: { lit?: boolean; hover?: boolean; dim?: boolean; quiet?: boolean } = {},
+  opts: { lit?: boolean; hover?: boolean; dim?: boolean; quiet?: boolean; strong?: boolean } = {},
 ): void {
   // `quiet` is the other half of a primary action: when one button on a row is
   // filled, the rest step back to a dark face so the eye has somewhere to go.
   // A row where every button is the same weight is a row with no answer in it.
+  //
+  // `strong` is a third register, for the one button on a screen that *commits*
+  // to something. It is not louder than the primary — it is a different colour
+  // entirely, because "the thing you press all day" and "the thing you press
+  // when you mean it" must not be two shades of the same idea.
   const face = opts.dim
     ? Theme.dim
-    : opts.lit || opts.hover
-      ? Theme.coin
-      : opts.quiet
-        ? Theme.navy
-        : Theme.panel;
+    : opts.strong
+      ? opts.hover
+        ? Theme.coin
+        : Theme.admit
+      : opts.lit || opts.hover
+        ? Theme.coin
+        : opts.quiet
+          ? Theme.navy
+          : Theme.panel;
   panel(g, x, y, w, h, face);
-  g.fillStyle = css(
-    opts.quiet && !opts.hover && !opts.dim ? Theme.cream : Theme.ink,
-    opts.dim ? 0.5 : 1,
-  );
+  const pale = (opts.quiet || (opts.strong && !opts.hover)) && !opts.dim;
+  g.fillStyle = css(pale ? Theme.cream : Theme.ink, opts.dim ? 0.5 : 1);
   // Centre the ink inside the panel's inner face, not the whole box.
   const ty = y + 8 + Math.floor((h - BTN_FRAME - font.height) * 0.5);
   printf(g, font, label, x, ty, w, "center");

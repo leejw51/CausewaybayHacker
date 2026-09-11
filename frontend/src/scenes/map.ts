@@ -14,6 +14,15 @@
  * fixed perpendicular offset that alternates with the edge index, because a
  * straight chord between two points on a drawn landscape is a wire and a map
  * of a place is a walk.
+ *
+ * **Nothing on this map is locked** (PROTOCOL §4.7): `state` is `open` or
+ * `cleared` and the server never refuses a quest because an earlier one is
+ * unfinished. The route is still drawn and still means something — the packs
+ * are written in a deliberate order and "where do I go next" is a real
+ * question — but it is advice, so no node is ever drawn as forbidden. The
+ * guidance that replaces the gate is the NEXT marker: the first street on the
+ * route the player has not cleared wears a chevron, and that is the whole of
+ * it.
  */
 import type { App, Scene } from "../app";
 import { ensureFonts, printf } from "../engine/text";
@@ -30,7 +39,7 @@ import {
   GO,
   RUST,
 } from "../ui/chrome";
-import { reducedMotion, seconds, Tween } from "../engine/motion";
+import { motionScale, reducedMotion, seconds, Tween } from "../engine/motion";
 import type { Category, Land, MapNode } from "../net/protocol";
 import { LandsScene } from "./lands";
 import { QuestScene } from "./quest";
@@ -104,6 +113,12 @@ export class MapScene implements Scene {
   } | null = null;
   /** Which way she is facing: 1 right, -1 left. */
   private facing = 1;
+  /**
+   * The street she is walking to in order to go *into*, as opposed to the walk
+   * she takes when one unlocks. Set when the player chooses a node; the quest
+   * opens on arrival.
+   */
+  private pendingOpen: MapNode | null = null;
 
   constructor(
     private readonly app: App,
@@ -136,7 +151,7 @@ export class MapScene implements Scene {
           // The street that just opened is where she goes next. First one
           // only: two simultaneous unlocks is a fork, and a walk to both is
           // not a thing a person can do.
-          if (!this.walk) this.walkTo(u);
+          if (!this.walk) this.walkTo(u, true);
         }
       }
       // A node we have never seen means the map really did change shape.
@@ -195,7 +210,12 @@ export class MapScene implements Scene {
       const before = this.mei[0];
       this.mei = this.onRoad(w.a, w.c, w.b, w.tween.inOut);
       if (Math.abs(this.mei[0] - before) > 0.0004) this.facing = this.mei[0] > before ? 1 : -1;
-      if (w.tween.finished) this.walk = null;
+      if (w.tween.finished) {
+        this.walk = null;
+        const go = this.pendingOpen;
+        this.pendingOpen = null;
+        if (go) this.open(go);
+      }
       return;
     }
     const home = this.nodes.find((n) => n.quest_id === this.meiOn) ?? this.homeNode();
@@ -230,14 +250,24 @@ export class MapScene implements Scene {
       h: Math.round(this.plate[3] * scale),
       dh,
     });
+    // While she walks the camera follows *her* and leans in a little; the
+    // lean is only affordable because the slight zoom makes the plane
+    // over-fill the plate, so there is no edge to expose (see `mode7.ts`).
+    // At rest it sits square on the whole map.
     const n = this.nodes[this.selected];
-    gl.map.aim(n?.x ?? 0.5, n?.y ?? 0.5, this.zoom);
+    if (this.walk) gl.map.aim(this.mei[0], this.mei[1], 0.86);
+    else gl.map.aim(n?.x ?? 0.5, n?.y ?? 0.5, this.zoom);
   }
 
   // -- input ---------------------------------------------------------------
 
   key(name: string): void {
     if (name === "escape") return void this.app.go(new LandsScene(this.app), "back");
+    // The walk is delight, not a toll. Any key while she is walking puts her at
+    // the far end of it immediately — a player who has chosen a street wants
+    // the street, and a cutscene between the click and the quest is a cutscene
+    // they will learn to resent.
+    if (this.walk) return this.skipWalk();
     if (this.nodes.length === 0) return;
     if (name === "left" || name === "up" || name === "a" || name === "w") {
       this.selected = (this.selected + this.nodes.length - 1) % this.nodes.length;
@@ -246,7 +276,7 @@ export class MapScene implements Scene {
       this.selected = (this.selected + 1) % this.nodes.length;
       this.app.chip.blip();
     } else if (name === "return" || name === "kpenter" || name === "space") {
-      this.open(this.nodes[this.selected]);
+      this.choose(this.nodes[this.selected]);
     }
   }
 
@@ -260,19 +290,40 @@ export class MapScene implements Scene {
       }
       if (phase === "down") {
         this.selected = i;
-        this.open(this.nodes[i]);
+        this.choose(this.nodes[i]);
       }
       return;
     }
+    // A click on the ground, mid-walk, is also "get on with it".
+    if (phase === "down" && this.walk) this.skipWalk();
+  }
+
+  /**
+   * Choosing a street: she walks there, and the quest opens when she arrives.
+   *
+   * Every node is reachable (§4.7), so a click can be from node 1 to node 24.
+   * The duration is therefore capped and grows only gently with distance — the
+   * camera carries the ground past, the legs do not have to cover it in real
+   * time. Exponential in and out, which is almost still, then very fast, then
+   * almost still: it needs a longer duration than a cubic to read as
+   * deliberate and a shorter one than you expect once the distance is large.
+   */
+  private choose(n: MapNode | undefined): void {
+    if (!n) return;
+    if (this.walk) return this.skipWalk();
+    if (this.meiOn === n.quest_id) return this.open(n);
+    this.app.chip.blip();
+    this.pendingOpen = n;
+    this.walkTo(n);
+  }
+
+  /** Put her at the end of the walk on the next frame, and act on arrival. */
+  private skipWalk(): void {
+    this.walk?.tween.finish();
   }
 
   private open(n: MapNode | undefined): void {
     if (!n) return;
-    if (n.state === "locked") {
-      this.app.chip.fail();
-      this.app.say("clear the street before it first");
-      return;
-    }
     this.app.chip.select();
     // The iris closes on the node you chose, and the camera pushes into the
     // ground under it while it does. This is the one place in the game where
@@ -334,19 +385,24 @@ export class MapScene implements Scene {
     return [x / A, y];
   }
 
-  private walkTo(to: MapNode): void {
+  private walkTo(to: MapNode, fanfare = false): void {
     const from = this.nodes.find((n) => n.quest_id === this.meiOn);
     const a: [number, number] = from ? [from.x, from.y] : this.mei;
     const { c } = from ? this.road(from, to) : { c: [(a[0] + to.x) / 2, (a[1] + to.y) / 2] };
     const A = this.plate[2] / Math.max(1, this.plate[3]);
+    // Tuned by eye against the real map. A neighbouring street is a little
+    // under half a second; the whole diagonal is a little under a second, and
+    // never more, however far it is.
+    const dist = Math.hypot((to.x - a[0]) * A, to.y - a[1]);
+    const dur = Math.min(0.92, Math.max(0.42, 0.34 + dist * 0.55)) * motionScale();
     this.walk = {
       a,
       c: from ? (c as [number, number]) : [((a[0] + to.x) / 2) * A, (a[1] + to.y) / 2],
       b: [to.x, to.y],
-      tween: new Tween(seconds("scene") * 1.6),
+      tween: new Tween(dur),
     };
     this.meiOn = to.quest_id;
-    this.app.chip.coin();
+    if (fanfare) this.app.chip.coin();
   }
 
   // -- geometry ------------------------------------------------------------
@@ -568,13 +624,28 @@ export class MapScene implements Scene {
   /**
    * The marker a node wears.
    *
-   * Silhouette carries the meaning, not colour: a padlock disc for locked, a
-   * spiked gear for a boss, a plain coin for an ordinary street. Node 12 is
-   * THE AUTOCOMPLETE and it used to be drawn exactly like node 5.
+   * Silhouette carries the meaning, not colour: a spiked gear for a boss, a
+   * plain coin for an ordinary street. Node 12 is THE AUTOCOMPLETE and it used
+   * to be drawn exactly like node 5.
+   *
+   * `node_locked` is deliberately not used. Every street is reachable now, and
+   * a padlock on a door that opens is worse than no padlock at all. The art is
+   * still in the set; it is simply not what this map means any more.
    */
   private markerFor(n: MapNode): string {
-    if (n.state === "locked") return "node_locked";
     return n.kind === "boss" ? "node_boss" : "node_quest";
+  }
+
+  /**
+   * The street the route suggests next: the first one, in the pack's own
+   * order, that has not been cleared.
+   *
+   * This is what is left of the gate, and it is the part worth keeping. The
+   * packs are written in an order and a player who has just cleared node 3 is
+   * asking where to go, not asking for permission.
+   */
+  private nextNode(): MapNode | undefined {
+    return this.nodes.find((n) => n.state !== "cleared");
   }
 
   private drawNodes(g: Ctx): void {
@@ -583,6 +654,7 @@ export class MapScene implements Scene {
     // Back to front, so a near marker overlaps a far one rather than the other
     // way round. On a tilted plane that is the difference between depth and a
     // pile of stickers.
+    const next = this.nextNode();
     const order = this.nodes.map((_, i) => i).sort((a, b) => this.nodes[a].y - this.nodes[b].y);
     for (const i of order) {
       const n = this.nodes[i];
@@ -634,6 +706,19 @@ export class MapScene implements Scene {
       if (n.state === "cleared") {
         clearRibbon(g, x, y + rr * 0.75, r * 2.6);
         drawStars(g, x - r * 1.2, y + r * 2.3, r * 0.42, n.stars, 3);
+      }
+      // The route's advice, and the only thing left of the old gate: the first
+      // street not yet cleared wears a chevron. Nothing is forbidden; this
+      // just answers "where was I".
+      if (n.quest_id === next?.quest_id && !chosen) {
+        const bob = Math.sin(this.t * 3) * rr * 0.12;
+        g.fillStyle = css(Theme.coin, 0.9);
+        g.beginPath();
+        g.moveTo(x, y - rr * 1.5 - bob);
+        g.lineTo(x - rr * 0.4, y - rr * 2.1 - bob);
+        g.lineTo(x + rr * 0.4, y - rr * 2.1 - bob);
+        g.closePath();
+        g.fill();
       }
       if (chosen) {
         g.strokeStyle = css(Theme.cyan, 0.8 + 0.2 * Math.sin(this.t * 8));
@@ -756,7 +841,15 @@ export class MapScene implements Scene {
       // cycle reads as a limp. Ten a second is fast enough that it reads as a
       // walk at map size; standing rests on frame 2, which is the upright one.
       const n = strip.frames;
-      const i = walking ? Math.floor(phase * 1.4) % n : 1;
+      // Ten a second, on the scene clock rather than on the walk's progress:
+      // the cadence of a walk is a property of the legs, not of how far there
+      // is to go, and driving it off the tween made a short hop flicker and a
+      // long one crawl. `t` is accumulated `dt`, so a captured frame is still
+      // the same frame every run.
+      //
+      // Ten rather than six because frames 2 and 4 are both passing poses and
+      // are not identical: slower than this and the cycle reads as a limp.
+      const i = walking ? Math.floor(this.t * 10) % n : 1;
       const bx = strip.boxes[i] ?? strip.boxes[0];
       const cellH = strip.fh;
       const scale = h / cellH;
@@ -891,22 +984,19 @@ export class MapScene implements Scene {
     // The one line that says what to do about it. `requires` is given by the
     // server (§5.2) so the lock can name the street it is waiting on rather
     // than saying "locked" and leaving the player to guess which of eleven.
+    // Never a refusal. §4.7: every street is reachable, so the line either
+    // says what happened here or points at where the route goes next.
+    const next = this.nextNode();
     let line: string;
     let colour = Theme.coin;
     if (n.state === "cleared") {
-      line = `CLEARED · ${n.stars}/3 STARS · ENTER TO RUN IT AGAIN`;
+      line = `CLEARED · ${n.stars}/3 STARS · ENTER to walk back in`;
       colour = Theme.admit;
-    } else if (n.state === "locked") {
-      const need = n.requires
-        .map((id) => this.nodes.find((x) => x.quest_id === id)?.node)
-        .filter((v): v is number => v !== undefined)
-        .map((v) => String(v).padStart(2, "0"));
-      line = need.length
-        ? `LOCKED — clear ${need.length > 1 ? "streets" : "street"} ${need.join(", ")} first`
-        : "LOCKED — clear the street before it";
-      colour = Theme.dim;
+    } else if (next && next.quest_id === n.quest_id) {
+      line =
+        n.kind === "boss" ? "NEXT ON THE ROUTE · the boss" : "NEXT ON THE ROUTE · ENTER to go in";
     } else {
-      line = n.kind === "boss" ? "OPEN — the boss of this street" : "OPEN — ENTER to go in";
+      line = n.kind === "boss" ? "the boss of this street · ENTER to go in" : "ENTER to go in";
     }
     g.fillStyle = css(colour);
     printf(g, fonts.small, line, ix, iy, textW, "left");

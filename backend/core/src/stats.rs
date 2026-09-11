@@ -34,13 +34,18 @@ pub fn summary(conn: &Connection, address: &str) -> Result<Summary> {
         params![address],
         |r| r.get(0),
     )?;
+    // PROTOCOL §4.9b: accuracy is submits over submits. Iterating honestly
+    // with the RUN button must not read as failing repeatedly — and since
+    // `accuracy` is `accepted / attempts`, the denominator has to be the same
+    // population as the numerator or the number means nothing.
     let attempts: i64 = conn.query_row(
-        "SELECT count(*) FROM attempts WHERE address = ?1",
+        "SELECT count(*) FROM attempts WHERE address = ?1 AND mode = 'submit'",
         params![address],
         |r| r.get(0),
     )?;
     let accepted: i64 = conn.query_row(
-        "SELECT count(*) FROM attempts WHERE address = ?1 AND verdict = 'accepted'",
+        "SELECT count(*) FROM attempts
+          WHERE address = ?1 AND mode = 'submit' AND verdict = 'accepted'",
         params![address],
         |r| r.get(0),
     )?;
@@ -81,6 +86,8 @@ pub fn summary(conn: &Connection, address: &str) -> Result<Summary> {
     })
 }
 
+/// Both modes, deliberately: a streak is "days you turned up", and a day spent
+/// iterating with the RUN button is a day you turned up.
 fn streak(conn: &Connection, address: &str) -> Result<i64> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT substr(created_at, 1, 10) AS day FROM attempts

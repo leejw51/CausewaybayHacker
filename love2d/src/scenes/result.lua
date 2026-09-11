@@ -62,7 +62,11 @@ function Result:draw()
 
   local s = Layout.uiScale()
   local accepted = a.verdict == "accepted"
-  local color = Theme.verdict[a.verdict] or Theme.dim
+  -- A run should never reach this screen — `src/scenes/quest.lua` keeps them
+  -- in place — but if one ever did, it must not be dressed as a verdict.
+  -- §4.9b: a run is for the player, a submit is for the record.
+  local is_run = a.mode == "run"
+  local color = is_run and Theme.cyan or (Theme.verdict[a.verdict] or Theme.dim)
 
   -- The banner drops in (docs/art.md §7's clear sequence, in miniature).
   local drop = Ease.expOut(math.min(1, self.t / 0.45))
@@ -73,8 +77,8 @@ function Result:draw()
   love.graphics.setLineWidth(3)
   love.graphics.rectangle("line", 0, by, vw, 56)
   love.graphics.setColor(1, 1, 1, 1)
-  UI.text(VERDICT_LABEL[a.verdict] or a.verdict:upper(), 0, by + 18,
-    math.floor(18 * s), Theme.cream, "center", vw)
+  UI.text(is_run and "SAMPLE RUN" or (VERDICT_LABEL[a.verdict] or a.verdict:upper()),
+    0, by + 18, math.floor(18 * s), Theme.cream, "center", vw)
 
   local pad = Layout.isPortrait() and 14 or 60
   local x = pad
@@ -100,7 +104,10 @@ function Result:draw()
     Theme.withAlpha(Theme.cream, 0.75)) + 10
 
   -- SPEC §0: the node is stamped CLEARED, for good.
-  if a.cleared then
+  if is_run then
+    cy = cy + UI.text("a run never clears a node — SUBMIT does", cx, cy, 8,
+      Theme.withAlpha(Theme.cyan, 0.9)) + 10
+  elseif a.cleared then
     UI.setColor(Theme.admit, 0.25)
     love.graphics.rectangle("fill", cx, cy, w - 32, 34)
     UI.text("CLEARED", cx + 10, cy + 11, 12, Theme.admit)

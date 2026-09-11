@@ -14,7 +14,7 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
 import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { Editor } from "../ui/editor";
@@ -37,6 +37,21 @@ type Stage = "idle" | RunStage;
 function show(text: string): string {
   return JSON.stringify(text);
 }
+
+/**
+ * What a failed *run* is called. Deliberately the plain fact of what happened
+ * and never a judgement — "ACCEPTED" belongs to the verdict screen and must
+ * not appear anywhere a run can reach.
+ */
+const VERDICT_LINE: Record<Attempt["verdict"], string> = {
+  accepted: "THE SAMPLE WORKS",
+  wrong_answer: "THE SAMPLE DOES NOT MATCH YET",
+  compile_error: "IT DID NOT COMPILE",
+  runtime_error: "IT CRASHED",
+  timeout: "TOO SLOW",
+  output_limit: "TOO MUCH OUTPUT",
+  internal_error: "THE SERVER COULD NOT RUN IT",
+};
 
 /**
  * The street this quest happens on, as a painted backdrop.
@@ -74,6 +89,13 @@ export class QuestScene implements Scene {
   private elapsedMs = 0;
   private hints: string[] = [];
   private error = "";
+  /**
+   * The last `quest.run` (§4.9b), shown in the drawer rather than on the result
+   * screen. A run is not a verdict and must never be dressed as one: it says
+   * the sample works and nothing about the hidden cases, and taking the player
+   * to the ACCEPTED screen for it would teach them that green means done.
+   */
+  private runResult: Attempt | null = null;
   /** True when `error` is news rather than a fault; it changes the colour. */
   private notice = false;
   private t = 0;
@@ -157,7 +179,23 @@ export class QuestScene implements Scene {
     return this.editor.source.trim() !== this.quest.starter.trim();
   }
 
-  private async submit(): Promise<void> {
+  private submit(): Promise<void> {
+    return this.execute("quest.submit");
+  }
+
+  private run(): Promise<void> {
+    return this.execute("quest.run");
+  }
+
+  /**
+   * One path for both (§4.9b says the payloads are the same shape on purpose).
+   *
+   * The only difference is what is done with the reply: a submit goes to the
+   * verdict screen, a run stays here and reports into the drawer. Both share
+   * the one-execution-per-connection rule, which is why `stage !== "idle"`
+   * guards the pair of them rather than one button each.
+   */
+  private async execute(kind: "quest.submit" | "quest.run"): Promise<void> {
     if (!this.quest || !this.editor || this.stage !== "idle") return;
     this.attemptId = null;
     this.log = new LogBuffer("");
@@ -165,14 +203,23 @@ export class QuestScene implements Scene {
     this.consoleOpen = true;
     this.error = "";
     this.notice = false;
+    this.runResult = null;
     try {
-      const res = await this.app.client.request("quest.submit", {
+      const res = await this.app.client.request(kind, {
         quest_id: this.quest.id,
         source: this.editor.source,
         lang: this.land,
       });
       this.stage = "idle";
       this.log.end();
+      if (kind === "quest.run") {
+        this.runResult = res.attempt;
+        this.logScroll = 0;
+        // A chime, not a fanfare. The fanfare belongs to CLEARED.
+        if (this.samplePassed(res.attempt)) this.app.chip.coin();
+        else this.app.chip.fail();
+        return;
+      }
       this.showResult(res.attempt);
     } catch (e) {
       this.stage = "idle";
@@ -198,6 +245,11 @@ export class QuestScene implements Scene {
             ? playerText(e.payload.code)
             : "the run failed";
     }
+  }
+
+  /** Every visible case the run actually executed came back passing. */
+  private samplePassed(a: Attempt): boolean {
+    return a.verdict === "accepted" && a.tests_passed === a.tests_total;
   }
 
   private showResult(attempt: Attempt): void {
@@ -253,7 +305,9 @@ export class QuestScene implements Scene {
     }
     if ((name === "return" || name === "kpenter") && (ev.metaKey || ev.ctrlKey)) {
       ev.preventDefault();
-      void this.submit();
+      // The reflex key is RUN. Submitting is a decision and it is made with a
+      // button, not with the shortcut somebody's hands press without looking.
+      void this.run();
     }
   }
 
@@ -268,6 +322,9 @@ export class QuestScene implements Scene {
     this.app.chip.select();
     switch (hit.id) {
       case "run":
+        void this.run();
+        break;
+      case "submit":
         void this.submit();
         break;
       case "hint":
@@ -496,12 +553,18 @@ export class QuestScene implements Scene {
     else this.overlay?.hide();
 
     const rowY = inner[1] + editorH + Math.round(8 * s);
+    // SUBMIT is laid out first and taken out of the row's width, so it sits at
+    // the far end of the bench and the everyday buttons flow up to it. It is
+    // the one control on this screen that spends an attempt, and a control that
+    // can be hit on the way to RUN is a control that will be.
+    const [subW] = btnBox(fonts.button, ["SUBMIT"], 0, fonts.button.size * 2, layout.minTouchH());
+    const gap = Math.round(fonts.button.size * 1.6);
     // `hints_used` comes back on `quest.get` (§5.3) and on every `quest.hint`,
     // so leaving a quest and coming back does not offer a hint already paid for.
     const hintsLeft = this.quest ? this.quest.hints_total - this.quest.hints_used : 0;
     this.buttons.row(
       fonts.button,
-      [inner[0], rowY, inner[2], btnH],
+      [inner[0], rowY, inner[2] - subW - gap, btnH],
       // RUN is filled and first; RESET is the destructive one and sits at the
       // far end, where it cannot be hit on the way to anything else. And the
       // hint button says how many are left rather than which one is next —
@@ -529,12 +592,79 @@ export class QuestScene implements Scene {
       ],
       layout.minTouchH(),
     );
+    this.buttons.add({
+      id: "submit",
+      rect: [inner[0] + inner[2] - subW, rowY, subW, btnH],
+      label: this.stage === "idle" ? "SUBMIT" : "…",
+      dim: this.stage !== "idle",
+      strong: this.stage === "idle",
+    });
 
     if (consoleH > 0) {
       const cy = rowY + btnH + Math.round(8 * s);
       const ch = Math.max(24, inner[1] + inner[3] - cy);
       this.drawConsole(g, [inner[0], cy, inner[2], ch]);
     }
+  }
+
+  /**
+   * What a run found, in the drawer, in language that is not a verdict.
+   *
+   * §4.9b: a run executes the **visible** cases only, so "it passed" means the
+   * sample works and says nothing at all about the hidden ones. The strip says
+   * both halves of that, every time, because a player who learns that green
+   * here means done will be contradicted by SUBMIT and will trust neither.
+   *
+   * And it never claims a run was free. A run does not count against the
+   * node's attempts or the player's stars — but it *is* recorded and its
+   * mistakes do feed the drills, so the line says what is true.
+   *
+   * @returns the height it used.
+   */
+  private drawRunReport(g: Ctx, rect: Rect): number {
+    const a = this.runResult;
+    if (!a) return 0;
+    const [x, y, w] = rect;
+    const s = this.app.layout.uiScale();
+    const fonts = ensureFonts(s);
+    const pad = Math.round(8 * s);
+    const hidden = this.quest?.tests.hidden_count ?? 0;
+    const ok = this.samplePassed(a);
+    const failed = a.cases.find((c) => c.visible && !c.passed);
+
+    const head = ok
+      ? "THE SAMPLE WORKS"
+      : a.verdict === "accepted"
+        ? "THE SAMPLE DOES NOT MATCH YET"
+        : VERDICT_LINE[a.verdict];
+    const detail = ok
+      ? hidden > 0
+        ? `${a.tests_passed}/${a.tests_total} sample cases · ${hidden} hidden ${hidden === 1 ? "case was" : "cases were"} not run — press SUBMIT to check ${hidden === 1 ? "it" : "them"}`
+        : `${a.tests_passed}/${a.tests_total} sample cases — press SUBMIT to record it`
+      : failed
+        ? `${failed.name} · expected ${show(failed.expect ?? "")} · got ${show(failed.got ?? "")}`
+        : `${a.tests_passed}/${a.tests_total} sample cases`;
+
+    const lines = wrap(fonts.codeSm, detail, w - pad * 2);
+    const h =
+      pad * 2 + fonts.stationSm.height + Math.round(4 * s) + lines.length * fonts.codeSm.height;
+    const accent = ok ? Theme.cyan : Theme.red;
+    fill(g, Theme.ink, x, y, w, h, 0.92);
+    fill(g, accent, x, y, Math.round(3 * s), h);
+    fill(g, Theme.dim, x, y + h - 1, w, 1, 0.5);
+    g.fillStyle = css(accent);
+    printf(g, fonts.stationSm, `RUN · ${head}`, x + pad, y + pad, w - pad * 2, "left");
+    g.fillStyle = css(Theme.cream, 0.85);
+    printf(
+      g,
+      fonts.codeSm,
+      detail,
+      x + pad,
+      y + pad + fonts.stationSm.height + Math.round(4 * s),
+      w - pad * 2,
+      "left",
+    );
+    return h + Math.round(4 * s);
   }
 
   private stageLabel(): string {
@@ -551,9 +681,15 @@ export class QuestScene implements Scene {
    * error message that the mistake taxonomy is about to be built from.
    */
   private drawConsole(g: Ctx, rect: Rect): void {
-    const [x, y, w, h] = rect;
+    let [x, y, w, h] = rect;
     const s = this.app.layout.uiScale();
     const fonts = ensureFonts(s);
+    if (this.runResult) {
+      const used = this.drawRunReport(g, [x, y, w, h]);
+      y += used;
+      h -= used;
+      if (h < fonts.codeSm.height * 2) return;
+    }
     well(g, x, y, w, h, [0.04, 0.03, 0.1, 0.98]);
     const pad = Math.round(6 * s);
     const lineH = fonts.codeSm.height;

@@ -1,10 +1,14 @@
-//! Progress, stars and the lock graph (SPEC §6.3, §12).
+//! Progress and stars (SPEC §6.3, PROTOCOL §4.7).
 //!
-//! `locked` / `open` are **derived** at read time from `quest_deps` and the
-//! set of cleared quests; only the cleared fact and the counters are stored.
-//! A persisted `locked` row goes stale the moment the content changes its
-//! dependencies, and then a player is staring at a node the map says they
-//! already unlocked.
+//! State is **derived** at read time and is `cleared` or `open` — never
+//! `locked`. Nothing in the map is gated: `requires` describes the suggested
+//! route, and a player may enter any node at any time. A trainer is not a
+//! platformer, and somebody with an interview on Thursday needs the
+//! dynamic-programming street on Tuesday.
+//!
+//! `State::Locked` and the `progress.state` CHECK keep the value so rows
+//! written before this read back, and so §3.3's closed error set keeps its
+//! `locked` code. Nothing writes it and nothing derives it.
 
 use std::collections::HashSet;
 
@@ -17,6 +21,8 @@ use crate::time::now_stamp;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum State {
+    /// Legacy. Never derived and never written since PROTOCOL §4.7; kept so
+    /// rows and clients from before it still make sense.
     Locked,
     Open,
     Cleared,
@@ -71,16 +77,17 @@ pub fn cleared_set(conn: &Connection, address: &str) -> Result<HashSet<String>> 
     Ok(rows.collect::<rusqlite::Result<HashSet<_>>>()?)
 }
 
-/// Derive the state of one quest. `requires` empty means open from the start
-/// (SPEC §12); otherwise every requirement must be cleared.
-pub fn derive_state(quest_id: &str, requires: &[String], cleared: &HashSet<String>) -> State {
+/// Derive the state of one quest: cleared, or open. There is no third answer.
+///
+/// This used to consult `quest_deps` and answer `locked` when a requirement
+/// was unfinished. It no longer does (PROTOCOL §4.7) — the dependencies are
+/// still carried on the wire as the suggested route, and the client still
+/// draws the line between nodes, but they gate nothing.
+pub fn derive_state(quest_id: &str, cleared: &HashSet<String>) -> State {
     if cleared.contains(quest_id) {
-        return State::Cleared;
-    }
-    if requires.iter().all(|r| cleared.contains(r)) {
-        State::Open
+        State::Cleared
     } else {
-        State::Locked
+        State::Open
     }
 }
 
@@ -148,9 +155,12 @@ pub fn record_clear(
     // Only the failures that came before the first clear count. A player who
     // clears a node, comes back to play with it and fails four times has not
     // retroactively made their original clear a worse one.
+    // Submits only (PROTOCOL §4.9b): a star is about the record, and pressing
+    // RUN while you work the problem out is not a failed attempt.
     let failures: i64 = conn.query_row(
         "SELECT count(*) FROM attempts
-          WHERE address = ?1 AND quest_id = ?2 AND verdict <> 'accepted'
+          WHERE address = ?1 AND quest_id = ?2 AND mode = 'submit'
+            AND verdict <> 'accepted'
             AND (?3 IS NULL OR created_at < ?3)",
         params![address, quest_id, before.first_clear_at],
         |r| r.get(0),

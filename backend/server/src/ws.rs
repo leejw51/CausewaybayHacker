@@ -17,6 +17,7 @@ use axum::response::Response;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc::unbounded_channel;
 
+use cwbhacker_core::attempts::Mode;
 use cwbhacker_core::error::{bad_request, Code, Error};
 
 use crate::handlers::{self, Session};
@@ -245,8 +246,11 @@ async fn dispatch(
         return;
     }
 
-    if kind == "quest.submit" {
-        submit_async(
+    // RUN and SUBMIT are the same path with a flag (PROTOCOL §4.9b), and they
+    // share the one-execution-per-connection rule: a second of *either* while
+    // one is in flight is `busy`.
+    if let Some(mode) = execution_mode(&kind) {
+        execute_async(
             state,
             connection_id,
             session,
@@ -254,6 +258,7 @@ async fn dispatch(
             live_ids,
             tx,
             id,
+            mode,
             frame.payload,
         );
         return;
@@ -309,8 +314,16 @@ fn release(live_ids: &Arc<Mutex<HashSet<String>>>, id: &Option<String>) {
     }
 }
 
+fn execution_mode(kind: &str) -> Option<Mode> {
+    match kind {
+        "quest.submit" => Some(Mode::Submit),
+        "quest.run" => Some(Mode::Run),
+        _ => None,
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
-fn submit_async(
+fn execute_async(
     state: &Shared,
     connection_id: u64,
     session: &Session,
@@ -318,8 +331,13 @@ fn submit_async(
     live_ids: &Arc<Mutex<HashSet<String>>>,
     tx: &Out,
     id: Option<String>,
+    mode: Mode,
     payload: serde_json::Value,
 ) {
+    let reply_kind = match mode {
+        Mode::Submit => "quest.submit",
+        Mode::Run => "quest.run",
+    };
     let address = match session.address.clone() {
         Some(address) => address,
         None => {
@@ -328,7 +346,7 @@ fn submit_async(
                 tx,
                 ServerFrame::err(
                     id,
-                    "quest.submit",
+                    reply_kind,
                     &Error::new(Code::Unauthorized, "log in first"),
                 ),
             );
@@ -344,8 +362,8 @@ fn submit_async(
             tx,
             ServerFrame::err(
                 id,
-                "quest.submit",
-                &Error::new(Code::Busy, "one submission at a time"),
+                reply_kind,
+                &Error::new(Code::Busy, "one execution at a time on a connection"),
             ),
         );
         return;
@@ -362,18 +380,18 @@ fn submit_async(
         let result = {
             let tx = tx.clone();
             tokio::task::spawn_blocking(move || {
-                submit::run(&state, &address, connection_id, &payload, &tx)
+                submit::run(&state, &address, connection_id, mode, &payload, &tx)
             })
             .await
         };
         flag.store(false, Ordering::SeqCst);
         release(&live_ids, &id);
         let frame = match result {
-            Ok(Ok(payload)) => ServerFrame::ok(id, "quest.submit", payload),
-            Ok(Err(e)) => ServerFrame::err(id, "quest.submit", &e),
+            Ok(Ok(payload)) => ServerFrame::ok(id, reply_kind, payload),
+            Ok(Err(e)) => ServerFrame::err(id, reply_kind, &e),
             Err(e) => ServerFrame::err(
                 id,
-                "quest.submit",
+                reply_kind,
                 &Error::new(Code::Internal, format!("the runner panicked: {e}")),
             ),
         };

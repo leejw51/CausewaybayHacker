@@ -6,7 +6,7 @@
 //! that read an address from a payload at all are `auth.challenge` and
 //! `auth.login`, and both of them make the client prove it with a signature.
 
-use cwbhacker_core::error::{bad_request, not_found, unauthorized, Code, Error, Result};
+use cwbhacker_core::error::{bad_request, not_found, unauthorized, Error, Result};
 use cwbhacker_core::Connection;
 use cwbhacker_core::{attempts, auth, eth, mistakes, progress, quests, stats, users, world};
 use serde_json::json;
@@ -179,18 +179,11 @@ pub fn world_map(
     }))
 }
 
-/// `locked` names the blocker, so a client can show the lock *and* say what
-/// opens it (PROTOCOL §3.3's worked example).
-pub fn locked_error(conn: &Connection, address: &str, quest_id: &str) -> Error {
-    let requires = quests::requirements(conn, quest_id).unwrap_or_default();
-    let cleared = progress::cleared_set(conn, address).unwrap_or_default();
-    let blocking: Vec<&String> = requires.iter().filter(|r| !cleared.contains(*r)).collect();
-    Error::new(Code::Locked, format!("{quest_id} is locked"))
-        .with_detail(json!({ "requires": blocking }))
-}
-
-/// Open the quest, or say why not. One function decides it for `quest.get`,
-/// `quest.hint`, `quest.reset` and the submit path alike.
+/// Open the quest. There is nothing to refuse any more (PROTOCOL §4.7): a
+/// player may enter any node at any time, and `requires` is advice the client
+/// draws rather than a gate the server enforces. The function stays because
+/// three handlers want the same three things, and because "the quest does not
+/// exist" is still a real answer.
 fn readable_quest(
     conn: &Connection,
     address: &str,
@@ -198,9 +191,6 @@ fn readable_quest(
 ) -> Result<(quests::Quest, progress::State, progress::Row)> {
     let quest = quests::get(conn, quest_id)?;
     let state = world::state_of(conn, address, quest_id)?;
-    if state == progress::State::Locked {
-        return Err(locked_error(conn, address, quest_id));
-    }
     Ok((quest, state, progress::get(conn, address, quest_id)?))
 }
 

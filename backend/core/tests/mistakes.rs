@@ -137,6 +137,7 @@ fn the_rollup_counts_clean_attempts() {
             address,
             "rust.basic.01.hello",
             "rust",
+            cwbhacker_core::attempts::Mode::Submit,
             "fn main(){}".into(),
         );
         record.verdict = if kinds.is_empty() {
@@ -155,7 +156,15 @@ fn the_rollup_counts_clean_attempts() {
                 col: None,
             })
             .collect();
-        mistakes::record(&conn, n, address, "rust.basic.01.hello", &found).unwrap();
+        mistakes::record(
+            &conn,
+            n,
+            address,
+            "rust.basic.01.hello",
+            &found,
+            cwbhacker_core::attempts::Mode::Submit,
+        )
+        .unwrap();
     };
 
     attempt("att_1", &[("borrow-after-move", "E0382")]);

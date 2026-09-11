@@ -1,6 +1,16 @@
 -- Cosine and exponential easing. t is 0..1.
 --
--- Ported unchanged from `CausewaybayGolang/love2d/src/ease.lua`.
+-- Ported from `CausewaybayGolang/love2d/src/ease.lua`. Added here: the
+-- `expo*` names and `E.apply`, because the map's walk is authored against an
+-- exponential ease-in-out and a curve that lives in a scene is a curve the
+-- other client cannot be compared against.
+--
+-- Why expo rather than cubic, for a figure crossing a map: it is almost
+-- still, then very fast, then almost still. That reads as *deliberate* — she
+-- gathers herself, covers the ground, and arrives — where a cubic reads as
+-- merely smooth. The cost is that it needs more time to be legible at all,
+-- and less time than you would guess once the distance is large, because the
+-- fast middle does most of the work.
 local E = {}
 
 function E.clamp(t, a, b)
@@ -56,6 +66,20 @@ function E.expInOut(t)
     return 0.5 * math.pow(2, 20 * t - 10)
   end
   return 1 - 0.5 * math.pow(2, -20 * t + 10)
+end
+
+-- The `expo` spelling, matching CSS and every tweening library written since;
+-- `expIn`/`expOut`/`expInOut` above are the sibling's names for the same
+-- curves and stay so a ported file keeps working.
+E.expoIn = E.expIn
+E.expoOut = E.expOut
+E.expoInOut = E.expInOut
+
+--- Look a curve up by name, so a caller can be configured rather than edited.
+function E.apply(name, t)
+  local fn = E[name]
+  if type(fn) ~= "function" then fn = E.expInOut end
+  return fn(t)
 end
 
 function E.lerp(a, b, t)

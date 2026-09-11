@@ -219,8 +219,16 @@ async fn the_whole_slice_end_to_end() {
     let map = alice
         .ok("world.map", json!({ "land": "rust", "category": "basic" }))
         .await;
-    assert_eq!(map["nodes"][0]["state"].as_str(), Some("open"));
-    assert_eq!(map["nodes"][1]["state"].as_str(), Some("locked"));
+    // PROTOCOL §4.7: nothing is locked. Every node on a fresh map is open.
+    assert!(
+        map["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|n| n["state"] == "open"),
+        "a fresh player must be able to open any node: {}",
+        map["nodes"]
+    );
     assert_eq!(map["nodes"][0]["x"].as_f64(), Some(0.12));
     assert_eq!(map["land"].as_str(), Some("rust"));
     assert_eq!(map["category"].as_str(), Some("basic"));
@@ -228,15 +236,23 @@ async fn the_whole_slice_end_to_end() {
     assert_eq!(
         map["nodes"][1]["requires"],
         json!(["rust.basic.01.hello"]),
-        "a node names what blocks it"
+        "the suggested route still travels, it just does not gate anything"
     );
 
-    // §6.2: a locked node is `locked`, not a 404 and not a free pass.
+    // This used to be the `locked` case. The last node of the map opens for a
+    // player who has touched nothing: somebody with an interview on Thursday
+    // needs the hard street on Tuesday.
+    let ahead = alice
+        .ok(
+            "quest.get",
+            json!({ "quest_id": "rust.basic.03.shadowing" }),
+        )
+        .await;
+    assert_eq!(ahead["quest"]["state"].as_str(), Some("open"));
     assert_eq!(
-        alice
-            .err("quest.get", json!({ "quest_id": "rust.basic.02.sum" }))
-            .await,
-        "locked"
+        ahead["quest"]["node"].as_i64(),
+        Some(3),
+        "the third node opened without the first two"
     );
 
     let quest = alice
@@ -505,8 +521,19 @@ async fn the_whole_slice_end_to_end() {
     let bob_map = bob
         .ok("world.map", json!({ "land": "rust", "category": "basic" }))
         .await;
+    // Alice cleared node 1; Bob has not. Nothing is locked for either of
+    // them, so what distinguishes the two maps is the stamp — which is what
+    // this test is about.
     assert_eq!(bob_map["nodes"][0]["state"].as_str(), Some("open"));
-    assert_eq!(bob_map["nodes"][1]["state"].as_str(), Some("locked"));
+    assert!(
+        bob_map["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|n| n["state"] == "open"),
+        "{}",
+        bob_map["nodes"]
+    );
     assert_eq!(
         bob.ok("stats.summary", json!({})).await["cleared"].as_i64(),
         Some(0)

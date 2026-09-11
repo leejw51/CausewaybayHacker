@@ -11,9 +11,34 @@
 --     chunks by `seq` and hands back the contiguous prefix, because §4.18
 --     says chunks "may split anywhere, including mid-line". A gap is shown as
 --     a gap rather than quietly closed up.
---   * **Submit is disabled while one is in flight** (§3.2, §8.10). The client
---     refuses locally, so the button is grey rather than the player learning
---     it from a `busy` round trip.
+--   * **Both buttons are disabled while either is in flight** (§3.2, §4.9b,
+--     §8.10). Runs and submits share one execution slot, the client refuses
+--     locally, and the buttons go grey rather than the player learning it
+--     from a `busy` round trip.
+--
+-- ## RUN and SUBMIT
+--
+-- §4.9b: a run is for the player, a submit is for the record. RUN compiles
+-- and runs the **visible** cases and is meant to be pressed constantly;
+-- SUBMIT runs everything, and is the only one that can clear the node.
+--
+-- Two consequences for this screen, and they are the whole design:
+--
+--   1. **A passing run is not a verdict.** It is drawn in `cyan` and says
+--      SAMPLE PASSES, never ACCEPTED and never in the green this game uses
+--      for a clear. If green meant "done" after a run, SUBMIT would then
+--      contradict the player — which is a worse feeling than a plain
+--      failure, because it teaches them not to trust the screen.
+--   2. **The buttons are far apart**, on the keyboard and on the panel, with
+--      RUN on the reflex key it already had. Reaching for RUN must not land
+--      on SUBMIT.
+--
+-- And one thing the copy has to be exactly right about: a run **is** recorded
+-- and its mistakes **do** feed the drills (§4.9b, SPEC §7) — the errors made
+-- while iterating are the truest record of the struggle. What a run does not
+-- do is count as an attempt against the node. "Runs don't count against your
+-- stars" is true. "Runs aren't saved" is not, and is not written anywhere
+-- here.
 
 local Layout = require("src.layout")
 local Theme = require("src.theme")
@@ -53,8 +78,12 @@ function Quest.new(app)
     log = nil,
     stage = nil,
     elapsed_ms = 0,
-    submitting = false,
+    -- The execution in flight: "quest.run", "quest.submit", or nil.
+    running_mode = nil,
     attempt = nil,
+    -- The last run's Attempt, shown in place rather than on the result
+    -- screen: a run is not a verdict and does not deserve that banner.
+    run_attempt = nil,
     hint = nil,
     focus = "editor",     -- "editor" | "brief"
     brief_scroll = 0,
@@ -133,13 +162,28 @@ function Quest:on_log(payload)
   if self.log_follow ~= false then self.log_scroll = 1e9 end
 end
 
+--- RUN (§4.9b) — visible cases only, never clears, stays on this screen.
+function Quest:run()
+  self:execute("quest.run")
+end
+
+--- SUBMIT (§4.9) — everything, and the only one that can clear the node.
 function Quest:submit()
-  if self.submitting or not self.quest then return end
+  self:execute("quest.submit")
+end
+
+--- One path for both, because §4.9b gave them the same payload shape on
+--- purpose.
+function Quest:execute(mode)
+  if self.running_mode or not self.quest then return end
+  if mode == "quest.run" and self.run_unsupported then SFX.play("locked"); return end
   if self.quest.state == "locked" then SFX.play("locked"); return end
 
-  self.submitting = true
+  local is_run = mode == "quest.run"
+  self.running_mode = mode
   self.attempt = nil
   self.attempt_id = nil
+  self.run_attempt = nil
   self.stage = "queued"
   self.elapsed_ms = 0
   self.log = nil
@@ -147,31 +191,52 @@ function Quest:submit()
   self.show_log = true
   SFX.play("submit")
 
-  self.app.session:request("quest.submit", {
+  self.app.session:request(mode, {
     quest_id = self.quest.id,
     -- §4.9: `lang` must match the quest's land.
     lang = self.quest.land,
     source = self.editor:text(),
   }, function(ok, payload, why)
-    self.submitting = false
+    self.running_mode = nil
     self.stage = nil
     if not ok then
       SFX.play("rejected")
       self.error = why.player
+      -- §4.9b is newer than some servers. `not_found` on a run means the
+      -- endpoint is not there yet, which is not the player's problem and is
+      -- not "no such quest" — SUBMIT still works, so say that.
+      if is_run and payload.code == "not_found" then
+        self.run_unsupported = true
+        self.error = "RUN is not on this server yet — SUBMIT still works"
+        self.app:toast(self.error)
+        return
+      end
       if payload.code == "busy" then
-        self.app:toast("a submission is already running")
+        -- The other button is still going. Says which, because "busy" with
+        -- no subject is the least useful message in any program.
+        local running = (payload.detail or {}).running
+        self.app:toast(running == "quest.run" and "a run is still going"
+          or "a submission is already running")
       end
       return
     end
-    self.attempt = payload.attempt
-    self.app.last_attempt = payload.attempt
-    if payload.attempt.verdict == "accepted" then
-      SFX.play("accepted")
-    else
-      SFX.play("rejected")
+
+    local attempt = payload.attempt
+    if attempt.verdict == "accepted" then SFX.play("accepted") else SFX.play("rejected") end
+
+    if is_run then
+      -- Stay here. A run is an iteration, not an outcome, and bouncing the
+      -- player to a result screen after every RUN would make the reflex
+      -- button feel expensive.
+      self.run_attempt = attempt
+      self.show_log = true
+      return
     end
+
+    self.attempt = attempt
+    self.app.last_attempt = attempt
     self.app:go("result", {
-      attempt = payload.attempt,
+      attempt = attempt,
       quest = self.quest,
       log = self.log,
       source = self.editor:text(),
@@ -220,7 +285,7 @@ end
 
 function Quest:update(dt)
   self.t = self.t + dt
-  if self.submitting then
+  if self.running_mode then
     self.elapsed_ms = self.elapsed_ms + dt * 1000
   end
 end
@@ -277,12 +342,12 @@ function Quest:draw()
   self:draw_brief(brief, tint)
   self:draw_editor(code, tint)
 
-  if self.show_log and (self.submitting or self.log) then
+  if self.show_log and (self.running_mode or self.log or self.run_attempt) then
     self:draw_run_overlay()
   end
 
   self.app:footer(
-    "F5 submit   F6 reset   F7 hint   F8 log   F9 $EDITOR   F11 fullscreen   ESC map")
+    "F5 run   F10 submit   F6 reset   F7 hint   F8 log   F9 $EDITOR   ESC map")
 end
 
 function Quest:draw_brief(rect, tint)
@@ -442,14 +507,40 @@ function Quest:draw_editor(rect, tint)
     love.graphics.setColor(1, 1, 1, 1)
   end
 
-  local bw, bh = 150, 28
-  local bx = rect.x + rect.w - bw - 10
+  -- RUN and SUBMIT, with a deliberate gap between them.
+  --
+  -- RUN is the reflex button and keeps F5, the key it has always had here.
+  -- SUBMIT is the deliberate one: F10, five keys away, and the right-hand
+  -- button of the pair. A hand going for RUN cannot land on SUBMIT by being
+  -- a centimetre off, and a finger going for F5 cannot submit.
+  local bh = 28
+  local gap = 22
+  local bw = math.min(150, math.floor((rect.w - 30 - gap) / 2))
   local by = rect.y + rect.h - bh - 8
-  local state_name = "hot"
-  if self.submitting or not self.quest then state_name = "disabled" end
-  UI.button(bx, by, bw, bh,
-    self.submitting and "RUNNING…" or "SUBMIT  F5", state_name, 9)
-  self.submit_rect = { x = bx, y = by, w = bw, h = bh }
+  local sx = rect.x + rect.w - bw - 10
+  local rx = sx - gap - bw
+
+  local busy = self.running_mode ~= nil
+  local usable = (self.quest ~= nil) and not busy
+
+  UI.button(rx, by, bw, bh,
+    self.running_mode == "quest.run" and "RUNNING…" or "RUN  F5",
+    (usable and not self.run_unsupported) and "normal" or "disabled", 9)
+  UI.button(sx, by, bw, bh,
+    self.running_mode == "quest.submit" and "JUDGING…" or "SUBMIT  F10",
+    usable and "hot" or "disabled", 9)
+  self.run_rect = { x = rx, y = by, w = bw, h = bh }
+  self.submit_rect = { x = sx, y = by, w = bw, h = bh }
+
+  -- What each one is for, under the button it belongs to.
+  local tests = (self.quest and self.quest.tests) or {}
+  local visible = #(tests.visible or {})
+  local hidden = tests.hidden_count or 0
+  UI.text(self.run_unsupported and "not on this server"
+      or ("%d sample%s"):format(visible, visible == 1 and "" or "s"),
+    rx, by - 12, 7, Theme.withAlpha(self.run_unsupported and Theme.dim or Theme.cyan, 0.9))
+  UI.text(hidden > 0 and ("+%d hidden"):format(hidden) or "all cases",
+    sx, by - 12, 7, Theme.withAlpha(Theme.coin, 0.8))
 
   local info = ("%d lines   %d bytes"):format(total, #self.editor:text())
   UI.text(info, rect.x + 10, rect.y + rect.h - 18, 7, Theme.withAlpha(Theme.cream, 0.45))
@@ -509,7 +600,7 @@ function Quest:draw_run_overlay()
     end
   end
   if #lines == 0 then
-    lines[1] = { name = "", text = self.submitting and "waiting for the compiler…" or "" }
+    lines[1] = { name = "", text = self.running_mode and "waiting for the compiler…" or "" }
   end
 
   local first = math.max(1, math.min(#lines - rows + 1, math.floor(self.log_scroll)))
@@ -533,6 +624,72 @@ function Quest:draw_run_overlay()
   end
   UI.text("F8 hide", x + w - 12 - UI.textWidth("F8 hide", 7), y + h - 16, 7,
     Theme.withAlpha(Theme.cream, 0.5))
+
+  if self.run_attempt and not self.running_mode then
+    self:draw_run_outcome(x, y, w)
+  end
+end
+
+--- What a RUN came back with.
+---
+--- Drawn as a strip above the log, in **cyan** — never in `Theme.admit`, the
+--- green this game uses for a clear, and never with the word ACCEPTED. A run
+--- that passes means "the sample works, now submit", and a screen that said
+--- anything stronger would be contradicted by the very next thing the player
+--- does.
+function Quest:draw_run_outcome(x, y, w)
+  local a = self.run_attempt
+  local passed = a.verdict == "accepted"
+  local tests = (self.quest and self.quest.tests) or {}
+  local hidden = tests.hidden_count or 0
+
+  -- The note wraps, and the strip grows to hold it. The line about runs
+  -- being kept is the one sentence on this screen that must not be clipped:
+  -- half of it says the opposite of the whole of it.
+  local note_lines
+  if passed then
+    note_lines = { hidden > 0
+      and ("now SUBMIT — %d hidden case%s have not run yet"):format(
+        hidden, hidden == 1 and "" or "s")
+      or "now SUBMIT to record it against the node" }
+  else
+    note_lines = UI.wrap(
+      "runs do not count against your stars — but they are kept, "
+        .. "and what went wrong feeds your drills", w - 24, 7)
+  end
+
+  local h = 30 + #note_lines * 10
+  local sy = y - h - 6
+  local tint = passed and Theme.cyan or (Theme.verdict[a.verdict] or Theme.brick)
+  UI.setColor(Theme.ink, 0.96)
+  love.graphics.rectangle("fill", x, sy, w, h)
+  love.graphics.setLineWidth(2)
+  UI.setColor(tint)
+  love.graphics.rectangle("line", x + 1, sy + 1, w - 2, h - 2)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  -- The headline. `SAMPLE PASSES`, not `ACCEPTED`.
+  local headline = passed and "SAMPLE PASSES"
+    or ({
+      wrong_answer = "SAMPLE FAILS",
+      compile_error = "DOES NOT COMPILE",
+      runtime_error = "CRASHED",
+      timeout = "TOO SLOW",
+      output_limit = "TOO MUCH OUTPUT",
+      internal_error = "THE RUNNER BROKE",
+    })[a.verdict] or a.verdict:upper()
+  UI.text(headline, x + 12, sy + 9, 11, tint)
+
+  local counts = ("%d / %d samples"):format(a.tests_passed or 0, a.tests_total or 0)
+  UI.text(counts, x + w - 12 - UI.textWidth(counts, 9), sy + 10, 9,
+    Theme.withAlpha(Theme.cream, 0.85))
+
+  -- The line that has to be exactly right (§4.9b). A run *is* saved and its
+  -- mistakes *do* feed the drills; what it does not do is count against the
+  -- node. "Runs aren't saved" would be false and is written nowhere.
+  for i, line in ipairs(note_lines) do
+    UI.text(line, x + 12, sy + 24 + (i - 1) * 10, 7, Theme.withAlpha(Theme.cream, 0.75))
+  end
 end
 
 -- -------------------------------------------------------------------- input
@@ -545,14 +702,23 @@ function Quest:textinput(text)
 end
 
 function Quest:keypressed(key, mods)
-  if key == "f5" or ((mods.ctrl or mods.gui) and (key == "return" or key == "kpenter")) then
+  -- RUN keeps F5, the reflex key. SUBMIT is F10 — far enough away on the
+  -- keyboard that neither is a slip of the other — and ctrl-shift-Enter for
+  -- anyone whose hands already know that idiom.
+  local cmd = mods.ctrl or mods.gui
+  if key == "f5" or (cmd and not mods.shift and (key == "return" or key == "kpenter")) then
+    self:run(); return true
+  end
+  if key == "f10" or (cmd and mods.shift and (key == "return" or key == "kpenter")) then
     self:submit(); return true
   end
   if key == "f6" then self:reset(); return true end
   if key == "f7" then self:take_hint(); return true end
   if key == "f8" then self.show_log = not self.show_log; return true end
   if key == "f9" then self:external_edit(); return true end
-  if key == "f10" then
+  -- The pane toggle moved off F10 when SUBMIT took it; ctrl-TAB is the
+  -- switch-pane gesture everywhere else anyway, and TAB alone still indents.
+  if key == "tab" and cmd then
     self.focus = self.focus == "editor" and "brief" or "editor"
     return true
   end
@@ -583,11 +749,11 @@ end
 
 function Quest:mousepressed(x, y, button)
   local brief, code = self:panes()
-  local r = self.submit_rect
-  if r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h then
-    self:submit()
-    return
+  local function inside(r)
+    return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
   end
+  if inside(self.run_rect) then self:run(); return end
+  if inside(self.submit_rect) then self:submit(); return end
   if x >= brief.x and x <= brief.x + brief.w and y >= brief.y and y <= brief.y + brief.h then
     self.focus = "brief"
     return

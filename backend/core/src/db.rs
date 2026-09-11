@@ -11,8 +11,14 @@ use crate::paths::set_private;
 /// The migrations, in order. Forward-only: a shipped file is never edited,
 /// a change is a new one. `include_str!` so the binary carries them and a
 /// deployed server cannot be missing its own schema.
-pub const MIGRATIONS: &[(i64, &str, &str)] =
-    &[(1, "0001_init", include_str!("../migrations/0001_init.sql"))];
+pub const MIGRATIONS: &[(i64, &str, &str)] = &[
+    (1, "0001_init", include_str!("../migrations/0001_init.sql")),
+    (
+        2,
+        "0002_attempt_mode",
+        include_str!("../migrations/0002_attempt_mode.sql"),
+    ),
+];
 
 pub fn latest_version() -> i64 {
     MIGRATIONS.last().map(|m| m.0).unwrap_or(0)

@@ -236,7 +236,7 @@ return function()
     T.eq(netclient.Client.send_key, nil)
   end)
 
-  T.section("client — §8.10: one quest.submit in flight")
+  T.section("client — §8.10 / §4.9b: one execution in flight, run or submit")
 
   T.case("a second submit is refused locally with busy", function()
     local c, server = connected()
@@ -259,6 +259,63 @@ return function()
     T.ok(c:request("quest.submit", { quest_id = "q", lang = "rust", source = "c" }) ~= nil)
   end)
 
+  T.case("runs and submits share the one slot, in both directions", function()
+    -- §4.9b: "Runs and submits share the one-execution-per-connection rule:
+    -- a second of either while one is in flight is `busy`." Both directions,
+    -- because a slot taken by one message type and released by the other is
+    -- a slot that wedges.
+    for _, pair in ipairs({
+      { "quest.run", "quest.submit" },
+      { "quest.submit", "quest.run" },
+      { "quest.run", "quest.run" },
+    }) do
+      local first, second = pair[1], pair[2]
+      local c, server = connected()
+      local id = c:request(first, { quest_id = "q", lang = "rust", source = "a" }, function() end)
+      T.ok(id ~= nil, first .. " went out")
+      T.eq(c.executing, first)
+
+      local blocked, why = c:request(second, { quest_id = "q", lang = "rust", source = "b" },
+        function(ok, payload)
+          T.eq(ok, false)
+          T.eq(payload.code, "busy")
+          T.eq(payload.detail.running, first, "the refusal names what is running")
+        end)
+      T.eq(blocked, nil, second .. " was refused while " .. first .. " was in flight")
+      T.eq(why, "busy")
+      c:update()
+      T.eq(#server:sent(second), second == first and 1 or 0)
+
+      -- Answering the first frees the slot for the second.
+      server:reply(id, first .. ".ok", { attempt = { id = "att_1", mode = "run" } })
+      c:update()
+      T.eq(c.executing, nil)
+      T.ok(c:request(second, { quest_id = "q", lang = "rust", source = "c" }) ~= nil)
+    end
+  end)
+
+  T.case("an .err on a run frees the slot for a submit", function()
+    local c, server = connected()
+    local id = c:request("quest.run", { quest_id = "q", lang = "rust", source = "a" },
+      function() end)
+    c:update()
+    server:reply_err(id, "quest.run", "bad_request", "source too large", {})
+    c:update()
+    T.eq(c.executing, nil, "a failed run must not hold the slot")
+    T.ok(c:request("quest.submit", { quest_id = "q", lang = "rust", source = "b" }) ~= nil)
+  end)
+
+  T.case("a reply of the wrong type frees the slot too", function()
+    local c, server = connected()
+    local id = c:request("quest.run", { quest_id = "q", lang = "rust", source = "a" },
+      function() end)
+    c:update()
+    server:reply(id, "world.map.ok", {})
+    c:update()
+    T.eq(c.executing, nil)
+    T.ok(c:request("quest.submit", { quest_id = "q", lang = "rust", source = "b" }) ~= nil)
+  end)
+
   T.case("everything else pipelines freely", function()
     local c, server = connected()
     for _ = 1, 5 do c:request("quest.get", { quest_id = "q" }) end
@@ -266,17 +323,19 @@ return function()
     T.eq(#server:sent("quest.get"), 5, "§3.2: every other request may be pipelined")
   end)
 
-  T.case("a dropped connection releases the submit slot", function()
-    local c, server = connected({ auto_reconnect = false })
-    local answered
-    c:request("quest.submit", { quest_id = "q", lang = "rust", source = "a" },
-      function(ok, payload) answered = payload.code end)
-    c:update()
-    server:drop()
-    c:update()
-    T.eq(c.state, "closed")
-    T.eq(answered, "internal", "an in-flight request is answered rather than left hanging")
-    T.eq(c.submit_inflight, false)
+  T.case("a dropped connection releases the execution slot", function()
+    for _, type_name in ipairs({ "quest.submit", "quest.run" }) do
+      local c, server = connected({ auto_reconnect = false })
+      local answered
+      c:request(type_name, { quest_id = "q", lang = "rust", source = "a" },
+        function(ok, payload) answered = payload.code end)
+      c:update()
+      server:drop()
+      c:update()
+      T.eq(c.state, "closed")
+      T.eq(answered, "internal", "an in-flight request is answered rather than left hanging")
+      T.eq(c.executing, nil, type_name .. " released the slot on teardown")
+    end
   end)
 
   T.section("client — §8.11: server.bye then close, and close with no bye")

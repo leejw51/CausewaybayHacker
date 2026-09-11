@@ -1,4 +1,11 @@
-//! `quest.submit` (PROTOCOL §4.9): compile, run, judge, record.
+//! `quest.submit` and `quest.run` (PROTOCOL §4.9, §4.9b): compile, run,
+//! judge, record.
+//!
+//! One path for both buttons, because they differ in four small ways and are
+//! otherwise the same job. A run executes only the visible cases, never
+//! clears, never counts toward a node's attempts and never reaches accuracy —
+//! and its mistakes still enter the curriculum, because a borrow-checker error
+//! is the same lesson whichever button produced it.
 //!
 //! This is the one handler that blocks for seconds, so it runs on a blocking
 //! thread and streams `run.stage` / `run.log` through the connection's writer
@@ -9,12 +16,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use cwbhacker_core::attempts::Mode;
 use cwbhacker_core::error::{bad_request, unavailable, Result};
 use cwbhacker_core::{attempts, ids, mistakes, progress, quests, world};
 use cwbhacker_runner::{Event, Submission, TestSpec, Verdict};
 use serde_json::json;
 
-use crate::handlers::locked_error;
 use crate::proto::{opt_str_field, send, str_field, Out, ServerFrame};
 use crate::state::Shared;
 
@@ -115,6 +122,7 @@ pub fn run(
     state: &Shared,
     address: &str,
     connection_id: u64,
+    mode: Mode,
     payload: &serde_json::Value,
     out: &Out,
 ) -> Result<serde_json::Value> {
@@ -126,12 +134,11 @@ pub fn run(
             source.len()
         )));
     }
+    // No gate: every node is playable (PROTOCOL §4.7). The only reason to
+    // refuse here is that the quest does not exist.
     let (quest, was_cleared) = {
         let conn = state.store.conn();
         let quest = quests::get(&conn, &quest_id)?;
-        if world::state_of(&conn, address, &quest_id)? == progress::State::Locked {
-            return Err(locked_error(&conn, address, &quest_id));
-        }
         let cleared = progress::get(&conn, address, &quest_id)?.cleared;
         (quest, cleared)
     };
@@ -142,7 +149,13 @@ pub fn run(
             quest.land
         )));
     }
-    let spec = TestSpec::parse(&quest.tests)?;
+    let full_spec = TestSpec::parse(&quest.tests)?;
+    // A run never sees the hidden cases — not "sees them and hides the
+    // result", never receives them. Nothing to leak (PROTOCOL §4.9b).
+    let spec = match mode {
+        Mode::Run => full_spec.visible_only(),
+        Mode::Submit => full_spec,
+    };
 
     // Refused before anything is written. A submission this build cannot judge
     // must leave no attempt row behind: an attempt carries a verdict, a
@@ -155,7 +168,9 @@ pub fn run(
     }
 
     let attempt_id = ids::attempt_id();
-    {
+    if mode.is_submit() {
+        // A node's `attempts` is the record of what was submitted. Iterating
+        // with RUN must not read as failing repeatedly.
         let conn = state.store.conn();
         progress::bump_attempt(&conn, address, &quest_id)?;
     }
@@ -226,6 +241,7 @@ pub fn run(
         address,
         &quest_id,
         &lang,
+        mode,
         source.clone(),
     );
     record.verdict = report.verdict.as_str().to_string();
@@ -240,15 +256,20 @@ pub fn run(
     let accepted = report.verdict == Verdict::Accepted;
     // §5.4: `cleared` answers "did *this* submission clear the node", so
     // re-solving something already cleared reports accepted with cleared false.
-    let just_cleared = accepted && !was_cleared;
+    // A run never clears anything, however well it went: it only ran the
+    // cases the player could already see.
+    let just_cleared = accepted && !was_cleared && mode.is_submit();
     let stars;
     let cleared_total;
     let unlocked;
     {
         let conn = state.store.conn();
         attempts::insert(&conn, &record)?;
-        mistakes::record(&conn, &attempt_id, address, &quest_id, &found)?;
-        if accepted {
+        // Both modes. The errors made while iterating are the truest record
+        // of what someone is struggling with, and SPEC §7's drills are built
+        // from this table.
+        mistakes::record(&conn, &attempt_id, address, &quest_id, &found, mode)?;
+        if accepted && mode.is_submit() {
             let row = progress::record_clear(
                 &conn,
                 address,
@@ -310,6 +331,7 @@ pub fn run(
         "attempt": {
             "id": attempt_id,
             "quest_id": quest_id,
+            "mode": mode.as_str(),
             "verdict": record.verdict,
             "tests_passed": report.tests_passed,
             "tests_total": report.tests_total,

@@ -155,6 +155,8 @@ export interface Button {
   dim?: boolean;
   /** The one action the screen is for. Filled, not outlined. */
   primary?: boolean;
+  /** The action that commits. Its own colour, not a louder primary. */
+  strong?: boolean;
 }
 
 export class Buttons {
@@ -174,7 +176,13 @@ export class Buttons {
   row(
     f: Font,
     rect: Rect,
-    labels: Array<{ id: string; label: string; dim?: boolean; primary?: boolean }>,
+    labels: Array<{
+      id: string;
+      label: string;
+      dim?: boolean;
+      primary?: boolean;
+      strong?: boolean;
+    }>,
     minH = 0,
   ): void {
     const [x, y, w] = rect;
@@ -195,6 +203,7 @@ export class Buttons {
         label: item.label,
         dim: item.dim,
         primary: item.primary,
+        strong: item.strong,
       });
       cx += bw + gap;
       lineH = Math.max(lineH, bh);
@@ -209,7 +218,8 @@ export class Buttons {
         hover: this.hovered === b.id,
         dim: b.dim,
         lit: b.primary,
-        quiet: hasPrimary && !b.primary,
+        strong: b.strong,
+        quiet: hasPrimary && !b.primary && !b.strong,
       });
     }
   }

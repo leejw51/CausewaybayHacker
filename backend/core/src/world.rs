@@ -1,7 +1,5 @@
 //! `world.lands` and `world.map` (PROTOCOL §4.6, §4.7, §5.2).
 
-use std::collections::HashSet;
-
 use rusqlite::{params, Connection};
 use serde::Serialize;
 
@@ -21,7 +19,13 @@ pub struct CategoryStat {
     pub total: i64,
     pub cleared: i64,
     pub stars: i64,
-    /// False while the category's first node is still locked.
+    /// Whether there is anything here to play.
+    ///
+    /// It used to mean "the first node is unlocked", which since PROTOCOL §4.7
+    /// is always true. The field stays because clients read it, and it is kept
+    /// honest rather than hard-coded: a category with no quests imported is
+    /// not open, and saying so is more useful to a land-select screen than a
+    /// constant `true`.
     pub open: bool,
 }
 
@@ -41,10 +45,8 @@ pub fn lands(conn: &Connection, address: &str) -> Result<Vec<Land>> {
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
-    let cleared = progress::cleared_set(conn, address)?;
     let mut lands: Vec<Land> = Vec::new();
     for (land, category, total, cleared_count, stars) in rows {
-        let open = first_node_open(conn, &land, &category, &cleared)?;
         let entry = match lands.iter_mut().find(|l| l.land == land) {
             Some(entry) => entry,
             None => {
@@ -60,32 +62,10 @@ pub fn lands(conn: &Connection, address: &str) -> Result<Vec<Land>> {
             total,
             cleared: cleared_count.unwrap_or(0),
             stars,
-            open,
+            open: total > 0,
         });
     }
     Ok(lands)
-}
-
-fn first_node_open(
-    conn: &Connection,
-    land: &str,
-    category: &str,
-    cleared: &HashSet<String>,
-) -> Result<bool> {
-    let first: Option<String> = conn
-        .query_row(
-            "SELECT id FROM quests WHERE land = ?1 AND category = ?2 ORDER BY node LIMIT 1",
-            params![land, category],
-            |r| r.get(0),
-        )
-        .ok();
-    match first {
-        Some(id) => {
-            let requires = quests::requirements(conn, &id)?;
-            Ok(progress::derive_state(&id, &requires, cleared) != State::Locked)
-        }
-        None => Ok(false),
-    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -116,7 +96,10 @@ pub fn map(conn: &Connection, address: &str, land: &str, category: &str) -> Resu
         let requires = quests::requirements(conn, &quest.id)?;
         let row = progress::get(conn, address, &quest.id)?;
         nodes.push(MapNode {
-            state: progress::derive_state(&quest.id, &requires, &cleared),
+            // `requires` still travels: it is the suggested route and the line
+            // the map draws. It is not consulted here, because it gates
+            // nothing (PROTOCOL §4.7).
+            state: progress::derive_state(&quest.id, &cleared),
             quest_id: quest.id.clone(),
             node: quest.node,
             title: quest.title.clone(),
@@ -135,17 +118,22 @@ pub fn map(conn: &Connection, address: &str, land: &str, category: &str) -> Resu
     })
 }
 
-/// The one place that answers "may this player open this quest?" — used by
-/// `quest.get`, `quest.hint`, `quest.reset` and the submit path alike, so the
-/// four cannot disagree.
+/// Cleared, or open. Kept as one function so `quest.get`, `quest.hint`,
+/// `quest.reset` and the two execution paths cannot disagree about what a node
+/// is — they no longer disagree about whether it may be *entered*, because the
+/// answer to that is always yes.
 pub fn state_of(conn: &Connection, address: &str, quest_id: &str) -> Result<State> {
-    let requires = quests::requirements(conn, quest_id)?;
     let cleared = progress::cleared_set(conn, address)?;
-    Ok(progress::derive_state(quest_id, &requires, &cleared))
+    Ok(progress::derive_state(quest_id, &cleared))
 }
 
-/// What clearing `quest_id` just opened (PROTOCOL §4.19's `unlocked`), so a
-/// client updates the overworld without refetching it.
+/// What clearing `quest_id` just finished the prerequisites for — PROTOCOL
+/// §4.19's `unlocked`, so a client updates the overworld without refetching.
+///
+/// Since §4.7 nothing is gated, so this no longer means "these became
+/// playable"; it means "these are what the suggested route says comes next,
+/// and you have now done everything they asked for". The same set, a softer
+/// claim, and still the thing a map wants to light up.
 pub fn unlocked_by(conn: &Connection, address: &str, quest_id: &str) -> Result<Vec<String>> {
     let cleared = progress::cleared_set(conn, address)?;
     let mut stmt = conn.prepare(
@@ -157,7 +145,7 @@ pub fn unlocked_by(conn: &Connection, address: &str, quest_id: &str) -> Result<V
     let mut out = Vec::new();
     for dependent in dependents {
         let requires = quests::requirements(conn, &dependent)?;
-        if progress::derive_state(&dependent, &requires, &cleared) == State::Open {
+        if requires.iter().all(|r| cleared.contains(r)) && !cleared.contains(&dependent) {
             out.push(dependent);
         }
     }

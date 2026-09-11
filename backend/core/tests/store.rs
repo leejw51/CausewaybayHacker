@@ -162,8 +162,17 @@ fn a_clear_survives_a_restart_and_a_reimport() {
     assert_eq!(quest.title, "FIRST LIGHT, AGAIN", "the edit did not land");
 }
 
+/// PROTOCOL §4.7: every node is playable from the start. `requires` and
+/// `edges` still travel — they are the suggested route and the line the map
+/// draws — but they gate nothing.
+///
+/// This test used to assert the opposite (node 2 locked until node 1 cleared).
+/// It is kept, inverted, rather than deleted: the thing worth guarding now is
+/// that the route is still *advertised* while no longer being enforced, which
+/// is a weaker claim than before and easy to lose by deleting the dependency
+/// plumbing along with the gate.
 #[test]
-fn locked_nodes_open_as_their_requirements_clear() {
+fn every_node_is_playable_and_the_route_is_still_advertised() {
     let tmp = tempfile::tempdir().unwrap();
     let src = content_dir(tmp.path(), PACK);
     let store = open_and_import(&tmp.path().join("home"), &src);
@@ -171,15 +180,39 @@ fn locked_nodes_open_as_their_requirements_clear() {
     users::upsert(&conn, ALICE).unwrap();
 
     let map = world::map(&conn, ALICE, "rust", "basic").unwrap();
-    assert_eq!(map.nodes[0].state, progress::State::Open);
-    assert_eq!(map.nodes[1].state, progress::State::Locked);
+    assert!(
+        map.nodes.iter().all(|n| n.state == progress::State::Open),
+        "a fresh player should be able to open any node: {:?}",
+        map.nodes
+            .iter()
+            .map(|n| (&n.quest_id, n.state))
+            .collect::<Vec<_>>()
+    );
+    // The advice survives the gate's removal.
     assert_eq!(map.edges.len(), 2);
+    assert_eq!(map.nodes[0].requires, Vec::<String>::new());
+    assert_eq!(
+        map.nodes[1].requires,
+        vec!["rust.basic.01.hello".to_string()]
+    );
+    assert_eq!(
+        world::state_of(&conn, ALICE, "rust.basic.03.shadowing").unwrap(),
+        progress::State::Open,
+        "the last node is open before the first is touched"
+    );
 
+    // Clearing changes a node to cleared and nothing else to anything.
     progress::record_clear(&conn, ALICE, "rust.basic.01.hello", 10).unwrap();
     let map = world::map(&conn, ALICE, "rust", "basic").unwrap();
     assert_eq!(map.nodes[0].state, progress::State::Cleared);
     assert_eq!(map.nodes[1].state, progress::State::Open);
-    assert_eq!(map.nodes[2].state, progress::State::Locked);
+    assert_eq!(map.nodes[2].state, progress::State::Open);
+
+    // `unlocked_by` is now "what the route says comes next", and still useful.
+    assert_eq!(
+        world::unlocked_by(&conn, ALICE, "rust.basic.01.hello").unwrap(),
+        vec!["rust.basic.02.sum".to_string()]
+    );
 }
 
 #[test]
@@ -210,6 +243,7 @@ fn stars_follow_the_spec_and_never_regress() {
             ALICE,
             "rust.basic.01.hello",
             "rust",
+            attempts::Mode::Submit,
             "fn main() {}".into(),
         );
         record.verdict = "wrong_answer".into();
@@ -242,8 +276,14 @@ fn two_users_do_not_leak_into_each_other() {
         (BOB, "rust.basic.01.hello", "compile_error"),
     ] {
         let id = cwbhacker_core::ids::attempt_id();
-        let mut record =
-            attempts::new_record(id.clone(), address, quest, "rust", "fn main(){}".into());
+        let mut record = attempts::new_record(
+            id.clone(),
+            address,
+            quest,
+            "rust",
+            attempts::Mode::Submit,
+            "fn main(){}".into(),
+        );
         record.verdict = verdict.into();
         attempts::insert(&conn, &record).unwrap();
         progress::bump_attempt(&conn, address, quest).unwrap();
@@ -260,6 +300,7 @@ fn two_users_do_not_leak_into_each_other() {
                     line: Some(2),
                     col: Some(5),
                 }],
+                attempts::Mode::Submit,
             )
             .unwrap();
         }
@@ -289,11 +330,15 @@ fn two_users_do_not_leak_into_each_other() {
     assert_eq!(bobs.len(), 1);
     assert_eq!(bobs[0].count, 2);
 
-    // And the map each of them is looking at is their own.
+    // And the map each of them is looking at is their own. Nothing is locked
+    // any more (PROTOCOL §4.7), so what separates the two maps is the stamp on
+    // node 1 — which is the thing this test is actually about.
     let alice_map = world::map(&conn, ALICE, "rust", "basic").unwrap();
     let bob_map = world::map(&conn, BOB, "rust", "basic").unwrap();
-    assert_eq!(alice_map.nodes[1].state, progress::State::Open);
-    assert_eq!(bob_map.nodes[1].state, progress::State::Locked);
+    assert_eq!(alice_map.nodes[0].state, progress::State::Cleared);
+    assert_eq!(bob_map.nodes[0].state, progress::State::Open);
+    assert_eq!(alice_map.nodes[0].attempts, 2);
+    assert_eq!(bob_map.nodes[0].attempts, 2);
 }
 
 #[test]
@@ -306,6 +351,7 @@ fn an_attempt_is_written_into_the_users_own_directory() {
         ALICE,
         "rust.basic.01.hello",
         "rust",
+        attempts::Mode::Submit,
         "fn main() {}\n".into(),
     );
     attempts::write_to_disk(

@@ -482,15 +482,17 @@ pub fn verdict_mistake(verdict: &str, detail: &str) -> Option<Mistake> {
 
 /// Insert the rows, then run the §7.2 rollup.
 ///
-/// This runs on **every** attempt, accepted ones included: `cleared_since` is
-/// "consecutive clean attempts after", and an accepted attempt with no
-/// mistakes is the cleanest one there is.
+/// This runs on **every** attempt — accepted ones, and runs as well as submits
+/// (PROTOCOL §4.9b). A borrow-checker error is the same lesson whichever
+/// button produced it, and the mistakes made while iterating are the truest
+/// record of what a player is actually struggling with.
 pub fn record(
     conn: &Connection,
     attempt_id: &str,
     address: &str,
     quest_id: &str,
     mistakes: &[Mistake],
+    mode: crate::attempts::Mode,
 ) -> Result<()> {
     let now = now_stamp();
     for mistake in mistakes {
@@ -510,10 +512,16 @@ pub fn record(
             ],
         )?;
     }
-    rollup(conn, address, mistakes, &now)
+    rollup(conn, address, mistakes, &now, mode)
 }
 
-fn rollup(conn: &Connection, address: &str, mistakes: &[Mistake], now: &str) -> Result<()> {
+fn rollup(
+    conn: &Connection,
+    address: &str,
+    mistakes: &[Mistake],
+    now: &str,
+    mode: crate::attempts::Mode,
+) -> Result<()> {
     let kinds: BTreeSet<&str> = mistakes.iter().map(|m| m.kind.as_str()).collect();
     for kind in &kinds {
         conn.execute(
@@ -524,13 +532,30 @@ fn rollup(conn: &Connection, address: &str, mistakes: &[Mistake], now: &str) -> 
             params![address, kind, now],
         )?;
     }
+    // Deliberately asymmetric between the two modes (PROTOCOL §4.9b).
+    //
+    // Evidence that you *still* make a mistake counts whoever produced it, so
+    // the block above runs for a run as well as a submit: the count moves and
+    // `cleared_since` goes back to zero. Evidence that you have *stopped*
+    // making it should cost something, and pressing RUN five times in a minute
+    // is not evidence. §7.3 retires a kind at `cleared_since >= 5`, a
+    // threshold written when the only attempt was a submit; letting runs
+    // advance it would make "learned" mean "compiled five times", and the
+    // weakness drill would quietly stop teaching the thing the player is worst
+    // at.
+    //
+    // So only a submit advances it. The ranking still sees every run, because
+    // `count` does.
+    if !mode.is_submit() {
+        return Ok(());
+    }
+
     // SPEC §7.2, to the letter: "for every kind *not* in this attempt that the
     // user has a row for, increment cleared_since". Read as "you have not made
     // this particular mistake in N attempts", which is the question §7.3's
     // `cleared_since >= 5` asks. The alternative reading — only an attempt
     // with no mistakes at all counts as clean — would make a player who fails
-    // in a new way every time never age anything out. If the AI plan wants
-    // that stricter rule later, it is one `if mistakes.is_empty()` away.
+    // in a new way every time never age anything out.
     let placeholders = if kinds.is_empty() {
         String::new()
     } else {

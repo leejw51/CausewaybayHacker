@@ -31,7 +31,8 @@
 local Theme = require("src.theme")
 local json = require("src.json")
 
-local A = { images = {}, box = {}, fonts = {}, missing = {}, sources = {} }
+local A = { images = {}, box = {}, strip = {}, quads = {}, fonts = {},
+  missing = {}, sources = {} }
 
 -- Placeholder files under `love2d/assets/`. A name here is used only when
 -- `art/manifest.json` does not carry it.
@@ -175,6 +176,22 @@ function A.load_art()
         -- transparent canvas. Measured by `art/tools/manifest.py` from the
         -- actual alpha, so it is not a guess and is not re-derived here.
         if type(entry.box) == "table" then A.box[name] = entry.box end
+        -- A strip carries `boxes` (plural, one per frame) instead of `box`,
+        -- and reading `box` on one of those gets nil. Both are kept, and
+        -- `A.frames` records the cell geometry so nothing has to re-derive
+        -- it from the image width.
+        if type(entry.boxes) == "table" and entry.frames then
+          A.strip[name] = {
+            frames = entry.frames,
+            fw = entry.fw or math.floor(entry.w / entry.frames),
+            fh = entry.fh or entry.h,
+            boxes = entry.boxes,
+          }
+          -- All four cells share their ink extents (the cutter normalises
+          -- each figure into its cell), so frame 1's box is the strip's box
+          -- and aligning on the cell gives no jitter between frames.
+          A.box[name] = A.box[name] or entry.boxes[1]
+        end
         loaded = loaded + 1
       else
         A.missing[name] = "art/" .. file
@@ -328,6 +345,45 @@ function A.sprite(name, x, y, height, opts)
     (opts.flip and -s or s), s, ox, oy)
   love.graphics.setColor(1, 1, 1, 1)
   return true
+end
+
+--- One frame of a sprite strip, standing on `(x, y)`.
+---
+--- `frame` is 1-based and wraps, so a caller can hand it a raw animation
+--- counter. Placement is by the frame's own `boxes[i]` — the same `feet` and
+--- `cx` idea as `A.sprite`, per cell.
+function A.frame(name, index, x, y, height, opts)
+  opts = opts or {}
+  local image = A.images[name]
+  local strip = A.strip[name]
+  if not (image and strip) then return false end
+
+  index = ((math.floor(index) - 1) % strip.frames) + 1
+  local quads = A.quads[name]
+  if not quads then
+    quads = {}
+    local iw, ih = image:getDimensions()
+    for i = 1, strip.frames do
+      quads[i] = love.graphics.newQuad((i - 1) * strip.fw, 0, strip.fw, strip.fh, iw, ih)
+    end
+    A.quads[name] = quads
+  end
+
+  local box = strip.boxes[index] or strip.boxes[1]
+  local ink = (box and box.h and box.h > 0) and box.h or strip.fh
+  local s = (height or strip.fh) / ink
+  local ox = box and box.cx or (strip.fw * 0.5)
+  local oy = box and box.feet or strip.fh
+  love.graphics.setColor(opts.color or { 1, 1, 1, opts.alpha or 1 })
+  love.graphics.draw(image, quads[index], x, y, opts.rotation or 0,
+    (opts.flip and -s or s), s, ox, oy)
+  love.graphics.setColor(1, 1, 1, 1)
+  return true
+end
+
+function A.frames(name)
+  local strip = A.strip[name]
+  return strip and strip.frames or 0
 end
 
 --- Draw a marker centred on `(x, y)` at `size` pixels across — for the map's

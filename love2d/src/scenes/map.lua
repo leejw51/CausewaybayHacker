@@ -3,13 +3,23 @@
 -- Everything drawn here is the server's: the node positions are `x`/`y` in
 -- 0..1 of the map image (SPEC §12), the paths are the `edges` array — given
 -- explicitly "so a client never has to infer the overworld's shape" — and
--- `state` is `locked` / `open` / `cleared` as the server computed it. This
--- screen has no opinion about which node should light up next.
+-- `state` is `open` or `cleared` as the server computed it. This screen has
+-- no opinion about which node should light up next.
 --
--- `progress.update` (§4.19) patches the map in place, including the nodes it
--- unlocked, which is what keeps two windows in step without a refetch. A
--- reconnect refetches anyway (§6 rule 5), because a missed event is exactly
--- what a drop causes.
+-- `progress.update` (§4.19) patches the map in place, which keeps two windows
+-- in step without a refetch. A reconnect refetches anyway (§6 rule 5),
+-- because a missed event is exactly what a drop causes.
+--
+-- ## Nothing is locked
+--
+-- §4.7, amended: every node is playable and `MapNode.state` is `open` or
+-- `cleared`. `requires` and `edges` stay and still draw the route — the packs
+-- are written in a deliberate order and "where next" is a real question — but
+-- it is **advice, not a gate**. So no padlock and nothing greyed out:
+-- `art/node_locked.png` is retired from this screen, because a padlock on a
+-- node the player can walk into is a lie that costs them the quest they came
+-- for. A node further along the route is drawn as what it is — one they have
+-- not done yet.
 
 local Layout = require("src.layout")
 local Theme = require("src.theme")
@@ -31,6 +41,9 @@ function Map.new(app)
     error = nil,
     t = 0,
     stamped = {},   -- quest_id -> seconds since the stamp landed
+    -- Mei, standing on a node or walking between two.
+    at = nil,       -- the node index she is standing on
+    walk = nil,     -- { from, to, elapsed, duration, path }
   }, Map)
 end
 
@@ -63,6 +76,16 @@ function Map:refresh()
       end
       self.nodes = payload.nodes or {}
       self.edges = payload.edges or {}
+      -- §5.2: `state` is `open` or `cleared`, never `locked`. A server that
+      -- has not shipped §4.7 yet still sends `locked`, and this screen must
+      -- not draw the word on a node the player can walk straight into —
+      -- a label that contradicts the behaviour teaches them to distrust both.
+      -- Folded to `open` here, once, so nothing downstream has to know.
+      -- The server is still the authority on the *quest*: `quest.get` may
+      -- answer `locked` and the quest screen shows exactly that.
+      for _, node in ipairs(self.nodes) do
+        if node.state == "locked" then node.state = "open" end
+      end
       -- §4.7 says `nodes` arrives "ordered by node", and this sorts anyway.
       -- Observed on the live server: `world.map` for rust/basic returned
       -- `rust.basic.12.traits` as the first element. Nothing here depends on
@@ -77,13 +100,19 @@ function Map:refresh()
       for i, node in ipairs(self.nodes) do
         self.by_id[node.quest_id] = i
       end
-      -- Land on the first node the player can actually play: the earliest
-      -- open one, or failing that the earliest not-locked one.
+      -- Every node is playable now, so "where was I" is the only useful
+      -- question: the earliest one not yet cleared, which is where the
+      -- suggested route has got to.
       self.cursor = 1
       for i, node in ipairs(self.nodes) do
-        if node.state == "open" then self.cursor = i; break end
+        if node.state ~= "cleared" then self.cursor = i; break end
       end
       self.cursor = math.max(1, math.min(#self.nodes, self.cursor))
+      -- She appears where the player left off rather than walking in from
+      -- node 1 every time the map is opened.
+      self.at = self.cursor
+      self.walk = nil
+      self.adjacency = nil
     end)
 end
 
@@ -100,9 +129,11 @@ function Map:apply_progress(payload)
       SFX.play("stamp")
     end
   end
+  -- §4.19 may still carry `unlocked`; with nothing locked it is a no-op, but
+  -- a client that ignored a field the server sent would be guessing.
   for _, id in ipairs(payload.unlocked or {}) do
     local i = self.by_id[id]
-    if i and self.nodes[i].state == "locked" then
+    if i and self.nodes[i].state ~= "cleared" then
       self.nodes[i].state = "open"
     end
   end
@@ -127,25 +158,157 @@ function Map:node_xy(node)
     py + inset + (node.y or 0.5) * (ph - inset * 2)
 end
 
+--- Open the node under the cursor. Nothing refuses; §4.7.
+---
+--- If Mei is still walking, this **skips to the end** instead — a player who
+--- has picked a node wants the quest, not the animation, and a second press
+--- must never be a press they have to repeat.
 function Map:open_node()
-  local node = self:node_at(self.cursor)
-  if not node then return end
-  if node.state == "locked" then
-    SFX.play("locked")
-    -- §3.3's `locked` names the blocker; the map already knows it.
-    local blocker = (node.requires or {})[1]
-    self.app:toast(blocker and ("locked — clear " .. blocker) or "locked")
+  if self:skip_walk() then
+    SFX.play("move")
     return
   end
+  local node = self:node_at(self.cursor)
+  if not node then return end
   SFX.play("select")
   self.app.quest_id = node.quest_id
   self.app:go("quest", { quest_id = node.quest_id, land = self.land, category = self.category })
+end
+
+-- How long the walk takes.
+--
+-- Expo is almost still, then very fast, then almost still — so it needs room
+-- to read as deliberate rather than as a stutter, and *less* room than you
+-- would guess once the distance is large, because the fast middle does most
+-- of the work. Hence a floor, a ceiling, and a square root in between rather
+-- than a straight proportion.
+--
+-- The ceiling is the important number. Every node is reachable now (§4.7), so
+-- a jump can be node 1 to node 24, and nobody wants a second and a half of
+-- walking to reach the quest they asked for. Past that distance the view
+-- carries it and the legs simply keep moving.
+Map.WALK_MIN_S = 0.34
+Map.WALK_MAX_S = 0.85
+Map.WALK_REF_PX = 260          -- the distance WALK_MAX_S is tuned for
+Map.WALK_FPS = 7               -- see the note in `draw_mei`
+
+--- Declared with a dot rather than a colon: it uses nothing from `self`, and
+--- the headless test calls it without building a Map.
+function Map.walk_duration(_, distance)
+  local k = math.min(1, math.sqrt(math.max(0, distance or 0) / Map.WALK_REF_PX))
+  return Map.WALK_MIN_S + (Map.WALK_MAX_S - Map.WALK_MIN_S) * k
+end
+
+--- Send Mei from wherever she is to node `index`.
+---
+--- The route is the `edges` the map already draws, walked with a breadth-first
+--- search, so she follows the street rather than cutting across the harbour.
+--- When there is no route — and with nothing locked a player may well jump to
+--- an unconnected node — she goes straight there, which is honest: there is no
+--- path to show.
+function Map:walk_to(index)
+  if not self.nodes or not self.nodes[index] then return end
+  if not self.at then self.at = index; return end
+  if self.at == index then return end
+
+  local path = self:route(self.at, index)
+  local distance = 0
+  local px, py = self:node_xy(self.nodes[path[1]])
+  for i = 2, #path do
+    local qx, qy = self:node_xy(self.nodes[path[i]])
+    distance = distance + math.sqrt((qx - px) ^ 2 + (qy - py) ^ 2)
+    px, py = qx, qy
+  end
+
+  self.walk = {
+    path = path,
+    elapsed = 0,
+    duration = self:walk_duration(distance),
+    facing = 1,
+  }
+  self.at = index
+end
+
+--- The node indices from `a` to `b` along `edges`, inclusive.
+function Map:route(a, b)
+  if not self.adjacency then
+    self.adjacency = {}
+    for _, edge in ipairs(self.edges) do
+      local i, j = self.by_id[edge[1]], self.by_id[edge[2]]
+      if i and j then
+        self.adjacency[i] = self.adjacency[i] or {}
+        self.adjacency[j] = self.adjacency[j] or {}
+        table.insert(self.adjacency[i], j)
+        table.insert(self.adjacency[j], i)
+      end
+    end
+  end
+
+  local previous, queue, head = { [a] = a }, { a }, 1
+  while head <= #queue do
+    local here = queue[head]; head = head + 1
+    if here == b then break end
+    for _, next_index in ipairs(self.adjacency[here] or {}) do
+      if not previous[next_index] then
+        previous[next_index] = here
+        queue[#queue + 1] = next_index
+      end
+    end
+  end
+
+  if not previous[b] then return { a, b } end   -- no route: a straight line
+  local path, here = {}, b
+  while here ~= a do
+    table.insert(path, 1, here)
+    here = previous[here]
+  end
+  table.insert(path, 1, a)
+  return path
+end
+
+--- Where Mei is right now, and which way she is facing.
+function Map:mei_position()
+  if not self.nodes then return nil end
+  if not self.walk then
+    local node = self.nodes[self.at]
+    if not node then return nil end
+    local x, y = self:node_xy(node)
+    return x, y, 1, false
+  end
+
+  local w = self.walk
+  -- **The curve.** One expo ease over the whole route, not per segment: the
+  -- walk should accelerate once and arrive once, however many nodes it
+  -- crosses.
+  local eased = Ease.expInOut(math.min(1, w.elapsed / w.duration))
+  local segments = #w.path - 1
+  local travelled = eased * segments
+  local segment = math.min(segments, math.floor(travelled) + 1)
+  local within = travelled - (segment - 1)
+
+  local ax, ay = self:node_xy(self.nodes[w.path[segment]])
+  local bx, by = self:node_xy(self.nodes[w.path[segment + 1]])
+  local x = ax + (bx - ax) * within
+  local y = ay + (by - ay) * within
+  return x, y, (bx >= ax) and 1 or -1, true
+end
+
+function Map:skip_walk()
+  if not self.walk then return false end
+  self.walk = nil
+  return true
 end
 
 function Map:update(dt)
   self.t = self.t + dt
   for id, age in pairs(self.stamped) do
     self.stamped[id] = age + dt
+  end
+  if self.walk then
+    self.walk.elapsed = self.walk.elapsed + dt
+    if self.walk.elapsed >= self.walk.duration then
+      self.walk = nil
+    end
   end
 end
 
@@ -170,6 +333,7 @@ function Map:draw()
   self:draw_agents()
   self:draw_edges()
   self:draw_nodes()
+  self:draw_mei()
 
   -- The header band.
   local tint = Theme.land[self.land] or Theme.coin
@@ -198,7 +362,9 @@ function Map:draw()
       Theme.withAlpha(Theme.cream, 0.7), "center", vw)
   end
 
-  self.app:footer("ARROWS node   ENTER play   S search   T stats   A ai   ESC back")
+  self.app:footer(self.walk
+    and "ANY KEY skip"
+    or "ARROWS node   ENTER play   S search   T stats   A ai   ESC back")
 end
 
 function Map:draw_edges()
@@ -211,11 +377,12 @@ function Map:draw_edges()
       local na, nb = self.nodes[a], self.nodes[b]
       local ax, ay = self:node_xy(na)
       local bx, by = self:node_xy(nb)
-      -- A path beyond a locked node is drawn dim (docs/art.md §6).
-      local lit = na.state == "cleared" and nb.state ~= "locked"
+      -- The route, lit as far as the player has got. Not a gate: the dim
+      -- half is "you have not been here yet", not "you may not go".
+      local lit = na.state == "cleared"
       UI.setColor(Theme.ink, 0.55)
       love.graphics.line(ax, ay + 2, bx, by + 2)
-      UI.setColor(lit and Theme.coin or Theme.withAlpha(Theme.dim, 0.8))
+      UI.setColor(lit and Theme.coin or Theme.withAlpha(Theme.cream, 0.45))
       love.graphics.line(ax, ay, bx, by)
     end
   end
@@ -224,14 +391,13 @@ end
 
 --- Which marker a node wears.
 ---
---- `docs/design-review.md` §11: eleven identical dim circles told a player
---- nothing about *why* a node was unavailable, and the boss the game is named
---- after was drawn exactly like node 5. `art/node_boss.png` is a different
---- silhouette, not a recoloured circle, and `art/node_locked.png` carries a
---- padlock — which is the lock language that was missing.
+--- Two states, not three. `node_locked` — the padlock — is deliberately not
+--- reachable from here (§4.7: every node is playable).
 ---
---- `gate` has no marker because no content pack contains one (§11); it falls
---- back to the quest marker, tinted, rather than to a missing texture.
+--- `node_boss` is a different silhouette rather than a recoloured circle
+--- (`docs/design-review.md` §11), so the boss the premise is named after does
+--- not read like node 5. `gate` has no marker because no content pack
+--- contains one; it falls back to the quest marker.
 --- The boss at the end of each map, by land and category (docs/art.md §4.2).
 --- Drawn on the node card when the cursor is on a boss node, so the thing the
 --- premise is named after is a face and not a number.
@@ -245,7 +411,6 @@ local BOSS = {
 }
 
 local function marker_for(node)
-  if node.state == "locked" then return "node_locked" end
   if node.kind == "boss" then return "node_boss" end
   return "node_quest"
 end
@@ -266,22 +431,18 @@ function Map:draw_nodes()
     if not drew then
       -- No art: the old coloured disc, so the map still works.
       local r = size * 0.38
-      local fill = Theme.dim
-      if node.state == "open" then fill = Theme.panel end
+      local fill = Theme.panel
       if node.state == "cleared" then fill = Theme.admit end
-      if node.kind == "boss" and node.state ~= "locked" then fill = Theme.brick end
+      if node.kind == "boss" then fill = Theme.brick end
       UI.setColor(Theme.ink)
       love.graphics.circle("fill", x, y, r + 3)
       UI.setColor(fill)
       love.graphics.circle("fill", x, y, r)
     end
 
-    -- The number rides the marker, in ink, except on a locked node where the
-    -- padlock is the message and the number is secondary.
     local label = tostring(node.node)
     local nw = UI.textWidth(label, 9)
-    UI.text(label, x - nw / 2, y - 5, 9,
-      node.state == "locked" and Theme.withAlpha(Theme.cream, 0.75) or Theme.ink)
+    UI.text(label, x - nw / 2, y - 5, 9, Theme.ink)
 
     -- A cleared node wears the stamp (SPEC §0: stamped CLEARED, for good).
     -- The sprite is a wordless ring by design — `docs/design-review.md` says
@@ -337,6 +498,36 @@ function Map:draw_agents()
   end
 end
 
+--- Mei, standing on a node or walking between two.
+---
+--- The strip is `art/walk_mei.png`: four 64x96 cells with a `boxes` array
+--- (plural) in the manifest, one per frame — `box` on that entry is nil and
+--- reading it would silently place her by the corner of her cell.
+---
+--- **On the frame rate.** DESIGN flagged that frames 2 and 4 are both
+--- "passing" poses and are not identical, so a slow cycle can read as a
+--- slight limp. Watched in a real window: at 4 fps it does, visibly; by about
+--- 7 the eye stops resolving the two passing frames as different poses and it
+--- reads as a walk. 7 is what is here. The cycle also only runs while she is
+--- moving — a standing figure cycling on the spot is worse than either.
+function Map:draw_mei()
+  local x, y, facing, moving = self:mei_position()
+  if not x then return end
+  local scale = Layout.uiScale()
+  local height = 46 * scale
+
+  -- A soft shadow so she sits on the plate rather than floating over it.
+  UI.setColor(Theme.ink, 0.28)
+  love.graphics.ellipse("fill", x, y + 2, height * 0.20, height * 0.07)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  local frame = moving and (math.floor(self.t * Map.WALK_FPS) + 1) or 1
+  if not Assets.frame("walk_mei", frame, x, y + 2, height, { flip = facing < 0 }) then
+    -- No strip: the standing portrait, which at least says who is here.
+    Assets.sprite("sprite_mei", x, y + 2, height, { flip = facing < 0 })
+  end
+end
+
 function Map:draw_node_card(node)
   local vw, vh = Layout.vw, Layout.vh
   local portrait = Layout.isPortrait()
@@ -359,17 +550,15 @@ function Map:draw_node_card(node)
     local boss = BOSS[self.land .. "." .. self.category]
     if boss and Assets.image(boss) then
       boss_w = 78
-      Assets.sprite(boss, x + w - boss_w / 2 - 6, y + h - 8, h - 24,
-        { alpha = node.state == "locked" and 0.4 or 1 })
+      Assets.sprite(boss, x + w - boss_w / 2 - 6, y + h - 8, h - 24)
     end
   end
-  local color = node.state == "locked" and Theme.dim or Theme.cream
+  local color = Theme.cream
   UI.text(("%02d  %s"):format(node.node, node.title or ""), x + 12, y + 10, 11, color)
   UI.text(node.quest_id or "", x + 12, y + 28, 7, Theme.withAlpha(color, 0.6))
 
-  local state_color = ({
-    locked = Theme.dim, open = Theme.coin, cleared = Theme.admit,
-  })[node.state] or Theme.cream
+  local state_color = ({ open = Theme.coin, cleared = Theme.admit })[node.state]
+    or Theme.cream
   UI.text((node.state or "?"):upper(), x + 12, y + 44, 9, state_color)
   -- Difficulty is a segmented bar; stars are stars. Two scales, two shapes,
   -- and a row of text between them (design review §4).
@@ -382,8 +571,15 @@ function Map:draw_node_card(node)
     Theme.withAlpha(color, 0.6))
   UI.stars(x + w - 12 - boss_w - 3 * 13, y + 44, node.stars or 0, 10)
 
-  if node.state == "locked" and node.requires and #node.requires > 0 then
-    UI.text("NEEDS " .. node.requires[1], x + 12, y + h - 16, 7, Theme.red)
+  -- `requires` is the suggested route, and saying so is the whole point: it
+  -- answers "where next" without ever being a refusal.
+  if node.state ~= "cleared" and node.requires and #node.requires > 0 then
+    local after = node.requires[1]
+    local blocker = self.by_id[after] and self.nodes[self.by_id[after]]
+    if blocker and blocker.state ~= "cleared" then
+      UI.text("SUGGESTED AFTER " .. after, x + 12, y + h - 16, 7,
+        Theme.withAlpha(Theme.cyan, 0.8))
+    end
   end
 end
 
@@ -413,10 +609,18 @@ function Map:step(dx, dy)
   if best then
     self.cursor = best
     SFX.play("move")
+    self:walk_to(best)
   end
 end
 
 function Map:keypressed(key)
+  -- **Any key lands her immediately.** Not just the one that started it: a
+  -- player reaching for the next thing has already decided, and an animation
+  -- that eats that keystroke is a toll.
+  if self.walk and key ~= "escape" then
+    self:skip_walk()
+    if key == "return" or key == "kpenter" or key == "space" then return true end
+  end
   if key == "left" then self:step(-1, 0); return true end
   if key == "right" then self:step(1, 0); return true end
   if key == "up" then self:step(0, -1); return true end
@@ -434,11 +638,16 @@ function Map:mousepressed(x, y)
   for i, node in ipairs(self.nodes) do
     local nx, ny = self:node_xy(node)
     if (x - nx) ^ 2 + (y - ny) ^ 2 <= 22 * 22 then
+      if self.walk then
+        self:skip_walk()
+        return
+      end
       if self.cursor == i then
         self:open_node()
       else
         self.cursor = i
         SFX.play("move")
+        self:walk_to(i)
       end
       return
     end

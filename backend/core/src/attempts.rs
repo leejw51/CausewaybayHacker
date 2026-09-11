@@ -4,7 +4,7 @@
 //! reads. `cwbhacker prune` is the only thing that removes them.
 
 use rusqlite::{params, Connection};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 use crate::paths::{ensure_dir, write_private, Home};
@@ -28,12 +28,37 @@ pub fn truncate_stderr(stderr: &str) -> String {
     format!("{}\n…truncated {dropped} bytes", &stderr[..cut])
 }
 
+/// RUN or SUBMIT (PROTOCOL §4.9b). A run is an attempt too — it compiles, it
+/// runs, it fails in the same ways — but it is not part of the *record*: only
+/// a submit moves progress, counts toward a node's attempts, or enters
+/// accuracy. Both feed the mistake tables.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Mode {
+    Run,
+    Submit,
+}
+
+impl Mode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Mode::Run => "run",
+            Mode::Submit => "submit",
+        }
+    }
+
+    pub fn is_submit(self) -> bool {
+        self == Mode::Submit
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct AttemptRecord {
     pub id: String,
     pub address: String,
     pub quest_id: String,
     pub lang: String,
+    pub mode: Mode,
     pub source: String,
     pub verdict: String,
     pub compile_ms: i64,
@@ -48,10 +73,10 @@ pub struct AttemptRecord {
 
 pub fn insert(conn: &Connection, record: &AttemptRecord) -> Result<()> {
     conn.execute(
-        "INSERT INTO attempts (id, address, quest_id, lang, source, verdict, compile_ms,
+        "INSERT INTO attempts (id, address, quest_id, lang, mode, source, verdict, compile_ms,
                                run_ms, exit_code, stdout_bytes, stderr, tests_passed,
                                tests_total, created_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
+         VALUES (?1,?2,?3,?4,?15,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
         params![
             record.id,
             record.address,
@@ -67,6 +92,7 @@ pub fn insert(conn: &Connection, record: &AttemptRecord) -> Result<()> {
             record.tests_passed,
             record.tests_total,
             record.created_at,
+            record.mode.as_str(),
         ],
     )?;
     Ok(())
@@ -101,6 +127,7 @@ pub fn write_to_disk(
 pub struct AttemptBrief {
     pub id: String,
     pub quest_id: String,
+    pub mode: String,
     pub verdict: String,
     pub tests_passed: i64,
     pub tests_total: i64,
@@ -126,10 +153,13 @@ pub fn history(
             tests_passed: r.get(3)?,
             tests_total: r.get(4)?,
             created_at: r.get(5)?,
+            mode: r.get(6)?,
             kinds: Vec::new(),
         })
     };
-    const COLS: &str = "id, quest_id, verdict, tests_passed, tests_total, created_at";
+    // Both modes. A player looking at their own history wants to see the
+    // iteration, not a tidied-up list of the times they pressed SUBMIT.
+    const COLS: &str = "id, quest_id, verdict, tests_passed, tests_total, created_at, mode";
     match quest_id {
         Some(quest_id) => {
             let mut stmt = conn.prepare(&format!(
@@ -167,6 +197,7 @@ pub fn new_record(
     address: &str,
     quest_id: &str,
     lang: &str,
+    mode: Mode,
     source: String,
 ) -> AttemptRecord {
     AttemptRecord {
@@ -174,6 +205,7 @@ pub fn new_record(
         address: address.to_ascii_lowercase(),
         quest_id: quest_id.to_string(),
         lang: lang.to_string(),
+        mode,
         source,
         verdict: "internal_error".into(),
         compile_ms: 0,

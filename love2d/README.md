@@ -60,11 +60,47 @@ official release from GitHub instead, and `make run` will use a `love` on
 | **F** / **F11** | window ⇄ fullscreen — the same binding as `CausewaybayRaiden` |
 | **F1** | orientation: landscape → portrait → automatic |
 | **F3** / **F4** | scanlines · sound |
-| **F5** … **F9** | in a quest: submit · reset · hint · log · `$EDITOR` |
+| **F5** / **F10** | in a quest: **RUN** · **SUBMIT** — see below |
+| **F6** … **F9** | in a quest: reset · hint · log · `$EDITOR` |
 | **TAB** / **ESC** | indent · back |
 
 `F` is only a shortcut on screens that are not taking text; in the editor and
 the login fields it is the letter. `F11` always works.
+
+### RUN and SUBMIT
+
+**RUN** (F5, or ctrl-Enter) compiles and runs the **visible** sample cases. It
+is the reflex button — press it constantly. **SUBMIT** (F10, or
+ctrl-shift-Enter) runs everything including the hidden cases, and is the only
+one that can clear the node. They sit at opposite ends of the button row and
+five keys apart, because reaching for RUN must never land on SUBMIT.
+
+A passing run says **SAMPLE PASSES**, in cyan — never `ACCEPTED`, never the
+green this game uses for a clear. It means "the sample works, now submit". If
+a run said *done*, SUBMIT would contradict the player a second later, which
+teaches them not to trust the screen.
+
+A run **does not count against the node's attempts** and is out of your
+accuracy, so iterating honestly does not look like failing repeatedly. It
+**is** still recorded, and the mistakes in it still feed your drills —
+deliberately, because the errors made while iterating are the truest record of
+what you are actually struggling with (PROTOCOL §4.9b, SPEC §7).
+
+Runs and submits share one execution slot: while either is in flight both
+buttons are disabled, and the client refuses the second locally rather than
+making you wait for a round trip to learn it.
+
+### The map
+
+**Nothing is locked.** Every node is playable from the start (PROTOCOL §4.7).
+The paths and the node order are the *suggested* route — the order the content
+was written to be learned in — so the map still draws them and the node card
+still says `SUGGESTED AFTER …`, but it is advice and the player decides.
+
+Picking a node walks **Mei** there along the drawn path, on an exponential
+ease-in-out: almost still, then fast, then almost still. It is capped at
+0.85 s however far the jump, and **any key lands her immediately** — a player
+who picked a node wants the quest, not the animation.
 
 ### Window and fullscreen
 

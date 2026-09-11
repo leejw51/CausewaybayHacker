@@ -38,6 +38,14 @@ M.APP_PING_S = 20
 -- it. Judging takes seconds (§4.9), so this is generous.
 M.REQUEST_TIMEOUT_S = 180
 
+--- The request types that occupy the one-execution-per-connection slot.
+---
+--- §3.2 and §4.9b: "Runs and submits share the one-execution-per-connection
+--- rule: a second of either while one is in flight is `busy`." One set rather
+--- than two checks on `quest.submit`, so the slot cannot be released by one
+--- message type and held by the other.
+M.EXECUTES = { ["quest.submit"] = true, ["quest.run"] = true }
+
 local Client = {}
 Client.__index = Client
 M.Client = Client
@@ -108,7 +116,8 @@ function M.new(opts)
     state_handlers = {},
     unknown_types = {},    -- type -> count, for §8 point 3
 
-    submit_inflight = false,
+    -- The type currently holding the execution slot, or nil.
+    executing = nil,
 
     attempt = 0,
     retry_at = nil,
@@ -225,7 +234,7 @@ function Client:teardown(message)
   end
   self.conn = nil
   self.outbox, self.inbuf = "", ""
-  self.submit_inflight = false
+  self.executing = nil
 
   -- Every in-flight request is answered locally rather than left hanging:
   -- a scene waiting on a callback that never comes is a scene that spins
@@ -471,8 +480,10 @@ function Client:handle_text(text)
     local entry = self.pending[id]
     if entry then
       self.pending[id] = nil
-      if entry.type == "quest.submit" then
-        self.submit_inflight = false
+      -- Released here, before the type comparison below, so a `.ok`, a
+      -- `.err` and a reply of the wrong type all free the slot.
+      if M.EXECUTES[entry.type] then
+        self.executing = nil
       end
       local succeeded = env.type == entry.type .. ".ok"
       local failed = env.type == entry.type .. ".err"
@@ -535,22 +546,23 @@ function Client:request(type_name, payload, cb)
     return nil, "not connected"
   end
 
-  -- §3.2 / §8 point 10: one in-flight `quest.submit` per connection. The
-  -- client refuses locally rather than letting the server answer `busy`,
-  -- because the submit button has to be disabled either way and a round trip
-  -- to learn that is a round trip the player watches.
-  if type_name == "quest.submit" then
-    if self.submit_inflight then
+  -- §3.2 / §4.9b / §8 point 10: one execution in flight per connection, and
+  -- runs and submits share the slot. The client refuses locally rather than
+  -- letting the server answer `busy`, because both buttons have to be
+  -- disabled either way and a round trip to learn that is a round trip the
+  -- player watches.
+  if M.EXECUTES[type_name] then
+    if self.executing then
       if cb then
         cb(false, {
           code = "busy",
-          message = "a submission is already in flight on this connection",
-          detail = { local_check = true },
+          message = ("%s is already in flight on this connection"):format(self.executing),
+          detail = { local_check = true, running = self.executing },
         }, nil)
       end
       return nil, "busy"
     end
-    self.submit_inflight = true
+    self.executing = type_name
   end
 
   self.counter = self.counter + 1
@@ -564,7 +576,7 @@ function Client:request(type_name, payload, cb)
   local text = json.encode(envelope)
   local frame = self.conn:encode(ws.TEXT, text)
   if not frame then
-    self.submit_inflight = false
+    self.executing = nil
     return nil, "could not encode the frame"
   end
   self.pending[id] = { type = type_name, cb = cb, sent_at = self.now() }
@@ -581,8 +593,8 @@ function Client:expire_requests(now)
   for id, entry in pairs(self.pending) do
     if now - entry.sent_at > M.REQUEST_TIMEOUT_S then
       self.pending[id] = nil
-      if entry.type == "quest.submit" then
-        self.submit_inflight = false
+      if M.EXECUTES[entry.type] then
+        self.executing = nil
       end
       if entry.cb then
         pcall(entry.cb, false, {

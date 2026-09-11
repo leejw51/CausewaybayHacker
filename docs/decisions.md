@@ -2154,3 +2154,198 @@ the thing they came for.
 `locked` stays in PROTOCOL §3.3's closed set, unemitted. Removing a code from a
 closed set is the one change that breaks a client switching exhaustively on it,
 and the cost of keeping a dead row in a table is nothing.
+
+## 2026-09-11 — BE: RUN and SUBMIT, and why a clean run does not retire a mistake
+
+`quest.run` is in (PROTOCOL §4.9b), one code path with `quest.submit` and a
+flag. Migration `0002_attempt_mode` adds `attempts.mode` with a `'submit'`
+default, so the 144 attempts already in the live database read correctly.
+
+**The decision you asked for: a clean run does *not* advance `cleared_since`.**
+The rollup is deliberately asymmetric between the modes.
+
+* A run **can** reset it to zero, and does bump `count` and `last_at`. Evidence
+  that you *still* make a mistake counts whoever produced it — that is the
+  whole reason runs enter the curriculum.
+* A run **cannot** advance it. Only a submit does.
+
+The argument is about what the threshold was calibrated against. §7.3 retires a
+kind at `cleared_since >= 5`, written when the only attempt there was was a
+submit — five separate goes at a problem, each one a considered answer. If runs
+advanced it, five clean runs would retire a kind, and five clean runs is one
+minute of pressing a button while you fix an unrelated typo. "Learned" would
+come to mean "compiled five times", and the weakness drill would quietly stop
+teaching the thing the player is worst at — the exact failure the mode exists
+to prevent.
+
+The asymmetry is the point: evidence that you have stopped making a mistake
+should cost more than evidence that you are still making it. A submit is what
+costs something. And nothing is lost from the ranking, because `count` sees
+every run.
+
+`a_clean_run_does_not_advance_cleared_since` asserts both halves: six clean
+runs leave it at 0, and the next clean submit moves it to 1.
+
+**Queries changed.** `progress::record_clear`'s failure count (stars are about
+the record), and `stats::summary`'s `attempts` and `accepted` — both, because
+`accuracy` is one divided by the other and a numerator and denominator drawn
+from different populations is not a number.
+
+**Queries deliberately left alone.** `attempts::history` returns both modes and
+now carries `mode` per row: a player looking at their own week wants to see the
+iteration, not a tidied-up list of the times they pressed SUBMIT.
+`mistakes::stats` and the `mistakes` insert take both, which is the whole
+point. `stats::summary`'s **streak** counts both — a streak is "days you turned
+up", and a day spent iterating is a day you turned up. `prune` deletes both.
+
+**Hidden cases in a run.** A run is given a `TestSpec` built with
+`visible_only()`, so the hidden cases are not "run and then withheld" — the
+runner never receives them. Nothing to leak and nothing to accidentally report,
+and `tests_total` counts the visible ones because those are the ones that ran.
+
+## 2026-09-11 — BE: nothing is locked
+
+PROTOCOL §4.7. `MapNode.state` is `open` or `cleared`; the server refuses
+nothing on the grounds that an earlier node is unfinished.
+
+`requires` and `edges` still travel and are still computed — they are the
+suggested route and the line the map draws, and "where do I go next" is a real
+question. They gate nothing. `progress::derive_state` lost its `requires`
+argument entirely rather than keeping a parameter it ignores.
+
+`State::Locked` stays in the enum and in `progress.state`'s CHECK so rows
+written before this still read, and `Code::Locked` stays in §3.3's closed set
+unemitted — removing a code from a closed set is the one change that breaks an
+exhaustive client.
+
+**`world::first_node_open` is gone.** Its answer was always true, and it was
+the query that made the stranded-node bug visible in `world.lands` (the lowest
+node was a parked -12, so it asked whether *that* was unlocked). A function
+whose answer is a constant is worse than no function.
+
+**`world.lands`'s per-category `open` is kept and made honest:** it is now
+`total > 0` — is there anything here to play. A land-select screen can grey out
+a category whose pack failed to import, which is more use than a hard-coded
+`true`, and clients that read the field keep working.
+
+**`progress.update`'s `unlocked`** keeps its name and its contents: the
+dependents whose suggested prerequisites are now all cleared. The set is the
+same; the claim softens from "these became playable" to "these are what comes
+next on the route". A map still has something to light up.
+
+### Tests changed, for QA's audit
+
+Mine, all inverted rather than deleted — each still asserts something, and in
+each case the new assertion is the stronger half of the old one:
+
+* `core/tests/store.rs::locked_nodes_open_as_their_requirements_clear` →
+  `every_node_is_playable_and_the_route_is_still_advertised`. Asserts every
+  node is open on a fresh map, that the last node opens before the first is
+  touched, **and** that `requires`/`edges` still describe the route. The risk
+  when a gate is removed is that the dependency plumbing is deleted with it.
+* `core/tests/store.rs::two_users_do_not_leak_into_each_other` — the two maps
+  used to differ by a lock; they now differ by the stamp and the attempt count,
+  which is what the test was always about.
+* `server/tests/ws_flow.rs` — the `quest.get` → `locked` case became "the third
+  node opens for a player who has touched nothing", and the two map assertions
+  now check that *every* node is open.
+
+**QA's, which I have not touched** — `backend/server/tests/integration.rs`,
+two tests failing in four places:
+
+* `clearing_a_node_unlocks_exactly_the_next_one_and_announces_it` (line 522)
+  * line 548 — `let expected = if n["node"] == 1 { "open" } else { "locked" }`
+  * lines 556–570 — submitting to a locked node expecting `quest.submit.err`
+    with code `locked` and `detail.requires`
+  * line 614 — `(3, "locked".into())` in the expected `by_node` vector
+* `two_players_on_one_quest_at_the_same_time_stay_separate` (line 655)
+  * lines 697–700 — `"locked"`, *"bob's node 2 unlocked on alice's clear"*
+
+The `unlocked` half of the first test still holds and is worth keeping: §4.19
+still carries the field and it is still the dependents of the node just
+cleared. What needs rewriting is the gate, not the announcement. The isolation
+test's point survives too — Bob's map differs from Alice's in the stamps, not
+in what he may enter.
+
+## 2026-09-11 — L2D: RUN / SUBMIT, an unlocked map, and Mei walks
+
+### RUN and SUBMIT (§4.9b)
+
+One code path, as the amendment intended: `Quest:execute(mode)` takes
+`quest.run` or `quest.submit` and the payload is identical.
+
+**RUN keeps F5**, the key the old single button had, because it is the reflex
+one. **SUBMIT is F10** — five keys away, and the right-hand button of a pair
+with a deliberate gap between them. Neither is a slip of the other by a
+centimetre or by one finger. ctrl-Enter and ctrl-shift-Enter do the same two
+things for hands that already know that idiom; the pane toggle moved off F10
+to ctrl-TAB.
+
+**A passing run is not a verdict.** It says `SAMPLE PASSES` in `Theme.cyan`,
+never `ACCEPTED` and never in `Theme.admit`, the green this game uses for a
+clear — and it stays on the quest screen rather than going to the result
+screen, because a run is an iteration and bouncing the player out after every
+one would make the reflex button feel expensive. The strip names what ran and
+what did not: `1 / 1 samples`, `now SUBMIT — 2 hidden cases have not run yet`.
+
+The copy is exact about the nuance: **"runs do not count against your stars —
+but they are kept, and what went wrong feeds your drills."** "Runs aren't
+saved" is false and is written nowhere; the line wraps rather than clipping,
+because half of that sentence says the opposite of the whole of it.
+
+The in-flight slot is now one slot for both (`M.EXECUTES`), not two checks on
+`quest.submit` — a slot taken by one message type and released by the other is
+a slot that wedges. Tested in all three orders, plus release on `.err`, a
+wrong-type reply and teardown.
+
+### Nothing is locked (§4.7)
+
+`node_locked.png` is retired from the map. A padlock on a node the player can
+walk into is a lie that costs them the quest they came for. `requires` and
+`edges` still draw the route and the node card says `SUGGESTED AFTER …` in
+cyan — advice, in the colour this client now uses for advice.
+
+**One normalisation worth flagging:** a server that has not shipped §4.7 still
+sends `state: "locked"`, and this client folds it to `open` on arrival. Not to
+override the server — `quest.get` may still answer `locked` and the quest
+screen renders exactly that — but because the map must not print a word that
+contradicts what the map itself will let you do. It becomes a no-op the moment
+BE ships.
+
+### The walk
+
+`Ease.expInOut` was already in the ported `ease.lua`; added `expo*` aliases and
+`E.apply` so the curve is named the same thing as the browser's rather than
+inlined in a scene.
+
+She follows the drawn `edges`, by breadth-first search, so she walks the street
+rather than the harbour; an unconnected node — reachable now that nothing is
+locked — is a straight line, which is honest because there is no path to show.
+One expo ease over the whole route, not per segment: accelerate once, arrive
+once.
+
+**Duration: 0.34 s floor, 0.85 s ceiling, square root in between.** The ceiling
+is the number that matters — node 1 to node 24 is one press now, and a second
+and a half of walking would make the map a toll. Expo's fast middle does most
+of the work, so a long jump needs less extra time than you would guess.
+
+**Skippable by any key**, not just the one that started it: a player reaching
+for the next thing has already decided. A second ENTER lands her and does not
+open the quest, so the press is never one they have to repeat.
+
+**On DESIGN's caveat about frames 2 and 4.** Watched it moving in a real
+window: at 4 fps the two passing poses do read as a slight limp, visibly. By
+about 7 the eye stops resolving them as different poses and it reads as a
+walk. **7 fps** is what shipped, and the cycle only runs while she is moving.
+
+### Observed against the live server
+
+Both server halves are still landing, so the drive script *reports* them and
+asserts only this client's half:
+
+* `quest.run` → `not_found`. The client shows "RUN is not on this server yet —
+  SUBMIT still works", greys the button, and SUBMIT is unaffected — the same
+  probe-and-render pattern as the milestone-2 screens.
+* `world.map` still sends `locked` for 16 of 18 nodes. The client entered one
+  anyway and let the server answer, which is the correct division either way.
+* `Attempt.mode` is not yet on the wire; the client tolerates its absence.

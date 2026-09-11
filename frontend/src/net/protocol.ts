@@ -218,9 +218,19 @@ export interface AttemptMistake {
   col: number | null;
 }
 
+/**
+ * §4.9b. A run is for the player and a submit is for the record, and this is
+ * the field that says which one an attempt was. A `run` never clears a node,
+ * never awards stars and is not counted among the node's attempts — but it *is*
+ * recorded, and its mistakes do feed the drills.
+ */
+export type AttemptMode = "run" | "submit";
+
 export interface Attempt {
   id: string;
   quest_id: string;
+  /** Optional only so an older server's reply still parses; treat as "submit". */
+  mode?: AttemptMode;
   verdict: Verdict;
   tests_passed: number;
   tests_total: number;
@@ -307,6 +317,8 @@ export interface Requests {
   "world.map": { land: Land; category: Category };
   "quest.get": { quest_id: string };
   "quest.submit": { quest_id: string; lang: Land; source: string };
+  /** §4.9b — the same shape, deliberately, so one code path sends either. */
+  "quest.run": { quest_id: string; lang: Land; source: string };
   "quest.hint": { quest_id: string; index: number };
   "quest.reset": { quest_id: string };
   "search.query": {
@@ -339,6 +351,7 @@ export interface Responses {
   };
   "quest.get": { quest: Quest };
   "quest.submit": { attempt: Attempt };
+  "quest.run": { attempt: Attempt };
   "quest.hint": { hint: string; index: number; total: number; hints_used: number };
   "quest.reset": { starter: string };
   "search.query": { hits: SearchHit[]; mode: SearchMode; took_ms: number };

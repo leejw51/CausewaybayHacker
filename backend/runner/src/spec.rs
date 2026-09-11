@@ -102,6 +102,19 @@ pub struct TestSpec {
 }
 
 impl TestSpec {
+    /// The same spec with only the visible cases (PROTOCOL §4.9b).
+    ///
+    /// A run must not tell the player whether the hidden cases pass — that is
+    /// what submitting is for — and the cleanest way to guarantee it is that
+    /// the hidden cases are never handed to the runner at all. Nothing to
+    /// leak, and nothing to accidentally report.
+    pub fn visible_only(&self) -> TestSpec {
+        TestSpec {
+            cases: self.cases.iter().filter(|c| c.visible).cloned().collect(),
+            ..self.clone()
+        }
+    }
+
     pub fn parse(value: &serde_json::Value) -> Result<TestSpec> {
         let harness = match value
             .get("harness")
