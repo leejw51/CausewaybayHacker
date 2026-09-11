@@ -573,6 +573,61 @@ source over the submit cap is refused the same way.
 Taking a hint costs stars (SPEC §6.3) and is permanent. Re-requesting a hint
 already taken does not cost again. `not_found` when `index` is past `total`.
 
+### 4.9e Interview mode
+
+The point of this project, in one screen: **a live coding screen, simulated.**
+Everything else in the game teaches a topic. This rehearses the hour.
+
+A live screen is not "solve a problem". It is: read a statement under time
+pressure, **say what you are going to do and why before you do it**, write it
+while somebody watches, and answer for the result. The game has had the clock
+since §4.8b and the problems since the content packs. What it has never had is
+the half that is not typing — and that is the half that fails most candidates.
+
+```json
+→ interview.start     { "land": "rust", "category": "hacker" }
+← payload: { "session": InterviewSession }
+```
+
+The server picks a quest the player has **not cleared**, starts the clock, and
+withholds `solution` and `hints` **for the whole session** — even if the player
+cleared it long ago, and even after time runs out. A screen does not come with
+hints.
+
+```json
+→ interview.approach  { "session_id": "int_…", "text": "sort by end, greedy…" }
+← payload: { "session": InterviewSession }    with `approach_at` stamped
+```
+
+**The approach is written before the editor unlocks, and it is the feature.**
+A few sentences: what you are going to do, and what it costs. It is kept, it is
+**never graded by the server**, and it comes back at the end beside what the
+reference answer actually does, so the player can see whether they said the
+thing they then wrote. Rehearsing that sentence is the point; scoring it would
+be inventing a judgement the server cannot make.
+
+```json
+→ interview.finish    { "session_id": "int_…" }
+← payload: { "report": InterviewReport }
+```
+
+**The rules that make it an interview rather than a quest wearing a hat:**
+
+* **No hints, for the session.** Not rate-limited — absent.
+* **RUN still works.** Candidates run code on a real screen. What they do not
+  get is the hidden cases, and they do not get them here either.
+* **The clock does not stop you** (§4.8b) — it records. Running out is
+  information, not a wall; a trainer that locks you out at the buzzer teaches
+  panic rather than finishing.
+* **`interview.finish` is the only way to end it**, and the report is the
+  product: time against the limit, the approach you wrote, what the reference
+  does, your attempts, and the mistakes you made getting there.
+* One live session per player. Starting another finishes the first.
+
+Sessions write ordinary `attempts` rows (`mode: "submit"`), so everything in
+SPEC §7 still learns from them. An interview you walked out of is still a thing
+that happened.
+
 ### 4.11 `quest.reset`
 
 ```json
