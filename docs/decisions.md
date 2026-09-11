@@ -3290,3 +3290,23 @@ silent-wrong-thing failures go away.
 Until it lands, treat an e2e failure in `submit()` or `enterRustQuest()` as
 "a canvas control moved" before believing it is a product bug — the error
 messages say so.
+
+## 2026-09-11 — SPEC §12 and §4.1 contradicted each other; §4.1 wins
+
+§4.1: an id is stable forever, and if a node moves the `node` column changes
+and the id does not. §12: the id's number must equal `node`. Both cannot hold,
+and §12 was the one being enforced.
+
+It cost four boss quests their ids on three separate occasions — every one a
+delete-and-insert that discards whoever had cleared them. Free so far only
+because nobody has a real save. PM flagged it as the last free renumbering and
+was right to.
+
+§12 is now relaxed: the number in an id is the node the quest was **created**
+at, `node` is the authority on where it sits today, and a pack may legitimately
+have ids that look out of order. The importer still checks shape, land,
+category and uniqueness.
+
+The lesson worth keeping: a spec can hold two rules that are each sensible and
+jointly impossible, and the way it surfaced was someone implementing them both
+and noticing the cost — not review.

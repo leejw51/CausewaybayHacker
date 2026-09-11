@@ -753,3 +753,33 @@ generated = "2026-09-11"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art game award icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable as a shape when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a heavy brass padlock shackle that has been SNAPPED OPEN: a thick U-shaped metal loop broken clean through at the top with a jagged bright break and the two ends sprung apart, no lock body, no keyhole, nothing closed. It must read instantly as a broken, opened, defeated restraint. Brass gold with a bright silver break and a faint green glint. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "badge_flags"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game award icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable as a shape when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is TWO pennant flags on short poles crossed over each other in an X, one flag pointing left and one pointing right, both flying and completely blank with nothing on them. The LEFT flag is saturated rust orange, the RIGHT flag is saturated cyan turquoise, and the crossed poles are dark wood with brass tips. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "badge_tally"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game award icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable as a shape when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a tally mark group carved into a small dark slate tile: four thick straight vertical scratch marks side by side and a fifth thick scratch struck diagonally across all four. They are rough carved scratches, not letters and not numbers. Pale cream chalk scratches on a dark slate grey tile with a chipped edge. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "badge_chevron"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game award icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable as a shape when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a single bold military rank chevron: one thick solid V-shaped bar with square-cut ends, point upward, wide and heavy. Bright gold with a darker gold bevel underneath and one white shine. Nothing else in the picture, just the one chevron. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""

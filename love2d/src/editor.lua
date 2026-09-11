@@ -332,40 +332,79 @@ local function indent_of(line)
   return line:match("^[ \t]*") or ""
 end
 
+--- Count the non-whitespace characters in `text` before byte `stop`.
+local function ink_before(text, stop)
+  return #(text:sub(1, stop - 1):gsub("%s", ""))
+end
+
+--- Turn "the Nth non-whitespace character of the document" back into a
+--- (line, col) pair.
+local function position_at_ink(lines, target)
+  local seen = 0
+  for index, line in ipairs(lines) do
+    local col = 1
+    while col <= #line do
+      if not line:sub(col, col):match("%s") then
+        if seen == target then return index, col end
+        seen = seen + 1
+      end
+      col = M.next_boundary(line, col)
+    end
+    if seen == target then
+      -- The caret belongs at the end of this line rather than at the start of
+      -- the next: a formatter that moved a `{` down should not drag the caret
+      -- with it.
+      return index, #line + 1
+    end
+  end
+  local last = #lines
+  return last, #(lines[last] or "") + 1
+end
+
 --- Replace the whole buffer, keeping the caret where the player left it, as
 --- **one undo step**.
 ---
 --- This is what a FORMAT button does (PROTOCOL §4.9d), and it is the one
 --- operation in this editor that can throw somebody to line 1 while they were
---- thinking. `rustfmt` and `gofmt` overwhelmingly change *whitespace*: the
---- indentation of a line, the spaces inside it, sometimes a line break. So the
---- caret is anchored to the text rather than to a coordinate:
+--- thinking.
 ---
----   1. remember the current line with its whitespace stripped, and how many
----      **non-whitespace** characters sit before the caret on it;
----   2. after the replacement, find the line whose stripped form matches —
----      nearest to the old line number, so a file with twenty `}` lines picks
----      the right one;
----   3. put the caret after the same count of non-whitespace characters.
+--- **The anchor is the ink stream, not a coordinate and not a line.** A
+--- formatter changes whitespace: it re-indents, it puts spaces around
+--- operators, and — the case that matters — it *splits one long line into
+--- several*. So the caret's position is recorded as "after the Nth
+--- non-whitespace character of the whole document", and restored by counting
+--- to the same N in the new text. Indentation, spacing and line breaks can
+--- all change and the caret still lands between the same two characters.
 ---
---- Indentation can change by any amount and the caret still lands between the
---- same two characters. When nothing matches — the formatter joined or split
---- the line — it falls back to the same line number, clamped, because the
---- line is much better than nothing.
+--- The first version of this matched the caret's *line* by its stripped
+--- content and fell back to the line number when nothing matched. Against a
+--- fixture that only re-indented, it was perfect. Against real `rustfmt` on a
+--- long one-liner — which is exactly when somebody reaches for FORMAT — no
+--- line matched, the fallback fired, and the caret went to the end of line 1.
+--- The exact-line pass is kept as a fast path because it is exact when a line
+--- does survive; the ink stream is what catches everything else.
 ---
 --- One `push_undo` and no other, so ctrl-Z puts the buffer back in one press.
 function Editor:replace_all(text)
   if self.read_only then return false end
+  local old_text = self:text()
   local old_line = self.lines[self.line] or ""
-  local before = old_line:sub(1, self.col - 1)
-  local ink_before = #(before:gsub("%s", ""))
   local anchor = old_line:gsub("%s", "")
   local old_index = self.line
+  local line_ink = ink_before(old_line, self.col)
+
+  -- Where the caret is in the document's ink stream.
+  local document_ink = 0
+  for i = 1, self.line - 1 do
+    document_ink = document_ink + #(self.lines[i]:gsub("%s", ""))
+  end
+  document_ink = document_ink + line_ink
 
   self:push_undo(false)
   self:set_text(text)
 
-  local target = nil
+  local target, col
+  -- Fast path: the same line still exists, so land on it exactly.
   if anchor ~= "" then
     local best
     for i, line in ipairs(self.lines) do
@@ -375,27 +414,28 @@ function Editor:replace_all(text)
       end
     end
   end
-  target = target or math.max(1, math.min(#self.lines, old_index))
 
-  -- Walk the new line counting non-whitespace, and stop where the caret was.
-  local line = self.lines[target]
-  local col, seen = 1, 0
-  while col <= #line and seen < ink_before do
-    local nextb = M.next_boundary(line, col)
-    if not line:sub(col, nextb - 1):match("^%s") then seen = seen + 1 end
-    col = nextb
-  end
-  -- Land after the run of whitespace the formatter may have inserted, rather
-  -- than inside it.
-  if ink_before == 0 then
-    col = (#(line:match("^[ \t]*") or "")) + 1
+  if target then
+    local line = self.lines[target]
+    local seen
+    col, seen = 1, 0
+    while col <= #line and seen < line_ink do
+      local nextb = M.next_boundary(line, col)
+      if not line:sub(col, nextb - 1):match("^%s") then seen = seen + 1 end
+      col = nextb
+    end
+    if line_ink == 0 then col = (#(line:match("^[ \t]*") or "")) + 1 end
+  else
+    -- The line was split, joined or rewritten. Follow the ink.
+    target, col = position_at_ink(self.lines, document_ink)
   end
 
-  self.line = target
+  self.line = math.max(1, math.min(#self.lines, target))
+  local line = self.lines[self.line] or ""
   self.col = math.max(1, math.min(#line + 1, col))
   self.anchor = nil
   self.goal_char = nil
-  self.dirty = true
+  self.dirty = old_text ~= text
   return true
 end
 

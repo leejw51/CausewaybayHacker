@@ -873,8 +873,23 @@ cases = [
 
 Rules:
 
-* `id` must match `<land>.<category>.<node:02d>.<slug>` and must agree with the
-  file's `land` and `category`. The importer refuses a pack where it does not.
+* `id` must be `<land>.<category>.<NN>.<slug>`, agree with the file's `land`
+  and `category`, and be unique within the pack. **`NN` is the node the quest
+  was created at, and it does not have to equal its `node` today.**
+
+  This is the half of §4.1 that matters: *"Stable forever… If a node moves, the
+  `node` column changes and the id does not."* An earlier version of this
+  clause required `NN == node`, which contradicts §4.1 outright — and the
+  contradiction was not theoretical. Lengthening a map moves its boss, so the
+  rule renumbered four boss ids on three separate occasions, and every rename
+  is a delete-and-insert that throws away whoever had cleared it. It was free
+  only because nobody had a real save yet.
+
+  §4.1 wins. The importer checks the shape, the land, the category and
+  uniqueness; it does not check the number against `node`, and a quest that
+  moves keeps the id it was born with. A pack may therefore be perfectly valid
+  with ids that look out of order — that is the point, and `node` is the
+  authority on where it sits.
 * `node` is unique within a pack and 1-based and contiguous. A gap is an error,
   because the map draws a path through them.
 * `map.x` / `map.y` are 0..1 of the map image, so the art can be replaced

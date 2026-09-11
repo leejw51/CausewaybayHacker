@@ -43,6 +43,15 @@ export interface Scene {
   unsaved?(): boolean;
   /** Which land the city should be tinted for, if the screen knows. */
   land?: Land;
+  /**
+   * The screen's button lists, for `dev/capture.ts` only.
+   *
+   * Nothing in the game reads this — it is how an automated run finds a
+   * control that has no DOM node. The lists are the same objects the scene
+   * hit-tests against, so what the hook reports and what a click actually
+   * hits cannot drift apart.
+   */
+  controls?(): Buttons[];
 }
 
 /** Where the player's chosen orientation is kept. A preference, not a secret. */

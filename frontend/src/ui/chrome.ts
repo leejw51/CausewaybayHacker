@@ -224,6 +224,18 @@ export class Buttons {
     }
   }
 
+  /**
+   * What is on screen, for the capture hook.
+   *
+   * Read-only and rebuilt every frame like the rest of this class. It exists
+   * because a canvas button has no DOM node: an e2e run that wants to press
+   * SUBMIT has either a list like this or a geometric scan of the pixels, and
+   * the scan breaks every time a row re-wraps — which has now cost three runs.
+   */
+  list(): readonly Button[] {
+    return this.items;
+  }
+
   hit(x: number, y: number): Button | null {
     for (const b of this.items) if (!b.dim && inRect(x, y, b.rect)) return b;
     return null;
