@@ -323,7 +323,10 @@ jobs:
       - name: The race fixture, alone
         run: |
           d=$(mktemp -d) && cp tests/vectors/mistakes/go/data-race.go "$d/main.go"
-          cd "$d" && timeout 120 go run -race main.go; echo "exit=$?"
+          # `go run -race` exits 66 when it finds the race it is here to
+          # find, and the step's shell runs with -e: the report is the point,
+          # the exit status is not.
+          cd "$d" && { timeout 120 go run -race main.go || echo "exit=$?"; }
 
       # Every §7.1 taxonomy fixture still compiles to the code it claims.
       - run: python3 tests/vectors/mistakes/generate.py --check
