@@ -1,4 +1,4 @@
-import { atScreen, expect, test, testAccount, view } from "./fixtures.js";
+import { atScreen, expect, freshAccount, test, view } from "./fixtures.js";
 
 /**
  * The connection rules of SPEC §6.4, from the browser.
@@ -10,21 +10,36 @@ import { atScreen, expect, test, testAccount, view } from "./fixtures.js";
  * is being tested is that *the frontend copes*, not that the server answers.
  */
 
-const RIGHT = `fn main() {
-    println!("hello, causewaybay");
-}
-`;
-
 async function toQuest(page: import("@playwright/test").Page) {
-  const account = testAccount(0);
+  // A player nobody has been before: the server persists, and these tests
+  // submit. See `freshAccount` in fixtures.ts.
+  const { phrase, index } = freshAccount();
   await atScreen(page, "login");
-  await page.evaluate((s) => window.__cwb!.login(s), account.phrase);
+  await page.evaluate(([s, i]) => window.__cwb!.login(s as string, i as number), [
+    phrase,
+    index,
+  ] as const);
   await atScreen(page, "lands");
-  await page.keyboard.press("Enter");
+  // ONE Enter, not two: land select and category select are one `LandsScene`
+  // (a 2×3 grid) since SPEC §10 was amended. RUST × BASIC is the first cell.
   await page.keyboard.press("Enter");
   await atScreen(page, "map");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter"); // open node 1
   await atScreen(page, "quest");
+}
+
+/** The answer, composed from the quest's own visible case. */
+async function rightAnswer(page: import("@playwright/test").Page): Promise<string> {
+  const v = await view(page);
+  const expected = v.quest?.tests?.visible?.[0]?.expect;
+  if (!expected)
+    throw new Error("the quest screen exposes no visible case to compose an answer from");
+  const body = expected
+    .replace(/\n$/, "")
+    .split("\n")
+    .map((l) => `    println!("${l}");`)
+    .join("\n");
+  return `fn main() {\n${body}\n}\n`;
 }
 
 test("a second submit while one is in flight is refused, not queued", async ({
@@ -35,7 +50,7 @@ test("a second submit while one is in flight is refused, not queued", async ({
   // first attempt still finishes — a client that swallows `busy` and waits
   // forever looks identical to a hung server.
   await toQuest(page);
-  await page.evaluate((s) => window.__cwb!.setSource(s), RIGHT);
+  await page.evaluate((s) => window.__cwb!.setSource(s), await rightAnswer(page));
   await page.evaluate(() => {
     window.__cwb!.submit();
     window.__cwb!.submit();
@@ -62,7 +77,10 @@ test("a dropped socket reconnects and the session survives it", async ({ page })
     // no button for "your wifi died", and that is the case being tested.
     const ws = (window as unknown as { __cwbSocket?: WebSocket }).__cwbSocket;
     if (!ws) throw new Error("window.__cwbSocket is not exposed — see e2e/README.md");
-    ws.close(1006);
+    // 1006 is reserved and cannot be *sent* by an endpoint; 4000-4999 is the
+    // private-use range, and a close with no `server.bye` first is what a
+    // sleeping laptop actually looks like.
+    ws.close(4000, "simulated drop");
   });
 
   // No mnemonic prompt, no lost place: `auth.resume` does it with the token.
@@ -92,7 +110,7 @@ test("an unknown protocol version does not kill the page", async ({ page }) => {
     .toContain("proto_version");
   // Still connected, still on the quest, still able to do the next thing.
   expect((await view(page)).state).toBe("quest");
-  await page.evaluate((s) => window.__cwb!.setSource(s), RIGHT);
+  await page.evaluate((s) => window.__cwb!.setSource(s), await rightAnswer(page));
   await page.evaluate(() => window.__cwb!.submit());
   await atScreen(page, "result", 120_000);
   expect((await view(page)).attempt?.verdict).toBe("accepted");

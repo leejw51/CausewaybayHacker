@@ -43,8 +43,9 @@ cannot cover that, the nonce is fresh every time — so it shells out to
 `tests/vectors/signatures.json`. `$CWBWALLET` overrides the path. Without it
 the checker skips with an explanation rather than pretending.
 
-The five test accounts come from `tests/vectors/addresses.json`, one per
-state-changing check. Sharing an account across checks makes the suite
+Read-only checks use the accounts in `tests/vectors/addresses.json`; every
+check that changes state derives its **own fresh account** (see "Running it
+twice" below). Sharing an account across checks makes the suite
 order-dependent, and an order-dependent contract checker is the thing you
 stop trusting the first time it disagrees with itself.
 
@@ -97,9 +98,9 @@ file, whatever its coverage report says.
 It exists so the checker can be tested. Two things it deliberately does not
 own:
 
-* **keccak** — its EIP-55 spellings are looked up in `addresses.json`, and an
-  address that is not in the fixture is refused with `bad_request` rather
-  than given an invented checksum that would look right and be wrong.
+* **keccak** — its EIP-55 spellings come from `addresses.json` first and
+  `cwbwallet utils checksum` for anything else, never from a checksum it
+  computed itself.
 * **secp256k1** — recovery is `cwbwallet verify`.
 
 A second, subtly different implementation of either, living in the test tree,
@@ -108,15 +109,43 @@ is exactly the drift SPEC §9.1 exists to prevent.
 Its judging is a regex for `println!("…")`. That is enough to exercise the
 *protocol*; it is not a runner and does not pretend to be one.
 
+## Against the real server
+
+It has run. `cargo run -p cwbhacker -- serve` on :5390:
+**18 passed, 1 failed, §8 conformance 11/12.**
+
+The one failure is real: an **absent `payload` is accepted as `{}`**, where
+PROTOCOL.md §2 says a frame has exactly four keys and `payload` is "never
+absent". Two softer divergences beside it — a rejected signature burns the
+nonce and reports `auth_expired` rather than `auth_nonce_used`, and a second
+`auth.login` on an authenticated connection is `bad_request` (correct, and
+undocumented). All three are written up in `docs/decisions.md` and
+`tests/PLAN.md`.
+
+Everything else BE already does first time: the envelope, the closed error
+set, `proto_version` with `detail.supported`, `locked` with
+`detail.requires`, the four-line challenge byte-for-byte, `v` as both 27/28
+and 0/1, token rotation with the old one dying, `run.log` seq from 0 with no
+gaps, `busy` per connection, `progress.update` to the second window, and full
+multi-user isolation.
+
+### Running it twice
+
+The server persists. Every state-changing check derives a **fresh account per
+run** — index `1000 + random` off the published BIP-39 all-zero mnemonic — so
+the checker does not need the database wiped between runs. A checker pinned to
+five fixed addresses sees a different map every time and is only honest once.
+
 ## What this does not cover
 
-* **The real server.** Everything the checker claims today is "green against
-  a mock I also wrote". The first run against BE's server is the one that
-  counts, and it will find things.
-* **§8.12 is weak.** Node answers websocket pongs itself, so the default
-  6-second idle window mostly proves the server does not drop a ponging
-  connection. Run `--slow` for the real 70-second window before believing it.
+* **The two-missed-ping rule.** `--slow --only 8.12` has been run against the
+  real server: pass at 70.1 s, past §1.1's window, so the server does not
+  drop a connection whose only traffic is keepalive. Proving it *does* drop a
+  silent one needs a client that deliberately stops answering pongs, which is
+  not written.
 * **The runner.** SPEC §9.6's limits — timeout, output cap, fork bomb,
   `GOPROXY=off` — need a real runner. `tests/PLAN.md` §9.6 has the cases.
-* **`search.query`, `ai.*`.** Milestone 2. The checker asserts only that they
-  are `unauthorized` before login.
+* **`search.query`, `ai.*`.** Milestone 2. There is a pending check that
+  asserts they *declare* the gap — `not_found` with `detail: {"milestone":
+  2}` — and that starts failing the day either ships, which is the signal to
+  write the real one.

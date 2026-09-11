@@ -1,6 +1,7 @@
 import {
   atScreen,
   expect,
+  freshAccount,
   state,
   test,
   testAccount,
@@ -33,24 +34,57 @@ import {
  * `docs/decisions.md` for the hook contract FE is being asked for.
  */
 
-const RUST_BASIC_FIRST = "rust.basic.01.hello";
+const RUST_BASIC_FIRST = "rust.basic.01.first-light";
 
-// SPEC §12's worked example is this quest, so its answer is knowable from the
-// spec alone rather than from content that PM is still writing.
+// The answer is not hard-coded. `quest.tests.visible[0].expect` comes back
+// with the quest (PROTOCOL.md §4.8), so the test composes a source that
+// prints it — content is PM's, and a suite that hard-codes an answer breaks
+// the day a string changes.
 const WRONG = `fn main() {
-    println!("Hello, Causewaybay!");
+    println!("deliberately not the answer");
 }
 `;
-const RIGHT = `fn main() {
-    println!("hello, causewaybay");
+
+function sourceThatPrints(expected: string): string {
+  const lines = expected.replace(/\n$/, "").split("\n");
+  const body = lines.map((l) => `    println!("${l}");`).join("\n");
+  return `fn main() {\n${body}\n}\n`;
 }
-`;
+
+/** The answer, read off the quest's own visible case (PROTOCOL.md §4.8). */
+async function rightAnswer(page: import("@playwright/test").Page): Promise<string> {
+  const v = await view(page);
+  const expected = v.quest?.tests?.visible?.[0]?.expect;
+  if (!expected)
+    throw new Error(
+      "the quest screen exposes no `quest.tests.visible[0].expect`. The server " +
+        "sends it (PROTOCOL.md §4.8); the view model has to pass it through, " +
+        "or this suite cannot answer a quest without hard-coding content.",
+    );
+  return sourceThatPrints(expected);
+}
+
+/**
+ * The player this journey is about — a fresh one, per project.
+ *
+ * The server persists. Account 0 of the fixture mnemonic has cleared node 1
+ * on some previous run, so "node 1 is open" and PROTOCOL.md §5.4's
+ * "`cleared` is true only on the first clear" would both fail against it —
+ * and this file runs twice per invocation (landscape then portrait, serially,
+ * against one database), so the second project would hit that on the very
+ * first run.
+ */
+let player: { phrase: string; index: number };
+test.beforeAll(() => {
+  player = freshAccount();
+});
 
 async function login(page: import("@playwright/test").Page) {
-  const account = testAccount(0);
   await atScreen(page, "login");
-  await page.evaluate((secret) => window.__cwb!.login(secret), account.phrase);
-  return account;
+  await page.evaluate(
+    ([secret, index]) => window.__cwb!.login(secret as string, index as number),
+    [player.phrase, player.index] as const,
+  );
 }
 
 /** The map node this journey is about, whatever order the map draws them in. */
@@ -75,7 +109,13 @@ test("boots to the login screen and asks for a mnemonic", async ({ page }) => {
 test("a mnemonic logs in, and the address is the one the wallet derives", async ({
   page,
 }) => {
-  const account = await login(page);
+  // The one test that deliberately uses the FIXTURE account rather than a
+  // fresh one: the whole point is that the address is the one
+  // `CausewaybayWallet` derives and this suite did not compute it (SPEC
+  // §9.1). It only reads, so a previously-played account costs nothing.
+  const account = testAccount(0);
+  await atScreen(page, "login");
+  await page.evaluate((secret) => window.__cwb!.login(secret), account.phrase);
   await atScreen(page, "lands");
   const v = await view(page);
   // The whole of SPEC §9.1, observed from outside: this is the address
@@ -109,12 +149,13 @@ test("the mnemonic never crosses the wire", async ({ page }) => {
   expect(stored).not.toContain("abandon");
 });
 
-test("RUST → BASIC → a map with an open first node", async ({ page }) => {
+test("RUST × BASIC → a map with an open first node", async ({ page }) => {
   await login(page);
   await atScreen(page, "lands");
-  await page.keyboard.press("Enter"); // rust is the first land
-  await atScreen(page, "categories");
-  await page.keyboard.press("Enter"); // basic is the first category
+  // One screen, not two: FE merged land and category select into a 2×3 grid
+  // (`LandsScene`), and SPEC §10 was amended to match. RUST × BASIC is the
+  // top-left cell, so a single Enter lands on the map.
+  await page.keyboard.press("Enter");
   await atScreen(page, "map");
 
   const v = await view(page);
@@ -131,8 +172,7 @@ test("RUST → BASIC → a map with an open first node", async ({ page }) => {
 
 test("a wrong answer is rejected, and the node stays open", async ({ page }) => {
   await login(page);
-  await page.keyboard.press("Enter");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter"); // RUST × BASIC, the first cell
   await atScreen(page, "map");
   await page.keyboard.press("Enter"); // open node 1
   await atScreen(page, "quest");
@@ -160,13 +200,12 @@ test("the right answer clears it, stamps it, and it survives a reload", async ({
   page,
 }) => {
   await login(page);
-  await page.keyboard.press("Enter");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter"); // RUST × BASIC, the first cell
   await atScreen(page, "map");
   await page.keyboard.press("Enter");
   await atScreen(page, "quest");
 
-  await page.evaluate((s) => window.__cwb!.setSource(s), RIGHT);
+  await page.evaluate((s) => window.__cwb!.setSource(s), await rightAnswer(page));
   await page.evaluate(() => window.__cwb!.submit());
   await atScreen(page, "result", 120_000);
 
@@ -198,8 +237,7 @@ test("the right answer clears it, stamps it, and it survives a reload", async ({
   // without touching key material — so the reload does NOT ask for the
   // mnemonic again.
   await atScreen(page, "lands", 60_000);
-  await page.keyboard.press("Enter");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter"); // RUST × BASIC
   await atScreen(page, "map");
   expect(node(await view(page)).state).toBe("cleared");
 });
@@ -211,8 +249,7 @@ test("the CLEARED stamp is on screen in this orientation", async ({ page }, info
   // viewport is the one the project asked for, the canvas fills it) and
   // attaches the picture for the other half.
   await login(page);
-  await page.keyboard.press("Enter");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter"); // RUST × BASIC, the first cell
   await atScreen(page, "map");
 
   const size = page.viewportSize()!;
@@ -227,4 +264,125 @@ test("the CLEARED stamp is on screen in this orientation", async ({ page }, info
     body: await page.screenshot(),
     contentType: "image/png",
   });
+});
+
+test("the compiler's output paints mid-run, before the verdict", async ({ page }) => {
+  // Nobody has seen this work. FE unit-tested the console and could not
+  // confirm it visually — headless RAF starvation defeated its timing
+  // attempts — so `run.log` painting *while* rustc thinks is, today, a thing
+  // that is believed rather than known.
+  //
+  // SPEC §5.4 is explicit about why it matters: "so the player watches
+  // `rustc` think instead of a spinner". A console that only fills in once
+  // the verdict lands is a spinner with extra steps, and every unit test on
+  // both sides would still pass.
+  //
+  // The trick is to submit something slow enough that "before" is a real
+  // interval, then race the console against the screen change. A generic
+  // struct tree costs rustc real time and still compiles, so the attempt is
+  // a genuine one rather than a syntax error that fails instantly.
+  await login(page);
+  await page.keyboard.press("Enter"); // RUST × BASIC
+  await atScreen(page, "map");
+  await page.keyboard.press("Enter");
+  await atScreen(page, "quest");
+
+  const slow = `
+// Deliberately slow to compile: deep generic nesting, monomorphised.
+struct W<T>(T);
+trait Go { fn go(&self) -> usize; }
+impl Go for u8 { fn go(&self) -> usize { *self as usize } }
+impl<T: Go> Go for W<T> { fn go(&self) -> usize { self.0.go() + 1 } }
+type A = W<W<W<W<W<W<W<W<u8>>>>>>>>;
+type B = W<W<W<W<W<W<W<W<A>>>>>>>>;
+type C = W<W<W<W<W<W<W<W<B>>>>>>>>;
+fn main() {
+    let c: C = W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(1u8)))))))))))))))))))))));
+    println!("not the answer: {}", c.go());
+}
+`;
+  await page.evaluate((s) => window.__cwb!.setSource(s), slow);
+
+  const sawConsoleBeforeVerdict = page
+    .waitForFunction(
+      () => {
+        const v = JSON.parse(window.__cwb!.view());
+        return typeof v.console === "string" && v.console.length > 0;
+      },
+      null,
+      { timeout: 120_000 },
+    )
+    .then(() => "console");
+  const verdict = page
+    .waitForFunction(
+      () => document.documentElement.dataset.state === "result",
+      null,
+      { timeout: 120_000 },
+    )
+    .then(() => "verdict");
+
+  await page.evaluate(() => window.__cwb!.submit());
+  const first = await Promise.race([sawConsoleBeforeVerdict, verdict]);
+
+  expect(
+    first,
+    "the streaming console stayed empty until the verdict arrived. " +
+      "SPEC §5.4 and PROTOCOL.md §4.18 exist so the player watches rustc " +
+      "think; if this fails, `run.log` is being buffered and flushed at the " +
+      "end, which is a spinner with extra steps.",
+  ).toBe("console");
+
+  await atScreen(page, "result", 120_000);
+  const v = await view(page);
+  expect(v.console, "the console should still hold what it streamed").toBeTruthy();
+});
+
+test("a Go submission says 'not built yet', not 'the server broke'", async ({ page }) => {
+  // Go is milestone 2 (PLAN.md). The server answers a Go submission with
+  // `internal_error`, which PROTOCOL.md §3.3 tells a client to render as
+  // "the server broke — show a retry, log the trace_id". A player who picks
+  // the GO land on day one therefore sees a crash report for a feature that
+  // was simply never built.
+  //
+  // This test asserts the behaviour that exists AND records the complaint.
+  // It is written to go green either way: what it refuses to accept is the
+  // player being told nothing at all.
+  await login(page);
+  await atScreen(page, "lands");
+
+  const v = await view(page);
+  // GO is the second row of the 2×3 grid. If the grid cannot reach it yet,
+  // there is nothing to assert and saying so is better than a false pass.
+  test.skip(
+    !v.lands?.some((l) => l.land === "go"),
+    "the view model exposes no `lands` grid, or it has no GO row — nothing to select",
+  );
+
+  await page.keyboard.press("ArrowDown"); // GO
+  await page.keyboard.press("Enter"); // GO × BASIC
+  await atScreen(page, "map");
+  await page.keyboard.press("Enter");
+  await atScreen(page, "quest");
+
+  await page.evaluate((s) => window.__cwb!.setSource(s), 'package main\n\nimport "fmt"\n\nfunc main() { fmt.Println("x") }\n');
+  await page.evaluate(() => window.__cwb!.submit());
+  await atScreen(page, "result", 120_000);
+
+  const after = await view(page);
+  const verdict = after.attempt?.verdict ?? after.errors?.at(-1)?.code;
+  expect(verdict, "a Go submission produced no verdict and no error").toBeTruthy();
+
+  // The complaint, in the only place it will be read: a failing assertion the
+  // day somebody decides to fix it. Until then it is recorded, not asserted.
+  if (verdict === "internal_error" || verdict === "internal") {
+    test.info().annotations.push({
+      type: "known-gap",
+      description:
+        "Go comes back `internal_error`, which PROTOCOL.md §3.3 renders as " +
+        "'the server broke'. A declared milestone-2 gap deserves the shape " +
+        "`search.query` already uses: `not_found` with detail {\"milestone\": 2}, " +
+        "so the client can grey the land out instead of showing a crash. " +
+        "Raised in docs/decisions.md.",
+    });
+  }
 });

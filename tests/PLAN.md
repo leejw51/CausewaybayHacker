@@ -29,13 +29,53 @@ e2e/                     playwright: the M1 journey, both orientations
 | `tests/vectors/mistakes/` | yes | 33/33 verified | 1 documented gap (go `unhandled-error`) |
 | `tests/content/verify_pack.py` | yes | **60/60 quests** | every solution passes, every starter rejected |
 | `tests/smoke/selftest.mjs` | yes | 20/20 | proves the checker catches 19 injected faults |
-| `tests/smoke/contract.mjs` | needs a server | — | 12/12 §8 against the mock; nothing real to run against |
-| `e2e/` | needs frontend + backend | — | 20 tests, all skipping, each naming what is missing |
+| `tests/smoke/contract.mjs` | **yes — against the real backend** | **11/12** | one real divergence (§8.1), documented below |
+| `e2e/` | needs the frontend hooks | — | 24 tests, all skipping; the hooks do not exist yet |
 
 Nothing above is green by assumption. `verify_pack.py` really compiled 60
 quests; the mistake fixtures really ran `rustc` and `go`; the smoke checker
-really caught 19 deliberately-broken servers. The two that are not green are
-not green because the thing they test does not exist yet, and they say so.
+really caught 19 deliberately-broken servers, **and has now run against BE's
+real server on :5390**.
+
+### What the first real run found
+
+`node tests/smoke/contract.mjs` against `cargo run -p cwbhacker -- serve`:
+**18 passed, 1 failed, §8 conformance 11/12.** Three divergences, in
+descending order of how much they matter:
+
+1. **An absent `payload` is accepted as `{}`** — the one failure. PROTOCOL.md
+   §2 says a frame "is an object with **exactly** these four keys" and that
+   `payload` is "never absent. Use `{}`". A three-key frame is not a
+   conformant frame, and §2's own justification for strictness ("a silently
+   ignored field is how a client ships a bug that looks like it works")
+   applies exactly as well to a silently defaulted one. BE is being generous.
+   A payload that is present but bare (`7`) or an array is correctly refused.
+   Raised in `docs/decisions.md`; PM's call whether §2 or the server moves.
+
+2. **A rejected signature burns the nonce, and the retry says `auth_expired`.**
+   SPEC §3.2 step 4 orders it recover → compare → check the nonce → burn, so
+   a failed comparison should leave the challenge alive. Two separate
+   things: the burn itself is arguably a hardening choice, but `auth_expired`
+   is the wrong code for it — §3.3 defines that as "the challenge's
+   `expires_at` passed", which is false. `auth_nonce_used` says what
+   happened. Benign in effect (the client's prescribed reaction to both is
+   "start `auth.challenge` again") and misleading in a log.
+
+3. **A second `auth.login` on an authenticated connection is `bad_request`,**
+   with the message "this connection is already authenticated; open a new one
+   to change user". That is **correct and desirable** — it is §3.1's "a
+   connection never goes back to ANONYMOUS", enforced — and it is not written
+   down anywhere. It was also a bug in this checker, which used to reuse one
+   connection for several login attempts; every login attempt now gets its
+   own.
+
+Everything else the checker asserts, BE already does: the envelope, the
+closed error set, `proto_version` with `detail.supported`, `locked` with
+`detail.requires`, the four-line challenge, `v` as 27/28 *and* 0/1, token
+rotation with the old token dying, `run.log` seq from 0 with no gaps, stages
+strictly ordered and each sent once, `busy` per connection and not per user,
+`progress.update` reaching the same user's second window, and full multi-user
+isolation including a spoofed payload address.
 
 ---
 
@@ -228,14 +268,28 @@ And two findings BE should read before writing the classifier:
   here and `race_detected_runs` records that, but the detector reports what it
   observed. Advisory in CI, never a gate.
 
+### A note on running it twice
+
+The server persists. `~/.causewaybayhacker/hacker.db` remembers that an
+address cleared node 1 on the last run, so a checker pinned to five fixed
+fixture addresses sees a different map every time and is only honest against
+a wiped database.
+
+So every state-changing check derives a **fresh account per run**: index
+`1000 + random` off the same published BIP-39 all-zero mnemonic. Still a
+published phrase, still holds nothing, and nobody browses index 1000+. That
+is the difference between a checker you can run twice and one that needs the
+database deleted first.
+
 ## SPEC §9.8 — Multi-user isolation
 
 > Two sessions, two addresses, interleaved submissions: neither sees the
 > other's progress, attempts or mistakes.
 
 **Owner:** `tests/smoke/contract.mjs`, "beyond: two users never see each
-other's progress or attempts". **Written; green against the mock; waiting on
-a real server.**
+other's progress or attempts". **Written, and green against the real
+server** — two fresh addresses, overlapping submissions, and neither side's
+history, mistakes, progress or summary crosses.
 
 | # | case | setup → action → assertion | suite | status |
 | --- | --- | --- | --- | --- |
@@ -244,7 +298,7 @@ a real server.**
 | 9.8.c | progress does not cross | alice clears → alice's node `cleared`, bob's not | **smoke** | **written** |
 | 9.8.d | mistakes do not cross | bob's wrong answer → a row in bob's `stats.mistakes` and not alice's | **smoke** | **written** |
 | 9.8.e | summaries do not cross | `stats.summary.cleared` differs | **smoke** | **written** |
-| 9.8.f | a payload address is ignored | bob sends `{address: alice}` → identical answer to `{}` (SPEC §3.5) | **smoke** | **written** |
+| 9.8.f | a payload address is ignored | bob sends `{address: alice}` → identical answer to `{}` (SPEC §3.5) | **smoke** | **green vs the real server** |
 | 9.8.g | on-disk isolation | `users/<address>/attempts/` — alice's directory holds only alice's | **BE** | not written — the filesystem is not reachable over the wire |
 | 9.8.h | a second connection is the same user | the same wallet twice → one identity, and `progress.update` reaches both | **smoke** | **written** (PROTOCOL.md §4.19) |
 
@@ -268,25 +322,27 @@ node tests/smoke/selftest.mjs            # prove the checker catches things
 
 | point | the rule | what the case actually does | status |
 | --- | --- | --- | --- |
-| §8.1 | exactly `v`/`id`/`type`/`payload` | sends a frame with an extra key → `bad_request`; payload absent, bare and array → `bad_request`; then audits its own frames | **green vs mock** |
-| §8.2 | match by `id`, tolerate out-of-order | a slow `quest.submit` and a `ping` in flight together → the ping comes back first, both correlated; a reused in-flight `id` → `bad_request` | **green vs mock** |
-| §8.3 | ignore an unknown `type` | an unknown type on an **authenticated** connection → an error from the closed set, socket alive; then injects an unknown event into its own receive path and requires it to be dropped, not thrown | **green vs mock** |
-| §8.4 | handle every `code` | provokes 8 of the 11 codes and asserts `proto_version` carries `detail.supported` and `locked` carries `detail.requires` | **green vs mock** |
-| §8.5 | never send key material | audits **every frame every connection sent** for the five private keys and three mnemonics it holds, and for the field names | **green vs mock** |
-| §8.6 | sign byte-for-byte | a signature over `message + "\n"` → `auth_bad_signature`; over `message` → ok; `v` as 0/1 → also ok | **green vs mock** |
-| §8.7 | store the returned token | resumes, uses the returned token, and requires the rotated-away one to be **dead** | **green vs mock** |
-| §8.8 | buffer `run.log`, notice a `seq` gap | asserts `seq` starts at 0 per stream with no gaps, stages strictly ordered and each sent once, and reassembles a chunk split mid-line | **green vs mock** |
-| §8.9 | reconnect with backoff, resume, refetch | drops the socket, checks §6.2's schedule as code, resumes with the token, refetches the map | **green vs mock** |
-| §8.10 | no second submit in flight | second on one connection → `busy`; second **connection** of the same user → **not** busy (§3.2 is per connection) | **green vs mock** |
-| §8.11 | survive `server.bye`, and a close without one | an abrupt close drains the pending map; an injected `server.bye` is a known event with a valid `reason` | **green vs mock** |
+| §8.1 | exactly `v`/`id`/`type`/`payload` | sends a frame with an extra key → `bad_request`; payload absent, bare and array → `bad_request`; then audits its own frames | **RED vs the real server** — absent payload accepted as `{}` |
+| §8.2 | match by `id`, tolerate out-of-order | a slow `quest.submit` and a `ping` in flight together → the ping comes back first, both correlated; a reused in-flight `id` → `bad_request` | **green vs the real server** |
+| §8.3 | ignore an unknown `type` | an unknown type on an **authenticated** connection → an error from the closed set, socket alive; then injects an unknown event into its own receive path and requires it to be dropped, not thrown | **green vs the real server** |
+| §8.4 | handle every `code` | provokes 8 of the 11 codes and asserts `proto_version` carries `detail.supported` and `locked` carries `detail.requires` | **green vs the real server** |
+| §8.5 | never send key material | audits **every frame every connection sent** for the five private keys and three mnemonics it holds, and for the field names | **green vs the real server** |
+| §8.6 | sign byte-for-byte | a signature over `message + "\n"` → `auth_bad_signature`; over `message` → ok; `v` as 0/1 → also ok | **green vs the real server** |
+| §8.7 | store the returned token | resumes, uses the returned token, and requires the rotated-away one to be **dead** | **green vs the real server** |
+| §8.8 | buffer `run.log`, notice a `seq` gap | asserts `seq` starts at 0 per stream with no gaps, stages strictly ordered and each sent once, and reassembles a chunk split mid-line | **green vs the real server** |
+| §8.9 | reconnect with backoff, resume, refetch | drops the socket, checks §6.2's schedule as code, resumes with the token, refetches the map | **green vs the real server** |
+| §8.10 | no second submit in flight | second on one connection → `busy`; second **connection** of the same user → **not** busy (§3.2 is per connection) | **green vs the real server** |
+| §8.11 | survive `server.bye`, and a close without one | an abrupt close drains the pending map; an injected `server.bye` is a known event with a valid `reason` | **green vs the real server** |
 | §8.12 | keepalive | an idle connection survives, sending §1.1's application-level `ping`. 6 s by default, 70 s with `--slow` | **green vs mock, weak** |
 
-**§8.12 is the weakest of the twelve.** Node answers websocket pongs itself,
-so what this asserts is that the server does not drop an idle-but-ponging
-connection. The half that matters for the LÖVE client — a client that
-*cannot* pong and must send `ping` every 20 s — is asserted by doing exactly
-that, but only a server that actually enforces the two-missed-ping rule will
-make it mean anything. Run with `--slow` before believing it.
+**§8.12 was the weakest of the twelve, and has now been run properly.**
+`--slow --only 8.12` against the real server: **pass, 70.1 s**, which is past
+§1.1's two-missed-ping window. Node answers websocket pongs itself, so what
+that proves is that the server does not drop a connection whose only traffic
+is keepalive — including the application-level `ping` that §1.1 requires of a
+client whose library cannot pong, which is the LÖVE client's case. It still
+does not prove the server *enforces* the two-missed-ping rule, which needs a
+client that deliberately stops answering; that one is not written.
 
 ### Does the checker catch anything?
 
@@ -322,10 +378,28 @@ Playwright projects, 1280×720 and 720×1280, over one spec — SPEC §10 makes
 both first-class on every screen, so the journey is the assertion rather than
 a separate "does it look right in portrait" test).
 
-**20 tests. All skipping. Every skip names what has to exist.** Nothing here
+**24 tests. All skipping. Every skip names what has to exist.** Nothing here
 has ever passed, and nothing here will pass vacuously: the preflight refuses
 to run a browser at all until both ports answer, and the fixture stops with a
 `fixme` until the frontend publishes the hooks.
+
+**Verified, not assumed.** The suite was pointed at the backend's own
+`frontend/dist` on :5390 (PROTOCOL.md §1: one port, no CORS), which loads and
+boots. The page exposes `__THREE__` and nothing else — no `data-state`
+attribute, no `window.__cwb`, and none with `?e2e=1` either. So the 24 skips
+are the correct answer today and the hook contract below is the whole gap.
+
+**The flow is six screens, not seven.** FE merged land select and category
+select into one `LandsScene` — a 2×3 grid, lands down and categories across
+in the fixed order `basic`, `advanced`, `hacker` — and SPEC §10 was amended
+to match. `boot → login → lands → map → quest → result`. A test that waits
+for a `categories` screen waits forever, so `SCREENS` in `fixtures.ts` no
+longer contains one.
+
+**No answer is hard-coded.** `quest.tests.visible[0].expect` arrives with the
+quest (PROTOCOL.md §4.8), so the right-answer test composes a source that
+prints it. Content is PM's; a suite that hard-codes a string breaks the day
+one changes.
 
 | test | asserts | blocked on |
 | --- | --- | --- |
@@ -339,6 +413,27 @@ to run a browser at all until both ports answer, and the fixture stops with a
 | a double submit | `busy` visible to the client, the first attempt still finishes | backend |
 | a dropped socket | `auth.resume` puts the player back without re-asking for the key | frontend |
 | an unknown `v` | `proto_version` reaches the client and the page carries on | frontend |
+| **the console paints mid-run** | a slow-compiling source → console text appears **before** `data-state` becomes `result` | frontend |
+| **a Go submission** | says "not built yet", not "the server broke" | the M2 gap |
+
+Two of those close holes neither implementation could confirm from the inside:
+
+* **The mid-run streaming console has never been seen working.** FE
+  unit-tested it and could not confirm it visually — headless RAF starvation
+  defeated its timing attempts. SPEC §5.4 is explicit about why it matters:
+  "so the player watches `rustc` think instead of a spinner". A console that
+  only fills in once the verdict lands is a spinner with extra steps, and
+  every unit test on both sides still passes. The test races the console
+  against the screen change over a deliberately slow-to-compile source (deep
+  generic nesting, which costs `rustc` real time and still compiles, so the
+  attempt is genuine rather than a syntax error that fails instantly).
+* **A Go submission surfaces as `internal_error`**, which PROTOCOL.md §3.3
+  tells a client to render as "the server broke — show a retry, log the
+  trace_id". A player who picks GO on day one gets a crash report for a
+  feature that was never built. `search.query` already has the right shape:
+  `not_found` with `detail: {"milestone": 2}`. The test asserts what exists
+  and records the complaint as a Playwright annotation rather than a false
+  failure.
 
 **What has to exist for it to go green**, in order:
 
@@ -404,6 +499,11 @@ in SPEC §9's eight.
 | X.16 | timestamps are RFC3339 UTC with seconds | every `_at` field on the wire | smoke | **partial** — asserted on `expires_at` only |
 | X.17 | an attempt is recorded even when it fails | compile error, timeout, anything → a row in `stats.history` | smoke | **not written** — needs a runner |
 | X.18 | `stars` is the server's, not the client's | clear after a failed attempt → at most 2 stars | e2e | **written, skipping** |
+| X.19 | **`run.log` paints before the verdict** | a slow compile → console text before `data-state="result"` | e2e | **written, skipping** — the hole FE could not close from inside |
+| X.20 | a declared M2 gap reads as a gap | a Go submission → not a crash report | e2e + smoke | **written**; smoke green, e2e skipping |
+| X.21 | M2 endpoints declare themselves | `search.query`, `ai.*` → `not_found` with `detail.milestone: 2` | smoke | **green vs the real server** |
+| X.22 | `Quest` carries no `cases` key | PROTOCOL.md §4.8 named one before it was corrected; a client reading it renders an empty test list, which looks like a quest with no tests rather than a bug | smoke | **green vs the real server** |
+| X.23 | the signature byte order is `r‖s‖v` | `s‖r‖v` and `v‖r‖s` must both be refused — noble v2 hands back `[recid, r, s]`, so assembling them in the order given produces exactly the second one | smoke §8.6 | **green vs the real server** |
 
 ---
 
@@ -442,10 +542,16 @@ reimplementing secp256k1.
    not QA's file. Proposed.
 4. **The go `unhandled-error` taxonomy row has no fixture** and will not get
    one without `errcheck`.
-5. **`e2e/` is 20 skipping tests.** That is the correct state today, and it is
-   worth nothing until the hooks in `docs/decisions.md` land.
-6. **The smoke checker has never met the real server.** Everything it claims
-   is "green against a mock I also wrote". The mock is deliberately minimal
-   and explicitly non-authoritative, and the selftest proves the checker
-   catches 19 real faults — but the first run against BE's server is the one
-   that counts, and it will find things.
+5. **`e2e/` is 24 skipping tests.** That is the correct state today, verified
+   against the real built frontend, and it is worth nothing until the hooks in
+   `docs/decisions.md` land. The two highest-value ones — the mid-run console
+   and the Go-gap message — are exactly the ones nobody has been able to
+   check from inside a unit test.
+6. **The smoke checker has now met the real server, and 11 of 12 §8 points
+   pass.** The one that does not, and the two softer divergences beside it,
+   are written up above and in `docs/decisions.md`. That is the first run;
+   there will be more when the runner limits and search land.
+7. **The two-missed-ping rule is untested.** `--slow` now passes against the
+   real server (70.1 s idle, connection alive), which proves the server does
+   not drop a keepalive-only connection. Proving it *does* drop a silent one
+   needs a client that deliberately stops answering pongs — not written.

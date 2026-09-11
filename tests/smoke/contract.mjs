@@ -136,6 +136,50 @@ function allAccounts() {
 const ROLE = { reader: 0, busy: 1, streamer: 2, alice: 3, bob: 4 };
 const account = (role) => allAccounts()[ROLE[role]];
 
+/**
+ * A throwaway account nobody has played before.
+ *
+ * The real server persists: `~/.causewaybayhacker/hacker.db` remembers that
+ * the fixture accounts cleared node 1 on the last run, so a checker pinned to
+ * five fixed addresses gets a different map every time and is only honest on
+ * a fresh home. Deriving a high index off the same published mnemonic gives a
+ * new user per run — the phrase is still the BIP-39 all-zero vector, still
+ * holds nothing, and index 1000+ is somewhere no human ever browses.
+ *
+ * This is the difference between a checker that can be run twice and one that
+ * has to be run against a wiped database.
+ */
+const FRESH_BASE = 1_000 + Math.floor(Math.random() * 1_000_000);
+let freshN = 0;
+const freshCache = new Map();
+function freshAccount(role) {
+  if (freshCache.has(role)) return freshCache.get(role);
+  if (!existsSync(WALLET))
+    throw new SkipError(
+      `no wallet at ${WALLET}; fresh accounts cannot be derived. Set $CWBWALLET.`,
+    );
+  const index = FRESH_BASE + freshN++;
+  const phrase = JSON.parse(readFileSync(VECTORS, "utf8")).mnemonics.find(
+    (m) => m.name === "bip39-canonical",
+  ).phrase;
+  const out = spawnSync(
+    WALLET,
+    ["--json", "utils", "derive", "--mnemonic", phrase, "--index", String(index)],
+    { encoding: "utf8" },
+  );
+  if (out.status !== 0) throw new Error(`derive failed: ${out.stderr || out.stdout}`);
+  const d = JSON.parse(out.stdout).data;
+  const acct = {
+    index,
+    role,
+    address: d.address,
+    address_lower: d.address.toLowerCase(),
+    private_key: d.private_key,
+  };
+  freshCache.set(role, acct);
+  return acct;
+}
+
 /** Every private key this process knows, for the §8.5 audit. */
 const SECRETS = () => allAccounts().map((a) => a.private_key.replace(/^0x/, ""));
 
@@ -147,12 +191,18 @@ const SECRETS = () => allAccounts().map((a) => a.private_key.replace(/^0x/, ""))
  * owns. Returns null for anything else, and the caller degrades to asserting
  * only what it still can — loudly, never silently.
  */
-function sourceThatPrints(expected) {
-  if (typeof expected !== "string") return null;
-  if (!expected.endsWith("\n") || expected.slice(0, -1).includes("\n")) return null;
-  const line = expected.slice(0, -1);
-  if (/["\\{}]/.test(line)) return null;
-  return `fn main() {\n    println!("${line}");\n}\n`;
+function sourceThatPrints(visible) {
+  // Only a case that reads no stdin can be answered by printing a constant;
+  // one that transforms its input needs the lesson, which is the point of the
+  // quest and not something a contract checker should be able to shortcut.
+  if (!visible || typeof visible.expect !== "string") return null;
+  if (visible.stdin) return null;
+  const expected = visible.expect;
+  if (!expected.endsWith("\n")) return null;
+  const lines = expected.slice(0, -1).split("\n");
+  if (lines.some((l) => /["\\{}]/.test(l))) return null;
+  const body = lines.map((l) => `    println!("${l}");`).join("\n");
+  return `fn main() {\n${body}\n}\n`;
 }
 
 // --------------------------------------------------------------- the client
@@ -433,8 +483,34 @@ async function firstOpenQuest(cl) {
   return { node: open, quest: got.payload.quest, map: map.payload };
 }
 
+/**
+ * An open node whose visible case this checker can compose an answer for.
+ *
+ * Not every quest is answerable by printing a constant, and it should not be
+ * — one that reads stdin is teaching something. So: walk the open nodes and
+ * take the first that is. A checker that hard-codes `rust.basic.01` breaks
+ * the day PM renumbers the map.
+ */
+async function anAnswerableQuest(cl) {
+  const map = await cl.send("world.map", { land: "rust", category: "basic" });
+  assertEq(map.type, "world.map.ok", "world.map");
+  for (const node of map.payload.nodes.filter((n) => n.state === "open")) {
+    const got = await cl.send("quest.get", { quest_id: node.quest_id });
+    if (got.type !== "quest.get.ok") continue;
+    const quest = got.payload.quest;
+    const source = rightSourceFor(quest);
+    if (source) return { node, quest, source, map: map.payload };
+  }
+  throw new Error(
+    "no open quest whose visible case this checker can answer by printing a " +
+      "constant. Either every open node reads stdin, or this account has " +
+      "already cleared the ones that do not — fresh accounts are derived per " +
+      `run (index ${FRESH_BASE}+), so the former is the likely one.`,
+  );
+}
+
 const WRONG_SOURCE = 'fn main() { println!("deliberately not the answer"); }';
-const rightSourceFor = (quest) => sourceThatPrints(quest?.tests?.visible?.[0]?.expect);
+const rightSourceFor = (quest) => sourceThatPrints(quest?.tests?.visible?.[0]);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Feed a frame through the real receive path, as if the server sent it. */
@@ -462,9 +538,24 @@ check("8.1", "every frame is exactly v/id/type/payload, payload an object", asyn
     cl.raw(JSON.stringify({ v: 1, id: "p1-b", type: "ping", payload: 7 }), "p1-b");
     cl.raw(JSON.stringify({ v: 1, id: "p1-c", type: "ping", payload: [] }), "p1-c");
     await sleep(800);
-    const answers = cl.inbound.filter((f) => ["p1-a", "p1-b", "p1-c"].includes(f.id));
-    assertEq(answers.length, 3, "one answer per malformed frame");
-    for (const a of answers) assertErr(a, "bad_request", String(a.id));
+    const answers = new Map(
+      cl.inbound.filter((f) => ["p1-a", "p1-b", "p1-c"].includes(f.id)).map((f) => [f.id, f]),
+    );
+    assertEq(answers.size, 3, "one answer per malformed frame");
+    // A payload that is present but not an object is unambiguously wrong.
+    assertErr(answers.get("p1-b"), "bad_request", "payload: 7 (a bare value)");
+    assertErr(answers.get("p1-c"), "bad_request", "payload: [] (an array)");
+    // An ABSENT payload is the softer case. §2's table says "never absent.
+    // Use {}", and §2 opens with "an object with exactly these four keys" —
+    // so a three-key frame is not a conformant frame. A server that treats it
+    // as {} is being generous, which is defensible and is also how a client
+    // ships a bug that looks like it works. Raised in docs/decisions.md;
+    // asserted here, because the alternative is to stop asserting §2.
+    assertErr(
+      answers.get("p1-a"),
+      "bad_request",
+      "payload absent — §2: a frame has exactly v, id, type, payload",
+    );
     assert(cl.open, "§3.3: an application error never closes the connection");
 
     // And this client's own frames obey the rule.
@@ -478,7 +569,7 @@ check("8.1", "every frame is exactly v/id/type/payload, payload an object", asyn
 });
 
 check("8.2", "replies are matched by id and may arrive out of order", async () => {
-  const cl = await session(account("reader"), "p2");
+  const cl = await session(freshAccount("ordering"), "p2");
   try {
     // §2.2: "quest.submit takes seconds and a ping sent after it will come
     // back first." Start the slow one, then the fast one; require the fast
@@ -548,7 +639,7 @@ check("8.3", "an unknown type is ignored, not an error and not a close", async (
   // Authenticated on purpose: an unknown type sent while ANONYMOUS is
   // answered `unauthorized` by §3.1 before the server ever reaches its
   // unknown-type path, and a test that stops there proves nothing.
-  const cl = await session(account("reader"), "p3");
+  const cl = await session(freshAccount("unknown-type"), "p3");
   try {
     // The server's half: a type it does not know gets an error from the
     // closed set, and the connection lives.
@@ -613,45 +704,73 @@ check("8.4", "every error code is in §3.3's closed set, and they are reachable"
     );
     seen.add("bad_request");
 
-    // auth_bad_signature, then auth_nonce_used.
-    const acct = account("reader");
-    const ch = await cl.send("auth.challenge", { address: acct.address });
-    assertErr(
-      await cl.send("auth.login", {
+    // auth_bad_signature — on its own connection, because a connection that
+    // has authenticated refuses a second auth.login (§3.1: "A connection
+    // never goes back to ANONYMOUS").
+    const acct = freshAccount("codes");
+    {
+      const bad = new Client(URL_WS, "p4bad");
+      await bad.connect();
+      await bad.send("auth.challenge", { address: acct.address });
+      assertErr(
+        await bad.send("auth.login", {
+          address: acct.address,
+          signature: `0x${"00".repeat(65)}`,
+        }),
+        "auth_bad_signature",
+        "an all-zero signature",
+      );
+      seen.add("auth_bad_signature");
+      bad.close();
+    }
+
+    // auth_nonce_used — a genuine replay of a signature that already worked.
+    {
+      const one = new Client(URL_WS, "p4rep");
+      await one.connect();
+      const ch = await one.send("auth.challenge", { address: acct.address });
+      const sig = sign(acct.private_key, ch.payload.message);
+      assertEq(
+        (await one.send("auth.login", { address: acct.address, signature: sig })).type,
+        "auth.login.ok",
+        "the first login",
+      );
+      one.close();
+
+      const two = new Client(URL_WS, "p4rep2");
+      await two.connect();
+      const replay = await two.send("auth.login", {
         address: acct.address,
-        signature: `0x${"00".repeat(65)}`,
-      }),
-      "auth_bad_signature",
-      "an all-zero signature",
-    );
-    seen.add("auth_bad_signature");
+        signature: sig,
+      });
+      assert(replay.type.endsWith(".err"), "a replayed signature must not log in");
+      assert(
+        ["auth_nonce_used", "auth_expired"].includes(replay.payload.code),
+        `§3.3: a replay should be auth_nonce_used (auth_expired tolerated), got ` +
+          `${replay.payload.code}`,
+      );
+      seen.add(replay.payload.code);
+      two.close();
+    }
 
-    const sig = sign(acct.private_key, ch.payload.message);
-    assertEq(
-      (await cl.send("auth.login", { address: acct.address, signature: sig })).type,
-      "auth.login.ok",
-      "a rejected signature must not burn the nonce",
-    );
-    assertErr(
-      await cl.send("auth.login", { address: acct.address, signature: sig }),
-      "auth_nonce_used",
-      "a replay inside the expiry window",
-    );
-    seen.add("auth_nonce_used");
-
+    // The rest needs an authenticated connection, and `cl` is still the
+    // anonymous one on purpose (the codes above are anonymous-reachable).
+    cl.close();
+    const auth = await session(freshAccount("codes2"), "p4auth");
+    Object.assign(cl, {}); // keep the finally-block harmless
     // not_found — a quest id that does not exist.
     assertErr(
-      await cl.send("quest.get", { quest_id: "rust.basic.99.nope" }),
+      await auth.send("quest.get", { quest_id: "rust.basic.99.nope" }),
       "not_found",
       "a quest id that does not exist",
     );
     seen.add("not_found");
 
     // locked — a node whose requires are not cleared.
-    const map = await cl.send("world.map", { land: "rust", category: "basic" });
+    const map = await auth.send("world.map", { land: "rust", category: "basic" });
     const locked = map.payload.nodes.find((n) => n.state === "locked");
     if (locked) {
-      const l = await cl.send("quest.submit", {
+      const l = await auth.send("quest.submit", {
         quest_id: locked.quest_id,
         lang: "rust",
         source: WRONG_SOURCE,
@@ -668,7 +787,7 @@ check("8.4", "every error code is in §3.3's closed set, and they are reachable"
     const open = map.payload.nodes.find((n) => n.state === "open");
     if (open) {
       assertErr(
-        await cl.send("quest.submit", {
+        await auth.send("quest.submit", {
           quest_id: open.quest_id,
           lang: "go",
           source: "package main\nfunc main() {}\n",
@@ -677,6 +796,7 @@ check("8.4", "every error code is in §3.3's closed set, and they are reachable"
         "§4.9: lang disagreeing with the quest's land",
       );
     }
+    auth.close();
   } finally {
     cl.close();
   }
@@ -746,33 +866,78 @@ check("8.6", "the challenge message is signed byte-for-byte, not rebuilt", async
     const secs = (Date.parse(expires_at) - Date.now()) / 1000;
     assert(secs > 100 && secs < 140, `§4.2 says 120s out; this is ${secs.toFixed(0)}s`);
 
-    // The most plausible reconstruction: the same parts, one trailing
-    // newline. It must not authenticate.
-    assertErr(
-      await cl.send("auth.login", {
-        address: acct.address,
-        signature: sign(acct.private_key, `${message}\n`),
-      }),
-      "auth_bad_signature",
-      "a signature over a rebuilt message",
-    );
-
-    // §4.3: v is 27 or 28 on the way out; 0/1 is also accepted.
+    // §4.3: r || s || v, 65 bytes, v = 27 or 28.
     const good = sign(acct.private_key, message);
     const v = parseInt(good.slice(-2), 16);
     assert([27, 28].includes(v), `§4.3: v should be 27 or 28, the signer gave ${v}`);
+    assertEq(good.length, 132, "§4.3: 0x + 130 hex = 65 bytes");
+
+    // The most plausible reconstruction: the same parts, one trailing
+    // newline. It must not authenticate.
+    //
+    // Every login below gets its OWN connection. A connection that has
+    // authenticated refuses a second `auth.login` (§3.1: "A connection never
+    // goes back to ANONYMOUS"), and a rejected signature may or may not have
+    // burned the nonce — see the decisions.md entry of 2026-09-11. Neither is
+    // what this point is testing, so neither is allowed to confuse it.
+    const attempt = async (label, signature, address = acct.address) => {
+      const c = new Client(URL_WS, label);
+      await c.connect();
+      try {
+        const fresh = await c.send("auth.challenge", { address });
+        const sig = typeof signature === "function" ? signature(fresh.payload) : signature;
+        return await c.send("auth.login", { address, signature: sig });
+      } finally {
+        c.close();
+      }
+    };
+
+    assertErr(
+      await attempt("p6-rebuilt", (p) => sign(acct.private_key, `${p.message}\n`)),
+      "auth_bad_signature",
+      "a signature over a rebuilt message (one trailing newline)",
+    );
     assertEq(
-      (await cl.send("auth.login", { address: acct.address, signature: good })).type,
+      (await attempt("p6-good", (p) => sign(acct.private_key, p.message))).type,
       "auth.login.ok",
       "a signature over the message exactly as given",
     );
 
-    const ch2 = await cl.send("auth.challenge", { address: acct.address });
-    const raw = sign(acct.private_key, ch2.payload.message);
-    const normalised =
-      raw.slice(0, -2) + (parseInt(raw.slice(-2), 16) - 27).toString(16).padStart(2, "0");
+    // §4.3's byte order, as a negative: r||s||v is not s||r||v, and it is not
+    // v||r||s. A client assembling noble's [recid, r, s] in the order it was
+    // handed them produces exactly these, and both must be refused.
+    const r = good.slice(2, 66);
+    const s = good.slice(66, 130);
+    const vv = good.slice(130);
+    assertErr(
+      await attempt("p6-srv", (p) => {
+        const g = sign(acct.private_key, p.message);
+        return `0x${g.slice(66, 130)}${g.slice(2, 66)}${g.slice(130)}`;
+      }),
+      "auth_bad_signature",
+      "§4.3: s||r||v must not authenticate",
+    );
+    assertErr(
+      await attempt("p6-vrs", (p) => {
+        const g = sign(acct.private_key, p.message);
+        return `0x${g.slice(130)}${g.slice(2, 130)}`;
+      }),
+      "auth_bad_signature",
+      "§4.3: v||r||s must not authenticate — noble v2 hands back [recid, r, s]",
+    );
+    void r, s, vv;
+
+    // §4.3: "0 or 1 is also accepted and normalised."
     assertEq(
-      (await cl.send("auth.login", { address: acct.address, signature: normalised })).type,
+      (
+        await attempt("p6-v01", (p) => {
+          const g = sign(acct.private_key, p.message);
+          return (
+            g.slice(0, -2) +
+            (parseInt(g.slice(-2), 16) - 27).toString(16).padStart(2, "0")
+          );
+        })
+      ).type,
       "auth.login.ok",
       "§4.3: a v of 0/1 must be accepted and normalised",
     );
@@ -844,7 +1009,7 @@ check("8.7", "auth.resume rotates the token; the returned one is the live one", 
 });
 
 check("8.8", "run.log seq starts at 0 per stream with no gaps, chunks buffer", async () => {
-  const cl = await session(account("streamer"), "p8");
+  const cl = await session(freshAccount("streamer"), "p8");
   try {
     const { node, quest } = await firstOpenQuest(cl);
     const r = await cl.send("quest.submit", {
@@ -918,7 +1083,7 @@ check("8.8", "run.log seq starts at 0 per stream with no gaps, chunks buffer", a
 });
 
 check("8.9", "a reconnect resumes with the token and the map is refetched", async () => {
-  const acct = account("alice");
+  const acct = freshAccount("alice");
   const first = await session(acct, "p9a");
   let token = first.token;
   const before = await firstOpenQuest(first);
@@ -974,7 +1139,7 @@ function backoff(n) {
 }
 
 check("8.10", "a second quest.submit while one is in flight is busy", async () => {
-  const acct = account("busy");
+  const acct = freshAccount("busy");
   const cl = await session(acct, "p10");
   try {
     const { node, quest } = await firstOpenQuest(cl);
@@ -1204,6 +1369,18 @@ check(null, "beyond: world.lands, world.map and quest.get match §5", async () =
     );
     assert(typeof quest.tests?.hidden_count === "number", "§5.3: tests.hidden_count");
     assert(Array.isArray(quest.tests?.visible), "§5.3: tests.visible");
+    // PROTOCOL.md §4.8 named `Quest.tests.cases` before it was corrected, and
+    // there is no such key on the wire. A client that reads it gets nothing
+    // and renders an empty test list — which looks like a quest with no tests
+    // rather than like a bug, so nobody investigates. Assert the key's
+    // absence in both spellings.
+    assert(
+      !("cases" in quest.tests),
+      "§4.8: `tests.cases` does not exist on the wire; it is `tests.visible` " +
+        "plus `tests.hidden_count`. A client reading `cases` silently renders " +
+        "an empty test list.",
+    );
+    assert(!("cases" in quest), "§5.3: `cases` is on Attempt, never on Quest");
     assert(quest.tests.visible.length > 0, "SPEC §12: at least one visible case");
     for (const v of quest.tests.visible)
       assert(
@@ -1230,21 +1407,17 @@ check(null, "beyond: progress.update reaches the same user's other connection", 
   // which is how two windows stay in step." No §8 point covers it, and a
   // server that only answers the socket that asked looks entirely correct
   // until somebody opens a second window.
-  const acct = account("bob");
+  // Its own account: this check clears a node, and an account shared with
+  // the isolation check below would arrive there already cleared.
+  const acct = freshAccount("two-windows");
   const a = await session(acct, "two-a");
   const b = await session(acct, "two-b"); // the same wallet, a second window
   try {
-    const { node, quest } = await firstOpenQuest(a);
-    const right = rightSourceFor(quest);
-    assert(
-      right !== null,
-      `could not compose an answer for ${node.quest_id} from its visible case, ` +
-        `so §4.19 propagation cannot be exercised. See tests/PLAN.md.`,
-    );
+    const { node, source } = await anAnswerableQuest(a);
     const r = await a.send("quest.submit", {
       quest_id: node.quest_id,
       lang: "rust",
-      source: right,
+      source,
     });
     assertEq(r.type, "quest.submit.ok", "the submit");
     assertEq(r.payload.attempt.verdict, "accepted", "the composed answer");
@@ -1268,19 +1441,18 @@ check(null, "beyond: progress.update reaches the same user's other connection", 
 check(null, "beyond: two users never see each other's progress or attempts", async () => {
   // SPEC §9.8 and §3.5. Two addresses, two sessions, submissions that overlap
   // in time.
-  const alice = account("alice");
-  const bob = account("bob");
+  const alice = freshAccount("alice");
+  const bob = freshAccount("bob");
   const a = await session(alice, "iso-a");
   const b = await session(bob, "iso-b");
   try {
-    const { node, quest } = await firstOpenQuest(a);
-    const right = rightSourceFor(quest);
+    const { node, source } = await anAnswerableQuest(a);
 
     const [aDone, bDone] = await Promise.all([
       a.send("quest.submit", {
         quest_id: node.quest_id,
         lang: "rust",
-        source: right ?? WRONG_SOURCE,
+        source,
       }),
       b.send("quest.submit", {
         quest_id: node.quest_id,
@@ -1334,12 +1506,88 @@ check(null, "beyond: two users never see each other's progress or attempts", asy
   }
 });
 
+check(null, "beyond: milestone-2 endpoints say so, and are not failures", async () => {
+  // `search.query` and `ai.*` are SPEC §8 and §7.3, and PLAN.md puts both in
+  // milestone 2. They answer `not_found` with `detail: {"milestone": 2}`,
+  // which is the right shape: a closed-set code plus a machine-readable
+  // reason, so a client can grey the button out instead of showing an error.
+  //
+  // This is a PENDING check, not a failing one. What it asserts is that the
+  // gap is *declared* — the day either ships, this check starts failing and
+  // that is the signal to write the real one.
+  const cl = await session(freshAccount("m2"), "m2");
+  try {
+    const pending = [
+      ["search.query", { q: "borrow", mode: "unified" }],
+      ["ai.plan", { mode: "repeat" }],
+      ["ai.next", { drill_id: "drl_0000000000000000" }],
+      ["ai.finish", { drill_id: "drl_0000000000000000" }],
+    ];
+    const landed = [];
+    for (const [type, payload] of pending) {
+      const r = await cl.send(type, payload);
+      if (!r.type.endsWith(".err")) {
+        landed.push(type);
+        continue;
+      }
+      assert(
+        ERROR_CODES.has(r.payload.code),
+        `${type} answered ${r.payload.code}, outside §3.3`,
+      );
+      assertEq(r.payload.code, "not_found", `${type} while unimplemented`);
+      assertEq(
+        r.payload.detail?.milestone,
+        2,
+        `${type}: an unimplemented endpoint must say so in detail.milestone, ` +
+          `or a client cannot tell "not built yet" from "you asked for something ` +
+          `that does not exist"`,
+      );
+    }
+    if (landed.length)
+      throw new Error(
+        `${landed.join(", ")} now answer for real. This pending check has done ` +
+          `its job — replace it with the real assertions (tests/PLAN.md §9.3.d, ` +
+          `and the search rows of SPEC §8).`,
+      );
+
+    // A Go submission is the other declared M2 gap. It currently comes back
+    // `internal_error`, which reads to a player as "the server broke — try
+    // again" for something that is simply not built. Asserted as it is, with
+    // the complaint recorded rather than swallowed.
+    const goMap = await cl.send("world.map", { land: "go", category: "basic" });
+    const goNode = goMap.payload.nodes?.find((n) => n.state === "open");
+    if (goNode) {
+      const r = await cl.send("quest.submit", {
+        quest_id: goNode.quest_id,
+        lang: "go",
+        source: 'package main\n\nimport "fmt"\n\nfunc main() { fmt.Println("x") }\n',
+      });
+      const verdict = r.type.endsWith(".ok") ? r.payload.attempt.verdict : r.payload.code;
+      assert(
+        ["internal_error", "not_found", "internal", "locked"].includes(verdict),
+        `a Go submission gave ${verdict}; expected the declared M2 gap`,
+      );
+      // Not a failure — a note. See docs/decisions.md.
+      if (verdict === "internal_error" && !AS_JSON)
+        console.log(
+          dim(
+            "      note: a Go submission surfaces as `internal_error`, which a " +
+              "client renders as \"the server broke\". A known gap deserves a " +
+              "better code — raised in docs/decisions.md.",
+          ),
+        );
+    }
+  } finally {
+    cl.close();
+  }
+});
+
 check(null, "beyond: an address in a payload is ignored, never trusted", async () => {
   // SPEC §3.5. The server filters by the connection's session; an address in
   // the payload is ignored, not honoured. This catches a server that
   // helpfully obeys it — which reads as a feature until it is a data leak.
-  const alice = account("alice");
-  const b = await session(account("bob"), "spoof");
+  const alice = freshAccount("alice");
+  const b = await session(freshAccount("bob"), "spoof");
   try {
     const spoofed = await b.send("stats.summary", { address: alice.address });
     const own = await b.send("stats.summary", {});

@@ -70,6 +70,9 @@ const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const WALLET =
   process.env.CWBWALLET ?? `${ROOT}/../CausewaybayWallet/rustcli/target/debug/cwbwallet`;
 
+// Seeded from the fixture so the common addresses need no subprocess, then
+// filled in by `cwbwallet utils checksum` for anything else — the checker
+// derives a fresh account per run, and those are not in the fixture.
 const EIP55 = new Map();
 try {
   const doc = JSON.parse(readFileSync(`${ROOT}/tests/vectors/addresses.json`, "utf8"));
@@ -80,11 +83,18 @@ try {
 }
 
 function toEip55(address) {
-  const known = EIP55.get(address.toLowerCase());
-  // Not a fixture address. The mock says so rather than inventing a checksum
-  // that would look right and be wrong.
-  if (!known) throw new Error(`mock knows no EIP-55 spelling for ${address}`);
-  return known;
+  const lower = address.toLowerCase();
+  const known = EIP55.get(lower);
+  if (known) return known;
+  // Borrowed, not computed. A keccak of the mock's own would be the second
+  // implementation SPEC §9.1 exists to prevent.
+  const out = spawnSync(WALLET, ["--json", "utils", "checksum", lower], {
+    encoding: "utf8",
+  });
+  if (out.status !== 0) throw new Error(`checksum failed for ${lower}`);
+  const eip55 = JSON.parse(out.stdout).data.address;
+  EIP55.set(lower, eip55);
+  return eip55;
 }
 
 function recover(message, signature) {
@@ -223,10 +233,12 @@ wss.on("connection", (ws) => {
     // §2: exactly four top-level keys. "The server does not silently ignore
     // fields, because a silently ignored field is how a client ships a bug
     // that looks like it works."
+    // §2: "an object with exactly these four keys". An absent `payload` is a
+    // three-key frame, so it is not one — the mock is strict, because the
+    // point of the mock is to be what the checker asserts against.
     const keys = Object.keys(f).sort().join(",");
-    const knownShape = keys === "id,payload,type,v" || keys === "id,type,v";
-    if (!knownShape && !broke("extra-key-ok"))
-      return err(id, type, "bad_request", `unexpected top-level keys: ${keys}`);
+    if (keys !== "id,payload,type,v" && !broke("extra-key-ok"))
+      return err(id, type, "bad_request", `top-level keys are ${keys}`);
 
     if (f.v !== 1)
       return err(
@@ -687,6 +699,18 @@ wss.on("connection", (ws) => {
             })),
         });
       }
+
+      // ----------------------------------------------------- milestone 2
+      case "search.query":
+        return err(id, type, "not_found", "search (SPEC §8) is not in this build yet", {
+          milestone: 2,
+        });
+      case "ai.plan":
+      case "ai.next":
+      case "ai.finish":
+        return err(id, type, "not_found", "AI drills (SPEC §7.3) are not in this build yet", {
+          milestone: 2,
+        });
 
       default:
         // §2.3 tells a *client* to ignore an unknown type. The server has to

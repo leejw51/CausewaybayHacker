@@ -25,11 +25,18 @@ import { fileURLToPath } from "node:url";
 
 // ---------------------------------------------------------------- the hooks
 
+/**
+ * Six, not SPEC §10's original seven.
+ *
+ * FE merged land select and category select into one `LandsScene` — a 2×3
+ * grid, lands down and categories across in the fixed order `basic`,
+ * `advanced`, `hacker` — and SPEC §10 has been amended to match. There is no
+ * `categories` screen; a test that waits for one waits forever.
+ */
 export const SCREENS = [
   "boot",
   "login",
   "lands",
-  "categories",
   "map",
   "quest",
   "result",
@@ -40,13 +47,18 @@ export interface CwbHooks {
   /** The whole view model, as the scene sees it, JSON-stringified. */
   view(): string;
   /**
-   * Log in with a mnemonic or a `0x…` private key: derive, `auth.challenge`,
-   * sign, `auth.login`, land on the land-select screen. Resolves when the
-   * session is live. This exists because typing twelve words into a canvas
-   * one `keyboard.press` at a time is a test of the keyboard handler, not of
-   * the login, and it is tested separately by FE's own unit tests.
+   * Log in with a mnemonic or a `0x…` private key: derive on
+   * `m/44'/60'/0'/0/<index>` (default 0), `auth.challenge`, sign,
+   * `auth.login`, land on the lands screen. Resolves when the session is
+   * live.
+   *
+   * This exists because typing twelve words into a canvas one
+   * `keyboard.press` at a time is a test of the keyboard handler, not of the
+   * login, and FE's own unit tests already cover that. The `index` argument
+   * exists because the server persists and a suite that always logs in as
+   * account 0 can only be run once.
    */
-  login(secret: string): Promise<void>;
+  login(secret: string, index?: number): Promise<void>;
   /** Replace the editor's contents. CodeMirror is not a `<textarea>`. */
   setSource(source: string): void;
   /** Fire `quest.submit` with whatever is in the editor. */
@@ -68,6 +80,7 @@ export interface View {
   address: string | null;
   address_eip55: string | null;
   land: "rust" | "go" | null;
+  /** Categories are drawn in this fixed order on the lands grid. */
   category: "basic" | "advanced" | "hacker" | null;
   /** Present on the map screen. Mirrors `MapNode` from SPEC §6.3. */
   nodes?: {
@@ -77,9 +90,31 @@ export interface View {
     state: "locked" | "open" | "cleared";
     stars: 0 | 1 | 2 | 3;
   }[];
-  /** Present on the quest screen. */
-  quest?: { quest_id: string; title: string; source: string };
-  /** Present on the result screen. Mirrors `Attempt` from SPEC §6.3. */
+  /** Present on the lands screen: the 2×3 grid, as `world.lands` gave it. */
+  lands?: {
+    land: "rust" | "go";
+    categories: { category: string; total: number; cleared: number; open: boolean }[];
+  }[];
+  /**
+   * Present on the quest screen.
+   *
+   * `tests.visible` is the shape the server sends (PROTOCOL.md §4.8 —
+   * `visible[]` plus `hidden_count`, and **no `cases` key**), so passing the
+   * server's `Quest` straight through is the least work and the most correct.
+   * The suite needs it because it composes the right answer from
+   * `visible[0].expect` rather than hard-coding a string PM owns.
+   */
+  quest?: {
+    quest_id: string;
+    title: string;
+    /** whatever is in the editor right now, starter or edited */
+    source: string;
+    tests?: {
+      visible: { name: string; stdin: string; expect: string }[];
+      hidden_count: number;
+    };
+  };
+  /** Present on the result screen. Mirrors `Attempt` from PROTOCOL.md §5.4. */
   attempt?: {
     id: string;
     verdict: string;
@@ -89,22 +124,55 @@ export interface View {
     stars: 0 | 1 | 2 | 3;
   };
   /** Every error frame the client has received, newest last. */
-  errors?: { code: string; message: string }[];
+  errors?: { code: string; message: string; detail?: Record<string, unknown> }[];
+  /**
+   * The streaming console's text so far — everything `run.log` has delivered
+   * for the attempt in flight, concatenated. Needed by the one test that can
+   * prove the console paints *during* a compile rather than after it.
+   */
+  console?: string;
 }
 
 // ------------------------------------------------------------- the fixtures
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
-/** The first mnemonic from `tests/vectors/addresses.json`, with its address. */
-export function testAccount(index = 0): { phrase: string; address: string; lower: string } {
-  const doc = JSON.parse(
+const vectors = () =>
+  JSON.parse(
     readFileSync(new URL("../tests/vectors/addresses.json", import.meta.url), "utf8"),
   );
-  const m = doc.mnemonics[0];
+
+/**
+ * A fixture account with a known address — for the conformance assertion
+ * (SPEC §9.1), where the whole point is that the address is the one
+ * `CausewaybayWallet` derives and this suite did not compute it.
+ */
+export function testAccount(index = 0): { phrase: string; address: string; lower: string } {
+  const m = vectors().mnemonics[0];
   const a = m.accounts.find((x: { index: number }) => x.index === index);
   if (!a) throw new Error(`no account ${index} in addresses.json`);
   return { phrase: m.phrase, address: a.address, lower: a.address_lower };
+}
+
+/**
+ * A player nobody has been before.
+ *
+ * The server persists — `~/.causewaybayhacker/hacker.db` remembers that the
+ * fixture address cleared node 1 — so a journey pinned to one address asserts
+ * "node 1 is open" against a node that is already cleared, and `cleared: true`
+ * against PROTOCOL.md §5.4's "true only on the *first* clear". This suite
+ * runs twice per invocation (landscape then portrait, serially, against one
+ * database), so the second project would hit that on the very first run.
+ *
+ * The derivation path is the same one the player uses. Index 1_000_000+ off
+ * the published BIP-39 all-zero mnemonic is still a published phrase, still
+ * holds nothing, and is somewhere no human ever browses. Unique per worker
+ * *and* per test, so nothing in the suite shares a map with anything else.
+ */
+let freshN = 0;
+const freshBase = 1_000_000 + Math.floor(Math.random() * 1_000_000);
+export function freshAccount(): { phrase: string; index: number } {
+  return { phrase: vectors().mnemonics[0].phrase, index: freshBase + freshN++ };
 }
 
 export async function isUp(url: string): Promise<boolean> {

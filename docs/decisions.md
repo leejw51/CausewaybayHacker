@@ -508,10 +508,29 @@ Gate all three on `import.meta.env.DEV || location.search.includes("e2e=1")`
 so a shipped bundle carries no "log me in" function.
 
 The `View` type — every field the suite reads — is in `e2e/fixtures.ts`, and
-`e2e/README.md` explains each. The one field with no server counterpart is
-`errors[]`: every `.err` payload the client has received, so a test can prove
-`busy` or `proto_version` actually reached the client rather than being
-swallowed.
+`e2e/README.md` has a table explaining each. Four of them are worth naming
+here because they are not obvious from "expose the view model":
+
+* **`quest.tests.visible[0].expect`** — how the suite composes a right answer
+  instead of hard-coding a string PM owns. The path matters: the wire shape
+  is `Quest.tests.visible[]` (PROTOCOL.md §4.8), not `Quest.visible[]` and
+  not `tests.cases`. Passing the server's `Quest` straight through is both
+  the least work and the correct answer.
+* **`lands[]`** — `world.lands` passed through, so the GO test can tell
+  whether a GO row exists before trying to select it.
+* **`errors[]`** — every `.err` payload the client has received, so a test can
+  prove `busy` or `proto_version` actually *reached* the client rather than
+  being swallowed. No server counterpart; this one is purely a client
+  observation.
+* **`console`** — the streaming console's text so far. The only way to assert
+  that `run.log` paints *during* a compile rather than after it.
+
+And `login(secret, index?)` takes a BIP-44 index (default 0), because the
+server persists: a suite that always logs in as account 0 asserts "node 1 is
+open" against a node a previous run cleared, and it runs twice per invocation
+(landscape then portrait, one database), so it would break on its own first
+run. Every test that submits derives a fresh high index off the same
+published mnemonic.
 
 FE owns `frontend/**` and takes this. QA does not edit there.
 
@@ -676,3 +695,140 @@ So that nobody plans against an overstated test suite. Full detail in
 **Not written:** every SPEC §9.6 runner-limit case (blocked on a runner), the
 §7.2 mistake rollup, and the three items in the "unownable as written" entry
 above.
+
+## 2026-09-11 — QA: what the first real run of the contract checker found
+
+`node tests/smoke/contract.mjs` against `cargo run -p cwbhacker -- serve` on
+:5390. **18 passed, 1 failed. PROTOCOL.md §8: 11/12.** Three divergences.
+
+**1. An absent `payload` is accepted as `{}` (the one failure).**
+
+PROTOCOL.md §2: a frame "is an object with **exactly** these four keys", and
+`payload` is "**always an object**, never a bare value, never absent". The
+server accepts `{"v":1,"id":"x","type":"ping"}` and answers `ping.ok`. A
+payload that is *present* but bare (`7`) or an array is correctly refused, so
+this is specifically the absent case.
+
+§2's own justification for strictness is "a silently ignored field is how a
+client ships a bug that looks like it works", and that applies word for word
+to a silently defaulted one — a LÖVE client that forgets `payload` on one
+message type would work everywhere and be non-conformant everywhere. Either
+§2 relaxes to say an absent payload is treated as `{}`, or the server
+refuses it. QA has no preference; what it cannot do is assert a rule the
+document states and the server does not keep.
+
+**2. A rejected signature burns the nonce, and the retry says `auth_expired`.**
+
+Observed on a fresh connection: `auth.challenge` → a bad signature →
+`auth_bad_signature` (correct) → the *good* signature over the same message
+→ `auth_expired`. The nonce did not expire; it was consumed by the failure.
+
+SPEC §3.2 step 4 orders it recover → compare → check the nonce is unused and
+unexpired → **burn** → upsert → mint, so the burn belongs to the success
+path. Two separable questions:
+
+* Should a failed verification burn the challenge? Arguably yes as
+  anti-grinding, arguably no because one malformed frame from anywhere then
+  invalidates the real client's challenge. PM's call.
+* Whichever it is, **`auth_expired` is the wrong code.** §3.3 defines it as
+  "the challenge's `expires_at` passed". `auth_nonce_used` — "that nonce was
+  already spent" — says what actually happened. Benign in effect, because the
+  client's prescribed reaction to both is "start `auth.challenge` again", and
+  actively misleading in a log at 2am.
+
+**3. A second `auth.login` on an authenticated connection is `bad_request`.**
+
+Message: "this connection is already authenticated; open a new one to change
+user". This is **right** — it is §3.1's "A connection never goes back to
+ANONYMOUS", enforced — and it is written down nowhere. Worth one sentence in
+§4.3. It was also a bug in this checker, which reused one connection for
+several login attempts; every attempt now gets its own.
+
+**Everything else BE already does**, first time, no negotiation: the
+envelope, the closed error set, `proto_version` with `detail.supported`,
+`locked` with `detail.requires`, the four-line challenge byte-for-byte,
+refusing a signature over a rebuilt message, `v` as 27/28 *and* 0/1,
+`auth.resume` rotating the token with the old one dying, `run.log` `seq` from
+0 per stream with no gaps, `run.stage` strictly ordered and each sent once,
+`busy` per connection rather than per user, `progress.update` reaching the
+same user's second window with `unlocked`, and full multi-user isolation
+including a spoofed payload address.
+
+## 2026-09-11 — QA: a Go submission should not read as a crash
+
+`search.query` and `ai.*` answer `not_found` with `detail: {"milestone": 2}`.
+That is exactly the right shape — a closed-set code plus a machine-readable
+reason — and a client can grey the button out with it.
+
+A **Go submission** comes back `internal_error`. PROTOCOL.md §3.3 tells a
+client to render that as "the server broke — show a retry, log
+`detail.trace_id`". So a player who picks the GO land on day one gets a crash
+report for a feature that was never built, and will retry it, and get the
+same crash report.
+
+Proposal: a Go submission answers the way search does —
+`not_found` with `detail: {"milestone": 2}`, or a `quest.submit.ok` whose
+`Attempt.verdict` is `internal_error` only for genuine internal faults. Then
+the client can say "GO opens in milestone 2" and mean it.
+
+`tests/smoke/contract.mjs` asserts the behaviour as it stands and prints the
+complaint as a note rather than a failure; `e2e/journey.spec.ts` has the
+browser-side test, which records it as a Playwright annotation. Neither will
+go red when this is fixed.
+
+## 2026-09-11 — QA: the e2e hook contract, verified as still missing
+
+The suite was pointed at the backend's own `frontend/dist` on :5390
+(PROTOCOL.md §1: one port, no CORS). The page loads and boots. It exposes
+`window.__THREE__` and nothing else: no `data-state` on `<html>`, no
+`window.__cwb`, no `window.__cwbSocket` — and none of them with `?e2e=1`
+either.
+
+So all 24 e2e tests skip, and the earlier proposal ("the e2e hook contract")
+stands unchanged and is the entire gap. The suite is written against the
+amended six-screen flow, `boot → login → lands → map → quest → result`, with
+no `categories` screen.
+
+Two of the 24 are worth FE's attention because they close holes nobody could
+confirm from inside a unit test:
+
+* **the mid-run streaming console** — FE reported that headless RAF
+  starvation defeated its timing attempts, so `run.log` painting *while*
+  rustc thinks is currently believed rather than known. The test races the
+  console against the screen change over a deliberately slow-to-compile
+  source, so "before the verdict" is a real interval and not a coin flip.
+* **the Go-gap message**, above.
+
+## 2026-09-11 — QA: `Quest.tests.cases` does not exist, and a client reading it fails silently
+
+PROTOCOL.md §4.8 named `Quest.tests.cases` before it was corrected. There is
+no such key: it is `tests.visible[]` plus `tests.hidden_count`, and the live
+server confirms it.
+
+The failure mode is the reason this is worth an entry. A client reading
+`tests.cases` gets `undefined`/`nil` and renders an **empty test list**,
+which looks like a quest that has no tests rather than like a bug. Nothing
+throws, nothing logs, and the player just sees a quest panel with a blank
+section.
+
+`tests/smoke/contract.mjs` now asserts the key's absence on `Quest`
+explicitly, in both spellings (`tests.cases` and a top-level `cases`), with
+that explanation in the failure message. Three clients read this shape now;
+one of them getting it wrong should be a red test and not a shrug.
+
+## 2026-09-11 — QA: the signature byte order has a negative test now
+
+PROTOCOL.md §4.3 pins `r || s || v`. `@noble/curves` v2 hands a signature
+back as `[recid, r, s]`, so a client that concatenates them in the order it
+received produces `v || r || s` — 65 bytes, all valid hex, and wrong.
+
+`tests/smoke/contract.mjs` §8.6 now signs correctly and then submits two
+deliberate mis-assemblies of the same signature, `s||r||v` and `v||r||s`, and
+requires `auth_bad_signature` for both. The server refuses both today. The
+value is for the next client: a login that fails with "bad signature" when
+the key is right is a day of debugging, and this turns it into one red line
+naming the byte order.
+
+`tests/vectors/signatures.json` already carries `r`, `s` and `v` as separate
+fields beside the assembled `signature`, so a client can assert its assembly
+against the fixture without a server at all.
