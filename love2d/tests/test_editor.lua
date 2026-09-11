@@ -847,6 +847,57 @@ return function()
     T.eq(unmatched[1].char, "{", "an opener with no closer")
   end)
 
+  T.section("editor — what a quest screen opens on (PROTOCOL §4.8)")
+
+  -- `draft ?? starter`, and the whole of the autosave feature on this side of
+  -- the wire. There is no save call to test because there is no save call:
+  -- the server kept the source of every run and submit already (SPEC §2.2),
+  -- and this function is the read.
+  T.case("a draft is what the editor opens on", function()
+    T.eq(editor.opening_text({ starter = "fn main() {}", draft = "fn main() { mine() }" }),
+      "fn main() { mine() }",
+      "the player's own most recent run or submit wins")
+  end)
+
+  T.case("a quest nobody has touched opens on the starter", function()
+    T.eq(editor.opening_text({ starter = "fn main() {}" }), "fn main() {}",
+      "`draft` is absent on a first visit")
+    T.eq(editor.opening_text({ starter = "fn main() {}", draft = nil }), "fn main() {}")
+  end)
+
+  T.case("an empty draft is still a draft", function()
+    -- Somebody who cleared the buffer and pressed RUN gets an empty buffer
+    -- back: that is what they left. The browser client spells this
+    -- `draft ?? starter`, where `""` survives too — the two clients must not
+    -- disagree about the same quest.
+    T.eq(editor.opening_text({ starter = "fn main() {}", draft = "" }), "",
+      "empty is a value, not an absence")
+  end)
+
+  T.case("`null` is absence, not a table", function()
+    -- §5.3 sends `null` (not omitted) under an interview, and `src/json.lua`
+    -- decodes JSON null to a sentinel **table**, which is truthy in Lua.
+    -- `draft or starter` on the raw payload would hand the editor a table and
+    -- the failure would be inside a draw call. `net/client.lua` denulls
+    -- payloads before a scene sees them; this is the belt to that braces,
+    -- exactly as `Clock.parse` takes it.
+    local json = require("src.json")
+    T.eq(editor.opening_text({ starter = "fn main() {}", draft = json.null }),
+      "fn main() {}", "an interview starts from the starter")
+    T.eq(editor.opening_text({ starter = json.null, draft = json.null }), "",
+      "and neither sentinel reaches the buffer")
+  end)
+
+  T.case("nothing at all is the empty buffer, never nil", function()
+    T.eq(editor.opening_text(nil), "")
+    T.eq(editor.opening_text({}), "")
+    -- `Editor:set_text` is the consumer, and it must never be handed a table.
+    local ed = editor.new({})
+    ed:set_text(editor.opening_text({ draft = "one\ntwo" }))
+    T.eq(ed:line_count(), 2)
+    T.eq(ed:text(), "one\ntwo")
+  end)
+
   T.section("editor — no love in the model")
 
   T.case("src/editor.lua does not reference love", function()

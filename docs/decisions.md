@@ -5872,3 +5872,81 @@ RUN leaves one; a SUBMIT moves it and clears at three stars; `quest.solve` on
 a different quest returns the real answer and costs a star; submitting that
 exact answer clears but never at three stars; and the solve call itself
 leaves no trace in `stats.history`.
+
+---
+
+## FE — the draft that was already there, and a SOLVE button that says what it costs
+
+Two features, both PROTOCOL §4.8 / §4.11b, both entirely inside
+`frontend/src/scenes/quest.ts` plus two lines of `net/protocol.ts` and six
+catalogues.
+
+**The draft is a read, and the client sends nothing new.** `quest.get` now
+carries `draft`, so `enter()` opens the editor on
+`openingSource(this.draft, res.quest)` — the buffer TRY AGAIN handed back, else
+the server's draft, else the starter. `??` and never `||`, which is why it is a
+named function with a test: **an empty draft is a real draft**, and a player who
+selected all, deleted, pressed RUN and came back must get an empty buffer rather
+than the starter reappearing and looking like the feature quietly not working.
+The map, search, stats and AI-drill entries needed **no change at all** —
+`QuestScene` issues its own `quest.get`, so `ai.next`'s copy of the field
+arrives through the same line. (`ai.plan` answers `unavailable {milestone: 2}`
+on this build, so the drill entry could not be played live; it is the same code
+path, not a second one.)
+
+**`unsaved()` had to change with it, and that is the part that was invisible.**
+It compared the buffer against the *starter*. The moment the editor opens on a
+draft that test is true on frame one, so a returning player pressing BACK TO
+MAP, LOBBY or ESC would be asked whether to throw away code the server is
+holding for them — precisely the "question nobody needs is a question everybody
+learns to click through" that method was written to avoid. The baseline is now
+`opened`, the text the editor was opened with, and it moves to the source that
+was just sent on every successful `quest.run` / `quest.submit`, because that is
+the instant the server takes its copy. Nothing is sent to say so. Verified by
+playing it: RUN, BACK TO MAP, no dialogue, re-open, the text is there; full page
+reload, still there, because it is on the server and not in the browser.
+
+**`quest.reset` does not clear the server's draft, and that is left alone.** A
+reset quest re-opens on the pre-reset draft the next time it is opened, because
+the draft is the last *attempt*, and resetting the editor is not an attempt
+(§4.8b says the same thing about the clock). Making the screen paper over that
+would mean inventing a save call this feature exists not to have. `opened` moves
+to the starter on a reset, so leaving straight afterwards still asks nothing.
+
+**SOLVE gets its own line, and the price is printed next to it.** The bench row
+is RUN · FORMAT · HINT · LOG · RESET with SUBMIT pinned right, and a sixth
+button in it would have been wrong twice: the row wraps at 1280 — that is what
+once put a button through the run report — so a wrapped SOLVE lands wherever the
+wrap leaves it, which at one width is directly under RUN, and the item nearest
+the pinned gap is the one nearest SUBMIT. A line of its own is a position that
+cannot move: at 1280 it sits 24 virtual pixels below the band, twice the gap
+between the band's own wrapped rows, measured rather than guessed.
+
+The sentence is **shows the answer — costs a star on this quest, and nothing is
+recorded until you SUBMIT**, in coin, beside the button, paid for out of the
+editor's height before the editor is laid out. Three facts in the order a player
+needs them and no drama: it is not a failure, it locks nothing, it does not
+touch `stats.history`. It is next to the button rather than shown after the
+press because a price read afterwards is not a price anybody agreed to. Same
+register as the run report a few pixels above it ("press SUBMIT to record it"),
+same treatment as PASTE for the destruction: no dialogue, one CTRL+Z, and the
+`focus()` afterwards is load-bearing — the message promises the undo and
+CodeMirror only hears a keystroke it has the focus for.
+
+**`not_found` is two situations with one code.** The probe against the live
+server confirms an interview and a server too old to have the message both
+answer `not_found` with an empty `detail` — indistinguishable on the wire. So
+there is one line, "no answer key here — a live screen does not come with one",
+and it is drawn as news rather than as a fault. Naming only the interview would
+lie to somebody on an old server; naming only the old server would lie to
+somebody in an interview.
+
+Played end to end against :5390 on a fresh wallet: first visit opens the starter
+and `draft` is `null`; RUN leaves a draft that survives a navigation and a full
+reload; SOLVE fills in the real reference answer, moves `2 HINTS LEFT` to a
+dimmed `NO HINTS`, and one CTRL+Z puts the player's own code back byte for byte;
+pressing it twice says "that is already what you have" rather than doing nothing
+visible; and submitting the revealed answer clears the street at **two stars**,
+which is the whole point of the price. `tsc --noEmit` clean, 188 vitest tests
+green, `npm run build` clean, and `__cwbCapture` / `buttonAt` / `mockTransport`
+appear zero times in every file of `dist/assets/`.

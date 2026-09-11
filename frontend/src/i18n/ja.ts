@@ -170,6 +170,13 @@ export const ja: Partial<Catalogue> = {
   "quest.log": "ログ",
   "quest.hideLog": "ログを隠す",
   "quest.reset": "リセット",
+  "quest.solve": "解答",
+  "quest.solveNote":
+    "解答を表示します — このクエストの星が一つ減り、提出を押すまでは何も記録されません",
+  "quest.solved": "解答をエディタに入れました — CTRL+Z で自分のコードに戻せます",
+  "quest.solveSame": "すでに同じ内容です",
+  "quest.noSolve": "ここに解答はありません — 本番の面接に解答は付いてきません",
+  "quest.solveSilent": "解答が届きませんでした",
   "quest.submit": "提出",
   "quest.backToMap": "マップへ戻る",
   "quest.lobby": "ロビー",

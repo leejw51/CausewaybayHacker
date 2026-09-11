@@ -199,4 +199,10 @@ return {
   ["BASIC"] = "ZÁKLADY",
   ["ADVANCED"] = "POKROČILÉ",
   ["OPEN"] = "OTEVŘENO",
+
+  -- PROTOCOL §4.11b — the answer, and what it costs.
+  ["SOLVE  SHIFT-F7"] = "ŘEŠENÍ  SHIFT-F7",
+  ["costs a star"] = "stojí hvězdu",
+  ["no answer key here"] = "tady řešení není",
+  ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "řešení je v editoru — CTRL-Z vrátí to tvoje. Úlohu pořád splníš, jen už ne na tři hvězdy; podívat se není pokus, zapíše ho teprve SUBMIT",
 }

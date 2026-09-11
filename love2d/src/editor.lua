@@ -184,6 +184,33 @@ function Editor:text()
   return table.concat(self.lines, "\n")
 end
 
+--- What a quest screen opens the buffer on: PROTOCOL §4.8's `draft ?? starter`.
+---
+--- `Quest.draft` is the source of the player's own most recent run or submit,
+--- kept by the server because it already kept every attempt's source (SPEC
+--- §2.2). There is no client-side save behind it and there must not be one:
+--- the buffer is written to the server as a side effect of RUN and SUBMIT,
+--- and this is the read.
+---
+--- Three cases, and the third is the one that would otherwise be a crash:
+---
+---   * a string — the player's own text, whatever it is. An **empty** draft
+---     is still a draft: somebody who cleared the buffer and pressed RUN gets
+---     an empty buffer back, which is what they left. The browser client
+---     spells the same rule `draft ?? starter`, where `""` also survives.
+---   * `nil` — a quest nobody has touched, so the starter.
+---   * `json.null` — the sentinel `src/json.lua` decodes `null` to. In
+---     practice `net/client.lua`'s `denull` has already turned it into `nil`
+---     by the time a scene sees a payload, but a *table* is truthy in Lua, so
+---     `draft or starter` on the raw thing would hand the editor a table.
+---     Checked by type here for the same reason `Clock.parse` does.
+function M.opening_text(quest)
+  if type(quest) ~= "table" then return "" end
+  if type(quest.draft) == "string" then return quest.draft end
+  if type(quest.starter) == "string" then return quest.starter end
+  return ""
+end
+
 function Editor:line_count()
   return #self.lines
 end

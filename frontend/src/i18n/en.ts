@@ -188,6 +188,13 @@ export const en = {
   "quest.log": "LOG",
   "quest.hideLog": "HIDE LOG",
   "quest.reset": "RESET",
+  "quest.solve": "SOLVE",
+  "quest.solveNote":
+    "shows the answer — costs a star on this quest, and nothing is recorded until you SUBMIT",
+  "quest.solved": "the answer is in the editor — CTRL+Z puts your own code back",
+  "quest.solveSame": "that is already what you have",
+  "quest.noSolve": "no answer key here — a live screen does not come with one",
+  "quest.solveSilent": "the answer did not arrive",
   "quest.submit": "SUBMIT",
   "quest.backToMap": "BACK TO MAP",
   "quest.lobby": "LOBBY",

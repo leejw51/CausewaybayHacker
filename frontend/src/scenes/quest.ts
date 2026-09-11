@@ -76,6 +76,53 @@ function show(text: string): string {
 }
 
 /**
+ * What the editor opens with, in the order that respects the player's work.
+ *
+ * `local` is the buffer handed back by the verdict screen's TRY AGAIN — the
+ * keystrokes of the last few seconds, which nothing on the wire has yet.
+ * `quest.draft` (§4.8) is the source of the player's most recent run or submit
+ * on this quest, kept by the server since SPEC §2.2 and returned by
+ * `quest.get`; it is `null` on a quest nobody has touched and under an
+ * interview, and either way the starter is then right.
+ *
+ * `??` and not `||`, and that is the whole reason this is a function with a
+ * test: **an empty draft is a real draft**. A player who selected all, deleted,
+ * pressed RUN and came back asked for an empty buffer, and `||` would hand them
+ * the starter back and look like the feature silently not working.
+ */
+export function openingSource(
+  local: string | undefined,
+  quest: { draft?: string | null; starter: string },
+): string {
+  return local ?? quest.draft ?? quest.starter;
+}
+
+/**
+ * Hints still for sale. Clamped, because `quest.solve` (§4.11b) moves
+ * `hints_used` to the quest's own hint count and a server that ever moved it
+ * past `hints_total` would otherwise print "-1 HINTS LEFT" at the player.
+ */
+export function hintsRemaining(total: number, used: number): number {
+  return Math.max(0, total - used);
+}
+
+/**
+ * What a `quest.solve` reply means for the screen.
+ *
+ * Two facts and no drawing: the hint counter has moved (the server just set
+ * it, and the label on the bench is that number), and the buffer is replaced
+ * unless the player is already looking at exactly this text — the same case
+ * PASTE calls out, because a button that correctly does nothing is
+ * indistinguishable from a broken one.
+ */
+export function solveOutcome(
+  buffer: string,
+  res: { source: string; hints_used: number },
+): { replace: boolean; hintsUsed: number } {
+  return { replace: res.source !== buffer, hintsUsed: res.hints_used };
+}
+
+/**
  * What a failed *run* is called. Deliberately the plain fact of what happened
  * and never a judgement — "ACCEPTED" belongs to the verdict screen and must
  * not appear anywhere a run can reach.
@@ -129,6 +176,14 @@ export class QuestScene implements Scene {
   private runResult: Attempt | null = null;
   /** One formatter call at a time. */
   private formatting = false;
+  /** And one answer-key call at a time, for the same reason. */
+  private solving = false;
+  /**
+   * What the editor was opened with — the draft the server had, or the
+   * starter. The baseline `unsaved()` measures against, and it moves every
+   * time the server takes a copy (§4.8: a run or a submit is a save).
+   */
+  private opened = "";
   /** True when `error` is news rather than a fault; it changes the colour. */
   private notice = false;
   private t = 0;
@@ -205,7 +260,12 @@ export class QuestScene implements Scene {
     try {
       const res = await this.app.client.request("quest.get", { quest_id: this.questId });
       this.quest = res.quest;
-      this.editor = new Editor(this.land, this.draft ?? res.quest.starter, () => {
+      // §4.8. The editor opens on the player's own most recent run or submit,
+      // fetched from the server with the quest itself — no local storage, no
+      // save button, nothing new sent. A player who typed for ten minutes and
+      // closed the tab finds what they left, on any machine they log in from.
+      this.opened = openingSource(this.draft, res.quest);
+      this.editor = new Editor(this.land, this.opened, () => {
         /* the source is read on submit; there is nothing to save locally */
       });
       this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
@@ -232,14 +292,21 @@ export class QuestScene implements Scene {
   // -- actions -------------------------------------------------------------
 
   /**
-   * Whether walking away throws work away. Compared against the starter rather
-   * than tracked with a dirty flag, because typing something and then undoing
-   * it back to the starter is not unsaved work, and being asked about it would
-   * teach the player to dismiss the question without reading it.
+   * Whether walking away throws work away. Compared against what the editor
+   * was opened with rather than tracked with a dirty flag, because typing
+   * something and then undoing it is not unsaved work, and being asked about
+   * it would teach the player to dismiss the question without reading it.
+   *
+   * The baseline is `opened`, not the starter, and that is §4.8 landing here:
+   * once the editor opens on the server's draft, "different from the starter"
+   * is true on the first frame, and a returning player would be warned that
+   * leaving throws away code the server is holding for them. It moves to the
+   * buffer that was sent on every successful run and submit, because that is
+   * the moment the server took its copy.
    */
   unsaved(): boolean {
-    if (!this.editor || !this.quest) return false;
-    return this.editor.source.trim() !== this.quest.starter.trim();
+    if (!this.editor) return false;
+    return this.editor.source.trim() !== this.opened.trim();
   }
 
   private submit(): Promise<void> {
@@ -267,14 +334,20 @@ export class QuestScene implements Scene {
     this.error = "";
     this.notice = false;
     this.runResult = null;
+    const sent = this.editor.source;
     try {
       const res = await this.app.client.request(kind, {
         quest_id: this.quest.id,
-        source: this.editor.source,
+        source: sent,
         lang: this.land,
       });
       this.stage = "idle";
       this.log.end();
+      // §4.8: the server has just stored this source as the quest's draft, as
+      // a side effect of judging it. Nothing is sent to say so — this line is
+      // only the screen agreeing with the server about what is now saved, so
+      // walking away afterwards asks no question it does not need to ask.
+      this.opened = sent;
       if (kind === "quest.run") {
         this.runResult = res.attempt;
         this.logScroll = 0;
@@ -398,13 +471,73 @@ export class QuestScene implements Scene {
     }
   }
 
+  /**
+   * §4.11b: the whole answer, in the editor, now.
+   *
+   * Priced as the largest hint there is — the server sets `hints_used` to the
+   * quest's own hint count, and SPEC §6.3's cascade only ever asks whether any
+   * hint was used, so a submission of the revealed answer can clear the quest
+   * and can never clear it at three stars. That is the honest price and the
+   * line beside the button says it before it is paid.
+   *
+   * **Asking records nothing.** No attempt, no history row, no mistake — the
+   * player has read an answer, not run one. Only a SUBMIT afterwards writes
+   * anything, and it writes what actually happened.
+   *
+   * Destructive to the buffer and deliberately not behind a dialogue, for the
+   * same reason PASTE is not: `replaceAll` narrows the change and dispatches
+   * one edit, so CodeMirror undoes the whole thing in a single CTRL+Z, and the
+   * `focus()` afterwards is what makes that promise true — CodeMirror only
+   * hears the keystroke when it has the focus, and pressing a canvas button
+   * leaves the focus on the page.
+   */
+  private async solve(): Promise<void> {
+    if (!this.quest || !this.editor || this.solving) return;
+    this.solving = true;
+    try {
+      const res = await this.app.client.request("quest.solve", { quest_id: this.quest.id });
+      const out = solveOutcome(this.editor.source, res);
+      // The one number this call changed, on the one control that displays it.
+      this.quest.hints_used = out.hintsUsed;
+      if (!out.replace) {
+        this.error = t("quest.solveSame");
+        this.notice = true;
+        return;
+      }
+      this.editor.replaceAll(res.source);
+      this.editor.focus();
+      this.error = t("quest.solved");
+      this.notice = true;
+      this.app.chip.coin();
+    } catch (e) {
+      const code = e instanceof WireError ? e.payload.code : null;
+      // `not_found` is two situations with one code and an empty `detail`: an
+      // interview session, where §4.11b withholds the answer on purpose, and a
+      // server too old to have the message at all. They are indistinguishable
+      // on the wire, so the line says the thing that is true of both rather
+      // than guessing — and it is news, not a fault, so it is not painted red.
+      this.error =
+        code === "not_found"
+          ? t("quest.noSolve")
+          : code
+            ? playerText(code)
+            : t("quest.solveSilent");
+      this.notice = code === "not_found";
+      this.app.chip.fail();
+    } finally {
+      this.solving = false;
+    }
+  }
+
   private async reset(): Promise<void> {
     if (!this.quest || !this.editor) return;
     try {
       const res = await this.app.client.request("quest.reset", { quest_id: this.quest.id });
       this.editor.load(this.land, res.starter);
+      this.opened = res.starter;
     } catch {
       this.editor.load(this.land, this.quest.starter);
+      this.opened = this.quest.starter;
     }
   }
 
@@ -645,6 +778,9 @@ export class QuestScene implements Scene {
         break;
       case "hint":
         void this.hint();
+        break;
+      case "solve":
+        void this.solve();
         break;
       case "reset":
         void this.reset();
@@ -1047,7 +1183,9 @@ export class QuestScene implements Scene {
       : 0;
     // `hints_used` comes back on `quest.get` (§5.3) and on every `quest.hint`,
     // so leaving a quest and coming back does not offer a hint already paid for.
-    const hintsLeft = this.quest ? this.quest.hints_total - this.quest.hints_used : 0;
+    const hintsLeft = this.quest
+      ? hintsRemaining(this.quest.hints_total, this.quest.hints_used)
+      : 0;
     const hintLabel = hintsLeft === 0 ? t("quest.noHints") : tn("quest.hintsLeft", hintsLeft);
     // SUBMIT is laid out first and taken out of the row's width, so it sits at
     // the far end of the bench and the everyday buttons flow up to it. It is
@@ -1079,7 +1217,45 @@ export class QuestScene implements Scene {
       layout.minTouchH(),
     );
     const bandH = rows * btnH + (rows - 1) * rowGap;
-    const editorH = Math.max(40, inner[3] - bandH - consoleH - Math.round(16 * s));
+
+    // The answer key gets its own line under the bench, and the reasons are
+    // the same two the RUN/SUBMIT pair already established here.
+    //
+    // *Placement*: it fills the editor with the reference solution, so it must
+    // not be reachable by a hand aiming at RUN, and it costs a star, so it
+    // must not be reachable by one aiming at SUBMIT. A sixth button in the
+    // bench row would be neither — the row wraps at 1280 (that is what put a
+    // button through the run report once already), and a wrapped SOLVE lands
+    // wherever the wrap leaves it, which on one width is directly under RUN.
+    // A line of its own is a position that cannot move.
+    //
+    // *The sentence beside it*: revealing the answer is the one thing on this
+    // screen that costs something and does not look like it costs something.
+    // It is drawn next to the button rather than shown after the press,
+    // because a price a player reads afterwards is not a price they agreed to.
+    // Wrapped, measured, and paid for out of the editor's height **before** the
+    // editor is laid out — the fault this file carries two scars from is
+    // sizing a band after the split and drawing into a height it does not have.
+    // Twice the gap between the bench's own wrapped rows, measured rather than
+    // guessed: at 1280 the rows sit 12 virtual pixels apart, and a control that
+    // wipes the editor must not be one slip below HINT either.
+    const solveGap = Math.round(fonts.button.size);
+    const [solveW, solveBtnH] = btnBox(
+      fonts.stationSm,
+      [t("quest.solve")],
+      0,
+      fonts.stationSm.size * 2,
+      layout.minTouchH(),
+    );
+    const noteX = inner[0] + solveW + Math.round(10 * s);
+    const noteW = Math.max(1, inner[0] + inner[2] - noteX);
+    const noteLines = wrap(fonts.stationSm, t("quest.solveNote"), noteW);
+    const noteH = Math.max(solveBtnH, noteLines.length * fonts.stationSm.height);
+
+    const editorH = Math.max(
+      40,
+      inner[3] - bandH - solveGap - noteH - consoleH - Math.round(16 * s),
+    );
 
     well(g, inner[0], inner[1], inner[2], editorH);
     const editorRect: Rect = [inner[0] + 4, inner[1] + 4, inner[2] - 8, editorH - 8];
@@ -1126,8 +1302,25 @@ export class QuestScene implements Scene {
       strong: this.stage === "idle",
     });
 
+    const solveY = rowY + bandH + solveGap;
+    this.bar.add({
+      id: "solve",
+      rect: [inner[0], solveY, solveW, solveBtnH],
+      label: t("quest.solve"),
+      dim: !this.quest || this.solving,
+    });
+    // Coin, not red and not dim: this is what a star costs, and stars on this
+    // screen and on the map are already that colour. Dim would read as small
+    // print, which is exactly the wrong register for a price.
+    g.fillStyle = css(Theme.coin, 0.72);
+    let ny = solveY + Math.round((noteH - noteLines.length * fonts.stationSm.height) / 2);
+    for (const line of noteLines) {
+      printf(g, fonts.stationSm, line, noteX, ny, noteW, "left");
+      ny += fonts.stationSm.height;
+    }
+
     if (consoleH > 0) {
-      const cy = rowY + bandH + Math.round(8 * s);
+      const cy = solveY + noteH + Math.round(8 * s);
       const ch = Math.max(24, inner[1] + inner[3] - cy);
       this.drawConsole(g, [inner[0], cy, inner[2], ch]);
     }

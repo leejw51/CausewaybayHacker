@@ -284,6 +284,94 @@ return function()
     T.ok(main:find("Layout.cycleFont", 1, true) ~= nil)
   end)
 
+  T.section("quest — the draft (§4.8) and the answer key (§4.11b)")
+
+  T.case("the editor opens on `draft ?? starter`, through one function", function()
+    local _, code = strings_of("src/scenes/quest.lua")
+    if not code then
+      T.skip("src/scenes/quest.lua", "not readable from this working directory")
+      return
+    end
+    T.ok(code:find("Editor.opening_text(self.quest)", 1, true) ~= nil,
+      "the fallback is `src/editor.lua`'s, so the rule is asserted headlessly")
+    T.nope(code:find("self.quest.starter or", 1, true),
+      "the old starter-only load is gone, or a draft would never be seen")
+    -- The whole feature is a read. A client-side save would be a second home
+    -- for the same bytes and the two would drift, which is the thing this
+    -- project decided against in its first entry.
+    T.nope(code:find("Store.set_draft", 1, true), "no client-side save path")
+    T.nope(code:find("save_draft", 1, true), "no client-side save path")
+  end)
+
+  T.case("SOLVE asks the server and replaces the buffer in one undo step", function()
+    local _, code = strings_of("src/scenes/quest.lua")
+    if not code then return end
+    T.ok(code:find('request("quest.solve"', 1, true) ~= nil,
+      "§4.11b, with the quest id")
+    local solve = code:match("function Quest:solve%(%).-\nend")
+    T.ok(solve ~= nil, "the handler is one function")
+    solve = solve or ""
+    -- `replace_all` is what makes ctrl-Z enough protection to skip a
+    -- confirmation dialog; `set_text` would drop the undo entry and the
+    -- player's own code with it.
+    T.ok(solve:find("editor:replace_all(payload.source", 1, true) ~= nil,
+      "one undo step, the same guarantee FORMAT gives")
+    T.nope(solve:find("editor:set_text", 1, true),
+      "set_text would lose the player's code for good")
+    -- The server just moved the high-water mark; the screen reads it back
+    -- rather than incrementing a local guess.
+    T.ok(solve:find("payload.hints_used", 1, true) ~= nil,
+      "the hint counter comes from the reply")
+    T.ok(solve:find('payload.code == "not_found"', 1, true) ~= nil,
+      "§4.11b's one error case is branched on, not lumped in")
+  end)
+
+  T.case("what SOLVE costs is on screen, and what it does not cost is too", function()
+    local strings = strings_of("src/scenes/quest.lua")
+    if not strings then return end
+    local all = table.concat(strings, "\n")
+    -- Priced, so it cannot read as free.
+    T.ok(all:find("costs a star", 1, true) ~= nil,
+      "the price is under the button, before anybody presses it")
+    -- And bounded, so it cannot read as scarier than it is: nothing fails,
+    -- nothing locks, the node still clears — just not at three stars.
+    T.ok(all:find("It can still clear", 1, true) ~= nil,
+      "the node is not lost, and the screen says so")
+    T.ok(all:find("not an attempt", 1, true) ~= nil,
+      "asking records nothing — only SUBMIT does (§4.11b)")
+    -- The same trap the RUN copy documents: "not saved" must not be said of
+    -- anything here, because everything a player runs *is* kept.
+    for _, banned in ipairs({ "erases", "cannot clear", "locked out", "forfeit" }) do
+      for _, literal in ipairs(strings) do
+        T.nope(literal:lower():find(banned, 1, true),
+          ("%q overstates §4.11b (found in %q)"):format(banned, literal))
+      end
+    end
+  end)
+
+  T.case("SOLVE has a key as well as a button, and it is not next to RUN", function()
+    local _, code = strings_of("src/scenes/quest.lua")
+    if not code then return end
+    -- The house rule: a control nobody can see is not a feature, and a key
+    -- nobody can find is not a control. Both exist, and the key is printed on
+    -- the button itself the way RUN's, SUBMIT's and FORMAT's are.
+    T.ok(code:find("self.solve_rect", 1, true) ~= nil, "a button with a hit test")
+    T.ok(code:find('key == "f7" and mods.shift', 1, true) ~= nil,
+      "shift-F7: every one of F1..F12 was already taken on this screen")
+    -- Plain F7 must still take an ordinary hint, so the chord is tested first.
+    local chord = code:find('key == "f7" and mods.shift', 1, true)
+    local hint = code:find('key == "f7" then self:take_hint', 1, true)
+    T.ok(chord ~= nil and hint ~= nil and chord < hint,
+      "the bare key still takes a hint")
+    -- And the buffer-only pair sits at the far left, with FORMAT between
+    -- SOLVE and RUN: reaching for RUN must never land on the answer.
+    local solve_btn = code:find("self.solve_rect = {", 1, true)
+    local format_btn = code:find("self.format_rect = {", 1, true)
+    local run_btn = code:find("self.run_rect = {", 1, true)
+    T.ok(solve_btn < format_btn and format_btn < run_btn,
+      "SOLVE, FORMAT, then the gap, then RUN and SUBMIT")
+  end)
+
   T.case("the FTS5 snippet markup is stripped rather than shown", function()
     local _, code = strings_of("src/scenes/search.lua")
     if not code then return end

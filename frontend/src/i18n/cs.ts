@@ -181,6 +181,13 @@ export const cs: Partial<Catalogue> = {
   "quest.log": "LOG",
   "quest.hideLog": "SKRÝT LOG",
   "quest.reset": "RESET",
+  "quest.solve": "ŘEŠENÍ",
+  "quest.solveNote":
+    "ukáže řešení — stojí to hvězdu v této úloze a nic se nezaznamená, dokud nestiskneš ODESLAT",
+  "quest.solved": "řešení je v editoru — CTRL+Z vrátí tvůj vlastní kód",
+  "quest.solveSame": "přesně tohle už v editoru máš",
+  "quest.noSolve": "tady klíč k řešení není — ostrý pohovor s ním nechodí",
+  "quest.solveSilent": "řešení nedorazilo",
   "quest.submit": "ODESLAT",
   "quest.backToMap": "ZPĚT NA MAPU",
   "quest.lobby": "HALA",

@@ -180,4 +180,10 @@ return {
   ["BASIC"] = "基礎",
   ["ADVANCED"] = "応用",
   ["OPEN"] = "公開",
+
+  -- PROTOCOL §4.11b — the answer, and what it costs.
+  ["SOLVE  SHIFT-F7"] = "解答  SHIFT-F7",
+  ["costs a star"] = "星を1つ使います",
+  ["no answer key here"] = "ここに解答はありません",
+  ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "解答がエディタに入りました — CTRL-Z で元のコードに戻せます。クリアはできますが、星3つにはなりません。見ただけでは記録されず、記録に残るのは SUBMIT だけです",
 }

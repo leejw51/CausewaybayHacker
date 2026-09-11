@@ -188,6 +188,18 @@ export interface Quest {
   opened_at?: string | null;
   deadline_at?: string | null;
   starter: string;
+  /**
+   * §4.8 — the source of the player's own most recent run or submit on this
+   * quest, `null` on a quest nobody has touched. Not a second copy of
+   * anything: every run and submit already stores its source (SPEC §2.2), so
+   * this is a read of what the server had. A client opens the editor on
+   * `draft ?? starter`.
+   *
+   * Optional in this type for the same reason `opened_at` is — a server that
+   * has not shipped §4.8's field omits it, and `??` treats that exactly like
+   * the `null` an interview sends.
+   */
+  draft?: string | null;
   concepts: string[];
   hints_total: number;
   hints_used: number;
@@ -383,6 +395,8 @@ export interface Requests {
   /** §4.9b — the same shape, deliberately, so one code path sends either. */
   "quest.run": { quest_id: string; lang: Land; source: string };
   "quest.hint": { quest_id: string; index: number };
+  /** §4.11b — the whole answer, priced like the largest hint there is. */
+  "quest.solve": { quest_id: string };
   "quest.reset": { quest_id: string };
   "search.query": {
     q: string;
@@ -428,6 +442,13 @@ export interface Responses {
   "quest.submit": { attempt: Attempt };
   "quest.run": { attempt: Attempt };
   "quest.hint": { hint: string; index: number; total: number; hints_used: number };
+  /**
+   * §4.11b. `hints_used` comes back because the call just moved it — to the
+   * quest's own hint count, in practice — and the screen has a control whose
+   * label is that number. Nothing is recorded by asking: no attempt, no
+   * history row. Only a later `quest.submit` writes anything.
+   */
+  "quest.solve": { source: string; hints_used: number };
   "quest.reset": { starter: string };
   /**
    * §4.9d. Source that does not parse is **not** an error: the reply is `.ok`,

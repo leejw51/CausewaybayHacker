@@ -184,4 +184,10 @@ return {
   ["BASIC"] = "基礎",
   ["ADVANCED"] = "進階",
   ["OPEN"] = "開咗",
+
+  -- PROTOCOL §4.11b — the answer, and what it costs.
+  ["SOLVE  SHIFT-F7"] = "答案  SHIFT-F7",
+  ["costs a star"] = "要用一粒星",
+  ["no answer key here"] = "呢度冇答案",
+  ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "答案已經入咗編輯器 — CTRL-Z 可以攞返你自己嘅碼。呢題仲可以通關，不過就攞唔到三粒星；睇答案唔算一次嘗試，淨係 SUBMIT 先會記低",
 }

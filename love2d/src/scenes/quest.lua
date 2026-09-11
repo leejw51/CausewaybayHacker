@@ -39,6 +39,26 @@
 -- do is count as an attempt against the node. "Runs don't count against your
 -- stars" is true. "Runs aren't saved" is not, and is not written anywhere
 -- here.
+--
+-- ## The draft, and the answer
+--
+-- Two more things this screen reads rather than owns:
+--
+--   * **`Quest.draft` (§4.8)** — the source of this player's own most recent
+--     run or submit on this node. The editor opens on `draft ?? starter` and
+--     there is **no save path in this file**: every RUN and SUBMIT already
+--     sends the buffer, and the server has kept each one's source since SPEC
+--     §2.2. Somebody who typed for ten minutes, quit the client and came back
+--     finds their text, on this machine or another one, without ever having
+--     pressed a save button. `null` under an interview (§4.9e), which needs
+--     no branch here — the starter is the fallback either way.
+--   * **`quest.solve` (§4.11b)** — the whole answer, in the editor, on one
+--     press. Priced as the largest hint there is, so the node can still be
+--     cleared but no longer at three stars; and *nothing is recorded by
+--     asking*, because reading an answer is not a run of one. Both halves are
+--     on screen, for the same reason the RUN copy above is exact: a control
+--     that reads as free is a lie, and one that reads as a trap stops
+--     somebody learning from a worked example.
 
 local Layout = require("src.layout")
 local Theme = require("src.theme")
@@ -90,6 +110,10 @@ function Quest.new(app)
     -- screen: a run is not a verdict and does not deserve that banner.
     run_attempt = nil,
     hint = nil,
+    -- §4.11b: what SOLVE said, in the hint register. `solve_unsupported`
+    -- greys the button for the rest of the visit, the way FORMAT's does.
+    solve_note = nil,
+    solve_unsupported = false,
     focus = "editor",     -- "editor" | "brief"
     clock_arrived = nil,  -- when the clock first appeared, for its entrance
     clock_phase = nil,    -- the last phase seen, so a crossing can pulse
@@ -150,10 +174,17 @@ function Quest:refresh()
     if Clock.read(self.quest) and not self.clock_arrived then
       self.clock_arrived = Anim.now()
     end
-    -- Only load the starter into a buffer the player has not touched, so a
-    -- reconnect mid-quest does not eat what they were writing.
+    -- §4.8: `draft ?? starter`. The draft is the source of this player's own
+    -- most recent run or submit on this quest, and it costs this screen
+    -- nothing to honour — every RUN and SUBMIT already sent the buffer, so
+    -- there is **no save path here** and there must not be one. Come back to
+    -- a node an hour later, or on another machine, and the editor opens on
+    -- what you left rather than on the starter you had already replaced.
+    --
+    -- Only into a buffer the player has not touched, so a reconnect
+    -- mid-quest does not eat what they were writing.
     if not self.editor.dirty then
-      self.editor:set_text(self.quest.starter or "")
+      self.editor:set_text(Editor.opening_text(self.quest))
     end
   end)
 end
@@ -207,6 +238,9 @@ function Quest:execute(mode)
   self.log = nil
   self.log_follow = true
   self.show_log = true
+  -- The note row holds one thing at a time, and what SOLVE said belongs to
+  -- the buffer as it was before this ran.
+  self.solve_note = nil
   SFX.play("submit")
 
   self.app.session:request(mode, {
@@ -281,6 +315,7 @@ function Quest:format()
   self.formatting = true
   self.format_note = nil
   self.format_problem = nil
+  self.solve_note = nil
   SFX.play("move")
 
   self.app.session:request("code.format", {
@@ -342,6 +377,62 @@ function Quest:take_hint()
       self.quest.hints_used = payload.hints_used or (index + 1)
       self.app:toast(I18n.t("hint %d of %d — costs stars",
         payload.index + 1, payload.total))
+    end)
+end
+
+--- SOLVE (PROTOCOL §4.11b) — the whole answer, in the editor, now.
+---
+--- **Instant, and one undo step.** No confirmation dialog: somebody who has
+--- been stuck for twenty minutes and reaches for the answer should get the
+--- answer, not a modal asking whether they meant it. `Editor:replace_all` is
+--- the same call FORMAT makes, so ctrl-Z puts their own code back in one
+--- press — which is all the protection this needs, because nothing here is
+--- irreversible in the editor.
+---
+--- **What it costs, and what it does not.** §4.11b prices this as the largest
+--- hint there is: the server bumps `hints_used`, and SPEC §6.3's cascade only
+--- ever asks whether any hint was taken, so this quest can still be cleared
+--- but no longer at three stars. What it does *not* do is record anything —
+--- there is no attempt here, nothing appears in `stats.history`, and only a
+--- later SUBMIT writes to the record. Both halves are said on screen, because
+--- a button that reads as free is a lie and a button that reads as a trap
+--- stops somebody learning from a worked example.
+---
+--- `not_found` means either "there is no answer key on a live screen"
+--- (§4.9e, interview) or "this server predates §4.11b" — identical on the
+--- wire, the same trap RUN documents above. So the message says what is true
+--- of both rather than guessing which.
+function Quest:solve()
+  if not self.quest or self.solving or self.solve_unsupported then
+    if self.solve_unsupported then SFX.play("locked") end
+    return
+  end
+  self.solving = true
+  self.solve_note = nil
+  SFX.play("move")
+
+  self.app.session:request("quest.solve", { quest_id = self.quest.id },
+    function(ok, payload, why)
+      self.solving = false
+      if not ok then
+        SFX.play("locked")
+        if payload.code == "not_found" then
+          self.solve_unsupported = true
+          self.solve_note = I18n.t("no answer key here")
+        else
+          self.solve_note = why.player
+        end
+        return
+      end
+
+      self.editor:replace_all(payload.source or self.editor:text())
+      -- The server just moved it, so this screen's hint counter is stale by
+      -- exactly one round trip. Taken from the payload rather than guessed.
+      if payload.hints_used then self.quest.hints_used = payload.hints_used end
+      self.solve_note = I18n.t("the answer is in the editor — CTRL-Z puts yours "
+        .. "back. It can still clear, just not at three stars, and asking is "
+        .. "not an attempt — only SUBMIT records one")
+      SFX.play("select")
     end)
 end
 
@@ -719,10 +810,28 @@ function Quest:draw_editor(rect, tint)
   local submit_label = self.running_mode == "quest.submit"
     and I18n.t("JUDGING…") or I18n.t("SUBMIT  F10")
   local format_label = self.formatting and "…" or I18n.t("FORMAT  F2")
+  local solve_label = self.solving and "…" or I18n.t("SOLVE  SHIFT-F7")
   local bh = math.max(28, UI.lineHeight(9) + 12)
   local gap = 22
   local want = math.max(UI.textWidth(run_label, 9), UI.textWidth(submit_label, 9)) + 20
-  local room = math.floor((rect.w - 30 - gap - UI.textWidth(format_label, 8) - 20) / 2)
+  -- The left-hand cluster is two buttons now, and both are measured from
+  -- their own labels for the reason the pair on the right is: `SOLVE
+  -- SHIFT-F7` in Czech is not `SOLVE  SHIFT-F7` in English, and a width
+  -- written as a number prints half a word at the other end of the language
+  -- list. The `gap` stays a subtracted term and is never divided up.
+  --
+  -- **The right-hand pair is measured first and keeps its labels.** The left
+  -- cluster is subtracted as a floor, not as its full want: sizing RUN and
+  -- SUBMIT around whatever SOLVE and FORMAT would like is how `SUBMIT  F10`
+  -- became `SUBMIT  F1` the last time, and this screen has that mistake
+  -- written down.
+  local left_gap = 8
+  local left_floor = 100
+  -- The caption row's height, needed here as well as below: when the buffer
+  -- buttons take a row of their own, the captions belonging to RUN and SUBMIT
+  -- have to fit *between* the two rows rather than through the upper one.
+  local cap = UI.lineHeight(7) + 3
+  local room = math.floor((rect.w - 30 - gap - left_floor - 10) / 2)
   local bw = math.max(60, math.min(want, room))
   local by = rect.y + rect.h - bh - 8
   local sx = rect.x + rect.w - bw - 10
@@ -731,16 +840,45 @@ function Quest:draw_editor(rect, tint)
   local busy = self.running_mode ~= nil
   local usable = (self.quest ~= nil) and not busy
 
-  -- FORMAT sits on the far left of the row, apart from the pair that costs
-  -- something. It changes the buffer and nothing else — never recorded, no
-  -- attempt, no mistake (§4.9d) — so it must not read as a third way to
-  -- submit.
-  local fw = math.max(48, math.min(UI.textWidth(format_label, 8) + 16,
-    math.max(48, rx - rect.x - 20)))
-  local fx = rect.x + 10
-  UI.button(fx, by, fw, bh, format_label,
+  -- The left of the row is the two buttons that only ever change the buffer:
+  -- **SOLVE, then FORMAT**, then a wide gap, then the pair that costs
+  -- something. Neither of the left two writes an attempt (§4.9d, §4.11b), and
+  -- neither must read as a third way to submit.
+  --
+  -- SOLVE is the far-left button on purpose: FORMAT stands between it and
+  -- RUN, so the one control on this screen that gives the answer away cannot
+  -- be reached by a press that was aimed a centimetre wide of RUN.
+  local sw = UI.textWidth(solve_label, 8) + 16
+  local fw = UI.textWidth(format_label, 8) + 16
+  local left_room = rx - rect.x - 20
+  -- Which row the two of them sit on. Beside RUN and SUBMIT when they fit
+  -- there; **on their own row above** when they do not, which is portrait in
+  -- every language and landscape in Czech. Four full labels do not fit across
+  -- 720 virtual pixels, and of the three ways out — shrink the pair on the
+  -- right, shrink the type, or use the empty row above — only the last one
+  -- costs nothing. The well has that row spare on every screen this game
+  -- draws, and the wide gap between the reflex button and the deliberate one
+  -- survives untouched.
+  local ly = by
+  if sw + left_gap + fw > left_room then
+    ly = by - bh - 6 - cap
+    left_room = rect.w - 20
+    if sw + left_gap + fw > left_room then
+      -- Narrower still: both give way together rather than one eating the
+      -- other, with a floor that still shows a word.
+      local scale = (left_room - left_gap) / (sw + fw)
+      sw = math.max(44, math.floor(sw * scale))
+      fw = math.max(44, math.floor(fw * scale))
+    end
+  end
+  local vx = rect.x + 10
+  local fx = vx + sw + left_gap
+  UI.button(vx, ly, sw, bh, solve_label,
+    (usable and not self.solve_unsupported) and "normal" or "disabled", 8)
+  self.solve_rect = { x = vx, y = ly, w = sw, h = bh }
+  UI.button(fx, ly, fw, bh, format_label,
     (usable and not self.format_unsupported) and "normal" or "disabled", 8)
-  self.format_rect = { x = fx, y = by, w = fw, h = bh }
+  self.format_rect = { x = fx, y = ly, w = fw, h = bh }
 
   UI.button(rx, by, bw, bh, run_label,
     (usable and not self.run_unsupported) and "normal" or "disabled", 9)
@@ -752,7 +890,6 @@ function Quest:draw_editor(rect, tint)
   local tests = (self.quest and self.quest.tests) or {}
   local visible = #(tests.visible or {})
   local hidden = tests.hidden_count or 0
-  local cap = UI.lineHeight(7) + 3
   -- Singular and plural as two translatable strings, the same as the streak
   -- on the stats screen. One "%d samples" for both reads "1 samples" in the
   -- source language, which is the language that has no excuse.
@@ -763,25 +900,75 @@ function Quest:draw_editor(rect, tint)
   UI.text(hidden > 0 and I18n.t("+%d hidden", hidden) or I18n.t("all cases"),
     sx, by - cap, 7, Theme.withAlpha(Theme.coin, 0.8), "left", bw)
 
+  -- **What SOLVE costs, said before it is pressed.** Under its own button, in
+  -- the same caption row and the same register as `+2 hidden`: revealing the
+  -- answer is priced as the largest hint there is (§4.11b), so the third star
+  -- goes. One clause, because a button whose caption is a paragraph reads as
+  -- a warning and this is a price. The rest of the story — that nothing is
+  -- recorded by asking — is in the note the press itself puts up, where
+  -- somebody is actually looking.
+  UI.text(self.solve_unsupported and I18n.t("no answer key here")
+      or I18n.t("costs a star"),
+    vx, ly - cap, 7,
+    Theme.withAlpha(self.solve_unsupported and Theme.dim or Theme.coin, 0.85),
+    "left", sw)
+
   -- On the caption row with `1 sample` and `+2 hidden`, not eighteen pixels
   -- off the bottom of the well — which put it *inside* the button band, so
   -- the FORMAT button was printed over the top of it and neither could be
   -- read. Found by looking at a screenshot; no test would have caught it.
+  --
+  -- It sits to the right of the two buffer buttons rather than at the left
+  -- margin, which is where SOLVE's own caption now is, and is dropped rather
+  -- than overprinted when a narrow window leaves it no room.
   local info = I18n.t("%d lines   %d bytes", total, #self.editor:text())
-  UI.text(info, rect.x + 10, by - 12, 7, Theme.withAlpha(Theme.cream, 0.45))
+  -- Always just past FORMAT, on whichever row FORMAT is on — because the row
+  -- *below* an upper button row is the button row itself, and printing a dim
+  -- line there puts it through the labels. `by - 12` was right when there was
+  -- one row and is a stripe across two.
+  local two_rows = ly ~= by
+  -- Two rows frees the left margin of the *lower* caption row, which is where
+  -- this line has always lived; one row does not, because SOLVE's own caption
+  -- is there, so it goes just past FORMAT instead.
+  local ix = two_rows and (rect.x + 10) or (fx + fw + 10)
+  local iy = two_rows and (by - cap) or (by - 12)
+  local limit = rx - 8
+  if ix + UI.textWidth(info, 7) < limit then
+    UI.text(info, ix, iy, 7, Theme.withAlpha(Theme.cream, 0.45))
+  end
 
-  -- §4.9d's `problem`, in the **hint** register rather than the failure one.
-  -- A formatter pressed mid-edit meeting half-written code is the normal
-  -- state of a text editor, not a fault, and the buffer was left alone.
-  local said = self.format_problem or self.format_note
+  -- The note row, in the **hint** register rather than the failure one, and
+  -- shared by the two buttons on the left because only one of them can have
+  -- spoken last:
+  --
+  --   * §4.9d's `problem` — a formatter pressed mid-edit meeting half-written
+  --     code is the normal state of a text editor, not a fault, and the
+  --     buffer was left alone.
+  --   * §4.11b's aftermath — what the answer just cost, and what it did not.
+  --     Three lines rather than two, because that sentence has to arrive
+  --     whole: half of it says the opposite of the whole of it.
+  local said = self.format_problem or self.format_note or self.solve_note
   if said then
-    local colour = self.format_problem and Theme.coin or Theme.withAlpha(Theme.cyan, 0.9)
-    -- Above the button row now, so it has the whole width of the well.
-    local room = rect.w - 24
-    for i, line in ipairs(UI.wrap(said, room, 7)) do
-      if i <= 2 then
-        UI.text(line, rect.x + 10, by - 34 + (i - 1) * 9, 7, colour)
-      end
+    local colour = (self.format_problem or self.solve_note) and Theme.coin
+      or Theme.withAlpha(Theme.cyan, 0.9)
+    -- Above the button row, so it has the whole width of the well, and
+    -- measured **upward** from the caption row so the last line cannot land
+    -- on `costs a star` however many lines it took. Four of them, on a plate:
+    -- at 7px in a portrait well this sentence is four lines, the first draft
+    -- allowed three, and what a player actually read was "... only SUBMIT
+    -- records" with the word `one` cut off — the precise failure the RUN copy
+    -- above is written to avoid. The plate is the clock's trick: this is an
+    -- overlay over somebody's program, and unreadable advice printed through
+    -- their own code is worse than none.
+    local lines = UI.wrap(said, rect.w - 28, 7)
+    local lh = UI.lineHeight(7)
+    local shown = math.min(#lines, 4)
+    local top = math.min(by, ly) - cap - 6 - shown * lh
+    UI.setColor(Theme.ink, 0.88)
+    love.graphics.rectangle("fill", rect.x + 4, top - 5, rect.w - 8, shown * lh + 10)
+    love.graphics.setColor(1, 1, 1, 1)
+    for i = 1, shown do
+      UI.text(lines[i], rect.x + 10, top + (i - 1) * lh, 7, colour)
     end
   end
 end
@@ -974,6 +1161,19 @@ function Quest:keypressed(key, mods)
   -- scanlines, sound, fullscreen) before a scene ever sees them, and a
   -- FORMAT bound to one of those would silently never fire.
   if key == "f2" or (cmd and mods.shift and key == "f") then self:format(); return true end
+  -- SOLVE is **shift-F7**, and the reason is arithmetic before it is taste:
+  -- every one of F1..F12 is already spoken for on this screen — F1/F3/F4/F11/
+  -- F12 globally in `main.lua` (orientation, scanlines, sound, fullscreen,
+  -- type size) and F2/F5/F6/F7/F8/F9/F10 here. There was no free key to pick.
+  --
+  -- A modifier on the *hint* key is the better answer anyway. §4.11b prices
+  -- the answer as "the largest hint there is", and that is exactly what
+  -- shift-F7 reads as with a hand on the keyboard: the same key, more of it.
+  -- It is also five keys from RUN and three from SUBMIT, which is the
+  -- distance this screen has always kept between a reflex and a decision.
+  -- Tested before plain F7 so the bare key still takes an ordinary hint, and
+  -- `ctrl` is excluded so a ctrl-shift-F7 aimed at something else misses.
+  if key == "f7" and mods.shift and not cmd then self:solve(); return true end
   if key == "f7" then self:take_hint(); return true end
   if key == "f8" then self.show_log = not self.show_log; return true end
   if key == "f9" then self:external_edit(); return true end
@@ -1017,6 +1217,7 @@ function Quest:mousepressed(x, y, button)
   -- fire on the press and not the release, which is what makes a drag that
   -- started in the text and ended over SUBMIT harmless: the release does
   -- nothing at all.
+  if inside(self.solve_rect) then self:solve(); return end
   if inside(self.format_rect) then self:format(); return end
   if inside(self.run_rect) then self:run(); return end
   if inside(self.submit_rect) then self:submit(); return end

@@ -171,6 +171,13 @@ export const ko: Partial<Catalogue> = {
   "quest.log": "로그",
   "quest.hideLog": "로그 숨기기",
   "quest.reset": "초기화",
+  "quest.solve": "정답",
+  "quest.solveNote":
+    "정답을 보여줍니다 — 이 퀘스트에서 별 하나를 잃고, 제출을 누르기 전까지는 아무것도 기록되지 않습니다",
+  "quest.solved": "정답이 편집기에 들어갔습니다 — CTRL+Z로 내 코드를 되돌립니다",
+  "quest.solveSame": "이미 같은 내용입니다",
+  "quest.noSolve": "여기에는 정답지가 없습니다 — 실전 면접에는 정답지가 따라오지 않습니다",
+  "quest.solveSilent": "정답이 도착하지 않았습니다",
   "quest.submit": "제출",
   "quest.backToMap": "지도로",
   "quest.lobby": "로비",
