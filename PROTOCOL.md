@@ -401,6 +401,16 @@ exhaustive client, and because a future mode may want it.
 entirely** unless the player has cleared it — not sent as null, not sent
 empty.
 
+**`Quest.draft`** is the source of the player's own most recent attempt at
+this quest — a run or a submit, either counts — or `null` on a quest nobody
+has touched yet. This is not a new save path: SPEC §2.2 already keeps every
+attempt's source verbatim, so a draft is a read of data the server already
+had, not a second copy of it. A client opens the editor on `draft ?? starter`,
+and a player who typed for ten minutes, closed the tab, and came back finds
+exactly what they left — without ever having pressed a save button. `null`
+under an interview (§4.9e), for the same reason hints and the solution are: a
+live screen starts from the starter.
+
 There is **no `tests.cases` field on a `Quest`** — that name belongs to the
 content pack (SPEC §12), not to the wire. What a client receives is
 `tests.visible`, an array of the cases marked `visible: true` with their
@@ -591,6 +601,8 @@ player then has two problems.
 The runner's limits apply: a formatter gets a short timeout of its own, and a
 source over the submit cap is refused the same way.
 
+### 4.10 `quest.hint`
+
 ```json
 → payload: { "quest_id": "…", "index": 0 }      0-based
 ← payload: { "hint": "…", "index": 0, "total": 2, "hints_used": 1 }
@@ -598,6 +610,33 @@ source over the submit cap is refused the same way.
 
 Taking a hint costs stars (SPEC §6.3) and is permanent. Re-requesting a hint
 already taken does not cost again. `not_found` when `index` is past `total`.
+
+### 4.11b `quest.solve`
+
+The whole answer, for a player who wants to read a worked example rather than
+keep guessing. Priced like the largest hint there is, because it is at least
+that much help:
+
+```json
+→ payload: { "quest_id": "…" }
+← payload: { "source": "fn main() { … }", "hints_used": 2 }
+```
+
+`source` is the quest's own reference solution — the same text that would be
+attached to `Quest.solution` if the player cleared it honestly. Calling this
+sets `hints_used` to at least one (in practice, to the quest's own hint count),
+so **a submission of the revealed answer can never earn a perfect, three-star
+clear** — SPEC §6.3's star cascade only ever checks whether any hint was used,
+and this counts as the biggest one there is.
+
+**Nothing is recorded by asking.** Unlike `quest.hint`, this does not append to
+`stats.history` — there is no attempt here, because reading an answer is not a
+run of one. Only a later, real `quest.submit` writes anything to the record,
+and it writes what actually happened: the player's own keystrokes, whatever
+they turned out to be, with the diminished stars this call already priced in.
+
+`not_found` under an interview, for the same reason `quest.hint` is: a live
+screen does not come with an answer key.
 
 ### 4.9e Interview mode
 
@@ -888,6 +927,10 @@ type Quest = {
   opened_at: string | null;              // §4.8b — server time the clock started
   deadline_at: string | null;            // opened_at + time_limit_s
   starter: string;
+  /** §4.8's own field: the source of the player's most recent run or submit
+   *  on this quest, or null on a first visit. `null` (not omitted) under an
+   *  interview (§4.9e) — a live screen starts from the starter. */
+  draft: string | null;
   concepts: string[];
   hints_total: number;                   // the text comes from quest.hint
   hints_used: number;

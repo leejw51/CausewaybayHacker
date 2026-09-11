@@ -224,7 +224,7 @@ async fn a_loop_of_frames_the_server_cannot_parse_is_rate_limited_too() {
 
     for probe in [
         // §2.1: answered `proto_version`, connection stays open.
-        format!(r#"{{"v":99,"id":"{{i}}","type":"ping","payload":{{}}}}"#),
+        r#"{"v":99,"id":"{i}","type":"ping","payload":{}}"#.to_string(),
         // §3.3: answered `bad_request`, connection stays open.
         format!(
             r#"{{"v":1,"id":"{{i}}","type":"ping","payload":{}1{}}}"#,

@@ -353,6 +353,7 @@ async fn dispatch(
         "world.map" => handlers::world_map(state, session, payload),
         "quest.get" => handlers::quest_get(state, session, payload),
         "quest.hint" => handlers::quest_hint(state, session, payload),
+        "quest.solve" => handlers::quest_solve(state, session, payload),
         "quest.reset" => handlers::quest_reset(state, session, payload),
         "stats.summary" => handlers::stats_summary(state, session),
         "stats.mistakes" => handlers::stats_mistakes(state, session, payload),

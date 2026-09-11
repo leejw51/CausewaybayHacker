@@ -297,7 +297,7 @@ fn the_masked_quest_has_no_answer_and_no_hints() {
     progress::record_clear(&conn, ALICE, "rust.hacker.01.q1", 10).unwrap();
     let quest = quests::get(&conn, "rust.hacker.01.q1").unwrap();
 
-    let normal = quest.to_wire(progress::State::Cleared, 3, 1, None);
+    let normal = quest.to_wire(progress::State::Cleared, 3, 1, None, None);
     assert!(
         normal.get("solution").is_some(),
         "a cleared quest shows its answer"

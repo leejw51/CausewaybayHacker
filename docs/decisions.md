@@ -5834,3 +5834,41 @@ node is *passed*, and this catalogue has to say both. Japanese and Chinese
 fared much better — 実行 / ログ / クリア and 运行 / 日志 / 通关 / 提交 are all
 the sibling's, arrived at independently, which is the closest thing to a review
 either of them has had.
+
+## 2026-09-11 — Every quest autosaves; SOLVE is a hint, not a shortcut
+
+Two small features, both cheaper than they first looked because the data was
+already there.
+
+**`Quest.draft` (PROTOCOL §4.8).** Asked for directly: "for each quiz,
+automatically save in backend... save when user run it automatically." This
+is not a new save path — every `quest.run` and `quest.submit` already write
+the source verbatim to `attempts.source` (SPEC §2.2) and to
+`users/<address>/attempts/<attempt_id>/main.{rs,go}` on disk (SPEC §1). The
+entire feature is a read: `attempts::latest_source(conn, address, quest_id)`
+against a DB column that already existed, exposed on `quest.get` and
+`ai.next` as `draft: string | null`. A client opens the editor on
+`draft ?? starter`. `null` under an interview, for the same reason hints and
+the solution are — a live screen starts from the starter.
+
+**`quest.solve` (PROTOCOL §4.11b).** "Add a SOLVE button, fill the code with
+the answer immediately, so user can study easily." The button is a client
+concern; the one real decision here is the economy. If a player reveals the
+answer and then submits it, and the server has no signal that happened, they
+get three stars and can walk into `perfectionist`/`no-hints` badges for
+something that did not happen — exactly the failure mode this project has
+been careful about everywhere else (playground runs, the formatter, the
+runner's own limits). So `quest.solve` reuses the existing `hints_used`
+high-water-mark column (`progress::use_solve`, modelled on `use_hint`) rather
+than inventing a fourth star tier or a second "did they cheat" column:
+`stars_for` only ever checks `hints_used > 0`, so setting it to the quest's
+own hint count is honest and sufficient. No `attempts` row is written by
+asking — reading an answer is not a run of one, and only a real submit enters
+the record.
+
+Verified end to end against a live server, `server/tests/ws_flow.rs::
+a_run_leaves_a_draft_and_solve_costs_a_star`: a fresh quest has no draft; a
+RUN leaves one; a SUBMIT moves it and clears at three stars; `quest.solve` on
+a different quest returns the real answer and costs a star; submitting that
+exact answer clears but never at three stars; and the solve call itself
+leaves no trace in `stats.history`.

@@ -567,9 +567,10 @@ Client → server, and the reply payload:
 | `profile.update` | `{name?, settings?}` | `{user}` |
 | `world.lands` | `{}` | `{lands:[{land, categories:[{category, total, cleared}]}]}` |
 | `world.map` | `{land, category}` | `{nodes:[MapNode], edges:[[from,to]]}` |
-| `quest.get` | `{quest_id}` | `{quest}` — no `solution` unless cleared |
+| `quest.get` | `{quest_id}` | `{quest}` — no `solution` unless cleared, `draft` if any |
 | `quest.submit` | `{quest_id, source, lang}` | `{attempt}` |
 | `quest.hint` | `{quest_id, index}` | `{hint, hints_used}` |
+| `quest.solve` | `{quest_id}` | `{source, hints_used}` — PROTOCOL §4.11b |
 | `quest.reset` | `{quest_id}` | `{starter}` |
 | `search.query` | `{q, mode, filters?, limit?}` | `{hits:[SearchHit]}` |
 | `stats.summary` | `{}` | `{cleared, attempts, accuracy, streak, by_land}` |

@@ -45,6 +45,7 @@ impl Quest {
         stars: i64,
         hints_used: i64,
         opened_at: Option<&str>,
+        draft: Option<&str>,
     ) -> serde_json::Value {
         let cleared = state == crate::progress::State::Cleared;
         let mut value = serde_json::json!({
@@ -58,6 +59,11 @@ impl Quest {
             "difficulty": self.difficulty,
             "time_limit_s": self.time_limit_s,
             "starter": self.starter,
+            // The source of the player's most recent run or submit on this
+            // quest, or null on a first visit — so the editor opens where
+            // they left off instead of the bare starter. See
+            // attempts::latest_source for what "most recent" means.
+            "draft": draft,
             "concepts": self.concepts,
             "hints_total": self.hints.len(),
             "hints_used": hints_used,
@@ -85,7 +91,10 @@ impl Quest {
         stars: i64,
         opened_at: Option<&str>,
     ) -> serde_json::Value {
-        let mut value = self.to_wire(state, stars, 0, opened_at);
+        // No draft either, on the same reasoning as no hints and no solution:
+        // a live screen starts from the starter, the way a real interview
+        // does, not from whatever the player had half-written before it began.
+        let mut value = self.to_wire(state, stars, 0, opened_at, None);
         if let Some(object) = value.as_object_mut() {
             object.remove("solution");
             object.insert("hints_total".into(), serde_json::json!(0));

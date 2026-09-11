@@ -592,6 +592,106 @@ async fn the_whole_slice_end_to_end() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_run_leaves_a_draft_and_solve_costs_a_star() {
+    // PROTOCOL §4.8's `draft`, and §4.11b's `quest.solve` — both new, both
+    // built on data the server already had rather than a new save path.
+    let tmp = tempfile::tempdir().unwrap();
+    let src = content_src(tmp.path());
+    let server = start(&tmp.path().join("home"), &src).await;
+    let mut alice = Client::connect(server.port).await;
+    alice.login(ALICE_KEY).await;
+
+    // Nobody has attempted this quest yet: no draft to speak of.
+    let first = alice
+        .ok("quest.get", json!({ "quest_id": "rust.basic.02.sum" }))
+        .await;
+    assert!(
+        first["quest"]["draft"].is_null(),
+        "a quest nobody has touched has no draft: {first}"
+    );
+
+    // A RUN — not even a submit — is enough to leave one. §4.9b's own rule
+    // ("a run is still recorded") is what makes this true without a new
+    // write path: the draft is just the newest attempt's source, and a run
+    // is an attempt.
+    let scratch = "fn main() { println!(\"not the answer\"); }";
+    alice
+        .ok(
+            "quest.run",
+            json!({ "quest_id": "rust.basic.02.sum", "source": scratch, "lang": "rust" }),
+        )
+        .await;
+    let after_run = alice
+        .ok("quest.get", json!({ "quest_id": "rust.basic.02.sum" }))
+        .await;
+    assert_eq!(
+        after_run["quest"]["draft"].as_str(),
+        Some(scratch),
+        "the run's own source comes back as the draft: {after_run}"
+    );
+
+    // A submit afterwards moves the draft again, to the newest source — and
+    // clears the node at three stars, since nothing has cost a star yet.
+    let solution = solution_of("rust.basic.02.sum");
+    alice
+        .ok(
+            "quest.submit",
+            json!({ "quest_id": "rust.basic.02.sum", "source": solution, "lang": "rust" }),
+        )
+        .await;
+    let after_submit = alice
+        .ok("quest.get", json!({ "quest_id": "rust.basic.02.sum" }))
+        .await;
+    assert_eq!(after_submit["quest"]["stars"].as_i64(), Some(3));
+
+    // quest.solve on a different, uncleared quest: the real answer comes
+    // back, and it costs at least as much as any hint would.
+    let solve = alice
+        .ok("quest.solve", json!({ "quest_id": "rust.basic.01.hello" }))
+        .await;
+    let real_solution = solution_of("rust.basic.01.hello");
+    assert_eq!(solve["source"].as_str(), Some(real_solution.as_str()));
+    assert!(
+        solve["hints_used"].as_i64().unwrap() > 0,
+        "solving must cost at least one hint's worth: {solve}"
+    );
+
+    // Submitting the revealed answer clears the quest, but never at three
+    // stars: `stars_for` only ever checks hints_used > 0, and solve just set
+    // it, so a perfect clear is exactly what this must never read as.
+    let cleared = alice
+        .ok(
+            "quest.submit",
+            json!({ "quest_id": "rust.basic.01.hello", "source": real_solution, "lang": "rust" }),
+        )
+        .await;
+    assert_eq!(cleared["attempt"]["verdict"].as_str(), Some("accepted"));
+    assert_eq!(cleared["attempt"]["cleared"].as_bool(), Some(true));
+    assert!(
+        cleared["attempt"]["stars"].as_i64().unwrap() <= 2,
+        "using solve must never earn a perfect clear: {cleared}"
+    );
+
+    // And quest.solve itself must not have written an attempt: asking for
+    // the answer is not a run, and recording one would put a submission in
+    // the table that never happened (the same rule the playground and the
+    // formatter are both held to). Exactly one real submit happened above.
+    let history = alice
+        .ok(
+            "stats.history",
+            json!({ "quest_id": "rust.basic.01.hello" }),
+        )
+        .await;
+    assert_eq!(
+        history["attempts"].as_array().unwrap().len(),
+        1,
+        "quest.solve must not appear as an attempt: {history}"
+    );
+
+    server.handle.abort();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_stale_nonce_and_a_forged_signature_are_both_refused() {
     let tmp = tempfile::tempdir().unwrap();
     let src = content_src(tmp.path());

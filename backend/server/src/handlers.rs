@@ -224,8 +224,41 @@ pub fn quest_get(
             "quest": quest.to_wire_under_interview(quest_state, row.stars, opened_at.as_deref())
         }));
     }
+    let draft = attempts::latest_source(&conn, address, &quest_id)?;
     Ok(json!({
-        "quest": quest.to_wire(quest_state, row.stars, row.hints_used, opened_at.as_deref())
+        "quest": quest.to_wire(
+            quest_state,
+            row.stars,
+            row.hints_used,
+            opened_at.as_deref(),
+            draft.as_deref(),
+        )
+    }))
+}
+
+/// PROTOCOL §4.11b. The whole answer, priced like the biggest hint there is:
+/// `progress::use_solve` bumps `hints_used` to at least one, which is all
+/// `stars_for` needs to stop this ever reading as a perfect clear. Nothing
+/// about this writes an `attempts` row — asking for the answer is not a run,
+/// and recording one would put a submission in the table that never happened.
+pub fn quest_solve(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let quest_id = str_field(payload, "quest_id")?;
+    let conn = state.store.conn();
+    let (quest, _, _) = readable_quest(&conn, address, &quest_id)?;
+    if under_interview(&conn, address, &quest_id)? {
+        // Same reasoning as quest_hint: a live screen does not come with an
+        // answer key, absent rather than refused-for-now.
+        return Err(not_found("there is no solution on a live screen"));
+    }
+    let hints_used = progress::use_solve(&conn, address, &quest_id, quest.hints.len() as i64)?;
+    Ok(json!({
+        "source": quest.solution,
+        "hints_used": hints_used,
     }))
 }
 
@@ -452,8 +485,15 @@ pub fn ai_next(
     } else {
         None
     };
+    let draft = attempts::latest_source(&conn, address, &step.quest_id)?;
     Ok(json!({
-        "quest": quest.to_wire(quest_state, row.stars, row.hints_used, opened_at.as_deref()),
+        "quest": quest.to_wire(
+            quest_state,
+            row.stars,
+            row.hints_used,
+            opened_at.as_deref(),
+            draft.as_deref(),
+        ),
         "position": step.position,
         "total": step.total,
         "why": step.why,

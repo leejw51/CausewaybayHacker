@@ -173,6 +173,28 @@ pub fn use_hint(conn: &Connection, address: &str, quest_id: &str, index: i64) ->
     Ok(get(conn, address, quest_id)?.hints_used)
 }
 
+/// PROTOCOL §4.11b (`quest.solve`): reveal the whole answer, which is at
+/// least as much help as any hint, so it costs at least as much. Reuses the
+/// same high-water-mark column hints do, rather than inventing a fourth star
+/// tier or a second "did they cheat" column — `stars_for` only ever checks
+/// `hints_used > 0`, so the exact number just has to be honest and nonzero.
+/// `hints_total.max(1)` covers a quest authored with zero hints: solving it
+/// still has to cost something.
+pub fn use_solve(
+    conn: &Connection,
+    address: &str,
+    quest_id: &str,
+    hints_total: i64,
+) -> Result<i64> {
+    ensure_row(conn, address, quest_id)?;
+    conn.execute(
+        "UPDATE progress SET hints_used = MAX(hints_used, ?3), updated_at = ?4
+          WHERE address = ?1 AND quest_id = ?2",
+        params![address, quest_id, hints_total.max(1), now_stamp()],
+    )?;
+    Ok(get(conn, address, quest_id)?.hints_used)
+}
+
 /// SPEC §6.3: 3 — cleared with no failed attempt and no hint; 2 — cleared with
 /// hints or ≤2 failed attempts; 1 — cleared.
 ///

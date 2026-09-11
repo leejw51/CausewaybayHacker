@@ -3,7 +3,7 @@
 //! Attempts are never deleted by the server — they are the training data §7
 //! reads. `cwbhacker prune` is the only thing that removes them.
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
@@ -123,6 +123,22 @@ pub fn write_to_disk(
     write_private(&dir.join("stderr.txt"), stderr.as_bytes())?;
     write_private(&dir.join("result.json"), serde_json::to_vec_pretty(result)?)?;
     Ok(())
+}
+
+/// PROTOCOL §4.8's `draft`: the source of the player's most recent attempt
+/// (run or submit, either counts) at this quest — so opening a quest you have
+/// worked on before restores where you left off instead of the bare starter.
+/// Not a separate save path: every run and submit already write this row
+/// (§2.2), so this is a read of data that already exists, not a new one.
+pub fn latest_source(conn: &Connection, address: &str, quest_id: &str) -> Result<Option<String>> {
+    conn.query_row(
+        "SELECT source FROM attempts WHERE address = ?1 AND quest_id = ?2
+          ORDER BY created_at DESC LIMIT 1",
+        params![address, quest_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(Into::into)
 }
 
 /// PROTOCOL §5.7. `kinds` is what makes a history list readable at a glance:
