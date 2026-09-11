@@ -48,10 +48,50 @@ add({ text = "legal winner thank year wave sausage worth useful legal winner tha
       when = on_login })
 add({ key = "return", when = on_login })
 add({ until_ = scene("lands"), note = "signed in", timeout = 25 })
-add({ key = "return" })
-add({ until_ = scene("categories"), timeout = 10 })
-add({ key = "return" })
-add({ until_ = function(app) return app.scene_name == "map" and app.scene.nodes end, timeout = 10 })
+-- Straight to the map, rather than through the land and category screens.
+--
+-- Not a shortcut for its own sake: `world.lands` currently disagrees with
+-- `world.map` on this server — for `rust` it reports `basic` with
+-- `total: 19, open: false` while `world.map` for rust/basic returns 12 nodes
+-- with node 1 `open`. The category screen does the right thing with that
+-- (§4.6: `open` is the server's word, and a closed category refuses to
+-- open), which means the normal route is blocked for any account with
+-- progress. The subject of *this* script is the display, so it goes around
+-- the disagreement and prints it as evidence instead.
+add({ until_ = function(app)
+      for _, land in ipairs(app.scene.lands or {}) do
+        local parts = { land.land }
+        for _, cat in ipairs(land.categories) do
+          parts[#parts + 1] = ("%s open=%s %d/%d"):format(
+            cat.category, tostring(cat.open), cat.cleared, cat.total)
+        end
+        print("world.lands: " .. table.concat(parts, "  "))
+      end
+      app.land, app.category = "rust", "basic"
+      app:go("map", { land = "rust", category = "basic" })
+      return true
+    end, note = "world.lands, as reported", timeout = 10 })
+add({ until_ = function(app)
+      if not (app.scene_name == "map" and app.scene.nodes) then return false end
+      local open, locked, cleared = 0, 0, 0
+      for _, n in ipairs(app.scene.nodes) do
+        if n.state == "open" then open = open + 1 end
+        if n.state == "locked" then locked = locked + 1 end
+        if n.state == "cleared" then cleared = cleared + 1 end
+      end
+      local first = app.scene.nodes[1]
+      print(("world.map:   rust/basic %d nodes, %d open, %d locked, %d cleared; "
+        .. "node 1 (%s) is %s"):format(#app.scene.nodes, open, locked, cleared,
+        tostring(first and first.quest_id), tostring(first and first.state)))
+      return true
+    end, note = "world.map, for the same land and category", timeout = 10 })
+add({ until_ = function(app)
+      -- Land on something playable.
+      for i, n in ipairs(app.scene.nodes) do
+        if n.state ~= "locked" then app.scene.cursor = i; return true end
+      end
+      return true
+    end, timeout = 3 })
 add({ key = "return" })
 add({ until_ = function(app) return app.scene_name == "quest" and app.scene.quest end,
       note = "in the editor", timeout = 15 })
@@ -120,16 +160,24 @@ add({ until_ = function(app)
       print("FAIL: F11 did not leave fullscreen")
       ok = false
     end
-    if not (seen["f1-once"].pinned and seen["f1-twice"].pinned) then
-      print("FAIL: F1 did not pin the orientation")
+    -- The script pins landscape in its first step, so the cycle runs
+    -- pinned-landscape -> pinned-portrait -> automatic -> pinned-landscape.
+    if not (seen["f1-once"].pinned and seen["f1-once"].mode == "portrait") then
+      print(("FAIL: the first F1 should pin portrait, got mode=%s pinned=%s")
+        :format(seen["f1-once"].mode, tostring(seen["f1-once"].pinned)))
       ok = false
     end
-    if seen["f1-twice"].mode ~= "portrait" then
-      print("FAIL: the second F1 should be a pinned portrait, got " .. seen["f1-twice"].mode)
+    if seen["f1-twice"].pinned then
+      print("FAIL: the second F1 should hand the orientation back to automatic")
       ok = false
     end
-    if seen["f1-thrice"].pinned then
-      print("FAIL: the third F1 should hand the orientation back to automatic")
+    if not (seen["f1-thrice"].pinned and seen["f1-thrice"].mode == "landscape") then
+      print(("FAIL: the third F1 should pin landscape again, got mode=%s pinned=%s")
+        :format(seen["f1-thrice"].mode, tostring(seen["f1-thrice"].pinned)))
+      ok = false
+    end
+    if seen["f1-once"].vw == seen.fullscreen.vw and seen["f1-once"].vh == seen.fullscreen.vh then
+      print("FAIL: pinning portrait did not re-measure the canvas")
       ok = false
     end
     if ok then

@@ -1510,7 +1510,7 @@ check(null, "beyond: two users never see each other's progress or attempts", asy
   }
 });
 
-check(null, "beyond: milestone-2 endpoints say so, and are not failures", async () => {
+check(null, "beyond: what is not built says so, and what is built is judged", async () => {
   // `search.query` and `ai.*` are SPEC §8 and §7.3, and PLAN.md puts both in
   // milestone 2. They answer `unavailable` with `detail: {"milestone": 2}`,
   // which is the right shape: a closed-set code plus a machine-readable
@@ -1557,39 +1557,109 @@ check(null, "beyond: milestone-2 endpoints say so, and are not failures", async 
           `and the search rows of SPEC §8).`,
       );
 
-    // A Go submission is the other declared M2 gap, and the one with teeth:
-    // the server must refuse it *without recording anything*. An attempt row
-    // carrying a fabricated verdict flows into `mistakes`, then into the AI
-    // drills, and the player is taught to fix a mistake they never made — so
-    // this asserts the three places that leak would show up, not just the code.
+    // Go used to be the other declared gap. It is not any more — BE built
+    // the runner — so the assertion that used to live here ("a Go submission
+    // is refused") has done its job and is replaced by the real one: Go is
+    // judged, like Rust, and a wrong Go answer produces a *Go* mistake kind.
+    //
+    // The rule underneath is unchanged and is the one worth protecting:
+    // nothing untrue may enter the curriculum. A verdict the server invented
+    // flows into `mistakes`, then `mistake_stats`, then the drills, and the
+    // player is taught to fix something they never did (SPEC §7).
     const goMap = await cl.send("world.map", { land: "go", category: "basic" });
     const goNode = goMap.payload.nodes?.find((n) => n.state === "open");
-    if (goNode) {
-      const r = await cl.send("quest.submit", {
-        quest_id: goNode.quest_id,
-        lang: "go",
-        source: 'package main\n\nimport "fmt"\n\nfunc main() { fmt.Println("x") }\n',
-      });
-      assert(
-        r.type.endsWith(".err"),
-        `a Go submission was accepted for judging; the runner cannot judge it yet`,
-      );
-      assertEq(r.payload.code, "unavailable", "a Go submission while the runner is M2");
-      assertEq(r.payload.detail?.milestone, 2, "a Go submission must say when");
+    assert(
+      goNode,
+      "the go/basic map has no open node — either Go content is missing or " +
+        "every node starts locked, and §12 says an empty `requires` is open",
+    );
 
-      const hist = await cl.send("stats.history", { quest_id: goNode.quest_id });
-      assertEq(
-        (hist.payload.attempts ?? []).length,
-        0,
-        "an unjudgeable submission wrote an attempt row",
+    const before = (await cl.send("stats.history", { quest_id: goNode.quest_id })).payload
+      .attempts.length;
+    const r = await cl.send("quest.submit", {
+      quest_id: goNode.quest_id,
+      lang: "go",
+      source:
+        'package main\n\nimport "fmt"\n\nfunc main() { fmt.Println("not the answer") }\n',
+    });
+    assertEq(r.type, "quest.submit.ok", "a Go submission must now be judged");
+    const attempt = r.payload.attempt;
+    assert(
+      [
+        "accepted",
+        "wrong_answer",
+        "compile_error",
+        "runtime_error",
+        "timeout",
+        "output_limit",
+      ].includes(attempt.verdict),
+      `§5.4: verdict ${attempt.verdict} is outside the set`,
+    );
+    assert(
+      attempt.verdict !== "internal_error",
+      "a Go submission came back `internal_error`, which tells the player " +
+        "their machine is broken. If Go cannot be judged, the answer is " +
+        "`unavailable` with detail.milestone, before an attempt is written.",
+    );
+
+    // It really ran: the attempt is on record (PROTOCOL.md §4.9, "always
+    // recorded"), and a wrong answer left a classified mistake behind.
+    const after = (await cl.send("stats.history", { quest_id: goNode.quest_id })).payload
+      .attempts;
+    assertEq(after.length, before + 1, "the Go attempt was not recorded");
+    assertEq(after[0].id, attempt.id, "the recorded attempt is the one that ran");
+
+    if (attempt.verdict !== "accepted") {
+      assert(
+        Array.isArray(attempt.mistakes) && attempt.mistakes.length > 0,
+        "a failed Go submission produced no classified mistake, so it teaches " +
+          "nothing (SPEC §7.1)",
       );
-      const mis = await cl.send("stats.mistakes", {});
-      assertEq(
-        (mis.payload.mistakes ?? []).length,
-        0,
-        "an unjudgeable submission put a mistake the player never made into the curriculum",
-      );
+      for (const m of attempt.mistakes) {
+        assert(typeof m.kind === "string" && m.kind, "a mistake with no kind");
+        // Go has no error codes, so §7.1's identity is the normalised
+        // message. A `code` that still carries the player's own identifier
+        // would make `undefined: tolal` and `undefined: subtotal` two
+        // different mistakes, and the rollup would never reach five.
+        if (typeof m.code === "string" && m.code.startsWith("go:"))
+          assert(
+            m.code === m.code.toLowerCase() && !/\s/.test(m.code),
+            `a Go mistake code should be a normalised slug, got ${m.code}`,
+          );
+      }
     }
+
+    // A compile error in Go classifies the way the fixtures say it should.
+    const broken = await cl.send("quest.submit", {
+      quest_id: goNode.quest_id,
+      lang: "go",
+      source: 'package main\n\nimport "fmt"\n\nfunc main() { fmt.Println(tolal) }\n',
+    });
+    assertEq(broken.type, "quest.submit.ok", "a Go compile error is still judged");
+    assertEq(broken.payload.attempt.verdict, "compile_error", "an undefined name");
+    const kinds = broken.payload.attempt.mistakes.map((m) => m.kind);
+    assert(
+      kinds.includes("unknown-name"),
+      `§7.1: \`undefined: tolal\` is the unknown-name row, got ${JSON.stringify(kinds)}`,
+    );
+    const codes = broken.payload.attempt.mistakes.map((m) => m.code).filter(Boolean);
+    assert(
+      !codes.some((c) => String(c).includes("tolal")),
+      `a mistake code carries the player's own identifier (${JSON.stringify(codes)}), ` +
+        "so two spellings of one lesson are two rows and the §7.2 rollup " +
+        "never learns anything",
+    );
+
+    // The wrong `lang` for a quest is still a `bad_request`, not a judgement.
+    assertErr(
+      await cl.send("quest.submit", {
+        quest_id: goNode.quest_id,
+        lang: "rust",
+        source: 'fn main() { println!("x"); }',
+      }),
+      "bad_request",
+      "§4.9: lang disagreeing with the quest's land",
+    );
   } finally {
     cl.close();
   }

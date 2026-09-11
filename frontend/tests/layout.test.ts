@@ -134,13 +134,58 @@ describe("the virtual canvas", () => {
     const l = new Layout(canvasOf(1280, 720));
     l.measure();
     expect(l.isPortrait()).toBe(false);
+    // No shape given: the choice is about the window it is made in.
     l.pin("portrait");
     l.measure();
-    // The window is landscape; the player said portrait, so portrait it is.
+    // The window is landscape; the player said portrait *here*, so portrait.
     expect(l.isPortrait()).toBe(true);
     expect(l.vw).toBeLessThanOrEqual(Math.floor(Theme.portW * 1.5));
     l.toggleOrientation();
     expect(l.isPortrait()).toBe(false);
+  });
+
+  it("suspends a choice made in a window that is no longer on screen", () => {
+    // The reported bug: F1 pressed once in a wide window, saved, and then
+    // every later session in every window was landscape — including a browser
+    // 1080 wide and 1730 tall, where the landscape layout is a band across the
+    // top with 47% of the window left over.
+    windowOf(1080, 1730, 1);
+    const c = canvasOf(1080, 1730);
+    const l = new Layout(c);
+    l.pin("landscape", [1600, 900]);
+    l.measure();
+    expect(l.mode).toBe("portrait");
+    // And the whole window is used: no bands at all.
+    expect(l.ox).toBe(0);
+    expect(l.oy).toBe(0);
+
+    // Put the window back into the shape the choice was made in and it applies
+    // again — suspended, not thrown away.
+    windowOf(1600, 900, 1);
+    Object.defineProperty(c, "clientWidth", { value: 1600, configurable: true });
+    Object.defineProperty(c, "clientHeight", { value: 900, configurable: true });
+    l.measure();
+    expect(l.mode).toBe("landscape");
+  });
+
+  it("drops a preference that does not say which window it was made in", () => {
+    // What an older build saved: a bare "landscape" with no shape. It is a
+    // preference, not an instruction, and a window this decisive overrules it.
+    windowOf(1080, 1730, 1);
+    const l = new Layout(canvasOf(1080, 1730));
+    l.pin("landscape", null);
+    l.measure();
+    expect(l.mode).toBe("portrait");
+  });
+
+  it("leaves a choice alone in a window that is not decisively either shape", () => {
+    windowOf(1000, 1000, 1);
+    const c = canvasOf(1000, 1000);
+    const l = new Layout(c);
+    l.pin("portrait", null);
+    l.measure();
+    // A square window is not an argument, so nothing overrules the choice.
+    expect(l.mode).toBe("portrait");
   });
 
   it("follows the window until the player pins one", () => {

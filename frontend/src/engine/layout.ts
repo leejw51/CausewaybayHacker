@@ -70,7 +70,7 @@ export class Layout {
    * phone does. So until somebody presses F1 the layout follows the window,
    * and after that it is theirs.
    */
-  private pinned = false;
+  private pinned: Orientation | null = null;
 
   /**
    * The window the choice was made in, in device pixels — and the Causewaybay
@@ -108,21 +108,28 @@ export class Layout {
   /**
    * Restore a saved orientation.
    *
-   * @param shape the window it was chosen in, if that was recorded. Without
-   * one — a preference saved by an older build — the choice loses to the first
-   * decisive window that disagrees with it, which is the safe direction: the
-   * cost of being wrong is a layout the player can fix with one key, and the
-   * cost of the other direction is a game rendering into 40% of the screen.
+   * @param shape the window it was chosen in. Omitted means *this* window,
+   * which is what an in-session choice is. An explicit `null` means the window
+   * is not known — a preference saved by an older build — and such a choice
+   * loses to the first decisive window that disagrees with it. That is the
+   * safe direction: the cost of being wrong is a layout the player fixes with
+   * one key, and the cost of the other direction is the game rendering into
+   * 40% of the screen with no way to find out why.
    */
   pin(mode: Orientation, shape?: [number, number] | null): void {
     this.mode = mode;
-    this.pinned = true;
-    this.pinnedShape = shape ?? null;
+    this.pinned = mode;
+    this.pinnedShape = shape === undefined ? [this.dw, this.dh] : shape;
   }
 
   /** The window the current choice was made in, for saving alongside it. */
   get choiceShape(): [number, number] {
-    return [this.dw, this.dh];
+    return this.pinnedShape ?? [this.dw, this.dh];
+  }
+
+  /** The orientation the player chose, whether or not it applies right now. */
+  get choice(): Orientation | null {
+    return this.pinned;
   }
 
   /**
@@ -147,7 +154,7 @@ export class Layout {
 
   toggleOrientation(): void {
     this.mode = this.mode === "landscape" ? "portrait" : "landscape";
-    this.pinned = true;
+    this.pinned = this.mode;
     // The choice is about *this* window. Recorded before `measure`, because
     // `dw`/`dh` still hold the window the key was pressed in.
     this.pinnedShape = [this.dw, this.dh];
@@ -200,16 +207,19 @@ export class Layout {
     // decisively contradicts is not a preference any more, it is a stale
     // answer, and honouring it is how the game ends up in a band across the
     // top of a column-shaped browser with the rest of it empty.
+    // A choice is *suspended*, not forgotten, while the window decisively
+    // disagrees with it in a shape it was not made in. Drag the window back to
+    // the shape the key was pressed in and the choice comes back — which is
+    // what a preference should do, and is the difference between this and
+    // simply throwing it away on the first resize.
     const says = this.decisive(ww, wh);
-    if (this.pinned && says && says !== this.mode) {
-      const sameWindow =
-        this.pinnedShape !== null && this.pinnedShape[0] === ww && this.pinnedShape[1] === wh;
-      if (!sameWindow) {
-        this.pinned = false;
-        this.pinnedShape = null;
-      }
+    const sameWindow =
+      this.pinnedShape !== null && this.pinnedShape[0] === ww && this.pinnedShape[1] === wh;
+    if (this.pinned !== null && (sameWindow || !says || says === this.pinned)) {
+      this.mode = this.pinned;
+    } else {
+      this.mode = says ?? (wh > ww ? "portrait" : "landscape");
     }
-    if (!this.pinned) this.mode = says ?? (wh > ww ? "portrait" : "landscape");
     const [bw, bh] = this.base();
 
     // The fit is worked out in CSS pixels, not device pixels: a Retina

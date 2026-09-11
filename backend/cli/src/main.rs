@@ -45,6 +45,13 @@ enum Command {
         /// Start without importing. Useful when the content is mid-edit.
         #[arg(long)]
         no_import: bool,
+        /// Refuse to start if any pack fails to import. Off by default,
+        /// because content is edited while the server runs and one broken pack
+        /// should not take the other five down — but a CI run or a demo wants
+        /// it, and so does anyone who would rather see nothing than see
+        /// yesterday's map.
+        #[arg(long)]
+        strict_content: bool,
     },
     /// Import content packs and exit.
     Import {
@@ -88,7 +95,15 @@ fn real_main() -> Result<()> {
             content,
             static_dir,
             no_import,
-        } => serve(&home_path, bind, content, static_dir, no_import),
+            strict_content,
+        } => serve(
+            &home_path,
+            bind,
+            content,
+            static_dir,
+            no_import,
+            strict_content,
+        ),
         Command::Import { content } => import(&home_path, content),
         Command::Doctor => doctor(&home_path),
         Command::Prune {
@@ -170,6 +185,7 @@ fn serve(
     content_dir: Option<PathBuf>,
     static_dir: Option<PathBuf>,
     no_import: bool,
+    strict_content: bool,
 ) -> Result<()> {
     // The home has to exist before logging can write into it.
     paths::ensure_dir(&home.join("logs")).map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -196,8 +212,28 @@ fn serve(
             failures = report.failures.len(),
             "content imported"
         );
+        // A skipped pack means the server is about to serve the content it
+        // loaded last time — yesterday's map, with nothing the player can see
+        // to say so. A WARN line in a log nobody reads is how half the packs
+        // went stale for a day.
         for (path, reason) in &report.failures {
-            tracing::warn!(path, reason, "pack skipped");
+            tracing::error!(
+                path,
+                reason,
+                "PACK FAILED TO IMPORT — serving stale content"
+            );
+            eprintln!("cwbhacker: PACK FAILED TO IMPORT\n  {path}\n  {reason}");
+        }
+        if !report.failures.is_empty() {
+            eprintln!(
+                "cwbhacker: {} of {} packs did not import; the database still holds whatever was\n\
+                 there before them. `cwbhacker doctor` prints the drift.",
+                report.failures.len(),
+                report.failures.len() + report.packs.len()
+            );
+            if strict_content {
+                anyhow::bail!("refusing to serve stale content (--strict-content)");
+            }
         }
     }
     {
@@ -246,8 +282,8 @@ fn import(home: &Path, content_dir: Option<PathBuf>) -> Result<()> {
     println!("content: {}", dir.display());
     for pack in &report.packs {
         println!(
-            "  {:<18} {:>3} quests  ({} new)  {}",
-            pack.pack, pack.quests, pack.inserted, pack.path
+            "  {:<18} {:>3} quests  (+{} new, -{} removed)  {}",
+            pack.pack, pack.quests, pack.inserted, pack.removed, pack.path
         );
     }
     for (path, reason) in &report.failures {
@@ -256,7 +292,27 @@ fn import(home: &Path, content_dir: Option<PathBuf>) -> Result<()> {
     if report.packs.is_empty() && report.failures.is_empty() {
         println!("  (nothing to import)");
     }
-    if !report.failures.is_empty() {
+    // Whatever the import said, the question that matters is whether the
+    // database now looks like the files. It is cheap to ask and it is the
+    // thing that silently went wrong.
+    let drift = {
+        let conn = store.conn();
+        content::audit_dir(&conn, &dir).map_err(|e| anyhow::anyhow!("{e}"))?
+    };
+    let bad: Vec<&content::PackAudit> = drift.iter().filter(|a| !a.agrees()).collect();
+    for audit in &bad {
+        println!(
+            "  DRIFT  {:<18} file {} / db {}  {}",
+            audit.pack, audit.in_file, audit.in_db, audit.path
+        );
+        for id in audit.missing.iter().take(5) {
+            println!("           missing from the database: {id}");
+        }
+        for id in audit.stale.iter().take(5) {
+            println!("           left over in the database: {id}");
+        }
+    }
+    if !report.failures.is_empty() || !bad.is_empty() {
         std::process::exit(1);
     }
     Ok(())
@@ -332,6 +388,13 @@ fn doctor(home: &Path) -> Result<()> {
                                 "packs       {name:<16} {:>3} quests, in step",
                                 audit.in_file
                             ),
+                            None if audit.in_db == 0 => {
+                                println!(
+                                    "packs       {name:<16} NOT IMPORTED ({} quests waiting) — run `cwbhacker import`",
+                                    audit.in_file
+                                );
+                                bad += 1;
+                            }
                             None => {
                                 println!(
                                     "packs       {name:<16} DRIFT: file {} / db {} ({} missing, {} stale)",

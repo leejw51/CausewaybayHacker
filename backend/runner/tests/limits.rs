@@ -40,8 +40,17 @@ struct Harness {
 }
 
 fn harness() -> Harness {
+    // The home is a directory *inside* the temp dir, not the temp dir itself.
+    //
+    // `the_runner_itself_writes_only_under_the_home_it_was_given` snapshots
+    // the home's parent before and after a run; with the home at the top of
+    // `$TMPDIR` that parent is shared with every other test in this binary,
+    // and a sibling creating its own `tempdir()` mid-snapshot looked exactly
+    // like the runner writing outside its home. One failure in four runs,
+    // which teaches people to re-run instead of read.
     let tmp = tempfile::tempdir().unwrap();
-    let root = tmp.path().to_path_buf();
+    let root = tmp.path().join("home");
+    std::fs::create_dir_all(&root).unwrap();
     Harness { _tmp: tmp, root }
 }
 

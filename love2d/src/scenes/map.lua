@@ -63,11 +63,23 @@ function Map:refresh()
       end
       self.nodes = payload.nodes or {}
       self.edges = payload.edges or {}
+      -- §4.7 says `nodes` arrives "ordered by node", and this sorts anyway.
+      -- Observed on the live server: `world.map` for rust/basic returned
+      -- `rust.basic.12.traits` as the first element. Nothing here depends on
+      -- array order for correctness — positions come from `x`/`y`, paths from
+      -- `edges`, labels from `node.node` — but "the first node the player can
+      -- play" is a walk over this list, and out of order it starts the cursor
+      -- somewhere arbitrary. One sort makes the screen right whatever arrives.
+      table.sort(self.nodes, function(a, b)
+        return (a.node or 0) < (b.node or 0)
+      end)
       self.by_id = {}
       for i, node in ipairs(self.nodes) do
         self.by_id[node.quest_id] = i
       end
-      -- Land on the first node the player can actually play.
+      -- Land on the first node the player can actually play: the earliest
+      -- open one, or failing that the earliest not-locked one.
+      self.cursor = 1
       for i, node in ipairs(self.nodes) do
         if node.state == "open" then self.cursor = i; break end
       end

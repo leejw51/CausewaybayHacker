@@ -1642,3 +1642,78 @@ interface; a tailnet is your own devices and a café network is not;
 live. The run section also now says plainly that a phone uses **5390**, not the
 dev server's 5291, and why — the page and the websocket have to share an
 origin.
+
+## 2026-09-11 — L2D: fullscreen, and a pin is not the same as a guess
+
+**F / F11 toggles window ⇄ fullscreen**, matching `CausewaybayRaiden`'s README
+("F / F11 | Toggle window / fullscreen") so a player who has used a sibling
+already knows the key. `F` is swallowed only on screens that are not taking
+text — in the editor and the login fields it is the letter — and `F11` always
+works. Both are shown in the footer, which now carries the display keys
+globally instead of each scene remembering to mention them.
+
+`desktop` by default. `exclusive` changes the display mode, and a game that
+exits badly while in it leaves the desktop rearranged; `CWBH_FULLSCREEN=
+exclusive` is the way in, matching the sibling's `GOSET_FULLSCREEN`.
+
+Two things taken verbatim from `CausewaybayRaiden/love2d/src/display.lua`,
+both of which had been got wrong here: use `love.window.setFullscreen` rather
+than `setMode` on an open window (macOS keeps the native Space instead of
+dropping to legacy fullscreen), and keep the window **resizable even in
+fullscreen** (SDL only puts a resizable window into a Space; a fixed-size one
+falls back to `CGShieldingWindowLevel` and paints over the Shift-Command-5
+capture UI).
+
+### The orientation bug FE is chasing — this client had a version of it
+
+The question was whether a *restored* orientation is treated as strongly as a
+*pressed* one. It was, because there was no difference: `Layout.mode` was a
+single value, saved and restored, with no record of where it came from.
+
+It did not bite yet, for a reason that stops being true with fullscreen: this
+client sized its own window to match the mode, so the mode and the window
+shape could not disagree. **In fullscreen the shape is the display's**, so the
+moment the toggle exists the bug is real — a landscape inferred once on a wide
+monitor would survive into a fullscreen portrait display and never
+re-evaluate.
+
+Fixed with one persisted boolean, `pinned`:
+
+* **pinned** — the player pressed F1, or `CWBH_ORIENT` was set. The window's
+  shape gets no vote, in a window or fullscreen.
+* **not pinned** — the mode was derived from the window and is derived again
+  every time the window changes shape, the fullscreen transition included.
+* A record written before the field existed reads as *not pinned*, which is
+  the safe side: an unpinned mode is re-derived and a wrongly-pinned one
+  never is.
+* F1 cycles **landscape → portrait → automatic**, three states rather than
+  two, because after one press a two-way toggle leaves a player pinned
+  forever with no way back — and automatic is usually what you want in
+  fullscreen.
+
+`tests/test_display.lua` asserts all of it headlessly, including the
+migration case. *FE: the one-line summary is that "restored" and "chosen"
+must be different values, and the third state has to be reachable.*
+
+### Two observations for BE, from driving the live server
+
+Neither is reproducible now and both may have been a transient, so they are
+recorded as observations rather than as bug reports.
+
+1. **`world.map` briefly returned nodes not ordered by `node`.** §4.7 says
+   "ordered by node"; for `rust/basic` the first array element was
+   `rust.basic.12.traits`. A re-probe minutes later returned 18 nodes in
+   correct order. If that window is the content re-import transaction (the
+   negative-node parking described in BE's own entry), then a client reading
+   `world.map` during an import can see it.
+2. **`world.lands` disagreed with `world.map` at the same moment** —
+   `rust/basic` reported `open: false` with `1/19` cleared while `world.map`
+   showed a cleared node 1 and an open node 2, and `rust/hacker` reported
+   `open: true` with nothing cleared. Consistent with `open` being derived
+   from the same partially-imported ordering. Also clean on re-probe.
+
+The LÖVE client now sorts `world.map`'s nodes by `node` on arrival. Nothing
+depends on array order for correctness — positions come from `x`/`y`, paths
+from `edges`, labels from `node.node` — but "the first node the player can
+play" is a walk over that list, and one sort makes the screen right whatever
+arrives.

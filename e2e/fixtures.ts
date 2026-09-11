@@ -333,16 +333,45 @@ export async function editorText(page: Page): Promise<string> {
  * and match. This turns "I hope the click went where I meant" into a fact.
  */
 export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string | null> {
-  const shown = (await editorText(page)).trim();
+  // The editor is populated by the `quest.get` reply, which is a round trip
+  // after the scene appears. Reading it too early gets an empty box and a
+  // confident `null`.
+  await page
+    .waitForFunction(
+      () =>
+        Array.from(document.querySelectorAll(".cm-line")).some(
+          (l) => (l.textContent ?? "").trim().length > 0,
+        ),
+      null,
+      { timeout: 30_000 },
+    )
+    .catch(() => undefined);
+
+  // CodeMirror renders a zero-width space into an empty line and does its own
+  // thing with trailing whitespace, so compare on shape rather than on bytes.
+  const flatten = (s: string) =>
+    s
+      .replace(/\u200b/g, "")
+      .split("\n")
+      .map((l) => l.replace(/\s+$/, ""))
+      .filter((l) => l.length > 0)
+      .join("\n")
+      .trim();
+
+  const shown = flatten(await editorText(page));
   if (!shown) return null;
   for (const land of ["rust", "go"] as const) {
     for (const node of await wire.mapOf(land)) {
       if (node.state === "locked") continue;
       const got = await wire.ok("quest.get", { quest_id: node.quest_id });
-      const starter = String((got.quest as { starter?: string }).starter ?? "").trim();
+      const starter = flatten(String((got.quest as { starter?: string }).starter ?? ""));
       if (starter && starter === shown) return node.quest_id;
     }
   }
+  // Not a match, but the language is still a strong signal — and for the
+  // retry loop that is all that is needed.
+  if (/^package\s+main\b/m.test(shown)) return "go.unknown";
+  if (/\bfn\s+main\s*\(/.test(shown)) return "rust.unknown";
   return null;
 }
 
@@ -360,6 +389,13 @@ export async function enterRustQuest(page: Page, wire: Wire): Promise<string> {
     await pickFirstCategory(page);
     await openSelectedNode(page);
     const id = await identifyOpenQuest(page, wire);
+    if (id === "rust.unknown")
+      throw new Error(
+        "the browser opened a RUST quest whose starter matches no open quest " +
+          "the wire knows about. Either the content on disk and the content " +
+          "in the database disagree (run `cwbhacker doctor`), or the editor " +
+          "is showing something other than the starter.",
+      );
     if (id?.startsWith("rust.")) return id;
     // Back to the lands plate and flip the land. `lands.key` toggles on
     // left/right and there is no way to *set* it, which is why this is a

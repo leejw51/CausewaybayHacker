@@ -47,14 +47,47 @@ official release from GitHub instead, and `make run` will use a `love` on
 | variable | default | |
 | --- | --- | --- |
 | `CWBH_SERVER` | `ws://127.0.0.1:5390/ws` | where the server is |
-| `CWBH_ORIENT` | — | `portrait` to start portrait |
+| `CWBH_ORIENT` | — | `portrait` or `landscape` to start pinned that way |
+| `CWBH_FULLSCREEN` | `desktop` | `exclusive` for a real display-mode change |
 | `CWBH_FFI_LIB` | — | an explicit path to `libcwbh_ffi.dylib` |
 | `CWBH_TEST` | — | `1` runs the suite and quits |
 | `CWBH_DRIVE` | — | a scripted session (`tests/drive/*.lua`) |
 
-Keys: **F1** orientation · **F3** scanlines · **F4** sound · **F11** fullscreen.
-In a quest: **F5** submit · **F6** reset · **F7** hint · **F8** log · **F9**
-`$EDITOR` · **TAB** indent · **ESC** back.
+| key | |
+| --- | --- |
+| **F** / **F11** | window ⇄ fullscreen — the same binding as `CausewaybayRaiden` |
+| **F1** | orientation: landscape → portrait → automatic |
+| **F3** / **F4** | scanlines · sound |
+| **F5** … **F9** | in a quest: submit · reset · hint · log · `$EDITOR` |
+| **TAB** / **ESC** | indent · back |
+
+`F` is only a shortcut on screens that are not taking text; in the editor and
+the login fields it is the letter. `F11` always works.
+
+### Window and fullscreen
+
+`F` or `F11` toggles at any time, from any screen, **without losing your
+place** — including mid-quest with half-written source in the editor. The
+virtual canvas is re-measured across the transition and the scene is not
+touched.
+
+Fullscreen is **`desktop`** by default: `exclusive` changes the display mode,
+and a game that exits badly while in it leaves the desktop rearranged. Set
+`CWBH_FULLSCREEN=exclusive` if you want the real thing — the same override the
+sibling spells `GOSET_FULLSCREEN`.
+
+**F1 cycles three states, not two.** Landscape and portrait are *pins*: you
+asked, so the window's shape does not get a vote. The third state is
+automatic, where the orientation follows the window — which is usually what
+you want in fullscreen, since the shape there is the display's and not yours.
+The footer always says which one you are in.
+
+Both the fullscreen state and the orientation are remembered across restarts,
+**including whether the orientation was a pin**. A mode that was merely
+inferred from last week's window comes back as a starting guess and is
+re-derived; a mode you pressed F1 for comes back as a pin. Those are different
+things and storing them as the same thing is a real bug — see
+`tests/test_display.lua`.
 
 ## Testing
 

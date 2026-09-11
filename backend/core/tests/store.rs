@@ -575,3 +575,64 @@ fn two_quests_can_swap_nodes_in_one_import() {
         ]
     );
 }
+
+/// The real edit that broke the importer, in miniature.
+///
+/// Lengthening a map moves the boss: SPEC §12 makes the id carry the node
+/// number, so `rust.basic.12.traits` becomes `rust.basic.18.traits` while a
+/// *different* quest takes node 12. An id that left the file while its node
+/// stayed occupied is the exact shape that produced the constraint violation,
+/// and it is not hypothetical — it happened to four quests at once.
+#[test]
+fn a_renumbered_boss_does_not_collide_with_its_replacement() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+
+    let v1 = pack_of(&[(1, "alpha"), (2, "beta"), (3, "boss")]);
+    let store = reimport(&home, tmp.path(), &v1);
+    {
+        let conn = store.conn();
+        users::upsert(&conn, ALICE).unwrap();
+        progress::record_clear(&conn, ALICE, "rust.basic.01.alpha", 10).unwrap();
+        progress::record_clear(&conn, ALICE, "rust.basic.03.boss", 10).unwrap();
+    }
+    drop(store);
+
+    // The map grew: `gamma` takes node 3, and the boss moves to the end and
+    // is renamed by the same rule that names every quest.
+    let v2 = pack_of(&[(1, "alpha"), (2, "beta"), (3, "gamma"), (4, "boss")]);
+    let store = reimport(&home, tmp.path(), &v2);
+
+    assert_eq!(
+        ids_and_nodes(&store),
+        vec![
+            ("rust.basic.01.alpha".to_string(), 1),
+            ("rust.basic.02.beta".to_string(), 2),
+            ("rust.basic.03.gamma".to_string(), 3),
+            ("rust.basic.04.boss".to_string(), 4),
+        ]
+    );
+    let conn = store.conn();
+    // The clear on the quest that did not move is untouched…
+    assert!(
+        progress::get(&conn, ALICE, "rust.basic.01.alpha")
+            .unwrap()
+            .cleared
+    );
+    // …and the old boss id is gone, progress and all. A rename is
+    // indistinguishable from a delete-plus-insert, and guessing wrong is
+    // worse than losing one clear while nobody has a real save.
+    let ghosts: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM progress WHERE quest_id = 'rust.basic.03.boss'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(ghosts, 0);
+    assert!(
+        !progress::get(&conn, ALICE, "rust.basic.04.boss")
+            .unwrap()
+            .cleared
+    );
+}

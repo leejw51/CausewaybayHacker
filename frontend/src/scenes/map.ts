@@ -30,7 +30,7 @@ import {
   GO,
   RUST,
 } from "../ui/chrome";
-import { seconds, Tween } from "../engine/motion";
+import { reducedMotion, seconds, Tween } from "../engine/motion";
 import type { Category, Land, MapNode } from "../net/protocol";
 import { LandsScene } from "./lands";
 import { QuestScene } from "./quest";
@@ -440,10 +440,14 @@ export class MapScene implements Scene {
     g.translate(0, -plateLift);
     this.drawPlate(g);
     clipped(g, this.plate[0], this.plate[1], this.plate[2], this.plate[3], () => {
+      // In front of the ground, behind the markers. The wires are scenery and
+      // the markers are the game: the first frame with them on top put the
+      // awning squarely over node 1, which on this pack stands in the very
+      // corner of the map.
+      this.drawWires(g);
       this.drawEdges(g);
       this.drawNodes(g);
       this.drawMei(g);
-      this.drawWires(g);
     });
     g.restore();
 
@@ -652,7 +656,7 @@ export class MapScene implements Scene {
    * camera leans, which is the only reason it is here at all: a static overlay
    * would be a decal, and a decal does not make a picture into a place.
    *
-   * Only the **top third of the source** is used, and that is a decision
+   * Only the **top half of the source** is used, and that is a decision
    * against the brief rather than a shortcut. `fg_wires` is a 3:1 strip, so
    * stretching all of it across a plate this wide makes it half the plate
    * tall — and the bottom two thirds of it are four hanging sign panels the
@@ -667,11 +671,18 @@ export class MapScene implements Scene {
     const [px, py, pw] = this.plate;
     const gl = this.app.backdrop?.map;
     const [lu] = gl?.active ? gl.lean() : [0.5];
-    const srcH = Math.round(art.naturalHeight * 0.34);
+    // 55% of the source: the wire web and the tops of the poles, stopping at the
+    // row where the hanging sign panels begin.
+    const srcH = Math.round(art.naturalHeight * 0.55);
     // Wider than the plate, so there is something to slide.
     const w = pw * 1.16;
     const h = (w * srcH) / art.naturalWidth;
-    const slide = (0.5 - lu) * pw * 0.2;
+    // Two things move it: the camera, while it is pushing into a street, and a
+    // slow idle drift, because wires over a street are never quite still. The
+    // drift is dt-driven like everything else, so a captured frame is the same
+    // frame every run.
+    const drift = reducedMotion() ? 0 : Math.sin(this.t * 0.21) * pw * 0.012;
+    const slide = (0.5 - lu) * pw * 0.5 + drift;
     g.save();
     g.globalAlpha = 0.9;
     g.drawImage(
@@ -707,7 +718,7 @@ export class MapScene implements Scene {
     const depth = this.app.backdrop?.map.active
       ? this.app.backdrop.map.scaleAt(this.mei[0], this.mei[1])
       : 1;
-    const h = Math.round(46 * s * depth);
+    const h = Math.round(58 * s * depth);
     const walking = this.walk !== null;
     // The step is driven by the walk's own progress, not by wall time, so a
     // captured frame is the same frame every run.
@@ -852,24 +863,27 @@ export class MapScene implements Scene {
      * this player earned on it, how many times they have thrown code at it, and
      * what is standing between them and it. None of it is invented here.
      */
-    const gap = Math.round(20 * s);
-    const barW = Math.min(Math.round(124 * s), Math.round(textW * 0.34));
+    // Three columns across the whole width of the plate, not three things
+    // huddled at the left end of it. The slab is as wide as the overworld and
+    // the facts have to be laid out as if that width were on purpose.
+    const col = textW / 3;
+    const barW = Math.min(Math.round(150 * s), Math.round(col * 0.8));
     drawDifficulty(g, ix, iy, barW, n.difficulty, 5);
 
-    const label = (text: string, lx: number, col = Theme.dim) => {
-      g.fillStyle = css(col);
+    const label = (text: string, lx: number, col2 = Theme.dim) => {
+      g.fillStyle = css(col2);
       printf(g, fonts.stationSm, text, lx, iy, textW, "left");
     };
     const valueY = iy + fonts.stationSm.height + Math.round(f8(s));
 
-    let cx2 = ix + barW + gap;
-    label("STARS", cx2);
-    drawStars(g, cx2 + Math.round(7 * s), valueY + Math.round(5 * s), Math.round(7 * s), n.stars, 3);
+    const starX = ix + Math.round(col);
+    label("STARS", starX);
+    drawStars(g, starX + Math.round(7 * s), valueY + Math.round(5 * s), Math.round(7 * s), n.stars, 3);
 
-    cx2 += Math.round(84 * s);
-    label("TRIES", cx2);
+    const tryX = ix + Math.round(col * 2);
+    label("TRIES", tryX);
     g.fillStyle = css(n.attempts > 0 ? Theme.cream : Theme.dim);
-    printf(g, fonts.small, String(n.attempts), cx2, valueY, textW, "left");
+    printf(g, fonts.small, String(n.attempts), tryX, valueY, textW, "left");
 
     iy += difficultyH() + Math.round(12 * s);
 

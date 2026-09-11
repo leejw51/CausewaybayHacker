@@ -453,8 +453,8 @@ export class App {
         [dw - ox, dw - ox + reachX, dw - ox, ox],
       ] as const) {
         const grad = g.createLinearGradient(x0, 0, x1, 0);
-        grad.addColorStop(0, "rgba(20,28,72,0.35)");
-        grad.addColorStop(1, "rgba(20,28,72,0.9)");
+        grad.addColorStop(0, "rgba(10,14,40,0.55)");
+        grad.addColorStop(1, "rgba(6,8,24,0.97)");
         g.fillStyle = grad;
         g.fillRect(x, 0, wide, dh);
       }
@@ -465,13 +465,18 @@ export class App {
         [dh - oy, dh - oy + reachY, dh - oy, oy],
       ] as const) {
         const grad = g.createLinearGradient(0, y0, 0, y1);
-        grad.addColorStop(0, "rgba(20,28,72,0.35)");
-        grad.addColorStop(1, "rgba(20,28,72,0.9)");
+        grad.addColorStop(0, "rgba(10,14,40,0.55)");
+        grad.addColorStop(1, "rgba(6,8,24,0.97)");
         g.fillStyle = grad;
         g.fillRect(0, y, dw, tall);
       }
     }
+    // Two rules, ink outside and gold inside: the edge of a screen set into a
+    // cabinet. One dark line on a night sky is not an edge, it is a scratch.
     g.strokeStyle = css(Theme.ink);
+    g.lineWidth = 4;
+    g.strokeRect(ox - 2, oy - 2, w + 4, h + 4);
+    g.strokeStyle = css(Theme.coin, 0.5);
     g.lineWidth = 2;
     g.strokeRect(ox - 1, oy - 1, w + 2, h + 2);
     g.lineWidth = 1;
@@ -512,7 +517,9 @@ export class App {
   }
 
   setOrientation(mode: Orientation): void {
-    this.layout.pin(mode, null);
+    // Forced, for this window: the capture hook asks for a landscape shot in a
+    // tall window and must actually get one.
+    this.layout.pin(mode);
     this.remeasure();
     this.saveOrientation();
   }

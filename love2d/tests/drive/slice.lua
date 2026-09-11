@@ -66,9 +66,15 @@ return {
   { shot = "05-map.png" },
 
   { until_ = function(app)
+      -- Node 1 on a wallet that has played before is `cleared`, not `open`;
+      -- either is playable and either is a fine place to start the slice.
       local n = app.scene.nodes and app.scene.nodes[app.scene.cursor]
-      return n and n.node == 1 and n.state == "open"
-    end, note = "the cursor is on node 1, and it is open", timeout = 10 },
+      if n then
+        print(("slice: starting on node %d (%s), state=%s"):format(
+          n.node or -1, tostring(n.quest_id), tostring(n.state)))
+      end
+      return n ~= nil and n.state ~= "locked"
+    end, note = "the cursor is on a playable node", timeout = 10 },
   { key = "return" },
   { until_ = scene("quest"), note = "node 1", timeout = 10 },
   { until_ = function(app) return app.scene.quest ~= nil end,

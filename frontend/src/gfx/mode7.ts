@@ -73,11 +73,41 @@ export class Mode7 {
   private tex: Texture | null = null;
   private source: HTMLImageElement | null = null;
 
-  /** The plane's extent in world units: `aspect` across, 1 deep. */
-  private aspect = 1.5;
+  /**
+   * The plane's extent in world units: `aspect` across, 1 deep.
+   *
+   * Starts at zero rather than at a plausible 1.5, so that the first image to
+   * arrive always applies its own. It was 1.5, the first map is 1.5, and the
+   * "has this changed?" guard therefore skipped the one call that sizes the
+   * plane — leaving it the 1x1 the geometry was built at, which drew the
+   * overworld as a square with a third of it missing.
+   */
+  private aspect = 0;
   /** The camera height that fits the whole plane in the plate, before zoom. */
   private baseDist = 2;
   private vp: Viewport = { x: 0, y: 0, w: 1, h: 1, dh: 1 };
+  /** Where the camera actually ended up looking, after the lean was applied. */
+  private appliedU = 0.5;
+  private appliedV = 0.5;
+
+  /**
+   * How far the camera leans toward the selected street, as a fraction of the
+   * distance to it — **and only while it is pushing in**.
+   *
+   * At rest the answer is zero, and that is a decision taken with the first
+   * frame in front of me. The plane is finite: any lean at rest means the fit
+   * has to hold the plate covered at the extremes of that lean, and the slack
+   * that buys shows up as the overworld sitting in the middle of its own plate
+   * with a band of floor all round it. The alternative — fit tight and crop
+   * the difference — is worse, because node 1 of rust/hacker stands at u=0.06
+   * and a three percent crop takes half of it off the map.
+   *
+   * So the plate is filled exactly, and the camera move is spent where it
+   * actually reads: going *in*. As the zoom pushes toward a street the plane
+   * over-fills the plate, and leaning is free because there is no edge to
+   * expose. The map holds still while you read it and moves when you commit.
+   */
+  private static readonly DIVE_LEAN = 0.85;
 
   /** Where the camera is looking, in 0..1 map coordinates, and how close. */
   private readonly fu = new Chase(0.5, "camera");
@@ -123,9 +153,10 @@ export class Mode7 {
     const a = Math.max(0.2, aspectW / Math.max(1, aspectH));
     if (a !== this.aspect) {
       this.aspect = a;
-      this.mesh.scale.set(a, 1, 1);
       this.fit();
     }
+    // Unconditional. The guard above is about *refitting*, not about sizing.
+    this.mesh.scale.set(a, 1, 1);
   }
 
   /** The plate, in device pixels. Refits the camera when it changes shape. */
@@ -182,11 +213,21 @@ export class Mode7 {
    * ground shift under the selection.
    */
   private place(): void {
-    const lean = reducedMotion() ? 0.12 : 0.34;
-    const u = 0.5 + (this.fu.value - 0.5) * lean;
-    const v = 0.5 + (this.fv.value - 0.5) * lean;
+    const z = this.zoom.value;
+    // Only what the push has bought. `1 - z` is how far in we are.
+    const lean = Math.max(0, 1 - z) * Mode7.DIVE_LEAN * (reducedMotion() ? 0.4 : 1);
+    this.look(
+      0.5 + (this.fu.value - 0.5) * lean,
+      0.5 + (this.fv.value - 0.5) * lean,
+      z,
+    );
+  }
+
+  private look(u: number, v: number, zoom: number): void {
+    this.appliedU = u;
+    this.appliedV = v;
     const focus = this.world(u, v);
-    const d = this.baseDist * this.zoom.value;
+    const d = this.baseDist * zoom;
     this.camera.position.set(focus.x, d * Math.cos(TILT), focus.z + d * Math.sin(TILT));
     this.camera.lookAt(focus.x, 0, focus.z);
     this.camera.updateMatrixWorld();
@@ -203,8 +244,10 @@ export class Mode7 {
   private fit(): void {
     const half = Math.tan((FOV * Math.PI) / 360);
     this.baseDist = (0.5 / half) * 1.04;
-    for (let i = 0; i < 32; i++) {
-      this.place();
+    // At rest the camera is centred, so the fit is the tight one: every corner
+    // of the plane just inside the frame and nothing left over.
+    for (let i = 0; i < 60; i++) {
+      this.look(0.5, 0.5, 1);
       let inside = true;
       for (const [cu, cv] of [
         [0, 0],
@@ -213,11 +256,12 @@ export class Mode7 {
         [1, 1],
       ] as const) {
         const p = this.world(cu, cv).project(this.camera);
-        if (Math.abs(p.x) > 0.995 || Math.abs(p.y) > 0.995) inside = false;
+        if (Math.abs(p.x) > 0.9995 || Math.abs(p.y) > 0.9995) inside = false;
       }
-      if (inside) return;
-      this.baseDist *= 1.03;
+      if (inside) break;
+      this.baseDist *= 1.01;
     }
+    this.place();
   }
 
   /**
@@ -272,7 +316,7 @@ export class Mode7 {
    * because the plate does not move.
    */
   lean(): [number, number] {
-    return [this.fu.value, this.fv.value];
+    return [this.appliedU, this.appliedV];
   }
 
   /** The second pass, over the sky, inside the plate. */
