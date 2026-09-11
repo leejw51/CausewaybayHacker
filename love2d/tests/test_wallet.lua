@@ -50,6 +50,17 @@ return function()
     end
     T.eq(paths[1], "/game/libcwbh_ffi.dylib", "a packaged copy beside the game wins")
     T.ok(paths[2]:find("ffi/target/release"), "then a checkout, freshest first")
+    -- The application bundle: the executable and the archive both sit one
+    -- directory below Contents, and Frameworks is beside them.
+    local joined = table.concat(paths, "\n")
+    T.ok(joined:find("/Frameworks/libcwbh_ffi.dylib", 1, true) ~= nil,
+      "a bundle finds its library in Contents/Frameworks")
+    local app = wallet.search_paths("/A.app/Contents/MacOS/love", nil, "OSX")
+    local hit = false
+    for _, p in ipairs(app) do
+      if p == "/A.app/Contents/Frameworks/libcwbh_ffi.dylib" then hit = true end
+    end
+    T.ok(hit, "from Contents/MacOS/love the path resolves to Contents/Frameworks")
     local override = wallet.search_paths("/game", "/tmp/mine.dylib", "OSX")
     T.eq(override[1], "/tmp/mine.dylib", "CWBH_FFI_LIB beats every guess")
     T.eq(wallet.library_name("Linux"), "libcwbh_ffi.so")

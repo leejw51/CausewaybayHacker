@@ -66,6 +66,29 @@ up. `make remote` prints them again.
 > addresses are live so you never have to guess. And do not paste in code you
 > would not run in your own shell — the trainer will run it.
 
+## Release
+
+```bash
+make package          # every release binary into dist/
+make package-server   # the server tarball: cwbhacker + web client + content packs + cwbh
+make package-gui      # the LÖVE client as a signed macOS .app, and a .love (macOS only)
+make version          # the version, once all four manifests agree on it
+```
+
+The server tarball unpacks to a directory with `run.sh` in it, which starts
+`cwbhacker` with its own web client and content beside it — nothing else is
+needed on the machine. Both halves check themselves on the way out: the staged
+server is started from outside the checkout and has to serve the page and
+import every pack; the app bundle is started and has to find its own key
+library.
+
+CI (`.github/workflows/ci.yml`) runs the backend, CLI, frontend, LÖVE and
+content suites on every push and pull request, and dry-runs the packaging.
+Pushing a tag `vX.Y.Z` that matches `make version` runs the release workflow,
+which builds the server for Linux (x86_64, aarch64) and macOS, signs and
+notarises the app when the Apple secrets are set, and attaches everything to a
+GitHub release with checksums.
+
 ## The parts
 
 | | |

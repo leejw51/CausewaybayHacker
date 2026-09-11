@@ -99,6 +99,18 @@ function M.search_paths(root, override, os_name)
   paths[#paths + 1] = M.normalize(root .. "/ffi/target/debug/" .. name)
   paths[#paths + 1] = M.normalize(root .. "/../ffi/target/release/" .. name)
   paths[#paths + 1] = M.normalize(root .. "/../ffi/target/debug/" .. name)
+  -- An application bundle. `love2d/Makefile`'s `app` puts the library in
+  -- `Contents/Frameworks`, where a signed bundle keeps its nested binaries
+  -- and where codesign expects to find them; `root` there is the executable
+  -- (`Contents/MacOS/love`) or the archive (`Contents/Resources/game.love`),
+  -- and both are one directory below `Contents`. A bundle has no checkout to
+  -- walk up to and no environment a double-click could set, so this is the
+  -- only way it finds its own library.
+  paths[#paths + 1] = M.normalize(root .. "/../Frameworks/" .. name)
+  paths[#paths + 1] = M.normalize(root .. "/../../Frameworks/" .. name)
+  -- Beside the archive, which is the shape a `.love` handed to somebody with
+  -- their own LÖVE takes.
+  paths[#paths + 1] = M.normalize(root .. "/../" .. name)
   for _, dir in ipairs(system_library_dirs(os_name)) do
     paths[#paths + 1] = dir .. "/" .. name
   end

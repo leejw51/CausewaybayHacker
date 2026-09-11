@@ -30,13 +30,14 @@ impl ExtendedPrivateKey {
         let mut chain_code = [0u8; 32];
         key.copy_from_slice(&out[..32]);
         chain_code.copy_from_slice(&out[32..]);
-        SecretKey::from_slice(&key).map_err(|_| "seed produced an invalid master key".to_string())?;
+        SecretKey::from_slice(&key)
+            .map_err(|_| "seed produced an invalid master key".to_string())?;
         Ok(ExtendedPrivateKey { key, chain_code })
     }
 
     pub fn derive_child(&self, index: u32) -> Result<Self, String> {
-        let parent =
-            SecretKey::from_slice(&self.key).map_err(|_| "invalid parent private key".to_string())?;
+        let parent = SecretKey::from_slice(&self.key)
+            .map_err(|_| "invalid parent private key".to_string())?;
 
         let mut data = Vec::with_capacity(37);
         if index >= HARDENED {
@@ -58,7 +59,8 @@ impl ExtendedPrivateKey {
         // at 1-in-2^127 it is reported rather than silently walked past.
         let tweak = SecretKey::from_slice(&out[..32])
             .map_err(|_| format!("derivation at index {index} landed on an invalid key"))?;
-        let child_scalar = *parent.to_nonzero_scalar().as_ref() + *tweak.to_nonzero_scalar().as_ref();
+        let child_scalar =
+            *parent.to_nonzero_scalar().as_ref() + *tweak.to_nonzero_scalar().as_ref();
         let child = SecretKey::from_bytes(&child_scalar.to_bytes())
             .map_err(|_| format!("derivation at index {index} landed on an invalid key"))?;
 

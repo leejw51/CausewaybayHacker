@@ -262,8 +262,7 @@ fn run(request_json: &str) -> Result<serde_json::Value, String> {
             let mode: u32 = if as_directory { 0o700 } else { 0o600 };
 
             if as_directory {
-                std::fs::create_dir_all(path)
-                    .map_err(|e| format!("cannot create {path}: {e}"))?;
+                std::fs::create_dir_all(path).map_err(|e| format!("cannot create {path}: {e}"))?;
             }
 
             #[cfg(unix)]
@@ -378,7 +377,9 @@ pub unsafe extern "C" fn cwbh_execute(request_json: *const c_char) -> *mut c_cha
     let raw = CStr::from_ptr(request_json);
     let text = match raw.to_str() {
         Ok(t) => t.to_string(),
-        Err(_) => return into_c_string(r#"{"ok":false,"error":"request is not UTF-8"}"#.to_string()),
+        Err(_) => {
+            return into_c_string(r#"{"ok":false,"error":"request is not UTF-8"}"#.to_string())
+        }
     };
     // A panic unwinding into LuaJIT is undefined behaviour; it becomes an
     // error envelope instead.
@@ -444,7 +445,10 @@ mod tests {
         assert_eq!(signed["signature"].as_str().unwrap().len(), 132);
 
         // `validate` agrees with `generate`.
-        assert_eq!(call(json!({ "op": "validate", "mnemonic": phrase }))["valid"], true);
+        assert_eq!(
+            call(json!({ "op": "validate", "mnemonic": phrase }))["valid"],
+            true
+        );
     }
 
     #[test]

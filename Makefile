@@ -3,6 +3,7 @@
 #   make          what you can do
 #   make start    bring the servers up in the background
 #   make stop     put them down again
+#   make package  every release binary into dist/ (server tarball, LÖVE app)
 #
 # `start` runs the servers detached, with their pids in .run/ and their output
 # in .run/*.log, so a terminal that started them can be closed and another one
@@ -54,6 +55,21 @@ VITE       := frontend/node_modules/.bin/vite
 # How long `start` waits for a port to answer before calling it a failure.
 WAIT_SECS  ?= 90
 
+# The version of record. Four manifests carry one: the backend workspace, the
+# CLI crate, the LÖVE key library and the frontend. `make version` prints it
+# only when all four agree, and the release workflow compares the tag to it.
+BE_VERSION  := $(shell sed -n 's/^version = "\(.*\)"/\1/p' backend/Cargo.toml | head -1)
+CLI_VERSION := $(shell sed -n 's/^version = "\(.*\)"/\1/p' cli/Cargo.toml | head -1)
+FFI_VERSION := $(shell sed -n 's/^version = "\(.*\)"/\1/p' love2d/ffi/Cargo.toml | head -1)
+FE_VERSION  := $(shell sed -n 's/^  "version": "\(.*\)",/\1/p' frontend/package.json | head -1)
+VERSION     := $(BE_VERSION)
+
+# Where `make package` puts what it built, and what the archives are named.
+DIST       := dist
+TARGET     := $(shell rustc -vV 2>/dev/null | sed -n 's/^host: //p')
+SIGN       := scripts/codesign-binary.sh
+SERVER_PKG := causewaybay-hacker-server-$(VERSION)-$(TARGET)
+
 # True when $(1) is held by a process whose name matches $(2) — that is, by
 # something of ours. Used as a plain shell test rather than a sub-make, because
 # a sub-make that returns non-zero prints `make: *** Error 1` at you, and
@@ -62,6 +78,7 @@ held = p=$$(lsof -nP -iTCP:$(1) -sTCP:LISTEN -t 2>/dev/null | head -1); \
        [ -n "$$p" ] && ps -o comm= -p $$p 2>/dev/null | grep -qE '$(2)'
 
 .PHONY: help start stop restart status logs remote art gui serve web build test test-all test-all-list test-be test-fe \
+        fmt-check check version package release package-server package-server-verify package-gui package-love \
         test-love test-e2e smoke fmt lint doctor clean clean-home
 
 ##@ Running
@@ -206,6 +223,110 @@ lint: ## clippy, tsc, and the LÖVE layering check
 	cd frontend && npm run lint
 	$(MAKE) -C love2d lint
 
+fmt-check: ## fail if anything is not formatted (what CI runs)
+	cd backend && cargo fmt --check
+	cd cli && cargo fmt --check
+	cd love2d/ffi && cargo fmt --check
+
+check: fmt-check lint test test-love ## everything CI runs on a pull request, in one word
+	$(MAKE) -C cli check
+
+version: ## print the version, once every manifest agrees on it
+	@test "$(BE_VERSION)" = "$(CLI_VERSION)" -a "$(BE_VERSION)" = "$(FFI_VERSION)" -a "$(BE_VERSION)" = "$(FE_VERSION)" || { \
+	  echo "ERROR: the manifests disagree — backend $(BE_VERSION), cli $(CLI_VERSION), love2d/ffi $(FFI_VERSION), frontend $(FE_VERSION)" >&2; \
+	  exit 1; }
+	@echo "$(VERSION)"
+
+##@ Packaging
+
+# `make package` is every release binary, into $(DIST):
+#
+#   $(SERVER_PKG).tar.gz        the server: cwbhacker (BE) with the built
+#                               frontend (FE) and the content packs beside it,
+#                               plus the cwbh terminal client and a run script
+#   CausewaybayHacker-macos.zip the LÖVE client as a double-clickable .app
+#                               (macOS only — see love2d/Makefile)
+#   causewaybay-hacker.love     the same game for anyone with their own LÖVE 11
+#
+# The halves are separate targets because they want different machines: the
+# server tarball is per platform and builds anywhere Rust and Node do, the
+# app needs macOS. The release workflow runs each where it belongs.
+package: package-server package-gui ## every release binary: the server tarball and the LÖVE client
+	@echo
+	@echo "  $(DIST)/"
+	@ls -1 $(DIST) | sed 's/^/    /'
+
+release: package ## alias for package
+
+package-server: ## the server (BE + FE + content) and the CLI, as one tarball in $(DIST)
+	@$(MAKE) -s version >/dev/null
+	@$(MAKE) -s art
+	cd frontend && npm ci --silent && npm run build --silent
+	cd backend && cargo build --release -p cwbhacker
+	cd cli && cargo build --release
+	@rm -rf "$(DIST)/$(SERVER_PKG)" "$(DIST)/$(SERVER_PKG).tar.gz"
+	@mkdir -p "$(DIST)/$(SERVER_PKG)/web"
+	@cp backend/target/release/cwbhacker "$(DIST)/$(SERVER_PKG)/cwbhacker"
+	@cp cli/target/release/cwbh "$(DIST)/$(SERVER_PKG)/cwbh"
+	@cp -R frontend/dist/. "$(DIST)/$(SERVER_PKG)/web/"
+	@cp -R content "$(DIST)/$(SERVER_PKG)/content"
+	@cp README.md LICENSE SPEC.md PROTOCOL.md "$(DIST)/$(SERVER_PKG)/"
+	@$(SIGN) "$(DIST)/$(SERVER_PKG)/cwbhacker"
+	@$(SIGN) "$(DIST)/$(SERVER_PKG)/cwbh"
+	@# The launcher: the server needs to be told where its frontend and its
+	@# content are, because outside a checkout it cannot walk up to them.
+	@printf '%s\n' \
+		'#!/bin/sh' \
+		'# Causewaybay Hacker — the server, with the web client and the content packs beside it.' \
+		'#' \
+		'#   ./run.sh                  serve on 127.0.0.1:5390 (this machine only)' \
+		'#   ./run.sh --bind 0.0.0.0:5390   ...reachable from your other devices' \
+		'#' \
+		'# Read README.md before binding to anything but loopback: the server compiles' \
+		'# and runs the code submitted to it, on this machine, as you. It is a trainer,' \
+		'# not a sandbox. Progress lives in ~/.causewaybayhacker (or --home DIR).' \
+		'set -eu' \
+		'here=$$(CDPATH= cd -- "$$(dirname -- "$$0")" && pwd)' \
+		'exec "$$here/cwbhacker" serve --static "$$here/web" --content "$$here/content" "$$@"' \
+		> "$(DIST)/$(SERVER_PKG)/run.sh"
+	@chmod +x "$(DIST)/$(SERVER_PKG)/run.sh"
+	@$(MAKE) -s package-server-verify
+	@cd "$(DIST)" && COPYFILE_DISABLE=1 tar -czf "$(SERVER_PKG).tar.gz" "$(SERVER_PKG)"
+	@echo "  $(DIST)/$(SERVER_PKG).tar.gz  ($$(du -h "$(DIST)/$(SERVER_PKG).tar.gz" | cut -f1))"
+
+# Start what was staged, from outside the checkout, and see that it serves
+# the page and imports every pack. A staged server that cannot find its
+# frontend answers the root with a "there is no frontend/dist yet" page and
+# a 200, so the check is for the page's own markup, not the status.
+package-server-verify:
+	@pkg="$(abspath $(DIST)/$(SERVER_PKG))"; port=$$((5600 + RANDOM % 200)); home=$$(mktemp -d); \
+	"$$pkg/cwbhacker" --version | grep -q "$(VERSION)" || { echo "  cwbhacker does not report $(VERSION)" >&2; exit 1; }; \
+	"$$pkg/cwbh" --version | grep -q "$(VERSION)" || { echo "  cwbh does not report $(VERSION)" >&2; exit 1; }; \
+	( cd /tmp && "$$pkg/run.sh" --bind 127.0.0.1:$$port --home "$$home" --strict-content > "$$home/server.log" 2>&1 & echo $$! > "$$home/pid" ); \
+	ok=""; for _ in $$(seq 1 60); do \
+	  if curl -fsS "http://127.0.0.1:$$port/" 2>/dev/null | grep -q '<script'; then ok=1; break; fi; sleep 0.5; \
+	done; \
+	kill "$$(cat "$$home/pid")" 2>/dev/null || true; \
+	if [ -z "$$ok" ]; then echo "  the packaged server did not serve the page:" >&2; tail -20 "$$home/server.log" >&2; rm -rf "$$home"; exit 1; fi; \
+	grep -q "content imported" "$$home/server.log" || { echo "  the packaged server did not import its content:" >&2; tail -20 "$$home/server.log" >&2; rm -rf "$$home"; exit 1; }; \
+	rm -rf "$$home"; \
+	echo "  the packaged server serves the page and imports every pack"
+
+package-gui: ## the LÖVE client: a macOS .app (signed) and a .love, into $(DIST)
+	@$(MAKE) -s version >/dev/null
+	@$(MAKE) -C love2d app $(if $(SKIP_SMOKE),SKIP_SMOKE=1,)
+	@mkdir -p "$(DIST)"
+	@cp love2d/build/CausewaybayHacker-macos.zip "$(DIST)/CausewaybayHacker-$(VERSION)-$(TARGET).zip"
+	@cp love2d/build/causewaybay-hacker.love "$(DIST)/causewaybay-hacker-$(VERSION).love"
+	@echo "  $(DIST)/CausewaybayHacker-$(VERSION)-$(TARGET).zip"
+	@echo "  $(DIST)/causewaybay-hacker-$(VERSION).love"
+
+package-love: ## just the .love archive (any platform with zip)
+	@$(MAKE) -C love2d love-file
+	@mkdir -p "$(DIST)"
+	@cp love2d/build/causewaybay-hacker.love "$(DIST)/causewaybay-hacker-$(VERSION).love"
+	@echo "  $(DIST)/causewaybay-hacker-$(VERSION).love"
+
 doctor: ## check the toolchains and the server's own view of things
 	@command -v cargo >/dev/null && cargo --version   || echo "MISSING: rust   — https://rustup.rs"
 	@command -v go    >/dev/null && go version        || echo "MISSING: go     — needed for the go land"
@@ -216,7 +337,7 @@ doctor: ## check the toolchains and the server's own view of things
 
 clean: ## drop build output (your progress is untouched)
 	cd backend && cargo clean
-	rm -rf frontend/dist frontend/node_modules $(RUN)
+	rm -rf frontend/dist frontend/node_modules $(RUN) $(DIST)
 	$(MAKE) -C love2d clean
 
 clean-home: ## DELETE every user's code, attempts and progress in $(HOME_DIR)

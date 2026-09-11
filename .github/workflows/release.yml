@@ -1,0 +1,320 @@
+# Release — `make package` on the machines it needs, attached to a GitHub
+# release.
+#
+# Triggered by pushing a tag like `v0.1.0` to main. The tag must match the
+# version of record — `make version`, which prints the number only once the
+# backend workspace, the CLI crate, the LÖVE key library and the frontend all
+# agree on it. Or manually via workflow_dispatch for a dry run that uploads
+# the artifacts without creating a release.
+#
+#   causewaybay-hacker-server-<version>-<target>.tar.gz   one per platform:
+#       cwbhacker (the server) with the built web client and the content packs
+#       beside it, the cwbh terminal client, and run.sh
+#   CausewaybayHacker-<version>-<arch>-apple-darwin.zip    the LÖVE client as a
+#       double-clickable macOS .app, signed, notarised and stapled
+#   causewaybay-hacker-<version>.love                      the same game for
+#       anyone with their own LÖVE 11
+#   SHA256SUMS
+#
+# The recipe is the Makefiles', not this file's: `make package-server` builds,
+# stages, signs and self-checks the tarball; `make package-gui` builds and
+# signs the app; `make -C love2d notarize` finishes it. Everything here is
+# credentials and plumbing, so that `make package` on a laptop and a tagged
+# release do the same thing.
+#
+# Signing uses the Developer ID certificate from the repository secrets
+# (MACOS_CERTIFICATE_P12_BASE64 / MACOS_CERTIFICATE_PASSWORD) and notarization
+# uses APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / TEAM_ID. Without the secrets
+# everything falls back to ad-hoc signing, so a fork's dry run still produces
+# binaries — ones that need a right-click Open on somebody else's Mac.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: "1.97.1"
+  NODE_VERSION: "24"
+
+jobs:
+  # ------------------------------------------------------------- the server
+  #
+  # One tarball per platform. Linux on both architectures from GitHub's own
+  # runners; macOS on Apple silicon. An Intel Mac build would want a
+  # `macos-15-intel` runner and is a one-line addition to the matrix.
+  server:
+    name: Server (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: |
+            backend
+            cli
+
+      # `make version` fails outright when the manifests disagree, so this
+      # settles both questions at once: one version, and it is the tagged one.
+      - name: Resolve the version
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(make version)
+          if [ "${{ github.ref_type }}" = "tag" ] && [ "${TAG#v}" != "$version" ]; then
+            echo "tag $TAG does not match the version of record $version" >&2
+            echo "bump backend/Cargo.toml, cli/Cargo.toml, love2d/ffi/Cargo.toml and frontend/package.json, or retag" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "target=$(rustc -vV | sed -n 's/^host: //p')" >> "$GITHUB_OUTPUT"
+
+      # macOS only: imports the Developer ID certificate into a throwaway
+      # keychain and exports APPLE_SIGNING_IDENTITY for the build. Falls back
+      # to ad-hoc when the secret is absent (a fork's dry run).
+      - name: Import codesigning certificate
+        if: runner.os == 'macOS'
+        env:
+          P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$P12_BASE64" ]; then
+            echo "::warning::MACOS_CERTIFICATE_P12_BASE64 not set, using ad-hoc signing"
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$P12_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          CERT_INFO=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" || true)
+          if [ -n "$CERT_INFO" ]; then
+            CERT_ID=$(echo "$CERT_INFO" | head -1 | awk -F'"' '{print $2}')
+            echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> "$GITHUB_ENV"
+            echo "Found certificate: $CERT_ID"
+          else
+            echo "::warning::No Developer ID Application certificate found, using ad-hoc signing"
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+          fi
+
+      # scripts/codesign-binary.sh reads APPLE_SIGNING_IDENTITY to sign each
+      # binary and APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID to notarize it.
+      # A no-op off macOS. An ad-hoc-signed binary cannot be notarized, so
+      # the credentials are dropped in that case rather than tried.
+      - name: Package and verify
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: |
+          if [ "${APPLE_SIGNING_IDENTITY:--}" = "-" ]; then
+            unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
+          fi
+          make package-server
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: server-${{ steps.version.outputs.target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+      - name: Cleanup keychain
+        if: always() && runner.os == 'macOS'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/build.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+  # ---------------------------------------------------------------- the app
+  #
+  # CAUSEWAYBAY HACKER as a double-clickable macOS bundle: LÖVE downloaded and
+  # embedded, the game and the key library inside it, signed, notarised and
+  # stapled. Notarising is what makes the difference between a bundle that
+  # opens and one that shows "Apple could not verify…": a Developer ID
+  # signature is necessary and not sufficient, and `spctl` asked the way
+  # Finder asks will say so.
+  gui:
+    name: LÖVE app (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: love2d/ffi
+
+      - name: Resolve the version
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(make version)
+          if [ "${{ github.ref_type }}" = "tag" ] && [ "${TAG#v}" != "$version" ]; then
+            echo "tag $TAG does not match the version of record $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "arch=$(uname -m)" >> "$GITHUB_OUTPUT"
+
+      - name: Import codesigning certificate
+        env:
+          P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$P12_BASE64" ]; then
+            echo "::warning::MACOS_CERTIFICATE_P12_BASE64 not set, using ad-hoc signing"
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$P12_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          CERT_INFO=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" || true)
+          if [ -n "$CERT_INFO" ]; then
+            CERT_ID=$(echo "$CERT_INFO" | head -1 | awk -F'"' '{print $2}')
+            echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> "$GITHUB_ENV"
+            echo "Found certificate: $CERT_ID"
+          else
+            echo "::warning::No Developer ID Application certificate found, using ad-hoc signing"
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+          fi
+
+      # `make -C love2d app` reads APPLE_SIGNING_IDENTITY, downloads LÖVE,
+      # embeds the game and the key library, signs inside-out and checks the
+      # archive carries every module and painting. The smoke test it normally
+      # runs is skipped: it starts the bundle and waits for a frame, and a
+      # runner has no window server to draw into.
+      - name: Build and sign the app
+        run: make package-gui SKIP_SMOKE=1
+
+      # Only with a real certificate: Apple refuses an ad-hoc signature, and a
+      # fork's dry run has no secrets. The Makefile checks this too and would
+      # stop before uploading; this keeps the log honest about why.
+      - name: Notarize and staple
+        if: env.APPLE_SIGNING_IDENTITY != '-'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: |
+          make -C love2d notarize
+          # The zip in dist/ was cut before stapling; replace it with the stapled one.
+          cp love2d/build/CausewaybayHacker-macos.zip \
+            "dist/CausewaybayHacker-${{ steps.version.outputs.version }}-$(rustc -vV | sed -n 's/^host: //p').zip"
+
+      # What a person downloading it will actually get. Printed either way,
+      # because "signed but not notarised" is the state worth seeing in a log.
+      - name: Assess with Gatekeeper
+        run: make -C love2d gatekeeper
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: love2d-macos-${{ steps.version.outputs.arch }}
+          path: |
+            dist/*.zip
+            dist/*.love
+          if-no-files-found: error
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/build.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+  # ------------------------------------------------------------ the release
+  release:
+    name: Create GitHub release
+    needs: [server, gui]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+
+      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          body: |
+            One server, three ways to play it.
+
+            | archive | what is inside |
+            | --- | --- |
+            | `causewaybay-hacker-server-…-linux-gnu.tar.gz` | the server for Linux (x86_64 and aarch64): `cwbhacker` with the web client and the content packs beside it, the `cwbh` terminal client, and `run.sh` |
+            | `causewaybay-hacker-server-…-apple-darwin.tar.gz` | the same, for macOS on Apple silicon |
+            | `CausewaybayHacker-…-apple-darwin.zip` | the LÖVE desktop client — a double-clickable `.app` with LÖVE inside, signed and notarised |
+            | `causewaybay-hacker-….love` | the same game for anyone with their own LÖVE 11 |
+
+            Verify a download against `SHA256SUMS`, then:
+
+            ```sh
+            tar -xzf causewaybay-hacker-server-*.tar.gz
+            cd causewaybay-hacker-server-*/
+            ./run.sh                      # http://127.0.0.1:5390
+            ```
+
+            The desktop client and `cwbh` connect to that server; the web client is
+            already being served by it.
+
+            ⚠️ **This is a single-trusted-user trainer, not a sandbox.** The server
+            compiles and runs the code submitted to it, on the machine it runs on,
+            as the user who started it. Read the README before binding it to
+            anything but loopback.
