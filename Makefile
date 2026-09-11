@@ -61,7 +61,7 @@ WAIT_SECS  ?= 90
 held = p=$$(lsof -nP -iTCP:$(1) -sTCP:LISTEN -t 2>/dev/null | head -1); \
        [ -n "$$p" ] && ps -o comm= -p $$p 2>/dev/null | grep -qE '$(2)'
 
-.PHONY: help start stop restart status logs remote serve web build test test-be test-fe \
+.PHONY: help start stop restart status logs remote art serve web build test test-all test-all-list test-be test-fe \
         test-love test-e2e smoke fmt lint doctor clean clean-home
 
 ##@ Running
@@ -90,6 +90,7 @@ start: ## start both servers in the background
 	  ( cd backend && cargo build -p cwbhacker 2>&1 | tail -3 ) || exit 1; \
 	fi
 	@if [ ! -x "$(VITE)" ]; then echo "installing frontend deps…"; cd frontend && npm install; fi
+	@$(MAKE) -s art
 	@if $(call held,$(BACK_PORT),cwbhacker); then :; elif [ ! -f frontend/dist/index.html ]; then \
 	  echo "building the frontend (the server serves it on $(BACK_PORT))…"; \
 	  cd frontend && npm run build >/dev/null 2>&1 || { echo "  frontend build failed — run 'cd frontend && npm run build'"; exit 1; }; \
@@ -155,13 +156,23 @@ serve: ## the backend in the foreground, for a stack trace
 web: ## the frontend in the foreground
 	cd frontend && npm run dev
 
+art: ## copy art/ into the frontend's public/ (it serves its own copy)
+	@rsync -a --delete --exclude tools/ --exclude raw/ --exclude prompts.toml art/ frontend/public/art/
+	@printf "  art  %s files in frontend/public/art\n" "$$(ls frontend/public/art/*.png frontend/public/art/*.jpg 2>/dev/null | wc -l | tr -d ' ')"
+
 ##@ Building and testing
 
 build: ## release build, with the frontend bundled into the server
+	@$(MAKE) -s art
 	cd frontend && npm ci && npm run build
 	cd backend && cargo build --release
 
-test: test-be test-fe ## the Rust and TypeScript suites
+test-all: ## every suite, one command, with an honest summary of what was skipped
+	node tests/run-all.mjs
+test-all-list: ## what test-all would run, and why anything would not
+	node tests/run-all.mjs --list
+
+test: test-be test-fe ## the Rust and TypeScript suites (fast; see test-all)
 test-be: ## the Rust suite (add ARGS="-- --ignored" for the content check)
 	cd backend && cargo test --workspace $(ARGS)
 test-fe: ## the TypeScript suite

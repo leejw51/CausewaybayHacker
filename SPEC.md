@@ -69,8 +69,15 @@ directory holds a user's own work and nothing else on the machine needs it.
 └── logs/server.jsonl               one JSON object per line
 ```
 
-**Nothing outside the home is written.** No `/tmp`, no project directory. A
-attempt that needs scratch space gets a directory under `build/`.
+**The server writes nothing outside the home.** No `/tmp`, no project
+directory; an attempt that needs scratch space gets a directory under `build/`.
+
+That is a statement about *the server*, and not about the code it runs. A
+submission can write wherever the user can — §5.3 says plainly that this is not
+a sandbox, and the rlimits and the timeout do not change it. An earlier version
+of this paragraph did not draw that line and read as a containment guarantee
+the implementation has never made. If you want containment, do not expose the
+port (§5.3) — the file system is not where it comes from.
 
 ### 1.1 The LÖVE client's own store
 

@@ -693,3 +693,63 @@ generated = "2026-09-11"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art painted background, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. Warm ambers, soft greens and worn creams with deep comfortable shadow. Absolutely no text, no letters, no words, no numbers, no writing on the calendar, the postcard, the books, the screen or anywhere else — every surface is blank. TALL PORTRAIT composition. The same small walk-up flat above a Hong Kong market lane that the game opens in, but now in the middle of a warm afternoon and lived in. A cheap wooden desk against the window with an open laptop on it, a half-drunk mug of milk tea, a stack of dog-eared paperbacks, a desk lamp, a jar of pens, a small electric fan turning, a pot plant, a drying rack with a shirt on it, a bare bulb, cracked plaster, a taped-up postcard and a wall calendar that is completely blank. Through the window the lane opposite in warm afternoon light — shuttered tenements, air-conditioner boxes, drying poles, a tram wire. Nobody in the room. Calm, ordinary, safe, unhurried — a room that belongs to somebody, with no clock and no deadline in it. Seen straight on: the tall window and the lane beyond fill the upper half of the frame, the desk with the laptop and the mug fills the middle, and the floor is flat and level across the bottom fifth."""
+
+[[asset]]
+name = "badge_stamp"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game award icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable as a shape when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is an office rubber stamp seen from the side at a slight angle: a broad chunky wooden handle like a fat mushroom cap on top, a short neck, and a wide flat green inking base at the bottom. The silhouette is a fat T shape, wide at the top and wide at the bottom. Warm brown wood, brass collar, deep green base. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "badge_star"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game award icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable as a shape when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a single bold five-pointed star with sharp points, thick and solid, tilted very slightly. Bright gold with a brighter gold bevel and one white shine in the upper left. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "badge_flame"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game award icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable as a shape when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a single bold teardrop flame, wide and round at the bottom and drawn to a curling point at the top, with an inner lighter flame inside it. Orange and red outside, gold and pale yellow inside. The silhouette is one clean tapering teardrop. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "badge_chain"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game award icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable as a shape when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is three thick oval chain links interlocked in a straight diagonal row running from lower left to upper right, each link clearly separate and clearly threaded through the next. Polished steel blue-grey with cyan highlights. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "badge_watch"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game award icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable as a shape when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a pocket stopwatch seen flat-on: a plain round case with a completely blank white dial with NO numbers and NO markings, only two bold black hands and one thin red sweep hand, a small crown button and a ring loop on top and a small button to one side. Gunmetal case, bone white dial, one red hand. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "badge_shackle"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game award icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable as a shape when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a heavy brass padlock shackle that has been SNAPPED OPEN: a thick U-shaped metal loop broken clean through at the top with a jagged bright break and the two ends sprung apart, no lock body, no keyhole, nothing closed. It must read instantly as a broken, opened, defeated restraint. Brass gold with a bright silver break and a faint green glint. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
