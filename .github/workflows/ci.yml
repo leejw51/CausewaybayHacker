@@ -320,13 +320,21 @@ jobs:
       # The data-race fixture on its own first, with its stderr in the log,
       # so a race runtime that cannot start on this runner says why here
       # rather than as a timeout inside the generator.
-      - name: The race fixture, alone
+      - name: The race fixture, alone, in the generator's own environment
         run: |
           d=$(mktemp -d) && cp tests/vectors/mistakes/go/data-race.go "$d/main.go"
-          # `go run -race` exits 66 when it finds the race it is here to
-          # find, and the step's shell runs with -e: the report is the point,
-          # the exit status is not.
-          cd "$d" && { timeout 120 go run -race main.go || echo "exit=$?"; }
+          cd "$d"
+          # Exactly what tests/vectors/mistakes/generate.py hands `go`: its
+          # own GOPATH and module cache, -mod=mod, no proxy, and stdout and
+          # stderr through pipes. `-x` prints every command `go` runs, so a
+          # stall names the command it stalled on. `go run -race` exits 66
+          # when it finds the race it is here to find, and the step's shell
+          # runs with -e: the report is the point, the exit status is not.
+          export GOCACHE="$CWBH_GOCACHE" GOMODCACHE="$d/gomodcache" GOPATH="$d/gopath" GOFLAGS=-mod=mod GOPROXY=off
+          go env GOCACHE GOMODCACHE GOPATH GOFLAGS GOPROXY CGO_ENABLED CC
+          { time timeout 120 go run -x -race main.go 2>&1 | tail -60 | cat; } || echo "exit=$?"
+          echo "--- and once more, warm:"
+          { time timeout 120 go run -race main.go 2>&1 | tail -5 | cat; } || echo "exit=$?"
 
       # Every §7.1 taxonomy fixture still compiles to the code it claims.
       - run: python3 tests/vectors/mistakes/generate.py --check
