@@ -8,12 +8,15 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
+pub mod cargo;
 pub mod format;
 pub mod go;
+pub mod gotest;
 pub mod harness;
 pub mod proc;
 pub mod rust;
 pub mod spec;
+pub mod suite;
 
 pub use spec::{Case, Harness, MatchMode, TestSpec};
 
@@ -134,15 +137,12 @@ impl Report {
 /// really happen.
 pub fn unsupported(lang: &str, spec: &TestSpec) -> Option<String> {
     match (lang, spec.harness) {
-        // Both lands compile and run now. What is still missing is the two
-        // harnesses no shipped quest declares.
+        // All three harnesses are built. What is still refused is a harness
+        // asked of the wrong land, which is an authoring mistake rather than a
+        // missing feature and should say so.
         ("rust" | "go", Harness::Stdio) => None,
-        ("rust", Harness::Cargo) => {
-            Some("the cargo harness is not in this build yet (SPEC §5.1)".into())
-        }
-        ("go", Harness::Gotest) => {
-            Some("the gotest harness is not in this build yet (SPEC §5.1)".into())
-        }
+        ("rust", Harness::Cargo) => None,
+        ("go", Harness::Gotest) => None,
         ("rust", Harness::Gotest) => {
             Some("the gotest harness is not a rust harness (SPEC §5.2)".into())
         }

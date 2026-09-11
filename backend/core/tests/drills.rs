@@ -240,19 +240,25 @@ fn a_plan_is_fixed_and_a_reconnect_resumes_it() {
     for _ in 0..2 {
         submit(&store, "rust.basic.02.the-move", "compile_error", &[]);
     }
-    let conn = store.conn();
-    let drill = drills::create(&conn, ALICE, drills::Mode::Repeat, None, 5).unwrap();
-    let plan = drill.plan.clone();
-
-    let step = drills::next(&conn, ALICE, &drill.id).unwrap();
-    assert_eq!(step.position, 1);
-    assert_eq!(step.quest_id, plan[0]);
-    assert!(step.why.contains("2 times"), "{}", step.why);
+    // `Store::conn` is a plain mutex guard and is not reentrant, so it is
+    // taken in short scopes here: holding one across `submit`, which takes its
+    // own, deadlocks rather than panicking.
+    let (drill, plan) = {
+        let conn = store.conn();
+        let drill = drills::create(&conn, ALICE, drills::Mode::Repeat, None, 5).unwrap();
+        let plan = drill.plan.clone();
+        let step = drills::next(&conn, ALICE, &drill.id).unwrap();
+        assert_eq!(step.position, 1);
+        assert_eq!(step.quest_id, plan[0]);
+        assert!(step.why.contains("2 times"), "{}", step.why);
+        (drill, plan)
+    };
 
     // The world changes underneath it — and the plan does not.
     submit(&store, "rust.basic.04.closures", "compile_error", &[]);
     submit(&store, "rust.basic.04.closures", "compile_error", &[]);
     submit(&store, "rust.basic.04.closures", "compile_error", &[]);
+    let conn = store.conn();
     let resumed = drills::get(&conn, ALICE, &drill.id).unwrap();
     assert_eq!(resumed.plan, plan);
     assert_eq!(resumed.cursor, 1, "the cursor survived");
@@ -312,10 +318,16 @@ fn a_finished_drill_reports_what_actually_happened() {
             &["borrow-after-move"],
         );
     }
+    // SPEC §2.2's timestamps have second granularity, so the mistakes made
+    // *before* the drill need to be a second older than the drill itself. A
+    // real session has minutes between them; this is the test paying for the
+    // same clock.
+    std::thread::sleep(std::time::Duration::from_millis(1_100));
     let drill = {
         let conn = store.conn();
         drills::create(&conn, ALICE, drills::Mode::Repeat, None, 5).unwrap()
     };
+
     // During the drill: one attempt, and it passes.
     submit(&store, "rust.basic.02.the-move", "accepted", &[]);
 

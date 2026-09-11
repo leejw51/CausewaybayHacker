@@ -48,12 +48,29 @@ def flatness(im, nx, ny, r=0.022):
     return sum(ImageStat.Stat(tile).stddev) / 3.0
 
 
-# Below this the neighbourhood has no edges in it at all — no roof, no kerb,
-# no outline — which on these plates means open sky or open water. Calibrated
-# by eye against crops: genuinely dead regions measure 0.2-0.9, a dim corner
-# that still has trees and a roof measures 5.3, lit ground runs 20-40. The cut
-# is at 4, an order of magnitude clear of both sides.
+# Flatness alone is not enough either, and the reason is worth keeping: an open
+# lawn is perfectly good ground with nothing built on it, so it measures as flat
+# as open water does. Two content nodes landed on park grass and the variance
+# test called them floating.
+#
+# So the rule is the conjunction of the two heuristics that each failed alone.
+# A node is floating only where the neighbourhood is BOTH featureless AND not a
+# ground colour:
+#
+#   * hue alone failed on `map_go`, a night plate whose ground is indigo — it
+#     called a lit platform and a neon stall "water";
+#   * variance alone failed on `map_rust`'s lawn — it called grass "sky".
+#
+# Their failure modes are orthogonal, so the conjunction is right: sky and open
+# water are flat AND blue-or-black, while grass is flat but green and a platform
+# is blue-ish but full of edges.
 FLAT = 4.0
+
+
+def is_void_colour(p):
+    """Blue-dominant (sky, water) or near-black (an unlit gap). Not grass."""
+    r, g, b = p[:3]
+    return b > r + 15 or max(r, g, b) < 40
 
 
 def nodes(path):
@@ -68,7 +85,11 @@ def check(plate, pts, label):
     bad = []
     for i, (nx, ny) in enumerate(pts, 1):
         f = flatness(im, nx, ny)
-        if f < FLAT:
+        if f >= FLAT:
+            continue
+        w, h = im.size
+        p = im.getpixel((min(w - 1, int(nx * w)), min(h - 1, int(ny * h))))
+        if is_void_colour(p):
             bad.append((i, nx, ny, round(f, 1)))
     mark = "FAIL" if bad else "ok"
     print(f"  {label:34} {len(pts):3} nodes  {mark}"

@@ -19,6 +19,7 @@ local M = {}
 ---   "refresh" refetch the map
 ---   "show"    render the message in place
 ---   "backoff" wait `detail.retry_after_ms` and retry
+---   "unavailable" real but unbuilt; say so in the story's voice, never retry
 ---   "log"     a bug in this client; make noise in the console
 M.CODES = {
   proto_version = {
@@ -61,6 +62,14 @@ M.CODES = {
     player = "A submission is already running.",
     action = "show",
   },
+  -- **Not `internal`.** §3.3: a feature that is real, specified and merely
+  -- unbuilt answers `unavailable` with `detail.milestone`. Reporting it as
+  -- `internal` tells the player their machine is broken and invites them to
+  -- retry something that will never work; the honest line names the chapter.
+  unavailable = {
+    player = "Not built yet — it opens in a later chapter.",
+    action = "unavailable",
+  },
   internal = {
     player = "The server broke. Try again.",
     action = "show",
@@ -83,6 +92,18 @@ function M.classify(code)
     player = M.CODES.internal.player,
     action = M.CODES.internal.action,
   }
+end
+
+--- The milestone an `unavailable` feature is waiting for, if the server said.
+---
+--- §3.3: `unavailable` carries `detail.milestone`, and a screen that can name
+--- the chapter says something a player can plan around rather than something
+--- they will retry forever.
+function M.milestone(payload)
+  if type(payload) ~= "table" then return nil end
+  local detail = payload.detail
+  if type(detail) ~= "table" then return nil end
+  return tonumber(detail.milestone)
 end
 
 --- True when `payload` is the exact §3.3 shape and nothing else.

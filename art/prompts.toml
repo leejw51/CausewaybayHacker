@@ -518,10 +518,9 @@ kind = "sprite"
 aspect = "3:2"
 size = [1152, 384]
 generated = "2026-09-11"
-rerolls = 1
-note = "Near-parallax overlay for the Mode-7 map plane: everything hangs from the top edge, lower half transparent, so it can scroll faster than the plate. ACCEPTED WITH ONE DEFECT: the leftmost sign panel reads as an empty outlined sign rather than a filled one. That is the magenta collision in the header — the hot pink asked for came back as the backdrop colour and was keyed out. It is not a process.py bug; a blank outlined panel is a legitimate Hong Kong sign, so it was kept. A re-roll should ask for crimson, not pink."
+rerolls = 2
 prompt = """\
-16-bit SNES pixel art foreground overlay layer, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Objects hang down from the TOP EDGE only and SPREAD EVENLY ACROSS THE WHOLE WIDTH OF THE FRAME, reaching right out to the far left edge and the far right edge with nothing bunched in the middle and no empty stretch at either end; the BOTTOM HALF of the picture is left completely empty plain magenta. Spanning the full width: a web of black overhead tram wires and thinner span wires strung from edge to edge with small dark ceramic insulators, two leaning wooden utility poles with crossarms, one near the left edge and one near the right, a dark green banyan branch with hanging aerial roots reaching in from the top right corner, a red-and-white striped awning edge jutting in from the top left corner, and FOUR blank rectangular hanging sign panels on brackets spaced across the width. EVERY sign panel is filled edge to edge with ONE solid flat saturated colour — hot pink, jade green, cyan, gold — with a dark outline; NO sign is white, empty, hollow, pale or see-through. Chunky hard-edged pixels, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradient, no drop shadow. Absolutely no text, no letters, no words, no numbers, no writing on the sign panels."""
+16-bit SNES pixel art foreground overlay layer, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone. ONLY overhead wires and nothing else — NO awning, NO utility pole, NO tree, NO branch, NO sign panels, NO buildings. A web of NEAR-BLACK overhead tram wires and thinner span wires strung horizontally from the far LEFT EDGE to the far RIGHT EDGE across the UPPER HALF of the frame, four or five of them at slightly different heights, gently sagging, crossing each other, with small dark ceramic insulators and a few short droppers hanging from them. The LOWER HALF of the picture is completely empty plain magenta. The wires are very dark charcoal, almost black, with a faint grey highlight along the top of each — NOT purple, NOT maroon, NOT brown. Chunky hard-edged pixels, no anti-aliasing, no soft gradient, no drop shadow. Absolutely no text, no letters, no words, no numbers. Painted 16-bit console game sprite, not 3D rendered."""
 
 [[asset]]
 name = "neon_signs"
@@ -853,3 +852,54 @@ generated = "2026-09-11"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art game award icon, ONE object, centred, filling most of the frame, seen flat-on. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers. Painted 16-bit console game sprite, not 3D rendered. The object is ONE empty recessed socket in a medal presentation case, seen flat-on from above: a rounded square depression pressed into dark navy velvet, with a soft dark inner shadow along its top and left inner edges and a faint pale lip along its bottom and right, so it reads clearly as a hollow that something is missing from. Completely empty — nothing sits in it. Dark navy and charcoal velvet with a faint dusty highlight. Quiet and unlit, obviously a gap waiting to be filled. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_ai_repeat"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, slip, board or screen — every surface is blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right, wider than it is tall, nothing stacked up high, sitting on a common ground line with no floor, no wall, no sky and no background drawn behind them — only flat magenta between and behind them. THREE IDENTICAL Hong Kong shopfronts standing side by side in a row, exactly the same shutter, the same awning and the same doorstep repeated three times over — the first shutter fully down, the second half up, the third fully up — and beside them a metal receipt spike with a thick stack of identical paper slips pushed onto it. It must read as the same thing done again and again. Warm gold morning light, saturated ambers and greens. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_ai_weakness"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, slip, board or screen — every surface is blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right, wider than it is tall, nothing stacked up high, sitting on a common ground line with no floor, no wall, no sky and no background drawn behind them — only flat magenta between and behind them. A repair workbench seen from the front: a scarred wooden bench top with a small bright work lamp leaning over it, and on the bench ONE brass padlock lying broken wide open with a bright silver snapped shackle, beside a neat row of FOUR more identical closed brass padlocks still waiting their turn, plus a small vice and two steel picks. It must read as one problem solved and several more of the same kind lined up next. Warm lamp light, brass and steel, deep shadow. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_ai_spaced"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, slip, board or screen — every surface is blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right, wider than it is tall, nothing stacked up high, sitting on a common ground line with no floor, no wall, no sky and no background drawn behind them — only flat magenta between and behind them. A Hong Kong tram stop: a blank enamel timetable board on a post with nothing written on it, a round station clock on a bracket beside it, a worn wooden bench, and a blue double-decker tram arriving again at the right of the group. It must read as something that comes back round on a schedule. Cool late-afternoon light, saturated blues and warm ambers. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "shackle_break"
+kind = "strip"
+aspect = "3:2"
+size = [384, 64]
+rerolls = 0
+generated = "2026-09-11"
+note = "Six frames of SPEC 7.2's cleared_since, 0..5. Cut by art/tools/strip.py --grid rather than by connected components: the last frame is two separate pieces, so a component split would have returned seven frames for six stages. The change between stages is in the OUTLINE — the gap grows — so the meter reads as a shape at 20px, not as a colour."
+prompt = """\
+16-bit SNES pixel art progression strip: SIX brass U-shaped bars in a row on magenta, identical in size and style, showing one bar broken open in six steps left to right — whole, notched, quarter gap, half gap, two stubs, fully snapped into two pieces. Jagged silver breaks. See art/tools/strip.py --grid for the cut."""
+
+[[asset]]
+name = "fx_shards"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-11"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, slip, board or screen — every surface is blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A burst of SIX small jagged metal shards flying outward in all directions from an empty centre, like something heavy has just snapped apart — each shard a short angular chip of brass gold with a bright silver broken edge, tumbling at a different angle, largest at the top and smallest at the bottom, with three tiny pale sparks between them. The centre of the burst is empty magenta. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""

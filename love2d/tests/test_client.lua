@@ -175,7 +175,7 @@ return function()
     for _, code in ipairs({
       "proto_version", "bad_request", "unauthorized", "auth_expired",
       "auth_nonce_used", "auth_bad_signature", "not_found", "locked",
-      "rate_limited", "busy", "internal",
+      "rate_limited", "busy", "unavailable", "internal",
     }) do
       local c = errors.classify(code)
       T.eq(c.known, true, code .. " must be handled")
@@ -184,7 +184,17 @@ return function()
     end
     local n = 0
     for _ in pairs(errors.CODES) do n = n + 1 end
-    T.eq(n, 11, "§3.3 lists exactly eleven codes")
+    T.eq(n, 12, "§3.3 lists exactly twelve codes")
+
+    -- **`unavailable` is not `internal`**, and the distinction is the whole
+    -- reason it exists: "the server broke, try again" invites a retry that
+    -- will never work, where "it opens in a later chapter" is something a
+    -- player can plan around.
+    T.ne(errors.classify("unavailable").action, errors.CODES.internal.action)
+    T.eq(errors.classify("unavailable").action, "unavailable")
+    T.eq(errors.milestone({ code = "unavailable", detail = { milestone = 2 } }), 2)
+    T.eq(errors.milestone({ code = "unavailable", detail = {} }), nil)
+    T.eq(errors.milestone(nil), nil)
   end)
 
   T.case("an unknown code is treated as internal, with the original kept", function()

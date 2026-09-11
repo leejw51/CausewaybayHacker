@@ -54,11 +54,15 @@ ORDER = [
     "badge_watch", "badge_shackle", "badge_flags", "badge_tally",
     "badge_chevron_bronze", "badge_chevron_silver", "badge_chevron",
     "badge_slot",
+    # The trainer screens: AI mode's three plans, and the cleared_since meter
+    # that turns SPEC §7.2's 0..5 counter into a shape.
+    "emblem_ai_repeat", "emblem_ai_weakness", "emblem_ai_spaced",
+    "shackle_break", "fx_shards",
 ]
 
 # Assets that are not one picture. `walk_mei` is four frames in a row; the
 # renderer needs the frame size and a box per frame, not one box for the sheet.
-STRIPS = {"walk_mei": 4}
+STRIPS = {"walk_mei": 4, "shackle_break": 6}
 
 root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 art = []

@@ -501,12 +501,12 @@
       "h": 384,
       "box": {
         "cx": 575.0,
-        "feet": 342.0,
-        "h": 300.0,
+        "feet": 335.0,
+        "h": 286.0,
         "minx": 63,
-        "miny": 42,
+        "miny": 49,
         "maxx": 1087,
-        "maxy": 341
+        "maxy": 334
       }
     },
     {
@@ -982,6 +982,131 @@
         "h": 85.0,
         "minx": 6,
         "miny": 5,
+        "maxx": 89,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "emblem_ai_repeat",
+      "file": "emblem_ai_repeat.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 110.0,
+        "h": 92.0,
+        "minx": 21,
+        "miny": 18,
+        "maxx": 362,
+        "maxy": 109
+      }
+    },
+    {
+      "name": "emblem_ai_weakness",
+      "file": "emblem_ai_weakness.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 48,
+        "miny": 7,
+        "maxx": 335,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_ai_spaced",
+      "file": "emblem_ai_spaced.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 31,
+        "miny": 7,
+        "maxx": 351,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "shackle_break",
+      "file": "shackle_break.png",
+      "w": 384,
+      "h": 64,
+      "frames": 6,
+      "fw": 64,
+      "fh": 64,
+      "boxes": [
+        {
+          "cx": 31.5,
+          "feet": 49.0,
+          "h": 34.0,
+          "minx": 11,
+          "miny": 15,
+          "maxx": 52,
+          "maxy": 48
+        },
+        {
+          "cx": 31.0,
+          "feet": 49.0,
+          "h": 34.0,
+          "minx": 4,
+          "miny": 15,
+          "maxx": 58,
+          "maxy": 48
+        },
+        {
+          "cx": 31.5,
+          "feet": 49.0,
+          "h": 34.0,
+          "minx": 4,
+          "miny": 15,
+          "maxx": 59,
+          "maxy": 48
+        },
+        {
+          "cx": 31.5,
+          "feet": 50.0,
+          "h": 36.0,
+          "minx": 4,
+          "miny": 14,
+          "maxx": 59,
+          "maxy": 49
+        },
+        {
+          "cx": 31.5,
+          "feet": 50.0,
+          "h": 36.0,
+          "minx": 4,
+          "miny": 14,
+          "maxx": 59,
+          "maxy": 49
+        },
+        {
+          "cx": 31.0,
+          "feet": 50.0,
+          "h": 37.0,
+          "minx": 6,
+          "miny": 13,
+          "maxx": 56,
+          "maxy": 49
+        }
+      ]
+    },
+    {
+      "name": "fx_shards",
+      "file": "fx_shards.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 90.0,
+        "h": 84.0,
+        "minx": 5,
+        "miny": 6,
         "maxx": 89,
         "maxy": 89
       }

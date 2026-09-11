@@ -3975,10 +3975,11 @@ output: 4594
 **The complexity here is enforced.** One hidden case is `n = 100000`,
 `m = 200000`. Dijkstra is the right algorithm either way; what the clock
 decides is the priority queue. Scanning every unvisited node for the minimum
-is `O(V²)` — `10^10` comparisons, and it does not finish in the five second
-run limit. A binary heap makes it `O((V + E) log V)` and it finishes in about
-twenty milliseconds. Both measured on this machine, with the two programs that
-ship in this quest: the starter is the scanning version.
+is `O(V²)` — `10^10` comparisons, and it takes sixteen seconds against a five
+second run limit. A binary heap makes it `O((V + E) log V)` and the same case
+comes back in forty-four milliseconds. Both measured on this machine, with the
+two programs that ship in this quest: the starter is the scanning version, and
+it gets the right answer — just three times too late.
 
 `container/heap` over a slice of `{dist, node}`, ordered by `dist`. There is
 no decrease-key and you do not need one: push the improved distance as a new
@@ -4433,12 +4434,20 @@ character is a centre for the odd-length palindromes, and every gap between
 two characters is a centre for the even-length ones. Forgetting the gaps is
 why a correct-looking solution returns `1` on `abba`.
 
-**What the tests do and do not enforce**, plainly. One hidden case is
-`n = 20000` over a two-letter alphabet: that rejects the `O(n³)` answer —
-check every substring, test each for being a palindrome — which does not
-finish in five seconds. Another is `n = 20000` over a **one**-letter alphabet,
-which is the worst case for expand-around-centre and makes it do its full
-`O(n²)` work; it takes a fraction of a second and passes comfortably.
+**What the tests do and do not enforce**, plainly. The hidden case that does
+the work is `n = 20000` over a **one**-letter alphabet. It is the worst case
+for expand-around-centre — every centre runs to the end of the string — so the
+right answer does its full `O(n²)` there and still finishes in about a tenth of
+a second. It is also what rejects the `O(n³)` answer, check-every-substring-
+and-test-each-one: that is still running after twenty seconds against a five
+second limit.
+
+The other big case, `n = 20000` over a two-letter alphabet, is a **correctness**
+case and not a speed one. On a random binary string the palindrome test fails
+after a character or two, so even the cubic answer clears it in under a second.
+It checks that your generator and your leftmost-index tie-break agree with ours
+at scale. It does not check that you were fast. Both numbers measured on this
+machine.
 
 So: the tests reject cubic and accept quadratic. They do **not** demand
 Manacher's algorithm, which is the `O(n)` answer. Know that it exists, because

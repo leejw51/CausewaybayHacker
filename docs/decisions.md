@@ -3467,3 +3467,582 @@ Also fixed while looking at a real HACKER brief: the text ran under its own
 scrollbar. The brief now reserves that gutter permanently — a width that
 changed when the bar appeared would reflow the text that decides whether the
 bar appears.
+
+## 2026-09-11 — PM: six interview gaps closed; and a collision with PM2 to reconcile
+
+`coverage.md` §5's ordered list was the brief: Dijkstra, range queries with
+updates, longest palindromic substring, a modular counting problem, grid DP
+with obstacles, and a stability-sensitive sort. All six are written **in both
+languages**, as `hacker` nodes 28–33, taking each pack to 34.
+
+**Collision.** The Go half was finished and verified before the message
+arriving that PM2 owns `content/go/**`. No further writes to `content/go/`
+have been made since. The six Go quests occupy **nodes 28–33**, with ids
+`go.hacker.29.dijkstra`, `.30.range-queries`, `.31.palindrome`, `.32.modular`,
+`.33.grid-paths`, `.34.stable-sort`; the LRU boss sits at node 34 keeping its
+original id `go.hacker.28.lru`. All 4/4 on every case, every starter rejected.
+If PM2 appends its own six, the pack gets duplicate slugs and the reorder tool
+will refuse it. **Coordinator to decide which half survives.** They are not
+quite interchangeable: the Go half's expected values were derived from the
+*same* LCG draw order as the Rust half and checked byte-for-byte against it
+across six seeds, so the two packs currently share their generated data. A
+freshly authored Go half re-derives every expected value independently, and
+that cross-check is gone. The recommendation is therefore to keep this one —
+but it should be discarded without argument if PM2's is further along on
+anything not visible from here.
+
+**No new concept slugs are needed for the six.** They are covered by the
+existing 58: `graphs`, `heaps`, `complexity`, `prefix-sums`, `collections`,
+`strings`, `two-pointers`, `math`, `recursion`, `dynamic-programming`,
+`matrix`, `sorting`, `slices`. PM2 can use those directly.
+
+**Complexity enforcement: four of the six carry it, two do not, and the briefs
+say which.** Measured on this machine with the programs that ship in each
+quest:
+
+```
+dijkstra       heap            0.02s   |  linear-scan min   >5s TIMEOUT
+range-queries  Fenwick         0.10s   |  loop-per-query    >8s TIMEOUT
+modular        factorial table 0.04s   |  per-query inverse >5s TIMEOUT
+palindrome     expand-centre   0.13s   |  check-every-substring >5s TIMEOUT
+grid-paths     DP              0.01s   |  (enumeration is super-exponential)
+stable-sort    n/a — this one is about correctness, not speed
+```
+
+`range-queries` needed `n = 500000, q = 4000000` to get there: the naive
+range sum is a contiguous loop the compiler **vectorises**, and at
+`n = q = 100000` it finished in 0.13 s. Anyone sizing a "the slow answer must
+fail" case should assume the slow answer is eight times faster than they
+expect.
+
+`palindrome`'s brief states outright that the tests reject cubic, accept
+quadratic, and **do not demand Manacher** — the honest version of a complexity
+claim we cannot enforce.
+
+**Sorting stability needed the case built empirically.** Measured: at `n = 8`
+Rust's `sort_unstable_by_key` and Go's `sort.Slice` both happen to agree with
+the stable answer, so a small case proves nothing. At `n >= 40` both
+demonstrably scramble ties. The visible sample is therefore `n = 8` (readable,
+and does not judge) and the hidden cases are `n = 60` and `n = 200`. **This
+is the one quest in the repository whose test depends on a library's internal
+behaviour** — if a future rustc or Go changes its unstable sort, the case could
+stop separating. QA should know that is why it exists and why it is sized that
+way.
+
+**Cross-language asymmetries are written up in `coverage.md` §5b** — the places
+where the same problem is genuinely different work in the two languages
+(`linked-list`, the LRU boss, `inversions`, `dijkstra`, `range-queries`,
+`stable-sort`). Mirroring a pack without reading that section produces a quest
+that teaches the wrong language's difficulty.
+
+Noted with thanks: **SPEC §12 no longer requires an id's number to equal its
+node**, which resolves the §4.1 conflict in §4.1's favour. The bosses kept
+their ids this round — `rust.hacker.28.lru` sits at node 34 — and no future
+lengthening will rename anything. `tools/verify_pack.py` was updated to the new
+rule and now checks id uniqueness and slug uniqueness instead.
+
+**Two counts earlier in this file are now stale, and this is the correction**
+rather than an edit, because the log is append-only and those entries were true
+when written. The `unsupported()` entry says "no pack declares either — all 116
+quests are `stdio`"; the substance still holds — **all 138 quests are `stdio`,
+and no pack declares `cargo` or `gotest`** — only the number has moved. The
+harness author should read that as a statement about today, not a count. The
+`float:1e-6` entry is still accurate as written: it was unused at 116 quests and
+is exercised now by `26.statistics` in both languages, which remain the only two
+quests in the repository that do not compare as text.
+
+## 2026-09-11 — L2D: search, stats and AI mode, and a new code in the closed set
+
+### `unavailable` is now in §3.3, and my client had eleven codes
+
+The contract grew a twelfth code and my `errors.lua` asserted *exactly eleven*
+— which is the assertion earning its keep: the suite failed the moment the
+contract moved, rather than the client quietly folding a new code into
+`internal`. Added, with the distinction §3.3 insists on: `unavailable` gets
+its own action, never `internal`'s. Telling a player their machine is broken
+invites a retry that will never work; naming the chapter is something they can
+plan around. `errors.milestone` reads `detail.milestone` so a screen can say
+which one.
+
+`locked` stays in the table with a note that §4.7 amended it out of existence
+— removing a code from a closed set is the one change that breaks an
+exhaustive client.
+
+### Stats — live, and `cleared_since` gets the weight
+
+All four calls are real. `cleared_since` is drawn as a **five-step track with
+the remaining steps visible**, so the shape says how far there is to go, and
+said in words underneath — "3 clean submits since — 2 to go", "you did this on
+your last submit", "learned — out of the drill". The number alone is a table
+row; the sentence is about a person.
+
+The shelf uses `badge_slot` exactly as DESIGN intended: earned awards from
+`stats.awards`, sockets for the rest. **No award id is invented.** A test
+asserts the file contains no hard-coded award name, because the moment it does
+the client is claiming something the server did not say.
+
+### Search and AI — built, not stubbed
+
+Both are complete screens that render whatever comes back. They answer
+`unavailable` today and say so in the story's voice; the day the endpoints
+land they render hits and drills with no change.
+
+Search shows *why* something matched, which §8.3 says the components exist
+for. A `null` component is drawn as **absence** (an em dash), not as a
+zero-length bar: §5.5 says null means the quest was not in that ranking at
+all, and a zero bar would assert it scored nothing there, which is a different
+and untrue thing. The FTS5 `<b>` markup is stripped rather than shown —
+showing a player raw markup is showing them the plumbing.
+
+AI mode draws `why` as the largest thing on the screen with the quest under
+it. A drill that showed the quest and hid the reason would be a playlist.
+
+### Empty states, since a new player has all three
+
+Every panel says something. The one that mattered most to get right is the
+mistakes list: **having made no mistakes yet is the correct state** for
+somebody who has just arrived, so it explains what fills it rather than
+apologising for being blank. AI mode checks `stats.mistakes` on entry so it
+can say "nothing to drill yet, and here is what changes that" *before* the
+player picks a mode rather than after.
+
+A test pins the register — no "sorry", "oops", "unfortunately", "afraid". It
+does **not** ban "failed": SPEC §7.3 calls the `repeat` plan "the quests the
+user failed most", and describing what a drill selects is a statement of fact.
+The thing to keep out is the register that makes a blank screen feel like the
+player's fault. (My first version of that test banned the word outright and
+failed on the spec's own sentence, which is a good argument for writing the
+reason into the test.)
+
+### A real bug the screenshots caught
+
+**The keystroke that opens a scene was leaking into it as typed text.** LÖVE
+delivers `textinput` for a printable key *after* `keypressed` for the same
+press, so pressing `S` on the map opened the search screen and then typed "s"
+into its query box — the first capture read `sborrow checker`. `App:go` now
+swallows text input for exactly that frame. It would have hit `P` for the
+playground and `Q` for a category too.
+
+### What I deliberately left out
+
+* **A filter row on search.** §4.12 has `filters` for land, category and
+  state, and the browser should have them. Here the box is one line and the
+  screen is 126 quests; adding three dropdowns to a feature nobody can use yet
+  would be designing against a shape I have not seen return a single hit. When
+  search is live and I can see what a real result set looks like, that is the
+  moment to decide whether filters earn their space.
+* **A history *chart*.** `stats.history` gives twelve attempts with verdicts;
+  a sparkline of accuracy over time is the obvious next thing and I did not
+  build it. Twelve points is not a trend, and a chart that is mostly noise
+  teaches a player to ignore the panel it is in.
+* **Award detail.** `Award.detail` is "whatever the rule counted" and I show
+  only the title. Rendering an arbitrary object would mean guessing at shapes
+  the server has not committed to; the shelf says *what* you have, and the
+  fanfare already said *why* when it happened.
+* **Drill progress persistence across a restart.** §4.16 says the plan is
+  fixed at creation so a reconnect resumes it — which means the *server*
+  remembers, and a client that also cached the cursor would be a second home
+  for the same state. The screen asks `ai.next` and renders the answer.
+
+## 2026-09-11 — `cargo` and `gotest` are built, and both run in two phases
+
+SPEC §5.1 names `cargo test` and `go test -run . -json`; SPEC §5.3 says every
+limit applies to every run. Taken literally at the same time, those two
+sentences do not fit: `cargo test` and `go test` **compile and then run in one
+process**, so either the toolchain runs under a 1 GiB address-space cap, a
+stripped `PATH` and a `HOME` in the build directory — which no toolchain
+survives — or the player's tests run with the toolchain's environment and none
+of §5.3. The second is what a naive implementation ships, and it would make a
+test-harness quest the only place in the game where arbitrary code runs
+unlimited.
+
+So both harnesses split the job the way `rust.rs` and `go.rs` already split it:
+
+* **compile** — `cargo test --offline --no-run --message-format=json`, and
+  `go test -c -o prog .` — with a working environment, the scratch redirected
+  into `build/<lang>/` (§5.1), and `compile_timeout_ms`;
+* **run** — the test binaries it produced, executed exactly the way
+  `harness.rs` executes a stdio submission: own process group, stripped
+  environment, rlimits, output cap enforced while draining, SIGTERM then
+  SIGKILL.
+
+`gotest` still reads **the JSON event stream the brief asks for**: the captured
+output is handed to `go tool test2json`, which is the program `go test -json`
+pipes through internally. The events are Go's own, and the player's code is
+held to §5.3 rather than to the compiler's environment. If the tool cannot be
+reached, a fallback reads the `--- PASS:` lines directly, because a toolchain
+oddity should not turn a real submission into an `internal_error`.
+
+`cargo` has no equivalent: libtest's `--format json` is still nightly-only, so
+`suite.rs` reads the `test tests::x ... ok` lines that have looked the same
+since 1.0. No `-Z` flags, no `RUSTC_BOOTSTRAP`.
+
+### The case loop is shared, and it holds three rules nothing else holds
+
+`suite.rs` is to these two what `harness.rs` is to stdio, and for the same
+reason: a rule that forgave a skipped test in one land and not the other reads
+to a player as the server being unfair. Three of its rules exist because each
+is a way to clear a node without writing a working test:
+
+1. **A suite that ran no tests never passes.** `cargo test` on a file with no
+   `#[test]` prints `test result: ok. 0 passed` and exits 0; `go test` on a
+   package with no `TestXxx` says `no tests to run` and exits 0. This is
+   exactly the hole SPEC §12 closes for stdio with "no `expect` may be empty" —
+   an empty submission clearing the node for free — and it is the single thing
+   most likely to have shipped broken.
+2. **A skipped or ignored test has not passed.** Otherwise `#[ignore]` and
+   `t.Skip()` are a cheat code for whichever test was failing.
+3. **A declared case with no matching test fails, by name.** "You did not
+   write it" and "you wrote it and it failed" are different lessons.
+
+Names are matched in one place: an exact name always matches, a declared name
+with no separator matches the leaf of a Rust module path (`adds` finds
+`tests::adds`), and a Go subtest is never satisfied by its parent
+(`TestTable` does not answer for `TestTable/negative`).
+
+### `test_source`: the two quest shapes, and whose fault a failure is
+
+A new optional key in the test spec, for these harnesses only. Present, the
+quest ships its own tests (`tests/quest.rs`, `quest_test.go`) and the player
+writes the implementation; absent, the player writes the tests too. Which file
+the submission lands in follows from the spec, never from scanning the source:
+`src/lib.rs` always for Rust, and for Go `solution.go` when the quest brings
+tests and `solution_test.go` when it does not, because Go only registers
+`TestXxx` from a `_test.go` file.
+
+`test_source` creates the failure mode these harnesses have and stdio cannot:
+**the quest's own tests may be the thing that does not compile.** The rule:
+
+* an error in the player's file → `compile_error`, diagnostics kept in
+  `compiler_stderr` where SPEC §7.1 classifies them;
+* an error in the *quest's* file that is about the player's API — `undefined:
+  Add`, `E0425`, `E0308`, a wrong signature — → `compile_error`, because the
+  player really did fail to provide what the tests call, but with **no**
+  `compiler_stderr`: a span pointing into a file the player has never seen
+  would put a wrong line number into `mistakes`, and the drills are built from
+  that table. They are told, in words, what the tests could not find;
+* anything else in the quest's file — a syntax error, a bad import — →
+  `internal_error` that says *"this is not something you did. Nothing has been
+  recorded against you."* No attempt row's verdict is ever invented, which is
+  the rule submit.rs already states.
+
+Getting this backwards in the generous direction shows `internal_error` for a
+function the player forgot to write; backwards the other way blames them for a
+typo in a file they cannot open. Both directions are tested, in both lands.
+
+### Four things measured rather than assumed
+
+* **`go` was silently dropping out of module mode.** `go` ignores a `go.mod`
+  that sits inside `os.TempDir()`, and `os.TempDir()` is `$TMPDIR`, which the
+  toolchain environment points at the build directory. Every gotest quest would
+  have built in GOPATH mode with the warning buried in the compile log — and
+  with no `go` directive in force, the language version falls back to 1.16 and
+  generics stop compiling. The scratch now gets its own subdirectory one level
+  down. Found by a test asserting the *wording* of a `GOPROXY=off` refusal.
+* **The compile budget.** Cold, with empty caches and no dependencies,
+  `cargo test --no-run` takes 0.15 s and `go test -c` takes 2.8 s — it builds
+  `testing`, `fmt` and `runtime` before it sees the quest — and 4.3 s with
+  `-race`. Warm, both are ~0.15 s. SPEC §5.2's 30 s default is right for one
+  `rustc`; for these two the default is now **60 s**, which is not a claim that
+  the compile is slow but the budget before the runner calls a *compiler* hung.
+  A pack that names its own `compile_timeout_ms` still gets it.
+* **The output cap binds differently under `cargo`.** libtest *captures* a
+  test's stdout and stderr into memory and prints them only if the test fails,
+  so a test in an infinite `println!` puts nothing on the pipe the runner is
+  draining and `max_stdout_bytes` never fires — what stops it is the wall clock
+  (and `RLIMIT_AS`, where the platform honours it; on darwin `setrlimit`
+  returns `EINVAL` for `RLIMIT_AS`, so there it is already a no-op). Output
+  that goes around the capture *is* capped, and there is a test for each.
+  `go test` streams, so the cap fires there exactly as it does for stdio.
+* **A cargo timeout still names the test.** libtest writes `test tests::x ... `
+  *before* running it, but through a line buffer, so on a kill that half-line
+  is usually still in the buffer. On a timeout only, the harness re-runs the
+  binary with `--list` and names the first test with no result. Paid for on the
+  failing path, never on the common one.
+
+### A RUN of a quest that ships its own tests runs only the declared ones
+
+PROTOCOL §4.9b — "a run cannot tell you whether the hidden cases pass" — is
+guaranteed for stdio by never handing the hidden cases to the runner. That
+guarantee does not survive `test_source`: the hidden tests are functions in one
+file, so filtering the pack's *cases* would leave `cargo test` and `go test`
+running them anyway, streaming each result to `run.log` and failing the run on
+one the player is not allowed to see.
+
+So `visible_only()` now also sets `only_declared`, and when a quest ships its
+own tests a RUN executes only the declared ones — `-test.run '^(TestA|TestB)$'`
+for Go, and for libtest the names resolved against the binary's own `--list`
+and passed `--exact`, because a substring filter would drag in `adds_zero` on
+its way to `adds`. A SUBMIT runs everything, as it must. Both lands have the
+test: the hidden test fails, the submit says so, the run comes back green and
+the hidden name appears nowhere in the report, the log or the verdict.
+
+When the *player* wrote the tests, everything runs on a RUN. There is nothing
+hidden to protect, and watching your own tests go green is what RUN is for.
+
+## 2026-09-11 — `-race` is implemented, and no quest should depend on it yet
+
+`race = true` in the test spec, `gotest` only, refused at parse time anywhere
+else — a quest that believed it was judged under `-race` and was not would be
+worse than one that failed to import.
+
+Measured here (go1.27.1, darwin/arm64), 20 runs each:
+
+| fixture | detected |
+| --- | --- |
+| four goroutines incrementing one `int` | **20/20** |
+| a flag written by a goroutine, read after a `time.Sleep` — no synchronisation at all | **20/20** |
+| a result written by a goroutine, read after `select { case <-done: case <-time.After(50ms): }` | **0/20** |
+
+The third one is racy code. The detector is right not to report it: when the
+goroutine wins the `select` — which it does every time — closing `done`
+establishes a happens-before edge, and there is no race *in that execution*.
+This is what QA saw as "0 times in 3", and it is not flakiness in the detector;
+it is that `-race` reports races that **happened**, not races that **exist**.
+Note also what the second row disproves: two accesses that never overlap in
+wall-clock time are still caught, because the detector reasons about
+happens-before, not about timing.
+
+Two more facts. `-race` builds without cgo on this Go and this platform
+(go1.27, darwin/arm64) — the premise that it needs cgo here is out of date —
+but it needs cgo nearly everywhere else, so the harness sets `CGO_ENABLED=1`
+when the flag is on. And a `-race` binary reserves far more *virtual* address
+space than 1 GiB before it runs a line, so §5.3's `RLIMIT_AS` would not limit
+it but delete it; `proc::Limits` now separates the address-space cap from the
+rest for this one caller. Every other §5.3 limit still applies to a race run.
+
+**The recommendation: a race quest stays `stdio`, or runs under plain
+`gotest`.** Judge the *fix* — a `sync.Mutex`, an atomic, a channel — with a
+deterministic test that fails when the fix is absent, which is what
+`go.advanced`'s concurrency quests already do. `-race` as a *pass* condition is
+only reliable for the blatant shape in row one, and a quest author cannot tell
+from the outside which shape they have written. A flaky judge is worse than an
+absent one; the flag is here so that the day a quest wants it, the wiring is
+tested rather than invented under time pressure.
+
+## 2026-09-11 — Proposal for BE: the importer must let a test-harness case have no `expect`
+
+**Nothing in `content/` can use these harnesses until this lands**, so it is
+the blocking item, not a tidy-up.
+
+`core/src/content.rs` refuses any case whose `expect` is empty — "an empty
+expectation is cleared by an empty `fn main() {}`". That rule is exactly right
+for `stdio` and meaningless for `cargo`/`gotest`, where a case names a **test**
+and there is no expected output to write: the test is the expectation. As it
+stands, every cargo or gotest quest fails to import with *"case 'adds' expects
+nothing; an empty main would clear it"*.
+
+The equivalent guard for the test harnesses is that the case must **name**
+something, and the "empty submission clears it" hole is closed in the runner
+instead, by `suite.rs`'s rule that a suite which ran no tests never passes.
+
+Requested change, in `validate` (the `for case in cases` loop):
+
+```rust
+let harness = tests.get("harness").and_then(|v| v.as_str()).unwrap_or("stdio");
+for case in cases {
+    let name = case.get("name").and_then(|v| v.as_str()).unwrap_or("");
+    if harness == "stdio" {
+        let expect = case.get("expect").and_then(|v| v.as_str()).unwrap_or("");
+        if expect.trim().is_empty() {
+            return Err(bad_request(format!(
+                "quest '{}' case '{}' expects nothing; an empty main would clear it",
+                quest.id, if name.is_empty() { "?" } else { name },
+            )));
+        }
+    } else if name.trim().is_empty() {
+        // A cargo/gotest case names a test that must pass; there is no
+        // expected output to compare. An unnamed case names nothing and
+        // could never be satisfied.
+        return Err(bad_request(format!(
+            "quest '{}' has a {harness} case with no name; a case here names \
+             the test that must pass",
+            quest.id
+        )));
+    }
+}
+```
+
+Nothing else in `backend/server/` or `backend/core/` needs to change:
+`runner::unsupported()` lives in the runner and already opens the gate,
+`submit.rs` dispatches on `lang` and classifies whatever `compiler_stderr`
+holds, and the `cargo` harness emits the same `rustc` JSON-per-line that
+`mistakes::classify_rust_json` already reads.
+
+## 2026-09-11 — CLI: the fourth client, and what the wire actually does
+
+`cli/` is a Rust terminal client, binary `cwbh`: command mode for people who
+live in a shell, plus `cwbh tui`. It is the fourth implementation of
+`PROTOCOL.md` and the first one that can be driven from a script, so most of
+this note is things the other three could not easily have found out.
+
+### The editor loop
+
+`cwbh edit <id>` writes the starter to
+`~/.causewaybayhackercli/work/<address-lower>/<quest-id>.rs` **only if that
+file does not exist**, then opens `$VISUAL`/`$EDITOR` on it and waits. `run`
+and `submit` send that same file; there is no second buffer. `cwbh reset` is
+the only thing that overwrites, and it asks. `$EDITOR` is split on whitespace
+so `code -w` keeps its wait flag, and the file is compared before and after —
+an editor that returns without waiting is reported as "unchanged" rather than
+silently submitting the starter.
+
+`lang` is always taken from the quest's `land`, never from the file extension:
+§4.9 makes a disagreement `bad_request`, and a client that infers it from the
+filename will one day rename a file and not understand the answer.
+
+### `run.log` really does paint mid-compile — and the `compile` stream is JSON
+
+Measured on the live server, `rust.hacker.24.inversions` with three deliberate
+warnings added to the O(n²) starter:
+
+```
+   0ms queued / compiling
+  33ms ─── compile ───      four rustc warnings
+1754ms ─── stdout ───       19 / MAX 908834774 / …
+6878ms judging
+first compile chunk at 33ms, first stdout chunk at 1754ms, reply at 6882ms
+```
+
+The compiler's words were on screen **6.8 seconds before the verdict**. A
+120-error file gives the same answer from the other end: 122 separate `run.log`
+frames arriving over 28–50 ms with the reply at 86 ms.
+
+**But §4.18's example is not what the `compile` stream carries.** The example
+shows `"chunk": "error[E0382]: borrow of moved value: \`s\`\n"` — rendered
+text. SPEC §5.1 compiles with `rustc --error-format=json` and
+`backend/server/src/submit.rs` streams the compiler's stderr verbatim, so what
+actually arrives for a Rust attempt is one JSON diagnostic object per line,
+several kilobytes each, most of it `explanation` prose nobody asked for.
+Printed raw it is unreadable, which is a plausible reason nobody had watched
+this stream before. `Attempt.stderr` **is** rendered (`mistakes::rendered_from_json`),
+so a client that only reads the final attempt never notices.
+
+This client buffers to line boundaries and prints each diagnostic's own
+`rendered` field, which is exactly the text the example promised; `--raw`
+turns that off. §4.18 is worth amending either to say what the stream carries,
+or to render it server-side the way `Attempt.stderr` already is. The second
+would be better: three clients would each otherwise have to learn rustc's JSON.
+
+### `server.bye` has never been sent on a shutdown
+
+Against a throwaway server on 5391 (never the shared one), killed while a TUI
+was connected:
+
+* **SIGTERM** — no `server.bye`, no close frame. `backend/server/src/lib.rs`'s
+  `shutdown()` awaits `ctrl_c()` only, so SIGTERM kills the process outright.
+* **SIGINT** — also no `server.bye`. Axum's graceful shutdown drains HTTP
+  requests; the upgraded websocket task is not told, and the client sees
+  `Connection reset without closing handshake`.
+
+The two places `ws.rs` emits `server.bye` are the keepalive-missed branch and
+the end of the per-connection task — the latter runs *after* the client has
+gone, so nobody hears it. So §4.21's `reason: "shutdown"` and §6's "reconnect
+on `shutdown`" have never fired in practice. §8.11 is still satisfiable — this
+client survives both halves, and the close-without-goodbye path is the one
+that actually happens — but the contract currently describes something the
+server does not do.
+
+Related: the keepalive-missed branch sends `reason: "shutdown"`, which is not
+true. §1.2 distinguishes "server going away" from "keepalive missed" in the
+close codes; §4.21's `reason` set (`shutdown | revoked | replaced`) has no
+value for the second.
+
+### `detail.milestone` is an integer
+
+§3.3 requires `unavailable` to carry `detail.milestone` and shows a client
+saying *"the GO land opens in the next chapter"*, which reads as a phrase. The
+server sends `{"milestone": 2}` (`handlers::unimplemented`). Neither type is
+written down. This client accepts both rather than dropping the one it did not
+expect and printing a sentence with a hole in it, and renders the integer as
+"milestone 2". Worth pinning in §3.3 either way.
+
+### §4.10 `quest.hint` has no heading
+
+Between §4.9d and §4.11, the hint request/response block and its "taking a hint
+costs stars" paragraph sit directly under `code.format`'s text with no
+`### 4.10 quest.hint` header. Read straight through, the hint payload looks
+like part of the formatter's section. Also, the section order runs 4.8, 4.9,
+4.8b, 4.9b, 4.9c, 4.9d, (4.10), 4.11 — and §5 runs 5.4, 5.9, 5.5, 5.10, 5.6.
+
+### §4.9c: the three undocumented playground messages, probed independently
+
+Confirming L2D's note from the other direction, against the live server, with
+one correction:
+
+```
+playground.list   -> { snippets: SnippetBrief[] }            agrees
+playground.load   -> { snippet: Snippet }                    agrees; not_found on an unknown id
+playground.delete -> { deleted: true, id: "pg_…" }           L2D recorded `{ }`
+```
+
+`playground.save`'s idempotence holds: saving identical content under the same
+`id` returned the same `updated_at` to the second.
+
+### Warnings become `mistakes` rows
+
+A submit whose only compiler output was four `unused_variables` /`unused_mut`
+warnings came back with four `mistakes` entries of kind `unused`, and they are
+now in `stats.mistakes` beside `borrow-after-move` and `timeout`. That may be
+intended — an unused binding is a real habit — but it means the curriculum will
+drill a player on warnings from a program that compiled and passed, and
+`stats.mistakes` ranks them by raw count against genuine errors. Flagging it
+for BE/PM rather than asserting it is wrong.
+
+### The client's own store
+
+`~/.causewaybayhackercli`, SPEC §1.1 to the letter: `0700`/`0600`, append-only
+JSONL, state by replay, `session.clear` as a record. Every directory from the
+home down is forced to `0700` — `create_dir_all` applies the umask, which left
+the intermediate `work/` at `0755` on macOS and made the `0700`s either side of
+it decoration.
+
+Tokens are keyed by a **canonical** server URL: `localhost:5390`,
+`http://localhost:5390`, `HTTP://LocalHost:5390/` and `ws://localhost:5390/ws`
+all reduce to one key, so the "one token, two servers" failure §1.1 warns about
+cannot happen through a spelling. Precedence is written down and tested:
+`--server` > `$CWBH_SERVER` > the last server used > `ws://127.0.0.1:5390/ws`.
+
+### Key material
+
+Derivation and EIP-191 signing are checked against `tests/vectors/*.json` —
+every mnemonic, every index, and the full `r ‖ s ‖ v` signature byte for byte,
+so this is the fourth implementation to agree on
+`0x9858EfFD232B4033E47d90003D41EC34EcaEda94`. §4.3's recovery-id warning is
+asserted rather than described: a test builds `v ‖ r ‖ s` and proves it
+recovers a different address.
+
+There is **no `--mnemonic` flag**. Not one with a warning — the flag does not
+exist, because argv lands in shell history and in `ps`. The phrase is read
+without echo (not even asterisks: counting twelve groups of stars tells a
+shoulder-surfer the word count) or from a pipe, lives in `Zeroizing<String>`,
+and is dropped before the socket is touched.
+
+### §8, and where each item is checked
+
+`cli/tests/conformance.rs` runs the client against a mock websocket server for
+the half of §8 that a real server will not perform on request: a reply arriving
+out of order (§8.2 — two requests in flight, answered backwards), three unknown
+event types (§8.3), every error code plus an invented one (§8.4), the whole
+login handshake swept for the phrase, the private key and the BIP-39 seed
+(§8.5, §8.6), a rotated `auth.resume` token (§8.7), a `seq` gap and a line split
+across three chunks (§8.8), a port that is not listening yet (§8.9), and both
+`server.bye`-then-close and close-with-no-goodbye (§8.11).
+
+§8.2's evidence is not contrived: the 20-second keepalive `ping` fires *during*
+a long submit, so §2.2's own example — "a `ping` sent after it will come back
+first" — happens on every slow run. Replies for ids nobody is waiting on are
+stashed, not dropped.
+
+§1.1/§8.12 confirmed against the live server with `cwbh doctor --hold 75`:
+alive after 75 idle seconds, 2 websocket pings from the server (auto-ponged by
+`tokio-tungstenite`) and 3 application pings sent. Both halves, belt and
+braces.
+
+### Not finished
+
+`search.query` and `ai.plan`/`next`/`finish` are wired as `cwbh search` and
+`cwbh drill` and render `unavailable` in the story's voice — they are not
+implemented on the server, so there is nothing more to do until milestone 2.
+`profile.update` has no command. The TUI has a node list rather than a drawn
+overworld, and no `x`/`y` map layout.

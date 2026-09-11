@@ -49,16 +49,17 @@ cases = [
 [[quest]]
 id          = "go.basic.02.testing"
 node        = 2
-title       = "A HARNESS NOBODY BUILT"
+title       = "A HARNESS FROM THE WRONG LAND"
 difficulty  = 1
 story       = "Some doors are drawn on the map before they are cut."
 concepts    = ["functions", "error-handling"]
 requires    = []
 map         = { x = 0.25, y = 0.66, kind = "quest" }
 brief       = '''
-This quest declares the `gotest` harness, which this build cannot run. It
-exists so the "refuse without recording anything" rule stays tested now that
-the Go land itself works.
+This quest declares the `cargo` harness on a Go quest, which no build will
+ever run. It exists so the "refuse without recording anything" rule stays
+tested whatever the current set of built harnesses happens to be — the rule is
+about what the server writes when it cannot judge, not about which gap.
 '''
 starter     = '''
 package main
@@ -73,7 +74,7 @@ func main() {}
 hints = []
 
 [quest.tests]
-harness      = "gotest"
+harness      = "cargo"
 timeout_ms   = 5000
 match        = "trim"
 cases = [

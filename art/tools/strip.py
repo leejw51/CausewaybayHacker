@@ -21,7 +21,7 @@ from collections import deque
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from process import defringe, drop_trapped_backdrop, ink_bounds, knockout
+from process import backdrop_ref, defringe, drop_trapped_backdrop, ink_bounds, knockout
 
 
 def components(im, min_px=400):
@@ -51,6 +51,55 @@ def components(im, min_px=400):
             if n >= min_px:
                 out.append((n, (minx, miny, maxx + 1, maxy + 1)))
     return out
+
+
+def build_grid(src, dst, n, cw, ch, pad=0.06):
+    """
+    Cut a strip by even columns instead of by connected components.
+
+    `build` takes the n largest ink blobs, which is right for a walk cycle
+    where every frame is one figure. It is wrong for a progression whose last
+    frame has fallen into two pieces: a shackle that has finally snapped is two
+    blobs, so the component split would hand back seven frames for six stages
+    and put half a shackle in its own cell.
+
+    Here the image is divided into n equal columns and each column is cropped
+    to its own ink, which survives a frame being any number of pieces.
+    """
+    im = defringe(drop_trapped_backdrop(knockout(Image.open(src)), ref=backdrop_ref(Image.open(src))))
+    w, h = im.size
+    step = w // n
+    crops = []
+    for i in range(n):
+        col = im.crop((i * step, 0, (i + 1) * step if i < n - 1 else w, h))
+        bb = ink_bounds(col)
+        if bb is None:
+            raise SystemExit(f"{src}: column {i + 1} of {n} is empty — re-roll it")
+        crops.append(col.crop(bb))
+
+    inner_w = int(round(cw * (1 - pad * 2)))
+    inner_h = int(round(ch * (1 - pad * 2)))
+    k = min(inner_h / max(c.height for c in crops), inner_w / max(c.width for c in crops))
+
+    sheet = Image.new("RGBA", (cw * n, ch), (0, 0, 0, 0))
+    boxes = []
+    for i, c in enumerate(crops):
+        nw, nh = max(1, round(c.width * k)), max(1, round(c.height * k))
+        f = c.resize((nw, nh), Image.LANCZOS)
+        r, g, b, a = f.split()
+        f = Image.merge("RGBA", (r, g, b, a.point(lambda v: 255 if v >= 128 else 0)))
+        ox = i * cw + (cw - nw) // 2
+        oy = (ch - nh) // 2
+        sheet.paste(f, (ox, oy))
+        bb = ink_bounds(f)
+        boxes.append({
+            "cx": round(ox + (bb[0] + bb[2] - 1) / 2.0, 2),
+            "feet": float(oy + bb[3]), "h": float(bb[3] - bb[1]),
+            "minx": ox + bb[0], "miny": oy + bb[1],
+            "maxx": ox + bb[2] - 1, "maxy": oy + bb[3] - 1,
+        })
+    sheet.save(dst)
+    return {"file": dst, "w": cw * n, "h": ch, "frames": n, "fw": cw, "fh": ch, "boxes": boxes}
 
 
 def build(src, dst, n, cw, ch, pad=0.06):
@@ -93,5 +142,7 @@ def build(src, dst, n, cw, ch, pad=0.06):
 
 
 if __name__ == "__main__":
-    src, dst, n, cw, ch = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
-    print(json.dumps(build(src, dst, n, cw, ch), indent=1))
+    args = [a for a in sys.argv[1:] if a != "--grid"]
+    fn = build_grid if "--grid" in sys.argv else build
+    src, dst, n, cw, ch = args[0], args[1], int(args[2]), int(args[3]), int(args[4])
+    print(json.dumps(fn(src, dst, n, cw, ch), indent=1))

@@ -1,0 +1,56 @@
+# Causewaybay Hacker — the terminal client.
+#
+# One crate, one binary: `cwbh`. The fourth implementation of PROTOCOL.md,
+# after the browser, the LÖVE client and the smoke harness.
+#
+# Deliberately standalone. `CausewaybayWallet`'s `causewaybay-core` has the
+# same derivation and the same JSONL store conventions, and this crate follows
+# them line for line — but depending on it would drag in a Midnight ledger and
+# a Solana curve to sign one login message.
+
+[package]
+name = "causewaybay-hacker-cli"
+description = "The Causewaybay Hacker terminal client: quests, the editor loop, and a TUI"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+
+[[bin]]
+name = "cwbh"
+path = "src/main.rs"
+
+[dependencies]
+# --- key material: BIP-39 -> BIP-32 -> secp256k1 -> EIP-191 ---
+k256 = { version = "0.13", features = ["ecdsa", "arithmetic"] }
+sha2 = "0.10"
+sha3 = "0.10"
+hmac = "0.12"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+unicode-normalization = "0.1"
+# Secrets are wiped when they go out of scope rather than left in freed memory,
+# where a realloc, a swap file or a core dump can still carry them.
+zeroize = { version = "1", features = ["derive"] }
+hex = "0.4"
+
+# --- the wire ---
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "macros", "sync", "io-std", "process"] }
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+futures-util = { version = "0.3", default-features = false, features = ["std", "sink"] }
+url = "2"
+
+# --- the terminal ---
+clap = { version = "4", features = ["derive", "env"] }
+ratatui = "0.29"
+crossterm = "0.28"
+
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+rand = "0.8"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+strip = true

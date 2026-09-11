@@ -50,6 +50,7 @@ pub fn judge(
                 max_stdout: sub.spec.max_stdout_bytes,
                 max_stderr: 256 * 1024,
                 apply_rlimits: true,
+                address_space: true,
             },
             "stdout",
             "stderr",
@@ -139,7 +140,11 @@ pub fn not_run(sub: &Submission) -> Vec<CaseResult> {
 }
 
 /// SPEC §5.3: `PATH`, `HOME` pointed at the build dir, and nothing else.
-fn strip_env(command: &mut Command, workdir: &Path) {
+///
+/// Shared with the `cargo` and `gotest` harnesses (`suite.rs`): a test binary
+/// is the player's code too, and it must not run in a roomier environment
+/// than a stdio submission does.
+pub(crate) fn strip_env(command: &mut Command, workdir: &Path) {
     command
         .env_clear()
         .env("PATH", "/usr/bin:/bin")

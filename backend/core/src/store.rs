@@ -44,6 +44,12 @@ impl Store {
         &self.home
     }
 
+    /// **The guard is not reentrant.** Taking it twice on one thread — most
+    /// easily by holding it while calling a helper that takes its own —
+    /// deadlocks, and a deadlock hangs rather than panicking, which is a
+    /// nastier way to lose an afternoon than a stack trace. Take it in short
+    /// scopes.
+    ///
     /// A poisoned mutex means a previous caller panicked mid-statement. The
     /// connection itself is still usable — SQLite's state is in the file, not
     /// in the guard — and refusing to serve anything ever again is a worse

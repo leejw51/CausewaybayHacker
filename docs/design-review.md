@@ -1002,3 +1002,131 @@ that hides: the first version sampled the reference colour from the border
 the new rule silently never fired. It looked like it worked because nothing
 crashed. The reference is now taken from the raw image before knockout, and both
 cases are asserted after every reprocess — the pocket gone, the cloth intact.
+
+---
+
+## 2.14 The three trainer screens — how much art each deserves
+
+`search`, `stats` and `ai` have no scenes yet, so this is art direction written
+ahead of the code rather than a review of it. READ: SPEC §7.1-§7.3,
+`docs/concepts.md` §2.
+
+### SEARCH — no art, and that is the answer
+
+A box and a result list. It is a utility, it is used with the keyboard, and the
+faster it gets out of the way the better it is. Anything I drew for it would be
+something to look past. The existing panel chrome and the city backdrop are
+enough; the work this screen needs is typographic — result rows that scan, a
+visible match highlight, and an empty state that says what to type rather than
+"no results". None of that is a picture.
+
+### STATS — one asset, and a proposal that needs none
+
+SPEC §7.2 is the whole design brief for this screen and it is better than a
+table: every attempt bumps a kind's `count` and resets `cleared_since` to 0,
+every attempt *without* that kind increments it, and **at 5 the kind is
+learned** — it drops out of the AI plan's priority list and is never deleted.
+
+So the screen is not a list of failures. It is a list of things you are in the
+middle of beating, and `cleared_since` 0→5 is the arc. A number cannot carry
+that. **`shackle_break` can**: six frames of the same brass bar, whole at 0 and
+snapped in two at 5, where the change between stages is in the *outline* — the
+gap grows — so it still reads at 20px in a list row. It also reuses the
+metaphor the game already owns: BE's `tamed-<kind>` badge is a broken shackle,
+and this is that badge being earned in slow motion.
+
+**The proposal that costs no art.** Give the screen a hero above the list:
+*the kinds you have broken, the kinds still holding, and the ones you have
+never made* — a row built from three assets that already exist. `badge_shackle`
+for a learned kind, `shackle_break` frame 0 for one still holding, and
+`badge_slot` for a kind in the taxonomy you have never hit. Seventeen sockets,
+filling up. That turns a table into a collection, which is the difference the
+question was asking about, and it needs nothing new.
+
+**What I deliberately did not make: an icon per mistake kind.** There are
+seventeen, and seventeen icons at list-row size is noise, not scanning. If the
+rows need grouping, `docs/concepts.md` §1 already groups the vocabulary —
+Grammar, Memory and aliasing, Concurrency, Algorithms — and a coloured left rule
+per group does that job in chrome, with no art and no new vocabulary invented.
+
+### AI MODE — three emblems, because it is the same kind of choice as a land
+
+Three plans, one line of reason, and a decision about where the next hour goes.
+That is structurally the CHOOSE YOUR LAND category rows, so it gets the same
+treatment and the same 3:1 band, which also means the two "pick a road" screens
+in the game look related rather than each inventing a style.
+
+| plan | the picture |
+| --- | --- |
+| `repeat` | the same shopfront three times over — shutter down, half up, fully up — and a spike thick with identical receipts |
+| `weakness` | a workbench: one padlock broken open under the lamp, four more of the same kind lined up waiting |
+| `spaced` | a tram stop — blank timetable board, station clock, bench, and the tram arriving again |
+
+`weakness` is the one that had to be right, because it is the plan that teaches:
+SPEC §7.3 finds *borrow-after-move* and hands over five different shapes of it,
+and "one lock open, four more of the same kind waiting" is that sentence as a
+picture. It also keeps the game's lock-and-shackle language running through
+badges, stats and AI mode as one idea instead of three.
+
+`fx_shards` — a small burst of brass shards — is for the moment a kind reaches 5
+and the bar finally snaps. It is the only new effect: the payoff needed
+something, and confetti would have been the wrong register for *"you used to do
+this and you have stopped"*.
+
+## 2.14b The node checker got one more lesson, from new content
+
+`content/go/hacker.toml` grew from 24 nodes to 34 while this round was in
+flight, and `checknodes.py` immediately failed two of the new ones. They turned
+out to be **on grass** — rgb(32,92,40), open park lawn, which is perfectly good
+ground that simply has nothing built on it. The variance test cannot tell an
+empty lawn from open water.
+
+So the rule is now the **conjunction** of the two heuristics that each failed
+alone: a node is floating only where its neighbourhood is *both* featureless
+*and* a void colour — blue-dominant or near-black. Hue alone failed on `map_go`,
+a night plate whose ground is indigo; variance alone failed on a lawn. The
+failure modes are orthogonal, so the conjunction is correct.
+
+Loosening a test risks disabling it, so this one is regression-checked: painting
+a patch of flat harbour blue over a known-good node still makes it fail, and
+restoring the plate makes it pass. A rule that cannot fail is not a rule.
+
+The useful part is that the check caught a **content** change against the art
+within minutes of it landing, which is what it was for — and it reported two
+coordinates rather than sending anyone to re-roll a plate that was fine.
+
+## 2.15 The two open items from §2.3 and §2.7, resolved
+
+**The login title (§2.3) is a spec note, not an asset**, which is the cheaper
+and better of the two options I offered. FE: draw `CAUSEWAYBAY HACKER` four
+times in `Theme.ink` at ±2px offsets before drawing the face, so the glyphs
+carry their own outline. That keeps the painted backdrop fully visible where a
+title plate would have covered it, and it is what every SNES title screen does.
+Measured need: the glyph runs 8.26:1 over the sky and **2.25:1** where it
+crosses the pink tenement, so the outline only has to win against the worst
+patch, not the average one.
+
+**`fg_wires` (§2.7) is re-rolled as wires only** — five sagging span wires edge
+to edge with insulators and droppers, in near-black, with no awning, no pole, no
+branch and no sign panels. The awning corner was the part that floated
+unattached over the map's sky; wires read as depth over a top-down plate because
+a wire crossing a city from above is a real thing, and a canopy hanging from
+nothing is not.
+
+## 2.16 An asset made and never wired — worth catching early
+
+READ: `grep -rn bg_playground frontend/src` returns nothing. SEEN
+`60-playground-landscape.png` — the playground draws the generic night-city
+backdrop, not Mei's desk.
+
+`bg_playground` and `bg_playground_p` were made last round for exactly that
+screen and are not referenced. This is §5 of the first review beginning again in
+miniature, and it is much cheaper to fix at two assets than at twenty-six. If
+the desk was considered and rejected, that is a fine answer and worth an entry
+in `docs/decisions.md`; if it was simply missed, it is one `picture()` call.
+
+Two smaller things on the same capture: **the scratchpad title overlaps its
+language tag** — `scratch 2026-09-11` runs under the `RUST` chip at the right of
+the row — and the scratchpad list has ~350px of dead column between its one item
+and the `saved` line, which is §7's stretched-panel habit returning on a new
+screen.

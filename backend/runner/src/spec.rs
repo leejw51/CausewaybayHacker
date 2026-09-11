@@ -99,6 +99,33 @@ pub struct TestSpec {
     pub max_stdout_bytes: usize,
     pub cases: Vec<Case>,
     pub match_mode: MatchMode,
+    /// The quest's **own** tests, for the `cargo` and `gotest` harnesses
+    /// (SPEC §5.2). Present means "implement this; we grade it with the tests
+    /// below"; absent means "you write the tests too".
+    ///
+    /// It is the difference between the two quest shapes these harnesses can
+    /// teach, and it is also the only way a quest can break in a way that is
+    /// not the player's fault — which is why the runner tracks whose file a
+    /// diagnostic came from.
+    pub test_source: Option<String>,
+    /// Set by [`TestSpec::visible_only`]: this is a RUN, so the only tests
+    /// that may execute are the ones the pack declared (PROTOCOL §4.9b).
+    ///
+    /// It matters only when the quest ships its own tests. For stdio the
+    /// hidden *cases* are simply not handed to the runner, and for a quest
+    /// whose tests the player wrote there is nothing hidden to protect. But a
+    /// quest-supplied test file is one file: filtering its cases out of the
+    /// spec would not stop `cargo test` or `go test` from running every test
+    /// in it and streaming the result, and "a run cannot tell you whether the
+    /// hidden cases pass" would be false.
+    pub only_declared: bool,
+    /// `gotest` only: build the test binary with `-race` (SPEC §5.1).
+    ///
+    /// Off by default and deliberately hard to reach. The detector only sees
+    /// a race that actually raced on that run, so a quest that turns it on is
+    /// making a promise about the schedule that the schedule does not make
+    /// back. See `docs/decisions.md`.
+    pub race: bool,
 }
 
 impl TestSpec {
@@ -124,6 +151,9 @@ impl TestSpec {
                 visible: true,
             }],
             match_mode: MatchMode::Trim,
+            test_source: None,
+            only_declared: false,
+            race: false,
         }
     }
 
@@ -136,6 +166,7 @@ impl TestSpec {
     pub fn visible_only(&self) -> TestSpec {
         TestSpec {
             cases: self.cases.iter().filter(|c| c.visible).cloned().collect(),
+            only_declared: true,
             ..self.clone()
         }
     }
@@ -151,6 +182,21 @@ impl TestSpec {
             "gotest" => Harness::Gotest,
             other => return Err(bad_request(format!("unknown harness '{other}'"))),
         };
+        let race = value.get("race").and_then(|v| v.as_bool()).unwrap_or(false);
+        if race && harness != Harness::Gotest {
+            // A quest that asks for `-race` under a harness that cannot give
+            // it would be judged as if it had, which is worse than refusing.
+            return Err(bad_request(format!(
+                "race = true is a gotest option; this quest is '{}'",
+                harness.as_str()
+            )));
+        }
+        if value.get("test_source").is_some() && harness == Harness::Stdio {
+            return Err(bad_request(
+                "test_source belongs to the cargo and gotest harnesses; \
+                 a stdio quest has no test file",
+            ));
+        }
         let cases = value
             .get("cases")
             .and_then(|v| v.as_array())
@@ -187,7 +233,23 @@ impl TestSpec {
             compile_timeout_ms: value
                 .get("compile_timeout_ms")
                 .and_then(|v| v.as_u64())
-                .unwrap_or(30_000),
+                // SPEC §5.2's default is 30 s, which is the right number for
+                // one `rustc` or one `go build`. A test harness builds more:
+                // measured cold on this machine (empty caches, no
+                // dependencies) `cargo test --no-run` takes 0.15 s but
+                // `go test -c` takes 2.8 s — it compiles `testing`, `fmt` and
+                // `runtime` before it sees the quest — and 4.3 s with
+                // `-race`. Warm, both are ~0.15 s. Thirty seconds holds on
+                // this machine and would not hold on a cold cache on a slower
+                // one, and the failure mode is a `timeout` verdict on a
+                // correct answer, which is the worst verdict this game can
+                // hand anybody. Sixty is not a promise that the compile is
+                // slow; it is the budget before the runner calls a *compiler*
+                // hung.
+                .unwrap_or(match harness {
+                    Harness::Stdio => 30_000,
+                    Harness::Cargo | Harness::Gotest => 60_000,
+                }),
             max_stdout_bytes: value
                 .get("max_stdout_bytes")
                 .and_then(|v| v.as_u64())
@@ -199,6 +261,13 @@ impl TestSpec {
                     .and_then(|v| v.as_str())
                     .unwrap_or("trim"),
             )?,
+            only_declared: false,
+            test_source: value
+                .get("test_source")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.trim().is_empty())
+                .map(str::to_string),
+            race,
         })
     }
 }

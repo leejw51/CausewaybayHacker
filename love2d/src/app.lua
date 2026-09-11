@@ -4,10 +4,11 @@
 --
 --   boot → login → lands → categories → map → quest → result
 --
--- plus `search`, `stats` and `ai` reachable from the map. Milestone 1 is
--- login → RUST → BASIC → a map → a quest → submit → CLEARED, and the three
--- extra screens are honest stubs (see `src/scenes/stub.lua`): they say what
--- they will be and go back, rather than pretending.
+-- plus `search`, `stats` and `ai` reachable from the map, and `playground`
+-- from either. `stats` is live; `search` and `ai` are built against their
+-- contracts and render whatever the server answers — including `unavailable`
+-- (§3.3), which is said in the story's voice and offers no retry, because
+-- retrying a feature that does not exist yet never helps.
 --
 -- **Nothing in here decides a game rule.** No scene knows whether an answer
 -- is right, which node unlocks next, or what a quest is worth. Those are
@@ -281,6 +282,12 @@ function App:go(name, params)
   local scene = require(path).new(self)
   self.scene = scene
   self.scene_name = name
+  -- LÖVE delivers `textinput` for a printable key *after* `keypressed` for
+  -- the same physical press. A scene opened by a letter — S for search, P for
+  -- the playground, Q for a category — would otherwise receive that letter as
+  -- typed text on its first frame, and the search box opened reading
+  -- "sborrow checker". One frame of deafness is the fix.
+  self.swallow_textinput = true
   if scene.enter then scene:enter(params or {}) end
 end
 
@@ -320,6 +327,9 @@ function App:update(dt)
     self.toast_left = math.max(0, self.toast_left - dt)
   end
   if self.scene and self.scene.update then self.scene:update(dt) end
+  -- Cleared at the end of the frame, so exactly the keystroke that opened the
+  -- scene is swallowed and nothing after it.
+  self.swallow_textinput = false
 end
 
 function App:draw()
@@ -359,6 +369,7 @@ function App:keypressed(key)
 end
 
 function App:textinput(text)
+  if self.swallow_textinput then return end
   if self.scene and self.scene.textinput then self.scene:textinput(text) end
 end
 

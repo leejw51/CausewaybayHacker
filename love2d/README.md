@@ -66,6 +66,7 @@ official release from GitHub instead, and `make run` will use a `love` on
 | **F6** … **F9** | in a quest: reset · hint · log · `$EDITOR` |
 | **TAB** / **Q** | on the map: switch land · switch category |
 | **P** | the playground — Mei's desk, from the map or the land select |
+| **S** / **T** / **A** | from the map: search · stats · AI mode |
 | **TAB** / **ESC** | indent · back |
 
 `F` is only a shortcut on screens that are not taking text; in the editor and
@@ -93,6 +94,32 @@ what you are actually struggling with (PROTOCOL §4.9b, SPEC §7).
 Runs and submits share one execution slot: while either is in flight both
 buttons are disabled, and the client refuses the second locally rather than
 making you wait for a round trip to learn it.
+
+### Stats
+
+Where the premise becomes visible: your mistakes are the curriculum.
+`cleared_since` — the consecutive clean submits since you last made a given
+mistake — is drawn as a five-step track *and* said in words, because "you have
+not done this in four submits" is a sentence about a person and "count: 6" is
+a row in a table. At five the kind is learned and leaves the drill.
+
+Awards sit on a shelf with empty sockets for the ones you have not earned. No
+award is ever invented: earned ones come from `stats.awards`, and a socket is
+furniture rather than a guess at a name.
+
+### Search and AI mode
+
+Both are **built against their contracts and render whatever the server
+answers**. Today that is `unavailable` with a milestone, so they say which
+chapter they open in — in the story's voice, with no retry offered, because
+retrying a feature that does not exist never helps (PROTOCOL §3.3:
+`unavailable` is deliberately **not** `internal`). The day the endpoints land
+these screens show hits and drills with no change here.
+
+Search shows *why* something matched: the fused score and its `bm25` and
+`cosine` components, with a missing component drawn as absence rather than as
+zero — §5.5 says `null` means the quest was not in that ranking at all, which
+is a different fact.
 
 ### The playground
 

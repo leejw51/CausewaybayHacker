@@ -17,11 +17,16 @@ use crate::spec::Harness;
 use crate::{Event, Report, Submission, Verdict};
 
 pub fn run(sub: &Submission) -> Report {
-    if sub.spec.harness != Harness::Stdio {
-        return Report::internal(format!(
-            "the {} harness is not in this build yet (SPEC §5.1)",
-            sub.spec.harness.as_str()
-        ));
+    match sub.spec.harness {
+        Harness::Stdio => {}
+        // `go test`, parsed from its own JSON event stream: `gotest.rs`.
+        Harness::Gotest => return crate::gotest::run(sub),
+        Harness::Cargo => {
+            return Report::internal(format!(
+                "the {} harness is not a go harness (SPEC §5.2)",
+                sub.spec.harness.as_str()
+            ));
+        }
     }
     match compile_and_judge(sub) {
         Ok(report) => report,
@@ -64,6 +69,7 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
             max_stdout: 1 << 20,
             max_stderr: 4 << 20,
             apply_rlimits: false,
+            address_space: false,
         },
         "compile",
         "compile",
@@ -121,7 +127,7 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
 /// otherwise put in the user's own home is pointed inside ours. §5.3's
 /// stripped environment applies one step down, to the program the player
 /// wrote.
-fn toolchain_env(command: &mut Command, sub: &Submission) {
+pub(crate) fn toolchain_env(command: &mut Command, sub: &Submission) {
     command
         .env("GOCACHE", sub.cache_root.join("gocache"))
         .env("GOMODCACHE", sub.cache_root.join("gomodcache"))

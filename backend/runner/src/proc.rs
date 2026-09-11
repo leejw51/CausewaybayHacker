@@ -31,6 +31,18 @@ pub struct Limits {
     /// 1 GiB of address space and 64 MiB of file size, per §5.3. Skipped for
     /// the compiler, which legitimately wants more than a quest's binary.
     pub apply_rlimits: bool,
+    /// The address-space half of `apply_rlimits`, separable for exactly one
+    /// caller: a `-race` test binary reserves tens of gigabytes of *virtual*
+    /// address space before it runs a line, so a 1 GiB `RLIMIT_AS` does not
+    /// limit it, it deletes it. The file-size cap still applies, and so does
+    /// everything else in §5.3 — the timeout, the process group, the output
+    /// cap, the stripped environment.
+    ///
+    /// On darwin this is moot in both directions: `setrlimit(RLIMIT_AS)`
+    /// returns `EINVAL` there, so the cap is already a no-op. On Linux it is
+    /// the difference between a race quest running and a race quest dying
+    /// instantly with a signal nobody can explain.
+    pub address_space: bool,
 }
 
 impl Default for Limits {
@@ -40,6 +52,7 @@ impl Default for Limits {
             max_stdout: 262_144,
             max_stderr: 1_048_576,
             apply_rlimits: true,
+            address_space: true,
         }
     }
 }
@@ -86,11 +99,14 @@ pub fn run(
         // bomb spawned, which killing the pid alone would not.
         command.process_group(0);
         if limits.apply_rlimits {
+            let address_space = limits.address_space;
             let apply = move || {
                 // SAFETY: setrlimit is async-signal-safe and touches only this
                 // freshly forked child, between fork and exec.
                 unsafe {
-                    set_rlimit(libc::RLIMIT_AS, RLIMIT_AS_BYTES);
+                    if address_space {
+                        set_rlimit(libc::RLIMIT_AS, RLIMIT_AS_BYTES);
+                    }
                     set_rlimit(libc::RLIMIT_FSIZE, RLIMIT_FSIZE_BYTES);
                 }
                 // RLIMIT_NPROC is deliberately not set. On macOS it is per

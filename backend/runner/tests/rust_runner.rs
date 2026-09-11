@@ -297,18 +297,18 @@ fn the_compiler_streams_while_it_works() {
     assert!(logs > 0, "no run.log chunks were emitted while compiling");
 }
 
-/// The Go land has its own suite now (`go_runner.rs`). What is still refused
-/// is the `cargo` harness, and it refuses cleanly rather than compiling the
-/// wrong thing and calling the answer wrong.
+/// Both test harnesses are built now (`cargo_harness.rs`, `gotest_harness.rs`).
+/// What is still refused is a harness asked of the wrong land, and it refuses
+/// cleanly rather than compiling the wrong thing and calling the answer wrong.
 #[test]
-fn an_unbuilt_harness_refuses_cleanly_rather_than_panicking() {
+fn a_harness_from_the_other_land_refuses_cleanly_rather_than_panicking() {
     let h = harness();
     let spec = spec(serde_json::json!({
-        "harness": "cargo",
+        "harness": "gotest",
         "cases": [ { "name": "any", "stdin": "", "expect": "x", "visible": true } ]
     }));
     let submission = Submission {
-        attempt_id: "att_cargo",
+        attempt_id: "att_gotest_in_rust",
         lang: "rust",
         source: "fn main() {}",
         spec: &spec,
@@ -318,7 +318,7 @@ fn an_unbuilt_harness_refuses_cleanly_rather_than_panicking() {
     };
     let report = cwbhacker_runner::run(&submission);
     assert_eq!(report.verdict, Verdict::InternalError);
-    assert!(report.runtime_stderr.contains("cargo harness"));
+    assert!(report.runtime_stderr.contains("not a rust harness"));
 }
 
 /// The capability check the server asks **before** it creates an attempt.
@@ -334,11 +334,14 @@ fn unsupported_names_what_this_build_cannot_judge() {
     // Both lands are built; the gate is open for stdio in either.
     assert_eq!(cwbhacker_runner::unsupported("go", &stdio_spec), None);
 
+    // The cargo harness is built: the gate is open for it in the Rust land…
     let cargo_spec = spec(serde_json::json!({
         "harness": "cargo",
         "cases": [ { "name": "any", "stdin": "", "expect": "x", "visible": true } ]
     }));
-    assert!(cwbhacker_runner::unsupported("rust", &cargo_spec).is_some());
+    assert_eq!(cwbhacker_runner::unsupported("rust", &cargo_spec), None);
+    // …and shut in the Go one, which is an authoring mistake, not a gap.
+    assert!(cwbhacker_runner::unsupported("go", &cargo_spec).is_some());
 
     assert!(cwbhacker_runner::unsupported("cobol", &stdio_spec).is_some());
 }

@@ -452,8 +452,11 @@ async fn an_unjudgeable_submission_records_nothing() {
     let mut socket = connect(server.port).await;
     login(&mut socket).await;
 
-    // `go.basic.02.testing` declares the `gotest` harness, which this build
-    // does not run. The language is fine; the harness is the gap.
+    // `go.basic.02.testing` declares the `cargo` harness on a Go quest, which
+    // nothing will ever run. The language is fine; the harness is the gap.
+    // The rule under test is what the server writes when it cannot judge —
+    // which must be nothing — rather than which harness happens to be
+    // unbuilt today.
     send(
         &mut socket,
         json!({ "v":1, "id":"c-5", "type":"quest.submit", "payload": {

@@ -71,6 +71,7 @@ pub fn format(lang: &str, source: &str) -> std::io::Result<Formatted> {
             max_stdout: 8 << 20,
             max_stderr: 256 * 1024,
             apply_rlimits: false,
+            address_space: false,
         },
         "format",
         "format",

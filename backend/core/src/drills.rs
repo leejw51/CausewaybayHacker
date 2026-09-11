@@ -556,6 +556,11 @@ pub fn finish(conn: &Connection, address: &str, drill_id: &str) -> Result<Summar
     }
     // A kind improved is one the player made before this drill and has not
     // made since it started. Measured, not assumed.
+    //
+    // The comparison is on SPEC §2.2's timestamps, which have second
+    // granularity — so a drill created and finished inside one second cannot
+    // tell "before" from "during". That is the honest answer for a session
+    // that lasted less than a second, and it is the only case it affects.
     let mut stmt = conn.prepare(
         "SELECT DISTINCT kind FROM mistakes
           WHERE address = ?1 AND created_at < ?2

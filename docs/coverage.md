@@ -9,8 +9,8 @@ interviewer rather than as their author, listing what a screen could ask that
 a cleared player would still not recognise, and then closing what was worth
 closing. **The residual list in §5 is the important part of this document.**
 
-State of the content: **126 quests** — 18 + 18 `basic`, 17 + 17 `advanced`,
-28 + 28 `hacker`. Every reference solution compiles and runs against every
+State of the content: **138 quests** — 18 + 18 `basic`, 17 + 17 `advanced`,
+34 + 34 `hacker`. Every reference solution compiles and runs against every
 case through the real toolchain; every starter is proven to fail.
 
 ---
@@ -154,72 +154,95 @@ both `bits` quests to 600 and `go.anagrams` to 900, which were padded.
 Stated plainly, because the rule in this repository is *do not promise a
 constraint no test enforces*:
 
-* **`24.inversions` is the only quest whose hidden case rejects a correct
-  answer for being too slow.** Its brief says so, with the measured numbers.
+* **Five quests now have a hidden case that rejects a correct answer for being
+  too slow**, each with the measured numbers in its own brief:
+  `24.inversions` (merge sort vs the double loop), `29.dijkstra` (heap vs
+  linear-scan min), `30.range-queries` (Fenwick vs the per-query loop),
+  `31.palindrome` (quadratic accepted, cubic rejected — and Manacher explicitly
+  *not* demanded), and `32.modular` (one factorial table vs a modular inverse
+  per query). `33.grid-paths` rejects route enumeration, which is a
+  mathematical statement rather than a timing one.
 * Every other quest's hidden cases are small, and every brief that discusses
   complexity now says the cases are small and what the real constraint would
   be. `19.knapsack` is the one other quest whose test punishes a *wrong
   strategy* (greedy) rather than a slow one, and its brief points at the case
   that catches it.
-* All 126 quests use `harness = "stdio"`. `cargo` and `gotest` (SPEC §5.2) are
+* All 138 quests use `harness = "stdio"`. `cargo` and `gotest` (SPEC §5.2) are
   still unused, which is why the two `testing` quests teach the table shape
-  rather than running under `#[test]` / `go test`.
+  rather than running under `#[test]` / `go test`. A harness for both is being
+  built separately; when it lands, §5 item 1 becomes writable.
 
 ---
 
 ## 5. What a cleared player still could not do
 
-The honest residual. None of this is covered by the 126.
+The honest residual, revised after the second pass. Six items from the first
+version are now closed — Dijkstra, range queries with updates, palindromes,
+modular counting, grid DP with obstacles, and sorting stability all shipped as
+`hacker` nodes 28–33 in both languages.
+
+What remains:
 
 1. **Write a test that runs.** The `testing` quests teach the table, not the
-   harness, because the runner only does `stdio`. A screen that says "add unit
-   tests" is not something this content has prepared anyone for. *Fixable only
-   by BE wiring `cargo` / `gotest`.*
-2. **Segment trees, Fenwick trees, and range-update queries.** `24.inversions`
-   names the Fenwick alternative in a hint and never asks for one. A
-   "q range-sum queries with point updates" problem would be unfamiliar.
-3. **Dijkstra and weighted graphs.** Graph coverage is BFS, DFS, topological
-   sort and union-find. Every edge in every quest has weight one. Shortest path
-   with weights, and anything needing a priority queue keyed on distance, is
-   absent.
-4. **String algorithms beyond grouping and DP.** No palindromes (expand-around-
-   centre or Manacher), no KMP/Z-function, no rolling hash. "Longest
-   palindromic substring" is a top-twenty screen question and would land on
-   nothing.
-5. **Sorting stability, and custom comparators with a multi-key tie-break under
-   a stability requirement.** Ties are broken explicitly everywhere in this
-   content, which dodges the question rather than teaching it.
-6. **Bit-mask DP and combinatorics.** `20.bits` is bit *manipulation*. Subset
-   DP over a mask, and counting problems needing modular arithmetic —
-   `nCr mod p`, modular inverse — are absent, and "answer modulo 1e9+7" is a
-   phrase this content has never shown anyone.
-7. **Matrix/geometry beyond rotate and spiral.** No 2D DP over a grid with
-   obstacles, no interval scheduling with weights, no coordinate geometry.
-8. **Interactive and multi-file problems.** Out of scope for the runner, and
-   worth saying rather than leaving implied.
-9. **Talking.** A live screen is half explanation. Nothing here rehearses
-   saying why you chose the structure you chose. The `brief`s model the
-   reasoning; the quest never asks the player to produce it.
+   harness, because the runner only does `stdio`. *A separate agent is building
+   the `cargo` and `gotest` harnesses; once they land this becomes writable
+   content and is the first thing to write.*
+2. **Segment trees with range *update*.** `30.range-queries` ships a Fenwick
+   tree, which is point-update / range-query. Range-update-range-query, and
+   lazy propagation, are still absent — and a segment tree is the more
+   commonly *named* structure of the two.
+3. **String algorithms beyond palindromes and grouping.** No KMP, no Z-function,
+   no rolling hash. `31.palindrome` explicitly tells the player that Manacher
+   exists and that the tests do not demand it, which is honest but is not the
+   same as having taught it.
+4. **Minimum spanning tree.** Union-find is in the packs and Dijkstra is now in
+   the packs; Kruskal is the two of them put together and is one of the most
+   commonly asked graph questions after shortest path.
+5. **Bit-mask DP.** `20.bits` is bit *manipulation*; subset DP over a mask is a
+   different thing and is absent.
+6. **Geometry.** No coordinate geometry of any kind.
+7. **Interactive and multi-file problems.** Out of scope for the runner.
+8. **Talking.** A live screen is half explanation and nothing here rehearses
+   producing it out loud.
 
-**The six quests that would close the most, in order:** Dijkstra;
-range queries with a Fenwick or segment tree; longest palindromic substring;
-a modular-arithmetic counting problem; grid DP with obstacles; and a
-stability-sensitive multi-key sort. That is the 28 → 34 the honest answer in
-§1.5 asks for.
+**The four that would close the most now, in order:** a test that actually
+runs (blocked on the harness); Kruskal, which is cheap because both halves are
+already in the packs; a segment tree with lazy propagation; and KMP. That is
+34 → 38 per language, and the returns are visibly diminishing — the first item
+is worth more than the other three together.
 
 ---
 
+## 5b. Where the same quest is not the same quest
+
+For PM2, and for anyone tempted to mirror a Rust pack into Go or back. These
+are the places where the two languages make the *same problem* a different
+piece of work, found by writing both halves. Symmetry is not the goal;
+teaching the thing the language actually makes hard is.
+
+| quest | the asymmetry | what was done about it |
+| --- | --- | --- |
+| `linked-list` | `Option<Box<Node>>` reversal needs `.take()` and a borrow dance; `*Node` reversal is four lines | Rust **1200 s**, Go **900 s**. Same problem, different clock. |
+| `28.lru` (boss) | Go has `container/list`, a real doubly linked list, so the textbook O(1) answer is writable. Rust without `unsafe` or `Rc<RefCell<_>>` cannot, honestly | Two genuinely different quests. Rust's brief admits its O(cap) eviction scan and says saying so out loud is worth more than pretending; Go's builds the real thing. |
+| `24.inversions` | Rust needs `wrapping_mul`/`wrapping_add` and would panic in debug; Go's `uint64` wraps silently | Rust's brief teaches wrapping arithmetic as a named thing. Go's cannot, and says so instead. |
+| `29.dijkstra` | Rust: `BinaryHeap` is a **max**-heap, so `Reverse` is a concept you must know. Go: `container/heap` needs five methods with mixed value/pointer receivers | Same 1500 s — the difficulty is equal but is in a different place. Each brief names its own obstacle rather than the other's. |
+| `30.range-queries` | `i & i.wrapping_neg()` in Rust, because unary minus is not defined on `usize`; plain `i & -i` in Go on `int` | A real Rust papercut. Called out in the Rust hints; the Go hint just says `i & -i`. |
+| `34.stable-sort` | **The defaults differ.** Rust's plain `.sort()`/`sort_by_key` is stable, so reaching for the obvious thing gives stability free. Go's `sort.Slice` is *not* stable, and it is the obvious thing | The quest matters **more in Go**, and Go's brief leans harder on it. Both ship the "make the comparator total" answer as the one to reach for by default. |
+| `modular`, `grid-paths`, `palindrome` | no meaningful asymmetry | deliberately near-mirrors. |
+
 ## 6. So — can a cleared player pass a live screen?
 
-**Most of one, and not any of one.**
+**Most of one, and now most of the hard half too.**
 
 They would recognise the shape of the session, read the statement properly,
 handle the empty and single-element cases, reach for the right structure on
-about four questions in five, and — after `24.inversions` — know in their hands
-and not just in a brief that the correct slow answer is a rejection.
+roughly nine questions in ten, and — after four quests whose hidden cases kill
+a correct-but-slow answer — know in their hands and not just in a brief that
+the right algorithm is part of the answer and not a bonus.
 
-They would be caught out by a weighted shortest path, by a palindrome
-question, by anything that says *modulo 1e9+7*, and by "now add tests".
+They would still be caught out by "now add tests", by a lazy segment tree, and
+by a question that wants KMP by name. None of those is a coin flip in a screen;
+all three are recoverable in a conversation. The first is the one to fix.
 
 §5 is the list to close, and until it is closed this document should not claim
 otherwise.

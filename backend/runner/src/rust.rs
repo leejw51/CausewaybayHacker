@@ -11,13 +11,18 @@ use crate::spec::Harness;
 use crate::{Event, Report, Submission, Verdict};
 
 pub fn run(sub: &Submission) -> Report {
-    if sub.spec.harness != Harness::Stdio {
-        // `cargo` harnesses (dependencies, `#[test]`) are milestone 2. Saying
-        // so beats compiling the wrong thing and calling the answer wrong.
-        return Report::internal(format!(
-            "the {} harness is not in this build yet (SPEC §5.1)",
-            sub.spec.harness.as_str()
-        ));
+    match sub.spec.harness {
+        Harness::Stdio => {}
+        // `#[test]` and a generated manifest: a different job, in `cargo.rs`.
+        Harness::Cargo => return crate::cargo::run(sub),
+        Harness::Gotest => {
+            // Refused rather than approximated. The server asks
+            // [`crate::unsupported`] first and never gets here.
+            return Report::internal(format!(
+                "the {} harness is not a rust harness (SPEC §5.2)",
+                sub.spec.harness.as_str()
+            ));
+        }
     }
     match compile_and_judge(sub) {
         Ok(report) => report,
@@ -73,6 +78,7 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
             max_stdout: 1 << 20,
             max_stderr: 4 << 20,
             apply_rlimits: false,
+            address_space: false,
         },
         "compile",
         "compile",
