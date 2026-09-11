@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""
+Build art/manifest.json in CausewaybayGolang's shape (docs/art.md §3).
+
+Every `box` is measured from the actual alpha, never guessed: it is the
+sprite's ink bounds inside its transparent canvas, so the renderer can place a
+sprite by its feet and its centre of mass rather than by the corner of its
+cell. A sprite without one sits wrong on the map path and nobody can say why.
+"""
+import json, os, sys
+from PIL import Image
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from process import box_of
+
+# Draw order is the read order: the screens first, then the cast, then the
+# furniture. It is the list a new engineer reads to learn what exists.
+ORDER = [
+    "title_bg", "title_bg_p",
+    "map_rust", "map_rust_p", "map_go", "map_go_p",
+    "bg_street", "bg_times", "bg_till", "bg_mtr",
+    "bg_room732", "bg_room732_p", "bg_datacentre",
+    "sprite_mei", "sprite_alex", "sprite_ferris", "sprite_gogo",
+    "agent_skynet",
+    "boss_autocomplete", "boss_deadlock", "boss_nullptr",
+    "boss_race", "boss_whiteboard", "boss_clock",
+    "node_quest", "node_boss", "node_locked",
+    "stamp_cleared", "fx_ribbon", "fx_medal", "fx_trophy", "ui_panel",
+]
+
+root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+art = []
+for name in ORDER:
+    for ext in ("jpg", "png"):
+        path = os.path.join(root, f"{name}.{ext}")
+        if not os.path.exists(path):
+            continue
+        im = Image.open(path)
+        e = {"name": name, "file": f"{name}.{ext}", "w": im.width, "h": im.height}
+        if ext == "png":
+            b = box_of(im.convert("RGBA"))
+            if b:
+                e["box"] = b
+        art.append(e)
+        break
+    else:
+        sys.stderr.write(f"missing: {name}\n")
+
+out = os.path.join(root, "manifest.json")
+with open(out, "w") as f:
+    json.dump({"art": art}, f, indent=2)
+    f.write("\n")
+print(f"{len(art)} assets -> {out}")

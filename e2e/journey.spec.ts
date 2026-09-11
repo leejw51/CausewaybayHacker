@@ -165,6 +165,18 @@ test("the right answer clears it, and the clear survives a reload", async ({ pag
     await submit(page);
     await atScreen(page, "result", 180_000);
 
+    // Which quest did the browser actually submit to? If the lands scan
+    // picked the wrong category row, the symptom without this line is
+    // "expected cleared, got open" on a quest the UI never opened, which
+    // reads as a server bug and is not one.
+    const history = await wire.history();
+    expect(history.length, "the browser's submit never reached the server").toBe(1);
+    expect(
+      (history[0] as unknown as { quest_id: string }).quest_id,
+      "the browser submitted to a different quest than the one the wire " +
+        "chose — the lands scan picked the wrong category row",
+    ).toBe(node.quest_id);
+
     const cleared = await wire.node(node.quest_id);
     expect(cleared?.state, "the server did not record the clear").toBe("cleared");
     expect(cleared?.stars, "a clean first clear is three stars (SPEC §6.3)").toBe(3);

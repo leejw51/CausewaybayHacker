@@ -72,6 +72,46 @@ def knockout(im):
     return im
 
 
+
+def defringe(im, passes=3):
+    """
+    Strip the magenta halo off the silhouette.
+
+    The flood fill above is exact — it only clears pixels that really are the
+    backdrop. But Grok renders at ~1024 and the studio magenta blends into the
+    sprite's outline over a pixel or two, and those blended pixels fail the
+    predicate (too little red, too much green) and survive. Downscaled they
+    average into a pink rim round everything.
+
+    So: any pixel that is *leaning* magenta AND touches transparency is
+    backdrop bleed, and goes. Interior pink — Gogo's paws, a neon sign — never
+    touches transparency, so it is never eaten. Two or three passes is the
+    whole halo; more would start biting into the outline.
+    """
+    w, h = im.size
+    px = im.load()
+    for _ in range(passes):
+        doomed = []
+        for y in range(h):
+            for x in range(w):
+                r, g, b, a = px[x, y]
+                if a < 128:
+                    continue
+                # Looser than is_bg: catches half-blended backdrop.
+                if not (r > 110 and b > 60 and g < r - 25 and g < b + 40):
+                    continue
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = x + dx, y + dy
+                    if nx < 0 or ny < 0 or nx >= w or ny >= h or px[nx, ny][3] < 128:
+                        doomed.append((x, y))
+                        break
+        if not doomed:
+            break
+        for x, y in doomed:
+            px[x, y] = (0, 0, 0, 0)
+    return im
+
+
 def ink_bounds(im, thresh=31):
     """assets.lua:measureBox — the opaque bounds, or None when nothing is."""
     w, h = im.size
@@ -81,7 +121,7 @@ def ink_bounds(im, thresh=31):
 
 
 def make_sprite(src, dst, tw, th, pad=0.055, anchor="feet"):
-    im = knockout(Image.open(src))
+    im = defringe(knockout(Image.open(src)))
     bb = ink_bounds(im)
     if bb is None:
         raise SystemExit(f"{src}: the knockout removed everything — re-roll it")

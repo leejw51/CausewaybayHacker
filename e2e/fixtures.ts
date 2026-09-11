@@ -146,11 +146,27 @@ export function fixtureAccount(index = 0): Account {
 
 // ------------------------------------------------------------ the driving
 
-/** Settle the game and read the screen it is on. */
+/**
+ * Settle the game, read the screen, and hand the loop back.
+ *
+ * `settle()` runs the game at a fixed step until every transition has
+ * finished and then **freezes** it — which is exactly right for a screenshot
+ * and exactly wrong for a test that is going to carry on. A frozen app never
+ * ticks again, so anything that arrives afterwards (a `quest.get` reply, and
+ * with it the editor being shown) never gets drawn, and the next locator
+ * waits thirty seconds for an element that is permanently hidden.
+ *
+ * So: settle for the determinism, then `resume()` so the game is still alive.
+ * The one test that wants a still frame settles without resuming, on purpose.
+ */
 export async function scene(page: Page): Promise<string | null> {
   return page.evaluate(() => {
-    window.__cwbCapture?.settle();
-    return window.__cwbCapture?.scene() ?? null;
+    const api = window.__cwbCapture;
+    if (!api) return null;
+    api.settle();
+    const name = api.scene();
+    api.resume();
+    return name;
   });
 }
 
@@ -207,16 +223,20 @@ export async function pickFirstCategory(page: Page): Promise<void> {
   const box = await page.locator("canvas#game").boundingBox();
   if (!box) throw new Error("the game canvas has no box");
   const x = box.x + box.width * 0.72; // the right-hand panel
-  for (let i = 0; i < 24; i++) {
-    const y = box.y + box.height * (0.28 + i * 0.025);
-    if (y > box.y + box.height * 0.92) break;
-    await page.mouse.click(x, y);
+  // Measured, not guessed: the first row's band starts around 0.18 of the
+  // canvas height in landscape. Starting the scan below it silently selects
+  // ADVANCED, and the only symptom is a quest that will not clear — which
+  // took a while to work out once, hence the low start and the fine step.
+  for (let i = 0; i < 40; i++) {
+    const fy = 0.12 + i * 0.01;
+    if (fy > 0.95) break;
+    await page.mouse.click(x, box.y + box.height * fy);
     if ((await scene(page)) === "map") return;
   }
   throw new Error(
     "no click in the right-hand panel opened a map. The category rows are " +
-      "canvas-drawn and pointer-only (lands.key handles the land toggle and " +
-      "nothing else), so this scan is the only way in — see e2e/README.md.",
+      "canvas-drawn and pointer-only (`lands.key` handles the land toggle " +
+      "and nothing else), so this scan is the only way in — see e2e/README.md.",
   );
 }
 

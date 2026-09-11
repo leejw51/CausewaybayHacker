@@ -16,3 +16,7 @@ playwright-report/
 # re-running the capture does not.
 frontend/shots/
 frontend/dist-e2e/
+
+# Intermediate Grok output, 8 MB and fully regenerable from art/prompts.toml.
+# The processed PNG/JPG beside it is the deliverable.
+art/raw/
