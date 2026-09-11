@@ -1,31 +1,41 @@
 #!/usr/bin/env node
 /**
- * A deliberately minimal SPEC §6 server, for testing the *checker*.
+ * A deliberately minimal PROTOCOL.md server, for testing the *checker*.
  *
  * This is not a second implementation of the game and must never become one.
  * It exists so `selftest.mjs` can answer the only question that matters about
  * a test tool: **does it actually catch anything?** A contract checker that
  * has only ever run against a dead port is a file, not a test.
  *
- * It implements enough of the catalogue to satisfy `contract.mjs` when
+ * It implements enough of the protocol to satisfy `contract.mjs` when
  * correct, and takes a `--break <fault>` flag that makes it wrong in one
- * specific, realistic way. The checker is then required to notice.
+ * specific, realistic way. The checker is then required to notice, on the
+ * §8 point that owns that rule.
  *
  *     node mock-server.mjs --port 5399
  *     node mock-server.mjs --port 5399 --break correlation
  *
  * Faults, each one a bug somebody actually ships:
- *   correlation      replies in arrival order with a fresh id
- *   error-code       invents `not_authorized`, outside §6.1's closed set
- *   version-kills    closes the socket on an unknown `v`
- *   anon-leak        serves world.lands before login
- *   nonce-reuse      accepts the same nonce twice
- *   solution-leak    sends `solution` on quest.get
- *   trust-payload    filters stats by an address in the payload
- *   cross-user       shows every user's attempts to everyone
- *   no-busy          queues a second submit instead of refusing it
- *   event-id         gives run.stage a correlation id
- *   trailing-newline ends the challenge message with a newline
+ *
+ *   extra-key-ok     silently ignores an unknown top-level key        §8.1
+ *   correlation      replies with a fresh id instead of echoing       §8.2
+ *   unknown-closes   closes the connection on an unknown type         §8.3
+ *   error-code       invents `not_authorized`, outside the closed set §8.4
+ *   no-supported     proto_version without detail.supported           §8.4
+ *   nonce-reuse      accepts the same nonce twice                     §8.4
+ *   trailing-newline ends the challenge message with a newline        §8.6
+ *   accepts-rebuilt  accepts a signature over a reconstruction        §8.6
+ *   token-static     rotates the token but keeps the old one alive    §8.7
+ *   seq-gap          run.log seq skips a number                       §8.8
+ *   seq-from-one     run.log seq starts at 1                          §8.8
+ *   event-id         gives a server event a correlation id            §8.8
+ *   no-busy          queues a second submit instead of refusing it    §8.10
+ *   busy-per-user    refuses the user's *second connection* as busy   §8.10
+ *   anon-leak        serves world.lands before login                  beyond
+ *   solution-leak    sends `solution` on quest.get                    beyond
+ *   trust-payload    filters stats by an address in the payload       beyond
+ *   cross-user       shows every user's attempts to everyone          beyond
+ *   no-broadcast     never tells a user's other connection            beyond
  */
 
 import { spawnSync } from "node:child_process";
@@ -43,430 +53,18 @@ const flag = (n, d) => {
 };
 const PORT = Number(flag("port", "5399"));
 const BREAK = flag("break", null);
+const broke = (f) => BREAK === f;
 
-// ------------------------------------------------------------------- state
-
-const QUESTS = [
-  {
-    quest_id: "rust.basic.01.hello",
-    node: 1,
-    title: "FIRST LIGHT",
-    difficulty: 1,
-    kind: "quest",
-    x: 0.12,
-    y: 0.74,
-    requires: [],
-    starter: "fn main() {\n    // your code here\n}\n",
-    solution: 'fn main() {\n    println!("hello, causewaybay");\n}\n',
-    expect: "hello, causewaybay\n",
-  },
-  {
-    quest_id: "rust.basic.02.shadowing",
-    node: 2,
-    title: "SECOND STREET",
-    difficulty: 2,
-    kind: "quest",
-    x: 0.3,
-    y: 0.6,
-    requires: ["rust.basic.01.hello"],
-    starter: "fn main() {}\n",
-    solution: 'fn main() { println!("shadow"); }\n',
-    expect: "shadow\n",
-  },
-  {
-    quest_id: "rust.basic.03.borrow",
-    node: 3,
-    title: "THIRD STREET",
-    difficulty: 3,
-    kind: "boss",
-    x: 0.55,
-    y: 0.4,
-    requires: ["rust.basic.02.shadowing"],
-    starter: "fn main() {}\n",
-    solution: 'fn main() { println!("borrow"); }\n',
-    expect: "borrow\n",
-  },
-];
-
-const users = new Map(); // lower address -> { address, address_eip55, name }
-const progress = new Map(); // `${addr}|${quest}` -> { state, stars }
-const attempts = new Map(); // addr -> [attempt]
-const mistakes = new Map(); // addr -> [{kind, code, message}]
-const nonces = new Map(); // nonce -> { address, expires_at, used }
-const tokens = new Map(); // sha256(token) -> lower address
-
-const now = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
-const sha = (s) => createHash("sha256").update(s).digest("hex");
-
-function nodeState(addr, q) {
-  const key = `${addr}|${q.quest_id}`;
-  if (progress.get(key)?.state === "cleared") return "cleared";
-  if (q.requires.every((r) => progress.get(`${addr}|${r}`)?.state === "cleared"))
-    return "open";
-  return "locked";
-}
-
-// --------------------------------------------------------------- the server
-
-const http = createServer((_req, res) => {
-  res.writeHead(200, { "content-type": "text/plain" });
-  res.end("causewaybay-hacker mock\n");
-});
-const wss = new WebSocketServer({ server: http, path: "/ws" });
-
-wss.on("connection", (ws) => {
-  const session = { address: null, inFlight: false, queue: [] };
-
-  const emit = (type, payload) =>
-    ws.send(
-      JSON.stringify({
-        v: 1,
-        id: BREAK === "event-id" ? "s-1" : null,
-        type,
-        payload,
-      }),
-    );
-  const reply = (id, type, payload) =>
-    ws.send(
-      JSON.stringify({
-        v: 1,
-        id: BREAK === "correlation" ? `s-${Math.random().toString(36).slice(2, 8)}` : id,
-        type,
-        payload,
-      }),
-    );
-  const err = (id, type, code, message, detail = {}) =>
-    reply(id, `${type}.err`, {
-      code: BREAK === "error-code" && code === "unauthorized" ? "not_authorized" : code,
-      message,
-      detail,
-    });
-
-  ws.on("message", async (raw) => {
-    let f;
-    try {
-      f = JSON.parse(String(raw));
-    } catch {
-      return err(null, "frame", "bad_request", "not JSON");
-    }
-    const { id = null, type, payload } = f ?? {};
-    if (typeof type !== "string") return err(id, "frame", "bad_request", "no type");
-
-    if (f.v !== 1) {
-      err(id, type, "proto_version", `unsupported protocol version ${f.v}`);
-      if (BREAK === "version-kills") ws.close(1002, "bad version");
-      return;
-    }
-    if (typeof payload !== "object" || payload === null || Array.isArray(payload))
-      return err(id, type, "bad_request", "payload must be an object");
-
-    // SPEC §6.4 reads "Anything else before that is `unauthorized`, except
-    // `ping` and `auth.challenge`" — which, taken literally, would make
-    // `auth.login` itself unauthorized and nobody could ever log in. The
-    // sentence before it names login and resume as the things that end the
-    // anonymous state, so all four are anonymous-reachable. Raised in
-    // docs/decisions.md.
-    const anonymousOk =
-      type === "ping" ||
-      type === "auth.challenge" ||
-      type === "auth.login" ||
-      type === "auth.resume";
-    const leaky = BREAK === "anon-leak" && type === "world.lands";
-    if (!session.address && !anonymousOk && !leaky)
-      return err(id, type, "unauthorized", "log in first");
-
-    switch (type) {
-      case "ping":
-        return reply(id, "ping.ok", { t: now() });
-
-      case "auth.challenge": {
-        const claimed = String(payload.address ?? "");
-        if (!/^0x[0-9a-fA-F]{40}$/.test(claimed))
-          return err(id, type, "bad_request", "not an address");
-        let eip55;
-        try {
-          eip55 = toEip55(claimed);
-        } catch {
-          return err(id, type, "bad_request", "unknown address (mock has no keccak)");
-        }
-        const nonce = randomBytes(32).toString("hex");
-        const expires_at = new Date(Date.now() + 120_000)
-          .toISOString()
-          .replace(/\.\d+Z$/, "Z");
-        const message =
-          `Causewaybay Hacker login\n` +
-          `address: ${eip55}\n` +
-          `nonce: ${nonce}\n` +
-          `expires: ${expires_at}` +
-          (BREAK === "trailing-newline" ? "\n" : "");
-        nonces.set(nonce, {
-          address: eip55.toLowerCase(),
-          expires_at,
-          message,
-          used: false,
-        });
-        return reply(id, "auth.challenge.ok", { nonce, message, expires_at });
-      }
-
-      case "auth.login": {
-        const sig = String(payload.signature ?? "");
-        const claimed = String(payload.address ?? "").toLowerCase();
-        const live = [...nonces.entries()].filter(
-          ([, n]) => n.address === claimed && Date.parse(n.expires_at) > Date.now(),
-        );
-        if (!/^0x[0-9a-f]{130}$/i.test(sig))
-          return err(id, type, "auth_bad_signature", "not 65 bytes of hex");
-        if (live.length === 0) return err(id, type, "auth_expired", "no live nonce");
-        const [nonce, rec] = live[live.length - 1];
-        // SPEC §3.2 step 4, in order: recover, compare, check the nonce, burn
-        // it. A bad signature must not consume anyone's challenge.
-        const who = recover(rec.message, sig);
-        if (!who || who !== claimed)
-          return err(id, type, "auth_bad_signature", "recovered a different address");
-        if (rec.used && BREAK !== "nonce-reuse")
-          return err(id, type, "auth_nonce_used", "that nonce is spent");
-        rec.used = true;
-        nonces.set(nonce, rec);
-
-        const eip55 = toEip55(claimed);
-        const user = users.get(claimed) ?? {
-          address: claimed,
-          address_eip55: eip55,
-          name: "hacker",
-          created_at: now(),
-        };
-        users.set(claimed, user);
-        session.address = claimed;
-        const token = randomBytes(32).toString("base64url");
-        tokens.set(sha(token), claimed);
-        return reply(id, "auth.login.ok", { token, user });
-      }
-
-      case "auth.resume": {
-        const addr = tokens.get(sha(String(payload.token ?? "")));
-        if (!addr) return err(id, type, "unauthorized", "unknown token");
-        session.address = addr;
-        const token = randomBytes(32).toString("base64url");
-        tokens.set(sha(token), addr);
-        return reply(id, "auth.resume.ok", { token, user: users.get(addr) });
-      }
-
-      case "world.lands": {
-        const addr = session.address ?? "0x";
-        const cleared = QUESTS.filter(
-          (q) => progress.get(`${addr}|${q.quest_id}`)?.state === "cleared",
-        ).length;
-        return reply(id, "world.lands.ok", {
-          lands: [
-            {
-              land: "rust",
-              categories: [
-                { category: "basic", total: QUESTS.length, cleared },
-                { category: "advanced", total: 0, cleared: 0 },
-                { category: "hacker", total: 0, cleared: 0 },
-              ],
-            },
-            {
-              land: "go",
-              categories: [
-                { category: "basic", total: 0, cleared: 0 },
-                { category: "advanced", total: 0, cleared: 0 },
-                { category: "hacker", total: 0, cleared: 0 },
-              ],
-            },
-          ],
-        });
-      }
-
-      case "world.map": {
-        if (payload.land !== "rust" || payload.category !== "basic")
-          return reply(id, "world.map.ok", { nodes: [], edges: [] });
-        const addr = session.address;
-        return reply(id, "world.map.ok", {
-          nodes: QUESTS.map((q) => ({
-            quest_id: q.quest_id,
-            node: q.node,
-            title: q.title,
-            difficulty: q.difficulty,
-            state: nodeState(addr, q),
-            stars: progress.get(`${addr}|${q.quest_id}`)?.stars ?? 0,
-            x: q.x,
-            y: q.y,
-            kind: q.kind,
-          })),
-          edges: QUESTS.flatMap((q) => q.requires.map((r) => [r, q.quest_id])),
-        });
-      }
-
-      case "quest.get": {
-        const q = QUESTS.find((x) => x.quest_id === payload.quest_id);
-        if (!q) return err(id, type, "not_found", "no such quest");
-        const cleared =
-          progress.get(`${session.address}|${q.quest_id}`)?.state === "cleared";
-        const quest = {
-          quest_id: q.quest_id,
-          node: q.node,
-          title: q.title,
-          brief: "Print `hello, causewaybay` and nothing else.",
-          story: "The terminal blinks.",
-          difficulty: q.difficulty,
-          starter: q.starter,
-          hints: ["`println!` is a macro."],
-          concepts: ["io", "macros"],
-          cases: [{ name: "greets", stdin: "", expect: q.expect, visible: true }],
-        };
-        if (cleared || BREAK === "solution-leak") quest.solution = q.solution;
-        return reply(id, "quest.get.ok", { quest });
-      }
-
-      case "quest.submit": {
-        if (session.inFlight && BREAK !== "no-busy")
-          return err(id, type, "busy", "one submit at a time");
-        session.inFlight = true;
-        const q = QUESTS.find((x) => x.quest_id === payload.quest_id);
-        if (!q) {
-          session.inFlight = false;
-          return err(id, type, "not_found", "no such quest");
-        }
-        const addr = session.address;
-        const attemptId = "att_" + randomBytes(8).toString("hex");
-        for (const stage of ["queued", "compiling", "running", "judging"]) {
-          emit("run.stage", { attempt_id: attemptId, stage });
-          await sleep(25);
-        }
-        emit("run.log", {
-          attempt_id: attemptId,
-          stream: "compile",
-          chunk: "Compiling main.rs\n",
-        });
-        // "Judging": does the source print what the case expects?
-        const printed = /println!\("([^"]*)"\)/.exec(String(payload.source ?? ""))?.[1];
-        const ok = printed !== undefined && printed + "\n" === q.expect;
-        const prev = progress.get(`${addr}|${q.quest_id}`);
-        const attempt = {
-          id: attemptId,
-          verdict: ok ? "accepted" : "wrong_answer",
-          tests_passed: ok ? 1 : 0,
-          tests_total: 1,
-          compile_ms: 120,
-          run_ms: 3,
-          stderr: "",
-          cases: [
-            {
-              name: "greets",
-              passed: ok,
-              visible: true,
-              stdin: "",
-              expect: q.expect,
-              got: printed === undefined ? "" : printed + "\n",
-            },
-          ],
-          mistakes: ok ? [] : [{ kind: "wrong-answer", code: null, message: "output differs", line: null }],
-          stars: ok ? (prev ? 2 : 3) : 0,
-          cleared: ok,
-        };
-        (attempts.get(addr) ?? attempts.set(addr, []).get(addr)).push(attempt);
-        if (!ok)
-          (mistakes.get(addr) ?? mistakes.set(addr, []).get(addr)).push({
-            kind: "wrong-answer",
-            code: null,
-            message: "output differs",
-          });
-        if (ok) {
-          progress.set(`${addr}|${q.quest_id}`, {
-            state: "cleared",
-            stars: attempt.stars,
-          });
-          emit("progress.update", {
-            quest_id: q.quest_id,
-            state: "cleared",
-            stars: attempt.stars,
-            cleared_total: QUESTS.filter(
-              (x) => progress.get(`${addr}|${x.quest_id}`)?.state === "cleared",
-            ).length,
-          });
-        } else {
-          progress.set(`${addr}|${q.quest_id}`, {
-            state: "open",
-            stars: prev?.stars ?? 0,
-          });
-        }
-        session.inFlight = false;
-        return reply(id, "quest.submit.ok", { attempt });
-      }
-
-      case "stats.history": {
-        const who =
-          BREAK === "trust-payload" && payload.address
-            ? String(payload.address).toLowerCase()
-            : session.address;
-        const rows = BREAK === "cross-user" ? [...attempts.values()].flat() : attempts.get(who) ?? [];
-        return reply(id, "stats.history.ok", {
-          attempts: rows.slice(-Number(payload.limit ?? 20)).map((a) => ({
-            id: a.id,
-            verdict: a.verdict,
-            tests_passed: a.tests_passed,
-            tests_total: a.tests_total,
-            created_at: now(),
-          })),
-        });
-      }
-
-      case "stats.mistakes": {
-        const who =
-          BREAK === "trust-payload" && payload.address
-            ? String(payload.address).toLowerCase()
-            : session.address;
-        const rows = mistakes.get(who) ?? [];
-        const byKind = new Map();
-        for (const m of rows)
-          byKind.set(m.kind, (byKind.get(m.kind) ?? 0) + 1);
-        return reply(id, "stats.mistakes.ok", {
-          mistakes: [...byKind].map(([kind, count]) => ({
-            kind,
-            label: kind,
-            count,
-            last_at: now(),
-            cleared_since: 0,
-            example_quest_id: null,
-          })),
-        });
-      }
-
-      case "stats.summary": {
-        const who =
-          BREAK === "trust-payload" && payload.address
-            ? String(payload.address).toLowerCase()
-            : session.address;
-        const rows = attempts.get(who) ?? [];
-        const cleared = QUESTS.filter(
-          (q) => progress.get(`${who}|${q.quest_id}`)?.state === "cleared",
-        ).length;
-        return reply(id, "stats.summary.ok", {
-          cleared,
-          attempts: rows.length,
-          accuracy: rows.length ? rows.filter((a) => a.cleared).length / rows.length : 0,
-          streak: 0,
-          by_land: { rust: cleared, go: 0 },
-        });
-      }
-
-      default:
-        return err(id, type, "bad_request", `unknown type ${type}`);
-    }
-  });
-});
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// ------------------------------------------------------- borrowed, not built
 
 /**
- * EIP-55 and signature recovery, both borrowed rather than implemented.
+ * EIP-55 spellings and signature recovery both come from elsewhere.
  *
  * The mock has no business owning a keccak or a secp256k1 — a second, subtly
  * different implementation living in the test tree is exactly the drift SPEC
- * §9.1 exists to prevent. The checksummed spellings come out of
- * `tests/vectors/addresses.json`, and recovery is `cwbwallet verify`, the
- * same binary that generated the fixture.
+ * §9.1 exists to prevent. Checksummed addresses come out of
+ * `tests/vectors/addresses.json`; recovery is `cwbwallet verify`, the same
+ * binary that generated the fixture.
  */
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const WALLET =
@@ -482,15 +80,13 @@ try {
 }
 
 function toEip55(address) {
-  const lower = address.toLowerCase();
-  const known = EIP55.get(lower);
-  if (known) return known;
-  // Not a fixture address. The mock has no keccak, so it says so rather than
-  // inventing a checksum that would look right and be wrong.
-  throw new Error(`mock knows no EIP-55 spelling for ${lower}`);
+  const known = EIP55.get(address.toLowerCase());
+  // Not a fixture address. The mock says so rather than inventing a checksum
+  // that would look right and be wrong.
+  if (!known) throw new Error(`mock knows no EIP-55 spelling for ${address}`);
+  return known;
 }
 
-/** Who really signed this? Asked of the wallet, not guessed. */
 function recover(message, signature) {
   const out = spawnSync(
     WALLET,
@@ -506,9 +102,604 @@ function recover(message, signature) {
   }
 }
 
+// ------------------------------------------------------------------- content
+
+const QUESTS = [
+  {
+    id: "rust.basic.01.hello",
+    node: 1,
+    title: "FIRST LIGHT",
+    difficulty: 1,
+    kind: "quest",
+    x: 0.12,
+    y: 0.74,
+    requires: [],
+    starter: "fn main() {\n    // your code here\n}\n",
+    solution: 'fn main() {\n    println!("hello, causewaybay");\n}\n',
+    expect: "hello, causewaybay\n",
+    hints: ["`println!` is a macro, so it takes a `!`."],
+  },
+  {
+    id: "rust.basic.02.bindings",
+    node: 2,
+    title: "SECOND STREET",
+    difficulty: 2,
+    kind: "quest",
+    x: 0.3,
+    y: 0.6,
+    requires: ["rust.basic.01.hello"],
+    starter: "fn main() {}\n",
+    solution: 'fn main() { println!("shadow"); }\n',
+    expect: "shadow\n",
+    hints: [],
+  },
+  {
+    id: "rust.basic.03.borrow",
+    node: 3,
+    title: "THIRD STREET",
+    difficulty: 3,
+    kind: "boss",
+    x: 0.55,
+    y: 0.4,
+    requires: ["rust.basic.02.bindings"],
+    starter: "fn main() {}\n",
+    solution: 'fn main() { println!("borrow"); }\n',
+    expect: "borrow\n",
+    hints: [],
+  },
+];
+
+// --------------------------------------------------------------------- state
+
+const users = new Map(); // lower -> User
+const progress = new Map(); // `${lower}|${quest}` -> { state, stars, tries }
+const attempts = new Map(); // lower -> [Attempt]
+const mistakes = new Map(); // lower -> [{kind, code, message}]
+const nonces = new Map(); // nonce -> { address, expires_at, message, used }
+const tokens = new Map(); // sha256(token) -> lower
+const connections = new Set(); // every live session, for §4.19's broadcast
+
+const now = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
+const sha = (s) => createHash("sha256").update(s).digest("hex");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const push = (map, key, value) => {
+  const list = map.get(key) ?? [];
+  list.push(value);
+  map.set(key, list);
+};
+
+const stateOf = (lower, q) => {
+  if (progress.get(`${lower}|${q.id}`)?.state === "cleared") return "cleared";
+  return q.requires.every((r) => progress.get(`${lower}|${r}`)?.state === "cleared")
+    ? "open"
+    : "locked";
+};
+const clearedCount = (lower) =>
+  QUESTS.filter((q) => progress.get(`${lower}|${q.id}`)?.state === "cleared").length;
+const starsOf = (lower) =>
+  QUESTS.reduce((s, q) => s + (progress.get(`${lower}|${q.id}`)?.stars ?? 0), 0);
+
+// -------------------------------------------------------------------- server
+
+const http = createServer((_req, res) => {
+  res.writeHead(200, { "content-type": "text/plain" });
+  res.end("causewaybay-hacker mock\n");
+});
+const wss = new WebSocketServer({ server: http, path: "/ws" });
+
+wss.on("connection", (ws) => {
+  const session = { ws, address: null, inFlight: false, ids: new Set() };
+  connections.add(session);
+  ws.on("close", () => connections.delete(session));
+
+  const frame = (id, type, payload) =>
+    ws.send(JSON.stringify({ v: 1, id, type, payload }));
+  const reply = (id, type, payload) =>
+    frame(broke("correlation") ? `s-${randomBytes(3).toString("hex")}` : id, type, payload);
+  const emit = (type, payload) => frame(broke("event-id") ? "s-1" : null, type, payload);
+  const err = (id, type, code, message, detail = {}) =>
+    reply(id, `${type}.err`, {
+      code: broke("error-code") && code === "unauthorized" ? "not_authorized" : code,
+      message,
+      detail,
+    });
+
+  ws.on("message", async (raw) => {
+    let f;
+    try {
+      f = JSON.parse(String(raw));
+    } catch {
+      // PROTOCOL.md §1.2: a frame that is not a JSON object is a transport
+      // error, closed with 1003 — not an application error.
+      return ws.close(1003, "not a JSON object");
+    }
+    if (typeof f !== "object" || f === null || Array.isArray(f))
+      return ws.close(1003, "not a JSON object");
+
+    const id = "id" in f ? f.id : null;
+    const type = f.type;
+    if (typeof type !== "string") return err(id, "frame", "bad_request", "no type");
+
+    // §2: exactly four top-level keys. "The server does not silently ignore
+    // fields, because a silently ignored field is how a client ships a bug
+    // that looks like it works."
+    const keys = Object.keys(f).sort().join(",");
+    const knownShape = keys === "id,payload,type,v" || keys === "id,type,v";
+    if (!knownShape && !broke("extra-key-ok"))
+      return err(id, type, "bad_request", `unexpected top-level keys: ${keys}`);
+
+    if (f.v !== 1)
+      return err(
+        id,
+        type,
+        "proto_version",
+        `unsupported protocol version ${JSON.stringify(f.v)}`,
+        broke("no-supported") ? {} : { supported: [1] },
+      );
+
+    if (!("payload" in f)) return err(id, type, "bad_request", "payload is absent");
+    const payload = f.payload;
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload))
+      return err(id, type, "bad_request", "payload must be an object");
+
+    // §2.2: reusing an id that is still in flight is bad_request.
+    if (id !== null && id !== undefined) {
+      if (session.ids.has(id))
+        return err(id, type, "bad_request", `id ${id} is already in flight`);
+      session.ids.add(id);
+    }
+    const done = () => session.ids.delete(id);
+
+    // §3.1: exactly four messages while ANONYMOUS.
+    const anonOk = ["ping", "auth.challenge", "auth.login", "auth.resume"].includes(type);
+    const leak = broke("anon-leak") && type === "world.lands";
+    if (!session.address && !anonOk && !leak) {
+      done();
+      return err(id, type, "unauthorized", "log in first");
+    }
+
+    try {
+      await handle(type, id, payload);
+    } catch (e) {
+      err(id, type, "internal", String(e?.message ?? e), { trace_id: "mock" });
+    } finally {
+      done();
+    }
+  });
+
+  async function handle(type, id, payload) {
+    const me = session.address;
+    switch (type) {
+      // ---------------------------------------------------------- §4.1
+      case "ping":
+        return reply(id, "ping.ok", { t: now() });
+
+      // ---------------------------------------------------------- §4.2
+      case "auth.challenge": {
+        const claimed = String(payload.address ?? "");
+        if (!/^0x[0-9a-fA-F]{40}$/.test(claimed))
+          return err(id, type, "bad_request", "not an address");
+        let eip55;
+        try {
+          eip55 = toEip55(claimed);
+        } catch {
+          return err(id, type, "bad_request", "unknown address (the mock has no keccak)");
+        }
+        const nonce = randomBytes(32).toString("hex");
+        const expires_at = new Date(Date.now() + 120_000)
+          .toISOString()
+          .replace(/\.\d+Z$/, "Z");
+        const message =
+          `Causewaybay Hacker login\n` +
+          `address: ${eip55}\n` +
+          `nonce: ${nonce}\n` +
+          `expires: ${expires_at}` +
+          (broke("trailing-newline") ? "\n" : "");
+        nonces.set(nonce, {
+          address: eip55.toLowerCase(),
+          expires_at,
+          message,
+          used: false,
+        });
+        return reply(id, "auth.challenge.ok", { nonce, message, expires_at });
+      }
+
+      // ---------------------------------------------------------- §4.3
+      case "auth.login": {
+        const sig = String(payload.signature ?? "");
+        const claimed = String(payload.address ?? "").toLowerCase();
+        if (!/^0x[0-9a-f]{130}$/i.test(sig))
+          return err(id, type, "auth_bad_signature", "not 65 bytes of hex");
+        const live = [...nonces.entries()].filter(
+          ([, n]) => n.address === claimed && Date.parse(n.expires_at) > Date.now(),
+        );
+        if (live.length === 0) return err(id, type, "auth_expired", "no live nonce");
+        const [nonce, rec] = live[live.length - 1];
+
+        // §4.3: v is 27/28; 0/1 is also accepted and normalised.
+        let normalised = sig;
+        const v = parseInt(sig.slice(-2), 16);
+        if (v === 0 || v === 1)
+          normalised = sig.slice(0, -2) + (v + 27).toString(16).padStart(2, "0");
+
+        // In order: recover, compare, check the nonce, burn it. A bad
+        // signature must never consume anyone's challenge.
+        let who = recover(rec.message, normalised);
+        if (who !== claimed && broke("accepts-rebuilt"))
+          if (recover(`${rec.message}\n`, normalised) === claimed) who = claimed;
+        if (who !== claimed)
+          return err(id, type, "auth_bad_signature", "recovered a different address");
+        if (rec.used && !broke("nonce-reuse"))
+          return err(id, type, "auth_nonce_used", "that nonce is spent");
+        rec.used = true;
+        nonces.set(nonce, rec);
+
+        const eip55 = toEip55(claimed);
+        const user = users.get(claimed) ?? {
+          address: eip55, // §2.4: EIP-55 on the wire, both directions
+          name: String(payload.name ?? `hacker-${claimed.slice(2, 8)}`),
+          created_at: now(),
+          last_seen_at: now(),
+          settings: {},
+          level: 1,
+          xp: 0,
+        };
+        user.last_seen_at = now();
+        users.set(claimed, user);
+        session.address = claimed;
+        const token = randomBytes(32).toString("base64url");
+        tokens.set(sha(token), claimed);
+        return reply(id, "auth.login.ok", { token, user });
+      }
+
+      // ---------------------------------------------------------- §4.4
+      case "auth.resume": {
+        const sent = String(payload.token ?? "");
+        const who = tokens.get(sha(sent));
+        if (!who) return err(id, type, "unauthorized", "unknown or expired token");
+        session.address = who;
+        const token = randomBytes(32).toString("base64url");
+        tokens.set(sha(token), who);
+        // "the server rotates on use" — so the old one dies. A server that
+        // rotates but leaves the old one alive teaches clients to keep it.
+        if (!broke("token-static")) tokens.delete(sha(sent));
+        return reply(id, "auth.resume.ok", { token, user: users.get(who) });
+      }
+
+      // ---------------------------------------------------------- §4.5
+      case "profile.update": {
+        const user = users.get(me);
+        if (payload.name !== undefined) user.name = String(payload.name);
+        if (payload.settings !== undefined) user.settings = payload.settings;
+        return reply(id, "profile.update.ok", { user });
+      }
+
+      // ---------------------------------------------------------- §4.6
+      case "world.lands": {
+        const lower = me ?? "0x";
+        const empty = (category) => ({
+          category,
+          total: 0,
+          cleared: 0,
+          stars: 0,
+          open: false,
+        });
+        return reply(id, "world.lands.ok", {
+          lands: [
+            {
+              land: "rust",
+              categories: [
+                {
+                  category: "basic",
+                  total: QUESTS.length,
+                  cleared: clearedCount(lower),
+                  stars: starsOf(lower),
+                  open: true,
+                },
+                empty("advanced"),
+                empty("hacker"),
+              ],
+            },
+            {
+              land: "go",
+              categories: [empty("basic"), empty("advanced"), empty("hacker")],
+            },
+          ],
+        });
+      }
+
+      // ---------------------------------------------------------- §4.7
+      case "world.map": {
+        const { land, category } = payload;
+        if (land !== "rust" || category !== "basic")
+          return reply(id, "world.map.ok", { land, category, nodes: [], edges: [] });
+        return reply(id, "world.map.ok", {
+          land,
+          category,
+          nodes: QUESTS.map((q) => ({
+            quest_id: q.id,
+            node: q.node,
+            title: q.title,
+            difficulty: q.difficulty,
+            state: stateOf(me, q),
+            stars: progress.get(`${me}|${q.id}`)?.stars ?? 0,
+            x: q.x,
+            y: q.y,
+            kind: q.kind,
+            requires: q.requires,
+            attempts: (attempts.get(me) ?? []).filter((a) => a.quest_id === q.id).length,
+          })),
+          edges: QUESTS.flatMap((q) => q.requires.map((r) => [r, q.id])),
+        });
+      }
+
+      // ---------------------------------------------------------- §4.8
+      case "quest.get": {
+        const q = QUESTS.find((x) => x.id === payload.quest_id);
+        if (!q) return err(id, type, "not_found", "no such quest");
+        const state = stateOf(me, q);
+        const quest = {
+          id: q.id,
+          land: "rust",
+          category: "basic",
+          node: q.node,
+          title: q.title,
+          brief: "Print `hello, causewaybay` and nothing else.",
+          story: "The terminal blinks. You used to know this one.",
+          difficulty: q.difficulty,
+          time_limit_s: null,
+          starter: q.starter,
+          concepts: ["io", "macros"],
+          hints_total: q.hints.length,
+          hints_used: 0,
+          state,
+          stars: progress.get(`${me}|${q.id}`)?.stars ?? 0,
+          tests: {
+            match: "trim",
+            timeout_ms: 5000,
+            visible: [{ name: "greets", stdin: "", expect: q.expect }],
+            hidden_count: 0,
+          },
+        };
+        // §4.8: omitted entirely unless cleared — not null, not empty.
+        if (state === "cleared" || broke("solution-leak")) quest.solution = q.solution;
+        return reply(id, "quest.get.ok", { quest });
+      }
+
+      // ---------------------------------------------------------- §4.9
+      case "quest.submit": {
+        const q = QUESTS.find((x) => x.id === payload.quest_id);
+        if (!q) return err(id, type, "not_found", "no such quest");
+        if (payload.lang !== "rust")
+          return err(id, type, "bad_request", "lang does not match the quest's land");
+        if (stateOf(me, q) === "locked")
+          return err(id, type, "locked", `${q.id} is locked`, { requires: q.requires });
+
+        // §3.2: one in flight per CONNECTION, not per user.
+        const isBusy = broke("busy-per-user")
+          ? [...connections].some((s) => s.address === me && s.inFlight)
+          : session.inFlight;
+        if (isBusy && !broke("no-busy"))
+          return err(id, type, "busy", "a submission is already in flight");
+        session.inFlight = true;
+
+        try {
+          const attemptId = "att_" + randomBytes(8).toString("hex");
+          let seq = broke("seq-from-one") ? 1 : 0;
+          const log = (stream, chunk) => {
+            emit("run.log", { attempt_id: attemptId, stream, chunk, seq: seq++ });
+            if (broke("seq-gap")) seq++;
+          };
+          for (const [i, stage] of ["queued", "compiling", "running", "judging"].entries()) {
+            emit("run.stage", {
+              attempt_id: attemptId,
+              stage,
+              queued: 0,
+              elapsed_ms: i * 40,
+            });
+            if (stage === "compiling") {
+              log("compile", "   Compiling main ");
+              log("compile", "v0.1.0\n");
+            }
+            await sleep(30);
+          }
+
+          // "Judging": does the source print what the visible case expects?
+          const printed = /println!\("([^"]*)"\)/.exec(String(payload.source ?? ""))?.[1];
+          const ok = printed !== undefined && `${printed}\n` === q.expect;
+          const had = progress.get(`${me}|${q.id}`);
+          const firstClear = ok && had?.state !== "cleared";
+          const attempt = {
+            id: attemptId,
+            quest_id: q.id,
+            verdict: ok ? "accepted" : "wrong_answer",
+            tests_passed: ok ? 1 : 0,
+            tests_total: 1,
+            compile_ms: 120,
+            run_ms: 3,
+            exit_code: 0,
+            stderr: "",
+            cases: [
+              {
+                name: "greets",
+                passed: ok,
+                visible: true,
+                stdin: "",
+                expect: q.expect,
+                got: printed === undefined ? "" : `${printed}\n`,
+              },
+            ],
+            mistakes: ok
+              ? []
+              : [
+                  {
+                    kind: "wrong-answer",
+                    code: null,
+                    message: "output differs from the expected value",
+                    line: null,
+                    col: null,
+                  },
+                ],
+            stars: ok ? (had?.tries ? 2 : 3) : 0,
+            cleared: firstClear,
+            created_at: now(),
+          };
+          push(attempts, me, attempt);
+          if (!ok)
+            push(mistakes, me, {
+              kind: "wrong-answer",
+              code: null,
+              message: "output differs",
+            });
+
+          if (ok) {
+            progress.set(`${me}|${q.id}`, {
+              state: "cleared",
+              stars: attempt.stars,
+              tries: (had?.tries ?? 0) + 1,
+            });
+            const unlocked = QUESTS.filter(
+              (x) => x.requires.includes(q.id) && stateOf(me, x) === "open",
+            ).map((x) => x.id);
+            const update = {
+              quest_id: q.id,
+              state: "cleared",
+              stars: attempt.stars,
+              cleared_total: clearedCount(me),
+              unlocked,
+            };
+            // §4.19: to this connection, and to the same user's others.
+            for (const s of connections) {
+              if (s.address !== me) continue;
+              if (s !== session && broke("no-broadcast")) continue;
+              s.ws.send(
+                JSON.stringify({
+                  v: 1,
+                  id: broke("event-id") ? "s-1" : null,
+                  type: "progress.update",
+                  payload: update,
+                }),
+              );
+            }
+            if (firstClear)
+              emit("award", { kind: "stamp", id: "cleared", title: "CLEARED", detail: {} });
+          } else {
+            progress.set(`${me}|${q.id}`, {
+              state: "open",
+              stars: had?.stars ?? 0,
+              tries: (had?.tries ?? 0) + 1,
+            });
+          }
+          return reply(id, "quest.submit.ok", { attempt });
+        } finally {
+          session.inFlight = false;
+        }
+      }
+
+      // --------------------------------------------------------- §4.10-11
+      case "quest.hint": {
+        const q = QUESTS.find((x) => x.id === payload.quest_id);
+        if (!q) return err(id, type, "not_found", "no such quest");
+        const index = Number(payload.index ?? 0);
+        if (!(index >= 0 && index < q.hints.length))
+          return err(id, type, "not_found", "no such hint");
+        return reply(id, "quest.hint.ok", {
+          hint: q.hints[index],
+          index,
+          total: q.hints.length,
+          hints_used: index + 1,
+        });
+      }
+      case "quest.reset": {
+        const q = QUESTS.find((x) => x.id === payload.quest_id);
+        if (!q) return err(id, type, "not_found", "no such quest");
+        return reply(id, "quest.reset.ok", { starter: q.starter });
+      }
+
+      // --------------------------------------------------------- §4.13-15
+      case "stats.summary": {
+        const who =
+          broke("trust-payload") && payload.address
+            ? String(payload.address).toLowerCase()
+            : me;
+        const rows = attempts.get(who) ?? [];
+        const cleared = clearedCount(who);
+        return reply(id, "stats.summary.ok", {
+          cleared,
+          total: QUESTS.length,
+          attempts: rows.length,
+          accuracy: rows.length
+            ? rows.filter((a) => a.verdict === "accepted").length / rows.length
+            : 0,
+          streak_days: 0,
+          stars: starsOf(who),
+          by_land: [
+            { land: "rust", cleared, total: QUESTS.length },
+            { land: "go", cleared: 0, total: 0 },
+          ],
+        });
+      }
+      case "stats.mistakes": {
+        const who =
+          broke("trust-payload") && payload.address
+            ? String(payload.address).toLowerCase()
+            : me;
+        const byKind = new Map();
+        for (const m of mistakes.get(who) ?? [])
+          byKind.set(m.kind, (byKind.get(m.kind) ?? 0) + 1);
+        return reply(id, "stats.mistakes.ok", {
+          mistakes: [...byKind]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, Number(payload.limit ?? 10))
+            .map(([kind, count]) => ({
+              kind,
+              label: kind,
+              count,
+              last_at: now(),
+              cleared_since: 0,
+              example_quest_id: null,
+              concepts: [],
+            })),
+        });
+      }
+      case "stats.history": {
+        const who =
+          broke("trust-payload") && payload.address
+            ? String(payload.address).toLowerCase()
+            : me;
+        let rows = broke("cross-user")
+          ? [...attempts.values()].flat()
+          : attempts.get(who) ?? [];
+        if (payload.quest_id) rows = rows.filter((a) => a.quest_id === payload.quest_id);
+        return reply(id, "stats.history.ok", {
+          attempts: rows
+            .slice()
+            .reverse()
+            .slice(0, Number(payload.limit ?? 20))
+            .map((a) => ({
+              id: a.id,
+              quest_id: a.quest_id,
+              verdict: a.verdict,
+              tests_passed: a.tests_passed,
+              tests_total: a.tests_total,
+              created_at: a.created_at,
+              kinds: a.mistakes.map((m) => m.kind),
+            })),
+        });
+      }
+
+      default:
+        // §2.3 tells a *client* to ignore an unknown type. The server has to
+        // answer something; `bad_request` is the honest one.
+        if (broke("unknown-closes")) return ws.close(1003, "unknown type");
+        return err(id, type, "bad_request", `unknown type ${type}`);
+    }
+  }
+});
+
 http.listen(PORT, "127.0.0.1", () => {
   console.log(
-    `mock §6 server on ws://127.0.0.1:${PORT}/ws` +
+    `mock PROTOCOL.md server on ws://127.0.0.1:${PORT}/ws` +
       (BREAK ? `  [broken on purpose: ${BREAK}]` : ""),
   );
 });

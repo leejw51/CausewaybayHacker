@@ -249,3 +249,161 @@ copy that gates a merge should live in QA's tree, not in a scratch directory.
 Toolchain checked on this machine, for the record: `rustc 1.97.1`,
 `go1.27.1 darwin/arm64`. A bare `go build -o prog main.go` with no `go.mod`
 and `GOPROXY=off` works, so SPEC §5.1's Go command needs no amendment.
+
+## 2026-09-11 — BE: rebuilt against PROTOCOL.md, and one contradiction in §12
+
+`PROTOCOL.md` landed mid-build and is now the authority for the wire. The
+backend was reworked against it rather than patched around it. What changed,
+and what it supersedes from the BE entry above:
+
+* **Addresses are EIP-55 on the wire, both directions** (§2.4). `User.address`
+  is the checksummed spelling; `address_eip55` is gone from the payload because
+  there is no longer a second form to distinguish it from. Lowercase remains
+  the only spelling *inside* the server and on disk (SPEC §3.4).
+* **`auth.resume` rotates the token** (§4.4). The old token stops working the
+  moment the new one is handed over, so a token read off a disk backup is good
+  for exactly one resume rather than thirty days.
+* **`ping.ok` carries `t` as an RFC3339 string**, not epoch milliseconds.
+* **`quest.get` omits `solution`** rather than sending null, and `tests`
+  carries only the visible cases plus `hidden_count`.
+* **`Attempt.cleared` means "this submission just cleared the node"** — false
+  when re-solving something already cleared.
+* **`run.log` carries a per-stream `seq` from 0**, and the server stops
+  streaming after 256 KiB per attempt with one final `\n…output truncated\n`
+  chunk. The whole text is still on disk and the 64 KiB copy still in the
+  `Attempt`.
+* **`progress.update` carries `unlocked`** and is pushed to the same user's
+  other open connections through a small in-memory hub.
+* **Transport rules**: unknown top-level keys are `bad_request`; a reused
+  in-flight `id` is `bad_request`; a frame that is not a JSON object, and any
+  binary frame, closes with 1003; 4 MiB inbound cap; `server.bye` before every
+  close. `backend/server/tests/protocol.rs` asserts these, because two more
+  clients are being written against them and "the frontend seems happy" is not
+  evidence.
+
+**`User.level` and `User.xp`** are `xp = 10 × stars` and
+`level = 1 + xp / 100`. PROTOCOL §5.1 fixes the fields and not the curve;
+writing it down here is what keeps the browser and the LÖVE client drawing the
+same number.
+
+**SPEC §12's `time_limit_s` biconditional is enforced; its hidden-case clause
+is not, because the shipped content contradicts it.** §12 now reads "a
+`hacker` quest has a `time_limit_s` and at least one hidden case, and a quest
+outside `hacker` has neither". The first half is enforced both ways and all
+six packs satisfy it. The second half cannot be: `content/rust/basic.toml` and
+`advanced.toml` carry 22 and 20 hidden cases between them, and hidden cases in
+a grammar quest are plainly intentional and good — a player should not be able
+to read the whole test sheet. The importer therefore enforces: `hacker` ⇒
+`time_limit_s` **and** ≥1 hidden case; non-`hacker` ⇒ no `time_limit_s`; and
+says nothing about hidden cases outside `hacker`. **PM: either the sentence or
+the packs wants changing — the packs look right to me.**
+
+**The importer refuses a `"""`-quoted `brief`/`story`/`starter`/`solution`**
+with the file and line number, before TOML has parsed it. After parsing, a
+mangled `'\n'` is invisible and fails as what looks like a compiler bug.
+
+**Concept slugs outside `docs/concepts.md` are a warning, not a refusal.** The
+vocabulary is compiled into the importer and the §7.1 kind → concepts join is
+that file's table verbatim. A refusal would mean a whole pack stops importing
+because this list lagged a slug by an hour; a warning names the quest and the
+slug, and the drill that would reach nothing is the only thing lost.
+
+---
+
+## 2026-09-11 — FE: what the browser persists, and what it refuses to
+
+`localStorage` holds exactly two keys: `cwbhacker.token` (the session token,
+PROTOCOL §6.1) and `cwbhacker.orientation` (a display preference). Nothing
+else, ever. The mnemonic and the private key live in a module-local variable in
+`frontend/src/wallet/wallet.ts`; no export returns them, no scene holds a
+reference, and the login textarea is emptied before the first byte goes near
+the socket.
+
+The derivation is pinned to `CausewaybayWallet`'s EVM account 0 by vectors
+asserted in `frontend/tests/wallet.test.ts`: `m/44'/60'/0'/0/i`, EIP-55, and
+the EIP-191 signature compared byte for byte against `eth-account`'s own
+output — including a `"héllo 🌏"` case, which is the only one that catches a
+length prefix counting characters instead of UTF-8 bytes.
+
+**Request to QA.** `tests/vectors/` is still empty, so those vectors are
+inlined with their provenance rather than read across repositories. When the
+shared fixtures land, FE will switch to reading them — `addresses.json`
+(mnemonic → path → address → private key) and `eip191.json` (key, message,
+prefixed hash, signature, signer) in `CausewaybayWallet/testvectors/`'s shape
+would need no translation on either side.
+
+## 2026-09-11 — FE: the dev mock is a server, and it is strict on purpose
+
+`frontend/src/net/mock.ts` implements the PROTOCOL §4 catalogue in the browser
+so the frontend could be built and tested before the backend ran. It is dev
+only: the sole reference to it is a dynamic `import()` behind
+`import.meta.env.DEV`, which Vite folds to `false` in a production build, and
+the build is checked by grepping `dist/` for a sentinel string in the file.
+
+It is deliberately **stricter than a demo needs**, because a lenient mock is
+worse than none — it certifies bugs. It rotates the token on `auth.resume`,
+splits `run.log` chunks mid-line with a per-stream `seq`, answers a second
+`quest.submit` with `busy`, refuses everything but `ping`/`auth.*` before
+authentication, and recovers the address from the signature with real
+secp256k1 rather than trusting the claim. Each of those exists to fail a
+client that got PROTOCOL §8 wrong.
+
+Its world is mirrored into `sessionStorage`, so "clear it, reload, it is still
+cleared" — the milestone-1 acceptance test — can be exercised before the
+server exists. The real server keeps that in SQLite; the mock keeps it in a
+tab, and nothing in the game is ever read from it by a scene.
+
+## 2026-09-11 — FE: the browser sends the application-level `ping` anyway
+
+PROTOCOL §8.12 requires the 20-second `ping` only of a client that cannot
+answer websocket pings, which a browser can. The browser client sends it
+regardless. A laptop that slept leaves a socket that looks open and is not,
+and the application ping is what discovers that in twenty seconds rather than
+at the player's next click. It is cheap and it makes the reconnect path
+(§6) something that runs in normal use instead of only in a test.
+
+## 2026-09-11 — BE: `cleared_since` counts attempts without *that* kind
+
+SPEC §7.2 says "for every kind **not in this attempt** that the user has a row
+for, increment `cleared_since`", and that is what the server does — read as
+"you have not made this particular mistake in N attempts", which is the
+question §7.3's `cleared_since >= 5` asks.
+
+The `mistake_stats` column comment calls it "consecutive clean attempts", which
+suggests the stricter reading: only an attempt with **no** mistakes at all
+counts. That reading is not implemented, because a player who fails in a new
+way every time would then never age anything out of the weakness plan and the
+mode would keep drilling mistakes they stopped making months ago.
+
+Whoever builds the `weakness` plan in M2 inherits this: it is one
+`if mistakes.is_empty()` away if the other reading turns out to teach better,
+and `backend/core/tests/mistakes.rs::the_rollup_counts_clean_attempts` asserts
+the current one deliberately rather than by accident.
+
+## 2026-09-11 — SPEC §12's hidden-case clause was wrong; the packs were right
+
+BE's importer found the contradiction: §12 said a quest outside `hacker` has
+neither a `time_limit_s` nor a hidden case, while `content/rust/basic.toml` and
+`advanced.toml` ship 22 and 20 hidden cases between them.
+
+The packs are right and the sentence was wrong. Hidden cases belong anywhere —
+a `basic` quest that only ever showed its own test cases teaches the player to
+write to the example rather than to the brief. The biconditional the importer
+enforces is on `time_limit_s` alone; a `hacker` quest additionally needs at
+least one hidden case. §12 amended.
+
+## 2026-09-11 — Verified independently, not taken on report
+
+The backend's own suite is green, but the vertical slice was also driven by a
+third client written for the purpose (Node's built-in WebSocket, `@scure/bip39`
++ `@scure/bip32` + `@noble/curves`, no backend or frontend code). It derived
+`0x9858EfFD232B4033E47d90003D41EC34EcaEda94` from the BIP-39 "abandon … about"
+vector on `m/44'/60'/0'/0/0` — the ecosystem's canonical address for that
+mnemonic — signed the challenge, cleared `rust.basic.01.first-light`, and saw
+`rust.basic.02.bindings` unlock. Three implementations of the derivation now
+agree.
+
+Note for the noble v2 API, since it cost time: `secp256k1.sign(..., {format:
+'recovered'})` returns `[recid, r, s]` with the recovery id **first**, while
+Ethereum wants `r || s || v`. A client that concatenates it as-is produces a
+signature that verifies as the wrong address.

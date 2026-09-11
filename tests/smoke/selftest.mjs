@@ -38,25 +38,32 @@ const red = (s) => c("31", s);
 const dim = (s) => c("2", s);
 
 /**
- * fault → the check it must break.
+ * fault → the PROTOCOL.md §8 point (or the check name) that must catch it.
  *
  * The mapping is the point. "Something failed" would pass even if the
- * checker only ever managed to notice that the socket was different; naming
- * the check proves the rule is being tested by the thing that claims to test
- * it.
+ * checker only ever managed to notice the socket was different; naming the
+ * owning check proves the rule is tested by the thing that claims to test it.
  */
 const FAULTS = [
-  ["correlation", "correlated by id"],
-  ["error-code", "closed set"], // caught by the envelope validator
-  ["version-kills", "unknown protocol version"],
-  ["anon-leak", "unauthorized before login"],
-  ["nonce-reuse", "single-use"],
-  ["solution-leak", "withholds the solution"],
-  ["trust-payload", "ignored, never trusted"],
+  ["extra-key-ok", "8.1"],
+  ["correlation", "8.2"],
+  ["unknown-closes", "8.3"],
+  ["error-code", "8.4"],
+  ["no-supported", "8.4"],
+  ["nonce-reuse", "8.4"],
+  ["trailing-newline", "8.6"],
+  ["accepts-rebuilt", "8.6"],
+  ["token-static", "8.7"],
+  ["seq-gap", "8.8"],
+  ["seq-from-one", "8.8"],
+  ["event-id", "8.8"],
+  ["no-busy", "8.10"],
+  ["busy-per-user", "8.10"],
+  ["anon-leak", "ANONYMOUS"],
+  ["solution-leak", "§5"],
+  ["trust-payload", "never trusted"],
   ["cross-user", "never see each other"],
-  ["no-busy", "busy"],
-  ["event-id", "id: null"],
-  ["trailing-newline", "four lines"],
+  ["no-broadcast", "other connection"],
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -75,7 +82,7 @@ async function withMock(fault, fn) {
   child.stderr.on("data", (d) => log.push(String(d)));
   try {
     for (let i = 0; i < 60; i++) {
-      if (log.join("").includes("mock §6 server")) break;
+      if (log.join("").includes("mock PROTOCOL.md server")) break;
       await sleep(100);
     }
     return await fn(`ws://127.0.0.1:${p}/ws`, log);
@@ -141,9 +148,14 @@ async function main() {
   for (const [fault, mustBreak] of faults) {
     const out = await withMock(fault, (url) => runChecker(url));
     const failed = out.results.filter((r) => r.status === "fail");
-    const named = failed.filter((r) => r.name.includes(mustBreak) || r.detail?.includes(mustBreak));
+    const named = failed.filter(
+      (r) =>
+        r.point === mustBreak ||
+        r.name.includes(mustBreak) ||
+        (r.detail ?? "").includes(mustBreak),
+    );
     record(
-      `--break ${fault} is caught by "${mustBreak}"`,
+      `--break ${fault} is caught by ${mustBreak}`,
       named.length > 0,
       named.length > 0
         ? dim(named[0].detail.split("\n")[0].slice(0, 140))

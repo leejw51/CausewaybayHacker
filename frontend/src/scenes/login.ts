@@ -26,7 +26,13 @@ import { fill, well, type Ctx, type Rect } from "../engine/ui";
 import { Buttons, footer, frame, header, RUST, titledPanel } from "../ui/chrome";
 import { Overlay } from "../ui/overlay";
 import { WireError } from "../net/client";
-import { addressFromMnemonic, addressFromPrivateKeyHex, current, signMessage, unlock } from "../wallet/wallet";
+import {
+  addressFromMnemonic,
+  addressFromPrivateKeyHex,
+  current,
+  signMessage,
+  unlock,
+} from "../wallet/wallet";
 import { LandsScene } from "./lands";
 
 export class LoginScene implements Scene {

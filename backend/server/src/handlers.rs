@@ -27,6 +27,20 @@ impl Session {
             .as_deref()
             .ok_or_else(|| unauthorized("log in first"))
     }
+
+    /// PROTOCOL §3.1: a connection never goes back to ANONYMOUS, and to change
+    /// user you open a new one. Logging in twice on one socket would leave it
+    /// registered in the hub under the address it used to have, so the old
+    /// user's windows would hear about the new user's clears. Refused as a
+    /// client bug rather than half-handled.
+    pub fn must_be_anonymous(&self) -> Result<()> {
+        match self.address {
+            None => Ok(()),
+            Some(_) => Err(bad_request(
+                "this connection is already authenticated; open a new one to change user",
+            )),
+        }
+    }
 }
 
 /// PROTOCOL §5.1. `address` is the EIP-55 spelling: checksummed on the wire in
@@ -70,6 +84,7 @@ pub fn auth_login(
     session: &mut Session,
     payload: &serde_json::Value,
 ) -> Result<serde_json::Value> {
+    session.must_be_anonymous()?;
     let address = str_field(payload, "address")?;
     let signature = str_field(payload, "signature")?;
     let name = opt_str_field(payload, "name");
@@ -94,6 +109,7 @@ pub fn auth_resume(
     session: &mut Session,
     payload: &serde_json::Value,
 ) -> Result<serde_json::Value> {
+    session.must_be_anonymous()?;
     let token = str_field(payload, "token")?;
     let conn = state.store.conn();
     let (address, fresh) = auth::rotate_session(&conn, &token)?;

@@ -10,8 +10,7 @@
 import { PROTOCOL_VERSION, type Envelope, type ErrorPayload, isErrorCode } from "./protocol";
 
 export type Decoded =
-  | { kind: "ok"; frame: Envelope }
-  | { kind: "bad"; reason: string; raw: string };
+  { kind: "ok"; frame: Envelope } | { kind: "bad"; reason: string; raw: string };
 
 /**
  * PROTOCOL §2: exactly `v`, `id`, `type`, `payload`, and `payload` is always an

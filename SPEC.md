@@ -809,8 +809,11 @@ Rules:
 * `time_limit_s` is a **quest-level** key, set on `hacker` quests and omitted
   elsewhere. It is the player's clock, and is not `tests.timeout_ms`, which is
   one run's wall clock — a quest can give you twenty minutes to write something
-  that must execute in five seconds. The importer enforces the biconditional:
-  a `hacker` quest has a `time_limit_s` and at least one hidden case, and a
-  quest outside `hacker` has neither.
+  that must execute in five seconds. The importer enforces the biconditional
+  **on `time_limit_s` alone**: a `hacker` quest has one, a quest outside
+  `hacker` does not. Hidden cases are a separate matter and are welcome
+  anywhere — a `basic` quest that only ever showed its own test cases would be
+  teaching the player to write to the example rather than to the brief. A
+  `hacker` quest must additionally carry at least one hidden case.
 * `solution` is mandatory and is run by CI (SPEC §9.4). A quest without a
   working reference answer does not get imported.

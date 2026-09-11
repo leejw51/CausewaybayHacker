@@ -205,8 +205,13 @@ pub fn run(
         }
     };
 
-    let mut record =
-        attempts::new_record(attempt_id.clone(), address, &quest_id, &lang, source.clone());
+    let mut record = attempts::new_record(
+        attempt_id.clone(),
+        address,
+        &quest_id,
+        &lang,
+        source.clone(),
+    );
     record.verdict = report.verdict.as_str().to_string();
     record.compile_ms = report.compile_ms;
     record.run_ms = report.run_ms;

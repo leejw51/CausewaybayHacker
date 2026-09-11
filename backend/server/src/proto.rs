@@ -151,7 +151,10 @@ pub fn str_field(payload: &serde_json::Value, name: &str) -> Result<String> {
 }
 
 pub fn opt_str_field(payload: &serde_json::Value, name: &str) -> Option<String> {
-    payload.get(name).and_then(|v| v.as_str()).map(str::to_string)
+    payload
+        .get(name)
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
 }
 
 pub fn i64_field(payload: &serde_json::Value, name: &str) -> Result<i64> {

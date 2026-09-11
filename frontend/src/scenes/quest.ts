@@ -141,9 +141,7 @@ export class QuestScene implements Scene {
     // still accepted and still deserves the sound, just not the fanfare.
     if (attempt.verdict === "accepted") this.app.chip.clear();
     else this.app.chip.fail();
-    void this.app.go(
-      new ResultScene(this.app, this.land, this.category, this.questId, attempt),
-    );
+    void this.app.go(new ResultScene(this.app, this.land, this.category, this.questId, attempt));
   }
 
   private async hint(): Promise<void> {
@@ -243,7 +241,15 @@ export class QuestScene implements Scene {
     this.buttons.draw(g, fonts.button);
     if (this.error) {
       g.fillStyle = css(Theme.red);
-      printf(g, fonts.small, this.error, f.body[0], f.body[1] + f.body[3] - fonts.small.height, f.body[2], "left");
+      printf(
+        g,
+        fonts.small,
+        this.error,
+        f.body[0],
+        f.body[1] + f.body[3] - fonts.small.height,
+        f.body[2],
+        "left",
+      );
     }
     footer(g, layout, "CTRL+ENTER  RUN      ESC  MAP      F1  ORIENTATION");
   }
@@ -260,24 +266,33 @@ export class QuestScene implements Scene {
     let y = inner[1];
     if (this.quest.story) {
       g.fillStyle = css(Theme.cyan);
-      y += printf(g, fonts.small, `“${this.quest.story}”`, inner[0], y, inner[2], "left") * fonts.small.height;
+      y +=
+        printf(g, fonts.small, `“${this.quest.story}”`, inner[0], y, inner[2], "left") *
+        fonts.small.height;
       y += Math.round(6 * s);
     }
     g.fillStyle = css(Theme.cream);
     clipped(g, inner[0], y, inner[2], inner[1] + inner[3] - y, () => {
       let yy = y;
-      yy += printf(g, fonts.small, this.quest!.brief, inner[0], yy, inner[2], "left") * fonts.small.height;
+      yy +=
+        printf(g, fonts.small, this.quest!.brief, inner[0], yy, inner[2], "left") *
+        fonts.small.height;
       for (const h of this.hints) {
         yy += Math.round(6 * s);
         g.fillStyle = css(Theme.coin);
-        yy += printf(g, fonts.small, `HINT: ${h}`, inner[0], yy, inner[2], "left") * fonts.small.height;
+        yy +=
+          printf(g, fonts.small, `HINT: ${h}`, inner[0], yy, inner[2], "left") * fonts.small.height;
         g.fillStyle = css(Theme.cream);
       }
     });
   }
 
   /** The editor well, the button row, and the console drawer under them. */
-  private drawWorkbench(g: Ctx, rect: Rect, accent: readonly [number, number, number, number]): void {
+  private drawWorkbench(
+    g: Ctx,
+    rect: Rect,
+    accent: readonly [number, number, number, number],
+  ): void {
     const { layout } = this.app;
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
@@ -285,7 +300,9 @@ export class QuestScene implements Scene {
     const inner = titledPanel(g, rect, `${label}   ${this.stageLabel()}`, accent);
 
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
-    const consoleH = this.consoleOpen ? Math.round(inner[3] * (layout.isPortrait() ? 0.36 : 0.32)) : 0;
+    const consoleH = this.consoleOpen
+      ? Math.round(inner[3] * (layout.isPortrait() ? 0.36 : 0.32))
+      : 0;
     const editorH = Math.max(40, inner[3] - btnH - consoleH - Math.round(16 * s));
 
     well(g, inner[0], inner[1], inner[2], editorH);
@@ -343,7 +360,10 @@ export class QuestScene implements Scene {
       }
     }
     if (!this.log.complete) {
-      flat.push({ stream: "stderr", text: `[some output was lost: ${[...this.log.gaps].join(", ")}]` });
+      flat.push({
+        stream: "stderr",
+        text: `[some output was lost: ${[...this.log.gaps].join(", ")}]`,
+      });
     }
     const start = Math.max(0, flat.length - rows - this.logScroll);
     clipped(g, x + pad, y + pad, w - pad * 2, h - pad * 2, () => {
@@ -351,18 +371,37 @@ export class QuestScene implements Scene {
       for (let i = start; i < Math.min(flat.length, start + rows); i++) {
         const line = flat[i];
         g.fillStyle = css(
-          line.stream === "stderr" ? Theme.red : line.stream === "compile" ? Theme.dim : Theme.grass,
+          line.stream === "stderr"
+            ? Theme.red
+            : line.stream === "compile"
+              ? Theme.dim
+              : Theme.grass,
         );
         printf(g, fonts.codeSm, line.text, x + pad, ly, w - pad * 2, "left");
         ly += lineH;
       }
       if (flat.length === 0) {
         g.fillStyle = css(Theme.dim);
-        printf(g, fonts.codeSm, "the compiler has not said anything yet", x + pad, y + pad, w - pad * 2, "left");
+        printf(
+          g,
+          fonts.codeSm,
+          "the compiler has not said anything yet",
+          x + pad,
+          y + pad,
+          w - pad * 2,
+          "left",
+        );
       }
     });
     if (this.stage !== "idle") {
-      fill(g, Theme.coin, x, y + h - 3, Math.round(w * (0.25 + 0.25 * (Math.sin(this.t * 3) + 1))), 3);
+      fill(
+        g,
+        Theme.coin,
+        x,
+        y + h - 3,
+        Math.round(w * (0.25 + 0.25 * (Math.sin(this.t * 3) + 1))),
+        3,
+      );
     }
   }
 

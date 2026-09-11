@@ -16,7 +16,15 @@ import type { App, Scene } from "../app";
 import { ensureFonts, printf } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { clipped, fill, panel, type Ctx, type Rect } from "../engine/ui";
-import { clearRibbon, clearedStamp, footer, header, stars as drawStars, GO, RUST } from "../ui/chrome";
+import {
+  clearRibbon,
+  clearedStamp,
+  footer,
+  header,
+  stars as drawStars,
+  GO,
+  RUST,
+} from "../ui/chrome";
 import type { Category, Land, MapNode } from "../net/protocol";
 import { MapFx } from "./mapfx";
 import { LandsScene } from "./lands";
@@ -176,7 +184,7 @@ export class MapScene implements Scene {
   }
 
   private nodeRadius(): number {
-    return Math.round(14 * this.app.layout.uiScale());
+    return Math.round(18 * this.app.layout.uiScale());
   }
 
   // -- drawing -------------------------------------------------------------
@@ -261,8 +269,8 @@ export class MapScene implements Scene {
       g.moveTo(ax, ay);
       g.lineTo(bx, by);
       g.stroke();
-      g.strokeStyle = css(walked ? Theme.coin : Theme.dim, walked ? 1 : 0.55);
-      g.lineWidth = 3 * s;
+      g.strokeStyle = css(walked ? Theme.coin : Theme.cream, walked ? 1 : 0.5);
+      g.lineWidth = 4 * s;
       g.stroke();
       // The dots: a step every eight virtual pixels, so a long street reads as
       // a walk rather than a wire.
@@ -305,7 +313,15 @@ export class MapScene implements Scene {
       g.fill();
 
       g.fillStyle = css(Theme.ink);
-      printf(g, fonts.stationSm, String(n.node), x - r, y - fonts.stationSm.height / 2, r * 2, "center");
+      printf(
+        g,
+        fonts.stationSm,
+        String(n.node),
+        x - r,
+        y - fonts.stationSm.height / 2,
+        r * 2,
+        "center",
+      );
 
       if (n.state === "cleared") {
         clearRibbon(g, x, y, r * 2.6);
@@ -350,7 +366,14 @@ export class MapScene implements Scene {
     g.fillStyle = css(accent);
     printf(g, fonts.station, `${String(n.node).padStart(2, "0")}  ${n.title}`, ix, iy, iw, "left");
     iy += fonts.station.height + Math.round(6 * s);
-    drawStars(g, ix + Math.round(6 * s), iy + fonts.small.height * 0.4, Math.round(6 * s), n.difficulty, 5);
+    drawStars(
+      g,
+      ix + Math.round(6 * s),
+      iy + fonts.small.height * 0.4,
+      Math.round(6 * s),
+      n.difficulty,
+      5,
+    );
     g.fillStyle = css(Theme.cream);
     printf(
       g,

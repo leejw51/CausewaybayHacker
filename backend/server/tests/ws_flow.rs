@@ -178,7 +178,10 @@ async fn the_whole_slice_end_to_end() {
 
     // §6.4: ping is allowed before logging in; everything else is not.
     let pong = alice.ok("ping", json!({})).await;
-    assert!(pong["t"].is_number());
+    assert!(
+        pong["t"].as_str().unwrap().ends_with('Z'),
+        "t is RFC3339 UTC"
+    );
     assert_eq!(alice.err("world.lands", json!({})).await, "unauthorized");
 
     // §6.1: an unknown protocol version is answered, and the socket stays up.
@@ -196,7 +199,13 @@ async fn the_whole_slice_end_to_end() {
         other => panic!("{other:?}"),
     };
     assert_eq!(reply["payload"]["code"].as_str(), Some("proto_version"));
-    assert!(alice.ok("ping", json!({})).await["t"].is_number());
+    assert_eq!(
+        reply["payload"]["detail"]["supported"],
+        json!([1]),
+        "PROTOCOL §2.1 names the versions this server speaks"
+    );
+    // …and the connection stays open.
+    assert!(alice.ok("ping", json!({})).await["t"].is_string());
 
     let (address, token) = alice.login(ALICE_KEY).await;
 
@@ -213,6 +222,14 @@ async fn the_whole_slice_end_to_end() {
     assert_eq!(map["nodes"][0]["state"].as_str(), Some("open"));
     assert_eq!(map["nodes"][1]["state"].as_str(), Some("locked"));
     assert_eq!(map["nodes"][0]["x"].as_f64(), Some(0.12));
+    assert_eq!(map["land"].as_str(), Some("rust"));
+    assert_eq!(map["category"].as_str(), Some("basic"));
+    assert_eq!(map["nodes"][0]["requires"], json!([]));
+    assert_eq!(
+        map["nodes"][1]["requires"],
+        json!(["rust.basic.01.hello"]),
+        "a node names what blocks it"
+    );
 
     // §6.2: a locked node is `locked`, not a 404 and not a free pass.
     assert_eq!(
@@ -227,13 +244,17 @@ async fn the_whole_slice_end_to_end() {
         .await;
     assert_eq!(quest["quest"]["title"].as_str(), Some("FIRST LIGHT"));
     assert!(
-        quest["quest"]["solution"].is_null(),
-        "the answer must not be handed to someone who has not cleared it"
+        quest["quest"].get("solution").is_none(),
+        "PROTOCOL §4.8: solution is omitted entirely, not sent as null"
     );
+    assert_eq!(quest["quest"]["state"].as_str(), Some("open"));
+    assert_eq!(quest["quest"]["hints_total"].as_i64(), Some(2));
+    assert_eq!(quest["quest"]["hints_used"].as_i64(), Some(0));
     assert_eq!(
-        quest["quest"]["cases"][0]["expect"].as_str(),
+        quest["quest"]["tests"]["visible"][0]["expect"].as_str(),
         Some("hello, causewaybay\n")
     );
+    assert_eq!(quest["quest"]["tests"]["hidden_count"].as_i64(), Some(0));
 
     // A wrong answer first, so the clear is worth two stars and the mistake
     // shows up in the stats.
@@ -287,7 +308,18 @@ async fn the_whole_slice_end_to_end() {
         )
         .await;
     assert!(hint["hint"].as_str().unwrap().contains("println!"));
+    assert_eq!(hint["index"].as_i64(), Some(0));
+    assert_eq!(hint["total"].as_i64(), Some(2));
     assert_eq!(hint["hints_used"].as_i64(), Some(1));
+    assert_eq!(
+        alice
+            .err(
+                "quest.hint",
+                json!({ "quest_id": "rust.basic.01.hello", "index": 9 })
+            )
+            .await,
+        "not_found"
+    );
 
     let cleared = alice
         .ok(
@@ -311,9 +343,36 @@ async fn the_whole_slice_end_to_end() {
         Some(2),
         "a hint and a failure is two stars"
     );
+    let update = alice
+        .events
+        .iter()
+        .rev()
+        .find(|e| e["type"] == "progress.update")
+        .expect("the map was never told");
+    assert_eq!(
+        update["payload"]["unlocked"],
+        json!(["rust.basic.02.sum"]),
+        "progress.update names what it opened"
+    );
     assert!(
-        alice.events.iter().any(|e| e["type"] == "progress.update"),
-        "the map was never told"
+        alice.events.iter().any(|e| e["type"] == "award"),
+        "a clear is worth a stamp"
+    );
+    // §4.18: run.log carries a per-stream sequence starting at 0.
+    let compile_seqs: Vec<i64> = alice
+        .events
+        .iter()
+        .filter(|e| e["type"] == "run.log" && e["payload"]["stream"] == "compile")
+        .map(|e| e["payload"]["seq"].as_i64().unwrap())
+        .collect();
+    assert_eq!(
+        compile_seqs.first(),
+        Some(&0),
+        "seq counts from 0 per stream"
+    );
+    assert!(
+        compile_seqs.windows(2).all(|w| w[1] == w[0] + 1),
+        "a gap in seq means a client cannot trust it: {compile_seqs:?}"
     );
 
     // The node ahead is open now, and the answer is visible on the one cleared.
@@ -333,7 +392,11 @@ async fn the_whole_slice_end_to_end() {
 
     let summary = alice.ok("stats.summary", json!({})).await;
     assert_eq!(summary["cleared"].as_i64(), Some(1));
+    assert_eq!(summary["total"].as_i64(), Some(3));
     assert_eq!(summary["attempts"].as_i64(), Some(2));
+    assert_eq!(summary["stars"].as_i64(), Some(2));
+    assert_eq!(summary["streak_days"].as_i64(), Some(1));
+    assert_eq!(summary["accuracy"].as_f64(), Some(0.5));
     let stats = alice.ok("stats.mistakes", json!({})).await;
     assert_eq!(stats["mistakes"][0]["kind"].as_str(), Some("type-mismatch"));
     assert_eq!(
@@ -358,7 +421,13 @@ async fn the_whole_slice_end_to_end() {
         )
         .await;
     assert_eq!(profile["user"]["name"].as_str(), Some("kowloon"));
-    assert_eq!(profile["user"]["address"].as_str(), Some(address.as_str()));
+    assert_eq!(
+        profile["user"]["address"].as_str(),
+        Some(eth::to_eip55(&address).as_str()),
+        "PROTOCOL §2.4: addresses are EIP-55 on the wire"
+    );
+    assert!(profile["user"]["level"].is_number());
+    assert!(profile["user"]["xp"].is_number());
 
     // Milestone 2 refuses cleanly rather than panicking the connection.
     assert_eq!(
@@ -369,7 +438,7 @@ async fn the_whole_slice_end_to_end() {
         alice.err("ai.plan", json!({ "mode": "weakness" })).await,
         "not_found"
     );
-    assert!(alice.ok("ping", json!({})).await["t"].is_number());
+    assert!(alice.ok("ping", json!({})).await["t"].is_string());
 
     // §6.4: one in-flight submit per connection. Both frames go out before
     // either is answered, so the second one meets the flag the first set.
@@ -457,7 +526,12 @@ async fn the_whole_slice_end_to_end() {
     let server = start(&home, &src).await;
     let mut alice = Client::connect(server.port).await;
     let resumed = alice.ok("auth.resume", json!({ "token": token })).await;
-    assert_eq!(resumed["user"]["address"].as_str(), Some(address.as_str()));
+    let rotated = resumed["token"].as_str().unwrap().to_string();
+    assert_ne!(rotated, token, "PROTOCOL §4.4: the token rotates on resume");
+    assert_eq!(
+        resumed["user"]["address"].as_str(),
+        Some(eth::to_eip55(&address).as_str())
+    );
     assert_eq!(resumed["user"]["name"].as_str(), Some("kowloon"));
     let map = alice
         .ok("world.map", json!({ "land": "rust", "category": "basic" }))
@@ -470,6 +544,19 @@ async fn the_whole_slice_end_to_end() {
     assert_eq!(map["nodes"][0]["stars"].as_i64(), Some(2));
     let stats = alice.ok("stats.mistakes", json!({})).await;
     assert_eq!(stats["mistakes"][0]["kind"].as_str(), Some("type-mismatch"));
+
+    // The old token is dead the moment the new one is handed over.
+    let mut stale = Client::connect(server.port).await;
+    assert_eq!(
+        stale.err("auth.resume", json!({ "token": token })).await,
+        "unauthorized"
+    );
+    let mut fresh = Client::connect(server.port).await;
+    assert!(
+        fresh.ok("auth.resume", json!({ "token": rotated })).await["user"]["name"]
+            .as_str()
+            .is_some()
+    );
     server.handle.abort();
 }
 

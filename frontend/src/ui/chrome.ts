@@ -10,7 +10,17 @@
  */
 import { css, Theme, type RGBA } from "../engine/theme";
 import { ensureFonts, font, printf, width, type Font } from "../engine/text";
-import { btnBox, fill, inRect, panel, pixBtn, shadowText, star, type Ctx, type Rect } from "../engine/ui";
+import {
+  btnBox,
+  fill,
+  inRect,
+  panel,
+  pixBtn,
+  shadowText,
+  star,
+  type Ctx,
+  type Rect,
+} from "../engine/ui";
 import type { Layout } from "../engine/layout";
 
 export const RUST: RGBA = [0.95, 0.47, 0.16, 1];
@@ -135,7 +145,12 @@ export class Buttons {
   }
 
   /** Lay a row of buttons out inside `rect`, wrapping to the next line. */
-  row(f: Font, rect: Rect, labels: Array<{ id: string; label: string; dim?: boolean }>, minH = 0): void {
+  row(
+    f: Font,
+    rect: Rect,
+    labels: Array<{ id: string; label: string; dim?: boolean }>,
+    minH = 0,
+  ): void {
     const [x, y, w] = rect;
     const gap = Math.round(f.size * 0.5);
     let cx = x;
@@ -219,7 +234,12 @@ export function clearedStamp(g: Ctx, cx: number, cy: number, w: number, angle = 
   g.lineWidth = Math.max(3, f.size * 0.22);
   g.strokeStyle = css(Theme.red, 0.92);
   g.strokeRect(-bw / 2, -bh / 2, bw, bh);
-  g.strokeRect(-bw / 2 + g.lineWidth * 1.6, -bh / 2 + g.lineWidth * 1.6, bw - g.lineWidth * 3.2, bh - g.lineWidth * 3.2);
+  g.strokeRect(
+    -bw / 2 + g.lineWidth * 1.6,
+    -bh / 2 + g.lineWidth * 1.6,
+    bw - g.lineWidth * 3.2,
+    bh - g.lineWidth * 3.2,
+  );
   g.fillStyle = css(Theme.red, 0.92);
   printf(g, f, label, -bw / 2, -f.height / 2, bw, "center");
   g.restore();

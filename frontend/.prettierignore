@@ -1,0 +1,8 @@
+# The ported engine and the chip synth are kept byte-close to the sibling repos
+# they came from, so a fix made there can still be diffed across. Reformatting
+# them would make that diff useless for the sake of a few line breaks.
+src/engine/
+src/audio/
+dist/
+node_modules/
+public/

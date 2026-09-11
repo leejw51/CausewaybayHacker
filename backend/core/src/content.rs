@@ -154,6 +154,7 @@ fn collect_toml(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
 pub fn import_file(conn: &Connection, home: &Home, path: &Path) -> Result<PackReport> {
     let text = std::fs::read_to_string(path)
         .map_err(|e| internal(format!("cannot read {}: {e}", path.display())))?;
+    reject_basic_strings(&text, path)?;
     let pack: Pack = toml::from_str(&text)
         .map_err(|e| bad_request(format!("{} is not a valid pack: {e}", path.display())))?;
     validate(&pack)?;
@@ -170,6 +171,85 @@ pub fn import_file(conn: &Connection, home: &Home, path: &Path) -> Result<PackRe
         updated: counts.1,
     })
 }
+
+/// SPEC §12: every field holding code is a TOML **literal** string.
+///
+/// `"""` is a multi-line *basic* string and processes backslash escapes, so a
+/// `'\n'` inside a quest's Rust or Go source is rewritten to a real newline
+/// before `rustc` ever sees it. The quest then fails in a way that reads as a
+/// compiler bug, which is a day of somebody's life. Caught here, on the raw
+/// text, because by the time TOML has parsed it the damage is invisible.
+fn reject_basic_strings(text: &str, path: &Path) -> Result<()> {
+    const CODE_FIELDS: &[&str] = &["brief", "story", "starter", "solution"];
+    for (number, line) in text.lines().enumerate() {
+        let trimmed = line.trim_start();
+        for field in CODE_FIELDS {
+            let Some(rest) = trimmed.strip_prefix(field) else {
+                continue;
+            };
+            let rest = rest.trim_start();
+            let Some(rest) = rest.strip_prefix('=') else {
+                continue;
+            };
+            if rest.trim_start().starts_with("\"\"\"") {
+                return Err(bad_request(format!(
+                    "{}:{}: `{field}` is quoted with a TOML basic string, which eats the \
+                     backslash escapes in the code it holds. Use a literal string instead.",
+                    path.display(),
+                    number + 1
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The closed vocabulary of `docs/concepts.md`. A slug outside it reaches no
+/// quest, so SPEC §7.3's `weakness` drill would hand the player an empty list.
+pub const CONCEPT_VOCABULARY: &[&str] = &[
+    // grammar
+    "io",
+    "bindings",
+    "imports",
+    "types",
+    "control-flow",
+    "functions",
+    "closures",
+    "slices",
+    "collections",
+    "strings",
+    "structs",
+    "enums",
+    "pattern-matching",
+    "error-handling",
+    "iteration",
+    "traits",
+    "interfaces",
+    "generics",
+    // memory and aliasing — Rust only
+    "ownership",
+    "borrowing",
+    "lifetimes",
+    "mutability",
+    "smart-pointers",
+    // concurrency
+    "concurrency",
+    "channels",
+    "shared-state",
+    "cancellation",
+    "data-races",
+    "deadlock",
+    // algorithms — the hacker road
+    "hashing",
+    "two-pointers",
+    "binary-search",
+    "sorting",
+    "stacks-queues",
+    "graphs",
+    "intervals",
+    "dynamic-programming",
+    "complexity",
+];
 
 /// SPEC §12's rules, all of them, before a single row is written.
 pub fn validate(pack: &Pack) -> Result<()> {
@@ -242,6 +322,70 @@ pub fn validate(pack: &Pack) -> Result<()> {
                 "quest '{}' has no visible case; a player would be guessing at the output format",
                 quest.id
             )));
+        }
+        // An empty expectation is satisfied by an empty `fn main() {}`, which
+        // clears the node for free. Whitespace-only counts as empty under
+        // every match mode but `exact`, and `exact` on nothing is worse still.
+        for case in cases {
+            let expect = case.get("expect").and_then(|v| v.as_str()).unwrap_or("");
+            if expect.trim().is_empty() {
+                let name = case.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+                return Err(bad_request(format!(
+                    "quest '{}' case '{name}' expects nothing; an empty main would clear it",
+                    quest.id
+                )));
+            }
+        }
+        let hidden = cases
+            .iter()
+            .filter(|c| !c.get("visible").and_then(|v| v.as_bool()).unwrap_or(false))
+            .count();
+        // §12's biconditional: `time_limit_s` is the *player's* clock and
+        // belongs to the `hacker` road alone. It is not `tests.timeout_ms`,
+        // which is one run's wall clock — a quest can give twenty minutes to
+        // write something that must execute in five seconds.
+        match (pack.category.as_str(), quest.time_limit_s) {
+            ("hacker", None) => {
+                return Err(bad_request(format!(
+                    "quest '{}' is a hacker quest with no time_limit_s",
+                    quest.id
+                )))
+            }
+            ("hacker", Some(limit)) if limit <= 0 => {
+                return Err(bad_request(format!(
+                    "quest '{}' has a time_limit_s of {limit}",
+                    quest.id
+                )))
+            }
+            ("hacker", _) if hidden == 0 => {
+                return Err(bad_request(format!(
+                    "quest '{}' is a hacker quest with no hidden case",
+                    quest.id
+                )))
+            }
+            (other, Some(_)) if other != "hacker" => {
+                return Err(bad_request(format!(
+                    "quest '{}' is a {other} quest and must not carry time_limit_s; \
+                     tests.timeout_ms is the per-run clock",
+                    quest.id
+                )))
+            }
+            _ => {}
+        }
+        let unknown: Vec<&String> = quest
+            .concepts
+            .iter()
+            .filter(|c| !CONCEPT_VOCABULARY.contains(&c.as_str()))
+            .collect();
+        if !unknown.is_empty() {
+            // A warning, not a refusal: `docs/concepts.md` can grow a slug
+            // before this list does, and refusing to serve a whole pack over a
+            // vocabulary lag is worse than one drill that reaches nothing.
+            tracing::warn!(
+                quest = %quest.id,
+                concepts = ?unknown,
+                "concept slugs outside docs/concepts.md; weakness drills will not reach this quest"
+            );
         }
     }
     // 1-based and contiguous: the map draws a path through the nodes, and a

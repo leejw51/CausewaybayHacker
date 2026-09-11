@@ -30,6 +30,7 @@ const MISSED_PONGS_ALLOWED: usize = 2;
 /// PROTOCOL §1.2.
 const CLOSE_GOING_AWAY: u16 = 1001;
 const CLOSE_UNSUPPORTED: u16 = 1003;
+const CLOSE_TOO_LARGE: u16 = 1009;
 
 pub async fn upgrade(ws: WebSocketUpgrade, State(state): State<Shared>) -> Response {
     ws.max_message_size(MAX_FRAME_BYTES)
@@ -113,10 +114,27 @@ async fn connection(socket: WebSocket, state: Shared) {
         let message = match message {
             Ok(message) => message,
             Err(e) => {
-                tracing::debug!(error = %e, "websocket read failed");
+                // §1.2: a frame over the 4 MiB cap is closed with 1009. The
+                // library reports it as a read error, so the code has to be
+                // put back on the way out.
+                let text = e.to_string();
+                if text.contains("Space limit exceeded") || text.contains("too long") {
+                    let _ = tx.send(Outgoing::Close {
+                        code: CLOSE_TOO_LARGE,
+                        reason: "frame over the 4 MiB limit",
+                    });
+                } else {
+                    tracing::debug!(error = %e, "websocket read failed");
+                }
                 break;
             }
         };
+        // §1.1: the server accepts *either* keepalive. A client whose
+        // websocket library does not expose ping/pong sends the application
+        // `ping` every 20 seconds instead, and a frame arriving is proof of
+        // life whatever kind of frame it is. Counting only pongs would hang
+        // up on the LÖVE client at ninety seconds.
+        missed.store(0, Ordering::Relaxed);
         match message {
             Message::Text(text) => {
                 dispatch(
@@ -130,9 +148,7 @@ async fn connection(socket: WebSocket, state: Shared) {
                 )
                 .await;
             }
-            Message::Pong(_) => {
-                missed.store(0, Ordering::Relaxed);
-            }
+            Message::Pong(_) => {}
             Message::Close(_) => break,
             Message::Binary(_) => {
                 // §1: text frames only. A binary frame is closed with 1003
@@ -260,7 +276,9 @@ async fn dispatch(
         "stats.mistakes" => handlers::stats_mistakes(state, session, payload),
         "stats.history" => handlers::stats_history(state, session, payload),
         "search.query" => Err(handlers::unimplemented("search (SPEC §8)")),
-        "ai.plan" | "ai.next" | "ai.finish" => Err(handlers::unimplemented("AI drills (SPEC §7.3)")),
+        "ai.plan" | "ai.next" | "ai.finish" => {
+            Err(handlers::unimplemented("AI drills (SPEC §7.3)"))
+        }
         other => Err(Error::new(
             Code::NotFound,
             format!("no message type '{other}'"),

@@ -15,19 +15,19 @@ story       = "The terminal blinks. You used to know this one."
 concepts    = ["io", "macros"]
 requires    = []
 map         = { x = 0.12, y = 0.74, kind = "quest" }
-brief       = """
+brief       = '''
 Print `hello, causewaybay` and nothing else.
-"""
-starter     = """
+'''
+starter     = '''
 fn main() {
     // your code here
 }
-"""
-solution    = """
+'''
+solution    = '''
 fn main() {
     println!("hello, causewaybay");
 }
-"""
+'''
 hints = [
   "`println!` is a macro, so it takes a `!`.",
   "The string is exact: lowercase, one comma, one space.",
@@ -50,15 +50,15 @@ story       = "Numbers on a wall. Add them up."
 concepts    = ["io", "iterators"]
 requires    = ["rust.basic.01.hello"]
 map         = { x = 0.31, y = 0.62, kind = "quest" }
-brief       = """
+brief       = '''
 Read `n`, then `n` integers on the next line. Print their sum.
-"""
-starter     = """
+'''
+starter     = '''
 fn main() {
     // your code here
 }
-"""
-solution    = """
+'''
+solution    = '''
 use std::io::Read;
 
 fn main() {
@@ -69,7 +69,7 @@ fn main() {
     let total: i64 = parts.take(n).map(|t| t.parse::<i64>().unwrap()).sum();
     println!("{total}");
 }
-"""
+'''
 hints = [
   "Read the whole of stdin, then split on whitespace.",
 ]
@@ -92,23 +92,23 @@ story       = "It is the same name, and it is not the same value."
 concepts    = ["shadowing", "bindings"]
 requires    = ["rust.basic.02.sum"]
 map         = { x = 0.48, y = 0.55, kind = "quest" }
-brief       = """
+brief       = '''
 Print `12` and nothing else.
-"""
-starter     = """
+'''
+starter     = '''
 fn main() {
     let x = 5;
     // your code here
     println!("{x}");
 }
-"""
-solution    = """
+'''
+solution    = '''
 fn main() {
     let x = 5;
     let x = x + 7;
     println!("{x}");
 }
-"""
+'''
 hints = [
   "`let` a second time with the same name is shadowing, not assignment.",
 ]

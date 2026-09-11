@@ -16,7 +16,17 @@ import { css, Theme } from "../engine/theme";
 import { clipped, fill, type Ctx, type Rect } from "../engine/ui";
 import { burstPlan, type Plan } from "../engine/burst";
 import { cosine, expOut } from "../engine/ease";
-import { Buttons, clearedStamp, footer, frame, GO, header, RUST, stars as drawStars, titledPanel } from "../ui/chrome";
+import {
+  Buttons,
+  clearedStamp,
+  footer,
+  frame,
+  GO,
+  header,
+  RUST,
+  stars as drawStars,
+  titledPanel,
+} from "../ui/chrome";
 import type { Attempt, Category, Land } from "../net/protocol";
 import { MapScene } from "./map";
 import { QuestScene } from "./quest";
@@ -111,7 +121,9 @@ export class ResultScene implements Scene {
     const left = titledPanel(g, f.left, "VERDICT", ok ? Theme.admit : Theme.red);
     let y = left[1];
     g.fillStyle = css(ok ? Theme.admit : Theme.red);
-    y += printf(g, fonts.title, VERDICT_TEXT[this.attempt.verdict], left[0], y, left[2], "center") * fonts.title.height;
+    y +=
+      printf(g, fonts.title, VERDICT_TEXT[this.attempt.verdict], left[0], y, left[2], "center") *
+      fonts.title.height;
     y += Math.round(8 * s);
 
     if (ok) {
@@ -124,7 +136,13 @@ export class ResultScene implements Scene {
         3,
       );
       y += Math.round(34 * s);
-      clearedStamp(g, left[0] + left[2] / 2, y + Math.round(28 * s), Math.min(left[2] * 0.7, 260 * s), -0.12);
+      clearedStamp(
+        g,
+        left[0] + left[2] / 2,
+        y + Math.round(28 * s),
+        Math.min(left[2] * 0.7, 260 * s),
+        -0.12,
+      );
       y += Math.round(70 * s);
     }
 
@@ -153,14 +171,40 @@ export class ResultScene implements Scene {
 
       for (const c of this.attempt.cases) {
         g.fillStyle = css(c.passed ? Theme.admit : Theme.red);
-        printf(g, fonts.small, `${c.passed ? "PASS" : "FAIL"}  ${c.name}`, right[0], ry, right[2], "left");
+        printf(
+          g,
+          fonts.small,
+          `${c.passed ? "PASS" : "FAIL"}  ${c.name}`,
+          right[0],
+          ry,
+          right[2],
+          "left",
+        );
         ry += lineH;
         // Hidden cases report pass/fail and nothing else (SPEC §5.2), so there
         // is deliberately no `else` branch printing the data.
         if (c.visible && !c.passed) {
           g.fillStyle = css(Theme.dim);
-          ry += printf(g, fonts.codeSm, `expected ${JSON.stringify(c.expect ?? "")}`, right[0], ry, right[2], "left") * fonts.codeSm.height;
-          ry += printf(g, fonts.codeSm, `got      ${JSON.stringify(c.got ?? "")}`, right[0], ry, right[2], "left") * fonts.codeSm.height;
+          ry +=
+            printf(
+              g,
+              fonts.codeSm,
+              `expected ${JSON.stringify(c.expect ?? "")}`,
+              right[0],
+              ry,
+              right[2],
+              "left",
+            ) * fonts.codeSm.height;
+          ry +=
+            printf(
+              g,
+              fonts.codeSm,
+              `got      ${JSON.stringify(c.got ?? "")}`,
+              right[0],
+              ry,
+              right[2],
+              "left",
+            ) * fonts.codeSm.height;
         }
       }
 
@@ -171,17 +215,29 @@ export class ResultScene implements Scene {
         ry += fonts.stationSm.height + Math.round(6 * s);
         for (const m of this.attempt.mistakes) {
           g.fillStyle = css(Theme.pink);
-          printf(g, fonts.small, `${m.kind}${m.code ? ` (${m.code})` : ""}`, right[0], ry, right[2], "left");
+          printf(
+            g,
+            fonts.small,
+            `${m.kind}${m.code ? ` (${m.code})` : ""}`,
+            right[0],
+            ry,
+            right[2],
+            "left",
+          );
           ry += lineH;
           g.fillStyle = css(Theme.cream);
-          ry += printf(g, fonts.codeSm, m.message, right[0], ry, right[2], "left") * fonts.codeSm.height;
+          ry +=
+            printf(g, fonts.codeSm, m.message, right[0], ry, right[2], "left") *
+            fonts.codeSm.height;
         }
       }
 
       if (this.attempt.stderr) {
         ry += Math.round(8 * s);
         g.fillStyle = css(Theme.red);
-        ry += printf(g, fonts.codeSm, this.attempt.stderr, right[0], ry, right[2], "left") * fonts.codeSm.height;
+        ry +=
+          printf(g, fonts.codeSm, this.attempt.stderr, right[0], ry, right[2], "left") *
+          fonts.codeSm.height;
       }
     });
 
@@ -189,7 +245,10 @@ export class ResultScene implements Scene {
 
     const btnRect: Rect = [
       f.body[0],
-      layout.vh - Math.round(26 * s) - Math.max(layout.minTouchH(), fonts.button.height + 20) - Math.round(6 * s),
+      layout.vh -
+        Math.round(26 * s) -
+        Math.max(layout.minTouchH(), fonts.button.height + 20) -
+        Math.round(6 * s),
       f.body[2],
       Math.max(layout.minTouchH(), fonts.button.height + 20),
     ];

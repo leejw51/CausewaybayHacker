@@ -15,12 +15,14 @@ import type { Transport, TransportHandlers } from "../src/net/transport";
 
 describe("the envelope", () => {
   it("always carries v, id, type and an object payload", () => {
-    expect(JSON.parse(encode("c-42", "quest.submit", { quest_id: "rust.basic.01.hello" }))).toEqual({
-      v: 1,
-      id: "c-42",
-      type: "quest.submit",
-      payload: { quest_id: "rust.basic.01.hello" },
-    });
+    expect(JSON.parse(encode("c-42", "quest.submit", { quest_id: "rust.basic.01.hello" }))).toEqual(
+      {
+        v: 1,
+        id: "c-42",
+        type: "quest.submit",
+        payload: { quest_id: "rust.basic.01.hello" },
+      },
+    );
   });
 
   it("never sends a bare value or a missing payload (§6.1)", () => {
@@ -75,9 +77,9 @@ describe("the envelope", () => {
 
 describe("the closed error-code set (§6.1)", () => {
   it("passes a known code through", () => {
-    expect(asError({ code: "locked", message: "clear the node before it", detail: { node: 2 } })).toEqual(
-      { code: "locked", message: "clear the node before it", detail: { node: 2 } },
-    );
+    expect(
+      asError({ code: "locked", message: "clear the node before it", detail: { node: 2 } }),
+    ).toEqual({ code: "locked", message: "clear the node before it", detail: { node: 2 } });
   });
 
   it("folds an unknown code into internal without losing it", () => {

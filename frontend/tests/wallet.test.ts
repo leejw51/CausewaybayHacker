@@ -75,20 +75,19 @@ describe("m/44'/60'/0'/0/i, as CausewaybayWallet derives it", () => {
 
   it("accepts a raw private key as the alternative to a phrase (SPEC §3.1)", () => {
     expect(
-      addressFromPrivateKeyHex(
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-      ).eip55,
+      addressFromPrivateKeyHex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+        .eip55,
     ).toBe("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
     expect(
-      addressFromPrivateKeyHex(
-        "0x0000000000000000000000000000000000000000000000000000000000000001",
-      ).eip55,
+      addressFromPrivateKeyHex("0x0000000000000000000000000000000000000000000000000000000000000001")
+        .eip55,
     ).toBe("0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf");
   });
 
   it("normalizes a phrase pasted with ragged whitespace", () => {
-    expect(normalizeMnemonic(`  test test\ttest test test test\ntest test test test test junk `))
-      .toBe(ANVIL);
+    expect(
+      normalizeMnemonic(`  test test\ttest test test test\ntest test test test test junk `),
+    ).toBe(ANVIL);
     expect(addressFromMnemonic(`  ${ANVIL.replace(/ /g, "  ")}\n`).eip55).toBe(
       "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
     );

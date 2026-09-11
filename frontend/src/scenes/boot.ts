@@ -82,9 +82,25 @@ export class BootScene implements Scene {
 
     const cy = Math.round(layout.vh * 0.4);
     neonPrint(g, f.title, "CAUSEWAYBAY", cy - f.title.height, layout.vw, Theme.cyan, this.t);
-    neonPrint(g, f.title, "HACKER", cy + Math.round(f.title.height * 0.2), layout.vw, [0.95, 0.47, 0.16, 1], this.t + 0.6);
+    neonPrint(
+      g,
+      f.title,
+      "HACKER",
+      cy + Math.round(f.title.height * 0.2),
+      layout.vw,
+      [0.95, 0.47, 0.16, 1],
+      this.t + 0.6,
+    );
 
     g.fillStyle = css(Theme.coin, 0.6 + 0.4 * Math.sin(this.t * 4));
-    printf(g, f.stationSm, this.step.toUpperCase(), 0, Math.round(layout.vh * 0.72), layout.vw, "center");
+    printf(
+      g,
+      f.stationSm,
+      this.step.toUpperCase(),
+      0,
+      Math.round(layout.vh * 0.72),
+      layout.vw,
+      "center",
+    );
   }
 }

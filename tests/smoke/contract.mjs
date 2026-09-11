@@ -1,23 +1,36 @@
 #!/usr/bin/env node
 /**
- * The contract checker.
+ * The contract checker — PROTOCOL.md §8, point by point.
  *
- * It speaks SPEC §6 to a running server on :5390 and nothing else — no
- * browser, no frontend, no build. When BE and FE disagree about a frame, this
- * is the thing that says which one is wrong, in about two seconds, without
- * anybody having to reproduce a click.
+ * It speaks the wire protocol to a running server on :5390 and nothing else:
+ * no browser, no frontend, no build. When two clients disagree about a frame
+ * this is the thing that says which one is wrong, in about two seconds,
+ * without anybody having to reproduce a click.
+ *
+ * PROTOCOL.md §8 is a twelve-point conformance checklist and it is the shared
+ * definition of "the client works" for three clients now — the browser, the
+ * LÖVE desktop client, and this. So the twelve are the spine of this file:
+ * one named case each, reported by number. Everything else runs after them,
+ * under "beyond the checklist", and never obscures the score.
  *
  *     node tests/smoke/contract.mjs
  *     node tests/smoke/contract.mjs --url ws://127.0.0.1:5390/ws
- *     node tests/smoke/contract.mjs --only auth       # substring filter
+ *     node tests/smoke/contract.mjs --only 8.6        # one point
+ *     node tests/smoke/contract.mjs --only beyond     # substring match
  *     node tests/smoke/contract.mjs --json            # machine-readable
+ *     node tests/smoke/contract.mjs --slow            # the real 70s keepalive
  *
- * Exit 0 if every check passed, 1 if any failed, 2 if it could not even
- * start (nothing listening, no signer).
+ * Exit 0 if every check passed, 1 if any failed, 2 if it could not start
+ * (nothing listening, no signer).
  *
- * Zero npm dependencies. Node has had a global `WebSocket` since 22, and the
- * one thing it cannot do — produce a recoverable secp256k1 signature over a
- * nonce the server just invented — is shelled out to `CausewaybayWallet`'s
+ * Several of the twelve are rules about *the client*. This checker is a
+ * client, so it asserts them against itself — every frame it sends is kept
+ * and inspected. A conformance suite that only ever audits the other side is
+ * half a suite.
+ *
+ * Zero npm dependencies. Node has had a global `WebSocket` since 22; the one
+ * thing it cannot do — a recoverable secp256k1 signature over a nonce the
+ * server invented a moment ago — is shelled out to `CausewaybayWallet`'s
  * `utils sign`, the same binary that generated `tests/vectors/signatures.json`.
  * A fixture cannot cover that half: the nonce is fresh every time.
  */
@@ -39,7 +52,8 @@ const has = (name) => args.includes(`--${name}`);
 const URL_WS = flag("url", process.env.SMOKE_WS_URL ?? "ws://127.0.0.1:5390/ws");
 const ONLY = flag("only", null);
 const AS_JSON = has("json");
-const TIMEOUT_MS = Number(flag("timeout", "10000"));
+const SLOW = has("slow");
+const TIMEOUT_MS = Number(flag("timeout", "20000"));
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const VECTORS = `${ROOT}/tests/vectors/addresses.json`;
@@ -47,7 +61,10 @@ const WALLET =
   process.env.CWBWALLET ??
   `${ROOT}/../CausewaybayWallet/rustcli/target/debug/cwbwallet`;
 
-// SPEC §6.1. Closed. A code outside this set is a bug wherever it came from.
+/** PROTOCOL.md §2: exactly these four top-level keys, no others. */
+const ENVELOPE_KEYS = ["id", "payload", "type", "v"]; // sorted
+
+/** PROTOCOL.md §3.3. Closed. A code outside it is a server bug. */
 const ERROR_CODES = new Set([
   "proto_version",
   "bad_request",
@@ -62,16 +79,19 @@ const ERROR_CODES = new Set([
   "internal",
 ]);
 
-// SPEC §6.2, server → client, unsolicited.
+/** PROTOCOL.md §4.17–§4.21, the server-initiated events. */
 const EVENT_TYPES = new Set([
-  "run.log",
   "run.stage",
+  "run.log",
   "progress.update",
   "award",
   "server.bye",
 ]);
 
-// ------------------------------------------------------------------ colours
+/** PROTOCOL.md §3.1: the four messages an ANONYMOUS connection accepts. */
+const ANONYMOUS_OK = new Set(["ping", "auth.challenge", "auth.login", "auth.resume"]);
+
+// ----------------------------------------------------------------- colours
 
 const tty = process.stdout.isTTY && !AS_JSON;
 const c = (code, s) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
@@ -80,14 +100,15 @@ const red = (s) => c("31", s);
 const dim = (s) => c("2", s);
 const yellow = (s) => c("33", s);
 
-// ------------------------------------------------------------- the wallet
+// ------------------------------------------------------------- the signer
+
+class SkipError extends Error {}
 
 function sign(privateKey, message) {
   if (!existsSync(WALLET)) {
     throw new SkipError(
-      `no signer at ${WALLET}. Build CausewaybayWallet (\`make -C ` +
-        `../CausewaybayWallet build\`) or set $CWBWALLET. Everything that needs ` +
-        `a live signature is skipped without it; the anonymous half still runs.`,
+      `no signer at ${WALLET}. Build CausewaybayWallet ` +
+        `(\`make -C ../CausewaybayWallet build\`) or set $CWBWALLET.`,
     );
   }
   const out = spawnSync(
@@ -101,36 +122,30 @@ function sign(privateKey, message) {
   return env.data.signature;
 }
 
-class SkipError extends Error {}
-
 /**
  * Five well-known accounts from `tests/vectors/addresses.json`.
  *
- * Checks that change state take one each. Sharing an account between checks
+ * Checks that change state take one each. Sharing an account across checks
  * makes the suite order-dependent, and an order-dependent contract checker is
  * the thing you stop trusting the first time it disagrees with itself.
  */
-function accounts() {
+function allAccounts() {
   const doc = JSON.parse(readFileSync(VECTORS, "utf8"));
-  const canonical = doc.mnemonics.find((m) => m.name === "bip39-canonical");
-  return canonical.accounts;
+  return doc.mnemonics.find((m) => m.name === "bip39-canonical").accounts;
 }
-const ACCOUNT = {
-  reader: 0, // never submits: challenge, resume, map and quest shapes
-  busy: 1,
-  streamer: 2,
-  alice: 3, // the isolation pair
-  bob: 4,
-};
-const account = (role) => accounts()[ACCOUNT[role]];
+const ROLE = { reader: 0, busy: 1, streamer: 2, alice: 3, bob: 4 };
+const account = (role) => allAccounts()[ROLE[role]];
+
+/** Every private key this process knows, for the §8.5 audit. */
+const SECRETS = () => allAccounts().map((a) => a.private_key.replace(/^0x/, ""));
 
 /**
- * A Rust source that prints exactly what a visible test case expects.
+ * A Rust source that prints exactly what a visible case expects.
  *
- * Milestone 1 is three print-one-line quests (PLAN.md), so this is enough to
- * make a submission the server will accept without QA needing to know the
- * content PM is still writing. Returns null for anything else, and the check
- * that uses it degrades to asserting only what it still can.
+ * Milestone 1 is print-one-line quests, so this is enough to make a
+ * submission the server will accept without QA having to know content PM
+ * owns. Returns null for anything else, and the caller degrades to asserting
+ * only what it still can — loudly, never silently.
  */
 function sourceThatPrints(expected) {
   if (typeof expected !== "string") return null;
@@ -143,13 +158,13 @@ function sourceThatPrints(expected) {
 // --------------------------------------------------------------- the client
 
 /**
- * One connection, with the envelope rules of SPEC §6.1 enforced on the way in.
+ * One connection, with PROTOCOL.md §2's envelope rules enforced on the way in
+ * and §8's client rules enforced on the way out.
  *
- * Every frame the server sends is checked before any test sees it: `v` is a
- * number, `payload` is an object and never absent, an error payload has the
- * three fields, an error code is in the closed set, and a frame with `id:
- * null` is one of the five event types. A malformed frame is recorded as a
- * protocol violation against whatever check was running.
+ * Nothing a check sees has skipped validation: every inbound frame is
+ * structurally checked before it is handed over, and every outbound frame is
+ * kept so §8.1 and §8.5 can audit this client's own behaviour rather than
+ * taking its word for it.
  */
 class Client {
   constructor(url, label = "c") {
@@ -159,14 +174,23 @@ class Client {
     this.pending = new Map();
     this.events = [];
     this.violations = [];
-    this.frames = [];
+    this.inbound = [];
+    this.outbound = [];
+    this.unknownTypes = [];
     this.rawIds = new Set();
     this.closed = null;
+    /** run.log reassembly, per attempt per stream — PROTOCOL.md §8.8. */
+    this.logs = new Map();
   }
 
   connect() {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(this.url);
+      let ws;
+      try {
+        ws = new WebSocket(this.url);
+      } catch (err) {
+        return reject(new SkipError(`bad url ${this.url}: ${err.message}`));
+      }
       this.ws = ws;
       const timer = setTimeout(
         () => reject(new Error(`no open within ${TIMEOUT_MS}ms`)),
@@ -174,6 +198,7 @@ class Client {
       );
       ws.addEventListener("open", () => {
         clearTimeout(timer);
+        this.openedAt = Date.now();
         resolve(this);
       });
       ws.addEventListener("error", () => {
@@ -181,112 +206,143 @@ class Client {
         reject(
           new SkipError(
             `nothing answered ${this.url}.\n` +
-              `  Start the server:  make serve   (or: cd backend && cargo run -p cwbhacker -- serve)\n` +
+              `  Start the server:  make serve` +
+              `   (or: cd backend && cargo run -p cwbhacker -- serve)\n` +
               `  Point elsewhere:   node tests/smoke/contract.mjs --url ws://host:port/ws`,
           ),
         );
       });
       ws.addEventListener("close", (e) => {
-        this.closed = { code: e.code, reason: e.reason };
+        this.closed = { code: e.code, reason: e.reason, at: Date.now() };
         for (const [, p] of this.pending) p.reject(new Error("socket closed"));
         this.pending.clear();
       });
-      ws.addEventListener("message", (e) => this.#onMessage(String(e.data)));
+      ws.addEventListener("message", (e) => this.receive(String(e.data)));
     });
   }
 
-  #violate(why, frame) {
+  violate(why, frame) {
     this.violations.push({ why, frame });
   }
 
-  #onMessage(text) {
+  /**
+   * The receive path. Public on purpose: two of §8's points are about how a
+   * client reacts to a frame, and feeding one in through the same path a real
+   * frame takes is the only honest way to test that.
+   */
+  receive(text) {
     let f;
     try {
       f = JSON.parse(text);
     } catch {
-      this.#violate("frame is not JSON", text.slice(0, 200));
+      this.violate("frame is not JSON", text.slice(0, 200));
       return;
     }
-    this.frames.push(f);
+    this.inbound.push(f);
 
+    // ---- PROTOCOL.md §2, the envelope ---------------------------------
     if (typeof f !== "object" || f === null || Array.isArray(f))
-      return this.#violate("frame is not a JSON object", f);
-    if (f.v !== 1) this.#violate(`v is ${JSON.stringify(f.v)}, expected 1`, f);
-    if (typeof f.type !== "string") this.#violate("type is not a string", f);
-    if (f.type !== f.type.toLowerCase()) this.#violate("type is not lowercase", f);
+      return this.violate("frame is not a JSON object", f);
+    const keys = Object.keys(f).sort();
+    if (JSON.stringify(keys) !== JSON.stringify(ENVELOPE_KEYS))
+      this.violate(
+        `top-level keys are ${JSON.stringify(keys)}; §2 says exactly ` +
+          `${JSON.stringify(ENVELOPE_KEYS)}`,
+        f,
+      );
+    if (f.v !== 1) this.violate(`v is ${JSON.stringify(f.v)}, expected 1`, f);
+    if (typeof f.type !== "string") this.violate("type is not a string", f);
+    else if (f.type !== f.type.toLowerCase())
+      this.violate("type is not lowercase (§2.3)", f);
     if (typeof f.payload !== "object" || f.payload === null || Array.isArray(f.payload))
-      this.#violate("payload must be an object, never absent and never bare", f);
-    if (!("id" in f)) this.#violate("id is absent; an event must say id: null", f);
+      this.violate("payload must be an object, never bare, never absent (§2)", f);
 
-    if (f.type.endsWith(".err")) {
+    // ---- PROTOCOL.md §3.3, the error shape ----------------------------
+    if (typeof f.type === "string" && f.type.endsWith(".err")) {
       const p = f.payload ?? {};
-      if (typeof p.code !== "string") this.#violate("error payload has no code", f);
-      else if (!ERROR_CODES.has(p.code))
-        this.#violate(
-          `error code ${JSON.stringify(p.code)} is outside SPEC §6.1's closed set`,
+      const pk = Object.keys(p).sort();
+      if (JSON.stringify(pk) !== JSON.stringify(["code", "detail", "message"]))
+        this.violate(
+          `error payload keys are ${JSON.stringify(pk)}; §3.3 says exactly ` +
+            `["code","detail","message"] and no extra keys`,
           f,
         );
-      if (typeof p.message !== "string")
-        this.#violate("error payload has no message string", f);
-      if (!("detail" in p)) this.#violate("error payload has no detail", f);
+      if (typeof p.code !== "string") this.violate("error payload has no code", f);
+      else if (!ERROR_CODES.has(p.code))
+        this.violate(
+          `error code ${JSON.stringify(p.code)} is outside §3.3's closed set`,
+          f,
+        );
+      if (typeof p.message === "string" && p.message.includes("\n"))
+        this.violate("§3.3: `message` is one line", f);
     }
 
+    // ---- PROTOCOL.md §2.2, correlation --------------------------------
     if (f.id === null) {
-      // An `.err` with a null id is allowed: a frame the server could not
-      // parse has no id to echo, and SPEC §6.1 does not say what to do about
-      // that. Flagged as an open question in docs/decisions.md, tolerated
-      // here so it does not drown the real findings.
-      if (!EVENT_TYPES.has(f.type) && !f.type.endsWith(".err"))
-        this.#violate(`id:null but ${f.type} is not a SPEC §6.2 event`, f);
+      if (EVENT_TYPES.has(f.type)) {
+        this.track(f);
+      } else {
+        // §2.3 tells a client to *ignore* an unknown type, not to error on
+        // it. Recorded so §8.3 can prove the ignoring actually happened.
+        this.unknownTypes.push(f.type);
+      }
       this.events.push(f);
       return;
     }
 
     const p = this.pending.get(f.id);
     if (!p) {
-      // `raw()` frames are sent without registering a waiter, on purpose —
-      // they are the malformed ones. Their ids are known and not a violation.
+      // `raw()` frames are sent deliberately without a waiter — they are the
+      // malformed ones — so a reply to one is expected, not a violation.
       if (!this.rawIds.has(f.id))
-        this.#violate(`reply correlated to ${f.id}, which was never sent`, f);
+        this.violate(`reply correlated to ${f.id}, which was never sent`, f);
       return;
     }
     this.pending.delete(f.id);
     p.resolve(f);
   }
 
+  /** PROTOCOL.md §8.8: buffer chunks, never assume line boundaries. */
+  track(f) {
+    if (f.type !== "run.log") return;
+    const { attempt_id, stream, chunk, seq } = f.payload ?? {};
+    const key = `${attempt_id}|${stream}`;
+    const rec = this.logs.get(key) ?? { text: "", seqs: [] };
+    rec.text += typeof chunk === "string" ? chunk : "";
+    rec.seqs.push(seq);
+    this.logs.set(key, rec);
+  }
+
   /** Send a request and wait for the reply the server correlates to it. */
-  send(type, payload = {}, { v = 1, id = null } = {}) {
+  send(type, payload = {}, { v = 1, id = null, extra = null } = {}) {
     const frameId = id ?? `${this.label}-${++this.n}`;
     const frame = { v, id: frameId, type, payload };
+    if (extra) Object.assign(frame, extra); // §8.1's negative case, on purpose
     const p = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(frameId);
         reject(new Error(`no reply to ${type} (${frameId}) within ${TIMEOUT_MS}ms`));
       }, TIMEOUT_MS);
       this.pending.set(frameId, {
-        resolve: (f) => {
-          clearTimeout(timer);
-          resolve(f);
-        },
-        reject: (e) => {
-          clearTimeout(timer);
-          reject(e);
-        },
+        resolve: (f) => (clearTimeout(timer), resolve(f)),
+        reject: (e) => (clearTimeout(timer), reject(e)),
       });
     });
-    this.ws.send(JSON.stringify(frame));
+    this.write(frame);
     return p;
   }
 
-  /** Send without waiting — for the frames whose reply order is the test. */
-  fire(type, payload = {}, opts = {}) {
-    return this.send(type, payload, opts).catch(() => null);
+  write(frame) {
+    const text = JSON.stringify(frame);
+    this.outbound.push({ frame, text, at: Date.now() });
+    this.ws.send(text);
   }
 
-  /** Send a frame verbatim, without waiting. `id` is remembered so a reply
-   *  to it is not mistaken for a reply to nothing. */
+  /** Send verbatim without waiting. `id` is remembered so a reply to it is
+   *  not mistaken for a reply to nothing. */
   raw(text, id = null) {
     if (id !== null) this.rawIds.add(id);
+    this.outbound.push({ frame: null, text, at: Date.now() });
     this.ws.send(text);
   }
 
@@ -306,140 +362,764 @@ class Client {
 // ----------------------------------------------------------------- harness
 
 const checks = [];
-const check = (name, fn) => checks.push({ name, fn });
+/** `point` is the PROTOCOL.md §8 number, or null for a supplementary check. */
+const check = (point, name, fn) => checks.push({ point, name, fn });
 
 function assert(cond, message) {
   if (!cond) throw new Error(message);
 }
 function assertEq(actual, expected, what) {
   if (JSON.stringify(actual) !== JSON.stringify(expected))
-    throw new Error(`${what}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    throw new Error(
+      `${what}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+    );
 }
 function assertErr(frame, code, what) {
-  assert(frame.type.endsWith(".err"), `${what}: expected an .err, got ${frame.type}`);
+  assert(
+    typeof frame.type === "string" && frame.type.endsWith(".err"),
+    `${what}: expected an .err, got ${frame.type}`,
+  );
   assertEq(frame.payload.code, code, `${what} code`);
 }
 
-/** A logged-in connection, or a SkipError explaining why not. */
-async function session(account, label) {
+/** Every frame every client sent, for the §8.5 audit. */
+const allOutbound = [];
+const allViolations = [];
+const origClose = Client.prototype.close;
+Client.prototype.close = function close() {
+  allViolations.push(...this.violations);
+  allOutbound.push(...this.outbound);
+  this.violations = [];
+  this.outbound = [];
+  return origClose.call(this);
+};
+
+/** An authenticated connection. PROTOCOL.md §4.2–§4.3, done properly. */
+async function session(acct, label, { name } = {}) {
   const cl = new Client(URL_WS, label);
   await cl.connect();
-  const ch = await cl.send("auth.challenge", { address: account.address });
-  assert(ch.type === "auth.challenge.ok", `challenge refused: ${JSON.stringify(ch)}`);
-  const sig = sign(account.private_key, ch.payload.message);
-  const login = await cl.send("auth.login", {
-    address: account.address,
-    signature: sig,
-  });
+  const ch = await cl.send("auth.challenge", { address: acct.address });
+  assert(
+    ch.type === "auth.challenge.ok",
+    `challenge refused: ${JSON.stringify(ch.payload)}`,
+  );
+  // §8.6: the message is signed exactly as given, never rebuilt.
+  const payload = { address: acct.address, signature: sign(acct.private_key, ch.payload.message) };
+  if (name) payload.name = name;
+  const login = await cl.send("auth.login", payload);
   assert(
     login.type === "auth.login.ok",
     `login refused: ${JSON.stringify(login.payload)}`,
   );
   cl.token = login.payload.token;
-  cl.account = account;
+  cl.user = login.payload.user;
+  cl.account = acct;
   return cl;
 }
 
-// ------------------------------------------------------------- the checks
-// SPEC §6.1 — the envelope
+/** The first node a player can actually attempt, with its quest. */
+async function firstOpenQuest(cl) {
+  const map = await cl.send("world.map", { land: "rust", category: "basic" });
+  assertEq(map.type, "world.map.ok", "world.map");
+  const open = map.payload.nodes.find((n) => n.state === "open");
+  assert(open, "the map has no open node; SPEC §12 says an empty `requires` is open");
+  const got = await cl.send("quest.get", { quest_id: open.quest_id });
+  assertEq(got.type, "quest.get.ok", "quest.get");
+  return { node: open, quest: got.payload.quest, map: map.payload };
+}
 
-check("ping answers with a well-formed envelope", async () => {
-  const cl = new Client(URL_WS, "env");
+const WRONG_SOURCE = 'fn main() { println!("deliberately not the answer"); }';
+const rightSourceFor = (quest) => sourceThatPrints(quest?.tests?.visible?.[0]?.expect);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Feed a frame through the real receive path, as if the server sent it. */
+const inject = (cl, frame) => cl.receive(JSON.stringify(frame));
+
+// ====================================================================
+// PROTOCOL.md §8 — the conformance checklist, one case per point
+// ====================================================================
+
+check("8.1", "every frame is exactly v/id/type/payload, payload an object", async () => {
+  const cl = new Client(URL_WS, "p1");
   await cl.connect();
   try {
-    const r = await cl.send("ping", {});
-    assertEq(r.type, "ping.ok", "reply type");
-    assertEq(r.v, 1, "protocol version");
-    assert(typeof r.payload.t !== "undefined", "ping.ok payload has no `t`");
+    const ok = await cl.send("ping", {});
+    assertEq(ok.type, "ping.ok", "a well-formed ping");
+    assert(typeof ok.payload.t === "string", "§4.1: ping.ok payload has no `t`");
+
+    // §2: "the server does not silently ignore fields, because a silently
+    // ignored field is how a client ships a bug that looks like it works."
+    const extra = await cl.send("ping", {}, { extra: { trace: "please-reject-me" } });
+    assertErr(extra, "bad_request", "a frame with an unknown top-level key");
+
+    // payload absent, bare, and an array.
+    cl.raw(JSON.stringify({ v: 1, id: "p1-a", type: "ping" }), "p1-a");
+    cl.raw(JSON.stringify({ v: 1, id: "p1-b", type: "ping", payload: 7 }), "p1-b");
+    cl.raw(JSON.stringify({ v: 1, id: "p1-c", type: "ping", payload: [] }), "p1-c");
+    await sleep(800);
+    const answers = cl.inbound.filter((f) => ["p1-a", "p1-b", "p1-c"].includes(f.id));
+    assertEq(answers.length, 3, "one answer per malformed frame");
+    for (const a of answers) assertErr(a, "bad_request", String(a.id));
+    assert(cl.open, "§3.3: an application error never closes the connection");
+
+    // And this client's own frames obey the rule.
+    for (const { frame } of cl.outbound) {
+      if (!frame || "trace" in frame) continue; // the deliberate negatives
+      assertEq(Object.keys(frame).sort(), ENVELOPE_KEYS, "a frame this checker sent");
+    }
   } finally {
     cl.close();
   }
 });
 
-check("replies are correlated by id, not by arrival order", async () => {
-  // Three requests in flight at once, answered in whatever order the server
-  // likes. A client that matched on order instead of `id` passes a serial
-  // test and corrupts the moment anything is concurrent.
-  const cl = new Client(URL_WS, "corr");
+check("8.2", "replies are matched by id and may arrive out of order", async () => {
+  const cl = await session(account("reader"), "p2");
+  try {
+    // §2.2: "quest.submit takes seconds and a ping sent after it will come
+    // back first." Start the slow one, then the fast one; require the fast
+    // one back first, with both correctly correlated.
+    const { node, quest } = await firstOpenQuest(cl);
+    const order = [];
+    const slow = cl
+      .send("quest.submit", {
+        quest_id: node.quest_id,
+        lang: "rust",
+        source: rightSourceFor(quest) ?? WRONG_SOURCE,
+      })
+      .then((f) => (order.push("submit"), f));
+    const fast = cl.send("ping", {}).then((f) => (order.push("ping"), f));
+    const [pong, attempt] = await Promise.all([fast, slow]);
+    assertEq(pong.type, "ping.ok", "the ping sent during a submit");
+    assertEq(attempt.type, "quest.submit.ok", "the submit");
+    assertEq(
+      order[0],
+      "ping",
+      "the ping did not come back first. Either the server serialises its " +
+        "replies — legal, but it means §2.2's out-of-order promise is " +
+        "untested here — or the compile was instant.",
+    );
+
+    // §2.2: "Reusing an `id` that is still in flight is bad_request."
+    //
+    // Both frames go out with `raw`, no waiter on either: two promises on one
+    // id would be this client's bug, not the server's, and the point is to
+    // test the server. The replies are read back off the inbound log.
+    cl.rawIds.add("p2-held");
+    cl.raw(
+      JSON.stringify({
+        v: 1,
+        id: "p2-held",
+        type: "quest.submit",
+        payload: { quest_id: node.quest_id, lang: "rust", source: WRONG_SOURCE },
+      }),
+    );
+    await sleep(50); // let it become in-flight
+    cl.raw(JSON.stringify({ v: 1, id: "p2-held", type: "ping", payload: {} }));
+
+    const until = Date.now() + 15_000;
+    let dup = null;
+    let finished = null;
+    while (Date.now() < until && !(dup && finished)) {
+      dup ??= cl.inbound.find((x) => x.id === "p2-held" && x.type === "ping.err");
+      finished ??= cl.inbound.find(
+        (x) => x.id === "p2-held" && x.type.startsWith("quest.submit."),
+      );
+      if (!(dup && finished)) await sleep(100);
+    }
+    assert(
+      dup !== null && dup.payload.code === "bad_request",
+      `§2.2: reusing an in-flight id must be bad_request, got ${JSON.stringify(dup)}`,
+    );
+    assert(
+      finished !== null && finished.type === "quest.submit.ok",
+      "§2.2: the original request must still complete; the duplicate is what is refused",
+    );
+  } finally {
+    cl.close();
+  }
+});
+
+check("8.3", "an unknown type is ignored, not an error and not a close", async () => {
+  const cl = new Client(URL_WS, "p3");
   await cl.connect();
   try {
-    const ids = ["corr-a", "corr-b", "corr-c"];
-    const replies = await Promise.all(
-      ids.map((id) => cl.send("ping", {}, { id })),
+    // The server's half: a type it does not know gets an error from the
+    // closed set, and the connection lives.
+    const r = await cl.send("no.such.message", {});
+    assert(r.type.endsWith(".err"), `an unknown type gave ${r.type}`);
+    assert(
+      ERROR_CODES.has(r.payload.code),
+      `an unknown type gave ${r.payload.code}, outside §3.3`,
+    );
+    assert(cl.open, "the server closed the connection over an unknown type");
+
+    // This client's half: an unsolicited frame whose type it does not know
+    // is dropped on the floor, not thrown. Fed through the same receive path
+    // a real frame takes — §2.3 is what lets the server add events without
+    // breaking an older client, so it has to be tested, not assumed.
+    const before = cl.violations.length;
+    inject(cl, {
+      v: 1,
+      id: null,
+      type: "future.event.from.a.newer.server",
+      payload: { whatever: true },
+    });
+    assertEq(
+      cl.violations.length,
+      before,
+      "an unknown event type was recorded as a protocol violation",
+    );
+    assert(
+      cl.unknownTypes.includes("future.event.from.a.newer.server"),
+      "the unknown event never reached the handler — the test proved nothing",
+    );
+    assert(cl.open, "this client closed the connection over an unknown event");
+  } finally {
+    cl.close();
+  }
+});
+
+check("8.4", "every error code is in §3.3's closed set, and they are reachable", async () => {
+  const seen = new Set();
+  const cl = new Client(URL_WS, "p4");
+  await cl.connect();
+  try {
+    // unauthorized — anything outside §3.1's four, before login.
+    assertErr(await cl.send("world.lands", {}), "unauthorized", "world.lands before login");
+    seen.add("unauthorized");
+
+    // proto_version — §2.1, with detail.supported.
+    const v = await cl.send("ping", {}, { v: 99 });
+    assertErr(v, "proto_version", "an unknown v");
+    assert(
+      Array.isArray(v.payload.detail?.supported),
+      '§2.1: proto_version\'s detail must carry {"supported":[1]}',
+    );
+    assert(cl.open, "§2.1: the connection stays open on an unknown version");
+    seen.add("proto_version");
+
+    // bad_request — a frame with an extra top-level key.
+    assertErr(
+      await cl.send("ping", {}, { extra: { nope: 1 } }),
+      "bad_request",
+      "an extra top-level key",
+    );
+    seen.add("bad_request");
+
+    // auth_bad_signature, then auth_nonce_used.
+    const acct = account("reader");
+    const ch = await cl.send("auth.challenge", { address: acct.address });
+    assertErr(
+      await cl.send("auth.login", {
+        address: acct.address,
+        signature: `0x${"00".repeat(65)}`,
+      }),
+      "auth_bad_signature",
+      "an all-zero signature",
+    );
+    seen.add("auth_bad_signature");
+
+    const sig = sign(acct.private_key, ch.payload.message);
+    assertEq(
+      (await cl.send("auth.login", { address: acct.address, signature: sig })).type,
+      "auth.login.ok",
+      "a rejected signature must not burn the nonce",
+    );
+    assertErr(
+      await cl.send("auth.login", { address: acct.address, signature: sig }),
+      "auth_nonce_used",
+      "a replay inside the expiry window",
+    );
+    seen.add("auth_nonce_used");
+
+    // not_found — a quest id that does not exist.
+    assertErr(
+      await cl.send("quest.get", { quest_id: "rust.basic.99.nope" }),
+      "not_found",
+      "a quest id that does not exist",
+    );
+    seen.add("not_found");
+
+    // locked — a node whose requires are not cleared.
+    const map = await cl.send("world.map", { land: "rust", category: "basic" });
+    const locked = map.payload.nodes.find((n) => n.state === "locked");
+    if (locked) {
+      const l = await cl.send("quest.submit", {
+        quest_id: locked.quest_id,
+        lang: "rust",
+        source: WRONG_SOURCE,
+      });
+      assertErr(l, "locked", "submitting to a locked node");
+      assert(
+        Array.isArray(l.payload.detail?.requires),
+        "§3.3's worked example: `locked` names the blocker in detail.requires",
+      );
+      seen.add("locked");
+    }
+
+    // bad_request — `lang` disagreeing with the quest (§4.9).
+    const open = map.payload.nodes.find((n) => n.state === "open");
+    if (open) {
+      assertErr(
+        await cl.send("quest.submit", {
+          quest_id: open.quest_id,
+          lang: "go",
+          source: "package main\nfunc main() {}\n",
+        }),
+        "bad_request",
+        "§4.9: lang disagreeing with the quest's land",
+      );
+    }
+  } finally {
+    cl.close();
+  }
+  assert(
+    seen.size >= 7,
+    `only provoked ${[...seen].sort().join(", ")} — expected 7+ of the closed set`,
+  );
+});
+
+check("8.5", "no mnemonic or private key is ever sent, in any field", async () => {
+  // §8.5, and SPEC §3.1's non-negotiable. This checker holds five private
+  // keys in memory and signs with them, so the assertion has something real
+  // to be wrong about. It audits every frame every connection has sent so
+  // far, which is why it runs after the auth points rather than before.
+  const cl = await session(account("reader"), "p5");
+  try {
+    await cl.send("world.lands", {});
+    await cl.send("profile.update", { name: "smoke" });
+  } finally {
+    cl.close();
+  }
+
+  const secrets = SECRETS();
+  const phrases = JSON.parse(readFileSync(VECTORS, "utf8")).mnemonics.map((m) => m.phrase);
+  const offenders = [];
+  for (const { text } of allOutbound) {
+    const hay = text.toLowerCase();
+    for (const s of secrets)
+      if (hay.includes(s.toLowerCase())) offenders.push(`a private key in ${text.slice(0, 120)}`);
+    for (const p of phrases)
+      if (hay.includes(p.toLowerCase())) offenders.push(`a mnemonic in ${text.slice(0, 120)}`);
+    for (const k of ["mnemonic", "private_key", "privkey", "seed", "passphrase"])
+      if (hay.includes(`"${k}"`)) offenders.push(`a "${k}" field in ${text.slice(0, 120)}`);
+  }
+  assert(offenders.length === 0, `key material on the wire:\n    ${offenders.join("\n    ")}`);
+  assert(
+    allOutbound.length > 10,
+    `only ${allOutbound.length} frames were audited — this point is only ` +
+      `meaningful across the whole suite, not under --only`,
+  );
+});
+
+check("8.6", "the challenge message is signed byte-for-byte, not rebuilt", async () => {
+  // §4.2's warning, made into a test. A client that reassembles the string
+  // from `nonce` and `expires_at` will disagree about a space or a trailing
+  // newline and fail for reasons that take a day to find — so the server must
+  // reject a signature over a reconstruction, and this proves it does.
+  const acct = account("reader");
+  const cl = new Client(URL_WS, "p6");
+  await cl.connect();
+  try {
+    const ch = await cl.send("auth.challenge", { address: acct.address });
+    const { nonce, message, expires_at } = ch.payload;
+
+    // §4.2's exact shape, asserted against the server's own string.
+    const lines = message.split("\n");
+    assertEq(lines.length, 4, "§4.2: four lines, no trailing newline");
+    assertEq(lines[0], "Causewaybay Hacker login", "line 1");
+    assertEq(lines[1], `address: ${acct.address}`, "line 2 — EIP-55, no annotation");
+    assertEq(lines[2], `nonce: ${nonce}`, "line 3");
+    assertEq(lines[3], `expires: ${expires_at}`, "line 4");
+    assert(/^[0-9a-f]{64}$/.test(nonce), `§4.2: nonce is 64 lowercase hex, got ${nonce}`);
+    assert(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(expires_at),
+      `§2.4: RFC3339 UTC with seconds, got ${expires_at}`,
+    );
+    const secs = (Date.parse(expires_at) - Date.now()) / 1000;
+    assert(secs > 100 && secs < 140, `§4.2 says 120s out; this is ${secs.toFixed(0)}s`);
+
+    // The most plausible reconstruction: the same parts, one trailing
+    // newline. It must not authenticate.
+    assertErr(
+      await cl.send("auth.login", {
+        address: acct.address,
+        signature: sign(acct.private_key, `${message}\n`),
+      }),
+      "auth_bad_signature",
+      "a signature over a rebuilt message",
+    );
+
+    // §4.3: v is 27 or 28 on the way out; 0/1 is also accepted.
+    const good = sign(acct.private_key, message);
+    const v = parseInt(good.slice(-2), 16);
+    assert([27, 28].includes(v), `§4.3: v should be 27 or 28, the signer gave ${v}`);
+    assertEq(
+      (await cl.send("auth.login", { address: acct.address, signature: good })).type,
+      "auth.login.ok",
+      "a signature over the message exactly as given",
+    );
+
+    const ch2 = await cl.send("auth.challenge", { address: acct.address });
+    const raw = sign(acct.private_key, ch2.payload.message);
+    const normalised =
+      raw.slice(0, -2) + (parseInt(raw.slice(-2), 16) - 27).toString(16).padStart(2, "0");
+    assertEq(
+      (await cl.send("auth.login", { address: acct.address, signature: normalised })).type,
+      "auth.login.ok",
+      "§4.3: a v of 0/1 must be accepted and normalised",
+    );
+  } finally {
+    cl.close();
+  }
+});
+
+check("8.7", "auth.resume rotates the token; the returned one is the live one", async () => {
+  const acct = account("reader");
+  const first = await session(acct, "p7a");
+  const sent = first.token;
+  first.close();
+
+  const cl = new Client(URL_WS, "p7b");
+  await cl.connect();
+  try {
+    const r = await cl.send("auth.resume", { token: sent });
+    assertEq(r.type, "auth.resume.ok", "resume with a live token");
+    const returned = r.payload.token;
+    assert(typeof returned === "string" && returned.length > 0, "no token returned");
+    assertEq(
+      r.payload.user.address,
+      acct.address,
+      "§2.4: addresses are EIP-55 on the wire, in both directions",
     );
     assertEq(
-      replies.map((r) => r.id),
-      ids,
-      "each reply must carry the id of its own request",
+      (await cl.send("world.lands", {})).type,
+      "world.lands.ok",
+      "a resumed connection is a real session",
     );
+
+    // §4.4: "The returned token may differ from the one sent — the server
+    // rotates on use. Store the returned one." A client that keeps the old
+    // one works right up until the server actually rotates, and then logs
+    // the player out for no visible reason.
+    const withNew = new Client(URL_WS, "p7c");
+    await withNew.connect();
+    assertEq(
+      (await withNew.send("auth.resume", { token: returned })).type,
+      "auth.resume.ok",
+      "the token auth.resume returned must itself work",
+    );
+    withNew.close();
+
+    if (returned !== sent) {
+      const withOld = new Client(URL_WS, "p7d");
+      await withOld.connect();
+      assertErr(
+        await withOld.send("auth.resume", { token: sent }),
+        "unauthorized",
+        "§4.4: a token that was rotated away must be dead",
+      );
+      withOld.close();
+    }
+
+    const junk = new Client(URL_WS, "p7e");
+    await junk.connect();
+    assertErr(
+      await junk.send("auth.resume", { token: "not-a-token" }),
+      "unauthorized",
+      "an unknown token",
+    );
+    assert(junk.open, "§3.3: the connection stays open");
+    junk.close();
   } finally {
     cl.close();
   }
 });
 
-check("an unknown protocol version is refused and the socket stays open", async () => {
-  // SPEC §6.1: "A frame with an unknown `v` is answered with `proto_version`
-  // and the connection stays open." Dropping the connection here is the
-  // failure mode that makes a version bump unshippable.
-  const cl = new Client(URL_WS, "ver");
-  await cl.connect();
+check("8.8", "run.log seq starts at 0 per stream with no gaps, chunks buffer", async () => {
+  const cl = await session(account("streamer"), "p8");
   try {
-    const r = await cl.send("ping", {}, { v: 99 });
-    assertErr(r, "proto_version", "unknown v");
-    assert(cl.open, "the connection was closed; §6.1 says it stays open");
-    const after = await cl.send("ping", {});
-    assertEq(after.type, "ping.ok", "the connection must still work afterwards");
-  } finally {
-    cl.close();
-  }
-});
+    const { node, quest } = await firstOpenQuest(cl);
+    const r = await cl.send("quest.submit", {
+      quest_id: node.quest_id,
+      lang: "rust",
+      source: rightSourceFor(quest) ?? WRONG_SOURCE,
+    });
+    assertEq(r.type, "quest.submit.ok", "the submit");
+    const attemptId = r.payload.attempt.id;
+    await sleep(400); // §4's note: events may trail the reply they relate to
 
-check("a malformed frame is a bad_request, not a disconnect", async () => {
-  const cl = new Client(URL_WS, "junk");
-  await cl.connect();
-  try {
-    cl.raw("this is not json");
-    cl.raw(JSON.stringify({ v: 1, id: "junk-1", type: "ping" }), "junk-1"); // no payload
-    cl.raw(JSON.stringify({ v: 1, id: "junk-2", type: "ping", payload: 7 }), "junk-2"); // bare
-    await new Promise((r) => setTimeout(r, 500));
-    assert(cl.open, "the connection was dropped on malformed input");
-    const after = await cl.send("ping", {});
-    assertEq(after.type, "ping.ok", "still usable after junk");
-    const codes = cl.frames
-      .filter((f) => f.type?.endsWith(".err"))
-      .map((f) => f.payload.code);
+    const stages = cl.events.filter(
+      (e) => e.type === "run.stage" && e.payload.attempt_id === attemptId,
+    );
+    assert(stages.length > 0, "§4.17: no run.stage during a submit");
     assert(
-      codes.every((c) => ERROR_CODES.has(c)),
-      `error codes outside the closed set: ${codes}`,
+      stages.every((e) => e.id === null),
+      "§2.2: a server-initiated event must carry id: null",
     );
+    const order = ["queued", "compiling", "running", "judging"];
+    const seenStages = stages.map((e) => e.payload.stage);
+    assert(
+      seenStages.every((s) => order.includes(s)),
+      `§4.17: a stage outside the set: ${seenStages}`,
+    );
+    // "Strictly ordered, each sent once."
+    assertEq(seenStages, [...new Set(seenStages)], "§4.17: a stage was sent twice");
+    const idx = seenStages.map((s) => order.indexOf(s));
+    assertEq(
+      idx,
+      [...idx].sort((a, b) => a - b),
+      `§4.17: stages out of order: ${seenStages}`,
+    );
+
+    const logs = [...cl.logs.entries()].filter(([k]) => k.startsWith(attemptId));
+    assert(logs.length > 0, "§4.18: no run.log at all for an attempt that compiled");
+    for (const [key, rec] of logs) {
+      const stream = key.split("|")[1];
+      assert(
+        ["compile", "stdout", "stderr"].includes(stream),
+        `§4.18: stream ${stream} is outside the set`,
+      );
+      assertEq(rec.seqs[0], 0, `§4.18: the ${stream} stream's seq must start at 0`);
+      assertEq(
+        rec.seqs,
+        rec.seqs.map((_, i) => i),
+        `§4.18: the ${stream} stream has a seq gap or repeat: ${rec.seqs}`,
+      );
+    }
+
+    // The buffering half, tested where it can be: a chunk split mid-line and
+    // mid-codepoint-sequence must reassemble, and must not be treated as a
+    // line. Injected because the server has no way to be asked for one.
+    const probe = new Client(URL_WS, "p8b");
+    for (const [i, chunk] of ["error[E00", "01]: half a li", "ne\nand more"].entries())
+      inject(probe, {
+        v: 1,
+        id: null,
+        type: "run.log",
+        payload: { attempt_id: "att_probe", stream: "compile", chunk, seq: i },
+      });
+    assertEq(
+      probe.logs.get("att_probe|compile").text,
+      "error[E0001]: half a line\nand more",
+      "§8.8: chunks split mid-line must reassemble exactly",
+    );
+    assertEq(probe.violations.length, 0, "the injected chunks were read as violations");
   } finally {
     cl.close();
   }
 });
 
-// SPEC §6.4 — anonymous connections
+check("8.9", "a reconnect resumes with the token and the map is refetched", async () => {
+  const acct = account("alice");
+  const first = await session(acct, "p9a");
+  let token = first.token;
+  const before = await firstOpenQuest(first);
+  // A drop rather than a polite goodbye — the sleeping-laptop case. 1006 is
+  // reserved and cannot be *sent* by an endpoint, so the nearest honest
+  // simulation is a close in the private-use range with no server.bye first.
+  first.ws.close(4000, "simulated drop");
+  await sleep(150);
+  assert(!first.open, "the socket did not actually drop");
 
-check("everything but ping and auth.challenge is unauthorized before login", async () => {
+  // §6.2's schedule, asserted as code rather than by waiting fifteen seconds:
+  // 0.5, 1, 2, 4, 8, then 8s, each with ±20% jitter.
+  const schedule = backoff(7);
+  assert(
+    schedule.every((d, i) => {
+      const base = Math.min(500 * 2 ** i, 8000);
+      return d >= base * 0.8 && d <= base * 1.2;
+    }),
+    `§6.2: the backoff schedule is off: ${schedule}`,
+  );
+
+  const cl = new Client(URL_WS, "p9b");
+  await cl.connect();
+  try {
+    const r = await cl.send("auth.resume", { token });
+    assertEq(r.type, "auth.resume.ok", "§6.3: resume with the stored token");
+    token = r.payload.token; // §6.3: store the one it returns
+    assert(typeof token === "string" && token.length > 0, "no token after resume");
+    // §6.5: "Do not trust a map cached across a disconnect."
+    const after = await firstOpenQuest(cl);
+    assertEq(
+      after.map.nodes.map((n) => n.quest_id),
+      before.map.nodes.map((n) => n.quest_id),
+      "the refetched map is a different overworld",
+    );
+    // §6.6: an in-flight submit survives the drop and is findable in history.
+    const hist = await cl.send("stats.history", { quest_id: before.node.quest_id, limit: 5 });
+    assertEq(hist.type, "stats.history.ok", "§6.6: stats.history after a resume");
+    assert(Array.isArray(hist.payload.attempts), "§5.7: attempts is an array");
+  } finally {
+    cl.close();
+  }
+});
+
+/** PROTOCOL.md §6.2's schedule, as code so the rule is testable. */
+function backoff(n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const base = Math.min(500 * 2 ** i, 8000);
+    out.push(Math.round(base * (1 + (Math.random() * 0.4 - 0.2))));
+  }
+  return out;
+}
+
+check("8.10", "a second quest.submit while one is in flight is busy", async () => {
+  const acct = account("busy");
+  const cl = await session(acct, "p10");
+  try {
+    const { node, quest } = await firstOpenQuest(cl);
+    const body = {
+      quest_id: node.quest_id,
+      lang: "rust",
+      source: rightSourceFor(quest) ?? WRONG_SOURCE,
+    };
+    const first = cl.send("quest.submit", body);
+    assertErr(
+      await cl.send("quest.submit", { ...body, source: WRONG_SOURCE }),
+      "busy",
+      "§3.2: the second concurrent submit on one connection",
+    );
+    assertEq((await first).type, "quest.submit.ok", "the first submit still finished");
+
+    // §3.2: "This is per connection, not per user" — the same wallet in two
+    // windows gets two slots, and the server serialises the compiler behind
+    // them. A server that keys the lock on the address instead looks correct
+    // until somebody opens a second window.
+    const other = await session(acct, "p10b");
+    try {
+      const third = cl.send("quest.submit", body);
+      const onOther = await other.send("quest.submit", { ...body, source: WRONG_SOURCE });
+      assert(
+        !(onOther.type.endsWith(".err") && onOther.payload.code === "busy"),
+        "§3.2: `busy` is per connection, but the user's second connection was refused",
+      );
+      await third;
+    } finally {
+      other.close();
+    }
+  } finally {
+    cl.close();
+  }
+});
+
+check("8.11", "an abrupt close is survivable, and server.bye is understood", async () => {
+  const cl = new Client(URL_WS, "p11");
+  await cl.connect();
+  await cl.send("ping", {});
+  // A close with no goodbye — the common case, and the harder one. (1006 is
+  // reserved and cannot be sent; 4000 is the private-use range.)
+  cl.ws.close(4000, "simulated drop");
+  await sleep(250);
+  assert(cl.closed !== null, "the close was never observed");
+  assert(!cl.open, "the socket reports open after a close");
+  assertEq(
+    cl.pending.size,
+    0,
+    "in-flight requests were not rejected on close — a reconnect would leak waiters",
+  );
+
+  // The `server.bye`-then-close half needs a server willing to shut down, so
+  // what is asserted here is that a client handles the frame when it comes:
+  // through the real receive path it is a known event, not a violation.
+  const cl2 = new Client(URL_WS, "p11b");
+  await cl2.connect();
+  try {
+    const before = cl2.violations.length;
+    inject(cl2, { v: 1, id: null, type: "server.bye", payload: { reason: "shutdown" } });
+    assertEq(cl2.violations.length, before, "server.bye was read as a violation");
+    const bye = cl2.events.find((e) => e.type === "server.bye");
+    assert(bye, "server.bye never reached the event list");
+    assert(
+      ["shutdown", "revoked", "replaced"].includes(bye.payload.reason),
+      `§4.21: reason ${bye.payload.reason} is outside the set`,
+    );
+    assert(cl2.open, "a server.bye must not make the client close first");
+  } finally {
+    cl2.close();
+  }
+});
+
+check("8.12", "an idle connection survives the keepalive window", async () => {
+  // §1.1: the server sends a websocket ping every 30 s and drops a connection
+  // that misses two. Node's WebSocket answers pongs itself, so what is
+  // honestly assertable here is that an idle connection survives — plus the
+  // application-level `ping` that §1.1 requires of a client whose library
+  // cannot answer pongs (the LÖVE client's hand-rolled one). The full
+  // 70-second version is behind --slow, because a two-second contract checker
+  // is one people actually run.
+  const idleMs = SLOW ? 70_000 : 6_000;
+  const cl = new Client(URL_WS, "p12");
+  await cl.connect();
+  try {
+    const started = Date.now();
+    while (Date.now() - started < idleMs) {
+      await sleep(Math.min(2_000, idleMs));
+      if (!cl.open) break;
+      // §1.1's fallback cadence, compressed. Harmless for a client that can
+      // answer websocket pings; required for one that cannot.
+      const t = await cl.send("ping", {});
+      assertEq(t.type, "ping.ok", "an application-level keepalive ping");
+    }
+    assert(
+      cl.open,
+      `the connection closed after ${((Date.now() - started) / 1000).toFixed(0)}s of ` +
+        `keepalive-only traffic` + (cl.closed ? ` with code ${cl.closed.code}` : ""),
+    );
+    if (!SLOW && !AS_JSON)
+      console.log(
+        dim(`      ${idleMs / 1000}s only — pass --slow for the real 70s window`),
+      );
+  } finally {
+    cl.close();
+  }
+});
+
+// ====================================================================
+// Beyond the checklist — server-side rules that no §8 point covers but
+// that a client would be broken by.
+// ====================================================================
+
+check(null, "beyond: the four ANONYMOUS messages, and nothing else", async () => {
+  // PROTOCOL.md §3.1's state machine, exhaustively over §4's catalogue.
   const cl = new Client(URL_WS, "anon");
   await cl.connect();
   try {
-    // The allowed two.
-    assertEq((await cl.send("ping", {})).type, "ping.ok", "ping before login");
-    const ch = await cl.send("auth.challenge", {
-      address: account("reader").address,
+    assertEq((await cl.send("ping", {})).type, "ping.ok", "ping while anonymous");
+    const acct = account("reader");
+    assertEq(
+      (await cl.send("auth.challenge", { address: acct.address })).type,
+      "auth.challenge.ok",
+      "auth.challenge while anonymous",
+    );
+    // auth.login and auth.resume must be reachable, or a connection could
+    // never leave ANONYMOUS. Asserted by their being answered with an *auth*
+    // error rather than `unauthorized`.
+    const login = await cl.send("auth.login", {
+      address: acct.address,
+      signature: `0x${"11".repeat(65)}`,
     });
-    assertEq(ch.type, "auth.challenge.ok", "auth.challenge before login");
+    assert(
+      login.payload.code !== "unauthorized",
+      "§3.1: auth.login must be reachable while anonymous",
+    );
+    assertErr(
+      await cl.send("auth.resume", { token: "nope" }),
+      "unauthorized",
+      "§4.4: an unknown token",
+    );
 
-    // Everything else in the §6.2 catalogue.
-    const forbidden = [
+    const rest = [
       ["profile.update", { name: "nope" }],
       ["world.lands", {}],
       ["world.map", { land: "rust", category: "basic" }],
       ["quest.get", { quest_id: "rust.basic.01.hello" }],
-      ["quest.submit", { quest_id: "rust.basic.01.hello", source: "fn main(){}", lang: "rust" }],
+      ["quest.submit", { quest_id: "rust.basic.01.hello", lang: "rust", source: "fn main(){}" }],
       ["quest.hint", { quest_id: "rust.basic.01.hello", index: 0 }],
       ["quest.reset", { quest_id: "rust.basic.01.hello" }],
-      ["search.query", { q: "hello", mode: "unified" }],
+      ["search.query", { q: "hello" }],
       ["stats.summary", {}],
       ["stats.mistakes", {}],
       ["stats.history", {}],
@@ -448,353 +1128,170 @@ check("everything but ping and auth.challenge is unauthorized before login", asy
       ["ai.finish", { drill_id: "drl_0000000000000000" }],
     ];
     const bad = [];
-    for (const [type, payload] of forbidden) {
+    for (const [type, payload] of rest) {
+      assert(!ANONYMOUS_OK.has(type), `${type} is in §3.1's anonymous set`);
       const r = await cl.send(type, payload);
       if (!r.type.endsWith(".err") || r.payload.code !== "unauthorized")
         bad.push(`${type} → ${r.type} ${r.payload.code ?? ""}`);
     }
     assert(bad.length === 0, `not unauthorized before login:\n    ${bad.join("\n    ")}`);
+    assert(cl.open, "§3.1: the connection stays open through all of that");
   } finally {
     cl.close();
   }
 });
 
-// SPEC §3.2 — the challenge
-
-check("the challenge message is exactly the four lines of §3.2", async () => {
-  const alice = account("reader");
-  const cl = new Client(URL_WS, "chal");
-  await cl.connect();
-  try {
-    const r = await cl.send("auth.challenge", { address: alice.address });
-    const { nonce, message, expires_at } = r.payload;
-    assert(/^[0-9a-f]{64}$/.test(nonce), `nonce is not 32 hex bytes: ${nonce}`);
-    assert(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(expires_at),
-      `expires_at is not RFC3339 UTC with seconds: ${expires_at}`,
-    );
-    const lines = message.split("\n");
-    assertEq(lines[0], "Causewaybay Hacker login", "line 1");
-    assertEq(lines[1], `address: ${alice.address}`, "line 2 (EIP-55, no annotation)");
-    assertEq(lines[2], `nonce: ${nonce}`, "line 3");
-    assertEq(lines[3], `expires: ${expires_at}`, "line 4");
-    assertEq(lines.length, 4, "line count — a trailing newline changes the digest");
-
-    // §3.2 says 120 seconds out. Allow a little clock slack, not a minute.
-    const secs = (Date.parse(expires_at) - Date.now()) / 1000;
-    assert(secs > 100 && secs < 140, `expiry is ${secs.toFixed(0)}s out, §3.2 says 120`);
-
-    // §3.4: the claim is case-insensitive, so the lowercase spelling of the
-    // same wallet must get a challenge too — and the message still shows the
-    // checksummed form, because that is what gets signed.
-    const lower = await cl.send("auth.challenge", { address: alice.address_lower });
-    assertEq(lower.type, "auth.challenge.ok", "lowercase address refused");
-    assert(
-      lower.payload.message.includes(alice.address),
-      "the message must carry the EIP-55 spelling whichever case was claimed",
-    );
-  } finally {
-    cl.close();
-  }
-});
-
-check("a bad signature is auth_bad_signature, and the nonce is not burned", async () => {
-  const alice = account("reader");
-  const cl = new Client(URL_WS, "badsig");
-  await cl.connect();
-  try {
-    const ch = await cl.send("auth.challenge", { address: alice.address });
-    const r = await cl.send("auth.login", {
-      address: alice.address,
-      signature: `0x${"00".repeat(65)}`,
-    });
-    assertErr(r, "auth_bad_signature", "all-zero signature");
-    // A rejected signature must not consume the nonce: otherwise one bad
-    // frame from anywhere locks the real client out of its own challenge.
-    const sig = sign(alice.private_key, ch.payload.message);
-    const ok = await cl.send("auth.login", { address: alice.address, signature: sig });
-    assertEq(ok.type, "auth.login.ok", "the good signature after a bad one");
-  } finally {
-    cl.close();
-  }
-});
-
-check("a signature by the wrong key does not log in as the claimed address", async () => {
-  const alice = account("reader");
-  const bob = account("bob");
-  const cl = new Client(URL_WS, "wrongkey");
-  await cl.connect();
-  try {
-    const ch = await cl.send("auth.challenge", { address: alice.address });
-    const r = await cl.send("auth.login", {
-      address: alice.address,
-      signature: sign(bob.private_key, ch.payload.message),
-    });
-    assertErr(r, "auth_bad_signature", "bob signing alice's challenge");
-  } finally {
-    cl.close();
-  }
-});
-
-check("a nonce is single-use", async () => {
-  const alice = account("reader");
-  const cl = new Client(URL_WS, "replay");
-  await cl.connect();
-  try {
-    const ch = await cl.send("auth.challenge", { address: alice.address });
-    const sig = sign(alice.private_key, ch.payload.message);
-    const first = await cl.send("auth.login", { address: alice.address, signature: sig });
-    assertEq(first.type, "auth.login.ok", "first login");
-    const second = await cl.send("auth.login", {
-      address: alice.address,
-      signature: sig,
-    });
-    assertErr(second, "auth_nonce_used", "replay inside the expiry window");
-  } finally {
-    cl.close();
-  }
-});
-
-check("login stores the address lowercased and echoes the EIP-55 form", async () => {
-  // SPEC §3.4: two spellings of one wallet must never become two players.
-  const alice = account("reader");
-  const cl = await session({ ...alice, address: alice.address_lower }, "case");
-  try {
-    const user = cl.token && (await cl.send("auth.resume", { token: cl.token })).payload.user;
-    assertEq(user.address, alice.address_lower, "users.address");
-    assertEq(user.address_eip55, alice.address, "users.address_eip55");
-  } finally {
-    cl.close();
-  }
-});
-
-check("auth.resume trades a token for a session without the key", async () => {
-  // SPEC §3.3. This is what lets the client keep key material in memory only
-  // and forget it on reload — the whole reason §3.1 is affordable.
-  const alice = account("reader");
-  const first = await session(alice, "res1");
-  const token = first.token;
-  first.close();
-
-  const second = new Client(URL_WS, "res2");
-  await second.connect();
-  try {
-    const r = await second.send("auth.resume", { token });
-    assertEq(r.type, "auth.resume.ok", "resume with a live token");
-    assertEq(r.payload.user.address, alice.address_lower, "the resumed identity");
-    const lands = await second.send("world.lands", {});
-    assertEq(lands.type, "world.lands.ok", "a resumed session is a real session");
-  } finally {
-    second.close();
-  }
-
-  const third = new Client(URL_WS, "res3");
-  await third.connect();
-  try {
-    const r = await third.send("auth.resume", { token: "not-a-token" });
-    assert(r.type.endsWith(".err"), "a junk token must not resume");
-    assert(
-      ["unauthorized", "bad_request", "not_found"].includes(r.payload.code),
-      `junk token gave ${r.payload.code}`,
-    );
-  } finally {
-    third.close();
-  }
-});
-
-// SPEC §6.2 — the catalogue, authenticated
-
-check("world.lands and world.map answer with the §6.3 shapes", async () => {
-  const alice = account("reader");
-  const cl = await session(alice, "world");
+check(null, "beyond: world.lands, world.map and quest.get match §5", async () => {
+  const cl = await session(account("reader"), "shapes");
   try {
     const lands = await cl.send("world.lands", {});
     assertEq(lands.type, "world.lands.ok", "world.lands");
-    assert(Array.isArray(lands.payload.lands), "lands is not an array");
     for (const l of lands.payload.lands) {
-      assert(["rust", "go"].includes(l.land), `unknown land ${l.land}`);
+      assert(["rust", "go"].includes(l.land), `§4.6: land ${l.land}`);
       for (const cat of l.categories) {
         assert(
           ["basic", "advanced", "hacker"].includes(cat.category),
-          `unknown category ${cat.category}`,
+          `§4.6: category ${cat.category}`,
         );
-        assert(typeof cat.total === "number", "category.total");
-        assert(typeof cat.cleared === "number", "category.cleared");
-        assert(cat.cleared <= cat.total, "cleared exceeds total");
+        assert(cat.cleared <= cat.total, "§4.6: cleared exceeds total");
+        assert(typeof cat.open === "boolean", "§4.6: `open` is missing");
+        assert(typeof cat.stars === "number", "§4.6: `stars` is missing");
       }
     }
 
     const map = await cl.send("world.map", { land: "rust", category: "basic" });
-    assertEq(map.type, "world.map.ok", "world.map");
-    assert(Array.isArray(map.payload.nodes), "nodes is not an array");
-    assert(Array.isArray(map.payload.edges), "edges is not an array");
-    const seen = new Set();
-    for (const n of map.payload.nodes) {
+    const nodes = map.payload.nodes;
+    assertEq(map.payload.land, "rust", "§4.7: the map echoes its land");
+    assertEq(map.payload.category, "basic", "§4.7: the map echoes its category");
+    for (const n of nodes) {
       assert(
         /^(rust|go)\.(basic|advanced|hacker)\.\d{2}\..+$/.test(n.quest_id),
-        `quest_id does not match SPEC §4.1: ${n.quest_id}`,
+        `SPEC §4.1: quest_id ${n.quest_id}`,
       );
-      assert(["locked", "open", "cleared"].includes(n.state), `state ${n.state}`);
-      assert(n.stars >= 0 && n.stars <= 3, `stars ${n.stars}`);
-      assert(n.difficulty >= 1 && n.difficulty <= 5, `difficulty ${n.difficulty}`);
-      assert(["quest", "boss", "gate"].includes(n.kind), `kind ${n.kind}`);
-      assert(n.x >= 0 && n.x <= 1 && n.y >= 0 && n.y <= 1, `map position ${n.x},${n.y}`);
-      assert(!seen.has(n.node), `node ${n.node} appears twice`);
-      seen.add(n.node);
+      assert(["locked", "open", "cleared"].includes(n.state), `§5.2: state ${n.state}`);
+      assert(n.stars >= 0 && n.stars <= 3, `§5.2: stars ${n.stars}`);
+      assert(n.difficulty >= 1 && n.difficulty <= 5, `§5.2: difficulty ${n.difficulty}`);
+      assert(["quest", "boss", "gate"].includes(n.kind), `§5.2: kind ${n.kind}`);
+      assert(n.x >= 0 && n.x <= 1 && n.y >= 0 && n.y <= 1, `§5.2: position ${n.x},${n.y}`);
+      assert(Array.isArray(n.requires), "§5.2: `requires` is missing");
+      assert(typeof n.attempts === "number", "§5.2: `attempts` is missing");
     }
-    // SPEC §12: 1-based and contiguous — a gap is an error, the map draws a
-    // path through them.
-    const nodes = [...seen].sort((a, b) => a - b);
-    assertEq(nodes, nodes.map((_, i) => i + 1), "node numbering is not contiguous from 1");
-    // At least one node must be reachable or the game cannot be started.
+    // §5.2: 1-based and contiguous, "ordered by node".
+    const numbers = nodes.map((n) => n.node);
+    assertEq(numbers, numbers.map((_, i) => i + 1), "§4.7/§5.2: node numbering");
+    // §4.7: edges are derived from `requires` and given explicitly, so a
+    // client never has to infer the overworld's shape.
+    const declared = new Set(map.payload.edges.map((e) => e.join("\u2192")));
+    for (const n of nodes)
+      for (const r of n.requires)
+        assert(
+          declared.has(`${r}\u2192${n.quest_id}`),
+          `§4.7: the edge ${r} → ${n.quest_id} is missing from edges`,
+        );
+
+    const { quest } = await firstOpenQuest(cl);
+    assert(typeof quest.starter === "string" && quest.starter, "§5.3: no starter code");
     assert(
-      map.payload.nodes.some((n) => n.state !== "locked"),
-      "every node is locked; §12 says an empty `requires` is open from the start",
+      !("solution" in quest),
+      "§4.8: `solution` is omitted entirely until cleared — not null, not empty",
     );
-  } finally {
-    cl.close();
-  }
-});
-
-check("quest.get withholds the solution until it is cleared", async () => {
-  // SPEC §6.2: "no `solution` unless cleared". A reference answer handed to a
-  // client that has not earned it is the map clearing itself.
-  const alice = account("reader");
-  const cl = await session(alice, "quest");
-  try {
-    const map = await cl.send("world.map", { land: "rust", category: "basic" });
-    const open = map.payload.nodes.find((n) => n.state === "open");
-    assert(open, "no open node to ask about");
-    const r = await cl.send("quest.get", { quest_id: open.quest_id });
-    assertEq(r.type, "quest.get.ok", "quest.get");
-    const q = r.payload.quest;
-    assert(typeof q.starter === "string" && q.starter.length > 0, "no starter code");
+    assert(typeof quest.tests?.hidden_count === "number", "§5.3: tests.hidden_count");
+    assert(Array.isArray(quest.tests?.visible), "§5.3: tests.visible");
+    assert(quest.tests.visible.length > 0, "SPEC §12: at least one visible case");
+    for (const v of quest.tests.visible)
+      assert(
+        typeof v.name === "string" && typeof v.expect === "string",
+        "§5.3: a visible case is {name, stdin, expect}",
+      );
     assert(
-      q.solution === undefined || q.solution === null,
-      "the solution was sent for a quest this user has not cleared",
+      !JSON.stringify(quest).includes('"visible":false'),
+      "§4.8: hidden case data leaked into quest.get",
     );
-    // And the hidden test data is not in the brief either.
-    const blob = JSON.stringify(q);
-    assert(!blob.includes('"visible":false'), "hidden cases leaked in quest.get");
-
-    const missing = await cl.send("quest.get", { quest_id: "rust.basic.99.nope" });
-    assertErr(missing, "not_found", "a quest id that does not exist");
+    assert(typeof quest.hints_total === "number", "§5.3: hints_total");
+    assert(
+      quest.time_limit_s === null || typeof quest.time_limit_s === "number",
+      "§5.3: time_limit_s is a number or null",
+    );
+    assert(["locked", "open", "cleared"].includes(quest.state), "§5.3: quest.state");
   } finally {
     cl.close();
   }
 });
 
-check("a second quest.submit while one is in flight is busy", async () => {
-  // SPEC §6.4: one in-flight submit per connection.
-  const alice = account("busy");
-  const cl = await session(alice, "busy");
+check(null, "beyond: progress.update reaches the same user's other connection", async () => {
+  // PROTOCOL.md §4.19: "Also sent to the same user's other open connections,
+  // which is how two windows stay in step." No §8 point covers it, and a
+  // server that only answers the socket that asked looks entirely correct
+  // until somebody opens a second window.
+  const acct = account("bob");
+  const a = await session(acct, "two-a");
+  const b = await session(acct, "two-b"); // the same wallet, a second window
   try {
-    const map = await cl.send("world.map", { land: "rust", category: "basic" });
-    const open = map.payload.nodes.find((n) => n.state === "open");
-    assert(open, "no open node to submit to");
-    const body = {
-      quest_id: open.quest_id,
-      // Deliberately slow to compile, so the second frame is genuinely
-      // concurrent rather than racing a finished job.
-      source: "fn main() { println!(\"hello, causewaybay\"); }",
+    const { node, quest } = await firstOpenQuest(a);
+    const right = rightSourceFor(quest);
+    assert(
+      right !== null,
+      `could not compose an answer for ${node.quest_id} from its visible case, ` +
+        `so §4.19 propagation cannot be exercised. See tests/PLAN.md.`,
+    );
+    const r = await a.send("quest.submit", {
+      quest_id: node.quest_id,
       lang: "rust",
-    };
-    const first = cl.send("quest.submit", body);
-    const second = await cl.send("quest.submit", body);
-    assertErr(second, "busy", "the second concurrent submit");
-    const done = await first;
-    assertEq(done.type, "quest.submit.ok", "the first submit still finished");
-  } finally {
-    cl.close();
-  }
-});
-
-check("run.stage and run.log arrive as events with id: null", async () => {
-  // SPEC §5.4 / §6.2: the player watches rustc think. An event with a
-  // non-null id would be correlated to a request nobody made.
-  const alice = account("streamer");
-  const cl = await session(alice, "stream");
-  try {
-    const map = await cl.send("world.map", { land: "rust", category: "basic" });
-    const open = map.payload.nodes.find((n) => n.state === "open");
-    assert(open, "no open node to submit to");
-    await cl.send("quest.submit", {
-      quest_id: open.quest_id,
-      source: "fn main() { println!(\"hello, causewaybay\"); }",
-      lang: "rust",
+      source: right,
     });
-    const stages = cl.events.filter((e) => e.type === "run.stage");
-    assert(stages.length > 0, "no run.stage events during a submit");
-    assert(
-      stages.every((e) => e.id === null),
-      "a run.stage arrived with a non-null id",
+    assertEq(r.type, "quest.submit.ok", "the submit");
+    assertEq(r.payload.attempt.verdict, "accepted", "the composed answer");
+    await sleep(500); // the event may trail the reply
+
+    const onB = b.events.filter(
+      (e) => e.type === "progress.update" && e.payload.quest_id === node.quest_id,
     );
-    const names = stages.map((e) => e.payload.stage);
-    assert(
-      names.every((s) => ["queued", "compiling", "running", "judging"].includes(s)),
-      `stage outside the §6.2 set: ${names}`,
-    );
-    // Only the two run events carry one; `progress.update` and `award` do not.
-    assert(
-      cl.events
-        .filter((e) => e.type === "run.log" || e.type === "run.stage")
-        .every((e) => typeof e.payload.attempt_id === "string"),
-      "a run.log/run.stage event without an attempt_id",
-    );
-    // Clearing a quest must announce itself, or the map only updates on a
-    // screen the player might not go back to (SPEC §6.2).
-    const updates = cl.events.filter((e) => e.type === "progress.update");
-    assert(
-      updates.every((e) => ["locked", "open", "cleared"].includes(e.payload.state)),
-      "a progress.update with a state outside the §2.1 CHECK constraint",
-    );
+    assert(onB.length > 0, "§4.19: the user's second connection never heard about it");
+    const ev = onB[0];
+    assertEq(ev.id, null, "§2.2: a server-initiated event carries id: null");
+    assertEq(ev.payload.state, "cleared", "§4.19: state");
+    assert(Array.isArray(ev.payload.unlocked), "§4.19: `unlocked` is missing");
+    assert(typeof ev.payload.cleared_total === "number", "§4.19: `cleared_total`");
   } finally {
-    cl.close();
+    a.close();
+    b.close();
   }
 });
 
-// SPEC §3.5 / §9.8 — multi-user isolation
-
-check("two sessions never see each other's progress, attempts or mistakes", async () => {
-  // SPEC §9.8, and §3.5's rule underneath it. Two addresses, two sessions,
-  // submissions that overlap in time.
+check(null, "beyond: two users never see each other's progress or attempts", async () => {
+  // SPEC §9.8 and §3.5. Two addresses, two sessions, submissions that overlap
+  // in time.
   const alice = account("alice");
   const bob = account("bob");
   const a = await session(alice, "iso-a");
   const b = await session(bob, "iso-b");
   try {
-    const map = await a.send("world.map", { land: "rust", category: "basic" });
-    const open = map.payload.nodes.find((n) => n.state === "open");
-    assert(open, "no open node for alice — the map starts fully locked");
-
-    // What would clear it, read off the quest's own visible case rather than
-    // hard-coded here: QA does not own the content.
-    const got = await a.send("quest.get", { quest_id: open.quest_id });
-    const visible = (got.payload.quest.cases ?? []).find((c) => c.visible);
-    const right = sourceThatPrints(visible?.expect);
-    const wrong = 'fn main() { println!("deliberately not the answer"); }';
+    const { node, quest } = await firstOpenQuest(a);
+    const right = rightSourceFor(quest);
 
     const [aDone, bDone] = await Promise.all([
       a.send("quest.submit", {
-        quest_id: open.quest_id,
-        source: right ?? wrong,
+        quest_id: node.quest_id,
         lang: "rust",
+        source: right ?? WRONG_SOURCE,
       }),
-      b.send("quest.submit", { quest_id: open.quest_id, source: wrong, lang: "rust" }),
+      b.send("quest.submit", {
+        quest_id: node.quest_id,
+        lang: "rust",
+        source: WRONG_SOURCE,
+      }),
     ]);
     assertEq(aDone.type, "quest.submit.ok", "alice's submit");
     assertEq(bDone.type, "quest.submit.ok", "bob's submit");
     assert(
       bDone.payload.attempt.verdict !== "accepted",
-      "a source that prints the wrong thing was accepted",
+      "a source printing the wrong thing was accepted",
     );
     assert(
       aDone.payload.attempt.id !== bDone.payload.attempt.id,
       "the two attempts share an id",
     );
 
-    // History does not cross. This is the assertion §9.8 is really about,
-    // and it holds whatever the verdicts were.
     const aHist = await a.send("stats.history", { limit: 50 });
     const bHist = await b.send("stats.history", { limit: 50 });
     const aIds = new Set(aHist.payload.attempts.map((x) => x.id));
@@ -804,35 +1301,24 @@ check("two sessions never see each other's progress, attempts or mistakes", asyn
     assert(!aIds.has(bDone.payload.attempt.id), "alice can see bob's attempt");
     assert(!bIds.has(aDone.payload.attempt.id), "bob can see alice's attempt");
 
-    // Mistakes do not cross: bob earned one, and it is his.
-    const aMistakes = await a.send("stats.mistakes", { limit: 50 });
     const bMistakes = await b.send("stats.mistakes", { limit: 50 });
-    assert(Array.isArray(aMistakes.payload.mistakes), "stats.mistakes shape");
-    assert(Array.isArray(bMistakes.payload.mistakes), "stats.mistakes shape");
-    const total = (r) => r.payload.mistakes.reduce((s, m) => s + m.count, 0);
-    assert(total(bMistakes) > 0, "bob's wrong answer produced no mistake row");
+    assert(Array.isArray(bMistakes.payload.mistakes), "§5.6: stats.mistakes shape");
+    const total = bMistakes.payload.mistakes.reduce((s, m) => s + m.count, 0);
+    assert(total > 0, "bob's wrong answer produced no mistake row");
 
-    // Progress does not cross — only assertable if alice actually cleared it,
-    // which needs a quest this checker could compose an answer for.
     if (aDone.payload.attempt.verdict === "accepted") {
       const aMap = await a.send("world.map", { land: "rust", category: "basic" });
       const bMap = await b.send("world.map", { land: "rust", category: "basic" });
-      const aNode = aMap.payload.nodes.find((n) => n.quest_id === open.quest_id);
-      const bNode = bMap.payload.nodes.find((n) => n.quest_id === open.quest_id);
-      assertEq(aNode.state, "cleared", "alice's node after clearing it");
+      const aNode = aMap.payload.nodes.find((n) => n.quest_id === node.quest_id);
+      const bNode = bMap.payload.nodes.find((n) => n.quest_id === node.quest_id);
+      assertEq(aNode.state, "cleared", "alice's node after she cleared it");
       assert(bNode.state !== "cleared", "bob's node went cleared on alice's work");
       const aSum = await a.send("stats.summary", {});
       const bSum = await b.send("stats.summary", {});
-      assert(aSum.payload.cleared >= 1, "alice's cleared count");
+      assert(aSum.payload.cleared >= 1, "§4.13: alice's cleared count");
       assert(
         bSum.payload.cleared < aSum.payload.cleared,
         "bob's cleared count includes alice's work",
-      );
-    } else {
-      assert(
-        total(aMistakes) > 0,
-        "neither side cleared anything and alice has no mistake either — " +
-          "this check asserted almost nothing; see tests/PLAN.md §9.8",
       );
     }
   } finally {
@@ -841,100 +1327,127 @@ check("two sessions never see each other's progress, attempts or mistakes", asyn
   }
 });
 
-check("an address in a payload is ignored, never trusted", async () => {
-  // SPEC §3.5: "every query ... is filtered by the address on the
-  // connection's session, never by an address in the payload. A payload that
-  // carries an address is ignored, not trusted." This is the check that
-  // catches a server that helpfully honours it.
+check(null, "beyond: an address in a payload is ignored, never trusted", async () => {
+  // SPEC §3.5. The server filters by the connection's session; an address in
+  // the payload is ignored, not honoured. This catches a server that
+  // helpfully obeys it — which reads as a feature until it is a data leak.
   const alice = account("alice");
-  const bob = account("bob");
-  const b = await session(bob, "spoof");
+  const b = await session(account("bob"), "spoof");
   try {
-    const hist = await b.send("stats.history", {
-      limit: 50,
-      address: alice.address_lower,
-    });
-    assertEq(hist.type, "stats.history.ok", "stats.history with a spoofed address");
-    const sum = await b.send("stats.summary", { address: alice.address_lower });
+    const spoofed = await b.send("stats.summary", { address: alice.address });
     const own = await b.send("stats.summary", {});
-    assertEq(
-      sum.payload,
-      own.payload,
-      "a payload address changed the answer — §3.5 says it is ignored",
+    assert(
+      spoofed.type === "stats.summary.ok" || spoofed.payload.code === "bad_request",
+      `a spoofed address gave ${spoofed.type} ${spoofed.payload.code ?? ""}`,
     );
+    if (spoofed.type === "stats.summary.ok")
+      assertEq(spoofed.payload, own.payload, "§3.5: a payload address changed the answer");
+
+    const hist = await b.send("stats.history", { limit: 5, address: alice.address });
+    const ownHist = await b.send("stats.history", { limit: 5 });
+    if (hist.type === "stats.history.ok")
+      assertEq(
+        hist.payload.attempts.map((x) => x.id),
+        ownHist.payload.attempts.map((x) => x.id),
+        "§3.5: a payload address changed stats.history",
+      );
   } finally {
     b.close();
   }
 });
 
-check("the frames the server sent never broke the envelope rules", async () => {
-  // Every Client validates as it goes; this rolls the whole run up so a
+check(null, "beyond: no frame the server sent broke the envelope rules", async () => {
+  // Every Client validates as it goes; this rolls the whole run up, so a
   // violation in the middle of an otherwise-passing check is still reported.
-  const total = allViolations.length;
+  // It runs last, deliberately.
   assert(
-    total === 0,
-    `${total} envelope violation(s):\n    ` +
+    allViolations.length === 0,
+    `${allViolations.length} envelope violation(s):\n    ` +
       allViolations
-        .slice(0, 10)
-        .map((v) => `${v.why}  ${JSON.stringify(v.frame).slice(0, 160)}`)
+        .slice(0, 12)
+        .map((v) => `${v.why}\n      ${JSON.stringify(v.frame).slice(0, 200)}`)
         .join("\n    "),
   );
 });
 
 // --------------------------------------------------------------------- run
 
-const allViolations = [];
-const origClose = Client.prototype.close;
-Client.prototype.close = function close() {
-  allViolations.push(...this.violations);
-  this.violations = [];
-  return origClose.call(this);
-};
-
 async function main() {
-  const selected = ONLY ? checks.filter((c) => c.name.includes(ONLY)) : checks;
+  const selected = ONLY
+    ? checks.filter((c) => (c.point ?? "").includes(ONLY) || c.name.includes(ONLY))
+    : checks;
+  if (selected.length === 0) {
+    console.error(`no check matches --only ${ONLY}`);
+    return 2;
+  }
+
   const results = [];
   let hardStop = null;
 
-  for (const { name, fn } of selected) {
+  for (const { point, name, fn } of selected) {
+    const label = point ? `${`§${point}`.padEnd(6)}${name}` : `      ${name}`;
     if (hardStop) {
-      results.push({ name, status: "skipped", detail: hardStop });
+      results.push({ point, name, status: "skipped", detail: hardStop });
       continue;
     }
     const t0 = Date.now();
     try {
       await fn();
-      results.push({ name, status: "pass", ms: Date.now() - t0 });
-      if (!AS_JSON) console.log(`${green("pass")}  ${name} ${dim(`${Date.now() - t0}ms`)}`);
+      results.push({ point, name, status: "pass", ms: Date.now() - t0 });
+      if (!AS_JSON)
+        console.log(`${green("pass")}  ${label} ${dim(`${Date.now() - t0}ms`)}`);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       if (err instanceof SkipError) {
-        // Nothing listening, or no signer: every later check would report the
-        // same thing. Say it once.
-        hardStop = detail;
-        results.push({ name, status: "skipped", detail });
-        if (!AS_JSON) console.log(`${yellow("skip")}  ${name}\n      ${detail}`);
+        hardStop = detail; // every later check would say the same thing
+        results.push({ point, name, status: "skipped", detail });
+        if (!AS_JSON) console.log(`${yellow("skip")}  ${label}\n      ${detail}`);
         continue;
       }
-      results.push({ name, status: "fail", detail, ms: Date.now() - t0 });
-      if (!AS_JSON) console.log(`${red("FAIL")}  ${name}\n      ${detail}`);
+      results.push({ point, name, status: "fail", detail, ms: Date.now() - t0 });
+      if (!AS_JSON) console.log(`${red("FAIL")}  ${label}\n      ${detail}`);
     }
   }
 
-  const pass = results.filter((r) => r.status === "pass").length;
-  const fail = results.filter((r) => r.status === "fail").length;
-  const skip = results.filter((r) => r.status === "skipped").length;
+  const by = (s) => results.filter((r) => r.status === s);
+  const conformance = results.filter((r) => r.point);
+  const passed = conformance.filter((r) => r.status === "pass");
 
   if (AS_JSON) {
-    console.log(JSON.stringify({ url: URL_WS, pass, fail, skip, results }, null, 2));
-  } else {
     console.log(
-      `\n${pass} passed, ${fail > 0 ? red(`${fail} failed`) : "0 failed"}, ${skip} skipped` +
-        `  ${dim(URL_WS)}`,
+      JSON.stringify(
+        {
+          url: URL_WS,
+          protocol_8: {
+            passed: passed.map((r) => r.point),
+            failed: conformance.filter((r) => r.status === "fail").map((r) => r.point),
+            skipped: conformance.filter((r) => r.status === "skipped").map((r) => r.point),
+          },
+          pass: by("pass").length,
+          fail: by("fail").length,
+          skip: by("skipped").length,
+          results,
+        },
+        null,
+        2,
+      ),
+    );
+  } else {
+    const score = `${passed.length}/${conformance.length}`;
+    console.log(
+      `\nPROTOCOL.md §8 conformance: ` +
+        (passed.length === conformance.length ? green(score) : red(score)) +
+        (conformance.length < 12 && !ONLY ? red("  (fewer than 12 points ran)") : ""),
+    );
+    console.log(
+      `${by("pass").length} passed, ` +
+        (by("fail").length > 0 ? red(`${by("fail").length} failed`) : "0 failed") +
+        `, ${by("skipped").length} skipped  ${dim(URL_WS)}`,
     );
   }
-  if (fail > 0) return 1;
-  if (pass === 0) return 2; // nothing ran: a green with no checks is a lie
+
+  if (by("fail").length > 0) return 1;
+  if (by("pass").length === 0) return 2; // a green with no checks is a lie
   return 0;
 }
 

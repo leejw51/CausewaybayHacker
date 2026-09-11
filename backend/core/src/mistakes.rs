@@ -309,27 +309,36 @@ fn rollup(conn: &Connection, address: &str, mistakes: &[Mistake], now: &str) -> 
     Ok(())
 }
 
-/// What to drill to fix a kind (PROTOCOL §5.6). These are the same slugs the
-/// content packs put in `concepts`, which is how §7.3's `weakness` plan will
-/// find "five different shapes of borrow-after-move".
+/// The §7.1 kind → concepts join, taken verbatim from `docs/concepts.md`.
+///
+/// This is the table SPEC §7.3's `weakness` plan runs: take the user's top
+/// kind, look it up here, pull every quest whose `concepts` overlap the row.
+/// Order within a row is priority — the first concept is the one that most
+/// directly teaches the mistake. **Do not invent slugs here**: a slug outside
+/// `docs/concepts.md`'s vocabulary reaches no quest, and a drill that reaches
+/// nothing reads to the player as the AI mode being broken.
+///
+/// `other` deliberately has no row. An unrecognized compiler code carries no
+/// information about *which* idea is missing, so the drill falls back to the
+/// concepts of the quest the mistake happened on.
 pub fn concepts_for(kind: &str) -> &'static [&'static str] {
     match kind {
-        "borrow-after-move" => &["ownership", "move", "clone"],
-        "borrow-conflict" => &["borrowing", "ownership"],
-        "lifetime" => &["lifetimes", "references"],
-        "type-mismatch" => &["types", "inference"],
-        "unknown-name" => &["modules", "scope", "imports"],
-        "missing-trait" => &["traits", "generics"],
+        "borrow-after-move" => &["ownership", "borrowing", "closures", "smart-pointers"],
+        "borrow-conflict" => &["borrowing", "mutability", "shared-state"],
+        "lifetime" => &["lifetimes", "borrowing", "structs", "traits"],
+        "type-mismatch" => &["types", "generics", "error-handling", "pattern-matching"],
+        "unknown-name" => &["bindings", "imports", "functions"],
+        "missing-trait" => &["traits", "generics", "iteration"],
         "unused" => &["bindings", "imports"],
-        "mutability" => &["mutability", "bindings"],
-        "nil-deref" => &["pointers", "errors"],
-        "index-range" => &["slices", "bounds"],
-        "data-race" => &["concurrency", "sync"],
-        "deadlock" => &["concurrency", "channels"],
-        "unhandled-error" => &["errors", "result"],
-        "syntax" => &["syntax"],
-        "wrong-answer" => &["io", "logic"],
-        "timeout" => &["complexity", "algorithms"],
+        "mutability" => &["mutability", "borrowing", "slices"],
+        "nil-deref" => &["error-handling", "interfaces", "structs"],
+        "index-range" => &["slices", "iteration", "two-pointers"],
+        "data-race" => &["data-races", "shared-state", "concurrency"],
+        "deadlock" => &["deadlock", "channels", "shared-state"],
+        "unhandled-error" => &["error-handling", "pattern-matching"],
+        "syntax" => &["bindings", "control-flow", "functions"],
+        "wrong-answer" => &["complexity", "iteration", "strings", "io"],
+        "timeout" => &["complexity", "hashing", "binary-search", "two-pointers"],
         _ => &[],
     }
 }

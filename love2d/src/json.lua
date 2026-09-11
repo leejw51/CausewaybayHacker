@@ -76,7 +76,7 @@ end
 --- A Lua table is both a list and a map, so this asks the only question that
 --- matters: are the keys exactly 1..n?
 local function is_array(t)
-  if t == json.empty_array then return true end
+  if getmetatable(t) == json.array_mt then return true end
   local count = 0
   for _ in pairs(t) do count = count + 1 end
   if count == 0 then return false end
@@ -93,7 +93,7 @@ local function encode_table(value, seen)
   seen[value] = true
 
   local out
-  if value == json.empty_array then
+  if is_array(value) and #value == 0 then
     out = "[]"
   elseif is_array(value) then
     local parts = {}
@@ -244,7 +244,9 @@ end
 
 function Parser:parse_array()
   self.pos = self.pos + 1
-  local out = {}
+  -- Tagged on the way in, so `[]` comes back out as `[]`. A `world.map` with
+  -- no edges yet must not re-encode as an object if a client echoes it.
+  local out = setmetatable({}, json.array_mt)
   self:skip_whitespace()
   if self.text:sub(self.pos, self.pos) == "]" then
     self.pos = self.pos + 1

@@ -193,7 +193,15 @@ export class LandsScene implements Scene {
 
     if (this.error) {
       g.fillStyle = css(Theme.red);
-      printf(g, fonts.small, this.error, right[0], right[1] + right[3] - fonts.small.height, right[2], "left");
+      printf(
+        g,
+        fonts.small,
+        this.error,
+        right[0],
+        right[1] + right[3] - fonts.small.height,
+        right[2],
+        "left",
+      );
     }
 
     footer(g, layout, "←→  LAND      CLICK  CATEGORY      F1  ORIENTATION");

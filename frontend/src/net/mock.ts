@@ -136,7 +136,13 @@ function quests(): MockQuest[] {
 
 const QUESTS = quests();
 
-type Row = { state: "locked" | "open" | "cleared"; stars: 0 | 1 | 2 | 3; fails: number; hints: number; attempts: number };
+type Row = {
+  state: "locked" | "open" | "cleared";
+  stars: 0 | 1 | 2 | 3;
+  fails: number;
+  hints: number;
+  attempts: number;
+};
 
 function hex(bytes: Uint8Array): string {
   let s = "";
@@ -533,7 +539,8 @@ export function mockTransport(): TransportFactory {
           if (!q) return err(id, type, "not_found", "no such quest");
           // §3.2: one in flight per connection.
           if (submitting) return err(id, type, "busy", "an attempt is already running");
-          if (p.lang !== q.land) return err(id, type, "bad_request", "lang disagrees with the quest");
+          if (p.lang !== q.land)
+            return err(id, type, "bad_request", "lang disagrees with the quest");
           const source = String(p.source ?? "");
           if (source.length > 262144) return err(id, type, "bad_request", "source over 256 KiB");
 

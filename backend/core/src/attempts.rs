@@ -153,9 +153,8 @@ pub fn history(
     // One small query per row. At a history limit of fifty this is cheaper
     // than the join it replaces is to read.
     for brief in &mut out {
-        let mut stmt = conn.prepare(
-            "SELECT DISTINCT kind FROM mistakes WHERE attempt_id = ?1 ORDER BY kind",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT DISTINCT kind FROM mistakes WHERE attempt_id = ?1 ORDER BY kind")?;
         brief.kinds = stmt
             .query_map(params![brief.id], |r| r.get(0))?
             .collect::<rusqlite::Result<Vec<String>>>()?;

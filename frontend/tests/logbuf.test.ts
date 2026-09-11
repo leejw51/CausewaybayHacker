@@ -15,7 +15,9 @@ describe("run.log reassembly", () => {
     const b = new LogBuffer("att_1");
     b.push("compile", "error[E0382]: borrow of ", 0);
     b.push("compile", "moved value: `s`\n", 1);
-    expect(b.lines).toEqual([{ stream: "compile", text: "error[E0382]: borrow of moved value: `s`" }]);
+    expect(b.lines).toEqual([
+      { stream: "compile", text: "error[E0382]: borrow of moved value: `s`" },
+    ]);
   });
 
   it("holds back a line that has no newline yet", () => {

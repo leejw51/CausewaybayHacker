@@ -13,7 +13,15 @@
  * server is the judge of.
  */
 import { EditorState, type Extension } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, rectangularSelection } from "@codemirror/view";
+import {
+  EditorView,
+  keymap,
+  lineNumbers,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  drawSelection,
+  rectangularSelection,
+} from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import {
   HighlightStyle,
@@ -30,7 +38,11 @@ import type { Land } from "../net/protocol";
 const hex = (c: readonly [number, number, number, number]) =>
   "#" +
   [c[0], c[1], c[2]]
-    .map((v) => Math.round(v * 255).toString(16).padStart(2, "0"))
+    .map((v) =>
+      Math.round(v * 255)
+        .toString(16)
+        .padStart(2, "0"),
+    )
     .join("");
 
 /** Wonder Boy candy applied to a syntax tree: coin, cyan, pink, cream. */

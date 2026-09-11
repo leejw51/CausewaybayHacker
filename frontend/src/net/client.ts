@@ -260,7 +260,12 @@ export class Client {
   // -- requests ------------------------------------------------------------
 
   /** §3.1: exactly four messages are accepted on an ANONYMOUS connection. */
-  private static readonly PREAUTH = new Set(["ping", "auth.challenge", "auth.login", "auth.resume"]);
+  private static readonly PREAUTH = new Set([
+    "ping",
+    "auth.challenge",
+    "auth.login",
+    "auth.resume",
+  ]);
 
   request<K extends RequestType>(type: K, payload: Requests[K]): Promise<Responses[K]> {
     if (!this.transport) {
@@ -315,7 +320,10 @@ export class Client {
    * server recovers it from the signature anyway and does not trust ours.
    */
   async login(address: string, signature: string, name?: string): Promise<User> {
-    const res = await this.request("auth.login", name ? { address, signature, name } : { address, signature });
+    const res = await this.request(
+      "auth.login",
+      name ? { address, signature, name } : { address, signature },
+    );
     this.adopt(res.token, res.user);
     return res.user;
   }
