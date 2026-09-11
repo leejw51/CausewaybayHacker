@@ -529,6 +529,24 @@ the browser and in the LÖVE client.
 cheap and idempotent: saving identical content returns the same
 `updated_at` rather than churning a new version.
 
+**The other three**, documented here because they shipped before this section
+described them — a client had to discover their shapes by probing, which is
+not how a contract should work:
+
+```json
+→ playground.list    { }                  ← { "snippets": [ SnippetBrief, … ] }   newest first
+→ playground.load    { "id": "pg_…" }     ← { "snippet": Snippet }
+→ playground.delete  { "id": "pg_…" }     ← { }
+```
+
+**Another player's snippet id answers `not_found`, never `unauthorized`** —
+whether an id exists at all is none of that user's business, and the two codes
+together would let someone enumerate what other people have saved.
+
+Caps are per user and both refusals name the limit: **64 snippets, 256 KiB
+each** — the same ceiling as a submission, because it is the same question
+("a source file this server will take") asked twice.
+
 ### 4.9d `code.format`
 
 Run the language's own formatter over the source and hand it back. `rustfmt`
@@ -719,6 +737,19 @@ that does not exist — it makes every other badge mean nothing.
 → ai.next   payload: { "drill_id": "drl_…" }
 ← ai.next.ok payload: { "quest": Quest, "position": 2, "total": 5,
                         "why": "you hit borrow-after-move 6 times" }
+```
+
+**`position` and `Drill.cursor` are 0-based**, and count how many quests of the
+plan are already behind you — so the first `ai.next` returns `position: 0`, and
+a client showing "quest N of M" prints `position + 1`. Stated because it cannot
+be inferred from one observation, and a client that guesses 1-based is wrong by
+one for the whole drill with nothing on the wire to reveal it.
+
+**`plan` may legitimately be empty.** `weakness` on a player with no mistakes
+is the ordinary case, not an error: the answer is `.ok` with an empty plan, and
+the client says which kind of empty it is (§7.3).
+
+```json
 
 → ai.finish payload: { "drill_id": "drl_…" }
 ← ai.finish.ok payload: { "summary": { "attempted": 5, "cleared": 4,
@@ -929,8 +960,10 @@ type SnippetBrief = Omit<Snippet, "source"> & { bytes: number };
 type SearchHit = {
   quest_id: string; title: string; land: string; category: string;
   snippet: string;                       // FTS5 snippet(), may contain <b>…</b>
-  score: number;                         // the fused RRF score
-  bm25: number | null;                   // component, null if not in that ranking
+  score: number;                         // the fused RRF score, higher is better
+  bm25: number | null;                   // SQLite bm25(): **more negative is better**
+                                         // null = absent from that ranking entirely,
+                                         // which is not the same as scoring zero
   cosine: number | null;
   state: "open" | "cleared";
 };
@@ -991,6 +1024,7 @@ type MistakeStat = {
 ```ts
 type AttemptBrief = {
   id: string; quest_id: string; verdict: string;
+  mode: "run" | "submit";                // §4.9b — history returns both
   tests_passed: number; tests_total: number;
   created_at: string; kinds: string[];
 };

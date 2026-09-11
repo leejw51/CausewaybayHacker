@@ -771,6 +771,17 @@ async fn on_key(
                 return Ok(());
             };
             let path = workspace::path_for(&ctx.store, &app.address, &quest);
+            // It sits one shift key away from `r`, which runs. Command mode
+            // asks the same question with a y/N prompt, and for the same
+            // reason: the file is the player's, and a stray keystroke must not
+            // be able to take an afternoon of it.
+            if path.exists() && !app.confirm_reset {
+                app.confirm_reset = true;
+                app.status = format!("R again to overwrite {} with the starter", path.display());
+                return Ok(());
+            }
+            app.confirm_reset = false;
+            app.status.clear();
             request(
                 session,
                 app,

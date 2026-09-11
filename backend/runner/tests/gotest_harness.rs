@@ -695,12 +695,16 @@ func TestCounter(t *testing.T) {
         "cases": [{ "name": "TestCounter", "visible": true }],
     }));
     let run = run(source, &spec);
-    if run.report.verdict == Verdict::InternalError
-        && run.report.runtime_stderr.contains("requires cgo")
-    {
-        // A platform without the race runtime. Saying so beats a red test that
-        // means "this machine cannot", and the recommendation in the report is
-        // that no shipped quest depends on this anyway.
+    let refusal = format!(
+        "{}{}",
+        run.report.compiler_stderr, run.report.runtime_stderr
+    );
+    if refusal.contains("cgo") || refusal.contains("C compiler") {
+        // A platform or a machine without the race runtime — `-race` needs cgo
+        // nearly everywhere, and cgo needs a C compiler that a bare CI box may
+        // not have.
+        // Saying so beats a red test that means "this machine cannot", and no
+        // shipped quest depends on `-race` anyway — see `docs/decisions.md`.
         return;
     }
     assert_eq!(

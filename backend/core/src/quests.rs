@@ -75,6 +75,25 @@ impl Quest {
         value
     }
 
+    /// The same quest with the answer and the hints taken away, for the
+    /// duration of an interview (PROTOCOL §4.9e). Not rate-limited, not
+    /// "hidden behind a click" — absent. A live screen does not come with
+    /// hints, and one that did would rehearse the wrong hour.
+    pub fn to_wire_under_interview(
+        &self,
+        state: crate::progress::State,
+        stars: i64,
+        opened_at: Option<&str>,
+    ) -> serde_json::Value {
+        let mut value = self.to_wire(state, stars, 0, opened_at);
+        if let Some(object) = value.as_object_mut() {
+            object.remove("solution");
+            object.insert("hints_total".into(), serde_json::json!(0));
+            object.insert("under_interview".into(), serde_json::json!(true));
+        }
+        value
+    }
+
     fn tests_wire(&self) -> serde_json::Value {
         let empty = Vec::new();
         let cases = self

@@ -234,7 +234,7 @@ CREATE TABLE mistake_stats (
   kind          TEXT NOT NULL,
   count         INTEGER NOT NULL DEFAULT 0,
   last_at       TEXT NOT NULL,
-  cleared_since INTEGER NOT NULL DEFAULT 0, -- consecutive clean attempts after
+  cleared_since INTEGER NOT NULL DEFAULT 0, -- consecutive clean *submits* (§7.2)
   PRIMARY KEY (address, kind)
 );
 
@@ -624,9 +624,24 @@ recognize.**
 
 On every attempt: insert the `mistakes` rows, then for each distinct kind bump
 `mistake_stats.count` and reset `cleared_since` to 0. For every kind *not* in
-this attempt that the user has a row for, increment `cleared_since`. A kind
-with `cleared_since >= 5` is considered learned and drops out of the AI plan's
-priority list, without being deleted.
+this attempt that the user has a row for, increment `cleared_since` — **but
+only when the attempt is a `submit`.** A kind with `cleared_since >= 5` is
+considered learned and drops out of the AI plan's priority list, without being
+deleted.
+
+**The rollup is deliberately asymmetric, and this is the sentence that says so.**
+A `run` (PROTOCOL §4.9b) *can* reset `cleared_since` to zero and does bump
+`count` — making a mistake is making a mistake, whichever button produced it.
+Only a `submit` advances it.
+
+The reason is what the threshold of 5 was calibrated against. It was written
+when an attempt meant a considered answer. Five clean *runs* is a minute of
+pressing a button while fixing an unrelated typo; if that retired a kind,
+"learned" would mean "compiled five times" and the weakness drill would stop
+teaching the thing the player is worst at. **Evidence that you have stopped
+making a mistake should cost more than evidence that you are still making it.**
+
+Nothing is lost from the ranking: `count` still sees every run.
 
 ### 7.3 AI mode
 

@@ -20,6 +20,11 @@ pub fn pack_id() -> String {
     format!("pack_{}", suffix())
 }
 
+/// A simulated live coding screen (PROTOCOL §5.11).
+pub fn interview_id() -> String {
+    format!("int_{}", suffix())
+}
+
 /// A playground scratchpad (PROTOCOL §5.9).
 pub fn snippet_id() -> String {
     format!("pg_{}", suffix())

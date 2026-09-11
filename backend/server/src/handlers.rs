@@ -9,7 +9,8 @@
 use cwbhacker_core::error::{bad_request, not_found, unauthorized, Error, Result};
 use cwbhacker_core::Connection;
 use cwbhacker_core::{
-    attempts, auth, awards, drills, eth, mistakes, progress, quests, search, stats, users, world,
+    attempts, auth, awards, drills, eth, interviews, mistakes, progress, quests, search, stats,
+    users, world,
 };
 use serde_json::json;
 
@@ -215,8 +216,83 @@ pub fn quest_get(
     } else {
         None
     };
+    // PROTOCOL §4.9e: while an interview on this quest is live, the answer
+    // and the hints are absent — not rate-limited, and not restored when the
+    // clock runs out. A screen does not come with hints.
+    if under_interview(&conn, address, &quest_id)? {
+        return Ok(json!({
+            "quest": quest.to_wire_under_interview(quest_state, row.stars, opened_at.as_deref())
+        }));
+    }
     Ok(json!({
         "quest": quest.to_wire(quest_state, row.stars, row.hints_used, opened_at.as_deref())
+    }))
+}
+
+fn under_interview(conn: &Connection, address: &str, quest_id: &str) -> Result<bool> {
+    Ok(interviews::live(conn, address)?
+        .is_some_and(|session| session.quest_id == quest_id && session.finished_at.is_none()))
+}
+
+pub fn interview_start(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let land = str_field(payload, "land")?;
+    let category = opt_str_field(payload, "category");
+    let conn = state.store.conn();
+    let live = interviews::start(&conn, address, &land, category.as_deref())?;
+    interview_json(&conn, address, &live)
+}
+
+pub fn interview_approach(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let session_id = str_field(payload, "session_id")?;
+    let text = str_field(payload, "text")?;
+    let conn = state.store.conn();
+    let live = interviews::set_approach(&conn, address, &session_id, &text)?;
+    interview_json(&conn, address, &live)
+}
+
+pub fn interview_finish(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let session_id = str_field(payload, "session_id")?;
+    let conn = state.store.conn();
+    Ok(json!({ "report": interviews::finish(&conn, address, &session_id)? }))
+}
+
+fn interview_json(
+    conn: &Connection,
+    address: &str,
+    live: &interviews::Session,
+) -> Result<serde_json::Value> {
+    let quest = quests::get(conn, &live.quest_id)?;
+    let quest_state = world::state_of(conn, address, &live.quest_id)?;
+    let row = progress::get(conn, address, &live.quest_id)?;
+    Ok(json!({
+        "session": {
+            "id": live.id,
+            "quest": quest.to_wire_under_interview(
+                quest_state,
+                row.stars,
+                Some(live.opened_at.as_str()),
+            ),
+            "opened_at": live.opened_at,
+            "deadline_at": live.deadline_at,
+            "approach": live.approach,
+            "approach_at": live.approach_at,
+            "finished_at": live.finished_at,
+        }
     }))
 }
 
@@ -235,6 +311,11 @@ pub fn quest_hint(
     }
     let conn = state.store.conn();
     let (quest, _, _) = readable_quest(&conn, address, &quest_id)?;
+    if under_interview(&conn, address, &quest_id)? {
+        // Absent, not refused-for-now: there is no hint to be had on a live
+        // screen (PROTOCOL §4.9e).
+        return Err(not_found("there are no hints in an interview"));
+    }
     let hint = quest
         .hints
         .get(index as usize)

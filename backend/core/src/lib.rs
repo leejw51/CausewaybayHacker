@@ -14,6 +14,7 @@ pub mod drills;
 pub mod error;
 pub mod eth;
 pub mod ids;
+pub mod interviews;
 pub mod mistakes;
 pub mod paths;
 pub mod progress;

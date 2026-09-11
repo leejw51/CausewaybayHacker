@@ -157,7 +157,7 @@ fn repeat(conn: &Connection, address: &str, land: Option<&str>, size: usize) -> 
 fn weakness(conn: &Connection, address: &str, land: Option<&str>, size: usize) -> Result<Built> {
     let mut stmt = conn.prepare(
         "SELECT kind, count FROM mistake_stats
-          WHERE address = ?1 AND cleared_since < 5 AND kind <> 'other'
+          WHERE address = ?1 AND cleared_since < 5
           ORDER BY count DESC, last_at DESC
           LIMIT 6",
     )?;
@@ -170,10 +170,22 @@ fn weakness(conn: &Connection, address: &str, land: Option<&str>, size: usize) -
     let mut seen = HashSet::new();
     let mut headline: Option<(String, i64)> = None;
     for (kind, times) in &kinds {
-        let concepts = mistakes::concepts_for(kind);
+        // `other` maps to no concepts **by design** (docs/concepts.md): an
+        // unrecognised compiler code carries no information about which idea
+        // is missing, so guessing one would be worse than not guessing. The
+        // fallback is the concepts of the quests the mistake actually happened
+        // on — which is a fact rather than a guess.
+        let owned: Vec<String>;
+        let concepts: Vec<&str> = if kind == "other" {
+            owned = concepts_of_quests_where_made(conn, address, kind)?;
+            owned.iter().map(String::as_str).collect()
+        } else {
+            mistakes::concepts_for(kind).to_vec()
+        };
         if concepts.is_empty() {
             continue;
         }
+        let concepts = concepts.as_slice();
         let matches = quests_touching(conn, land, concepts)?;
         if matches.is_empty() {
             continue;
@@ -282,6 +294,32 @@ pub fn review_interval_days(stars: i64) -> i64 {
         2 => 7,
         _ => 2,
     }
+}
+
+/// The concepts of the quests where a player actually made this kind of
+/// mistake. The fallback for `other`, whose row in `docs/concepts.md` is
+/// deliberately empty.
+fn concepts_of_quests_where_made(
+    conn: &Connection,
+    address: &str,
+    kind: &str,
+) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT DISTINCT q.concepts FROM mistakes m JOIN quests q ON q.id = m.quest_id
+          WHERE m.address = ?1 AND m.kind = ?2",
+    )?;
+    let rows: Vec<String> = stmt
+        .query_map(params![address, kind], |r| r.get(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut out: Vec<String> = Vec::new();
+    for raw in rows {
+        for concept in serde_json::from_str::<Vec<String>>(&raw).unwrap_or_default() {
+            if !out.contains(&concept) {
+                out.push(concept);
+            }
+        }
+    }
+    Ok(out)
 }
 
 fn quests_touching(

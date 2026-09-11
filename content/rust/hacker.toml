@@ -3353,10 +3353,14 @@ output: 4594
 **The complexity here is enforced.** One hidden case is `n = 100000`,
 `m = 200000`. Dijkstra is the right algorithm either way; what the clock
 decides is the priority queue. Scanning every unvisited node for the minimum
-is `O(V²)` — `10^10` comparisons, and it does not finish in the five second
-run limit. A binary heap makes it `O((V + E) log V)` and it finishes in about
-twenty milliseconds. Both numbers measured on this machine, with the two
+is `O(V²)`, and it takes **about sixteen seconds** against a five second run
+limit. A binary heap makes it `O((V + E) log V)` and it finishes in **about
+fifty milliseconds**. Both numbers measured on this machine, with the two
 programs that ship in this quest: the starter is the scanning version.
+
+Worth seeing clearly, because it is the most common way to fail a timed
+screen: **the starter is not wrong.** It prints exactly the right answer. It
+is rejected only for arriving three times too late.
 
 `std::collections::BinaryHeap` is a max-heap, so push `Reverse((distance,
 node))`. It has no decrease-key, and you do not need one: push the improved

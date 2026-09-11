@@ -4210,3 +4210,85 @@ that locks you out at the buzzer teaches panic rather than finishing.
 
 The report is the product, not the verdict: time against the limit, what you
 said you would do, what the reference does, your attempts, your mistakes.
+
+## 2026-09-11 — Authoring notes for `cargo` and `gotest` quests (for PM)
+
+What these harnesses can and cannot do, written by the person who built them.
+
+**Two shapes, and `test_source` is the switch.**
+
+* *You write the tests* — omit `test_source`. The submission is the whole file:
+  the function under test **and** its `#[cfg(test)] mod tests` / `TestXxx`
+  functions. Declare a case per test the quest insists on. Extra tests the
+  player writes are run and reported too, and they must pass.
+* *We test your code* — set `test_source` to the quest's own test file. The
+  submission is the implementation only. `use quest::add;` in Rust (the lib
+  target is always `quest`); plain `package main` in Go.
+
+**A case's `name` is a test name, and there is no `expect`.** `adds` finds
+`tests::adds`; `TestTable/negative` must be written in full, because a parent
+never stands in for a subtest.
+
+**Hidden cases need `test_source`.** When the player wrote the tests, a RUN
+executes all of them — there is nothing hidden to protect, and watching your
+own tests go green is what RUN is for. So a `hidden = false` case in a
+player-written-tests quest is only hidden on paper. Since the importer requires
+a `hacker` quest to carry a hidden case, **a `hacker` quest on these harnesses
+should ship its own `test_source`.** A `basic`/`advanced` quest that asks the
+player to write tests is fine with everything visible.
+
+**Starters fail for free, in both shapes.** A "write the tests" starter with no
+test in it is rejected by the zero-tests rule; a "we test your code" starter
+with `todo!()` / `panic("TODO")` compiles and fails its tests. Neither needs a
+trick to satisfy SPEC §9.5.
+
+**`timeout_ms` is the budget for the whole suite**, not per case — twenty tests
+share one five-second clock. `compile_timeout_ms` defaults to 60 s here.
+`tests_total` on a submit counts the declared cases **plus** any test the
+player wrote that no case named, so it can exceed the number of cases in the
+pack; that is the honest count of what ran.
+
+**`match` is ignored.** There is no output to compare: the test is the
+expectation. `race` is `gotest`-only and no quest should use it yet (above).
+
+**Do not write a perf quest for the `cargo` harness.** `cargo test` builds the
+dev profile — unoptimised, with overflow checks on. Good for teaching (a debug
+assertion fires, an overflow panics instead of wrapping), wrong for "the naive
+answer must be too slow", which belongs on `stdio` with `-O` as today.
+
+**No dependencies.** `--offline` with an empty `CARGO_HOME` and `GOPROXY=off`
+mean the standard library and nothing else. A quest that wants `testify` or
+`proptest` needs a vendored registry first, which nothing in this repo has.
+
+**Disk.** A Go test binary is 4–5 MB and stays in the attempt's build
+directory; a stdio `prog` is under 1 MB. `cwbhacker prune --builds` clears the
+lot, and now has five times as much reason to be run.
+
+## 2026-09-11 — Five contract gaps the implementers found, all closed
+
+Every one was found by somebody building against the document and noticing it
+could not answer a question. None came from review.
+
+1. **SPEC §7.2 contradicted the implementation.** It said `cleared_since`
+   advances on "every attempt"; BE advances it only on a `submit`, and argued
+   why: five clean *runs* is a minute of pressing a button while fixing an
+   unrelated typo, and if that retired a mistake kind then "learned" would mean
+   "compiled five times". **Evidence that you have stopped making a mistake
+   should cost more than evidence that you are still making it.** The spec now
+   says so, and says why, so the asymmetry is not mistaken for a bug.
+2. **`AttemptBrief.mode`** was on the wire and not in §5.7.
+3. **`SearchHit.bm25` had no sign convention.** SQLite's `bm25()` is
+   more-negative-is-better, which a client cannot guess. Also stated: `null`
+   means *absent from that ranking*, which is not the same as scoring zero —
+   the LÖVE client had already worked this out and drew an em dash rather than
+   a zero-length bar.
+4. **`ai.next`'s `position` and `Drill.cursor` had no stated base.** Now
+   0-based. This is the dangerous kind of gap: a client that guesses 1-based is
+   wrong by one for an entire drill, and nothing on the wire reveals it.
+   Also stated: an empty `plan` is a legitimate answer, not an error.
+5. **§4.9c documented two of the five `playground.*` messages.** The other
+   three shipped and a client had to identify them by probing — an unknown *id*
+   answers "no such snippet" while an unknown *message type* answers "no
+   message type 'x'". Now documented, including that another player's snippet
+   id answers `not_found` rather than `unauthorized`, so the pair cannot be
+   used to enumerate what other people have saved.
