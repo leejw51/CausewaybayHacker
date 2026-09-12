@@ -10,6 +10,22 @@
 #
 # Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
 
+#
+# **Which quests enforce their complexity differs by land, and that is a
+# measurement rather than an oversight.** All four packs hold the same problems
+# in the same order under the same ids, and the small cases are identical
+# wherever the problem is the same problem. What differs is the big case that
+# rejects a correct-but-slow answer: it is sized per land, and in several
+# quests it exists in one land and not another. Whether a generated input can
+# punish the naive answer is a fact about the language and its compiler, and
+# each land measured it rather than assuming it.
+# Rust converts `05.binary-search` and `23.prefix-sums`. It leaves `02.window`,
+# `06.stack` and `20.bits` alone because on generated input their naive answers
+# come home in single-digit milliseconds — only adversarial input catches them,
+# and a generator cannot write it. It leaves `17.lis` because the four
+# generated cases would lose the flat array that catches a non-strict
+# comparison, and a test that catches a real bug is worth more than a clock.
+
 pack = "rust.hacker"
 land = "rust"
 category = "hacker"

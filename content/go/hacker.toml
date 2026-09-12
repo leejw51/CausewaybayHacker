@@ -6,6 +6,20 @@
 #
 # Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
 
+#
+# **Which quests enforce their complexity differs by land, and that is a
+# measurement rather than an oversight.** All four packs hold the same problems
+# in the same order under the same ids, and the small cases are identical
+# wherever the problem is the same problem. What differs is the big case that
+# rejects a correct-but-slow answer: it is sized per land, and in several
+# quests it exists in one land and not another. Whether a generated input can
+# punish the naive answer is a fact about the language and its compiler, and
+# each land measured it rather than assuming it.
+# Go converts `02.window`, `08.kth-largest` and `20.lis`. `02` takes
+# n = 500000 rather than the usual 200000 because at 200000 the quadratic
+# answer came home in 6.3 s against a 5 s limit, and a 1.26x margin is a
+# coincidence rather than a gate.
+
 pack = "go.hacker"
 land = "go"
 category = "hacker"

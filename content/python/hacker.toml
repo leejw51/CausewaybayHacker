@@ -35,6 +35,22 @@
 #
 # Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
 
+#
+# **Which quests enforce their complexity differs by land, and that is a
+# measurement rather than an oversight.** All four packs hold the same problems
+# in the same order under the same ids, and the small cases are identical
+# wherever the problem is the same problem. What differs is the big case that
+# rejects a correct-but-slow answer: it is sized per land, and in several
+# quests it exists in one land and not another. Whether a generated input can
+# punish the naive answer is a fact about the language and its compiler, and
+# each land measured it rather than assuming it.
+# Python converts `16.union-find`, following the edge convention
+# `29.dijkstra` already uses in this same pack. It leaves `06.stack` alone on
+# a measurement that holds for every land: on generated values the naive
+# next-greater scan takes 0.09 s against the intended 0.05 s, because the scan
+# is only quadratic on near-descending input, which this generator never
+# produces.
+
 pack = "python.hacker"
 land = "python"
 category = "hacker"
