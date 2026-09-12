@@ -1,0 +1,8 @@
+main.cpp:9:9: error: use of undeclared identifier 'totl'; did you mean 'total'?
+    9 |         totl += i;
+      |         ^~~~
+      |         total
+main.cpp:7:9: note: 'total' declared here
+    7 |     int total = 0;
+      |         ^
+1 error generated.

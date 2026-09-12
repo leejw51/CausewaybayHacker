@@ -16,7 +16,8 @@ nothing else.
    ───────                          ─────────────                ────
    vite + ts + three.js  ──ws──▶    axum + tokio         ──▶     rustc / cargo
    scenes, sprites, input   json    sqlite (bm25+vec)    ──▶     go build / go test
-   key derivation (local)           ~/.causewaybayhacker
+   key derivation (local)           ~/.causewaybayhacker ──▶     c++ -std=c++20
+                                                         ──▶     python3 -I
 ```
 
 ## 0. The shape of the thing
@@ -24,7 +25,8 @@ nothing else.
 A 16-bit trainer. A rust coder in Causeway Bay lost their craft to vibe coding —
 Skynet's plan all along — and takes it back one street at a time.
 
-* Two **lands**: `rust`, `go`. The player picks one; the other is still there.
+* Four **lands**: `rust`, `go`, `cpp`, `python`. The player picks one; the
+  others are still there.
 * Three **categories** per land: `basic` (grammar), `advanced` (threads,
   mutexes, lifetimes, channels), `hacker` (HackerRank-style timed quests).
 * Each category is a **map** — a Super Mario World overworld of numbered nodes
@@ -59,13 +61,19 @@ directory holds a user's own work and nothing else on the machine needs it.
 │       ├── profile.json            display name, chosen land, settings
 │       └── attempts/
 │           └── <attempt_id>/       one directory per submission, kept
-│               ├── main.rs | main.go
+│               ├── main.rs | main.go | main.cpp | main.py
 │               ├── stdout.txt
 │               ├── stderr.txt
 │               └── result.json
+├── edits/                          the undo/redo stacks' sources (§2.3)
+│   └── <address>/
+│       └── <quest_id>/
+│           └── <sha256>.rs | .go | .cpp | .py     content-addressed
 ├── build/                          scratch; safe to delete when the server is down
 │   ├── go/{gocache,gomodcache}
-│   └── rust/{cargo-home,target}
+│   ├── rust/{cargo-home,target}
+│   ├── cpp/                        one directory per attempt; no cache to keep
+│   └── python/                     one directory per attempt; no cache to keep
 └── logs/server.jsonl               one JSON object per line
 ```
 
@@ -269,6 +277,37 @@ CREATE TABLE snippets (
 );
 CREATE INDEX snippets_by_user ON snippets(address, updated_at DESC);
 
+-- ---------- the edit stack (PROTOCOL §4.11c) ----------
+-- The order of the undo/redo entries lives here; the source itself lives on
+-- disk, content-addressed under `edits/` (§1). A row is tens of bytes and a
+-- source is up to 256 KiB — see §2.3 for why the blob is not a column.
+CREATE TABLE edit_stack (
+  address       TEXT NOT NULL REFERENCES users(address) ON DELETE CASCADE,
+  quest_id      TEXT NOT NULL REFERENCES quests(id) ON DELETE CASCADE,
+  seq           INTEGER NOT NULL,          -- 1-based position, contiguous
+  sha           TEXT NOT NULL,             -- sha256 of the source; names the file
+  bytes         INTEGER NOT NULL,          -- length of that source, so "how
+                                           -- big is this stack" is a query and
+                                           -- not a hundred stat() calls. It is
+                                           -- an upper bound: entries sharing a
+                                           -- sha share one file on disk.
+  created_at    TEXT NOT NULL,
+  PRIMARY KEY (address, quest_id, seq)
+);
+
+-- One row per stack. The cursor is not a column on `edit_stack` because
+-- `cursor = 0` — "the editor shows the starter" — is a legal state with no
+-- entry to hang it on, on a stack that may have no entries at all.
+CREATE TABLE edit_cursor (
+  address       TEXT NOT NULL REFERENCES users(address) ON DELETE CASCADE,
+  quest_id      TEXT NOT NULL REFERENCES quests(id) ON DELETE CASCADE,
+  cursor        INTEGER NOT NULL DEFAULT 0, -- 0..the stack's depth
+                -- No CHECK: the bound is a count of rows in the other table,
+                -- which SQLite cannot express here. This invariant is the
+                -- code's, and `backend/core/tests/edits.rs` is where it is held.
+  PRIMARY KEY (address, quest_id)
+);
+
 -- ---------- AI drill sessions ----------
 CREATE TABLE drills (
   id            TEXT PRIMARY KEY,          -- 'drl_' + 16 hex
@@ -293,6 +332,19 @@ CREATE TABLE quest_vec (
   dim           INTEGER NOT NULL,
   model         TEXT NOT NULL,             -- embedder id, §8.2
   vec           BLOB NOT NULL              -- dim * f32, little-endian
+);
+
+-- The quests' prose in other languages (§12.1). English stays on `quests`
+-- and is what search indexes and the checksum covers; a translation is a
+-- row per (quest, locale) that the read path substitutes on request.
+CREATE TABLE quest_text (
+  quest_id      TEXT NOT NULL REFERENCES quests(id) ON DELETE CASCADE,
+  locale        TEXT NOT NULL,             -- ko | yue | zh | ja | cs
+  title         TEXT NOT NULL,
+  story         TEXT NOT NULL,
+  brief         TEXT NOT NULL,             -- markdown; same code blocks as the English
+  hints         TEXT NOT NULL,             -- JSON array, same length as quests.hints
+  PRIMARY KEY (quest_id, locale)
 );
 
 -- ---------- sessions ----------
@@ -321,6 +373,54 @@ CREATE TABLE sessions (
   `\n…truncated N bytes` line. The untruncated copy is on disk (§1).
 * A quest whose `checksum` changed keeps its `progress` rows. Content is edited
   constantly; progress is not thrown away for a typo fix.
+
+### 2.3 The edit stack
+
+PROTOCOL §4.11c's undo/redo, stored in two halves: SQLite owns the order, the
+file system owns the text.
+
+**Why not a `source` column.** The rows are small and the text is not. The cap
+is 100 entries per quest per player and a source may be 256 KiB, so at the
+ceiling a table with the source in a column is 25 MiB *per quest* for one
+player who used their undo button — inside a database whose every other row is
+a few hundred bytes and which is read on every map draw. Real sources are a few
+KB and the worst case will not happen; the shape is the argument, not the
+number. The order of the entries is a query; a source file is a blob; putting
+the blob where the queries are makes the database the wrong shape. So
+`edit_stack` holds a sha and a file holds the bytes:
+
+```
+~/.causewaybayhacker/edits/<address>/<quest_id>/<sha256>.<ext>
+```
+
+`<ext>` is the land's source extension — `rs`, `go`, `cpp`, `py`, the same
+`source_filename(lang)` that names the file in an attempt directory (§1), so
+one of these opens in an editor and compiles by hand like anything else the
+player wrote. `<address>` is the lowercase form (§3.4), as it is under
+`users/`.
+
+**Content-addressed**, which pays for itself twice. An undo, a redo, and an
+edit back to a text the stack has already seen write no new bytes, because the
+sha is already on disk — a player toggling between two versions costs two
+files, not twenty. And a file is unlinked only when no row anywhere references
+its sha, which is what makes CLEAR STACK give the disk back rather than merely
+forgetting the rows that pointed at it.
+
+The invariant is in both directions: no row may name a sha with no file, and no
+file may outlive the last row that named it. A foreign key does the first half
+of that when a quest or a user disappears, but `ON DELETE CASCADE` deletes rows
+and not files — whatever removes the rows has to sweep the directory in the
+same breath, or the home directory quietly keeps the history of a quest that no
+longer exists.
+
+**Why the cursor is its own table.** `cursor` is a property of the stack rather
+than of any entry in it, and `cursor = 0` — "show the starter" — is a legal
+state with no entry to hang it on, on a stack that may itself be empty. A
+`current` flag on `edit_stack` would have to be maintained across every undo,
+and a stack with no flag set would be indistinguishable from a corrupt one.
+
+A stack is per `(address, quest_id)`: two quests never share one, and neither
+do two players.
 
 ---
 
@@ -401,7 +501,8 @@ payload that carries an address is ignored, not trusted.
 ### 4.1 Quest ids
 
 `<land>.<category>.<node:02d>.<slug>` — `rust.basic.03.shadowing`,
-`go.hacker.07.two-sum`. Stable forever; the slug is part of it so a reordered
+`go.hacker.07.two-sum`, `cpp.basic.01.hello`, `python.advanced.17.the-gil`.
+Stable forever; the slug is part of it so a reordered
 map does not renumber someone's cleared list into nonsense. If a node moves,
 the `node` column changes and the id does not.
 
@@ -437,13 +538,36 @@ go build -o prog main.go        # or: go test -run . -json
 with `GOCACHE`, `GOMODCACHE`, `GOFLAGS=-mod=mod`, `GOPATH` all under
 `build/go/`, and `GOPROXY=off` — a quest does not fetch the internet.
 
+**C++**
+
+```
+c++ -std=c++20 -O2 -pthread -Wall main.cpp -o prog
+```
+
+`c++` is the system driver (clang on macOS, gcc on Linux). No package cache.
+Formatter: `clang-format --style=LLVM` on stdin (optional: `is_supported` may be true
+only when `clang-format` is on PATH).
+
+**Python**
+
+```
+python3 -m py_compile main.py        # the "compile" phase: SyntaxError ⇒ compile_error
+python3 -I main.py                    # the run, per case, under the same limits
+```
+
+`-I` = isolated mode (no user site, no PYTHON* env). Needs Python ≥ 3.10.
+No formatter (`is_supported("python") == false`).
+
+Both are stdio-harness only. `Harness::Cargo` / `Harness::Gotest` remain
+rust-only / go-only; `unsupported()` returns a message for any other pairing.
+
 ### 5.2 The test spec
 
 `quests.tests` is JSON:
 
 ```json
 {
-  "harness": "stdio",            // "stdio" | "cargo" | "gotest"
+  "harness": "stdio",            // "stdio" | "cargo" | "gotest" — cargo is rust-only, gotest go-only; cpp and python are stdio-only
   "timeout_ms": 5000,
   "compile_timeout_ms": 30000,
   "max_stdout_bytes": 262144,
@@ -572,6 +696,9 @@ Client → server, and the reply payload:
 | `quest.hint` | `{quest_id, index}` | `{hint, hints_used}` |
 | `quest.solve` | `{quest_id}` | `{source, hints_used}` — PROTOCOL §4.11b |
 | `quest.reset` | `{quest_id}` | `{starter}` |
+| `edit.state` | `{quest_id}` | `EditState` — PROTOCOL §4.11c |
+| `edit.push` | `{quest_id, source}` | `EditState` |
+| `edit.undo` / `edit.redo` / `edit.clear` | `{quest_id}` | `EditState` |
 | `search.query` | `{q, mode, filters?, limit?}` | `{hits:[SearchHit]}` |
 | `stats.summary` | `{}` | `{cleared, attempts, accuracy, streak, by_land}` |
 | `stats.mistakes` | `{limit?}` | `{mistakes:[MistakeStat]}` |
@@ -644,28 +771,34 @@ type MistakeStat = {
 A mistake is classified by the compiler's own identity for it, not by a
 regex on prose. Rust: `--error-format=json` gives `code.code` (`E0382`) and a
 span. Go: the message text is matched against a small table and normalized.
+C++: the same, over clang's and gcc's prose (they word one mistake two ways,
+and the slug is what they share); a program the kernel stopped is identified
+by its signal. Python: `py_compile` for the one compile-time row, and
+otherwise the last `XxxError:` line of the traceback, which is the whole
+identity Python gives. Every code is prefixed by its land except Rust's,
+whose codes are the compiler's own: `go:`, `cpp:`, `py:`.
 
 Kinds (the slug stored in `mistakes.kind`), each mapped from one or more codes:
 
-| kind | rust | go |
-| --- | --- | --- |
-| `borrow-after-move` | E0382, E0505 | — |
-| `borrow-conflict` | E0499, E0502 | — |
-| `lifetime` | E0106, E0597, E0621, E0373 | — |
-| `type-mismatch` | E0308 | `cannot use … as … value` |
-| `unknown-name` | E0425, E0433 | `undefined: X` |
-| `missing-trait` | E0277 | — |
-| `unused` | unused_variables, unused_imports | `declared and not used`, `imported and not used` |
-| `mutability` | E0596, E0594 | — |
-| `nil-deref` | — | runtime `nil pointer dereference` |
-| `index-range` | runtime `index out of bounds` | runtime `index out of range` |
-| `data-race` | — | `go test -race` report |
-| `deadlock` | — | `all goroutines are asleep` |
-| `unhandled-error` | E0277 *discriminated*, see below | `err` assigned and not checked |
-| `syntax` | any parse error | any parse error |
-| `wrong-answer` | — | — (verdict, not a compiler code) |
-| `timeout` | — | — |
-| `other` | anything unmatched, with its code kept | same |
+| kind | rust | go | cpp | python |
+| --- | --- | --- | --- | --- |
+| `borrow-after-move` | E0382, E0505 | — | `cpp:use-after-move` (clang `-Wall`) | — |
+| `borrow-conflict` | E0499, E0502 | — | — | — |
+| `lifetime` | E0106, E0597, E0621, E0373 | — | — | — |
+| `type-mismatch` | E0308 | `cannot use … as … value` | `cpp:no-matching-function`, `cpp:cannot-convert` | `py:type-error` (`TypeError`) |
+| `unknown-name` | E0425, E0433 | `undefined: X` | `cpp:undeclared-identifier` | `py:name-error` (`NameError`) |
+| `missing-trait` | E0277 | — | — | `py:attribute-error` (`AttributeError`, not on `None`) |
+| `unused` | unused_variables, unused_imports | `declared and not used`, `imported and not used` | `cpp:unused` (`-Wall`) | — |
+| `mutability` | E0596, E0594 | — | `cpp:const-discard` | — |
+| `nil-deref` | — | runtime `nil pointer dereference` | `cpp:segfault` (signal 11 / `Segmentation fault`) | `py:none-attribute` (`AttributeError: 'NoneType'`) |
+| `index-range` | runtime `index out of bounds` | runtime `index out of range` | `cpp:out-of-range` (`std::out_of_range`) | `py:index-error`, `py:key-error` |
+| `data-race` | — | `go test -race` report | — | — |
+| `deadlock` | — | `all goroutines are asleep` | — (not detectable; it is a `timeout`) | — |
+| `unhandled-error` | E0277 *discriminated*, see below | `err` assigned and not checked | `cpp:abort` (`terminate called` / signal 6) | `py:zero-division`, `py:value-error`, `py:exception` (any other uncaught) |
+| `syntax` | any parse error | any parse error | `cpp:expected-token` | `py:syntax` (`SyntaxError`, `IndentationError`) |
+| `wrong-answer` | — | — (verdict, not a compiler code) | — | `py:recursion` (`RecursionError`) |
+| `timeout` | — | — | — | — |
+| `other` | anything unmatched, with its code kept | same | `cpp:other` | same |
 
 An unmatched code is stored as `other` with `code` set, so the taxonomy can
 grow from real data instead of guesses. **Never drop a code you did not
@@ -848,7 +981,7 @@ Both orientations are first-class on every screen, not just the map.
 ```
 backend/            Rust workspace
   core/             domain: store, quests, progress, mistakes, search, drills
-  runner/           compile + run, rust and go, limits and streaming
+  runner/           compile + run, rust, go, cpp and python, limits and streaming
   server/           axum, the websocket, the message catalogue, static files
   cli/              `cwbhacker`: serve, import, prune, doctor
 love2d/             LÖVE 11.5 desktop client, same protocol
@@ -863,8 +996,11 @@ frontend/           vite + ts + three.js
 content/            quest packs (TOML), one file per land+category
   rust/{basic,advanced,hacker}.toml
   go/{basic,advanced,hacker}.toml
+  cpp/{basic,advanced,hacker}.toml
+  python/{basic,advanced,hacker}.toml
+  i18n/<locale>/<land>.<category>.toml   translations of the packs above (§12.1)
 docs/               decisions.md, story.md, art.md
-tests/vectors/      shared fixtures: addresses, signatures, mistake sources
+tests/vectors/      shared fixtures: addresses, signatures, mistake sources (four lands)
 e2e/                playwright: the whole loop, both orientations
 ```
 
@@ -934,7 +1070,7 @@ cases = [
 
 > **Use `'''`, not `"""`, for every field holding code.** TOML's `"""` is a
 > multi-line *basic* string and processes backslash escapes, so a `'\n'` inside
-> a quest's Rust or Go source is silently rewritten to a real newline before
+> a quest's source (in any land) is silently rewritten to a real newline before
 > the compiler ever sees it, and the quest breaks in a way that looks like a
 > compiler bug. `'''` is a multi-line *literal* string and passes the bytes
 > through. `brief`, `story`, `starter` and `solution` are always `'''`.
@@ -985,3 +1121,87 @@ Rules:
   `hacker` quest must additionally carry at least one hidden case.
 * `solution` is mandatory and is run by CI (SPEC §9.4). A quest without a
   working reference answer does not get imported.
+
+### 12.1 Translations
+
+A pack is written in English and stays English: `content/<land>/<category>.toml`
+is the source, the thing the checksum covers and the thing search indexes. A
+translation is a second file, in a tree of its own so the importer can never
+mistake one for the other:
+
+```
+content/i18n/<locale>/<land>.<category>.toml      locale ∈ ko yue zh ja cs
+```
+
+```toml
+pack   = "rust.basic"
+locale = "ko"
+
+[[quest]]
+id    = "rust.basic.01.first-light"
+title = "첫 불빛"
+story = "06:40, 자딘스 바자 위. 커서만 깜박이고 회색 안내문은 사라졌다."
+brief = '''
+정확히 다음을 출력하세요:
+
+```
+hello, causewaybay
+```
+
+소문자, 쉼표 하나, 공백 하나, 한 줄. 그 외에는 아무것도 없어야 합니다.
+'''
+hints = [
+  "println!은 매크로이므로 느낌표를 붙입니다.",
+  "문자열은 정확해야 합니다: 소문자, 쉼표 하나, 그 뒤 공백 하나.",
+]
+```
+
+It carries the four prose fields and nothing else. There is no `node`, no
+`starter`, no `solution`, no `tests`: a translation cannot move a quest or
+change what it checks, only say it in another language. The directory is the
+locale and the file name is the pack, so a reader — and CI — finds the file
+for a language without opening every one; a file whose `locale` or `pack`
+disagrees with where it sits is misfiled and refused.
+
+Rules:
+
+* `locale` is one of `ko`, `yue`, `zh`, `ja`, `cs`. English is not a locale
+  here because English is the source. Anything else is refused.
+* `brief` and `story` are `'''` literal strings, for the reason §12 gives:
+  the brief carries the English brief's code blocks verbatim, and a `"""`
+  string would eat their escapes.
+* **Code is not translated.** Code blocks, identifiers, sample stdin and
+  stdout, and the exact strings the program must print are the English pack's,
+  copied byte for byte; `verify_pack.py --i18n` compares the fenced blocks.
+  Titles are translated — they were uppercase in English because that is how
+  the map draws them; in a CJK locale write them naturally.
+* `hints` has exactly as many entries as the English quest. Hints are revealed
+  by index and priced per hint (§6.3), so a count that differs would hand out
+  a hint the English does not have or run out one early. The importer refuses
+  the whole file rather than trimming it.
+* Every `id` is `<land>.<category>.<NN>.<slug>` and belongs to `pack`. An id
+  that no imported pack supplies is logged and skipped, not fatal: a
+  translation that runs ahead of a content edit is stale, not wrong, and the
+  rows that still match are worth serving. A file may therefore cover a pack
+  partially and the importer keeps what it can.
+* **Coverage is reported, correctness is enforced.** `verify_pack.py --i18n`
+  fails on a file that breaks any rule above, and prints — without failing —
+  how far each language has got. Translating 207 quests into five languages is
+  incremental by nature, and a gate that only goes green on the last one is
+  red for months and stops meaning anything, while a player whose language is
+  half done gets the translated quests and English for the rest, which is the
+  design working rather than a bug. `--require-complete` turns coverage back
+  into a failure, for the sweep that finishes a language.
+
+How to write one — the register per language, the terminology that is fixed,
+what is never translated, and the order to work in — is `docs/translating.md`.
+
+The importer runs after every English pack, in one transaction per file,
+replacing whatever that locale had for that pack (there is no user state on
+`quest_text`, so delete-and-insert is the honest reconciliation, and a quest
+the file no longer translates goes back to English). On the wire
+(PROTOCOL §4.7, §4.8, §4.10) a client sends its UI locale; where a row exists
+the server substitutes the four fields and marks the object `text_locale`
+with the language, and where none does the English goes out marked `"en"`.
+Search hits stay English: the index is the English text, and a hit is a
+pointer to a quest, not a rendering of it.

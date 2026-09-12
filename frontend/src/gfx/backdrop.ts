@@ -71,10 +71,17 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
-/** Per-land sky. Rust burns orange over the harbour; Go is colder and greener. */
+/**
+ * Per-land sky. Rust burns orange over the harbour; Go is colder and greener.
+ * C++ is noon on the typhoon shelter, a hard blue with the sun glaring off the
+ * water; Python is the wet market at dawn, amber coming up under a night that
+ * has not quite gone.
+ */
 const SKY: Record<Land, { top: number; bottom: number; glow: number }> = {
   rust: { top: 0x161e50, bottom: 0x2c1a1e, glow: 0xf27828 },
   go: { top: 0x111c3c, bottom: 0x122c34, glow: 0x50d8f8 },
+  cpp: { top: 0x1c4a8c, bottom: 0x0a1e3c, glow: 0xd8ecff },
+  python: { top: 0x1a1a44, bottom: 0x3c2810, glow: 0xffd43b },
 };
 
 /**

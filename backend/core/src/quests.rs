@@ -1,10 +1,26 @@
 //! Reading content back out: the quest row, and the world and map shapes the
 //! wire asks for (SPEC §6.2, §6.3).
 
+use std::collections::HashMap;
+
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 
 use crate::error::{not_found, Result};
+
+/// The locales a translation pack may carry (SPEC §12.1). English is not in
+/// the list because English is the source: it lives on `quests`, never on
+/// `quest_text`, and asking for it is asking for no substitution at all.
+pub const TEXT_LOCALES: &[&str] = &["ko", "yue", "zh", "ja", "cs"];
+
+/// What a client's `locale?` means to the read path. Anything outside
+/// `TEXT_LOCALES` — absent, empty, `"en"`, or a string nobody has written a
+/// pack for — is English. Never an error: a client's UI locale is its own
+/// business, and refusing `quest.get` over it would break the screen that
+/// was going to show the English anyway.
+pub fn text_locale(locale: Option<&str>) -> Option<&str> {
+    locale.filter(|l| TEXT_LOCALES.contains(l))
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Quest {
@@ -26,6 +42,22 @@ pub struct Quest {
     pub tests: serde_json::Value,
     pub checksum: String,
     pub map: MapPos,
+    /// Which language `title`, `brief`, `story` and `hints` are in right now.
+    /// `"en"` straight out of the database; `localized` swaps the four in
+    /// from `quest_text` and says so here, so `to_wire` can tell the client
+    /// which half of its screen is which.
+    pub text_locale: String,
+}
+
+/// One row of `quest_text`: a quest's four prose fields in one language.
+#[derive(Debug, Clone, Serialize)]
+pub struct QuestText {
+    pub quest_id: String,
+    pub locale: String,
+    pub title: String,
+    pub story: String,
+    pub brief: String,
+    pub hints: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -56,6 +88,10 @@ impl Quest {
             "title": self.title,
             "brief": self.brief,
             "story": self.story,
+            // PROTOCOL §5.3: the language of the four prose fields above (and
+            // of the hints `quest.hint` will hand out). `"en"` unless a
+            // translation was substituted in.
+            "text_locale": self.text_locale,
             "difficulty": self.difficulty,
             "time_limit_s": self.time_limit_s,
             "starter": self.starter,
@@ -101,6 +137,36 @@ impl Quest {
             object.insert("under_interview".into(), serde_json::json!(true));
         }
         value
+    }
+
+    /// The same quest with its prose in `locale`, when a `quest_text` row
+    /// exists for it; unchanged otherwise. The code fields — starter,
+    /// solution, tests — are never touched: a translation is prose only
+    /// (SPEC §12.1), and the program the player must write is the same one.
+    pub fn localized(mut self, conn: &Connection, locale: Option<&str>) -> Result<Quest> {
+        if let Some(text) = get_text(conn, &self.id, locale)? {
+            self.apply_text(text);
+        }
+        Ok(self)
+    }
+
+    fn apply_text(&mut self, text: QuestText) {
+        // The hint count is checked at import, so `hints_total` cannot change
+        // under a player between the map and the screen. Checked again here
+        // for the row an older importer might have written: a short array
+        // would make `quest.hint` say not_found on an index the English has.
+        if text.hints.len() == self.hints.len() {
+            self.hints = text.hints;
+        } else {
+            tracing::warn!(
+                quest = %self.id, locale = %text.locale,
+                "quest_text hint count differs from the English; keeping English hints"
+            );
+        }
+        self.title = text.title;
+        self.story = text.story;
+        self.brief = text.brief;
+        self.text_locale = text.locale;
     }
 
     fn tests_wire(&self) -> serde_json::Value {
@@ -168,6 +234,67 @@ fn row_to_quest(row: &rusqlite::Row<'_>) -> rusqlite::Result<Quest> {
             y: row.get(17)?,
             kind: row.get(18)?,
         },
+        text_locale: "en".into(),
+    })
+}
+
+/// The `quest_text` row for one quest in one locale, or `None` when there is
+/// nothing to substitute — which includes every locale that is not one of
+/// `TEXT_LOCALES`, so a caller can pass the client's string straight through.
+pub fn get_text(
+    conn: &Connection,
+    quest_id: &str,
+    locale: Option<&str>,
+) -> Result<Option<QuestText>> {
+    let Some(locale) = text_locale(locale) else {
+        return Ok(None);
+    };
+    Ok(conn
+        .query_row(
+            "SELECT quest_id, locale, title, story, brief, hints
+               FROM quest_text WHERE quest_id = ?1 AND locale = ?2",
+            params![quest_id, locale],
+            row_to_text,
+        )
+        .optional()?)
+}
+
+/// Every `quest_text` row of one map in one locale, keyed by quest id. One
+/// query rather than one per node, because `world.map` is the screen a
+/// player sees most and 34 lookups on every visit is the kind of thing that
+/// is fine until it is not.
+pub fn texts_for(
+    conn: &Connection,
+    land: &str,
+    category: &str,
+    locale: Option<&str>,
+) -> Result<HashMap<String, QuestText>> {
+    let mut out = HashMap::new();
+    let Some(locale) = text_locale(locale) else {
+        return Ok(out);
+    };
+    let mut stmt = conn.prepare(
+        "SELECT t.quest_id, t.locale, t.title, t.story, t.brief, t.hints
+           FROM quest_text t JOIN quests q ON q.id = t.quest_id
+          WHERE q.land = ?1 AND q.category = ?2 AND t.locale = ?3",
+    )?;
+    let rows = stmt.query_map(params![land, category, locale], row_to_text)?;
+    for row in rows {
+        let text = row?;
+        out.insert(text.quest_id.clone(), text);
+    }
+    Ok(out)
+}
+
+fn row_to_text(row: &rusqlite::Row<'_>) -> rusqlite::Result<QuestText> {
+    let hints: String = row.get(5)?;
+    Ok(QuestText {
+        quest_id: row.get(0)?,
+        locale: row.get(1)?,
+        title: row.get(2)?,
+        story: row.get(3)?,
+        brief: row.get(4)?,
+        hints: serde_json::from_str(&hints).unwrap_or_default(),
     })
 }
 

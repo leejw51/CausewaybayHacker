@@ -1,0 +1,626 @@
+# RUST LAND — ADVANCED, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/rust/advanced.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "rust.advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.advanced.01.threads"
+title = "Dvě pokladny, jeden pult"
+story = "Pobočka v Times Square v poledne otevře druhou pokladnu a fronta se konečně pohne. Nic jiného se v obchodě nezměnilo."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` celých čísel.
+
+Spusť jedno vlákno na každou hodnotu, které spočítá její druhou mocninu.
+Připoj je (join) **v pořadí, v jakém jsi je spustil**, a vypiš každý výsledek
+na vlastní řádek, potom `THREADS <n>`.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+Právě připojení v pořadí dělá výstup stejný při každém běhu. Vlákno, které by
+vypisovalo samo za sebe, by takové nebylo.
+'''
+hints = [
+  "thread::spawn vrací JoinHandle<T>, kde T je cokoli, co vrací uzávěra.",
+  "join() ti dá Result<T, _> — Err je panika a unwrap je tu poctivý.",
+  "Vezmi si počet před smyčkou; iterace hodnotou ten Vec spotřebuje.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.advanced.02.move"
+title = "Vezmi si to s sebou"
+story = "Alex podá kurýrovi adresu na jediné kopii lístku a pak chce po pultu, aby ji přečetl zpátky."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` řádků textu.
+
+Spusť jedno vlákno na každý řádek, které vrátí řádek velkými písmeny. Připoj
+je v pořadí, vypiš každý, potom `DONE`.
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        DONE
+```
+
+Startovní kód se nezkompiluje: uzávěra si `line` půjčuje a `thread::spawn`
+nemá tušení, jak dlouho vlákno poběží, takže se nedá dokázat, že výpůjčka
+přežije déle než ono. Dej vláknu ten řetězec, ne pohled na něj.
+'''
+hints = [
+  "Chyba je E0373: closure may outlive the current function.",
+  "Jedno klíčové slovo před uzávěrou ji změní z půjčující na vlastnící.",
+  "line je už tak čerstvý String v každé iteraci, takže dát ho pryč nestojí nic.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.advanced.03.channels"
+title = "Jedno okénko, mnoho kurýrů"
+story = "Čtyřicet kurýrů, jedno výdejní okénko vzadu v kuchyni Times Square. Všechno jde okénkem a okénko se nikdy nezasekne."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` celých čísel.
+
+Spusť jedno vlákno na každou hodnotu. Každé pošle `(index, value * 10)`
+jediným kanálem `mpsc`. Hlavní vlákno je všechny přijme, seřadí podle indexu,
+vypíše `<index> <value>` po jednom na řádek, potom `RECV <n>`.
+
+```
+input:  3
+        1 2 3
+output: 0 10
+        1 20
+        2 30
+        RECV 3
+```
+
+Přijímání iterací přes `rx` skončí, až je zahozen **každý** odesílatel — a ten,
+který pořád drží `main`, se počítá. Zahoď ho, jinak program nikdy neskončí.
+'''
+hints = [
+  "Každé vlákno potřebuje vlastní Sender: tx.clone() před uzávěrou s move.",
+  "drop(tx) po smyčce. Bez něj přijímač čeká věčně na odesílatele, který sedí v main.",
+  "rx.iter() dává hodnoty, dokud se kanál nezavře, takže collect() je celá přijímací smyčka.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.advanced.04.mutex"
+title = "Jedna zásuvka, osm rukou"
+story = "Obě pokladny berou hotovost ze stejné zásuvky a při zavírce zásuvka nesouhlasí ani s jednou z nich."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` celých čísel.
+
+Spusť jedno vlákno na každou hodnotu, které ji přičte k **jednomu sdílenému
+součtu**. Připoj je všechna, potom vypiš `TOTAL <sum>` a `THREADS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        THREADS 4
+```
+
+Startovní kód se zkompiluje a je špatně: `i64` je `Copy`, takže každá uzávěra
+s `move` dostala vlastní soukromý součet a zahodila ho. Sdílej jeden a zamkni
+ho.
+'''
+hints = [
+  "Arc je sdílené vlastnictví; Mutex je výhradní přístup. Potřebuješ obojí, v tomto pořadí: Arc<Mutex<i64>>.",
+  "Arc::clone(&total) uvnitř smyčky, před uzávěrou s move — ten klon je to, co si každé vlákno bere.",
+  "Strážce (guard) z lock() se dereferencuje na hodnotu; *guard += value, a strážce odemkne, když vypadne z rozsahu platnosti.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.advanced.05.rwlock"
+title = "Mnoho čtenářů, jeden písař"
+story = "Rozcestník v Hysan Place se čte třistakrát za minutu a mění dvakrát denně, a zámek ten rozdíl nezná."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` slov.
+
+Drž `Arc<RwLock<HashMap<String, i64>>>`. Spusť jedno vlákno na každé slovo,
+které vezme zámek pro **zápis** a zvýší počet toho slova. Připoj je všechna,
+potom vezmi jeden zámek pro **čtení** a vypiš každé `<word> <count>` seřazené
+podle slova, potom `TOTAL <sum>`.
+
+```
+input:  3
+        tram
+        bus
+        tram
+output: bus 1
+        tram 2
+        TOTAL 3
+```
+
+Startovní kód se nezkompiluje. Bere zámek pro čtení a zkouší přes něj
+zapisovat, a `RwLockReadGuard` ti `&mut` nedá.
+'''
+hints = [
+  "write() vrací strážce, který se dereferencuje na &mut; read() vrací takového, který se dereferencuje jen na &.",
+  "Řazení Vec<(&String, &i64)> řadí nejdřív podle slova, což je přesně to, co výstup chce.",
+  "Drž strážce pro čtení ve vazbě, dokud přes něj iteruješ, jinak se dočasná hodnota zahodí dřív, než s ní skončíš.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.advanced.06.lifetimes"
+title = "Jak dlouho to platí"
+story = "Odjezdová tabule si drží pohled na jízdní řád místo jeho kopie a nikdo nezapsal, kdy se jízdní řád vyhazuje."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` řádků.
+
+Postav `Board`, která drží **vypůjčené** řezy `&str` ze vstupu — žádný
+`String`, žádná kopie — a dej jí `longest()` (při shodě vyhrává první řádek)
+a `bytes()`.
+
+Vypiš nejdelší řádek, potom kolik je řádků, potom jejich celkovou délku
+v bajtech.
+
+```
+input:  3
+        tram
+        percival street
+        mtr
+output: percival street
+        3
+        22
+```
+
+Startovní kód se nezkompiluje: struktura, která drží referenci, musí říct, jak
+dlouho ta reference platí. To je E0106 a oprava je parametr doby života na
+struktuře, na `impl` a na tom, co `longest` vrací.
+'''
+hints = [
+  "struct Board<'a> { lines: Vec<&'a str> } — struktura je teď generická přes dobu života.",
+  "impl<'a> Board<'a> — deklaruj ji, než ji použiješ, stejně jako typový parametr.",
+  "longest vrací &'a str, ne &str: odpověď přežije výpůjčku self, patří vstupu.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.advanced.07.generics"
+title = "Napiš to jednou"
+story = "Alex napsal largest čtyřikrát — pro jízdné, pro minuty, pro kurýry a pro názvy zastávek — a pátý má být hotový do konce směny."
+brief = '''
+Na standardním vstupu jsou dva řádky: celá čísla na prvním, slova na druhém.
+
+Napiš **jednu** `largest`, která funguje pro obojí, a generický `Pair<T>`
+s `larger()` a `smaller()`.
+
+Vypiš největší celé číslo, největší slovo, potom
+`PAIR <larger> <smaller>` pro `Pair` z prvních dvou celých čísel. Při shodě
+se za větší počítá `a`.
+
+```
+input:  4 8 15 16
+        tram bus mtr
+output: 16
+        tram
+        PAIR 8 4
+```
+
+Startovní kód se nezkompiluje: `largest` je přibitá na `i64`, takže předat jí
+slova je E0308.
+'''
+hints = [
+  "largest<T: PartialOrd + Copy> — PartialOrd na porovnání, Copy proto, že smyčka bere hodnoty z řezu ven.",
+  "&str je Copy i PartialOrd, takže stejná funkce vezme seznam slov beze změny.",
+  "Mez patří na blok impl, ne na strukturu: impl<T: PartialOrd> Pair<T>.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.advanced.08.iterator"
+title = "Vlastní cyklus for"
+story = "Tramvaj vyjmenuje každou zastávku od Shau Kei Wan po Kennedy Town a nikde si jejich seznam nedrží."
+brief = '''
+Na standardním vstupu jsou tři celá čísla: `start`, `step`, `count`.
+
+Implementuj `Iterator` pro `Stops` tak, aby dával `count` hodnot počínaje
+`start` a postupujících o `step`. Vypiš každou na vlastní řádek, potom
+`SUM <total>` spočítané vlastním `sum()` iterátoru.
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+Jakmile existuje `next`, dostaneš `for`, `sum`, `map`, `take` a všechno ostatní
+zadarmo. To je to, co ti implementace traitu kupuje.
+'''
+hints = [
+  "next vrací None, když už nic nezbývá, a právě to None ukončí cyklus for.",
+  "Ulož si hodnotu, kterou se chystáš vrátit, než posuneš dál, jinak jsi o jeden krok vedle.",
+  "left je odpočet; sniž ho pokaždé, když vydáš hodnotu.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.advanced.09.pipeline"
+title = "Kuchař na lince"
+story = "Noční kuchyně šéfkuchaře Bo běží jako linka: jedno stanoviště objednávku umocní, další drží průběžný součet a nikdo nečeká na celou dávku."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` celých čísel.
+
+Postav dvoustupňovou linku ze dvou kanálů `mpsc` a dvou vláken:
+
+1. první stupeň pošle každou hodnotu umocněnou na druhou
+2. druhý stupeň je přijímá, drží průběžný součet a posílá `(square, total)`
+
+`main` vypíše každou přijatou dvojici jako `<square> <total>`, potom `PIPE <n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+Odesílatel každého stupně je **přesunut do** jeho vlákna, takže je zahozen,
+když vlákno skončí, takže cyklus `for` dalšího stupně doběhne. Nech si kopii
+kdekoli a program se zasekne.
+'''
+hints = [
+  "Vezmi si počet, než nums přesuneš do prvního vlákna.",
+  "for square in rx1 uvnitř druhého vlákna je přijímací smyčka, která skončí, když první stupeň zahodí tx1.",
+  "Smyčka v main přes rx2 skončí, když skončí druhé vlákno, a proto se join potom nezasekne.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.advanced.10.async"
+title = "Kde async doopravdy běží"
+story = "Mei píše asynchronní Rust čtyři roky a ani jednou neviděla tu věc, která ho pohání."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` celých čísel.
+
+Žádný runtime tu není — žádné tokio, vůbec žádné crate. Napiš exekutor.
+
+Dokonči `block_on`, který polluje future, dokud není `Ready`, a vrátí hodnotu
+**a kolikrát polloval**. Potom přes `block_on` spusť blok `async`, který pro
+každou hodnotu v pořadí awaitne `double(v)`, vypíše každý výsledek, a vypiš
+`SUM <total>` a `POLLS <k>`.
+
+`double` jednou předá řízení (yield), než vrátí, takže každá hodnota stojí
+jeden poll navíc: `POLLS` je `n + 1`.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        POLLS 4
+```
+
+`async fn` je stavový automat, který implementuje `Future`, a `.await` je
+„pollni ten vnitřní; když je `Pending`, vrať `Pending` a zapamatuj si, kde
+jsem byl“. Nic neběží, dokud to něco nepolluje. To něco je třicet řádků a
+napsat je jednou má větší cenu než pětkrát si o tom číst.
+'''
+hints = [
+  "Box::pin ti dá Pin<Box<F>> bez jakéhokoli unsafe a .as_mut() z něj udělá Pin<&mut F>, který poll chce.",
+  "Context::from_waker(&waker) je celý ten obřad — Waker je to, čím by tě skutečný runtime znovu naplánoval.",
+  "Tento exekutor při Pending točí naprázdno. Skutečný by vlákno uspal, dokud se waker neozve, a to je jediný zajímavý rozdíl.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.advanced.11.send-sync"
+title = "Proč to nepřejde"
+story = "Stejný kód, stejný Vec, jedno slovo jinak, a jeden z těch dvou se nezkompiluje. Řekni které slovo a proč."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` celých čísel.
+
+Sečti je ve dvou vláknech přes jeden sdílený součet, potom vypiš:
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        SEND ARC OK
+        SYNC MUTEX OK
+```
+
+Poslední dva řádky se vypíší jen tehdy, když `assert_send` a `assert_sync`
+ten handle přijmou — a ty dvě funkce za běhu nedělají nic. Jsou to
+`fn assert_send<T: Send>(_: &T) {}`: kontrolou je ta mez a odehraje se při
+kompilaci, nebo vůbec.
+
+Startovní kód se nezkompiluje a ta chyba je lekce. `Rc` není `Send`, protože
+jeho počítadlo referencí je obyčejné neatomické celé číslo — dvě vlákna
+klonující jeden `Rc` by na něm soupeřila, takže kompilátor `Rc` přes hranici
+vlákna vůbec nepustí. `Arc` je totéž s atomickým počítadlem a `Send` je.
+
+`Sync` je druhá polovina: `T` je `Sync`, když `&T` je `Send`. `Mutex<T>` je
+`Sync` pro každé `T: Send`, protože právě zámek dělá sdílený přístup
+bezpečným.
+'''
+hints = [
+  "Chyba je E0277: `Rc<Mutex<i64>>` cannot be sent between threads safely. Změní se jeden název typu a s ním jeden import.",
+  "Počítadlo v Rc je obyčejné usize; v Arc je to AtomicUsize. Ten jediný rozdíl je celý důvod, proč jeden je Send a druhý ne.",
+  "assert_sync(&*total) se ptá na samotný Mutex, ne na Arc kolem něj — Mutex<T> je Sync, kdykoli T je Send.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.advanced.12.dispatch"
+title = "Teď, nebo později"
+story = "Stejné dvě výlohy, stejné vykreslení, a zkoušející chce na tabuli obě podoby naráz."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` řádků `SHOP <NAME> <FLOOR>` nebo
+`STOP <ROUTE>`.
+
+Vykresli každou značku **dvakrát**: jednou přes
+`render_static<T: Sign>(sign: &T)` a jednou přes
+`render_dynamic(sign: &dyn Sign)`, v tomto pořadí — všechny statické, potom
+všechny dynamické. Potom vypiš `DYNAMIC <k>`, délku
+`Vec<Box<dyn Sign>>`.
+
+```
+input:  3
+        SHOP HYSAN 4
+        STOP 2
+        SHOP SOGO 1
+output: HYSAN / F4
+        TRAM 2
+        SOGO / F1
+        HYSAN / F4
+        TRAM 2
+        SOGO / F1
+        DYNAMIC 3
+```
+
+Obě dají stejný text a nejsou totéž. `render_static` je monomorfizovaná:
+kompilátor vyrazí jednu kopii na každý konkrétní typ a volání je přímé a dá se
+inlinovat — ale typ musí být známý **na místě volání**, a proto se statický
+průchod musí odehrát uvnitř parsovací větve, kde ještě víš, co jsi postavil.
+
+`render_dynamic` bere tlustý ukazatel — data plus vtable — vyhledá metodu za
+běhu a je jí jedno, co drží. To je jediný důvod, proč jeden `Vec` může držet
+obojí.
+'''
+hints = [
+  "render_static se musí volat tam, kde je konkrétní typ ještě vidět — uvnitř větve match, než se hodnota zabalí do Box.",
+  "sign.as_ref() promění &Box<dyn Sign> v &dyn Sign; předání samotného boxu by potřebovalo druhou dereferenci.",
+  "Obě funkce mají stejné jednořádkové tělo. Rozdíl je celý v signatuře a celý v tom, kde se metoda vyhledává.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.advanced.13.interior-mutability"
+title = "Změna přes sdílenou referenci"
+story = "Počítadlo na dveřích musí růst, zatímco čtyři různé kusy kódu se na něj jen dívají."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` celých čísel.
+
+Vypiš čtyři řádky:
+
+1. `CELL <k>` — `Cell<usize>` zvýšený jednou na každou hodnotu, přečtený zpět
+   přes `.get()`, to vše přes obyčejnou referenci `&`
+2. `REF <sum>` — kniha (ledger) naplněná hodnotami a sečtená
+3. `RC <k>` — kniha je `Rc<RefCell<Vec<i64>>>` a držíš k ní **dva** handly;
+   vypiš `Rc::strong_count`, dokud jsou oba naživu
+4. `DOUBLE panic` — vezmi dva `borrow_mut()` na stejném `RefCell` naráz,
+   schválně, a chyť paniku přes `std::panic::catch_unwind`
+
+```
+input:  3
+        1 2 3
+output: CELL 3
+        REF 6
+        RC 2
+        DOUBLE panic
+```
+
+`&T` normálně znamená, že to nikdo nemůže změnit. `Cell` a `RefCell` jsou
+povolená výjimka a platí za ni každý jinou měnou: `Cell` jen přesouvá celé
+hodnoty dovnitř a ven, takže nepotřebuje vůbec žádnou kontrolu; `RefCell`
+vydává skutečné reference, a proto musí vynucovat pravidla výpůjček — za běhu,
+panikou, místo při kompilaci chybou.
+
+`Rc<RefCell<T>>` je dvojice, po které nakonec sáhne každý, a stojí za to umět
+říct, co dělá která polovina. `Rc` dává hodnotě víc než jednoho vlastníka —
+neatomické počítadlo referencí, takže není `Send` a nepřejde přes vlákno (to
+byla mapa `send-sync`). `RefCell` dává těm vlastníkům právo měnit. Ani jedno
+není `Mutex`. Sdílené **a** měnitelné je přesně to, co borrow checker při
+kompilaci odmítá, takže tenhle vzor si to kupuje zpátky za běhu a účtuje ti
+paniku, když to uděláš špatně.
+
+Ta panika není chyba v úloze. Je to ta cena a vidět ji jednou je celý smysl.
+'''
+hints = [
+  "Cell nemá borrow(): přes get() dostaneš kopii ven a přes set() vložíš celou hodnotu dovnitř. Proto nepotřebuje žádnou evidenci za běhu.",
+  "ledger.borrow_mut().push(v) jako jeden příkaz nechá strážce zahodit u středníku, což je to, co drží smyčku legální.",
+  "catch_unwind potřebuje kolem uzávěry AssertUnwindSafe, protože zachytává &RefCell; hlášení paniky jde stejně na stderr, který testy nečtou.",
+  "Rc::clone(&ledger) se píše takhle, a ne .clone(), aby čtenář viděl, že se kopíruje handle, a ne Vec. Rc::strong_count ukazuje 2, dokud jsou oba handly naživu, a ty dva borrow_mut() v testu paniky mohou přijít po jednom z každého handlu — je to stejný RefCell a počítá je dohromady.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.advanced.14.custom-error"
+title = "Vlastní chyba"
+story = "Čtyři vrstvy služby jízdného si každá vymyslely vlastní typ selhání a žádná z nich se nechce převést."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` řádků, každý má být vzdálenost
+v km.
+
+Definuj `enum FareError { NotANumber, Negative(i64) }`, implementuj pro něj
+`Display` a `std::error::Error` a implementuj
+`From<std::num::ParseIntError> for FareError`, aby `?` převáděl sám.
+
+`fare(text) -> Result<i64, FareError>` parsuje pomocí `?`, odmítne zápornou
+vzdálenost a jinak vrací `500 + 100 * km`. Vypiš každý výsledek nebo text
+chyby z `Display`, potom `ERRORS <k>`.
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative distance: -2
+        ERRORS 2
+```
+
+Startovní kód se nezkompiluje. `?` chybu jen nepropaguje — cestou ven volá
+`From::from`, a bez toho impl neexistuje cesta od `ParseIntError` k tvému
+typu. Implementace `From` je to, co nechá `?` fungovat přes hranici vrstvy, a
+je to celý důvod, proč mít chybové enumy.
+
+`map_err` je druhá polovina odpovědi, pro případ, že chceš přidat kontext,
+a ne převést typ. Zmiň ho, když se zeptají; tady potřeba není.
+'''
+hints = [
+  "Chyba je E0277 na tom `?`: the trait From<ParseIntError> is not implemented for FareError.",
+  "Šest řádků: impl From<ParseIntError> for FareError s fn from, která vrací FareError::NotANumber.",
+  "Display je to, co vypisuje {}; Debug je to, co vypisuje {:?}; trait Error je to, co ho pustí do Box<dyn Error>. Všechny tři stojí za to mít a jen jeden je tu potřeba.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.advanced.15.atomics"
+title = "Jedno slovo, žádný zámek"
+story = "Počítadlo turniketu zámek nepotřebuje. Všechno ostatní ve strojovně ano, a rozeznat je od sebe je ta práce."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` celých čísel.
+
+Spusť jedno vlákno na každou hodnotu. Každé přičte svou hodnotu ke sdílenému
+`AtomicI64` a zvýší sdílený `AtomicUsize` o jedna — nikde žádný `Mutex`.
+Připoj je všechna a vypiš `TOTAL <sum>` a `HITS <n>`.
+
+Potom: deklaruj dvě hodnoty `Guard` **na začátku** `main`, pojmenované `first`
+a `second`, jejichž `Drop` vypíše `DROP <name>`. Proběhnou na konci `main`, po
+všem ostatním, v obráceném pořadí deklarace.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+        DROP second
+        DROP first
+```
+
+Atomik není levnější mutex; je to jiný nástroj, pro jedno strojové slovo
+přečtené, změněné a zapsané v jediné instrukci. Ve chvíli, kdy potřebuješ, aby
+spolu souhlasily dvě položky, je zámek zpátky — pro „tyhle dvě věci dohromady“
+žádný atomik není.
+
+`Ordering::Relaxed` tu stačí, protože nic nezávisí na tom, *kdy* se tyhle
+přírůstky stanou viditelnými vůči jakémukoli jinému zápisu, jen na tom, že se
+žádný neztratí. Tahle věta je doplňující otázka a je to celé, co `Relaxed`
+znamená.
+'''
+hints = [
+  "fetch_add vrací předchozí hodnotu a přičtení provede atomicky; není tu žádný zámek ani strážce.",
+  "Arc je pořád potřeba — atomik dělá bezpečným *přístup*, ne *sdílení*.",
+  "Drop běží v obráceném pořadí deklarace, takže `second` jde první. Navázání jako _first a _second je udrží naživu do konce main; holé `_` by je zahodilo okamžitě.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.advanced.16.closure-kinds"
+title = "Tři druhy uzávěr"
+story = "Zkoušející napíše na tabuli `Fn`, `FnMut` a `FnOnce` a ptá se, který z nich má být ten callback. Správná odpověď existuje."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` celých čísel, `n` aspoň jedna.
+
+Použij jednu uzávěru od každého druhu:
+
+* `apply_fn<F: Fn(i64) -> i64>` — zachytí první hodnotu kopií a přičte ji
+  ke každé hodnotě. Vypiš každý výsledek.
+* `apply_fn_mut<F: FnMut(i64)>` — zvyšuje počítadlo, které žije v `main`.
+  Vypiš `SEEN <k>`.
+* `apply_once<F: FnOnce() -> String>` — **přesune** `String` ven ze svého
+  zachycení a vrátí ho. Vypiš `TAKEN <s>`, kde ten řetězec je
+  `<n> items`.
+
+```
+input:  3
+        10 20 30
+output: 20
+        30
+        40
+        SEEN 3
+        TAKEN 3 items
+```
+
+Ty tři traity jsou hierarchie, ne nabídka: každé `Fn` je `FnMut` a každé
+`FnMut` je `FnOnce`. Co uzávěra implementuje, rozhoduje to, co se svými
+zachycenými hodnotami *dělá* — čte je (`Fn`), mění je (`FnMut`), nebo je
+spotřebuje (`FnOnce`) — a `move` mění, jak se zachytí, ne který trait z toho
+vyjde.
+
+Startovní kód se nezkompiluje. `apply_once` chce `Fn`, a uzávěra, která svůj
+`String` dává pryč, se dá zavolat jen jednou, takže je `FnOnce` a nic víc.
+Ber nejslabší mez, se kterou místo volání vyžije: chtěj `FnOnce`, když voláš
+jednou, a nevyloučil jsi bezdůvodně každou jinou uzávěru.
+'''
+hints = [
+  "Chyba je E0525: expected a closure implementing Fn, but this one only implements FnOnce.",
+  "Mění se jedno slovo: mez na apply_once. Uzávěra je už správně.",
+  "apply_fn_mut bere `mut f: F` — parametr sám musí být měnitelný, aby uzávěra mohla měnit své vlastní zachycené hodnoty.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.advanced.17.deadlock"
+title = "Uváznutí"
+story = "Strojovna v Times Square, dvě patra pod zemí. Dva zámky, dvě vlákna a oba eskalátory se zastavily v téže vteřině."
+brief = '''
+Dva účty, `A` a `B`, každý `Arc<Mutex<i64>>`.
+
+Na standardním vstupu jsou počáteční zůstatky na prvním řádku, počet `n` na
+druhém a potom `n` řádků `<FROM> <TO> <AMOUNT>` s `FROM`/`TO` z `{A, B}`.
+
+Spusť každý převod ve vlastním vlákně, připoj je všechna, potom vypiš
+`A <balance>`, `B <balance>`, `MOVED <n>`.
+
+```
+input:  100 100
+        2
+        A B 30
+        B A 10
+output: A 80
+        B 120
+        MOVED 2
+```
+
+Ve startovním kódu jsou špatně dvě věci a jen jedna z nich je vidět na
+výstupu. Odečte ze zdroje a nikdy nepřičte cíli — to je ta viditelná chyba. Ta
+druhá je tvar: zamykat *nejdřív zdroj* znamená, že dva opačné převody mohou
+každý držet jeden zámek a čekat na druhý, navždy.
+
+Vezmi oba zámky, **vždy ve stejném globálním pořadí** — `A`, potom `B`, ať
+peníze jdou kterýmkoli směrem — a cyklus nemůže vzniknout.
+'''
+hints = [
+  "Zamkni oba účty, než sáhneš na kterýkoli zůstatek, a vždy ve stejném pořadí.",
+  "Který strážce dostane minus, rozhoduje směr peněz, ne to, který zámek se bere první.",
+  "Oba strážci se na konci transfer zahodí, v obráceném pořadí, což je v pořádku — záleží na pořadí získání.",
+]

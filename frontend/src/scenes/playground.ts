@@ -31,13 +31,13 @@ import {
   type Ctx,
   type Rect,
 } from "../engine/ui";
-import { Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import { Buttons, footer, frame, header, landColour, titledPanel, landName } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
-import { Editor } from "../ui/editor";
+import { Editor, MAIN_FILE } from "../ui/editor";
 import { Overlay } from "../ui/overlay";
 import { LogBuffer } from "../net/logbuf";
 import { WireError } from "../net/client";
-import { playerText } from "../net/protocol";
+import { isLand, LANDS, playerText } from "../net/protocol";
 import { t } from "../i18n";
 import type { Land, PlaygroundRun, RunStage, SnippetBrief } from "../net/protocol";
 import { LandsScene } from "./lands";
@@ -50,6 +50,8 @@ const AUTOSAVE_AFTER = 2.5;
 const STARTER: Record<Land, string> = {
   rust: 'fn main() {\n    println!("hello, causewaybay");\n}\n',
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hello, causewaybay")\n}\n',
+  cpp: '#include <iostream>\n\nint main() {\n    std::cout << "hello, causewaybay\\n";\n}\n',
+  python: 'print("hello, causewaybay")\n',
 };
 
 const OUTCOME: Record<PlaygroundRun["outcome"], () => string> = {
@@ -205,7 +207,7 @@ export class PlaygroundScene implements Scene {
       this.held = {
         id: typeof v.id === "string" ? v.id : null,
         name: typeof v.name === "string" ? v.name : "SCRATCH",
-        lang: v.lang === "go" ? "go" : "rust",
+        lang: isLand(v.lang) ? v.lang : "rust",
         source: v.source,
         dirty: v.dirty === true,
       };
@@ -452,8 +454,7 @@ export class PlaygroundScene implements Scene {
     else if (hit.id === "new") this.fresh();
     else if (hit.id === "delete") void this.remove();
     else if (hit.id === "back") void this.app.go(new LandsScene(this.app), "back");
-    else if (hit.id === "rust") this.setLang("rust");
-    else if (hit.id === "go") this.setLang("go");
+    else if (isLand(hit.id)) this.setLang(hit.id);
     else if (hit.id.startsWith("snip:")) void this.load(hit.id.slice(5));
   }
 
@@ -575,7 +576,7 @@ export class PlaygroundScene implements Scene {
         fill(g, open ? Theme.navy : Theme.ink, inner[0], ry, inner[2], rowH - 2, open ? 0.95 : 0.5);
         fill(
           g,
-          snip.lang === "rust" ? RUST : GO,
+          landColour(snip.lang),
           inner[0],
           ry,
           Math.round(4 * s),
@@ -600,7 +601,7 @@ export class PlaygroundScene implements Scene {
         printf(
           g,
           fonts.stationSm,
-          snip.lang.toUpperCase(),
+          landName(snip.lang),
           inner[0],
           ry + Math.round((rowH - fonts.stationSm.height) / 2),
           inner[2] - Math.round(8 * s),
@@ -659,8 +660,8 @@ export class PlaygroundScene implements Scene {
   private drawBench(g: Ctx, rect: Rect, s: number): void {
     const { layout } = this.app;
     const fonts = ensureFonts(s);
-    const accent = this.held.lang === "rust" ? RUST : GO;
-    const label = this.held.lang === "rust" ? "main.rs" : "main.go";
+    const accent = landColour(this.held.lang);
+    const label = MAIN_FILE[this.held.lang];
     const inner = titledPanel(g, rect, `${label}   ${this.stageLabel()}`, accent);
 
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
@@ -668,19 +669,19 @@ export class PlaygroundScene implements Scene {
     const stdinH = Math.max(Math.round(46 * s), fonts.codeSm.height * 2 + Math.round(16 * s));
     const outH = Math.round(inner[3] * (layout.isPortrait() ? 0.3 : 0.28));
     const labels = [t("pg.run"), t("pg.format"), t("pg.save"), t("pg.maps")];
-    // The language pair is laid out first and taken out of the row's width,
-    // like SUBMIT on the quest screen: it is a *state*, not an action, and it
-    // is painted lit so the screen says which file you are in twice over.
-    const [langW, langH] = btnBox(
-      fonts.button,
-      [t("pg.rust")],
-      0,
-      fonts.button.size * 2,
-      layout.minTouchH(),
-    );
-    const [goW] = btnBox(fonts.button, [t("pg.go")], 0, fonts.button.size * 2, layout.minTouchH());
+    // The language buttons are laid out first and taken out of the row's
+    // width, like SUBMIT on the quest screen: they are a *state*, not an
+    // action, and the chosen one is painted lit so the screen says which file
+    // you are in twice over. One box per land, each as wide as its own label.
+    const langBoxes = LANDS.map((land) => {
+      const label = t(`pg.${land}` as "pg.rust");
+      const [bw, bh] = btnBox(fonts.button, [label], 0, fonts.button.size * 2, layout.minTouchH());
+      return { land, label, bw, bh };
+    });
+    const langH = langBoxes[0].bh;
     const langGap = Math.round(fonts.button.size * 0.5);
-    const rowW = inner[2] - langW - goW - langGap * 2 - Math.round(fonts.button.size * 1.6);
+    const langsW = langBoxes.reduce((n, b) => n + b.bw, 0) + langGap * (langBoxes.length - 1);
+    const rowW = inner[2] - langsW - langGap - Math.round(fonts.button.size * 1.6);
     const rows = rowsIn(fonts.button, labels, rowW, layout.minTouchH());
     const bandH = rows * btnH + (rows - 1) * Math.round(fonts.button.size * 0.5);
     const editorH = Math.max(60, inner[3] - bandH - stdinH - outH - gap * 3);
@@ -732,32 +733,31 @@ export class PlaygroundScene implements Scene {
       layout.minTouchH(),
     );
 
-    // RUST | GO, at the far end of the band.
+    // RUST | GO | C++ | PYTHON, at the far end of the band, laid right to left
+    // so the last land sits flush with the edge whatever the labels measure.
     const langY = rowY + Math.round((btnH - langH) / 2);
-    const goX = inner[0] + inner[2] - goW;
-    const rustX = goX - langGap - langW;
-    for (const [id, bx, bw] of [
-      ["rust", rustX, langW],
-      ["go", goX, goW],
-    ] as Array<[Land, number, number]>) {
+    let bx = inner[0] + inner[2];
+    for (const { land: id, label, bw } of [...langBoxes].reverse()) {
+      bx -= bw;
       const on = this.held.lang === id;
       const hover = this.buttons.hovered === id;
       if (on) {
-        panel(g, bx, langY, bw, langH, id === "rust" ? RUST : GO);
+        panel(g, bx, langY, bw, langH, landColour(id));
         g.fillStyle = css(Theme.ink);
         printf(
           g,
           fonts.button,
-          id.toUpperCase(),
+          label,
           bx,
           langY + 8 + Math.floor((langH - 8 - fonts.button.height) * 0.5),
           bw,
           "center",
         );
       } else {
-        pixBtn(g, fonts.button, bx, langY, bw, langH, id.toUpperCase(), { hover, quiet: true });
+        pixBtn(g, fonts.button, bx, langY, bw, langH, label, { hover, quiet: true });
       }
-      this.buttons.add({ id, rect: [bx, langY, bw, langH], label: id.toUpperCase() });
+      this.buttons.add({ id, rect: [bx, langY, bw, langH], label });
+      bx -= langGap;
     }
 
     this.drawOutput(

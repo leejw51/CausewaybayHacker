@@ -269,7 +269,7 @@ fn help(frame: &mut Frame, area: Rect) {
         Line::from("  e             open $EDITOR on your file, and wait"),
         Line::from("  r             run — visible cases only, nothing cleared"),
         Line::from("  s             submit — every case, for the record"),
-        Line::from("  f             rustfmt / gofmt your file"),
+        Line::from("  f             rustfmt / gofmt / clang-format your file"),
         Line::from("  h             take a hint (this costs stars)"),
         Line::from("  [ ]           previous / next land and category"),
         Line::from("  ⇥             move focus between the map and the output"),

@@ -20,24 +20,23 @@ import {
   Buttons,
   footer,
   frame,
-  GO,
   header,
-  RUST,
+  landColour,
   titledPanel,
   type Stack,
 } from "../ui/chrome";
 import { CLOCK, clockPulse, reducedMotion, seconds, Tween } from "../engine/motion";
-import { Editor } from "../ui/editor";
+import { Editor, MAIN_FILE } from "../ui/editor";
 import { Overlay } from "../ui/overlay";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
-import type { Attempt, Category, Land, Quest, RunStage } from "../net/protocol";
+import type { Attempt, Category, EditState, Land, Quest, RunStage } from "../net/protocol";
 import { LogBuffer } from "../net/logbuf";
 import { blocks } from "../ui/markdown";
 import { clipMessage, copyText, readText } from "../ui/clip";
 import { readEnumPref, readNumberPref, writePref } from "../ui/prefs";
 import { LandsScene } from "./lands";
-import { locale, t, tn } from "../i18n";
+import { locale, t, tn, type Locale } from "../i18n";
 import { MapScene } from "./map";
 import { ResultScene } from "./result";
 
@@ -65,6 +64,18 @@ const STACKS = ["auto", "row", "column"] as const;
 const FONT_MIN = 0.7;
 const FONT_MAX = 2.4;
 const FONT_STEP = 0.15;
+
+/**
+ * How long typing has to stop before the edit stack takes a copy.
+ *
+ * A step on the server's stack should be *a thought*, not a keystroke.
+ * CodeMirror's own history is already the per-keystroke one and it is better
+ * at that job than anything across a socket could be; this stack is the
+ * coarse one that survives a reload and follows the player to the other
+ * client, so pushing on every change would fill a hundred-entry stack with
+ * half a line of typing and make UNDO useless for the thing it is for.
+ */
+const PUSH_IDLE_MS = 1500;
 
 /**
  * Expected output with its whitespace made visible. "your answer is right but
@@ -107,6 +118,21 @@ export function hintsRemaining(total: number, used: number): number {
 }
 
 /**
+ * Whether the brief panel has to say "the brief is in English".
+ *
+ * The server answers `text_locale` (PROTOCOL §4.8): the language the prose
+ * actually arrived in, `"en"` when no translation exists for the quest. The
+ * note is owed whenever that is not the language the rest of the screen is
+ * in — a Korean panel with an English paragraph inside and no explanation
+ * reads as a translation somebody abandoned halfway. A server too old to send
+ * the field sent English, so an absent value is `"en"`, and an English UI
+ * around English prose has nothing to explain.
+ */
+export function briefNeedsNote(textLocale: string | undefined, uiLocale: string): boolean {
+  return (textLocale ?? "en") !== uiLocale;
+}
+
+/**
  * What a `quest.solve` reply means for the screen.
  *
  * Two facts and no drawing: the hint counter has moved (the server just set
@@ -120,6 +146,50 @@ export function solveOutcome(
   res: { source: string; hints_used: number },
 ): { replace: boolean; hintsUsed: number } {
   return { replace: res.source !== buffer, hintsUsed: res.hints_used };
+}
+
+/** Which of UNDO, REDO and CLEAR STACK can be pressed. True means live. */
+export interface EditControls {
+  undo: boolean;
+  redo: boolean;
+  clear: boolean;
+}
+
+/**
+ * The three buttons, from the state the server last sent.
+ *
+ * `null` is the case this function mostly exists for: it is what a server that
+ * does not answer `edit.*` leaves behind, and the answer then is that all
+ * three are dim. The screen must keep working against such a server — the
+ * stack is an addition to the bench, not a thing the bench depends on — so
+ * "no state" and "a state with nothing in it" both come out as "nothing to
+ * press" rather than as a fault anybody is told about.
+ *
+ * `busy` is one call at a time, the same guard `formatting` and `solving`
+ * already are: every one of the five messages rewrites the whole state, so two
+ * in flight at once would apply in whichever order the replies happened to
+ * land.
+ */
+export function editControls(state: EditState | null, busy: boolean): EditControls {
+  if (!state || busy) return { undo: false, redo: false, clear: false };
+  // `can_undo`/`can_redo` are the server's own answer and are not re-derived
+  // from the cursor here; CLEAR has no flag of its own because there is only
+  // one thing to ask — whether there is any history to throw away.
+  return { undo: state.can_undo, redo: state.can_redo, clear: state.depth > 0 };
+}
+
+/**
+ * What the editor should hold after an undo or a redo.
+ *
+ * `??` and not `||`, for the reason `openingSource` already carries a test
+ * for: **an empty entry is a real entry**. A player who selected all, deleted,
+ * and let the stack take a copy has an empty string on it, and `||` would hand
+ * them the starter back — which reads as UNDO jumping two steps rather than
+ * one. `null` is the separate case where the cursor is at the bottom of the
+ * stack and there is no entry at all, and *then* the starter is right.
+ */
+export function editorTextFor(state: EditState, starter: string): string {
+  return state.source ?? starter;
 }
 
 /**
@@ -146,12 +216,26 @@ const STREET: Record<string, string> = {
   "go/basic": "bg_mtr",
   "go/advanced": "bg_times",
   "go/hacker": "bg_till",
+  // The two newer lands borrow plates until they have their own. C++ LAND is
+  // the typhoon shelter at noon (the street), the pump room under Victoria
+  // Park (the closest thing to machinery is the datacentre) and the third
+  // interview in Room 7-32. PYTHON LAND is the wet market (a till is a stall
+  // with a price board), the SOGO basement food hall (Times Square is the
+  // nearest retail floor we have painted) and the fourth interview, same room.
+  "cpp/basic": "bg_street",
+  "cpp/advanced": "bg_datacentre",
+  "cpp/hacker": "bg_room732",
+  "python/basic": "bg_till",
+  "python/advanced": "bg_times",
+  "python/hacker": "bg_room732",
 };
 
 export class QuestScene implements Scene {
   readonly name = "quest";
   readonly mood = "quest" as const;
   private quest: Quest | null = null;
+  /** The UI locale the current `quest` was fetched with; see `update`. */
+  private askedLocale: Locale | null = null;
   private editor: Editor | null = null;
   private overlay: Overlay | null = null;
   private readonly buttons = new Buttons();
@@ -178,6 +262,33 @@ export class QuestScene implements Scene {
   private formatting = false;
   /** And one answer-key call at a time, for the same reason. */
   private solving = false;
+  /**
+   * The edit stack as the server last described it, or `null` when it has
+   * never described it — which is also what a server without `edit.*` leaves
+   * here. Nothing about the stack is modelled locally: every reply is the
+   * whole state and this field is simply the latest one.
+   */
+  private edit: EditState | null = null;
+  /** One stack call at a time; see `editControls`. */
+  private editBusy = false;
+  /**
+   * Set once the server has said it does not have the edit stack.
+   *
+   * Without it the idle push would ask a server that answered `not_found` once
+   * to answer it again every 1.5 seconds for as long as somebody is typing.
+   * One refusal is enough: the three buttons stay dim, nothing is said to the
+   * player, and the rest of the bench is untouched.
+   */
+  private editGone = false;
+  /** The pending idle push, so typing again postpones it. */
+  private pushTimer: number | null = null;
+  /**
+   * The source the stack most recently agreed with — what was pushed, or what
+   * an undo or a redo just put in the editor. The idle push compares against
+   * it so that replacing the buffer from the stack cannot immediately push it
+   * straight back.
+   */
+  private lastPushed: string | null = null;
   /**
    * What the editor was opened with — the draft the server had, or the
    * starter. The baseline `unsaved()` measures against, and it moves every
@@ -258,18 +369,31 @@ export class QuestScene implements Scene {
     );
 
     try {
-      const res = await this.app.client.request("quest.get", { quest_id: this.questId });
+      // §4.8: the prose comes back in the UI language when the server has a
+      // translation pack for it, and `text_locale` says which it got.
+      this.askedLocale = locale();
+      const res = await this.app.client.request("quest.get", {
+        quest_id: this.questId,
+        locale: this.askedLocale,
+      });
       this.quest = res.quest;
       // §4.8. The editor opens on the player's own most recent run or submit,
       // fetched from the server with the quest itself — no local storage, no
       // save button, nothing new sent. A player who typed for ten minutes and
       // closed the tab finds what they left, on any machine they log in from.
       this.opened = openingSource(this.draft, res.quest);
-      this.editor = new Editor(this.land, this.opened, () => {
-        /* the source is read on submit; there is nothing to save locally */
-      });
+      this.lastPushed = this.opened;
+      // The source is read on submit and there is nothing to save locally —
+      // but a change is the one moment the edit stack cares about, so it
+      // starts the idle timer that eventually takes a copy.
+      this.editor = new Editor(this.land, this.opened, () => this.touched());
       this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
       queueMicrotask(() => this.editor?.focus());
+      // Deliberately *not* inside this try. The stack is an addition to the
+      // bench and a server without it must not make the quest itself look
+      // broken: a failure here has to land somewhere that says nothing, not in
+      // the catch below that puts "could not open the quest" on the screen.
+      void this.loadEditState();
     } catch (e) {
       if (e instanceof WireError) {
         console.warn("quest.get failed:", e.payload.code, e.payload.message, e.payload.detail);
@@ -283,6 +407,7 @@ export class QuestScene implements Scene {
   leave(): void {
     for (const off of this.offs) off();
     this.offs.length = 0;
+    this.cancelPush();
     this.overlay?.destroy();
     this.editor?.destroy();
     this.editor = null;
@@ -348,6 +473,13 @@ export class QuestScene implements Scene {
       // only the screen agreeing with the server about what is now saved, so
       // walking away afterwards asks no question it does not need to ask.
       this.opened = sent;
+      // A run and a submit are the two moments the draft is already saved, so
+      // they are the two moments the stack should have an entry — a player who
+      // ran something that worked wants to be able to get back to it. Fired
+      // and forgotten on purpose: `pushEdit` swallows its own failures, and a
+      // rejection allowed to reach the catch below would report a successful
+      // run as a failed one.
+      void this.pushEdit(sent);
       if (kind === "quest.run") {
         this.runResult = res.attempt;
         this.logScroll = 0;
@@ -455,6 +587,32 @@ export class QuestScene implements Scene {
     }
   }
 
+  /**
+   * Re-request the quest for its prose alone, after a language change. The
+   * guard is set before the await so a second frame does not ask again while
+   * the first answer is in flight.
+   */
+  private async refetchText(): Promise<void> {
+    if (!this.quest) return;
+    const asked = locale();
+    this.askedLocale = asked;
+    try {
+      const res = await this.app.client.request("quest.get", {
+        quest_id: this.quest.id,
+        locale: asked,
+      });
+      if (!this.quest || this.quest.id !== res.quest.id) return;
+      this.quest.title = res.quest.title;
+      this.quest.story = res.quest.story;
+      this.quest.brief = res.quest.brief;
+      this.quest.text_locale = res.quest.text_locale;
+      // Hints already bought stay in the language they were bought in; the
+      // next one is asked for in the new language.
+    } catch {
+      // The old prose is still on screen and still true; nothing to say.
+    }
+  }
+
   private async hint(): Promise<void> {
     if (!this.quest) return;
     if (this.quest.hints_used >= this.quest.hints_total) return;
@@ -462,6 +620,7 @@ export class QuestScene implements Scene {
       const res = await this.app.client.request("quest.hint", {
         quest_id: this.quest.id,
         index: this.quest.hints_used,
+        locale: locale(),
       });
       this.hints.push(res.hint);
       if (this.quest) this.quest.hints_used = res.hints_used;
@@ -539,6 +698,205 @@ export class QuestScene implements Scene {
       this.editor.load(this.land, this.quest.starter);
       this.opened = this.quest.starter;
     }
+  }
+
+  // -- the edit stack -------------------------------------------------------
+
+  /**
+   * Ask what the stack looks like, when the screen opens — and open on it.
+   *
+   * **The stack wins over the draft** (PROTOCOL §4.11c). `draft` is a read of
+   * the last *attempt*, so it moves only when the player runs or submits,
+   * while the stack also moves on the idle push and on undo and redo. A player
+   * who typed for a minute and closed the tab without running has their
+   * typing on the stack and not in the draft: opening on the draft would show
+   * them an older text and read as work lost, which is the exact failure
+   * persisting the stack exists to prevent.
+   *
+   * Only when the buffer is **untouched** since it opened, though. The reply
+   * is a round trip away and the player may already be typing into it, and
+   * nothing here is worth overwriting a live keystroke for.
+   */
+  private async loadEditState(): Promise<void> {
+    if (!this.quest || this.editGone) return;
+    try {
+      const res = await this.app.client.request("edit.state", { quest_id: this.quest.id });
+      // The scene may have been left while this was in flight.
+      if (!this.editor) return;
+      this.edit = res;
+      const next = editorTextFor(res, this.quest.starter);
+      if (res.depth > 0 && !this.unsaved() && next !== this.editor.source) {
+        this.editor.replaceAll(next);
+        this.opened = next;
+        this.lastPushed = next;
+      }
+    } catch (e) {
+      this.editFailed(e, "edit.state");
+    }
+  }
+
+  /**
+   * A step back or forward through the stack, into the editor.
+   *
+   * The gate is checked here as well as on the button because the keyboard
+   * reaches this without going past a button at all, and an undo at the bottom
+   * of the stack should be silence rather than a refusal on the message bar.
+   */
+  private async editStep(kind: "edit.undo" | "edit.redo"): Promise<void> {
+    if (!this.quest || !this.editor || this.editGone) return;
+    const live = editControls(this.edit, this.editBusy);
+    if (!(kind === "edit.undo" ? live.undo : live.redo)) return;
+    this.editBusy = true;
+    try {
+      const res = await this.app.client.request(kind, { quest_id: this.quest.id });
+      this.applyEdit(res);
+      this.app.chip.blip();
+    } catch (e) {
+      this.editFailed(e, kind);
+    } finally {
+      this.editBusy = false;
+    }
+  }
+
+  /** The state the server just sent, and the text that goes with it. */
+  private applyEdit(state: EditState): void {
+    this.edit = state;
+    if (!this.editor || !this.quest) return;
+    const next = editorTextFor(state, this.quest.starter);
+    // Both of these before the buffer changes, not after: `replaceAll`
+    // dispatches an edit, the edit calls `touched`, and an idle push of the
+    // text the stack just handed us would be a pointless round trip.
+    this.lastPushed = next;
+    this.cancelPush();
+    this.editor.replaceAll(next);
+    // The caret goes back into the editor for the same reason PASTE hands it
+    // over: the player pressed a canvas button and the next thing they want to
+    // do is type.
+    this.editor.focus();
+  }
+
+  /**
+   * Throw the history away, having asked first.
+   *
+   * The only control on this bench that is behind a dialogue, and the
+   * asymmetry is deliberate. PASTE and SOLVE replace the buffer and are not
+   * behind one, because CTRL+Z puts the buffer back and a dialogue nobody
+   * needs is a dialogue everybody learns to click through. This throws away
+   * the thing that would have put it back, on the server, for good — there is
+   * nothing left to undo it with.
+   */
+  private async clearStack(): Promise<void> {
+    if (!this.quest || this.editGone) return;
+    if (!editControls(this.edit, this.editBusy).clear) return;
+    const ok = await this.app.ask({
+      title: t("quest.clearStack"),
+      body: t("quest.clearStackAsk"),
+      confirm: t("quest.clearStack"),
+      cancel: t("quest.keepWriting"),
+    });
+    if (!ok || !this.quest) return;
+    this.editBusy = true;
+    try {
+      // The state is taken, the buffer is not: clearing the history is not an
+      // edit, and the player keeps whatever they are looking at.
+      this.edit = await this.app.client.request("edit.clear", { quest_id: this.quest.id });
+    } catch (e) {
+      this.editFailed(e, "edit.clear");
+    } finally {
+      this.editBusy = false;
+    }
+  }
+
+  /**
+   * Typing happened. Postpone the copy rather than take one.
+   *
+   * See `PUSH_IDLE_MS`: the stack step is meant to be a thought, so the timer
+   * restarts on every keystroke and only the pause at the end of one gets an
+   * entry.
+   */
+  private touched(): void {
+    if (this.editGone) return;
+    this.cancelPush();
+    this.pushTimer = window.setTimeout(() => {
+      this.pushTimer = null;
+      if (!this.editor) return;
+      // A pause that lands while some other `edit.*` is still in flight waits
+      // rather than being dropped: `pushEdit` refuses when the stack is busy,
+      // and a silently lost entry is exactly the sort of gap that makes an
+      // undo history untrustworthy.
+      if (this.editBusy) return this.touched();
+      void this.pushEdit(this.editor.source);
+    }, PUSH_IDLE_MS);
+  }
+
+  private cancelPush(): void {
+    if (this.pushTimer === null) return;
+    clearTimeout(this.pushTimer);
+    this.pushTimer = null;
+  }
+
+  /**
+   * Put one entry on the stack, quietly.
+   *
+   * Never throws and never says anything: this runs off a timer while
+   * somebody is typing, and a message bar that filled with "the stack did not
+   * answer" every second and a half would be worse than having no stack at
+   * all. `lastPushed` is set before the request rather than after so that a
+   * slow reply cannot let a second, identical push through behind it.
+   */
+  private async pushEdit(source: string): Promise<void> {
+    if (!this.quest || !this.editor || this.editGone || this.editBusy) return;
+    if (source === this.lastPushed) return;
+    this.lastPushed = source;
+    this.editBusy = true;
+    try {
+      const res = await this.app.client.request("edit.push", {
+        quest_id: this.quest.id,
+        source,
+      });
+      if (this.editor) this.edit = res;
+    } catch (e) {
+      this.editFailed(e, "edit.push");
+    } finally {
+      this.editBusy = false;
+    }
+  }
+
+  /**
+   * What a refused `edit.*` means, which is deliberately nothing on screen.
+   *
+   * `not_found` and `bad_request` from this family are one situation in
+   * practice — a server that has not shipped the messages at all, which
+   * answers an unknown type with one or the other — and the honest response is
+   * to stop asking and leave the three buttons dim for the rest of the visit.
+   * Anything else — a dropped socket, a busy server — is a server that *has*
+   * them and is having a moment, so the state stands and the next press or the
+   * next pause tries again.
+   *
+   * `edit.push` is the one exception, and `from` is here for it alone: it is
+   * the only one of the five that carries anything but a quest id, so a
+   * `bad_request` from it is the 256 KiB cap refusing one oversized source and
+   * says nothing at all about whether the server has the stack. Taking the
+   * feature away over that would dim UNDO and REDO over entries that exist and
+   * step perfectly well.
+   */
+  private editFailed(
+    e: unknown,
+    from: "edit.state" | "edit.push" | "edit.undo" | "edit.redo" | "edit.clear",
+  ): void {
+    if (e instanceof WireError) {
+      console.warn("edit stack:", from, e.payload.code, e.payload.message, e.payload.detail);
+    }
+    const absent =
+      e instanceof WireError &&
+      (e.payload.code === "not_found" ||
+        (e.payload.code === "bad_request" && from !== "edit.push") ||
+        e.payload.code === "unavailable" ||
+        e.payload.code === "proto_version");
+    if (!absent) return;
+    this.editGone = true;
+    this.edit = null;
+    this.cancelPush();
   }
 
   // -- leaving, and the one question worth asking ---------------------------
@@ -753,6 +1111,23 @@ export class QuestScene implements Scene {
       ev.preventDefault();
       void this.format();
     }
+    // Two undo histories, on one keystroke, and which one answers is decided
+    // by where the caret is.
+    //
+    // **Inside CodeMirror it is CodeMirror's**, untouched. That history is per
+    // keystroke and it is the one a person means while they are typing — a
+    // mistyped bracket is not a step on the server's stack and never should
+    // be. An accelerator reaches a scene even while the editor has the focus
+    // (that is how CTRL+ENTER works mid-thought), so this has to check rather
+    // than assume, and it deliberately does not `preventDefault` on that path.
+    //
+    // **Outside it, it is the server's**: the coarse stack, a thought per
+    // entry, the one that survives a reload and follows the player to the
+    // other client — the same thing the UNDO and REDO buttons drive.
+    if (name === "z" && (ev.metaKey || ev.ctrlKey) && !this.editor?.focused) {
+      ev.preventDefault();
+      void this.editStep(ev.shiftKey ? "edit.redo" : "edit.undo");
+    }
   }
 
   controls(): Buttons[] {
@@ -784,6 +1159,15 @@ export class QuestScene implements Scene {
         break;
       case "reset":
         void this.reset();
+        break;
+      case "undo":
+        void this.editStep("edit.undo");
+        break;
+      case "redo":
+        void this.editStep("edit.redo");
+        break;
+      case "clearstack":
+        void this.clearStack();
         break;
       case "console":
         this.consoleOpen = !this.consoleOpen;
@@ -824,6 +1208,13 @@ export class QuestScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
+    if (this.quest && this.askedLocale !== null && this.askedLocale !== locale()) {
+      // F7 changed the language under an open quest. The interface re-reads
+      // its own strings for free; the prose came from the server in the old
+      // language and has to be asked for again. Only the prose is swapped —
+      // the editor, the clock and the run log are the player's and stay.
+      void this.refetchText();
+    }
     this.briefIn.update(dt);
     this.clockIn.update(dt);
     this.clockSince += dt;
@@ -864,7 +1255,7 @@ export class QuestScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
-    const accent = this.land === "rust" ? RUST : GO;
+    const accent = landColour(this.land);
     const street = this.app.assets?.picture(
       STREET[`${this.land}/${this.category}`] ?? "bg_street",
       layout.isPortrait(),
@@ -1001,6 +1392,54 @@ export class QuestScene implements Scene {
   }
 
   /**
+   * The bench's own row, in the order it is laid out.
+   *
+   * RUN is filled and first; the hint button says how many are left rather
+   * than which one is next — `HINT 2` reads as "hint number two", which is not
+   * what it means. MAP used to be here, one gap from SUBMIT; it is in the
+   * toolbar at the top of the screen now, because a control that abandons the
+   * quest has no business sharing a row with the control that submits it.
+   *
+   * UNDO and REDO sit beside FORMAT because that is where the everyday
+   * housekeeping of a buffer lives. The two irreversible controls share the
+   * far end instead: RESET throws the buffer away and CLEAR STACK throws the
+   * way back to it away, and neither can be hit by a hand that was aiming at
+   * RUN. All three of the stack's buttons are drawn dim and are unhittable —
+   * `Buttons.hit` skips a dim button — whenever the server has not told us
+   * there is anything to step through, which includes a server that does not
+   * have the edit stack at all.
+   */
+  private benchItems(): Array<{
+    id: string;
+    label: string;
+    dim?: boolean;
+    primary?: boolean;
+  }> {
+    // `hints_used` comes back on `quest.get` (§5.3) and on every `quest.hint`,
+    // so leaving a quest and coming back does not offer a hint already paid for.
+    const hintsLeft = this.quest
+      ? hintsRemaining(this.quest.hints_total, this.quest.hints_used)
+      : 0;
+    const hintLabel = hintsLeft === 0 ? t("quest.noHints") : tn("quest.hintsLeft", hintsLeft);
+    const steps = editControls(this.edit, this.editBusy);
+    return [
+      {
+        id: "run",
+        label: this.stage === "idle" ? t("quest.run") : "…",
+        dim: this.stage !== "idle",
+        primary: this.stage === "idle",
+      },
+      { id: "format", label: t("quest.format"), dim: this.formatting },
+      { id: "undo", label: t("quest.undo"), dim: !steps.undo },
+      { id: "redo", label: t("quest.redo"), dim: !steps.redo },
+      { id: "hint", label: hintLabel, dim: hintsLeft <= 0 },
+      { id: "console", label: this.consoleOpen ? t("quest.hideLog") : t("quest.log") },
+      { id: "reset", label: t("quest.reset") },
+      { id: "clearstack", label: t("quest.clearStack"), dim: !steps.clear },
+    ];
+  }
+
+  /**
    * The strip between the header and the panels.
    *
    * It gets its own plate for the same reason the message bar does: this sits
@@ -1046,12 +1485,15 @@ export class QuestScene implements Scene {
     clipped(g, inner[0], inner[1], inner[2], inner[3], () => {
       // The one place a mixed-language screen has to be honest about itself.
       //
-      // The interface is translated and the 138 briefs are not — they belong
-      // to `content/` and translating them is a different, much larger job. A
-      // Korean panel with an English paragraph inside it and no explanation
-      // reads as a translation somebody abandoned halfway. One line saying
-      // which half is which turns it into a stated fact, and it costs a line.
-      if (locale() !== "en") {
+      // The interface is translated here; the briefs are translated in
+      // `content/i18n/` (SPEC §12.1), pack by pack, and the server says with
+      // `text_locale` which language this one actually arrived in. When that
+      // is not the language on screen — no pack for it yet, or a quest the
+      // pack has not reached — a Korean panel with an English paragraph
+      // inside it and no explanation reads as a translation somebody
+      // abandoned halfway. One line saying which half is which turns it into
+      // a stated fact, and it costs a line. See `briefNeedsNote`.
+      if (briefNeedsNote(this.quest!.text_locale, locale())) {
         g.fillStyle = css(Theme.cyan, 0.7);
         // Line by line rather than one `printf`, for the leading. Press Start
         // 2P has no room above its capitals, so when this wraps in Czech the
@@ -1174,19 +1616,13 @@ export class QuestScene implements Scene {
     const { layout } = this.app;
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
-    const label = this.land === "rust" ? "main.rs" : "main.go";
+    const label = MAIN_FILE[this.land];
     const inner = titledPanel(g, rect, `${label}   ${this.stageLabel()}`, accent);
 
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
     const consoleH = this.consoleOpen
       ? Math.round(inner[3] * (layout.isPortrait() ? 0.36 : 0.32))
       : 0;
-    // `hints_used` comes back on `quest.get` (§5.3) and on every `quest.hint`,
-    // so leaving a quest and coming back does not offer a hint already paid for.
-    const hintsLeft = this.quest
-      ? hintsRemaining(this.quest.hints_total, this.quest.hints_used)
-      : 0;
-    const hintLabel = hintsLeft === 0 ? t("quest.noHints") : tn("quest.hintsLeft", hintsLeft);
     // SUBMIT is laid out first and taken out of the row's width, so it sits at
     // the far end of the bench and the everyday buttons flow up to it. It is
     // the one control on this screen that spends an attempt, and a control that
@@ -1204,15 +1640,17 @@ export class QuestScene implements Scene {
     // and a band sized for one row put that button straight through the run
     // report underneath it — the report lost its first line to a button.
     const rowGap = Math.round(fonts.button.size * 0.5);
+    // The row's labels, in order, written once. The measurement below and the
+    // layout further down are handed the *same* list for the reason this file
+    // already carries a scar for: two lists that can disagree about how many
+    // lines they wrap onto will eventually disagree, and the button that lands
+    // past the band is drawn over whatever was under it. Three more controls
+    // makes this the most crowded row on the screen, so it matters more now
+    // than it did when there were five.
+    const rowItems = this.benchItems();
     const rows = rowsIn(
       fonts.button,
-      [
-        t("quest.run"),
-        t("quest.format"),
-        hintLabel,
-        this.consoleOpen ? t("quest.hideLog") : t("quest.log"),
-        t("quest.reset"),
-      ],
+      rowItems.map((i) => i.label),
       rowW,
       layout.minTouchH(),
     );
@@ -1270,30 +1708,7 @@ export class QuestScene implements Scene {
     } else this.overlay?.hide();
 
     const rowY = inner[1] + editorH + Math.round(8 * s);
-    this.buttons.row(
-      fonts.button,
-      [inner[0], rowY, rowW, bandH],
-      // RUN is filled and first; RESET is the destructive one and sits at the
-      // far end, where it cannot be hit on the way to anything else. And the
-      // hint button says how many are left rather than which one is next —
-      // `HINT 2` reads as "hint number two", which is not what it means.
-      [
-        {
-          id: "run",
-          label: this.stage === "idle" ? t("quest.run") : "…",
-          dim: this.stage !== "idle",
-          primary: this.stage === "idle",
-        },
-        { id: "format", label: t("quest.format"), dim: this.formatting },
-        { id: "hint", label: hintLabel, dim: hintsLeft <= 0 },
-        { id: "console", label: this.consoleOpen ? t("quest.hideLog") : t("quest.log") },
-        // MAP used to be here, one gap from SUBMIT. It is in the toolbar at
-        // the top of the screen now: a control that abandons the quest has no
-        // business sharing a row with the control that submits it.
-        { id: "reset", label: t("quest.reset") },
-      ],
-      layout.minTouchH(),
-    );
+    this.buttons.row(fonts.button, [inner[0], rowY, rowW, bandH], rowItems, layout.minTouchH());
     this.buttons.add({
       id: "submit",
       rect: [inner[0] + inner[2] - subW, rowY, subW, btnH],

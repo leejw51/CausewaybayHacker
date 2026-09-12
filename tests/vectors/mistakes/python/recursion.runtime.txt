@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "<work>/main.py", line 7, in <module>
+    print(depth(0))
+          ~~~~~^^^
+  File "<work>/main.py", line 4, in depth
+    return 1 + depth(n + 1)
+               ~~~~~^^^^^^^
+  File "<work>/main.py", line 4, in depth
+    return 1 + depth(n + 1)
+               ~~~~~^^^^^^^
+  File "<work>/main.py", line 4, in depth
+    return 1 + depth(n + 1)
+               ~~~~~^^^^^^^
+  [Previous line repeated 996 more times]
+RecursionError: maximum recursion depth exceeded

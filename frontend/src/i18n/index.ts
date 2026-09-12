@@ -8,12 +8,16 @@
  * it; a key missing from a locale falls back to English rather than to a blank,
  * and `tests/i18n.test.ts` fails if one ever is.
  *
- * **Not the quests.** The 138 briefs in `content/` belong to another agent and
- * translating them is a different and much larger job — one that has to be done
- * by somebody who can check that a Rust ownership brief still teaches ownership
- * afterwards. So a player who chooses Korean gets a Korean interface around an
- * English brief, and the quest screen says so in as many words rather than
- * letting it read as a half-finished translation.
+ * **The quests, when a translation pack exists — and the server says which.**
+ * Quest prose lives in `content/` and is translated there, not here: a pack per
+ * language under `content/i18n/<locale>/` (SPEC §12.1), written by somebody who
+ * can check that a Rust ownership brief still teaches ownership afterwards. The
+ * client's only part is to send `locale()` with `quest.get`, `world.map` and
+ * `quest.hint`; the server substitutes what it has and answers `text_locale`
+ * on the quest and on every map node. When that is not the language on screen
+ * — no pack yet, or a quest the pack has not reached — the quest screen says
+ * the brief is in English, in as many words, rather than letting it read as a
+ * half-finished translation. Code is never translated in any language.
  *
  * **Not the server's `message`.** PROTOCOL §3.3 is explicit that it is for a
  * developer and not for the player; the client already renders its own text

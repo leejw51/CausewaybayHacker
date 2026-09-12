@@ -15,15 +15,23 @@
 --
 -- ## What is translated, and what is not
 --
--- **The interface only.** The 138 quests are content, owned elsewhere, and a
+-- **The interface, here.** The quests are content, owned elsewhere, and a
 -- quest brief is a specification of a program — mistranslating one would make
--- a test fail for a reason the player cannot see. So a Korean player gets a
--- Korean interface around an English quest, which is what a Korean
--- programmer's editor looks like anyway.
+-- a test fail for a reason the player cannot see. So they are translated
+-- where the content lives, a pack per language under `content/i18n/<locale>/`
+-- (SPEC §12.1), by somebody who can check the brief still specifies the same
+-- program; this file never touches them. The scenes send `locale = I18n.lang`
+-- with `quest.get`, `world.map` and `quest.hint`, and the server answers
+-- `text_locale` — the language the prose actually came in, which is English
+-- wherever no pack has reached yet. A Korean player then gets a Korean
+-- interface around a Korean quest where one exists and around an English
+-- quest where it does not, which is what a Korean programmer's editor looks
+-- like anyway.
 --
--- A quest title, a quest id and a compiler message are **code identifiers**
--- and are drawn as such — in the code face, next to the id — rather than as
--- prose that somebody forgot to translate. See `docs/decisions.md`.
+-- A quest id and a compiler message are **code identifiers** and are drawn
+-- as such — in the code face — rather than as prose that somebody forgot to
+-- translate; a quest title is drawn beside its id in the same spirit whatever
+-- language it arrived in. See `docs/decisions.md`.
 --
 -- ## Technical terms stay in English, deliberately
 --

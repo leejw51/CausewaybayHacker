@@ -1,0 +1,2389 @@
+# C++ LAND — ADVANCED. The pump room under Victoria Park's fountain, and
+# everything in it running at once. std::thread and join, mutex and
+# lock_guard, scoped_lock, condition_variable, atomics, a producer/consumer
+# queue, async and promise, unique_ptr / shared_ptr / weak_ptr, move
+# semantics, a class template, iterator invalidation, undefined behaviour
+# made visible, jthread and stop_token, and THE DANGLING at the bottom.
+#
+# Every quest here has a deterministic answer on purpose: results are written
+# by index and joined before printing, or handed through a FIFO queue. A quest
+# whose output depends on the scheduler is a quest that fails CI at random,
+# and that is not a lesson. Nothing here relies on undefined behaviour to
+# produce its expected output either — where UB is the subject, the program
+# detects the condition rather than committing it.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Toolchain: c++ -std=c++20 -O2 -pthread (clang on macOS, gcc on Linux).
+
+pack = "cpp.advanced"
+land = "cpp"
+category = "advanced"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "cpp.advanced.01.threads"
+node        = 1
+title       = "TWO PUMPS, ONE SUMP"
+difficulty  = 3
+story       = "Victoria Park's pump room starts its second pump at noon and the sump finally drains. Nothing else about the room changed."
+concepts    = ["concurrency", "closures", "slices"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Start one `std::thread` per value that computes its square and writes it into
+`out[i]` — its own slot, so no two threads touch the same element. Join them
+all, then print each result on its own line, then `THREADS <n>`.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+The threads finish in whatever order the scheduler likes. Writing by index
+and printing after the joins is what makes the output the same every run. A
+thread that printed for itself would not be, and a thread that captured the
+loop variable by reference would be reading a variable that had already moved
+on — capture `i` by value, and `out` by reference.
+'''
+starter     = '''
+#include <iostream>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::vector<long long> out(n, 0);
+    std::vector<std::thread> threads;
+
+    // one thread per value writing out[i], join them all, print
+    (void)nums;
+    (void)out;
+}
+'''
+solution    = '''
+#include <iostream>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::vector<long long> out(n, 0);
+    std::vector<std::thread> threads;
+    for (int i = 0; i < n; ++i) {
+        // i by value, out by reference: each thread owns exactly one slot
+        threads.emplace_back([i, &nums, &out] {
+            out[i] = nums[i] * nums[i];
+        });
+    }
+    for (std::thread& t : threads) {
+        t.join();
+    }
+
+    for (long long v : out) {
+        std::cout << v << '\n';
+    }
+    std::cout << "THREADS " << n << '\n';
+}
+'''
+hints = [
+  "threads.emplace_back(lambda) constructs the thread in place and starts it immediately.",
+  "Capture [i, &nums, &out]: the index by value so each thread keeps its own, the vectors by reference so the writes land in main's copy.",
+  "Join every thread before you read out. join() blocks until that thread has finished, and after it the writes are visible.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n2 3 4\n",       expect = "4\n9\n16\nTHREADS 3\n",         visible = true },
+  { name = "single", stdin = "1\n-5\n",          expect = "25\nTHREADS 1\n",               visible = false },
+  { name = "wide",   stdin = "4\n0 1 10 100\n",  expect = "0\n1\n100\n10000\nTHREADS 4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "cpp.advanced.02.join"
+node        = 2
+title       = "NOBODY LEAVES WITHOUT SIGNING OUT"
+difficulty  = 3
+story       = "A pump thread finishes its shift and the foreman walks out of the room without signing it off, and the whole building's power goes."
+concepts    = ["concurrency", "raii", "closures"]
+requires    = ["cpp.advanced.01.threads"]
+map          = { x = 0.275, y = 0.058, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of text.
+
+Start one thread per line that uppercases it into its own slot. Join them
+all, print the lines in order, then `DONE`.
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        DONE
+```
+
+The starter compiles, starts the threads, and aborts. It never joins them, and
+a `std::thread` that is still **joinable** when its destructor runs calls
+`std::terminate`. That is not a bug in the library. A thread that outlives the
+function that started it would be running against stack variables that no
+longer exist, and the standard decided that an abort you can see is better
+than a read from freed memory you cannot.
+
+So every `std::thread` is joined (or detached, which is almost never what you
+want) before it goes out of scope. C++20 has `std::jthread`, which joins in
+its destructor — RAII for threads, the same idea as `lock_guard` for locks —
+and it is the type to reach for by default. Both spellings pass here.
+'''
+starter     = '''
+#include <cctype>
+#include <iostream>
+#include <string>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::string rest;
+    std::getline(std::cin, rest);
+    std::vector<std::string> lines(n);
+    for (std::string& line : lines) {
+        std::getline(std::cin, line);
+    }
+
+    std::vector<std::thread> threads;
+    for (int i = 0; i < n; ++i) {
+        threads.emplace_back([i, &lines] {
+            for (char& c : lines[i]) {
+                c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            }
+        });
+    }
+
+    // the threads are never joined: their destructors call std::terminate
+    for (const std::string& line : lines) {
+        std::cout << line << '\n';
+    }
+    std::cout << "DONE\n";
+}
+'''
+solution    = '''
+#include <cctype>
+#include <iostream>
+#include <string>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::string rest;
+    std::getline(std::cin, rest);
+    std::vector<std::string> lines(n);
+    for (std::string& line : lines) {
+        std::getline(std::cin, line);
+    }
+
+    {
+        // a jthread joins itself when it is destroyed: the closing brace of
+        // this block is the join, for every thread in the vector
+        std::vector<std::jthread> threads;
+        for (int i = 0; i < n; ++i) {
+            threads.emplace_back([i, &lines] {
+                for (char& c : lines[i]) {
+                    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+                }
+            });
+        }
+    }
+
+    for (const std::string& line : lines) {
+        std::cout << line << '\n';
+    }
+    std::cout << "DONE\n";
+}
+'''
+hints = [
+  "The smallest fix is a loop: for (std::thread& t : threads) t.join(); before anything is printed.",
+  "The better fix is the type: std::vector<std::jthread>, and let the destructor do the joining when the vector goes out of scope.",
+  "Put the jthread vector in its own block so the joins happen at the closing brace, before the print loop reads the lines.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-lines", stdin = "2\nlucky mac\npercival\n", expect = "LUCKY MAC\nPERCIVAL\nDONE\n", visible = true },
+  { name = "one",       stdin = "1\nhku\n",                 expect = "HKU\nDONE\n",                 visible = false },
+  { name = "three",     stdin = "3\na\nb\nc\n",             expect = "A\nB\nC\nDONE\n",             visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "cpp.advanced.03.mutex"
+node        = 3
+title       = "ONE SUMP, EIGHT PUMPS"
+difficulty  = 4
+story       = "Every pump adds what it drained to one total on the wall, and at the end of the hour the wall disagrees with all of them."
+concepts    = ["shared-state", "concurrency", "data-races"]
+requires    = ["cpp.advanced.02.join"]
+map          = { x = 0.389, y = 0.132, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Start one thread per value that adds it to **one shared total**. Join them
+all, then print `TOTAL <sum>` and `THREADS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        THREADS 4
+```
+
+The starter compiles and prints `TOTAL 0`. The lambda captures `total` by
+value — `[total, value]` with `mutable` — so every thread adds to its own
+private copy and throws it away. Capture it by reference and you have a
+different bug, the one that does not show up in a test this small: `total +=
+value` from several threads at once is a **data race**, which in C++ is
+undefined behaviour, not merely a wrong number.
+
+A `std::mutex` next to the total, and a `std::lock_guard` in every thread
+that touches it, is the answer. The guard locks in its constructor and
+unlocks in its destructor, so there is no unlock to forget and an exception
+thrown mid-update still releases it.
+'''
+starter     = '''
+#include <iostream>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    long long total = 0;
+    std::vector<std::thread> threads;
+    for (long long value : nums) {
+        // total is captured by value: every thread gets a private copy
+        threads.emplace_back([total, value]() mutable {
+            total += value;
+        });
+    }
+    for (std::thread& t : threads) {
+        t.join();
+    }
+
+    std::cout << "TOTAL " << total << '\n';
+    std::cout << "THREADS " << n << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <mutex>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    long long total = 0;
+    std::mutex total_mutex;
+    std::vector<std::thread> threads;
+    for (long long value : nums) {
+        threads.emplace_back([&total, &total_mutex, value] {
+            // locked from here to the closing brace, whatever happens in between
+            std::lock_guard<std::mutex> lock(total_mutex);
+            total += value;
+        });
+    }
+    for (std::thread& t : threads) {
+        t.join();
+    }
+
+    std::cout << "TOTAL " << total << '\n';
+    std::cout << "THREADS " << n << '\n';
+}
+'''
+hints = [
+  "Capture total by reference — [&total, &total_mutex, value] — and drop the mutable; the thread should change main's total, not its own.",
+  "std::lock_guard<std::mutex> lock(total_mutex); is one line, and the unlock is the end of the block.",
+  "Reading total after every join is safe without the lock: join() is a synchronisation point, and no thread is left to write.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",   stdin = "4\n1 2 3 4\n",                  expect = "TOTAL 10\nTHREADS 4\n",      visible = true },
+  { name = "single", stdin = "1\n-5\n",                       expect = "TOTAL -5\nTHREADS 1\n",      visible = false },
+  { name = "big",    stdin = "3\n1000000 1000000 1000000\n",  expect = "TOTAL 3000000\nTHREADS 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "cpp.advanced.04.counter"
+node        = 4
+title       = "A COUNTER THAT LOCKS ITSELF"
+difficulty  = 4
+story       = "The turnstile at Victoria Park's east gate keeps two numbers that have to agree with each other, and two people are reading them at the same time."
+concepts    = ["shared-state", "structs", "mutability"]
+requires    = ["cpp.advanced.03.mutex"]
+map          = { x = 0.602, y = 0.065, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Finish the `Counter`: `add` takes the lock, adds to the total and bumps the
+hit count; `snapshot` takes the lock and returns both together. Start one
+thread per value, join them, then print `TOTAL <sum>` and `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+The mutex lives **inside** the class, next to the fields it guards, and every
+method that touches them takes it. That is the shape: the lock is part of the
+object, not something callers are trusted to remember.
+
+The starter does not compile, and the reason is worth a minute. `snapshot()`
+is `const` — it changes no field the caller can see — but locking a mutex
+*changes the mutex*, and inside a `const` method every member is `const`.
+The fix is `mutable std::mutex`: `mutable` marks a member that is allowed to
+change even through a `const` object, precisely for bookkeeping like this
+that is not part of the value. It is the only place `mutable` is routinely
+correct, and an interviewer who asks about it wants to hear this example.
+'''
+starter     = '''
+#include <iostream>
+#include <mutex>
+#include <thread>
+#include <utility>
+#include <vector>
+
+class Counter {
+public:
+    void add(long long value) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        total_ += value;
+        ++hits_;
+    }
+
+    // const, so mutex_ is const here, and a const mutex cannot be locked
+    std::pair<long long, int> snapshot() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return {total_, hits_};
+    }
+
+private:
+    std::mutex mutex_;
+    long long total_ = 0;
+    int hits_ = 0;
+};
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    Counter counter;
+    std::vector<std::thread> threads;
+    for (long long value : nums) {
+        threads.emplace_back([&counter, value] { counter.add(value); });
+    }
+    for (std::thread& t : threads) {
+        t.join();
+    }
+
+    auto [total, hits] = counter.snapshot();
+    std::cout << "TOTAL " << total << '\n';
+    std::cout << "HITS " << hits << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <mutex>
+#include <thread>
+#include <utility>
+#include <vector>
+
+class Counter {
+public:
+    void add(long long value) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        total_ += value;
+        ++hits_;
+    }
+
+    // reading both under one lock is what makes the pair consistent
+    std::pair<long long, int> snapshot() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return {total_, hits_};
+    }
+
+private:
+    // mutable: the lock may change even when the Counter is const
+    mutable std::mutex mutex_;
+    long long total_ = 0;
+    int hits_ = 0;
+};
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    Counter counter;
+    std::vector<std::thread> threads;
+    for (long long value : nums) {
+        threads.emplace_back([&counter, value] { counter.add(value); });
+    }
+    for (std::thread& t : threads) {
+        t.join();
+    }
+
+    auto [total, hits] = counter.snapshot();
+    std::cout << "TOTAL " << total << '\n';
+    std::cout << "HITS " << hits << '\n';
+}
+'''
+hints = [
+  "One word fixes the compile error: mutable std::mutex mutex_;",
+  "Dropping the const from snapshot() also compiles, and is the wrong answer — the method really does not change the value, and the signature should say so.",
+  "A std::mutex cannot be copied or moved, so a class holding one cannot be either; pass Counter by reference, which the lambda already does.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",   stdin = "4\n1 2 3 4\n",                 expect = "TOTAL 10\nHITS 4\n",      visible = true },
+  { name = "single", stdin = "1\n-5\n",                      expect = "TOTAL -5\nHITS 1\n",      visible = false },
+  { name = "big",    stdin = "3\n1000000 1000000 1000000\n", expect = "TOTAL 3000000\nHITS 3\n", visible = false },
+  { name = "none",   stdin = "0\n",                          expect = "TOTAL 0\nHITS 0\n",       visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "cpp.advanced.05.scoped-lock"
+node        = 5
+title       = "TWO LOCKS, ONE ORDER"
+difficulty  = 4
+story       = "Two sluice gates under the fountain, two locks, two threads, and both pumps stopped in the same second."
+concepts    = ["deadlock", "raii", "shared-state"]
+requires    = ["cpp.advanced.04.counter"]
+map          = { x = 0.716, y = 0.137, kind = "quest" }
+brief       = '''
+Two tanks, `A` and `B`, each a `long long` with its own `std::mutex`.
+
+Standard input is the starting levels on line one, a count `n` on line two,
+and then `n` lines of `<FROM> <TO> <AMOUNT>` with `FROM`/`TO` in `{A, B}`.
+
+Run every transfer on its own thread, join them all, then print
+`A <level>`, `B <level>`, `MOVED <n>`.
+
+```
+input:  100 100
+        2
+        A B 30
+        B A 10
+output: A 80
+        B 120
+        MOVED 2
+```
+
+Two things are wrong with the starter and only one shows in the output. It
+debits the source and never credits the destination — that is the visible
+bug. The other is the shape: locking *the source first* means two opposite
+transfers can each hold one lock and wait for the other, forever. That is
+deadlock, and it does not show in a test; it shows at 12:00 on a Tuesday.
+
+Take both locks in **one global order** and the cycle cannot form. C++17 gives
+you the order for free: `std::scoped_lock lock(a_mutex, b_mutex)` acquires
+any number of mutexes with a deadlock-avoiding algorithm, and releases them
+all in its destructor. Two `lock_guard`s always taken `A` then `B` is the
+same answer written by hand.
+'''
+starter     = '''
+#include <iostream>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
+
+struct Tank {
+    long long level = 0;
+    std::mutex mutex;
+};
+
+void transfer(Tank& a, Tank& b, bool from_a, long long amount) {
+    // locks whichever side the water leaves, and only that side
+    if (from_a) {
+        std::lock_guard<std::mutex> lock(a.mutex);
+        a.level -= amount;
+    } else {
+        std::lock_guard<std::mutex> lock(b.mutex);
+        b.level -= amount;
+    }
+}
+
+int main() {
+    Tank a;
+    Tank b;
+    int n = 0;
+    std::cin >> a.level >> b.level >> n;
+
+    std::vector<std::thread> threads;
+    for (int i = 0; i < n; ++i) {
+        std::string from, to;
+        long long amount = 0;
+        std::cin >> from >> to >> amount;
+        threads.emplace_back([&a, &b, from, amount] {
+            transfer(a, b, from == "A", amount);
+        });
+    }
+    for (std::thread& t : threads) {
+        t.join();
+    }
+
+    std::cout << "A " << a.level << '\n';
+    std::cout << "B " << b.level << '\n';
+    std::cout << "MOVED " << n << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
+
+struct Tank {
+    long long level = 0;
+    std::mutex mutex;
+};
+
+void transfer(Tank& a, Tank& b, bool from_a, long long amount) {
+    // both locks, taken together by an algorithm that cannot deadlock,
+    // and released together when lock goes out of scope
+    std::scoped_lock lock(a.mutex, b.mutex);
+    if (from_a) {
+        a.level -= amount;
+        b.level += amount;
+    } else {
+        b.level -= amount;
+        a.level += amount;
+    }
+}
+
+int main() {
+    Tank a;
+    Tank b;
+    int n = 0;
+    std::cin >> a.level >> b.level >> n;
+
+    std::vector<std::thread> threads;
+    for (int i = 0; i < n; ++i) {
+        std::string from, to;
+        long long amount = 0;
+        std::cin >> from >> to >> amount;
+        threads.emplace_back([&a, &b, from, amount] {
+            transfer(a, b, from == "A", amount);
+        });
+    }
+    for (std::thread& t : threads) {
+        t.join();
+    }
+
+    std::cout << "A " << a.level << '\n';
+    std::cout << "B " << b.level << '\n';
+    std::cout << "MOVED " << n << '\n';
+}
+'''
+hints = [
+  "Lock both tanks before you touch either level. std::scoped_lock lock(a.mutex, b.mutex); does it in one line and in a safe order.",
+  "The direction of the water decides which level gets the minus, not which lock is taken first.",
+  "Two std::lock_guard objects, always A's mutex then B's, is the same answer; the rule is that every thread agrees on the order.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "both-ways",  stdin = "100 100\n2\nA B 30\nB A 10\n",           expect = "A 80\nB 120\nMOVED 2\n",  visible = true },
+  { name = "overdraw",   stdin = "0 0\n1\nA B 5\n",                        expect = "A -5\nB 5\nMOVED 1\n",    visible = false },
+  { name = "round-trip", stdin = "50 50\n4\nA B 1\nB A 1\nA B 1\nB A 1\n", expect = "A 50\nB 50\nMOVED 4\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "cpp.advanced.06.condition-variable"
+node        = 6
+title       = "THE HATCH"
+difficulty  = 4
+story       = "One pump fills the tank and one drains it, and the drain has been polling an empty tank since 11:40."
+concepts    = ["channels", "concurrency", "shared-state"]
+requires    = ["cpp.advanced.05.scoped-lock"]
+map          = { x = 0.962, y = 0.054, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+A producer thread pushes each value onto a `std::queue` guarded by a mutex; a
+consumer thread pops them one at a time and prints each doubled. When the
+producer has pushed everything it sets `done` and wakes the consumer, and the
+consumer stops when the queue is empty **and** `done` is set. Join both, then
+print `CONSUMED <n>`.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        CONSUMED 3
+```
+
+The queue is FIFO, so the order is the input order whatever the scheduler
+does. The `std::condition_variable` is how the consumer sleeps until there is
+something to do instead of spinning on the lock: `cv.wait(lock, predicate)`
+releases the mutex, sleeps, and re-checks the predicate every time it is
+woken — which handles spurious wakeups for you, and is why the predicate form
+is the only form to write.
+
+The starter hangs. The producer pushes everything and returns without ever
+setting `done` or notifying, so the consumer wakes for the last value, drains
+the queue, and waits for a signal that will not come. Every producer/consumer
+pair needs a way to say *there will be no more* — that is what `done` is.
+'''
+starter     = '''
+#include <condition_variable>
+#include <iostream>
+#include <mutex>
+#include <queue>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::queue<long long> tank;
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool done = false;
+    long long consumed = 0;
+
+    std::thread producer([&] {
+        for (long long v : nums) {
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                tank.push(v);
+            }
+            cv.notify_one();
+        }
+        // never says it has finished
+    });
+
+    std::thread consumer([&] {
+        while (true) {
+            std::unique_lock<std::mutex> lock(mutex);
+            cv.wait(lock, [&] { return !tank.empty() || done; });
+            if (tank.empty()) {
+                return;
+            }
+            long long v = tank.front();
+            tank.pop();
+            lock.unlock();
+            std::cout << v * 2 << '\n';
+            ++consumed;
+        }
+    });
+
+    producer.join();
+    consumer.join();
+    std::cout << "CONSUMED " << consumed << '\n';
+}
+'''
+solution    = '''
+#include <condition_variable>
+#include <iostream>
+#include <mutex>
+#include <queue>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::queue<long long> tank;
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool done = false;
+    long long consumed = 0;
+
+    std::thread producer([&] {
+        for (long long v : nums) {
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                tank.push(v);
+            }
+            cv.notify_one();
+        }
+        {
+            // done is shared state like the queue, so it changes under the lock
+            std::lock_guard<std::mutex> lock(mutex);
+            done = true;
+        }
+        cv.notify_all();
+    });
+
+    std::thread consumer([&] {
+        while (true) {
+            std::unique_lock<std::mutex> lock(mutex);
+            // sleeps until there is a value or the producer has finished
+            cv.wait(lock, [&] { return !tank.empty() || done; });
+            if (tank.empty()) {
+                return;  // empty and done: nothing more is coming
+            }
+            long long v = tank.front();
+            tank.pop();
+            lock.unlock();
+            std::cout << v * 2 << '\n';
+            ++consumed;
+        }
+    });
+
+    producer.join();
+    consumer.join();
+    std::cout << "CONSUMED " << consumed << '\n';
+}
+'''
+hints = [
+  "After the producer's loop: lock, set done = true, unlock, cv.notify_all(). Four lines, and the program terminates.",
+  "done is read inside the wait predicate under the mutex, so it must be written under the mutex too — a flag written without the lock is a data race.",
+  "cv.wait takes a std::unique_lock, not a lock_guard, because wait has to unlock and relock it; the predicate is re-checked on every wakeup.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n1 2 3\n",    expect = "2\n4\n6\nCONSUMED 3\n",   visible = true },
+  { name = "single", stdin = "1\n-5\n",       expect = "-10\nCONSUMED 1\n",       visible = false },
+  { name = "none",   stdin = "0\n",           expect = "CONSUMED 0\n",            visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "cpp.advanced.07.atomic"
+node        = 7
+title       = "ONE WORD, NO LOCK"
+difficulty  = 4
+story       = "The turnstile count does not need a lock. Everything else in the pump room does, and telling them apart is the job."
+concepts    = ["shared-state", "thread-safety", "concurrency"]
+requires    = ["cpp.advanced.06.condition-variable"]
+map          = { x = 0.898, y = 0.526, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Start one thread per value. Each adds its value to a shared
+`std::atomic<long long>` and bumps a shared `std::atomic<int>` by one — no
+mutex anywhere. Join them all and print `TOTAL <sum>` and `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+The starter does not compile: the lambda captures the two atomics **by
+value**, and `std::atomic` has no copy constructor. That is deliberate. An
+atomic is a location that several threads agree to update one instruction at
+a time; a copy of it would be a different location, and the sharing would be
+gone. Capture them by reference.
+
+An atomic is not a cheaper mutex; it is a different tool, for one machine
+word read-modify-written in a single instruction. `fetch_add` is that
+instruction. The moment two fields have to agree with each other, the lock
+comes back — there is no atomic for "these two things, together", which is
+why the previous quest's `Counter` had a mutex and this one does not.
+
+`std::memory_order_relaxed` is enough here because nothing depends on *when*
+these increments become visible relative to any other write, only that none
+are lost. That sentence is the follow-up question.
+'''
+starter     = '''
+#include <atomic>
+#include <iostream>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::atomic<long long> total{0};
+    std::atomic<int> hits{0};
+
+    std::vector<std::thread> threads;
+    for (long long value : nums) {
+        // by value: an atomic cannot be copied, and should not be
+        threads.emplace_back([total, hits, value]() mutable {
+            total.fetch_add(value, std::memory_order_relaxed);
+            hits.fetch_add(1, std::memory_order_relaxed);
+        });
+    }
+    for (std::thread& t : threads) {
+        t.join();
+    }
+
+    std::cout << "TOTAL " << total.load() << '\n';
+    std::cout << "HITS " << hits.load() << '\n';
+}
+'''
+solution    = '''
+#include <atomic>
+#include <iostream>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::atomic<long long> total{0};
+    std::atomic<int> hits{0};
+
+    std::vector<std::thread> threads;
+    for (long long value : nums) {
+        // by reference: one location, updated one instruction at a time
+        threads.emplace_back([&total, &hits, value] {
+            total.fetch_add(value, std::memory_order_relaxed);
+            hits.fetch_add(1, std::memory_order_relaxed);
+        });
+    }
+    for (std::thread& t : threads) {
+        t.join();
+    }
+
+    std::cout << "TOTAL " << total.load() << '\n';
+    std::cout << "HITS " << hits.load() << '\n';
+}
+'''
+hints = [
+  "The error says the copy constructor of std::atomic is deleted. Capture [&total, &hits, value] and drop the mutable.",
+  "fetch_add returns the previous value and applies the addition atomically; there is no lock and no guard.",
+  "total += value on an atomic is also atomic and also fine; total = total + value is not — that is a load and a store with a gap between them.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",   stdin = "4\n1 2 3 4\n", expect = "TOTAL 10\nHITS 4\n", visible = true },
+  { name = "single", stdin = "1\n-5\n",      expect = "TOTAL -5\nHITS 1\n", visible = false },
+  { name = "same",   stdin = "3\n7 7 7\n",   expect = "TOTAL 21\nHITS 3\n", visible = false },
+  { name = "none",   stdin = "0\n",          expect = "TOTAL 0\nHITS 0\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "cpp.advanced.08.parallel-sum"
+node        = 8
+title       = "SPLIT THE SUMP"
+difficulty  = 4
+story       = "Twelve thousand readings and four pumps. The room wants each pump's share and the total, and the total has to come out the same on every run."
+concepts    = ["concurrency", "slices", "iteration"]
+requires    = ["cpp.advanced.07.atomic"]
+map          = { x = 0.785, y = 0.463, kind = "quest" }
+brief       = '''
+Line one is `k n`: `k` threads and `n` values. Line two is the `n` values.
+
+Split the values into `k` contiguous chunks — chunk `i` covers indices from
+`i * n / k` up to but not including `(i + 1) * n / k`, in integer arithmetic —
+and have thread `i` sum its chunk into `partial[i]`. Join them all, then print
+`CHUNK <i> <sum>` for each chunk in order and `TOTAL <sum of partials>`.
+
+```
+input:  2 5
+        1 2 3 4 5
+output: CHUNK 0 3
+        CHUNK 1 12
+        TOTAL 15
+```
+
+This is the shape that actually goes faster with threads, and the only one in
+this map: each thread reads its own range and writes its own slot, so there is
+no lock, no atomic, nothing shared but the input. The formula for the chunk
+bounds is what makes the split exact — the last chunk always ends at `n`, and
+a chunk may be empty when `k > n`, which one of the hidden cases arranges.
+'''
+starter     = '''
+#include <iostream>
+#include <thread>
+#include <vector>
+
+int main() {
+    int k = 0;
+    int n = 0;
+    std::cin >> k >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::vector<long long> partial(k, 0);
+
+    // thread i sums nums[i*n/k .. (i+1)*n/k) into partial[i]
+    for (int i = 0; i < k; ++i) {
+        std::cout << "CHUNK " << i << " 0\n";
+    }
+    std::cout << "TOTAL 0\n";
+    (void)partial;
+}
+'''
+solution    = '''
+#include <iostream>
+#include <thread>
+#include <vector>
+
+int main() {
+    int k = 0;
+    int n = 0;
+    std::cin >> k >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::vector<long long> partial(k, 0);
+    std::vector<std::thread> threads;
+    for (int i = 0; i < k; ++i) {
+        // 64-bit arithmetic on the bounds, so i * n cannot overflow an int
+        std::size_t begin = static_cast<std::size_t>(i) * n / k;
+        std::size_t end = static_cast<std::size_t>(i + 1) * n / k;
+        threads.emplace_back([i, begin, end, &nums, &partial] {
+            long long sum = 0;
+            for (std::size_t j = begin; j < end; ++j) {
+                sum += nums[j];
+            }
+            partial[i] = sum;
+        });
+    }
+    for (std::thread& t : threads) {
+        t.join();
+    }
+
+    long long total = 0;
+    for (int i = 0; i < k; ++i) {
+        std::cout << "CHUNK " << i << ' ' << partial[i] << '\n';
+        total += partial[i];
+    }
+    std::cout << "TOTAL " << total << '\n';
+}
+'''
+hints = [
+  "Compute the two bounds in main and capture them by value; the thread should not have to know how the split was decided.",
+  "A local sum inside the thread and one write to partial[i] at the end keeps the shared vector touched exactly once per thread.",
+  "k > n makes some chunks empty — begin == end — and the loop simply does not run. No special case.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-chunks", stdin = "2 5\n1 2 3 4 5\n",  expect = "CHUNK 0 3\nCHUNK 1 12\nTOTAL 15\n",             visible = true },
+  { name = "more-threads", stdin = "3 2\n7 8\n",      expect = "CHUNK 0 0\nCHUNK 1 7\nCHUNK 2 8\nTOTAL 15\n",   visible = false },
+  { name = "one-thread", stdin = "1 3\n-1 -2 -3\n",   expect = "CHUNK 0 -6\nTOTAL -6\n",                        visible = false },
+  { name = "empty",      stdin = "2 0\n",             expect = "CHUNK 0 0\nCHUNK 1 0\nTOTAL 0\n",               visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "cpp.advanced.09.async"
+node        = 9
+title       = "PROMISE ME THE COUNT"
+difficulty  = 4
+story       = "The winch operator sends a boy to fetch each figure and does not stand there waiting; the figures come back when they come back."
+concepts    = ["async", "concurrency", "closures"]
+requires    = ["cpp.advanced.08.parallel-sum"]
+map          = { x = 0.557, y = 0.538, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Launch one `std::async` task per value, with `std::launch::async`, that
+returns the value squared. Collect the `std::future`s in a vector and `get()`
+them **in order**, printing each. Then hand a `std::promise<int>` to one more
+thread that sets it to `n`, and print `READY <n>` from the matching future.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        READY 3
+```
+
+A future is a value that is not here yet. `std::async` gives you one for a
+function's return value; `get()` blocks until it exists and then hands it
+over, once. Calling the futures in order is what puts the output in order —
+the tasks themselves finish whenever they finish.
+
+`std::promise` is the other end of the same pipe, for when there is no return
+value to wrap: one side calls `set_value`, the other side `get`s it. It is how
+a thread reports one result without a mutex, a queue, or a flag.
+
+Say `std::launch::async` out loud. Without it the implementation may choose
+`deferred`, which runs the task lazily on the calling thread inside `get()` —
+still correct here, and not what anyone reading `async` expects.
+'''
+starter     = '''
+#include <future>
+#include <iostream>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::vector<std::future<long long>> squares;
+    // one std::async per value; then get() each in order and print
+
+    std::promise<int> count;
+    std::future<int> ready = count.get_future();
+    // a thread sets the promise to n; print READY from the future
+    (void)nums;
+    (void)squares;
+    std::cout << "READY 0\n";
+}
+'''
+solution    = '''
+#include <future>
+#include <iostream>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::vector<std::future<long long>> squares;
+    for (long long value : nums) {
+        squares.push_back(std::async(std::launch::async, [value] {
+            return value * value;
+        }));
+    }
+    for (std::future<long long>& f : squares) {
+        std::cout << f.get() << '\n';
+    }
+
+    std::promise<int> count;
+    std::future<int> ready = count.get_future();
+    std::thread reporter([&count, n] {
+        count.set_value(n);
+    });
+    std::cout << "READY " << ready.get() << '\n';
+    reporter.join();
+}
+'''
+hints = [
+  "std::async(std::launch::async, lambda) returns a std::future of whatever the lambda returns; push it onto the vector.",
+  "get() can be called exactly once per future and blocks until the value is there; walking the vector in order gives you the output in order.",
+  "The promise is moved or referenced into the thread, set_value(n) is called there, and ready.get() in main waits for it. Join the thread before main returns.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n2 3 4\n",      expect = "4\n9\n16\nREADY 3\n",         visible = true },
+  { name = "single", stdin = "1\n-5\n",         expect = "25\nREADY 1\n",               visible = false },
+  { name = "none",   stdin = "0\n",             expect = "READY 0\n",                   visible = false },
+  { name = "wide",   stdin = "4\n0 1 10 100\n", expect = "0\n1\n100\n10000\nREADY 4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "cpp.advanced.10.unique-ptr"
+node        = 10
+title       = "A SIZE THE COMPILER CAN NAME"
+difficulty  = 4
+story       = "The mooring chain in the typhoon shelter: every link holds the next one, all the way down to the anchor, and nobody holds any link twice."
+concepts    = ["smart-pointers", "ownership", "pointers"]
+requires    = ["cpp.advanced.09.async"]
+map          = { x = 0.447, y = 0.480, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` amounts in cents.
+
+Hold them in a chain, one node per amount, in the order they arrived:
+
+```
+struct Entry {
+    long long cents;
+    std::unique_ptr<Entry> next;
+};
+```
+
+Print three lines:
+
+1. the amounts in order, space separated, or `-` if there are none
+2. `SUM <total>`, from a **recursive** function over the chain
+3. `LAST <cents>` — the amount on the final node — or `LAST NONE`
+
+```
+input:  5
+        1 2 3 4 5
+output: 1 2 3 4 5
+        SUM 15
+        LAST 5
+```
+
+The starter does not compile, and the error is the reason pointers exist.
+Write `Entry next;` and the compiler has to lay `Entry` out in memory: eight
+bytes for `cents` plus however big an `Entry` is — which is the thing it is
+trying to work out. *Field has incomplete type.*
+
+A `std::unique_ptr<Entry>` is a pointer, and a pointer has a size the compiler
+already knows. It **owns** what it points at: exactly one owner, `delete`d in
+the destructor, cannot be copied, can be moved. A raw `Entry*` is the other
+kind of pointer — it looks and owns nothing — and walking the chain to print
+it is exactly what a raw pointer is for. `nullptr` is both the end of the
+chain and the empty chain, so there is no separate empty case anywhere.
+'''
+starter     = '''
+#include <iostream>
+#include <memory>
+#include <vector>
+
+struct Entry {
+    long long cents;
+    // field has incomplete type: this is what a type with no nameable size looks like
+    Entry next;
+};
+
+long long sum(const Entry* chain) {
+    (void)chain;
+    return 0;
+}
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> amounts(n);
+    for (long long& v : amounts) {
+        std::cin >> v;
+    }
+
+    // build the chain in arrival order, walk it, then sum it recursively
+    std::cout << "-\n";
+    std::cout << "SUM 0\n";
+    std::cout << "LAST NONE\n";
+}
+'''
+solution    = '''
+#include <iostream>
+#include <memory>
+#include <vector>
+
+struct Entry {
+    long long cents;
+    std::unique_ptr<Entry> next;
+};
+
+// the tail of a chain is another chain, so the walk is the type's own shape;
+// a raw pointer here is a view, and owns nothing
+long long sum(const Entry* chain) {
+    if (chain == nullptr) {
+        return 0;
+    }
+    return chain->cents + sum(chain->next.get());
+}
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> amounts(n);
+    for (long long& v : amounts) {
+        std::cin >> v;
+    }
+
+    // built back to front, so the finished chain reads in arrival order:
+    // each new head takes ownership of the old one
+    std::unique_ptr<Entry> head;
+    for (auto it = amounts.rbegin(); it != amounts.rend(); ++it) {
+        head = std::make_unique<Entry>(Entry{*it, std::move(head)});
+    }
+
+    if (!head) {
+        std::cout << "-\n";
+    } else {
+        bool first = true;
+        for (const Entry* walk = head.get(); walk != nullptr; walk = walk->next.get()) {
+            std::cout << (first ? "" : " ") << walk->cents;
+            first = false;
+        }
+        std::cout << '\n';
+    }
+
+    std::cout << "SUM " << sum(head.get()) << '\n';
+
+    const Entry* last = head.get();
+    while (last != nullptr && last->next) {
+        last = last->next.get();
+    }
+    if (last == nullptr) {
+        std::cout << "LAST NONE\n";
+    } else {
+        std::cout << "LAST " << last->cents << '\n';
+    }
+}
+'''
+hints = [
+  "One line fixes the compile error: std::unique_ptr<Entry> next; — and now the struct is sixteen bytes, whatever it points at.",
+  "Build it back to front: head = std::make_unique<Entry>(Entry{value, std::move(head)}). The std::move is required; a unique_ptr cannot be copied, only handed over.",
+  "Walk with a const Entry* from head.get(), stepping to walk->next.get(). The raw pointer borrows; the unique_ptr still owns, and nothing is freed twice.",
+  "The recursive sum is two lines: nullptr is 0, otherwise cents plus the sum of the rest.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",      stdin = "5\n1 2 3 4 5\n",    expect = "1 2 3 4 5\nSUM 15\nLAST 5\n",       visible = true },
+  { name = "single",    stdin = "1\n700\n",          expect = "700\nSUM 700\nLAST 700\n",          visible = false },
+  { name = "none",      stdin = "0\n",               expect = "-\nSUM 0\nLAST NONE\n",             visible = false },
+  { name = "negatives", stdin = "3\n-100 50 -25\n",  expect = "-100 50 -25\nSUM -75\nLAST -25\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "cpp.advanced.11.shared-ptr"
+node        = 11
+title       = "WHO ELSE IS HOLDING THIS"
+difficulty  = 4
+story       = "Two gauges read the same tank through one pipe, and the pipe has to stay until the last gauge is gone and not one second longer."
+concepts    = ["smart-pointers", "raii", "zero-values"]
+requires    = ["cpp.advanced.10.unique-ptr"]
+map          = { x = 0.222, y = 0.514, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Put the values in a `std::vector<long long>` owned by a `std::shared_ptr`,
+take a **second** `shared_ptr` to the same vector, and a `std::weak_ptr` that
+watches it. Print four lines:
+
+1. `REF <sum>` — the sum, read through the second handle
+2. `SHARED <k>` — `use_count()` while both handles are alive
+3. `ALIVE yes` — `!watch.expired()` while they are
+4. `ALIVE no` — after both handles have been `reset()`
+
+```
+input:  3
+        1 2 3
+output: REF 6
+        SHARED 2
+        ALIVE yes
+        ALIVE no
+```
+
+`unique_ptr` was one owner. `shared_ptr` is a count of owners, kept next to
+the object, and the object is freed when the count reaches zero — by whichever
+handle happened to go last. Copying the handle bumps the count; resetting or
+destroying it drops the count. The count is atomic, so two threads can each
+hold a handle safely; the *object* is not made thread-safe by that, and the
+previous maps' mutexes are still needed to touch it.
+
+`weak_ptr` is a handle that does **not** count. It can see whether the object
+is still there and can be promoted to a `shared_ptr` with `lock()` if it is;
+it cannot keep the object alive. That is what breaks a cycle — two objects
+holding `shared_ptr`s to each other never reach zero — and it is what the
+last map on this road is about.
+'''
+starter     = '''
+#include <iostream>
+#include <memory>
+#include <numeric>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    auto ledger = std::make_shared<std::vector<long long>>(n);
+    for (long long& v : *ledger) {
+        std::cin >> v;
+    }
+
+    // a second shared_ptr to the same vector, and a weak_ptr watching it
+    std::cout << "REF 0\n";
+    std::cout << "SHARED 1\n";
+    std::cout << "ALIVE yes\n";
+    std::cout << "ALIVE yes\n";
+}
+'''
+solution    = '''
+#include <iostream>
+#include <memory>
+#include <numeric>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    auto ledger = std::make_shared<std::vector<long long>>(n);
+    for (long long& v : *ledger) {
+        std::cin >> v;
+    }
+
+    // a second owner of the same vector: the copy is the handle, not the data
+    std::shared_ptr<std::vector<long long>> mirror = ledger;
+    // a watcher: sees the object, does not keep it alive
+    std::weak_ptr<std::vector<long long>> watch = ledger;
+
+    std::cout << "REF " << std::accumulate(mirror->begin(), mirror->end(), 0LL) << '\n';
+    std::cout << "SHARED " << ledger.use_count() << '\n';
+    std::cout << "ALIVE " << (watch.expired() ? "no" : "yes") << '\n';
+
+    ledger.reset();
+    mirror.reset();
+    // the count reached zero on the second reset, and the vector is gone
+    std::cout << "ALIVE " << (watch.expired() ? "no" : "yes") << '\n';
+}
+'''
+hints = [
+  "std::shared_ptr<...> mirror = ledger; copies the handle and bumps the count to 2. mirror->begin() reaches the same vector.",
+  "A weak_ptr is constructed straight from a shared_ptr and never changes the count; expired() is the whole question you ask it.",
+  "reset() on both handles drops the count to zero; the first reset alone would not free anything, and one of the hints in the room is to say why.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n",        expect = "REF 6\nSHARED 2\nALIVE yes\nALIVE no\n",    visible = true },
+  { name = "one",   stdin = "1\n-5\n",           expect = "REF -5\nSHARED 2\nALIVE yes\nALIVE no\n",   visible = false },
+  { name = "none",  stdin = "0\n",               expect = "REF 0\nSHARED 2\nALIVE yes\nALIVE no\n",    visible = false },
+  { name = "four",  stdin = "4\n10 20 30 40\n",  expect = "REF 100\nSHARED 2\nALIVE yes\nALIVE no\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "cpp.advanced.12.move"
+node        = 12
+title       = "TAKE IT WITH YOU"
+difficulty  = 4
+story       = "The harbour master photocopies every docket before handing it to the rider, and the copier is the slowest thing in the typhoon shelter."
+concepts    = ["move-semantics", "ownership", "structs"]
+requires    = ["cpp.advanced.11.shared-ptr"]
+map          = { x = 0.116, y = 0.476, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of text.
+
+Build one `Docket` per line in a `std::vector<Docket> pile`, then hand every
+docket over to a second vector, `sent`, and print each one's text uppercased
+from `sent`, then `SENT <n>`, `COPIES <c>`, `MOVES <m>`.
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        SENT 2
+        COPIES 0
+        MOVES 2
+```
+
+`Docket` counts its own copies and moves: its copy constructor bumps one
+global, its move constructor the other. Both vectors are `reserve`d up front
+so that nothing is copied or moved by a reallocation — the only copies and
+moves that happen are the ones you write.
+
+The starter reports `COPIES 2`. `sent.push_back(d)` with an lvalue copies the
+docket, string and all. `sent.push_back(std::move(d))` casts `d` to an
+**rvalue**, which selects the move constructor, which steals the string's
+buffer instead of duplicating it. `std::move` moves nothing itself; it is a
+cast that says *I am done with this one*, and what happens next is up to the
+receiving constructor.
+
+What is `d` afterwards? *Valid but unspecified.* You may destroy it or assign
+to it. You may not read it and expect anything in particular — which is why
+this program prints from `sent` and never looks back at `pile`.
+'''
+starter     = '''
+#include <cctype>
+#include <iostream>
+#include <string>
+#include <utility>
+#include <vector>
+
+int copies = 0;
+int moves = 0;
+
+struct Docket {
+    std::string text;
+
+    explicit Docket(std::string t) : text(std::move(t)) {}
+    Docket(const Docket& other) : text(other.text) { ++copies; }
+    Docket(Docket&& other) noexcept : text(std::move(other.text)) { ++moves; }
+};
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::string rest;
+    std::getline(std::cin, rest);
+
+    std::vector<Docket> pile;
+    pile.reserve(n);
+    for (int i = 0; i < n; ++i) {
+        std::string line;
+        std::getline(std::cin, line);
+        pile.emplace_back(line);
+    }
+
+    std::vector<Docket> sent;
+    sent.reserve(n);
+    for (Docket& d : pile) {
+        // an lvalue: this copies
+        sent.push_back(d);
+    }
+
+    for (Docket& d : sent) {
+        for (char& c : d.text) {
+            c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        }
+        std::cout << d.text << '\n';
+    }
+    std::cout << "SENT " << sent.size() << '\n';
+    std::cout << "COPIES " << copies << '\n';
+    std::cout << "MOVES " << moves << '\n';
+}
+'''
+solution    = '''
+#include <cctype>
+#include <iostream>
+#include <string>
+#include <utility>
+#include <vector>
+
+int copies = 0;
+int moves = 0;
+
+struct Docket {
+    std::string text;
+
+    explicit Docket(std::string t) : text(std::move(t)) {}
+    Docket(const Docket& other) : text(other.text) { ++copies; }
+    Docket(Docket&& other) noexcept : text(std::move(other.text)) { ++moves; }
+};
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::string rest;
+    std::getline(std::cin, rest);
+
+    std::vector<Docket> pile;
+    pile.reserve(n);
+    for (int i = 0; i < n; ++i) {
+        std::string line;
+        std::getline(std::cin, line);
+        pile.emplace_back(line);
+    }
+
+    std::vector<Docket> sent;
+    sent.reserve(n);
+    for (Docket& d : pile) {
+        // std::move casts d to an rvalue, so push_back picks the move
+        // constructor and steals the string's buffer; d is now valid but
+        // unspecified, and this program never reads it again
+        sent.push_back(std::move(d));
+    }
+
+    for (Docket& d : sent) {
+        for (char& c : d.text) {
+            c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        }
+        std::cout << d.text << '\n';
+    }
+    std::cout << "SENT " << sent.size() << '\n';
+    std::cout << "COPIES " << copies << '\n';
+    std::cout << "MOVES " << moves << '\n';
+}
+'''
+hints = [
+  "One call changes: sent.push_back(std::move(d)). Everything else in the program is already move-aware.",
+  "The move constructor is marked noexcept on purpose: std::vector only moves elements during a reallocation when the move cannot throw, and otherwise copies them to stay exception-safe.",
+  "reserve(n) on both vectors is what makes the counts exact. Without it a reallocation would move (or copy) every element already stored, and the numbers would depend on the growth policy.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two",   stdin = "2\nlucky mac\npercival\n", expect = "LUCKY MAC\nPERCIVAL\nSENT 2\nCOPIES 0\nMOVES 2\n", visible = true },
+  { name = "one",   stdin = "1\nhku\n",                 expect = "HKU\nSENT 1\nCOPIES 0\nMOVES 1\n",                visible = false },
+  { name = "none",  stdin = "0\n",                      expect = "SENT 0\nCOPIES 0\nMOVES 0\n",                     visible = false },
+  { name = "three", stdin = "3\na\nb c\nd\n",           expect = "A\nB C\nD\nSENT 3\nCOPIES 0\nMOVES 3\n",          visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "cpp.advanced.13.template-class"
+node        = 13
+title       = "A RING FOR ANY CARGO"
+difficulty  = 4
+story       = "The gauge keeps the last few readings and the harbour master keeps the last few boat names, and Alex wrote the same ring buffer twice."
+concepts    = ["generics", "structs", "iteration"]
+requires    = ["cpp.advanced.12.move"]
+map          = { x = 0.045, y = 0.931, kind = "quest" }
+brief       = '''
+Line one is a capacity `cap`. Line two is a list of integers; line three is
+a list of words.
+
+Write **one** class template `Ring<T>`: a fixed-capacity buffer that keeps the
+most recent `cap` items pushed into it, overwriting the oldest, and can be
+walked in arrival order. Push the integers into a `Ring<long long>` and the
+words into a `Ring<std::string>`, print each ring's contents on one line,
+then `DROPPED <k>` — how many items in total were pushed out.
+
+```
+input:  2
+        1 2 3 4
+        hku tram bus
+output: 3 4
+        tram bus
+        DROPPED 3
+```
+
+The starter does not compile: `Ring` is written for `long long`, and the
+words have nowhere to go. A class template is one definition instantiated
+per type, exactly like the function template on the basic road, and the
+whole of `Ring<T>` is written without knowing what `T` is — only that it can
+be default-constructed, copied, and printed.
+
+Give it `begin()`/`end()` too. The ring is not stored in arrival order — the
+oldest item is wherever the write head is about to overwrite — so the
+iterator has to do the arithmetic, and that is the part worth writing rather
+than reading.
+'''
+starter     = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+class Ring {
+public:
+    explicit Ring(std::size_t cap) : slots_(cap), head_(0), count_(0) {}
+
+    void push(long long item) {
+        slots_[head_] = item;
+        head_ = (head_ + 1) % slots_.size();
+        if (count_ < slots_.size()) {
+            ++count_;
+        } else {
+            ++dropped_;
+        }
+    }
+
+    std::size_t dropped() const { return dropped_; }
+
+    // no begin()/end(): nothing can walk it yet
+
+private:
+    std::vector<long long> slots_;
+    std::size_t head_;
+    std::size_t count_;
+    std::size_t dropped_ = 0;
+};
+
+int main() {
+    std::size_t cap = 0;
+    std::cin >> cap;
+    std::string line;
+    std::getline(std::cin, line);
+
+    std::getline(std::cin, line);
+    std::istringstream ints(line);
+    Ring numbers(cap);
+    long long v = 0;
+    while (ints >> v) {
+        numbers.push(v);
+    }
+
+    std::getline(std::cin, line);
+    std::istringstream text(line);
+    Ring words(cap);
+    std::string w;
+    while (text >> w) {
+        words.push(w);
+    }
+
+    std::cout << "DROPPED " << numbers.dropped() + words.dropped() << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+template <typename T>
+class Ring {
+public:
+    explicit Ring(std::size_t cap) : slots_(cap), head_(0), count_(0) {}
+
+    void push(const T& item) {
+        slots_[head_] = item;
+        head_ = (head_ + 1) % slots_.size();
+        if (count_ < slots_.size()) {
+            ++count_;
+        } else {
+            ++dropped_;
+        }
+    }
+
+    std::size_t dropped() const { return dropped_; }
+
+    // walks from the oldest item to the newest, wrapping round the buffer
+    class iterator {
+    public:
+        iterator(const Ring& ring, std::size_t offset) : ring_(ring), offset_(offset) {}
+
+        const T& operator*() const {
+            std::size_t oldest = (ring_.head_ + ring_.slots_.size() - ring_.count_) % ring_.slots_.size();
+            return ring_.slots_[(oldest + offset_) % ring_.slots_.size()];
+        }
+        iterator& operator++() {
+            ++offset_;
+            return *this;
+        }
+        bool operator!=(const iterator& other) const { return offset_ != other.offset_; }
+
+    private:
+        const Ring& ring_;
+        std::size_t offset_;
+    };
+
+    iterator begin() const { return iterator(*this, 0); }
+    iterator end() const { return iterator(*this, count_); }
+
+private:
+    std::vector<T> slots_;
+    std::size_t head_;
+    std::size_t count_;
+    std::size_t dropped_ = 0;
+};
+
+template <typename T>
+void print(const Ring<T>& ring) {
+    bool first = true;
+    for (const T& item : ring) {
+        std::cout << (first ? "" : " ") << item;
+        first = false;
+    }
+    std::cout << '\n';
+}
+
+int main() {
+    std::size_t cap = 0;
+    std::cin >> cap;
+    std::string line;
+    std::getline(std::cin, line);
+
+    std::getline(std::cin, line);
+    std::istringstream ints(line);
+    Ring<long long> numbers(cap);
+    long long v = 0;
+    while (ints >> v) {
+        numbers.push(v);
+    }
+
+    std::getline(std::cin, line);
+    std::istringstream text(line);
+    Ring<std::string> words(cap);
+    std::string w;
+    while (text >> w) {
+        words.push(w);
+    }
+
+    print(numbers);
+    print(words);
+    std::cout << "DROPPED " << numbers.dropped() + words.dropped() << '\n';
+}
+'''
+hints = [
+  "template <typename T> above the class, std::vector<T> for the slots, const T& for push. Then Ring<long long> and Ring<std::string> at the two points of use.",
+  "The oldest item sits at (head + cap - count) % cap; item k in arrival order is (oldest + k) % cap. The iterator only needs to carry k.",
+  "A function template print(const Ring<T>&) deduces T from the argument, so one printer serves both rings.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "2\n1 2 3 4\nhku tram bus\n", expect = "3 4\ntram bus\nDROPPED 3\n",   visible = true },
+  { name = "roomy",   stdin = "3\n5\na b c d\n",            expect = "5\nb c d\nDROPPED 1\n",        visible = false },
+  { name = "tight",   stdin = "1\n9 8\nx\n",                expect = "8\nx\nDROPPED 1\n",            visible = false },
+  { name = "exact",   stdin = "3\n1 2 3\nx y z\n",          expect = "1 2 3\nx y z\nDROPPED 0\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "cpp.advanced.14.invalidation"
+node        = 14
+title       = "ERASE WHILE WALKING"
+difficulty  = 4
+story       = "The harbour master crosses sampans off the mooring list while reading down it, and skips the one after every cross."
+concepts    = ["iteration", "undefined-behaviour", "slices"]
+requires    = ["cpp.advanced.13.template-class"]
+map          = { x = 0.287, y = 0.854, kind = "quest" }
+brief       = '''
+Line one is `n t`. Line two is `n` integers.
+
+Remove every value below `t` from the vector, **in place**, and print what is
+left on one line (or `-` if nothing is), then `REMOVED <k>`.
+
+```
+input:  6 3
+        1 1 2 5 1 4
+output: 5 4
+        REMOVED 4
+```
+
+The starter is the bug everyone writes once: it walks by index, erases at
+`i`, and then does `++i` — and the element that slid into slot `i` is never
+looked at. Two adjacent small values, and the second one survives. That bug
+is at least well-defined. Its iterator twin is not: `erase(it)` invalidates
+`it` and every iterator after it, so `for (auto it = v.begin(); ...; ++it)`
+with an `erase` inside is **undefined behaviour** — it usually walks off the
+end and sometimes appears to work, which is worse.
+
+`erase` returns the iterator to the element after the one removed. Use it:
+`it = v.erase(it)` on a hit, `++it` on a miss, and never both. C++20 also has
+`std::erase_if(v, predicate)`, which does the whole job in one call and is
+the answer to give first; the loop is the answer to give when they ask what
+`erase_if` does.
+'''
+starter     = '''
+#include <iostream>
+#include <vector>
+
+int main() {
+    int n = 0;
+    long long threshold = 0;
+    std::cin >> n >> threshold;
+    std::vector<long long> moorings(n);
+    for (long long& v : moorings) {
+        std::cin >> v;
+    }
+
+    int removed = 0;
+    // erases at i and then steps past whatever slid into slot i
+    for (std::size_t i = 0; i < moorings.size(); ++i) {
+        if (moorings[i] < threshold) {
+            moorings.erase(moorings.begin() + static_cast<long>(i));
+            ++removed;
+        }
+    }
+
+    if (moorings.empty()) {
+        std::cout << "-\n";
+    } else {
+        for (std::size_t i = 0; i < moorings.size(); ++i) {
+            std::cout << (i ? " " : "") << moorings[i];
+        }
+        std::cout << '\n';
+    }
+    std::cout << "REMOVED " << removed << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <vector>
+
+int main() {
+    int n = 0;
+    long long threshold = 0;
+    std::cin >> n >> threshold;
+    std::vector<long long> moorings(n);
+    for (long long& v : moorings) {
+        std::cin >> v;
+    }
+
+    int removed = 0;
+    // erase hands back the iterator to the next element; the old one is dead
+    for (auto it = moorings.begin(); it != moorings.end();) {
+        if (*it < threshold) {
+            it = moorings.erase(it);
+            ++removed;
+        } else {
+            ++it;
+        }
+    }
+    // the one-line answer, equivalent to the loop above:
+    //     removed = std::erase_if(moorings, [&](long long v) { return v < threshold; });
+
+    if (moorings.empty()) {
+        std::cout << "-\n";
+    } else {
+        for (std::size_t i = 0; i < moorings.size(); ++i) {
+            std::cout << (i ? " " : "") << moorings[i];
+        }
+        std::cout << '\n';
+    }
+    std::cout << "REMOVED " << removed << '\n';
+}
+'''
+hints = [
+  "Leave the increment out of the for header. Advance with ++it only in the branch that did not erase; in the other branch, it = erase(it) already advanced.",
+  "The index version can also be fixed — do not ++i after an erase — but the iterator form is the one to know, because it is the same on a std::list and a std::map.",
+  "std::erase_if(vector, pred) returns how many it removed, which is exactly the REMOVED line.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "6 3\n1 1 2 5 1 4\n", expect = "5 4\nREMOVED 4\n",      visible = true },
+  { name = "all-gone", stdin = "3 10\n1 2 3\n",      expect = "-\nREMOVED 3\n",        visible = false },
+  { name = "none",     stdin = "4 0\n3 1 2 0\n",     expect = "3 1 2 0\nREMOVED 0\n",  visible = false },
+  { name = "run",      stdin = "5 2\n1 1 1 1 9\n",   expect = "9\nREMOVED 4\n",        visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "cpp.advanced.15.undefined-behaviour"
+node        = 15
+title       = "THE COMPILER ASSUMED"
+difficulty  = 4
+story       = "The pump room's litre counter is an int, and at 2147483647 litres the compiler had already assumed it would never get there."
+concepts    = ["undefined-behaviour", "types", "math"]
+requires    = ["cpp.advanced.14.invalidation"]
+map          = { x = 0.391, y = 0.950, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers, each of which fits in a
+`long long`. Their running total fits in a `long long` too.
+
+Print two lines: `INT32 OK` if every running total along the way fits in a
+32-bit `int`, or `INT32 OVERFLOW <i>` with the 0-based index of the first
+value that would have pushed it out; then `INT64 <total>`.
+
+```
+input:  3
+        2147483647 1 -5
+output: INT32 OVERFLOW 1
+        INT64 2147483643
+```
+
+The starter keeps the total in an `int` and prints `INT32 OK` whatever
+happens. It cannot be fixed by adding the obvious check —
+`if (total + v < total)` — because that check is written in terms of the
+overflow it is looking for, and **signed overflow is undefined behaviour**.
+The compiler is entitled to assume UB does not happen, so `total + v < total`
+with positive `v` is *always false* as far as it is concerned, and under
+`-O2` both gcc and clang delete the test. The wrong number is not a bug in
+the optimiser. It is the contract.
+
+The rule this land runs on: undefined behaviour is not "some value". It is
+the compiler assuming a thing is impossible and reasoning from there. So you
+never detect overflow by causing it. You detect it *before* the addition, in
+a wider type or by comparing against the limits — `std::numeric_limits<int>`
+— and this program's expected output depends on nothing that is undefined.
+'''
+starter     = '''
+#include <iostream>
+#include <limits>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    // an int accumulator, and no check at all
+    int total = 0;
+    for (long long v : nums) {
+        total += static_cast<int>(v);
+    }
+
+    std::cout << "INT32 OK\n";
+    std::cout << "INT64 " << total << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <limits>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    const long long low = std::numeric_limits<int>::min();
+    const long long high = std::numeric_limits<int>::max();
+
+    // the running total is kept in the wide type, and the narrow range is
+    // checked against limits before anything narrow is ever computed
+    long long total = 0;
+    long long overflow_at = -1;
+    for (std::size_t i = 0; i < nums.size(); ++i) {
+        total += nums[i];
+        if (overflow_at < 0 && (total < low || total > high)) {
+            overflow_at = static_cast<long long>(i);
+        }
+    }
+
+    if (overflow_at < 0) {
+        std::cout << "INT32 OK\n";
+    } else {
+        std::cout << "INT32 OVERFLOW " << overflow_at << '\n';
+    }
+    std::cout << "INT64 " << total << '\n';
+}
+'''
+hints = [
+  "Keep the total in a long long and compare it against std::numeric_limits<int>::min() and max() after each addition. No int arithmetic ever happens.",
+  "Record only the first index that leaves the range; a later value may bring the total back inside, and the question asked where it first left.",
+  "If you must add two ints and want to know whether it is safe: check v > INT_MAX - total before the add, not the sign of the sum after it. The first is defined; the second is the thing the compiler deletes.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3\n2147483647 1 -5\n",   expect = "INT32 OVERFLOW 1\nINT64 2147483643\n",  visible = true },
+  { name = "fits",    stdin = "3\n1 2 3\n",             expect = "INT32 OK\nINT64 6\n",                  visible = false },
+  { name = "edge",    stdin = "1\n2147483647\n",        expect = "INT32 OK\nINT64 2147483647\n",         visible = false },
+  { name = "under",   stdin = "2\n-2147483648 -1\n",    expect = "INT32 OVERFLOW 1\nINT64 -2147483649\n", visible = false },
+  { name = "wide",    stdin = "2\n5000000000 -5000000000\n", expect = "INT32 OVERFLOW 0\nINT64 0\n",     visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "cpp.advanced.16.jthread"
+node        = 16
+title       = "STOP WHEN ASKED"
+difficulty  = 4
+story       = "The night pump runs until somebody tells it to stop, and until this shift nobody could."
+concepts    = ["cancellation", "concurrency", "raii"]
+requires    = ["cpp.advanced.15.undefined-behaviour"]
+map          = { x = 0.619, y = 0.868, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Start two `std::jthread`s. The first sums the values and stores the result.
+The second takes a `std::stop_token`, registers a `std::stop_callback` on it
+that sets a flag, and then loops until `stop_requested()`. From `main`, call
+`request_stop()` on the second thread, join both, and print:
+
+```
+input:  3
+        1 2 3
+output: SUM 6
+        STOPPED yes
+        CALLBACK yes
+```
+
+`std::jthread` is `std::thread` with two things added, both of them RAII.
+Its destructor **joins**, so the starter's abort — a `std::thread` destroyed
+while joinable — cannot happen. And it carries a `std::stop_source`: if the
+thread function takes a `std::stop_token` as its first parameter, the
+`jthread` passes one in, `request_stop()` flips it, and the destructor calls
+`request_stop()` before it joins. A thread that checks its token is a thread
+you can always shut down; one that does not is the starter.
+
+`stop_callback` is how a blocked thread finds out — it runs the moment stop
+is requested, on the requesting thread, and its usual job is to wake up a
+condition variable the worker is asleep on.
+'''
+starter     = '''
+#include <atomic>
+#include <iostream>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    long long sum = 0;
+    std::atomic<bool> stopped{false};
+    std::atomic<bool> callback{false};
+
+    // a plain std::thread, never joined: its destructor calls std::terminate
+    std::thread summer([&] {
+        for (long long v : nums) {
+            sum += v;
+        }
+    });
+
+    // the second thread, with a stop_token and a stop_callback, is missing
+
+    std::cout << "SUM " << sum << '\n';
+    std::cout << "STOPPED " << (stopped ? "yes" : "no") << '\n';
+    std::cout << "CALLBACK " << (callback ? "yes" : "no") << '\n';
+}
+'''
+solution    = '''
+#include <atomic>
+#include <iostream>
+#include <stop_token>
+#include <thread>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    long long sum = 0;
+    std::atomic<bool> stopped{false};
+    std::atomic<bool> callback{false};
+
+    std::jthread summer([&] {
+        for (long long v : nums) {
+            sum += v;
+        }
+    });
+
+    // the jthread sees the stop_token parameter and supplies one
+    std::jthread pump([&](std::stop_token token) {
+        std::stop_callback on_stop(token, [&] { callback = true; });
+        while (!token.stop_requested()) {
+            std::this_thread::yield();
+        }
+        stopped = true;
+    });
+
+    pump.request_stop();
+    pump.join();
+    summer.join();
+
+    std::cout << "SUM " << sum << '\n';
+    std::cout << "STOPPED " << (stopped ? "yes" : "no") << '\n';
+    std::cout << "CALLBACK " << (callback ? "yes" : "no") << '\n';
+}
+'''
+hints = [
+  "Change std::thread to std::jthread for summer and the abort is gone even before you add a join — but join it anyway, before you read sum.",
+  "A lambda whose first parameter is std::stop_token gets one automatically from the jthread that runs it; that is the whole hookup.",
+  "std::stop_callback on_stop(token, fn) is an object: it registers in its constructor and unregisters in its destructor, so it lives for the loop and no longer.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n",    expect = "SUM 6\nSTOPPED yes\nCALLBACK yes\n",   visible = true },
+  { name = "none",  stdin = "0\n",           expect = "SUM 0\nSTOPPED yes\nCALLBACK yes\n",   visible = false },
+  { name = "cancel", stdin = "2\n-4 4\n",    expect = "SUM 0\nSTOPPED yes\nCALLBACK yes\n",   visible = false },
+  { name = "big",   stdin = "2\n3000000000 3000000000\n", expect = "SUM 6000000000\nSTOPPED yes\nCALLBACK yes\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17  BOSS
+[[quest]]
+id          = "cpp.advanced.17.dangling"
+node        = 17
+title       = "THE DANGLING"
+difficulty  = 5
+story       = "Victoria Park's pump room, two floors under the fountain. A pump thread is still reading a buffer that the room freed when the shift ended."
+concepts    = ["raii", "smart-pointers", "concurrency", "undefined-behaviour"]
+requires    = ["cpp.advanced.16.jthread", "cpp.advanced.11.shared-ptr"]
+map          = { x = 0.719, y = 0.950, kind = "boss" }
+brief       = '''
+Line one is `w n`: `w` pumps and `n` readings. Line two is the readings.
+
+`pump(w, buffer)` starts `w` threads; thread `i` sums the readings from
+`i * n / w` up to `(i + 1) * n / w` into `partial[i]`, and `pump` returns
+the partials. `main` prints `PUMP <i> <sum>` for each, `TOTAL <sum>`, and
+then `FREED yes` if the buffer has been released by the time everything is
+done — observed through a `std::weak_ptr`.
+
+```
+input:  2 4
+        1 2 3 4
+output: PUMP 0 3
+        PUMP 1 7
+        TOTAL 10
+        FREED yes
+```
+
+The starter aborts. `pump` builds its threads in a local vector and returns
+while they are still joinable, so the vector's destructor calls
+`std::terminate`. Read what it was about to do instead: those threads hold a
+**reference** to `buffer`, and `pump`'s caller is about to let `buffer` die.
+A thread reading a vector after its destructor ran is reading freed memory.
+Sometimes it gets the old numbers. Sometimes it gets the next allocation.
+Sometimes the allocator has already handed the pages back and it segfaults.
+It is undefined behaviour, and it is the most expensive kind, because it does
+not fail where the mistake is.
+
+Fix the ownership, not the symptom. The buffer is a
+`std::shared_ptr<const std::vector<long long>>`, every thread captures **its
+own copy of the handle**, and the buffer lives exactly as long as the last
+thread holding it — however `pump` returns and whatever order the threads
+finish in. Join before you return. `main` keeps a `weak_ptr` and, after
+`pump` has returned and dropped its own handle, `expired()` is the proof: the
+readings were freed, once, by whichever pump finished last, and nobody was
+still reading.
+
+That is the whole land in one program. Nothing checked you. You made the
+lifetime match the use, and the tools that do it — the smart pointer that
+counts, the join that waits — are the same RAII you met on the basic road.
+'''
+starter     = '''
+#include <iostream>
+#include <memory>
+#include <thread>
+#include <vector>
+
+// starts w pumps over the buffer and returns their partial sums
+std::vector<long long> pump(int w, std::shared_ptr<const std::vector<long long>> buffer) {
+    const std::vector<long long>& readings = *buffer;
+    std::size_t n = readings.size();
+    std::vector<long long> partial(w, 0);
+
+    std::vector<std::thread> pumps;
+    for (int i = 0; i < w; ++i) {
+        std::size_t begin = static_cast<std::size_t>(i) * n / w;
+        std::size_t end = static_cast<std::size_t>(i + 1) * n / w;
+        // the thread holds a reference to readings, which is about to die
+        pumps.emplace_back([i, begin, end, &readings, &partial] {
+            long long sum = 0;
+            for (std::size_t j = begin; j < end; ++j) {
+                sum += readings[j];
+            }
+            partial[i] = sum;
+        });
+    }
+
+    // pumps is destroyed here with every thread still joinable
+    return partial;
+}
+
+int main() {
+    int w = 0;
+    int n = 0;
+    std::cin >> w >> n;
+    auto buffer = std::make_shared<std::vector<long long>>(n);
+    for (long long& v : *buffer) {
+        std::cin >> v;
+    }
+    std::weak_ptr<const std::vector<long long>> watch = buffer;
+
+    std::vector<long long> partial = pump(w, std::move(buffer));
+
+    long long total = 0;
+    for (int i = 0; i < w; ++i) {
+        std::cout << "PUMP " << i << ' ' << partial[i] << '\n';
+        total += partial[i];
+    }
+    std::cout << "TOTAL " << total << '\n';
+    std::cout << "FREED " << (watch.expired() ? "yes" : "no") << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <memory>
+#include <thread>
+#include <vector>
+
+// starts w pumps over the buffer and returns their partial sums
+std::vector<long long> pump(int w, std::shared_ptr<const std::vector<long long>> buffer) {
+    std::size_t n = buffer->size();
+    std::vector<long long> partial(w, 0);
+
+    {
+        std::vector<std::jthread> pumps;
+        for (int i = 0; i < w; ++i) {
+            std::size_t begin = static_cast<std::size_t>(i) * n / w;
+            std::size_t end = static_cast<std::size_t>(i + 1) * n / w;
+            // each thread owns a handle to the readings; the vector cannot
+            // be freed while any of them is still running
+            pumps.emplace_back([i, begin, end, buffer, &partial] {
+                long long sum = 0;
+                for (std::size_t j = begin; j < end; ++j) {
+                    sum += (*buffer)[j];
+                }
+                partial[i] = sum;
+            });
+        }
+        // every pump is joined at this brace, before partial is read or returned
+    }
+
+    return partial;
+    // pump's own handle dies here; the threads' handles died when they finished
+}
+
+int main() {
+    int w = 0;
+    int n = 0;
+    std::cin >> w >> n;
+    auto buffer = std::make_shared<std::vector<long long>>(n);
+    for (long long& v : *buffer) {
+        std::cin >> v;
+    }
+    std::weak_ptr<const std::vector<long long>> watch = buffer;
+
+    std::vector<long long> partial = pump(w, std::move(buffer));
+
+    long long total = 0;
+    for (int i = 0; i < w; ++i) {
+        std::cout << "PUMP " << i << ' ' << partial[i] << '\n';
+        total += partial[i];
+    }
+    std::cout << "TOTAL " << total << '\n';
+    // main gave its handle away, pump's is gone, the threads' are gone
+    std::cout << "FREED " << (watch.expired() ? "yes" : "no") << '\n';
+}
+'''
+hints = [
+  "Two changes in pump: capture buffer (the shared_ptr) by value instead of readings by reference, and join every thread before return — a std::vector<std::jthread> in its own block does the joining at the closing brace.",
+  "The lambda's copy of the shared_ptr is what keeps the vector alive; it is released when the thread function returns, not when pump does. That is the difference between a reference and an owner.",
+  "partial is still captured by reference, and that is correct: pump owns it, pump joins before returning it, and each thread writes only its own slot.",
+  "main moves its handle into pump on purpose. If it had kept one, FREED would be no — the buffer would be alive because main was still holding it, and that is the other answer this boss accepts you being able to explain.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-pumps",  stdin = "2 4\n1 2 3 4\n",          expect = "PUMP 0 3\nPUMP 1 7\nTOTAL 10\nFREED yes\n",                     visible = true },
+  { name = "more-pumps", stdin = "3 2\n7 8\n",              expect = "PUMP 0 0\nPUMP 1 7\nPUMP 2 8\nTOTAL 15\nFREED yes\n",           visible = false },
+  { name = "empty",      stdin = "1 0\n",                   expect = "PUMP 0 0\nTOTAL 0\nFREED yes\n",                                visible = false },
+  { name = "even",       stdin = "4 8\n1 1 1 1 1 1 1 1\n",  expect = "PUMP 0 2\nPUMP 1 2\nPUMP 2 2\nPUMP 3 2\nTOTAL 8\nFREED yes\n",  visible = false },
+]

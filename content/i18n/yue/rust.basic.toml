@@ -1,0 +1,592 @@
+# RUST LAND — BASIC, in Cantonese (colloquial written Cantonese, traditional
+# characters). A translation pack (SPEC §12.1): the prose of
+# `content/rust/basic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "rust.basic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.basic.01.first-light"
+title = "第一下光"
+story = "06:40，渣甸坊樓上。個游標就咁停喺度，灰色嘅字冇咗。你仲憑記憶打得出嘅嘢，先係你嘅。"
+brief = '''
+一模一樣咁印出：
+
+```
+hello, causewaybay
+```
+
+全部細楷，一個逗號，一個空格，一行。其他乜都唔好有。
+'''
+hints = [
+  "println! 係一個 macro，所以個感嘆號要保留。",
+  "個字串要一模一樣：細楷、一個逗號、逗號後面一個空格。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.basic.02.bindings"
+title = "車費牌"
+story = "波斯富街電車站個車費牌淨係顯示一個數，之後日票同月票嗰兩格都係空嘅。"
+brief = '''
+由標準輸入讀一個整數 `n`。
+
+印三行：`n`，然後 `n` 嘅兩倍，然後 `n` 乘自己。
+
+`n` 裝得入 `i64`，可以係負數。
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "讀入嗰part已經幫你寫好。將 _n 前面條底線拎走，直接用佢。",
+  "println! 食一個格式字串：println!(\"{}\", n)。",
+  "負數 n 嘅平方係正數。測試係知嘅。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.basic.03.shadowing"
+title = "三個名，一個名"
+story = "崇光過路口嗰部售票機將個價錢當文字又當數字又當錢咁存，而三個都叫做 price。"
+brief = '''
+讀一行：一個以仙為單位嘅金額，用數字寫。
+
+印三行：
+
+1. trim 咗之後嘅文字有幾多個字元
+2. 個金額，當數字
+3. 個金額換做元，啱啱好兩個小數位
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+金額唔會係負數，裝得入 `i64`。用一個名做晒，shadow 兩次 —— 先係
+`&str`，再係 `i64`，最後係 `String`。
+'''
+hints = [
+  "第二個 `let cents = ...` 唔係賦值；佢係開一個新嘅 binding，遮住舊嗰個，而且可以係另一個型。",
+  "所以 shadowing 唔係 `mut`：`mut` 保住個型，shadowing 唔保。",
+  "兩個小數位、前面補零，係 {:02} 呢個闊度 flag。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.basic.04.the-move"
+title = "一張收據"
+story = "Lucky Mac 部收銀機印完收據之後就講唔到多謝，因為佢連個名都跟張紙一齊交咗出去。"
+brief = '''
+讀一行：一個顧客名。印兩行：
+
+```
+input:  MEI
+output: RECEIPT: MEI
+        THANK YOU, MEI
+```
+
+個 starter 編譯唔到。`receipt` 係**以值**攞走個名，所以呼叫完之後 `main`
+已經唔再擁有佢，冇得再印多次。
+
+改法係畀 `receipt` *睇一睇*個名，而唔係攞走佢。唔准 clone。
+'''
+hints = [
+  "個錯誤係 E0382：borrow of moved value。個 move 係喺呼叫嗰下發生，唔係喺印嗰下。",
+  "型係 &str 嘅參數係借；型係 String 嘅參數係攞走。",
+  "先改個簽名，之後呼叫嗰邊就要加個 &。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.basic.05.slices"
+title = "條隊嘅中間"
+story = "四十個人排喺希慎廣場出面。櫃檯睇到條隊嘅頭同尾，中間嘅一個都睇唔到。"
+brief = '''
+標準輸入第一行係一個數量 `n`，第二行係 `n` 個整數，用空格分開。
+
+印三行：第一個值、最後一個值，同埋嚴格喺佢哋兩個之間所有數嘅總和。
+唔夠三個值嘅話，個總和係 `0`。
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+'''
+hints = [
+  "nums[1..nums.len() - 1] 係個 Vec 嘅一個 slice，唔係一個副本。",
+  "得一個或者兩個值嘅時候，嗰個範圍會係空或者倒轉 —— 索引之前用個 if 擋住先。",
+  "一個 &i64 嘅 iterator 可以直接 sum 做一個 i64。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.basic.06.strings"
+title = "byte 唔係字"
+story = "時代廣場個指示牌將「銅鑼灣」截做三個字元，結果得返一個半。"
+brief = '''
+讀一行。印三行：
+
+1. 佢有幾多個 **byte**
+2. 佢有幾多個**字元**
+3. 呢一行，將啲字元倒轉
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+呢一行可能有 ASCII 以外嘅字元，到時頭兩個數就唔會一樣。呢個正正就係重點。
+'''
+hints = [
+  "str::len 係 byte 長度。一直都係。",
+  "chars() 係逐個 scalar value 行，所以 chars().count() 就係另一個數。",
+  "chars().rev().collect::<String>() 倒轉係安全嘅；倒轉啲 byte 就唔係。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.basic.07.structs"
+title = "收銀機"
+story = "Lucky Mac 前面個櫃檯將張單每一行都放喺同一個地方 —— 直到個建議將個 struct 換成一句註解為止。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<ITEM> <CENTS>`。
+
+寫一個 `Till` 收集啲項目，然後將每個項目照 `<ITEM> <CENTS>` 印返出嚟，
+一行一個，跟到達嘅次序，最後印 `TOTAL <sum>`。
+
+```
+input:  2
+        HASHBROWN 600
+        SET 2800
+output: HASHBROWN 600
+        SET 2800
+        TOTAL 3400
+```
+
+`n` 可以係 `0`，咁嘅話唯一嗰行就係 `TOTAL 0`。
+'''
+hints = [
+  "一個裝 (String, i64) 嘅 Vec 就夠。個 struct 嘅作用係等部收銀機擁有自己嗰啲行。",
+  "add 會改變部收銀機，所以佢攞 &mut self；total 淨係讀，所以佢攞 &self。",
+  "用 &till.items 嚟 iterate 係借，正正係你想要嘅 —— 印嘢唔應該清空部收銀機。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.basic.08.enums"
+title = "邊個搭緊車"
+story = "銅鑼灣個閘機每一張卡都收成人車費，包括嗰啲唔係成人嘅，同埋嗰張根本唔係卡嘅。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<TYPE> <KM>`。
+
+基本車費係 `500 + 100 * KM` 仙。每一行印以下其中一樣：
+
+* `ADULT` —— 基本車費
+* `STUDENT` —— 基本車費嘅一半，整數除法
+* `SENIOR` —— 永遠係 `200`
+* 其他任何嘢 —— `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+用一個有四個 variant 嘅 `enum` 嚟表示乘客，其中一個 variant 帶住嗰個
+認唔出嘅 tag，然後用一個 `match` 決定車費。
+'''
+hints = [
+  "variant 可以帶數據：Other(String) 裝住嗰個對唔上嘅 tag。",
+  "對 &str 做 match，最後一個 arm 綁住剩低所有嘢：`other => ...`。",
+  "對 &Rider 做 match，喺 Other 嗰個 arm 攞到嘅係 &String —— format! 一樣食得。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.basic.09.maps"
+title = "個墟嗌緊乜"
+story = "九點嘅渣甸坊：每個檔口都嗌緊啲嘢，而個告示板想要個排名。"
+brief = '''
+讀晒成個標準輸入，用空白字元切開。
+
+每個唔同嘅字印一次，格式係 `<word> <count>`，按次數由多到少排，
+次數一樣就按個字由細到大排。
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+'''
+hints = [
+  "*counts.entry(word).or_insert(0) += 1 已經係成個計數迴圈。",
+  "HashMap 冇次序。印之前先 collect 落一個 Vec。",
+  "Ordering::then 將個 tie-break 串起嚟：先次數由多到少，再個字由細到大。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.basic.10.errors"
+title = "唔係數字嗰一行"
+story = "維園個抄錶員交上嚟一欄數字，中間夾住咗唔知邊個嘅午餐柯打。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行。每一行應該係一個整數。
+
+每一行印個值嘅兩倍，或者 parse 唔到嘅話印 `BAD <line>`。最後印
+`SUM <total>`，total 係你印咗出嚟嗰啲值嘅總和。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+寫一個用 `?` 嘅 `fn double(text: &str) -> Result<i64, ParseIntError>`，
+然後喺 `main` 用一個 `match` 處理兩種結果。
+'''
+hints = [
+  "對 Result 用 `?`，佢會幫你將個錯誤由 function 返回出去，所以 double 嘅內容得兩行。",
+  "match double(line) 啱啱好兩個 arm：Ok(value) 同 Err(_)。",
+  "SUM 係你印咗出嚟嘅嘢嘅總和 —— 係兩倍之後嘅值，唔係原本嘅。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.basic.11.iterators"
+title = "怡和街一次過"
+story = "Alex 話用三個 for 迴圈就得。你見識過怡和街嘅車流；你得一次過嘅機會。"
+brief = '''
+標準輸入係一行整數，用空格分開。
+
+印三行：
+
+1. 所有偶數嘅總和（冇嘅話係 `0`）
+2. 每個大過 `10` 嘅值，乘二，跟原本次序，用一個空格串起 ——
+   冇嘅話印 `-`
+3. 有幾多個唔同嘅值
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+用 iterator adapter —— `filter`、`map`、`sum`、`collect` —— 唔好用索引迴圈。
+'''
+hints = [
+  "nums.iter() 產出 &i64，而 filter 交畀個 closure 嘅係佢嘅一個 reference，所以個參數係 &&i64。喺 pattern 度拆開佢 —— |&&n| n % 2 == 0 —— 好過估個 body 要幾多粒星。",
+  "join 要字串，所以每個數先用 to_string() map 一次，再 collect 落一個 Vec<String>。",
+  "直接由個 iterator 起一個 HashSet，用 len() 就攞到唔同值嘅數量。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.basic.12.str-and-string"
+title = "第一條問題"
+story = "香港每一次 Rust 面試都係用呢條開場，而阿薇已經答衰咗兩次。"
+brief = '''
+讀一行。印三行：
+
+1. 佢第一個用空白字元分開嘅字，以一個**借用**嘅 `&str` 嘅形式 ——
+   唔准 allocate，唔准 `to_string()`
+2. 嗰個字轉大楷，呢個一定要係一個擁有嘅 `String`，因為大楷版本
+   唔係任何已經存在嘅嘢嘅 slice
+3. 兩個比較起嚟相等就印 `SAME YES`，否則印 `SAME NO`
+
+```
+input:  lucky mac
+output: lucky
+        LUCKY
+        SAME NO
+```
+
+`&str` 係一個望住其他人擁有嘅文字嘅 view。`String` 擁有一個可以增長嘅
+buffer。`first_word` 返回一個 view，所以佢嘅返回型係由佢個參數借嘅，
+乜都唔 allocate —— 呢個就係佢哋真正想問嗰條問題嘅完整答案。
+'''
+hints = [
+  "split_whitespace().next() 畀你 Option<&str>，再對佢用 unwrap_or，空行就變成空字。",
+  "to_uppercase 返回 String，唔係 &str —— 佢一定要 allocate，因為個結果唔係輸入嘅一部分。",
+  "&str 同 String 可以直接比較；標準庫實現咗佢哋之間嘅相等，所以你唔使 as_str()。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.basic.13.combinators"
+title = "一個 unwrap 都冇"
+story = "Alex 成日話 Rust 版全部都係 unwrap。再寫一次個讀欄程式，會出錯嗰part唔准有 unwrap。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行，每行應該係一個整數。
+
+每一行印個值嘅兩倍，parse 唔到就印 `-1`。然後印 `SOME <k>`，即係有幾多行
+parse 到，同埋 `FIRST <v>` —— 第一個 parse 到嘅值 —— 或者 `FIRST NONE`。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        -1
+        -8
+        SOME 2
+        FIRST 21
+```
+
+用 combinator 嚟做：`.ok()` 將 `Result` 變做 `Option`，`.map(|v| v * 2)`
+淨係對存在嘅值起作用，而 `.unwrap_or(-1)` 喺冇值嘅時候提供答案。
+`find_map` 一次過就畀到你最後嗰行。
+
+`unwrap()` 喺 parse 到嗰啲行都「得」嘅，然後喺 `xx` 就會拖冧成個程式。
+`unwrap_or` 唔會 panic。知道邊個係邊個，就係呢條街嘅任務。
+'''
+hints = [
+  "parse::<i64>() 呢度要用 turbofish，因為下游冇嘢幫編譯器釘死個型。",
+  ".ok() 係故意將個錯誤掉走 —— 你唔係要報告點解失敗，淨係報告佢失敗咗。",
+  "find_map 會一直行個 closure，直到有一次返回 Some，所以佢喺第一行 parse 到嘅地方就停。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.basic.14.matching"
+title = "件嘢嘅形狀"
+story = "個送餐 app 食四個指令，而舊嘅碼係用九個層層疊嘅 if 去 check 佢哋。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行，每行係 `<COMMAND>` 或者
+`<COMMAND> <ARG>`。
+
+每一行印：
+
+* `GO <n>` 而 `n` 大過零 —— `FORWARD <n>`
+* `GO <n>` 而 `n` 係零或者以下 —— `STAY`
+* `STOP` —— `HALT`
+* 其他任何嘢 —— `UNKNOWN <COMMAND>`
+
+然後印 `MOVED <total>`，即係你所有向前行嘅總和。
+
+```
+input:  4
+        GO 3
+        GO -1
+        STOP
+        JUMP 9
+output: FORWARD 3
+        STAY
+        HALT
+        UNKNOWN JUMP
+        MOVED 3
+```
+
+對切開咗嘅一行做一個 `match`，喺 `GO` 嗰個 arm 用一個 **guard** 分開
+兩種情況，唔使第二個分支。用 slice pattern —— `["GO", arg]`—— 去 match，
+就將一行有幾多截變成 pattern 嘅一部分，而唔係你自己手寫嘅長度檢查。
+'''
+hints = [
+  "parts.as_slice() 就係將個 Vec 變成 slice pattern 可以 match 嘅嘢。",
+  "pattern 後面嘅 `if` 係一個 match guard —— 佢分開兩個形狀一樣嘅 arm。",
+  "`[command, ..]` 綁住第一個元素、唔理其餘；`[]` 係空行，你一樣要覆蓋。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.basic.15.modules"
+title = "邊個准睇呢樣嘢"
+story = "個車費表漏咗去三個檔案，其中兩個俾人改咗。將佢放喺一道門後面。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個以 km 為單位嘅距離。
+
+將車費邏輯整理做一個 module：
+
+* `mod fares`，入面有一個**公開**嘅 `adult(km) -> i64`，同一個**私有**嘅
+  `base(km)`，由 `adult` 呼叫 —— `500 + 100 * km`
+* 一個嵌套嘅 `mod fares::pass`，入面有一個公開嘅 `monthly() -> i64`，
+  返回 `50000`
+
+每個距離印一個成人車費，然後印 `MONTHLY <x>`。
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        MONTHLY 50000
+```
+
+個 starter 編譯唔到：啲 item 係存在嘅，但係冇一樣係 `pub`，而一個 module
+嘅內容預設係對佢私有。呢個預設正正就係個功能 —— `base` 唔係介面嘅一部分，
+而編譯器就係保住呢件事嘅嘢。嵌套嘅 module 要喺 `mod` 嗰行自己有 `pub`，
+唔係淨係入面個 function 有就得。
+'''
+hints = [
+  "個錯誤係 E0603：個 item 係存在嘅，只係私有。三個 pub 就修好成個檔案。",
+  "base 係故意保持私有 —— 佢係呢度唯一一樣同其他人無關嘅嘢。",
+  "將個 function 變公開唔等於將道門變公開：`mod pass` 一樣要 pub。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.basic.16.smart-pointers"
+title = "編譯器講得出嘅大細"
+story = "Lucky Mac 個單據插：每張單都釘喺下面嗰張上面，一路釘落去到個櫃檯為止。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個以仙為單位嘅金額。
+
+用一條鏈裝住佢哋，一個金額一個節點，跟到達嘅次序：
+
+```
+struct Entry {
+    cents: i64,
+    next: Option<Box<Entry>>,
+}
+```
+
+印三行：
+
+1. 啲金額，跟次序，用空格分開，冇嘅話印 `-`
+2. `SUM <total>`，要由一個**遞歸**嘅 function 行成條鏈計出嚟
+3. `LAST <cents>` —— 最後一個節點嘅金額 —— 或者 `LAST NONE`
+
+```
+input:  5
+        1 2 3 4 5
+output: 1 2 3 4 5
+        SUM 15
+        LAST 5
+```
+
+個 starter 編譯唔到，而個錯誤正正係 `Box` 存在嘅理由。寫
+`next: Option<Entry>`，編譯器就要將 `Entry` 喺記憶體度排好：佢要 `8` 個
+byte 畀 `cents`，再加一個 `Entry` 有幾大 —— 而呢樣正正係佢計緊嘅嘢。
+E0072，*recursive type has infinite size*。
+
+`Box<Entry>` 係一個指住 heap 上一塊 allocation 嘅指針，而一個指針嘅大細
+編譯器本來就知。佢擁有佢指住嘅嘢：啱啱好一個擁有者，`Box` drop 嘅時候
+釋放，冇計數，冇共享。`Option<Box<Entry>>` 用一個指針大細嘅值，同時係
+條鏈嘅尾同埋條鏈入面嘅一個節點 —— 個 `None` 係用 null 地址嚟存，唔係額外
+一個 tag byte，所以比起淨係 `Box` 一啲成本都冇多。
+'''
+hints = [
+  "一個字就修好個編譯錯誤：Option<Entry> 變 Option<Box<Entry>>，而個 constructor 加一個 Box::new。",
+  "由後面砌返去前面 —— 倒轉 iterate 啲金額，每個新節點都攞你已經有嗰條鏈做佢嘅 next。由前砌到後就要一個指住條尾嘅 cursor，嗰場 borrow 嘅爭拗你而家未需要。",
+  "想行但唔想消耗，就揸住一個 Option<&Box<Entry>>：用 head.as_ref() 起步，用 entry.next.as_ref() 行一步。.as_ref() 將 &Option<T> 變做 Option<&T>，呢一下就係保住成條鏈唔散嘅動作。",
+  "遞歸嘅 sum 唔使 mut 唔使迴圈：Some(entry) => entry.cents + sum(&entry.next)，None => 0。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.basic.17.testing"
+title = "自己證明畀自己睇"
+story = "06:40 冇人會幫你 check 呢樣嘢。個表就喺度；整佢變綠。"
+brief = '''
+個程式有一個表，入面係四對已知正確嘅 `(km, fare)`，佢會逐一用嚟 check
+`fare`，印 `<name> ok` 或者 `<name> FAIL got <g> want <w>`，然後印
+`PASSED <k>/4`。最後佢由標準輸入讀一個距離，印 `FARE <x>`。
+
+`fare(km)` 應該係 `500 + 100 * km`。個 starter 嗰個係錯嘅，而個表捉到佢
+—— 呢個就係成件事嘅重點。
+
+```
+input:  4
+output: zero ok
+        one ok
+        four ok
+        ten ok
+        PASSED 4/4
+        FARE 900
+```
+
+唔好掂個表；佢就係規格。喺一個真正嘅 crate 入面，佢會住喺
+`#[cfg(test)] mod tests`，由 `cargo test` 行。個表點都係一樣嘅 ——
+唯一唔同嘅係個 harness，而一個你讀得明嘅表，值錢過一個你讀唔明嘅 harness。
+'''
+hints = [
+  "個表就係規格。錯嘅係個 function。",
+  "四個 case 有三個唔過，過嗰個係 km = 0，正正就係點解一個測試 case 證明唔到任何嘢。",
+  "喺一個 crate 入面，呢啲就係 #[cfg(test)] mod tests，入面有 #[test] fn fares() 同 assert_eq!(fare(arg), want)。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.basic.18.traits"
+title = "自動補完"
+story = "波斯富街部電話亭你未有一行佢就幫你寫完每一行。不過你自己改名嗰個 trait，佢冇嘢補畀你。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行，每行係以下其中一種
+
+* `SHOP <NAME> <FLOOR>`
+* `STOP <ROUTE>` —— `ROUTE` 係一個數
+
+每個牌印一行 `<tag> <rendering>`，然後印 `SIGNS <n>`：
+
+* `Shop` render 做 `<NAME> / F<FLOOR>`，佢嘅 tag 係 `SIGN`
+* `Stop` render 做佢嘅路線號碼，佢嘅 tag 係 `TRAM`
+
+```
+input:  3
+        SHOP HYSAN 4
+        STOP 2
+        SHOP SOGO 1
+output: SIGN HYSAN / F4
+        TRAM 2
+        SIGN SOGO / F1
+        SIGNS 3
+```
+
+宣告一個 trait，為兩個唔同嘅 struct 實現佢：
+
+```
+trait Sign {
+    fn render(&self) -> String;      // required: no body, every implementor writes one
+    fn tag(&self) -> &'static str { "SIGN" }   // provided: an implementor gets this free
+}
+```
+
+`tag` 係一個**預設方法**。`Shop` 乜都唔講就攞到 `SIGN`；`Stop` 自己寫一個，
+攞到 `TRAM`。呢個就係面試嗰陣好多人唔記得嘅 trait 嘅另一半：trait 唔止係
+一張簽名清單，佢可以帶住行為，而 override 係你自己揀嘅。
+
+透過**一個** function 印嘢：`fn show<T: Sign>(sign: &T)`。個 bound 就係
+份合約 —— `show` 對 `Shop` 或者 `Stop` 一無所知，佢淨係知交畀佢嘅嘢有
+`render` 同 `tag`。編譯器為每個具體嘅型印一份 `show`，啲呼叫係直接嘅。
+
+個 starter 編譯唔到。個 trait 宣告咗，啲 struct 亦都存在，但係單憑咁樣
+你乜都攞唔到：`show(&Shop { .. })` 係 E0277，*the trait bound `Shop: Sign`
+is not satisfied*。宣告一個 trait 同實現佢係兩個獨立嘅動作，而喺 Rust
+入面第二個永遠都要明文寫出嚟。
+
+兩種牌放落同一個 `Vec` 會係另一個機制 —— `Box<dyn Sign>`，一個指針加一個
+vtable，執行嗰陣先查。你呢度唔需要佢，因為每個呼叫點都仲見到具體嘅型。
+嗰個係下一張地圖嘅問題，而佢問嘅正正係：你手上揸住嘅係兩者之中邊一個。
+'''
+hints = [
+  "impl Sign for Shop 係寫喺 struct 外面。trait 講係乜；impl 講點做；而編譯器唔會由前者推斷出後者。",
+  "Shop 個 impl 完全唔寫 tag，佢就攞 trait 嗰個版本。喺 Stop 個 impl 度寫，Stop 嗰個就贏。預設方法嘅全部就係咁。",
+  "show<T: Sign>(sign: &T) 係 generic 嘅，所以個型要喺呼叫嘅地方已經知道 —— 即係喺 match 嘅 arm 入面，你仲見到自己啱啱砌咗乜嘅時候。",
+  "一個 Vec 同時裝住兩種就要 Box<dyn Sign>，嗰個係另一個機制，執行嗰陣要查表。冇人問你要呢樣嘢，而喺一條關於 trait 嘅問題度伸手攞佢，會係錯嘅答案。",
+]

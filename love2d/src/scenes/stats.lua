@@ -40,6 +40,7 @@ local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Anim = require("src.anim")
 local Ease = require("src.ease")
+local Land = require("src.land")
 
 local Stats = {}
 Stats.__index = Stats
@@ -53,6 +54,28 @@ Stats.LEARNED_AT = 5
 Stats.SHELF_SLOTS = 8
 
 local KIND_BADGE = { badge = "badge_star", level = "badge_chevron", streak = "badge_flame" }
+
+--- The per-land record, broken into the lines it will actually be drawn as.
+---
+--- Two lands to a line. `UI.text` without a width goes through
+--- `love.graphics.print`, which neither wraps nor clips, so a single joined
+--- line of four lands runs off the panel and out of the window — which is
+--- exactly what happened when `cpp` and `python` arrived. Breaking it here,
+--- rather than in the draw call, is what lets a headless test check it.
+---
+--- Returns an array of strings, one per line, and never `nil`.
+function Stats.land_lines(by_land)
+  local parts = {}
+  for _, land in ipairs(by_land or {}) do
+    parts[#parts + 1] = ("%s %d/%d"):format(
+      Land.name(land.land), land.cleared or 0, land.total or 0)
+  end
+  local lines = {}
+  for i = 1, #parts, 2 do
+    lines[#lines + 1] = parts[i] .. (parts[i + 1] and ("     " .. parts[i + 1]) or "")
+  end
+  return lines
+end
 
 function Stats.new(app)
   return setmetatable({
@@ -118,7 +141,12 @@ function Stats:draw_summary(x, y, w)
   -- constant tuned against 7 px captions and 14 px figures; at twice that the
   -- caption sat on the figure and the figure sat on the bar.
   local cap_h, fig_h, land_h = UI.lineHeight(7), UI.lineHeight(14), UI.lineHeight(7)
-  local h = 10 + cap_h + 2 + fig_h + 10 + 9 + 6 + land_h + 8
+  -- The lands take as many lines as they need, two to a line. One line was
+  -- right while there were two lands and silently wrong at four: the row is
+  -- drawn with `print`, which does not wrap, so the last land ran off the
+  -- panel and out of the window.
+  local land_lines = math.max(1, #Stats.land_lines(self.summary and self.summary.by_land))
+  local h = 10 + cap_h + 2 + fig_h + 10 + 9 + 6 + land_h * land_lines + 8
   UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = Theme.coin })
   local sm = self.summary
   if not sm then
@@ -151,13 +179,12 @@ function Stats:draw_summary(x, y, w)
 
   -- Per land, under the bar and on its own line: sharing a row with the
   -- STREAK tile put two different numbers in the same place.
-  local parts = {}
-  for _, land in ipairs(sm.by_land or {}) do
-    parts[#parts + 1] = ("%s %d/%d"):format(land.land:upper(), land.cleared, land.total)
-  end
-  if #parts > 0 then
-    UI.text(table.concat(parts, "     "), x + 14,
-      y + 10 + cap_h + 2 + fig_h + 10 + 9 + 6, 7,
+  -- Two to a line. `UI.text` without a width uses `print`, which neither
+  -- wraps nor clips, so the line is broken here rather than left to run past
+  -- the panel edge — and the pairs keep the columns under each other.
+  local land_y = y + 10 + cap_h + 2 + fig_h + 10 + 9 + 6
+  for i, line in ipairs(Stats.land_lines(sm.by_land)) do
+    UI.text(line, x + 14, land_y + (i - 1) * land_h, 7,
       Theme.withAlpha(Theme.cream, 0.55))
   end
   return y + h

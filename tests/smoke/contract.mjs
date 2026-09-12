@@ -1400,7 +1400,7 @@ check(null, "beyond: world.lands, world.map and quest.get match §5", async () =
     const lands = await cl.send("world.lands", {});
     assertEq(lands.type, "world.lands.ok", "world.lands");
     for (const l of lands.payload.lands) {
-      assert(["rust", "go"].includes(l.land), `§4.6: land ${l.land}`);
+      assert(["rust", "go", "cpp", "python"].includes(l.land), `§4.6: land ${l.land}`);
       for (const cat of l.categories) {
         assert(
           ["basic", "advanced", "hacker"].includes(cat.category),

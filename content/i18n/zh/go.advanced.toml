@@ -1,0 +1,587 @@
+# GO LAND — ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/go/advanced.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "go.advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "go.advanced.01.goroutines"
+title = "四十个车手"
+story = "12:30。八辆车，四十份订单，调度员还在一份一份地叫号。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+每个值启动一个 goroutine。每个 goroutine 在同一个 channel 上发送
+`{index, value * value}`。收集全部 `n` 个结果，按下标排序，每行输出一个
+`<index> <value>`，然后输出 `GOROUTINES <n>`。
+
+```
+input:  3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        GOROUTINES 3
+```
+
+结果按调度器随意决定的顺序到达。带上下标，才能让程序每次运行的答案都一样。
+
+这个包里的每个 goroutine 都把循环变量作为**参数**接收。从 Go 1.22 起 —— 而且只在
+`go` 指令写着 `1.22` 或更高版本的模块里 —— `for` 循环会给每次迭代各自的 `i` 和 `v`，
+所以在那里直接捕获它们是安全的；在其他任何地方，捕获它们都是 Go 里最常见的那一个
+bug。把它们作为参数传入在每个版本下都是正确的，而且在签名里明确写出了这个 goroutine
+被允许看到什么。
+'''
+hints = [
+  "容量为 n 的带缓冲 channel 意味着没有发送方会阻塞，所以就算你提前停下也不会泄漏 goroutine。",
+  "恰好接收 n 次。在这里没有别的办法知道它们全都完成了。",
+  "按下标做 sort.Slice，把调度器拿走的顺序还回来。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.advanced.02.waitgroup"
+title = "谁也不许早走"
+story = "最后一个车手还没签到，调度员就去读排班板，板上一半是空的。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个单词。
+
+每个单词启动一个 goroutine，把这个单词转成大写写进 `out[i]` —— 它自己的下标，所以
+不会有两个 goroutine 碰同一个元素。用一个 `sync.WaitGroup` 等它们全部完成，然后按顺序
+输出 `out`，再输出 `WAITED <n>`。
+
+```
+input:  2
+        lucky
+        mac
+output: LUCKY
+        MAC
+        WAITED 2
+```
+
+`wg.Add(1)` 在 `go` 之前，`defer wg.Done()` 是 goroutine 里的第一件事，`wg.Wait()` 在
+你读任何东西之前。在 goroutine 内部调用 Add，是在和 `Wait` 本身竞争。
+'''
+hints = [
+  "从很多 goroutine 写 out[i] 是安全的，因为每个 i 都恰好只由其中一个来写。",
+  "把 defer wg.Done() 写成 goroutine 的第一行，这样即使 panic 也会释放等待。",
+  "wg.Add(1) 放在循环里、go 语句之前 —— 不是放在 goroutine 里面。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.advanced.03.close"
+title = "谁来关出餐口"
+story = "最后一份订单之后出餐口还开着，柜台站在那里等着再来一份。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+一个 goroutine 把每个值乘以十发送出去，然后**关闭** channel。`main` 用 range 遍历这个
+channel，输出每个值并累计总和，然后输出 `SUM <total>` 和 `CLOSED`。
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+对 channel 的 `range` 在 channel 关闭时才结束，不会更早。忘了 `close`，Go 运行时会
+准确地告诉你发生了什么：*all goroutines are asleep — deadlock!*
+
+由发送方关闭。永远不是接收方。
+'''
+hints = [
+  "一行，在发送 goroutine 的末尾。",
+  "在 goroutine 顶部写 defer close(ch) 做的是同一件事，而且提前 return 也不受影响。",
+  "从接收方关闭会让发送方在发送时 panic —— 这就是为什么规则是由发送方关闭。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.advanced.04.select"
+title = "两个月台"
+story = "1 号月台和 2 号月台都往同一个大堂计数器送人，而计数器一次只能看其中一个。"
+brief = '''
+标准输入是两个整数 `a` 和 `b`。
+
+一个 goroutine 在电车 channel 上发送 `a` 个值然后关闭它；另一个在地铁 channel 上发送
+`b` 个然后关闭它。`main` 用一个 `select` 循环把**两个**都排空，并数清各自来了多少。
+
+输出 `TRAM <a>`、`MTR <b>`、`TOTAL <a+b>`。
+
+```
+input:  3 2
+output: TRAM 3
+        MTR 2
+        TOTAL 5
+```
+
+对已关闭 channel 的接收会立即返回，而且永远如此 —— 所以一个保留着那个分支的 `select`
+会空转。诀窍：`v, ok := <-ch`，当 `ok` 为 false 时把那个 channel 变量设为 `nil`。对
+**nil** channel 的接收会永远阻塞，在 `select` 里这就意味着那个分支被直接关掉了。只要
+任一个仍然非 nil 就继续循环。
+'''
+hints = [
+  "select 的 case 里写 v, ok := <-ch：恰好在 channel 关闭且排空之后，ok 才为 false。",
+  "把 channel 变量设为 nil 会禁用那个 case。nil channel 永远不会就绪。",
+  "循环条件是 `tramCh != nil || mtrCh != nil`，所以两个分支都关掉时循环结束。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.advanced.05.mutex"
+title = "一个钱箱，八只手"
+story = "两台收银机从同一个钱箱里拿现金，打烊时钱箱和两台机器的账都对不上。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+补完 `Counter`：`Add` 拿锁，加到总数上并把命中次数加一；`Snapshot` 拿锁并返回两者。
+每个值启动一个 goroutine，等它们完成，然后输出 `TOTAL <sum>` 和 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+互斥锁放在它所保护的结构体**里面**，紧挨着它守护的字段，而每个碰这些字段的方法都要
+拿它。一旦你忘了指针接收者，`Counter` 就会被按值复制 —— `go vet` 会这么告诉你。
+'''
+hints = [
+  "c.mu.Lock() 然后 defer c.mu.Unlock() 就是整个模式，而且提前 return 也不影响 defer。",
+  "Snapshot 读两个字段；在同一把锁下读它们，才让这一对数据是一致的。",
+  "两个方法都需要指针接收者，否则每次调用锁住的都是互斥锁的一份副本，什么都守不住。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.advanced.06.atomic"
+title = "一次，只此一次"
+story = "每个车手的 app 启动时都打开一条到车厂的连接，现在车厂有四十条连接和一个 socket。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+每个值启动一个 goroutine。它们每一个都调用同一个 `sync.Once`，它会输出 `INIT`
+—— 所以 `INIT` 恰好出现一次，不管哪个 goroutine 先到。然后每一个都把自己的值加到一个
+`atomic.Int64` 总数上，并把一个 `atomic.Int64` 计数加一。
+
+它们全部完成后，输出 `TOTAL <sum>` 和 `COUNT <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: INIT
+        TOTAL 10
+        COUNT 4
+```
+
+原子计数器不是一把更便宜的互斥锁 —— 它是另一种工具，正好用于这种情况：一个字，
+读-改-写，周围没有临界区。任何比一个字更宽的东西仍然需要互斥锁。
+'''
+hints = [
+  "once.Do(func(){ ... }) 第一次调用时运行它的参数，并让其他调用阻塞到它完成为止。",
+  "atomic.Int64 有 Add 和 Load 方法 —— 不用取地址，不用互斥锁。",
+  "INIT 总是排在 TOTAL 之前，因为那次输出发生在 goroutine 里，而 TOTAL 发生在 Wait 之后。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.advanced.07.context"
+title = "别再发了"
+story = "顾客三条街之前就关掉了 app，厨房还在做他们的单。"
+brief = '''
+标准输入是两个整数 `n` 和 `k`。
+
+启动一个生产者 goroutine，它本会在一个**无缓冲** channel 上逐个发送 `1..n`，但一旦它的
+`context` 被取消就立刻停下，并报告它实际成功发送了多少个。
+
+`main` 恰好接收 `k` 个值并输出它们，调用 `cancel()`，输出 `CANCELLED`，然后输出来自
+生产者的 `SENT <count>`。
+
+```
+input:  5 3
+output: 1
+        2
+        3
+        CANCELLED
+        SENT 3
+```
+
+生产者的循环体是一个有两个分支的 `select`：`<-ctx.Done()` 和那次发送。一旦没有人在
+接收，发送就永远不会就绪，所以取消是唯一能触发的东西。这就是让它确定而不是碰运气的
+原因。
+'''
+hints = [
+  "ctx.Done() 是一个在 cancel 被调用时关闭的 channel，所以对它的接收就是一个和其他分支一样的 select 分支。",
+  "生产者在两条路径上都必须报告：被取消的 return 和循环的结束。",
+  "即使你自己调用了 cancel，main 里的 defer cancel() 也不是可有可无的 —— 它才是释放 context 的东西。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.advanced.08.worker-pool"
+title = "八辆车"
+story = "四十份订单，八辆车。没人想要四十辆车；他们要的是那八辆永远不停。"
+brief = '''
+标准输入是两个整数 `w` 和 `n`，然后是 `n` 个值。
+
+搭一个工作池：`w` 个 worker 用 range 遍历一个 `jobs` channel，每个都把
+`{index, value * value}` 推到一个 `results` channel 上。一个 goroutine 投放任务并关闭
+`jobs`；另一个等待 worker 并关闭 `results`。`main` 用 range 遍历 `results` 直到它关闭，
+按下标排序，输出 `<index> <value>`，然后输出 `WORKERS <w>`。
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+三次关闭，按唯一行得通的顺序：投放者关闭 `jobs`，让 worker 的 `range` 结束；worker
+完成，让 `WaitGroup` 放行；负责等待的那个关闭 `results`，让 `main` 的 `range` 结束。
+'''
+hints = [
+  "worker 不需要自己的下标；任务本身带着它。",
+  "close(results) 不能在 worker 里发生 —— worker 有 w 个，而合法的关闭只有一次。",
+  "这正是那个额外 goroutine 的用途：wg.Wait() 然后 close(results)，与此同时 main 还在排空。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.advanced.09.errors-in-flight"
+title = "某人的午饭订单"
+story = "四十张单据同时解析，其中一张是手写的一条关于粥的留言。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行，每行都应该是一个整数。
+
+**并发地**解析它们 —— 每行一个 goroutine —— 并在同一个 channel 上发送
+`{index, value, err}`。收集全部 `n` 个，按下标排序，对每一个输出该值的两倍或
+`BAD <line>`。然后输出你输出过的值的 `SUM <total>`，以及 `ERRORS <count>`。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+        ERRORS 1
+```
+
+goroutine 里的错误必须像其他任何结果一样被传送出来。`go` 语句没有 `return err`，而
+一个在坏行上 panic 的 goroutine 会把整个程序一起带走。
+'''
+hints = [
+  "错误是结果结构体上的一个字段。这就是全部的思路：错误和值一起传送。",
+  "即使解析失败也要发送 —— main 正好在数 n 次接收，否则会差一个而永远挂住。",
+  "输出之前先按下标排序，否则输出的就是调度器决定的顺序。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.advanced.10.context-tree"
+title = "它向下取消"
+story = "一位顾客关掉了 app，上游还有九件事在烹饪、派送和扣款。"
+brief = '''
+标准输入是一个整数 `n`。
+
+用 `context.WithCancel` 创建一个父 context。从它派生 `n` 个子 context：**偶数**编号的用
+`context.WithCancel(parent)`，**奇数**编号的用 `context.WithDeadline(parent, <一小时前>)`。
+
+每个子 context 启动一个 goroutine，等待 `<-child.Done()` 并报告它的下标和
+`child.Err().Error()`。取消父 context，收集全部 `n` 条报告，按下标排序后输出。然后输出
+父 context 自己的错误，并在 `errors.Is(parent.Err(), context.Canceled)` 成立时输出
+`IS_CANCELED YES`。
+
+```
+input:  3
+output: 0 context canceled
+        1 context deadline exceeded
+        2 context canceled
+        PARENT context canceled
+        IS_CANCELED YES
+```
+
+取消沿着 context 树**向下**流动，永远不会向上。一个截止时间已经过去的子 context 在被
+创建的那一刻就已经死了，不管父 context 做什么 —— 这就是为什么奇数编号的报告的是另一种
+错误，也是为什么每次运行的输出都一样，而不是一场竞争。
+
+对你创建的每一个 context 写 `defer cancel()` 不是礼貌。一个你从不取消的 context 会让它
+父 context 的子列表一直增长，那是一个里面没有任何 goroutine 的泄漏。
+'''
+hints = [
+  "把 `done` 的缓冲设为 n，这样截止时间已经过去的子 context 不用等接收方就能报告。",
+  "在开始收集之前先取消父 context，否则你在 channel 上阻塞时，偶数编号的子 context 还在等。",
+  "ctx.Err() 是 context.Canceled 或 context.DeadlineExceeded，区分它们的办法是 errors.Is，而不是比较字符串。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.advanced.11.rwmutex"
+title = "三百个读者"
+story = "希慎的楼层指示牌每分钟被读三百次，每天改两次，而一把普通的 Mutex 让读的人白白地排在彼此后面。"
+brief = '''
+第一行是 `n q`。下一行是要存储的 `n` 个单词，再下一行是要查询的 `q` 个单词。
+
+围绕一个 `map[string]int` 和一个 `sync.RWMutex` 构建一个 `Directory`。`Set` 拿写锁；
+`Get` 和 `Size` 拿**读**锁。把每个单词和它的位置对应存起来，顺序执行 —— 后出现的重复
+单词覆盖先出现的。然后**并发地**运行全部 `q` 次查询，收集结果，按查询顺序输出
+`<word> <index>` 或 `<word> MISSING`，然后输出 `SIZE <k>`。
+
+```
+input:  3 2
+        tram bus mtr
+        bus zzz
+output: bus 1
+        zzz MISSING
+        SIZE 3
+```
+
+`RLock` 可以同时被任意多个读者持有，只会和写者互相阻塞。这是它存在的全部理由，而
+如果读者拿的是 `Lock`，它就一文不值。
+
+写入是故意顺序执行的：对同一个单词的并发 `Set` 调用会让存下来的下标取决于哪个
+goroutine 碰巧最后执行，而一条答案取决于调度器的街道，就是一条随机失败的街道。
+'''
+hints = [
+  "读者用 RLock/RUnlock，写者用 Lock/Unlock。弄混了也能编译，只是悄悄地把好处抹掉了。",
+  "每个 goroutine 写 answers[slot]，没有两个共用一个槽位，所以这个切片不需要自己的锁。",
+  "map 读取的逗号 ok 形式，就是把 `missing` 和 `present and zero` 区分开的东西。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.advanced.12.chan-directions"
+title = "它往哪边走"
+story = "生产者从自己的输出 channel 里接收了一星期，而且编译通过了，因为没人把箭头写下来。"
+brief = '''
+第一行是 `n b`，其中 `b` 至少为 `n`。
+
+创建一个缓冲为 `b` 的 channel。`produce(out chan<- int, n int)` 发送 `0..n-1` 然后关闭它。
+`consume(in <-chan int) int` 用 range 遍历并返回总和。输出：
+
+```
+input:  3 5
+output: CAP 5
+        LEN 3
+        SUM 3
+        LEN_AFTER 0
+```
+
+`CAP` 和 `LEN` 是在生产**之后**、消费之前取的 `cap(ch)` 和 `len(ch)`：`cap` 是缓冲区
+大小，`len` 是里面现在放着多少。
+
+初始代码无法编译。`consume` 接受一个 `<-chan int` —— 只收不发 —— 却试图往它上面发送。
+方向是**类型**的一部分，在编译期检查，而把双向 channel 转换成有方向的 channel 是免费的，
+并且是单向的。这是这门语言里最便宜的文档：一个签名，说明这个函数握着管子的哪一头。
+'''
+hints = [
+  "错误信息说得一清二楚：invalid operation, cannot send to receive-only channel。删掉那一行。",
+  "produce 在这里能在主 goroutine 上运行，只是因为缓冲区大到装得下所有东西；b < n 时它会永远阻塞。",
+  "对已关闭且排空的 channel 的 range 会结束 —— 这就是为什么 produce 关闭它，consume 才能返回。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.advanced.13.select-default"
+title = "试一下，不要等"
+story = "指标 channel 满了，收银机不会为了等它而停止给顾客结账。"
+brief = '''
+第一行是 `b n`：一个缓冲为 `b` 的 channel，以及要向它提供的 `n` 个值。
+
+用**非阻塞**发送提供 `1..n` —— 一个带 `default` 的 `select`，宁可放弃也不等待。然后用
+非阻塞接收排空它，再多试一次。输出：
+
+```
+input:  2 5
+output: SENT 2
+        DROPPED 3
+        GOT 2
+        EMPTY yes
+```
+
+带 `default` 的 `select` 永远不会阻塞：如果此刻没有其他 case 就绪，就运行 `default`。
+这把"发送"变成了"尝试发送"，而这正是指标或日志 channel 应有的行为 —— 满了就丢弃，
+而不是卡住。
+
+当 `b = 0` 且没有人接收时，**每一次**发送都会被丢弃，因为无缓冲发送只有在接收方已经
+在等待时才是就绪的。
+'''
+hints = [
+  "一个带 default 和一个 case 的 select 就是整个非阻塞惯用法；没有 TrySend 函数。",
+  "用同样的形状排空：有值就绪时就接收，让 default 结束循环。",
+  "不要用关闭 channel 来测试是否为空 —— 对已关闭 channel 的接收总是就绪的，会报出 `no`。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.advanced.14.happens-before"
+title = "这一个为什么是安全的"
+story = "白板上四段代码。三段同步正确，一段不正确，竞争检测器也这么认为。"
+brief = '''
+标准输入是一个整数 `n`。
+
+构建四个同步正确的东西，并输出每一个产生的结果：
+
+1. `CHAN <v>` —— 一个 goroutine 写一个普通的 `int`，**然后**在一个 channel 上发送；
+   是那次接收让这次写入可见。写入 `42`。
+2. `ONCE <k>` —— `n` 个 goroutine 都调用同一个 `sync.Once`；`k` 是那个函数实际运行的次数。
+3. `MUTEX <k>` —— `n` 个 goroutine 在一个 `sync.Mutex` 下递增一个计数器。
+4. `WG <k>` —— `n` 个 goroutine 各自写一个切片里属于自己的槽位，而 `wg.Wait()` 是让
+   全部 `n` 次写入对读者可见的东西。
+
+```
+input:  4
+output: CHAN 42
+        ONCE 1
+        MUTEX 4
+        WG 4
+```
+
+这里每一个都是一条 *happens-before* 边，而且它们就是你需要的全部四种形状：发送发生在
+对应的接收完成之前；`Once.Do` 只在那一次调用结束后才返回；解锁发生在下一次加锁之前；
+`wg.Wait` 只在配对的 `Done` 调用之后才返回。
+
+这里没有任何东西是因为时机而安全的。拿掉任何一条边，`-race` 都会找到它 —— 哪怕在一台
+从来没有算出过错误数字的机器上。
+'''
+hints = [
+  "close(ready) 然后 <-ready 是 Go 里最便宜的发布边，它带着这个 goroutine 在它之前做的每一次写入。",
+  "once.Do 里的 runs++ 不需要自己的锁 —— Once 已经保证它恰好发生一次，并且在其他所有 Do 返回之前。",
+  "每个 goroutine 只拥有一个槽位，所以不会有两个碰同一块内存；唯一需要的边是读它们之前的那次 Wait。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.advanced.15.generic-constraints"
+title = "类型必须承诺什么"
+story = "三个辅助函数，三种不同的承诺，只有一个在乎类型能做什么。"
+brief = '''
+第一行是 `n`。第二行是 `n` 个小写单词。
+
+写三个泛型辅助函数，每个使用一种不同的约束：
+
+* `Names[T Named](xs []T) []string` —— 带**方法**的约束
+* `Max[T Ordered](xs []T) T` —— 一个**类型集合**约束，`~string | ~int64`
+* `Distinct[T comparable](xs []T) int` —— 内建约束
+
+把每个单词包进一个带 `Name() string` 方法的 `Stop`。输出用空格连接的名字，然后输出
+`MAX <w>`（字典序最大的单词）和 `DISTINCT <k>`。
+
+```
+input:  3
+        tram bus mtr
+output: tram bus mtr
+        MAX tram
+        DISTINCT 3
+```
+
+约束是用在类型参数位置上的接口，它可以容纳两种普通接口不能容纳的东西：**类型集合**
+（`~string` 匹配任何底层类型是 `string` 的类型）和预声明的 `comparable`。
+
+它和 `interface{ Name() string }` **参数**的区别，值得大声说出来：`Names[T Named]` 是
+单态化的，调用是静态的，不需要装箱。`func Names(xs []Named)` 则需要在每个调用处手工
+构造一个不同的切片。
+'''
+hints = [
+  "在 Names 里，x.Name() 能通过类型检查是因为约束承诺了这个方法 —— 这就是方法约束换来的东西。",
+  "Max 能用 > 只是因为 Ordered 是一个由支持它的类型组成的类型集合；`any` 会编译不过。",
+  "map[T]struct{} 要求 T 是 comparable，这正是那个约束，而 struct{} 是零宽度的值，表示“是集合，不是 map”。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.advanced.16.gotchas"
+title = "三件看起来不像的事"
+story = "不是算法题。三段代码，面试官只想知道每一段打印什么。"
+brief = '''
+标准输入是一个数量 `n`（至少为 4），然后是 `n` 个整数。
+
+构建 `a := make([]int, n, n+4)` 并填满它。然后恰好产生四行：
+
+1. `ALIAS <a[2]>` —— 在 `b := a[:2]` 和 `b = append(b, 99)` 之后。
+2. `NILIFACE <bool>` —— 把一个 **nil `*Thing`** 赋给一个 `Fooer` 接口变量，报告该变量
+   是否 `!= nil`。
+3. `DEFER_CLOSURE <v>` —— 来自读取 `x` 的 `defer func(){ ... }()`。
+4. `DEFER_ARG <v>` —— 来自 `defer fmt.Printf(..., x)`。
+
+在两个 defer 都被注册**之前**设置 `x := a[0]`，并在 `main` 的最末尾设置 `x = a[n-1]`。
+（`n` 至少为 4，是为了让 `a[n-1]` 永远不是别名那一步覆盖的那个单元 —— 在 `n = 3` 时
+它就会是，那是第四个意外，这条街刻意把它挡在了外面。）
+
+```
+input:  4
+        1 2 3 4
+output: ALIAS 99
+        NILIFACE true
+        DEFER_CLOSURE 4
+        DEFER_ARG 1
+```
+
+三个答案都让人意外，而三个的原因是同一个：Go 对某些东西求值的时机比看起来更早或更晚。
+
+**别名。** `a[:2]` 共享 `a` 的底层数组并保留它的容量，所以 `append` 有空间，直接写进
+`a[2]` 而不是重新分配。切片不是复制。`a[:2:2]` —— 三下标形式 —— 会限制容量，这是阻止
+这种事的方法。
+
+**带类型的 nil。** 接口值是一个 (类型, 值) 对。把一个 nil `*Thing` 放进去得到的是
+`(*Thing, nil)`，它不是 nil *接口*。这就是为什么一个函数返回了 nil 的具体错误指针，
+`if err != nil` 却会触发，这是 Go 里最昂贵的两行。
+
+**Defer。** 延迟调用的参数在 **`defer` 执行时**求值，而不是在调用发生时。不带参数的
+延迟闭包则是在调用时才读它的变量。两个 defer 看到的是同一个 `x`；它们意见不同，是因为
+其中一个已经做了一份副本。而且它们按后进先出运行，所以后写的那个先打印。
+'''
+hints = [
+  "在任何东西改变 x 之前注册两个 defer，并记住它们按后进先出运行。",
+  "cap(a[:2]) 是 cap(a)，不是 2 —— 这就是别名问题的全部答案。之后试试 a[:2:2]，看 ALIAS 变回原来的值。",
+  "boxed 持有的是 (*Thing, nil)。拿它和 nil 比较，比较的是这一对，而类型那一半不是 nil。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "go.advanced.17.race"
+title = "竞争"
+story = "铜锣湾换乘站，2 号月台。两个计数器，一个数字，而这个数字错掉的量没人能重现两次。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<IN|OUT> <K>`。
+
+每行启动一个 goroutine。每一个把它的计数器递增 `K` 次，一次加一 —— 不是 `+= K`，
+而是一次一次地加，因为闸机就是这么干的。等它们全部完成，然后输出 `IN <a>`、`OUT <b>`、
+`NET <a-b>`。
+
+```
+input:  2
+        IN 3
+        OUT 1
+output: IN 3
+        OUT 1
+        NET 2
+```
+
+隐藏用例里 `K` 达到六位数，这正是重点：几个 goroutine 一起做一个普通的 `in++`，在这个
+规模下不只是*有可能*丢计数，而是一定会丢，每次运行都丢，每次丢的数量还不一样。`in++`
+是一次加载、一次相加和一次存储，没有任何东西把这三步绑在一起。
+
+用 `sync/atomic`（或者一个 `sync.Mutex`），并用真正的答案被验证的方式去验证它：
+`go test -race` / `go run -race`，它报告的是那次未同步的访问本身，而不是它产生的错误
+总数。
+'''
+hints = [
+  "带 Add(1) 的 atomic.Int64 是让它正确的最小改动。",
+  "在两个计数器外面套一个 sync.Mutex 也行，只是更慢；每次递增拿一次锁才是诚实的比较。",
+  "在 Wait 之后读两个计数器，不要在中途读 —— 半路上取的快照是另一种错误。",
+]

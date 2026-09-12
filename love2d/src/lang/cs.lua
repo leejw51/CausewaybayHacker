@@ -51,7 +51,7 @@ return {
   ["TAB field   F2 reveal   N new wallet   F10 story   ENTER apply/sign in"] = "TAB pole   F2 odkrýt   N nová peněženka   F10 příběh   ENTER použít/přihlásit",
   ["The plan will be a fixed ordered list, so a reconnect resumes the same session rather than reshuffling it — and every step will say why it was chosen."] = "Plán bude pevně seřazený seznam, takže po opětovném připojení pokračuje stejná session a nepřehazuje se — a u každého kroku bude napsáno, proč byl vybrán.",
   ["This builds a session out of the mistakes you have actually made, so it needs you to have made some. Play a few streets — the errors get classified as they happen — and come back."] = "Tohle staví session z chyb, které jsi opravdu udělal, takže nějaké potřebuje. Projdi pár ulic — chyby se zařazují, jak vznikají — a vrať se.",
-  ["Type and press ENTER. It searches every quest in both lands — titles, briefs, concepts and the story text."] = "Napiš a stiskni ENTER. Prohledá každý quest v obou zemích — názvy, zadání, pojmy i text příběhu.",
+  ["Type and press ENTER. It searches every quest in every land — titles, briefs, concepts and the story text."] = "Napiš a stiskni ENTER. Prohledá každý quest v každé zemi — názvy, zadání, pojmy i text příběhu.",
   ["When it lands, each hit will show why it matched — the fused score and the two rankings behind it, so a match on the words reads differently from a match on the meaning."] = "Až to přijde, u každého výsledku bude vidět, proč se trefil — sloučené skóre i obě pořadí za ním, takže shoda na slovech se čte jinak než shoda na významu.",
   ["Write them on paper, in order. Anyone who reads them owns the account, and nobody — not this game, not the server — can recover them for you."] = "Napiš si je na papír, po pořádku. Kdokoli je přečte, vlastní účet, a nikdo — ani tato hra, ani server — ti je nedokáže obnovit.",
   ["Your most frequent is %s, %d times. Press ENTER and this will find different shapes of it."] = "Nejčastěji děláš %s, %d×. Stiskni ENTER a najde to různé podoby téhož.",
@@ -93,6 +93,8 @@ return {
   ["timed. the whiteboard is watching."] = "na čas. tabule se dívá.",
   ["ownership, borrows, lifetimes"] = "ownership, borrows, lifetimes",
   ["goroutines, channels, interfaces"] = "goroutines, channels, interfaces",
+  ["threads, mutexes, the STL"] = "vlákna, mutexy, STL",
+  ["dicts, generators, the GIL"] = "slovníky, generátory, GIL",
   -- UNREVIEWED: "fused" ranking — no settled term
   ["both rankings, fused"] = "obě pořadí sloučená",
   ["the words you typed"] = "slova, která jsi napsal",
@@ -205,6 +207,18 @@ return {
   ["costs a star"] = "stojí hvězdu",
   ["no answer key here"] = "tady řešení není",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "řešení je v editoru — CTRL-Z vrátí to tvoje. Úlohu pořád splníš, jen už ne na tři hvězdy; podívat se není pokus, zapíše ho teprve SUBMIT",
+
+  -- The edit stack: UNDO, REDO and CLEAR, and the caption that says how
+  -- deep it goes. `stack` is the data structure programmers already name
+  -- in their own language, so the word is translated rather than kept.
+  ["UNDO"] = "ZPĚT",
+  ["REDO"] = "ZNOVU",
+  ["CLEAR  SHIFT-F6"] = "VYČISTIT  SHIFT-F6",
+  ["stack %d/%d"] = "zásobník %d/%d",
+  ["stack empty"] = "zásobník je prázdný",
+  ["no stack here"] = "tady zásobník není",
+  ["press CLEAR again to drop the %d steps behind this quest — the editor keeps the text it is showing, and so does CTRL-Z"] = "stiskni CLEAR znovu a %d kroků za touto úlohou zmizí — text v editoru zůstává, a CTRL-Z taky",
+  ["the history is gone; the text in the editor is not"] = "historie je pryč; text v editoru nikoli",
 
   -- ------------------------------------------------- the title card and the
   -- opening (`src/scenes/title.lua`, `src/scenes/story.lua`). The sentences

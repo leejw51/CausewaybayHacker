@@ -1,0 +1,4880 @@
+# C++ LAND — HACKER. HKU, Chow Yei Ching Building, Room 7-32, the third time.
+# The same thirty-four questions as the Rust and Go interviews, in the same
+# order, with the same input and the same expected output wherever the problem
+# is the same problem — so a player can sit the same interview in any land.
+#
+# Every quest here carries `time_limit_s` — the player's clock for the whole
+# quest, not the per-run `timeout_ms` — and at least one hidden case.
+#
+# Two big cases are larger than their Rust and Go twins, and the briefs say
+# so: C++ at -O2 has no bounds checks and vectorises the naive inversion count
+# into 1.5 s at n = 200000, and the linear-scan Dijkstra sits right on the
+# five second line at n = 100000. Neither would reject the slow answer, so the
+# C++ cases are n = 1000000 and n = 200000, where the slow answers take 38 s
+# and 35 s and the right ones take under a tenth of a second. All measured on
+# the machine this pack was written on, with the programs that ship in it.
+#
+# Node 17, the longest run up, was converted to that same generator afterwards
+# and needed no such enlargement: its O(n^2) table does not vectorise, and at
+# the shared n = 200000 it takes 32.6 s against the right answer's 0.006 s. Its
+# stdin and its expected output are byte for byte the other three lands'.
+#
+# Nine other briefs claimed a bar their cases could not hold, and now say so
+# instead. Some of those problems cannot be generated at this size at all — a
+# random string has no long repeat-free run in it, a pairs-plus-one array is
+# constructed rather than generated — and a brief that admits that is worth
+# more than a hidden case that proves nothing.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+
+#
+# **Which quests enforce their complexity differs by land, and that is a
+# measurement rather than an oversight.** All four packs hold the same problems
+# in the same order under the same ids, and the small cases are identical
+# wherever the problem is the same problem. What differs is the big case that
+# rejects a correct-but-slow answer: it is sized per land, and in several
+# quests it exists in one land and not another. Whether a generated input can
+# punish the naive answer is a fact about the language and its compiler, and
+# each land measured it rather than assuming it.
+# C++ converts `17.lis`, and only that one: it was the single candidate whose
+# input a two-token generator can express without inventing a parameter, and a
+# parameter invented here would diverge from the other three lands on expected
+# output — which is the one thing these packs may not do.
+
+pack = "cpp.hacker"
+land = "cpp"
+category = "hacker"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id           = "cpp.hacker.01.two-sum"
+node         = 1
+title        = "TWO FARES"
+difficulty   = 3
+time_limit_s = 600
+story        = "Room 7-32, third time. The first question is the one everybody gets, and this time the compiler will not tell you when you are wrong."
+concepts     = ["hashing", "complexity", "slices"]
+requires     = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` integers.
+
+Print the **1-based** indices `i j` of two different entries that add up to
+`target`, as `i j` with `i < j`. If more than one pair works, give the one
+whose second index is smallest; if that still ties, the smallest first index.
+If no pair works, print `-1`.
+
+```
+input:  4 9
+        2 7 11 15
+output: 1 2
+```
+
+The hidden cases here are small: they check the tie-break and the
+no-answer case, not your speed. The question is still the linear one — one
+pass, one `std::unordered_map` — because a real `n` is 200000 and the nested
+loop is what this question exists to weed out. Write the answer the question
+is asking for, not the one that happens to clear these four cases.
+'''
+starter      = '''
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+
+int main() {
+    int n = 0;
+    long long target = 0;
+    std::cin >> n >> target;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::unordered_map<long long, int> seen;
+    (void)seen;
+    std::cout << "-1\n";
+}
+'''
+solution     = '''
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+
+int main() {
+    int n = 0;
+    long long target = 0;
+    std::cin >> n >> target;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    // value -> the first index it was seen at
+    std::unordered_map<long long, int> seen;
+    for (int j = 0; j < n; ++j) {
+        auto hit = seen.find(target - nums[j]);
+        if (hit != seen.end()) {
+            std::cout << hit->second + 1 << ' ' << j + 1 << '\n';
+            return 0;
+        }
+        seen.emplace(nums[j], j);
+    }
+    std::cout << "-1\n";
+}
+'''
+hints = [
+  "One pass. For each value ask whether target minus it has already been seen.",
+  "seen.emplace(x, j) does nothing if x is already there, which keeps the first index of a repeated value — the tie-break the statement asks for.",
+  "Print and return the moment you find it — the first hit as you scan is already the smallest second index.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "4 9\n2 7 11 15\n",      expect = "1 2\n",  visible = true },
+  { name = "late",    stdin = "5 10\n1 2 3 4 6\n",     expect = "4 5\n",  visible = false },
+  { name = "none",    stdin = "3 100\n1 2 3\n",        expect = "-1\n",   visible = false },
+  { name = "signed",  stdin = "6 0\n-3 4 3 90 -1 1\n", expect = "1 3\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id           = "cpp.hacker.02.window"
+node         = 2
+title        = "NO REPEATS"
+difficulty   = 4
+time_limit_s = 900
+story        = "The second question is on the board before you have put the marker down."
+concepts     = ["two-pointers", "strings", "complexity"]
+requires     = ["cpp.hacker.01.two-sum"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief        = '''
+One line of text, no spaces.
+
+Print the length of the longest run of characters with no repeat in it, then
+the run itself. If several runs tie, print the leftmost.
+
+```
+input:  abcabcbb
+output: 3
+        abc
+```
+
+The window only ever moves right. If you find yourself rescanning from the
+start after a repeat, you have written the quadratic one.
+
+The cases here are small, and the clock is not measuring speed. Nor could it:
+on a random string the rescanning version never has more than a few characters
+to rescan before it hits a repeat, so it finishes as fast as the window does
+at any size — measured on this machine at `n = 200000`, not assumed. What
+these four cases check is the length, the leftmost tie-break and the run
+itself. Write the window anyway. It is `O(n)` on every input rather than on
+most of them, and the input a real screen hands you is chosen to be unkind.
+'''
+starter      = '''
+#include <iostream>
+#include <string>
+#include <unordered_map>
+
+int main() {
+    std::string text;
+    std::cin >> text;
+
+    std::unordered_map<char, std::size_t> last;
+    (void)last;
+
+    // print the best length, then the run itself
+    std::cout << "0\n?\n";
+}
+'''
+solution     = '''
+#include <iostream>
+#include <string>
+#include <unordered_map>
+
+int main() {
+    std::string text;
+    std::cin >> text;
+
+    std::unordered_map<char, std::size_t> last;
+    std::size_t start = 0;
+    std::size_t best_len = 0;
+    std::size_t best_start = 0;
+
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        auto previous = last.find(text[i]);
+        if (previous != last.end() && previous->second >= start) {
+            start = previous->second + 1;
+        }
+        last[text[i]] = i;
+        std::size_t len = i - start + 1;
+        if (len > best_len) {
+            best_len = len;
+            best_start = start;
+        }
+    }
+
+    std::cout << best_len << '\n';
+    std::cout << text.substr(best_start, best_len) << '\n';
+}
+'''
+hints = [
+  "Keep the index where each character was last seen, and the index the window starts at.",
+  "A repeat only matters if its last position is inside the current window — that is the previous >= start test.",
+  "Record the best length and where it started, or you cannot print the run at the end; substr(start, len) does the rest.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "abcabcbb\n",    expect = "3\nabc\n",      visible = true },
+  { name = "one",     stdin = "bbbbb\n",       expect = "1\nb\n",        visible = false },
+  { name = "middle",  stdin = "pwwkew\n",      expect = "3\nwke\n",      visible = false },
+  { name = "street",  stdin = "causewaybay\n", expect = "7\nusewayb\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id           = "cpp.hacker.03.intervals"
+node         = 3
+title        = "THE SHIFT ROTA"
+difficulty   = 4
+time_limit_s = 900
+story        = "They hand you the pump room rota and ask which hours are actually covered."
+concepts     = ["intervals", "sorting", "complexity"]
+requires     = ["cpp.hacker.02.window"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are `<start> <end>` with `start <= end`.
+
+Merge every pair that overlaps or touches, and print the result in increasing
+order, one `<start> <end>` per line, then `COUNT <k>`.
+
+```
+input:  4
+        1 3
+        2 6
+        8 10
+        15 18
+output: 1 6
+        8 10
+        15 18
+        COUNT 3
+```
+
+Touching counts as overlapping: `1 4` and `4 5` merge into `1 5`.
+'''
+starter      = '''
+#include <algorithm>
+#include <iostream>
+#include <utility>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<std::pair<long long, long long>> spans(n);
+    for (auto& [start, end] : spans) {
+        std::cin >> start >> end;
+    }
+
+    // sort, sweep, merge, print, then COUNT <k>
+    std::cout << "COUNT " << spans.size() << '\n';
+}
+'''
+solution     = '''
+#include <algorithm>
+#include <iostream>
+#include <utility>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<std::pair<long long, long long>> spans(n);
+    for (auto& [start, end] : spans) {
+        std::cin >> start >> end;
+    }
+    std::sort(spans.begin(), spans.end());
+
+    std::vector<std::pair<long long, long long>> merged;
+    for (const auto& [start, end] : spans) {
+        if (!merged.empty() && start <= merged.back().second) {
+            merged.back().second = std::max(merged.back().second, end);
+        } else {
+            merged.emplace_back(start, end);
+        }
+    }
+
+    for (const auto& [start, end] : merged) {
+        std::cout << start << ' ' << end << '\n';
+    }
+    std::cout << "COUNT " << merged.size() << '\n';
+}
+'''
+hints = [
+  "Sort by start first — std::sort on a vector of pairs already does that. After it one left-to-right pass is enough.",
+  "Extend the last merged interval when the new start is <= its end; otherwise push a new one.",
+  "Extend to max(last.end, end) — a short interval swallowed by a long one must not shrink it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "4\n1 3\n2 6\n8 10\n15 18\n", expect = "1 6\n8 10\n15 18\nCOUNT 3\n", visible = true },
+  { name = "touching", stdin = "2\n1 4\n4 5\n",              expect = "1 5\nCOUNT 1\n",              visible = false },
+  { name = "point",    stdin = "1\n5 5\n",                   expect = "5 5\nCOUNT 1\n",              visible = false },
+  { name = "unsorted", stdin = "3\n5 6\n1 2\n3 4\n",         expect = "1 2\n3 4\n5 6\nCOUNT 3\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id           = "cpp.hacker.04.grid"
+node         = 4
+title        = "OUT OF THE BUILDING"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A floor plan on the whiteboard, a fire door at the far corner, and the interviewer watching the clock rather than the marker."
+concepts     = ["graphs", "stacks-queues", "complexity"]
+requires     = ["cpp.hacker.03.intervals"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are the floor: `.` is open, `#` is wall.
+
+Start at the top-left `(0,0)` and reach the bottom-right `(r-1, c-1)`, moving
+up, down, left or right through open cells only.
+
+Print the number of **steps** on a shortest route, or `-1` if there is none.
+Then print `REACHED <k>`: how many open cells are reachable from the start,
+counting the start itself.
+
+```
+input:  3 3
+        ...
+        .#.
+        ...
+output: 4
+        REACHED 8
+```
+
+Breadth first, not depth first. A depth-first walk finds *a* route; the
+question asks for the shortest one.
+'''
+starter      = '''
+#include <deque>
+#include <iostream>
+#include <string>
+#include <vector>
+
+int main() {
+    int rows = 0;
+    int cols = 0;
+    std::cin >> rows >> cols;
+    std::vector<std::string> grid(rows);
+    for (std::string& row : grid) {
+        std::cin >> row;
+    }
+
+    std::deque<std::pair<int, int>> queue;
+    (void)queue;
+
+    // print the shortest step count or -1, then REACHED <k>
+    std::cout << "-1\nREACHED 0\n";
+}
+'''
+solution     = '''
+#include <deque>
+#include <iostream>
+#include <string>
+#include <vector>
+
+int main() {
+    int rows = 0;
+    int cols = 0;
+    std::cin >> rows >> cols;
+    std::vector<std::string> grid(rows);
+    for (std::string& row : grid) {
+        std::cin >> row;
+    }
+
+    // the distance grid doubles as the visited set: -1 means not seen yet
+    std::vector<std::vector<int>> dist(rows, std::vector<int>(cols, -1));
+    std::deque<std::pair<int, int>> queue;
+    int reached = 0;
+
+    if (grid[0][0] == '.') {
+        dist[0][0] = 0;
+        queue.emplace_back(0, 0);
+        reached = 1;
+    }
+
+    const int dr[4] = {-1, 1, 0, 0};
+    const int dc[4] = {0, 0, -1, 1};
+
+    while (!queue.empty()) {
+        auto [r, c] = queue.front();
+        queue.pop_front();
+        for (int k = 0; k < 4; ++k) {
+            int nr = r + dr[k];
+            int nc = c + dc[k];
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) {
+                continue;
+            }
+            if (grid[nr][nc] != '.' || dist[nr][nc] >= 0) {
+                continue;
+            }
+            dist[nr][nc] = dist[r][c] + 1;
+            ++reached;
+            queue.emplace_back(nr, nc);
+        }
+    }
+
+    std::cout << dist[rows - 1][cols - 1] << '\n';
+    std::cout << "REACHED " << reached << '\n';
+}
+'''
+hints = [
+  "A std::deque used as a queue — push_back, pop_front — is the whole difference between BFS and DFS here.",
+  "Mark a cell when you push it, not when you pop it, or it goes into the queue several times.",
+  "The distance grid doubles as the visited set: -1 means not seen yet, so you need no second structure.",
+  "Two small arrays of the four offsets beat four copies of the body. Do the bounds check in int before you index: rows and cols are ints here on purpose, so r - 1 at r == 0 is -1 and not a wrapped size_t.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 3\n...\n.#.\n...\n",              expect = "4\nREACHED 8\n",   visible = true },
+  { name = "blocked", stdin = "2 2\n.#\n#.\n",                     expect = "-1\nREACHED 1\n",  visible = false },
+  { name = "single",  stdin = "1 1\n.\n",                          expect = "0\nREACHED 1\n",   visible = false },
+  { name = "maze",    stdin = "4 5\n.....\n###.#\n.....\n.#.#.\n", expect = "7\nREACHED 14\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id           = "cpp.hacker.05.binary-search"
+node         = 5
+title        = "HOW BIG A VAN"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The depot wants the smallest van that clears the day's dockets in the days they have. They will not tell you which van; they will tell you if one you name is too small."
+concepts     = ["binary-search", "complexity", "slices"]
+requires     = ["cpp.hacker.04.grid"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief        = '''
+Line one is `n d`. Line two is `n` package weights, in the order they must be
+loaded — the order cannot change.
+
+Find the smallest van capacity that ships all `n` packages in at most `d`
+days, loading in order and never splitting a package.
+
+Print the capacity, then `MAX <heaviest package>`.
+
+```
+input:  10 5
+        1 2 3 4 5 6 7 8 9 10
+output: 15
+        MAX 10
+```
+
+You are not searching the list. You are searching the **answer**: the
+capacities from `max(weight)` to `sum(weights)`, on which "does it fit in `d`
+days" is false, false, false, then true forever. Binary search that.
+
+The cases here are small and the clock is not measuring speed. There is no big
+hidden case: this input is `n`, `d` and a list, and a generator that produced
+it would have to invent a `d`, which is exactly the kind of choice that makes
+two lands disagree about the same question. The claim still holds where it
+matters — at a real `n` the capacities run from `max(weight)` to
+`sum(weights)`, a range on the order of `10^14`, and a walk up it does not
+finish. Write the binary search, not the walk.
+'''
+starter      = '''
+#include <algorithm>
+#include <iostream>
+#include <vector>
+
+long long days_needed(const std::vector<long long>& weights, long long capacity) {
+    (void)weights;
+    (void)capacity;
+    // how many days does this capacity take, loading in order?
+    return 0;
+}
+
+int main() {
+    int n = 0;
+    long long days = 0;
+    std::cin >> n >> days;
+    std::vector<long long> weights(n);
+    for (long long& w : weights) {
+        std::cin >> w;
+    }
+
+    (void)days_needed(weights, 0);
+    std::cout << "0\n";
+    std::cout << "MAX " << *std::max_element(weights.begin(), weights.end()) << '\n';
+}
+'''
+solution     = '''
+#include <algorithm>
+#include <iostream>
+#include <numeric>
+#include <vector>
+
+long long days_needed(const std::vector<long long>& weights, long long capacity) {
+    long long days = 1;
+    long long load = 0;
+    for (long long w : weights) {
+        if (load + w > capacity) {
+            ++days;
+            load = 0;
+        }
+        load += w;
+    }
+    return days;
+}
+
+int main() {
+    int n = 0;
+    long long days = 0;
+    std::cin >> n >> days;
+    std::vector<long long> weights(n);
+    for (long long& w : weights) {
+        std::cin >> w;
+    }
+
+    long long low = *std::max_element(weights.begin(), weights.end());
+    long long high = std::accumulate(weights.begin(), weights.end(), 0LL);
+    while (low < high) {
+        long long mid = low + (high - low) / 2;
+        if (days_needed(weights, mid) <= days) {
+            high = mid;
+        } else {
+            low = mid + 1;
+        }
+    }
+
+    std::cout << low << '\n';
+    std::cout << "MAX " << *std::max_element(weights.begin(), weights.end()) << '\n';
+}
+'''
+hints = [
+  "The lower bound is the heaviest single package — anything smaller can never carry it.",
+  "The upper bound is the total: one day, everything on it. std::accumulate with 0LL, not 0.",
+  "low + (high - low) / 2, and move high down to mid on success so you keep the smallest capacity that worked.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5\n1 2 3 4 5 6 7 8 9 10\n", expect = "15\nMAX 10\n", visible = true },
+  { name = "tight",  stdin = "3 3\n3 2 2\n",                 expect = "3\nMAX 3\n",   visible = false },
+  { name = "spread", stdin = "5 4\n1 2 3 1 1\n",             expect = "3\nMAX 3\n",   visible = false },
+  { name = "one",    stdin = "1 1\n7\n",                     expect = "7\nMAX 7\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id           = "cpp.hacker.06.stack"
+node         = 6
+title        = "THE NEXT BIGGER ONE"
+difficulty   = 4
+time_limit_s = 900
+story        = "A column of fares on the board and one question: for each of them, which is the next one after it that is bigger."
+concepts     = ["stacks-queues", "slices", "complexity"]
+requires     = ["cpp.hacker.05.binary-search"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+For each entry print the first entry **to its right** that is strictly
+greater, or `-1` if there is none. Put them on one line, space separated. Then
+print `NONE <k>`, how many of them were `-1`.
+
+```
+input:  4
+        2 1 2 4
+output: 4 2 4 -1
+        NONE 1
+```
+
+Keep a stack of positions whose answer is still unknown, and it stays
+decreasing from the bottom up. Each position is pushed once and popped once,
+so the whole thing is one pass however it looks.
+
+The cases here are small and the clock is not measuring speed, and on this
+question a big case would not help. Scanning right from each position until
+something bigger turns up finds its answer within a couple of steps on random
+values and beats any clock at any size — `n = 200000` in well under a
+hundredth of a second, measured. What a big case would reject is a descending
+array, which is the one input that makes that scan quadratic. The stack is
+still the answer: it is one pass on *every* input rather than on most of them.
+'''
+starter      = '''
+#include <iostream>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::vector<long long> answer(n, -1);
+    std::vector<int> pending;
+    (void)pending;
+
+    for (int i = 0; i < n; ++i) {
+        std::cout << (i ? " " : "") << answer[i];
+    }
+    std::cout << '\n';
+    std::cout << "NONE " << n << '\n';
+}
+'''
+solution     = '''
+#include <iostream>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::vector<long long> answer(n, -1);
+    std::vector<int> pending;  // indices still waiting for their answer
+
+    for (int i = 0; i < n; ++i) {
+        while (!pending.empty() && nums[pending.back()] < nums[i]) {
+            answer[pending.back()] = nums[i];
+            pending.pop_back();
+        }
+        pending.push_back(i);
+    }
+
+    int none = 0;
+    for (int i = 0; i < n; ++i) {
+        std::cout << (i ? " " : "") << answer[i];
+        if (answer[i] == -1) {
+            ++none;
+        }
+    }
+    std::cout << '\n';
+    std::cout << "NONE " << none << '\n';
+}
+'''
+hints = [
+  "The stack holds indices that are still waiting for their answer, not values. A std::vector with push_back and pop_back is the stack.",
+  "When the new value beats the value at the top of the stack, that index's answer is the new value — and keep popping, it may beat several.",
+  "Strictly greater, so equal values do not resolve each other; they stack up and resolve together later.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "4\n2 1 2 4\n",     expect = "4 2 4 -1\nNONE 1\n",        visible = true },
+  { name = "descending", stdin = "3\n5 4 3\n",       expect = "-1 -1 -1\nNONE 3\n",        visible = false },
+  { name = "ascending",  stdin = "5\n1 2 3 4 5\n",   expect = "2 3 4 5 -1\nNONE 1\n",      visible = false },
+  { name = "plateau",    stdin = "6\n2 2 2 1 3 1\n", expect = "3 3 3 3 -1 -1\nNONE 2\n",   visible = false },
+  { name = "single",     stdin = "1\n5\n",           expect = "-1\nNONE 1\n",              visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id           = "cpp.hacker.07.coins"
+node         = 7
+title        = "EXACT CHANGE"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The Yacht Club bar has three coin trays and a member who will not take a note."
+concepts     = ["dynamic-programming", "complexity", "slices"]
+requires     = ["cpp.hacker.06.stack"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` coin values. Every coin is available
+in unlimited quantity.
+
+Print the smallest number of coins that makes `target` exactly, or `-1` if it
+cannot be made. Then print `REACH <k>`: how many of the amounts `0..=target`
+can be made at all, counting `0`.
+
+```
+input:  3 11
+        1 2 5
+output: 3
+        REACH 12
+```
+
+The hidden cases are small, so what they catch is wrongness rather than
+slowness — and one of them catches the usual wrong answer. Greedy, taking the
+biggest coin that fits and repeating, makes `6` out of `3 4` by grabbing the
+`4` and then failing, and there is a case for exactly that. The other bad
+answer, plain recursion with no table, is not caught here and still is not the
+one to write: `target` is 100000 in the real thing and the same amount gets
+recomputed thousands of times.
+'''
+starter      = '''
+#include <iostream>
+#include <limits>
+#include <vector>
+
+int main() {
+    int n = 0;
+    int target = 0;
+    std::cin >> n >> target;
+    std::vector<int> coins(n);
+    for (int& c : coins) {
+        std::cin >> c;
+    }
+
+    const long long unreachable = std::numeric_limits<long long>::max();
+    std::vector<long long> best(target + 1, unreachable);
+
+    // fill the table bottom up, then print the answer and REACH <k>
+    (void)best;
+    std::cout << "-1\nREACH 0\n";
+}
+'''
+solution     = '''
+#include <iostream>
+#include <limits>
+#include <vector>
+
+int main() {
+    int n = 0;
+    int target = 0;
+    std::cin >> n >> target;
+    std::vector<int> coins(n);
+    for (int& c : coins) {
+        std::cin >> c;
+    }
+
+    const long long unreachable = std::numeric_limits<long long>::max();
+    std::vector<long long> best(target + 1, unreachable);
+    best[0] = 0;
+
+    for (int amount = 1; amount <= target; ++amount) {
+        for (int coin : coins) {
+            if (coin <= amount && best[amount - coin] != unreachable) {
+                long long candidate = best[amount - coin] + 1;
+                if (candidate < best[amount]) {
+                    best[amount] = candidate;
+                }
+            }
+        }
+    }
+
+    if (best[target] == unreachable) {
+        std::cout << "-1\n";
+    } else {
+        std::cout << best[target] << '\n';
+    }
+    int reach = 0;
+    for (long long v : best) {
+        if (v != unreachable) {
+            ++reach;
+        }
+    }
+    std::cout << "REACH " << reach << '\n';
+}
+'''
+hints = [
+  "best[0] = 0, and best[a] is one more than the cheapest best[a - coin] over every coin that fits.",
+  "Guard against reading an unreachable cell before you add one to it — max() + 1 is signed overflow, which in C++ is undefined and not merely wrong.",
+  "REACH is just how many cells of the finished table are not still marked unreachable.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "3 11\n1 2 5\n", expect = "3\nREACH 12\n", visible = true },
+  { name = "impossible", stdin = "1 3\n2\n",      expect = "-1\nREACH 2\n", visible = false },
+  { name = "not-greedy", stdin = "2 6\n3 4\n",    expect = "2\nREACH 4\n",  visible = false },
+  { name = "zero",       stdin = "3 0\n1 2 5\n",  expect = "0\nREACH 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id           = "cpp.hacker.08.top-k"
+node         = 8
+title        = "FIVE MOST ASKED"
+difficulty   = 4
+time_limit_s = 900
+story        = "Warm-up round. They ask for the five words that came up most in last year's tickets, and they time it anyway."
+concepts     = ["hashing", "sorting", "complexity"]
+requires     = ["cpp.hacker.07.coins", "cpp.hacker.01.two-sum"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief        = '''
+Line one is `n k`. Line two is `n` words separated by spaces.
+
+Print the `k` most frequent words, most frequent first, ties broken by the
+word ascending, one per line. If there are fewer than `k` distinct words,
+print all of them. Then print `DISTINCT <d>`.
+
+```
+input:  6 2
+        tram tram bus bus bus mtr
+output: bus
+        tram
+        DISTINCT 3
+```
+
+Count with a hash map, then rank. The tie-break is not decoration. A
+`std::unordered_map` hands its entries out in whatever order its buckets
+happen to be in — an order that differs between libstdc++ and libc++, and
+between two runs with different insertions — so a comparator that looks only
+at the count leaves equal-count words in that order, and the same program
+prints a different answer on the next machine. `std::sort` is not stable
+either, so it would not save you even if the input order were meaningful.
+Making the comparison **total** — count descending, then the word ascending —
+is what fixes it, and it is the answer the interviewer is listening for.
+
+The cases here are small and the clock is not measuring speed. That is the
+right way round for this question — counting and ranking is `O(n log n)`
+however you write it, and the thing that actually fails a candidate here is
+the comparator, which the `ties` case checks and a big case would not.
+'''
+starter      = '''
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+int main() {
+    int n = 0;
+    int k = 0;
+    std::cin >> n >> k;
+    std::vector<std::string> words(n);
+    for (std::string& w : words) {
+        std::cin >> w;
+    }
+
+    std::unordered_map<std::string, long long> counts;
+    (void)k;
+
+    // count, rank by count descending then word ascending, print k of them,
+    // then DISTINCT <d>
+    std::cout << "DISTINCT " << counts.size() << '\n';
+}
+'''
+solution     = '''
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+int main() {
+    int n = 0;
+    int k = 0;
+    std::cin >> n >> k;
+    std::vector<std::string> words(n);
+    for (std::string& w : words) {
+        std::cin >> w;
+    }
+
+    std::unordered_map<std::string, long long> counts;
+    for (const std::string& w : words) {
+        counts[w]++;
+    }
+
+    std::vector<std::pair<std::string, long long>> ranked(counts.begin(), counts.end());
+    std::sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) {
+        if (a.second != b.second) {
+            return a.second > b.second;
+        }
+        return a.first < b.first;
+    });
+
+    std::size_t shown = std::min<std::size_t>(k, ranked.size());
+    for (std::size_t i = 0; i < shown; ++i) {
+        std::cout << ranked[i].first << '\n';
+    }
+    std::cout << "DISTINCT " << ranked.size() << '\n';
+}
+'''
+hints = [
+  "One pass to count, one sort to rank. Do not try to keep the ranking up to date while counting.",
+  "The comparator returns a.second > b.second when the counts differ, and a.first < b.first when they do not — a total order, so the sort's instability cannot show.",
+  "std::min(k, ranked.size()) is what makes k-too-big safe; slicing past the end of a vector is not an error the runtime reports.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "6 2\ntram tram bus bus bus mtr\n", expect = "bus\ntram\nDISTINCT 3\n", visible = true },
+  { name = "one",       stdin = "4 1\na b a c\n",                   expect = "a\nDISTINCT 3\n",         visible = false },
+  { name = "ties",      stdin = "5 3\nx y z x y\n",                 expect = "x\ny\nz\nDISTINCT 3\n",   visible = false },
+  { name = "k-too-big", stdin = "3 5\nq q q\n",                     expect = "q\nDISTINCT 1\n",         visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id           = "cpp.hacker.09.linked-list"
+node         = 9
+title        = "THE CHAIN"
+difficulty   = 4
+time_limit_s = 1200
+story        = "They want it without a vector. Nodes that point at nodes, because that is the shape the question is really about."
+concepts     = ["linked-lists", "two-pointers", "smart-pointers"]
+requires     = ["cpp.hacker.08.top-k"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers, in order.
+
+Build a singly linked list from them — `std::unique_ptr<Node>` for the links,
+no vector in the answer — then print three lines:
+
+1. the list reversed, space separated
+2. the value at the middle node (for an even `n`, the second of the two)
+3. `LEN <n>` counted by walking the list, not by trusting the input
+
+```
+input:  5
+        1 2 3 4 5
+output: 5 4 3 2 1
+        3
+        LEN 5
+```
+
+The middle is the runner: one pointer one step at a time, one two steps at a
+time, and when the fast one runs out the slow one is there. One pass.
+
+The reversal is where `unique_ptr` earns its keep: a node can have exactly one
+owner, so moving a node from one list to the other is `std::move` on its
+`next`, and there is no moment at which two lists both think they own it.
+A raw `Node*` for the *walk* is still right — it looks and owns nothing.
+'''
+starter      = '''
+#include <iostream>
+#include <memory>
+#include <vector>
+
+struct Node {
+    long long value;
+    std::unique_ptr<Node> next;
+};
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> values(n);
+    for (long long& v : values) {
+        std::cin >> v;
+    }
+
+    std::unique_ptr<Node> head;
+    (void)head;
+
+    // build the list, reverse it, find the middle by walking twice as fast
+    std::cout << "?\n0\nLEN 0\n";
+}
+'''
+solution     = '''
+#include <iostream>
+#include <memory>
+#include <vector>
+
+struct Node {
+    long long value;
+    std::unique_ptr<Node> next;
+};
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> values(n);
+    for (long long& v : values) {
+        std::cin >> v;
+    }
+
+    // build it back to front, so each new node owns what we had
+    std::unique_ptr<Node> head;
+    for (auto it = values.rbegin(); it != values.rend(); ++it) {
+        head = std::make_unique<Node>(Node{*it, std::move(head)});
+    }
+
+    // walk it to count, and run a second pointer at half speed for the middle
+    long long length = 0;
+    const Node* slow = head.get();
+    const Node* fast = head.get();
+    while (fast != nullptr) {
+        ++length;
+        fast = fast->next.get();
+        if (fast != nullptr) {
+            ++length;
+            fast = fast->next.get();
+            slow = slow->next.get();
+        }
+    }
+    long long middle = slow ? slow->value : 0;
+
+    // reverse by moving nodes off the front of one list onto the front of another
+    std::unique_ptr<Node> reversed;
+    while (head) {
+        std::unique_ptr<Node> node = std::move(head);
+        head = std::move(node->next);
+        node->next = std::move(reversed);
+        reversed = std::move(node);
+    }
+
+    bool first = true;
+    for (const Node* walk = reversed.get(); walk != nullptr; walk = walk->next.get()) {
+        std::cout << (first ? "" : " ") << walk->value;
+        first = false;
+    }
+    std::cout << '\n';
+    std::cout << middle << '\n';
+    std::cout << "LEN " << length << '\n';
+}
+'''
+hints = [
+  "Building back to front is the easy direction: each new node takes the old head as its next, with std::move because a unique_ptr cannot be copied.",
+  "To reverse: detach the head (std::move it into a local), point head at what it owned, hang the old reversed list off the detached node, and make it the new reversed head. Four moves per node.",
+  "For the middle, advance slow only on the steps where fast managed two.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "odd",    stdin = "5\n1 2 3 4 5\n",   expect = "5 4 3 2 1\n3\nLEN 5\n",   visible = true },
+  { name = "even",   stdin = "4\n7 8 9 10\n",    expect = "10 9 8 7\n9\nLEN 4\n",    visible = false },
+  { name = "single", stdin = "1\n42\n",          expect = "42\n42\nLEN 1\n",         visible = false },
+  { name = "signed", stdin = "3\n-1 0 1\n",      expect = "1 0 -1\n0\nLEN 3\n",      visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id           = "cpp.hacker.10.tree-walk"
+node         = 10
+title        = "THREE WAYS ROUND A TREE"
+difficulty   = 4
+time_limit_s = 900
+story        = "A tree on the whiteboard and the question nobody should have to think about twice: name the three orders."
+concepts     = ["trees", "recursion", "stacks-queues"]
+requires     = ["cpp.hacker.09.linked-list"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` values in **level order**, where `-1` means
+"no node here" — so the tree is stored the way a heap is: the children of
+index `i` are `2i+1` and `2i+2`.
+
+Print four lines: the **preorder**, **inorder** and **postorder** walks, each
+space separated, and then `DEPTH <d>` — the number of nodes on the longest
+root-to-leaf path.
+
+```
+input:  5
+        1 2 3 -1 4
+output: 1 2 4 3
+        2 4 1 3
+        4 2 3 1
+        DEPTH 3
+```
+
+Preorder is node, left, right. Inorder is left, node, right. Postorder is
+left, right, node. The recursion is the same three lines each time and only
+the position of the `push_back` moves.
+'''
+starter      = '''
+#include <iostream>
+#include <vector>
+
+void walk(const std::vector<long long>& tree, std::size_t i, int order, std::vector<long long>& out) {
+    (void)tree;
+    (void)i;
+    (void)order;
+    (void)out;
+    // order 0 = preorder, 1 = inorder, 2 = postorder
+}
+
+int depth(const std::vector<long long>& tree, std::size_t i) {
+    (void)tree;
+    (void)i;
+    return 0;
+}
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> tree(n);
+    for (long long& v : tree) {
+        std::cin >> v;
+    }
+
+    for (int order = 0; order < 3; ++order) {
+        std::vector<long long> out;
+        walk(tree, 0, order, out);
+        for (std::size_t i = 0; i < out.size(); ++i) {
+            std::cout << (i ? " " : "") << out[i];
+        }
+        std::cout << '\n';
+    }
+    std::cout << "DEPTH " << depth(tree, 0) << '\n';
+}
+'''
+solution     = '''
+#include <algorithm>
+#include <iostream>
+#include <vector>
+
+bool present(const std::vector<long long>& tree, std::size_t i) {
+    return i < tree.size() && tree[i] != -1;
+}
+
+void walk(const std::vector<long long>& tree, std::size_t i, int order, std::vector<long long>& out) {
+    if (!present(tree, i)) {
+        return;
+    }
+    if (order == 0) out.push_back(tree[i]);
+    walk(tree, 2 * i + 1, order, out);
+    if (order == 1) out.push_back(tree[i]);
+    walk(tree, 2 * i + 2, order, out);
+    if (order == 2) out.push_back(tree[i]);
+}
+
+int depth(const std::vector<long long>& tree, std::size_t i) {
+    if (!present(tree, i)) {
+        return 0;
+    }
+    return 1 + std::max(depth(tree, 2 * i + 1), depth(tree, 2 * i + 2));
+}
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> tree(n);
+    for (long long& v : tree) {
+        std::cin >> v;
+    }
+
+    for (int order = 0; order < 3; ++order) {
+        std::vector<long long> out;
+        walk(tree, 0, order, out);
+        for (std::size_t i = 0; i < out.size(); ++i) {
+            std::cout << (i ? " " : "") << out[i];
+        }
+        std::cout << '\n';
+    }
+    std::cout << "DEPTH " << depth(tree, 0) << '\n';
+}
+'''
+hints = [
+  "One recursive function with the push_back in three possible places beats three near-identical functions.",
+  "The base case is both conditions at once: past the end of the vector, or sitting on a -1.",
+  "Depth is 1 + the deeper of the two children, and 0 for a missing node.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n1 2 3 -1 4\n",        expect = "1 2 4 3\n2 4 1 3\n4 2 3 1\nDEPTH 3\n", visible = true },
+  { name = "leaf",   stdin = "1\n9\n",                 expect = "9\n9\n9\nDEPTH 1\n",                   visible = false },
+  { name = "left",   stdin = "7\n1 2 -1 3 -1 -1 -1\n", expect = "1 2 3\n3 2 1\n3 2 1\nDEPTH 3\n",       visible = false },
+  { name = "full",   stdin = "7\n4 2 6 1 3 5 7\n",     expect = "4 2 1 3 6 5 7\n1 2 3 4 5 6 7\n1 3 2 5 7 6 4\nDEPTH 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id           = "cpp.hacker.11.bst"
+node         = 11
+title        = "IS IT ACTUALLY A BST"
+difficulty   = 4
+time_limit_s = 900
+story        = "The follow-up. Everyone checks the two children and everyone is wrong the first time."
+concepts     = ["trees", "recursion", "binary-search"]
+requires     = ["cpp.hacker.10.tree-walk"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief        = '''
+Same level-order encoding as the last quest: `-1` is a missing node, children
+of `i` are `2i+1` and `2i+2`.
+
+Line one is `n q`. Line two is the `n` tree values. Line three is `q` query
+values.
+
+Print `VALID` or `INVALID` — is this a binary search tree, with every value in
+the left subtree strictly smaller than the node and every value in the right
+strictly larger? Then one line per query: `<value> FOUND <depth>` if the
+search finds it, `<value> ABSENT` if it does not, where the root is depth 1.
+
+The search is the binary search the tree is for: start at the root, go left
+when the value is smaller and right otherwise, and stop when you land on it
+or on a missing node — a `-1`, or an index past the end of the array. On an
+INVALID tree that walk can pass by a value that is sitting in the array, and
+the answer is still `ABSENT`: the query asks what the lookup finds, not what
+a scan of the array would find. One of the hidden cases is exactly that.
+
+```
+input:  7 2
+        4 2 6 1 3 5 7
+        3 8
+output: VALID
+        3 FOUND 3
+        8 ABSENT
+```
+
+Checking `left < node < right` at each node **is not enough** — a value deep
+in the left subtree can still be larger than an ancestor. Carry the open
+interval down instead.
+'''
+starter      = '''
+#include <iostream>
+#include <limits>
+#include <vector>
+
+bool present(const std::vector<long long>& tree, std::size_t i) {
+    return i < tree.size() && tree[i] != -1;
+}
+
+bool valid(const std::vector<long long>& tree, std::size_t i, long long low, long long high) {
+    // the node must sit strictly inside (low, high), and each child
+    // inherits a narrower window
+    (void)tree;
+    (void)i;
+    (void)low;
+    (void)high;
+    return true;
+}
+
+int main() {
+    int n = 0;
+    int q = 0;
+    std::cin >> n >> q;
+    std::vector<long long> tree(n);
+    for (long long& v : tree) {
+        std::cin >> v;
+    }
+
+    std::cout << (valid(tree, 0, std::numeric_limits<long long>::min(), std::numeric_limits<long long>::max()) ? "VALID" : "INVALID") << '\n';
+    for (int k = 0; k < q; ++k) {
+        long long target = 0;
+        std::cin >> target;
+        (void)present(tree, 0);
+        std::cout << target << " ABSENT\n";
+    }
+}
+'''
+solution     = '''
+#include <iostream>
+#include <limits>
+#include <vector>
+
+bool present(const std::vector<long long>& tree, std::size_t i) {
+    return i < tree.size() && tree[i] != -1;
+}
+
+bool valid(const std::vector<long long>& tree, std::size_t i, long long low, long long high) {
+    if (!present(tree, i)) {
+        return true;
+    }
+    long long value = tree[i];
+    if (value <= low || value >= high) {
+        return false;
+    }
+    return valid(tree, 2 * i + 1, low, value) && valid(tree, 2 * i + 2, value, high);
+}
+
+// the depth at which target sits, or 0 if it is not in the tree
+int find(const std::vector<long long>& tree, long long target) {
+    std::size_t i = 0;
+    int depth = 1;
+    while (present(tree, i)) {
+        if (tree[i] == target) {
+            return depth;
+        }
+        i = target < tree[i] ? 2 * i + 1 : 2 * i + 2;
+        ++depth;
+    }
+    return 0;
+}
+
+int main() {
+    int n = 0;
+    int q = 0;
+    std::cin >> n >> q;
+    std::vector<long long> tree(n);
+    for (long long& v : tree) {
+        std::cin >> v;
+    }
+
+    std::cout << (valid(tree, 0, std::numeric_limits<long long>::min(), std::numeric_limits<long long>::max()) ? "VALID" : "INVALID") << '\n';
+    for (int k = 0; k < q; ++k) {
+        long long target = 0;
+        std::cin >> target;
+        int depth = find(tree, target);
+        if (depth > 0) {
+            std::cout << target << " FOUND " << depth << '\n';
+        } else {
+            std::cout << target << " ABSENT\n";
+        }
+    }
+}
+'''
+hints = [
+  "Pass an open interval (low, high) down. The root gets the whole range; a left child gets (low, node), a right child gets (node, high).",
+  "A missing node is vacuously valid — that is the base case, and it returns true, not false.",
+  "The lookup is the binary search: smaller goes left, otherwise right, and the depth is how many hops it took.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "7 2\n4 2 6 1 3 5 7\n3 8\n",  expect = "VALID\n3 FOUND 3\n8 ABSENT\n",  visible = true },
+  { name = "sneaky",    stdin = "7 1\n5 1 7 -1 6 -1 -1\n6\n", expect = "INVALID\n6 ABSENT\n",           visible = false },
+  { name = "root",      stdin = "1 1\n10\n10\n",              expect = "VALID\n10 FOUND 1\n",           visible = false },
+  { name = "left-only", stdin = "3 2\n8 4 -1\n4 8\n",         expect = "VALID\n4 FOUND 2\n8 FOUND 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id           = "cpp.hacker.12.heap"
+node         = 12
+title        = "K SORTED QUEUES"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Every branch sends its dockets already in order. Merge them into one line without sorting the lot again."
+concepts     = ["heaps", "sorting", "complexity"]
+requires     = ["cpp.hacker.11.bst"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief        = '''
+Line one is `k`. Then `k` lines, each a count followed by that many integers,
+already sorted ascending.
+
+Print all of them merged into one ascending line, space separated, then
+`POPS <total count>`.
+
+```
+input:  3
+        3 1 4 5
+        2 1 3
+        2 2 6
+output: 1 1 2 3 4 5 6
+        POPS 7
+```
+
+`std::priority_queue` is a **max**-heap. To use it as a min-heap, give it
+`std::greater<>` as its third template argument — and its second, the
+container, has to be spelled out to get there:
+`std::priority_queue<T, std::vector<T>, std::greater<T>>`. That is the whole
+C++-specific trick, and it is what the question is checking.
+
+The heap holds one entry per list, not one per element, so it stays at size
+`k` however long the lists are.
+
+The cases here are small and the clock is not measuring speed, and on this
+question no case could. Pouring every list into one `std::vector` and calling
+`std::sort` passes these, and would pass a big one too: `O(N log N)` against
+the heap's `O(N log k)` is not a gap a run limit can see. What is being checked
+is that you can spell the min-heap. What the interviewer is listening for is
+the one-entry-per-list invariant, which is the part that matters when the
+lists do not fit in memory at once.
+'''
+starter      = '''
+#include <functional>
+#include <iostream>
+#include <queue>
+#include <tuple>
+#include <vector>
+
+int main() {
+    int k = 0;
+    std::cin >> k;
+    std::vector<std::vector<long long>> lists(k);
+    for (auto& list : lists) {
+        int count = 0;
+        std::cin >> count;
+        list.resize(count);
+        for (long long& v : list) {
+            std::cin >> v;
+        }
+    }
+
+    // (value, which list, how far into it)
+    using Entry = std::tuple<long long, int, std::size_t>;
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> heap;
+    (void)heap;
+
+    // seed the heap with the head of each list, then pop and refill
+    std::cout << "?\nPOPS 0\n";
+}
+'''
+solution     = '''
+#include <functional>
+#include <iostream>
+#include <queue>
+#include <tuple>
+#include <vector>
+
+int main() {
+    int k = 0;
+    std::cin >> k;
+    std::vector<std::vector<long long>> lists(k);
+    for (auto& list : lists) {
+        int count = 0;
+        std::cin >> count;
+        list.resize(count);
+        for (long long& v : list) {
+            std::cin >> v;
+        }
+    }
+
+    // (value, which list, how far into it); std::greater makes it a min-heap
+    using Entry = std::tuple<long long, int, std::size_t>;
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> heap;
+    for (int which = 0; which < k; ++which) {
+        if (!lists[which].empty()) {
+            heap.emplace(lists[which][0], which, 0);
+        }
+    }
+
+    std::vector<long long> out;
+    while (!heap.empty()) {
+        auto [value, which, at] = heap.top();
+        heap.pop();
+        out.push_back(value);
+        if (at + 1 < lists[which].size()) {
+            heap.emplace(lists[which][at + 1], which, at + 1);
+        }
+    }
+
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        std::cout << (i ? " " : "") << out[i];
+    }
+    std::cout << '\n';
+    std::cout << "POPS " << out.size() << '\n';
+}
+'''
+hints = [
+  "The heap entry has to carry where the value came from, or you cannot refill after popping it. A std::tuple orders by its first element first, which is what you want.",
+  "std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> — all three arguments, or you get the max-heap.",
+  "Push the next element of a list only when you pop one of its elements — that keeps the heap at k.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3\n3 1 4 5\n2 1 3\n2 2 6\n", expect = "1 1 2 3 4 5 6\nPOPS 7\n", visible = true },
+  { name = "one",    stdin = "1\n3 -5 0 5\n",              expect = "-5 0 5\nPOPS 3\n",         visible = false },
+  { name = "ragged", stdin = "3\n1 9\n0\n4 1 2 3 4\n",     expect = "1 2 3 4 9\nPOPS 5\n",      visible = false },
+  { name = "dupes",  stdin = "2\n2 2 2\n2 2 2\n",          expect = "2 2 2 2\nPOPS 4\n",        visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id           = "cpp.hacker.13.backtracking"
+node         = 13
+title        = "EVERY COMBINATION"
+difficulty   = 4
+time_limit_s = 900
+story        = "List every way the shop could be laid out. All of them, in a fixed order, and do not print the same one twice."
+concepts     = ["backtracking", "recursion", "slices"]
+requires     = ["cpp.hacker.12.heap"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` distinct integers **already in ascending
+order**.
+
+Print every subset, one per line, values space separated, the empty subset as
+`-`. Order them the way the obvious recursion produces them: at each position,
+first the branch that **takes** the element, then the branch that skips it.
+Then print `SUBSETS <2^n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 2 3
+        1 2
+        1 3
+        1
+        2 3
+        2
+        3
+        -
+        SUBSETS 8
+```
+
+Push, recurse, **pop**. The pop is the part people leave out, and the symptom
+is every line after the first being too long.
+'''
+starter      = '''
+#include <iostream>
+#include <string>
+#include <vector>
+
+void build(const std::vector<long long>& nums, std::size_t at, std::vector<long long>& chosen, std::vector<std::string>& out) {
+    (void)nums;
+    (void)at;
+    (void)chosen;
+    (void)out;
+    // at the end of the list, record `chosen`; otherwise take it, recurse,
+    // undo, then skip it and recurse
+}
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::vector<long long> chosen;
+    std::vector<std::string> out;
+    build(nums, 0, chosen, out);
+
+    for (const std::string& line : out) {
+        std::cout << line << '\n';
+    }
+    std::cout << "SUBSETS " << out.size() << '\n';
+}
+'''
+solution     = '''
+#include <iostream>
+#include <string>
+#include <vector>
+
+void build(const std::vector<long long>& nums, std::size_t at, std::vector<long long>& chosen, std::vector<std::string>& out) {
+    if (at == nums.size()) {
+        if (chosen.empty()) {
+            out.push_back("-");
+        } else {
+            std::string line;
+            for (std::size_t i = 0; i < chosen.size(); ++i) {
+                line += (i ? " " : "") + std::to_string(chosen[i]);
+            }
+            out.push_back(line);
+        }
+        return;
+    }
+
+    chosen.push_back(nums[at]);
+    build(nums, at + 1, chosen, out);
+    chosen.pop_back();  // the undo in try-recurse-undo
+
+    build(nums, at + 1, chosen, out);
+}
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::vector<long long> chosen;
+    std::vector<std::string> out;
+    build(nums, 0, chosen, out);
+
+    for (const std::string& line : out) {
+        std::cout << line << '\n';
+    }
+    std::cout << "SUBSETS " << out.size() << '\n';
+}
+'''
+hints = [
+  "Two recursive calls per element: one with it pushed, one without. Take first, and the order in the sample falls out.",
+  "chosen.pop_back() goes between the two calls. That is the undo in try-recurse-undo.",
+  "The base case is at == nums.size(), and the empty selection there is the empty subset, which still counts.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n", expect = "1 2 3\n1 2\n1 3\n1\n2 3\n2\n3\n-\nSUBSETS 8\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",     expect = "5\n-\nSUBSETS 2\n",                             visible = false },
+  { name = "two",   stdin = "2\n-1 4\n",  expect = "-1 4\n-1\n4\n-\nSUBSETS 4\n",                   visible = false },
+  { name = "none",  stdin = "0\n\n",      expect = "-\nSUBSETS 1\n",                                visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id           = "cpp.hacker.14.word-search"
+node         = 14
+title        = "IS THE WORD IN THE GRID"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A board of letters and a name. They want to know whether the name is written in it, and they want the count of dead ends."
+concepts     = ["backtracking", "matrix", "graphs"]
+requires     = ["cpp.hacker.13.backtracking"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are a grid of lowercase letters. The
+last line is the word.
+
+The word is in the grid if you can spell it by moving up, down, left or right
+between **adjacent** cells, never using the same cell twice in one attempt.
+
+Print `FOUND` or `ABSENT`, then `STARTS <k>`: how many cells hold the word's
+first letter.
+
+```
+input:  3 4
+        abce
+        sfcs
+        adee
+        abcced
+output: FOUND
+        STARTS 2
+```
+
+Mark the cell used on the way in and **unmark it on the way out**. A cell
+that stays marked after a failed branch makes later branches fail for a reason
+that is not in the grid.
+'''
+starter      = '''
+#include <iostream>
+#include <string>
+#include <vector>
+
+bool search(std::vector<std::string>& grid, int r, int c, const std::string& word, std::size_t at) {
+    (void)grid;
+    (void)r;
+    (void)c;
+    (void)word;
+    (void)at;
+    return false;
+}
+
+int main() {
+    int rows = 0;
+    int cols = 0;
+    std::cin >> rows >> cols;
+    std::vector<std::string> grid(rows);
+    for (std::string& row : grid) {
+        std::cin >> row;
+    }
+    std::string word;
+    std::cin >> word;
+
+    int starts = 0;
+    (void)search(grid, 0, 0, word, 0);
+
+    std::cout << "ABSENT\n";
+    std::cout << "STARTS " << starts << '\n';
+}
+'''
+solution     = '''
+#include <iostream>
+#include <string>
+#include <vector>
+
+bool search(std::vector<std::string>& grid, int r, int c, const std::string& word, std::size_t at) {
+    if (grid[r][c] != word[at]) {
+        return false;
+    }
+    if (at + 1 == word.size()) {
+        return true;
+    }
+
+    char here = grid[r][c];
+    grid[r][c] = '#';
+
+    // || short-circuits, so the first direction that spells the rest of the
+    // word stops the other three from being tried at all
+    int rows = static_cast<int>(grid.size());
+    int cols = static_cast<int>(grid[0].size());
+    bool found = (r > 0 && search(grid, r - 1, c, word, at + 1))
+        || (r + 1 < rows && search(grid, r + 1, c, word, at + 1))
+        || (c > 0 && search(grid, r, c - 1, word, at + 1))
+        || (c + 1 < cols && search(grid, r, c + 1, word, at + 1));
+
+    grid[r][c] = here;
+    return found;
+}
+
+int main() {
+    int rows = 0;
+    int cols = 0;
+    std::cin >> rows >> cols;
+    std::vector<std::string> grid(rows);
+    for (std::string& row : grid) {
+        std::cin >> row;
+    }
+    std::string word;
+    std::cin >> word;
+
+    // count the starting letters before any cell is marked
+    int starts = 0;
+    for (const std::string& row : grid) {
+        for (char cell : row) {
+            if (cell == word[0]) {
+                ++starts;
+            }
+        }
+    }
+
+    bool found = false;
+    for (int r = 0; r < rows && !found; ++r) {
+        for (int c = 0; c < cols && !found; ++c) {
+            found = search(grid, r, c, word, 0);
+        }
+    }
+
+    std::cout << (found ? "FOUND" : "ABSENT") << '\n';
+    std::cout << "STARTS " << starts << '\n';
+}
+'''
+hints = [
+  "Overwrite the cell with a character the word cannot contain, recurse, then put the original back.",
+  "Count the starting letters in a separate pass before you search, or the '#' marks will confuse the count.",
+  "The success base case is at + 1 == word.size() — checked after matching this cell, not before.",
+  "Chain the four directions with || rather than four ifs and a found flag: || already stops at the first branch that succeeds, and the && !found in the loop conditions does the same for the starting cells.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 4\nabce\nsfcs\nadee\nabcced\n", expect = "FOUND\nSTARTS 2\n",  visible = true },
+  { name = "absent",  stdin = "3 4\nabce\nsfcs\nadee\nabcb\n",   expect = "ABSENT\nSTARTS 2\n", visible = false },
+  { name = "reuse",   stdin = "1 3\naba\naba\n",                 expect = "FOUND\nSTARTS 2\n",  visible = false },
+  { name = "single",  stdin = "1 1\na\na\n",                     expect = "FOUND\nSTARTS 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id           = "cpp.hacker.15.topo-sort"
+node         = 15
+title        = "WHAT ORDER DOES IT BUILD IN"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Eleven translation units and a dependency graph. Name a build order, or name the cycle that means there is not one."
+concepts     = ["graphs", "stacks-queues", "sorting"]
+requires     = ["cpp.hacker.14.word-search"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief        = '''
+Line one is `n m`: `n` tasks numbered `0..n-1` and `m` edges. The next `m`
+lines are `<a> <b>`, meaning `a` must be built before `b`.
+
+Print a build order on one line, space separated. When several tasks are ready
+at once, take the **lowest numbered** one, so the answer is unique. If no
+order exists, print `CYCLE` instead. Then print `DONE <how many you ordered>`.
+
+```
+input:  4 4
+        0 1
+        0 2
+        1 3
+        2 3
+output: 0 1 2 3
+        DONE 4
+```
+
+Kahn's algorithm: count how many things each task waits on, start with the
+ones waiting on nothing, and when you take a task, decrement its dependents.
+If you finish with tasks left over, those tasks are the cycle.
+'''
+starter      = '''
+#include <functional>
+#include <iostream>
+#include <queue>
+#include <vector>
+
+int main() {
+    int n = 0;
+    int m = 0;
+    std::cin >> n >> m;
+
+    std::vector<std::vector<int>> after(n);
+    std::vector<int> waiting(n, 0);
+    for (int e = 0; e < m; ++e) {
+        int a = 0;
+        int b = 0;
+        std::cin >> a >> b;
+        after[a].push_back(b);
+        waiting[b]++;
+    }
+
+    std::priority_queue<int, std::vector<int>, std::greater<int>> ready;
+    (void)ready;
+
+    // start with everything waiting on nothing, take the smallest each time
+    std::cout << "CYCLE\nDONE 0\n";
+}
+'''
+solution     = '''
+#include <functional>
+#include <iostream>
+#include <queue>
+#include <vector>
+
+int main() {
+    int n = 0;
+    int m = 0;
+    std::cin >> n >> m;
+
+    std::vector<std::vector<int>> after(n);
+    std::vector<int> waiting(n, 0);
+    for (int e = 0; e < m; ++e) {
+        int a = 0;
+        int b = 0;
+        std::cin >> a >> b;
+        after[a].push_back(b);
+        waiting[b]++;
+    }
+
+    std::priority_queue<int, std::vector<int>, std::greater<int>> ready;
+    for (int task = 0; task < n; ++task) {
+        if (waiting[task] == 0) {
+            ready.push(task);
+        }
+    }
+
+    std::vector<int> order;
+    while (!ready.empty()) {
+        int task = ready.top();
+        ready.pop();
+        order.push_back(task);
+        for (int next : after[task]) {
+            if (--waiting[next] == 0) {
+                ready.push(next);
+            }
+        }
+    }
+
+    if (static_cast<int>(order.size()) < n) {
+        std::cout << "CYCLE\n";
+    } else {
+        for (std::size_t i = 0; i < order.size(); ++i) {
+            std::cout << (i ? " " : "") << order[i];
+        }
+        std::cout << '\n';
+    }
+    std::cout << "DONE " << order.size() << '\n';
+}
+'''
+hints = [
+  "waiting[b] is the in-degree of b — how many edges point at it.",
+  "A plain queue gives *an* order; a min-heap gives *the* order the statement asks for.",
+  "You never detect the cycle directly. You notice that fewer than n tasks came out, and the ones left are in it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "diamond", stdin = "4 4\n0 1\n0 2\n1 3\n2 3\n", expect = "0 1 2 3\nDONE 4\n",   visible = true },
+  { name = "cycle",   stdin = "3 3\n0 1\n1 2\n2 0\n",      expect = "CYCLE\nDONE 0\n",     visible = false },
+  { name = "loose",   stdin = "3 0\n",                     expect = "0 1 2\nDONE 3\n",     visible = false },
+  { name = "chain",   stdin = "5 4\n4 3\n3 2\n2 1\n1 0\n", expect = "4 3 2 1 0\nDONE 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id           = "cpp.hacker.16.union-find"
+node         = 16
+title        = "WHO IS CONNECTED TO WHOM"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The tram network, the MTR and the minibus routes on one sheet. How many separate networks are there really."
+concepts     = ["disjoint-set", "graphs", "complexity"]
+requires     = ["cpp.hacker.15.topo-sort"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief        = '''
+Line one is `n m`: `n` stops numbered `0..n-1`, `m` undirected links. The next
+`m` lines are `<a> <b>`.
+
+Print three lines: how many separate networks there are, the size of the
+largest, and `REDUNDANT <k>` — how many of the links joined two stops that
+were already connected.
+
+```
+input:  6 4
+        0 1
+        1 2
+        3 4
+        0 2
+output: 3
+        3
+        REDUNDANT 1
+```
+
+Union-find: every stop points at a parent, `find` walks to the root, `union`
+points one root at the other. Compress the path on the way back out of `find`
+and the whole thing is effectively constant time per query.
+
+The cases here are small and the clock is not measuring speed — a `find` that
+walks without compressing would clear all four, and so would rescanning the
+whole array for each query. Compress anyway. The paragraph above is a claim
+about a hundred thousand stops and a hundred thousand links, and it is the
+claim you will be asked to defend, not these four lines.
+'''
+starter      = '''
+#include <iostream>
+#include <numeric>
+#include <vector>
+
+int find(std::vector<int>& parent, int x) {
+    // walk to the root, and flatten what you walked over
+    (void)parent;
+    return x;
+}
+
+int main() {
+    int n = 0;
+    int m = 0;
+    std::cin >> n >> m;
+
+    std::vector<int> parent(n);
+    std::iota(parent.begin(), parent.end(), 0);
+    std::vector<int> size(n, 1);
+    int redundant = 0;
+
+    for (int e = 0; e < m; ++e) {
+        int a = 0;
+        int b = 0;
+        std::cin >> a >> b;
+        (void)find(parent, a);
+        (void)find(parent, b);
+    }
+
+    std::cout << n << "\n1\nREDUNDANT " << redundant << '\n';
+    (void)size;
+}
+'''
+solution     = '''
+#include <algorithm>
+#include <iostream>
+#include <numeric>
+#include <vector>
+
+int find(std::vector<int>& parent, int x) {
+    int root = x;
+    while (parent[root] != root) {
+        root = parent[root];
+    }
+    // path compression: point everything we walked over straight at the root
+    while (parent[x] != root) {
+        int next = parent[x];
+        parent[x] = root;
+        x = next;
+    }
+    return root;
+}
+
+int main() {
+    int n = 0;
+    int m = 0;
+    std::cin >> n >> m;
+
+    std::vector<int> parent(n);
+    std::iota(parent.begin(), parent.end(), 0);
+    std::vector<int> size(n, 1);
+    int groups = n;
+    int redundant = 0;
+
+    for (int e = 0; e < m; ++e) {
+        int a = 0;
+        int b = 0;
+        std::cin >> a >> b;
+        a = find(parent, a);
+        b = find(parent, b);
+        if (a == b) {
+            ++redundant;
+            continue;
+        }
+        // hang the smaller tree under the bigger one
+        if (size[a] < size[b]) {
+            std::swap(a, b);
+        }
+        parent[b] = a;
+        size[a] += size[b];
+        --groups;
+    }
+
+    int largest = 0;
+    for (int x = 0; x < n; ++x) {
+        if (parent[x] == x) {
+            largest = std::max(largest, size[x]);
+        }
+    }
+
+    std::cout << groups << '\n';
+    std::cout << largest << '\n';
+    std::cout << "REDUNDANT " << redundant << '\n';
+}
+'''
+hints = [
+  "Start with every stop as its own parent — std::iota — and n groups; each successful union drops the count by one.",
+  "An edge whose two ends already have the same root is the redundant one — count it and move on.",
+  "Only a root's size entry is meaningful, so read the largest off the roots, not off every index.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "6 4\n0 1\n1 2\n3 4\n0 2\n", expect = "3\n3\nREDUNDANT 1\n", visible = true },
+  { name = "islands",   stdin = "4 0\n",                     expect = "4\n1\nREDUNDANT 0\n", visible = false },
+  { name = "one-net",   stdin = "3 2\n0 1\n1 2\n",           expect = "1\n3\nREDUNDANT 0\n", visible = false },
+  { name = "all-dupes", stdin = "2 3\n0 1\n0 1\n1 0\n",      expect = "1\n2\nREDUNDANT 2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id           = "cpp.hacker.17.lis"
+node         = 17
+title        = "THE LONGEST RUN UP"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Daily takings, as many as they care to name, and you make them yourself from a seed. They want the longest stretch of improving days, and they do not have to be consecutive."
+concepts     = ["dynamic-programming", "binary-search", "complexity"]
+requires     = ["cpp.hacker.16.union-find"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief        = '''
+Standard input is two integers, `n` and `seed`. There is no array in the input
+— you build it, with **exactly** this generator, in `std::uint64_t` arithmetic,
+which wraps by definition:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (wrapping)
+    next value = (x >> 33) % 1000000007
+```
+
+Print the length of the longest **strictly increasing subsequence** — the
+values keep their order but need not be adjacent. Then print
+`TAILS <k>` where `k` is that same length, read off the patience-sorting pile
+count.
+
+```
+input:  8 1
+output: 3
+        TAILS 3
+```
+
+For `8 1` the array is
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`,
+and the longest run up inside it is `93944146 392341189 822192870`. Check your
+generator against that line before you go looking for a bug in your algorithm.
+
+**This quest enforces its complexity.** The starter is the `O(n²)` table — the
+answer you should be able to write cold, and it is not wrong. At `n = 200000`
+it prints the same `881` the fast one prints. It prints it **32.6 s** after it
+starts, against a five second run limit, so what you see is a timeout and not
+a wrong answer. That is the failure this question exists to produce.
+
+The `O(n log n)` one keeps, for each length, the smallest value a subsequence
+of that length can end on — a list that is always sorted, so the position of a
+new value is a binary search, and `std::lower_bound` is that search. It does
+`n = 200000` in **0.006 s**. Both measured on this machine, with the two
+programs that ship in this quest.
+
+One note on widths, because it is the half of this question C++ adds. Every
+generated value is below `2^30` and the answer is at most `n`, so `int` would
+hold both — but the generator's `x` must be `std::uint64_t` and nothing else.
+Unsigned overflow wraps by definition; **signed** overflow is undefined
+behaviour, so a `long long` there leaves the compiler entitled to do anything
+at all, and `>> 33` on it would be an arithmetic shift rather than the logical
+one this generator means. Generate unsigned, convert after the modulus.
+'''
+starter      = '''
+
+#include <algorithm>
+#include <cstdint>
+#include <iostream>
+#include <vector>
+
+std::vector<long long> generate(std::size_t n, std::uint64_t seed) {
+    std::uint64_t x = seed;
+    std::vector<long long> values;
+    values.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        values.push_back(static_cast<long long>((x >> 33) % 1000000007ULL));
+    }
+    return values;
+}
+
+int main() {
+    std::size_t n = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> seed;
+
+    std::vector<long long> values = generate(n, seed);
+
+    // correct, and far too slow: this is what the big hidden case rejects.
+    // best[i] is the longest increasing subsequence ending at i.
+    std::vector<int> best(n, 1);
+    int longest = n > 0 ? 1 : 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        for (std::size_t j = 0; j < i; ++j) {
+            if (values[j] < values[i] && best[j] + 1 > best[i]) {
+                best[i] = best[j] + 1;
+            }
+        }
+        if (best[i] > longest) {
+            longest = best[i];
+        }
+    }
+
+    std::cout << longest << '\n';
+    std::cout << "TAILS " << longest << '\n';
+}
+'''
+solution     = '''
+
+#include <algorithm>
+#include <cstdint>
+#include <iostream>
+#include <vector>
+
+std::vector<long long> generate(std::size_t n, std::uint64_t seed) {
+    std::uint64_t x = seed;
+    std::vector<long long> values;
+    values.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        values.push_back(static_cast<long long>((x >> 33) % 1000000007ULL));
+    }
+    return values;
+}
+
+int main() {
+    std::size_t n = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> seed;
+
+    std::vector<long long> values = generate(n, seed);
+
+    // tails[i] = the smallest value an increasing subsequence of length i+1
+    // can end on. It is sorted, always, which is what makes the search legal.
+    std::vector<long long> tails;
+    for (long long value : values) {
+        auto slot = std::lower_bound(tails.begin(), tails.end(), value);
+        if (slot == tails.end()) {
+            tails.push_back(value);
+        } else {
+            *slot = value;
+        }
+    }
+
+    std::cout << tails.size() << '\n';
+    std::cout << "TAILS " << tails.size() << '\n';
+}
+'''
+hints = [
+  "tails is not a subsequence. Its length is the answer; its contents are only the best ending values.",
+  "Strictly increasing means you replace the first tail that is >= value, which is exactly what std::lower_bound returns.",
+  "If the big case times out, nothing is wrong with your answer — the shape of your loop is the answer here. Two nested loops over 200000 values is 2 x 10^10 comparisons.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 1\n",          expect = "3\nTAILS 3\n",     visible = true },
+  { name = "single", stdin = "1 7\n",          expect = "1\nTAILS 1\n",     visible = false },
+  { name = "dozen",  stdin = "12 99\n",        expect = "5\nTAILS 5\n",     visible = false },
+  { name = "big",    stdin = "200000 12345\n", expect = "881\nTAILS 881\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id           = "cpp.hacker.18.edit-distance"
+node         = 18
+title        = "HOW FAR APART"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Two spellings of the same street on two different signs. How many single-character edits between them."
+concepts     = ["dynamic-programming", "strings", "matrix"]
+requires     = ["cpp.hacker.17.lis"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief        = '''
+Two lines, one word each, lowercase. Either line may be **empty**, and then
+the answer is the length of the other one.
+
+Print the **edit distance**: the fewest single-character insertions,
+deletions or substitutions that turn the first into the second. Then print
+`LCS <k>`, the length of their longest common subsequence.
+
+```
+input:  horse
+        ros
+output: 3
+        LCS 2
+```
+
+Two tables over the same two strings, and both are the same three-line
+recurrence with a different tie-break. Fill row by row; the answer is the far
+corner. Row `0` and column `0` are not zero for the edit table — they are the
+cost of deleting or inserting everything.
+
+Read the lines with `std::getline`, not `>>`: an empty line is a real input
+here, and `>>` would skip over it to the next word.
+'''
+starter      = '''
+#include <iostream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string a;
+    std::string b;
+    std::getline(std::cin, a);
+    std::getline(std::cin, b);
+
+    std::vector<std::vector<int>> edit(a.size() + 1, std::vector<int>(b.size() + 1, 0));
+    std::vector<std::vector<int>> lcs(a.size() + 1, std::vector<int>(b.size() + 1, 0));
+    (void)edit;
+    (void)lcs;
+
+    // fill both tables; the answers are the bottom-right corners
+    std::cout << "0\nLCS 0\n";
+}
+'''
+solution     = '''
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string a;
+    std::string b;
+    std::getline(std::cin, a);
+    std::getline(std::cin, b);
+    std::size_t la = a.size();
+    std::size_t lb = b.size();
+
+    std::vector<std::vector<int>> edit(la + 1, std::vector<int>(lb + 1, 0));
+    for (std::size_t i = 0; i <= la; ++i) edit[i][0] = static_cast<int>(i);
+    for (std::size_t j = 0; j <= lb; ++j) edit[0][j] = static_cast<int>(j);
+    for (std::size_t i = 1; i <= la; ++i) {
+        for (std::size_t j = 1; j <= lb; ++j) {
+            if (a[i - 1] == b[j - 1]) {
+                edit[i][j] = edit[i - 1][j - 1];
+            } else {
+                edit[i][j] = 1 + std::min({edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1]});
+            }
+        }
+    }
+
+    std::vector<std::vector<int>> lcs(la + 1, std::vector<int>(lb + 1, 0));
+    for (std::size_t i = 1; i <= la; ++i) {
+        for (std::size_t j = 1; j <= lb; ++j) {
+            if (a[i - 1] == b[j - 1]) {
+                lcs[i][j] = lcs[i - 1][j - 1] + 1;
+            } else {
+                lcs[i][j] = std::max(lcs[i - 1][j], lcs[i][j - 1]);
+            }
+        }
+    }
+
+    std::cout << edit[la][lb] << '\n';
+    std::cout << "LCS " << lcs[la][lb] << '\n';
+}
+'''
+hints = [
+  "edit[i][0] = i and edit[0][j] = j: turning a prefix into nothing costs one deletion per character.",
+  "Matching characters cost nothing and step diagonally; a mismatch costs one and takes the cheapest of the three neighbours — std::min with a braced list takes all three at once.",
+  "LCS is the same walk with max instead of min, and no diagonal step on a mismatch.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "horse\nros\n",         expect = "3\nLCS 2\n", visible = true },
+  { name = "same",    stdin = "causeway\ncauseway\n", expect = "0\nLCS 8\n", visible = false },
+  { name = "nothing", stdin = "abc\nxyz\n",           expect = "3\nLCS 0\n", visible = false },
+  { name = "insert",  stdin = "mtr\nmetro\n",         expect = "2\nLCS 3\n", visible = false },
+  { name = "empty",   stdin = "\nabc\n",              expect = "3\nLCS 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id           = "cpp.hacker.19.knapsack"
+node         = 19
+title        = "WHAT FITS IN THE BAG"
+difficulty   = 5
+time_limit_s = 1200
+story        = "One rider, one bag, and a board of orders each with a weight and a tip. Greedy picks the wrong ones."
+concepts     = ["dynamic-programming", "greedy", "slices"]
+requires     = ["cpp.hacker.18.edit-distance"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief        = '''
+Line one is `n cap`. The next `n` lines are `<weight> <value>`. Each item can
+be taken at most **once**.
+
+Print the best total value that fits in `cap`, then `GREEDY <v>`: what you
+would get by repeatedly taking the item with the best value-per-weight that
+still fits.
+
+```
+input:  3 10
+        6 10
+        5 7
+        5 7
+output: 14
+        GREEDY 10
+```
+
+The two numbers being different is the whole point of the quest, and the
+sample shows it: the best value-per-weight is the `6 10` item at `1.67`, and
+taking it leaves four units of room that nothing fits into. Passing on it and
+taking both `5 7` items is worth `14`. The hidden cases are small, so what
+they check is that you got both numbers right, not that the table is fast.
+'''
+starter      = '''
+#include <algorithm>
+#include <iostream>
+#include <utility>
+#include <vector>
+
+int main() {
+    int n = 0;
+    int cap = 0;
+    std::cin >> n >> cap;
+    std::vector<std::pair<int, long long>> items(n);
+    for (auto& [weight, value] : items) {
+        std::cin >> weight >> value;
+    }
+
+    std::vector<long long> best(cap + 1, 0);
+    (void)best;
+
+    // one row per item, capacities walked downwards so each item is used once
+    std::cout << "0\nGREEDY 0\n";
+}
+'''
+solution     = '''
+#include <algorithm>
+#include <iostream>
+#include <utility>
+#include <vector>
+
+int main() {
+    int n = 0;
+    int cap = 0;
+    std::cin >> n >> cap;
+    std::vector<std::pair<int, long long>> items(n);
+    for (auto& [weight, value] : items) {
+        std::cin >> weight >> value;
+    }
+
+    std::vector<long long> best(cap + 1, 0);
+    for (const auto& [weight, value] : items) {
+        // downwards, so this item cannot be picked up twice in one pass
+        for (int room = cap; room >= weight; --room) {
+            best[room] = std::max(best[room], best[room - weight] + value);
+        }
+    }
+
+    // ratio compared without dividing: b.value * a.weight vs a.value * b.weight
+    std::vector<std::pair<int, long long>> order = items;
+    std::sort(order.begin(), order.end(), [](const auto& a, const auto& b) {
+        long long left = b.second * a.first;
+        long long right = a.second * b.first;
+        if (left != right) {
+            return left < right;  // a's ratio is larger
+        }
+        return a.first < b.first;
+    });
+    int room = cap;
+    long long greedy = 0;
+    for (const auto& [weight, value] : order) {
+        if (weight <= room) {
+            room -= weight;
+            greedy += value;
+        }
+    }
+
+    std::cout << best[cap] << '\n';
+    std::cout << "GREEDY " << greedy << '\n';
+}
+'''
+hints = [
+  "Walking the capacities downwards is what makes it 0/1 instead of unbounded. Upwards lets the same item be reused.",
+  "Compare ratios without dividing: b.value * a.weight against a.value * b.weight, so there is no floating point in the answer.",
+  "The greedy pass is a straight loop over the sorted items — no backtracking, which is exactly why it is wrong.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "3 10\n6 10\n5 7\n5 7\n", expect = "14\nGREEDY 10\n", visible = true },
+  { name = "no-room",   stdin = "2 1\n5 100\n9 900\n",    expect = "0\nGREEDY 0\n",   visible = false },
+  { name = "takes-all", stdin = "3 10\n1 1\n2 2\n3 3\n",  expect = "6\nGREEDY 6\n",   visible = false },
+  { name = "one",       stdin = "1 4\n4 9\n",             expect = "9\nGREEDY 9\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id           = "cpp.hacker.20.bits"
+node         = 20
+title        = "THE ONE THAT IS ALONE"
+difficulty   = 4
+time_limit_s = 600
+story        = "Every docket is scanned twice except one. They will not let you use a hash map and they will not let you sort."
+concepts     = ["bit-manipulation", "math", "complexity"]
+requires     = ["cpp.hacker.19.knapsack"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` non-negative integers, in which every value
+appears exactly twice except one.
+
+Print four lines:
+
+1. the value that appears once, found with **xor** and constant extra space
+2. how many `1` bits are set in it
+3. `POW2 YES` if it is a power of two, `POW2 NO` otherwise (`0` is not)
+4. the value with its lowest set bit cleared, or `0` if it has none
+
+```
+input:  5
+        4 1 2 1 2
+output: 4
+        1
+        POW2 YES
+        0
+```
+
+`x ^ x == 0` and `x ^ 0 == x`, and xor does not care what order it happens in.
+That is the whole first line. `x & (x - 1)` clears the lowest set bit, which
+gives you the third and fourth lines for free. Do it all in `unsigned long
+long`: shifting and subtracting on a signed type has edge cases, and the
+question is not about them.
+
+The cases here are small and the clock is not measuring speed. There is no big
+hidden case and there cannot be one built the way this pack builds them: an
+array that is pairs-plus-one is *constructed*, not generated, and two lands
+constructing it would not construct the same array. So these cases check the
+four lines and their edges — `0` is not a power of two, and a value with no
+set bits stays `0` when you clear the lowest one. The xor is still the answer;
+counting occurrences in a nested loop is `O(n²)` and dies at a real `n`.
+'''
+starter      = '''
+#include <iostream>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<unsigned long long> nums(n);
+    for (unsigned long long& v : nums) {
+        std::cin >> v;
+    }
+
+    unsigned long long alone = 0;
+    (void)nums;
+
+    // xor everything together, then read the bits off the result
+    std::cout << alone << "\n0\nPOW2 NO\n0\n";
+}
+'''
+solution     = '''
+#include <iostream>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<unsigned long long> nums(n);
+    for (unsigned long long& v : nums) {
+        std::cin >> v;
+    }
+
+    unsigned long long alone = 0;
+    for (unsigned long long v : nums) {
+        alone ^= v;
+    }
+
+    int bits = 0;
+    for (unsigned long long walk = alone; walk != 0; walk &= walk - 1) {
+        ++bits;
+    }
+
+    bool power_of_two = alone != 0 && (alone & (alone - 1)) == 0;
+    unsigned long long cleared = alone == 0 ? 0 : alone & (alone - 1);
+
+    std::cout << alone << '\n';
+    std::cout << bits << '\n';
+    std::cout << "POW2 " << (power_of_two ? "YES" : "NO") << '\n';
+    std::cout << cleared << '\n';
+}
+'''
+hints = [
+  "The pairs cancel themselves out whatever order they arrive in, so one fold over the list is enough.",
+  "Counting bits by clearing the lowest one each time runs once per set bit, not once per bit width. std::popcount in <bit> is the C++20 one-liner.",
+  "A power of two has exactly one bit set, so clearing the lowest one leaves zero — and zero itself has to be excluded by hand.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n4 1 2 1 2\n",    expect = "4\n1\nPOW2 YES\n0\n",    visible = true },
+  { name = "seven",  stdin = "3\n7 9 9\n",        expect = "7\n3\nPOW2 NO\n6\n",     visible = false },
+  { name = "single", stdin = "1\n0\n",            expect = "0\n0\nPOW2 NO\n0\n",     visible = false },
+  { name = "big",    stdin = "5\n1024 5 5 8 8\n", expect = "1024\n1\nPOW2 YES\n0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id           = "cpp.hacker.21.matrix"
+node         = 21
+title        = "TURN THE FLOOR PLAN"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The plan is the wrong way up and there is no room on the table for a second copy of it."
+concepts     = ["matrix", "slices", "iteration"]
+requires     = ["cpp.hacker.20.bits"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are an `n × n` grid of integers.
+
+Print the grid rotated **90° clockwise**, `n` lines of space-separated values.
+Then print its values in **spiral order** — outer ring clockwise from the top
+left, inwards — on one line.
+
+```
+input:  3
+        1 2 3
+        4 5 6
+        7 8 9
+output: 7 4 1
+        8 5 2
+        9 6 3
+        1 2 3 6 9 8 7 4 5
+```
+
+The rotation is the one to do in place: transpose, then reverse each row.
+Naming that out loud is half the question.
+'''
+starter      = '''
+#include <algorithm>
+#include <iostream>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<std::vector<long long>> grid(n, std::vector<long long>(n));
+    for (auto& row : grid) {
+        for (long long& v : row) {
+            std::cin >> v;
+        }
+    }
+
+    // transpose, reverse each row, print; then walk the spiral
+    for (int r = 0; r < n; ++r) {
+        std::cout << "?\n";
+    }
+    std::cout << "?\n";
+}
+'''
+solution     = '''
+#include <algorithm>
+#include <iostream>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<std::vector<long long>> grid(n, std::vector<long long>(n));
+    for (auto& row : grid) {
+        for (long long& v : row) {
+            std::cin >> v;
+        }
+    }
+    // the spiral wants the original, so keep a copy before rotating in place
+    std::vector<std::vector<long long>> original = grid;
+
+    for (int r = 0; r < n; ++r) {
+        for (int c = r + 1; c < n; ++c) {
+            std::swap(grid[r][c], grid[c][r]);
+        }
+    }
+    for (auto& row : grid) {
+        std::reverse(row.begin(), row.end());
+    }
+    for (const auto& row : grid) {
+        for (int c = 0; c < n; ++c) {
+            std::cout << (c ? " " : "") << row[c];
+        }
+        std::cout << '\n';
+    }
+
+    std::vector<long long> spiral;
+    int top = 0, bottom = n - 1, left = 0, right = n - 1;
+    while (top <= bottom && left <= right) {
+        for (int c = left; c <= right; ++c) spiral.push_back(original[top][c]);
+        ++top;
+        for (int r = top; r <= bottom; ++r) spiral.push_back(original[r][right]);
+        --right;
+        if (top <= bottom) {
+            for (int c = right; c >= left; --c) spiral.push_back(original[bottom][c]);
+            --bottom;
+        }
+        if (left <= right) {
+            for (int r = bottom; r >= top; --r) spiral.push_back(original[r][left]);
+            ++left;
+        }
+    }
+    for (std::size_t i = 0; i < spiral.size(); ++i) {
+        std::cout << (i ? " " : "") << spiral[i];
+    }
+    std::cout << '\n';
+}
+'''
+hints = [
+  "Transpose by swapping only above the diagonal — c starting at r + 1 — or you swap everything back.",
+  "The spiral wants the original grid, so keep a copy before you rotate in place.",
+  "The two if guards inside the spiral loop are what stop a single middle row or column being walked twice.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n4 5 6\n7 8 9\n", expect = "7 4 1\n8 5 2\n9 6 3\n1 2 3 6 9 8 7 4 5\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",                   expect = "5\n5\n",                                   visible = false },
+  { name = "two",   stdin = "2\n1 2\n3 4\n",            expect = "3 1\n4 2\n1 2 4 3\n",                      visible = false },
+  { name = "four",  stdin = "4\n1 2 3 4\n5 6 7 8\n9 10 11 12\n13 14 15 16\n", expect = "13 9 5 1\n14 10 6 2\n15 11 7 3\n16 12 8 4\n1 2 3 4 8 12 16 15 14 13 9 5 6 7 11 10\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id           = "cpp.hacker.22.trie"
+node         = 22
+title        = "THE PREFIX BOX"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Autocomplete for the stop board — the honest kind, that only completes what is actually on the list."
+concepts     = ["tries", "strings", "collections"]
+requires     = ["cpp.hacker.21.matrix"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief        = '''
+Line one is `n q`. The next `n` lines are lowercase words to insert. The next
+`q` lines are queries, each `WORD <s>` or `PREFIX <s>`.
+
+Build a trie — a tree of nodes each holding up to 26 children — and answer:
+
+* `WORD <s>` → `YES` if `s` was inserted, `NO` otherwise
+* `PREFIX <s>` → how many of the `n` inserted words start with `s`
+
+The `n` words are not promised to be distinct, and `PREFIX` counts
+**insertions**, not distinct words: insert `tram` twice and `PREFIX tram` is
+`2`. `NODES` counts nodes, so the second insertion adds none.
+
+Then print `NODES <k>`, the number of nodes in the trie including the root.
+
+```
+input:  3 3
+        tram
+        tramway
+        train
+        WORD tram
+        PREFIX tra
+        WORD tra
+output: YES
+        3
+        NO
+        NODES 10
+```
+
+Keep a count on every node of how many inserted words pass through it, and
+`PREFIX` is a walk with no counting at the end. Store the nodes in one
+`std::vector` and let children hold indices — `-1` for none — rather than
+twenty-six `unique_ptr`s per node; it is smaller, faster, and the index is
+never invalidated by growth the way a pointer into the vector would be.
+'''
+starter      = '''
+#include <array>
+#include <iostream>
+#include <string>
+#include <vector>
+
+struct Node {
+    std::array<int, 26> children;
+    int through = 0;
+    bool terminal = false;
+    Node() { children.fill(-1); }
+};
+
+int main() {
+    int n = 0;
+    int q = 0;
+    std::cin >> n >> q;
+
+    std::vector<Node> nodes(1);
+
+    for (int i = 0; i < n; ++i) {
+        std::string word;
+        std::cin >> word;
+        // walk down, creating nodes as needed, bumping `through`
+    }
+
+    for (int i = 0; i < q; ++i) {
+        std::string kind;
+        std::string text;
+        std::cin >> kind >> text;
+        std::cout << "NO\n";
+    }
+    std::cout << "NODES " << nodes.size() << '\n';
+}
+'''
+solution     = '''
+#include <array>
+#include <iostream>
+#include <string>
+#include <vector>
+
+struct Node {
+    std::array<int, 26> children;
+    int through = 0;
+    bool terminal = false;
+    Node() { children.fill(-1); }
+};
+
+int main() {
+    int n = 0;
+    int q = 0;
+    std::cin >> n >> q;
+
+    std::vector<Node> nodes(1);
+
+    for (int i = 0; i < n; ++i) {
+        std::string word;
+        std::cin >> word;
+        int at = 0;
+        for (char ch : word) {
+            int slot = ch - 'a';
+            if (nodes[at].children[slot] == -1) {
+                // push_back may reallocate, so the index is taken first and
+                // nodes[at] is re-read after, never held across the push
+                nodes.push_back(Node());
+                nodes[at].children[slot] = static_cast<int>(nodes.size()) - 1;
+            }
+            at = nodes[at].children[slot];
+            nodes[at].through++;
+        }
+        nodes[at].terminal = true;
+    }
+
+    for (int i = 0; i < q; ++i) {
+        std::string kind;
+        std::string text;
+        std::cin >> kind >> text;
+
+        int at = 0;
+        for (char ch : text) {
+            if (at == -1) break;
+            at = nodes[at].children[ch - 'a'];
+        }
+
+        if (kind == "WORD") {
+            std::cout << (at != -1 && nodes[at].terminal ? "YES" : "NO") << '\n';
+        } else {
+            std::cout << (at == -1 ? 0 : nodes[at].through) << '\n';
+        }
+    }
+
+    std::cout << "NODES " << nodes.size() << '\n';
+}
+'''
+hints = [
+  "Store the nodes in one vector and let children hold indices. A reference into the vector taken before push_back is the iterator-invalidation bug from the previous map, wearing a hat.",
+  "through is bumped on the node you step onto, so the root never counts itself.",
+  "A query that falls off the trie leaves at == -1, and -1 answers NO and 0 without a special case.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 3\ntram\ntramway\ntrain\nWORD tram\nPREFIX tra\nWORD tra\n", expect = "YES\n3\nNO\nNODES 10\n", visible = true },
+  { name = "missing", stdin = "1 2\nmtr\nPREFIX z\nWORD mtr\n",                              expect = "0\nYES\nNODES 4\n",     visible = false },
+  { name = "nested",  stdin = "2 2\na\nab\nPREFIX a\nWORD a\n",                              expect = "2\nYES\nNODES 3\n",     visible = false },
+  { name = "empty-q", stdin = "2 1\nhku\nhk\nPREFIX hk\n",                                   expect = "2\nNODES 4\n",          visible = false },
+  { name = "twice",   stdin = "3 3\ntram\ntram\ntrap\nPREFIX tram\nPREFIX tra\nWORD tram\n",  expect = "2\n3\nYES\nNODES 6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id           = "cpp.hacker.23.prefix-sums"
+node         = 23
+title        = "HOW MANY WAYS TO HIT THE TARGET"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A day of takings and a number the auditor wants to see. How many runs of consecutive hours add up to exactly that."
+concepts     = ["prefix-sums", "hashing", "complexity"]
+requires     = ["cpp.hacker.22.trie"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief        = '''
+Line one is `n k`. Line two is `n` integers, which may be negative.
+
+Print how many contiguous runs sum to exactly `k`, then `RANGE <s>`, the sum
+of the whole list, read off the last prefix sum rather than by adding again.
+
+```
+input:  5 3
+        1 2 3 -3 3
+output: 5
+        RANGE 6
+```
+
+Negative values kill the sliding window — a window that is too big cannot be
+fixed by shrinking it. What survives is prefix sums: a run `i..j` sums to `k`
+exactly when `prefix[j] - prefix[i] == k`, so count how many earlier prefixes
+equal `prefix[j] - k`. Seed the map with `0 → 1` for runs that start at the
+beginning.
+
+The cases here are small and the clock is not measuring speed, and there is no
+case here that would reject the `O(n²)` double loop — at a real `n` there
+would be. That same double loop over 200000 values is `2 × 10^10` additions
+and takes about six seconds on this machine, against a five second run limit
+and against a hash map's single pass in a hundredth of that. What these four
+check is the negatives and the runs that start at the beginning, which are the
+two places this answer actually goes wrong. The complexity is on your honour.
+'''
+starter      = '''
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+
+int main() {
+    int n = 0;
+    long long k = 0;
+    std::cin >> n >> k;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::unordered_map<long long, long long> seen;
+    seen[0] = 1;
+    (void)k;
+
+    // running prefix; for each one, how many earlier prefixes were prefix - k
+    std::cout << "0\nRANGE 0\n";
+}
+'''
+solution     = '''
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+
+int main() {
+    int n = 0;
+    long long k = 0;
+    std::cin >> n >> k;
+    std::vector<long long> nums(n);
+    for (long long& v : nums) {
+        std::cin >> v;
+    }
+
+    std::unordered_map<long long, long long> seen;
+    seen[0] = 1;
+
+    long long prefix = 0;
+    long long runs = 0;
+    for (long long value : nums) {
+        prefix += value;
+        auto earlier = seen.find(prefix - k);
+        if (earlier != seen.end()) {
+            runs += earlier->second;
+        }
+        seen[prefix]++;
+    }
+
+    std::cout << runs << '\n';
+    std::cout << "RANGE " << prefix << '\n';
+}
+'''
+hints = [
+  "Look the earlier prefix up before you record the current one, or a run of length zero counts itself when k is 0.",
+  "seen[0] = 1 up front is what lets a run that starts at index 0 be found at all.",
+  "The final prefix is the total, so the second line costs nothing extra.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "5 3\n1 2 3 -3 3\n",  expect = "5\nRANGE 6\n",  visible = true },
+  { name = "zeroes",   stdin = "3 0\n0 0 0\n",       expect = "6\nRANGE 0\n",  visible = false },
+  { name = "none",     stdin = "3 9\n1 1 1\n",       expect = "0\nRANGE 3\n",  visible = false },
+  { name = "negative", stdin = "4 -2\n-1 -1 2 -2\n", expect = "3\nRANGE -2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id           = "cpp.hacker.24.inversions"
+node         = 24
+title        = "THE ONE THE CLOCK CATCHES"
+difficulty   = 5
+time_limit_s = 1500
+story        = "First question of the afternoon round. The naive answer is correct, and it is the wrong answer — and in this language it is fast enough to fool a smaller test."
+concepts     = ["sorting", "complexity", "recursion"]
+requires     = ["cpp.hacker.23.prefix-sums"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief        = '''
+Standard input is two integers, `n` and `seed`. There is no array in the input
+— you build it, with **exactly** this generator, in `std::uint64_t` arithmetic,
+which wraps by definition:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (wrapping)
+    next value = (x >> 33) % 1000000007
+```
+
+Count the **inversions**: pairs `i < j` where `a[i] > a[j]`. Print the count,
+then `MAX <largest value>`.
+
+```
+input:  8 1
+output: 19
+        MAX 908834774
+```
+
+For `8 1` the array is
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`.
+
+**This quest enforces its complexity, and it is the only kind that can.** The
+starter is the `O(n²)` double loop, and in C++ it is a trap with a twist: at
+`-O2`, with no bounds checks in the way, the compiler vectorises it, and at
+`n = 200000` — the size the Rust and Go versions of this interview use — it
+finishes in **1.5 s**, inside the five second run limit. So the C++ hidden
+case is `n = 1000000`. There the double loop is `5 × 10^11` comparisons and
+takes **38 s**. Counting inversions during a merge sort is `O(n log n)` and
+takes **0.05 s**. Measured, on this machine, with these two programs.
+
+Two other things the big case decides for you. The answer for `n = 1000000`
+is `250046540838`, which does not fit in an `int` — an accumulator of the
+wrong width is silently wrong, not slow. And the generator must wrap rather
+than overflow: `std::uint64_t` wraps by definition, a signed `long long`
+would be undefined behaviour, and the compiler would be entitled to do
+anything at all with it.
+'''
+starter      = '''
+#include <cstdint>
+#include <iostream>
+#include <vector>
+
+std::vector<long long> generate(std::size_t n, std::uint64_t seed) {
+    std::uint64_t x = seed;
+    std::vector<long long> values;
+    values.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        values.push_back(static_cast<long long>((x >> 33) % 1000000007ULL));
+    }
+    return values;
+}
+
+int main() {
+    std::size_t n = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> seed;
+
+    std::vector<long long> values = generate(n, seed);
+    long long max = 0;
+    for (long long v : values) {
+        if (v > max) max = v;
+    }
+
+    // correct, and far too slow: this is what the big hidden case rejects
+    long long inversions = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        for (std::size_t j = i + 1; j < n; ++j) {
+            if (values[i] > values[j]) {
+                ++inversions;
+            }
+        }
+    }
+
+    std::cout << inversions << '\n';
+    std::cout << "MAX " << max << '\n';
+}
+'''
+solution     = '''
+#include <cstdint>
+#include <iostream>
+#include <vector>
+
+std::vector<long long> generate(std::size_t n, std::uint64_t seed) {
+    std::uint64_t x = seed;
+    std::vector<long long> values;
+    values.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        values.push_back(static_cast<long long>((x >> 33) % 1000000007ULL));
+    }
+    return values;
+}
+
+// Merge sort over values[lo, hi), returning how many inversions it removed.
+long long sort_count(std::vector<long long>& values, std::vector<long long>& scratch, std::size_t lo, std::size_t hi) {
+    if (hi - lo < 2) {
+        return 0;
+    }
+    std::size_t mid = (lo + hi) / 2;
+    long long inversions = sort_count(values, scratch, lo, mid) + sort_count(values, scratch, mid, hi);
+
+    std::size_t left = lo, right = mid, out = lo;
+    while (left < mid && right < hi) {
+        if (values[left] <= values[right]) {
+            scratch[out++] = values[left++];
+        } else {
+            // values[left, mid) are all greater than values[right]
+            inversions += static_cast<long long>(mid - left);
+            scratch[out++] = values[right++];
+        }
+    }
+    while (left < mid) scratch[out++] = values[left++];
+    while (right < hi) scratch[out++] = values[right++];
+    for (std::size_t i = lo; i < hi; ++i) {
+        values[i] = scratch[i];
+    }
+    return inversions;
+}
+
+int main() {
+    std::size_t n = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> seed;
+
+    std::vector<long long> values = generate(n, seed);
+    long long max = 0;
+    for (long long v : values) {
+        if (v > max) max = v;
+    }
+
+    std::vector<long long> scratch(n);
+    long long inversions = sort_count(values, scratch, 0, n);
+
+    std::cout << inversions << '\n';
+    std::cout << "MAX " << max << '\n';
+}
+'''
+hints = [
+  "Take the max before you sort, or sort a copy. The merge sort reorders the array under you.",
+  "When the right-hand value wins the merge, every remaining element of the left half is greater than it — that is mid - left inversions in one go, and it is the whole trick.",
+  "A Fenwick tree over the compressed values is the other O(n log n) answer and is worth naming in the room; merge sort is less code under a clock.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 1\n",           expect = "19\nMAX 908834774\n",            visible = true },
+  { name = "single", stdin = "1 7\n",           expect = "0\nMAX 59165271\n",              visible = false },
+  { name = "dozen",  stdin = "12 99\n",         expect = "33\nMAX 998275676\n",            visible = false },
+  { name = "big",    stdin = "1000000 12345\n", expect = "250046540838\nMAX 999999258\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id           = "cpp.hacker.25.test-cases"
+node         = 25
+title        = "T TEST CASES FOLLOW"
+difficulty   = 3
+time_limit_s = 900
+story        = "The shape every screen uses, and the bug every candidate writes at least once: the second case remembers the first."
+concepts     = ["io", "collections", "control-flow", "sorting"]
+requires     = ["cpp.hacker.24.inversions"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief        = '''
+Line one is `T`, the number of independent test cases. Each case is a line
+with `n`, then a line with `n` integers — and when `n` is `0` that second line
+is empty.
+
+For each case print the **second largest distinct** value, or `NONE` if there
+are fewer than two distinct values. After all of them print `CASES <T>`.
+
+```
+input:  3
+        5
+        3 1 4 1 5
+        3
+        7 7 7
+        0
+
+output: 4
+        NONE
+        NONE
+        CASES 3
+```
+
+This is the standard competitive-screen wrapper and it fails candidates for
+one reason: state that should have been per-case was declared before the
+loop. Every accumulator, every set, every `best` goes **inside** the `for`.
+
+Read by whitespace token with `>>` rather than by line, and the empty line
+for `n = 0` stops being a special case at all — which is the second thing
+this shape teaches.
+'''
+starter      = '''
+#include <iostream>
+#include <set>
+
+int main() {
+    int cases = 0;
+    std::cin >> cases;
+
+    // declared once, reused for every case — this is the bug
+    std::set<long long> distinct;
+
+    for (int t = 0; t < cases; ++t) {
+        int n = 0;
+        std::cin >> n;
+        for (int i = 0; i < n; ++i) {
+            long long value = 0;
+            std::cin >> value;
+            distinct.insert(value);
+        }
+        if (distinct.size() < 2) {
+            std::cout << "NONE\n";
+        } else {
+            std::cout << *std::next(distinct.rbegin()) << '\n';
+        }
+    }
+    std::cout << "CASES " << cases << '\n';
+}
+'''
+solution     = '''
+#include <iostream>
+#include <set>
+
+int main() {
+    int cases = 0;
+    std::cin >> cases;
+
+    for (int t = 0; t < cases; ++t) {
+        // fresh for every case
+        std::set<long long> distinct;
+
+        int n = 0;
+        std::cin >> n;
+        for (int i = 0; i < n; ++i) {
+            long long value = 0;
+            std::cin >> value;
+            distinct.insert(value);
+        }
+
+        if (distinct.size() < 2) {
+            std::cout << "NONE\n";
+        } else {
+            // rbegin is the largest; one step further back is the second
+            std::cout << *std::next(distinct.rbegin()) << '\n';
+        }
+    }
+    std::cout << "CASES " << cases << '\n';
+}
+'''
+hints = [
+  "Move the set inside the loop. That is the entire fix, and it is the entire quest.",
+  "A std::set is sorted and de-duplicated at once, so *std::next(rbegin()) is the second largest distinct value.",
+  "Guard with size() < 2 first: std::next on a reverse iterator past the end is undefined, and in this land undefined does not mean an error message.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3\n5\n3 1 4 1 5\n3\n7 7 7\n0\n\n",            expect = "4\nNONE\nNONE\nCASES 3\n",      visible = true },
+  { name = "one",     stdin = "1\n2\n10 -10\n",                              expect = "-10\nCASES 1\n",                visible = false },
+  { name = "pairs",   stdin = "2\n1\n5\n4\n2 2 3 3\n",                       expect = "NONE\n2\nCASES 2\n",            visible = false },
+  { name = "leaky",   stdin = "4\n3\n9 8 7\n1\n1\n2\n4 4\n3\n-1 -2 -3\n",    expect = "8\nNONE\nNONE\n-2\nCASES 4\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id           = "cpp.hacker.26.statistics"
+node         = 26
+title        = "SIX DECIMAL PLACES"
+difficulty   = 3
+time_limit_s = 900
+story        = "They want the numbers rounded the way the spec says, not the way your language happens to print them."
+concepts     = ["math", "sorting", "types"]
+requires     = ["cpp.hacker.25.test-cases"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+Print three lines, each to **six decimal places**: the mean, the **population**
+standard deviation (divide by `n`, not `n - 1`), and the median — which for an
+even `n` is the average of the two middle values.
+
+```
+input:  5
+        2 4 4 4 5
+output: 3.800000
+        0.979796
+        4.000000
+```
+
+This quest is judged with `match = "float:1e-6"`, so the comparison is
+numeric: `3.8` and `3.800000` both pass, and a value that is off by `1e-7`
+passes too. That is deliberate — the point is not your formatter, it is that
+`sum / n` in integer arithmetic gives `3`, and that the even-length median is
+a boundary people get wrong under a clock.
+
+`std::cout << std::fixed << std::setprecision(6)` from `<iomanip>` is the
+formatter; `printf("%.6f")` is the other one and is just as correct.
+Population, not sample. Read the statement twice; on a real screen the
+difference between `/ n` and `/ (n - 1)` is the whole submission.
+'''
+starter      = '''
+#include <algorithm>
+#include <iomanip>
+#include <iostream>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> values(n);
+    for (long long& v : values) {
+        std::cin >> v;
+    }
+
+    // integer division, so the mean is wrong before anything else is
+    long long sum = 0;
+    for (long long v : values) sum += v;
+    long long mean = sum / n;
+    std::sort(values.begin(), values.end());
+
+    std::cout << std::fixed << std::setprecision(6);
+    std::cout << static_cast<double>(mean) << '\n';
+    std::cout << 0.0 << '\n';
+    std::cout << static_cast<double>(values[n / 2]) << '\n';
+}
+'''
+solution     = '''
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
+#include <iostream>
+#include <vector>
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<long long> values(n);
+    for (long long& v : values) {
+        std::cin >> v;
+    }
+
+    double count = static_cast<double>(n);
+    double sum = 0.0;
+    for (long long v : values) sum += static_cast<double>(v);
+    double mean = sum / count;
+
+    double variance = 0.0;
+    for (long long v : values) {
+        double delta = static_cast<double>(v) - mean;
+        variance += delta * delta;
+    }
+    variance /= count;
+
+    std::sort(values.begin(), values.end());
+    int middle = n / 2;
+    double median = n % 2 == 1
+        ? static_cast<double>(values[middle])
+        : (static_cast<double>(values[middle - 1]) + static_cast<double>(values[middle])) / 2.0;
+
+    std::cout << std::fixed << std::setprecision(6);
+    std::cout << mean << '\n';
+    std::cout << std::sqrt(variance) << '\n';
+    std::cout << median << '\n';
+}
+'''
+hints = [
+  "Cast to double before you divide, not after. sum / n on two integers has already thrown the fraction away.",
+  "Population variance is the mean of the squared deviations — divide the sum by n.",
+  "For an even count the median is the average of values[n/2 - 1] and values[n/2], and that subtraction is where the off-by-one lives.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "float:1e-6"
+cases = [
+  { name = "odd",    stdin = "5\n2 4 4 4 5\n", expect = "3.800000\n0.979796\n4.000000\n", visible = true },
+  { name = "even",   stdin = "4\n1 2 3 4\n",   expect = "2.500000\n1.118034\n2.500000\n", visible = false },
+  { name = "single", stdin = "1\n7\n",         expect = "7.000000\n0.000000\n7.000000\n", visible = false },
+  { name = "signed", stdin = "2\n-3 3\n",      expect = "0.000000\n3.000000\n0.000000\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id           = "cpp.hacker.27.commands"
+node         = 27
+title        = "THE INPUT IS THE PROBLEM"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The till log comes off the machine wrapped at eighty columns, and the count at the top is a count of commands, not of words."
+concepts     = ["io", "stacks-queues", "control-flow"]
+requires     = ["cpp.hacker.26.statistics"]
+map          = { x = 0.199, y = 0.742, kind = "quest" }
+brief        = '''
+Line one is `k`, the number of **commands** that follow. The commands are
+whitespace-separated tokens packed across the remaining lines however they
+happened to wrap — any number per line, any amount of spacing, possibly a
+trailing blank line.
+
+| command | tokens | effect |
+| --- | --- | --- |
+| `ADD <cents>` | two | push an item |
+| `VOID` | one | remove the last item, or do nothing if there is none |
+| `TOTAL` | one | print the current sum |
+| `CLEAR` | one | remove everything |
+
+After the `k` commands, print `COMMANDS <k>` and `ITEMS <how many are left>`.
+
+```
+input:  5
+        ADD 600 ADD 2800 TOTAL VOID TOTAL
+output: 3400
+        600
+        COMMANDS 5
+        ITEMS 1
+```
+
+`k` counts commands, and `ADD` is one command made of two tokens — so a loop
+that runs `k` times and reads one token per turn stops in the wrong place.
+Read `k` commands, pulling the argument only when the command has one.
+
+`VOID` on an empty till and `TOTAL` before anything was added both have to
+work. There is no line in the statement saying they cannot happen, and on a
+real screen that silence is the specification. `pop_back()` on an empty
+`std::vector` is undefined behaviour — not an exception, not a no-op — so
+the guard is yours to write.
+'''
+starter      = '''
+#include <iostream>
+#include <string>
+#include <vector>
+
+int main() {
+    int commands = 0;
+    std::cin >> commands;
+
+    std::vector<long long> items;
+
+    // one token per command — which is wrong for ADD
+    for (int i = 0; i < commands; ++i) {
+        std::string token;
+        std::cin >> token;
+        if (token == "TOTAL") {
+            long long sum = 0;
+            for (long long v : items) sum += v;
+            std::cout << sum << '\n';
+        }
+    }
+
+    std::cout << "COMMANDS " << commands << '\n';
+    std::cout << "ITEMS " << items.size() << '\n';
+}
+'''
+solution     = '''
+#include <iostream>
+#include <string>
+#include <vector>
+
+int main() {
+    int commands = 0;
+    std::cin >> commands;
+
+    std::vector<long long> items;
+
+    for (int i = 0; i < commands; ++i) {
+        std::string command;
+        std::cin >> command;
+        if (command == "ADD") {
+            // the argument is a second token of the same command
+            long long cents = 0;
+            std::cin >> cents;
+            items.push_back(cents);
+        } else if (command == "VOID") {
+            if (!items.empty()) {
+                items.pop_back();
+            }
+        } else if (command == "TOTAL") {
+            long long sum = 0;
+            for (long long v : items) sum += v;
+            std::cout << sum << '\n';
+        } else if (command == "CLEAR") {
+            items.clear();
+        }
+    }
+
+    std::cout << "COMMANDS " << commands << '\n';
+    std::cout << "ITEMS " << items.size() << '\n';
+}
+'''
+hints = [
+  "operator>> skips every run of spaces, tabs and newlines, so the wrapping in the file stops mattering the moment you stop reading lines.",
+  "Pull the ADD argument inside the ADD branch, from the same stream. The loop counter counts commands, not tokens.",
+  "Guard the pop_back with empty(). On an empty vector it is undefined behaviour, and the one time it appears to work is the one time it is not being tested.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\nADD 600 ADD 2800 TOTAL VOID TOTAL\n",              expect = "3400\n600\nCOMMANDS 5\nITEMS 1\n", visible = true },
+  { name = "ragged", stdin = "6\nADD 100\n  ADD 200   TOTAL\nVOID\n\nVOID TOTAL\n", expect = "300\n0\nCOMMANDS 6\nITEMS 0\n",    visible = false },
+  { name = "empty",  stdin = "3\nVOID TOTAL VOID\n",                                expect = "0\nCOMMANDS 3\nITEMS 0\n",         visible = false },
+  { name = "clear",  stdin = "6\nADD 1 ADD 2 TOTAL CLEAR TOTAL ADD 9\n",            expect = "3\n0\nCOMMANDS 6\nITEMS 1\n",      visible = false },
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id           = "cpp.hacker.29.dijkstra"
+node         = 28
+title        = "NOT EVERY STREET IS THE SAME LENGTH"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Every map you have cleared so far counted hops. The tram does not care how many stops there are; it cares how long they take."
+concepts     = ["graphs", "heaps", "complexity"]
+requires     = ["cpp.hacker.27.commands"]
+map          = { x = 0.114, y = 0.663, kind = "quest" }
+brief        = '''
+Standard input is `n m seed`: `n` stops, `m` undirected weighted edges. Build
+the graph yourself, with **exactly** this generator, in `std::uint64_t`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for i in 1..n:                  # a spanning tree first, so it is connected
+    p = next() % i
+    w = next() % 1000 + 1
+    edge (p, i, w)
+for the remaining m - (n-1) edges:
+    a = next() % n
+    b = next() % n
+    w = next() % 1000 + 1
+    edge (a, b, w)
+```
+
+Print the sum of the shortest distances from stop `0` to every reachable stop
+(including `0` itself, which is `0`), then `MAX <the largest of them>`.
+
+```
+input:  6 8 1
+output: 4594
+        MAX 1582
+```
+
+**The complexity here is enforced.** The hidden case is `n = 200000`,
+`m = 400000` — twice the size the Rust and Go interviews use, because C++
+runs the wrong answer fast enough that at `n = 100000` it lands on the five
+second line and would pass or fail by the weather. Dijkstra is the right
+algorithm either way; what the clock decides is the priority queue. Scanning
+every unvisited node for the minimum is `O(V²)`, and at `n = 200000` it takes
+**35 s** against a five second run limit. A binary heap makes it
+`O((V + E) log V)` and finishes in **0.09 s**. Both measured on this machine,
+with the two programs that ship in this quest: the starter is the scanning
+version.
+
+Worth seeing clearly, because it is the most common way to fail a timed
+screen: **the starter is not wrong.** It prints exactly the right answer. It
+is rejected only for arriving seven times too late.
+
+`std::priority_queue` is a max-heap, so declare it with `std::greater` over a
+`(distance, node)` pair. It has no decrease-key, and you do not need one: push
+the improved distance as a new entry and skip any entry you pop whose distance
+is already worse than the one you have recorded. That "stale entry" skip is
+the line people forget, and without it the heap grows without bound.
+'''
+starter      = '''
+#include <cstdint>
+#include <iostream>
+#include <limits>
+#include <utility>
+#include <vector>
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+using Graph = std::vector<std::vector<std::pair<std::size_t, long long>>>;
+
+Graph build(std::size_t n, std::size_t m, std::uint64_t seed) {
+    Rng rng{seed};
+    Graph graph(n);
+    for (std::size_t i = 1; i < n; ++i) {
+        std::size_t p = rng.next() % i;
+        long long w = static_cast<long long>(rng.next() % 1000 + 1);
+        graph[p].emplace_back(i, w);
+        graph[i].emplace_back(p, w);
+    }
+    for (std::size_t e = n - 1; e < m; ++e) {
+        std::size_t a = rng.next() % n;
+        std::size_t b = rng.next() % n;
+        long long w = static_cast<long long>(rng.next() % 1000 + 1);
+        graph[a].emplace_back(b, w);
+        graph[b].emplace_back(a, w);
+    }
+    return graph;
+}
+
+int main() {
+    std::size_t n = 0;
+    std::size_t m = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> m >> seed;
+
+    const long long INF = std::numeric_limits<long long>::max();
+    Graph graph = build(n, m, seed);
+    std::vector<long long> dist(n, INF);
+    std::vector<bool> done(n, false);
+    dist[0] = 0;
+
+    // correct, and far too slow: the minimum is found by scanning every node
+    for (std::size_t round = 0; round < n; ++round) {
+        std::size_t best = n;
+        long long best_dist = INF;
+        for (std::size_t u = 0; u < n; ++u) {
+            if (!done[u] && dist[u] < best_dist) {
+                best_dist = dist[u];
+                best = u;
+            }
+        }
+        if (best == n) {
+            break;
+        }
+        done[best] = true;
+        for (const auto& [v, w] : graph[best]) {
+            if (best_dist + w < dist[v]) {
+                dist[v] = best_dist + w;
+            }
+        }
+    }
+
+    long long sum = 0;
+    long long max = 0;
+    for (long long d : dist) {
+        if (d < INF) {
+            sum += d;
+            if (d > max) max = d;
+        }
+    }
+    std::cout << sum << '\n';
+    std::cout << "MAX " << max << '\n';
+}
+'''
+solution     = '''
+#include <cstdint>
+#include <functional>
+#include <iostream>
+#include <limits>
+#include <queue>
+#include <utility>
+#include <vector>
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+using Graph = std::vector<std::vector<std::pair<std::size_t, long long>>>;
+
+Graph build(std::size_t n, std::size_t m, std::uint64_t seed) {
+    Rng rng{seed};
+    Graph graph(n);
+    for (std::size_t i = 1; i < n; ++i) {
+        std::size_t p = rng.next() % i;
+        long long w = static_cast<long long>(rng.next() % 1000 + 1);
+        graph[p].emplace_back(i, w);
+        graph[i].emplace_back(p, w);
+    }
+    for (std::size_t e = n - 1; e < m; ++e) {
+        std::size_t a = rng.next() % n;
+        std::size_t b = rng.next() % n;
+        long long w = static_cast<long long>(rng.next() % 1000 + 1);
+        graph[a].emplace_back(b, w);
+        graph[b].emplace_back(a, w);
+    }
+    return graph;
+}
+
+int main() {
+    std::size_t n = 0;
+    std::size_t m = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> m >> seed;
+
+    const long long INF = std::numeric_limits<long long>::max();
+    Graph graph = build(n, m, seed);
+    std::vector<long long> dist(n, INF);
+    dist[0] = 0;
+
+    // (distance, node), smallest distance on top
+    using Entry = std::pair<long long, std::size_t>;
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> heap;
+    heap.emplace(0, 0);
+    while (!heap.empty()) {
+        auto [d, u] = heap.top();
+        heap.pop();
+        // a stale entry: we already found a shorter way to u
+        if (d > dist[u]) {
+            continue;
+        }
+        for (const auto& [v, w] : graph[u]) {
+            if (d + w < dist[v]) {
+                dist[v] = d + w;
+                heap.emplace(dist[v], v);
+            }
+        }
+    }
+
+    long long sum = 0;
+    long long max = 0;
+    for (long long d : dist) {
+        if (d < INF) {
+            sum += d;
+            if (d > max) max = d;
+        }
+    }
+    std::cout << sum << '\n';
+    std::cout << "MAX " << max << '\n';
+}
+'''
+hints = [
+  "std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> with Entry = pair<distance, node>: the pair orders by distance first, and greater turns the max-heap over.",
+  "if (d > dist[u]) continue; is the stale-entry skip. Without it the algorithm is still correct and the heap fills with obsolete entries.",
+  "The spanning-tree half of the generator guarantees every node is reachable, so the filter on INF never actually removes anything — keep it anyway, because the version of this question with an unreachable node is the follow-up.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "6 8 1\n",           expect = "4594\nMAX 1582\n",      visible = true },
+  { name = "pair",   stdin = "2 1 5\n",           expect = "774\nMAX 774\n",        visible = false },
+  { name = "ten",    stdin = "10 12 3\n",         expect = "12277\nMAX 2237\n",     visible = false },
+  { name = "big",    stdin = "200000 400000 7\n", expect = "515848012\nMAX 5153\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id           = "cpp.hacker.30.range-queries"
+node         = 29
+title        = "TOTALS THAT KEEP CHANGING"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Four million till operations from one day across the whole chain, half of them corrections, and somebody wants the running totals."
+concepts     = ["prefix-sums", "complexity", "collections"]
+requires     = ["cpp.hacker.29.dijkstra"]
+map          = { x = 0.059, y = 0.950, kind = "quest" }
+brief        = '''
+Standard input is `n q seed`. Build an array of `n` values and then run `q`
+operations, all from the same generator, in `std::uint64_t`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+values[i] = next() % 1000            for i in 0..n
+
+for each of the q operations:
+    a = next(); b = next(); c = next()
+    if a % 2 == 0:   UPDATE  values[b % n] += (c % 1000) + 1
+    else:            QUERY   l = b % n, r = c % n, swap them if l > r,
+                             and add sum(values[l..=r]) to a running total
+```
+
+Print the running total of every query answer, then `UPDATES <k>`.
+
+```
+input:  8 6 1
+output: 4112
+        UPDATES 3
+```
+
+**The complexity here is enforced, and it took some doing.** The naive answer
+— loop over the range for every query — is `O(n)` per query, and the compiler
+vectorises it into something startlingly fast. Small cases will not catch it.
+So the big hidden case is `n = 500000, q = 4000000`, where the naive answer
+touches on the order of `10^11` elements and does not finish in the five
+second run limit, while a Fenwick tree does the whole thing in well under a
+second. Both measured, with the two programs in this quest.
+
+The lesson is the one an interviewer is fishing for: *point update, range sum*
+is the exact shape a Fenwick tree exists for. Three short functions — add,
+prefix, and range as the difference of two prefixes — and `i & -i` is how you
+step by the lowest set bit. Keep the index signed for that expression; on an
+unsigned type `-i` is a wrap, which happens to give the same bits and is not
+the thing to have to explain in the room.
+'''
+starter      = '''
+#include <cstdint>
+#include <iostream>
+#include <utility>
+#include <vector>
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+int main() {
+    std::size_t n = 0;
+    std::size_t q = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> q >> seed;
+
+    Rng rng{seed};
+    std::vector<long long> values(n);
+    for (long long& v : values) {
+        v = static_cast<long long>(rng.next() % 1000);
+    }
+
+    long long total = 0;
+    std::size_t updates = 0;
+    for (std::size_t k = 0; k < q; ++k) {
+        std::uint64_t a = rng.next();
+        std::uint64_t b = rng.next();
+        std::uint64_t c = rng.next();
+        if (a % 2 == 0) {
+            values[b % n] += static_cast<long long>(c % 1000 + 1);
+            ++updates;
+        } else {
+            std::size_t l = b % n;
+            std::size_t r = c % n;
+            if (l > r) std::swap(l, r);
+            // correct, and far too slow at four million operations
+            for (std::size_t i = l; i <= r; ++i) {
+                total += values[i];
+            }
+        }
+    }
+
+    std::cout << total << '\n';
+    std::cout << "UPDATES " << updates << '\n';
+}
+'''
+solution     = '''
+#include <cstdint>
+#include <iostream>
+#include <utility>
+#include <vector>
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+// Fenwick tree, 1-based internally. add and prefix are both O(log n).
+class Fenwick {
+public:
+    explicit Fenwick(std::size_t n) : tree_(n + 1, 0) {}
+
+    void add(std::size_t index, long long delta) {
+        for (long long i = static_cast<long long>(index) + 1; i < static_cast<long long>(tree_.size()); i += i & -i) {
+            tree_[i] += delta;  // step up by the lowest set bit
+        }
+    }
+
+    long long prefix(std::size_t upto) const {
+        long long sum = 0;
+        for (long long i = static_cast<long long>(upto); i > 0; i -= i & -i) {
+            sum += tree_[i];
+        }
+        return sum;
+    }
+
+    long long range(std::size_t l, std::size_t r) const {
+        return prefix(r + 1) - prefix(l);
+    }
+
+private:
+    std::vector<long long> tree_;
+};
+
+int main() {
+    std::size_t n = 0;
+    std::size_t q = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> q >> seed;
+
+    Rng rng{seed};
+    Fenwick fenwick(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        fenwick.add(i, static_cast<long long>(rng.next() % 1000));
+    }
+
+    long long total = 0;
+    std::size_t updates = 0;
+    for (std::size_t k = 0; k < q; ++k) {
+        std::uint64_t a = rng.next();
+        std::uint64_t b = rng.next();
+        std::uint64_t c = rng.next();
+        if (a % 2 == 0) {
+            fenwick.add(b % n, static_cast<long long>(c % 1000 + 1));
+            ++updates;
+        } else {
+            std::size_t l = b % n;
+            std::size_t r = c % n;
+            if (l > r) std::swap(l, r);
+            total += fenwick.range(l, r);
+        }
+    }
+
+    std::cout << total << '\n';
+    std::cout << "UPDATES " << updates << '\n';
+}
+'''
+hints = [
+  "Build the tree by calling add once per initial value. The O(n) bottom-up build is a nice optimisation and is not what the clock is testing.",
+  "i & -i isolates the lowest set bit. Adding it walks up the tree; subtracting it walks down.",
+  "range(l, r) is prefix(r + 1) - prefix(l), and getting that pair of off-by-ones right is most of the debugging.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 6 1\n",            expect = "4112\nUPDATES 3\n",                 visible = true },
+  { name = "no-ups", stdin = "5 4 9\n",            expect = "4458\nUPDATES 0\n",                 visible = false },
+  { name = "mid",    stdin = "1000 2000 3\n",      expect = "249603264\nUPDATES 987\n",          visible = false },
+  { name = "big",    stdin = "500000 4000000 7\n", expect = "500026173039045\nUPDATES 2001469\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id           = "cpp.hacker.31.palindrome"
+node         = 30
+title        = "THE SAME BACKWARDS"
+difficulty   = 4
+time_limit_s = 1200
+story        = "Top-twenty question, asked in some form in most screens, and the one most people have written once and never understood."
+concepts     = ["strings", "two-pointers", "complexity"]
+requires     = ["cpp.hacker.30.range-queries"]
+map          = { x = 0.260, y = 0.857, kind = "quest" }
+brief        = '''
+Standard input is `n alphabet seed`. Build the string yourself:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+s[i] = 'a' + (next() % alphabet)      for i in 0..n
+```
+
+Print the length of the longest palindromic substring, then `AT <index>` — the
+0-based start of the **leftmost** one of that length.
+
+```
+input:  12 3 5
+output: 5
+        AT 1
+```
+
+Expand around each centre. There are `2n - 1` centres, not `n`: every
+character is a centre for the odd-length palindromes, and every gap between
+two characters is a centre for the even-length ones. Forgetting the gaps is
+why a correct-looking solution returns `1` on `abba`, and it is what the
+starter does.
+
+**What the tests do and do not enforce**, plainly. The hidden case that does
+the work is `n = 20000` over a **one**-letter alphabet. It is the worst case
+for expand-around-centre — every centre runs to the end of the string — so the
+right answer does its full `O(n²)` there and still finishes in a few
+hundredths of a second. It is also what rejects
+check-every-substring-and-test-each-one, which is cubic and does not come
+back inside five seconds.
+
+The other big case, `n = 20000` over a two-letter alphabet, is a **correctness**
+case and not a speed one. On a random binary string the palindrome test fails
+after a character or two, so even the cubic answer clears it. It checks that
+your generator and your leftmost-index tie-break agree with ours at scale.
+
+One honest caveat, because it is the kind of thing an interviewer would press
+on: what the one-letter case rejects is check-*every*-substring. Add a single
+line that skips any substring no longer than the best found so far and the
+same cubic loop passes both big cases — on this input that pruning collapses
+it to `O(n²)`. So the tests reject the naive cubic, not every program that is
+cubic in the worst case.
+
+So: the tests reject cubic and accept quadratic. They do **not** demand
+Manacher's algorithm, which is the `O(n)` answer. Know that it exists and what
+it does, because "and can you do better than quadratic?" is the follow-up this
+question is usually asked to set up.
+'''
+starter      = '''
+#include <cstdint>
+#include <iostream>
+#include <string>
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+int main() {
+    long long n = 0;
+    std::uint64_t alphabet = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> alphabet >> seed;
+
+    Rng rng{seed};
+    std::string s;
+    for (long long i = 0; i < n; ++i) {
+        s.push_back(static_cast<char>('a' + rng.next() % alphabet));
+    }
+
+    // only the odd centres, so every even-length palindrome is invisible
+    long long best_len = 0;
+    long long best_start = 0;
+    for (long long centre = 0; centre < n; ++centre) {
+        long long i = centre;
+        long long j = centre;
+        while (i >= 0 && j < n && s[i] == s[j]) {
+            --i;
+            ++j;
+        }
+        long long len = j - i - 1;
+        if (len > best_len) {
+            best_len = len;
+            best_start = i + 1;
+        }
+    }
+
+    std::cout << best_len << '\n';
+    std::cout << "AT " << best_start << '\n';
+}
+'''
+solution     = '''
+#include <cstdint>
+#include <iostream>
+#include <string>
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+int main() {
+    long long n = 0;
+    std::uint64_t alphabet = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> alphabet >> seed;
+
+    Rng rng{seed};
+    std::string s;
+    for (long long i = 0; i < n; ++i) {
+        s.push_back(static_cast<char>('a' + rng.next() % alphabet));
+    }
+
+    long long best_len = 0;
+    long long best_start = 0;
+    // i and j walk outwards from a centre and stop one step too far each way
+    auto expand = [&](long long i, long long j) {
+        while (i >= 0 && j < n && s[i] == s[j]) {
+            --i;
+            ++j;
+        }
+        long long len = j - i - 1;
+        if (len > best_len) {
+            best_len = len;
+            best_start = i + 1;
+        }
+    };
+
+    for (long long centre = 0; centre < n; ++centre) {
+        expand(centre, centre);      // odd length: one character at the middle
+        expand(centre, centre + 1);  // even length: the gap to the right of it
+    }
+
+    std::cout << best_len << '\n';
+    std::cout << "AT " << best_start << '\n';
+}
+'''
+hints = [
+  "Two calls per centre: (c, c) for odd lengths and (c, c + 1) for even ones. The starter is missing the second.",
+  "When the loop stops, i and j have both moved one past the palindrome — so it starts at i + 1 and its length is j - i - 1.",
+  "Only update on a strictly longer palindrome, and the leftmost of each length is the one you keep, which is what AT is asking for.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "12 3 5\n",    expect = "5\nAT 1\n",         visible = true },
+  { name = "one",     stdin = "1 4 2\n",     expect = "1\nAT 0\n",         visible = false },
+  { name = "random",  stdin = "20000 2 9\n", expect = "41\nAT 2166\n",     visible = false },
+  { name = "all-one", stdin = "20000 1 9\n", expect = "20000\nAT 0\n",     visible = false },
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id           = "cpp.hacker.32.modular"
+node         = 31
+title        = "MODULO ONE BILLION AND SEVEN"
+difficulty   = 5
+time_limit_s = 1500
+story        = "The phrase appears at the bottom of the statement and half the room does not know what it is asking them to do."
+concepts     = ["math", "complexity", "recursion"]
+requires     = ["cpp.hacker.31.palindrome"]
+map          = { x = 0.335, y = 0.936, kind = "quest" }
+brief        = '''
+Standard input is `n q seed`. Generate `q` queries, in `std::uint64_t`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for each of the q queries:
+    a = next() % (n + 1)
+    b = next() % (a + 1)          # so 0 <= b <= a <= n
+```
+
+For each query compute the binomial coefficient `C(a, b)` **modulo
+1000000007**. Print the sum of all `q` answers, itself modulo `1000000007`,
+then `LAST <the final query's answer>`.
+
+```
+input:  10 5 3
+output: 209
+        LAST 1
+```
+
+`C(a, b)` has hundreds of thousands of digits at these sizes, so it is never
+computed and then reduced — every multiplication is reduced as you go. The
+problem is the division: `a! / (b! (a-b)!)` has no meaning in modular
+arithmetic. What replaces it is the **modular inverse**, and because
+`1000000007` is prime, Fermat's little theorem gives it to you:
+`inverse(v) = v^(p-2) mod p`, computed by fast exponentiation in about thirty
+squarings.
+
+So: precompute `factorial[0..=n]` once, and answer each query as
+`f[a] * inv(f[b]) * inv(f[a-b])`.
+
+**The complexity here is enforced.** One hidden case is `n = 200000`,
+`q = 200000`. Computing each coefficient independently — multiply `b` terms,
+divide by `b` terms, one modular inverse each — does not finish in the five
+second run limit; that is the starter. One shared factorial table finishes in
+well under a second. Both measured on this machine.
+
+Every intermediate is a product of two values below `2^30`, so it fits in a
+`long long` and nothing overflows. With `int` it would not — `int` is 32 bits
+here — and that is the other half of why this question gets asked.
+'''
+starter      = '''
+#include <cstdint>
+#include <iostream>
+
+const long long P = 1000000007LL;
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+long long power(long long base, long long exp) {
+    long long result = 1;
+    base %= P;
+    while (exp > 0) {
+        if (exp & 1) result = result * base % P;
+        base = base * base % P;
+        exp >>= 1;
+    }
+    return result;
+}
+
+int main() {
+    std::uint64_t n = 0;
+    std::uint64_t q = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> q >> seed;
+
+    Rng rng{seed};
+    long long sum = 0;
+    long long last = 0;
+    for (std::uint64_t k = 0; k < q; ++k) {
+        std::uint64_t a = rng.next() % (n + 1);
+        std::uint64_t b = rng.next() % (a + 1);
+
+        // correct, and far too slow: b multiplications and a modular inverse
+        // for every single query
+        long long numerator = 1;
+        long long denominator = 1;
+        for (std::uint64_t i = 0; i < b; ++i) {
+            numerator = numerator * (static_cast<long long>(a - i) % P) % P;
+            denominator = denominator * (static_cast<long long>(i + 1) % P) % P;
+        }
+        long long value = numerator * power(denominator, P - 2) % P;
+
+        sum = (sum + value) % P;
+        last = value;
+    }
+
+    std::cout << sum << '\n';
+    std::cout << "LAST " << last << '\n';
+}
+'''
+solution     = '''
+#include <cstdint>
+#include <iostream>
+#include <vector>
+
+const long long P = 1000000007LL;
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+// base^exp mod P, by repeated squaring: about 30 steps for a 30-bit exponent.
+long long power(long long base, long long exp) {
+    long long result = 1;
+    base %= P;
+    while (exp > 0) {
+        if (exp & 1) result = result * base % P;
+        base = base * base % P;
+        exp >>= 1;
+    }
+    return result;
+}
+
+// P is prime, so Fermat gives v^(P-2) as the inverse of v.
+long long inverse(long long v) {
+    return power(v, P - 2);
+}
+
+int main() {
+    std::uint64_t n = 0;
+    std::uint64_t q = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> q >> seed;
+
+    // one shared factorial table for every query
+    std::vector<long long> factorial(n + 1, 1);
+    for (std::uint64_t i = 1; i <= n; ++i) {
+        factorial[i] = factorial[i - 1] * static_cast<long long>(i) % P;
+    }
+
+    Rng rng{seed};
+    long long sum = 0;
+    long long last = 0;
+    for (std::uint64_t k = 0; k < q; ++k) {
+        std::uint64_t a = rng.next() % (n + 1);
+        std::uint64_t b = rng.next() % (a + 1);
+
+        long long value = factorial[a] * inverse(factorial[b]) % P * inverse(factorial[a - b]) % P;
+
+        sum = (sum + value) % P;
+        last = value;
+    }
+
+    std::cout << sum << '\n';
+    std::cout << "LAST " << last << '\n';
+}
+'''
+hints = [
+  "Reduce after every multiplication, never at the end. long long holds the product of two values below P; it does not hold a factorial.",
+  "inverse(v) is power(v, P - 2), and it only works because P is prime — that is the whole content of Fermat's little theorem here.",
+  "Precomputing inverse factorials as well, backwards from inverse(factorial[n]), removes the two power() calls per query. Not needed to pass, and worth saying out loud.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5 3\n",           expect = "209\nLAST 1\n",                 visible = true },
+  { name = "tiny",   stdin = "1 1 1\n",            expect = "1\nLAST 1\n",                   visible = false },
+  { name = "mid",    stdin = "100 50 4\n",         expect = "707023692\nLAST 689856059\n",   visible = false },
+  { name = "big",    stdin = "200000 200000 11\n", expect = "390914381\nLAST 201898882\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id           = "cpp.hacker.33.grid-paths"
+node         = 32
+title        = "ACROSS THE BLOCK, NEVER BACKWARDS"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The delivery grid with three streets closed for bamboo. How many ways across, and which way is cheapest."
+concepts     = ["dynamic-programming", "matrix", "math"]
+requires     = ["cpp.hacker.32.modular"]
+map          = { x = 0.538, y = 0.857, kind = "quest" }
+brief        = '''
+Standard input is `r c pct seed`. Build the grid yourself, in row-major order,
+drawing **two** values for every cell:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for i in 0..r, for j in 0..c:
+    a = next(); b = next()
+    the cell is BLOCKED if  a % 100 < pct,
+        except (0,0) and (r-1,c-1), which are never blocked
+    the cell costs  (b % 9) + 1
+```
+
+Move only **right** or **down**, through open cells. Print:
+
+1. `PATHS <k>` — how many distinct routes from `(0,0)` to `(r-1,c-1)`, modulo
+   `1000000007`
+2. `MIN <cost>` — the smallest total cost of a route, counting both endpoints,
+   or `-1` if there is no route
+
+```
+input:  3 4 30 2
+output: PATHS 9
+        MIN 27
+```
+
+One pass in row-major order does both: a cell's routes are the sum of the
+routes into it from above and from the left, and its best cost is its own cost
+plus the cheaper of those two. Because you only ever move right or down, the
+two cells you need are always already finished — which is why this needs no
+recursion and no visited set.
+
+The `PATHS` count is taken modulo `1000000007` for the usual reason: on the
+`1000 × 1000` hidden case the true number has over six hundred digits. Reduce
+as you add.
+
+**What the big case enforces:** it rejects any answer that enumerates routes.
+There are more of them than there are atoms in the room. It does not
+distinguish a bottom-up table from a memoised recursion — both are linear in
+the number of cells and both pass comfortably.
+'''
+starter      = '''
+#include <cstdint>
+#include <iostream>
+#include <limits>
+#include <vector>
+
+const long long P = 1000000007LL;
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+int main() {
+    std::size_t rows = 0;
+    std::size_t cols = 0;
+    std::uint64_t pct = 0;
+    std::uint64_t seed = 0;
+    std::cin >> rows >> cols >> pct >> seed;
+
+    Rng rng{seed};
+    std::vector<std::vector<bool>> open(rows, std::vector<bool>(cols, true));
+    std::vector<std::vector<long long>> cost(rows, std::vector<long long>(cols, 0));
+    for (std::size_t i = 0; i < rows; ++i) {
+        for (std::size_t j = 0; j < cols; ++j) {
+            std::uint64_t a = rng.next();
+            std::uint64_t b = rng.next();
+            bool corner = (i == 0 && j == 0) || (i == rows - 1 && j == cols - 1);
+            if (!corner && a % 100 < pct) {
+                open[i][j] = false;
+            }
+            cost[i][j] = static_cast<long long>(b % 9 + 1);
+        }
+    }
+
+    // fill `ways` and `best` in row-major order
+    const long long INF = std::numeric_limits<long long>::max();
+    std::vector<std::vector<long long>> ways(rows, std::vector<long long>(cols, 0));
+    std::vector<std::vector<long long>> best(rows, std::vector<long long>(cols, INF));
+    (void)ways;
+    (void)best;
+    (void)P;
+
+    std::cout << "PATHS 0\n";
+    std::cout << "MIN -1\n";
+}
+'''
+solution     = '''
+#include <algorithm>
+#include <cstdint>
+#include <iostream>
+#include <limits>
+#include <vector>
+
+const long long P = 1000000007LL;
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+int main() {
+    std::size_t rows = 0;
+    std::size_t cols = 0;
+    std::uint64_t pct = 0;
+    std::uint64_t seed = 0;
+    std::cin >> rows >> cols >> pct >> seed;
+
+    Rng rng{seed};
+    std::vector<std::vector<bool>> open(rows, std::vector<bool>(cols, true));
+    std::vector<std::vector<long long>> cost(rows, std::vector<long long>(cols, 0));
+    for (std::size_t i = 0; i < rows; ++i) {
+        for (std::size_t j = 0; j < cols; ++j) {
+            std::uint64_t a = rng.next();
+            std::uint64_t b = rng.next();
+            bool corner = (i == 0 && j == 0) || (i == rows - 1 && j == cols - 1);
+            if (!corner && a % 100 < pct) {
+                open[i][j] = false;
+            }
+            cost[i][j] = static_cast<long long>(b % 9 + 1);
+        }
+    }
+
+    const long long INF = std::numeric_limits<long long>::max();
+    std::vector<std::vector<long long>> ways(rows, std::vector<long long>(cols, 0));
+    std::vector<std::vector<long long>> best(rows, std::vector<long long>(cols, INF));
+
+    for (std::size_t i = 0; i < rows; ++i) {
+        for (std::size_t j = 0; j < cols; ++j) {
+            if (!open[i][j]) {
+                continue;
+            }
+            if (i == 0 && j == 0) {
+                ways[0][0] = 1;
+                best[0][0] = cost[0][0];
+                continue;
+            }
+            long long routes = 0;
+            long long cheapest = INF;
+            if (i > 0 && open[i - 1][j]) {
+                routes = (routes + ways[i - 1][j]) % P;
+                cheapest = std::min(cheapest, best[i - 1][j]);
+            }
+            if (j > 0 && open[i][j - 1]) {
+                routes = (routes + ways[i][j - 1]) % P;
+                cheapest = std::min(cheapest, best[i][j - 1]);
+            }
+            ways[i][j] = routes;
+            // INF + cost would overflow, which is undefined: guard it
+            best[i][j] = cheapest == INF ? INF : cheapest + cost[i][j];
+        }
+    }
+
+    std::cout << "PATHS " << ways[rows - 1][cols - 1] << '\n';
+    long long answer = best[rows - 1][cols - 1];
+    std::cout << "MIN " << (answer == INF ? -1 : answer) << '\n';
+}
+'''
+hints = [
+  "Draw both values for every cell, including the two corners — the generator does not skip them, it only refuses to block them.",
+  "An open cell with no open neighbour above or left is reachable by zero routes and has no best cost; keep INF meaning unreachable and guard the addition, because INF plus anything is signed overflow.",
+  "The destination can be open and still unreachable, which is exactly when PATHS is 0 and MIN is -1. One of the hidden cases is that.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "3 4 30 2\n",        expect = "PATHS 9\nMIN 27\n",           visible = true },
+  { name = "one-cell", stdin = "1 1 0 1\n",         expect = "PATHS 1\nMIN 4\n",            visible = false },
+  { name = "walled",   stdin = "5 5 60 4\n",        expect = "PATHS 0\nMIN -1\n",           visible = false },
+  { name = "big",      stdin = "1000 1000 20 13\n", expect = "PATHS 442990855\nMIN 6890\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id           = "cpp.hacker.34.stable-sort"
+node         = 33
+title        = "TIES KEEP THEIR PLACE"
+difficulty   = 4
+time_limit_s = 900
+story        = "Two riders finished on the same score and the leaderboard puts them in a different order every time it redraws."
+concepts     = ["sorting", "slices", "complexity"]
+requires     = ["cpp.hacker.33.grid-paths"]
+map          = { x = 0.605, y = 0.932, kind = "quest" }
+brief        = '''
+Standard input is `n buckets seed`. Build `n` riders, where rider `i` has
+index `i` and a score:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+score[i] = next() % buckets           for i in 0..n
+```
+
+Sort the riders by score **descending**. Riders with the same score must keep
+the order they arrived in. Print their indices, space separated, then
+`TIES <k>` — how many adjacent pairs in your sorted order have equal scores.
+
+```
+input:  8 3 5
+output: 1 5 6 0 2 3 4 7
+        TIES 6
+```
+
+`buckets` is small, so almost everything is a tie, and the answer is almost
+entirely decided by what happens to them.
+
+**This is the quest about knowing which sort you are holding.** `std::sort`
+is **not stable** — it makes no promise about the order of equal elements,
+and on a real input it visibly will not keep it: it is an introsort, and its
+partition step swaps equal elements across the pivot as a matter of course.
+`std::stable_sort` is stable, is a merge sort, and costs some memory for the
+promise. The starter uses `std::sort` with a comparator that looks only at
+the score, and the hidden cases are large enough that it demonstrably
+scrambles them. (At `n = 8` the library falls back to an insertion sort and
+happens to keep the order — which is why a small test would have proved
+nothing, and why the small case here is the *visible* one rather than the
+one that judges you.)
+
+There are two correct answers and you should be able to give both. Use
+`std::stable_sort`. **Or** keep `std::sort` and make the comparison
+**total** — score descending, then index ascending — so no two elements ever
+compare equal and stability stops being a question. The second is what to
+reach for by default; an unstable sort has nothing to prove when the order is
+fully specified.
+'''
+starter      = '''
+#include <algorithm>
+#include <cstdint>
+#include <iostream>
+#include <utility>
+#include <vector>
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+int main() {
+    std::size_t n = 0;
+    std::uint64_t buckets = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> buckets >> seed;
+
+    Rng rng{seed};
+    // (score, original index)
+    std::vector<std::pair<long long, std::size_t>> riders;
+    riders.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        riders.emplace_back(static_cast<long long>(rng.next() % buckets), i);
+    }
+
+    // unstable, and the comparison ignores the index — so ties are scrambled
+    std::sort(riders.begin(), riders.end(), [](const auto& a, const auto& b) {
+        return a.first > b.first;
+    });
+
+    std::size_t ties = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        std::cout << (i ? " " : "") << riders[i].second;
+        if (i > 0 && riders[i - 1].first == riders[i].first) {
+            ++ties;
+        }
+    }
+    std::cout << '\n';
+    std::cout << "TIES " << ties << '\n';
+}
+'''
+solution     = '''
+#include <algorithm>
+#include <cstdint>
+#include <iostream>
+#include <utility>
+#include <vector>
+
+struct Rng {
+    std::uint64_t x;
+    std::uint64_t next() {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        return x >> 33;
+    }
+};
+
+int main() {
+    std::size_t n = 0;
+    std::uint64_t buckets = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> buckets >> seed;
+
+    Rng rng{seed};
+    // (score, original index)
+    std::vector<std::pair<long long, std::size_t>> riders;
+    riders.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        riders.emplace_back(static_cast<long long>(rng.next() % buckets), i);
+    }
+
+    // std::stable_sort keeps equal scores in the order they arrived in.
+    // The equally correct alternative keeps std::sort and makes the
+    // comparison total:
+    //     return a.first != b.first ? a.first > b.first : a.second < b.second;
+    std::stable_sort(riders.begin(), riders.end(), [](const auto& a, const auto& b) {
+        return a.first > b.first;
+    });
+
+    std::size_t ties = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        std::cout << (i ? " " : "") << riders[i].second;
+        if (i > 0 && riders[i - 1].first == riders[i].first) {
+            ++ties;
+        }
+    }
+    std::cout << '\n';
+    std::cout << "TIES " << ties << '\n';
+}
+'''
+hints = [
+  "One word: std::sort becomes std::stable_sort. That is the stable answer.",
+  "The other answer keeps std::sort and compares (score descending, then index ascending) — a total order, so there are no ties left to be unstable about.",
+  "TIES counts adjacent equal scores in the finished order, and that count is the same whichever of the two you wrote — it is the index order that gives you away.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 3 5\n",   expect = "1 5 6 0 2 3 4 7\nTIES 6\n", visible = true },
+  { name = "three",  stdin = "3 2 1\n",   expect = "1 0 2\nTIES 1\n",           visible = false },
+  { name = "sixty",  stdin = "60 3 11\n", expect = "2 9 11 12 14 15 16 19 22 23 31 33 36 38 47 48 52 56 57 58 0 1 4 5 6 13 17 18 20 24 27 32 34 35 39 40 42 44 45 46 50 51 53 54 59 3 7 8 10 21 25 26 28 29 30 37 41 43 49 55\nTIES 57\n", visible = false },
+  { name = "many",   stdin = "200 10 4\n", expect = "30 32 45 51 62 71 83 86 87 94 103 118 128 130 142 149 164 170 172 176 180 190 191 194 18 19 20 23 31 38 48 74 91 113 116 129 141 146 148 168 175 187 5 15 17 24 28 50 58 68 88 102 110 124 132 137 188 193 196 198 199 0 9 12 25 26 46 49 52 55 70 75 78 84 97 108 112 134 156 158 163 4 10 21 35 42 73 99 104 106 107 114 120 121 125 131 136 150 160 166 173 174 177 2 8 11 13 16 39 40 41 54 65 72 82 93 95 119 123 143 169 178 179 195 197 7 27 36 47 56 61 64 67 69 76 100 126 140 153 157 161 162 181 1 37 57 60 77 85 92 96 98 105 111 117 133 135 138 159 167 186 192 3 6 14 43 53 59 63 66 80 81 101 109 115 122 127 144 145 151 154 155 165 171 183 189 22 29 33 34 44 79 89 90 139 147 152 182 184 185\nTIES 190\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 34  BOSS
+[[quest]]
+id           = "cpp.hacker.28.lru"
+node         = 34
+title        = "THE LINKER"
+difficulty   = 5
+time_limit_s = 1800
+story        = "Room 7-32, the third interview, last question. A language with no safety net, a shorter clock, and a cache that has to evict the right thing."
+concepts     = ["collections", "linked-lists", "complexity"]
+requires     = ["cpp.hacker.34.stable-sort", "cpp.hacker.24.inversions"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief        = '''
+Line one is `cap q`. The next `q` lines are `PUT <key> <value>` or
+`GET <key>`.
+
+Implement a fixed-capacity cache that evicts the **least recently used** entry
+when it is full. A `GET` and a `PUT` both count as using a key.
+
+For each `GET` print the value, or `-1` if it is not there. At the end print
+the surviving keys, most-recently-used first, space separated — or `-` if the
+cache is empty — and then `EVICTED <k>`.
+
+```
+input:  2 6
+        PUT 1 10
+        PUT 2 20
+        GET 1
+        PUT 3 30
+        GET 2
+        GET 3
+output: 10
+        -1
+        30
+        3 1
+        EVICTED 1
+```
+
+Follow the sample through: `GET 1` makes `1` recent again, so when `PUT 3`
+needs room it is `2` that goes. `GET 2` misses. `GET 3` hits and makes `3` the
+most recent, which is why the survivors print as `3 1`.
+
+The textbook answer is a hash map into a **doubly linked list**, and C++ has
+the real thing: `std::list`, whose iterators stay valid when other elements
+are inserted, erased or spliced — the one guarantee `std::vector` cannot
+make, and the whole reason the map can hold a `std::list::iterator` as its
+value. `push_front`, `splice` to the front, `back` and `pop_back` are all
+O(1), so every operation here is O(1) and you can say so without hedging.
+
+Two things to get right that the Rust interview did not ask of you. The list
+node holds the key **as well as** the value, because eviction starts from the
+list and has to know which map entry to erase. And the order of the two
+erases matters: read the key out of `back()` first, erase it from the map,
+*then* `pop_back` — the other way round is a read through an iterator to a
+node that no longer exists, and that is the thing this land has been about
+since the Noon Day Gun.
+
+The cases here are small and the clock is not measuring speed: four operations
+cannot tell a `std::list` apart from a `std::vector` you scan from the front.
+The `O(1)` in the paragraph above is the sentence you say out loud in the
+room, so it has to be true of the code you wrote rather than of the code that
+happened to clear four cases.
+'''
+starter      = '''
+#include <iostream>
+#include <list>
+#include <string>
+#include <unordered_map>
+#include <utility>
+
+int main() {
+    std::size_t capacity = 0;
+    int q = 0;
+    std::cin >> capacity >> q;
+
+    // front is the most recently used; each node is (key, value)
+    std::list<std::pair<long long, long long>> recent;
+    std::unordered_map<long long, std::list<std::pair<long long, long long>>::iterator> where;
+    int evicted = 0;
+
+    for (int i = 0; i < q; ++i) {
+        std::string op;
+        long long key = 0;
+        std::cin >> op >> key;
+        if (op == "GET") {
+            std::cout << "-1\n";
+            continue;
+        }
+        long long value = 0;
+        std::cin >> value;
+    }
+
+    (void)capacity;
+    (void)recent;
+    (void)where;
+    std::cout << "-\n";
+    std::cout << "EVICTED " << evicted << '\n';
+}
+'''
+solution     = '''
+#include <iostream>
+#include <list>
+#include <string>
+#include <unordered_map>
+#include <utility>
+
+int main() {
+    std::size_t capacity = 0;
+    int q = 0;
+    std::cin >> capacity >> q;
+
+    // front is the most recently used; each node is (key, value)
+    using Node = std::pair<long long, long long>;
+    std::list<Node> recent;
+    std::unordered_map<long long, std::list<Node>::iterator> where;
+    int evicted = 0;
+
+    for (int i = 0; i < q; ++i) {
+        std::string op;
+        long long key = 0;
+        std::cin >> op >> key;
+
+        if (op == "GET") {
+            auto hit = where.find(key);
+            if (hit == where.end()) {
+                std::cout << "-1\n";
+                continue;
+            }
+            // move the node to the front without invalidating its iterator
+            recent.splice(recent.begin(), recent, hit->second);
+            std::cout << hit->second->second << '\n';
+            continue;
+        }
+
+        long long value = 0;
+        std::cin >> value;
+
+        auto hit = where.find(key);
+        if (hit != where.end()) {
+            hit->second->second = value;
+            recent.splice(recent.begin(), recent, hit->second);
+            continue;
+        }
+        if (recent.size() == capacity) {
+            // read the key before the node is gone, then erase in that order
+            long long oldest = recent.back().first;
+            where.erase(oldest);
+            recent.pop_back();
+            ++evicted;
+        }
+        recent.emplace_front(key, value);
+        where[key] = recent.begin();
+    }
+
+    if (recent.empty()) {
+        std::cout << "-\n";
+    } else {
+        bool first = true;
+        for (const Node& node : recent) {
+            std::cout << (first ? "" : " ") << node.first;
+            first = false;
+        }
+        std::cout << '\n';
+    }
+    std::cout << "EVICTED " << evicted << '\n';
+}
+'''
+hints = [
+  "recent.splice(recent.begin(), recent, it) moves the node it points at to the front, in O(1), and it still points at the same node afterwards. That is the operation the whole design rests on.",
+  "Overwriting a key that is already present is not an eviction — check the map before you decide the cache is full.",
+  "Eviction: take back().first, erase that key from the map, then pop_back. After pop_back the iterator the map held is dangling, so the map entry has to go first.",
+  "Walking the list front to back is already most-recent-first, so the last line needs no sort.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "2 6\nPUT 1 10\nPUT 2 20\nGET 1\nPUT 3 30\nGET 2\nGET 3\n", expect = "10\n-1\n30\n3 1\nEVICTED 1\n", visible = true },
+  { name = "overwrite", stdin = "1 3\nPUT 5 1\nPUT 5 2\nGET 5\n",                           expect = "2\n5\nEVICTED 0\n",           visible = false },
+  { name = "miss",      stdin = "2 2\nGET 9\nGET 8\n",                                      expect = "-1\n-1\n-\nEVICTED 0\n",      visible = false },
+  { name = "churn",     stdin = "1 4\nPUT 1 1\nPUT 2 2\nPUT 3 3\nGET 1\n",                  expect = "-1\n3\nEVICTED 2\n",          visible = false },
+]

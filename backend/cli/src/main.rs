@@ -327,22 +327,30 @@ fn doctor(home: &Path) -> Result<()> {
         ("rustc", "rustc", ["--version"]),
         ("cargo", "cargo", ["--version"]),
         ("go", "go", ["version"]),
+        ("c++", "c++", ["--version"]),
+        ("python3", "python3", ["--version"]),
+        ("clang-format", "clang-format", ["--version"]),
         ("node", "node", ["--version"]),
     ] {
         match std::process::Command::new(program).args(args).output() {
             Ok(out) if out.status.success() => {
+                // `c++ --version` is several lines; the first is the one
+                // that names the compiler.
                 let text = String::from_utf8_lossy(&out.stdout);
-                println!("{label:<11} {}", text.trim());
+                println!("{label:<11} {}", text.lines().next().unwrap_or("").trim());
             }
             _ => {
-                // Both lands compile and run now, so a missing `go` is half
-                // the map gone; node is the frontend's build and not the
-                // server's problem.
-                let fatal = matches!(label, "rustc" | "cargo" | "go");
-                println!(
-                    "{label:<11} MISSING{}",
-                    if fatal { "  (required)" } else { "" }
-                );
+                // Every land compiles and runs now, so a missing compiler is
+                // a quarter of the map gone; node is the frontend's build and
+                // not the server's problem, and clang-format only takes the
+                // C++ land's format button away.
+                let fatal = matches!(label, "rustc" | "cargo" | "go" | "c++" | "python3");
+                let note = match label {
+                    _ if fatal => "  (required)",
+                    "clang-format" => "  (formatting C++ is off without it)",
+                    _ => "",
+                };
+                println!("{label:<11} MISSING{note}");
                 if fatal {
                     bad += 1;
                 }

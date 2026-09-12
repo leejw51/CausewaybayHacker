@@ -1,0 +1,652 @@
+# PYTHON LAND — BASIC, in Cantonese. A translation pack (SPEC §12.1): the
+# prose of `content/python/basic.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+#
+# Register: colloquial written Cantonese in traditional characters, as
+# `frontend/src/i18n/yue.ts` fixes it; technical nouns are the standard ones.
+
+pack   = "python.basic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.basic.01.six-oclock"
+title = "六點正"
+story = "06:00，寶靈頓道。捲閘扯緊上去，地下已經濕晒，今日第一塊價錢牌仲係空白嘅。"
+brief = '''
+一隻字都唔可以差，印出：
+
+```
+hello, causewaybay
+```
+
+全部細楷，一個逗號，一個空格，一行。其他乜都唔要。
+
+`print` 會自動幫你加換行。佢仲會喺每個參數之間加一個空格，呢樣係大家第一個
+會搞錯嘅地方：`print("hello,", "causewaybay")` 係啱嘅，但係
+`print("hello, ", "causewaybay")` 就會有兩個空格。
+'''
+hints = [
+  "print(\"hello, causewaybay\") 就係成個程式。",
+  "個字串一隻字都唔可以差：細楷，一個逗號，後面一個空格。",
+  "最底嗰句 `main()` 唔好郁佢。冇人叫過嘅 function 乜都唔會印，而個 starter 正正就係咁。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.basic.02.price-board"
+title = "價錢牌"
+story = "豆腐檔塊牌得一個數，本來寫住兩件價同一平方價嗰兩格而家係空嘅。"
+brief = '''
+由標準輸入讀一個整數 `n`。
+
+印三行：`n`，然後 `n` 嘅兩倍，然後 `n` 乘自己。
+
+`n` 可以係負數。佢裝幾大都得，因為 Python 嘅整數係冇闊度限制嘅。
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+
+`input()` 畀你嘅係一個**字串**。`"12" * 2` 係 `"1212"`，而 `"12" * "12"`
+係一個 `TypeError`。要先轉型。
+'''
+hints = [
+  "個 starter 印到第三個 print 就仆街：TypeError, can't multiply sequence by non-int of type 'str'。睇下個訊息；佢話緊你知 n 係乜。",
+  "int(input()) 一讀就轉型。int() 仲會順手幫你剪走頭尾嘅空白。",
+  "負數嘅 n 平方之後係正數。個測試係知嘅。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.basic.03.conversions"
+title = "三個樣，一個名"
+story = "魚檔本簿仔入面，個價錢一時係文字、一時係數字、一時係蚊，三樣嘢都叫做 price。"
+brief = '''
+讀一行：一個以仙為單位嘅金額，全部係數字。
+
+印三行：
+
+1. 剪走頭尾空白之後嘅文字有幾多個字元
+2. 個金額作為一個數字
+3. 個金額以蚊為單位，啱啱好兩個小數位
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+個金額唔會係負數。用**一個名**去做，重新綁定三次 —— `str`，然後 `int`，
+然後再 `str`。Python 容許一個名裝任何嘢、隨時改主意；代價係冇嘢會話你知
+`cents` 而家係乜，淨係可以睇返上面嘅碼。
+
+計蚊嗰行唔好經 `float`。`1234 / 100` 今日係 `12.34`，但係 `0.1 + 0.2`
+日日都係 `0.30000000000000004`。整數除法同餘數可以將兩截啱啱好分開，
+`f"{cents % 100:02d}"` 就幫你補零。
+'''
+hints = [
+  "cents 仲係字串嗰陣 len(cents) 就係第一行。",
+  "cents = int(cents) 唔係就地轉型；係一個新嘅值綁去舊嘅名度。之後個字串就冇咗。",
+  "f-string 入面嘅 :02d 係闊度二、補零、十進制。5 仙係 0.05，唔係 0.5。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.basic.04.control-flow"
+title = "邊條通道"
+story = "街市啲通道號碼油咗喺地下，門口塊牌本來應該話你知每條通道賣乜。佢每次都淨係寫個號碼。"
+brief = '''
+讀一個整數 `n`。由 `1` 到 `n` 嘅每一個 `i`，印一行：
+
+* `FISHVEG` —— 如果 `i` 同時整除到 3 同 5
+* `FISH` —— 如果 `i` 整除到 3
+* `VEG` —— 如果 `i` 整除到 5
+* 否則就印 `i` 本身
+
+然後繼續讀整數，一行一個，讀到 `0` 為止，再印 `SKIPPED <k>`，
+即係途中讀咗幾多行非零嘅數。
+
+```
+input:  5
+        7
+        8
+        0
+output: 1
+        2
+        FISH
+        4
+        VEG
+        SKIPPED 2
+```
+
+兩個循環，兩種款。第一個未開始已經知自己要行幾多次：
+`for i in range(1, n + 1)`。第二個唔知：`while True` 加 `break`，
+因為次數係由讀到乜嘢決定嘅。Python 嘅 `range` 會喺終點**之前**停，
+而 `range(1, n)` 就係人人喺呢度都寫過一次嘅差一錯誤。
+'''
+hints = [
+  "先 check 兩樣都中嗰個情況，唔係佢永遠唔會觸發。3 同 5 都整除到，即係 15 整除到。",
+  "range(1, n) 去到 n - 1 就停。個 starter 就係有呢隻蟲；示例輸出會少咗最尾一行。",
+  "while True 加 break 就係 Python 寫「出口喺中間」嘅循環嘅方法。冇 do-while。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.basic.05.lists"
+title = "條龍嘅中間"
+story = "崇光地庫燒鵝檔排咗四十個人。個櫃檯睇到龍頭同龍尾，中間嗰啲一個都睇唔到。"
+brief = '''
+標準輸入第一行係個數量 `n`，第二行係 `n` 個整數，用空格隔開。
+
+印三行：第一個值、最後一個值，同埋佢哋兩個之間（唔計佢哋本身）所有值嘅總和。
+少過三個值嘅話，個總和係 `0`。
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+`nums[1:-1]` 就係中間：一個 slice，佢係一個**新嘅 list** —— Python 切片
+係會複製嘅，同 Rust 嘅 slice 或者 Go 嘅 sub-slice 唔同。`nums[-1]` 係最後
+一個元素，有負數索引，正正就係你喺 Python 永遠唔會寫
+`nums[len(nums) - 1]` 嘅原因。
+
+淨係得一個值嘅時候，`nums[1:-1]` 係空嘅，`sum` 佢就係 `0`，所以其他語言
+要寫嘅守衛喺呢度係免費嘅。呢樣嘢值得知，亦都值得親自 check 下，唔好靠估。
+'''
+hints = [
+  "nums[-1] 係最後一個元素；nums[-2] 係佢前面嗰個。",
+  "nums[1:-1] 係除咗頭尾之外嘅所有嘢，而一個空嘅 slice 自己加埋就係 0。",
+  "sys.stdin.read().split() 一次過讀晒所有嘢，再按任何空白切開，咁換行喺邊就唔重要喇。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.basic.06.strings"
+title = "位元組唔係字"
+story = "崇光地庫塊指示牌將「銅鑼灣」截到剩三個位元組，印出一個字同一個問號。"
+brief = '''
+讀一行。印三行：
+
+1. 佢以 UTF-8 編碼之後嘅長度，以**位元組**計
+2. 佢嘅長度，以**字元**計
+3. 呢一行嘅字元倒轉
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+呢一行可能有 ASCII 以外嘅字元，咁頭兩個數就唔會一樣。Python 嘅 `str`
+係一串碼位，所以 `len` 係字元數；想要位元組就要自己開口攞，用
+`.encode("utf-8")`，而**嗰個**嘅 `len` 先係另一個數。
+
+`s[::-1]` 可以倒轉一個字串。佢係一個步長為 `-1` 嘅 slice，任何序列都用得。
+'''
+hints = [
+  "len(line) 係字元數。len(line.encode(\"utf-8\")) 係位元組數。個 starter 先印咗錯嗰個。",
+  "line[::-1] 就係成個倒轉。切 str 得返嘅都係 str。",
+  "倒轉一個 byte string 會將多位元組嘅字元斬開兩截；倒轉 str 就唔會，因為 str 入面根本冇位元組。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.basic.07.dicts"
+title = "街市嗌乜"
+story = "七點嘅寶靈頓道：每個檔口都喺度嗌緊啲嘢，堅拿道嗰頭塊告示牌想要個排名。"
+brief = '''
+讀晒成個標準輸入，按空白切開。
+
+每個唔同嘅字印一次，格式係 `<word> <count>`，按次數由多到少排，
+次數一樣就按字由細到大排。
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+dict 記得插入嘅次序，但嗰個唔係你想要嘅次序。`sorted` 配一個返回 tuple
+嘅 `key`，會先按第一個元素排，打和就睇第二個；將次數變負數，就可以做到
+一個欄位降序、另一個欄位照樣升序。
+'''
+hints = [
+  "個 starter 讀到第一個字就 KeyError 死咗：counts[word] += 1 未寫先讀，而根本冇嘢可以讀。counts.get(word, 0) 幫你補個零。",
+  "sorted(counts.items(), key=...) 會按你要嘅次序畀你 (word, count) 對。個 dict 本身照舊係插入次序。",
+  "key=lambda item: (-item[1], item[0]) —— 次數降序，然後字升序，一個 tuple 搞掂。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.basic.08.sets"
+title = "兩檔都有嘅"
+story = "兩個菜檔，通道一邊一個，有個師奶想知邊啲嘢兩邊都攞到，唔使喺濕地下行嚟行去行兩次。"
+brief = '''
+標準輸入有兩行，每行係一個檔口嘅貨，用空格隔開。同一個檔口可能將同一樣嘢
+列兩次；當一次計。
+
+印三行：
+
+1. `BOTH` 後面跟住兩張單都有嘅嘢，排好序，用空格隔開 —— 冇嘅話就印 `BOTH -`
+2. `ONLY_A <k>`：第一張單有、第二張單冇嘅嘢有幾多樣
+3. `ALL <k>`：兩張單加埋有幾多樣唔同嘅嘢
+
+```
+input:  choisum tofu gailan tofu
+        gailan egg
+output: BOTH gailan
+        ONLY_A 2
+        ALL 4
+```
+
+`set` 冇重複、冇次序，`&`、`-` 同 `|` 就係嗰三個運算。`sorted` 一個 set
+會畀返一個 list，呢個係唯一可以按固定次序印一個 set 嘅方法。
+'''
+hints = [
+  "set(input().split()) 直接由啲 token 砌個 set 出嚟；重複嗰個 tofu 入去嗰陣已經冇咗。",
+  "a & b 係交集，a - b 係差集，a | b 係聯集。每個嘅 len 就係個數。",
+  "\" \".join(sorted(both)) 要字串 —— 呢啲本身就係 —— 而 `if both else \"-\"` 用一個表達式就處理埋空嘅情況。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.basic.09.functions"
+title = "每斤"
+story = "寶靈頓道每張價錢牌都係每斤計，除非佢另外寫明，但係部打價錢牌機堅持要你次次都講一次。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<NAME> <CENTS>` 或者
+`<NAME> <CENTS> <UNIT>`。
+
+寫一個 `tag(name, cents, unit="catty")`，返回 `<NAME> $<dollars>/<unit>`，
+兩個小數位，然後一行印一個 tag。
+
+```
+input:  3
+        CHOISUM 1200
+        EGG 250 each
+        GARLIC 800
+output: CHOISUM $12.00/catty
+        EGG $2.50/each
+        GARLIC $8.00/catty
+```
+
+個 starter 嘅 `tag` 冇預設值，所以兩個 token 嗰啲行會令佢仆街：
+`TypeError: tag() missing 1 required positional argument`。預設參數係
+function 合約嘅一部分 —— 佢講明叫嘅人可以唔畀乜，唔畀嘅時候會得到乜。
+
+用 `.split()` 切開行，轉咗 cents 之後用 `tag(*parts)` 將啲碎件交過去。
+個 `*` 會將一個 list 拆開做位置參數，咁兩個元素嘅 list 同三個元素嘅 list
+都夾到同一個簽名。
+'''
+hints = [
+  "def 嗰行加 unit=\"catty\"。成個修正就係咁。",
+  "預設值要放喺冇預設值嘅參數後面 —— def tag(name, cents, unit=\"catty\") —— 而如果預設值係 list 或者 dict，佢係每次呼叫共用嘅，呢個係跟住落嚟嗰條問題。",
+  "tag(*parts) 將個 list 攤開；得兩件嘅時候，預設值就補上第三個。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.basic.10.exceptions"
+title = "唔係數嘅嗰行"
+story = "魚檔個磅印咗一欄重量出嚟，中間夾咗個唔知邊個嘅電話號碼。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行。每一行本來應該係一個整數。
+
+每一行，要麼印個值嘅兩倍，要麼印 `BAD <line>`（如果解析唔到）。
+最後印 `SUM <total>`，total 係你印出嚟嗰啲值嘅總和。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+`int("xx")` 會拋 `ValueError`。呢個係 Python 話你知轉型失敗嘅唯一方法 ——
+冇 `Result`，冇 `(value, ok)`；失敗就係一個例外，而本來以為會收到數字嘅碼
+就要用 `try`/`except ValueError` 講明佢打算點處理。
+
+要捉**`ValueError`**，唔係 `Exception`。淨係一句 `except:` 會連
+`KeyboardInterrupt` 同你自己碼入面嘅手民之誤都吞埋，程式就係咁學識靜靜雞
+失敗嘅。
+'''
+hints = [
+  "個 starter 讀到 xx 就死：ValueError: invalid literal for int() with base 10。呢個訊息就係你要捉嘅例外。",
+  "try 區塊要細：淨係有可能失敗嗰個呼叫放入去，print 同加總放喺後面。",
+  "except 入面嘅 continue 會跳過嗰一行剩低嘅循環主體，咁壞嗰行就乜都唔會加。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.basic.11.comprehensions"
+title = "行一次寶靈頓道"
+story = "阿力話用三個 for 循環就做到。條通道得一個人咁闊，地下又濕；你淨係行得一次。"
+brief = '''
+標準輸入係一行整數，用空格隔開。
+
+印三行：
+
+1. 所有雙數嘅總和（冇嘅話印 `0`）
+2. 所有大過 `10` 嘅值，乘二，按原本次序，用單個空格連埋 —— 冇嘅話印 `-`
+3. 有幾多個唔同嘅值
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+用 comprehension，唔好用索引循環：`sum` 入面放一個 generator expression，
+第二行用一個帶 `if` 嘅 list comprehension，第三行用一個 set comprehension。
+`if` 放喺最尾，負責過濾；放喺最前嘅表達式負責轉換。
+
+`" ".join(...)` 要字串，所以第二個 comprehension 要產出 `str(v * 2)`，
+唔係 `v * 2`。嗰個 `TypeError: sequence item 0: expected str instance,
+int found` 就係人人喺呢行都會撞到嘅。
+'''
+hints = [
+  "sum(v for v in nums if v % 2 == 0) —— generator expression 係唯一參數嘅時候，唔使多加括號。",
+  "[str(v * 2) for v in nums if v > 10] —— 前面轉換，後面過濾。",
+  "{v for v in nums} 係 set comprehension；set(nums) 係同一樣嘢，喺呢度用邊個都得。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.basic.12.sorting"
+title = "排名榜"
+story = "街市辦公室每朝都會貼出最平嘅菜心，職員用兩張單同一支鉛筆，人手幫啲檔口排名。"
+brief = '''
+標準輸入有兩行：第一行係檔口名，第二行係佢哋嘅價錢（以仙計），次序一樣。
+
+由最平開始，將啲檔口排名印出嚟，格式係 `<rank>. <NAME> <cents>`，
+名次由 `1` 開始，打和就按名由細到大排。然後印 `CHEAPEST <NAME>`。
+
+```
+input:  LAM WONG CHAN
+        1200 900 1200
+output: 1. WONG 900
+        2. CHAN 1200
+        3. LAM 1200
+        CHEAPEST WONG
+```
+
+`zip` 將兩個 list 配對；`sorted` 配 `key` 將啲對排好；
+`enumerate(..., start=1)` 幫佢哋編號。三個內置函數，成段冇一句索引運算 ——
+寫 `for i in range(len(names))` 嗰個版本，去到第三個檔口就會搞錯打和嘅規則。
+'''
+hints = [
+  "zip(names, prices) 會逐個檔口產出 (name, price) tuple，去到短嗰個 list 完就停。",
+  "key=lambda pair: (pair[1], pair[0]) 先按價錢排、再按名排；sorted 係穩定嘅，但 key 已經齊全嘅時候你唔使靠佢。",
+  "enumerate(ranked, start=1) 畀你 (rank, (name, price))，入面嗰個 tuple 可以喺 for 嗰行直接拆開。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.basic.13.classes"
+title = "檔口本簿仔"
+story = "寶靈頓道每個檔口都有本自己嘅簿仔記當日嘅賣出，而豆腐檔嗰本，每一行都寫咗喺封面而唔係入面。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<ITEM> <CENTS>`。
+
+寫一個 `Notebook` class 收集啲項目，然後將每個項目按到達次序印返出嚟，
+格式係 `<ITEM> <CENTS>`，跟住印 `TOTAL <sum>`，最後用 `print(book)`
+印本簿仔本身 —— 佢嘅 `__repr__` 一定要產出
+`Notebook(items=<n>, total=<sum>)`。
+
+```
+input:  2
+        TOFU 600
+        SET 2800
+output: TOFU 600
+        SET 2800
+        TOTAL 3400
+        Notebook(items=2, total=3400)
+```
+
+`n` 可以係 `0`，咁嗰兩行就係 `TOTAL 0` 同
+`Notebook(items=0, total=0)`。
+
+個 starter 有隻蟲，就係呢條街個名嘅由來：`items = []` 放咗喺 **class 主體**
+入面，所以佢係一個由將來每一個 `Notebook` 共用嘅 list，唔係每本簿一個。
+喺 `__init__` 入面透過 `self` 整嘅嘢屬於個 instance；喺 class 主體入面嘅嘢
+屬於個 class。可變嘅 class 屬性係最常喺 code review 度走甩嘅 Python 蟲，
+因為個程式一直行得好地地，直到有第二本簿出現。
+'''
+hints = [
+  "行下個 starter，睇下輸出第一行：PENCIL 0，嚟自一本冇人寫過嘢入去嘅簿。嗰個就係共用嘅 list。",
+  "def __init__(self): self.items = [] —— 每個 instance 一個，喺構造器入面，透過 self 整。",
+  "冇 __str__ 嘅時候，print(book) 會叫 repr(book)，所以 __repr__ 係唯一要寫嘅方法。整到佢似一句可以重新砌返佢出嚟嘅構造器呼叫；呢個係慣例。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.basic.14.dataclasses"
+title = "邊個買"
+story = "崇光地庫米檔每張卡都收足價，包括嗰啲唔係成人嘅，同埋嗰張根本唔係卡嘅。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<TYPE> <KG>`。
+
+底價係 `500 + 100 * KG` 仙。每一行印以下其中一樣：
+
+* `ADULT` —— 底價
+* `STUDENT` —— 底價一半，整數除法
+* `SENIOR` —— 一律 `200`
+* 其他任何嘢 —— `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+將每一行建模做一個 frozen 嘅 `@dataclass` —— `Order(kind: str, kg: int)` ——
+然後用**一個** `match` 對住個 order 決定價錢。`match` 可以用關鍵字拆開一個
+dataclass —— `case Order(kind="ADULT", kg=kg):` —— 而佢最後嗰個分支
+`case Order(kind=other):` 會綁住所有冇夾中嘅嘢。
+
+個 starter 嘅 `match` 得一個分支，之後就係一個兜底嘅 `case _:`，乜嘢都印
+`UNKNOWN`，包括佢本來應該識嘅嗰三種。啲分支係按次序試嘅，第一個夾中就贏，
+所以萬用符一定要放最後，而且一定要係唯一嗰個萬用符。
+'''
+hints = [
+  "每種一個 case：case Order(kind=\"STUDENT\"): 如此類推。dataclass 係按欄位名夾嘅。",
+  "// 係整數除法；/ 會畀你 450.0，而個測試要 450。",
+  "case Order(kind=other): 係一個捕捉模式 —— 佢永遠夾中，並且綁住個標籤 —— 所以佢要放最後，正如 Rust match 入面嘅 `other =>` 分支。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.basic.15.generators"
+title = "你自己嘅 for 循環"
+story = "魚檔個報價機由開市價開始，以固定步幅逐個價列出嚟，但係邊度都冇存低一張表。"
+brief = '''
+標準輸入係三個整數：`start`、`step`、`count`。
+
+寫一個 **generator** `ticker(start, step, count)`，由 `start` 開始，
+每次加 `step`，yield `count` 個值。每個值印一行，然後印 `SUM <total>`，
+個 total 係將第二個 ticker 交畀 `sum` 計出嚟嘅。
+
+```
+input:  5 2 4
+output: 5
+        7
+        9
+        11
+        SUM 32
+        generator
+```
+
+最後一行係 `type(ticker(...)).__name__`，由 starter 現有嘅 `main` 印出嚟。
+而家佢印嘅係 `list`。
+
+一個入面有 `yield` 嘅 function，你叫佢嗰陣佢係唔會行嘅。佢返回一個
+generator，主體就一步一步咁行，每次有嘢問佢攞下一個值先行一步。所以 `for`
+用得佢，`sum` 用得佢，而且佢可以產出一百萬個值，而從來冇一個裝住一百萬個值
+嘅 list 存在過。
+
+個 starter 砌咗個 list 就返回佢，呢樣係啱嘅，但唔係問緊嘅嘢。一個 list 係
+所有值一次過；一個 generator 係有人問先畀一個。將 `append` 改做 `yield`，
+再刪走個 list。
+'''
+hints = [
+  "輸出最後一行係個型別嘅名，而個測試要 `generator`。有 yield 嘅 def 返回嘅就係呢樣嘢。",
+  "yield 個值，然後前進。個 function 會喺 yield 度停低，下次有人問先由嗰度繼續。",
+  "一個 generator 淨係可以耗用一次。所以 main 會為 sum 整個新嘅 ticker，而唔係重用個循環已經抽乾咗嗰個。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.basic.16.decorators"
+title = "包住咗"
+story = "街市辦公室想知今日個價錢 function 畀人叫咗幾多次，而個 function 唔想知自己畀人監視緊。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個以 kg 計嘅重量。
+
+`price(kg)` 係 `500 + 100 * kg`。用 `@counted` 裝飾佢，令每次呼叫都會被數住，
+而 `price` 自己唔知。每個重量印一個價錢，然後印 `CALLS <n>`，再印
+`NAME <price.__name__>` —— 呢個一定仲要係 `price`。
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        CALLS 3
+        NAME price
+```
+
+decorator 係一個接收 function、返回 function 嘅 function。佢返回嗰個通常
+係一個叫 `wrapper` 嘅閉包，做啲嘢然後叫返原本嗰個 —— 而除非你另外講明，
+`wrapper` 就係 `price` 呢個名而家指住嘅嘢，連 `__name__` 都係。
+`functools.wraps` 會將原本嗰個嘅名同 docstring 抄落 wrapper 度。個 starter
+漏咗佢，所以最後一行印 `NAME wrapper`。
+
+個計數放喺邊？唔係放喺 global。掛喺 wrapper 上面 —— `wrapper.calls = 0` ——
+之後讀 `price.calls`。function 係一個物件，同其他物件一樣可以掛屬性。
+'''
+hints = [
+  "喺 def wrapper 上面嗰行加 @functools.wraps(func)。你個 decorator 入面再有一個 decorator。",
+  "def price 上面嘅 @counted，等於喺佢後面寫 price = counted(price)。個名會重新綁去 counted 返回嘅嘢度。",
+  "*args, **kwargs 係 wrapper 唔使知簽名都可以轉發任何簽名嘅方法，呢樣先令個 decorator 可以重用。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.basic.17.duck-typing"
+title = "識嘎就係鴨"
+story = "蛋檔嘅一個膠袋。冇人問過佢係乜；佢哋問嘅係入面有幾多隻、啲鴨蛋喺唔喺入面，同埋想逐隻逐隻攞出嚟睇。"
+brief = '''
+標準輸入係一行貨物，用空格隔開，然後一行係一個要搵嘅字。
+
+將啲貨放入一個 `Bag`，然後印：
+
+1. `LEN <k>` —— 由 `len(bag)` 得出
+2. 啲貨，一行一樣 —— 由 `for item in bag` 得出
+3. `HAS <WORD> YES` 或者 `HAS <WORD> NO` —— 由 `word in bag` 得出
+4. `LONGEST <item>` —— 由 `max(bag, key=len)` 得出，打和就攞第一個
+
+```
+input:  egg duckegg tofu
+        duckegg
+output: LEN 3
+        egg
+        duckegg
+        tofu
+        HAS duckegg YES
+        LONGEST duckegg
+```
+
+`Bag` 唔繼承 `list`，亦都唔需要。`len` 會叫 `__len__`，`for` 會叫
+`__iter__`，`in` 會叫 `__contains__`，而 `max` 淨係需要 `__iter__`。
+Python 從來唔會問一樣嘢*係*乜；佢問嘅係，喺需要嗰一刻，佢有冇嗰個方法。
+個 starter 一個都冇，第一個錯誤係
+`TypeError: object of type 'Bag' has no len()`。
+
+`__contains__` 係可有可無嘅：冇佢，`in` 會退而求其次，逐個迭代嚟比較，
+結果係啱嘅，只係慢啲。都係寫埋佢啦，因為面試官講「整到佢係一個容器」嘅時候，
+講嘅就係呢樣嘢。
+'''
+hints = [
+  "def __len__(self): return len(self._goods) —— 三個方法，每個一行。",
+  "__iter__ 可以直接 return iter(self._goods)；佢唔一定要係 generator，不過 `yield from self._goods` 都得。",
+  "max(bag, key=len) 長度一樣嘅時候會留低第一個，所以示例話係 duckegg 而唔係後面嗰啲。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "python.basic.18.none"
+title = "冇"
+story = "05:59，寶靈頓道。價錢牌向本簿仔問一個仲未開檔嘅檔口，本簿仔答佢「冇嘢」，塊牌就將嗰個「冇嘢」嘅價錢印咗出嚟。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<STALL> <CENTS>` —— 已經開檔嘅檔口 ——
+然後一個數量 `q`，再有 `q` 個要查嘅檔口名。
+
+每個查詢印 `<STALL> <cents>`，如果嗰個檔口未開就印 `<STALL> NONE`。
+然後印 `MISSING <k>` 同 `CHEAPEST <STALL>` —— 開咗檔嘅檔口入面價錢最低
+嗰個，打和就睇名 —— 如果一個都未開就印 `CHEAPEST NONE`。
+
+```
+input:  2
+        LAM 1200
+        WONG 900
+        3
+        WONG
+        CHAN
+        LAM
+output: WONG 900
+        CHAN NONE
+        LAM 1200
+        MISSING 1
+        CHEAPEST WONG
+```
+
+個 starter 去到 `CHAN` 就仆街：
+
+```
+AttributeError: 'NoneType' object has no attribute 'cents'
+```
+
+呢一行就係大佬。佢永遠唔會指住隻蟲。佢指住嘅係個 `None` 最後畀人*用*嘅
+位置，而嗰個位置同佢畀人*整出嚟*嘅位置可以隔幾遠都得 —— 而喺個 starter
+入面，佢仲要係喺兩個唔同嘅地方整出嚟。`lookup` 搵唔到檔口就返回 `None`，
+呢個係故意嘅，但叫佢嘅人冇問過就直接讀 `.cents`。而 `cheapest` 有一條路徑
+冇 `return`，所以佢會**暗中**返回 `None`，叫佢嘅人又對住嗰個 `None` 做返
+同一樣嘢。
+
+Python 每個 function 都會返回啲嘢。行到落尾冇 return 嘅 function 返回
+`None`。冇預設值嘅 `dict.get` 返回 `None`。兩樣嘢當時都唔係錯誤；兩樣嘢
+之後都會變成錯誤。修法兩次都一樣：有可能收到 `None` 嘅碼，喺掂任何屬性之前，
+先用 `is None` check 下。唔係 `== None`，唔係 `if not stall` —— 一個價錢係
+`0` 嘅檔口係真嘅檔口，而 `not` 會將佢掉走。
+
+**特登**令 `lookup` 同 `cheapest` 返回 `Optional[Stall]`，喺型別註解度講明，
+然後喺個 `None` 落地嘅地方處理佢。
+'''
+hints = [
+  "由下而上讀個 traceback：AttributeError 係喺 print 嗰行，但個 None 係前一行由 lookup 出嚟嘅，再之前係由 board.get 出嚟嘅。",
+  "if stall is None: 就係個 check。用 `is`，因為 None 係單一個物件，比較身份先係老實嘅比較；`==` 可以被覆寫，而 `not stall` 對一個假值但真實存在嘅嘢嚟講係錯嘅。",
+  "cheapest 有兩條路徑，得一條有 return。Python 唔會為此警告你；佢將 None 交畀叫佢嘅人，等嗰個人自己發現。畀空嘅情況一句明確嘅 `return None`，等睇碼嘅人見到係有心咁做嘅。",
+  "型別註解入面嘅 Optional[Stall] 唔係由直譯器強制執行嘅。佢係寫畀睇碼嘅人同型別檢查器嘅備註，而睇碼嘅人就係嗰個計緊時嘅人。",
+]

@@ -77,6 +77,26 @@ return function()
     T.nope(source:find('SFX.play("rejected")', 1, true), "and no rejection chime")
   end)
 
+  T.case("TAB offers every land's language, each with a starter that prints", function()
+    -- The desk is where a player checks the toolchain is there before a
+    -- quest asks anything of it, so the starter for each language is the
+    -- smallest program that compiles and prints — and there is one for
+    -- every land the map can show, in the order the map shows them.
+    local Playground = require("src.scenes.playground")
+    local Land = require("src.land")
+    T.same(Playground.LANGS, Land.ORDER, "TAB walks the lands' order")
+    for _, lang in ipairs(Land.ORDER) do
+      local starter = Playground.STARTER[lang]
+      T.ok(type(starter) == "string" and #starter > 0, lang .. " has a starter")
+      T.ok(starter:find("hello", 1, true) ~= nil, lang .. "'s starter says hello")
+      T.eq(starter:sub(-1), "\n", lang .. "'s starter ends in a newline, as a file should")
+    end
+    T.ok(Playground.STARTER.cpp:find("#include <iostream>", 1, true) ~= nil)
+    T.ok(Playground.STARTER.cpp:find('std::cout << "hello\\n";', 1, true) ~= nil,
+      "the C++ starter prints an escaped newline, not a literal one")
+    T.eq(Playground.STARTER.python, 'print("hello")\n')
+  end)
+
   T.case("the run shares the one execution slot", function()
     -- §4.9c: "the playground is the same runner", and §3.2's one-in-flight is
     -- per connection. Observed on the live server: three concurrent

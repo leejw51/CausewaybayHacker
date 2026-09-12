@@ -9,11 +9,13 @@ use std::sync::Arc;
 use serde::Serialize;
 
 pub mod cargo;
+pub mod cpp;
 pub mod format;
 pub mod go;
 pub mod gotest;
 pub mod harness;
 pub mod proc;
+pub mod python;
 pub mod reap;
 pub mod rust;
 pub mod spec;
@@ -100,7 +102,8 @@ pub struct Report {
     pub tests_passed: i64,
     pub tests_total: i64,
     pub cases: Vec<CaseResult>,
-    /// `rustc`'s JSON diagnostics, kept raw so §7.1 can classify them.
+    /// `rustc`'s JSON diagnostics, or the prose of `go build`, `c++` and
+    /// `py_compile`, kept raw so §7.1 can classify them.
     pub compiler_stderr: String,
     pub runtime_stderr: String,
     pub stdout: String,
@@ -140,14 +143,18 @@ pub fn unsupported(lang: &str, spec: &TestSpec) -> Option<String> {
     match (lang, spec.harness) {
         // All three harnesses are built. What is still refused is a harness
         // asked of the wrong land, which is an authoring mistake rather than a
-        // missing feature and should say so.
-        ("rust" | "go", Harness::Stdio) => None,
+        // missing feature and should say so. The C++ and Python lands are
+        // stdio only: `cargo` and `gotest` are the test frameworks of the
+        // languages they are named after.
+        ("rust" | "go" | "cpp" | "python", Harness::Stdio) => None,
         ("rust", Harness::Cargo) => None,
         ("go", Harness::Gotest) => None,
-        ("rust", Harness::Gotest) => {
-            Some("the gotest harness is not a rust harness (SPEC §5.2)".into())
-        }
-        ("go", Harness::Cargo) => Some("the cargo harness is not a go harness (SPEC §5.2)".into()),
+        ("rust" | "cpp" | "python", Harness::Gotest) => Some(format!(
+            "the gotest harness is not a {lang} harness (SPEC §5.2)"
+        )),
+        ("go" | "cpp" | "python", Harness::Cargo) => Some(format!(
+            "the cargo harness is not a {lang} harness (SPEC §5.2)"
+        )),
         (other, _) => Some(format!("there is no runner for '{other}'")),
     }
 }
@@ -159,6 +166,8 @@ pub fn run(sub: &Submission) -> Report {
     match sub.lang {
         "rust" => rust::run(sub),
         "go" => go::run(sub),
+        "cpp" => cpp::run(sub),
+        "python" => python::run(sub),
         other => Report::internal(format!("unknown language '{other}'")),
     }
 }

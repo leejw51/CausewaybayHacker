@@ -1,0 +1,1412 @@
+# GO LAND — HACKER, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/go/hacker.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "go.hacker"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "go.hacker.01.two-sum"
+title = "Dvě jízdenky"
+story = "Stejná místnost, stejná první otázka, a tentokrát ji chtějí v Go."
+brief = '''
+První řádek je `n target`. Druhý řádek je `n` celých čísel.
+
+Vypiš indexy `i j` (**od 1**) dvou různých položek, které dají dohromady
+`target`, jako `i j` s `i < j`. Pokud vyhovuje víc dvojic, dej tu, jejíž
+druhý index je nejmenší; pokud je i tak shoda, nejmenší první index. Pokud
+nevyhovuje žádná dvojice, vypiš `-1`.
+
+```
+input:  4 9
+        2 7 11 15
+output: 1 2
+```
+
+Skryté případy jsou tu malé: kontrolují rozhodnutí při shodě a případ bez
+odpovědi, ne tvou rychlost. Otázka je pořád ta lineární — jeden průchod,
+jedna hashovací mapa — protože skutečné `n` je 200000 a vnořená smyčka je
+přesně to, co má tahle otázka vytřídit. Napiš odpověď, na kterou se otázka
+ptá, ne tu, která náhodou projde těmito čtyřmi případy.
+'''
+hints = [
+  "Jeden průchod. Pro každou hodnotu se zeptej mapy, jestli už viděla target minus tuhle hodnotu.",
+  "U opakované hodnoty zaznamenej jen první index — to je rozhodnutí při shodě, které zadání žádá.",
+  "Tvar comma-ok je celý idiom: i, ok := seen[k].",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.hacker.02.window"
+title = "Nejkratší úsek"
+story = "Kolik nejméně po sobě jdoucích zastávek pokryje vzdálenost. Chtějí počet zastávek a pak to, kde začíná."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádné pole
+není — postavíš ho sám, **přesně** tímto generátorem, v aritmetice `uint64`,
+která v Go přetéká bez jakýchkoli okolků:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407
+    next value = (x >> 33) % 1000000007
+
+s = (sum of all n values) / 2
+```
+
+To dělení je celočíselné, a je to také důvod, proč odpověď vždycky existuje:
+celé pole na `s` z podstaty své konstrukce dosáhne.
+
+Najdi nejkratší souvislý úsek, jehož součet je nejméně `s`. Vypiš jeho délku
+a pak jeho počáteční index od 1. Pokud je několik úseků stejně krátkých,
+vezmi ten nejvíc vlevo.
+
+```
+input:  8 1
+output: 3
+        3
+```
+
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`,
+jeho součet je `3330417819`, takže `s` je `1665208909` a tři hodnoty od indexu
+`3` jsou nejkratší úsek, který na něj dosáhne.
+
+**Tahle ulice vynucuje svou složitost.** Jeden skrytý případ je `n = 500000`.
+Ve startovním kódu je poctivá kvadratická odpověď — z každého začátku jdi
+dopředu, dokud součet nedosáhne `s` — a protože `s` je polovina celkového
+součtu, každá taková procházka je dlouhá asi `n / 2` prvků. To je řádově
+`10^11` sčítání a proti pětisekundovému limitu běhu to trvá třicet osm sekund.
+Když se oba konce posouvají jen doprava, je to `O(n)` — každý prvek se jednou
+přičte a jednou odečte — a tentýž případ se vrátí za sedm milisekund. Změřeno,
+na tomto stroji, s těmi dvěma programy, které jsou v této ulici.
+
+Případ je `n = 500000` a ne `200000` proto, že vnitřní smyčka je jediné sčítání
+s předčasným ukončením a přesně na tohle je překladač dobrý: na `200000`
+kvadratická odpověď pořád doběhne za šest sekund, což je na limit příliš blízko,
+než aby to byla závora.
+
+Součet je při té velikosti kolem `2.5 × 10^14`. Sčítej ho do `int64`. V tomhle
+64bitovém sestavení je `int` v Go 64 bitů, takže s obyčejným `int` ti to
+projde — právě proto musí ten návyk přijít od tebe, ne od překladače.
+'''
+hints = [
+  "Veď průběžný součet. Přičti nums[right] jednou za krok a nikdy ho nepřepočítávej.",
+  "Zužuj zleva, dokud by vypuštění nejlevějšího prvku ještě nechalo okno na s nebo nad.",
+  "Nové nejlepší zaznamenej jen u ostře kratšího úseku, aby ti z každé délky zůstal ten nejvíc vlevo.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.hacker.03.intervals"
+title = "Rozpis směn"
+story = "Zase rozpis v Lucky Mac a otázka je pořád stejná: které hodiny jsou skutečně pokryté."
+brief = '''
+První řádek je `n`. Dalších `n` řádků je `<start> <end>` se `start <= end`.
+
+Slij každou dvojici, která se překrývá nebo dotýká, a vypiš výsledek ve
+vzestupném pořadí, jeden `<start> <end>` na řádek, pak `COUNT <k>`.
+
+```
+input:  4
+        1 3
+        2 6
+        8 10
+        15 18
+output: 1 6
+        8 10
+        15 18
+        COUNT 3
+```
+
+Dotyk se počítá jako překryv: `1 4` a `4 5` se slijí do `1 5`.
+'''
+hints = [
+  "Nejdřív seřaď podle začátku. Potom stačí jeden průchod zleva doprava.",
+  "merged[last].end je adresovatelné, protože merged je slice struktur, ne ukazatelů — přiřazuj rovnou do něj.",
+  "Prodluž na větší z obou konců; krátký interval uvnitř dlouhého ho nesmí zkrátit.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.hacker.04.islands"
+title = "Kolik je bloků"
+story = "Plán čtvrti na tabuli. Spočítej bloky a pak jim řekni, který je největší."
+brief = '''
+První řádek je `r c`. Dalších `r` řádků je plán: `#` je budova, `.` je ulice.
+
+Dvě buňky `#` jsou ve stejném bloku, pokud se dotýkají nahoře, dole, vlevo
+nebo vpravo — ne diagonálně.
+
+Vypiš, kolik je bloků, a pak kolik buněk má ten největší. Prázdný plán je `0`
+a `0`.
+
+```
+input:  4 5
+        ##...
+        ##...
+        ..#..
+        ...##
+output: 3
+        4
+```
+
+Projdi každou buňku jednou. Když najdeš nenavštívené `#`, zaplav z něj celý
+blok pomocí fronty a průběžně ho počítej.
+'''
+hints = [
+  "Označ buňku jako viděnou, když ji vkládáš do fronty, ne když ji vybíráš, jinak se do fronty dostane několikrát.",
+  "queue = queue[1:] je tady jako dequeue v pořádku — podkladové pole se uvolní, jakmile je celý blok hotový.",
+  "grid[r][c] indexuje řetězec, takže je to bajt: porovnávej s '#', ne s \"#\".",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.hacker.05.brackets"
+title = "Kde se to rozbilo"
+story = "Konfigurační soubor na projektoru a tazatel se neptá, jestli je rozbitý, ale který znak ho rozbil."
+brief = '''
+Jeden řádek složený jen z `(`, `)`, `[`, `]`, `{`, `}`.
+
+Vypiš `VALID` a pak `0`, pokud je každá závorka uzavřena svým vlastním druhem
+ve správném pořadí.
+
+Jinak vypiš `INVALID` a pak **index od 1** provinilého znaku:
+
+* uzavírací závorka, která neodpovídá tomu, co je otevřené — vlastní index
+  té uzavírací
+* uzavírací závorka, když není nic otevřené — vlastní index té uzavírací
+* něco na konci řádku zůstalo otevřené — index poslední stále otevřené
+  závorky
+
+```
+input:  ([]{})
+output: VALID
+        0
+```
+'''
+hints = [
+  "Na zásobník vkládej index každé otevírací závorky, ne znak — index potřebuješ, abys ho ohlásil.",
+  "Uzavírací závorka je špatně, když je zásobník prázdný, nebo když znak na vrcholovém indexu není její partner.",
+  "Pokud smyčka skončí a na zásobníku něco zbylo, jeho vrchol je poslední neuzavřená závorka.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.hacker.06.rotated"
+title = "Linka, která se přetáčí"
+story = "Jízdní řád Island Line začíná na špatné stanici a přetáčí se dokola, a stejně chtějí vyhledání v logaritmickém čase."
+brief = '''
+První řádek je `n target`. Druhý řádek je `n` různých celých čísel: seznam,
+který byl seřazený vzestupně a pak o nějaký počet (možná nulový) otočený
+doleva.
+
+Vypiš index `target` (**od 1**), nebo `-1`, pokud tam není. Pak vypiš
+`PIVOT <p>`, index od 1 nejmenší hodnoty.
+
+```
+input:  7 0
+        4 5 6 7 0 1 2
+output: 5
+        PIVOT 5
+```
+
+Dvě binární hledání, nebo jedno chytré. Tak či tak, lineární průchod je
+odpověď na jinou otázku.
+'''
+hints = [
+  "Pivot je jediné místo, kde je hodnota větší než ta za ní — porovnávej mid s hi, ne s lo.",
+  "Po smyčce pro pivot je lo == hi a to je index nejmenší hodnoty; neotočený seznam dá 0.",
+  "Každá polovina je obyčejně seřazená, takže druhé hledání je běžné binární hledání spuštěné nejvýš dvakrát.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.hacker.07.anagrams"
+title = "Stejná písmena"
+story = "Stránka názvů zastávek s promíchanými písmeny. Seskup ty, které jsou stejný název."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` slov malými písmeny oddělených
+mezerami.
+
+Seskup slova, která jsou navzájem anagramy. Vypiš každou skupinu na jeden
+řádek, její slova seřazená vzestupně a spojená jednotlivými mezerami. Skupiny
+seřaď podle jejich prvního slova, vzestupně. Pak vypiš `GROUPS <k>`.
+
+Opakované slovo zůstává ve své skupině dvakrát.
+
+```
+input:  6
+        eat tea tan ate nat bat
+output: ate eat tea
+        bat
+        nat tan
+        GROUPS 3
+```
+
+Klíč je slovo se seřazenými písmeny. Dvě slova jsou anagramy přesně tehdy,
+když se jejich klíče rovnají, a to je vyhledání v mapě, ne porovnání se vším,
+co jsi dosud viděl.
+'''
+hints = [
+  "sort.Slice nad []byte(word) a pak zpět string(...) ti dá klíč.",
+  "append do groups[k] funguje i na chybějícím klíči: nulová hodnota slice je nil a append si s nil poradí.",
+  "Seřazení spojených řádků řadí podle prvního slova, protože každý řádek prvním slovem začíná.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.hacker.08.kth-largest"
+title = "K-tý největší"
+story = "Zahřívací kolo, a stejně chtějí haldu, ne řazení."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádný
+seznam není — postavíš si ho sám, **přesně** tímto generátorem, v aritmetice
+`uint64`, která v Go přetéká bez jakýchkoli okolků:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407
+    next value = (x >> 33) % 1000000007
+
+k = n / 2 + 1
+```
+
+To dělení je celočíselné, takže `1 <= k <= n` platí, ať je `n` jakkoli malé.
+
+Vypiš `k`-tou největší **hodnotu** — duplicity se počítají, takže v `3 3 1` je
+2. největší `3`. Pak vypiš `HEAP <size>`, počet prvků, které jsi držel, když
+jsi skončil.
+
+```
+input:  8 1
+output: 189567123
+        HEAP 5
+```
+
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`
+a `k` je `5`. Pět největších je po řadě
+`908834774 822192870 708211027 392341189 189567123`, takže odpověď je poslední
+z nich a v ruce máš pět hodnot.
+
+**Co velký případ vynucuje a co ne.** Jeden skrytý případ je `n = 200000`,
+kde `k` je `100001`. Odmítne odpověď, která `k`-krát projde celý seznam a
+pokaždé z něj vytáhne největší hodnotu: to je `O(nk)`, `2 × 10^10` porovnání,
+čtyřicet pět sekund proti pětisekundovému limitu běhu — a je to přesně to, co
+dělá startovní kód. **Neodmítne** ale seřazení celého seznamu: `n log n` je
+rychlé a sort tudy projde s přehledem. Jestli píšeš sort, řekni to nahlas;
+předstírat, že ho odmítly hodiny, je horší.
+
+Odpověď, na kterou se ptají, je **min-halda velikosti k**: každou hodnotu
+vlož, a když halda přeroste `k`, jednu vyhoď — na konci je kořen ta odpověď.
+Je to `O(n log k)`, drží `k` hodnot místo `n` a velký případ vrátí za dvacet
+pět milisekund. Obě čísla změřena na tomto stroji, s těmi dvěma programy,
+které jsou v této ulici.
+
+`container/heap` je pět metod na sliceovém typu: `Len`, `Less`, `Swap`,
+`Push`, `Pop`. `Push` a `Pop` berou ukazatelový receiver, ostatní tři ne — a
+právě tahle asymetrie je to, co pod hodinami splete každého.
+'''
+hints = [
+  "Push a Pop jsou surové operace nad slicem — append a useknutí konce. heap.Push a heap.Pop jsou ty, které prosívají.",
+  "Nikdy nevolej h.Push přímo; volej heap.Push(h, v), jinak se invariant haldy neobnoví.",
+  "Po smyčce je nejmenší z k největších na indexu 0, a to je k-tý největší celkově.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.hacker.09.linked-list"
+title = "Řetěz"
+story = "Chtějí to bez slice. Uzly, které ukazují na uzly, protože o ten tvar v té otázce doopravdy jde."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel, v pořadí.
+
+Postav z nich jednosměrně zřetězený seznam `*Node` — v řešení žádný slice —
+a pak vypiš tři řádky:
+
+1. seznam obráceně, oddělený mezerami
+2. hodnotu v prostředním uzlu (pro sudé `n` ten druhý ze dvou)
+3. `LEN <n>` spočítané průchodem seznamu
+
+```
+input:  5
+        1 2 3 4 5
+output: 5 4 3 2 1
+        3
+        LEN 5
+```
+
+Střed je běžec: jeden ukazatel po jednom kroku, druhý po dvou, a když tomu
+rychlému dojde seznam, ten pomalý je na místě. Jeden průchod, a tytéž dva
+ukazatele odhalí cyklus, kdyby se tě někdy zeptali.
+'''
+hints = [
+  "Stavět odzadu dopředu je ten snadný směr: každý nový uzel si vezme starou hlavu jako Next.",
+  "Ulož si cursor.Next dřív, než ho přepíšeš, jinak je zbytek seznamu pryč.",
+  "Posuň slow jednou za každé dva kroky, které fast zvládne; když je fast nebo fast.Next nil, zastav.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.hacker.10.tree-walk"
+title = "Třikrát kolem stromu"
+story = "Strom na tabuli a otázka, nad kterou by nikdo neměl přemýšlet dvakrát: pojmenuj tři pořadí."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` hodnot v **pořadí po úrovních**, kde
+`-1` znamená „tady uzel není“ — strom je tedy uložený jako halda: děti indexu
+`i` jsou `2i+1` a `2i+2`.
+
+Vypiš čtyři řádky: průchody **preorder**, **inorder** a **postorder**, každý
+oddělený mezerami, a pak `DEPTH <d>` — počet uzlů na nejdelší cestě od kořene
+k listu.
+
+```
+input:  5
+        1 2 3 -1 4
+output: 1 2 4 3
+        2 4 1 3
+        4 2 3 1
+        DEPTH 3
+```
+
+Preorder je uzel, levý, pravý. Inorder je levý, uzel, pravý. Postorder je
+levý, pravý, uzel. Jedna rekurzivní funkce zvládne všechny tři; posouvá se
+jen místo, kde je append.
+'''
+hints = [
+  "out je *[]int64, protože append může realokovat — obyčejný parametr []int64 by zápisy ztratil.",
+  "Základní případ jsou obě podmínky najednou: za koncem slice, nebo na -1.",
+  "Hloubka je 1 + hlubší dítě, a 0 pro chybějící uzel.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.hacker.11.bst"
+title = "Je to opravdu BST"
+story = "Doplňující otázka. Každý zkontroluje dvě děti a každý to má napoprvé špatně."
+brief = '''
+Stejné kódování po úrovních jako v minulé ulici: `-1` je chybějící uzel, děti
+`i` jsou `2i+1` a `2i+2`.
+
+První řádek je `n q`. Druhý řádek je `n` hodnot stromu. Třetí řádek je `q`
+hodnot dotazů.
+
+Vypiš `VALID` nebo `INVALID` — každá hodnota v levém podstromu ostře menší než
+uzel, každá hodnota v pravém ostře větší. Pak jeden řádek na dotaz:
+`<value> FOUND <depth>` s kořenem v hloubce 1, nebo `<value> ABSENT`.
+
+```
+input:  7 2
+        4 2 6 1 3 5 7
+        3 8
+output: VALID
+        3 FOUND 3
+        8 ABSENT
+```
+
+Kontrola `left < node < right` v každém uzlu **nestačí** — hodnota hluboko
+v levém podstromu může být pořád větší než nějaký předek. Místo toho nes dolů
+otevřený interval.
+
+Vyhledání je **sestup BST**, ne prohledání celého stromu: od kořene jdi
+doleva, když je cíl menší, a doprava, když je větší, a zastav, když
+vypadneš. Na `INVALID` stromu může ten sestup projít rovnou kolem hodnoty,
+která v poli sedí — a přesto musí ohlásit `ABSENT`, protože sestup je jediné,
+co vyhledání v BST smí stát. Jeden skrytý případ je přesně takový strom.
+'''
+hints = [
+  "Předávej dolů otevřený interval. Kořen dostane celý rozsah int64; levé dítě dostane (low, node), pravé dítě (node, high).",
+  "Chybějící uzel je triviálně platný — základní případ vrací true.",
+  "Vyhledání je binární hledání: menší jde doleva, jinak doprava, a hloubka je počet skoků, které to stálo.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.hacker.12.heap"
+title = "K seřazených front"
+story = "Každá pobočka Lucky Mac posílá své lístky už seřazené. Slij je do jedné řady, aniž bys celou hromadu řadil znovu."
+brief = '''
+První řádek je `k`. Pak `k` řádků, každý je počet následovaný tolika celými
+čísly, už seřazenými vzestupně.
+
+Vypiš je všechny slité do jednoho vzestupného řádku, oddělené mezerami, pak
+`POPS <total count>`.
+
+```
+input:  3
+        3 1 4 5
+        2 1 3
+        2 2 6
+output: 1 1 2 3 4 5 6
+        POPS 7
+```
+
+Halda drží jeden záznam na seznam, ne na prvek, takže zůstává na velikosti
+`k`, ať jsou seznamy jakkoli dlouhé. Každý záznam si musí pamatovat, ze
+kterého seznamu přišel, jinak po jeho vybrání nemáš čím doplnit.
+
+`container/heap` je pět metod na typu slice. `Len`, `Less` a `Swap` berou
+hodnotový příjemce; `Push` a `Pop` berou ukazatelový, protože mění délku.
+'''
+hints = [
+  "heap.Pop vrací any, takže typová aserce zpět na entry je součást idiomu.",
+  "Při počátečním plnění přeskoč prázdné seznamy, jinak první pop čte za koncem jednoho z nich.",
+  "Další prvek seznamu vlož jen tehdy, když jeden z jeho prvků vybereš — tak halda zůstane na k.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.hacker.13.permutations"
+title = "Každé pořadí"
+story = "Vypiš každé pořadí, v jakém můžou jezdci vyrazit. Všechna, ve slovníkovém pořadí, a žádné neopakuj."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` různých celých čísel **už ve
+vzestupném pořadí**.
+
+Vypiš každou permutaci, jednu na řádek, hodnoty oddělené mezerami,
+v **lexikografickém** pořadí. Pak vypiš `PERMS <n!>`.
+
+```
+input:  3
+        1 2 3
+output: 1 2 3
+        1 3 2
+        2 1 3
+        2 3 1
+        3 1 2
+        3 2 1
+        PERMS 6
+```
+
+Protože vstup je už vzestupný, vybírání nepoužitých hodnot v pořadí indexů
+dává slovníkové pořadí zadarmo — žádné řazení výstupu.
+
+Označ jako použité, rekurze, **odznač**. Odznačení je ta část, kterou lidé
+vynechávají, a příznakem je, že vidíš vždycky jen jednu permutaci.
+'''
+hints = [
+  "used[i] = true, rekurze, used[i] = false. To je zkus–rekurze–vrať zpět, a vrácení zpět není nepovinné.",
+  "chosen se staví pomocí append a předává dolů; kapacita byla rezervována předem, aby tě append nepřekvapil.",
+  "Základní případ je len(chosen) == len(nums) — úplné uspořádání, ne prázdné.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.hacker.14.word-search"
+title = "Je slovo v mřížce"
+story = "Deska s písmeny a jméno. Chtějí vědět, jestli je v ní to jméno napsané, a chtějí počet slepých uliček."
+brief = '''
+První řádek je `r c`. Dalších `r` řádků je mřížka malých písmen. Poslední
+řádek je slovo.
+
+Slovo je v mřížce, pokud ho dokážeš vyhláskovat pohybem nahoru, dolů, doleva
+nebo doprava mezi **sousedními** buňkami, aniž bys v jednom pokusu použil
+tutéž buňku dvakrát.
+
+Vypiš `FOUND` nebo `ABSENT`, pak `STARTS <k>`: kolik buněk nese první písmeno
+slova.
+
+```
+input:  3 4
+        abce
+        sfcs
+        adee
+        abcced
+output: FOUND
+        STARTS 2
+```
+
+Cestou dovnitř označ buňku jako použitou a **cestou ven ji odznač**. Buňka,
+která zůstane označená po neúspěšné větvi, způsobí, že pozdější větve selžou
+z důvodu, který v mřížce není.
+'''
+hints = [
+  "defer je úhledný způsob, jak zaručit, že odznačení proběhne na každé návratové cestě z funkce.",
+  "Počáteční písmena spočítej ve zvláštním průchodu před hledáním, jinak značky '#' počet zmatou.",
+  "Úspěšný základní případ je at+1 == len(word) — kontrolovaný po shodě této buňky, ne před ní.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.hacker.15.topo-sort"
+title = "V jakém pořadí se to staví"
+story = "Jedenáct balíčků a graf závislostí. Pojmenuj pořadí sestavení, nebo pojmenuj fakt, že žádné není."
+brief = '''
+První řádek je `n m`: `n` úloh číslovaných `0..n-1` a `m` hran. Dalších `m`
+řádků je `<a> <b>`, což znamená, že `a` se musí sestavit před `b`.
+
+Vypiš pořadí sestavení na jeden řádek, oddělené mezerami. Když je připraveno
+několik úloh najednou, vezmi tu s **nejnižším číslem**, aby byla odpověď
+jednoznačná. Pokud žádné pořadí neexistuje, vypiš místo toho `CYCLE`. Pak
+vypiš `DONE <kolik jsi jich seřadil>`.
+
+```
+input:  4 4
+        0 1
+        0 2
+        1 3
+        2 3
+output: 0 1 2 3
+        DONE 4
+```
+
+Kahnův algoritmus: spočítej, na kolik věcí každá úloha čeká, začni těmi,
+které nečekají na nic, a když úlohu vezmeš, sniž počet u těch, které na ní
+závisejí. Pokud skončíš a úlohy zbyly, jsou ty úlohy v cyklu.
+
+`DONE` je, kolik úloh jsi skutečně seřadil, což je při cyklu počet, který jsi
+stihl, než ses zasekl — ne nula, pokud nebylo připravené vůbec nic.
+
+Množina připravených se tu drží seřazená, protože `n` je malé a čte se to
+jasně. Halda je odpověď pro skutečné `n`, a uzel 12 už jednu postavil.
+'''
+hints = [
+  "waiting[b] je vstupní stupeň b — kolik hran do něj ukazuje.",
+  "Obyčejná fronta dává *nějaké* pořadí; braní nejmenší připravené úlohy dává *to* pořadí, které zadání žádá.",
+  "Cyklus nikdy nedetekuješ přímo. Všimneš si, že vyšlo méně než n úloh.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.hacker.16.union-find"
+title = "Kdo je s kým spojený"
+story = "Tramvajová síť, MTR a trasy minibusů na jednom listu. Kolik je ve skutečnosti samostatných sítí."
+brief = '''
+První řádek je `n m`: `n` zastávek číslovaných `0..n-1`, `m` neorientovaných
+spojů. Dalších `m` řádků je `<a> <b>`.
+
+Vypiš tři řádky: kolik je samostatných sítí, velikost té největší
+a `REDUNDANT <k>` — kolik spojů spojilo dvě zastávky, které už spojené byly.
+
+```
+input:  6 4
+        0 1
+        1 2
+        3 4
+        0 2
+output: 3
+        3
+        REDUNDANT 1
+```
+
+Union-find: každá zastávka ukazuje na rodiče, `find` dojde ke kořeni, `union`
+nasměruje jeden kořen na druhý. Cestou zpět z `find` cestu stlač a je to
+efektivně konstantní čas na dotaz.
+'''
+hints = [
+  "Začni s každou zastávkou jako vlastním rodičem a n skupinami; každé úspěšné union sníží počet o jednu.",
+  "Hrana, jejíž oba konce už mají stejný kořen, je ta redundantní — započítej ji a jdi dál.",
+  "Smysluplný je jen záznam velikosti u kořene, takže největší čti z kořenů, ne z každého indexu.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "go.hacker.17.coins"
+title = "Přesně nazpátek"
+story = "Pokladna na Percival Street má tři přihrádky na mince a zákazníka, který nevezme bankovku."
+brief = '''
+První řádek je `n target`. Druhý řádek je `n` hodnot mincí, každá dostupná
+v neomezeném množství.
+
+Vypiš nejmenší počet mincí, který dá přesně `target`, nebo `-1`, pokud se
+složit nedá. Pak vypiš `REACH <k>`: kolik z částek `0..target` lze vůbec
+složit, včetně `0`.
+
+```
+input:  3 11
+        1 2 5
+output: 3
+        REACH 12
+```
+
+Skryté případy jsou malé, takže chytají nesprávnost, ne pomalost — a jeden
+z nich chytá tu obvyklou špatnou odpověď. Hladový postup, vzít největší
+minci, která se vejde, a opakovat, skládá `6` z `3 4` tak, že popadne `4`
+a pak selže, a přesně na to jeden případ je.
+'''
+hints = [
+  "best[0] = 0 a best[a] je o jedna víc než nejlevnější best[a - coin] přes každou minci, která se vejde.",
+  "Než k nedosažitelné buňce přičteš jedničku, ohlídej, že ji nečteš.",
+  "REACH je, kolik buněk hotové tabulky není pořád označeno jako nedosažitelné.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "go.hacker.18.kadane"
+title = "Nejlepší úsek"
+story = "Rok denních zisků a ztrát. Který úsek po sobě jdoucích dní vydělal nejvíc, a kolik úseků skončilo přesně na nule."
+brief = '''
+První řádek je `n`, nejméně `1`. Druhý řádek je `n` celých čísel, která mohou
+být záporná.
+
+Vypiš tři řádky:
+
+1. největší součet **neprázdného** souvislého úseku
+2. `AT <start> <end>`, meze toho úseku od 1 — pokud je jich několik
+   stejných, ten, který se najde první při průchodu zleva doprava
+3. `ZERO <k>`, kolik souvislých úseků má součet přesně `0`
+
+```
+input:  9
+        -2 1 -3 4 -1 2 1 -5 4
+output: 6
+        AT 4 7
+        ZERO 3
+```
+
+Dvě různé jednoprůchodové myšlenky v jedné ulici. Maximální úsek je Kadane:
+nes průběžný součet a zahoď ho ve chvíli, kdy klesne pod nulu, protože záporný
+prefix může tomu, co přijde dál, jen uškodit.
+
+Počet nulových součtů **není** okno — záporné hodnoty znamenají, že úsek,
+který je moc velký, nejde spravit zúžením. Jsou to prefixové součty: úsek má
+součet nula přesně tehdy, když se dva prefixové součty rovnají, takže počítej
+opakování. Mapu naplň tak, že `0` byla viděna jednou, kvůli úsekům, které
+začínají na začátku.
+'''
+hints = [
+  "Kadane začni na nums[0], ne na 0, jinak seznam samých záporných čísel odpoví 0 a úsek je prázdný.",
+  "Kdykoli průběžný součet zahodíš, resetuj začátek úseku, a meze zaznamenej jen tehdy, když ostře překonáš nejlepší.",
+  "Pro počet nul vyhledej prefix dřív, než ho zaznamenáš, jinak každý prefix najde sám sebe.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "go.hacker.19.edit-distance"
+title = "Jak daleko od sebe"
+story = "Dva zápisy stejné ulice na dvou různých cedulích. Kolik je mezi nimi úprav po jednom znaku."
+brief = '''
+Dva řádky, na každém jedno slovo malými písmeny.
+
+Vypiš **editační vzdálenost**: nejmenší počet vložení, smazání nebo náhrad
+jednoho znaku, které promění první slovo v druhé. Pak vypiš `LCS <k>`, délku
+jejich nejdelší společné podposloupnosti.
+
+```
+input:  horse
+        ros
+output: 3
+        LCS 2
+```
+
+Dvě tabulky nad stejnými dvěma řetězci, obě se stejnou tříformulovou
+rekurencí a jiným rozhodováním při shodě. Řádek `0` a sloupec `0` nejsou
+u editační tabulky nulové — jsou to náklady na smazání nebo vložení všeho.
+'''
+hints = [
+  "edit[i][0] = i a edit[0][j] = j: proměnit prefix v nic stojí jedno smazání na znak.",
+  "Shodné znaky nestojí nic a jdou diagonálně; neshoda stojí jedna a bere nejlevnějšího ze tří sousedů.",
+  "LCS je stejný průchod s max místo min a bez diagonálního kroku při neshodě.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "go.hacker.20.lis"
+title = "Nejdelší cesta vzhůru"
+story = "Zase rok denních tržeb. Tentokrát chtějí nejdelší řadu zlepšujících se dní, a nemusí jít po sobě."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádné pole
+není — postavíš ho sám, **přesně** tímto generátorem, v aritmetice `uint64`,
+která v Go přetéká bez jakýchkoli okolků:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407
+    next value = (x >> 33) % 1000000007
+```
+
+Vypiš délku nejdelší **ostře rostoucí** podposloupnosti — pořadí zůstává,
+sousednost se nevyžaduje. Pak vypiš `TAILS <k>`, totéž číslo přečtené z počtu
+hromádek.
+
+```
+input:  8 1
+output: 3
+        TAILS 3
+```
+
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`
+a `93944146 392341189 822192870` je jeden z nejdelších výstupů v něm.
+
+**Tahle ulice vynucuje svou složitost.** Jeden skrytý případ je `n = 200000`.
+Tabulka `O(n²)` — pro každou hodnotu se ohlédnout po všech předchozích — je ta,
+kterou musíš umět napsat zpaměti, a je to přesně to, co je ve startovním kódu:
+`2 × 10^10` porovnání, třicet devět sekund proti pětisekundovému limitu běhu.
+Verze s hromádkami si pro každou délku pamatuje nejmenší hodnotu, na které
+podposloupnost té délky může skončit — slice, který je vždycky setříděný, takže
+umístit novou hodnotu je binární vyhledávání. To je `O(n log n)` a tentýž případ
+vrátí za jedenáct milisekund. Změřeno, na tomto stroji, s těmi dvěma programy,
+které jsou v této ulici.
+
+Odpověď na ten případ je `881`, což je zhruba `2√n`. Takhle vypadá nejdelší
+výstup v seznamu náhodných hodnot a stojí za to si to odnést do místnosti: je to
+způsob, jak víš, že tvůj vlastní výstup nedává nesmysl, dřív než ti to řekne
+tazatel.
+'''
+hints = [
+  "tails není podposloupnost. Jeho délka je odpověď; jeho obsah jsou jen nejlepší koncové hodnoty.",
+  "Ostře rostoucí znamená, že nahradíš první tail, který je >= value, takže podmínka hledání je tails[mid] < value.",
+  "Vyběhnout za konec tails znamená, že tahle hodnota prodlužuje dosud nejdelší řadu — přidej ji pomocí append.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "go.hacker.21.bits"
+title = "Ten, který je sám"
+story = "Každý lístek je naskenovaný dvakrát kromě jednoho. Nedovolí ti použít mapu a nedovolí ti řadit."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` nezáporných celých čísel, v nichž se
+každá hodnota objevuje přesně dvakrát kromě jedné.
+
+Vypiš čtyři řádky:
+
+1. hodnotu, která se objevuje jednou, nalezenou pomocí **xor** a konstantní
+   paměti navíc
+2. kolik bitů `1` je v ní nastaveno
+3. `POW2 YES`, pokud je mocninou dvou, jinak `POW2 NO` (`0` není)
+4. hodnotu s vynulovaným nejnižším nastaveným bitem, nebo `0`, pokud žádný
+   nemá
+
+```
+input:  5
+        4 1 2 1 2
+output: 4
+        1
+        POW2 YES
+        0
+```
+
+`x ^ x == 0` a `x ^ 0 == x`, a xor nezajímá, v jakém pořadí se to děje. To
+je celý první řádek. `x & (x - 1)` vynuluje nejnižší nastavený bit, což dává
+třetí a čtvrtý řádek zadarmo.
+'''
+hints = [
+  "Dvojice se vyruší samy, ať přijdou v jakémkoli pořadí, takže stačí jeden fold přes slice.",
+  "Počítání bitů nulováním nejnižšího pokaždé běží jednou na každý nastavený bit, ne jednou na bit šířky.",
+  "Mocnina dvou má nastavený přesně jeden bit, takže vynulování nejnižšího nechá nulu — a samotnou nulu musíš vyloučit ručně.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "go.hacker.22.matrix"
+title = "Otoč půdorys"
+story = "Plán je vzhůru nohama a na stole není místo na jeho druhou kopii."
+brief = '''
+První řádek je `n`. Dalších `n` řádků je mřížka `n × n` celých čísel.
+
+Vypiš mřížku otočenou o **90° po směru hodinových ručiček**, `n` řádků hodnot
+oddělených mezerami. Pak vypiš hodnoty původní mřížky ve **spirálovém
+pořadí** — vnější prstenec po směru hodinových ručiček od levého horního
+rohu, směrem dovnitř — na jeden řádek.
+
+```
+input:  3
+        1 2 3
+        4 5 6
+        7 8 9
+output: 7 4 1
+        8 5 2
+        9 6 3
+        1 2 3 6 9 8 7 4 5
+```
+
+Otočení je transpozice a pak obrácení každého řádku, a oba kroky jsou
+prohození — takže nepotřebuje druhou mřížku. Říct to nahlas je půlka otázky.
+Tady si původní mřížku stejně musíš nechat, protože spirála ji potom
+prochází: zkopíruj jednou, kopii otoč na místě a řekni, proč tam ta kopie je.
+Tazatel, který chce jen otočení, chce `O(1)` paměti navíc.
+'''
+hints = [
+  "Transponuj prohazováním jen nad diagonálou — c začíná na r + 1 — jinak všechno prohodíš zpátky.",
+  "Spirála chce původní mřížku, takže zkopíruj před otočením. append([]int64(nil), row...) je jednořádková kopie řádku.",
+  "Ty dva `if` uvnitř spirálové smyčky jsou to, co zabrání dvojímu průchodu jediného prostředního řádku nebo sloupce.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "go.hacker.23.trie"
+title = "Krabice s prefixy"
+story = "Automatické doplňování pro tabuli zastávek — to poctivé, které doplňuje jen to, co na seznamu opravdu je."
+brief = '''
+První řádek je `n q`. Dalších `n` řádků jsou slova malými písmeny k vložení.
+Dalších `q` řádků jsou dotazy, každý `WORD <s>` nebo `PREFIX <s>`.
+
+Postav trii a odpověz:
+
+* `WORD <s>` → `YES`, pokud bylo `s` vloženo, jinak `NO`
+* `PREFIX <s>` → kolik vložených slov začíná na `s`
+
+Pak vypiš `NODES <k>`, počet uzlů včetně kořene.
+
+```
+input:  3 3
+        tram
+        tramway
+        train
+        WORD tram
+        PREFIX tra
+        WORD tra
+output: YES
+        3
+        NO
+        NODES 10
+```
+
+Drž na každém uzlu počet, kolik vložených slov jím prochází, a `PREFIX` je
+průchod bez počítání na konci.
+'''
+hints = [
+  "Jeden slice uzlů, děti drží indexy do něj. Index 0 je kořen, takže 0 slouží zároveň jako `žádné dítě`.",
+  "`through` se zvyšuje na uzlu, na který vstupuješ, takže kořen nikdy nepočítá sám sebe.",
+  "Dotaz, který z trie vypadne, odpoví NO a 0 bez zvláštního případu — nes příznak a přestaň procházet.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "go.hacker.24.inversions"
+title = "Ten, který chytnou hodiny"
+story = "První otázka odpoledního kola. Naivní odpověď je správná, a je to špatná odpověď."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádné pole
+není — postavíš ho sám, **přesně** tímto generátorem, v aritmetice `uint64`,
+která v Go přetéká bez jakýchkoli okolků:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407
+    next value = (x >> 33) % 1000000007
+```
+
+Spočítej **inverze**: dvojice `i < j`, kde `a[i] > a[j]`. Vypiš počet, pak
+`MAX <largest value>`.
+
+```
+input:  8 1
+output: 19
+        MAX 908834774
+```
+
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`.
+
+**Tahle ulice vynucuje svou složitost, a je to jediný druh, který to
+dokáže.** Jeden skrytý případ je `n = 200000`. Dvojitá smyčka `O(n²)` — což
+je to, co je ve startovním kódu — je `2 × 10^10` porovnání a nedoběhne
+v pětisekundovém limitu běhu. Počítání inverzí během merge sortu je
+`O(n log n)` a doběhne asi za dvacet milisekund. Změřeno, na tomto stroji,
+s těmito dvěma programy.
+
+Odpověď pro `n = 200000` je `9990744366`, což se nevejde do `int32`. Na
+64bitovém sestavení je `int` v Go 64 bitů a projde ti to; stejně napiš
+`int64`, protože verze této otázky, která poběží někde jinde, ti to
+neodpustí.
+'''
+hints = [
+  "Maximum vezmi před řazením. Merge sort ti slice pod rukama přeuspořádá a je to totéž podkladové pole.",
+  "Když v merge vyhraje hodnota zprava, každý zbývající prvek levé poloviny je větší než ona — to je mid-left inverzí naráz a je to celý trik.",
+  "copy(values[lo:hi], scratch[lo:hi]) zapíše slitý úsek zpátky; Fenwickův strom je druhá odpověď O(n log n) a v místnosti stojí za to ji pojmenovat.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "go.hacker.25.test-cases"
+title = "Následuje T testovacích případů"
+story = "Tvar, který používá každé výběrové kolo, a chyba, kterou každý kandidát napíše aspoň jednou: druhý případ si pamatuje první."
+brief = '''
+První řádek je `T`, počet nezávislých testovacích případů. Každý případ je
+řádek s `n` a pak řádek s `n` celými čísly — a když je `n` rovno `0`, je ten
+druhý řádek prázdný.
+
+Pro každý případ vypiš **druhou největší různou** hodnotu, nebo `NONE`, pokud
+jsou méně než dvě různé hodnoty. Po všech vypiš `CASES <T>`.
+
+```
+input:  3
+        5
+        3 1 4 1 5
+        3
+        7 7 7
+        0
+
+output: 4
+        NONE
+        NONE
+        CASES 3
+```
+
+Tohle je standardní obal soutěžních výběrových kol a kandidáty potápí
+z jednoho důvodu: stav, který měl být na každý případ zvlášť, byl
+deklarován před smyčkou. Každý akumulátor, každá mapa, každé `best` patří
+**dovnitř** `for`.
+
+`bufio.Scanner` se `ScanWords` čte po tokenech, ne po řádcích, a prázdný
+řádek pro `n = 0` přestává být zvláštním případem úplně — což je druhá věc,
+kterou tenhle tvar učí.
+'''
+hints = [
+  "Přesuň mapu dovnitř smyčky. To je celá oprava a je to celá ulice.",
+  "map[int64]struct{} je idiomatická množina; struct{} nezabírá místo a říká `jen členství`.",
+  "Procházení mapy je záměrně neuspořádané, takže posbírej a seřaď, než můžeš mluvit o `druhé největší`.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "go.hacker.26.statistics"
+title = "Šest desetinných míst"
+story = "Chtějí čísla zaokrouhlená tak, jak říká specifikace, ne tak, jak je náhodou tiskne tvůj jazyk."
+brief = '''
+První řádek je `n`, nejméně `1`. Druhý řádek je `n` celých čísel.
+
+Vypiš tři řádky, každý na **šest desetinných míst**: průměr, **populační**
+směrodatnou odchylku (děl `n`, ne `n - 1`) a medián — který je pro sudé `n`
+průměrem dvou prostředních hodnot.
+
+```
+input:  5
+        2 4 4 4 5
+output: 3.800000
+        0.979796
+        4.000000
+```
+
+Tahle ulice se hodnotí s `match = "float:1e-6"`, takže porovnání je
+numerické: `3.8` i `3.800000` projdou, a hodnota lišící se o `1e-7` projde
+také. To je záměr — nejde o tvůj formátovač, jde o to, že `sum / n`
+v celočíselné aritmetice dá `3`, a že medián sudé délky je hranice, kterou
+lidé pod časovým tlakem spletou.
+
+Go za tebe nepřevede: `int64 / int` se nezkompiluje a
+`float64(sum) / float64(n)` je převod, který musíš napsat. Ta přísnost je tu
+na tvé straně.
+
+Populační, ne výběrová. Přečti si zadání dvakrát.
+'''
+hints = [
+  "Převeď na float64 před dělením, ne po něm. sum / int64(n) už zlomek zahodilo.",
+  "Populační rozptyl je průměr čtverců odchylek — děl součet n.",
+  "Pro sudý počet je medián průměr values[n/2-1] a values[n/2], a v tom odečtení bydlí chyba o jedničku.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "go.hacker.27.commands"
+title = "Problém je ten vstup"
+story = "Log pokladny vypadne ze stroje zalomený na osmdesát sloupců a počet nahoře je počet příkazů, ne slov."
+brief = '''
+První řádek je `k`, počet **příkazů**, které následují. Příkazy jsou tokeny
+oddělené bílými znaky, nabalené přes zbývající řádky tak, jak se zrovna
+zalomily — libovolný počet na řádek, libovolné množství mezer, možná
+prázdný řádek na konci.
+
+| příkaz | tokenů | účinek |
+| --- | --- | --- |
+| `ADD <cents>` | dva | vlož položku |
+| `VOID` | jeden | odeber poslední položku, nebo nedělej nic, pokud žádná není |
+| `TOTAL` | jeden | vypiš aktuální součet |
+| `CLEAR` | jeden | odeber všechno |
+
+Po `k` příkazech vypiš `COMMANDS <k>` a `ITEMS <kolik jich zbylo>`.
+
+```
+input:  5
+        ADD 600 ADD 2800 TOTAL VOID TOTAL
+output: 3400
+        600
+        COMMANDS 5
+        ITEMS 1
+```
+
+`k` počítá příkazy a `ADD` je jeden příkaz složený ze dvou tokenů — takže
+smyčka, která běží `k`-krát a čte jeden token na kolo, se zastaví na špatném
+místě. Načti `k` příkazů a argument vytáhni jen tehdy, když ho příkaz má.
+
+`VOID` na prázdné pokladně a `TOTAL` dřív, než bylo cokoli přidáno, musí
+obojí fungovat. V zadání není řádek, který by říkal, že se to nemůže stát,
+a na skutečném výběrovém kole je to mlčení specifikace.
+'''
+hints = [
+  "bufio.ScanWords sloučí každou sérii mezer, tabulátorů a odřádkování, takže na zalomení v souboru přestane záležet ve chvíli, kdy přestaneš číst řádky.",
+  "Argument ADD vytáhni uvnitř větve ADD, ze stejného scanneru. Počítadlo smyčky počítá příkazy, ne tokeny.",
+  "items[:len(items)-1] na prázdném slice zpanikaří, takže VOID potřebuje kontrolu délky, kterou by Vec::pop udělal za tebe.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "go.hacker.29.dijkstra"
+title = "Ne každá ulice je stejně dlouhá"
+story = "Každá mapa, kterou jsi dosud splnil, počítala skoky. Tramvaj nezajímá, kolik je zastávek; zajímá ji, jak dlouho trvají."
+brief = '''
+Na standardním vstupu je `n m seed`: `n` zastávek, `m` neorientovaných
+ohodnocených hran. Graf si postav sám, **přesně** tímto generátorem,
+v `uint64` (které v Go přetéká bez jakýchkoli okolků):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for i in 1..n:                  # a spanning tree first, so it is connected
+    p = next() % i
+    w = next() % 1000 + 1
+    edge (p, i, w)
+for the remaining m - (n-1) edges:
+    a = next() % n
+    b = next() % n
+    w = next() % 1000 + 1
+    edge (a, b, w)
+```
+
+Vypiš součet nejkratších vzdáleností ze zastávky `0` do každé dosažitelné
+zastávky (včetně samotné `0`, která je `0`), pak `MAX <the largest of them>`.
+
+```
+input:  6 8 1
+output: 4594
+        MAX 1582
+```
+
+**Složitost je tu vynucená.** Jeden skrytý případ je `n = 100000`,
+`m = 200000`. Dijkstra je správný algoritmus tak či tak; o čem rozhodují
+hodiny, je prioritní fronta. Projít každý nenavštívený uzel kvůli minimu je
+`O(V²)` — `10^10` porovnání a proti pětisekundovému limitu běhu to trvá
+šestnáct sekund. Binární halda z toho udělá `O((V + E) log V)` a stejný
+případ se vrátí za čtyřicet čtyři milisekund. Obojí změřeno na tomto stroji,
+s těmi dvěma programy, které se s touto ulicí dodávají: startovní kód je ta
+prohledávací verze a dostane správnou odpověď — jen třikrát pozdě.
+
+`container/heap` nad slicem `{dist, node}`, řazeným podle `dist`. Žádné
+decrease-key neexistuje a nepotřebuješ ho: vlož zlepšenou vzdálenost jako
+nový záznam a přeskoč každý vybraný záznam, jehož vzdálenost je už horší než
+ta, kterou máš zaznamenanou. To přeskočení zastaralého záznamu je řádek, na
+který lidé zapomínají.
+'''
+hints = [
+  "Less porovnává dist, takže container/heap ti dá min-haldu přímo — žádné Reverse není potřeba, na rozdíl od BinaryHeap v Rustu.",
+  "`if cur.dist > dist[cur.node] { continue }` je přeskočení zastaralého záznamu. Bez něj je algoritmus pořád správný a halda se plní zastaralými záznamy.",
+  "Polovina generátoru s kostrou zaručuje, že každý uzel je dosažitelný, takže filtr na inf nikdy nic neodstraní — stejně ho tam nech, protože verze s nedosažitelnými uzly je ta doplňující otázka.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "go.hacker.30.range-queries"
+title = "Součty, které se pořád mění"
+story = "Čtyři miliony operací pokladny z jednoho dne napříč celým řetězcem, polovina z nich opravy, a někdo chce průběžné součty."
+brief = '''
+Na standardním vstupu je `n q seed`. Postav pole `n` hodnot a pak spusť `q`
+operací, všechno ze stejného generátoru:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+values[i] = next() % 1000            for i in 0..n
+
+for each of the q operations:
+    a = next(); b = next(); c = next()
+    if a % 2 == 0:   UPDATE  values[b % n] += (c % 1000) + 1
+    else:            QUERY   l = b % n, r = c % n, swap them if l > r,
+                             and add sum(values[l..r] inclusive) to a running total
+```
+
+Vypiš průběžný součet všech odpovědí na dotazy, pak `UPDATES <k>`.
+
+```
+input:  8 6 1
+output: 4112
+        UPDATES 3
+```
+
+**Složitost je tu vynucená, a dalo to práci.** Naivní odpověď — pro každý
+dotaz projít rozsah smyčkou — je `O(n)` na dotaz a kompilátor z té smyčky
+udělá něco překvapivě rychlého. Malé případy ji nechytnou. Velký skrytý
+případ je proto `n = 500000, q = 4000000`, kde naivní odpověď sáhne řádově
+na `10^11` prvků a nedoběhne v pětisekundovém limitu běhu, zatímco Fenwickův
+strom zvládne celou věc asi za desetinu sekundy. Obojí změřeno, s těmi dvěma
+programy v této ulici.
+
+*Bodová aktualizace, součet přes rozsah* je přesně ten tvar, pro který
+Fenwickův strom existuje. Tři krátké metody — add, prefix a range jako
+rozdíl dvou prefixů — a `i & -i` je způsob, jak krokovat po nejnižším
+nastaveném bitu.
+'''
+hints = [
+  "Strom postav voláním Add jednou na každou počáteční hodnotu. Stavba zdola nahoru v O(n) je pěkná optimalizace a není to, co hodiny testují.",
+  "i & -i izoluje nejnižší nastavený bit. Jeho přičtení jde stromem nahoru; odečtení jde dolů.",
+  "Range(l, r) je Prefix(r+1) - Prefix(l) a trefit tuhle dvojici chyb o jedničku je většina ladění.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "go.hacker.31.palindrome"
+title = "Pozpátku stejné"
+story = "Otázka z první dvacítky, v nějaké podobě položená na většině výběrových kol, a ta, kterou většina lidí jednou napsala a nikdy nepochopila."
+brief = '''
+Na standardním vstupu je `n alphabet seed`. Řetězec si postav sám:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+s[i] = 'a' + (next() % alphabet)      for i in 0..n
+```
+
+Vypiš délku nejdelšího palindromického podřetězce, pak `AT <index>` —
+začátek (od 0) toho **nejlevějšího** z té délky.
+
+```
+input:  12 3 5
+output: 5
+        AT 1
+```
+
+Rozšiřuj kolem každého středu. Středů je `2n - 1`, ne `n`: každý znak je
+středem pro palindromy liché délky a každá mezera mezi dvěma znaky je středem
+pro ty sudé délky. Zapomenout na mezery je důvod, proč správně vypadající
+řešení vrátí `1` na `abba`.
+
+**Co testy vynucují a co ne**, na rovinu. Skrytý případ, který dělá tu práci,
+je `n = 20000` nad **jedno**písmennou abecedou. Je to nejhorší případ pro
+rozšiřování kolem středu — každý střed doběhne až na konec řetězce — takže
+správná odpověď tam odvede celé své `O(n²)` a přesto doběhne asi za desetinu
+sekundy. Zároveň je to, co odmítne odpověď `O(n³)`, zkontroluj-každý-
+podřetězec-a-každý-otestuj: ta proti pětisekundovému limitu běží ještě po
+dvaceti sekundách.
+
+Druhý velký případ, `n = 20000` nad dvoupísmennou abecedou, je případ na
+**správnost**, ne na rychlost. Na náhodném binárním řetězci test na palindrom
+selže po jednom dvou znacích, takže ho i kubická odpověď zvládne pod sekundu.
+Kontroluje, že tvůj generátor a tvé rozhodování o nejlevějším indexu souhlasí
+s našimi ve velkém. Nekontroluje, že jsi byl rychlý. Obě čísla změřena na
+tomto stroji.
+
+Takže: testy odmítají kubickou a přijímají kvadratickou. **Nevyžadují**
+Manacherův algoritmus, což je odpověď `O(n)`. Věz, že existuje, protože
+„a umíš to lépe než kvadraticky?“ je doplňující otázka, kvůli které se tahle
+otázka obvykle pokládá.
+'''
+hints = [
+  "Dvě volání na střed: (c, c) pro liché délky a (c, c+1) pro sudé. Ve startovním kódu to druhé chybí.",
+  "Když se smyčka zastaví, i a j se obě posunuly o jedna za palindrom — takže začíná na i+1 a jeho délka je j-i-1.",
+  "Aktualizuj jen u ostře delšího palindromu a z každé délky si nech ten nejvíc vlevo, což je to, na co se AT ptá.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "go.hacker.32.modular"
+title = "Modulo miliarda a sedm"
+story = "Ta fráze stojí dole pod zadáním a půlka místnosti neví, co po nich chce."
+brief = '''
+Na standardním vstupu je `n q seed`. Vygeneruj `q` dotazů:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for each of the q queries:
+    a = next() % (n + 1)
+    b = next() % (a + 1)          # so 0 <= b <= a <= n
+```
+
+Pro každý dotaz spočítej kombinační číslo `C(a, b)` **modulo 1000000007**.
+Vypiš součet všech `q` odpovědí, sám modulo `1000000007`, pak
+`LAST <the final query's answer>`.
+
+```
+input:  10 5 3
+output: 209
+        LAST 1
+```
+
+`C(a, b)` má při těchto velikostech stovky tisíc číslic, takže se nikdy
+nespočítá a pak nezredukuje — každé násobení se redukuje průběžně. Problém je
+dělení: `a! / (b! (a-b)!)` nemá v modulární aritmetice žádný význam. Co ho
+nahrazuje, je **modulární inverze**, a protože `1000000007` je prvočíslo,
+dává ti ji malá Fermatova věta: `inverse(v) = v^(p-2) mod p`, spočítaná
+rychlým umocňováním asi ve třiceti umocněních na druhou.
+
+Takže: předpočítej jednou `factorial[0..n]` a každý dotaz zodpověz jako
+`f[a] * inv(f[b]) * inv(f[a-b])`.
+
+**Složitost je tu vynucená.** Jeden skrytý případ je `n = 200000`,
+`q = 200000`. Počítat každý koeficient nezávisle — vynásobit `b` členů,
+vydělit `b` členy, jedna modulární inverze na každý — nedoběhne
+v pětisekundovém limitu běhu; to je startovní kód. Jedna sdílená tabulka
+faktoriálů doběhne hluboko pod sekundu. Obojí změřeno na tomto stroji.
+
+Každý mezivýsledek je součin dvou hodnot pod `2^30`, takže se vejde do
+`int64` a nic nepřeteče. `int` v Go je tu 64 bitů, ale napiš `int64` a mysli
+to vážně — verze této otázky, která poběží někde jinde, tak velkorysá nebude.
+'''
+hints = [
+  "Redukuj po každém násobení, nikdy až na konci. int64 pojme součin dvou hodnot pod P; nepojme faktoriál.",
+  "inverse(v) je power(v, P-2) a funguje to jen proto, že P je prvočíslo — to je tady celý obsah malé Fermatovy věty.",
+  "Předpočítání i inverzních faktoriálů, pozpátku od inverse(factorial[n]), odstraní dvě volání power na dotaz. K projití to není potřeba a stojí za to to říct nahlas.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "go.hacker.33.grid-paths"
+title = "Přes blok, nikdy zpátky"
+story = "Rozvozová mřížka se třemi ulicemi zavřenými kvůli bambusovému lešení. Kolika způsoby napříč a která cesta je nejlevnější."
+brief = '''
+Na standardním vstupu je `r c pct seed`. Mřížku si postav sám, po řádcích,
+a pro každou buňku vytáhni **dvě** hodnoty:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for i in 0..r, for j in 0..c:
+    a = next(); b = next()
+    the cell is BLOCKED if  a % 100 < pct,
+        except (0,0) and (r-1,c-1), which are never blocked
+    the cell costs  (b % 9) + 1
+```
+
+Pohybuj se jen **doprava** nebo **dolů**, přes volné buňky. Vypiš:
+
+1. `PATHS <k>` — kolik různých cest vede z `(0,0)` do `(r-1,c-1)`, modulo
+   `1000000007`
+2. `MIN <cost>` — nejmenší celkovou cenu cesty, včetně obou koncových bodů,
+   nebo `-1`, pokud žádná cesta není
+
+```
+input:  3 4 30 2
+output: PATHS 9
+        MIN 27
+```
+
+Jeden průchod po řádcích zvládne obojí: cesty do buňky jsou součet cest do ní
+shora a zleva a její nejlepší cena je její vlastní cena plus levnější z těch
+dvou. Protože se vždy pohybuješ jen doprava nebo dolů, jsou ty dvě buňky,
+které potřebuješ, vždy už hotové — žádná rekurze, žádná množina navštívených.
+
+Počet `PATHS` je modulo `1000000007` z obvyklého důvodu: na skrytém případu
+`1000 × 1000` má skutečné číslo přes šest set číslic. Redukuj při sčítání.
+
+**Co velký případ vynucuje:** odmítne každou odpověď, která cesty vyjmenovává.
+Je jich víc než atomů v místnosti. Nerozlišuje tabulku zdola nahoru od
+memoizované rekurze — obě jsou lineární v počtu buněk a obě pohodlně projdou.
+'''
+hints = [
+  "Vytáhni obě hodnoty pro každou buňku, včetně obou rohů — generátor je nepřeskakuje, jen je odmítá zablokovat.",
+  "Volná buňka bez volného souseda nahoře ani vlevo je dosažitelná nula cestami a nemá nejlepší cenu; nech inf znamenat `nedosažitelné` a ohlídej sčítání.",
+  "Cíl může být volný a přesto nedosažitelný, což je přesně případ, kdy PATHS je 0 a MIN je -1. Jeden ze skrytých případů je takový.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "go.hacker.34.stable-sort"
+title = "Shody drží své místo"
+story = "Dva jezdci skončili se stejným skóre a žebříček je při každém překreslení seřadí jinak."
+brief = '''
+Na standardním vstupu je `n buckets seed`. Postav `n` jezdců, kde jezdec `i`
+má index `i` a skóre:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+score[i] = next() % buckets           for i in 0..n
+```
+
+Seřaď jezdce podle skóre **sestupně**. Jezdci se stejným skóre si musí
+zachovat pořadí, v jakém přišli. Vypiš jejich indexy oddělené mezerami, pak
+`TIES <k>` — kolik sousedních dvojic v tvém seřazeném pořadí má stejné skóre.
+
+```
+input:  8 3 5
+output: 1 5 6 0 2 3 4 7
+        TIES 6
+```
+
+`buckets` je malé, takže skoro všechno je shoda, a odpověď je téměř celá
+určena tím, co se s nimi stane.
+
+**Tohle je ulice o tom, vědět, který sort držíš v ruce.** `sort.SliceStable`
+je stabilní — stejné prvky si zachovají vzájemné pořadí. `sort.Slice` **není**
+a na skutečném vstupu to viditelně nezachová: je to pattern-defeating
+quicksort, obvykle je rychlejší a o shodách neslibuje vůbec nic. Startovní
+kód ho používá a skryté případy jsou dost velké, aby je prokazatelně
+zamíchal. (Při `n = 8` se to náhodou nestane — a proto by malý test nic
+nedokázal a proto je tu malý případ ten *viditelný*, a ne ten, který tě
+posuzuje.)
+
+Správné odpovědi jsou dvě a měl bys umět dát obě. Použij `sort.SliceStable`.
+**Nebo** si nech `sort.Slice` a udělej porovnání **úplné** — když jsou skóre
+stejná, porovnej index, takže se žádné dva prvky nikdy neporovnají jako
+stejné a stabilita přestane být otázkou. Ta druhá je to, po čem sáhnout
+standardně; nestabilní sort nemá co dokazovat, když je pořadí plně určeno.
+
+Moderní zápisy jsou `slices.SortFunc` a `slices.SortStableFunc`, jejichž
+porovnání vrací záporné číslo, nulu nebo kladné číslo místo `bool` —
+`cmp.Compare` je to, které ti dá přesně `-1`, `0` nebo `1`. Jsou generické,
+ne reflektivní, takže jsou rychlejší, a totéž rozlišení stability platí se
+stejnými dvěma jmény. Znej obojí — tenhle balíček píše `sort`, protože to je
+to, co budeš číst ve většině Go, které ti někdo předá.
+'''
+hints = [
+  "Jedno slovo: ze sort.Slice se stane sort.SliceStable. To je stabilní odpověď.",
+  "Druhá odpověď si nechá sort.Slice a při stejném skóre porovná index — úplné uspořádání, takže nezbudou žádné shody, u kterých by bylo co dělat nestabilně.",
+  "TIES počítá sousední stejná skóre v hotovém pořadí a ten počet je stejný, ať jsi napsal kteroukoli z těch dvou — prozradí tě pořadí indexů.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "go.hacker.28.lru"
+title = "Hodiny"
+story = "Stejná místnost, poslední otázka, a hodiny na zdi jsou ty, které vyměnili za kratší."
+brief = '''
+První řádek je `cap q`. Dalších `q` řádků je `PUT <key> <value>` nebo
+`GET <key>`.
+
+Implementuj cache s pevnou kapacitou, která při zaplnění vyhodí **nejdéle
+nepoužitou** položku. `GET` i `PUT` se oba počítají jako použití klíče.
+
+Pro každý `GET` vypiš hodnotu, nebo `-1`, pokud chybí. Na konci vypiš
+přeživší klíče, naposledy použitý první, oddělené mezerami — nebo `-`, pokud
+je cache prázdná — pak `EVICTED <k>`.
+
+```
+input:  2 6
+        PUT 1 10
+        PUT 2 20
+        GET 1
+        PUT 3 30
+        GET 2
+        GET 3
+output: 10
+        -1
+        30
+        3 1
+        EVICTED 1
+```
+
+Projdi ukázku krok za krokem: `GET 1` udělá `1` zase čerstvou, takže když
+`PUT 3` potřebuje místo, jde pryč `2`. `GET 2` mine. `GET 3` trefí a udělá
+z `3` naposledy použitou, a proto se přeživší vypíšou jako `3 1`.
+
+Učebnicová odpověď je hashovací mapa do **obousměrně zřetězeného seznamu**
+a Go jeden má ve standardní knihovně: `container/list`. `PushFront`,
+`MoveToFront`, `Back` a `Remove` jsou všechny O(1), takže každá operace tady
+je O(1) a můžeš to říct bez vytáček. Mapa drží `*list.Element`; `Value`
+prvku drží klíč i hodnotu, protože vyhazování začíná od seznamu a musí
+vědět, kterou položku mapy smazat.
+'''
+hints = [
+  "Value prvku musí nést klíč, jinak vyhazování zezadu nenajde položku mapy, kterou má smazat.",
+  "Přepsání klíče, který už je přítomný, není vyhození — než rozhodneš, že je cache plná, podívej se do mapy.",
+  "Průchod od Front k Back je už od naposledy použitého, takže poslední řádek žádné řazení nepotřebuje.",
+]

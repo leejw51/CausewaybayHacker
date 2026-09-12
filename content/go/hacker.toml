@@ -6,6 +6,20 @@
 #
 # Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
 
+#
+# **Which quests enforce their complexity differs by land, and that is a
+# measurement rather than an oversight.** All four packs hold the same problems
+# in the same order under the same ids, and the small cases are identical
+# wherever the problem is the same problem. What differs is the big case that
+# rejects a correct-but-slow answer: it is sized per land, and in several
+# quests it exists in one land and not another. Whether a generated input can
+# punish the naive answer is a fact about the language and its compiler, and
+# each land measured it rather than assuming it.
+# Go converts `02.window`, `08.kth-largest` and `20.lis`. `02` takes
+# n = 500000 rather than the usual 200000 because at 200000 the quadratic
+# answer came home in 6.3 s against a 5 s limit, and a 1.26x margin is a
+# coincidence rather than a gate.
+
 pack = "go.hacker"
 land = "go"
 category = "hacker"
@@ -134,22 +148,54 @@ concepts     = ["two-pointers", "complexity", "slices"]
 requires     = ["go.hacker.01.two-sum"]
 map          = { x = 0.260, y = 0.054, kind = "quest" }
 brief        = '''
-Line one is `n s`. Line two is `n` **positive** integers.
+Standard input is two integers, `n` and `seed`. There is no array in the input
+— you build it, with **exactly** this generator, in `uint64` arithmetic, which
+wraps in Go without any ceremony:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407
+    next value = (x >> 33) % 1000000007
+
+s = (sum of all n values) / 2
+```
+
+That division is integer division, and it is why there is always an answer:
+the whole array reaches `s` by construction.
 
 Find the shortest contiguous run whose sum is at least `s`. Print its length,
 then its 1-based start index. If several runs are equally short, take the
-leftmost. If no run reaches `s`, print `0` and `0`.
+leftmost.
 
 ```
-input:  6 7
-        2 3 1 2 4 3
-output: 2
-        5
+input:  8 1
+output: 3
+        3
 ```
 
-Both ends only move right, so every element is added once and removed once.
-Recomputing a sum inside the inner loop turns this back into the quadratic
-answer.
+For `8 1` the array is
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`.
+Its total is `3330417819`, so `s` is `1665208909`, and the three values
+starting at index `3` are the shortest run that reaches it.
+
+**This quest enforces its complexity.** One hidden case is `n = 500000`. The
+starter is the honest quadratic answer — from every start, walk forward until
+the sum reaches `s` — and because `s` is half the total, each of those walks
+is about `n / 2` elements long. That is on the order of `10^11` additions and
+it takes thirty-eight seconds against a five second run limit. Both ends only
+moving right is `O(n)` — every element is added once and removed once — and
+the same case comes back in seven milliseconds. Measured, on this machine,
+with the two programs in this quest.
+
+The case is `n = 500000` rather than `200000` because the inner loop is a
+single add with an early break and the compiler is good at exactly that: at
+`200000` the quadratic answer still lands at six seconds, which is too close
+to the limit to be a gate.
+
+The total is around `2.5 × 10^14` at that size. Accumulate it in `int64`. Go's
+`int` is 64 bits on this build so plain `int` gets away with it, which is
+precisely why the habit has to come from you rather than from the compiler.
 '''
 starter      = '''
 package main
@@ -160,21 +206,43 @@ import (
 	"os"
 )
 
+func generate(n int, seed uint64) []int64 {
+	x := seed
+	values := make([]int64, n)
+	for i := 0; i < n; i++ {
+		x = x*6364136223846793005 + 1442695040888963407
+		values[i] = int64((x >> 33) % 1000000007)
+	}
+	return values
+}
+
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 	var n int
-	var s int64
-	fmt.Fscan(reader, &n, &s)
-	nums := make([]int64, n)
-	for i := range nums {
-		fmt.Fscan(reader, &nums[i])
+	var seed uint64
+	fmt.Fscan(reader, &n, &seed)
+
+	values := generate(n, seed)
+	var total int64
+	for _, v := range values {
+		total += v
 	}
+	s := total / 2
 
+	// correct, and far too slow: this is what the big hidden case rejects
 	bestLen, bestStart := 0, 0
-
-	// walk `right` forward, pull `left` up while the window still reaches s
-	_ = nums
-	_ = s
+	for i := 0; i < n; i++ {
+		var sum int64
+		for j := i; j < n; j++ {
+			sum += values[j]
+			if sum >= s {
+				if bestLen == 0 || j-i+1 < bestLen {
+					bestLen, bestStart = j-i+1, i+1
+				}
+				break
+			}
+		}
+	}
 
 	fmt.Println(bestLen)
 	fmt.Println(bestStart)
@@ -189,32 +257,42 @@ import (
 	"os"
 )
 
+func generate(n int, seed uint64) []int64 {
+	x := seed
+	values := make([]int64, n)
+	for i := 0; i < n; i++ {
+		x = x*6364136223846793005 + 1442695040888963407
+		values[i] = int64((x >> 33) % 1000000007)
+	}
+	return values
+}
+
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 	var n int
-	var s int64
-	fmt.Fscan(reader, &n, &s)
-	nums := make([]int64, n)
-	for i := range nums {
-		fmt.Fscan(reader, &nums[i])
+	var seed uint64
+	fmt.Fscan(reader, &n, &seed)
+
+	values := generate(n, seed)
+	var total int64
+	for _, v := range values {
+		total += v
 	}
+	s := total / 2
 
 	bestLen, bestStart := 0, 0
 	left := 0
 	var sum int64
 
 	for right := 0; right < n; right++ {
-		sum += nums[right]
-		for left < right && sum-nums[left] >= s {
-			sum -= nums[left]
-			left++
-		}
-		if sum >= s {
-			length := right - left + 1
-			if bestLen == 0 || length < bestLen {
-				bestLen = length
-				bestStart = left + 1
+		sum += values[right]
+		// while the window still reaches s, record it and pull left up
+		for sum >= s {
+			if bestLen == 0 || right-left+1 < bestLen {
+				bestLen, bestStart = right-left+1, left+1
 			}
+			sum -= values[left]
+			left++
 		}
 	}
 
@@ -223,9 +301,9 @@ func main() {
 }
 '''
 hints = [
-  "Keep a running sum. Add nums[right] once per step and never recompute it.",
-  "Shrink from the left while dropping the leftmost element would still leave the window at or above s.",
-  "Record a new best only on a strictly shorter run, so the leftmost of each length is the one you keep.",
+  "Build the array first and total it in int64 — s is half that total, and the total is far past what 32 bits holds.",
+  "Keep a running sum. Add values[right] once per step and never recompute it; the moment the window reaches s, record it and drop values[left].",
+  "Record a new best only on a strictly shorter run, so the leftmost run of each length is the one you keep.",
 ]
 
 [quest.tests]
@@ -235,12 +313,10 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "sample", stdin = "6 7\n2 3 1 2 4 3\n",     expect = "2\n5\n", visible = true },
-  { name = "one",    stdin = "1 4\n4\n",               expect = "1\n1\n", visible = false },
-  { name = "never",  stdin = "3 11\n1 1 1\n",          expect = "0\n0\n", visible = false },
-  { name = "tail",   stdin = "8 15\n1 2 3 4 5 6 7 8\n", expect = "2\n7\n", visible = false },
-  # three windows of length 2 all reach s; `<=` instead of `<` keeps the last
-  { name = "ties",   stdin = "5 5\n1 4 1 4 1\n",       expect = "2\n1\n", visible = false },
+  { name = "sample", stdin = "8 1\n",          expect = "3\n3\n",           visible = true },
+  { name = "single", stdin = "1 7\n",          expect = "1\n1\n",           visible = false },
+  { name = "dozen",  stdin = "12 99\n",        expect = "6\n7\n",           visible = false },
+  { name = "big",    stdin = "500000 12345\n", expect = "249730\n248962\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 03
@@ -674,6 +750,12 @@ output: 5
 
 Two binary searches, or one clever one. Either way, a linear scan is the
 answer to a different question.
+
+The cases here are small: they check the pivot, the missing target and the
+unrotated list, not your speed — and no case could check it. The array arrives
+in the input, so reading it is already linear, and one search over a list you
+have just read costs the same either way. The bar on the linear scan is the
+interviewer's, not the clock's.
 '''
 starter      = '''
 package main
@@ -816,6 +898,11 @@ output: ate eat tea
 The key is the word with its letters sorted. Two words are anagrams exactly
 when their keys are equal, and that is a map lookup rather than a comparison
 against everything seen so far.
+
+The cases here are small: they check the grouping, the ordering and the
+repeated word, not your speed. Write the map-keyed answer anyway — a real `n`
+is thousands of words, and comparing each word against every group formed so
+far is what this question exists to weed out.
 '''
 starter      = '''
 package main
@@ -924,68 +1011,100 @@ concepts     = ["stacks-queues", "sorting", "complexity"]
 requires     = ["go.hacker.07.anagrams", "go.hacker.01.two-sum"]
 map          = { x = 0.955, y = 0.259, kind = "quest" }
 brief        = '''
-Line one is `n k`, with `1 <= k <= n`. Line two is `n` integers, which may
-repeat.
+Standard input is two integers, `n` and `seed`. There is no list in the input
+— you build it, with **exactly** this generator, in `uint64` arithmetic, which
+wraps in Go without any ceremony:
 
-Print the `k`-th largest **value** — duplicates count, so in `3 3 1` the
-2nd largest is `3`. Then print `HEAP <size>`, the number of elements you were
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407
+    next value = (x >> 33) % 1000000007
+
+k = n / 2 + 1
+```
+
+That division is integer division, so `1 <= k <= n` however small `n` is.
+
+Print the `k`-th largest **value** — duplicates count, so in `3 3 1` the 2nd
+largest is `3`. Then print `HEAP <size>`, the number of elements you were
 holding when you finished.
 
 ```
-input:  6 2
-        3 2 1 5 6 4
-output: 5
-        HEAP 2
+input:  8 1
+output: 189567123
+        HEAP 5
 ```
 
-Sorting the whole list answers it in `n log n`. The answer they are looking
-for keeps a **min-heap of size k** — push each value, pop when the heap grows
-past `k`, and the root is the answer at the end. `container/heap` is five
-methods on a slice type: `Len`, `Less`, `Swap`, `Push`, `Pop`. `Push` and
-`Pop` take a pointer receiver; the other three do not, and that asymmetry is
-the thing everyone gets wrong under a clock.
+For `8 1` the array is
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`
+and `k` is `5`. The five largest, in order, are
+`908834774 822192870 708211027 392341189 189567123`, so the answer is the last
+of them and you are holding five values when you stop.
+
+**What the big case enforces, and what it does not.** One hidden case is
+`n = 200000`, where `k` is `100001`. It rejects the answer that scans the
+whole list for the largest value `k` times over: that is `O(nk)`, two times
+`10^10` comparisons, forty-five seconds against a five second run limit, and
+it is what the starter does. It does **not** reject sorting the whole list —
+`n log n` is fast and a sort passes comfortably here. Say so out loud if you
+write the sort; pretending the clock rejected it is worse than writing it.
+
+The answer they are listening for is the **min-heap of size k**: push each
+value, pop when the heap grows past `k`, and the root is the answer at the
+end. That is `O(n log k)`, it holds `k` values rather than `n`, and it returns
+the big case in twenty-five milliseconds. Both numbers measured on this
+machine, with the two programs in this quest.
+
+`container/heap` is five methods on a slice type: `Len`, `Less`, `Swap`,
+`Push`, `Pop`. `Push` and `Pop` take a pointer receiver; the other three do
+not, and that asymmetry is the thing everyone gets wrong under a clock.
 '''
 starter      = '''
 package main
 
 import (
 	"bufio"
-	"container/heap"
 	"fmt"
 	"os"
 )
 
-type minHeap []int64
-
-func (h minHeap) Len() int           { return len(h) }
-func (h minHeap) Less(i, j int) bool { return h[i] < h[j] }
-func (h minHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
-
-func (h *minHeap) Push(x any) {
-	// append the value
-}
-
-func (h *minHeap) Pop() any {
-	// take the last element off and return it
-	return int64(0)
+func generate(n int, seed uint64) []int64 {
+	x := seed
+	values := make([]int64, n)
+	for i := 0; i < n; i++ {
+		x = x*6364136223846793005 + 1442695040888963407
+		values[i] = int64((x >> 33) % 1000000007)
+	}
+	return values
 }
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	var n, k int
-	fmt.Fscan(reader, &n, &k)
-	nums := make([]int64, n)
-	for i := range nums {
-		fmt.Fscan(reader, &nums[i])
+	var n int
+	var seed uint64
+	fmt.Fscan(reader, &n, &seed)
+
+	values := generate(n, seed)
+	k := n/2 + 1
+
+	// correct, and far too slow: k passes over the whole list, O(nk), which
+	// is what the big hidden case rejects
+	taken := make([]bool, n)
+	var answer int64
+	for round := 0; round < k; round++ {
+		best := -1
+		for i := 0; i < n; i++ {
+			if !taken[i] && (best < 0 || values[i] > values[best]) {
+				best = i
+			}
+		}
+		taken[best] = true
+		answer = values[best]
 	}
 
-	h := &minHeap{}
-	heap.Init(h)
-	_ = nums
-	_ = k
-
-	fmt.Println(0)
-	fmt.Printf("HEAP %d\n", h.Len())
+	fmt.Println(answer)
+	fmt.Printf("HEAP %d\n", k)
 }
 '''
 solution     = '''
@@ -1016,18 +1135,28 @@ func (h *minHeap) Pop() any {
 	return value
 }
 
+func generate(n int, seed uint64) []int64 {
+	x := seed
+	values := make([]int64, n)
+	for i := 0; i < n; i++ {
+		x = x*6364136223846793005 + 1442695040888963407
+		values[i] = int64((x >> 33) % 1000000007)
+	}
+	return values
+}
+
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	var n, k int
-	fmt.Fscan(reader, &n, &k)
-	nums := make([]int64, n)
-	for i := range nums {
-		fmt.Fscan(reader, &nums[i])
-	}
+	var n int
+	var seed uint64
+	fmt.Fscan(reader, &n, &seed)
+
+	values := generate(n, seed)
+	k := n/2 + 1
 
 	h := &minHeap{}
 	heap.Init(h)
-	for _, v := range nums {
+	for _, v := range values {
 		heap.Push(h, v)
 		if h.Len() > k {
 			heap.Pop(h)
@@ -1051,10 +1180,10 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "sample",  stdin = "6 2\n3 2 1 5 6 4\n",         expect = "5\nHEAP 2\n", visible = true },
-  { name = "dupes",   stdin = "9 4\n3 2 3 1 2 4 5 5 6\n",   expect = "4\nHEAP 4\n", visible = false },
-  { name = "single",  stdin = "1 1\n7\n",                   expect = "7\nHEAP 1\n", visible = false },
-  { name = "all-k",   stdin = "5 5\n9 9 9 9 9\n",           expect = "9\nHEAP 5\n", visible = false },
+  { name = "sample", stdin = "8 1\n",          expect = "189567123\nHEAP 5\n",      visible = true },
+  { name = "single", stdin = "1 7\n",          expect = "59165271\nHEAP 1\n",       visible = false },
+  { name = "dozen",  stdin = "12 99\n",        expect = "500921473\nHEAP 7\n",      visible = false },
+  { name = "big",    stdin = "200000 12345\n", expect = "463098334\nHEAP 100001\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 09
@@ -1589,6 +1718,11 @@ from, or you cannot refill after popping it.
 `container/heap` is five methods on a slice type. `Len`, `Less` and `Swap`
 take a value receiver; `Push` and `Pop` take a pointer receiver because they
 change the length.
+
+The cases here are small: they check the ragged list, the empty list and the
+duplicates, not your speed. Concatenating everything and sorting it would
+clear all four. The heap is still the answer for a real `k` — that is the
+interviewer's bar here, not the clock's.
 '''
 starter      = '''
 package main
@@ -2235,6 +2369,11 @@ output: 3
 Union-find: every stop points at a parent, `find` walks to the root, `union`
 points one root at the other. Compress the path on the way back out of `find`
 and it is effectively constant time per query.
+
+The cases here are small: they check the redundant links and the isolated
+stops, not your speed. With four links nothing can measure path compression,
+and the `find` that walks to the root without compressing passes every case
+here. Compress anyway, and be able to say what it costs.
 '''
 starter      = '''
 package main
@@ -2528,6 +2667,11 @@ The zero-sum count is **not** a window — negative values mean a run that is
 too big cannot be fixed by shrinking it. It is prefix sums: a run sums to zero
 exactly when two prefix sums are equal, so count the repeats. Seed the map
 with `0` seen once, for runs that start at the beginning.
+
+The cases here are small: they check the all-negative list, the zero runs and
+the tie-break, not your speed. Counting the zero-sum runs by trying every pair
+would clear all four of them. Both one-pass ideas are still the answer for a
+real `n`; this is the interviewer's bar, not the clock's.
 '''
 starter      = '''
 package main
@@ -2773,24 +2917,44 @@ concepts     = ["dynamic-programming", "binary-search", "complexity"]
 requires     = ["go.hacker.19.edit-distance"]
 map          = { x = 0.818, y = 0.461, kind = "quest" }
 brief        = '''
-Line one is `n`. Line two is `n` integers.
+Standard input is two integers, `n` and `seed`. There is no array in the input
+— you build it, with **exactly** this generator, in `uint64` arithmetic, which
+wraps in Go without any ceremony:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407
+    next value = (x >> 33) % 1000000007
+```
 
 Print the length of the longest **strictly increasing subsequence** — order
 kept, adjacency not required. Then print `TAILS <k>`, the same number read off
 the pile count.
 
 ```
-input:  8
-        10 9 2 5 3 7 101 18
-output: 4
-        TAILS 4
+input:  8 1
+output: 3
+        TAILS 3
 ```
 
-The `O(n²)` table is the one to be able to write cold. The `O(n log n)` one
-keeps, for each length, the smallest value a subsequence of that length can
-end on — a slice that is always sorted, so placing a new value is a binary
-search. Either passes here; the cases are small and say so. Write the second
-one anyway, because the follow-up is always "and faster?".
+For `8 1` the array is
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`,
+in which `93944146 392341189 822192870` is one of the longest runs up.
+
+**This quest enforces its complexity.** One hidden case is `n = 200000`. The
+`O(n²)` table — for every value, look back at every earlier one — is the one
+to be able to write cold, and it is what the starter is: `2 × 10^10`
+comparisons, thirty-nine seconds against a five second run limit. The pile
+version keeps, for each length, the smallest value a subsequence of that
+length can end on — a slice that is always sorted, so placing a new value is a
+binary search. That is `O(n log n)` and it returns the same case in eleven
+milliseconds. Measured, on this machine, with the two programs in this quest.
+
+The answer to that case is `881`, which is roughly `2√n`. That is what the
+longest run up in a list of random values looks like, and it is worth carrying
+into the room: it is how you know your own output is not nonsense before the
+interviewer tells you.
 '''
 starter      = '''
 package main
@@ -2801,22 +2965,41 @@ import (
 	"os"
 )
 
+func generate(n int, seed uint64) []int64 {
+	x := seed
+	values := make([]int64, n)
+	for i := 0; i < n; i++ {
+		x = x*6364136223846793005 + 1442695040888963407
+		values[i] = int64((x >> 33) % 1000000007)
+	}
+	return values
+}
+
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 	var n int
-	fmt.Fscan(reader, &n)
-	nums := make([]int64, n)
-	for i := range nums {
-		fmt.Fscan(reader, &nums[i])
+	var seed uint64
+	fmt.Fscan(reader, &n, &seed)
+
+	values := generate(n, seed)
+
+	// correct, and far too slow: this is what the big hidden case rejects
+	best := 0
+	length := make([]int, n)
+	for i := 0; i < n; i++ {
+		length[i] = 1
+		for j := 0; j < i; j++ {
+			if values[j] < values[i] && length[j]+1 > length[i] {
+				length[i] = length[j] + 1
+			}
+		}
+		if length[i] > best {
+			best = length[i]
+		}
 	}
 
-	tails := make([]int64, 0, n)
-
-	// for each value, find where it belongs among the pile tops and put it there
-	_ = tails
-	_ = nums
-	fmt.Println(0)
-	fmt.Println("TAILS 0")
+	fmt.Println(best)
+	fmt.Printf("TAILS %d\n", best)
 }
 '''
 solution     = '''
@@ -2828,19 +3011,28 @@ import (
 	"os"
 )
 
+func generate(n int, seed uint64) []int64 {
+	x := seed
+	values := make([]int64, n)
+	for i := 0; i < n; i++ {
+		x = x*6364136223846793005 + 1442695040888963407
+		values[i] = int64((x >> 33) % 1000000007)
+	}
+	return values
+}
+
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 	var n int
-	fmt.Fscan(reader, &n)
-	nums := make([]int64, n)
-	for i := range nums {
-		fmt.Fscan(reader, &nums[i])
-	}
+	var seed uint64
+	fmt.Fscan(reader, &n, &seed)
+
+	values := generate(n, seed)
 
 	// tails[i] = the smallest value an increasing subsequence of length i+1
 	// can end on. It is sorted, always.
 	tails := make([]int64, 0, n)
-	for _, value := range nums {
+	for _, value := range values {
 		low, high := 0, len(tails)
 		for low < high {
 			mid := low + (high-low)/2
@@ -2874,10 +3066,10 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "sample",     stdin = "8\n10 9 2 5 3 7 101 18\n", expect = "4\nTAILS 4\n", visible = true },
-  { name = "descending", stdin = "4\n5 4 3 2\n",             expect = "1\nTAILS 1\n", visible = false },
-  { name = "flat",       stdin = "5\n7 7 7 7 7\n",           expect = "1\nTAILS 1\n", visible = false },
-  { name = "ascending",  stdin = "6\n1 2 3 4 5 6\n",         expect = "6\nTAILS 6\n", visible = false },
+  { name = "sample", stdin = "8 1\n",          expect = "3\nTAILS 3\n",     visible = true },
+  { name = "single", stdin = "1 7\n",          expect = "1\nTAILS 1\n",     visible = false },
+  { name = "dozen",  stdin = "12 99\n",        expect = "5\nTAILS 5\n",     visible = false },
+  { name = "big",    stdin = "200000 12345\n", expect = "881\nTAILS 881\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 21
@@ -2914,6 +3106,11 @@ output: 4
 `x ^ x == 0` and `x ^ 0 == x`, and xor does not care what order it happens in.
 That is the whole first line. `x & (x - 1)` clears the lowest set bit, which
 gives the third and fourth lines for free.
+
+The cases here are small, and the constant extra space is not something a case
+can check: a map that counts how many times it saw each value passes all four.
+It is the interviewer who asks what you spent, and xor is the answer to that
+question rather than to the clock.
 '''
 starter      = '''
 package main
@@ -3199,6 +3396,11 @@ output: YES
 
 Keep a count on every node of how many inserted words pass through it, and
 `PREFIX` is a walk with no counting at the end.
+
+The cases here are small: they check the nested word, the missing prefix and
+the node count, not your speed. Keeping the inserted words in a slice and
+scanning them for each query would clear all four. The trie is what the
+question is for — it is not what these cases catch.
 '''
 starter      = '''
 package main
@@ -5244,6 +5446,11 @@ one in the standard library: `container/list`. `PushFront`, `MoveToFront`,
 say so without hedging. The map holds `*list.Element`; the element's `Value`
 holds the key as well as the value, because eviction starts from the list and
 has to know which map entry to delete.
+
+The cases here are small: they check the eviction order, the overwrite and the
+miss, not your speed. Nothing here measures the `O(1)` — a slice you scan on
+every touch passes all four cases — which is exactly why you have to be able
+to say out loud why the map and the list are both there.
 '''
 starter      = '''
 package main

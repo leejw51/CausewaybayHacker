@@ -30,6 +30,19 @@ sprite reacts.
 **Gogo** — a gopher with a milk tea. Go Land's mascot, from
 `CausewaybayGolang`'s map. Also does not speak.
 
+**The platypus** (오리너구리) — C++ Land's mascot. It sits on the harbour wall
+by the Noon Day Gun and watches addresses. A duck's bill, a beaver's tail, an
+otter's feet, it lays eggs and it is still a mammal: the first naturalists to
+see one went looking for the stitches, because nothing that is four things at
+once is supposed to be one animal. That is the language, and the joke is not
+only that — the spur behind its hind foot is venomous. It is the only mascot
+here that can hurt you, and it will do it while looking harmless. Placeholder
+art is a hue-shifted Ferris. Does not speak.
+
+**The python** — Python Land's mascot, a small coiled python asleep on a
+price board in the wet market. Placeholder art is a hue-shifted Gogo. Also
+does not speak, but it is warm.
+
 **Alex** — the Go coder. Works the Percival Street side. He never stopped
 typing, which is the only reason Go Land is still standing, and he is
 insufferable about it in a friendly way.
@@ -63,7 +76,7 @@ She starts with `println!`.
 
 ---
 
-## 3. The two lands
+## 3. The four lands
 
 ### RUST LAND — the street
 
@@ -85,8 +98,31 @@ once**, and the question is never "who owns this" but "who is waiting on whom".
 
 Colour: gopher cyan. Time: the lunch rush into the night shift.
 
-The player picks a land. The other one is still there, unchanged, and can be
-started at any time. Neither is a sequel to the other.
+### C++ LAND — the typhoon shelter and the Noon Day Gun
+
+Causeway Bay's machinery. The gun that fires at 12:00 because something wrote
+to the right register, the sampans in the typhoon shelter, the pump room under
+Victoria Park's fountain, the Yacht Club slipway winch. Everything here is
+**an address**. Nothing checks you. The question is always "what is actually
+at that address right now, and who freed it".
+
+Colour: ISO C++ blue, a deep blue haze. Time: noon, harsh sun off the water.
+
+### PYTHON LAND — the wet market and the food hall
+
+Bowrington Road wet market and the SOGO basement food hall. Stalls, price
+boards, plastic bags, a notebook per stall. Everything here is **a dict**,
+nothing is typed until it runs, and it runs at 06:00 when the stall opens.
+The question is always "what shape is this thing, really, and when did it
+turn into None".
+
+Colour: Python gold, a warm amber haze. Time: dawn, wet floors, fluorescent
+light.
+
+The player picks a land. The others are still there, unchanged, and can be
+started at any time. None of them is a sequel to another, and the hacker road
+asks the same thirty-four questions in every one of them, so the interview can
+be sat in whichever language the player is taking back.
 
 ---
 
@@ -115,6 +151,12 @@ One per map, always the last node, `map.kind = "boss"`.
 | `go.basic` | 18 | **NULLPTR** | Lucky Mac's front till at 11:55. Every order goes through and none of them exist. |
 | `go.advanced` | 17 | **THE RACE** | Causeway Bay interchange, platform 2. Two counters, one number, and the number is wrong by an amount nobody can reproduce. |
 | `go.hacker` | 28 | **THE CLOCK** | The second interview. Same room, and this time the clock is shorter. |
+| `cpp.basic` | 18 | **SEGFAULT** | The Noon Day Gun fires at an address nobody owns. |
+| `cpp.advanced` | 17 | **THE DANGLING** | Victoria Park's pump room: a thread still holding a reference to a buffer that was freed. |
+| `cpp.hacker` | 34 | **THE LINKER** | The third interview, Room 7-32, a language with no safety net and a shorter clock. |
+| `python.basic` | 18 | **NONE** | The market's price board at 05:59: `'NoneType' object has no attribute 'price'`. |
+| `python.advanced` | 17 | **THE GIL** | SOGO basement, twelve stalls, one lock; everything "concurrent" ran one at a time. |
+| `python.hacker` | 34 | **THE RECURSION LIMIT** | The fourth interview; depth 1000 and the clock. |
 
 A boss node is a quest like any other — harder, `difficulty` 4–5, and the story
 line is the only thing that says it is a boss. There is no separate boss
@@ -124,7 +166,7 @@ mechanic in milestone 2; the stamp is just louder.
 
 ## 6. The ending
 
-Both hacker roads cleared, Mei walks up to HKU. The thing is in the basement of
+All four hacker roads cleared, Mei walks up to HKU. The thing is in the basement of
 the Chow Yei Ching Building where the teaching cluster used to be: not a face,
 not a voice, a rack of machines serving completions to the whole island at very
 low latency.

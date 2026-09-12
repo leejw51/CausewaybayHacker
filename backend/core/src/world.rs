@@ -81,6 +81,11 @@ pub struct MapNode {
     pub kind: String,
     pub requires: Vec<String>,
     pub attempts: i64,
+    /// The language `title` is in — `"en"`, or the locale the caller asked
+    /// for when a translation of this quest exists. Per node rather than per
+    /// map because a translation file may cover a pack partially (SPEC §12.1)
+    /// and a client draws each title on its own.
+    pub text_locale: String,
 }
 
 pub struct Map {
@@ -89,12 +94,29 @@ pub struct Map {
 }
 
 pub fn map(conn: &Connection, address: &str, land: &str, category: &str) -> Result<Map> {
+    map_localized(conn, address, land, category, None)
+}
+
+/// `map`, with every title in `locale` where a translation exists. A locale
+/// nobody has written a pack for is English, not an error (PROTOCOL §4.7).
+pub fn map_localized(
+    conn: &Connection,
+    address: &str,
+    land: &str,
+    category: &str,
+    locale: Option<&str>,
+) -> Result<Map> {
     let quests = quests::list(conn, land, category)?;
     let cleared = progress::cleared_set(conn, address)?;
+    let mut texts = quests::texts_for(conn, land, category, locale)?;
     let mut nodes = Vec::with_capacity(quests.len());
     for quest in &quests {
         let requires = quests::requirements(conn, &quest.id)?;
         let row = progress::get(conn, address, &quest.id)?;
+        let (title, text_locale) = match texts.remove(&quest.id) {
+            Some(text) => (text.title, text.locale),
+            None => (quest.title.clone(), "en".to_string()),
+        };
         nodes.push(MapNode {
             // `requires` still travels: it is the suggested route and the line
             // the map draws. It is not consulted here, because it gates
@@ -102,7 +124,8 @@ pub fn map(conn: &Connection, address: &str, land: &str, category: &str) -> Resu
             state: progress::derive_state(&quest.id, &cleared),
             quest_id: quest.id.clone(),
             node: quest.node,
-            title: quest.title.clone(),
+            title,
+            text_locale,
             difficulty: quest.difficulty,
             stars: row.stars,
             x: quest.map.x,

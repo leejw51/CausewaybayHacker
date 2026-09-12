@@ -7,7 +7,15 @@
  * names, and the entire reason this file exists.
  */
 import { describe, expect, it } from "vitest";
-import { hintsRemaining, openingSource, solveOutcome } from "../src/scenes/quest";
+import {
+  briefNeedsNote,
+  editControls,
+  editorTextFor,
+  hintsRemaining,
+  openingSource,
+  solveOutcome,
+} from "../src/scenes/quest";
+import type { EditState } from "../src/net/protocol";
 
 const quest = (over: { draft?: string | null; starter?: string } = {}) => ({
   starter: "fn main() {}\n",
@@ -83,5 +91,104 @@ describe("what a quest.solve reply means (§4.11b)", () => {
     // The star is spent either way: the server moved `hints_used` before it
     // answered, and the label on the bench is that number.
     expect(solveOutcome("same", { source: "same", hints_used: 3 }).hintsUsed).toBe(3);
+  });
+});
+
+describe("when the brief panel says the brief is in English (§4.8)", () => {
+  it("says nothing when the prose arrived in the UI language", () => {
+    expect(briefNeedsNote("ko", "ko")).toBe(false);
+    expect(briefNeedsNote("en", "en")).toBe(false);
+  });
+
+  it("says so when the server had no translation for this quest", () => {
+    // `text_locale: "en"` under a Korean interface is the case the note
+    // exists for: a Korean panel with an English paragraph inside it.
+    expect(briefNeedsNote("en", "ko")).toBe(true);
+  });
+
+  it("treats a server that never sent the field as English", () => {
+    // An older server omits `text_locale`; what it sent was English, so an
+    // English interface owes no note and a Korean one does.
+    expect(briefNeedsNote(undefined, "en")).toBe(false);
+    expect(briefNeedsNote(undefined, "ko")).toBe(true);
+  });
+
+  it("notes a mismatch between two translations too", () => {
+    // Korean prose under a Japanese interface after an F7 mid-quest, before
+    // the re-fetch lands: still two languages on one screen.
+    expect(briefNeedsNote("ko", "ja")).toBe(true);
+  });
+});
+
+/**
+ * The edit stack, reduced to the two questions the screen actually asks of it:
+ * which of the three buttons are live, and what text an undo puts in the
+ * editor. Everything else about the stack lives on the server — a reply is the
+ * whole state and the client never counts entries itself — which is exactly
+ * why these two are worth pinning down.
+ */
+const state = (over: Partial<EditState> = {}): EditState => ({
+  quest_id: "rust/basic/01",
+  source: "fn main() {}\n",
+  cursor: 2,
+  depth: 3,
+  can_undo: true,
+  can_redo: true,
+  ...over,
+});
+
+describe("which of UNDO, REDO and CLEAR STACK are live", () => {
+  it("offers all three in the middle of a stack", () => {
+    expect(editControls(state(), false)).toEqual({ undo: true, redo: true, clear: true });
+  });
+
+  it("offers none at all when the server has never said (the graceful case)", () => {
+    // A server without `edit.*` leaves `null` here. The bench must keep
+    // working around it: three dim buttons, and nothing else on the screen
+    // knows or cares that the stack is missing.
+    expect(editControls(null, false)).toEqual({ undo: false, redo: false, clear: false });
+  });
+
+  it("offers none while a call is in flight", () => {
+    // Every one of the five messages rewrites the whole state, so two at once
+    // would apply in whichever order the replies landed.
+    expect(editControls(state(), true)).toEqual({ undo: false, redo: false, clear: false });
+  });
+
+  it("takes the server's word for undo and redo rather than re-deriving them", () => {
+    expect(editControls(state({ can_undo: false }), false).undo).toBe(false);
+    expect(editControls(state({ can_undo: false }), false).redo).toBe(true);
+    expect(editControls(state({ can_redo: false }), false).redo).toBe(false);
+    expect(editControls(state({ can_redo: false }), false).undo).toBe(true);
+  });
+
+  it("only offers CLEAR when there is history to throw away", () => {
+    const empty = state({ cursor: 0, depth: 0, can_undo: false, can_redo: false });
+    expect(editControls(empty, false).clear).toBe(false);
+    // At the bottom of a stack that still has a redo tail there is nothing to
+    // undo and there is still something to clear.
+    const bottom = state({ cursor: 0, depth: 3, can_undo: false });
+    expect(editControls(bottom, false)).toEqual({ undo: false, redo: true, clear: true });
+  });
+});
+
+describe("what an undo or a redo puts in the editor", () => {
+  it("uses the entry at the cursor", () => {
+    expect(editorTextFor(state({ source: "older work" }), "starter")).toBe("older work");
+  });
+
+  it("uses the starter when the cursor is at the bottom", () => {
+    // `null` is the one case that means "there is no entry here at all", and
+    // the quest's starter is what was there before the first edit.
+    expect(editorTextFor(state({ source: null, cursor: 0 }), "fn main() {}\n")).toBe(
+      "fn main() {}\n",
+    );
+  });
+
+  it("keeps an EMPTY entry rather than falling back to the starter", () => {
+    // The `??`-not-`||` trap `openingSource` already carries a test for. Some-
+    // body who selected all, deleted, and paused has an empty string on the
+    // stack; handing back the starter would read as UNDO skipping a step.
+    expect(editorTextFor(state({ source: "" }), "starter")).toBe("");
   });
 });

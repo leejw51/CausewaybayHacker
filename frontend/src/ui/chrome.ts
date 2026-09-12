@@ -9,6 +9,7 @@
  * the boxes it is handed cannot be landscape-only by accident.
  */
 import { css, Theme, TRACK_COL, type RGBA } from "../engine/theme";
+import type { Land } from "../net/protocol";
 import { bodyFontAt, ensureFonts, font, printf, width, type Font } from "../engine/text";
 import {
   btnBox,
@@ -29,6 +30,31 @@ import { t } from "../i18n";
 // One definition per land, taken from the palette rather than restated here.
 export const RUST: RGBA = TRACK_COL.rust;
 export const GO: RGBA = TRACK_COL.go;
+
+/**
+ * A land's own colour, for the accent on every screen that knows its land.
+ * The screens used to write `land === "rust" ? RUST : GO`, which was a choice
+ * between two lands and silently coloured a third one cyan. Takes a string
+ * because a search hit's land arrives untyped, and an unknown one gets Ferris.
+ */
+/**
+ * The land's name as a player reads it.
+ *
+ * Not `land.toUpperCase()`, which is right for three of the four and wrong for
+ * the one that matters: `"cpp"` upper-cases to `CPP`, which is not what anybody
+ * calls the language. The catalogue already holds the display name for the
+ * plate's own title bar, so every other title takes it from the same place
+ * rather than inventing one — the panel beside a plate reading `CPP` while the
+ * plate itself reads `C++` is the kind of small disagreement that makes a
+ * screen feel unfinished.
+ */
+export function landName(land: Land | string): string {
+  return t(`map.${land}` as "map.rust");
+}
+
+export function landColour(land: Land | string): RGBA {
+  return TRACK_COL[land] ?? RUST;
+}
 
 export interface Frame {
   /** The whole playfield, inset by the safe margin. */

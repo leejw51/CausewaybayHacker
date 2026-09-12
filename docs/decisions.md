@@ -6166,3 +6166,74 @@ does the same, so a drive script against a stored session still reaches the
 map inside its 25 s budget (card 8 s). `tests/drive/resume_title.lua` is
 the proof, run against the real store: resumed, card up and waiting, SPACE
 → opening on a store that had not seen it → `lands`.
+
+## 2026-09-12 — Two more lands (`cpp`, `python`), eight slugs, and a translation tree
+
+Four lands, not two. `cpp` (**C++ LAND**, the typhoon shelter and the Noon Day
+Gun, ISO C++ blue) and `python` (**PYTHON LAND**, the wet market and the SOGO
+food hall, Python gold) join `rust` and `go` with the same three roads and
+the same counts — 18 / 17 / 34, boss last — and the hacker road asks the
+same 34 interview problems in every land, so one interview can be sat in any
+language. `docs/story.md` §3 and §5 carry the lore and the six bosses;
+`docs/art.md` the tints and the placeholder mascots.
+
+**Runner (SPEC §5.1).** Both are stdio-only. C++ is `c++ -std=c++20 -O2
+-pthread main.cpp -o prog` through the system driver, clang on macOS and gcc
+on Linux, with no package cache; the formatter is `clang-format` and is
+supported only while it is on PATH. Python is `python3 -m py_compile main.py`
+as the compile phase — a `SyntaxError` is a `compile_error`, before any case
+runs — and then `python3 -I main.py` per case; no formatter. `cargo` and
+`gotest` harnesses stay rust-only and go-only.
+
+**Taxonomy (SPEC §7.1).** No new kinds. Two new columns, `cpp:` and `py:`
+codes, filed under the existing seventeen: clang and gcc word one mistake two
+ways (`use of undeclared identifier` / `was not declared in this scope`) and
+the slug `cpp:undeclared-identifier` is what they share; a program the kernel
+stopped is identified by its signal (`cpp:segfault` is signal 11 →
+`nil-deref`); Python's identity is the last `XxxError:` line of the traceback
+(`py:none-attribute` is `AttributeError: 'NoneType'` → `nil-deref`, plain
+`AttributeError` → `missing-trait`, `RecursionError` → `wrong-answer`). A C++
+deadlock is not detectable from outside and stays a `timeout`.
+
+**Fixtures (`tests/vectors/mistakes/`).** Six C++ and nine Python sources,
+captured from the real toolchains like the others. Because a C++ diagnostic
+is a property of *which* compiler, the C++ captures are per toolchain
+(`segfault.clang-darwin.cxx.txt`, and `gcc-linux` once a Linux machine has
+run the generator): each machine regenerates and checks the toolchain it has
+and carries the others over untouched, and `--check` reports a toolchain the
+repo has no captures for as a note rather than a failure, since the machine
+reporting the gap is the one that cannot fill it. As of this entry the repo
+carries `clang-darwin` only; the first `generate.py` run on Linux adds
+`gcc-linux`, and that is the intended next step rather than an oversight.
+
+**Vocabulary (`docs/concepts.md`).** Eight slugs, 58 → 66: `pointers`,
+`raii`, `move-semantics`, `undefined-behaviour` for C++; `comprehensions`,
+`generators`, `decorators`, `duck-typing` for Python. Each is carried by a
+quest in the land that owns it. `ownership`, `smart-pointers` and
+`mutability` are now Rust *and* C++ (`unique_ptr` is ownership, `const` is
+mutability); `traits` and `interfaces` stay Rust's and Go's — C++ and Python
+say `generics`, `dispatch`, `duck-typing`. The §2 rows grow accordingly
+(`borrow-after-move` += `move-semantics`, `raii`; `nil-deref` += `pointers`,
+`undefined-behaviour`; `wrong-answer` += `comprehensions`, `generators`; and
+so on, per the table).
+
+**Translations (SPEC §12.1).** Quest text — title, story, brief, hints —
+translated per locale lives in a separate tree, `content/i18n/<locale>/
+<land>.<category>.toml`, so the pack importer can never confuse a
+translation for a pack. Code blocks, identifiers and the exact strings a
+program must print are not translated; the hint count must equal the
+English quest's, because hints are revealed by index. Stored in
+`quest_text`, served by `quest.get` / `world.map` on a `locale`, with
+`text_locale` on the quest saying which text went out; a locale with no row
+falls back to English and the client keeps its "the brief is in English"
+note only in that case. `verify_pack.py --i18n` demands full coverage for
+every locale × pack in CI.
+
+**Toolchains everywhere else.** `make doctor` probes `c++` and `python3`
+(and notes `clang-format` as optional); CI's backend, love2d-window and
+content jobs use the ubuntu-24.04 image's g++ (checked against a pinned
+expectation rather than installed), install Python 3.13 (the version the
+Python fixtures were captured with) and add `clang-format`; `tests/run-all.mjs`
+gates the suites that compile programs on `c++` as well as `go`. The terminal
+client names its scratch file `<quest id>.cpp` / `.py` and its `fmt` knows
+`clang-format`.

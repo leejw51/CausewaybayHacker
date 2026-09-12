@@ -132,6 +132,10 @@ export const en = {
   "lands.rustBlurb":
     "Ownership, borrows, lifetimes. The craft you had before the machine wrote it for you.",
   "lands.goBlurb": "Goroutines, channels, the small language that fits in a head.",
+  "lands.cppBlurb":
+    "Pointers, RAII, undefined behaviour. Everything is an address and nothing checks you.",
+  "lands.pythonBlurb":
+    "Dicts, generators, duck typing. Nothing is typed until it runs, and it runs at six.",
   "lands.basicBlurb":
     "The morning walk. Shopfronts, kiosks and tills — read what the machine wrote.",
   "lands.advancedBlurb":
@@ -156,6 +160,8 @@ export const en = {
   "map.hacker": "HACKER",
   "map.rust": "RUST",
   "map.go": "GO",
+  "map.cpp": "C++",
+  "map.python": "PYTHON",
   "map.none": "no streets here yet",
   "map.failed": "could not read the map",
   "map.stars": "STARS",
@@ -188,6 +194,11 @@ export const en = {
   "quest.log": "LOG",
   "quest.hideLog": "HIDE LOG",
   "quest.reset": "RESET",
+  "quest.undo": "UNDO",
+  "quest.redo": "REDO",
+  "quest.clearStack": "CLEAR STACK",
+  "quest.clearStackAsk":
+    "The code in the editor stays exactly as it is. Only the steps back through it are thrown away, and they do not come back.",
   "quest.solve": "SOLVE",
   "quest.solveNote":
     "shows the answer — costs a star on this quest, and nothing is recorded until you SUBMIT",
@@ -292,6 +303,8 @@ export const en = {
   "pg.maps": "MAPS",
   "pg.rust": "RUST",
   "pg.go": "GO",
+  "pg.cpp": "C++",
+  "pg.python": "PYTHON",
   "pg.stdin": "STDIN",
   "pg.stdinHint": "stdin — what the program reads",
   "pg.unsaved": "UNSAVED",
@@ -340,6 +353,8 @@ export const en = {
   "search.hacker": "HACKER",
   "search.rust": "RUST",
   "search.go": "GO",
+  "search.cpp": "C++",
+  "search.python": "PYTHON",
   "search.unified": "UNIFIED",
   "search.text": "TEXT",
   "search.meaning": "MEANING",
@@ -430,6 +445,8 @@ export const en = {
   "ai.any": "ANY",
   "ai.rust": "RUST",
   "ai.go": "GO",
+  "ai.cpp": "C++",
+  "ai.python": "PYTHON",
   "ai.newPlan": "NEW PLAN",
   "ai.drillSize": "DRILL {n}",
   "ai.coach": "THE COACH",
@@ -522,7 +539,7 @@ export const en = {
   "award.interviewReady": "INTERVIEW READY",
   "award.interviewReadyNote": "five of them",
   "award.polyglot": "POLYGLOT",
-  "award.polyglotNote": "clear one in each land",
+  "award.polyglotNote": "clear one in two different lands",
   "award.bigO": "BIG O",
   "award.bigONote": "five HACKER streets",
   "award.century": "CENTURY",

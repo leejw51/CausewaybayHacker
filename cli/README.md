@@ -18,7 +18,7 @@ cwbh quest rust.basic.01.first-light
 cwbh edit <id>                   $EDITOR on your file
 cwbh run <id>                    visible cases only (PROTOCOL §4.9b)
 cwbh submit <id>                 the real thing
-cwbh fmt <file>                  rustfmt / gofmt (§4.9d)
+cwbh fmt <file>                  rustfmt / gofmt / clang-format (§4.9d)
 cwbh play <id>                   edit → run → submit, in a loop
 cwbh stats | mistakes | awards | history
 cwbh pg run|save|list|load|delete    the playground (§4.9c)

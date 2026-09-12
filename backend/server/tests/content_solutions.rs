@@ -1,5 +1,5 @@
 //! SPEC §9.4 and §9.5 against whatever is in `content/` right now: every
-//! reference solution must be accepted, and no starter may be. Both lands.
+//! reference solution must be accepted, and no starter may be. Every land.
 //!
 //! Ignored by default — it compiles every quest in the repository, twice, and
 //! takes a couple of minutes. Run it with `cargo test -- --ignored` when the
@@ -27,6 +27,18 @@ fn every_rust_reference_solution_is_accepted_and_no_starter_is() {
 #[ignore = "compiles every quest in content/go; run it with --ignored"]
 fn every_go_reference_solution_is_accepted_and_no_starter_is() {
     check_land("go");
+}
+
+#[test]
+#[ignore = "compiles every quest in content/cpp; run it with --ignored"]
+fn every_cpp_reference_solution_is_accepted_and_no_starter_is() {
+    check_land("cpp");
+}
+
+#[test]
+#[ignore = "runs every quest in content/python; run it with --ignored"]
+fn every_python_reference_solution_is_accepted_and_no_starter_is() {
+    check_land("python");
 }
 
 fn check_land(land: &str) {

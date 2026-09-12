@@ -17,12 +17,16 @@ from process import box_of
 ORDER = [
     "title_bg", "title_bg_p",
     "map_rust", "map_rust_p", "map_go", "map_go_p",
+    "map_cpp", "map_cpp_p", "map_python", "map_python_p",
     "bg_street", "bg_times", "bg_till", "bg_mtr",
     "bg_room732", "bg_room732_p", "bg_datacentre",
     "sprite_mei", "sprite_alex", "sprite_ferris", "sprite_gogo",
+    "sprite_cpp", "sprite_python",
     "agent_skynet",
     "boss_autocomplete", "boss_deadlock", "boss_nullptr",
     "boss_race", "boss_whiteboard", "boss_clock",
+    "boss_segfault", "boss_dangling", "boss_linker",
+    "boss_none", "boss_gil", "boss_recursion",
     "node_quest", "node_boss", "node_locked",
     "stamp_cleared", "fx_ribbon", "fx_medal", "fx_trophy", "ui_panel",
     # The opening (docs/story.md §2), in the order the sequence plays.
@@ -40,8 +44,12 @@ ORDER = [
     # doing that category's job, and the two states a row can be in.
     "emblem_rust_basic", "emblem_rust_advanced", "emblem_rust_hacker",
     "emblem_go_basic", "emblem_go_advanced", "emblem_go_hacker",
+    "emblem_cpp_basic", "emblem_cpp_advanced", "emblem_cpp_hacker",
+    "emblem_python_basic", "emblem_python_advanced", "emblem_python_hacker",
     "mascot_rust_basic", "mascot_rust_advanced", "mascot_rust_hacker",
     "mascot_go_basic", "mascot_go_advanced", "mascot_go_hacker",
+    "mascot_cpp_basic", "mascot_cpp_advanced", "mascot_cpp_hacker",
+    "mascot_python_basic", "mascot_python_advanced", "mascot_python_hacker",
     "badge_cleared", "badge_locked",
     # The playground: the one room in the game with no problem in it.
     "bg_playground", "bg_playground_p",

@@ -391,18 +391,32 @@ pub async fn fmt(ctx: &Ctx, file: &Path) -> Result<()> {
             "({} → {} bytes, {})",
             source.len(),
             reply.source.len(),
-            if lang == "rust" { "rustfmt" } else { "gofmt" }
+            formatter_label(lang)
         ))
     );
     Ok(())
+}
+
+/// The tool the server ran, named the way the player knows it. Python has no
+/// formatter (SPEC §5.1), so the server answers `unsupported` before this is
+/// ever printed for a `.py` file.
+fn formatter_label(lang: &str) -> &'static str {
+    match lang {
+        "rust" => "rustfmt",
+        "go" => "gofmt",
+        "cpp" => "clang-format",
+        _ => "formatter",
+    }
 }
 
 fn lang_for_path(path: &Path) -> Result<&'static str> {
     match path.extension().and_then(|e| e.to_str()) {
         Some("rs") => Ok("rust"),
         Some("go") => Ok("go"),
+        Some("cpp") => Ok("cpp"),
+        Some("py") => Ok("python"),
         _ => Err(error::usage(format!(
-            "cannot tell what language {} is; cwbh fmt takes a .rs or a .go file",
+            "cannot tell what language {} is; cwbh fmt takes a .rs, .go, .cpp or .py file",
             path.display()
         ))),
     }

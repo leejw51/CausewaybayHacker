@@ -1,0 +1,16 @@
+# A translation (SPEC §12.1) whose `locale` is not one of ko yue zh ja cs.
+# Refused before any row is written: the clients ask by locale and a file in
+# a language nothing asks for would sit in the database serving nobody —
+# and "en" in particular is not a locale here, because English is the source
+# and lives on `quests`.
+pack   = "rust.basic"
+locale = "en"
+
+[[quest]]
+id    = "rust.basic.01.hello"
+title = "FIRST LIGHT"
+story = "The terminal blinks."
+brief = '''
+Print `hello, causewaybay` and nothing else.
+'''
+hints = ["`println!` is a macro.", "The string is exact."]

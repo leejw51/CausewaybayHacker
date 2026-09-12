@@ -1,0 +1,653 @@
+# PYTHON LAND — ADVANCED, in Simplified Chinese. A translation pack (SPEC
+# §12.1): the prose of `content/python/advanced.toml`, quest by quest, and
+# nothing else. Code blocks, identifiers, sample input and output and the
+# exact strings a program must print are the English pack's and are copied
+# verbatim, never translated.
+
+pack   = "python.advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.advanced.01.threads"
+title = "十二个档口，一层楼"
+story = "12:30，崇光地库。十二个档口同时接单，而负责收总数的跑腿在任何一家写上去之前就已经把板子读完了。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+为每个值启动一个 `threading.Thread`，计算它的平方并存进 `results[i]`——它自己的那一格，这样没有两个线程写同一个位置。对每个线程
+`join`，然后**按索引顺序**输出结果，每行一个，最后输出 `THREADS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+线程不返回任何东西。`Thread(target=f)` 运行 `f` 并把它的返回值扔掉，所以结果必须写到某个主线程在
+`join` 之后读得到的地方。每线程一格的列表是最简单的这种地方：每个索引恰好由一个线程写入，所以没有什么需要加锁。
+
+起始代码的线程一启动就全部崩溃，而程序照样跑完并打印。没有 `args=` 的 `target=square` 会不带任何参数地调用
+`square()`，`TypeError` 落在线程里并被打印到标准错误，而 `results` 里始终全是
+`None`。一个死掉的线程只带走它自己——去读 stderr，否则你永远不会知道。
+'''
+hints = [
+  "在 Thread 上写 args=(i, v)。target 是以 square(*args) 的方式调用的，而起始代码什么都没传。",
+  "先启动每个线程，再对每个线程 join。在同一次循环迭代里既启动又 join 是正确的，只不过它们会一个一个地跑。",
+  "results 是对 main 局部列表的闭包；嵌套函数看到的是同一个列表，所以写入在 join 之后是可见的。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.advanced.02.lock"
+title = "一个抽屉，八只手"
+story = "地库里每个档口都往美食广场办公室的那一个钱抽屉里交钱，收档时抽屉里什么都没有，而每个档口都发誓自己交过了。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+为每个值启动一个线程，把它加到**一个共享的总数**上，并把一个共享的计数加一。全部 join 之后，输出 `TOTAL <sum>`
+和 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+起始代码打印 `TOTAL 0`，每次都是如此，而且每个工作线程都在 stderr 上留下一条回溯。工作函数里的
+`total += value` 碰不到 main 的 `total`：`int` 是不可变的，对它 `+=`
+会重新绑定这个名字，而在函数里被赋值的名字是该函数的**局部**变量，除非声明了 `nonlocal`。每个工作线程各自造了一个
+`total`，往上加，然后丢掉。
+
+修法是一个工作线程可以原地修改的容器——一个单元素列表或一个小类——**外加一把 `Lock`**。后半部分不是可选的。GIL
+保证同一时刻只有一条字节码在跑；`drawer[0] += value`
+是三条字节码（load、add、store），在 load 和 store 之间切一次线程就会丢掉一次更新。四个线程加四个数时它不会发生。凌晨两点四十个线程时它会发生。
+
+`with lock:` 取得锁，并在退出时释放它，包括通过异常退出的那条路。
+'''
+hints = [
+  "运行起始代码：它死于 UnboundLocalError，因为 `total += value` 让 total 成了 pay 的局部变量，并在它存在之前就去读它。这个错误就是完整的诊断。",
+  "dict 或 list 是原地修改的，所以 `drawer[\"total\"] += value` 改的是每个线程共享的那一个对象。`nonlocal total` 也行，是另一个诚实的答案。",
+  "在 main 里建一次 threading.Lock()，用 `with lock:` 围住读-改-写。GIL 不是你数据上的锁；它是解释器上的锁。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.advanced.03.queue"
+title = "谁来关窗口"
+story = "烧鹅柜台把每张单子从小窗口递进厨房，最后一张之后，厨房站在那里等着下一张，而它永远不会来。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+一个生产者线程把每个值乘以十放到一个 `queue.Queue` 上，然后放一个**哨兵**。主线程不断从队列取值，直到看见哨兵为止，每取一个就打印并累加，然后输出
+`SUM <total>` 和 `CLOSED`。
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+`queue.Queue` 没有 `close`。它上面没有任何东西能告诉消费者不会再有了；那必须是一个元素，而 `None`
+是常用的那个。起始代码从不发送它，于是 `get()` 在没有任何东西可等的情况下永远阻塞，运行器在时限到达时杀掉程序。Python
+里没有死锁检测器。程序只是不再回应，从外面看，“挂起”就是这个样子。
+
+由生产者发送哨兵。绝不由消费者发——知道流已经结束的那一方，才是结束它的那一方。
+'''
+hints = [
+  "在 kitchen 的末尾加一行：hatch.put(None)。",
+  "消费者已经在检查 `is None` 了。它一直在等一个生产者从未发出的东西。",
+  "如果值本身可能合法地是 None，哨兵就用一个私有对象：SENTINEL = object()，用 `is` 比较。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.advanced.04.thread-pool"
+title = "八个搬运工"
+story = "崇光卸货台上四十个货箱，八个搬运工。没人想要四十个搬运工；他们要的是这八个永远不闲着。"
+brief = '''
+标准输入是两个整数 `w` 和 `n`，然后是 `n` 个值。
+
+打开一个有 `w` 个工作线程的 `ThreadPoolExecutor`，为每个值 `submit` 一个返回
+`(index, value * value)` 的任务，并用 `as_completed` 收集结果。按索引排序，每行输出一个 `<index> <value>`，然后输出
+`WORKERS <w>`。
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+`submit` 返回的是一个 `Future`，不是结果。`as_completed` 按它们**完成**的顺序把 future
+交回来，也就是线程池随便什么顺序，而 `future.result()` 才是取出值的方式——或者重新抛出任务死于其中的那个异常，这是调用它的另一个理由。
+
+起始代码打印的是 future。把索引带在结果里，才能让输出每次运行都一样；按索引排序是答案的最后一行，不是第一行。
+'''
+hints = [
+  "起始代码死在解包一个 Future 上：`for index, value in sorted(results)` 没法解包一个不是元组的对象。元组在 future.result() 里面。",
+  "as_completed 在任务完成时逐个产出；结果里的索引是每一个来自哪里的唯一记录。",
+  "with ThreadPoolExecutor(...) as pool: 在退出时等待每个已提交的任务，所以你打印时没有任何东西还在跑。pool.map 在这里也行，而且替你保持顺序，代价是学不到 as_completed。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.advanced.05.asyncio"
+title = "async 到底在哪里跑"
+story = "阿薇写了四年 `async def`，却一次也没见过驱动它的那个东西。地库的点单板只有一个循环，每个档口轮流上去用。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+写一个 `async def double(value)`，它向事件循环让出一次——`await asyncio.sleep(0)`——然后返回值的两倍。用
+`asyncio.gather` 把全部 `n` 个一起跑起来，按输入顺序输出每个结果，然后输出
+`SUM <total>` 和 `TASKS <n>`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+调用一个 `async def` 并不会运行它。它构建一个**协程对象**并交还给你，在有东西 await
+它之前，里面什么都不会发生。起始代码的列表是三个没被 await 的协程，Python 在 stderr
+上这样说——`RuntimeWarning: coroutine 'double' was never awaited`——而输出是三行
+`<coroutine object double at 0x...>`。
+
+`gather` 接收这些协程，把它们全部调度到那一个循环上，并**按你传入的顺序**返回它们的结果，不管它们以什么顺序完成。这就是选它而不是手写一串
+`await` 循环的全部理由：那个循环是正确的、顺序的，而 `gather` 是正确的、交错的。
+
+这里只有一个线程。`await`
+是协程把线程交还给循环、好让别的协程使用的那个点。没有任何东西并行运行；一切**轮流**运行，在它们声明过可以停下的地方停下。
+'''
+hints = [
+  "await asyncio.gather(*coroutines) — 星号把列表展开成参数，而 await 才是让它们运行的东西。",
+  "asyncio.run(...) 是执行者：它建好循环，把一个协程跑到完成，然后关闭循环。每个程序有一个，在最顶层。",
+  "gather 按参数顺序返回结果。如果你需要按完成顺序拿到它们，那是 asyncio.as_completed，那时你得自己带上索引，和线程池那题一模一样。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.advanced.06.async-queue"
+title = "谁说它做完了"
+story = "三个跑腿在地库清理点单队列，楼面经理等着队列说它空了。它永远不会这么说，因为没人告诉它某张单子已经完成。"
+brief = '''
+标准输入是两个整数 `w` 和 `n`，然后是 `n` 个值。
+
+把 `(index, value)` 对放到一个 `asyncio.Queue` 上。启动 `w` 个消费者任务，它们永远循环：取一对，把 `value * 10` 写进
+`results[index]`，然后调用 `task_done()`。主协程 await `queue.join()`，然后取消消费者，然后按索引顺序输出结果和
+`CONSUMERS <w>`。
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+`queue.join()` 在每一个曾经被 `put` 的元素都有了对应的 `task_done()` 时返回。起始代码的消费者从不调用它，于是 `join`
+永远等待，循环里没有别的可运行的东西，程序挂起，直到运行器杀掉它。和线程那题一样的挂起，不同的写法——修法也同样是一行，在消费者一侧。
+
+消费者是 `while True` 循环。它们之所以会结束，是因为 main 在 join 之后取消了它们，而取消一个停在 `queue.get()`
+上的任务，正是停止它的正常、本意的方式。用
+`gather(..., return_exceptions=True)` await 被取消的任务，这样取消会被收集起来而不是被报告出来。
+'''
+hints = [
+  "每处理完一个元素就 queue.task_done()。join 只把 put 和 task_done 对着数，别的一概不管。",
+  "create_task 调度消费者而不 await 它；下一次 main await 什么东西的时候循环才会运行它，也就是那个 join。",
+  "在 await get() 时被取消的任务会在内部抛出 CancelledError，这就结束了 while True。return_exceptions=True 让 gather 不把它重新抛给你。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.advanced.07.context-managers"
+title = "卷闸门照样落下"
+story = "地库里一个档口每接一单就拉起卷闸门，接完就放下。12:40 收到一张坏单子的那家，从那时起就一直开着，因为关门的代码写在出错那一行的后面。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<STALL> <CENTS>`，其中
+`CENTS` 本该是一个整数。
+
+用 `contextlib.contextmanager` 写一个上下文管理器 `opened(stall)`，进入时打印 `OPEN <STALL>`，退出时打印
+`SHUT <STALL>`——**无论函数体是否抛出异常**。在它里面解析分数并累加到总数。分数解析不了的行，在卷闸门关上之后报告为
+`BAD <STALL>`。最后输出 `TOTAL <sum>` 和
+`REJECTED <k>`。
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+`@contextmanager` 把一个生成器变成上下文管理器：`yield` 之前的一切是 `__enter__`，之后的一切是
+`__exit__`。当函数体抛出异常时，异常会**在 `yield` 处被抛进生成器**，所以它之后的代码只有在 `yield` 位于
+`try`/`finally` 里面时才会运行。起始代码没有 `finally`，于是 `WONG` 的卷闸门永远关不上。
+
+类的写法——`__enter__` 和 `__exit__(self, exc_type, exc, tb)`——用更多行做同样的事，而且可以通过返回
+`True` 吞掉异常。这里不要吞：调用方要打印 `BAD`。
+'''
+hints = [
+  "try: yield / finally: print(SHUT)。finally 就是在每条路径上都会运行的那个 __exit__。",
+  "异常穿过生成器、穿出 with 语句，所以 main 的 except 仍然看得到它——这就是 BAD 印在 SHUT 之后的原因。",
+  "with opened(stall) as x: 会绑定生成器 yield 出来的任何东西。这里它什么都不 yield，那也没关系。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.advanced.08.pipeline"
+title = "流水线厨师"
+story = "波师傅在地库厨房的流水线：一个工位给订单求平方，下一个工位记着累计数，没有人等整批做完。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+用**生成器**搭一条两级流水线：
+
+1. `squares(values)` 逐个产出每个值的平方
+2. `running(stream)` 接收任意数字的可迭代对象，维护一个累计总数，并逐个产出 `(value, total)` 对
+
+`main` 把每一对输出为 `<square> <total>`，然后输出 `PIPE <n>`。
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+两级都不构建列表。每个 `yield` 把一个元素交给下一级然后暂停；`main` 拉取，`running` 从 `squares`
+拉取，`squares` 从输入拉取。没有任何东西在被需要之前被计算出来，整条流水线在途的只有一个元素。正是这一点，让同样的三个函数能处理一个一亿行的文件。
+
+起始代码的第二级在该写 `yield` 的地方写了 `return`，于是它是一个返回最终总数——一个 `int`——的普通函数，而 `main`
+试图去迭代它。
+'''
+hints = [
+  "错误是 TypeError: cannot unpack non-iterable int object — running 返回了一个数字，而不是逐个产出对。",
+  "循环里写 yield value, total。函数体内任何地方有一个 yield，它就是生成器，它的返回值不是调用方看到的东西。",
+  "running(squares(nums)) 之所以能组合，是因为生成器就是一个可迭代对象；running 从不知道也不关心它的输入是另一个生成器。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.advanced.09.itertools"
+title = "架子上的工具箱"
+story = "地库办公室有一架子没人打开的工具，办事员每天下午手工数着连续相同的单子。"
+brief = '''
+标准输入是一行整数。
+
+输出三行，每一行都用 `itertools` 来构建，不要手写任何一个：
+
+1. `SUMS` 后面跟着各个累计和——`accumulate`
+2. `RUNS` 后面跟着每一段**相邻**相等值的游程，格式为 `<v>x<k>`——
+   `groupby`
+3. `PAIRS <k>`：**不同**值之间有多少个无序对——
+   对排好序的不同值做 `combinations`
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+`groupby` 只把**相邻**的相等元素分成一组。它不是 `Counter`，样例正是挑选成让两者不一致的：`1`
+出现四次，分在两段游程里。起始代码在第二行用了一个计数 dict，恰恰在这个输入上是错的。
+
+这些函数返回的每一个都是惰性迭代器。尤其是 `groupby`
+的各组，只在你前进到下一组之前有效，所以要在继续之前把每一组读完——在循环里 `len(list(group))`，而不是把各组存成列表留到以后。
+'''
+hints = [
+  "accumulate(nums) 在每个元素之后产出累计总数；最后一个就是总和。",
+  "for value, group in groupby(nums): 这里的 group 是那一段游程上的迭代器，只能消费一次。len(list(group)) 是它的长度。",
+  "combinations(distinct, 2) 把每个无序对产出一次。数量是 n*(n-1)/2，手算一下核对，你就知道自己的 n 对不对。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.advanced.10.functools"
+title = "记住你算过的"
+story = "豆腐档在午饭前用同样两个数字把同一天的价格从头算了一万一千次，每一次都从零开始。"
+brief = '''
+标准输入是 `n k bits`：两个整数和一串二进制数字。
+
+输出四行：
+
+1. `FIB <fib(n)>`——来自一个用
+   `functools.lru_cache` 做了记忆化的**递归** `fib`
+2. `PRODUCT <k!>`——用 `functools.reduce` 配合 `operator.mul` 对 `1..k` 折叠，带一个初始值，使
+   `k = 0` 时得到 `1`
+3. `BIN <value>`——用带 `base=2` 的 `int` 的 `functools.partial`
+   解析 `bits`
+4. `MISSES <m>`——`fib.cache_info().misses`，递归真正运行函数体的次数
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` 最多是 `400`，所以递归不会超出 Python 的栈帧上限。没有缓存时，`fib(35)` 大约是三千万次调用，而 `fib(90)`
+根本跑不完。有了缓存，每个 `fib(i)` 只运行一次，`MISSES` 是 `n + 1`。`lru_cache`
+是一个装饰器，它能工作是因为参数可哈希——一个列表参数会在第一次调用时抛出 `TypeError`。
+
+`partial` 冻结一个函数的部分参数并给你一个新函数；`reduce`
+把一个双参数函数沿着序列折叠。两者都不高明。两者都会被问到。
+'''
+hints = [
+  "在 def fib 上面写 @functools.lru_cache(maxsize=None)。起始代码死在最后一行，因为普通函数没有 cache_info。",
+  "functools.reduce(operator.mul, range(1, k + 1), 1) — 第三个参数是起始值，正是它让空区间给出 1。",
+  "functools.partial(int, base=2) 是一个可调用对象，接收那个字符串并自己补上 base=2。在 3.9 及之后，functools.cache 与 lru_cache(maxsize=None) 相同；两个名字都行。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.advanced.11.protocol"
+title = "只要能画出来"
+story = "崇光地库的楼层指示牌列着档口和柜台，由两个不同的程序打印，而指示牌只想知道它们每一个都能把自己画出来。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行，每行是下列之一：
+
+* `STALL <NAME> <AISLE>`——渲染为 `<NAME> / A<AISLE>`
+* `COUNTER <NUMBER>`——渲染为 `COUNTER <NUMBER>`
+
+声明一个叫 `Sign` 的 `typing.Protocol`，只有一个方法 `render()`。把 `Stall` 和 `Counter`
+写成普通类——**不继承
+`Sign`**——再写一个函数 `show(sign: Sign)`，打印渲染结果。打印每个标牌，然后输出用
+`isinstance(x, Sign)` 数出来的 `SIGNS <n>`，再输出用 `isinstance(x, Stall)` 数出来的 `STALLS <k>`。
+
+```
+input:  3
+        STALL LAM 4
+        COUNTER 2
+        STALL WONG 1
+output: LAM / A4
+        COUNTER 2
+        WONG / A1
+        SIGNS 3
+        STALLS 2
+```
+
+`Protocol` 是一种**结构化**类型：一个类靠拥有那些方法来满足它，而不是靠声明。这就是带了一个类型检查器读得懂的名字的鸭子类型。在运行时，除非标了
+`@runtime_checkable`，协议什么都不做；标了之后，`isinstance` 会按名字检查方法是否存在。起始代码的 `Sign`
+缺了这个装饰器，它的 `isinstance` 抛出：
+
+```
+TypeError: Instance and class checks can only be used with @runtime_checkable protocols
+```
+
+`show` 在运行时靠属性查找来分派——`sign.render()` 找到对象拥有的那个 `render`，不管它是哪一个。没有静态分派可以选；Python
+只有一种机制，就是这个。
+'''
+hints = [
+  "在 class Sign(Protocol) 上面写 @runtime_checkable，从 typing 导入。这就是整个修复。",
+  "Stall 和 Counter 都没有在任何地方提到 Sign。它们靠拥有 render() 来满足它；结构化就是这个意思。",
+  "对 runtime-checkable 协议做 isinstance 只检查方法存在，不检查它的签名或返回类型。那些由类型检查器检查；解释器从来不检查。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.advanced.12.frozen"
+title = "它不会变"
+story = "当天打印好的价目表 06:00 发到每个档口手上，到 12:30 已有三家在上面涂改过，还有一家加了一栏根本不存在的东西。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<NAME> <CENTS>`。
+
+把每一行构建成一个 **frozen** 的 dataclass `Price(name, cents)`。然后，对每个价格，尝试覆盖它的
+`cents`，并在这次尝试抛出异常时打印 `FROZEN <NAME>`。接着，一个带 `__slots__ = ("count",)` 的 `Tally` 类：设置
+`tally.count`，然后尝试设置一个拼错的 `tally.cuont`，并在*那次*抛出异常时打印
+`SLOTS YES`。最后输出 `IN_SET <k>`——由这些价格组成的 `set` 的大小——和 `TOTAL <sum>`。
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SLOTS YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+frozen 的 dataclass 换来三样东西，起始代码一样都没有。`frozen=True` 让对字段的赋值抛出
+`FrozenInstanceError`，于是价目表没法被涂改。它还让实例变得**可哈希**——可变的 dataclass 会把 `__hash__` 设成
+`None`，对起始代码的价格做 `set()` 会抛出 `TypeError: unhashable type`。字段相等则哈希相等，所以两行
+`LAM 1200` 在集合里是同一个成员。
+
+`__slots__` 是另一种固定形状：实例恰好只有那些点名的属性，没有 `__dict__`，于是属性名的笔误在赋值时就是一个
+`AttributeError`，而不是一个没人会读的、悄悄新增的字段。它还让每个实例更小，这就是它成为“我们有一千万个这种东西”的答案的原因。
+'''
+hints = [
+  "@dataclass(frozen=True)。一个参数，循环里的赋值就开始抛异常了。",
+  "在类体里、__init__ 之前写 __slots__ = (\"count\",)。注意末尾的逗号：(\"count\") 是一个字符串，不是元组。",
+  "TOTAL 是原始分数的和，而这只在赋值失败的前提下才成立。起始代码里到那时每个价格都是 0，TOTAL 是 0——修改不仅被允许了，还真的生效了。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.advanced.13.exceptions"
+title = "自己的错误"
+story = "米柜台定价的四层各自抛出各自的东西，柜台前端接住了其中一个，被其余几个打倒。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行，每行本该是一个以千克计的重量。
+
+定义一个异常层次：`PriceError(Exception)` 作为基类，下面是
+`NotANumber(PriceError)` 和 `Negative(PriceError)`。`Negative` 携带那个重量，消息是 `negative weight: <kg>`；`NotANumber`
+的消息是 `not a number`。`price(text)` 转换文本，**从**它捕获的 `ValueError` 抛出 `NotANumber`，拒绝负的重量，否则返回
+`500 + 100 * kg`。
+
+打印每个价格或错误的消息，然后输出 `ERRORS <k>`。捕获**基类**，只捕获一次。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative weight: -2
+        ERRORS 2
+```
+
+起始代码只捕获 `Negative`，别的一概不管，所以 `xx` 那一行会以一个未捕获的 `NotANumber` 把程序打倒。一个
+`except PriceError as err:` 就能接住这个层次里的每一个成员，而 `str(err)` 就是消息——它是
+`Exception.__str__` 从你传给 `super().__init__` 的参数里给出的，所以消息住在类里，而不是处理器里。
+
+`raise NotANumber() from err` 把那个 `ValueError` 记为原因。这里没有什么会打印它，而一份回溯会把两者一上一下都显示出来，中间是那句
+*The above exception was the direct cause of the
+following exception*。这条链就是写 `from` 的理由。
+'''
+hints = [
+  "except PriceError as err: — 基类接住两个子类，而这正是有一个基类的意义。",
+  "print(err) 打印 str(err)，也就是交给 super().__init__ 的那条消息。不需要重写 __str__。",
+  "有多个 except 子句时顺序很重要：子类子句放在它基类子句之后就是死代码，而 Python 不会警告你。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.advanced.14.iterator"
+title = "下一个，直到停下"
+story = "地库入口的取号机从一个起点按固定步长发号，不保存任何列表，而排队板想像遍历任何列表一样遍历它。"
+brief = '''
+标准输入是三个整数：`start`、`step`、`count`。
+
+写一个类 `Tickets`，**手工实现迭代器协议**：`__iter__` 返回 `self`，`__next__` 返回下一个值，或者在已经发出
+`count` 个值之后抛出 `StopIteration`。每个值单独输出一行，然后输出 `SUM <total>`，这个总和要通过把第二个 `Tickets` 交给
+`sum` 来计算。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+这就是生成器替你写的东西。`for` 循环对那个东西调用一次 `iter()`，然后对结果反复调用 `next()`，直到它抛出
+`StopIteration`；`sum`、`list`、`max` 和 `in` 做的是同样的事。一个有 `__next__` 却没有
+`__iter__` 的对象，是一个 `for` 拒绝接受的迭代器——`TypeError: 'Tickets' object
+is not iterable`——起始代码就是这样。
+
+`__iter__` 返回 `self` 是**迭代器**的标志：它只能被走一遍，然后就耗尽了。**容器**则每次都从
+`__iter__` 返回一个新的迭代器，可以反复遍历；基础街道上的 `Bag`
+就是一个。说清楚你写的是哪一种；区别会在第二次有人循环时显现出来。
+'''
+hints = [
+  "def __iter__(self): return self。两行，for 就开始工作了。",
+  "StopIteration 是抛出的，不是返回的。for 循环会接住它；你永远看不到它。",
+  "在前进之前先存下你即将返回的值，否则你会差一步。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.advanced.15.collections"
+title = "对的容器"
+story = "地库办公室把当天的单子放在一张长长的列表里，回答关于它们的每一个问题都要从头读一遍。"
+brief = '''
+标准输入三行：一行词，一行已经**按升序排好**的整数，以及一个整数 `x`。
+
+输出四行：
+
+1. `TOP <word> <count>`——出现最多的词，次数相同时按词升序
+   ——来自一个 `collections.Counter`
+2. `BISECT <l> <r>`——`x` 在这些有序整数里的 `bisect_left` 和 `bisect_right`
+3. `SMALLEST3` 后面跟着最小的三个整数——`heapq.nsmallest`
+   ——不足三个就有几个输出几个
+4. `GROUPS` 后面跟着每个词首字母的 `<letter>:<k>`，字母升序——一个以首字母为键的
+   `collections.defaultdict(list)`
+
+```
+input:  tofu egg tofu egg fish
+        1 3 3 5 8
+        3
+output: TOP egg 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS e:2 f:1 t:2
+```
+
+`Counter.most_common(1)` 按**插入顺序**决胜，这里那是 `tofu`，而题面说的是
+`egg`。起始代码信了 `most_common`。改用一个把你的意思写明白的 key 给各项排序。
+
+`bisect` 不用循环就回答“这个该放在哪里”：`bisect_left` 是第一个不小于 `x` 的位置，`bisect_right`
+是第一个大于 `x` 的位置，两者之差就是 `x` 出现了几次。`heapq.nsmallest` 在 `k` 小而 `n`
+不小时是正确的选择；为了读前面三个值而把整个列表排序，正是它存在的目的所要避免的事。
+'''
+hints = [
+  "min(counts.items(), key=lambda item: (-item[1], item[0])) 就是把决胜规则写明白的最多词。用同样的 key 排序再取 [0] 是同一个答案。",
+  "bisect_left 和 bisect_right 从不抛异常；list.index 在 x 不存在时抛出 ValueError，而隐藏用例里恰好有一个就是这样。",
+  "defaultdict(list) 在第一次访问时创建列表，所以 groups[letter].append(w) 永远不需要检查。打印前先给各项排序；defaultdict 和任何 dict 一样按插入顺序。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.advanced.16.timeouts"
+title = "别再等了"
+story = "点单板向每个档口询问等候时间，读卡器坏掉的那家永远不回答，于是点单板永远不重绘。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<STALL> <SECONDS>`，其中
+`SECONDS` 为 `0` 表示这家档口立刻回答，为 `1` 表示它不能及时回答。
+
+对每个档口，在 `asyncio.wait_for` 下、以 **0.2 秒**超时 `await` 它的 `fetch(stall, seconds)`——它会睡那么久——然后按输入顺序打印
+`<STALL> OK` 或 `<STALL> TIMEOUT`。然后启动一个永远循环的 `watch()`
+任务，取消它，await 它，并让它从自己的 `except asyncio.CancelledError` 打印 `CANCELLED`、从自己的 `finally` 打印 `CLEANUP`。最后输出
+`TIMEOUTS <k>`。
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+`wait_for` 带着一个期限运行可等待对象；期限一过，它就**取消**内部任务并向你抛出 `asyncio.TimeoutError`。捕获这个名字——在
+3.11 及之后它就是内置的 `TimeoutError`，在 3.10 上不是，而 `asyncio.TimeoutError` 在两者上都正确。
+
+起始代码直接 await `fetch`，所以 `WONG` 花掉整整一秒然后打印 `OK`；它取消 `watch` 却不 await 它，所以那个任务的
+`except` 和 `finally` 在循环关闭之前根本没有机会运行。一个被取消的任务在下一次被调度、`CancelledError`
+被送进它内部之前并没有停止；await 它才是给它那一轮机会的东西。处理完 `CancelledError` 之后要重新抛出——吞掉它，任务就成了不可取消的。
+'''
+hints = [
+  "在 try 里写 asyncio.wait_for(fetch(stall, seconds), timeout=0.2)，配上 except asyncio.TimeoutError。",
+  "watcher.cancel() 只是请求取消。`await watcher` 才让任务得以运行它的 except 和 finally；它会把 CancelledError 重新抛给你，所以也要接住那个。",
+  "create_task 之后的 await asyncio.sleep(0) 给 watcher 一轮机会真正启动，这样要取消的是一个正在运行的任务，而不只是一个已调度的任务。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.advanced.17.gil"
+title = "GIL"
+story = "崇光地库，十二个档口，整层楼只有一把锁。所有本该同时发生的事都一件一件地发生了，而总数回来的时候什么都没有。"
+brief = '''
+标准输入是两个整数 `k` 和 `n`。
+
+把 `1..n` 切成 `k` 个连续的块——第 `i` 块是从
+`n*i//k + 1` 到 `n*(i+1)//k`，含两端——每块交给它自己的线程，由它对自己区间内的平方求和：一个 CPU 密集的循环，不调用库。每个线程在锁的保护下把自己的结果加到**一个共享的总数**上，同时也记进自己的那一格。全部
+join。按索引顺序为每块输出 `CHUNK <i> <sum>`，然后输出 `TOTAL <sum>`，然后输出 `THREADS <k>`。
+
+```
+input:  3 10
+output: CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        THREADS 3
+```
+
+起始代码失败的原因和时序毫无关系。`work` 返回它的和，`main` 收集 `t.join()`，而不管 target 返回什么，`join` 都返回
+`None`——线程没有返回值。第一个 `+=` 就是一个 `TypeError`。这是那个小
+bug。按锁那题的办法修它：一个共享容器，用 `with lock:` 围住更新，每块的格子恰好由一个线程写入。
+
+大的那件事才是 boss，而它不是一个你能修的 bug。用
+`k = 4` 和 `n = 4000000` 跑一次并计时，再用 `k = 1` 跑一次。它们花的时间一样。CPython 有一把**全局解释器锁**：任一时刻只有一个线程在运行
+Python 字节码，而一个 CPU 密集的线程每隔几毫秒交出这把锁，好让别的线程轮上一次。四个核上的四个线程在一个核上轮流求平方和，外加切换的开销。Python
+里的线程是用来等待的——等 socket、等文件、等 `sleep`——等待期间锁被释放，并发才是真的。对 CPU
+工作，答案是 `multiprocessing`，或者 `concurrent.futures.
+ProcessPoolExecutor`，它运行各自带锁的独立解释器，代价是复制参数。
+
+输出是确定的，因为各块按索引打印，总数是各块之和，而不是线程完成的顺序。`TOTAL`
+要从加了锁的总数打印，而不是把各格加起来——锁才是这张地图讲的东西，两者必须一致。
+'''
+hints = [
+  "join() 返回 None。给 work 一个索引和一个可写的格子，再给它一个加了锁的 dict 往里加；值就是这样从线程里出来的。",
+  "全部启动，然后全部 join，然后打印。在线程里打印会交错；join 之后从格子里打印，不可能交错。",
+  "n*(n+1)*(2n+1)/6 是总数的闭式。拿 TOTAL 对照一次，你就知道块的边界是对的。",
+  "在大的 n 上给 k=1 和 k=4 计时。当它们一样时，你就遇见了 GIL。那不是这道题里的 bug；它是这个程序的下一个版本会是 ProcessPoolExecutor 的原因。",
+]

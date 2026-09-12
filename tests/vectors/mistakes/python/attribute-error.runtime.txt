@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<work>/main.py", line 10, in <module>
+    print(s.price)
+          ^^^^^^^
+AttributeError: 'Stall' object has no attribute 'price'

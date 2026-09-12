@@ -42,7 +42,7 @@ return {
   ["TAB field   F2 reveal   N new wallet   F10 story   ENTER apply/sign in"] = "TAB 切换   F2 显示   N 新钱包   F10 故事   ENTER 应用/登录",
   ["The plan will be a fixed ordered list, so a reconnect resumes the same session rather than reshuffling it — and every step will say why it was chosen."] = "计划是一个顺序固定的列表，所以重新连上是接着同一个会话，而不是重新洗牌 — 并且每一步都会说明为什么选它。",
   ["This builds a session out of the mistakes you have actually made, so it needs you to have made some. Play a few streets — the errors get classified as they happen — and come back."] = "这是用你真正犯过的错误来生成一节课，所以得先有一些。去走几条街 — 错误一出现就会被归类 — 然后再回来。",
-  ["Type and press ENTER. It searches every quest in both lands — titles, briefs, concepts and the story text."] = "输入后按 ENTER。它会搜索两块地的所有关卡 — 标题、简介、概念，还有故事正文。",
+  ["Type and press ENTER. It searches every quest in every land — titles, briefs, concepts and the story text."] = "输入后按 ENTER。它会搜索每块地的所有关卡 — 标题、简介、概念，还有故事正文。",
   ["When it lands, each hit will show why it matched — the fused score and the two rankings behind it, so a match on the words reads differently from a match on the meaning."] = "等它上线后，每条结果都会说明为什么匹配 — 融合分数和它背后的两个排序都会给出，于是字面命中和语义命中读起来就不一样。",
   ["Write them on paper, in order. Anyone who reads them owns the account, and nobody — not this game, not the server — can recover them for you."] = "按顺序抄在纸上。谁读到它谁就拥有这个账户，而没有人 — 这个游戏不行，服务器也不行 — 能替你找回。",
   ["Your most frequent is %s, %d times. Press ENTER and this will find different shapes of it."] = "你最常犯的是 %s，%d 次。按 ENTER 就会找出同一个问题的不同形态。",
@@ -82,6 +82,8 @@ return {
   ["timed. the whiteboard is watching."] = "计时的。白板正看着你。",
   ["ownership, borrows, lifetimes"] = "ownership、borrows、lifetimes",
   ["goroutines, channels, interfaces"] = "goroutines、channels、interfaces",
+  ["threads, mutexes, the STL"] = "threads、mutexes、还有 STL",
+  ["dicts, generators, the GIL"] = "dicts、generators、还有 GIL",
   ["both rankings, fused"] = "两种排序融合",
   ["the words you typed"] = "你输入的词",
   ["what you meant"] = "你想表达的意思",
@@ -187,6 +189,18 @@ return {
   ["costs a star"] = "要花一颗星",
   ["no answer key here"] = "这里没有答案",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "答案已经放进编辑器 — CTRL-Z 可以退回你自己的代码。这道题仍然可以通关，只是拿不到三颗星了；看答案不算一次尝试，只有 SUBMIT 才会记录",
+
+  -- The edit stack: UNDO, REDO and CLEAR, and the caption that says how
+  -- deep it goes. `stack` is the data structure programmers already name
+  -- in their own language, so the word is translated rather than kept.
+  ["UNDO"] = "撤销",
+  ["REDO"] = "重做",
+  ["CLEAR  SHIFT-F6"] = "清空记录  SHIFT-F6",
+  ["stack %d/%d"] = "堆栈 %d/%d",
+  ["stack empty"] = "堆栈为空",
+  ["no stack here"] = "这里没有堆栈",
+  ["press CLEAR again to drop the %d steps behind this quest — the editor keeps the text it is showing, and so does CTRL-Z"] = "再按一次 CLEAR 就会丢掉这道题积累的 %d 步 — 编辑器里的文字不动，CTRL-Z 也还在",
+  ["the history is gone; the text in the editor is not"] = "历史没了；编辑器里的文字还在",
 
   -- ------------------------------------------------- the title card and the
   -- opening (`src/scenes/title.lua`, `src/scenes/story.lua`). The sentences

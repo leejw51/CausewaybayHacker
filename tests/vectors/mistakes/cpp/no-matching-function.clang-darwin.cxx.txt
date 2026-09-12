@@ -1,0 +1,7 @@
+main.cpp:9:18: error: no matching function for call to 'add'
+    9 |     std::cout << add("one", 2) << "\n";
+      |                  ^~~
+main.cpp:6:5: note: candidate function not viable: no known conversion from 'const char[4]' to 'int' for 1st argument
+    6 | int add(int a, int b) { return a + b; }
+      |     ^   ~~~~~
+1 error generated.

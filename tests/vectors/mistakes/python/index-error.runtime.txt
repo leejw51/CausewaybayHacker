@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<work>/main.py", line 3, in <module>
+    print(prices[3])
+          ~~~~~~^^^
+IndexError: list index out of range

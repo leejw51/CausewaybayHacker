@@ -9,8 +9,8 @@
 use cwbhacker_core::error::{bad_request, not_found, unauthorized, Error, Result};
 use cwbhacker_core::Connection;
 use cwbhacker_core::{
-    attempts, auth, awards, drills, eth, interviews, mistakes, progress, quests, search, stats,
-    users, world,
+    attempts, auth, awards, drills, edits, eth, interviews, mistakes, progress, quests, search,
+    stats, users, world,
 };
 use serde_json::json;
 
@@ -175,8 +175,11 @@ pub fn world_map(
     let address = session.address()?;
     let land = str_field(payload, "land")?;
     let category = str_field(payload, "category")?;
+    // PROTOCOL §4.7: `locale?` is the client's UI language. Titles come back
+    // in it where a translation exists and each node says which it got.
+    let locale = opt_str_field(payload, "locale");
     let conn = state.store.conn();
-    let map = world::map(&conn, address, &land, &category)?;
+    let map = world::map_localized(&conn, address, &land, &category, locale.as_deref())?;
     Ok(json!({
         "land": land,
         "category": category,
@@ -209,6 +212,10 @@ pub fn quest_get(
     let quest_id = str_field(payload, "quest_id")?;
     let conn = state.store.conn();
     let (quest, quest_state, row) = readable_quest(&conn, address, &quest_id)?;
+    // PROTOCOL §4.8: the prose in the client's language when a translation
+    // exists, English (and `text_locale: "en"`) otherwise. An unknown locale
+    // string is the second case, not an error.
+    let quest = quest.localized(&conn, opt_str_field(payload, "locale").as_deref())?;
     // PROTOCOL §4.8b: opening a timed quest starts its clock, once. Untimed
     // quests never get one — there is nothing for it to count down to.
     let opened_at = if quest.time_limit_s.is_some() {
@@ -349,6 +356,9 @@ pub fn quest_hint(
         // screen (PROTOCOL §4.9e).
         return Err(not_found("there are no hints in an interview"));
     }
+    // §4.10's `locale?`: the same index into the translated array, whose
+    // length the importer guarantees equals the English one.
+    let quest = quest.localized(&conn, opt_str_field(payload, "locale").as_deref())?;
     let hint = quest
         .hints
         .get(index as usize)
@@ -377,6 +387,85 @@ pub fn quest_reset(
     // the clock is deliberately untouched here.
     let (quest, _, _) = readable_quest(&conn, address, &quest_id)?;
     Ok(json!({ "starter": quest.starter }))
+}
+
+/// PROTOCOL §4.11c, all five of them. The stack is `edits.rs`; what is here is
+/// the wire: the address comes from the session and never from the payload
+/// (SPEC §3.5), and **every reply is the whole `EditState`**, so a client that
+/// missed a frame, reloaded, or opened a second window is never left holding a
+/// stack of its own that has drifted from the server's.
+///
+/// The five share this one body because the only thing that differs between
+/// them is which function moves the cursor. Writing them out separately would
+/// be five copies of the session lookup and the serialization, and the fifth
+/// copy is where the bug would live.
+fn edit_op(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+    op: impl FnOnce(&Connection, &cwbhacker_core::Home, &str, &str) -> Result<edits::EditState>,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let quest_id = str_field(payload, "quest_id")?;
+    // One guard, taken once: `Store::conn` is not reentrant (`store.rs`).
+    let conn = state.store.conn();
+    let edit_state = op(&conn, state.store.home(), address, &quest_id)?;
+    Ok(serde_json::to_value(edit_state)?)
+}
+
+/// `edit.state` — what the quest screen asks for when it opens.
+pub fn edit_state(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    edit_op(state, session, payload, edits::state)
+}
+
+/// `edit.push` — one step onto the stack. `source` over 256 KiB is
+/// `bad_request`, the same cap `quest.submit` uses, and a push of the text
+/// that is already current is a no-op rather than a refusal: the client sends
+/// this on an idle timer and being told off for not having typed anything
+/// would be noise.
+pub fn edit_push(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let source = str_field(payload, "source")?;
+    edit_op(
+        state,
+        session,
+        payload,
+        move |conn, home, address, quest| edits::push(conn, home, address, quest, &source),
+    )
+}
+
+pub fn edit_undo(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    edit_op(state, session, payload, edits::undo)
+}
+
+pub fn edit_redo(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    edit_op(state, session, payload, edits::redo)
+}
+
+/// `edit.clear` — the button the brief asks for. It empties the history and
+/// touches nothing else: no attempt, no progress, and no edit. The client
+/// keeps whatever text it is showing.
+pub fn edit_clear(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    edit_op(state, session, payload, edits::clear)
 }
 
 pub fn stats_summary(state: &Shared, session: &Session) -> Result<serde_json::Value> {
@@ -477,7 +566,10 @@ pub fn ai_next(
     let drill_id = str_field(payload, "drill_id")?;
     let conn = state.store.conn();
     let step = drills::next(&conn, address, &drill_id)?;
-    let quest = quests::get(&conn, &step.quest_id)?;
+    // A drill step opens the quest screen the same way `quest.get` does, so
+    // it takes the same `locale?` (PROTOCOL §4.16).
+    let quest = quests::get(&conn, &step.quest_id)?
+        .localized(&conn, opt_str_field(payload, "locale").as_deref())?;
     let quest_state = world::state_of(&conn, address, &step.quest_id)?;
     let row = progress::get(&conn, address, &step.quest_id)?;
     let opened_at = if quest.time_limit_s.is_some() {

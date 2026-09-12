@@ -39,7 +39,7 @@ return {
   ["TAB field   F2 reveal   N new wallet   F10 story   ENTER apply/sign in"] = "TAB 칸 이동   F2 보기   N 새 지갑   F10 이야기   ENTER 적용/로그인",
   ["The plan will be a fixed ordered list, so a reconnect resumes the same session rather than reshuffling it — and every step will say why it was chosen."] = "계획은 순서가 고정된 목록이라, 다시 접속해도 섞이지 않고 같은 세션을 이어서 합니다 — 그리고 각 단계마다 왜 골랐는지 적힙니다.",
   ["This builds a session out of the mistakes you have actually made, so it needs you to have made some. Play a few streets — the errors get classified as they happen — and come back."] = "이건 당신이 실제로 낸 실수로 세션을 만들기 때문에, 실수가 좀 쌓여 있어야 합니다. 거리를 몇 개 돌아보세요 — 오류는 생기는 즉시 분류됩니다 — 그리고 다시 오세요.",
-  ["Type and press ENTER. It searches every quest in both lands — titles, briefs, concepts and the story text."] = "입력하고 ENTER 를 누르세요. 두 땅의 모든 퀘스트를 찾습니다 — 제목, 설명, 개념, 그리고 이야기 본문까지.",
+  ["Type and press ENTER. It searches every quest in every land — titles, briefs, concepts and the story text."] = "입력하고 ENTER 를 누르세요. 모든 땅의 모든 퀘스트를 찾습니다 — 제목, 설명, 개념, 그리고 이야기 본문까지.",
   ["When it lands, each hit will show why it matched — the fused score and the two rankings behind it, so a match on the words reads differently from a match on the meaning."] = "이 기능이 들어오면, 각 결과마다 왜 걸렸는지 보여줍니다 — 합쳐진 점수와 그 뒤의 두 순위까지, 그래서 단어로 걸린 것과 의미로 걸린 것이 다르게 읽힙니다.",
   ["Write them on paper, in order. Anyone who reads them owns the account, and nobody — not this game, not the server — can recover them for you."] = "순서대로 종이에 적으세요. 이걸 읽은 사람은 누구든 그 계정의 주인이 되고, 누구도 — 이 게임도, 서버도 — 대신 복구해 줄 수 없습니다.",
   ["Your most frequent is %s, %d times. Press ENTER and this will find different shapes of it."] = "가장 자주 낸 실수는 %s, %d 번입니다. ENTER 를 누르면 같은 문제의 다른 모양들을 찾아 줍니다.",
@@ -79,6 +79,8 @@ return {
   ["timed. the whiteboard is watching."] = "시간 제한. 화이트보드가 보고 있습니다.",
   ["ownership, borrows, lifetimes"] = "ownership, borrows, lifetimes",
   ["goroutines, channels, interfaces"] = "goroutines, channels, interfaces",
+  ["threads, mutexes, the STL"] = "threads, mutexes, 그리고 STL",
+  ["dicts, generators, the GIL"] = "dicts, generators, 그리고 GIL",
   ["both rankings, fused"] = "두 순위를 합쳐서",
   ["the words you typed"] = "입력한 단어 그대로",
   ["what you meant"] = "말하려던 의미",
@@ -184,6 +186,18 @@ return {
   ["costs a star"] = "별 하나를 씁니다",
   ["no answer key here"] = "여기에는 정답이 없습니다",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "정답이 에디터에 들어왔습니다 — CTRL-Z 로 원래 코드가 돌아옵니다. 클리어는 그대로 되지만 별 셋은 아닙니다. 보는 것은 시도가 아니고, 기록은 SUBMIT 만 남깁니다",
+
+  -- The edit stack: UNDO, REDO and CLEAR, and the caption that says how
+  -- deep it goes. `stack` is the data structure programmers already name
+  -- in their own language, so the word is translated rather than kept.
+  ["UNDO"] = "되돌리기",
+  ["REDO"] = "다시 실행",
+  ["CLEAR  SHIFT-F6"] = "기록 비우기  SHIFT-F6",
+  ["stack %d/%d"] = "스택 %d/%d",
+  ["stack empty"] = "스택 비어 있음",
+  ["no stack here"] = "여기에는 스택이 없습니다",
+  ["press CLEAR again to drop the %d steps behind this quest — the editor keeps the text it is showing, and so does CTRL-Z"] = "CLEAR 를 한 번 더 누르면 이 퀘스트에 쌓인 %d 단계가 사라집니다 — 에디터에 보이는 글은 그대로 남고, CTRL-Z 도 그대로입니다",
+  ["the history is gone; the text in the editor is not"] = "기록은 사라졌습니다; 에디터의 글은 그대로입니다",
 
   -- ------------------------------------------------- the title card and the
   -- opening (`src/scenes/title.lua`, `src/scenes/story.lua`). The sentences

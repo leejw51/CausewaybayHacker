@@ -82,12 +82,17 @@ add({ until_ = function(app)
     end, note = "land switched, category kept, no walk across", timeout = 10 })
 add({ shot = "M4-go-hacker.png" })
 
--- Back to where we started: TAB returns to rust/hacker, and one Q wraps
--- hacker -> basic. (Two Q's overshoot to advanced — which this script did on
--- its first run, and the assertion below caught rather than glossing over.)
+-- Back to where we started: TAB walks on through cpp and python and
+-- returns to rust/hacker on the third press, and one Q wraps hacker ->
+-- basic. (Two Q's overshoot to advanced — which this script did on its
+-- first run, and the assertion below caught rather than glossing over.)
 add({ note = "back to where we were — nothing is lost by looking" })
-add({ key = "tab" })
-add({ until_ = loaded, timeout = 12 })
+for _, land in ipairs({ "cpp", "python", "rust" }) do
+  add({ key = "tab" })
+  add({ until_ = loaded, timeout = 12 })
+  add({ until_ = function(app) return app.scene.land == land end,
+        note = "TAB reached " .. land, timeout = 10 })
+end
 add({ key = "q" })
 add({ until_ = loaded, timeout = 12 })
 add({ wait = 0.6 })

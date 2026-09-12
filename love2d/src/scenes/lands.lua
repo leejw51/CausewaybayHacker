@@ -1,4 +1,4 @@
--- LAND SELECT. `world.lands` (PROTOCOL §4.6), drawn as two cards.
+-- LAND SELECT. `world.lands` (PROTOCOL §4.6), drawn as a card per land.
 --
 -- The counts, the `open` flags and the star totals are all the server's. This
 -- screen adds nothing to them: if `go` comes back with every category shut,
@@ -11,11 +11,12 @@ local UI = require("src.ui")
 local SFX = require("src.sfx")
 local Anim = require("src.anim")
 local I18n = require("src.i18n")
+local Land = require("src.land")
 
 local Lands = {}
 Lands.__index = Lands
 
-local LAND_ORDER = { "rust", "go" }
+local LAND_ORDER = Land.ORDER
 local CATEGORY_ORDER = { basic = 1, advanced = 2, hacker = 3 }
 
 --- SPEC §0's order. `world.lands` does not promise one, and the rows were
@@ -33,10 +34,11 @@ local function ordered_categories(categories)
   end)
   return out
 end
-local MASCOT = { rust = "sprite_ferris", go = "sprite_gogo" }
 local BLURB = {
   rust = "ownership, borrows, lifetimes",
   go = "goroutines, channels, interfaces",
+  cpp = "threads, mutexes, the STL",
+  python = "dicts, generators, the GIL",
 }
 
 function Lands.new(app)
@@ -62,15 +64,12 @@ end
 --- depends on. Anything the server sends that is not in `LAND_ORDER` is kept
 --- and shown after the ones that are, rather than dropped.
 local function ordered(lands)
-  local rank = {}
-  for i, name in ipairs(LAND_ORDER) do rank[name] = i end
   local out = {}
   for i, land in ipairs(lands or {}) do
     out[i] = land
   end
   table.sort(out, function(a, b)
-    local ra = rank[a.land] or (#LAND_ORDER + 1)
-    local rb = rank[b.land] or (#LAND_ORDER + 1)
+    local ra, rb = Land.rank(a.land), Land.rank(b.land)
     if ra ~= rb then return ra < rb end
     return tostring(a.land) < tostring(b.land)
   end)
@@ -135,7 +134,7 @@ end
 function Lands:card_rects()
   local vw, vh = Layout.vw, Layout.vh
   local portrait = Layout.isPortrait()
-  local n = math.max(1, self.lands and #self.lands or 2)
+  local n = math.max(1, self.lands and #self.lands or #LAND_ORDER)
   -- Measured from the type, not fixed: the title above the cards and the
   -- footer below them both grow when the player asks for bigger type.
   local pad = 16
@@ -250,11 +249,11 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
   local mascot = math.max(48, math.min(h * 0.42, free))
   local top = y + pad + math.max(0, (free - mascot) * 0.45)
 
-  local bob = Anim.bob(t, { amount = selected and 3 or 1.5, phase = key == "go" and 0.5 or 0 })
-  Assets.sprite(MASCOT[key], x + w / 2, top + mascot + bob, mascot)
+  local bob = Anim.bob(t, { amount = selected and 3 or 1.5, phase = Land.phase(key) })
+  Assets.sprite(Land.mascot(key), x + w / 2, top + mascot + bob, mascot)
 
   local ty = top + mascot + 6
-  UI.text(I18n.t("%s LAND", (key or "?"):upper()), x, ty, 14, tint, "center", w)
+  UI.text(I18n.t("%s LAND", Land.name(key)), x, ty, 14, tint, "center", w)
   for i, line in ipairs(blurb_lines) do
     UI.text(line, x, ty + title_h + 2 + (i - 1) * UI.lineHeight(8), 8,
       Theme.withAlpha(Theme.cream, 0.7), "center", w)
@@ -303,7 +302,7 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
 end
 
 function Lands:keypressed(key)
-  local n = math.max(1, self.lands and #self.lands or 2)
+  local n = math.max(1, self.lands and #self.lands or #LAND_ORDER)
   if key == "left" or key == "up" then
     self.cursor = ((self.cursor - 2) % n) + 1
     self.picked_at = Anim.now()

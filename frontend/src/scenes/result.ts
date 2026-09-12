@@ -24,10 +24,9 @@ import {
   footer,
   footerH,
   frame,
-  GO,
   header,
   keyRows,
-  RUST,
+  landColour,
   titledPanel,
 } from "../ui/chrome";
 import type { Attempt, Category, Land } from "../net/protocol";
@@ -251,7 +250,7 @@ export class ResultScene implements Scene {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
     const ok = this.passed;
-    const accent = this.land === "rust" ? RUST : GO;
+    const accent = landColour(this.land);
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
     header(

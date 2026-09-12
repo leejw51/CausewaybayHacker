@@ -1,0 +1,523 @@
+# RUST LAND — ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/rust/advanced.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "rust.advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.advanced.01.threads"
+title = "两台收银机，一个柜台"
+story = "时代广场分店中午开了第二台收银机，队伍终于动了起来。店里其他的一切都没变。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+为每个值生成一个线程，计算它的平方。**按你生成它们的顺序** join 它们，把每个结果各打印一行，然后打印 `THREADS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+按顺序 join，才是让输出每次运行都一样的原因。让线程自己打印，就做不到。
+'''
+hints = [
+  "thread::spawn 返回一个 JoinHandle<T>，其中 T 是闭包返回的任何类型。",
+  "join() 给你 Result<T, _> —— Err 就是 panic，这里用 unwrap 是诚实的。",
+  "在循环之前先取好数量；按值迭代会把这个 Vec 消耗掉。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.advanced.02.move"
+title = "把它带走"
+story = "Alex 把唯一一份单据上的地址交给骑手，然后让柜台把地址念回来。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行文本。
+
+为每一行生成一个线程，返回这一行的大写形式。按顺序 join，逐个打印，然后打印 `DONE`。
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        DONE
+```
+
+起始代码编译不通过：闭包借用了 `line`，而 `thread::spawn` 根本不知道线程会跑多久，所以无法证明这个借用活得比线程久。把字符串本身交给线程，而不是它的一个视图。
+'''
+hints = [
+  "错误是 E0373：closure may outlive the current function。",
+  "在闭包前面加一个关键字，它就从借用变成拥有。",
+  "line 在每次迭代里本来就是一个新的 String，所以把它送出去不花任何代价。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.advanced.03.channels"
+title = "一个窗口，许多骑手"
+story = "四十个骑手，时代广场后厨只有一个出餐口。所有东西都走这个口，而这个口从不堵。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+为每个值生成一个线程。每个线程把 `(index, value * 10)` 发进同一个 `mpsc` 通道。主线程把它们全部接收下来，按 index 排序，每行打印一个 `<index> <value>`，然后打印 `RECV <n>`。
+
+```
+input:  3
+        1 2 3
+output: 0 10
+        1 20
+        2 30
+        RECV 3
+```
+
+通过迭代 `rx` 来接收，会在**每一个**发送端都被丢弃后结束 —— 而 `main` 手里还握着的那一个也算在内。把它丢掉，否则程序永远结束不了。
+'''
+hints = [
+  "每个线程需要自己的 Sender：在 move 闭包之前 tx.clone()。",
+  "循环之后 drop(tx)。没有它，接收端会永远等着那个还待在 main 里的发送端。",
+  "rx.iter() 会一直产出直到通道关闭，所以 collect() 就是整个接收循环。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.advanced.04.mutex"
+title = "一个抽屉，八只手"
+story = "两台收银机从同一个抽屉里拿现金，打烊时抽屉里的数跟两台机都对不上。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+为每个值生成一个线程，把它加进**同一个共享总数**。把线程全部 join，然后打印 `TOTAL <sum>` 和 `THREADS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        THREADS 4
+```
+
+起始代码能编译，但是错的：`i64` 是 `Copy`，所以每个 `move` 闭包拿到的是自己私有的一份总数，然后把它扔掉了。共享一个，并且给它上锁。
+'''
+hints = [
+  "Arc 是共享所有权；Mutex 是独占访问。两个都要，而且按这个顺序：Arc<Mutex<i64>>。",
+  "在循环里、move 闭包之前 Arc::clone(&total) —— 每个线程拿走的就是这个克隆。",
+  "lock() 返回的 guard 解引用到值本身；*guard += value，guard 离开作用域时自动解锁。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.advanced.05.rwlock"
+title = "许多读者，一个写者"
+story = "希慎广场的楼层索引每分钟被读三百次，每天改两次，而那把锁分不出两者的区别。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个词。
+
+持有一个 `Arc<RwLock<HashMap<String, i64>>>`。为每个词生成一个线程，取**写**锁并把这个词的计数加一。把线程全部 join，然后取一次**读**锁，按词排序打印每个 `<word> <count>`，然后打印 `TOTAL <sum>`。
+
+```
+input:  3
+        tram
+        bus
+        tram
+output: bus 1
+        tram 2
+        TOTAL 3
+```
+
+起始代码编译不通过。它取的是读锁，却想通过它写入，而 `RwLockReadGuard` 不会给你 `&mut`。
+'''
+hints = [
+  "write() 返回的 guard 解引用到 &mut；read() 返回的只解引用到 &。",
+  "对 Vec<(&String, &i64)> 排序会先按词排，这正是输出要的。",
+  "迭代读 guard 的时候把它放在一个绑定里，否则临时值会在你用完之前就被丢弃。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.advanced.06.lifetimes"
+title = "它能管多久"
+story = "发车牌保存的是时刻表的一个视图而不是副本，却没有人记下时刻表什么时候会被扔掉。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行。
+
+写一个 `Board`，持有输入的**借用** `&str` 切片 —— 不用 `String`，不复制 —— 并给它 `longest()`（并列时第一行胜出）和 `bytes()`。
+
+打印最长的那一行，然后是一共有多少行，然后是它们的总字节长度。
+
+```
+input:  3
+        tram
+        percival street
+        mtr
+output: percival street
+        3
+        22
+```
+
+起始代码编译不通过：持有引用的结构体必须说明这个引用能管多久。这就是 E0106，修法是在结构体上、在 `impl` 上、在 `longest` 的返回值上各加一个生命周期参数。
+'''
+hints = [
+  "struct Board<'a> { lines: Vec<&'a str> } —— 结构体现在对一个生命周期是泛型的。",
+  "impl<'a> Board<'a> —— 用之前先声明它，和类型参数一样。",
+  "longest 返回 &'a str，不是 &str：答案活得比对 self 的借用长，它属于输入。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.advanced.07.generics"
+title = "只写一次"
+story = "Alex 已经把 largest 写了四遍 —— 为票价、为分钟数、为骑手、为站名 —— 第五遍要在这一班结束前交。"
+brief = '''
+标准输入是两行：第一行是整数，第二行是词。
+
+写**一个** `largest`，两种都能用，再写一个泛型的 `Pair<T>`，带 `larger()` 和 `smaller()`。
+
+打印最大的整数、最大的词，然后对前两个整数组成的 `Pair` 打印 `PAIR <larger> <smaller>`。相等时算 `a` 是较大的那个。
+
+```
+input:  4 8 15 16
+        tram bus mtr
+output: 16
+        tram
+        PAIR 8 4
+```
+
+起始代码编译不通过：`largest` 被钉死在 `i64` 上，所以把词传给它是 E0308。
+'''
+hints = [
+  "largest<T: PartialOrd + Copy> —— PartialOrd 用来比较，Copy 是因为循环要把值从切片里取出来。",
+  "&str 既是 Copy 又是 PartialOrd，所以同一个函数不用改就能接收词表。",
+  "约束写在 impl 块上，不是结构体上：impl<T: PartialOrd> Pair<T>。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.advanced.08.iterator"
+title = "你自己的 for 循环"
+story = "电车把从筲箕湾到坚尼地城的每一站都报出来，却没有在任何地方存一份站表。"
+brief = '''
+标准输入是三个整数：`start`、`step`、`count`。
+
+为 `Stops` 实现 `Iterator`，让它从 `start` 开始、每次前进 `step`，产出 `count` 个值。每个值各打印一行，然后打印用迭代器自己的 `sum()` 算出的 `SUM <total>`。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+一旦有了 `next`，`for`、`sum`、`map`、`take` 和其余的一切就都免费到手了。这就是实现一个 trait 换来的东西。
+'''
+hints = [
+  "没有剩余的时候 next 返回 None，而这个 None 就是结束 for 循环的东西。",
+  "在前进之前先把要返回的值存下来，否则你会差一步。",
+  "left 是倒计数；每交出一个值就把它减一。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.advanced.09.pipeline"
+title = "流水线厨师"
+story = "Bo 师傅的夜班厨房按流水线运转：一个工位给订单求平方，下一个工位记累计数，没有人等整批做完。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+用两个 `mpsc` 通道和两个线程搭一条两级流水线：
+
+1. 第一级把每个值的平方发出去
+2. 第二级接收这些值，维护一个累计总数，并发出 `(square, total)`
+
+`main` 把收到的每一对按 `<square> <total>` 打印，然后打印 `PIPE <n>`。
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+每一级的发送端都被**移进**它自己的线程，所以线程结束时它就被丢弃，下一级的 `for` 循环也就能结束。在任何地方多留一份副本，程序就会挂住。
+'''
+hints = [
+  "把 nums 移进第一个线程之前，先取好数量。",
+  "第二个线程里的 for square in rx1 是一个接收循环，在第一级丢弃 tx1 时结束。",
+  "main 对 rx2 的循环在第二个线程结束时结束，这就是为什么之后再 join 不会挂住。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.advanced.10.async"
+title = "async 到底在哪里跑"
+story = "阿薇写了四年 async Rust，却一次也没见过驱动它的那个东西。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+这里没有运行时 —— 没有 tokio，一个 crate 都没有。写那个执行器。
+
+完成 `block_on`，它轮询一个 future 直到 `Ready`，返回值**以及它轮询了多少次**。然后用 `block_on` 跑一个 `async` 块，按顺序对每个值 await `double(v)`，打印每个结果，再打印 `SUM <total>` 和 `POLLS <k>`。
+
+`double` 在返回之前会让出一次，所以每个值多花一次轮询：`POLLS` 是 `n + 1`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        POLLS 4
+```
+
+`async fn` 是一个实现了 `Future` 的状态机，而 `.await` 的意思是"轮询里面那个；如果它是 `Pending`，就返回 `Pending`，并记住我走到了哪里"。没有东西去轮询它，它就什么都不跑。那个东西只有三十行，写一遍比读五遍值钱。
+'''
+hints = [
+  "Box::pin 不用任何 unsafe 就给你一个 Pin<Box<F>>，.as_mut() 把它变成 poll 想要的 Pin<&mut F>。",
+  "Context::from_waker(&waker) 就是全部的仪式 —— Waker 是真正的运行时用来重新调度你的东西。",
+  "这个执行器在 Pending 上忙等。真正的执行器会把线程停住直到 waker 被触发，这是唯一有意思的区别。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.advanced.11.send-sync"
+title = "它为什么过不去"
+story = "同样的代码，同样的 Vec，只差一个词，两份里有一份编译不过。说出是哪个词，为什么。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+通过一个共享总数，在两个线程里把它们加起来，然后打印：
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        SEND ARC OK
+        SYNC MUTEX OK
+```
+
+最后两行只在 `assert_send` 和 `assert_sync` 接受这个句柄时才打印 —— 而这两个函数在运行时什么都不做。它们是 `fn assert_send<T: Send>(_: &T) {}`：检查就是那个约束，它要么发生在编译时，要么根本不发生。
+
+起始代码编译不通过，而这个错误就是这一课。`Rc` 不是 `Send`，因为它的引用计数是一个普通的非原子整数 —— 两个线程克隆同一个 `Rc` 会在它上面竞争，所以编译器根本不允许 `Rc` 跨越线程边界。`Arc` 是同一个东西换成原子计数，它是 `Send`。
+
+`Sync` 是另一半：当 `&T` 是 `Send` 时，`T` 就是 `Sync`。对任何 `T: Send`，`Mutex<T>` 都是 `Sync`，因为锁正是让共享访问安全的东西。
+'''
+hints = [
+  "错误是 E0277：`Rc<Mutex<i64>>` cannot be sent between threads safely。改一个类型名，连带改一个 import。",
+  "Rc 的引用计数是普通的 usize；Arc 的是 AtomicUsize。这一个差别就是为什么一个是 Send、另一个不是的全部原因。",
+  "assert_sync(&*total) 问的是 Mutex 本身，而不是外面包着的 Arc —— 只要 T 是 Send，Mutex<T> 就是 Sync。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.advanced.12.dispatch"
+title = "现在还是以后"
+story = "同样两家店面，同样的渲染，面试官要两种写法同时出现在板上。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `SHOP <NAME> <FLOOR>` 或 `STOP <ROUTE>`。
+
+把每个招牌渲染**两次**：一次通过 `render_static<T: Sign>(sign: &T)`，一次通过 `render_dynamic(sign: &dyn Sign)`，按这个顺序 —— 先全部静态的，再全部动态的。然后打印 `DYNAMIC <k>`，即 `Vec<Box<dyn Sign>>` 的长度。
+
+```
+input:  3
+        SHOP HYSAN 4
+        STOP 2
+        SHOP SOGO 1
+output: HYSAN / F4
+        TRAM 2
+        SOGO / F1
+        HYSAN / F4
+        TRAM 2
+        SOGO / F1
+        DYNAMIC 3
+```
+
+两者产出完全相同的文本，但不是同一回事。`render_static` 是单态化的：编译器为每个具体类型生成一份，调用是直接的、可内联的 —— 但类型必须**在调用点**已知，这就是为什么静态那一遍必须在解析分支里面完成，那时你还知道自己构造的是什么。
+
+`render_dynamic` 接收一个胖指针 —— 数据加虚表 —— 在运行时查方法，并不在乎自己拿着的是什么。这是同一个 `Vec` 能同时装下两者的唯一原因。
+'''
+hints = [
+  "render_static 必须在具体类型还看得见的地方调用 —— 在 match 分支里面，在值被装进 Box 之前。",
+  "sign.as_ref() 把 &Box<dyn Sign> 变成 &dyn Sign；直接传 Box 本身会需要再解引用一次。",
+  "两个函数的函数体是同一行。区别完全在签名上，完全在方法查找发生在哪里。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.advanced.13.interior-mutability"
+title = "通过共享引用修改"
+story = "门上的计数器必须往上走，而四段不同的代码都只是在看着它。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+打印四行：
+
+1. `CELL <k>` —— 一个 `Cell<usize>`，每个值加一次，用 `.get()` 读回来，全程通过一个普通的 `&` 引用
+2. `REF <sum>` —— 一本填入这些值并求和的账本
+3. `RC <k>` —— 账本是一个 `Rc<RefCell<Vec<i64>>>`，你手里握着**两个**句柄；在两个都活着的时候打印 `Rc::strong_count`
+4. `DOUBLE panic` —— 故意在同一个 `RefCell` 上同时取两个 `borrow_mut()`，并用 `std::panic::catch_unwind` 接住这个 panic
+
+```
+input:  3
+        1 2 3
+output: CELL 3
+        REF 6
+        RC 2
+        DOUBLE panic
+```
+
+`&T` 通常意味着谁都不能改它。`Cell` 和 `RefCell` 是受认可的例外，而两者付的是不同的货币：`Cell` 只整个地把值搬进搬出，所以完全不需要检查；`RefCell` 交出的是真正的引用，因此必须执行借用规则 —— 在运行时，用 panic，而不是在编译时用错误。
+
+`Rc<RefCell<T>>` 是每个人最终都会伸手去拿的那一对，值得能说清每一半各干什么。`Rc` 给值多于一个的所有者 —— 非原子的引用计数，所以它不是 `Send`，不能跨线程（那是 `send-sync` 那张地图讲的）。`RefCell` 给这些所有者修改的权利。两者都不是 `Mutex`。共享**并且**可变正是借用检查器在编译时拒绝的东西，所以这个模式在运行时把它买回来，并在你做错时向你收一次 panic。
+
+那个 panic 不是这条街的 bug。它是价格，而亲眼见它一次就是目的。
+'''
+hints = [
+  "Cell 没有 borrow()：你用 get() 取一份副本出来，用 set() 把整个值放进去。这就是它不需要运行时记账的原因。",
+  "ledger.borrow_mut().push(v) 写成一条语句，让 guard 在分号处丢弃，这才是让循环合法的关键。",
+  "catch_unwind 需要在闭包外面套一层 AssertUnwindSafe，因为闭包捕获了一个 &RefCell；panic 消息仍然会去 stderr，而测试不读它。",
+  "写成 Rc::clone(&ledger) 而不是 .clone()，是为了让读者看出它复制的是一个句柄而不是 Vec。两个句柄都活着时 Rc::strong_count 读到 2，而 panic 测试里的两个 borrow_mut() 可以一个句柄各来一个 —— 它们是同一个 RefCell，它把两者合在一起数。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.advanced.14.custom-error"
+title = "你自己的错误"
+story = "票价服务的四层各自发明了自己的失败类型，没有一个能互相转换。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行，每一行本应是一个以 km 为单位的距离。
+
+定义 `enum FareError { NotANumber, Negative(i64) }`，为它实现 `Display` 和 `std::error::Error`，并实现 `From<std::num::ParseIntError> for FareError`，让 `?` 能自动转换。
+
+`fare(text) -> Result<i64, FareError>` 用 `?` 解析，拒绝负距离，否则返回 `500 + 100 * km`。打印每个结果或错误的 `Display` 文本，然后打印 `ERRORS <k>`。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative distance: -2
+        ERRORS 2
+```
+
+起始代码编译不通过。`?` 不只是传播 —— 它在出去的路上调用 `From::from`，没有那个 impl，就没有从 `ParseIntError` 通往你的类型的路。实现 `From` 才是让 `?` 能跨越层边界工作的东西，也是错误枚举值得存在的全部理由。
+
+`map_err` 是答案的另一半，用于你想附加上下文而不是转换类型的时候。他们问起就提一句；这里不需要它。
+'''
+hints = [
+  "错误是 `?` 上的 E0277：the trait From<ParseIntError> is not implemented for FareError。",
+  "六行：impl From<ParseIntError> for FareError，fn from 返回 FareError::NotANumber。",
+  "Display 是 {} 打印的；Debug 是 {:?} 打印的；Error trait 是让它能放进 Box<dyn Error> 的。三个都值得有，这里只需要一个。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.advanced.15.atomics"
+title = "一个字，不上锁"
+story = "闸机的计数不需要锁。机房里其他的一切都需要，而把它们分清楚就是这份工作。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+为每个值生成一个线程。每个线程把自己的值加进一个共享的 `AtomicI64`，并把一个共享的 `AtomicUsize` 加一 —— 哪里都不许有 `Mutex`。把线程全部 join，打印 `TOTAL <sum>` 和 `HITS <n>`。
+
+然后：在 `main` 的**最顶部**声明两个 `Guard` 值，命名为 `first` 和 `second`，它们的 `Drop` 打印 `DROP <name>`。它们在 `main` 的末尾运行，在其他一切之后，按声明的相反顺序。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+        DROP second
+        DROP first
+```
+
+原子操作不是更便宜的互斥锁；它是另一种工具，针对的是在单条指令里读-改-写的一个机器字。一旦你需要两个字段彼此一致，锁就回来了 —— 没有哪种原子操作能表达"这两样东西，一起"。
+
+这里 `Ordering::Relaxed` 就够了，因为没有什么依赖于这些增量*何时*相对于任何其他写入变得可见，只要求一个都不丢。这句话就是追问的那个问题，也是 `Relaxed` 含义的全部。
+'''
+hints = [
+  "fetch_add 返回之前的值并原子地完成加法；没有锁，也没有 guard。",
+  "Arc 仍然需要 —— 原子操作让*访问*安全，不是让*共享*安全。",
+  "Drop 按声明的相反顺序运行，所以 `second` 先走。把它们绑定为 _first 和 _second 能让它们活到 main 结束；光秃秃的 `_` 会立刻丢弃它们。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.advanced.16.closure-kinds"
+title = "三种闭包"
+story = "面试官在板上写下 `Fn`、`FnMut` 和 `FnOnce`，问回调应该是哪一种。这道题有正确答案。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数，`n` 至少为一。
+
+三种闭包各用一个：
+
+* `apply_fn<F: Fn(i64) -> i64>` —— 按复制捕获第一个值，把它加到每个值上。打印每个结果。
+* `apply_fn_mut<F: FnMut(i64)>` —— 给一个住在 `main` 里的计数器加一。打印 `SEEN <k>`。
+* `apply_once<F: FnOnce() -> String>` —— 把一个 `String` 从它的捕获里**移出来**并返回。打印 `TAKEN <s>`，其中字符串是 `<n> items`。
+
+```
+input:  3
+        10 20 30
+output: 20
+        30
+        40
+        SEEN 3
+        TAKEN 3 items
+```
+
+这三个 trait 是一个层级，不是一份菜单：每个 `Fn` 都是 `FnMut`，每个 `FnMut` 都是 `FnOnce`。一个闭包实现哪一个，由它对捕获的东西*做了什么*决定 —— 读它们（`Fn`）、改它们（`FnMut`）、还是消耗它们（`FnOnce`）—— 而 `move` 改变的是捕获的方式，不是最后得到哪个 trait。
+
+起始代码编译不通过。`apply_once` 要求 `Fn`，而一个把自己的 `String` 送出去的闭包只能被调用一次，所以它是 `FnOnce`，仅此而已。取调用点能接受的最弱约束：只调用一次就要求 `FnOnce`，这样你就没有无缘无故把其他所有闭包都排除在外。
+'''
+hints = [
+  "错误是 E0525：expected a closure implementing Fn, but this one only implements FnOnce。",
+  "只改一个词：apply_once 上的约束。闭包本身已经是对的。",
+  "apply_fn_mut 接收 `mut f: F` —— 参数本身必须是可变的，闭包才能修改自己捕获的东西。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.advanced.17.deadlock"
+title = "死锁"
+story = "时代广场的机房，地下两层。两把锁，两个线程，两部扶梯在同一秒停住。"
+brief = '''
+两个账户 `A` 和 `B`，各是一个 `Arc<Mutex<i64>>`。
+
+标准输入第一行是起始余额，第二行是一个数量 `n`，然后是 `n` 行 `<FROM> <TO> <AMOUNT>`，其中 `FROM`/`TO` 取自 `{A, B}`。
+
+每笔转账在自己的线程上运行，把线程全部 join，然后打印 `A <balance>`、`B <balance>`、`MOVED <n>`。
+
+```
+input:  100 100
+        2
+        A B 30
+        B A 10
+output: A 80
+        B 120
+        MOVED 2
+```
+
+起始代码有两处错，只有一处会在输出里显现。它扣了来源却从不给目的地入账 —— 这是看得见的 bug。另一处是形状：*先锁来源*意味着两笔方向相反的转账可以各握一把锁、等对方的那把，等到永远。
+
+两把锁都要拿，**始终按同一个全局顺序** —— 先 `A` 后 `B`，不管钱往哪边走 —— 环就形不成。
+'''
+hints = [
+  "碰任何一个余额之前先把两个账户都锁上，并且始终按同一个顺序。",
+  "钱的方向决定哪个 guard 挨减，而不是哪把锁先被拿。",
+  "两个 guard 在 transfer 结束时按相反顺序丢弃，这没问题 —— 要紧的是获取的顺序。",
+]

@@ -119,8 +119,19 @@ export function playerText(code: ErrorCode): string {
 // §5 shared shapes
 // ---------------------------------------------------------------------------
 
-export type Land = "rust" | "go";
+export type Land = "rust" | "go" | "cpp" | "python";
+/**
+ * Every land, in the order the lands screen shows them and the keys cycle
+ * through them. One list so a fifth land is one edit, not a hunt through every
+ * ternary that used to spell out "rust or go".
+ */
+export const LANDS: readonly Land[] = ["rust", "go", "cpp", "python"];
+export function isLand(v: unknown): v is Land {
+  return typeof v === "string" && (LANDS as readonly string[]).includes(v);
+}
 export type Category = "basic" | "advanced" | "hacker";
+/** The languages quest prose can arrive in (SPEC §12.1); `"en"` is the source. */
+export type TextLocale = "en" | "ko" | "yue" | "zh" | "ja" | "cs";
 export type NodeState = "locked" | "open" | "cleared";
 export type Stars = 0 | 1 | 2 | 3;
 export type Difficulty = 1 | 2 | 3 | 4 | 5;
@@ -159,6 +170,13 @@ export interface MapNode {
   kind: "quest" | "boss" | "gate";
   requires: string[];
   attempts: number;
+  /**
+   * §4.7 — the language `title` is in: the `locale` the map was asked with
+   * when a translation of this quest exists, `"en"` otherwise. Per node, since
+   * a translation may cover a pack partially. Optional because a server that
+   * has not shipped §12.1 omits it, which reads as English.
+   */
+  text_locale?: TextLocale;
 }
 
 /** §5.3. `tests.visible` carries only the shown cases; hidden ones are a count. */
@@ -177,6 +195,14 @@ export interface Quest {
   title: string;
   brief: string;
   story: string;
+  /**
+   * §4.8 — which language `title`, `story`, `brief` and the hints are in.
+   * `"en"` unless the server substituted a translation for the `locale` we
+   * sent; the code fields are the same in every language. A scene compares it
+   * with the UI locale to decide whether to say "the brief is in English".
+   * Optional for the usual reason: an older server omits it, meaning English.
+   */
+  text_locale?: TextLocale;
   difficulty: Difficulty;
   time_limit_s: number | null;
   /**
@@ -382,6 +408,31 @@ export interface Snippet {
 /** The same thing without the text, for the list. */
 export type SnippetBrief = Omit<Snippet, "source"> & { bytes: number };
 
+/**
+ * The edit stack for one quest: a stack with a cursor, which is what makes
+ * redo possible at all.
+ *
+ * `cursor` is how many entries are applied, so the text the player should be
+ * looking at is entry `cursor - 1` — and `source` is `null` when the cursor is
+ * at the bottom, which means "the quest's starter" rather than "no text". A
+ * client renders exactly what it is told here and never models the stack
+ * itself: every one of the five `edit.*` messages answers the whole state, so
+ * there is no way for a client's idea of the depth to drift from the server's.
+ */
+export interface EditState {
+  quest_id: string;
+  /** The text at the cursor. `null` means the quest's starter. */
+  source: string | null;
+  /** 0..depth. */
+  cursor: number;
+  /** How many entries are on the stack. */
+  depth: number;
+  /** `cursor > 0`, sent rather than derived so the rule lives in one place. */
+  can_undo: boolean;
+  /** `cursor < depth`. */
+  can_redo: boolean;
+}
+
 export interface Requests {
   ping: Record<string, never>;
   "auth.challenge": { address: string };
@@ -389,15 +440,26 @@ export interface Requests {
   "auth.resume": { token: string };
   "profile.update": { name?: string; settings?: Record<string, unknown> };
   "world.lands": Record<string, never>;
-  "world.map": { land: Land; category: Category };
-  "quest.get": { quest_id: string };
+  /** `locale` on these four is the UI language; §4.7/§4.8 substitute quest
+   *  prose where a translation exists and answer `text_locale` either way. */
+  "world.map": { land: Land; category: Category; locale?: string };
+  "quest.get": { quest_id: string; locale?: string };
   "quest.submit": { quest_id: string; lang: Land; source: string };
   /** §4.9b — the same shape, deliberately, so one code path sends either. */
   "quest.run": { quest_id: string; lang: Land; source: string };
-  "quest.hint": { quest_id: string; index: number };
+  "quest.hint": { quest_id: string; index: number; locale?: string };
   /** §4.11b — the whole answer, priced like the largest hint there is. */
   "quest.solve": { quest_id: string };
   "quest.reset": { quest_id: string };
+  // The edit stack. Five messages, one shape of reply, and `source` is the
+  // only payload field any of them adds — everything else the screen needs to
+  // draw its three buttons comes back in the state.
+  "edit.state": { quest_id: string };
+  /** Over 256 KiB is `bad_request`, the same cap `quest.submit` uses. */
+  "edit.push": { quest_id: string; source: string };
+  "edit.undo": { quest_id: string };
+  "edit.redo": { quest_id: string };
+  "edit.clear": { quest_id: string };
   "search.query": {
     q: string;
     mode?: SearchMode;
@@ -420,7 +482,7 @@ export interface Requests {
   "stats.awards": Record<string, never>;
   "stats.history": { quest_id?: string; limit?: number };
   "ai.plan": { mode: DrillMode; land?: Land; size?: number };
-  "ai.next": { drill_id: string };
+  "ai.next": { drill_id: string; locale?: string };
   "ai.finish": { drill_id: string };
 }
 
@@ -450,6 +512,18 @@ export interface Responses {
    */
   "quest.solve": { source: string; hints_used: number };
   "quest.reset": { starter: string };
+  /**
+   * All five answer the whole state, unwrapped — the payload *is* the
+   * `EditState`. That is not a shortcut: it is what makes the five messages
+   * interchangeable at the call site, so one `applyEdit` handles every reply
+   * and a client can never end up drawing a stale depth next to a fresh
+   * cursor.
+   */
+  "edit.state": EditState;
+  "edit.push": EditState;
+  "edit.undo": EditState;
+  "edit.redo": EditState;
+  "edit.clear": EditState;
   /**
    * §4.9d. Source that does not parse is **not** an error: the reply is `.ok`,
    * `source` comes back byte for byte, `changed` is false and `problem` carries

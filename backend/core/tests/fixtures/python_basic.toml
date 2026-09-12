@@ -1,0 +1,67 @@
+# A throwaway pack for the backend's own tests: the Python land, small enough
+# to run in a test and shaped like the shipped content. NOT the shipped
+# content.
+pack = "python.basic"
+land = "python"
+category = "basic"
+version = 1
+
+[[quest]]
+id          = "python.basic.01.hello"
+node        = 1
+title       = "THE STALL OPENS"
+difficulty  = 1
+story       = "06:00. Wet floors, fluorescent light, a notebook per stall."
+concepts    = ["io", "duck-typing"]
+requires    = []
+map         = { x = 0.15, y = 0.70, kind = "quest" }
+brief       = '''
+Print `hello, causewaybay` and nothing else.
+'''
+starter     = '''
+# your code here
+'''
+solution    = '''
+print("hello, causewaybay")
+'''
+hints = [
+  "`print` adds the newline for you.",
+]
+
+[quest.tests]
+harness      = "stdio"
+timeout_ms   = 5000
+match        = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]
+
+[[quest]]
+id          = "python.basic.02.testing"
+node        = 2
+title       = "A HARNESS FROM THE WRONG LAND"
+difficulty  = 1
+story       = "Some doors are drawn on the map before they are cut."
+concepts    = ["functions", "generators"]
+requires    = []
+map         = { x = 0.25, y = 0.66, kind = "quest" }
+brief       = '''
+This quest declares the `cargo` harness on a Python quest, which no build will
+ever run. It exists so the "refuse without recording anything" rule stays
+tested in this land too.
+'''
+starter     = '''
+pass
+'''
+solution    = '''
+pass
+'''
+hints = []
+
+[quest.tests]
+harness      = "cargo"
+timeout_ms   = 5000
+match        = "trim"
+cases = [
+  { name = "runs", stdin = "", expect = "ok\n", visible = true },
+]

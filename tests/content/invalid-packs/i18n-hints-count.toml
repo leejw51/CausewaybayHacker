@@ -1,0 +1,18 @@
+# A translation (SPEC §12.1) of the fixture pack's first quest with THREE
+# hints where the English `rust.basic.01.hello` has two. Refused whole: hints
+# are revealed by index and priced per hint, so a count that differs would
+# hand out a hint the English does not have or run out one early.
+#
+# Lives at content/i18n/ko/rust.basic.toml when fed to the importer; the
+# English pack must already be imported for the count to be checked against.
+pack   = "rust.basic"
+locale = "ko"
+
+[[quest]]
+id    = "rust.basic.01.hello"
+title = "첫 불빛"
+story = "터미널이 깜박인다."
+brief = '''
+`hello, causewaybay`만 출력하세요.
+'''
+hints = ["하나", "둘", "셋"]

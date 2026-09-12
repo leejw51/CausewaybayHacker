@@ -1,8 +1,10 @@
 //! `code.format` (PROTOCOL §4.9d): the language's own formatter, over stdin.
 //!
-//! `rustfmt` and `gofmt`, not a house style invented here — these are the tools
-//! the player's colleagues use, and a trainer that teaches a private formatting
-//! style is teaching something they will have to unlearn.
+//! `rustfmt`, `gofmt` and `clang-format`, not a house style invented here —
+//! these are the tools the player's colleagues use, and a trainer that teaches
+//! a private formatting style is teaching something they will have to unlearn.
+//! Python has none: there is no formatter in a stock Python install, and
+//! shipping an opinion about `black` versus `ruff` is not this game's job.
 //!
 //! The rule that shapes the whole module: **source that does not parse is not
 //! an error.** A formatter is most often pressed in the middle of an edit, and
@@ -39,8 +41,28 @@ impl Formatted {
     }
 }
 
+/// Whether `code.format` is on for this land on this machine.
+///
+/// `rustfmt` and `gofmt` ship with their toolchains, so a land that runs at
+/// all can format. `clang-format` does not ship with `c++` — Xcode's command
+/// line tools and most distributions leave it out — so the C++ answer is
+/// asked of `PATH` rather than assumed, and a client sees the button gone
+/// rather than a button that always refuses.
 pub fn is_supported(lang: &str) -> bool {
-    matches!(lang, "rust" | "go")
+    match lang {
+        "rust" | "go" => true,
+        "cpp" => clang_format_is_installed(),
+        _ => false,
+    }
+}
+
+fn clang_format_is_installed() -> bool {
+    std::process::Command::new("clang-format")
+        .arg("--version")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false)
 }
 
 pub fn format(lang: &str, source: &str) -> std::io::Result<Formatted> {
@@ -51,6 +73,19 @@ pub fn format(lang: &str, source: &str) -> std::io::Result<Formatted> {
             c
         }
         "go" => Command::new("gofmt"),
+        "cpp" if clang_format_is_installed() => {
+            // LLVM style is the tool's own default, named so the answer does
+            // not depend on a `.clang-format` the player cannot see.
+            let mut c = Command::new("clang-format");
+            c.arg("--style=LLVM").arg("--assume-filename=main.cpp");
+            c
+        }
+        "cpp" => {
+            return Ok(Formatted::unchanged(
+                source,
+                "clang-format is not installed on this machine",
+            ))
+        }
         other => {
             return Ok(Formatted::unchanged(
                 source,
@@ -58,7 +93,7 @@ pub fn format(lang: &str, source: &str) -> std::io::Result<Formatted> {
             ))
         }
     };
-    // Both tools read stdin and write stdout, so none of the per-attempt
+    // All three tools read stdin and write stdout, so none of the per-attempt
     // directory machinery is needed. They are trusted tools rather than the
     // player's code, so they keep their environment and get no rlimits — what
     // they do get is the timeout and the output cap.
@@ -116,7 +151,9 @@ fn first_complaint(stderr: &str) -> String {
         .or_else(|| line.strip_prefix("error:"))
         .unwrap_or(line)
         .trim();
+    // gofmt's name for stdin, and clang-format's.
     let line = line.strip_prefix("<standard input>:").unwrap_or(line);
+    let line = line.strip_prefix("<stdin>:").unwrap_or(line);
     if line.chars().count() > 200 {
         line.chars().take(197).collect::<String>() + "..."
     } else {

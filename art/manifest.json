@@ -37,6 +37,30 @@
       "h": 1152
     },
     {
+      "name": "map_cpp",
+      "file": "map_cpp.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "map_cpp_p",
+      "file": "map_cpp_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "map_python",
+      "file": "map_python.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "map_python_p",
+      "file": "map_python_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
       "name": "bg_street",
       "file": "bg_street.jpg",
       "w": 1152,
@@ -135,6 +159,36 @@
         "minx": 20,
         "miny": 7,
         "maxx": 107,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "sprite_cpp",
+      "file": "sprite_cpp.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 95.0,
+        "minx": 7,
+        "miny": 26,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "sprite_python",
+      "file": "sprite_python.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 88.0,
+        "minx": 7,
+        "miny": 33,
+        "maxx": 120,
         "maxy": 120
       }
     },
@@ -240,6 +294,96 @@
         "minx": 12,
         "miny": 7,
         "maxx": 115,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "boss_segfault",
+      "file": "boss_segfault.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 105.0,
+        "minx": 7,
+        "miny": 16,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "boss_dangling",
+      "file": "boss_dangling.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 64.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 10,
+        "miny": 7,
+        "maxx": 119,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "boss_linker",
+      "file": "boss_linker.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 11,
+        "miny": 7,
+        "maxx": 116,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "boss_none",
+      "file": "boss_none.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 7,
+        "miny": 7,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "boss_gil",
+      "file": "boss_gil.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 70.0,
+        "minx": 7,
+        "miny": 51,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "boss_recursion",
+      "file": "boss_recursion.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 23,
+        "miny": 7,
+        "maxx": 103,
         "maxy": 120
       }
     },
@@ -615,6 +759,96 @@
       }
     },
     {
+      "name": "emblem_cpp_basic",
+      "file": "emblem_cpp_basic.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 56,
+        "miny": 7,
+        "maxx": 326,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_cpp_advanced",
+      "file": "emblem_cpp_advanced.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 42,
+        "miny": 7,
+        "maxx": 340,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_cpp_hacker",
+      "file": "emblem_cpp_hacker.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 74,
+        "miny": 7,
+        "maxx": 308,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_python_basic",
+      "file": "emblem_python_basic.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 50,
+        "miny": 7,
+        "maxx": 332,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_python_advanced",
+      "file": "emblem_python_advanced.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 118.0,
+        "h": 109.0,
+        "minx": 21,
+        "miny": 9,
+        "maxx": 362,
+        "maxy": 117
+      }
+    },
+    {
+      "name": "emblem_python_hacker",
+      "file": "emblem_python_hacker.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 72,
+        "miny": 7,
+        "maxx": 310,
+        "maxy": 120
+      }
+    },
+    {
       "name": "mascot_rust_basic",
       "file": "mascot_rust_basic.png",
       "w": 128,
@@ -701,6 +935,96 @@
         "minx": 10,
         "miny": 7,
         "maxx": 116,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_cpp_basic",
+      "file": "mascot_cpp_basic.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 90.0,
+        "minx": 7,
+        "miny": 31,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_cpp_advanced",
+      "file": "mascot_cpp_advanced.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 102.0,
+        "minx": 7,
+        "miny": 19,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_cpp_hacker",
+      "file": "mascot_cpp_hacker.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 103.0,
+        "minx": 7,
+        "miny": 18,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_python_basic",
+      "file": "mascot_python_basic.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 83.0,
+        "minx": 7,
+        "miny": 38,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_python_advanced",
+      "file": "mascot_python_advanced.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 78.0,
+        "minx": 7,
+        "miny": 43,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_python_hacker",
+      "file": "mascot_python_hacker.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 8,
+        "miny": 7,
+        "maxx": 118,
         "maxy": 120
       }
     },

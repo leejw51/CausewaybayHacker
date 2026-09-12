@@ -1,0 +1,629 @@
+# GO LAND — ADVANCED, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/go/advanced.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "go.advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "go.advanced.01.goroutines"
+title = "Čtyřicet jezdců"
+story = "12:30. Osm kol, čtyřicet objednávek a dispečer je pořád vyvolává jednu po druhé."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Spusť jednu gorutinu na každou hodnotu. Každá pošle `{index, value * value}`
+na jeden kanál. Posbírej všech `n` výsledků, seřaď je podle indexu, vypiš
+`<index> <value>` po jednom na řádek a pak `GOROUTINES <n>`.
+
+```
+input:  3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        GOROUTINES 3
+```
+
+Výsledky přicházejí v pořadí, jaké se zrovna zlíbí plánovači. Nést s sebou
+index je to, co dělá odpověď programu stejnou při každém spuštění.
+
+Každá gorutina v tomto balíčku bere proměnnou smyčky jako **parametr**. Od
+Go 1.22 — a jen v modulu, jehož direktiva `go` říká `1.22` nebo novější —
+dává smyčka `for` každé iteraci vlastní `i` a `v`, takže je tam bezpečné je
+zachytit přímo; všude jinde je jejich zachycení ta vůbec nejčastější chyba
+v Go. Předat je dovnitř je správně pod každou verzí a v signatuře přesně
+pojmenovává, co gorutina smí vidět.
+'''
+hints = [
+  "Bufferovaný kanál s kapacitou n znamená, že žádný odesílatel nikdy neblokuje, takže když skončíš dřív, žádná gorutina neunikne.",
+  "Přijmi přesně n-krát. Jiný způsob, jak tady poznat, že jsou všechny hotové, není.",
+  "sort.Slice podle indexu vrátí pořadí, které plánovač vzal.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.advanced.02.waitgroup"
+title = "Nikdo neodchází dřív"
+story = "Dispečer čte tabuli dřív, než se poslední jezdec ohlásil, a tabule je z půlky prázdná."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` slov.
+
+Spusť jednu gorutinu na každé slovo, která zapíše slovo velkými písmeny do
+`out[i]` — na vlastní index, takže žádné dvě gorutiny nesahají na stejný
+prvek. Počkej na všechny pomocí `sync.WaitGroup`, pak vypiš `out` v pořadí
+a `WAITED <n>`.
+
+```
+input:  2
+        lucky
+        mac
+output: LUCKY
+        MAC
+        WAITED 2
+```
+
+`wg.Add(1)` před `go`, `defer wg.Done()` jako první věc uvnitř, `wg.Wait()`
+dřív, než cokoli čteš. Add uvnitř gorutiny je závod se samotným `Wait`.
+'''
+hints = [
+  "Zápis out[i] z mnoha gorutin je bezpečný, protože každé i zapisuje přesně jedna z nich.",
+  "defer wg.Done() jako první řádek gorutiny, aby i panika uvolnila čekání.",
+  "wg.Add(1) patří do smyčky, před příkaz go — ne dovnitř gorutiny.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.advanced.03.close"
+title = "Kdo zavírá okénko"
+story = "Kuchyňské okénko zůstane po poslední objednávce otevřené a pult tam stojí a čeká na ještě jednu."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Jedna gorutina pošle každou hodnotu vynásobenou deseti a pak kanál **zavře**.
+`main` prochází kanál pomocí range, vypisuje každou hodnotu a vede součet,
+pak vypíše `SUM <total>` a `CLOSED`.
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+`range` přes kanál skončí, když je kanál zavřený, a ne dřív. Zapomeň na
+`close` a runtime Go ti přesně řekne, co se stalo:
+*all goroutines are asleep — deadlock!*
+
+Zavírá odesílatel. Nikdy příjemce.
+'''
+hints = [
+  "Jeden řádek, na konci odesílající gorutiny.",
+  "defer close(ch) na začátku gorutiny udělá totéž a přežije i předčasný návrat.",
+  "Zavření z přijímací strany by způsobilo paniku odesílatele při odeslání — proto zní pravidlo: zavírá odesílatel.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.advanced.04.select"
+title = "Dvě nástupiště"
+story = "Nástupiště 1 i nástupiště 2 plní stejné počítadlo ve vestibulu a počítadlo se může dívat jen na jedno z nich najednou."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla `a` a `b`.
+
+Jedna gorutina pošle `a` hodnot na tramvajový kanál a zavře ho; druhá pošle
+`b` na kanál MTR a zavře ho. `main` vyprázdní **oba** jednou smyčkou se
+`select` a počítá, co odkud přišlo.
+
+Vypiš `TRAM <a>`, `MTR <b>`, `TOTAL <a+b>`.
+
+```
+input:  3 2
+output: TRAM 3
+        MTR 2
+        TOTAL 5
+```
+
+Příjem ze zavřeného kanálu se vrací okamžitě, napořád — takže `select`,
+který si tu větev nechá, se točí naprázdno. Trik: `v, ok := <-ch`, a když je
+`ok` false, nastav proměnnou kanálu na `nil`. Příjem z **nil** kanálu blokuje
+navždy, což ve `select` znamená, že je ta větev prostě vypnutá. Opakuj, dokud
+je aspoň jeden z nich ještě non-nil.
+'''
+hints = [
+  "v, ok := <-ch uvnitř case ve select: ok je false přesně od chvíle, kdy je kanál zavřený a vyprázdněný.",
+  "Nastavení proměnné kanálu na nil tu větev vypne. Nil kanál nikdy nebude připravený.",
+  "Podmínka smyčky je `tramCh != nil || mtrCh != nil`, takže skončí, až jsou obě větve vypnuté.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.advanced.05.mutex"
+title = "Jedna zásuvka, osm rukou"
+story = "Obě pokladny berou hotovost ze stejné zásuvky a při zavírce zásuvka nesouhlasí ani s jednou z nich."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Dokonči `Counter`: `Add` vezme zámek, přičte k součtu a zvýší počet zásahů;
+`Snapshot` vezme zámek a vrátí obojí. Spusť jednu gorutinu na každou hodnotu,
+počkej na ně, pak vypiš `TOTAL <sum>` a `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+Mutex žije **uvnitř** struktury, kterou chrání, hned vedle polí, která hlídá,
+a každá metoda, která na ně sahá, si ho vezme. `Counter` se kopíruje hodnotou
+ve chvíli, kdy zapomeneš na ukazatelový příjemce — `go vet` ti to řekne.
+'''
+hints = [
+  "c.mu.Lock() a pak defer c.mu.Unlock() je celý vzor, a defer přežije i předčasný návrat.",
+  "Snapshot čte dvě pole; číst je pod jedním zámkem je to, co dělá tu dvojici konzistentní.",
+  "Obě metody potřebují ukazatelový příjemce, jinak každé volání zamkne kopii mutexu a nehlídá nic.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.advanced.06.atomic"
+title = "Jednou, a jen jednou"
+story = "Aplikace každého jezdce otevírá při startu spojení s depem a depo má teď čtyřicet spojení a jeden socket."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Spusť jednu gorutinu na každou hodnotu. Každá z nich zavolá tentýž
+`sync.Once`, který vypíše `INIT` — takže `INIT` se objeví přesně jednou, ať
+tam dorazila první kterákoli gorutina. Každá pak přičte svou hodnotu do
+součtu typu `atomic.Int64` a zvýší počet typu `atomic.Int64`.
+
+Až jsou všechny hotové, vypiš `TOTAL <sum>` a `COUNT <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: INIT
+        TOTAL 10
+        COUNT 4
+```
+
+Atomické počítadlo není levnější mutex — je to jiný nástroj, přesně na tohle:
+jedno slovo, čtení-úprava-zápis, žádná kritická sekce kolem. Cokoli širšího
+než jedno slovo pořád chce mutex.
+'''
+hints = [
+  "once.Do(func(){ ... }) spustí svůj argument napoprvé a ostatní blokuje, dokud neskončí.",
+  "atomic.Int64 má metody Add a Load — žádné braní adresy, žádný mutex.",
+  "INIT přistane vždy před TOTAL, protože tisk probíhá uvnitř gorutin a TOTAL se děje až po Wait.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.advanced.07.context"
+title = "Přestaň posílat"
+story = "Zákazník zavřel aplikaci před třemi ulicemi a kuchyně jeho objednávku pořád vaří."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla, `n` a `k`.
+
+Spusť gorutinu producenta, která by posílala `1..n` na **nebufferovaný**
+kanál, po jedné, ale která se zastaví ve chvíli, kdy je její `context`
+zrušen, a ohlásí, kolik jich skutečně stihla poslat.
+
+`main` přijme přesně `k` hodnot a vypíše je, zavolá `cancel()`, vypíše
+`CANCELLED` a pak vypíše `SENT <count>` od producenta.
+
+```
+input:  5 3
+output: 1
+        2
+        3
+        CANCELLED
+        SENT 3
+```
+
+Tělo smyčky producenta je `select` se dvěma větvemi: `<-ctx.Done()`
+a odeslání. Jakmile nikdo nepřijímá, odeslání není nikdy připravené, takže
+jediné, co může vystřelit, je zrušení. To dělá tohle deterministickým místo
+šťastnou náhodou.
+'''
+hints = [
+  "ctx.Done() je kanál, který se zavře při volání cancel, takže příjem z něj je větev select jako každá jiná.",
+  "Producent musí hlásit na obou cestách: při zrušeném návratu i na konci smyčky.",
+  "defer cancel() v main není nepovinné, ani když cancel voláš sám — právě to uvolní kontext.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.advanced.08.worker-pool"
+title = "Osm kol"
+story = "Čtyřicet objednávek a osm kol. Nikdo nechce čtyřicet kol; chtějí, aby těch osm nikdy nestálo."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla `w` a `n`, pak `n` hodnot.
+
+Postav worker pool: `w` workerů prochází pomocí range kanál `jobs` a každý
+posílá `{index, value * value}` na kanál `results`. Jedna gorutina dodává
+úlohy a zavře `jobs`; další čeká na workery a zavře `results`. `main` prochází
+`results`, dokud se nezavře, seřadí podle indexu, vypíše `<index> <value>`
+a pak `WORKERS <w>`.
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+Tři zavření, v jediném pořadí, které funguje: dodavatel zavře `jobs`, aby
+skončil `range` workerů; workeři doběhnou, aby se uvolnila `WaitGroup`; ten,
+kdo čekal, zavře `results`, aby skončil `range` v `main`.
+'''
+hints = [
+  "Workeři nepotřebují vlastní index; nese ho úloha.",
+  "close(results) se nemůže stát ve workeru — je jich w a legální je jen jedno zavření.",
+  "Na to je ta gorutina navíc: wg.Wait() a pak close(results), zatímco main pořád vyprazdňuje.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.advanced.09.errors-in-flight"
+title = "Něčí objednávka oběda"
+story = "Čtyřicet lístků parsovaných najednou a jeden z nich je ručně psaný vzkaz o rýžové kaši."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků, každý má být celé číslo.
+
+Naparsuj je **souběžně** — jedna gorutina na řádek — a pošli
+`{index, value, err}` na jeden kanál. Posbírej všech `n`, seřaď podle indexu
+a pro každý vypiš buď dvojnásobek hodnoty, nebo `BAD <line>`. Pak vypiš
+`SUM <total>` toho, co jsi vypsal, a `ERRORS <count>`.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+        ERRORS 1
+```
+
+Chyba z gorutiny musí cestovat jako kterýkoli jiný výsledek. Z příkazu `go`
+žádné `return err` není a gorutina, která na špatném řádku zpanikaří, vezme
+s sebou celý program.
+'''
+hints = [
+  "Chyba je pole ve struktuře výsledku. To je celá myšlenka: chyby cestují s hodnotou.",
+  "Pošli i tehdy, když parsování selhalo — main počítá přesně n příjmů a jinak se zasekne o jeden dřív.",
+  "Před tiskem seřaď podle indexu, jinak je výstup takový, jak se rozhodl plánovač.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.advanced.10.context-tree"
+title = "Ruší se směrem dolů"
+story = "Jeden zákazník zavře aplikaci a devět věcí výš v řetězu pořád vaří, rozváží a účtuje."
+brief = '''
+Na standardním vstupu je jedno celé číslo `n`.
+
+Vytvoř rodičovský kontext pomocí `context.WithCancel`. Odvoď z něj `n` dětí:
+ty se **sudým** číslem pomocí `context.WithCancel(parent)`, ty s **lichým**
+pomocí `context.WithDeadline(parent, <před hodinou>)`.
+
+Spusť jednu gorutinu na každé dítě, která čeká na `<-child.Done()` a ohlásí
+svůj index a `child.Err().Error()`. Zruš rodiče, posbírej všech `n` hlášení,
+vypiš je seřazené podle indexu. Pak vypiš vlastní chybu rodiče
+a `IS_CANCELED YES`, pokud platí `errors.Is(parent.Err(), context.Canceled)`.
+
+```
+input:  3
+output: 0 context canceled
+        1 context deadline exceeded
+        2 context canceled
+        PARENT context canceled
+        IS_CANCELED YES
+```
+
+Zrušení teče stromem kontextů **dolů** a nikdy nahoru. Dítě, jehož deadline
+už uplynul, je mrtvé ve chvíli, kdy vznikne, ať rodič dělá cokoli — proto ty
+liché hlásí jinou chybu a proto je výstup při každém spuštění stejný, a ne
+závod.
+
+`defer cancel()` na každém kontextu, který vytvoříš, není zdvořilost.
+Kontext, který nikdy nezrušíš, nechává růst seznam dětí svého rodiče, a to je
+únik bez jediné gorutiny.
+'''
+hints = [
+  "Dej `done` buffer n, aby dítě, jehož deadline už uplynul, mohlo hlásit bez čekání na příjemce.",
+  "Zruš rodiče dřív, než začneš sbírat, jinak sudé děti ještě čekají, když se zablokuješ na kanálu.",
+  "ctx.Err() je context.Canceled nebo context.DeadlineExceeded a errors.Is je způsob, jak je rozlišit, místo porovnávání řetězců.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.advanced.11.rwmutex"
+title = "Tři sta čtenářů"
+story = "Rozcestník v Hysan se čte třistakrát za minutu a mění dvakrát denně, a obyčejný Mutex nutí čtenáře stát ve frontě jeden za druhým pro nic."
+brief = '''
+První řádek je `n q`. Další řádek je `n` slov k uložení, ten za ním `q` slov
+k vyhledání.
+
+Postav `Directory` kolem `map[string]int` a `sync.RWMutex`. `Set` bere zámek
+pro zápis; `Get` a `Size` berou zámek pro **čtení**. Ulož každé slovo s jeho
+pozicí, sekvenčně — pozdější duplicita přepíše dřívější. Pak spusť všech `q`
+vyhledávání **souběžně**, posbírej je a vypiš v pořadí dotazů
+`<word> <index>` nebo `<word> MISSING`, pak `SIZE <k>`.
+
+```
+input:  3 2
+        tram bus mtr
+        bus zzz
+output: bus 1
+        zzz MISSING
+        SIZE 3
+```
+
+`RLock` může držet libovolný počet čtenářů najednou a blokuje jen proti
+zapisovateli. To je celý důvod jeho existence a nemá vůbec žádnou cenu, když
+si čtenář vezme `Lock`.
+
+Zápisy jsou sekvenční záměrně: souběžná volání `Set` pro totéž slovo by
+udělala z uloženého indexu ten, jehož gorutina náhodou šla poslední, a ulice
+s odpovědí závislou na plánovači je ulice, která selhává náhodně.
+'''
+hints = [
+  "RLock/RUnlock pro čtenáře, Lock/Unlock pro zapisovatele. Prohodit je se zkompiluje a potichu odstraní výhodu.",
+  "Každá gorutina zapisuje answers[slot] a žádné dvě nesdílí slot, takže slice žádný vlastní zámek nepotřebuje.",
+  "Tvar comma-ok při čtení z mapy je to, co odlišuje `chybí` od `je přítomné a nulové`.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.advanced.12.chan-directions"
+title = "Kterým směrem to jde"
+story = "Producent týden přijímal ze svého vlastního výstupního kanálu a kompilovalo se to, protože nikdo nezapsal šipku."
+brief = '''
+První řádek je `n b`, kde `b` je nejméně `n`.
+
+Vytvoř kanál s bufferem `b`. `produce(out chan<- int, n int)` pošle `0..n-1`
+a zavře ho. `consume(in <-chan int) int` projde kanál pomocí range a vrátí
+součet. Vypiš:
+
+```
+input:  3 5
+output: CAP 5
+        LEN 3
+        SUM 3
+        LEN_AFTER 0
+```
+
+`CAP` a `LEN` jsou `cap(ch)` a `len(ch)` odečtené **po** produkci a před
+konzumací: `cap` je velikost bufferu, `len` je, kolik v něm zrovna leží.
+
+Startovní kód se nekompiluje. `consume` bere `<-chan int` — jen pro příjem —
+a zkouší na něj poslat. Směr je součástí **typu**, kontroluje se při
+kompilaci, a převod obousměrného kanálu na směrovaný je zdarma
+a jednosměrný. Je to nejlevnější dokumentace v jazyce: signatura, která
+říká, který konec trubky tahle funkce drží.
+'''
+hints = [
+  "Chyba to pojmenovává přesně: invalid operation, cannot send to receive-only channel. Smaž ten řádek.",
+  "produce tu může běžet na hlavní gorutině jen proto, že buffer je dost velký, aby pojal všechno; s b < n by blokoval navždy.",
+  "range přes zavřený, vyprázdněný kanál skončí — proto právě to, že ho produce zavře, vůbec dovolí consume vrátit hodnotu.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.advanced.13.select-default"
+title = "Zkus to a nečekej"
+story = "Kanál metrik je plný a pokladna nepřestane obsluhovat zákazníky, aby na něj čekala."
+brief = '''
+První řádek je `b n`: kanál s bufferem `b` a `n` hodnot, které mu nabídneš.
+
+Nabídni `1..n` **neblokujícím** odesláním — `select` s `default`, který to
+vzdá, místo aby čekal. Pak vyprázdni neblokujícími příjmy a pak zkus ještě
+jeden. Vypiš:
+
+```
+input:  2 5
+output: SENT 2
+        DROPPED 3
+        GOT 2
+        EMPTY yes
+```
+
+`select` s `default` nikdy neblokuje: pokud v tomto okamžiku není připravená
+žádná jiná větev, běží `default`. To mění „pošli“ na „zkus poslat“, což je
+způsob, jakým se má chovat kanál metrik nebo logu — plný znamená zahodit,
+ne zastavit.
+
+S `b = 0` a nikým, kdo by přijímal, je zahozeno **každé** odeslání, protože
+nebufferované odeslání je připravené, jen když už čeká příjemce.
+'''
+hints = [
+  "select s default a jedním case je celý neblokující idiom; žádná funkce TrySend neexistuje.",
+  "Vyprázdni stejným tvarem: přijímej, dokud je hodnota připravená, a nech default ukončit smyčku.",
+  "Netestuj prázdnotu zavřením kanálu — příjem ze zavřeného kanálu je vždy připravený a hlásil by `no`.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.advanced.14.happens-before"
+title = "Proč je tenhle bezpečný"
+story = "Čtyři úryvky na tabuli. Tři jsou správně synchronizované a jeden ne, a detektor závodů souhlasí."
+brief = '''
+Na standardním vstupu je jedno celé číslo `n`.
+
+Postav čtyři správně synchronizované věci a vypiš, co každá dala:
+
+1. `CHAN <v>` — gorutina zapíše obyčejný `int` a **pak** pošle na kanál;
+   příjem je to, co zápis zviditelní. Zapiš `42`.
+2. `ONCE <k>` — `n` gorutin volá jeden `sync.Once`; `k` je, kolikrát funkce
+   skutečně běžela.
+3. `MUTEX <k>` — `n` gorutin inkrementuje počítadlo pod `sync.Mutex`.
+4. `WG <k>` — `n` gorutin zapíše každá do vlastního slotu slice a `wg.Wait()`
+   je to, co všech `n` zápisů zviditelní čtenáři.
+
+```
+input:  4
+output: CHAN 42
+        ONCE 1
+        MUTEX 4
+        WG 4
+```
+
+Každá z těchto věcí je hrana *happens-before* a jsou to jediné čtyři tvary,
+které potřebuješ: odeslání se stane před dokončením odpovídajícího příjmu;
+`Once.Do` se vrátí až po skončení toho jednoho volání; odemknutí se stane
+před dalším zamknutím; `wg.Wait` se vrátí až po odpovídajících voláních
+`Done`.
+
+Nic tady není bezpečné díky načasování. Odeber kteroukoli hranu a `-race` ji
+najde, na stroji, který ani jednou nevyprodukoval špatné číslo.
+'''
+hints = [
+  "close(ready) a pak <-ready je nejlevnější publikační hrana v Go a nese každý zápis, který gorutina před ním udělala.",
+  "runs++ uvnitř once.Do nepotřebuje vlastní zámek — Once už zaručuje, že se stane přesně jednou a dřív, než se vrátí kterékoli jiné Do.",
+  "Každá gorutina vlastní jeden slot, takže žádné dvě nikdy nesáhnou na stejnou paměť; jediná potřebná hrana je Wait před čtením všech.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.advanced.15.generic-constraints"
+title = "Co musí typ slíbit"
+story = "Tři pomocné funkce, tři různé sliby, a jen jednu z nich zajímá, co typ umí."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` slov malými písmeny.
+
+Napiš tři generické pomocné funkce, každou s jiným druhem omezení:
+
+* `Names[T Named](xs []T) []string` — omezení s **metodou**
+* `Max[T Ordered](xs []T) T` — omezení, které je **množinou typů**,
+  `~string | ~int64`
+* `Distinct[T comparable](xs []T) int` — vestavěné omezení
+
+Zabal každé slovo do `Stop` s metodou `Name() string`. Vypiš jména spojená
+mezerami, pak `MAX <w>` (lexikograficky největší slovo) a `DISTINCT <k>`.
+
+```
+input:  3
+        tram bus mtr
+output: tram bus mtr
+        MAX tram
+        DISTINCT 3
+```
+
+Omezení je rozhraní použité na místě typového parametru a může nést dvě věci,
+které obyčejné rozhraní nemůže: **množinu typů** (`~string` odpovídá
+jakémukoli typu, jehož podkladový typ je `string`) a předdeklarované
+`comparable`.
+
+Rozdíl oproti **parametru** typu `interface{ Name() string }` stojí za to
+říct nahlas: `Names[T Named]` je monomorfizovaná a volání je statické
+a nepotřebuje žádné balení. `func Names(xs []Named)` by potřebovala jiný
+slice postavený ručně na každém místě volání.
+'''
+hints = [
+  "V Names projde x.Name() typovou kontrolou, protože omezení tu metodu slíbilo — to je to, co metodové omezení přináší.",
+  "Max může použít > jen proto, že Ordered je množina typů, které to podporují; `any` by se nezkompilovalo.",
+  "map[T]struct{} potřebuje, aby T bylo comparable, což je přesně to omezení, a struct{} je hodnota nulové šířky, která říká `množina, ne mapa`.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.advanced.16.gotchas"
+title = "Tři věci, které nejsou, co vypadají"
+story = "Žádná otázka na algoritmus. Tři úryvky a tazatel chce jen vědět, co který vypíše."
+brief = '''
+Na standardním vstupu je počet `n` (nejméně 4) a pak `n` celých čísel.
+
+Postav `a := make([]int, n, n+4)` a naplň ho. Pak vytvoř přesně čtyři řádky:
+
+1. `ALIAS <a[2]>` — po `b := a[:2]` a `b = append(b, 99)`.
+2. `NILIFACE <bool>` — přiřaď **nil `*Thing`** do proměnné rozhraní `Fooer`
+   a ohlas, zda ta proměnná `!= nil`.
+3. `DEFER_CLOSURE <v>` — z `defer func(){ ... }()`, které čte `x`.
+4. `DEFER_ARG <v>` — z `defer fmt.Printf(..., x)`.
+
+Nastav `x := a[0]` **před** registrací obou deferů a `x = a[n-1]` na úplném
+konci `main`. (`n` je nejméně 4, aby `a[n-1]` nikdy nebyla buňka, kterou
+přepíše krok s aliasováním — což by při `n = 3` byla, a to je čtvrté
+překvapení, které tahle ulice záměrně drží stranou.)
+
+```
+input:  4
+        1 2 3 4
+output: ALIAS 99
+        NILIFACE true
+        DEFER_CLOSURE 4
+        DEFER_ARG 1
+```
+
+Všechny tři odpovědi lidi překvapují a všechny tři mají stejnou příčinu: Go
+něco vyhodnotí dřív nebo později, než to vypadá.
+
+**Aliasování.** `a[:2]` sdílí podkladové pole `a` a zachovává si jeho
+kapacitu, takže `append` má místo a zapíše do `a[2]`, místo aby alokoval.
+Slicing není kopírování. `a[:2:2]` — tvar se třemi indexy — kapacitu ořízne
+a tak se tomu zabrání.
+
+**Typovaný nil.** Hodnota rozhraní je dvojice (typ, hodnota). Vložit do ní
+nil `*Thing` ti dá `(*Thing, nil)`, což není nil *rozhraní*. Proto
+`if err != nil` vystřelí u funkce, která vrátila nil konkrétní ukazatel na
+chybu, a jsou to nejdražší dva řádky v Go.
+
+**Defer.** Argumenty odloženého volání se vyhodnotí **ve chvíli, kdy běží
+`defer`**, ne když běží to volání. Odložený uzávěr bez argumentů naproti tomu
+čte své proměnné až v okamžiku volání. Oba defery vidí totéž `x`; neshodnou
+se, protože jeden z nich už si udělal kopii. A běží LIFO, takže ten napsaný
+jako druhý tiskne první.
+'''
+hints = [
+  "Zaregistruj oba defery dřív, než se x cokoli změní, a pamatuj, že běží last-in-first-out.",
+  "cap(a[:2]) je cap(a), ne 2 — to je celá odpověď na aliasování. Zkus potom a[:2:2] a sleduj, jak se ALIAS změní na původní hodnotu.",
+  "boxed drží (*Thing, nil). Porovnání s nil porovnává dvojici a typová polovina nil není.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "go.advanced.17.race"
+title = "Závod"
+story = "Přestup Causeway Bay, nástupiště 2. Dvě počítadla, jedno číslo, a to číslo je špatně o hodnotu, kterou nikdo nedokáže zopakovat dvakrát."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků `<IN|OUT> <K>`.
+
+Spusť jednu gorutinu na každý řádek. Každá inkrementuje své počítadlo
+`K`-krát, po jedné — ne `+= K`, po jedné, protože tak to dělá turniket.
+Počkej na všechny a pak vypiš `IN <a>`, `OUT <b>`, `NET <a-b>`.
+
+```
+input:  2
+        IN 3
+        OUT 1
+output: IN 3
+        OUT 1
+        NET 2
+```
+
+`K` dosahuje ve skrytých případech šesti číslic, a to je ten smysl: obyčejné
+`in++` z několika gorutin při té velikosti nejenže *riskuje* ztrátu počtů,
+ono je ztrácí, při každém spuštění, pokaždé jiný počet. `in++` je načtení,
+sečtení a uložení, a nic ty tři nedrží pohromadě.
+
+Použij `sync/atomic` (nebo `sync.Mutex`) a ověř to tak, jak se ověřuje
+skutečná odpověď: `go test -race` / `go run -race`, který hlásí samotný
+nesynchronizovaný přístup, a ne špatný součet, který vyprodukoval.
+'''
+hints = [
+  "atomic.Int64 s Add(1) je nejmenší změna, která to udělá správně.",
+  "sync.Mutex kolem obou počítadel funguje také a je pomalejší; brát ho jednou na každý inkrement je poctivé srovnání.",
+  "Obě počítadla čti po Wait, ne během — snímek vzatý za letu je jiný druh špatně.",
+]

@@ -48,7 +48,7 @@ pub struct SnippetBrief {
 
 fn check_lang(lang: &str) -> Result<()> {
     match lang {
-        "rust" | "go" => Ok(()),
+        "rust" | "go" | "cpp" | "python" => Ok(()),
         other => Err(bad_request(format!("unknown language '{other}'"))),
     }
 }
@@ -197,11 +197,7 @@ pub fn delete(conn: &Connection, home: &Home, address: &str, id: &str) -> Result
 fn write_to_disk(home: &Home, address: &str, snippet: &Snippet) -> Result<()> {
     let dir = home.snippet_dir(address, &snippet.id);
     ensure_dir(&dir)?;
-    let filename = if snippet.lang == "go" {
-        "main.go"
-    } else {
-        "main.rs"
-    };
+    let filename = crate::attempts::source_filename(&snippet.lang);
     write_private(&dir.join(filename), snippet.source.as_bytes())?;
     write_private(
         &dir.join("snippet.json"),

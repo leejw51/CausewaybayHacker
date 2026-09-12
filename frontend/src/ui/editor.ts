@@ -32,8 +32,24 @@ import {
 import { tags as t } from "@lezer/highlight";
 import { rust } from "@codemirror/lang-rust";
 import { go } from "@codemirror/lang-go";
+import { cpp } from "@codemirror/lang-cpp";
+import { python } from "@codemirror/lang-python";
 import { Theme } from "../engine/theme";
 import type { Land } from "../net/protocol";
+
+/** The syntax mode per land: highlighting and indentation, nothing cleverer. */
+const MODE: Record<Land, () => Extension> = { rust, go, cpp, python };
+
+/**
+ * The file the server compiles for each land (SPEC §5.1), which is what the
+ * editor's panel title calls the thing you are typing into.
+ */
+export const MAIN_FILE: Record<Land, string> = {
+  rust: "main.rs",
+  go: "main.go",
+  cpp: "main.cpp",
+  python: "main.py",
+};
 
 const hex = (c: readonly [number, number, number, number]) =>
   "#" +
@@ -128,7 +144,7 @@ export class Editor {
       doc,
       extensions: [
         base,
-        lang === "go" ? go() : rust(),
+        MODE[lang](),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChange?.();
         }),
@@ -161,6 +177,19 @@ export class Editor {
 
   get source(): string {
     return this.view.state.doc.toString();
+  }
+
+  /**
+   * Whether the caret is in here.
+   *
+   * Asked by the quest screen, which has two undo histories to keep apart:
+   * CodeMirror's own, per keystroke, and the server's edit stack, per thought.
+   * Ctrl+Z reaches a scene even while the editor has the focus — an
+   * accelerator has to work mid-typing — so the scene needs to be able to tell
+   * that this keystroke was meant for the fine-grained one and leave it alone.
+   */
+  get focused(): boolean {
+    return this.view.hasFocus;
   }
 
   focus(): void {

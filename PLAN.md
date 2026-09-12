@@ -55,6 +55,19 @@ Badges, levels, XP, combo and the clear-fanfare. The HackerRank-style timed
 `hacker` category with its countdown. Boss nodes at the end of each map. The
 Skynet framing: each cleared street is a skill taken back.
 
+## Milestone 4 — two more lands, and the quests in the player's language
+
+`cpp` and `python`, each with the same three roads and the same quest counts
+as the first two (18 / 17 / 34, boss last), and the hacker road the same 34
+interview problems so one interview can be sat in any land. The runner
+grows two stdio-only toolchains (`c++ -std=c++20`, `py_compile` then
+`python3 -I`), the §7.1 taxonomy grows `cpp:` and `py:` columns without a
+single new kind, and the mistake fixtures are captured from the real
+compilers as before. Alongside: quest text translated per locale under
+`content/i18n/`, served by `quest.get`/`world.map` on a `locale`, so the
+brief a Korean player reads is Korean and not "in English, sorry". The
+interface catalogues are unchanged; the content is what moves.
+
 ---
 
 ## The team

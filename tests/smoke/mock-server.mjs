@@ -182,9 +182,49 @@ const GO_QUESTS = [
   },
 ];
 
-const questsOf = (land) => (land === "go" ? GO_QUESTS : QUESTS);
-const findQuest = (id) => [...QUESTS, ...GO_QUESTS].find((q) => q.id === id);
-const langOf = (id) => (id.startsWith("go.") ? "go" : "rust");
+/**
+ * One quest each for the two newer lands, for the same reason as the Go one:
+ * `world.lands` fabricates four lands and a land with an empty map is a mock
+ * bug, not a server one.
+ */
+const CPP_QUESTS = [
+  {
+    id: "cpp.basic.01.hello",
+    node: 1,
+    title: "FIRST LIGHT",
+    difficulty: 1,
+    kind: "quest",
+    x: 0.12,
+    y: 0.74,
+    requires: [],
+    starter: "#include <iostream>\n\nint main() {\n}\n",
+    solution: '#include <iostream>\n\nint main() { std::cout << "hello, causewaybay\\n"; }\n',
+    expect: "hello, causewaybay\n",
+    hints: [],
+  },
+];
+const PYTHON_QUESTS = [
+  {
+    id: "python.basic.01.hello",
+    node: 1,
+    title: "FIRST LIGHT",
+    difficulty: 1,
+    kind: "quest",
+    x: 0.12,
+    y: 0.74,
+    requires: [],
+    starter: "def main():\n    pass\n\n\nmain()\n",
+    solution: 'print("hello, causewaybay")\n',
+    expect: "hello, causewaybay\n",
+    hints: [],
+  },
+];
+
+const LANDS = { rust: QUESTS, go: GO_QUESTS, cpp: CPP_QUESTS, python: PYTHON_QUESTS };
+const questsOf = (land) => LANDS[land] ?? [];
+const findQuest = (id) => Object.values(LANDS).flat().find((q) => q.id === id);
+// The land is the first segment of the id (SPEC §4.1), never a lookup.
+const langOf = (id) => id.split(".", 1)[0];
 
 // --------------------------------------------------------------------- state
 
@@ -421,44 +461,31 @@ wss.on("connection", (ws) => {
           stars: 0,
           open: false,
         });
+        // Progress is only kept for the rust quests (the checker clears
+        // those); the other three lands are present so a client sees the
+        // real shape of the world, with one open basic map each.
         return reply(id, "world.lands.ok", {
-          lands: [
-            {
-              land: "rust",
-              categories: [
-                {
-                  category: "basic",
-                  total: QUESTS.length,
-                  cleared: clearedCount(lower),
-                  stars: starsOf(lower),
-                  open: true,
-                },
-                empty("advanced"),
-                empty("hacker"),
-              ],
-            },
-            {
-              land: "go",
-              categories: [
-                {
-                  category: "basic",
-                  total: GO_QUESTS.length,
-                  cleared: 0,
-                  stars: 0,
-                  open: true,
-                },
-                empty("advanced"),
-                empty("hacker"),
-              ],
-            },
-          ],
+          lands: Object.entries(LANDS).map(([land, quests]) => ({
+            land,
+            categories: [
+              {
+                category: "basic",
+                total: quests.length,
+                cleared: land === "rust" ? clearedCount(lower) : 0,
+                stars: land === "rust" ? starsOf(lower) : 0,
+                open: true,
+              },
+              empty("advanced"),
+              empty("hacker"),
+            ],
+          })),
         });
       }
 
       // ---------------------------------------------------------- §4.7
       case "world.map": {
         const { land, category } = payload;
-        if (category !== "basic" || (land !== "rust" && land !== "go"))
+        if (category !== "basic" || !(land in LANDS))
           return reply(id, "world.map.ok", { land, category, nodes: [], edges: [] });
         return reply(id, "world.map.ok", {
           land,
@@ -600,9 +627,13 @@ wss.on("connection", (ws) => {
             push(mistakes, me, { kind: "unknown-name", code: "go:undefined", message: "undefined name" });
             return reply(id, `${type}.ok`, { attempt });
           }
-          const printed = isGo
-            ? /Println\("([^"]*)"\)/.exec(src)?.[1]
-            : /println!\("([^"]*)"\)/.exec(src)?.[1];
+          const printed = {
+            go: () => /Println\("([^"]*)"\)/.exec(src)?.[1],
+            rust: () => /println!\("([^"]*)"\)/.exec(src)?.[1],
+            // `std::cout << "…\n"` carries its own newline, unlike the others.
+            cpp: () => /std::cout << "([^"]*)\\n"/.exec(src)?.[1],
+            python: () => /print\("([^"]*)"\)/.exec(src)?.[1],
+          }[langOf(q.id)]?.();
           const ok = printed !== undefined && `${printed}\n` === q.expect;
           const had = progress.get(`${me}|${q.id}`);
           const firstClear = ok && had?.state !== "cleared";
@@ -748,10 +779,11 @@ wss.on("connection", (ws) => {
           })(),
           streak_days: 0,
           stars: starsOf(who),
-          by_land: [
-            { land: "rust", cleared, total: QUESTS.length },
-            { land: "go", cleared: 0, total: 0 },
-          ],
+          by_land: Object.entries(LANDS).map(([land, quests]) => ({
+            land,
+            cleared: land === "rust" ? cleared : 0,
+            total: land === "rust" ? quests.length : 0,
+          })),
         });
       }
       case "stats.mistakes": {

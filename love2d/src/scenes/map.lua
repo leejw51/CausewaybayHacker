@@ -29,14 +29,15 @@ local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Ease = require("src.ease")
 local Anim = require("src.anim")
+local Land = require("src.land")
 
 local Map = {}
 Map.__index = Map
 
--- The two lands and the three categories, in SPEC §0's order.
-local LANDS = { "rust", "go" }
+-- The lands and the three categories, in SPEC §0's order. TAB walks the
+-- lands in this order and wraps.
+local LANDS = Land.ORDER
 local CATEGORIES = { "basic", "advanced", "hacker" }
-local MASCOT = { rust = "sprite_ferris", go = "sprite_gogo" }
 
 --- Where the player was, per map, keyed `land.category`.
 ---
@@ -137,7 +138,7 @@ function Map:switch(land, category)
   self.switched_at = self.t
 
   SFX.play("select")
-  self.app:toast(("%s / %s"):format(land:upper(), category:upper()))
+  self.app:toast(("%s / %s"):format(Land.name(land), category:upper()))
   self:refresh()
 end
 
@@ -168,7 +169,11 @@ end
 
 function Map:refresh()
   self.error = nil
-  self.app.session:request("world.map", { land = self.land, category = self.category },
+  -- PROTOCOL §4.7: node titles in the interface's language where a
+  -- translation exists; each node carries `text_locale` saying which it got.
+  self.asked_lang = I18n.lang
+  self.app.session:request("world.map",
+    { land = self.land, category = self.category, locale = I18n.lang },
     function(ok, payload, why)
       if not ok then
         self.error = why.player
@@ -423,6 +428,12 @@ function Map:skip_walk()
 end
 
 function Map:update(dt)
+  if self.asked_lang and self.asked_lang ~= I18n.lang then
+    -- The language changed under an open map; the titles came from the
+    -- server in the old one. `refresh` records the language it asks in
+    -- before the reply lands, so this is once per change, not per frame.
+    self:refresh()
+  end
   self.t = self.t + dt
   for id, age in pairs(self.stamped) do
     self.stamped[id] = age + dt
@@ -440,19 +451,31 @@ end
 
 -- ------------------------------------------------------------------ drawing
 
+--- The plate behind a map, as the names `Assets.pick` tries in order.
+---
+--- `art/` ships a plate per land — `map_<land>` and `map_<land>_p` for
+--- portrait — so the name is built from the land and a fourth land costs
+--- two files, not a branch here. The placeholder `map_bg` is the fallback
+--- for a checkout where `art/` is not readable, or where a land's plate has
+--- not been painted yet.
+function Map.plate_names(land, portrait)
+  local suffix = portrait and "_p" or ""
+  return "map_" .. land .. suffix, "map_bg" .. suffix, "map_bg"
+end
+
+--- The land's colour, laid over the plate. A land the theme has no haze for
+--- gets Rust's, which is a wrong colour rather than no map.
+function Map.haze(land)
+  return Theme.haze[land] or Theme.haze.rust
+end
+
 function Map:draw()
   local vw, vh = Layout.vw, Layout.vh
   local px, py, pw, ph = self:plate_rect()
 
-  -- `art/` ships a plate per land (`map_rust`, `map_go`, plus portrait
-  -- variants). The placeholder `map_bg` is the fallback for a checkout where
-  -- `art/` is not readable.
-  local suffix = Layout.isPortrait() and "_p" or ""
-  Assets.cover(
-    Assets.pick("map_" .. self.land .. suffix, "map_bg" .. suffix, "map_bg"),
+  Assets.cover(Assets.pick(Map.plate_names(self.land, Layout.isPortrait())),
     px, py, pw, ph)
-  local haze = Theme.haze[self.land] or Theme.haze.rust
-  love.graphics.setColor(haze)
+  love.graphics.setColor(Map.haze(self.land))
   love.graphics.rectangle("fill", px, py, pw, ph)
   love.graphics.setColor(1, 1, 1, 1)
 
@@ -548,7 +571,7 @@ function Map:draw_header()
   local mascot = bh - 10
   local land_w = 0
   for _, land in ipairs(LANDS) do
-    land_w = math.max(land_w, mascot + 8 + UI.textWidth(I18n.t(land:upper()), land_size) + 10)
+    land_w = math.max(land_w, mascot + 8 + UI.textWidth(I18n.t(Land.name(land)), land_size) + 10)
   end
   local cat_w = 0
   for _, category in ipairs(CATEGORIES) do
@@ -584,10 +607,10 @@ function Map:draw_header()
     UI.setColor(on and Theme.cream or Theme.withAlpha(Theme.cream, 0.3))
     love.graphics.rectangle("line", x + 1, by + 1, land_w - 2, bh - 2)
     love.graphics.setColor(1, 1, 1, 1)
-    Assets.sprite(MASCOT[land], x + 4 + mascot / 2, by + bh - 4, mascot,
+    Assets.sprite(Land.mascot(land), x + 4 + mascot / 2, by + bh - 4, mascot,
       { alpha = on and 1 or 0.45 })
     love.graphics.setScissor(x, by, land_w, bh)
-    UI.text(I18n.t(land:upper()), x + mascot + 6, by + (bh - label_h) / 2, land_size,
+    UI.text(I18n.t(Land.name(land)), x + mascot + 6, by + (bh - label_h) / 2, land_size,
       on and Theme.ink or Theme.withAlpha(Theme.cream, 0.55))
     love.graphics.setScissor()
     self.land_rects[land] = { x = x, y = by, w = land_w, h = bh }
