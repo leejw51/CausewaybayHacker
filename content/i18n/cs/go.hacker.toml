@@ -43,22 +43,54 @@ id    = "go.hacker.02.window"
 title = "Nejkratší úsek"
 story = "Kolik nejméně po sobě jdoucích zastávek pokryje vzdálenost. Chtějí počet zastávek a pak to, kde začíná."
 brief = '''
-První řádek je `n s`. Druhý řádek je `n` **kladných** celých čísel.
+Na standardním vstupu jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádné pole
+není — postavíš ho sám, **přesně** tímto generátorem, v aritmetice `uint64`,
+která v Go přetéká bez jakýchkoli okolků:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407
+    next value = (x >> 33) % 1000000007
+
+s = (sum of all n values) / 2
+```
+
+To dělení je celočíselné, a je to také důvod, proč odpověď vždycky existuje:
+celé pole na `s` z podstaty své konstrukce dosáhne.
 
 Najdi nejkratší souvislý úsek, jehož součet je nejméně `s`. Vypiš jeho délku
 a pak jeho počáteční index od 1. Pokud je několik úseků stejně krátkých,
-vezmi ten nejvíc vlevo. Pokud žádný úsek `s` nedosáhne, vypiš `0` a `0`.
+vezmi ten nejvíc vlevo.
 
 ```
-input:  6 7
-        2 3 1 2 4 3
-output: 2
-        5
+input:  8 1
+output: 3
+        3
 ```
 
-Oba konce se posouvají jen doprava, takže každý prvek se jednou přičte
-a jednou odečte. Přepočítávání součtu uvnitř vnitřní smyčky z toho zase
-udělá kvadratickou odpověď.
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`,
+jeho součet je `3330417819`, takže `s` je `1665208909` a tři hodnoty od indexu
+`3` jsou nejkratší úsek, který na něj dosáhne.
+
+**Tahle ulice vynucuje svou složitost.** Jeden skrytý případ je `n = 500000`.
+Ve startovním kódu je poctivá kvadratická odpověď — z každého začátku jdi
+dopředu, dokud součet nedosáhne `s` — a protože `s` je polovina celkového
+součtu, každá taková procházka je dlouhá asi `n / 2` prvků. To je řádově
+`10^11` sčítání a proti pětisekundovému limitu běhu to trvá třicet osm sekund.
+Když se oba konce posouvají jen doprava, je to `O(n)` — každý prvek se jednou
+přičte a jednou odečte — a tentýž případ se vrátí za sedm milisekund. Změřeno,
+na tomto stroji, s těmi dvěma programy, které jsou v této ulici.
+
+Případ je `n = 500000` a ne `200000` proto, že vnitřní smyčka je jediné sčítání
+s předčasným ukončením a přesně na tohle je překladač dobrý: na `200000`
+kvadratická odpověď pořád doběhne za šest sekund, což je na limit příliš blízko,
+než aby to byla závora.
+
+Součet je při té velikosti kolem `2.5 × 10^14`. Sčítej ho do `int64`. V tomhle
+64bitovém sestavení je `int` v Go 64 bitů, takže s obyčejným `int` ti to
+projde — právě proto musí ten návyk přijít od tebe, ne od překladače.
 '''
 hints = [
   "Veď průběžný součet. Přičti nums[right] jednou za krok a nikdy ho nepřepočítávej.",
@@ -230,26 +262,54 @@ id    = "go.hacker.08.kth-largest"
 title = "K-tý největší"
 story = "Zahřívací kolo, a stejně chtějí haldu, ne řazení."
 brief = '''
-První řádek je `n k`, s `1 <= k <= n`. Druhý řádek je `n` celých čísel, která
-se mohou opakovat.
-
-Vypiš `k`-tou největší **hodnotu** — duplicity se počítají, takže v `3 3 1`
-je 2. největší `3`. Pak vypiš `HEAP <size>`, počet prvků, které jsi držel,
-když jsi skončil.
+Na standardním vstupu jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádný
+seznam není — postavíš si ho sám, **přesně** tímto generátorem, v aritmetice
+`uint64`, která v Go přetéká bez jakýchkoli okolků:
 
 ```
-input:  6 2
-        3 2 1 5 6 4
-output: 5
-        HEAP 2
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407
+    next value = (x >> 33) % 1000000007
+
+k = n / 2 + 1
 ```
 
-Seřazení celého seznamu to zodpoví v `n log n`. Odpověď, kterou hledají,
-drží **min-haldu velikosti k** — vlož každou hodnotu, vyber, když halda
-přeroste `k`, a na konci je odpovědí kořen. `container/heap` je pět metod na
-typu slice: `Len`, `Less`, `Swap`, `Push`, `Pop`. `Push` a `Pop` berou
-ukazatelový příjemce; ostatní tři ne, a tahle asymetrie je to, co pod
-časovým tlakem každý splete.
+To dělení je celočíselné, takže `1 <= k <= n` platí, ať je `n` jakkoli malé.
+
+Vypiš `k`-tou největší **hodnotu** — duplicity se počítají, takže v `3 3 1` je
+2. největší `3`. Pak vypiš `HEAP <size>`, počet prvků, které jsi držel, když
+jsi skončil.
+
+```
+input:  8 1
+output: 189567123
+        HEAP 5
+```
+
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`
+a `k` je `5`. Pět největších je po řadě
+`908834774 822192870 708211027 392341189 189567123`, takže odpověď je poslední
+z nich a v ruce máš pět hodnot.
+
+**Co velký případ vynucuje a co ne.** Jeden skrytý případ je `n = 200000`,
+kde `k` je `100001`. Odmítne odpověď, která `k`-krát projde celý seznam a
+pokaždé z něj vytáhne největší hodnotu: to je `O(nk)`, `2 × 10^10` porovnání,
+čtyřicet pět sekund proti pětisekundovému limitu běhu — a je to přesně to, co
+dělá startovní kód. **Neodmítne** ale seřazení celého seznamu: `n log n` je
+rychlé a sort tudy projde s přehledem. Jestli píšeš sort, řekni to nahlas;
+předstírat, že ho odmítly hodiny, je horší.
+
+Odpověď, na kterou se ptají, je **min-halda velikosti k**: každou hodnotu
+vlož, a když halda přeroste `k`, jednu vyhoď — na konci je kořen ta odpověď.
+Je to `O(n log k)`, drží `k` hodnot místo `n` a velký případ vrátí za dvacet
+pět milisekund. Obě čísla změřena na tomto stroji, s těmi dvěma programy,
+které jsou v této ulici.
+
+`container/heap` je pět metod na sliceovém typu: `Len`, `Less`, `Swap`,
+`Push`, `Pop`. `Push` a `Pop` berou ukazatelový receiver, ostatní tři ne — a
+právě tahle asymetrie je to, co pod hodinami splete každého.
 '''
 hints = [
   "Push a Pop jsou surové operace nad slicem — append a useknutí konce. heap.Push a heap.Pop jsou ty, které prosívají.",
@@ -649,24 +709,45 @@ id    = "go.hacker.20.lis"
 title = "Nejdelší cesta vzhůru"
 story = "Zase rok denních tržeb. Tentokrát chtějí nejdelší řadu zlepšujících se dní, a nemusí jít po sobě."
 brief = '''
-První řádek je `n`. Druhý řádek je `n` celých čísel.
+Na standardním vstupu jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádné pole
+není — postavíš ho sám, **přesně** tímto generátorem, v aritmetice `uint64`,
+která v Go přetéká bez jakýchkoli okolků:
 
-Vypiš délku nejdelší **ostře rostoucí podposloupnosti** — pořadí zachováno,
-sousednost nevyžadována. Pak vypiš `TAILS <k>`, totéž číslo odečtené z počtu
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407
+    next value = (x >> 33) % 1000000007
+```
+
+Vypiš délku nejdelší **ostře rostoucí** podposloupnosti — pořadí zůstává,
+sousednost se nevyžaduje. Pak vypiš `TAILS <k>`, totéž číslo přečtené z počtu
 hromádek.
 
 ```
-input:  8
-        10 9 2 5 3 7 101 18
-output: 4
-        TAILS 4
+input:  8 1
+output: 3
+        TAILS 3
 ```
 
-Tabulka `O(n²)` je ta, kterou musíš umět napsat z hlavy. Ta `O(n log n)` drží
-pro každou délku nejmenší hodnotu, na které může podposloupnost té délky
-končit — slice, který je vždy seřazený, takže umístění nové hodnoty je
-binární hledání. Tady projde obojí; případy jsou malé a říkají to. Stejně
-napiš tu druhou, protože doplňující otázka zní vždycky „a rychleji?“.
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`
+a `93944146 392341189 822192870` je jeden z nejdelších výstupů v něm.
+
+**Tahle ulice vynucuje svou složitost.** Jeden skrytý případ je `n = 200000`.
+Tabulka `O(n²)` — pro každou hodnotu se ohlédnout po všech předchozích — je ta,
+kterou musíš umět napsat zpaměti, a je to přesně to, co je ve startovním kódu:
+`2 × 10^10` porovnání, třicet devět sekund proti pětisekundovému limitu běhu.
+Verze s hromádkami si pro každou délku pamatuje nejmenší hodnotu, na které
+podposloupnost té délky může skončit — slice, který je vždycky setříděný, takže
+umístit novou hodnotu je binární vyhledávání. To je `O(n log n)` a tentýž případ
+vrátí za jedenáct milisekund. Změřeno, na tomto stroji, s těmi dvěma programy,
+které jsou v této ulici.
+
+Odpověď na ten případ je `881`, což je zhruba `2√n`. Takhle vypadá nejdelší
+výstup v seznamu náhodných hodnot a stojí za to si to odnést do místnosti: je to
+způsob, jak víš, že tvůj vlastní výstup nedává nesmysl, dřív než ti to řekne
+tazatel.
 '''
 hints = [
   "tails není podposloupnost. Jeho délka je odpověď; jeho obsah jsou jen nejlepší koncové hodnoty.",
