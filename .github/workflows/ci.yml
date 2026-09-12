@@ -68,7 +68,14 @@ env:
   # on ubuntu-24.04 is g++ 13, which has all of C++20 the quests use. This
   # records the expectation so a runner-image bump that changes it is a
   # deliberate edit here, not a surprise in a fixture diff.
-  CXX_EXPECTED: "g++ (Ubuntu 13"
+  #
+  # The vendor and the major version, and deliberately **not** the program
+  # name. GCC's driver prints the name it was invoked as, so `c++ --version`
+  # opens with `c++ (Ubuntu 13.3.0-...)` and `g++ --version` with `g++ (Ubuntu
+  # 13.3.0-...)` — the same compiler, two different first words. The check
+  # below runs `c++` because that is what the runner and `verify_pack.py` hand
+  # the quests to, so pinning `g++` there failed on a correct image.
+  CXX_EXPECTED: "(Ubuntu 13"
   NODE_VERSION: "24"
 
 jobs:
