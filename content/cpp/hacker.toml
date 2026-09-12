@@ -14,6 +14,17 @@
 # and 35 s and the right ones take under a tenth of a second. All measured on
 # the machine this pack was written on, with the programs that ship in it.
 #
+# Node 17, the longest run up, was converted to that same generator afterwards
+# and needed no such enlargement: its O(n^2) table does not vectorise, and at
+# the shared n = 200000 it takes 32.6 s against the right answer's 0.006 s. Its
+# stdin and its expected output are byte for byte the other three lands'.
+#
+# Nine other briefs claimed a bar their cases could not hold, and now say so
+# instead. Some of those problems cannot be generated at this size at all — a
+# random string has no long repeat-free run in it, a pairs-plus-one array is
+# constructed rather than generated — and a brief that admits that is worth
+# more than a hidden case that proves nothing.
+#
 # Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
 
 pack = "cpp.hacker"
@@ -142,6 +153,14 @@ output: 3
 
 The window only ever moves right. If you find yourself rescanning from the
 start after a repeat, you have written the quadratic one.
+
+The cases here are small, and the clock is not measuring speed. Nor could it:
+on a random string the rescanning version never has more than a few characters
+to rescan before it hits a repeat, so it finishes as fast as the window does
+at any size — measured on this machine at `n = 200000`, not assumed. What
+these four cases check is the length, the leftmost tie-break and the run
+itself. Write the window anyway. It is `O(n)` on every input rather than on
+most of them, and the input a real screen hands you is chosen to be unkind.
 '''
 starter      = '''
 #include <iostream>
@@ -463,6 +482,14 @@ output: 15
 You are not searching the list. You are searching the **answer**: the
 capacities from `max(weight)` to `sum(weights)`, on which "does it fit in `d`
 days" is false, false, false, then true forever. Binary search that.
+
+The cases here are small and the clock is not measuring speed. There is no big
+hidden case: this input is `n`, `d` and a list, and a generator that produced
+it would have to invent a `d`, which is exactly the kind of choice that makes
+two lands disagree about the same question. The claim still holds where it
+matters — at a real `n` the capacities run from `max(weight)` to
+`sum(weights)`, a range on the order of `10^14`, and a walk up it does not
+finish. Write the binary search, not the walk.
 '''
 starter      = '''
 #include <algorithm>
@@ -580,6 +607,14 @@ output: 4 2 4 -1
 Keep a stack of positions whose answer is still unknown, and it stays
 decreasing from the bottom up. Each position is pushed once and popped once,
 so the whole thing is one pass however it looks.
+
+The cases here are small and the clock is not measuring speed, and on this
+question a big case would not help. Scanning right from each position until
+something bigger turns up finds its answer within a couple of steps on random
+values and beats any clock at any size — `n = 200000` in well under a
+hundredth of a second, measured. What a big case would reject is a descending
+array, which is the one input that makes that scan quadratic. The stack is
+still the answer: it is one pass on *every* input rather than on most of them.
 '''
 starter      = '''
 #include <iostream>
@@ -811,6 +846,11 @@ prints a different answer on the next machine. `std::sort` is not stable
 either, so it would not save you even if the input order were meaningful.
 Making the comparison **total** — count descending, then the word ascending —
 is what fixes it, and it is the answer the interviewer is listening for.
+
+The cases here are small and the clock is not measuring speed. That is the
+right way round for this question — counting and ranking is `O(n log n)`
+however you write it, and the thing that actually fails a candidate here is
+the comparator, which the `ties` case checks and a big case would not.
 '''
 starter      = '''
 #include <algorithm>
@@ -1355,6 +1395,14 @@ C++-specific trick, and it is what the question is checking.
 
 The heap holds one entry per list, not one per element, so it stays at size
 `k` however long the lists are.
+
+The cases here are small and the clock is not measuring speed, and on this
+question no case could. Pouring every list into one `std::vector` and calling
+`std::sort` passes these, and would pass a big one too: `O(N log N)` against
+the heap's `O(N log k)` is not a gap a run limit can see. What is being checked
+is that you can spell the min-heap. What the interviewer is listening for is
+the one-entry-per-list invariant, which is the part that matters when the
+lists do not fit in memory at once.
 '''
 starter      = '''
 #include <functional>
@@ -1894,6 +1942,12 @@ output: 3
 Union-find: every stop points at a parent, `find` walks to the root, `union`
 points one root at the other. Compress the path on the way back out of `find`
 and the whole thing is effectively constant time per query.
+
+The cases here are small and the clock is not measuring speed — a `find` that
+walks without compressing would clear all four, and so would rescanning the
+whole array for each query. Compress anyway. The paragraph above is a claim
+about a hundred thousand stops and a hundred thousand links, and it is the
+claim you will be asked to defend, not these four lines.
 '''
 starter      = '''
 #include <iostream>
@@ -2016,12 +2070,21 @@ node         = 17
 title        = "THE LONGEST RUN UP"
 difficulty   = 5
 time_limit_s = 1200
-story        = "A year of daily takings. They want the longest stretch of improving days, and they do not have to be consecutive."
+story        = "Daily takings, as many as they care to name, and you make them yourself from a seed. They want the longest stretch of improving days, and they do not have to be consecutive."
 concepts     = ["dynamic-programming", "binary-search", "complexity"]
 requires     = ["cpp.hacker.16.union-find"]
 map          = { x = 0.327, y = 0.554, kind = "quest" }
 brief        = '''
-Line one is `n`. Line two is `n` integers.
+Standard input is two integers, `n` and `seed`. There is no array in the input
+— you build it, with **exactly** this generator, in `std::uint64_t` arithmetic,
+which wraps by definition:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (wrapping)
+    next value = (x >> 33) % 1000000007
+```
 
 Print the length of the longest **strictly increasing subsequence** — the
 values keep their order but need not be adjacent. Then print
@@ -2029,56 +2092,109 @@ values keep their order but need not be adjacent. Then print
 count.
 
 ```
-input:  8
-        10 9 2 5 3 7 101 18
-output: 4
-        TAILS 4
+input:  8 1
+output: 3
+        TAILS 3
 ```
 
-The `O(n²)` table is the answer you should be able to write cold. The `O(n log n)`
-one keeps, for each length, the smallest value a subsequence of that length can
-end on — a list that is always sorted, so the position of a new value is a
-binary search, and `std::lower_bound` is that search. Either passes here; the
-cases are small and say so. Write the second one anyway, because the follow-up
-is always "and faster?".
+For `8 1` the array is
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`,
+and the longest run up inside it is `93944146 392341189 822192870`. Check your
+generator against that line before you go looking for a bug in your algorithm.
+
+**This quest enforces its complexity.** The starter is the `O(n²)` table — the
+answer you should be able to write cold, and it is not wrong. At `n = 200000`
+it prints the same `881` the fast one prints. It prints it **32.6 s** after it
+starts, against a five second run limit, so what you see is a timeout and not
+a wrong answer. That is the failure this question exists to produce.
+
+The `O(n log n)` one keeps, for each length, the smallest value a subsequence
+of that length can end on — a list that is always sorted, so the position of a
+new value is a binary search, and `std::lower_bound` is that search. It does
+`n = 200000` in **0.006 s**. Both measured on this machine, with the two
+programs that ship in this quest.
+
+One note on widths, because it is the half of this question C++ adds. Every
+generated value is below `2^30` and the answer is at most `n`, so `int` would
+hold both — but the generator's `x` must be `std::uint64_t` and nothing else.
+Unsigned overflow wraps by definition; **signed** overflow is undefined
+behaviour, so a `long long` there leaves the compiler entitled to do anything
+at all, and `>> 33` on it would be an arithmetic shift rather than the logical
+one this generator means. Generate unsigned, convert after the modulus.
 '''
 starter      = '''
+
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <vector>
 
+std::vector<long long> generate(std::size_t n, std::uint64_t seed) {
+    std::uint64_t x = seed;
+    std::vector<long long> values;
+    values.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        values.push_back(static_cast<long long>((x >> 33) % 1000000007ULL));
+    }
+    return values;
+}
+
 int main() {
-    int n = 0;
-    std::cin >> n;
-    std::vector<long long> nums(n);
-    for (long long& v : nums) {
-        std::cin >> v;
+    std::size_t n = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> seed;
+
+    std::vector<long long> values = generate(n, seed);
+
+    // correct, and far too slow: this is what the big hidden case rejects.
+    // best[i] is the longest increasing subsequence ending at i.
+    std::vector<int> best(n, 1);
+    int longest = n > 0 ? 1 : 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        for (std::size_t j = 0; j < i; ++j) {
+            if (values[j] < values[i] && best[j] + 1 > best[i]) {
+                best[i] = best[j] + 1;
+            }
+        }
+        if (best[i] > longest) {
+            longest = best[i];
+        }
     }
 
-    std::vector<long long> tails;
-    (void)tails;
-
-    // for each value, find where it belongs among the pile tops and put it there
-    std::cout << "0\nTAILS 0\n";
+    std::cout << longest << '\n';
+    std::cout << "TAILS " << longest << '\n';
 }
 '''
 solution     = '''
+
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <vector>
 
-int main() {
-    int n = 0;
-    std::cin >> n;
-    std::vector<long long> nums(n);
-    for (long long& v : nums) {
-        std::cin >> v;
+std::vector<long long> generate(std::size_t n, std::uint64_t seed) {
+    std::uint64_t x = seed;
+    std::vector<long long> values;
+    values.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        x = x * 6364136223846793005ULL + 1442695040888963407ULL;
+        values.push_back(static_cast<long long>((x >> 33) % 1000000007ULL));
     }
+    return values;
+}
+
+int main() {
+    std::size_t n = 0;
+    std::uint64_t seed = 0;
+    std::cin >> n >> seed;
+
+    std::vector<long long> values = generate(n, seed);
 
     // tails[i] = the smallest value an increasing subsequence of length i+1
-    // can end on. It is sorted, always.
+    // can end on. It is sorted, always, which is what makes the search legal.
     std::vector<long long> tails;
-    for (long long value : nums) {
+    for (long long value : values) {
         auto slot = std::lower_bound(tails.begin(), tails.end(), value);
         if (slot == tails.end()) {
             tails.push_back(value);
@@ -2094,7 +2210,7 @@ int main() {
 hints = [
   "tails is not a subsequence. Its length is the answer; its contents are only the best ending values.",
   "Strictly increasing means you replace the first tail that is >= value, which is exactly what std::lower_bound returns.",
-  "lower_bound returning end() means this value extends the longest run so far — push it.",
+  "If the big case times out, nothing is wrong with your answer — the shape of your loop is the answer here. Two nested loops over 200000 values is 2 x 10^10 comparisons.",
 ]
 
 [quest.tests]
@@ -2104,10 +2220,10 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "sample",     stdin = "8\n10 9 2 5 3 7 101 18\n", expect = "4\nTAILS 4\n", visible = true },
-  { name = "descending", stdin = "4\n5 4 3 2\n",             expect = "1\nTAILS 1\n", visible = false },
-  { name = "flat",       stdin = "5\n7 7 7 7 7\n",           expect = "1\nTAILS 1\n", visible = false },
-  { name = "ascending",  stdin = "6\n1 2 3 4 5 6\n",         expect = "6\nTAILS 6\n", visible = false },
+  { name = "sample", stdin = "8 1\n",          expect = "3\nTAILS 3\n",     visible = true },
+  { name = "single", stdin = "1 7\n",          expect = "1\nTAILS 1\n",     visible = false },
+  { name = "dozen",  stdin = "12 99\n",        expect = "5\nTAILS 5\n",     visible = false },
+  { name = "big",    stdin = "200000 12345\n", expect = "881\nTAILS 881\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 18
@@ -2383,6 +2499,14 @@ That is the whole first line. `x & (x - 1)` clears the lowest set bit, which
 gives you the third and fourth lines for free. Do it all in `unsigned long
 long`: shifting and subtracting on a signed type has edge cases, and the
 question is not about them.
+
+The cases here are small and the clock is not measuring speed. There is no big
+hidden case and there cannot be one built the way this pack builds them: an
+array that is pairs-plus-one is *constructed*, not generated, and two lands
+constructing it would not construct the same array. So these cases check the
+four lines and their edges — `0` is not a power of two, and a value with no
+set bits stays `0` when you clear the lowest one. The xor is still the answer;
+counting occurrences in a nested loop is `O(n²)` and dies at a real `n`.
 '''
 starter      = '''
 #include <iostream>
@@ -2769,6 +2893,14 @@ fixed by shrinking it. What survives is prefix sums: a run `i..j` sums to `k`
 exactly when `prefix[j] - prefix[i] == k`, so count how many earlier prefixes
 equal `prefix[j] - k`. Seed the map with `0 → 1` for runs that start at the
 beginning.
+
+The cases here are small and the clock is not measuring speed, and there is no
+case here that would reject the `O(n²)` double loop — at a real `n` there
+would be. That same double loop over 200000 values is `2 × 10^10` additions
+and takes about six seconds on this machine, against a five second run limit
+and against a hash map's single pass in a hundredth of that. What these four
+check is the negatives and the runs that start at the beginning, which are the
+two places this answer actually goes wrong. The complexity is on your honour.
 '''
 starter      = '''
 #include <iostream>
@@ -4602,6 +4734,12 @@ erases matters: read the key out of `back()` first, erase it from the map,
 *then* `pop_back` — the other way round is a read through an iterator to a
 node that no longer exists, and that is the thing this land has been about
 since the Noon Day Gun.
+
+The cases here are small and the clock is not measuring speed: four operations
+cannot tell a `std::list` apart from a `std::vector` you scan from the front.
+The `O(1)` in the paragraph above is the sentence you say out loud in the
+room, so it has to be true of the code you wrote rather than of the code that
+happened to clear four cases.
 '''
 starter      = '''
 #include <iostream>
