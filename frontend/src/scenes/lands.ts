@@ -31,7 +31,6 @@ import {
 } from "../net/protocol";
 import { MapScene } from "./map";
 import { PlaygroundScene } from "./playground";
-import { QuestScene } from "./quest";
 import { t } from "../i18n";
 
 type Lands = Responses["world.lands"]["lands"];
@@ -497,6 +496,11 @@ export class LandsScene implements Scene {
         return;
       }
       this.autoNote = null;
+      // Imported here rather than at the top: `quest.ts` constructs this scene
+      // on its way back to the lobby, so a static import would make the two
+      // modules a cycle. `app.ts` reaches for the same `await import` on every
+      // screen it opens by key, and this method was already async.
+      const { QuestScene } = await import("./quest");
       await this.app.go(
         new QuestScene(this.app, pick.land, pick.category, pick.quest_id),
         "forward",
