@@ -1336,3 +1336,165 @@ fn main() {
 
     server.stop().await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn auto_select_sends_a_player_to_the_stage_that_is_beating_them() {
+    // PROTOCOL §4.14c / SPEC §1.2. `snapshot.rs` unit-tests the ranking against
+    // rows it inserted itself; what a unit test cannot notice is a submit
+    // handler that never records the failure, a RUN counted as one, or a
+    // handler wired to the wrong address. Every submission below is really
+    // compiled and really run.
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let src = content_src(tmp.path());
+    let server = start(&home, &src).await;
+
+    let mut alice = Client::connect(server.port).await;
+    let (address, _) = alice.login(ALICE_KEY).await;
+
+    // Nobody has failed anything yet. Empty is the normal answer, not an error
+    // — a client that treated it as a fault would show a broken button to the
+    // only people who have earned it.
+    let empty = alice.ok("stats.weakest", json!({})).await;
+    assert_eq!(
+        empty["weakest"].as_array().unwrap().len(),
+        0,
+        "a player who has failed nothing has no weakest quest"
+    );
+
+    // HELLO: cleared, but it cost three failures — "costly".
+    for i in 0..3 {
+        let failed = alice
+            .submit(HELLO, &wrong_but_valid(&format!("h{i}")))
+            .await;
+        assert_eq!(failed["verdict"], "wrong_answer");
+    }
+    assert_eq!(
+        alice.submit(HELLO, &quest_field(HELLO, "solution")).await["cleared"],
+        true
+    );
+
+    // SUM: two failures and still not cleared — "stuck".
+    for i in 0..2 {
+        let failed = alice.submit(SUM, &wrong_but_valid(&format!("s{i}"))).await;
+        assert_eq!(failed["verdict"], "wrong_answer");
+    }
+
+    let weak = alice.ok("stats.weakest", json!({ "limit": 10 })).await;
+    let rows = weak["weakest"].as_array().unwrap();
+    assert_eq!(rows.len(), 2, "{rows:?}");
+
+    // The whole reason the ranking is not "most failures": HELLO has more, and
+    // HELLO is the one they have already beaten.
+    assert_eq!(rows[0]["quest_id"], SUM);
+    assert_eq!(rows[0]["reason"], "stuck");
+    assert_eq!(rows[0]["failures"], 2);
+    assert_eq!(rows[0]["cleared"], false);
+    assert_eq!(rows[1]["quest_id"], HELLO);
+    assert_eq!(rows[1]["reason"], "costly");
+    assert_eq!(rows[1]["failures"], 3);
+
+    // What AUTO SELECT actually does with the answer: everything it needs to
+    // open the quest is in the row, with no second round trip.
+    assert_eq!(rows[0]["land"], "rust");
+    assert_eq!(rows[0]["category"], "basic");
+    assert!(rows[0]["title"].as_str().is_some_and(|s| !s.is_empty()));
+    let quest = alice
+        .ok("quest.get", json!({ "quest_id": rows[0]["quest_id"] }))
+        .await;
+    assert_eq!(quest["quest"]["id"], SUM);
+
+    // `limit` is honoured, and clamped rather than trusted.
+    let one = alice.ok("stats.weakest", json!({ "limit": 1 })).await;
+    assert_eq!(one["weakest"].as_array().unwrap().len(), 1);
+    assert_eq!(one["weakest"][0]["quest_id"], SUM);
+
+    // A RUN is not a failure however it went (§4.9b), so it must not create
+    // weakness on a quest that has none.
+    alice
+        .ok(
+            "quest.run",
+            json!({ "quest_id": SHADOWING, "lang": "rust",
+                    "source": wrong_but_valid("ran") }),
+        )
+        .await;
+    let after_run = alice.ok("stats.weakest", json!({})).await;
+    assert!(
+        after_run["weakest"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|w| w["quest_id"] != SHADOWING),
+        "a RUN must never make a quest look like a weakness"
+    );
+
+    // And the same ranking reaches disk, where a player can read it without
+    // sqlite (SPEC §1.2). Mid-session the file is as of the last write, which
+    // the clear above triggered — the SUM failures came after it, so they are
+    // not in it yet. That is the documented cadence, not a lag worth hiding:
+    // a snapshot per attempt would put a few hundred KB through the disk on
+    // every RUN.
+    let path = home
+        .join("users")
+        .join(address.to_ascii_lowercase())
+        .join("progress.json");
+    let at_clear: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(at_clear["totals"]["cleared"], 1);
+    assert_eq!(
+        at_clear["position"]["quest_id"], HELLO,
+        "as of the clear that wrote it"
+    );
+
+    // Closing the socket is the third write, and it is the one that catches
+    // the common shape of an evening: failed submits on one quest, then the
+    // window shuts. Without it the file would lag until the next clear.
+    drop(alice);
+    let caught_up = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        loop {
+            let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+            // SUM's failures came after the clear, so its arrival at the top of
+            // `weakest` is exactly the close write landing.
+            if v["weakest"][0]["quest_id"] == SUM {
+                return v;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+    })
+    .await
+    .expect("progress.json should catch up when the socket closes");
+
+    assert_eq!(caught_up["weakest"][0]["reason"], "stuck");
+    assert_eq!(caught_up["weakest"][1]["quest_id"], HELLO);
+    // A RUN is not a failure (§4.9b) but it *is* where they were: the two
+    // questions are different, and SHADOWING answers only the second. It is
+    // absent from `weakest` above and is the position here.
+    assert_eq!(caught_up["position"]["quest_id"], SHADOWING);
+    // The undo sources stay in edits/; only the stack's position is mirrored.
+    assert!(caught_up["quests"][0]["edits"]["depth"].is_i64());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn one_players_weakness_is_never_another_players() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let src = content_src(tmp.path());
+    let server = start(&home, &src).await;
+
+    let mut alice = Client::connect(server.port).await;
+    alice.login(ALICE_KEY).await;
+    let mut bob = Client::connect(server.port).await;
+    bob.login(BOB_KEY).await;
+
+    for i in 0..2 {
+        alice.submit(SUM, &wrong_but_valid(&format!("a{i}"))).await;
+    }
+
+    let his = bob.ok("stats.weakest", json!({})).await;
+    assert_eq!(
+        his["weakest"].as_array().unwrap().len(),
+        0,
+        "Alice's failures are not Bob's"
+    );
+    let hers = alice.ok("stats.weakest", json!({})).await;
+    assert_eq!(hers["weakest"].as_array().unwrap().len(), 1);
+}

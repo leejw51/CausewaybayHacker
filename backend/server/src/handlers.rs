@@ -494,6 +494,23 @@ pub fn stats_mistakes(
     }))
 }
 
+/// §4.14c. The same ranking `progress.json` carries, on the wire, so a client
+/// can offer "the one I am worst at" without modelling weakness itself. The
+/// rule lives in `snapshot::weakest` and is written down in SPEC §1.2 — two
+/// clients agreeing on a number is worth more than either of them being clever.
+pub fn stats_weakest(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let limit = opt_i64_field(payload, "limit").unwrap_or(10).clamp(1, 50);
+    let conn = state.store.conn();
+    Ok(json!({
+        "weakest": snapshot::weakest(&conn, address, limit as usize)?
+    }))
+}
+
 pub fn search_query(
     state: &Shared,
     session: &Session,

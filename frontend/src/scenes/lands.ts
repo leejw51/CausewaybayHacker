@@ -31,6 +31,7 @@ import {
 } from "../net/protocol";
 import { MapScene } from "./map";
 import { PlaygroundScene } from "./playground";
+import { QuestScene } from "./quest";
 import { t } from "../i18n";
 
 type Lands = Responses["world.lands"]["lands"];
@@ -202,6 +203,10 @@ export class LandsScene implements Scene {
   private readonly catBtns = new Buttons();
   private t = 0;
   private error = "";
+  /** Replaces the AUTO SELECT hint while it is working, or when there is
+   *  nothing to send them to. Cleared on the next click. */
+  private autoNote: string | null = null;
+  private autoBusy = false;
   /**
    * How lit each row is, 0..1, eased per frame rather than switched.
    *
@@ -450,6 +455,10 @@ export class LandsScene implements Scene {
       this.land = hit.id.slice(5) as Land;
       return;
     }
+    if (hit.id === "auto") {
+      void this.autoSelect();
+      return;
+    }
     if (hit.id === "playground") {
       void this.app.go(new PlaygroundScene(this.app), "forward");
       return;
@@ -457,6 +466,38 @@ export class LandsScene implements Scene {
     if (hit.id.startsWith("cat:")) {
       const category = hit.id.slice(4) as Category;
       void this.app.go(new MapScene(this.app, this.land, category), "forward");
+    }
+  }
+
+  /**
+   * Go straight to the stage this player is worst at (§4.14c).
+   *
+   * The ranking is the server's: it is the same list `progress.json` carries,
+   * and a client that computed its own would disagree with the file the player
+   * can read. An empty answer is the normal one for somebody who has failed
+   * nothing — it says so and stays put, rather than sending them somewhere
+   * arbitrary or showing an error for having done well.
+   */
+  private async autoSelect(): Promise<void> {
+    if (this.autoBusy) return;
+    this.autoBusy = true;
+    this.autoNote = t("lands.autoWorking");
+    try {
+      const { weakest } = await this.app.client.request("stats.weakest", { limit: 1 });
+      const pick = weakest[0];
+      if (!pick) {
+        this.autoNote = t("lands.autoNone");
+        return;
+      }
+      this.autoNote = null;
+      await this.app.go(
+        new QuestScene(this.app, pick.land, pick.category, pick.quest_id),
+        "forward",
+      );
+    } catch {
+      this.autoNote = t("lands.autoNone");
+    } finally {
+      this.autoBusy = false;
     }
   }
 
@@ -671,7 +712,10 @@ export class LandsScene implements Scene {
       // The scratchpad lives under the three roads, with its own band of air,
       // because it is not a fourth road: nothing there is scored.
       const playH = Math.max(layout.minTouchH(), fonts.button.height + 20);
-      const rowsBottom = right[1] + right[3] - playH - gap * 2;
+      // Two buttons stack under the category rows now: AUTO SELECT above
+      // PLAYGROUND. Both are "somewhere other than a land plate to go", and
+      // they are the same size because neither is the primary action here.
+      const rowsBottom = right[1] + right[3] - playH * 2 - gap * 3;
       const rowH = Math.max(minRowH, Math.floor((rowsBottom - rowsTop) / cats.length) - gap);
 
       let y = rowsTop;
@@ -853,6 +897,39 @@ export class LandsScene implements Scene {
         });
         y += rowH + gap;
       }
+
+      // The one button on this screen that answers "I do not know what to
+      // practise". It asks the server rather than guessing, because the
+      // ranking is SPEC §1.2's and both clients must agree on it.
+      const [aw] = btnBox(
+        fonts.button,
+        [t("lands.autoSelect")],
+        0,
+        fonts.button.size * 2,
+        layout.minTouchH(),
+      );
+      const abw = Math.max(aw, Math.round(right[2] * 0.4));
+      const aby = right[1] + right[3] - playH * 2 - gap;
+      const ahov = this.landBtns.hovered === "auto";
+      pixBtn(g, fonts.button, right[0], aby, abw, playH, t("lands.autoSelect"), {
+        hover: ahov,
+        quiet: !ahov,
+      });
+      g.fillStyle = css(Theme.cream, 0.55);
+      printf(
+        g,
+        fonts.small,
+        this.autoNote ?? t("lands.autoNote"),
+        right[0] + abw + Math.round(12 * s),
+        aby + Math.round((playH - fonts.small.height) / 2),
+        right[2] - abw - Math.round(12 * s),
+        "left",
+      );
+      this.landBtns.add({
+        id: "auto",
+        rect: [right[0], aby, abw, playH],
+        label: t("lands.autoSelect"),
+      });
 
       const [pw] = btnBox(
         fonts.button,

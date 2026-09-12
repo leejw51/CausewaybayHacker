@@ -885,6 +885,28 @@ The heart of the training loop.
 Only kinds with `cleared_since < 5` are returned by default; pass
 `"include_learned": true` for all of them.
 
+### 4.14c `stats.weakest`
+
+What to practise, when the player would rather be told than choose.
+
+```json
+→ payload: { "limit": 10 }                 default 10, max 50
+← payload: { "weakest": [ Weak, … ] }      §5.6b, weakest first
+```
+
+`Weak` carries `quest_id`, `land`, `category`, `node`, `title`, `failures`,
+`submits`, `failure_rate`, `hints_used`, `cleared` and `reason`.
+
+The ranking is SPEC §1.2's, and it is the server's on purpose: it is the same
+list `progress.json` holds, and two clients agreeing on which quest is hardest
+is worth more than either of them computing it. `reason` is `"stuck"` (failed
+submits, not cleared) or `"costly"` (cleared, but it took failures); every
+`stuck` entry precedes every `costly` one.
+
+**An empty list is the normal answer, not an error.** A player who has failed
+nothing has no weakest quest, and a client that treats `[]` as a fault will
+show a broken button to the only people who have earned it.
+
 ### 4.14b `stats.awards`
 
 The shelf, as opposed to the fanfare.

@@ -19,6 +19,7 @@ use tokio::sync::mpsc::unbounded_channel;
 
 use cwbhacker_core::attempts::Mode;
 use cwbhacker_core::error::{bad_request, rate_limited, Code, Error};
+use cwbhacker_core::snapshot;
 
 use crate::handlers::{self, Session};
 use crate::limits::{self, ConnectionLimits};
@@ -172,6 +173,19 @@ async fn connection(socket: WebSocket, state: Shared) {
 
     if let Some(address) = session.address.as_deref() {
         state.hub.leave(address, connection_id);
+        // The last chance to put this session's work in users/<address>/ (SPEC
+        // §1.2). Login and a clear are the other two, and neither covers the
+        // common shape of an evening: a run of failed submits on one quest and
+        // then the window closes. A snapshot per attempt would be a few hundred
+        // KB through the disk on every RUN; one per disconnect is one.
+        //
+        // Best-effort on purpose. The socket is already going away, and a
+        // player whose disk is full should still get a clean close rather than
+        // a panic in a teardown path nobody is reading.
+        let conn = state.store.conn();
+        if let Err(err) = snapshot::write(&conn, state.store.home(), address) {
+            tracing::warn!(%address, %err, "could not write progress.json on close");
+        }
     }
     send(
         &tx,
@@ -366,6 +380,7 @@ async fn dispatch(
         "edit.clear" => handlers::edit_clear(state, session, payload),
         "stats.summary" => handlers::stats_summary(state, session),
         "stats.mistakes" => handlers::stats_mistakes(state, session, payload),
+        "stats.weakest" => handlers::stats_weakest(state, session, payload),
         "stats.history" => handlers::stats_history(state, session, payload),
         "stats.awards" => handlers::stats_awards(state, session),
         "interview.start" => handlers::interview_start(state, session, payload),

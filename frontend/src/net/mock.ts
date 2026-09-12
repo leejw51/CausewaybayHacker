@@ -711,6 +711,10 @@ export function mockTransport(): TransportFactory {
 
         case "stats.mistakes":
           return ok(id, type, { mistakes: [] });
+        // An empty list is the normal answer for a player who has failed
+        // nothing (§4.14c) — which is every player of the mock.
+        case "stats.weakest":
+          return ok(id, type, { weakest: [] });
         case "stats.history":
           return ok(id, type, { attempts: [] });
         case "search.query":

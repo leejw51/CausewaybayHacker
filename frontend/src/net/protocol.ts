@@ -324,6 +324,25 @@ export interface MistakeStat {
   concepts: string[];
 }
 
+/**
+ * §5.6b. What to practise, ranked by the server so both clients agree.
+ * `reason` is "stuck" (failed submits, not cleared) or "costly" (cleared, but
+ * it took failures); every stuck entry precedes every costly one.
+ */
+export interface Weak {
+  quest_id: string;
+  land: Land;
+  category: Category;
+  node: number;
+  title: string;
+  failures: number;
+  submits: number;
+  failure_rate: number;
+  hints_used: number;
+  cleared: boolean;
+  reason: "stuck" | "costly";
+}
+
 /** §5.7 */
 export interface AttemptBrief {
   id: string;
@@ -478,6 +497,8 @@ export interface Requests {
   "playground.delete": { id: string };
   "stats.summary": Record<string, never>;
   "stats.mistakes": { limit?: number; include_learned?: boolean };
+  /** §4.14c */
+  "stats.weakest": { limit?: number };
   /** §4.14b. Documented in PROTOCOL but absent from this file until now. */
   "stats.awards": Record<string, never>;
   "stats.history": { quest_id?: string; limit?: number };
@@ -546,6 +567,9 @@ export interface Responses {
     by_land: Array<{ land: Land; cleared: number; total: number }>;
   };
   "stats.mistakes": { mistakes: MistakeStat[] };
+  /** §4.14c. An empty list is the normal answer for a player who has failed
+   *  nothing — never an error. */
+  "stats.weakest": { weakest: Weak[] };
   "stats.awards": { awards: Award[] };
   "stats.history": { attempts: AttemptBrief[] };
   "ai.plan": { drill: Drill };

@@ -194,7 +194,8 @@ function Lands:draw()
       self.error and Theme.red or Theme.withAlpha(Theme.cream, 0.7), "center", vw)
   end
 
-  self.app:footer(I18n.t("ARROWS choose   ENTER go   P playground"))
+  self.app:footer(self.auto_note
+    or I18n.t("ARROWS choose   ENTER go   W weakest   P playground"))
 end
 
 --- One card, drawn into whatever rectangle it is handed.
@@ -301,6 +302,32 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
   end
 end
 
+-- Go straight to the stage this player fails most (§4.14c).
+--
+-- An empty answer is the normal one for somebody who has failed nothing: it
+-- says so and stays put, rather than sending them somewhere arbitrary or
+-- reporting an error for having done well.
+function Lands:auto_select()
+  if self.auto_busy then return end
+  self.auto_busy = true
+  self.auto_note = I18n.t("looking for the stage beating you most…")
+  SFX.play("select")
+  self.app.session:request("stats.weakest", { limit = 1 }, function(ok, payload)
+    self.auto_busy = false
+    local pick = ok and payload.weakest and payload.weakest[1]
+    if not pick then
+      self.auto_note = I18n.t("nothing has beaten you yet — pick a land")
+      return
+    end
+    self.auto_note = nil
+    self.app:go("quest", {
+      quest_id = pick.quest_id,
+      land = pick.land,
+      category = pick.category,
+    })
+  end)
+end
+
 function Lands:keypressed(key)
   local n = math.max(1, self.lands and #self.lands or #LAND_ORDER)
   if key == "left" or key == "up" then
@@ -322,6 +349,10 @@ function Lands:keypressed(key)
   -- Mei's own desk, reachable without picking a land first: it belongs to
   -- nobody's curriculum (§4.9c).
   if key == "p" then self.app:go("playground"); return true end
+  -- W for the stage that is winning. The ranking is the server's (§4.14c), the
+  -- same one users/<address>/progress.json carries: a client that worked it
+  -- out itself would disagree with the file the player can read.
+  if key == "w" then self:auto_select(); return true end
   if key == "r" then self:refresh(); return true end
   return false
 end

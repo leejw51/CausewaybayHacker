@@ -120,9 +120,13 @@ failures out of four outranks four out of twenty. Ties break on `quest_id` so
 the order is total and the file does not churn between writes. RUN attempts are
 never counted — §4.9b — and a quest never failed is not weakness.
 
-Written on login and on a clear, not on every attempt: it is a whole-account
-snapshot, and a clear is the only event that moves an entry between the two
-groups.
+Written on login, on a clear, and when the socket closes — not on every
+attempt: it is a whole-account snapshot, and putting one through the disk per
+RUN would cost more than the file is worth. The close is what catches the
+common shape of an evening, which is a run of failed submits on one quest and
+then the window shutting; without it the file would lag until the next clear.
+The close write is best-effort, because a player whose disk is full should
+still get a clean close.
 
 ### 1.1 The LÖVE client's own store
 
