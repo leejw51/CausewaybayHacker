@@ -20,6 +20,16 @@
 # is byte-identical, and the quests that carry one run with `timeout_ms =
 # 10000`, measured well inside it on this machine.
 #
+# One exception, and it is the one thing here that is not yet mirrored: node 16,
+# `python.hacker.16.union-find`, was converted in this land to build its links
+# from the pack generator instead of reading them, so its stdin is now
+# `n m seed` — `8 5 1`, `1 2 7`, `12 9 99`, `200000 200000 12345` — with the
+# links drawn `a = next() % n`, `b = next() % n`, exactly as node 28's
+# `29.dijkstra` already draws its non-tree edges, and a self-link counted as
+# redundant. The other three lands have to make the same change with the same
+# four `m` values before the "same stdin, same expected output" promise above
+# holds again for that node. Everything else in this file is unmoved.
+#
 # Every program is one main.py, run as `python3 -I main.py`, stdlib only, and
 # nothing in it needs anything newer than Python 3.10.
 #
@@ -142,6 +152,14 @@ output: 3
 
 The window only ever moves right. If you find yourself rescanning from the
 start after a repeat, you have written the quadratic one.
+
+The four cases here are a dozen characters at most, and the clock is not
+measuring speed on them — the quadratic one clears them too. There is no big
+hidden case because there is no honest one to build: on text with a small
+alphabet the longest run is bounded by the alphabet, so rescanning costs a
+constant factor and not a quadratic one, and the input that would punish it
+is not text any more. Write the one-pass answer because it is the answer, not
+because these four cases force it.
 '''
 starter      = '''
 import sys
@@ -237,6 +255,12 @@ output: 1 6
 ```
 
 Touching counts as overlapping: `1 4` and `4 5` merge into `1 5`.
+
+The four cases here are three or four intervals each, and the clock is not
+measuring speed on them. Sorting and sweeping is `O(n log n)`; a version that
+rescans the merged list for every interval is `O(n²)` and clears these four
+just as easily. The bar is real on a real rota. It is not what these cases
+check.
 '''
 starter      = '''
 import sys
@@ -444,6 +468,13 @@ capacities from `max(weights)` to `sum(weights)`, on which "does it fit in
 `d` days" is false, false, false, then true forever. Binary search that.
 `bisect` cannot help here — there is no list to bisect, only a predicate —
 so this one is written by hand.
+
+The four cases here are ten weights at most, and the clock is not measuring
+speed on them: walking the capacities up one at a time from `max(weights)`
+clears every one, because every answer is under twenty. It would not clear a
+real docket, where the gap between `max` and `sum` is billions wide — and
+that is the input the question is really about. These cases check that you
+got the search right, not that you wrote one.
 '''
 starter      = '''
 import sys
@@ -550,6 +581,17 @@ Keep a stack of positions whose answer is still unknown, and it stays
 decreasing from the bottom up. Each position is pushed once and popped once,
 so the whole thing is one pass however it looks. A Python list is the stack:
 `append` and `pop` from the end are both `O(1)`.
+
+The five cases here are six numbers at most, and the clock is not measuring
+speed on them. Nor would a bigger one, and that is worth knowing: the naive
+answer — for each entry, walk right until something bigger turns up — is
+quadratic only on input that is already close to descending. On random input
+it stops after about `ln(n)` steps on average. Built from the generator this
+pack uses elsewhere, 200000 entries went through the naive version in **0.09
+seconds** on this machine against **0.05** for the stack, so no run limit
+separates them. The stack is still the answer, because it is `O(n)` on every
+input including the descending one — but on this quest that is a claim you
+have to take on the argument rather than on the clock.
 '''
 starter      = '''
 import sys
@@ -746,6 +788,11 @@ words first appeared in the input — which is not what the statement says
 and is not what the interviewer is listening for. Making the comparison
 **total** — count descending, then the word ascending — is what fixes it,
 and `sorted` with a tuple key is how you say it.
+
+The four cases here are a handful of words, and the clock is not measuring
+speed on them: counting by scanning the whole list once per distinct word is
+`O(n²)` and clears all four. On a year of tickets it would not. What these
+cases check is the tie-break, which is the part people actually get wrong.
 '''
 starter      = '''
 import sys
@@ -1239,6 +1286,12 @@ The heap holds one entry per list, not one per element, so it stays at size
 `k` however long the lists are. `heapq.merge` does exactly this and is the
 one-line answer in production; here, write the loop, because the loop is the
 question.
+
+The four cases here are a handful of numbers across two or three lists, and
+the clock is not measuring speed on them: pouring everything into one list
+and sorting it clears all four, and so does rescanning all `k` heads on every
+step. The heap is what keeps it `O(N log k)` when `k` is large, and that is a
+promise about input these cases do not contain.
 '''
 starter      = '''
 import heapq
@@ -1681,23 +1734,50 @@ concepts     = ["disjoint-set", "graphs", "complexity"]
 requires     = ["python.hacker.15.topo-sort"]
 map          = { x = 0.255, y = 0.468, kind = "quest" }
 brief        = '''
-Line one is `n m`: `n` stops numbered `0..n-1`, `m` undirected links. The next
-`m` lines are `<a> <b>`.
+Standard input is `n m seed`: `n` stops numbered `0..n-1`, `m` undirected
+links. There are no links in the input — you build them, with **exactly** this
+generator, in 64-bit arithmetic that wraps (mask it by hand — Python's ints
+will not):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the m links, in order:
+    a = next() % n
+    b = next() % n
+    link a — b
+```
 
 Print three lines: how many separate networks there are, the size of the
 largest, and `REDUNDANT <k>` — how many of the links joined two stops that
-were already connected.
+were already connected. A link from a stop to itself is one of those.
 
 ```
-input:  6 4
-        0 1
-        1 2
-        3 4
-        0 2
-output: 3
-        3
+input:  8 5 1
+output: 4
+        5
         REDUNDANT 1
 ```
+
+For `8 5 1` the five links are `6—1`, `4—6`, `2—3`, `2—6`, `1—2`. The last one
+joins two stops already in the same network, so it is the redundant one, and
+what is left is `{1,2,3,4,6}` plus stops `0`, `5` and `7` on their own.
+
+**The complexity here is enforced.** One hidden case is `n = 200000` with
+`m = 200000` links. The obvious answer that is not union-find — walk the
+network out from `a` and see whether `b` is already in it, once per link — is
+correct, and it is `O(n)` per link and so `O(n·m)` in total: on this machine
+it had not finished after **two minutes**, against a ten second run limit.
+That is what the starter is. Union-find with path compression and union by
+size does the same 200000 links in **0.24 seconds**, measured here with the
+solution that ships in this quest.
+
+Worth seeing clearly, because it is the most common way to fail a timed
+screen: **the starter is not wrong.** It prints exactly the right answer on
+the sample and on both of the small hidden cases. It is rejected only for
+arriving far too late.
 
 Union-find: every stop points at a parent, `find` walks to the root, `union`
 points one root at the other. Compress the path on the way back out of `find`
@@ -1710,28 +1790,66 @@ before the first `find` ever compresses it.
 '''
 starter      = '''
 import sys
+from collections import deque
 
-
-def find(parent, x):
-    # walk to the root, and flatten what you walked over
-    _ = parent
-    return x
+MASK = (1 << 64) - 1
 
 
 def main():
-    data = [int(t) for t in sys.stdin.read().split()]
-    n, m = data[0], data[1]
+    n, m, seed = (int(t) for t in sys.stdin.read().split())
 
-    parent = list(range(n))
-    size = [1] * n
+    x = seed
+    links = [[] for _ in range(n)]
     redundant = 0
 
-    for e in range(m):
-        a, b = data[2 + 2 * e], data[3 + 2 * e]
-        _ = (find(parent, a), find(parent, b), size)
+    for _ in range(m):
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        a = (x >> 33) % n
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        b = (x >> 33) % n
 
-    print(n)
-    print(1)
+        # correct, and far too slow: walk the whole network out from a to see
+        # whether b is already in it. This is what the big hidden case rejects.
+        seen = [False] * n
+        seen[a] = True
+        queue = deque([a])
+        found = a == b
+        while queue and not found:
+            at = queue.popleft()
+            for nxt in links[at]:
+                if not seen[nxt]:
+                    if nxt == b:
+                        found = True
+                        break
+                    seen[nxt] = True
+                    queue.append(nxt)
+        if found:
+            redundant += 1
+        links[a].append(b)
+        links[b].append(a)
+
+    groups = 0
+    largest = 0
+    seen = [False] * n
+    for start in range(n):
+        if seen[start]:
+            continue
+        groups += 1
+        seen[start] = True
+        queue = deque([start])
+        count = 0
+        while queue:
+            at = queue.popleft()
+            count += 1
+            for nxt in links[at]:
+                if not seen[nxt]:
+                    seen[nxt] = True
+                    queue.append(nxt)
+        if count > largest:
+            largest = count
+
+    print(groups)
+    print(largest)
     print(f"REDUNDANT {redundant}")
 
 
@@ -1739,6 +1857,8 @@ main()
 '''
 solution     = '''
 import sys
+
+MASK = (1 << 64) - 1
 
 
 def find(parent, x):
@@ -1752,17 +1872,22 @@ def find(parent, x):
 
 
 def main():
-    data = [int(t) for t in sys.stdin.read().split()]
-    n, m = data[0], data[1]
+    n, m, seed = (int(t) for t in sys.stdin.read().split())
 
+    x = seed
     parent = list(range(n))
     size = [1] * n
     groups = n
     redundant = 0
 
-    for e in range(m):
-        a = find(parent, data[2 + 2 * e])
-        b = find(parent, data[3 + 2 * e])
+    for _ in range(m):
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        a = (x >> 33) % n
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        b = (x >> 33) % n
+
+        a = find(parent, a)
+        b = find(parent, b)
         if a == b:
             redundant += 1
             continue
@@ -1783,23 +1908,24 @@ def main():
 main()
 '''
 hints = [
+  "Draw the two endpoints as you go — one generator step each, in that order — rather than building a list of links first. Nothing here needs the links twice.",
   "Start with every stop as its own parent and n groups; each successful union drops the count by one.",
-  "An edge whose two ends already have the same root is the redundant one — count it and move on.",
+  "A link whose two ends already have the same root is the redundant one — count it and move on. A self-link, a == b, falls out of that test on its own.",
   "Only a root's size entry is meaningful, so read the largest off the roots, not off every index. max(..., default=0) covers n = 0 without a special case.",
   "parent[x], x = root, parent[x] compresses in one line: the right-hand side is evaluated in full before either assignment happens, so the old parent[x] is read before it is overwritten.",
 ]
 
 [quest.tests]
 harness    = "stdio"
-timeout_ms = 5000
+timeout_ms = 10000
 compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "sample",    stdin = "6 4\n0 1\n1 2\n3 4\n0 2\n", expect = "3\n3\nREDUNDANT 1\n", visible = true },
-  { name = "islands",   stdin = "4 0\n",                     expect = "4\n1\nREDUNDANT 0\n", visible = false },
-  { name = "one-net",   stdin = "3 2\n0 1\n1 2\n",           expect = "1\n3\nREDUNDANT 0\n", visible = false },
-  { name = "all-dupes", stdin = "2 3\n0 1\n0 1\n1 0\n",      expect = "1\n2\nREDUNDANT 2\n", visible = false },
+  { name = "sample", stdin = "8 5 1\n",               expect = "4\n5\nREDUNDANT 1\n",              visible = true },
+  { name = "single", stdin = "1 2 7\n",               expect = "1\n1\nREDUNDANT 2\n",              visible = false },
+  { name = "dozen",  stdin = "12 9 99\n",             expect = "5\n5\nREDUNDANT 2\n",              visible = false },
+  { name = "big",    stdin = "200000 200000 12345\n", expect = "32158\n159720\nREDUNDANT 32158\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 17
@@ -2151,6 +2277,13 @@ That is the whole first line. `x & (x - 1)` clears the lowest set bit, which
 gives you the third and fourth lines for free. Python ints have no width, so
 there is no sign bit to worry about and `int.bit_count()` exists on 3.10 and
 later — but write the loop once, because the loop is what they ask for.
+
+The four cases here are five numbers at most, and the clock is not measuring
+speed on them: a `Counter` clears every one, and so would sorting. Nor would
+a bigger case change that, because the bar this question sets is **space** —
+one accumulator and nothing else — and no run limit can tell a constant-space
+answer from a dict. That one is on your honour, and on the interviewer, who
+will ask.
 '''
 starter      = '''
 import sys
@@ -2514,6 +2647,12 @@ fixed by shrinking it. What survives is prefix sums: a run `i..j` sums to `k`
 exactly when `prefix[j] - prefix[i] == k`, so count how many earlier prefixes
 equal `prefix[j] - k`. Seed the map with `0 → 1` for runs that start at the
 beginning.
+
+The four cases here are five numbers at most, and the clock is not measuring
+speed on them: the `O(n²)` double loop over every start and every end clears
+all four. The bar is real — on a day of takings that double loop is minutes —
+and it is not what these cases check. What they check is the part that is
+easy to get wrong: the `{0: 1}` seed, and looking up before recording.
 '''
 starter      = '''
 import sys
@@ -3976,6 +4115,11 @@ descending with `reverse=True`, or with a negated key, and let stability do
 the rest. **Or** make the comparison **total** — sort by `(-score, index)` so
 no two elements ever compare equal and stability stops being a question. The
 second is what to reach for by default; a total order has nothing to prove.
+
+The clock is not measuring speed here, and there is nothing for it to
+measure: `sorted` is `sorted` whichever of the two you write. These four
+cases are decided entirely by what happens to the ties. This one is about
+knowing what your sort promises, not about how fast it keeps the promise.
 '''
 starter      = '''
 import sys
