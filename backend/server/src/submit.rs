@@ -224,12 +224,12 @@ pub fn run(
     let human_stderr = if report.compiler_stderr.trim().is_empty() {
         report.runtime_stderr.clone()
     } else {
-        let rendered = if lang == "go" {
-            // `go build` already prints for a human; there is nothing to
-            // un-JSON.
-            report.compiler_stderr.clone()
-        } else {
+        let rendered = if lang == "rust" {
             mistakes::rendered_from_json(&report.compiler_stderr)
+        } else {
+            // Every other compiler already prints for a human; there is
+            // nothing to un-JSON.
+            report.compiler_stderr.clone()
         };
         if report.runtime_stderr.trim().is_empty() {
             rendered

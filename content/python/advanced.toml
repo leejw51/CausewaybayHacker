@@ -1,0 +1,2201 @@
+# PYTHON LAND — ADVANCED. The SOGO basement food hall at 12:30: twelve
+# stalls, one floor, one interpreter lock. Threads and joins, a Lock, a
+# Queue, a thread pool, asyncio, context managers, generator pipelines,
+# itertools, functools, Protocol, frozen dataclasses and __slots__, custom
+# exceptions, the iterator protocol, the collections module, and THE GIL.
+#
+# Every quest here has a deterministic answer on purpose: results are stored
+# by index and printed in index order, joined before they are read, or pinned
+# by a sentinel. A quest whose output depends on the scheduler is a quest that
+# fails CI at random, and that is not a lesson. Every starter fails for a
+# reason that does not depend on timing either.
+#
+# Every program is one main.py, run as `python3 -I main.py`, stdlib only, and
+# nothing in it needs anything newer than Python 3.10.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+
+pack = "python.advanced"
+land = "python"
+category = "advanced"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "python.advanced.01.threads"
+node        = 1
+title       = "TWELVE STALLS, ONE FLOOR"
+difficulty  = 3
+story       = "12:30 in the SOGO basement. Twelve stalls take orders at once, and the runner who collects the totals reads the board before any of them has written on it."
+concepts    = ["concurrency", "closures", "functions"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Start one `threading.Thread` per value that computes its square and stores
+it in `results[i]` — its own slot, so no two threads write the same place.
+`join` every thread, then print the results **in index order**, one per
+line, then `THREADS <n>`.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+A thread does not return anything. `Thread(target=f)` runs `f` and throws
+its return value away, which is why the result has to be written somewhere
+the main thread can read after `join`. The slot-per-thread list is the
+simplest such place: every index is written by exactly one thread, so there
+is nothing to lock.
+
+The starter's threads all crash the moment they start, and the program still
+finishes and prints. `target=square` with no `args=` calls `square()` with
+nothing, the `TypeError` lands in the thread and is printed to standard
+error, and `results` stays full of `None`. A thread that dies takes only
+itself with it — read stderr, or you will never know.
+'''
+starter     = '''
+import sys
+import threading
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+    results = [None] * len(nums)
+
+    def square(index, value):
+        results[index] = value * value
+
+    threads = []
+    for i, v in enumerate(nums):
+        thread = threading.Thread(target=square)
+        threads.append(thread)
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    for value in results:
+        print(value)
+    print(f"THREADS {len(nums)}")
+
+
+main()
+'''
+solution    = '''
+import sys
+import threading
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+    results = [None] * len(nums)
+
+    def square(index, value):
+        results[index] = value * value
+
+    threads = []
+    for i, v in enumerate(nums):
+        thread = threading.Thread(target=square, args=(i, v))
+        threads.append(thread)
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    for value in results:
+        print(value)
+    print(f"THREADS {len(nums)}")
+
+
+main()
+'''
+hints = [
+  "args=(i, v) on the Thread. The target is called as square(*args), and the starter passes none.",
+  "Start every thread, then join every thread. Starting and joining in the same loop iteration is correct and runs them one at a time.",
+  "results is a closure over main's local list; the nested function sees the same list, which is why the writes are visible after join.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n2 3 4\n",      expect = "4\n9\n16\nTHREADS 3\n",         visible = true },
+  { name = "single", stdin = "1\n-5\n",         expect = "25\nTHREADS 1\n",               visible = false },
+  { name = "wide",   stdin = "4\n0 1 10 100\n", expect = "0\n1\n100\n10000\nTHREADS 4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "python.advanced.02.lock"
+node        = 2
+title       = "ONE DRAWER, EIGHT HANDS"
+difficulty  = 3
+story       = "Every stall in the basement pays into the one cash drawer at the food hall office, and at close the drawer has nothing in it and every stall swears it paid."
+concepts    = ["shared-state", "concurrency", "thread-safety"]
+requires    = ["python.advanced.01.threads"]
+map          = { x = 0.275, y = 0.058, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Start one thread per value that adds it to **one shared total** and bumps a
+shared hit count. Join them all, then print `TOTAL <sum>` and `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+The starter prints `TOTAL 0`, deterministically, with a traceback on
+stderr from every worker. `total += value` inside the worker does not touch
+main's `total`: an `int` is immutable, `+=` on it
+rebinds the name, and a name assigned inside a function is **local** to that
+function unless it says `nonlocal`. Each worker made its own `total`, added
+to it, and dropped it.
+
+The fix is a container that the workers mutate in place — a one-element list
+or a small class — **and a `Lock`**. The second half is not optional. The
+GIL guarantees that one bytecode runs at a time; `drawer[0] += value` is
+three bytecodes (load, add, store), and a thread switch between the load and
+the store loses an update. It will not happen in four threads adding four
+numbers. It will happen at 2 a.m. with forty.
+
+`with lock:` takes it and releases it on the way out, including the way out
+through an exception.
+'''
+starter     = '''
+import sys
+import threading
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+
+    total = 0
+    hits = 0
+
+    def pay(value):
+        total += value
+        hits += 1
+
+    threads = [threading.Thread(target=pay, args=(v,)) for v in nums]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    print(f"TOTAL {total}")
+    print(f"HITS {hits}")
+
+
+main()
+'''
+solution    = '''
+import sys
+import threading
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+
+    # one shared drawer, mutated in place, and one lock around every touch
+    drawer = {"total": 0, "hits": 0}
+    lock = threading.Lock()
+
+    def pay(value):
+        with lock:
+            drawer["total"] += value
+            drawer["hits"] += 1
+
+    threads = [threading.Thread(target=pay, args=(v,)) for v in nums]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    print(f"TOTAL {drawer['total']}")
+    print(f"HITS {drawer['hits']}")
+
+
+main()
+'''
+hints = [
+  "Run the starter: it dies with UnboundLocalError, because `total += value` makes total a local of pay and reads it before it exists. That error is the whole diagnosis.",
+  "A dict or a list is mutated in place, so `drawer[\"total\"] += value` changes the one object every thread shares. `nonlocal total` would also work and is the other honest answer.",
+  "threading.Lock() once in main, `with lock:` around the read-modify-write. The GIL is not a lock on your data; it is a lock on the interpreter.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",   stdin = "4\n1 2 3 4\n",                 expect = "TOTAL 10\nHITS 4\n",      visible = true },
+  { name = "single", stdin = "1\n-5\n",                      expect = "TOTAL -5\nHITS 1\n",      visible = false },
+  { name = "big",    stdin = "3\n1000000 1000000 1000000\n", expect = "TOTAL 3000000\nHITS 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "python.advanced.03.queue"
+node        = 3
+title       = "WHO CLOSES THE HATCH"
+difficulty  = 3
+story       = "The roast goose counter passes every order through the hatch to the kitchen, and after the last one the kitchen stands there waiting for a next that never comes."
+concepts    = ["channels", "concurrency", "iteration"]
+requires    = ["python.advanced.02.lock"]
+map          = { x = 0.389, y = 0.132, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+One producer thread puts each value multiplied by ten on a `queue.Queue`,
+then puts a **sentinel**. The main thread takes from the queue until it sees
+the sentinel, printing each value and keeping a total, then prints
+`SUM <total>` and `CLOSED`.
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+A `queue.Queue` has no `close`. Nothing on it can tell the consumer that
+there will be no more; that has to be an item, and `None` is the usual one.
+The starter never sends it, so `get()` blocks forever with nothing left to
+wait for and the runner kills the program at the time limit. There is no
+deadlock detector in Python. The program just stops answering, and that is
+what "hang" looks like from the outside.
+
+The producer sends the sentinel. Never the consumer — the side that knows
+the stream is over is the side that ends it.
+'''
+starter     = '''
+import queue
+import sys
+import threading
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+
+    hatch = queue.Queue()
+
+    def kitchen():
+        for value in nums:
+            hatch.put(value * 10)
+        # the hatch is still open
+
+    producer = threading.Thread(target=kitchen)
+    producer.start()
+
+    total = 0
+    while True:
+        value = hatch.get()
+        if value is None:
+            break
+        print(value)
+        total += value
+    producer.join()
+
+    print(f"SUM {total}")
+    print("CLOSED")
+
+
+main()
+'''
+solution    = '''
+import queue
+import sys
+import threading
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+
+    hatch = queue.Queue()
+
+    def kitchen():
+        for value in nums:
+            hatch.put(value * 10)
+        hatch.put(None)
+
+    producer = threading.Thread(target=kitchen)
+    producer.start()
+
+    total = 0
+    while True:
+        value = hatch.get()
+        if value is None:
+            break
+        print(value)
+        total += value
+    producer.join()
+
+    print(f"SUM {total}")
+    print("CLOSED")
+
+
+main()
+'''
+hints = [
+  "One line, at the end of kitchen: hatch.put(None).",
+  "The consumer already checks `is None`. It was waiting for something the producer never sent.",
+  "If the values could legitimately be None, the sentinel is a private object: SENTINEL = object(), compared with `is`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n1 2 3\n",     expect = "10\n20\n30\nSUM 60\nCLOSED\n",       visible = true },
+  { name = "zero",   stdin = "1\n0\n",         expect = "0\nSUM 0\nCLOSED\n",                 visible = false },
+  { name = "signed", stdin = "4\n-1 -2 3 4\n", expect = "-10\n-20\n30\n40\nSUM 40\nCLOSED\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "python.advanced.04.thread-pool"
+node        = 4
+title       = "EIGHT PORTERS"
+difficulty  = 4
+story       = "Forty crates on the SOGO loading dock and eight porters. Nobody wants forty porters; they want the eight never standing still."
+concepts    = ["concurrency", "collections", "closures"]
+requires    = ["python.advanced.03.queue"]
+map          = { x = 0.602, y = 0.065, kind = "quest" }
+brief       = '''
+Standard input is two integers `w` and `n`, then `n` values.
+
+Open a `ThreadPoolExecutor` with `w` workers, `submit` one job per value
+that returns `(index, value * value)`, and collect the results with
+`as_completed`. Sort by index, print `<index> <value>` one per line, then
+`WORKERS <w>`.
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+`submit` returns a `Future`, not a result. `as_completed` hands the futures
+back in the order they **finish**, which is whatever order the pool felt
+like, and `future.result()` is what gets the value out — or re-raises the
+exception the job died with, which is the other reason to call it.
+
+The starter prints the futures. Carrying the index in the result is what
+makes the output the same every run; sorting on it is the last line of the
+answer, not the first.
+'''
+starter     = '''
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+def square(index, value):
+    return index, value * value
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    workers, n = data[0], data[1]
+    nums = data[2:2 + n]
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(square, i, v) for i, v in enumerate(nums)]
+        results = [future for future in as_completed(futures)]
+
+    for index, value in sorted(results):
+        print(f"{index} {value}")
+    print(f"WORKERS {workers}")
+
+
+main()
+'''
+solution    = '''
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+def square(index, value):
+    return index, value * value
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    workers, n = data[0], data[1]
+    nums = data[2:2 + n]
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(square, i, v) for i, v in enumerate(nums)]
+        results = [future.result() for future in as_completed(futures)]
+
+    for index, value in sorted(results):
+        print(f"{index} {value}")
+    print(f"WORKERS {workers}")
+
+
+main()
+'''
+hints = [
+  "The starter dies unpacking a Future: `for index, value in sorted(results)` cannot unpack an object that is not a tuple. The tuple is inside future.result().",
+  "as_completed yields as jobs finish; the index in the result is the only record of where each one came from.",
+  "with ThreadPoolExecutor(...) as pool: waits for every submitted job on the way out, so nothing is left running when you print. pool.map would also work here and keeps the order for you, at the cost of not learning as_completed.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-workers",  stdin = "2 3\n2 3 4\n",     expect = "0 4\n1 9\n2 16\nWORKERS 2\n",              visible = true },
+  { name = "one-each",     stdin = "1 1\n-5\n",        expect = "0 25\nWORKERS 1\n",                        visible = false },
+  { name = "more-workers", stdin = "3 5\n1 2 3 4 5\n", expect = "0 1\n1 4\n2 9\n3 16\n4 25\nWORKERS 3\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "python.advanced.05.asyncio"
+node        = 5
+title       = "WHERE DOES ASYNC ACTUALLY RUN"
+difficulty  = 4
+story       = "Mei has written `async def` for four years and has never once seen the thing that drives it. The order board in the basement has one loop and every stall takes turns on it."
+concepts    = ["async", "concurrency", "functions"]
+requires    = ["python.advanced.04.thread-pool"]
+map          = { x = 0.716, y = 0.137, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Write `async def double(value)` that yields to the event loop once —
+`await asyncio.sleep(0)` — and returns the value doubled. Run all `n` of
+them with `asyncio.gather`, print each result in input order, then
+`SUM <total>` and `TASKS <n>`.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+Calling an `async def` does not run it. It builds a **coroutine object**
+and hands it back, and nothing inside happens until something awaits it.
+The starter's list is three coroutines, unawaited, and Python says so on
+stderr — `RuntimeWarning: coroutine 'double' was never awaited` — while the
+output is three lines of `<coroutine object double at 0x...>`.
+
+`gather` takes the coroutines, schedules them all on the one loop, and
+returns their results **in the order you passed them**, whatever order they
+finished in. That is the whole reason to reach for it over a hand-written
+loop of `await`s: the loop would be correct and sequential, and `gather` is
+correct and interleaved.
+
+There is exactly one thread here. `await` is the point at which a coroutine
+hands the thread back to the loop so another can use it. Nothing runs in
+parallel; things run **in turn**, at the places they said they could stop.
+'''
+starter     = '''
+import asyncio
+import sys
+
+
+async def double(value):
+    await asyncio.sleep(0)
+    return value * 2
+
+
+async def run(nums):
+    results = [double(v) for v in nums]
+    return results
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+
+    results = asyncio.run(run(nums))
+    for value in results:
+        print(value)
+    print(f"SUM {sum(results)}")
+    print(f"TASKS {len(nums)}")
+
+
+main()
+'''
+solution    = '''
+import asyncio
+import sys
+
+
+async def double(value):
+    await asyncio.sleep(0)
+    return value * 2
+
+
+async def run(nums):
+    results = await asyncio.gather(*(double(v) for v in nums))
+    return list(results)
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+
+    results = asyncio.run(run(nums))
+    for value in results:
+        print(value)
+    print(f"SUM {sum(results)}")
+    print(f"TASKS {len(nums)}")
+
+
+main()
+'''
+hints = [
+  "await asyncio.gather(*coroutines) — the star spreads the list into arguments, and the await is what runs them.",
+  "asyncio.run(...) is the executor: it makes the loop, runs one coroutine to completion, and closes the loop. There is one of these per program, at the top.",
+  "gather returns results in argument order. If you needed them as they finish, that is asyncio.as_completed, and then you carry the index yourself, exactly like the thread pool.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n",   expect = "2\n4\n6\nSUM 12\nTASKS 3\n",      visible = true },
+  { name = "one",   stdin = "1\n5\n",       expect = "10\nSUM 10\nTASKS 1\n",           visible = false },
+  { name = "mixed", stdin = "2\n0 -3\n",    expect = "0\n-6\nSUM -6\nTASKS 2\n",        visible = false },
+  { name = "four",  stdin = "4\n1 1 1 1\n", expect = "2\n2\n2\n2\nSUM 8\nTASKS 4\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "python.advanced.06.async-queue"
+node        = 6
+title       = "WHO SAYS IT IS DONE"
+difficulty  = 4
+story       = "Three runners clear the order queue in the basement and the floor manager waits for the queue to say it is empty. It never says so, because nobody told it a ticket was finished."
+concepts    = ["async", "channels", "concurrency", "deadlock"]
+requires    = ["python.advanced.05.asyncio"]
+map          = { x = 0.962, y = 0.054, kind = "quest" }
+brief       = '''
+Standard input is two integers `w` and `n`, then `n` values.
+
+Put `(index, value)` pairs on an `asyncio.Queue`. Start `w` consumer tasks
+that loop forever taking a pair, writing `value * 10` into `results[index]`,
+and calling `task_done()`. The main coroutine awaits `queue.join()`, then
+cancels the consumers, then prints the results in index order and
+`CONSUMERS <w>`.
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+`queue.join()` returns when every item that was ever `put` has had a
+matching `task_done()`. The starter's consumers never call it, so `join`
+waits forever, the loop has nothing else runnable, and the program hangs
+until the runner kills it. Same hang as the thread quest, different
+spelling — and the fix is again one line, on the consumer side.
+
+The consumers are `while True` loops. They end because main cancels them
+after the join, and cancelling a task that is parked on `queue.get()` is the
+normal, intended way to stop one. Await the cancelled tasks with
+`gather(..., return_exceptions=True)` so the cancellation is collected
+rather than reported.
+'''
+starter     = '''
+import asyncio
+import sys
+
+
+async def consumer(queue, results):
+    while True:
+        index, value = await queue.get()
+        results[index] = value * 10
+
+
+async def run(workers, nums):
+    queue = asyncio.Queue()
+    results = [None] * len(nums)
+    for i, v in enumerate(nums):
+        queue.put_nowait((i, v))
+
+    tasks = [asyncio.create_task(consumer(queue, results)) for _ in range(workers)]
+    await queue.join()
+
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    return results
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    workers, n = data[0], data[1]
+    nums = data[2:2 + n]
+
+    for value in asyncio.run(run(workers, nums)):
+        print(value)
+    print(f"CONSUMERS {workers}")
+
+
+main()
+'''
+solution    = '''
+import asyncio
+import sys
+
+
+async def consumer(queue, results):
+    while True:
+        index, value = await queue.get()
+        results[index] = value * 10
+        queue.task_done()
+
+
+async def run(workers, nums):
+    queue = asyncio.Queue()
+    results = [None] * len(nums)
+    for i, v in enumerate(nums):
+        queue.put_nowait((i, v))
+
+    tasks = [asyncio.create_task(consumer(queue, results)) for _ in range(workers)]
+    await queue.join()
+
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    return results
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    workers, n = data[0], data[1]
+    nums = data[2:2 + n]
+
+    for value in asyncio.run(run(workers, nums)):
+        print(value)
+    print(f"CONSUMERS {workers}")
+
+
+main()
+'''
+hints = [
+  "queue.task_done() after each item is handled. join counts puts against task_dones and nothing else.",
+  "create_task schedules the consumer without awaiting it; the loop runs it the next time main awaits something, which is the join.",
+  "A task cancelled while awaiting get() raises CancelledError inside it, which ends the while True. return_exceptions=True keeps gather from re-raising that at you.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-workers", stdin = "3 4\n1 2 3 4\n", expect = "10\n20\n30\n40\nCONSUMERS 3\n", visible = true },
+  { name = "one-worker",    stdin = "1 2\n-1 5\n",    expect = "-10\n50\nCONSUMERS 1\n",        visible = false },
+  { name = "more-workers",  stdin = "4 1\n7\n",       expect = "70\nCONSUMERS 4\n",             visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "python.advanced.07.context-managers"
+node        = 7
+title       = "THE SHUTTER COMES DOWN ANYWAY"
+difficulty  = 4
+story       = "A stall in the basement opens its shutter for every order and closes it after. The one that got a bad order at 12:40 has been open since, because the closing code was after the line that failed."
+concepts    = ["error-handling", "generators", "functions"]
+requires    = ["python.advanced.06.async-queue"]
+map          = { x = 0.898, y = 0.526, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<STALL> <CENTS>`, where
+`CENTS` is supposed to be an integer.
+
+Write a context manager `opened(stall)` with `contextlib.contextmanager`
+that prints `OPEN <STALL>` on the way in and `SHUT <STALL>` on the way out
+— **whether or not the body raised**. Inside it, parse the cents and add
+them to a total. A line whose cents do not parse is reported as
+`BAD <STALL>` after the shutter has closed. Finally print `TOTAL <sum>` and
+`REJECTED <k>`.
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+`@contextmanager` turns a generator into a context manager: everything
+before the `yield` is `__enter__`, everything after it is `__exit__`. When
+the body raises, the exception is thrown **into the generator at the
+`yield`**, so the code after it only runs if the `yield` is inside a
+`try`/`finally`. The starter has no `finally`, and `WONG`'s shutter never
+closes.
+
+The class spelling — `__enter__` and `__exit__(self, exc_type, exc, tb)` —
+does the same job in more lines and can swallow the exception by returning
+`True`. Do not swallow it here: the caller wants to print `BAD`.
+'''
+starter     = '''
+from contextlib import contextmanager
+
+
+@contextmanager
+def opened(stall):
+    print(f"OPEN {stall}")
+    yield
+    print(f"SHUT {stall}")
+
+
+def main():
+    n = int(input())
+    total = 0
+    rejected = 0
+    for _ in range(n):
+        stall, cents = input().split()
+        try:
+            with opened(stall):
+                total += int(cents)
+        except ValueError:
+            rejected += 1
+            print(f"BAD {stall}")
+    print(f"TOTAL {total}")
+    print(f"REJECTED {rejected}")
+
+
+main()
+'''
+solution    = '''
+from contextlib import contextmanager
+
+
+@contextmanager
+def opened(stall):
+    print(f"OPEN {stall}")
+    try:
+        yield
+    finally:
+        # runs on the normal exit and on the exception thrown in at the yield
+        print(f"SHUT {stall}")
+
+
+def main():
+    n = int(input())
+    total = 0
+    rejected = 0
+    for _ in range(n):
+        stall, cents = input().split()
+        try:
+            with opened(stall):
+                total += int(cents)
+        except ValueError:
+            rejected += 1
+            print(f"BAD {stall}")
+    print(f"TOTAL {total}")
+    print(f"REJECTED {rejected}")
+
+
+main()
+'''
+hints = [
+  "try: yield / finally: print(SHUT). The finally is the __exit__ that runs on every path.",
+  "The exception passes through the generator and out of the with statement, so main's except still sees it — that is why BAD prints after SHUT.",
+  "with opened(stall) as x: would bind whatever the generator yields. It yields nothing here, and that is fine.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",   stdin = "3\nLAM 1200\nWONG xx\nCHAN 800\n", expect = "OPEN LAM\nSHUT LAM\nOPEN WONG\nSHUT WONG\nBAD WONG\nOPEN CHAN\nSHUT CHAN\nTOTAL 2000\nREJECTED 1\n", visible = true },
+  { name = "clean",   stdin = "1\nLAM 5\n",                       expect = "OPEN LAM\nSHUT LAM\nTOTAL 5\nREJECTED 0\n",                                                 visible = false },
+  { name = "all-bad", stdin = "2\nA x\nB y\n",                    expect = "OPEN A\nSHUT A\nBAD A\nOPEN B\nSHUT B\nBAD B\nTOTAL 0\nREJECTED 2\n",                       visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "python.advanced.08.pipeline"
+node        = 8
+title       = "THE LINE COOK"
+difficulty  = 4
+story       = "Chef Bo's line in the basement kitchen: one station squares the order, the next keeps the running count, and nobody waits for the whole batch."
+concepts    = ["generators", "iteration", "closures"]
+requires    = ["python.advanced.07.context-managers"]
+map          = { x = 0.785, y = 0.463, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Build a two-stage pipeline of **generators**:
+
+1. `squares(values)` yields each value squared
+2. `running(stream)` takes any iterable of numbers, keeps a running total,
+   and yields `(value, total)` pairs
+
+`main` prints each pair as `<square> <total>`, then `PIPE <n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+Neither stage builds a list. Each `yield` hands one item to the next stage
+and pauses; `main` pulls, `running` pulls from `squares`, `squares` pulls
+from the input. Nothing is computed before it is wanted, and the whole
+pipeline holds one item in flight. That is what makes the same three
+functions work on a file of a hundred million lines.
+
+The starter's second stage has `return` where it should have `yield`, so
+it is a plain function that returns the final total — an `int` — and `main`
+tries to iterate over it.
+'''
+starter     = '''
+import sys
+
+
+def squares(values):
+    for value in values:
+        yield value * value
+
+
+def running(stream):
+    total = 0
+    for value in stream:
+        total += value
+    return total
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+
+    count = 0
+    for square, total in running(squares(nums)):
+        print(f"{square} {total}")
+        count += 1
+    print(f"PIPE {count}")
+
+
+main()
+'''
+solution    = '''
+import sys
+
+
+def squares(values):
+    for value in values:
+        yield value * value
+
+
+def running(stream):
+    total = 0
+    for value in stream:
+        total += value
+        yield value, total
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+
+    count = 0
+    for square, total in running(squares(nums)):
+        print(f"{square} {total}")
+        count += 1
+    print(f"PIPE {count}")
+
+
+main()
+'''
+hints = [
+  "The error is TypeError: cannot unpack non-iterable int object — running returned a number instead of yielding pairs.",
+  "yield value, total inside the loop. A function with a yield anywhere in it is a generator, and its return value is not what the caller sees.",
+  "running(squares(nums)) composes because a generator is an iterable; running never knows or cares that its input is another generator.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n1 2 3\n",   expect = "1 1\n4 5\n9 14\nPIPE 3\n",       visible = true },
+  { name = "single", stdin = "1\n-3\n",      expect = "9 9\nPIPE 1\n",                  visible = false },
+  { name = "repeat", stdin = "4\n0 2 2 2\n", expect = "0 0\n4 4\n4 8\n4 12\nPIPE 4\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "python.advanced.09.itertools"
+node        = 9
+title       = "THE TOOLBOX ON THE SHELF"
+difficulty  = 3
+story       = "The basement office has a shelf of tools nobody opens, and the clerk counts runs of identical tickets by hand every afternoon."
+concepts    = ["generators", "iteration", "collections", "imports"]
+requires    = ["python.advanced.08.pipeline"]
+map          = { x = 0.557, y = 0.538, kind = "quest" }
+brief       = '''
+Standard input is one line of integers.
+
+Print three lines, each built with `itertools` and nothing hand-rolled:
+
+1. `SUMS` followed by the running sums — `accumulate`
+2. `RUNS` followed by each run of **adjacent** equal values as `<v>x<k>` —
+   `groupby`
+3. `PAIRS <k>`: how many unordered pairs of **distinct** values there are —
+   `combinations` over the sorted distinct values
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+`groupby` groups **adjacent** equal items only. It is not `Counter`, and
+the sample is chosen so the two disagree: `1` appears four times, in two
+runs. The starter uses a dict of counts for the second line and is wrong on
+exactly that input.
+
+Every one of these returns a lazy iterator. `groupby`'s groups in particular
+are only valid until you advance to the next group, so read each one before
+moving on — `len(list(group))` inside the loop, not a list of groups saved
+for later.
+'''
+starter     = '''
+import sys
+from itertools import accumulate, combinations, groupby
+
+
+def main():
+    nums = [int(t) for t in sys.stdin.read().split()]
+
+    print("SUMS " + " ".join(str(v) for v in nums))
+
+    counts = {}
+    for value in nums:
+        counts[value] = counts.get(value, 0) + 1
+    print("RUNS " + " ".join(f"{v}x{k}" for v, k in counts.items()))
+
+    print("PAIRS 0")
+    _ = (accumulate, combinations, groupby)
+
+
+main()
+'''
+solution    = '''
+import sys
+from itertools import accumulate, combinations, groupby
+
+
+def main():
+    nums = [int(t) for t in sys.stdin.read().split()]
+
+    print("SUMS " + " ".join(str(v) for v in accumulate(nums)))
+
+    runs = [f"{value}x{len(list(group))}" for value, group in groupby(nums)]
+    print("RUNS " + " ".join(runs))
+
+    distinct = sorted(set(nums))
+    print(f"PAIRS {sum(1 for _ in combinations(distinct, 2))}")
+
+
+main()
+'''
+hints = [
+  "accumulate(nums) yields the running total after each element; the last one is the sum.",
+  "for value, group in groupby(nums): the group is an iterator over that run, consumed once. len(list(group)) is its length.",
+  "combinations(distinct, 2) yields each unordered pair once. Counting them is n*(n-1)/2, and checking that by hand is how you know you have the right n.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "1 1 2 1 1 3\n", expect = "SUMS 1 2 4 5 6 9\nRUNS 1x2 2x1 1x2 3x1\nPAIRS 3\n", visible = true },
+  { name = "flat",   stdin = "7 7 7\n",       expect = "SUMS 7 14 21\nRUNS 7x3\nPAIRS 0\n",                  visible = false },
+  { name = "rising", stdin = "1 2 3 4\n",     expect = "SUMS 1 3 6 10\nRUNS 1x1 2x1 3x1 4x1\nPAIRS 6\n",    visible = false },
+  { name = "one",    stdin = "-5\n",          expect = "SUMS -5\nRUNS -5x1\nPAIRS 0\n",                     visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "python.advanced.10.functools"
+node        = 10
+title       = "REMEMBER WHAT YOU WORKED OUT"
+difficulty  = 4
+story       = "The tofu stall works out the same day's price from the same two numbers eleven thousand times before lunch, from scratch, every time."
+concepts    = ["decorators", "recursion", "functions", "closures"]
+requires    = ["python.advanced.09.itertools"]
+map          = { x = 0.447, y = 0.480, kind = "quest" }
+brief       = '''
+Standard input is `n k bits`: two integers and a string of binary digits.
+
+Print four lines:
+
+1. `FIB <fib(n)>` — from a **recursive** `fib`, memoised with
+   `functools.lru_cache`
+2. `PRODUCT <k!>` — `functools.reduce` with `operator.mul` over `1..k`,
+   with an initial value so `k = 0` gives `1`
+3. `BIN <value>` — `bits` parsed by a `functools.partial` of `int` with
+   `base=2`
+4. `MISSES <m>` — `fib.cache_info().misses`, how many times the recursion
+   actually ran the body
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` is at most `400`, so the recursion stays inside Python's frame limit.
+Without the cache, `fib(35)` is about thirty million calls and `fib(90)`
+does not finish. With it, every `fib(i)` runs once and `MISSES` is `n + 1`.
+`lru_cache` is a decorator, and it works because the arguments are hashable
+— a list argument would raise `TypeError` at the first call.
+
+`partial` freezes some arguments of a function and gives you a new one;
+`reduce` folds a two-argument function across a sequence. Neither is
+clever. Both are asked about.
+'''
+starter     = '''
+import functools
+import operator
+
+
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+
+def main():
+    n, k, bits = input().split()
+    n, k = int(n), int(k)
+
+    print(f"FIB {fib(n)}")
+
+    product = 1
+    for i in range(1, k + 1):
+        product *= i
+    print(f"PRODUCT {product}")
+
+    print(f"BIN {int(bits, 2)}")
+    print(f"MISSES {fib.cache_info().misses}")
+    _ = (functools, operator)
+
+
+main()
+'''
+solution    = '''
+import functools
+import operator
+
+
+@functools.lru_cache(maxsize=None)
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+
+def main():
+    n, k, bits = input().split()
+    n, k = int(n), int(k)
+
+    print(f"FIB {fib(n)}")
+
+    product = functools.reduce(operator.mul, range(1, k + 1), 1)
+    print(f"PRODUCT {product}")
+
+    from_binary = functools.partial(int, base=2)
+    print(f"BIN {from_binary(bits)}")
+
+    print(f"MISSES {fib.cache_info().misses}")
+
+
+main()
+'''
+hints = [
+  "@functools.lru_cache(maxsize=None) above def fib. The starter dies on the last line because a plain function has no cache_info.",
+  "functools.reduce(operator.mul, range(1, k + 1), 1) — the third argument is the starting value, and it is what makes the empty range give 1.",
+  "functools.partial(int, base=2) is a callable that takes the string and supplies base=2 itself. functools.cache is the same as lru_cache(maxsize=None) on 3.9 and later; either name is fine.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5 1010\n",    expect = "FIB 55\nPRODUCT 120\nBIN 10\nMISSES 11\n",                     visible = true },
+  { name = "zero",   stdin = "0 0 0\n",        expect = "FIB 0\nPRODUCT 1\nBIN 0\nMISSES 1\n",                          visible = false },
+  { name = "ninety", stdin = "90 20 11111111\n", expect = "FIB 2880067194370816120\nPRODUCT 2432902008176640000\nBIN 255\nMISSES 91\n", visible = false },
+  { name = "deep",   stdin = "400 1 1\n",      expect = "FIB 176023680645013966468226945392411250770384383304492191886725992896575345044216019675\nPRODUCT 1\nBIN 1\nMISSES 401\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "python.advanced.11.protocol"
+node        = 11
+title       = "IT ONLY HAS TO RENDER"
+difficulty  = 4
+story       = "The SOGO basement directory lists stalls and counters, printed by two different programs, and the board only wants to know that each of them can draw itself."
+concepts    = ["duck-typing", "dispatch", "structs"]
+requires    = ["python.advanced.10.functools"]
+map          = { x = 0.222, y = 0.514, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines, each either
+
+* `STALL <NAME> <AISLE>` — renders as `<NAME> / A<AISLE>`
+* `COUNTER <NUMBER>` — renders as `COUNTER <NUMBER>`
+
+Declare a `typing.Protocol` called `Sign` with one method, `render()`.
+Write `Stall` and `Counter` as plain classes — **no inheritance from
+`Sign`** — and a single function `show(sign: Sign)` that prints the
+rendering. Print every sign, then `SIGNS <n>` counted with
+`isinstance(x, Sign)`, then `STALLS <k>` counted with `isinstance(x, Stall)`.
+
+```
+input:  3
+        STALL LAM 4
+        COUNTER 2
+        STALL WONG 1
+output: LAM / A4
+        COUNTER 2
+        WONG / A1
+        SIGNS 3
+        STALLS 2
+```
+
+A `Protocol` is a **structural** type: a class satisfies it by having the
+methods, not by saying so. That is duck typing with a name the type checker
+can read. At run time a protocol does nothing at all unless it is marked
+`@runtime_checkable`, and then `isinstance` checks for the method by name.
+The starter's `Sign` is missing that decorator, and its `isinstance` raises:
+
+```
+TypeError: Instance and class checks can only be used with @runtime_checkable protocols
+```
+
+`show` dispatches at run time by attribute lookup — `sign.render()` finds
+whichever `render` the object has. There is no static dispatch to choose
+instead; Python has one mechanism and this is it.
+'''
+starter     = '''
+from typing import Protocol
+
+
+class Sign(Protocol):
+    def render(self) -> str:
+        ...
+
+
+class Stall:
+    def __init__(self, name, aisle):
+        self.name = name
+        self.aisle = aisle
+
+    def render(self):
+        return f"{self.name} / A{self.aisle}"
+
+
+class Counter:
+    def __init__(self, number):
+        self.number = number
+
+    def render(self):
+        return f"COUNTER {self.number}"
+
+
+def show(sign: Sign):
+    print(sign.render())
+
+
+def main():
+    n = int(input())
+    signs = []
+    for _ in range(n):
+        parts = input().split()
+        if parts[0] == "STALL":
+            signs.append(Stall(parts[1], int(parts[2])))
+        else:
+            signs.append(Counter(int(parts[1])))
+
+    for sign in signs:
+        show(sign)
+    print(f"SIGNS {sum(1 for s in signs if isinstance(s, Sign))}")
+    print(f"STALLS {sum(1 for s in signs if isinstance(s, Stall))}")
+
+
+main()
+'''
+solution    = '''
+from typing import Protocol, runtime_checkable
+
+
+@runtime_checkable
+class Sign(Protocol):
+    def render(self) -> str:
+        ...
+
+
+class Stall:
+    def __init__(self, name, aisle):
+        self.name = name
+        self.aisle = aisle
+
+    def render(self):
+        return f"{self.name} / A{self.aisle}"
+
+
+class Counter:
+    def __init__(self, number):
+        self.number = number
+
+    def render(self):
+        return f"COUNTER {self.number}"
+
+
+def show(sign: Sign):
+    # one function, any type with a render(): the lookup happens now, by name
+    print(sign.render())
+
+
+def main():
+    n = int(input())
+    signs = []
+    for _ in range(n):
+        parts = input().split()
+        if parts[0] == "STALL":
+            signs.append(Stall(parts[1], int(parts[2])))
+        else:
+            signs.append(Counter(int(parts[1])))
+
+    for sign in signs:
+        show(sign)
+    print(f"SIGNS {sum(1 for s in signs if isinstance(s, Sign))}")
+    print(f"STALLS {sum(1 for s in signs if isinstance(s, Stall))}")
+
+
+main()
+'''
+hints = [
+  "@runtime_checkable above class Sign(Protocol), imported from typing. That is the whole fix.",
+  "Neither Stall nor Counter mentions Sign anywhere. They satisfy it by having render(); that is what structural means.",
+  "isinstance against a runtime-checkable protocol only checks that the method exists, not its signature or its return type. The type checker checks those; the interpreter never does.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",    stdin = "3\nSTALL LAM 4\nCOUNTER 2\nSTALL WONG 1\n", expect = "LAM / A4\nCOUNTER 2\nWONG / A1\nSIGNS 3\nSTALLS 2\n", visible = true },
+  { name = "counter",  stdin = "1\nCOUNTER 116\n",                          expect = "COUNTER 116\nSIGNS 1\nSTALLS 0\n",                   visible = false },
+  { name = "stalls",   stdin = "2\nSTALL A 0\nSTALL B 9\n",                 expect = "A / A0\nB / A9\nSIGNS 2\nSTALLS 2\n",                visible = false },
+  { name = "none",     stdin = "0\n",                                       expect = "SIGNS 0\nSTALLS 0\n",                                visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "python.advanced.12.frozen"
+node        = 12
+title       = "IT DOES NOT CHANGE"
+difficulty  = 4
+story       = "The printed price list for the day is handed to every stall at 06:00, and by 12:30 three of them have written on it and one has added a column that is not there."
+concepts    = ["structs", "mutability", "error-handling"]
+requires    = ["python.advanced.11.protocol"]
+map          = { x = 0.116, y = 0.476, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<NAME> <CENTS>`.
+
+Build each line into a **frozen** dataclass `Price(name, cents)`. Then, for
+each price, try to overwrite its `cents` and print `FROZEN <NAME>` when the
+attempt raises. Next, a `Tally` class with `__slots__ = ("count",)`: set
+`tally.count`, then try to set a misspelt `tally.cuont` and print
+`SLOTS YES` when *that* raises. Finally `IN_SET <k>`, the size of a `set`
+of the prices, and `TOTAL <sum>`.
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SLOTS YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+Three things a frozen dataclass buys, and the starter has none of them.
+`frozen=True` makes assignment to a field raise `FrozenInstanceError`, so
+the list cannot be written on. It also makes the instance **hashable** —
+a mutable dataclass sets `__hash__` to `None`, and `set()` of the starter's
+prices raises `TypeError: unhashable type`. Equal fields, equal hash, so the
+two `LAM 1200` lines are one member of the set.
+
+`__slots__` is the other kind of fixed shape: the instance has exactly the
+named attributes and no `__dict__`, so a typo in an attribute name is an
+`AttributeError` at the assignment instead of a silent new field nobody
+reads. It also makes every instance smaller, which is why it is the answer
+to "we have ten million of these".
+'''
+starter     = '''
+from dataclasses import dataclass, FrozenInstanceError
+
+
+@dataclass
+class Price:
+    name: str
+    cents: int
+
+
+class Tally:
+    def __init__(self):
+        self.count = 0
+
+
+def main():
+    n = int(input())
+    prices = []
+    for _ in range(n):
+        name, cents = input().split()
+        prices.append(Price(name, int(cents)))
+
+    for price in prices:
+        try:
+            price.cents = 0
+            print(f"MUTATED {price.name}")
+        except FrozenInstanceError:
+            print(f"FROZEN {price.name}")
+
+    tally = Tally()
+    tally.count = n
+    try:
+        tally.cuont = 0
+        print("SLOTS NO")
+    except AttributeError:
+        print("SLOTS YES")
+
+    print(f"IN_SET {len(set(prices))}")
+    print(f"TOTAL {sum(p.cents for p in prices)}")
+
+
+main()
+'''
+solution    = '''
+from dataclasses import dataclass, FrozenInstanceError
+
+
+@dataclass(frozen=True)
+class Price:
+    name: str
+    cents: int
+
+
+class Tally:
+    __slots__ = ("count",)
+
+    def __init__(self):
+        self.count = 0
+
+
+def main():
+    n = int(input())
+    prices = []
+    for _ in range(n):
+        name, cents = input().split()
+        prices.append(Price(name, int(cents)))
+
+    for price in prices:
+        try:
+            price.cents = 0
+            print(f"MUTATED {price.name}")
+        except FrozenInstanceError:
+            print(f"FROZEN {price.name}")
+
+    tally = Tally()
+    tally.count = n
+    try:
+        tally.cuont = 0
+        print("SLOTS NO")
+    except AttributeError:
+        print("SLOTS YES")
+
+    print(f"IN_SET {len(set(prices))}")
+    print(f"TOTAL {sum(p.cents for p in prices)}")
+
+
+main()
+'''
+hints = [
+  "@dataclass(frozen=True). One argument, and the assignment in the loop starts raising.",
+  "__slots__ = (\"count\",) in the class body, before __init__. Note the trailing comma: (\"count\") is a string, not a tuple.",
+  "The TOTAL is the sum of the original cents, which only holds because the assignments failed. In the starter every price is 0 by then, and TOTAL is 0 — the mutation was not only allowed, it went through.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3\nLAM 1200\nWONG 900\nLAM 1200\n", expect = "FROZEN LAM\nFROZEN WONG\nFROZEN LAM\nSLOTS YES\nIN_SET 2\nTOTAL 3300\n", visible = true },
+  { name = "one",    stdin = "1\nCHAN 5\n",                       expect = "FROZEN CHAN\nSLOTS YES\nIN_SET 1\nTOTAL 5\n",                          visible = false },
+  { name = "none",   stdin = "0\n",                               expect = "SLOTS YES\nIN_SET 0\nTOTAL 0\n",                                      visible = false },
+  { name = "distinct", stdin = "2\nA 1\nA 2\n",                   expect = "FROZEN A\nFROZEN A\nSLOTS YES\nIN_SET 2\nTOTAL 3\n",                   visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "python.advanced.13.exceptions"
+node        = 13
+title       = "AN ERROR OF YOUR OWN"
+difficulty  = 4
+story       = "Four layers of the rice counter's pricing each raise their own thing, and the counter's front end catches one of them and is taken down by the others."
+concepts    = ["error-handling", "structs", "control-flow"]
+requires    = ["python.advanced.12.frozen"]
+map          = { x = 0.045, y = 0.931, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines, each meant to be a weight in
+kg.
+
+Define an exception hierarchy: `PriceError(Exception)` as the base, with
+`NotANumber(PriceError)` and `Negative(PriceError)`. `Negative` carries the
+weight and its message is `negative weight: <kg>`; `NotANumber`'s message
+is `not a number`. `price(text)` converts the text, raising `NotANumber`
+**from** the `ValueError` it caught, rejects a negative weight, and
+otherwise returns `500 + 100 * kg`.
+
+Print each price or the error's message, then `ERRORS <k>`. Catch the
+**base class**, once.
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative weight: -2
+        ERRORS 2
+```
+
+The starter catches `Negative` and nothing else, so the `xx` line takes the
+program down with an uncaught `NotANumber`. One `except PriceError as err:`
+catches every member of the hierarchy, and `str(err)` is the message —
+which is what `Exception.__str__` gives you from the arguments you passed to
+`super().__init__`, so the message lives in the class, not in the handler.
+
+`raise NotANumber() from err` records the `ValueError` as the cause.
+Nothing here prints it, and a traceback would show both, one above the
+other, with the words *The above exception was the direct cause of the
+following exception*. That chain is the reason to write `from`.
+'''
+starter     = '''
+class PriceError(Exception):
+    pass
+
+
+class NotANumber(PriceError):
+    def __init__(self):
+        super().__init__("not a number")
+
+
+class Negative(PriceError):
+    def __init__(self, kg):
+        super().__init__(f"negative weight: {kg}")
+        self.kg = kg
+
+
+def price(text):
+    try:
+        kg = int(text)
+    except ValueError as err:
+        raise NotANumber() from err
+    if kg < 0:
+        raise Negative(kg)
+    return 500 + 100 * kg
+
+
+def main():
+    n = int(input())
+    errors = 0
+    for _ in range(n):
+        line = input().strip()
+        try:
+            print(price(line))
+        except Negative as err:
+            errors += 1
+            print(err)
+    print(f"ERRORS {errors}")
+
+
+main()
+'''
+solution    = '''
+class PriceError(Exception):
+    pass
+
+
+class NotANumber(PriceError):
+    def __init__(self):
+        super().__init__("not a number")
+
+
+class Negative(PriceError):
+    def __init__(self, kg):
+        super().__init__(f"negative weight: {kg}")
+        self.kg = kg
+
+
+def price(text):
+    try:
+        kg = int(text)
+    except ValueError as err:
+        # the ValueError becomes the cause; the caller sees our type
+        raise NotANumber() from err
+    if kg < 0:
+        raise Negative(kg)
+    return 500 + 100 * kg
+
+
+def main():
+    n = int(input())
+    errors = 0
+    for _ in range(n):
+        line = input().strip()
+        try:
+            print(price(line))
+        except PriceError as err:
+            errors += 1
+            print(err)
+    print(f"ERRORS {errors}")
+
+
+main()
+'''
+hints = [
+  "except PriceError as err: — the base class catches both subclasses, and that is the point of having a base class.",
+  "print(err) prints str(err), which is the message handed to super().__init__. No __str__ override needed.",
+  "Order matters when you have several except clauses: a subclass clause after its base class clause is dead code, and Python will not warn you.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",    stdin = "3\n4\nxx\n-2\n",   expect = "900\nnot a number\nnegative weight: -2\nERRORS 2\n", visible = true },
+  { name = "clean",    stdin = "1\n0\n",           expect = "500\nERRORS 0\n",                                    visible = false },
+  { name = "all-junk", stdin = "2\nzz\nyy\n",      expect = "not a number\nnot a number\nERRORS 2\n",             visible = false },
+  { name = "negative", stdin = "1\n-1\n",          expect = "negative weight: -1\nERRORS 1\n",                    visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "python.advanced.14.iterator"
+node        = 14
+title       = "NEXT, UNTIL IT STOPS"
+difficulty  = 4
+story       = "The ticket machine at the basement entrance hands out numbers from a start in fixed steps and keeps no list of them, and the queue board wants to loop over it like any list."
+concepts    = ["iteration", "duck-typing", "structs"]
+requires    = ["python.advanced.13.exceptions"]
+map          = { x = 0.287, y = 0.854, kind = "quest" }
+brief       = '''
+Standard input is three integers: `start`, `step`, `count`.
+
+Write a class `Tickets` that implements the **iterator protocol by hand**:
+`__iter__` returns `self`, and `__next__` returns the next value or raises
+`StopIteration` when `count` values have been handed out. Print each on its
+own line, then `SUM <total>` computed by handing a second `Tickets` to
+`sum`.
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+This is what a generator writes for you. A `for` loop calls `iter()` on the
+thing once, then `next()` on the result until it raises `StopIteration`;
+`sum`, `list`, `max` and `in` do the same. An object with `__next__` and no
+`__iter__` is an iterator that `for` refuses — `TypeError: 'Tickets' object
+is not iterable` — and that is the starter.
+
+`__iter__` returning `self` is the mark of an **iterator**: it can be walked
+once and is then spent. A **container** returns a fresh iterator from
+`__iter__` each time and can be walked repeatedly; `Bag` from the basic
+road was one. Say which you are writing; the difference shows up the second
+time somebody loops.
+'''
+starter     = '''
+class Tickets:
+    def __init__(self, start, step, count):
+        self.current = start
+        self.step = step
+        self.left = count
+
+    def __next__(self):
+        if self.left == 0:
+            raise StopIteration
+        value = self.current
+        self.current += self.step
+        self.left -= 1
+        return value
+
+
+def main():
+    start, step, count = (int(t) for t in input().split())
+
+    for value in Tickets(start, step, count):
+        print(value)
+    print(f"SUM {sum(Tickets(start, step, count))}")
+
+
+main()
+'''
+solution    = '''
+class Tickets:
+    def __init__(self, start, step, count):
+        self.current = start
+        self.step = step
+        self.left = count
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.left == 0:
+            raise StopIteration
+        value = self.current
+        self.current += self.step
+        self.left -= 1
+        return value
+
+
+def main():
+    start, step, count = (int(t) for t in input().split())
+
+    for value in Tickets(start, step, count):
+        print(value)
+    print(f"SUM {sum(Tickets(start, step, count))}")
+
+
+main()
+'''
+hints = [
+  "def __iter__(self): return self. Two lines, and for starts working.",
+  "StopIteration is raised, not returned. The for loop catches it; you never see it.",
+  "Save the value you are about to return before you advance, or you are off by one step.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",     stdin = "2 3 5\n",   expect = "2\n5\n8\n11\n14\nSUM 40\n", visible = true },
+  { name = "flat",     stdin = "0 0 3\n",   expect = "0\n0\n0\nSUM 0\n",          visible = false },
+  { name = "backward", stdin = "10 -4 4\n", expect = "10\n6\n2\n-2\nSUM 16\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "python.advanced.15.collections"
+node        = 15
+title       = "THE RIGHT CONTAINER"
+difficulty  = 4
+story       = "The basement office keeps the day's tickets in one long list and answers every question about them by reading it from the top."
+concepts    = ["collections", "heaps", "binary-search", "sorting"]
+requires    = ["python.advanced.14.iterator"]
+map          = { x = 0.391, y = 0.950, kind = "quest" }
+brief       = '''
+Three lines of standard input: a line of words, a line of integers already
+**sorted ascending**, and one integer `x`.
+
+Print four lines:
+
+1. `TOP <word> <count>` — the most frequent word, ties by the word ascending
+   — from a `collections.Counter`
+2. `BISECT <l> <r>` — `bisect_left` and `bisect_right` of `x` in the sorted
+   integers
+3. `SMALLEST3` followed by the three smallest integers — `heapq.nsmallest`
+   — or fewer if there are fewer
+4. `GROUPS` followed by `<letter>:<k>` for each first letter of the words,
+   letters ascending — a `collections.defaultdict(list)` keyed by first
+   letter
+
+```
+input:  tofu egg tofu egg fish
+        1 3 3 5 8
+        3
+output: TOP egg 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS e:2 f:1 t:2
+```
+
+`Counter.most_common(1)` breaks ties by **insertion order**, which is `tofu`
+here, and the statement says `egg`. The starter trusts `most_common`. Sort
+the items with a key that says what you mean instead.
+
+`bisect` answers "where would this go" without a loop: `bisect_left` is the
+first position not less than `x`, `bisect_right` the first position greater,
+and their difference is how many copies of `x` there are. `heapq.nsmallest`
+is the right call when `k` is small and `n` is not; sorting the whole list
+to read three values off the front is the thing it exists to avoid.
+'''
+starter     = '''
+import heapq
+from bisect import bisect_left, bisect_right
+from collections import Counter, defaultdict
+
+
+def main():
+    words = input().split()
+    nums = [int(t) for t in input().split()]
+    x = int(input())
+
+    counts = Counter(words)
+    word, count = counts.most_common(1)[0]
+    print(f"TOP {word} {count}")
+
+    print(f"BISECT {nums.index(x)} {nums.index(x) + 1}")
+
+    print("SMALLEST3 " + " ".join(str(v) for v in sorted(nums)[:3]))
+
+    groups = {}
+    for w in words:
+        groups[w[0]] = groups.get(w[0], 0) + 1
+    print("GROUPS " + " ".join(f"{k}:{v}" for k, v in groups.items()))
+    _ = (heapq, bisect_left, bisect_right, defaultdict)
+
+
+main()
+'''
+solution    = '''
+import heapq
+from bisect import bisect_left, bisect_right
+from collections import Counter, defaultdict
+
+
+def main():
+    words = input().split()
+    nums = [int(t) for t in input().split()]
+    x = int(input())
+
+    counts = Counter(words)
+    # most_common(1) would break the tie by insertion order; say what you mean
+    word, count = min(counts.items(), key=lambda item: (-item[1], item[0]))
+    print(f"TOP {word} {count}")
+
+    print(f"BISECT {bisect_left(nums, x)} {bisect_right(nums, x)}")
+
+    print("SMALLEST3 " + " ".join(str(v) for v in heapq.nsmallest(3, nums)))
+
+    groups = defaultdict(list)
+    for w in words:
+        groups[w[0]].append(w)
+    print("GROUPS " + " ".join(f"{k}:{len(v)}" for k, v in sorted(groups.items())))
+
+
+main()
+'''
+hints = [
+  "min(counts.items(), key=lambda item: (-item[1], item[0])) is the top word with the tie-break spelled out. Sorting by the same key and taking [0] is the same answer.",
+  "bisect_left and bisect_right never raise; list.index raises ValueError when x is absent, and one of the hidden cases is exactly that.",
+  "defaultdict(list) creates the list on first access, so groups[letter].append(w) never needs a check. Sort the items before printing; a defaultdict is in insertion order like any dict.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "tofu egg tofu egg fish\n1 3 3 5 8\n3\n", expect = "TOP egg 2\nBISECT 1 3\nSMALLEST3 1 3 3\nGROUPS e:2 f:1 t:2\n", visible = true },
+  { name = "absent", stdin = "a b c\n10 20 30\n25\n",                 expect = "TOP a 1\nBISECT 2 2\nSMALLEST3 10 20 30\nGROUPS a:1 b:1 c:1\n", visible = false },
+  { name = "short",  stdin = "zz zz\n4\n4\n",                         expect = "TOP zz 2\nBISECT 0 1\nSMALLEST3 4\nGROUPS z:2\n",              visible = false },
+  { name = "before", stdin = "fish tofu fish\n5 5 5\n1\n",            expect = "TOP fish 2\nBISECT 0 0\nSMALLEST3 5 5 5\nGROUPS f:2 t:1\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "python.advanced.16.timeouts"
+node        = 16
+title       = "STOP WAITING"
+difficulty  = 4
+story       = "The order board pings every stall for its wait time, and the stall whose card reader is down never answers, so the board never redraws."
+concepts    = ["async", "cancellation", "error-handling"]
+requires    = ["python.advanced.15.collections"]
+map          = { x = 0.619, y = 0.868, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<STALL> <SECONDS>`, where
+`SECONDS` is `0` for a stall that answers at once and `1` for one that does
+not answer in time.
+
+For each stall, `await` its `fetch(stall, seconds)` — which sleeps that long
+— under `asyncio.wait_for` with a **0.2 second** timeout, and print
+`<STALL> OK` or `<STALL> TIMEOUT`, in input order. Then start a `watch()`
+task that loops forever, cancel it, await it, and let it print `CANCELLED`
+from its `except asyncio.CancelledError` and `CLEANUP` from its `finally`.
+Last, print `TIMEOUTS <k>`.
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+`wait_for` runs the awaitable with a deadline; when the deadline passes it
+**cancels** the inner task and raises `asyncio.TimeoutError` to you. Catch
+that name — on 3.11 and later it is the builtin `TimeoutError`, on 3.10 it
+is not, and `asyncio.TimeoutError` is correct on both.
+
+The starter awaits `fetch` directly, so `WONG` takes a full second and then
+prints `OK`, and it cancels `watch` without awaiting it, so the task's
+`except` and `finally` never get to run before the loop closes. A cancelled
+task is not stopped until it is next scheduled and the `CancelledError` is
+delivered inside it; awaiting it is what gives it that turn. Re-raise the
+`CancelledError` after handling it — swallowing it is how a task becomes
+uncancellable.
+'''
+starter     = '''
+import asyncio
+
+
+async def fetch(stall, seconds):
+    await asyncio.sleep(seconds)
+    return f"{stall} OK"
+
+
+async def watch():
+    try:
+        while True:
+            await asyncio.sleep(0.01)
+    except asyncio.CancelledError:
+        print("CANCELLED")
+        raise
+    finally:
+        print("CLEANUP")
+
+
+async def run(stalls):
+    timeouts = 0
+    for stall, seconds in stalls:
+        print(await fetch(stall, seconds))
+
+    watcher = asyncio.create_task(watch())
+    await asyncio.sleep(0)
+    watcher.cancel()
+    print(f"TIMEOUTS {timeouts}")
+
+
+def main():
+    n = int(input())
+    stalls = []
+    for _ in range(n):
+        stall, seconds = input().split()
+        stalls.append((stall, int(seconds)))
+    asyncio.run(run(stalls))
+
+
+main()
+'''
+solution    = '''
+import asyncio
+
+
+async def fetch(stall, seconds):
+    await asyncio.sleep(seconds)
+    return f"{stall} OK"
+
+
+async def watch():
+    try:
+        while True:
+            await asyncio.sleep(0.01)
+    except asyncio.CancelledError:
+        print("CANCELLED")
+        raise
+    finally:
+        print("CLEANUP")
+
+
+async def run(stalls):
+    timeouts = 0
+    for stall, seconds in stalls:
+        try:
+            print(await asyncio.wait_for(fetch(stall, seconds), timeout=0.2))
+        except asyncio.TimeoutError:
+            timeouts += 1
+            print(f"{stall} TIMEOUT")
+
+    watcher = asyncio.create_task(watch())
+    await asyncio.sleep(0)
+    watcher.cancel()
+    try:
+        await watcher
+    except asyncio.CancelledError:
+        pass
+    print(f"TIMEOUTS {timeouts}")
+
+
+def main():
+    n = int(input())
+    stalls = []
+    for _ in range(n):
+        stall, seconds = input().split()
+        stalls.append((stall, int(seconds)))
+    asyncio.run(run(stalls))
+
+
+main()
+'''
+hints = [
+  "asyncio.wait_for(fetch(stall, seconds), timeout=0.2) inside a try, with except asyncio.TimeoutError.",
+  "watcher.cancel() only requests cancellation. `await watcher` is what lets the task run its except and finally; it re-raises CancelledError at you, so catch that too.",
+  "The await asyncio.sleep(0) after create_task gives the watcher one turn to actually start, so there is a running task to cancel and not just a scheduled one.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed", stdin = "3\nLAM 0\nWONG 1\nCHAN 0\n", expect = "LAM OK\nWONG TIMEOUT\nCHAN OK\nCANCELLED\nCLEANUP\nTIMEOUTS 1\n", visible = true },
+  { name = "fast",  stdin = "1\nLAM 0\n",                 expect = "LAM OK\nCANCELLED\nCLEANUP\nTIMEOUTS 0\n",                        visible = false },
+  { name = "slow",  stdin = "2\nA 1\nB 1\n",              expect = "A TIMEOUT\nB TIMEOUT\nCANCELLED\nCLEANUP\nTIMEOUTS 2\n",           visible = false },
+  { name = "none",  stdin = "0\n",                        expect = "CANCELLED\nCLEANUP\nTIMEOUTS 0\n",                                visible = false },
+]
+
+# ---------------------------------------------------------------- 17  BOSS
+[[quest]]
+id          = "python.advanced.17.gil"
+node        = 17
+title       = "THE GIL"
+difficulty  = 5
+story       = "SOGO basement, twelve stalls, one lock on the whole floor. Everything that was supposed to happen at once happened one at a time, and the totals came back as nothing at all."
+concepts    = ["concurrency", "shared-state", "thread-safety", "data-races"]
+requires    = ["python.advanced.16.timeouts", "python.advanced.02.lock"]
+map          = { x = 0.719, y = 0.950, kind = "boss" }
+brief       = '''
+Standard input is two integers `k` and `n`.
+
+Split `1..n` into `k` contiguous chunks — chunk `i` is
+`n*i//k + 1` to `n*(i+1)//k` inclusive — and give each chunk to its own
+thread, which sums the squares of its range: a CPU-bound loop, no library
+call. Every thread adds its result to **one shared total**, under a lock,
+and also records it in its own slot. Join them all. Print `CHUNK <i> <sum>`
+for each chunk in index order, then `TOTAL <sum>`, then `THREADS <k>`.
+
+```
+input:  3 10
+output: CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        THREADS 3
+```
+
+The starter fails for a reason that has nothing to do with timing.
+`work` returns its sum and `main` collects `t.join()`, and `join` returns
+`None` whatever the target returned — a thread has no return value. The
+first `+=` is a `TypeError`. That is the small bug. Fix it the way the
+lock quest did: a shared container, `with lock:` around the update, and
+the per-chunk slot written by exactly one thread.
+
+The big thing is the boss, and it is not a bug you can fix. Run this with
+`k = 4` and `n = 4000000` and time it, then run it with `k = 1`. They take
+the same time. CPython has a **global interpreter lock**: one thread runs
+Python bytecode at any moment, and a CPU-bound thread gives the lock up
+every few milliseconds so the others can take a turn. Four threads on four
+cores sum the squares in turns, on one core, plus the cost of switching.
+Threads in Python are for waiting — on sockets, on files, on `sleep` —
+where the lock is released during the wait and the concurrency is real.
+For CPU work the answer is `multiprocessing`, or `concurrent.futures.
+ProcessPoolExecutor`, which runs separate interpreters with separate locks
+and pays for it by copying the arguments.
+
+The output is deterministic because the chunks are printed by index and the
+total is the sum of the chunks, not the order the threads finished in.
+Print `TOTAL` from the locked total, not from summing the slots — the
+lock is the thing this map is about, and the two have to agree.
+'''
+starter     = '''
+import threading
+
+
+def work(lo, hi):
+    # sum of i*i for i in lo..hi, as a plain loop on purpose
+    total = 0
+    for i in range(lo, hi + 1):
+        total += i * i
+    return total
+
+
+def main():
+    k, n = (int(t) for t in input().split())
+
+    threads = []
+    for i in range(k):
+        lo = n * i // k + 1
+        hi = n * (i + 1) // k
+        threads.append(threading.Thread(target=work, args=(lo, hi)))
+    for thread in threads:
+        thread.start()
+
+    total = 0
+    for i, thread in enumerate(threads):
+        part = thread.join()
+        print(f"CHUNK {i} {part}")
+        total += part
+
+    print(f"TOTAL {total}")
+    print(f"THREADS {k}")
+
+
+main()
+'''
+solution    = '''
+import threading
+
+
+def main():
+    k, n = (int(t) for t in input().split())
+
+    chunks = [0] * k
+    shared = {"total": 0}
+    lock = threading.Lock()
+
+    def work(index, lo, hi):
+        # sum of i*i for i in lo..hi, as a plain loop on purpose: this is
+        # the CPU-bound work the GIL serialises however many threads run it
+        part = 0
+        for i in range(lo, hi + 1):
+            part += i * i
+        chunks[index] = part
+        with lock:
+            shared["total"] += part
+
+    threads = []
+    for i in range(k):
+        lo = n * i // k + 1
+        hi = n * (i + 1) // k
+        threads.append(threading.Thread(target=work, args=(i, lo, hi)))
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    for i, part in enumerate(chunks):
+        print(f"CHUNK {i} {part}")
+    print(f"TOTAL {shared['total']}")
+    print(f"THREADS {k}")
+
+
+main()
+'''
+hints = [
+  "join() returns None. Give work an index and a slot to write, and a locked dict to add into; that is how a value gets out of a thread.",
+  "Start all, then join all, then print. Printing inside the threads would interleave; printing after the joins, from the slots, cannot.",
+  "n*(n+1)*(2n+1)/6 is the closed form for the total. Check TOTAL against it once and you know the chunk boundaries are right.",
+  "Time k=1 against k=4 on a big n. When they match, you have met the GIL. That is not the bug in this quest; it is the reason the next version of this program is a ProcessPoolExecutor.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "3 10\n",       expect = "CHUNK 0 14\nCHUNK 1 77\nCHUNK 2 294\nTOTAL 385\nTHREADS 3\n", visible = true },
+  { name = "one",      stdin = "1 4\n",        expect = "CHUNK 0 30\nTOTAL 30\nTHREADS 1\n",                           visible = false },
+  { name = "idle",     stdin = "3 2\n",        expect = "CHUNK 0 0\nCHUNK 1 1\nCHUNK 2 4\nTOTAL 5\nTHREADS 3\n",       visible = false },
+  { name = "big",      stdin = "4 2000000\n",  expect = "CHUNK 0 41666791666750000\nCHUNK 1 291667041666750000\nCHUNK 2 791667291666750000\nCHUNK 3 1541667541666750000\nTOTAL 2666668666667000000\nTHREADS 4\n", visible = false },
+]

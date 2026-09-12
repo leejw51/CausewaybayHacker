@@ -26,7 +26,16 @@ import type { App, Scene } from "../app";
 import { ensureFonts, print, printf, width, wrap, type Font } from "../engine/text";
 import { css, Theme, type RGBA } from "../engine/theme";
 import { clipped, fill, pixBtn, well, type Ctx, type Rect } from "../engine/ui";
-import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import {
+  arriving,
+  Buttons,
+  footer,
+  frame,
+  header,
+  landColour,
+  titledPanel,
+  landName,
+} from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { Overlay } from "../ui/overlay";
 import { WireError } from "../net/client";
@@ -60,6 +69,8 @@ const LANDS = (): ReadonlyArray<{ id: string; label: string; value: Land | null 
   { id: "land:any", label: t("search.any"), value: null },
   { id: "land:rust", label: t("search.rust"), value: "rust" },
   { id: "land:go", label: t("search.go"), value: "go" },
+  { id: "land:cpp", label: t("search.cpp"), value: "cpp" },
+  { id: "land:python", label: t("search.python"), value: "python" },
 ];
 
 const CATS = (): ReadonlyArray<{ id: string; label: string; value: Category | null }> => [
@@ -528,7 +539,7 @@ export class SearchScene implements Scene {
     const fonts = ensureFonts(s);
     const [x, y, w, h] = rect;
     const hot = this.hitBtns.hovered === `hit:${hit.quest_id}`;
-    const accent: RGBA = hit.land === "go" ? GO : RUST;
+    const accent: RGBA = landColour(hit.land);
     const pad = Math.round(10 * s);
 
     fill(g, Theme.navy, x, y, w, h - Math.round(4 * s), hot ? 0.95 : 0.7);
@@ -554,7 +565,7 @@ export class SearchScene implements Scene {
 
     const metaY = y + pad + fonts.station.height + Math.round(4 * s);
     g.fillStyle = css(accent);
-    const meta = `${hit.land.toUpperCase()} · ${hit.category.toUpperCase()}${
+    const meta = `${landName(hit.land)} · ${hit.category.toUpperCase()}${
       hit.state === "cleared" ? " · CLEARED" : ""
     }`;
     printf(g, fonts.stationSm, meta, tx, metaY, tw, "left");

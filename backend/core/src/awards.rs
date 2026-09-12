@@ -136,7 +136,12 @@ fn earned(conn: &Connection, address: &str) -> Result<Vec<Candidate>> {
         );
     }
 
-    // Both lands. The one badge that says "you are not only a Rust person".
+    // Two lands, not all of them. The one badge that says "you are not only a
+    // Rust person", and two is enough to have said it — the threshold stayed
+    // at 2 when C++ and Python landed, on purpose. Raising it to four would
+    // recompute this badge away from everyone who had earned it with Rust and
+    // Go, and a badge that can be taken back by a content release is not a
+    // badge. `lands` is in the detail, so the card can still say how many.
     let lands: i64 = conn.query_row(
         "SELECT count(DISTINCT q.land) FROM progress p JOIN quests q ON q.id = p.quest_id
           WHERE p.address = ?1 AND p.state = 'cleared'",

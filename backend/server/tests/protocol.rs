@@ -14,6 +14,8 @@ use cwbhacker_core::{content, eth, Store};
 
 const PACK: &str = include_str!("../../core/tests/fixtures/rust_basic.toml");
 const GO_PACK: &str = include_str!("../../core/tests/fixtures/go_basic.toml");
+const CPP_PACK: &str = include_str!("../../core/tests/fixtures/cpp_basic.toml");
+const PYTHON_PACK: &str = include_str!("../../core/tests/fixtures/python_basic.toml");
 const ALICE_KEY: &str = "4646464646464646464646464646464646464646464646464646464646464646";
 
 type Socket =
@@ -41,9 +43,13 @@ async fn start_inner(with_go: bool) -> Server {
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("basic.toml"), PACK).unwrap();
     if with_go {
-        let go = tmp.path().join("content-src/go");
-        std::fs::create_dir_all(&go).unwrap();
-        std::fs::write(go.join("basic.toml"), GO_PACK).unwrap();
+        // The two newer lands ride along with Go: the tests that want a
+        // second land want the same thing of a third and a fourth.
+        for (land, pack) in [("go", GO_PACK), ("cpp", CPP_PACK), ("python", PYTHON_PACK)] {
+            let dir = tmp.path().join("content-src").join(land);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("basic.toml"), pack).unwrap();
+        }
     }
 
     let store = Arc::new(Store::open(&tmp.path().join("home")).unwrap());
@@ -447,6 +453,184 @@ async fn a_go_submission_is_compiled_run_and_recorded() {
     assert_eq!(
         history["payload"]["attempts"][0]["quest_id"].as_str(),
         Some("go.basic.01.hello")
+    );
+    server.handle.abort();
+}
+
+/// The C++ land runs: same wire, same verdict shape, same persistence.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_cpp_submission_is_compiled_run_and_recorded() {
+    let server = start_with_go().await;
+    let mut socket = connect(server.port).await;
+    login(&mut socket).await;
+
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-5", "type":"quest.submit", "payload": {
+            "quest_id": "cpp.basic.01.hello", "lang": "cpp",
+            "source": "#include <iostream>\nint main() { std::cout << \"hello, causewaybay\\n\"; }\n" } }),
+    )
+    .await;
+
+    let mut stages = Vec::new();
+    let reply = loop {
+        let frame = next_json(&mut socket).await;
+        match frame["type"].as_str() {
+            Some("run.stage") => {
+                stages.push(frame["payload"]["stage"].as_str().unwrap().to_string())
+            }
+            Some("quest.submit.ok") => break frame,
+            Some("quest.submit.err") => panic!("the C++ land is built and this failed: {frame}"),
+            _ => continue,
+        }
+    };
+    let attempt = &reply["payload"]["attempt"];
+    assert_eq!(attempt["verdict"].as_str(), Some("accepted"), "{attempt}");
+    assert_eq!(attempt["cleared"].as_bool(), Some(true));
+    assert_eq!(attempt["tests_passed"], attempt["tests_total"]);
+    assert!(stages.contains(&"compiling".to_string()), "{stages:?}");
+
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-6", "type":"stats.history", "payload": {} }),
+    )
+    .await;
+    let history = next_json(&mut socket).await;
+    assert_eq!(
+        history["payload"]["attempts"][0]["quest_id"].as_str(),
+        Some("cpp.basic.01.hello")
+    );
+    server.handle.abort();
+}
+
+/// A C++ compile error reaches the player as the compiler's own prose and
+/// reaches the table as §7.1's C++ column.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_cpp_compile_error_is_classified_over_the_wire() {
+    let server = start_with_go().await;
+    let mut socket = connect(server.port).await;
+    login(&mut socket).await;
+
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-5", "type":"quest.submit", "payload": {
+            "quest_id": "cpp.basic.01.hello", "lang": "cpp",
+            "source": "#include <iostream>\nint main() { std::cout << tolal; }\n" } }),
+    )
+    .await;
+    let reply = loop {
+        let frame = next_json(&mut socket).await;
+        if frame["type"].as_str() == Some("quest.submit.ok") {
+            break frame;
+        }
+    };
+    let attempt = &reply["payload"]["attempt"];
+    assert_eq!(
+        attempt["verdict"].as_str(),
+        Some("compile_error"),
+        "{attempt}"
+    );
+    let kinds: Vec<&str> = attempt["mistakes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["kind"].as_str().unwrap())
+        .collect();
+    assert!(kinds.contains(&"unknown-name"), "{attempt}");
+    assert_eq!(
+        attempt["mistakes"][0]["code"].as_str(),
+        Some("cpp:undeclared-identifier")
+    );
+    assert!(
+        attempt["stderr"].as_str().unwrap().contains("tolal"),
+        "the player should see what c++ said: {attempt}"
+    );
+    server.handle.abort();
+}
+
+/// The Python land runs: same wire, same verdict shape, same persistence.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_python_submission_is_run_and_recorded() {
+    let server = start_with_go().await;
+    let mut socket = connect(server.port).await;
+    login(&mut socket).await;
+
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-5", "type":"quest.submit", "payload": {
+            "quest_id": "python.basic.01.hello", "lang": "python",
+            "source": "print(\"hello, causewaybay\")\n" } }),
+    )
+    .await;
+
+    let mut stages = Vec::new();
+    let reply = loop {
+        let frame = next_json(&mut socket).await;
+        match frame["type"].as_str() {
+            Some("run.stage") => {
+                stages.push(frame["payload"]["stage"].as_str().unwrap().to_string())
+            }
+            Some("quest.submit.ok") => break frame,
+            Some("quest.submit.err") => panic!("the Python land is built and this failed: {frame}"),
+            _ => continue,
+        }
+    };
+    let attempt = &reply["payload"]["attempt"];
+    assert_eq!(attempt["verdict"].as_str(), Some("accepted"), "{attempt}");
+    assert_eq!(attempt["cleared"].as_bool(), Some(true));
+    assert!(stages.contains(&"running".to_string()), "{stages:?}");
+
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-6", "type":"stats.history", "payload": {} }),
+    )
+    .await;
+    let history = next_json(&mut socket).await;
+    assert_eq!(
+        history["payload"]["attempts"][0]["quest_id"].as_str(),
+        Some("python.basic.01.hello")
+    );
+    server.handle.abort();
+}
+
+/// A Python runtime error is the traceback's last line, classified.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_python_runtime_error_is_classified_over_the_wire() {
+    let server = start_with_go().await;
+    let mut socket = connect(server.port).await;
+    login(&mut socket).await;
+
+    send(
+        &mut socket,
+        json!({ "v":1, "id":"c-5", "type":"quest.submit", "payload": {
+            "quest_id": "python.basic.01.hello", "lang": "python",
+            "source": "stall = None\nprint(stall.price)\n" } }),
+    )
+    .await;
+    let reply = loop {
+        let frame = next_json(&mut socket).await;
+        if frame["type"].as_str() == Some("quest.submit.ok") {
+            break frame;
+        }
+    };
+    let attempt = &reply["payload"]["attempt"];
+    assert_eq!(
+        attempt["verdict"].as_str(),
+        Some("runtime_error"),
+        "{attempt}"
+    );
+    assert_eq!(
+        attempt["mistakes"][0]["kind"].as_str(),
+        Some("nil-deref"),
+        "{attempt}"
+    );
+    assert_eq!(
+        attempt["mistakes"][0]["code"].as_str(),
+        Some("py:none-attribute")
+    );
+    assert!(
+        attempt["stderr"].as_str().unwrap().contains("NoneType"),
+        "the player should see the traceback: {attempt}"
     );
     server.handle.abort();
 }

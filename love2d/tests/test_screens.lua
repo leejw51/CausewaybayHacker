@@ -618,4 +618,35 @@ return function()
     -- showing them the plumbing.
     T.ok(code:find("</?b>", 1, true) ~= nil, "the tags are removed")
   end)
+
+  T.section("quest text in the player's language (SPEC §12.1, PROTOCOL §4.7/§4.8/§4.10)")
+
+  T.case("every request that returns quest prose carries the interface language", function()
+    -- The server substitutes a translation only when asked; a scene that
+    -- forgets `locale` gets English forever and nothing looks broken.
+    local _, quest = strings_of("src/scenes/quest.lua")
+    local _, map = strings_of("src/scenes/map.lua")
+    local _, ai = strings_of("src/scenes/ai.lua")
+    T.ok(quest ~= nil and map ~= nil and ai ~= nil)
+    T.ok(quest:find('"quest.get", { quest_id = self.quest_id, locale = I18n.lang }', 1, true) ~= nil,
+      "quest.get asks in I18n.lang")
+    T.ok(quest:find("index = index, locale = I18n.lang", 1, true) ~= nil,
+      "quest.hint asks in I18n.lang — the same index into an array of the same length")
+    T.ok(map:find("category = self.category, locale = I18n.lang", 1, true) ~= nil,
+      "world.map asks in I18n.lang")
+    T.ok(ai:find("drill_id = self.drill.id, locale = I18n.lang", 1, true) ~= nil,
+      "ai.next opens the same screen and asks the same way")
+  end)
+
+  T.case("a language change under an open quest or map asks again", function()
+    -- The interface re-reads its own strings for free; the prose came from
+    -- the server in the old language. Both scenes record the language they
+    -- asked in and compare it every frame.
+    for _, path in ipairs({ "src/scenes/quest.lua", "src/scenes/map.lua" }) do
+      local _, code = strings_of(path)
+      T.ok(code ~= nil)
+      T.ok(code:find("self.asked_lang = I18n.lang", 1, true) ~= nil, path .. " records what it asked")
+      T.ok(code:find("self.asked_lang ~= I18n.lang", 1, true) ~= nil, path .. " notices the change")
+    end
+  end)
 end

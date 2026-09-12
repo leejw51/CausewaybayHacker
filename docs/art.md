@@ -45,16 +45,22 @@ Take `theme.ts` as it stands. It is already tuned and already shipped twice.
 | `coin` | 248,208,48 | stars, XP, the stamp's ring |
 | `grass` | 0,168,0 | Victoria Park, the map's path |
 | `cyan` | 80,216,248 | **GO LAND** |
+| `cppblue` | 0,89,156 | **C++ LAND** — ISO C++ blue, `#00599C` |
+| `pygold` | 255,212,59 | **PYTHON LAND** — Python gold, `#FFD43B` |
 | `red` | 216,40,0 | Skynet, failure states |
 | `pink` | 248,120,168 | confetti, ribbon |
 | `admit` | 0,168,68 | CLEARED, accepted verdict |
 | `dim` | 120,104,88 | locked nodes, disabled UI |
 
-Two land tints, also already in `theme.ts`:
+Four land tints, also in `theme.ts`:
 
 * **RUST LAND** — `TRACK_COL.rust` = `[0.95, 0.47, 0.16]`, Ferris orange, with
   `TRACK_HAZE.rust` over the overworld.
 * **GO LAND** — `TRACK_COL.go` = `Theme.cyan`, with `TRACK_HAZE.go`.
+* **C++ LAND** — `TRACK_COL.cpp` = `Theme.cppblue`, `#00599C`, with
+  `TRACK_HAZE.cpp` a deep blue: noon, harsh sun off the typhoon shelter.
+* **PYTHON LAND** — `TRACK_COL.python` = `Theme.pygold`, `#FFD43B`, with
+  `TRACK_HAZE.python` a warm amber: dawn under the wet market's fluorescents.
 
 The land tint is a haze layer over the map and a border colour on the panels.
 It is **not** a recolour of the sprites; the hero looks the same in both lands
@@ -89,6 +95,8 @@ Served from `/art/…` by the same axum server that serves the frontend
 | `sprite_alex` | 32×48 | **stand-in**: `sprite_hero.png` | Alex the Go coder. The sibling's hero sprite is him. |
 | `sprite_ferris` | 128×128 | **exists** — `sprite_ferris.png` | RUST LAND mascot. Sits on the map's land button and on the quest panel's corner. |
 | `sprite_gogo` | 128×128 | **exists** — `sprite_gogo.png` | GO LAND mascot, the gopher with the milk tea. |
+| `sprite_cpp` | 128×128 | **exists** — `sprite_cpp.png`, generated | C++ LAND mascot, the platypus (오리너구리): duck bill, beaver tail, venomous spur, sits on the harbour wall by the Noon Day Gun. Four animals in one, which is the language (docs/story.md §1). Drawn from the recipe in `art/prompts.toml`; re-run `art/tools/gen.sh` to re-roll it. |
+| `sprite_python` | 128×128 | **exists** — `sprite_python.png`, generated | PYTHON LAND mascot, a small coiled python asleep on a price board. Asleep because this is the warm land. |
 | `sprite_bo` | 32×48 | **stand-in**: `sprite_cook.png` | Chef Bo, the night kitchen. |
 | `sprite_clerk` | 32×48 | **exists** — `sprite_clerk.png` | Generic till NPC for `basic` shopfront nodes. |
 
@@ -105,7 +113,13 @@ same art with a different role and, eventually, a red rim.
 | `boss_deadlock` | **exists** — `Raiden/.../bossDeadlock.png` | `rust.advanced` boss. Already named DEADLOCK in Raiden. Take it. |
 | `boss_nullptr` | **stand-in** — `Raiden/.../nullptr.png`, scaled up | `go.basic` boss. Works at boss size with a bigger outline. |
 | `boss_race` | **new** | `go.advanced` boss. Two turnstiles, one counter, the number flickering. |
-| `boss_whiteboard` | **new** | both `hacker` bosses. A whiteboard and a wall clock. One asset, two maps, different tint. |
+| `boss_whiteboard` | **new** | the rust and go `hacker` bosses. A whiteboard and a wall clock. One asset, two maps, different tint. |
+| `boss_segfault` | **exists** — `boss_segfault.png` | `cpp.basic` boss, SEGFAULT. The Noon Day Gun fires at an address nobody owns. |
+| `boss_dangling` | **exists** — `boss_dangling.png` | `cpp.advanced` boss, THE DANGLING. Victoria Park's pump room: a thread still holding a reference to a buffer that was freed. |
+| `boss_linker` | **exists** — `boss_linker.png` | `cpp.hacker` boss, THE LINKER. Room 7-32 again, the same whiteboard and clock, a shorter clock. |
+| `boss_none` | **exists** — `boss_none.png` | `python.basic` boss, NONE. The price board at 05:59. |
+| `boss_gil` | **exists** — `boss_gil.png` | `python.advanced` boss, THE GIL. Twelve stalls, one lock. |
+| `boss_recursion` | **exists** — `boss_recursion.png` | `python.hacker` boss, THE RECURSION LIMIT. The fourth interview; depth 1000. |
 
 Only **three genuinely new sprites**: `boss_autocomplete`, `boss_race`,
 `boss_whiteboard`. Everything else in the cast has a stand-in good enough to
@@ -130,11 +144,15 @@ Screens, in the order SPEC §10 lists them, and what each one needs behind it.
 | `lands` | a split: Causeway Bay street left, MTR platform right | **stand-in**: `bg_street.jpg` and `bg_mtr.jpg` side by side |
 | `map` (rust) | `map_bg.jpg` / `map_bg_p.jpg` + rust haze | **exists** |
 | `map` (go) | same plate, cyan haze | **exists** — the haze is what separates them, do not commission a second overworld for M2 |
+| `map` (cpp) | `map_cpp.jpg` / `map_cpp_p.jpg` + `cppblue` haze | **exists** — cpp and python reuse the rust plate under their own haze: the files are copies of it, so a new overworld is a drop-in, and the tint and the mascot are what make the land |
+| `map` (python) | `map_python.jpg` / `map_python_p.jpg` + `pygold` haze | **exists** — as above |
 | `quest` (rust basic) | `bg_street.jpg` | exists |
 | `quest` (rust advanced) | `bg_times.jpg` | exists |
 | `quest` (go basic) | `bg_till.jpg` | exists |
 | `quest` (go advanced) | `bg_mtr.jpg` | exists |
-| `quest` (hacker, both) | **new** — a seminar room: whiteboard, clock, one window onto Pok Fu Lam | the only new background |
+| `quest` (cpp basic / advanced) | `bg_street.jpg` / `bg_times.jpg` under the `cppblue` haze | exists — the typhoon shelter and the pump room are a tint away until drawn |
+| `quest` (python basic / advanced) | `bg_till.jpg` / `bg_mtr.jpg` under the `pygold` haze | exists — the wet market and the food hall, same rule |
+| `quest` (hacker, all four) | **new** — a seminar room: whiteboard, clock, one window onto Pok Fu Lam | the only new background |
 | `result` | reuse the quest's own, dimmed by `Theme.paper` | — |
 | `search` / `stats` / `ai` | `bg_flat.jpg` under a full-width panel | exists |
 | ending | `Raiden/.../storyEnd.png` | stand-in |
@@ -151,7 +169,7 @@ plate is two files, `_p` suffixed, not one.
 The map is a Super Mario World overworld: numbered nodes joined by a path that
 **winds**. The node positions are already authored — `map.x` / `map.y` in each
 content pack, `0..1` of the map image (SPEC §12), so the plate can be replaced
-without touching content. Six layouts exist today:
+without touching content. Twelve layouts exist today:
 
 | pack | nodes | shape |
 | --- | --- | --- |
@@ -161,6 +179,12 @@ without touching content. Six layouts exist today:
 | `go.basic` | 18 | three rows, serpentine, mirrored from Rust Land |
 | `go.advanced` | 17 | three rows, serpentine, mirrored |
 | `go.hacker` | 28 | five rows, serpentine, mirrored |
+| `cpp.basic` | 18 | three rows, serpentine, the rust layout |
+| `cpp.advanced` | 17 | three rows, serpentine, the rust layout |
+| `cpp.hacker` | 34 | five rows, serpentine, boss on the last row |
+| `python.basic` | 18 | three rows, serpentine, mirrored like go |
+| `python.advanced` | 17 | three rows, serpentine, mirrored |
+| `python.hacker` | 34 | five rows, serpentine, mirrored |
 
 Every layout is generated and then checked against the same rules the content
 verifier enforces: inside `0..1`, no two nodes closer than `0.06`, real spread

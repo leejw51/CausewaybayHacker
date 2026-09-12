@@ -1,0 +1,7 @@
+main.cpp:7:10: error: cannot assign to variable 'hits' with const-qualified type 'const int'
+    7 |     hits = hits + 1;
+      |     ~~~~ ^
+main.cpp:6:15: note: variable 'hits' declared const here
+    6 |     const int hits = 0;
+      |     ~~~~~~~~~~^~~~~~~~
+1 error generated.

@@ -41,7 +41,7 @@ return {
   ["TAB field   F2 reveal   N new wallet   F10 story   ENTER apply/sign in"] = "TAB 欄移動   F2 表示   N 新しいウォレット   F10 ストーリー   ENTER 適用/サインイン",
   ["The plan will be a fixed ordered list, so a reconnect resumes the same session rather than reshuffling it — and every step will say why it was chosen."] = "プランは順序が固定されたリストなので、再接続しても並べ替えずに同じセッションの続きから再開します — そして各ステップに選ばれた理由が付きます。",
   ["This builds a session out of the mistakes you have actually made, so it needs you to have made some. Play a few streets — the errors get classified as they happen — and come back."] = "これは実際にあなたが犯したミスからセッションを組み立てるので、まずミスが要ります。通りをいくつか歩いてみてください — エラーは起きたそばから分類されます — そしてまた来てください。",
-  ["Type and press ENTER. It searches every quest in both lands — titles, briefs, concepts and the story text."] = "入力して ENTER を押してください。両方の土地のすべてのクエストを検索します — タイトル、概要、概念、物語の本文まで。",
+  ["Type and press ENTER. It searches every quest in every land — titles, briefs, concepts and the story text."] = "入力して ENTER を押してください。すべての土地のすべてのクエストを検索します — タイトル、概要、概念、物語の本文まで。",
   ["When it lands, each hit will show why it matched — the fused score and the two rankings behind it, so a match on the words reads differently from a match on the meaning."] = "実装されると、各ヒットがなぜ一致したかを示します — 統合スコアとその背後の二つのランキングまで出るので、語の一致と意味の一致が読み分けられます。",
   ["Write them on paper, in order. Anyone who reads them owns the account, and nobody — not this game, not the server — can recover them for you."] = "順番どおり紙に書いてください。これを読んだ人が誰であれそのアカウントの持ち主になり、誰も — このゲームもサーバーも — あなたの代わりに復元できません。",
   ["Your most frequent is %s, %d times. Press ENTER and this will find different shapes of it."] = "いちばん多いのは %s で、%d 回です。ENTER を押すと同じ問題の別のかたちを探します。",
@@ -81,6 +81,8 @@ return {
   ["timed. the whiteboard is watching."] = "時間制限あり。ホワイトボードが見ています。",
   ["ownership, borrows, lifetimes"] = "ownership、borrows、lifetimes",
   ["goroutines, channels, interfaces"] = "goroutines、channels、interfaces",
+  ["threads, mutexes, the STL"] = "threads、mutexes、そして STL",
+  ["dicts, generators, the GIL"] = "dicts、generators、そして GIL",
   ["both rankings, fused"] = "二つのランキングを統合",
   ["the words you typed"] = "入力した語そのもの",
   ["what you meant"] = "言いたかった意味",
@@ -186,6 +188,18 @@ return {
   ["costs a star"] = "星を1つ使います",
   ["no answer key here"] = "ここに解答はありません",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "解答がエディタに入りました — CTRL-Z で元のコードに戻せます。クリアはできますが、星3つにはなりません。見ただけでは記録されず、記録に残るのは SUBMIT だけです",
+
+  -- The edit stack: UNDO, REDO and CLEAR, and the caption that says how
+  -- deep it goes. `stack` is the data structure programmers already name
+  -- in their own language, so the word is translated rather than kept.
+  ["UNDO"] = "元に戻す",
+  ["REDO"] = "やり直す",
+  ["CLEAR  SHIFT-F6"] = "履歴を消す  SHIFT-F6",
+  ["stack %d/%d"] = "スタック %d/%d",
+  ["stack empty"] = "スタックは空です",
+  ["no stack here"] = "ここにスタックはありません",
+  ["press CLEAR again to drop the %d steps behind this quest — the editor keeps the text it is showing, and so does CTRL-Z"] = "もう一度 CLEAR を押すと、このクエストに積まれた %d ステップが消えます — エディタの文字はそのまま、CTRL-Z もそのままです",
+  ["the history is gone; the text in the editor is not"] = "履歴は消えました。エディタの文字は消えていません",
 
   -- ------------------------------------------------- the title card and the
   -- opening (`src/scenes/title.lua`, `src/scenes/story.lua`). The sentences

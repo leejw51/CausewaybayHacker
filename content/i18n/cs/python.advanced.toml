@@ -1,0 +1,749 @@
+# PYTHON LAND — ADVANCED, in Czech. A translation pack (SPEC §12.1): the prose
+# of `content/python/advanced.toml`, quest by quest, and nothing else. Code
+# blocks, identifiers, sample input and output and the exact strings a program
+# must print are the English pack's and are copied verbatim, never translated.
+
+pack   = "python.advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.advanced.01.threads"
+title = "Dvanáct stánků, jedno patro"
+story = "12:30 v suterénu SOGO. Dvanáct stánků bere objednávky najednou a poslíček, který sbírá součty, čte tabuli dřív, než na ni kterýkoli z nich něco napsal."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Spusť pro každou hodnotu jedno `threading.Thread`, které spočítá její druhou
+mocninu a uloží ji do `results[i]` — do vlastní přihrádky, takže žádná dvě
+vlákna nezapisují na stejné místo. Každé vlákno `join`ni, pak vypiš výsledky
+**v pořadí indexů**, jeden na řádek, a pak `THREADS <n>`.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+Vlákno nic nevrací. `Thread(target=f)` spustí `f` a její návratovou hodnotu
+zahodí, a proto se výsledek musí zapsat někam, odkud ho hlavní vlákno po
+`join` přečte. Seznam s přihrádkou na vlákno je nejjednodušší takové místo:
+každý index zapisuje přesně jedno vlákno, takže není co zamykat.
+
+Vlákna ve starteru všechna spadnou v okamžiku startu a program přesto
+doběhne a vypíše. `target=square` bez `args=` zavolá `square()` bez ničeho,
+`TypeError` dopadne ve vlákně a vypíše se na standardní chybový výstup, a
+`results` zůstane plný `None`. Vlákno, které umře, vezme s sebou jen samo
+sebe — čti stderr, jinak se to nikdy nedozvíš.
+'''
+hints = [
+  "args=(i, v) na Threadu. Target se volá jako square(*args) a starter nepředává nic.",
+  "Nejdřív spusť každé vlákno, pak každé joinni. Start a join ve stejné iteraci cyklu je správně a spouští je po jednom.",
+  "results je uzávěr nad lokálním seznamem v main; vnořená funkce vidí tentýž seznam, a proto jsou zápisy po join vidět.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.advanced.02.lock"
+title = "Jedna zásuvka, osm rukou"
+story = "Každý stánek v suterénu platí do jedné pokladní zásuvky v kanceláři jídelního patra a při zavírání v ní nic není a každý stánek přísahá, že zaplatil."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Spusť pro každou hodnotu jedno vlákno, které ji přičte k **jednomu
+sdílenému součtu** a zvýší sdílený počet zásahů. Všechna joinni, pak vypiš
+`TOTAL <sum>` a `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+Starter vypíše `TOTAL 0`, deterministicky, s tracebackem na stderr z každého
+workeru. `total += value` uvnitř workeru se `total` z main nedotkne: `int`
+je neměnný, `+=` na něm jméno znovu naváže, a jméno přiřazené uvnitř funkce
+je pro tu funkci **lokální**, pokud neřekne `nonlocal`. Každý worker si
+udělal vlastní `total`, přičetl k němu a zahodil ho.
+
+Oprava je kontejner, který workery mění na místě — jednoprvkový seznam nebo
+malá třída — **a `Lock`**. Druhá půlka není nepovinná. GIL zaručuje, že
+běží jeden bajtkód naráz; `drawer[0] += value` jsou tři bajtkódy (load, add,
+store) a přepnutí vlákna mezi loadem a storem jednu aktualizaci ztratí. Ve
+čtyřech vláknech sčítajících čtyři čísla se to nestane. Stane se to ve dvě
+ráno se čtyřiceti.
+
+`with lock:` ho vezme a cestou ven uvolní, včetně cesty ven přes výjimku.
+'''
+hints = [
+  "Spusť starter: umře s UnboundLocalError, protože `total += value` dělá z total lokální proměnnou pay a čte ji dřív, než existuje. Ta chyba je celá diagnóza.",
+  "Dict nebo seznam se mění na místě, takže `drawer[\"total\"] += value` mění ten jeden objekt, který všechna vlákna sdílejí. `nonlocal total` by fungoval také a je to druhá poctivá odpověď.",
+  "threading.Lock() jednou v main, `with lock:` kolem čtení-úpravy-zápisu. GIL není zámek na tvých datech; je to zámek na interpretu.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.advanced.03.queue"
+title = "Kdo zavře okénko"
+story = "Pult s pečenou husou posílá každou objednávku okénkem do kuchyně a po té poslední tam kuchyně stojí a čeká na další, která nikdy nepřijde."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Jedno producentské vlákno dá každou hodnotu vynásobenou deseti na
+`queue.Queue` a pak dá **sentinel**. Hlavní vlákno bere z fronty, dokud
+neuvidí sentinel, každou hodnotu vypíše a vede si součet, pak vypíše
+`SUM <total>` a `CLOSED`.
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+`queue.Queue` nemá `close`. Nic na ní neumí konzumentovi říct, že už nic
+dalšího nebude; musí to být položka a `None` je ta obvyklá. Starter ji nikdy
+nepošle, takže `get()` blokuje navěky, když už není na co čekat, a runner
+program zabije na časovém limitu. V Pythonu žádný detektor deadlocků není.
+Program prostě přestane odpovídat a takhle zvenku vypadá „zaseknutí“.
+
+Sentinel posílá producent. Nikdy konzument — strana, která ví, že proud
+skončil, je strana, která ho ukončí.
+'''
+hints = [
+  "Jeden řádek, na konci kitchen: hatch.put(None).",
+  "Konzument už `is None` kontroluje. Čekal na něco, co producent nikdy neposlal.",
+  "Kdyby hodnoty mohly legitimně být None, je sentinel soukromý objekt: SENTINEL = object(), porovnávaný přes `is`.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.advanced.04.thread-pool"
+title = "Osm nosičů"
+story = "Čtyřicet beden na nakládací rampě SOGO a osm nosičů. Nikdo nechce čtyřicet nosičů; chtějí, aby těch osm nikdy nestálo."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla `w` a `n` a pak `n` hodnot.
+
+Otevři `ThreadPoolExecutor` s `w` workery, přes `submit` zadej jednu úlohu na
+hodnotu, která vrací `(index, value * value)`, a výsledky posbírej pomocí
+`as_completed`. Seřaď podle indexu, vypiš `<index> <value>`, jedno na řádek,
+a pak `WORKERS <w>`.
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+`submit` vrací `Future`, ne výsledek. `as_completed` vrací futures v pořadí,
+v jakém **doběhly**, což je pořadí, jaké se poolu zrovna zachtělo, a
+`future.result()` je to, co z něj dostane hodnotu — nebo znovu vyhodí
+výjimku, na kterou úloha umřela, což je druhý důvod, proč ho volat.
+
+Starter vypisuje futures. Nést index ve výsledku je to, díky čemu je výstup
+každý běh stejný; řazení podle něj je poslední řádek odpovědi, ne první.
+'''
+hints = [
+  "Starter umře při rozbalování Future: `for index, value in sorted(results)` nemůže rozbalit objekt, který není n-tice. N-tice je uvnitř future.result().",
+  "as_completed vydává úlohy tak, jak končí; index ve výsledku je jediný záznam o tom, odkud která přišla.",
+  "with ThreadPoolExecutor(...) as pool: cestou ven počká na každou zadanou úlohu, takže při vypisování už nic neběží. pool.map by tu fungoval také a pořadí ti udrží sám, za cenu toho, že se nenaučíš as_completed.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.advanced.05.asyncio"
+title = "Kde async doopravdy běží"
+story = "Mei píše `async def` čtyři roky a ani jednou neviděla to, co to pohání. Objednávková tabule v suterénu má jednu smyčku a každý stánek se na ní střídá."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Napiš `async def double(value)`, která jednou předá řízení smyčce událostí —
+`await asyncio.sleep(0)` — a vrátí hodnotu zdvojenou. Spusť všech `n`
+pomocí `asyncio.gather`, vypiš každý výsledek v pořadí vstupu, pak
+`SUM <total>` a `TASKS <n>`.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+Zavolání `async def` ji nespustí. Postaví **objekt korutiny** a vrátí ho, a
+nic uvnitř se nestane, dokud ho něco neawaitne. Seznam ve starteru jsou tři
+korutiny, neawaitnuté, a Python to na stderr říká — `RuntimeWarning:
+coroutine 'double' was never awaited` — zatímco výstup jsou tři řádky
+`<coroutine object double at 0x...>`.
+
+`gather` vezme korutiny, naplánuje je všechny na tu jednu smyčku a vrátí
+jejich výsledky **v pořadí, v jakém jsi je předal**, ať doběhly v jakémkoli
+pořadí. To je celý důvod, proč po něm sáhnout místo ručně psaného cyklu
+`await`ů: cyklus by byl správně a sekvenční, `gather` je správně a
+prokládaný.
+
+Je tu přesně jedno vlákno. `await` je místo, kde korutina vrací vlákno
+smyčce, aby ho mohla použít jiná. Nic neběží paralelně; věci běží
+**po řadě**, na místech, kde řekly, že se mohou zastavit.
+'''
+hints = [
+  "await asyncio.gather(*coroutines) — hvězdička rozprostře seznam do argumentů a await je to, co je spustí.",
+  "asyncio.run(...) je exekutor: vytvoří smyčku, doběhne jednu korutinu do konce a smyčku zavře. Na program je jeden, úplně nahoře.",
+  "gather vrací výsledky v pořadí argumentů. Kdybys je potřeboval tak, jak končí, je to asyncio.as_completed, a pak si index neseš sám, přesně jako u thread poolu.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.advanced.06.async-queue"
+title = "Kdo řekne, že je hotovo"
+story = "Tři poslíčci vyřizují frontu objednávek v suterénu a vedoucí patra čeká, až fronta řekne, že je prázdná. Nikdy to neřekne, protože jí nikdo neřekl, že je nějaký lístek vyřízený."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla `w` a `n` a pak `n` hodnot.
+
+Dej dvojice `(index, value)` na `asyncio.Queue`. Spusť `w` konzumentských
+úloh, které v nekonečném cyklu berou dvojici, zapisují `value * 10` do
+`results[index]` a volají `task_done()`. Hlavní korutina awaitne
+`queue.join()`, pak konzumenty zruší, pak vypíše výsledky v pořadí indexů a
+`CONSUMERS <w>`.
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+`queue.join()` se vrátí, až když každá položka, která byla kdy `put`nuta,
+dostala odpovídající `task_done()`. Konzumenti ve starteru ho nikdy nevolají,
+takže `join` čeká navěky, smyčka nemá nic jiného ke spuštění a program visí,
+dokud ho runner nezabije. Stejné zaseknutí jako v questu s vlákny, jiný
+zápis — a oprava je zase jeden řádek, na straně konzumenta.
+
+Konzumenti jsou cykly `while True`. Končí, protože je main po joinu zruší,
+a zrušit úlohu zaparkovanou na `queue.get()` je normální, zamýšlený způsob,
+jak ji zastavit. Zrušené úlohy awaitni přes `gather(..., return_exceptions=True)`,
+aby se zrušení posbíralo, a ne hlásilo.
+'''
+hints = [
+  "queue.task_done() po zpracování každé položky. join počítá puty proti task_done a nic jiného.",
+  "create_task konzumenta naplánuje bez awaitnutí; smyčka ho spustí, až main příště něco awaitne, což je ten join.",
+  "Úloha zrušená během awaitování get() dostane uvnitř CancelledError, který ukončí while True. return_exceptions=True zabrání tomu, aby ti to gather vyhodil znovu.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.advanced.07.context-managers"
+title = "Roleta stejně spadne"
+story = "Stánek v suterénu otevře roletu na každou objednávku a po ní ji zavře. Ten, který ve 12:40 dostal špatnou objednávku, je od té doby otevřený, protože zavírací kód byl až za řádkem, který selhal."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků ve tvaru `<STALL> <CENTS>`,
+kde `CENTS` má být celé číslo.
+
+Napiš context manager `opened(stall)` pomocí `contextlib.contextmanager`,
+který cestou dovnitř vypíše `OPEN <STALL>` a cestou ven `SHUT <STALL>` —
+**ať už tělo vyhodilo výjimku, nebo ne**. Uvnitř načti centy a přičti je
+k součtu. Řádek, jehož centy se nedají načíst, se ohlásí jako `BAD <STALL>`
+poté, co se roleta zavřela. Nakonec vypiš `TOTAL <sum>` a `REJECTED <k>`.
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+`@contextmanager` udělá z generátoru context manager: všechno před `yield`
+je `__enter__`, všechno za ním je `__exit__`. Když tělo vyhodí výjimku, je
+výjimka vhozena **do generátoru na `yield`**, takže kód za ním běží jen
+tehdy, když je `yield` uvnitř `try`/`finally`. Starter žádné `finally` nemá
+a roleta `WONG` se nikdy nezavře.
+
+Zápis přes třídu — `__enter__` a `__exit__(self, exc_type, exc, tb)` — dělá
+totéž na víc řádků a může výjimku spolknout tím, že vrátí `True`. Tady ji
+nespolkni: volající chce vypsat `BAD`.
+'''
+hints = [
+  "try: yield / finally: print(SHUT). To finally je __exit__, který běží na každé cestě.",
+  "Výjimka projde generátorem a ven z příkazu with, takže except v main ji pořád vidí — proto se BAD vypíše až po SHUT.",
+  "with opened(stall) as x: by navázalo, cokoli generátor yieldne. Tady neyieldne nic a to je v pořádku.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.advanced.08.pipeline"
+title = "Kuchař na lince"
+story = "Linka šéfkuchaře Bo v suterénní kuchyni: jedna stanice objednávku umocní, další si vede průběžný součet a nikdo nečeká na celou dávku."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Postav dvoustupňovou pipeline z **generátorů**:
+
+1. `squares(values)` yieldne každou hodnotu na druhou
+2. `running(stream)` bere libovolný iterovatelný objekt s čísly, vede si
+   průběžný součet a yieldne dvojice `(value, total)`
+
+`main` vypíše každou dvojici jako `<square> <total>` a pak `PIPE <n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+Ani jeden stupeň nestaví seznam. Každý `yield` předá jednu položku dalšímu
+stupni a zastaví se; `main` tahá, `running` tahá ze `squares`, `squares`
+tahá ze vstupu. Nic se nepočítá dřív, než je to chtěné, a celá pipeline má
+v letu jednu položku. Právě díky tomu tytéž tři funkce fungují i na souboru
+o sto milionech řádků.
+
+Druhý stupeň ve starteru má `return` tam, kde má být `yield`, takže je to
+obyčejná funkce vracející konečný součet — `int` — a `main` se přes něj
+pokouší iterovat.
+'''
+hints = [
+  "Chyba je TypeError: cannot unpack non-iterable int object — running vrátil číslo místo toho, aby yieldoval dvojice.",
+  "yield value, total uvnitř cyklu. Funkce, která má kdekoli yield, je generátor a její návratová hodnota není to, co volající vidí.",
+  "running(squares(nums)) se skládá, protože generátor je iterovatelný; running nikdy neví ani ho nezajímá, že jeho vstup je další generátor.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.advanced.09.itertools"
+title = "Nářadí na polici"
+story = "Kancelář v suterénu má polici s nářadím, kterou nikdo neotvírá, a úředník každé odpoledne počítá série stejných lístků ručně."
+brief = '''
+Na standardním vstupu je jeden řádek celých čísel.
+
+Vypiš tři řádky, každý postavený z `itertools` a ničeho ručně psaného:
+
+1. `SUMS` a za ním průběžné součty — `accumulate`
+2. `RUNS` a za ním každou sérii **sousedících** stejných hodnot jako
+   `<v>x<k>` — `groupby`
+3. `PAIRS <k>`: kolik je neuspořádaných dvojic **různých** hodnot —
+   `combinations` nad seřazenými různými hodnotami
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+`groupby` seskupuje jen **sousedící** stejné položky. Není to `Counter` a
+ukázka je zvolená tak, aby se ty dva neshodly: `1` se objevuje čtyřikrát, ve
+dvou sériích. Starter používá pro druhý řádek dict s počty a je špatně
+přesně na tomhle vstupu.
+
+Každá z těchto funkcí vrací líný iterátor. Zvlášť skupiny z `groupby` platí
+jen do chvíle, než postoupíš na další skupinu, takže každou přečti, než
+půjdeš dál — `len(list(group))` uvnitř cyklu, ne seznam skupin uložený na
+později.
+'''
+hints = [
+  "accumulate(nums) yieldne průběžný součet po každém prvku; ten poslední je celkový součet.",
+  "for value, group in groupby(nums): group je iterátor přes tu sérii, spotřebovaný jednou. len(list(group)) je její délka.",
+  "combinations(distinct, 2) yieldne každou neuspořádanou dvojici jednou. Jejich počet je n*(n-1)/2 a ruční kontrola je způsob, jak zjistit, že máš správné n.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.advanced.10.functools"
+title = "Pamatuj si, co jsi spočítal"
+story = "Stánek s tofu počítá tutéž denní cenu z týchž dvou čísel jedenáct tisíckrát před obědem, od začátku, pokaždé."
+brief = '''
+Na standardním vstupu je `n k bits`: dvě celá čísla a řetězec binárních
+číslic.
+
+Vypiš čtyři řádky:
+
+1. `FIB <fib(n)>` — z **rekurzivního** `fib`, memoizovaného přes
+   `functools.lru_cache`
+2. `PRODUCT <k!>` — `functools.reduce` s `operator.mul` přes `1..k`,
+   s počáteční hodnotou, aby `k = 0` dalo `1`
+3. `BIN <value>` — `bits` načtené přes `functools.partial` z `int`
+   s `base=2`
+4. `MISSES <m>` — `fib.cache_info().misses`, kolikrát rekurze skutečně
+   spustila tělo
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` je nejvýš `400`, takže rekurze zůstane uvnitř limitu rámců Pythonu. Bez
+cache je `fib(35)` zhruba třicet milionů volání a `fib(90)` nedoběhne. S ní
+každé `fib(i)` běží jednou a `MISSES` je `n + 1`. `lru_cache` je dekorátor a
+funguje, protože argumenty jsou hashovatelné — argument typu seznam by
+vyhodil `TypeError` při prvním volání.
+
+`partial` zmrazí některé argumenty funkce a dá ti novou; `reduce` složí
+dvouargumentovou funkci přes posloupnost. Ani jedno není chytré. Na obojí se
+ptají.
+'''
+hints = [
+  "@functools.lru_cache(maxsize=None) nad def fib. Starter umře na posledním řádku, protože obyčejná funkce nemá cache_info.",
+  "functools.reduce(operator.mul, range(1, k + 1), 1) — třetí argument je počáteční hodnota a díky ní prázdný rozsah dá 1.",
+  "functools.partial(int, base=2) je volatelný objekt, který vezme řetězec a base=2 si dodá sám. functools.cache je totéž co lru_cache(maxsize=None) na 3.9 a novějších; obojí jméno je v pořádku.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.advanced.11.protocol"
+title = "Stačí, když se vykreslí"
+story = "Orientační tabule v suterénu SOGO vypisuje stánky a pulty, tištěné dvěma různými programy, a tabule chce vědět jen to, že se každý z nich umí vykreslit."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků, každý buď
+
+* `STALL <NAME> <AISLE>` — vykreslí se jako `<NAME> / A<AISLE>`
+* `COUNTER <NUMBER>` — vykreslí se jako `COUNTER <NUMBER>`
+
+Deklaruj `typing.Protocol` jménem `Sign` s jednou metodou, `render()`.
+Napiš `Stall` a `Counter` jako obyčejné třídy — **bez dědění ze `Sign`** — a
+jedinou funkci `show(sign: Sign)`, která vykreslení vypíše. Vypiš každou
+ceduli, pak `SIGNS <n>` spočítané přes `isinstance(x, Sign)`, pak
+`STALLS <k>` spočítané přes `isinstance(x, Stall)`.
+
+```
+input:  3
+        STALL LAM 4
+        COUNTER 2
+        STALL WONG 1
+output: LAM / A4
+        COUNTER 2
+        WONG / A1
+        SIGNS 3
+        STALLS 2
+```
+
+`Protocol` je **strukturální** typ: třída ho splňuje tím, že má ty metody,
+ne tím, že to o sobě řekne. Je to duck typing se jménem, které umí přečíst
+type checker. Za běhu protokol nedělá vůbec nic, pokud není označený
+`@runtime_checkable`, a pak `isinstance` kontroluje metodu podle jména.
+`Sign` ve starteru ten dekorátor chybí a jeho `isinstance` vyhodí:
+
+```
+TypeError: Instance and class checks can only be used with @runtime_checkable protocols
+```
+
+`show` rozhoduje za běhu vyhledáním atributu — `sign.render()` najde
+kteroukoli `render`, kterou objekt má. Žádný statický dispatch, který by
+šlo zvolit místo toho, není; Python má jeden mechanismus a tohle je on.
+'''
+hints = [
+  "@runtime_checkable nad class Sign(Protocol), importované z typing. To je celá oprava.",
+  "Ani Stall, ani Counter nikde Sign nezmiňují. Splňují ho tím, že mají render(); to znamená strukturální.",
+  "isinstance proti runtime-checkable protokolu kontroluje jen to, že metoda existuje, ne její signaturu ani návratový typ. Ty kontroluje type checker; interpret nikdy.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.advanced.12.frozen"
+title = "Nemění se"
+story = "Vytištěný ceník dne dostane každý stánek v 06:00 a do 12:30 do něj tři z nich něco připsaly a jeden přidal sloupec, který tam není."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků ve tvaru `<NAME> <CENTS>`.
+
+Postav z každého řádku **zmrazený** dataclass `Price(name, cents)`. Pak se
+u každé ceny pokus přepsat její `cents` a vypiš `FROZEN <NAME>`, když pokus
+vyhodí výjimku. Dále třída `Tally` s `__slots__ = ("count",)`: nastav
+`tally.count`, pak se pokus nastavit překlepnuté `tally.cuont` a vypiš
+`SLOTS YES`, když *tohle* vyhodí výjimku. Nakonec `IN_SET <k>`, velikost
+`set` z těch cen, a `TOTAL <sum>`.
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SLOTS YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+Tři věci, které zmrazený dataclass přináší, a starter nemá ani jednu.
+`frozen=True` způsobí, že přiřazení do pole vyhodí `FrozenInstanceError`,
+takže do ceníku nejde psát. Zároveň udělá instanci **hashovatelnou** —
+měnitelný dataclass nastaví `__hash__` na `None` a `set()` z cen ve starteru
+vyhodí `TypeError: unhashable type`. Stejná pole, stejný hash, takže dva
+řádky `LAM 1200` jsou jeden prvek množiny.
+
+`__slots__` je druhý druh pevného tvaru: instance má přesně pojmenované
+atributy a žádný `__dict__`, takže překlep ve jménu atributu je
+`AttributeError` už při přiřazení místo tichého nového pole, které nikdo
+nečte. Také každou instanci zmenší, a proto je to odpověď na „máme jich
+deset milionů“.
+'''
+hints = [
+  "@dataclass(frozen=True). Jeden argument a přiřazení v cyklu začne vyhazovat výjimku.",
+  "__slots__ = (\"count\",) v těle třídy, před __init__. Všimni si čárky na konci: (\"count\") je řetězec, ne n-tice.",
+  "TOTAL je součet původních centů, což platí jen proto, že přiřazení selhala. Ve starteru je do té doby každá cena 0 a TOTAL je 0 — změna nejenže byla dovolená, ona i prošla.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.advanced.13.exceptions"
+title = "Vlastní chyba"
+story = "Čtyři vrstvy výpočtu ceny u pultu s rýží vyhazují každá něco svého a přední část pultu jednu z nich chytí a ostatní ji položí."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků, každý má být hmotnost
+v kg.
+
+Definuj hierarchii výjimek: `PriceError(Exception)` jako základ,
+s `NotANumber(PriceError)` a `Negative(PriceError)`. `Negative` nese hmotnost
+a její zpráva je `negative weight: <kg>`; zpráva `NotANumber` je
+`not a number`. `price(text)` převede text, vyhodí `NotANumber` **from**
+`ValueError`, který zachytila, odmítne zápornou hmotnost a jinak vrátí
+`500 + 100 * kg`.
+
+Vypiš každou cenu nebo zprávu chyby a pak `ERRORS <k>`. Chytej **základní
+třídu**, jednou.
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative weight: -2
+        ERRORS 2
+```
+
+Starter chytá `Negative` a nic jiného, takže řádek `xx` položí program
+nezachyceným `NotANumber`. Jedno `except PriceError as err:` chytí každého
+člena hierarchie a `str(err)` je zpráva — což je to, co ti `Exception.__str__`
+dá z argumentů předaných do `super().__init__`, takže zpráva žije ve třídě,
+ne v handleru.
+
+`raise NotANumber() from err` zaznamená `ValueError` jako příčinu. Nic tady
+ji nevypisuje a traceback by ukázal obě, jednu nad druhou, se slovy *The
+above exception was the direct cause of the following exception*. Ten
+řetězec je důvod, proč psát `from`.
+'''
+hints = [
+  "except PriceError as err: — základní třída chytí obě podtřídy a to je smysl toho, mít základní třídu.",
+  "print(err) vypíše str(err), což je zpráva předaná do super().__init__. Žádné přepsání __str__ není potřeba.",
+  "Když máš několik klauzulí except, záleží na pořadí: klauzule podtřídy za klauzulí její základní třídy je mrtvý kód a Python tě nevaruje.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.advanced.14.iterator"
+title = "Další, dokud to nezastaví"
+story = "Automat na lístky u vchodu do suterénu vydává čísla od startu v pevných krocích a nevede si o nich seznam, a tabule fronty chce přes něj procházet cyklem jako přes každý seznam."
+brief = '''
+Na standardním vstupu jsou tři celá čísla: `start`, `step`, `count`.
+
+Napiš třídu `Tickets`, která implementuje **iterátorový protokol ručně**:
+`__iter__` vrací `self` a `__next__` vrací další hodnotu, nebo vyhodí
+`StopIteration`, jakmile bylo vydáno `count` hodnot. Každou vypiš na vlastní
+řádek, pak `SUM <total>` spočítaný tak, že druhý `Tickets` předáš do `sum`.
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+Tohle za tebe píše generátor. Cyklus `for` zavolá na tu věc jednou `iter()`
+a pak `next()` na výsledku, dokud nevyhodí `StopIteration`; `sum`, `list`,
+`max` a `in` dělají totéž. Objekt s `__next__` a bez `__iter__` je iterátor,
+který `for` odmítne — `TypeError: 'Tickets' object is not iterable` — a to
+je starter.
+
+`__iter__` vracející `self` je znak **iterátoru**: dá se projít jednou a pak
+je vyčerpaný. **Kontejner** vrací z `__iter__` pokaždé čerstvý iterátor a dá
+se procházet opakovaně; `Bag` ze základní cesty byl takový. Řekni, který
+z nich píšeš; ten rozdíl se ukáže, jakmile někdo projde cyklem podruhé.
+'''
+hints = [
+  "def __iter__(self): return self. Dva řádky a for začne fungovat.",
+  "StopIteration se vyhazuje, ne vrací. Cyklus for ji chytí; ty ji nikdy neuvidíš.",
+  "Ulož si hodnotu, kterou chceš vrátit, dřív než postoupíš, jinak jsi o krok vedle.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.advanced.15.collections"
+title = "Správný kontejner"
+story = "Kancelář v suterénu drží lístky dne v jednom dlouhém seznamu a na každou otázku o nich odpovídá tím, že ho přečte od začátku."
+brief = '''
+Tři řádky standardního vstupu: řádek slov, řádek celých čísel už
+**seřazených vzestupně** a jedno celé číslo `x`.
+
+Vypiš čtyři řádky:
+
+1. `TOP <word> <count>` — nejčastější slovo, při shodě podle slova
+   vzestupně — z `collections.Counter`
+2. `BISECT <l> <r>` — `bisect_left` a `bisect_right` pro `x` v seřazených
+   celých číslech
+3. `SMALLEST3` a za ním tři nejmenší celá čísla — `heapq.nsmallest` — nebo
+   méně, pokud jich je méně
+4. `GROUPS` a za ním `<letter>:<k>` pro každé první písmeno slov, písmena
+   vzestupně — `collections.defaultdict(list)` klíčovaný prvním písmenem
+
+```
+input:  tofu egg tofu egg fish
+        1 3 3 5 8
+        3
+output: TOP egg 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS e:2 f:1 t:2
+```
+
+`Counter.most_common(1)` rozhoduje shody podle **pořadí vkládání**, což je
+tady `tofu`, a zadání říká `egg`. Starter `most_common` věří. Místo toho
+seřaď položky s klíčem, který říká, co myslíš.
+
+`bisect` odpovídá na „kam by tohle patřilo“ bez cyklu: `bisect_left` je
+první pozice, která není menší než `x`, `bisect_right` první pozice větší, a
+jejich rozdíl je počet kopií `x`. `heapq.nsmallest` je správné volání, když
+je `k` malé a `n` ne; seřadit celý seznam, aby ses podíval na tři hodnoty
+zepředu, je přesně to, čemu má zabránit.
+'''
+hints = [
+  "min(counts.items(), key=lambda item: (-item[1], item[0])) je nejčastější slovo s vypsaným rozhodnutím shody. Seřadit podle stejného klíče a vzít [0] je stejná odpověď.",
+  "bisect_left a bisect_right nikdy nevyhodí výjimku; list.index vyhodí ValueError, když x chybí, a přesně takový je jeden ze skrytých případů.",
+  "defaultdict(list) vytvoří seznam při prvním přístupu, takže groups[letter].append(w) nikdy nepotřebuje kontrolu. Před vypsáním položky seřaď; defaultdict je v pořadí vkládání jako každý dict.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.advanced.16.timeouts"
+title = "Přestaň čekat"
+story = "Objednávková tabule pinguje každý stánek na dobu čekání a stánek, kterému nejde terminál na karty, nikdy neodpoví, takže tabule se nikdy nepřekreslí."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků ve tvaru
+`<STALL> <SECONDS>`, kde `SECONDS` je `0` pro stánek, který odpoví hned, a
+`1` pro ten, který včas neodpoví.
+
+Pro každý stánek `await`ni jeho `fetch(stall, seconds)` — které tak dlouho
+spí — pod `asyncio.wait_for` s timeoutem **0,2 sekundy** a vypiš
+`<STALL> OK` nebo `<STALL> TIMEOUT`, v pořadí vstupu. Pak spusť úlohu
+`watch()`, která běží v nekonečném cyklu, zruš ji, awaitni ji a nech ji
+vypsat `CANCELLED` z jejího `except asyncio.CancelledError` a `CLEANUP`
+z jejího `finally`. Nakonec vypiš `TIMEOUTS <k>`.
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+`wait_for` spustí awaitable s lhůtou; když lhůta vyprší, vnitřní úlohu
+**zruší** a tobě vyhodí `asyncio.TimeoutError`. Chytej to jméno — na 3.11 a
+novějších je to vestavěný `TimeoutError`, na 3.10 není, a `asyncio.TimeoutError`
+je správně na obou.
+
+Starter awaitne `fetch` přímo, takže `WONG` trvá celou sekundu a pak vypíše
+`OK`, a `watch` zruší bez awaitnutí, takže `except` a `finally` té úlohy se
+nestihnou spustit, než se smyčka zavře. Zrušená úloha není zastavená, dokud
+není příště naplánovaná a `CancelledError` není doručen dovnitř; awaitnutí
+je to, co jí ten tah dá. Po ošetření `CancelledError` znovu vyhoď —
+spolknutí je způsob, jak se úloha stane nezrušitelnou.
+'''
+hints = [
+  "asyncio.wait_for(fetch(stall, seconds), timeout=0.2) uvnitř try, s except asyncio.TimeoutError.",
+  "watcher.cancel() jen požádá o zrušení. `await watcher` je to, co úloze dovolí spustit její except a finally; vyhodí ti CancelledError znovu, takže chytej i ten.",
+  "await asyncio.sleep(0) po create_task dá watcheru jeden tah, aby se skutečně rozběhl, takže je co rušit — běžící úloha, a ne jen naplánovaná.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.advanced.17.gil"
+title = "GIL"
+story = "Suterén SOGO, dvanáct stánků, jeden zámek na celé patro. Všechno, co se mělo stát najednou, se stalo po jednom, a součty se vrátily jako vůbec nic."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla `k` a `n`.
+
+Rozděl `1..n` na `k` souvislých úseků — úsek `i` je od `n*i//k + 1` do
+`n*(i+1)//k` včetně — a každý úsek dej vlastnímu vláknu, které sečte druhé
+mocniny svého rozsahu: cyklus zatěžující CPU, žádné volání knihovny. Každé
+vlákno přičte svůj výsledek k **jednomu sdílenému součtu**, pod zámkem, a
+zapíše ho i do vlastní přihrádky. Všechna joinni. Vypiš `CHUNK <i> <sum>`
+pro každý úsek v pořadí indexů, pak `TOTAL <sum>`, pak `THREADS <k>`.
+
+```
+input:  3 10
+output: CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        THREADS 3
+```
+
+Starter selhává z důvodu, který s časováním nemá nic společného. `work`
+vrací svůj součet a `main` sbírá `t.join()`, jenže `join` vrací `None`, ať
+target vrátil cokoli — vlákno nemá návratovou hodnotu. První `+=` je
+`TypeError`. To je ta malá chyba. Oprav ji tak, jak to udělal quest se
+zámkem: sdílený kontejner, `with lock:` kolem aktualizace a přihrádka na
+úsek zapisovaná přesně jedním vláknem.
+
+Ta velká věc je boss a není to chyba, kterou bys mohl opravit. Spusť to
+s `k = 4` a `n = 4000000` a změř to, pak to spusť s `k = 1`. Trvají stejně
+dlouho. CPython má **globální zámek interpretu**: v každém okamžiku běží
+bajtkód Pythonu v jednom vlákně a vlákno zatěžující CPU zámek každých pár
+milisekund pustí, aby se ostatní mohla vystřídat. Čtyři vlákna na čtyřech
+jádrech sčítají druhé mocniny na střídačku, na jednom jádře, plus cena za
+přepínání. Vlákna v Pythonu jsou na čekání — na sockety, na soubory, na
+`sleep` — kde se zámek během čekání uvolní a souběžnost je skutečná. Na
+práci CPU je odpověď `multiprocessing` nebo `concurrent.futures.
+ProcessPoolExecutor`, které spouštějí oddělené interprety s oddělenými
+zámky a platí za to kopírováním argumentů.
+
+Výstup je deterministický, protože úseky se vypisují podle indexu a součet
+je součet úseků, ne pořadí, v jakém vlákna skončila. `TOTAL` vypiš ze
+zamčeného součtu, ne ze sečtení přihrádek — zámek je to, o čem tahle mapa
+je, a ta dvě čísla se musí shodovat.
+'''
+hints = [
+  "join() vrací None. Dej work index a přihrádku k zápisu a zamčený dict, do kterého přičítá; takhle se hodnota dostane z vlákna ven.",
+  "Spusť všechna, pak joinni všechna, pak vypisuj. Vypisování uvnitř vláken by se prokládalo; vypisování po joinech, z přihrádek, nemůže.",
+  "n*(n+1)*(2n+1)/6 je uzavřený vzorec pro celkový součet. Zkontroluj proti němu TOTAL jednou a víš, že hranice úseků jsou správně.",
+  "Změř k=1 proti k=4 na velkém n. Když se shodují, potkal jsi GIL. To není chyba v tomhle questu; je to důvod, proč je příští verze tohohle programu ProcessPoolExecutor.",
+]

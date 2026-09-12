@@ -10,7 +10,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -88,6 +88,9 @@ impl Default for MapDef {
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ImportReport {
     pub packs: Vec<PackReport>,
+    /// Translation packs (SPEC §12.1), imported after every English pack so
+    /// each one can be checked against the quests that actually exist.
+    pub translations: Vec<TranslationReport>,
     /// Files that could not be read or did not validate. A bad pack never
     /// stops the server: the rest of the content still imports, and the
     /// operator gets the path and the reason.
@@ -124,7 +127,16 @@ pub fn import_dir(conn: &Connection, home: &Home, dir: &Path) -> Result<ImportRe
     if files.is_empty() {
         tracing::warn!(path = %dir.display(), "content directory holds no .toml packs");
     }
-    for file in files {
+    // Two passes, English first. A translation names quest ids and is
+    // checked against the rows those ids have — hint counts, existence — so
+    // it cannot be imported before the pack that supplies them, and the walk
+    // above sorts `i18n/` before `rust/`. The split is by what the file *is*
+    // (a `locale` key), not by where it sits, so a translation dropped into
+    // `content/rust/` by mistake is still not parsed as a pack and refused
+    // for the wrong reason.
+    let (translations, packs): (Vec<PathBuf>, Vec<PathBuf>) =
+        files.into_iter().partition(|f| is_translation_file(f));
+    for file in packs {
         match import_file(conn, home, &file) {
             Ok(pack) => {
                 tracing::info!(path = %file.display(), pack = %pack.pack, quests = pack.quests, "imported pack");
@@ -132,6 +144,24 @@ pub fn import_dir(conn: &Connection, home: &Home, dir: &Path) -> Result<ImportRe
             }
             Err(e) => {
                 tracing::warn!(path = %file.display(), error = %e, "skipping pack");
+                report
+                    .failures
+                    .push((file.display().to_string(), e.to_string()));
+            }
+        }
+    }
+    for file in translations {
+        match import_translation(conn, home, &file) {
+            Ok(text) => {
+                tracing::info!(
+                    path = %file.display(), pack = %text.pack, locale = %text.locale,
+                    quests = text.quests, skipped = text.skipped.len(),
+                    "imported translation"
+                );
+                report.translations.push(text);
+            }
+            Err(e) => {
+                tracing::warn!(path = %file.display(), error = %e, "skipping translation");
                 report
                     .failures
                     .push((file.display().to_string(), e.to_string()));
@@ -157,7 +187,14 @@ fn collect_toml(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
 pub fn import_file(conn: &Connection, home: &Home, path: &Path) -> Result<PackReport> {
     let text = std::fs::read_to_string(path)
         .map_err(|e| internal(format!("cannot read {}: {e}", path.display())))?;
-    reject_basic_strings(&text, path)?;
+    if has_top_level_key(&text, "locale") {
+        return Err(bad_request(format!(
+            "{} carries a `locale` key, so it is a translation (SPEC §12.1), not a pack; \
+             it belongs under content/i18n/<locale>/",
+            path.display()
+        )));
+    }
+    reject_basic_strings(&text, path, PACK_CODE_FIELDS)?;
     let pack: Pack = toml::from_str(&text)
         .map_err(|e| bad_request(format!("{} is not a valid pack: {e}", path.display())))?;
     validate(&pack)?;
@@ -183,11 +220,17 @@ pub fn import_file(conn: &Connection, home: &Home, path: &Path) -> Result<PackRe
 /// before `rustc` ever sees it. The quest then fails in a way that reads as a
 /// compiler bug, which is a day of somebody's life. Caught here, on the raw
 /// text, because by the time TOML has parsed it the damage is invisible.
-fn reject_basic_strings(text: &str, path: &Path) -> Result<()> {
-    const CODE_FIELDS: &[&str] = &["brief", "story", "starter", "solution"];
+///
+/// The same trap holds for a translation's `brief` and `story` (SPEC §12.1),
+/// which carry the English brief's code blocks verbatim — so the field list
+/// is a parameter and the translation importer passes its own.
+const PACK_CODE_FIELDS: &[&str] = &["brief", "story", "starter", "solution"];
+const TRANSLATION_CODE_FIELDS: &[&str] = &["brief", "story"];
+
+fn reject_basic_strings(text: &str, path: &Path, code_fields: &[&str]) -> Result<()> {
     for (number, line) in text.lines().enumerate() {
         let trimmed = line.trim_start();
-        for field in CODE_FIELDS {
+        for field in code_fields {
             let Some(rest) = trimmed.strip_prefix(field) else {
                 continue;
             };
@@ -235,13 +278,23 @@ pub const CONCEPT_VOCABULARY: &[&str] = &[
     "zero-values",
     "testing",
     "serialization",
-    // memory and aliasing — rust only
+    // memory and aliasing — rust, and the parts of it C++ shares
     "ownership",
     "borrowing",
     "lifetimes",
     "mutability",
     "smart-pointers",
     "interior-mutability",
+    // C++ — everything is an address
+    "pointers",
+    "raii",
+    "move-semantics",
+    "undefined-behaviour",
+    // Python — everything is a dict
+    "comprehensions",
+    "generators",
+    "decorators",
+    "duck-typing",
     // concurrency
     "concurrency",
     "channels",
@@ -277,7 +330,7 @@ pub const CONCEPT_VOCABULARY: &[&str] = &[
 
 /// SPEC §12's rules, all of them, before a single row is written.
 pub fn validate(pack: &Pack) -> Result<()> {
-    if !matches!(pack.land.as_str(), "rust" | "go") {
+    if !matches!(pack.land.as_str(), "rust" | "go" | "cpp" | "python") {
         return Err(bad_request(format!("unknown land '{}'", pack.land)));
     }
     if !matches!(pack.category.as_str(), "basic" | "advanced" | "hacker") {
@@ -698,6 +751,12 @@ pub fn audit_dir(conn: &Connection, dir: &Path) -> Result<Vec<PackAudit>> {
     collect_toml(dir, &mut files)?;
     files.sort();
     for path in files {
+        // A translation is not a pack and has no `quests` rows of its own to
+        // audit; parsed as one it would read as "unreadable" and fail
+        // `doctor` on every healthy checkout.
+        if is_translation_file(&path) {
+            continue;
+        }
         out.push(audit_file(conn, &path)?);
     }
     Ok(out)
@@ -744,4 +803,278 @@ pub fn audit_file(conn: &Connection, path: &Path) -> Result<PackAudit> {
         pack: pack.pack,
         unreadable: None,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Translation packs (SPEC §12.1): `content/i18n/<locale>/<land>.<category>.toml`
+// ---------------------------------------------------------------------------
+
+/// A translation file. `pack` names the English pack it translates and
+/// `locale` the language; there is no `land`/`category` pair because the
+/// pack id already says both, and a file that carried them could disagree.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Translation {
+    pub pack: String,
+    pub locale: String,
+    #[serde(default, rename = "quest")]
+    pub quests: Vec<QuestTextDef>,
+}
+
+/// The four prose fields of one quest, in one language. Everything else —
+/// node, difficulty, starter, solution, tests — is the English pack's and is
+/// not repeated here, so a translation cannot quietly move a quest or change
+/// what its tests expect.
+#[derive(Debug, Clone, Deserialize)]
+pub struct QuestTextDef {
+    pub id: String,
+    pub title: String,
+    #[serde(default)]
+    pub story: String,
+    pub brief: String,
+    #[serde(default)]
+    pub hints: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TranslationReport {
+    pub path: String,
+    pub pack: String,
+    pub locale: String,
+    /// Rows written.
+    pub quests: usize,
+    /// Ids the file translates that no imported pack supplies. Logged and
+    /// left out rather than fatal: a translation that runs ahead of a
+    /// content edit is stale, not wrong, and the other rows are still worth
+    /// serving.
+    pub skipped: Vec<String>,
+}
+
+/// Whether a `.toml` under the content tree is a translation rather than a
+/// pack. Decided by the file's own top-level `locale` key so that the two
+/// kinds are never parsed as each other whatever directory they land in.
+fn is_translation_file(path: &Path) -> bool {
+    match std::fs::read_to_string(path) {
+        Ok(text) => has_top_level_key(&text, "locale"),
+        // Unreadable files fall through to the pack importer, which reports
+        // the read error the way it always has.
+        Err(_) => false,
+    }
+}
+
+/// A raw-text look for `key =` at column zero **before the first table
+/// header**, which is where TOML keeps a document's top-level keys. Cheaper
+/// than parsing twice and — unlike parsing — cannot be fooled by a quest
+/// table that happens to contain a key of the same name.
+fn has_top_level_key(text: &str, key: &str) -> bool {
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('[') {
+            return false;
+        }
+        if let Some(rest) = trimmed.strip_prefix(key) {
+            if rest.trim_start().starts_with('=') {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+pub fn import_translation(
+    conn: &Connection,
+    home: &Home,
+    path: &Path,
+) -> Result<TranslationReport> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|e| internal(format!("cannot read {}: {e}", path.display())))?;
+    reject_basic_strings(&text, path, TRANSLATION_CODE_FIELDS)?;
+    let translation: Translation = toml::from_str(&text).map_err(|e| {
+        bad_request(format!(
+            "{} is not a valid translation pack: {e}",
+            path.display()
+        ))
+    })?;
+    validate_translation(&translation, path)?;
+    let (written, skipped) = apply_translation(conn, &translation)?;
+    // §1 again: the home records what the database was built from, and a
+    // translation is part of that.
+    let name = format!(
+        "{}.{}.toml",
+        translation.pack.replace(['/', '\\'], "_"),
+        translation.locale
+    );
+    write_private(&home.content_dir().join(name), text.as_bytes())?;
+    Ok(TranslationReport {
+        path: path.display().to_string(),
+        pack: translation.pack,
+        locale: translation.locale,
+        quests: written,
+        skipped,
+    })
+}
+
+/// SPEC §12.1's rules that can be checked against the file alone. The ones
+/// that need the database — does the quest exist, how many hints does it
+/// have — are `apply_translation`'s.
+pub fn validate_translation(translation: &Translation, path: &Path) -> Result<()> {
+    if !crate::quests::TEXT_LOCALES.contains(&translation.locale.as_str()) {
+        return Err(bad_request(format!(
+            "{}: locale '{}' is not one of {}",
+            path.display(),
+            translation.locale,
+            crate::quests::TEXT_LOCALES.join(", ")
+        )));
+    }
+    let (pack_land, pack_category) = translation
+        .pack
+        .split_once('.')
+        .filter(|(land, category)| {
+            !land.is_empty() && !category.is_empty() && !category.contains('.')
+        })
+        .ok_or_else(|| {
+            bad_request(format!(
+                "{}: pack '{}' is not <land>.<category>",
+                path.display(),
+                translation.pack
+            ))
+        })?;
+    // The directory is the locale and the file name is the pack: that is how
+    // a reader — and `verify_pack.py --i18n` — finds the file for a language
+    // without opening every one. A file that says otherwise is misfiled.
+    let dir = path
+        .parent()
+        .and_then(|d| d.file_name())
+        .and_then(|d| d.to_str());
+    if dir.is_some_and(|d| d != translation.locale) {
+        return Err(bad_request(format!(
+            "{}: says locale = \"{}\" but sits under i18n/{}/",
+            path.display(),
+            translation.locale,
+            dir.unwrap_or("?")
+        )));
+    }
+    let stem = path.file_stem().and_then(|s| s.to_str());
+    if stem.is_some_and(|s| s != translation.pack) {
+        return Err(bad_request(format!(
+            "{}: translates pack \"{}\" but is not named {}.toml",
+            path.display(),
+            translation.pack,
+            translation.pack
+        )));
+    }
+    let mut ids = BTreeSet::new();
+    for quest in &translation.quests {
+        let (land, category, _, _) = parse_quest_id(&quest.id).ok_or_else(|| {
+            bad_request(format!(
+                "{}: quest id '{}' is not <land>.<category>.<node:02d>.<slug>",
+                path.display(),
+                quest.id
+            ))
+        })?;
+        if land != pack_land || category != pack_category {
+            return Err(bad_request(format!(
+                "{}: quest id '{}' does not belong to pack {}",
+                path.display(),
+                quest.id,
+                translation.pack
+            )));
+        }
+        if !ids.insert(quest.id.as_str()) {
+            return Err(bad_request(format!(
+                "{}: duplicate quest id '{}'",
+                path.display(),
+                quest.id
+            )));
+        }
+        if quest.title.trim().is_empty() || quest.brief.trim().is_empty() {
+            return Err(bad_request(format!(
+                "{}: quest '{}' has an empty title or brief",
+                path.display(),
+                quest.id
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Write the rows, in one transaction, replacing whatever this locale had
+/// for this pack. There is no user state on `quest_text` so — unlike
+/// `apply` — delete-and-insert is the honest reconciliation: a quest the
+/// file no longer translates goes back to English.
+///
+/// Returns the count written and the ids skipped for not existing.
+fn apply_translation(conn: &Connection, translation: &Translation) -> Result<(usize, Vec<String>)> {
+    conn.execute_batch("BEGIN IMMEDIATE")?;
+    let result = (|| {
+        let mut skipped = Vec::new();
+        let mut written = 0;
+        conn.execute(
+            "DELETE FROM quest_text
+              WHERE locale = ?1
+                AND quest_id IN (SELECT id FROM quests WHERE pack = ?2)",
+            params![translation.locale, translation.pack],
+        )?;
+        for quest in &translation.quests {
+            let english: Option<(String, String)> = conn
+                .query_row(
+                    "SELECT pack, hints FROM quests WHERE id = ?1",
+                    params![quest.id],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()?;
+            let Some((pack, hints_json)) = english else {
+                tracing::warn!(
+                    quest = %quest.id, locale = %translation.locale,
+                    "translation names a quest no pack supplies; skipping it"
+                );
+                skipped.push(quest.id.clone());
+                continue;
+            };
+            if pack != translation.pack {
+                // The id parsed as this pack's, but the row belongs to another
+                // one: the English side has moved it. Skip rather than write
+                // a row the delete above would never reclaim.
+                skipped.push(quest.id.clone());
+                continue;
+            }
+            let english_hints: Vec<String> = serde_json::from_str(&hints_json).unwrap_or_default();
+            if english_hints.len() != quest.hints.len() {
+                // Hints are revealed by index and priced per hint (SPEC
+                // §6.3). A translation with a different count would either
+                // hand out a hint the English does not have or run out one
+                // early — so the file is refused, not trimmed.
+                return Err(bad_request(format!(
+                    "quest '{}' has {} hints in {} and {} in English; the counts must match",
+                    quest.id,
+                    quest.hints.len(),
+                    translation.locale,
+                    english_hints.len()
+                )));
+            }
+            conn.execute(
+                "INSERT INTO quest_text (quest_id, locale, title, story, brief, hints)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    quest.id,
+                    translation.locale,
+                    quest.title,
+                    quest.story,
+                    quest.brief,
+                    serde_json::to_string(&quest.hints)?,
+                ],
+            )?;
+            written += 1;
+        }
+        Ok((written, skipped))
+    })();
+    match result {
+        Ok(counts) => {
+            conn.execute_batch("COMMIT")?;
+            Ok(counts)
+        }
+        Err(e) => {
+            let _ = conn.execute_batch("ROLLBACK");
+            Err(e)
+        }
+    }
 }

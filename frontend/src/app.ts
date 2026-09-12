@@ -11,7 +11,7 @@
 import { Layout, type Orientation } from "./engine/layout";
 import { Input, loveKey } from "./engine/input";
 import { Assets } from "./engine/assets";
-import { ensureFonts, printf, remeasure } from "./engine/text";
+import { ensureFonts, printf, remeasure, wrap } from "./engine/text";
 import { css, Theme } from "./engine/theme";
 import { btnBox, fill, inRect, panel, pixBtn, type Ctx, type Rect } from "./engine/ui";
 import { seconds, reducedMotion, Tween } from "./engine/motion";
@@ -103,6 +103,31 @@ interface Modal {
   tween: Tween;
   rects: { confirm: Rect; cancel: Rect } | null;
   hover: "confirm" | "cancel" | null;
+}
+
+/**
+ * How tall the confirmation dialogue has to be to hold its own question.
+ *
+ * This used to be a flat 190px, which is two lines of English and silently
+ * hides everything past that: the Korean "clear the stack?" body wraps to four
+ * and the last two printed *underneath* the buttons. A dialogue that crops the
+ * sentence explaining what it is about to destroy is worse than no dialogue,
+ * and it fails in exactly the languages nobody writing it reads — so the body
+ * is measured and the panel is built around it.
+ *
+ * Floored at the old height so the short English questions this was tuned
+ * against keep the proportions they had.
+ */
+export function askHeight(
+  s: number,
+  bodyTop: number,
+  bodyLines: number,
+  lineH: number,
+  buttonH: number,
+): number {
+  // Body, a breath, the buttons, and the same 18px skirt they always had.
+  const needed = bodyTop + bodyLines * lineH + Math.round(20 * s) + buttonH + Math.round(18 * s);
+  return Math.max(Math.round(190 * s), needed);
 }
 
 export class App {
@@ -711,8 +736,27 @@ export class App {
     fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.72 * t);
 
     const w = Math.min(layout.vw - 40 * s, 520 * s);
-    const h = Math.round(190 * s);
     const x = Math.round((layout.vw - w) / 2);
+
+    // Tall enough for the question it is actually asking.
+    //
+    // This was a flat 190px, which fits two lines of English and silently
+    // hides the rest: the Korean "clear the stack?" body wraps to four and the
+    // last two printed underneath the buttons. A dialogue that crops the
+    // sentence explaining what it is about to destroy is worse than no
+    // dialogue, and it fails in exactly the languages nobody writing it reads.
+    // So the body is measured first and the panel is built around it.
+    const bodyTop = Math.round(56 * s);
+    const bodyW = w - Math.round(40 * s);
+    const bodyLines = wrap(fonts.small, m.body, bodyW).length;
+    const [bw, bh] = btnBox(
+      fonts.button,
+      [m.confirm, m.cancel],
+      0,
+      fonts.button.size * 2,
+      layout.minTouchH(),
+    );
+    const h = askHeight(s, bodyTop, bodyLines, fonts.small.height, bh);
     // The dialogue drops in and settles rather than fading up, so it reads as
     // something that arrived to stop you rather than something that was
     // always there.
@@ -722,23 +766,8 @@ export class App {
     g.fillStyle = css(Theme.coin);
     printf(g, fonts.station, m.title, x, y + Math.round(22 * s), w, "center");
     g.fillStyle = css(Theme.cream);
-    printf(
-      g,
-      fonts.small,
-      m.body,
-      x + Math.round(20 * s),
-      y + Math.round(56 * s),
-      w - Math.round(40 * s),
-      "center",
-    );
+    printf(g, fonts.small, m.body, x + Math.round(20 * s), y + bodyTop, bodyW, "center");
 
-    const [bw, bh] = btnBox(
-      fonts.button,
-      [m.confirm, m.cancel],
-      0,
-      fonts.button.size * 2,
-      layout.minTouchH(),
-    );
     const gap = Math.round(12 * s);
     const by = y + h - bh - Math.round(18 * s);
     const cancelRect: Rect = [Math.round(x + w / 2 - bw - gap / 2), by, bw, bh];

@@ -211,6 +211,28 @@ prompt = """\
 16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The character is a chubby cartoon gopher standing upright: pale tan-and-brown fur, a big rounded muzzle with two large front teeth, tiny round ears, big friendly black eyes, small pink paws. He is holding a tall takeaway cup of Hong Kong milk tea in both paws and wearing a small cyan delivery-rider cap. He stands on a low concrete kerb. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no symbols, no writing on any screen or sign — every screen and panel is blank. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
 
 [[asset]]
+name = "sprite_cpp"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+note = "C++ LAND's mascot, the platypus (오리너구리) — docs/story.md §1. Four animals in one, which is the point: the bill, the tail and the webbed feet all have to read at 128px or it is just a brown blob, so they are named separately in the prompt. The spur is lore, not pixels; at this size it would be one dark dot and would read as dirt. Generated 2026-09-12; re-run this to re-roll it."
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The character is a friendly cartoon platypus sitting upright: a plump body covered in dark chocolate-brown fur, a wide flat duck-like bill in dull slate grey, two small round black eyes above the bill, a broad flat paddle-shaped beaver tail curled to one side, four short webbed feet in the same slate grey. He wears a small steel-blue neckerchief. He is sitting on a low grey granite harbour wall. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with a dithered highlight along the back and the bill, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "sprite_python"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+note = "PYTHON LAND's mascot — docs/story.md §1. Asleep on a price board in the wet market, so the pose is a flat coil rather than a rearing snake: a rearing one reads as a threat and this land is the warm one. Generated 2026-09-12; re-run this to re-roll it."
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The character is a small friendly cartoon python coiled up asleep: a thick rounded body in warm golden yellow with soft olive-green saddle markings along the back, the head resting on the topmost coil, both eyes closed in happy curved lines, a tiny forked tongue just showing. He is coiled on a blank wooden market price board lying flat. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights on the coils, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers — the price board is completely blank. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
 name = "agent_skynet"
 kind = "sprite"
 aspect = "1:1"
@@ -903,3 +925,183 @@ generated = "2026-09-11"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, slip, board or screen — every surface is blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A burst of SIX small jagged metal shards flying outward in all directions from an empty centre, like something heavy has just snapped apart — each shard a short angular chip of brass gold with a bright silver broken edge, tumbling at a different angle, largest at the top and smallest at the bottom, with three tiny pale sparks between them. The centre of the burst is empty magenta. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "boss_segfault"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. BOSS enemy sprite, large and imposing, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. The boss is a hostile colonial naval cannon on a low stone firing platform: a squat dark bronze barrel aimed straight at the viewer, its muzzle a perfectly flat matte black circular void with nothing inside it, a single hollow white ring hovering above the barrel for an eye, two heavy iron carriage wheels, a short stack of cannonballs beside it. Harsh noon light, cold grey stone, verdigris green bronze."""
+
+[[asset]]
+name = "boss_dangling"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. BOSS enemy sprite, large and imposing, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. The boss is a hostile industrial water pump machine standing upright: a dark riveted iron cylinder body with a big round pressure dial for a face, the dial completely blank, two thick articulated pipe arms reaching forward, one arm gripping a heavy severed rubber hose whose cut end hangs loose and drips, the other arm closed on empty air holding nothing. Wet concrete base, rust streaks, sickly green underground light."""
+
+[[asset]]
+name = "boss_linker"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. BOSS enemy sprite, large and imposing, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. The boss is a hostile interview-room whiteboard on castors: a tall blank white board in a dark aluminium frame, its surface completely empty, a large round wall clock mounted in the centre of the board where a face would be with blank hands and no numbers, two thin dark metal arms folded across the frame, a row of unused marker pens on the tray at the bottom. Cold fluorescent light, institutional grey and white."""
+
+[[asset]]
+name = "boss_none"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. BOSS enemy sprite, large and imposing, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. The boss is a hostile wet-market price board standing on a thin metal easel: a tall flat rectangular board of completely blank matte black slate with absolutely nothing written on it, a single hollow white ring near the top for an eye, two thin wooden arms reaching forward holding a completely empty plastic shopping bag, a bare metal price-tag clip hanging off one corner. Dim pre-dawn light, wet concrete floor, pale fluorescent tube above."""
+
+[[asset]]
+name = "boss_gil"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. BOSS enemy sprite, large and imposing, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. The boss is one enormous heavy brass padlock hanging in front of a row of closed metal shop shutters: the padlock body is a huge rounded brass block with a thick steel shackle, a single dark keyhole in the centre of the body for a mouth and one hollow white ring above it for an eye, short chain ends trailing from either side. Behind it the shutters are flat ribbed corrugated steel, all closed. Warm basement light, brass and dull steel."""
+
+[[asset]]
+name = "boss_recursion"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. BOSS enemy sprite, large and imposing, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. The boss is a hostile stack of identical interview chairs receding into itself: five or six plain dark wooden chairs stacked one inside another going back and getting smaller toward a dark vanishing point in the middle, the innermost one almost a dot, a single hollow white ring hovering in front of the stack for an eye. Cold fluorescent light, institutional brown and grey."""
+
+[[asset]]
+name = "mascot_cpp_basic"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. A friendly cartoon platypus: a plump dark chocolate-brown furred body, a wide flat duck-like bill in dull slate grey, two small round black eyes, a broad flat paddle-shaped beaver tail, four short webbed feet, a small steel-blue neckerchief. He is sitting upright on a low grey granite harbour wall holding a small brass telescope up to one eye with both front feet, looking out. Bright noon light off the water."""
+
+[[asset]]
+name = "mascot_cpp_advanced"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. A friendly cartoon platypus: a plump dark chocolate-brown furred body, a wide flat duck-like bill in dull slate grey, two small round black eyes, a broad flat paddle-shaped beaver tail, four short webbed feet, a small steel-blue neckerchief. He is standing between two big red iron wheel valves, one in each front foot, turning both at the same time, with a short length of pipe behind him. Green underground pump-room light."""
+
+[[asset]]
+name = "mascot_cpp_hacker"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. A friendly cartoon platypus: a plump dark chocolate-brown furred body, a wide flat duck-like bill in dull slate grey, two small round black eyes, a broad flat paddle-shaped beaver tail, four short webbed feet, a small steel-blue neckerchief. He is standing at a small blank white whiteboard holding a marker pen in one front foot, the board completely empty, a plain round wall clock on the wall behind him with blank hands. Cold fluorescent interview-room light."""
+
+[[asset]]
+name = "mascot_python_basic"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. A small friendly cartoon python coiled up: a thick rounded body in warm golden yellow with soft olive-green saddle markings, the head raised on top of the coils, two round black eyes, a tiny forked tongue. He is coiled on a wooden wet-market stall counter beside a stack of plain cardboard produce trays and a completely blank price board. Pale dawn light, wet concrete."""
+
+[[asset]]
+name = "mascot_python_advanced"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. A small friendly cartoon python: a thick rounded body in warm golden yellow with soft olive-green saddle markings, two round black eyes, a tiny forked tongue. His long body is looped through the handles of four metal food-hall trays at once, holding all of them up in a fan around him, the trays completely empty. Busy basement food-hall light, warm amber."""
+
+[[asset]]
+name = "mascot_python_hacker"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign, screen and board is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no holes through it and no magenta anywhere inside its outline. A small friendly cartoon python: a thick rounded body in warm golden yellow with soft olive-green saddle markings, two round black eyes, a tiny forked tongue. He is coiled on the tray of a small blank white whiteboard with the tip of his tail holding a marker pen against the board, the board completely empty, a plain round wall clock behind with blank hands. Cold fluorescent interview-room light."""
+
+[[asset]]
+name = "emblem_cpp_basic"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of typhoon-shelter waterfront objects: THREE wooden sampan boat hulls moored in a line low in the water, a short row of grey granite mooring bollards with coiled rope, and a squat bronze naval cannon on a stone platform at the end. Harsh noon sunlight, bleached grey stone, verdigris bronze, deep blue harbour water. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_cpp_advanced"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of underground pump-room machinery: TWO large dark iron pump housings side by side with round blank pressure dials, a bank of THREE red iron wheel valves on a pipe manifold, and a tangle of thick pipes running along the ground. Green underground light, rust streaks, wet dark metal. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_cpp_hacker"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of interview-room furniture: a plain blank white whiteboard on castors, TWO stacked dark wooden chairs, a small table with a blank round wall clock leaning on it, and a waste bin. Cold fluorescent light, institutional grey, brown and white. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_python_basic"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of wet-market stall objects: THREE wooden produce crates in a line filled with bright vegetables, a set of hanging brass scales, a stack of plain nested plastic baskets, and a blank slate price board on a metal easel. Pale dawn light, wet grey concrete, warm vegetable greens and oranges. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_python_advanced"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of basement food-hall objects: FOUR stainless steel serving counters packed in a line with empty glass sneeze-guards, a stack of metal trays, and a bank of THREE closed corrugated shutters at the end. Warm amber basement light, brushed steel, dull red shutters. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "emblem_python_hacker"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-12"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of interview-room furniture: a plain blank white whiteboard on castors, TWO stacked dark wooden chairs, a small table with a blank round wall clock leaning on it, and a closed laptop. Cold fluorescent light, institutional grey, brown and white. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""

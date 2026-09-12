@@ -447,20 +447,409 @@ fn go_panic_line(stderr: &str) -> Option<i64> {
     None
 }
 
-/// Compile diagnostics, whichever land they came from.
+// ---------------------------------------------------------------------------
+// C++ (SPEC §7.1's third column)
+//
+// clang and gcc agree on the frame of a diagnostic —
+// `main.cpp:5:18: error: message` — and disagree on almost every word inside
+// it: clang says "use of undeclared identifier 'x'", gcc says "'x' was not
+// declared in this scope". The identity is therefore made from what the
+// message is *about*, tested against both wordings, and the player's own
+// names stay in `mistakes.message` where they belong.
+// ---------------------------------------------------------------------------
+
+/// The message after `error:` / `warning:` → the kind and the identity.
+///
+/// Ordered from the most specific phrase to the least. "cannot bind
+/// non-const lvalue reference" is a constness lesson before it is a
+/// conversion lesson, and "expected" appears inside plenty of type errors
+/// ("expected 2 arguments"), so the syntax markers are checked last.
+pub fn cpp_kind(message: &str, level: &str) -> (&'static str, &'static str) {
+    const MOVED: [&str; 6] = [
+        "use after move",
+        "moved-from",
+        "use of moved",
+        "after being moved",
+        "after it was moved",
+        "after move",
+    ];
+    let lower = message.to_ascii_lowercase();
+    let has = |needles: &[&str]| needles.iter().any(|n| lower.contains(n));
+
+    if level == "warning" {
+        if has(&["unused", "set but not used", "never used"]) {
+            return ("unused", "cpp:unused");
+        }
+        if has(&MOVED) {
+            return ("borrow-after-move", "cpp:use-after-move");
+        }
+        return ("other", "cpp:other");
+    }
+    if has(&MOVED) {
+        return ("borrow-after-move", "cpp:use-after-move");
+    }
+    if has(&[
+        "const-qualified",
+        "read-only",
+        "discards qualifiers",
+        "drops 'const'",
+        "drops const",
+        "cannot bind non-const",
+        "as 'this' argument",
+        "assignment of member",
+        "increment of read-only",
+        "is not assignable",
+    ]) {
+        return ("mutability", "cpp:const-discard");
+    }
+    if has(&[
+        "undeclared identifier",
+        "was not declared",
+        "has not been declared",
+        "unknown type name",
+        "does not name a type",
+        "is not a member of",
+        "has no member named",
+        "no member named",
+        "no template named",
+        "is not a class, namespace, or enumeration",
+        "file not found",
+        "no such file or directory",
+    ]) {
+        return ("unknown-name", "cpp:undeclared-identifier");
+    }
+    if has(&[
+        "no matching function",
+        "no matching constructor",
+        "no matching member function",
+        "no viable overloaded",
+        "no viable constructor",
+        "too many arguments",
+        "too few arguments",
+        "requires 1 argument",
+        "requires 2 arguments",
+        "no match for",
+    ]) {
+        return ("type-mismatch", "cpp:no-matching-function");
+    }
+    if has(&[
+        "cannot convert",
+        "no viable conversion",
+        "cannot initialize",
+        "invalid conversion",
+        "invalid operands",
+        "incompatible",
+        "no known conversion",
+        "cannot be used to initialize",
+        "does not match",
+        "assigning to",
+        "invalid argument type",
+        "no member named 'value'",
+        "narrowing",
+        "binary expression",
+        "requires the 'this' argument",
+    ]) {
+        return ("type-mismatch", "cpp:cannot-convert");
+    }
+    if has(&[
+        "expected",
+        "unterminated",
+        "missing terminating",
+        "stray",
+        "unexpected",
+        "extraneous",
+        "before '",
+        "unclosed",
+        "unmatched",
+    ]) {
+        return ("syntax", "cpp:expected-token");
+    }
+    ("other", "cpp:other")
+}
+
+/// Classify the output of `c++`.
+///
+/// Only the diagnostic lines count. The source echo, the caret line, the
+/// `note:` candidates the compiler lists after an overload failure, and the
+/// `N errors generated.` trailer are all context for the player and nothing
+/// for the table. A `note:` in particular must not become a mistake: one
+/// wrong call to `push_back` produces two notes per overload, and "your top
+/// mistake" would be the standard library's own signature.
+pub fn classify_cpp_build(stderr: &str) -> Vec<Mistake> {
+    let mut out = Vec::new();
+    for line in stderr.lines() {
+        let Some((line_no, col_no, level, message)) = split_cpp_diagnostic(line) else {
+            continue;
+        };
+        if !matches!(level, "error" | "warning") {
+            continue;
+        }
+        let (kind, code) = cpp_kind(message, level);
+        out.push(Mistake {
+            kind: kind.to_string(),
+            code: Some(code.to_string()),
+            message: normalize_message(message),
+            line: line_no,
+            col: col_no,
+        });
+    }
+    // The linker has its own voice and no location: `undefined reference to
+    // 'foo(int)'` (ld) or `Undefined symbols for architecture …` (ld64). A
+    // function declared and never defined is the usual cause, and there is
+    // no §7.1 row for it, so it is kept as `other` under one identity rather
+    // than dropped.
+    let lower = stderr.to_ascii_lowercase();
+    if out.is_empty()
+        && (lower.contains("undefined reference to") || lower.contains("undefined symbols for"))
+    {
+        let hit = stderr
+            .lines()
+            .find(|l| {
+                let l = l.to_ascii_lowercase();
+                l.contains("undefined reference to") || l.contains("undefined symbols for")
+            })
+            .unwrap_or("undefined symbol at link time");
+        out.push(Mistake {
+            kind: "other".into(),
+            code: Some("cpp:undefined-symbol".into()),
+            message: normalize_message(hit),
+            line: None,
+            col: None,
+        });
+    }
+    out
+}
+
+/// `main.cpp:5:18: error: message` → `(5, 18, "error", "message")`. Only the
+/// player's file counts: a diagnostic inside `<vector>` is a consequence of
+/// something in `main.cpp`, and the compiler reports that one too.
+fn split_cpp_diagnostic(line: &str) -> Option<(Option<i64>, Option<i64>, &str, &str)> {
+    let rest = line.strip_prefix("main.cpp:")?;
+    // gcc: `main.cpp:5:18: error: …`; clang the same; both sometimes drop the
+    // column (`main.cpp:5: error:`), and a driver-level complaint has no
+    // location at all — that one is not a mistake in the player's code.
+    let mut parts = rest.splitn(3, ':');
+    let line_no = parts.next()?.trim().parse::<i64>().ok()?;
+    let second = parts.next()?;
+    let (col_no, tail) = match second.trim().parse::<i64>() {
+        Ok(c) => (Some(c), parts.next()?),
+        Err(_) => {
+            // `second` was the level; reassemble what follows it.
+            let third = parts.next().unwrap_or("");
+            return level_and_message(second, third).map(|(l, m)| (Some(line_no), None, l, m));
+        }
+    };
+    let (level, message) = tail.split_once(':')?;
+    level_and_message(level, message).map(|(l, m)| (Some(line_no), col_no, l, m))
+}
+
+fn level_and_message<'a>(level: &'a str, message: &'a str) -> Option<(&'a str, &'a str)> {
+    let level = match level.trim() {
+        "error" | "fatal error" => "error",
+        "warning" => "warning",
+        "note" => "note",
+        _ => return None,
+    };
+    Some((level, message.trim()))
+}
+
+/// C++'s runtime failures. A program that dereferenced nothing does not say
+/// so: the harness writes the signal it died of into the stderr the player
+/// sees (`killed by signal 11 (SIGSEGV: segmentation fault)`), and QA's
+/// captures record the same fact as `<signal 11>`; the number is what both
+/// have in common, so the number is what is matched. An uncaught exception is
+/// announced by the runtime (`libc++abi: terminating due to uncaught
+/// exception of type std::out_of_range` on macOS, `terminate called after
+/// throwing an instance of 'std::out_of_range'` with libstdc++) before the
+/// abort.
+pub fn classify_cpp_runtime(stderr: &str) -> Vec<Mistake> {
+    let mut out = Vec::new();
+    let lower = stderr.to_ascii_lowercase();
+    let first_line_with = |needle: &str| {
+        stderr
+            .lines()
+            .find(|l| l.to_ascii_lowercase().contains(needle))
+            .map(normalize_message)
+    };
+    let push = |out: &mut Vec<Mistake>, kind: &str, code: &str, message: String| {
+        out.push(Mistake {
+            kind: kind.into(),
+            code: Some(code.into()),
+            message,
+            line: None,
+            col: None,
+        });
+    };
+
+    // `signal N` with a word boundary after the number, so signal 1 does
+    // not match signal 11.
+    let signalled = |n: u32| {
+        let needle = format!("signal {n}");
+        lower
+            .match_indices(&needle)
+            .any(|(at, _)| !lower[at + needle.len()..].starts_with(|c: char| c.is_ascii_digit()))
+    };
+    // SIGSEGV is 11 everywhere; SIGBUS is 10 on darwin and 7 on linux.
+    if lower.contains("sigsegv")
+        || lower.contains("segmentation fault")
+        || lower.contains("sigbus")
+        || signalled(11)
+        || signalled(10)
+        || signalled(7)
+    {
+        let message = first_line_with("sig")
+            .or_else(|| first_line_with("segmentation"))
+            .unwrap_or_else(|| "segmentation fault".into());
+        push(&mut out, "nil-deref", "cpp:segfault", message);
+    }
+    let uncaught = lower.contains("uncaught exception") || lower.contains("terminate called");
+    if uncaught && lower.contains("out_of_range") {
+        let message = first_line_with("out_of_range").unwrap_or_else(|| "std::out_of_range".into());
+        push(&mut out, "index-range", "cpp:out-of-range", message);
+    } else if uncaught || lower.contains("sigabrt") || lower.contains("assertion") || signalled(6) {
+        let message = first_line_with("exception")
+            .or_else(|| first_line_with("terminate"))
+            .or_else(|| first_line_with("assert"))
+            .or_else(|| first_line_with("sig"))
+            .unwrap_or_else(|| "abort".into());
+        push(&mut out, "unhandled-error", "cpp:abort", message);
+    }
+    if lower.contains("sigfpe") || signalled(8) {
+        let message = first_line_with("sig").unwrap_or_else(|| "arithmetic exception".into());
+        push(&mut out, "unhandled-error", "cpp:fpe", message);
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+// Python (SPEC §7.1's fourth column)
+//
+// Python has no compiler and one voice: a traceback ending in the line that
+// names the exception, `NameError: name 'tolal' is not defined`. The
+// exception class is the identity — it is the closest thing the language has
+// to an error code — and the rest of the line is the message.
+// ---------------------------------------------------------------------------
+
+/// The exception class and its message → the kind and the identity.
+pub fn python_kind(class: &str, message: &str) -> Option<(&'static str, &'static str)> {
+    Some(match class {
+        "NameError" | "UnboundLocalError" => ("unknown-name", "py:name-error"),
+        "TypeError" => ("type-mismatch", "py:type-error"),
+        "AttributeError" if message.contains("'NoneType'") => ("nil-deref", "py:none-attribute"),
+        "AttributeError" => ("missing-trait", "py:attribute-error"),
+        "IndexError" => ("index-range", "py:index-error"),
+        "KeyError" => ("index-range", "py:key-error"),
+        "ZeroDivisionError" => ("unhandled-error", "py:zero-division"),
+        "ValueError" => ("unhandled-error", "py:value-error"),
+        // Depth 1000 is a wrong algorithm, not a crash: the recursion that
+        // blew the stack would have been a loop.
+        "RecursionError" => ("wrong-answer", "py:recursion"),
+        "SyntaxError" | "IndentationError" | "TabError" => ("syntax", "py:syntax"),
+        _ => return None,
+    })
+}
+
+/// Classify the output of `python3 -m py_compile`: the one thing it can
+/// find is a `SyntaxError` (or its `IndentationError` subclass), and it
+/// prints it either as a short traceback or, for indentation, as
+/// `Sorry: IndentationError: … (main.py, line 2)`.
+pub fn classify_python_compile(stderr: &str) -> Vec<Mistake> {
+    let Some((class, message)) = last_python_exception(stderr) else {
+        return Vec::new();
+    };
+    let (kind, code) = python_kind(class, message).unwrap_or(("syntax", "py:syntax"));
+    let line = python_line(stderr).or_else(|| sorry_line(message));
+    vec![Mistake {
+        kind: kind.into(),
+        code: Some(code.into()),
+        message: normalize_message(&format!("{class}: {message}")),
+        line,
+        col: None,
+    }]
+}
+
+/// Python's runtime failures: the traceback's last line names the exception,
+/// and the last `main.py` frame above it is where the player's code was.
+pub fn classify_python_runtime(stderr: &str) -> Vec<Mistake> {
+    let Some((class, message)) = last_python_exception(stderr) else {
+        return Vec::new();
+    };
+    // Anything else that escaped `main` — `RuntimeError`, an
+    // `AssertionError`, a class the player wrote — is an error nobody
+    // handled, and the class name is kept in the message.
+    let (kind, code) = python_kind(class, message).unwrap_or(("unhandled-error", "py:exception"));
+    vec![Mistake {
+        kind: kind.into(),
+        code: Some(code.into()),
+        message: normalize_message(&format!("{class}: {message}")),
+        line: python_line(stderr),
+        col: None,
+    }]
+}
+
+/// The last `XxxError: message` line of a traceback → `(class, message)`.
+/// A chained traceback ("During handling of the above exception…") ends with
+/// the one that actually escaped, which is the one the player has to fix.
+fn last_python_exception(stderr: &str) -> Option<(&str, &str)> {
+    stderr.lines().rev().find_map(|line| {
+        let line = line.trim();
+        let line = line.strip_prefix("Sorry: ").unwrap_or(line);
+        let (class, message) = line.split_once(':')?;
+        let class = class.trim();
+        // `a.b.SomeError` for an exception from a module; the last segment
+        // is the class.
+        let class = class.rsplit('.').next().unwrap_or(class);
+        let is_class = !class.is_empty()
+            && class.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+            && class.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            && (class.ends_with("Error")
+                || class.ends_with("Exception")
+                || class.ends_with("Exit")
+                || class.ends_with("Interrupt")
+                || class.ends_with("Warning")
+                || class == "StopIteration");
+        is_class.then(|| (class, message.trim()))
+    })
+}
+
+/// The deepest `main.py` frame: `File "…/main.py", line 3, in g`. The last
+/// one in the traceback is the innermost, which is where it went wrong.
+fn python_line(stderr: &str) -> Option<i64> {
+    stderr.lines().rev().find_map(|line| {
+        let rest = line.split("main.py\", line ").nth(1)?;
+        let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+        digits.parse::<i64>().ok()
+    })
+}
+
+/// `… (main.py, line 2)` at the end of a `Sorry:` line.
+fn sorry_line(message: &str) -> Option<i64> {
+    let rest = message.rsplit("line ").next()?;
+    let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+    digits.parse::<i64>().ok()
+}
+
+/// Compile diagnostics, whichever land they came from. Every land has an
+/// explicit arm: a new one falling through to the rustc JSON classifier
+/// would silently find nothing in it and the table would learn nothing.
 pub fn classify_compile(lang: &str, stderr: &str) -> Vec<Mistake> {
     match lang {
         "go" => classify_go_build(stderr),
+        "cpp" => classify_cpp_build(stderr),
+        "python" => classify_python_compile(stderr),
         _ => classify_rust_json(stderr),
     }
 }
 
 /// Runtime output, whichever land it came from. Rust says "index out of
-/// bounds" and Go says "index out of range"; one dispatcher beats one
-/// pattern list that half-matches both.
+/// bounds", Go says "index out of range", Python says `IndexError` and C++
+/// says nothing and dies of a signal; one dispatcher beats one pattern list
+/// that half-matches all four.
 pub fn classify_runtime(lang: &str, stderr: &str) -> Vec<Mistake> {
     match lang {
         "go" => classify_go_runtime(stderr),
+        "cpp" => classify_cpp_runtime(stderr),
+        "python" => classify_python_runtime(stderr),
         _ => classify_rust_runtime(stderr),
     }
 }
@@ -592,22 +981,61 @@ fn rollup(
 /// concepts of the quest the mistake happened on.
 pub fn concepts_for(kind: &str) -> &'static [&'static str] {
     match kind {
-        "borrow-after-move" => &["ownership", "borrowing", "closures", "smart-pointers"],
+        "borrow-after-move" => &[
+            "ownership",
+            "borrowing",
+            "closures",
+            "smart-pointers",
+            "move-semantics",
+            "raii",
+        ],
         "borrow-conflict" => &["borrowing", "mutability", "shared-state"],
-        "lifetime" => &["lifetimes", "borrowing", "structs", "traits"],
-        "type-mismatch" => &["types", "generics", "error-handling", "pattern-matching"],
-        "unknown-name" => &["bindings", "imports", "functions"],
-        "missing-trait" => &["traits", "generics", "iteration"],
+        "lifetime" => &[
+            "lifetimes",
+            "borrowing",
+            "structs",
+            "traits",
+            "raii",
+            "pointers",
+        ],
+        "type-mismatch" => &[
+            "types",
+            "generics",
+            "error-handling",
+            "pattern-matching",
+            "duck-typing",
+        ],
+        "unknown-name" => &["bindings", "imports", "functions", "decorators"],
+        "missing-trait" => &["traits", "generics", "iteration", "duck-typing"],
         "unused" => &["bindings", "imports"],
         "mutability" => &["mutability", "borrowing", "slices"],
-        "nil-deref" => &["error-handling", "interfaces", "structs"],
-        "index-range" => &["slices", "iteration", "two-pointers"],
+        "nil-deref" => &[
+            "error-handling",
+            "interfaces",
+            "structs",
+            "pointers",
+            "undefined-behaviour",
+        ],
+        "index-range" => &["slices", "iteration", "two-pointers", "undefined-behaviour"],
         "data-race" => &["data-races", "shared-state", "concurrency"],
         "deadlock" => &["deadlock", "channels", "shared-state"],
         "unhandled-error" => &["error-handling", "pattern-matching"],
         "syntax" => &["bindings", "control-flow", "functions"],
-        "wrong-answer" => &["complexity", "iteration", "strings", "io"],
-        "timeout" => &["complexity", "hashing", "binary-search", "two-pointers"],
+        "wrong-answer" => &[
+            "complexity",
+            "iteration",
+            "strings",
+            "io",
+            "comprehensions",
+            "generators",
+        ],
+        "timeout" => &[
+            "complexity",
+            "hashing",
+            "binary-search",
+            "two-pointers",
+            "generators",
+        ],
         _ => &[],
     }
 }

@@ -6,6 +6,7 @@
 //! — a `trim` that forgave a trailing newline in one land and not the other is
 //! exactly the kind of difference a player reads as the server being unfair.
 
+use std::ffi::OsStr;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
@@ -17,6 +18,20 @@ use crate::{Case, CaseResult, Event, Report, Submission, Verdict};
 pub fn judge(
     sub: &Submission,
     binary: &Path,
+    compile_ms: i64,
+    compiler_stderr: String,
+) -> std::io::Result<Report> {
+    judge_argv(sub, binary, &[], compile_ms, compiler_stderr)
+}
+
+/// The same loop for a program that is an interpreter plus arguments rather
+/// than a binary of its own: `python3 -I main.py`. The interpreter is handed
+/// over as an absolute path because §5.3's `PATH` is `/usr/bin:/bin`, and the
+/// `python3` that compiled the file may well not live there.
+pub fn judge_argv(
+    sub: &Submission,
+    program: &Path,
+    args: &[&OsStr],
     compile_ms: i64,
     compiler_stderr: String,
 ) -> std::io::Result<Report> {
@@ -38,8 +53,8 @@ pub fn judge(
             });
         });
 
-        let mut command = Command::new(binary);
-        command.current_dir(&sub.workdir);
+        let mut command = Command::new(program);
+        command.args(args).current_dir(&sub.workdir);
         strip_env(&mut command, &sub.workdir);
 
         let outcome = proc::run(
@@ -65,6 +80,16 @@ pub fn judge(
         }
         if runtime_stderr.is_empty() && !outcome.stderr.is_empty() {
             runtime_stderr = String::from_utf8_lossy(&outcome.stderr).to_string();
+        }
+        if runtime_stderr.is_empty() && !outcome.timed_out {
+            // A program that died of a signal said nothing on the way out:
+            // the "Segmentation fault" a shell prints is the shell's line,
+            // not the process's. A C++ null dereference is the commonest
+            // case, and without this line it would reach the player as an
+            // empty stderr and reach §7.1 as nothing at all.
+            if let Some(note) = signal_note(outcome.signal) {
+                runtime_stderr = note;
+            }
         }
         if exit_code.is_none() {
             exit_code = outcome.exit_code.map(i64::from);
@@ -118,6 +143,29 @@ pub fn judge(
         runtime_stderr,
         stdout: first_stdout,
     })
+}
+
+/// One line in the shape the classifiers and the player both read.
+#[cfg(unix)]
+fn signal_note(signal: Option<i32>) -> Option<String> {
+    let signal = signal?;
+    let name = match signal {
+        libc::SIGSEGV => "SIGSEGV: segmentation fault",
+        libc::SIGBUS => "SIGBUS: bus error",
+        libc::SIGABRT => "SIGABRT: abort",
+        libc::SIGFPE => "SIGFPE: arithmetic exception",
+        libc::SIGILL => "SIGILL: illegal instruction",
+        libc::SIGKILL => "SIGKILL: killed",
+        _ => "signal",
+    };
+    Some(format!(
+        "the program was killed by signal {signal} ({name})\n"
+    ))
+}
+
+#[cfg(not(unix))]
+fn signal_note(_signal: Option<i32>) -> Option<String> {
+    None
 }
 
 fn result_for(case: &Case, passed: bool, got: Option<String>) -> CaseResult {

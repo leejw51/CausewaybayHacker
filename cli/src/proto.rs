@@ -225,9 +225,13 @@ impl Quest {
         &self.land
     }
 
+    /// The scratch file's extension, per land. `python` is the one land whose
+    /// file is not named after the land itself.
     pub fn file_extension(&self) -> &str {
         match self.land.as_str() {
             "go" => "go",
+            "cpp" => "cpp",
+            "python" => "py",
             _ => "rs",
         }
     }

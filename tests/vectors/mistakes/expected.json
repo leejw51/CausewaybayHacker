@@ -4,11 +4,17 @@
   "toolchain": {
     "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "go": "go version go1.27.1 darwin/arm64",
+    "cxx": "clang-darwin: Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "python": "Python 3.13.13",
     "host": "Darwin 25.6.0 arm64"
   },
+  "cpp_toolchains_captured": [
+    "clang-darwin"
+  ],
   "how_to_read_this": {
     "kind": "the §7.1 taxonomy slug the classifier must produce",
-    "code": "the identity it must key off: a rustc code, or a slug for the normalized Go message. null where the toolchain gives none.",
+    "code": "the identity it must key off: a rustc code, or a slug for the normalized Go / clang / gcc message, or the Python exception name. null where the toolchain gives none.",
+    "cxx": "C++ cases only: the toolchain that produced the capture, `<family>-<os>`; clang and gcc word the same mistake differently, so each is its own case and its own captured file",
     "phase": "compile = build fails | lint = build succeeds with a warning | runtime = build succeeds, program dies | tool = needs go vet or -race, not the plain build",
     "compile_time": "true for compile and lint, false for runtime and tool",
     "verified": "this generator re-ran the toolchain and saw the expected identity. false means the row is a claim, not a fact.",
@@ -17,9 +23,10 @@
   "normalisation": {
     "why": "runtime output carries a scratch path, a thread id and a program counter that differ on every run and on every machine. Left in, they make `--check` impossible and bake this computer's temp directory into a fixture meant to run anywhere.",
     "substitutions": {
-      "<work>": "the per-case scratch directory",
+      "<work>": "the per-case scratch directory (also the directory a Python traceback names)",
       "<tid>": "the thread id in a Rust panic header",
-      "0x<pc>": "the program counter in a Go SIGSEGV line"
+      "0x<pc>": "the program counter in a Go SIGSEGV line",
+      "<signal N>": "appended to a C++ program's stderr when the kernel killed it with signal N; the program itself printed nothing"
     },
     "not_normalised": "file names and line:col — `main.rs:5:21` is the span the classifier reads, and it is already relative because each source is compiled from its own temp cwd"
   },
@@ -941,6 +948,431 @@
         ]
       },
       "captured": "go/other-unmatched.gobuild.txt"
+    },
+    {
+      "file": "cpp/undeclared-identifier.cpp",
+      "lang": "cpp",
+      "kind": "unknown-name",
+      "code": "cpp:undeclared-identifier",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "cxx": "clang-darwin",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "c++ -std=c++20 -O2 -pthread -o prog main.cpp",
+        "compile_exit": 1,
+        "identities": [
+          "use of undeclared identifier 'totl'; did you mean 'total'?"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.cpp",
+            "line": 9,
+            "col": 9,
+            "message": "use of undeclared identifier 'totl'; did you mean 'total'?"
+          },
+          {
+            "level": "note",
+            "file": "main.cpp",
+            "line": 7,
+            "col": 9,
+            "message": "'total' declared here"
+          }
+        ]
+      },
+      "captured": "cpp/undeclared-identifier.clang-darwin.cxx.txt"
+    },
+    {
+      "file": "cpp/no-matching-function.cpp",
+      "lang": "cpp",
+      "kind": "type-mismatch",
+      "code": "cpp:no-matching-function",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "cxx": "clang-darwin",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "c++ -std=c++20 -O2 -pthread -o prog main.cpp",
+        "compile_exit": 1,
+        "identities": [
+          "no matching function for call to 'add'"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.cpp",
+            "line": 9,
+            "col": 18,
+            "message": "no matching function for call to 'add'"
+          },
+          {
+            "level": "note",
+            "file": "main.cpp",
+            "line": 6,
+            "col": 5,
+            "message": "candidate function not viable: no known conversion from 'const char[4]' to 'int' for 1st argument"
+          }
+        ]
+      },
+      "captured": "cpp/no-matching-function.clang-darwin.cxx.txt"
+    },
+    {
+      "file": "cpp/expected-token.cpp",
+      "lang": "cpp",
+      "kind": "syntax",
+      "code": "cpp:expected-token",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "cxx": "clang-darwin",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "c++ -std=c++20 -O2 -pthread -o prog main.cpp",
+        "compile_exit": 1,
+        "identities": [
+          "expected ';' at end of declaration"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.cpp",
+            "line": 5,
+            "col": 17,
+            "message": "expected ';' at end of declaration"
+          }
+        ]
+      },
+      "captured": "cpp/expected-token.clang-darwin.cxx.txt"
+    },
+    {
+      "file": "cpp/const-discard.cpp",
+      "lang": "cpp",
+      "kind": "mutability",
+      "code": "cpp:const-discard",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "cxx": "clang-darwin",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "c++ -std=c++20 -O2 -pthread -o prog main.cpp",
+        "compile_exit": 1,
+        "identities": [
+          "cannot assign to variable 'hits' with const-qualified type 'const int'"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.cpp",
+            "line": 7,
+            "col": 10,
+            "message": "cannot assign to variable 'hits' with const-qualified type 'const int'"
+          },
+          {
+            "level": "note",
+            "file": "main.cpp",
+            "line": 6,
+            "col": 15,
+            "message": "variable 'hits' declared const here"
+          }
+        ]
+      },
+      "captured": "cpp/const-discard.clang-darwin.cxx.txt"
+    },
+    {
+      "file": "cpp/segfault.cpp",
+      "lang": "cpp",
+      "kind": "nil-deref",
+      "code": "cpp:segfault",
+      "phase": "runtime",
+      "level": "signal",
+      "compile_time": false,
+      "compiles": true,
+      "cxx": "clang-darwin",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "c++ -std=c++20 -O2 -pthread -o prog main.cpp",
+        "compile_exit": 0,
+        "identities": [
+          "<signal 11>"
+        ],
+        "diagnostics": [],
+        "run_command": "./prog",
+        "run_exit": -11,
+        "run_signal": 11,
+        "run_stderr": "<signal 11>\n"
+      },
+      "captured": "cpp/segfault.clang-darwin.cxx.txt",
+      "captured_runtime": "cpp/segfault.clang-darwin.runtime.txt"
+    },
+    {
+      "file": "cpp/out-of-range.cpp",
+      "lang": "cpp",
+      "kind": "index-range",
+      "code": "cpp:out-of-range",
+      "phase": "runtime",
+      "level": "abort",
+      "compile_time": false,
+      "compiles": true,
+      "cxx": "clang-darwin",
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "c++ -std=c++20 -O2 -pthread -o prog main.cpp",
+        "compile_exit": 0,
+        "identities": [
+          "libc++abi: terminating due to uncaught exception of type std::out_of_range: vector",
+          "<signal 6>"
+        ],
+        "diagnostics": [],
+        "run_command": "./prog",
+        "run_exit": -6,
+        "run_signal": 6,
+        "run_stderr": "libc++abi: terminating due to uncaught exception of type std::out_of_range: vector\n<signal 6>\n"
+      },
+      "captured": "cpp/out-of-range.clang-darwin.cxx.txt",
+      "captured_runtime": "cpp/out-of-range.clang-darwin.runtime.txt"
+    },
+    {
+      "file": "python/syntax.py",
+      "lang": "python",
+      "kind": "syntax",
+      "code": "py:syntax",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "python3 -m py_compile main.py",
+        "compile_exit": 1,
+        "identities": [
+          "SyntaxError: expected ':'"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.py",
+            "line": 4,
+            "col": null,
+            "message": "SyntaxError: expected ':'"
+          }
+        ]
+      },
+      "captured": "python/syntax.pycompile.txt"
+    },
+    {
+      "file": "python/name-error.py",
+      "lang": "python",
+      "kind": "unknown-name",
+      "code": "py:name-error",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "python3 -m py_compile main.py",
+        "compile_exit": 0,
+        "identities": [
+          "NameError: name 'totl' is not defined. Did you mean: 'total'?"
+        ],
+        "diagnostics": [],
+        "run_command": "python3 -I main.py",
+        "run_exit": 1,
+        "run_stderr": "Traceback (most recent call last):\n  File \"<work>/main.py\", line 4, in <module>\n    totl += i\n    ^^^^\nNameError: name 'totl' is not defined. Did you mean: 'total'?\n"
+      },
+      "captured": "python/name-error.pycompile.txt",
+      "captured_runtime": "python/name-error.runtime.txt"
+    },
+    {
+      "file": "python/type-error.py",
+      "lang": "python",
+      "kind": "type-mismatch",
+      "code": "py:type-error",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "python3 -m py_compile main.py",
+        "compile_exit": 0,
+        "identities": [
+          "TypeError: can only concatenate str (not \"int\") to str"
+        ],
+        "diagnostics": [],
+        "run_command": "python3 -I main.py",
+        "run_exit": 1,
+        "run_stderr": "Traceback (most recent call last):\n  File \"<work>/main.py\", line 4, in <module>\n    print(price + 3)\n          ~~~~~~^~~\nTypeError: can only concatenate str (not \"int\") to str\n"
+      },
+      "captured": "python/type-error.pycompile.txt",
+      "captured_runtime": "python/type-error.runtime.txt"
+    },
+    {
+      "file": "python/none-attribute.py",
+      "lang": "python",
+      "kind": "nil-deref",
+      "code": "py:none-attribute",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "python3 -m py_compile main.py",
+        "compile_exit": 0,
+        "identities": [
+          "AttributeError: 'NoneType' object has no attribute 'price'"
+        ],
+        "diagnostics": [],
+        "run_command": "python3 -I main.py",
+        "run_exit": 1,
+        "run_stderr": "Traceback (most recent call last):\n  File \"<work>/main.py\", line 10, in <module>\n    print(stall.price)\n          ^^^^^^^^^^^\nAttributeError: 'NoneType' object has no attribute 'price'\n"
+      },
+      "captured": "python/none-attribute.pycompile.txt",
+      "captured_runtime": "python/none-attribute.runtime.txt"
+    },
+    {
+      "file": "python/attribute-error.py",
+      "lang": "python",
+      "kind": "missing-trait",
+      "code": "py:attribute-error",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "python3 -m py_compile main.py",
+        "compile_exit": 0,
+        "identities": [
+          "AttributeError: 'Stall' object has no attribute 'price'"
+        ],
+        "diagnostics": [],
+        "run_command": "python3 -I main.py",
+        "run_exit": 1,
+        "run_stderr": "Traceback (most recent call last):\n  File \"<work>/main.py\", line 10, in <module>\n    print(s.price)\n          ^^^^^^^\nAttributeError: 'Stall' object has no attribute 'price'\n"
+      },
+      "captured": "python/attribute-error.pycompile.txt",
+      "captured_runtime": "python/attribute-error.runtime.txt"
+    },
+    {
+      "file": "python/index-error.py",
+      "lang": "python",
+      "kind": "index-range",
+      "code": "py:index-error",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "python3 -m py_compile main.py",
+        "compile_exit": 0,
+        "identities": [
+          "IndexError: list index out of range"
+        ],
+        "diagnostics": [],
+        "run_command": "python3 -I main.py",
+        "run_exit": 1,
+        "run_stderr": "Traceback (most recent call last):\n  File \"<work>/main.py\", line 3, in <module>\n    print(prices[3])\n          ~~~~~~^^^\nIndexError: list index out of range\n"
+      },
+      "captured": "python/index-error.pycompile.txt",
+      "captured_runtime": "python/index-error.runtime.txt"
+    },
+    {
+      "file": "python/key-error.py",
+      "lang": "python",
+      "kind": "index-range",
+      "code": "py:key-error",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "python3 -m py_compile main.py",
+        "compile_exit": 0,
+        "identities": [
+          "KeyError: 'choy sum'"
+        ],
+        "diagnostics": [],
+        "run_command": "python3 -I main.py",
+        "run_exit": 1,
+        "run_stderr": "Traceback (most recent call last):\n  File \"<work>/main.py\", line 4, in <module>\n    print(board[\"choy sum\"])\n          ~~~~~^^^^^^^^^^^^\nKeyError: 'choy sum'\n"
+      },
+      "captured": "python/key-error.pycompile.txt",
+      "captured_runtime": "python/key-error.runtime.txt"
+    },
+    {
+      "file": "python/zero-division.py",
+      "lang": "python",
+      "kind": "unhandled-error",
+      "code": "py:zero-division",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "python3 -m py_compile main.py",
+        "compile_exit": 0,
+        "identities": [
+          "ZeroDivisionError: division by zero"
+        ],
+        "diagnostics": [],
+        "run_command": "python3 -I main.py",
+        "run_exit": 1,
+        "run_stderr": "Traceback (most recent call last):\n  File \"<work>/main.py\", line 3, in <module>\n    print(sum(sales) / len(sales))\n          ~~~~~~~~~~~^~~~~~~~~~~~\nZeroDivisionError: division by zero\n"
+      },
+      "captured": "python/zero-division.pycompile.txt",
+      "captured_runtime": "python/zero-division.runtime.txt"
+    },
+    {
+      "file": "python/recursion.py",
+      "lang": "python",
+      "kind": "wrong-answer",
+      "code": "py:recursion",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "python3 -m py_compile main.py",
+        "compile_exit": 0,
+        "identities": [
+          "RecursionError: maximum recursion depth exceeded"
+        ],
+        "diagnostics": [],
+        "run_command": "python3 -I main.py",
+        "run_exit": 1,
+        "run_stderr": "Traceback (most recent call last):\n  File \"<work>/main.py\", line 7, in <module>\n    print(depth(0))\n          ~~~~~^^^\n  File \"<work>/main.py\", line 4, in depth\n    return 1 + depth(n + 1)\n               ~~~~~^^^^^^^\n  File \"<work>/main.py\", line 4, in depth\n    return 1 + depth(n + 1)\n               ~~~~~^^^^^^^\n  File \"<work>/main.py\", line 4, in depth\n    return 1 + depth(n + 1)\n               ~~~~~^^^^^^^\n  [Previous line repeated 996 more times]\nRecursionError: maximum recursion depth exceeded\n"
+      },
+      "captured": "python/recursion.pycompile.txt",
+      "captured_runtime": "python/recursion.runtime.txt"
     }
   ],
   "content_starter_cases": [
@@ -1190,10 +1622,11 @@
     "type-mismatch",
     "unhandled-error",
     "unknown-name",
-    "unused"
+    "unused",
+    "wrong-answer"
   ],
   "kinds_not_covered": {
-    "wrong-answer": "A verdict, not a compiler identity: the program compiles, runs and prints the wrong thing. Covered by SPEC §9.6 runner tests against a quest's test cases, not by a source fixture.",
+    "wrong-answer": "A verdict, not a compiler identity: the program compiles, runs and prints the wrong thing. Covered by SPEC §9.6 runner tests against a quest's test cases, not by a source fixture. The one exception is Python's RecursionError, which §7.1 files under this kind and python/recursion.py covers; the Rust, Go and C++ halves stay here.",
     "timeout": "Also a verdict. The fixture for it is an infinite loop, which belongs to the runner-limits suite (§9.6) because what is asserted is the SIGKILL, not a diagnostic."
   },
   "known_gaps": {

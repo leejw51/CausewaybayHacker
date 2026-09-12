@@ -106,10 +106,10 @@ pub fn run(
     let human_stderr = if report.compiler_stderr.trim().is_empty() {
         report.runtime_stderr.clone()
     } else {
-        let rendered = if lang == "go" {
-            report.compiler_stderr.clone()
-        } else {
+        let rendered = if lang == "rust" {
             mistakes::rendered_from_json(&report.compiler_stderr)
+        } else {
+            report.compiler_stderr.clone()
         };
         format!("{rendered}{}", report.runtime_stderr)
     };

@@ -59,11 +59,26 @@
       "detect": "the `starter` field is \"\"\"-quoted; after parsing, the two characters written as backslash-n inside the comment are one newline",
       "verified": "python3 -c \"import tomllib; print(repr(tomllib.loads(open('basic-escapes.toml','rb').read().decode())['quest'][0]['starter']))\" shows the escape already eaten",
       "note": "A TOML parser cannot report which quote style a string used, so an importer must check the raw bytes — scan the source for a quest-level `starter =` or `solution =` followed by \"\"\", not the parsed value. Flagged to BE in docs/decisions.md."
+    },
+    {
+      "file": "i18n-hints-count.toml",
+      "rule": "SPEC §12.1: a translation's hints count equals the English quest's",
+      "why": "Hints are revealed by index and priced per hint (§6.3). Three Korean hints over two English ones hands out a hint the English does not have; one over two runs out early. The whole file is refused, not trimmed, so a half-right translation never ships half.",
+      "detect": "rust.basic.01.hello has 3 hints here and 2 in the fixture pack",
+      "note": "Needs the English pack imported first; the importer walks content/ in that order. File it as content/i18n/ko/rust.basic.toml."
+    },
+    {
+      "file": "i18n-unknown-locale.toml",
+      "rule": "SPEC §12.1: locale is one of ko yue zh ja cs",
+      "why": "English is the source and lives on `quests`; a translation file claiming `en` (or any locale no client asks for) would either shadow the source or serve nobody.",
+      "detect": "locale is \"en\"",
+      "note": "Recognised as a translation by its `locale` key wherever it is filed, so it is refused for this reason and never parsed as a pack missing `land`."
     }
   ],
   "also_worth_refusing_but_not_fixtured_here": {
     "duplicate-id": "two quests with the same id in one pack — caught by the UNIQUE constraint in SPEC §2.1 rather than by the importer, so the test belongs to BE's store tests",
     "requires-cycle": "a requires chain that loops. Worth a fixture once the importer exists and it is clear whether it is refused or simply leaves every node locked",
-    "map-out-of-range": "map.x or map.y outside 0..1. Cheap to add; left out because nothing in SPEC §12 says it is an error rather than a clamp — raised in docs/decisions.md"
+    "map-out-of-range": "map.x or map.y outside 0..1. Cheap to add; left out because nothing in SPEC §12 says it is an error rather than a clamp — raised in docs/decisions.md",
+    "i18n-unknown-quest": "a translation naming a quest id no pack supplies — deliberately NOT refused: the importer logs and skips that quest and keeps the rest (SPEC §12.1), and CI's `verify_pack.py --i18n` is what fails on it"
   }
 }

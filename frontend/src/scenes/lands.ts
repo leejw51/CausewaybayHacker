@@ -8,22 +8,44 @@
  * later would otherwise read as the game growing a new limb.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, wrap } from "../engine/text";
+import { ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { btnBox, clipped, fill, pixBtn, type Ctx, type Rect } from "../engine/ui";
-import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import {
+  arriving,
+  Buttons,
+  footer,
+  frame,
+  header,
+  landColour,
+  landName,
+  titledPanel,
+} from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
-import type { Category, CategorySummary, Land, Responses } from "../net/protocol";
+import {
+  LANDS,
+  type Category,
+  type CategorySummary,
+  type Land,
+  type Responses,
+} from "../net/protocol";
 import { MapScene } from "./map";
 import { PlaygroundScene } from "./playground";
 import { t } from "../i18n";
 
 type Lands = Responses["world.lands"]["lands"];
 
-const NPC: Record<Land, string> = { rust: "sprite_ferris", go: "sprite_gogo" };
+const NPC: Record<Land, string> = {
+  rust: "sprite_ferris",
+  go: "sprite_gogo",
+  cpp: "sprite_cpp",
+  python: "sprite_python",
+};
 const BLURB: Record<Land, () => string> = {
   rust: () => t("lands.rustBlurb"),
   go: () => t("lands.goBlurb"),
+  cpp: () => t("lands.cppBlurb"),
+  python: () => t("lands.pythonBlurb"),
 };
 
 /**
@@ -48,6 +70,120 @@ const EMBLEM_OVERHANG = 1.3;
  * three places you could go. A road that says what it is is both more useful
  * and more alive than a slab with a label on it.
  */
+/**
+ * How many rows of a land's sentence the plate will show.
+ *
+ * Both the measuring (`plateHeight`) and the drawing (`drawLandPlate`) read
+ * this one constant, so the space budgeted and the space used cannot drift.
+ */
+const BLURB_LINES = 2;
+
+/**
+ * Cut already-wrapped lines to at most `max`, marking the cut.
+ *
+ * The ellipsis goes on the **last line kept**, not on a line of its own, so a
+ * capped sentence costs exactly `max` lines and the plate height budgeted for
+ * it in `plateHeight` is the height it actually takes. Getting that wrong is
+ * how the sentence ended up printed over the title bar in the first place.
+ */
+export function capLines(
+  lines: readonly string[],
+  max: number,
+  fits: (line: string) => boolean = () => true,
+): string[] {
+  if (max <= 0) return [];
+  if (lines.length <= max) return [...lines];
+  // The last kept line came out of `wrap`, so it already fills the column to
+  // the pixel — and appending an ellipsis to a full line makes it *wider than
+  // the column*. The caller draws with `printf`, which wraps, so that one
+  // character silently became a third line printed across the record
+  // underneath it. Give back a word at a time until the ellipsis fits.
+  let last = lines[max - 1].trimEnd();
+  while (last.length > 0 && !fits(`${last}…`)) {
+    const cut = last.replace(/\s*\S+$/, "").trimEnd();
+    // A single word longer than the column would loop forever; drop a
+    // character instead and let it end mid-word, which is still readable.
+    last = cut.length > 0 ? cut : last.slice(0, -1).trimEnd();
+  }
+  return [...lines.slice(0, max - 1), `${last}…`];
+}
+
+/** Where every land plate goes, and whether the column has to scroll. */
+export interface LandGrid {
+  cols: number;
+  rows: number;
+  /** Plate width and height; every plate is the same size. */
+  pw: number;
+  ph: number;
+  /** Height of the whole grid, gaps included. */
+  total: number;
+  /** How much of it does not fit the column. 0 when it all fits. */
+  overflow: number;
+  /** The scroll to actually use, clamped and nudged to show the selection. */
+  scroll: number;
+  /** Top-left of each plate, in order, already scrolled. */
+  origins: { x: number; y: number }[];
+}
+
+/**
+ * The land column's geometry, with no canvas and no fonts in sight.
+ *
+ * Pulled out of the draw call because every hard decision on this screen lives
+ * here — one column or two, share the height or take the floor, scroll or not,
+ * and where the selection drags the scroll to — and none of it was reachable
+ * by a test while it sat inside a closure that needed a 2D context to run.
+ * The two heights arrive measured (`viableH`, `comfortableH`) precisely so
+ * that this function never has to touch a font.
+ *
+ * @param col       the column to fill: `[x, y, w, h]`
+ * @param count     how many lands there are
+ * @param gap       pixels between plates, both ways
+ * @param minCol    narrowest a plate may be before two columns stop being worth it
+ * @param viableH   plate height with the smallest mascot still worth drawing
+ * @param comfortableH plate height with the mascot at the size it wants
+ * @param selected  index of the chosen land, which must stay on screen
+ * @param scroll    the scroll as it stands, before clamping
+ */
+export function landGrid(
+  col: Rect,
+  count: number,
+  gap: number,
+  minCol: number,
+  viableH: number,
+  comfortableH: number,
+  selected: number,
+  scroll: number,
+): LandGrid {
+  const [lx, ly, lw, lh] = col;
+  const n = Math.max(1, count);
+  // Two across only when both halves are still wide enough to read, and only
+  // when there is something to gain — two lands stacked are already fine.
+  const cols = n > 2 && Math.floor((lw - gap) / 2) >= minCol ? 2 : 1;
+  const rows = Math.ceil(n / cols);
+  const pw = Math.floor((lw - gap * (cols - 1)) / cols);
+  const fair = Math.floor((lh - gap * (rows - 1)) / rows);
+  // Take the fair share whenever it still leaves a mascot worth drawing, and
+  // fall back to the comfortable floor — which means scrolling — only when it
+  // does not. Twenty pixels of extra mascot is not worth hiding a land behind
+  // a scroll nobody knows is there.
+  const ph = fair >= viableH ? fair : Math.max(fair, comfortableH);
+  const total = ph * rows + gap * (rows - 1);
+  const overflow = Math.max(0, total - lh);
+  // Clamp first, then drag the window to the selected plate's row, so the
+  // arrow keys can walk past the bottom of the grid and the grid follows.
+  let next = Math.max(0, Math.min(overflow, scroll));
+  const top = Math.floor(Math.max(0, Math.min(n - 1, selected)) / cols) * (ph + gap);
+  next = Math.max(Math.min(next, top), Math.min(overflow, top + ph - lh));
+  const origins = [];
+  for (let i = 0; i < n; i++) {
+    origins.push({
+      x: lx + (i % cols) * (pw + gap),
+      y: ly - next + Math.floor(i / cols) * (ph + gap),
+    });
+  }
+  return { cols, rows, pw, ph, total, overflow, scroll: next, origins };
+}
+
 const CAT_LINE: Record<Category, () => string> = {
   basic: () => t("lands.basicBlurb"),
   advanced: () => t("lands.advancedBlurb"),
@@ -76,6 +212,23 @@ export class LandsScene implements Scene {
   private readonly glow = new Map<string, number>();
   private readonly leftIn = new Tween(seconds("panel"));
   private readonly rightIn = new Tween(seconds("panel"), seconds("stagger"));
+  /**
+   * The land column scrolls, and this is why.
+   *
+   * It used to divide the column's height by the number of lands, which was
+   * right while there were two of them and wrong the moment there were four:
+   * each plate got half the room, the mascot no longer fitted so it was
+   * skipped entirely, and the sentence — measured up from the bottom — ran off
+   * the top of its own panel and printed across the title bar. A land you
+   * cannot see the mascot of is the one thing this screen exists to show.
+   *
+   * So the plate has a floor now (`plateHeight`), tall enough for the whole
+   * arrangement, and when the plates no longer fit the column the column
+   * scrolls instead of squashing them. Four lands, or ten, look the same as
+   * two did.
+   */
+  private scroll = 0;
+  private overflow = 0;
 
   constructor(private readonly app: App) {}
 
@@ -94,11 +247,59 @@ export class LandsScene implements Scene {
    * emphasis read as deliberate; one large and one squashed reads as a bug,
    * and it was read as one.
    */
+  /**
+   * The shortest a plate may be and still hold everything `drawLandPlate`
+   * draws: the title bar, a mascot big enough to read as an animal, the
+   * sentence, and the record line.
+   *
+   * Measured from the same fonts and the same chrome the plate itself uses, so
+   * it cannot drift out of agreement with the drawing code the way a magic
+   * number would. The mascot allowance is the one judgement call, and it comes
+   * in two sizes because the honest answer differs by a few pixels and those
+   * few pixels decide whether a whole row of lands is on the screen:
+   *
+   * * `COMFORTABLE` is the size the sprite wants — what a plate takes when
+   *   the screen can afford it.
+   * * `VIABLE` is the smallest at which it still reads as an animal rather
+   *   than a smudge. Dropping to it is worth doing when it is the difference
+   *   between seeing every land and having to scroll for one, because a land
+   *   you must go looking for is a land nobody picks.
+   *
+   * The caller picks: fit the grid at `VIABLE` if it can, and only scroll when
+   * even that will not fit.
+   */
+  private plateHeight(s: number, colW: number, mascot = 76): number {
+    const fonts = ensureFonts(s);
+    const MASCOT_MIN = Math.round(mascot * s);
+    // The same font object `titledPanel` measures its bar with — `font()` and
+    // `ensureFonts()` hand back one registry — so the two cannot disagree.
+    const bar = fonts.stationSm;
+    // Both numbers come straight off `titledPanel`: it insets by 6 a side plus
+    // 8 again, and spends 8 above the bar and 6 below the body.
+    const chrome = 30 + bar.height + Math.round(bar.size * 0.9);
+    const innerW = Math.max(1, colW - 28);
+    // The tallest sentence of any land, so every plate is the same height and
+    // the one with the longest blurb is not the one that gets clipped — but
+    // capped, because the sentence is flavour and the mascot is the point.
+    //
+    // Uncapped it decides the layout, and badly: in Korean at half width the
+    // Python line wraps to six rows, which alone made the plate taller than
+    // half the column and pushed two of the four lands off the screen. Three
+    // rows says what the land is; a fourth is the plate spending the mascot's
+    // room on prose nobody is reading twice.
+    const lines = Math.min(
+      BLURB_LINES,
+      Math.max(...LANDS.map((l) => wrap(fonts.small, BLURB[l](), innerW).length)),
+    );
+    const recH = fonts.stationSm.height + Math.round(6 * s);
+    return chrome + MASCOT_MIN + Math.round(8 * s) + lines * fonts.small.height + recH;
+  }
+
   private drawLandPlate(g: Ctx, rect: Rect, land: Land, chosen: boolean): void {
     const s = this.app.layout.uiScale();
     const fonts = ensureFonts(s);
-    const accent = land === "rust" ? RUST : GO;
-    const inner = titledPanel(g, rect, land.toUpperCase(), chosen ? accent : Theme.dim);
+    const accent = landColour(land);
+    const inner = titledPanel(g, rect, t(`map.${land}` as "map.rust"), chosen ? accent : Theme.dim);
     const rec = this.record(land);
 
     // Bottom up: the record on the last line, the sentence above it, and the
@@ -106,9 +307,22 @@ export class LandsScene implements Scene {
     // `inner`, so nothing can land on the plate's own border — which is where
     // `0/58 ★0` was being cut in half.
     const recH = fonts.stationSm.height + Math.round(6 * s);
-    const blurbLines = wrap(fonts.small, BLURB[land](), inner[2]).length;
-    const blurbH = blurbLines * fonts.small.height;
-    const blurbY = inner[1] + inner[3] - recH - blurbH;
+    // Capped to the same number of rows `plateHeight` budgeted for, with the
+    // last one ended in an ellipsis so a cut sentence reads as cut rather than
+    // as one that simply stops mid-thought.
+    const blurb = capLines(
+      wrap(fonts.small, BLURB[land](), inner[2]),
+      BLURB_LINES,
+      (l) => width(fonts.small, l) <= inner[2],
+    );
+    const blurbH = blurb.length * fonts.small.height;
+    // Measured up from the bottom, then floored at the top of the panel. The
+    // floor is not defensive decoration: without it a plate shorter than its
+    // own contents puts the sentence *above* `inner`, which is the title bar,
+    // and the two print on top of each other. `plateHeight` is what stops the
+    // column ever asking for that, and this is what stops it looking broken if
+    // some future layout does anyway.
+    const blurbY = Math.max(inner[1], inner[1] + inner[3] - recH - blurbH);
     const room = blurbY - Math.round(8 * s) - inner[1];
 
     // Which sprite: the land's mascot at rest, or — while a road is under the
@@ -152,7 +366,11 @@ export class LandsScene implements Scene {
     }
 
     g.fillStyle = css(chosen ? Theme.cream : Theme.dim);
-    printf(g, fonts.small, BLURB[land](), inner[0], blurbY, inner[2], "center");
+    // Line by line, because the text was already wrapped and capped above and
+    // handing the whole string back to `printf` would re-wrap it uncapped.
+    blurb.forEach((line, i) => {
+      printf(g, fonts.small, line, inner[0], blurbY + i * fonts.small.height, inner[2], "center");
+    });
 
     g.fillStyle = css(chosen ? accent : Theme.dim);
     printf(
@@ -207,10 +425,7 @@ export class LandsScene implements Scene {
       this.glow.set(id, v + (want - v) * k);
     }
     // The overworld is a megabyte of JPEG and the player is one click from it.
-    this.app.assets?.prefetch(
-      this.land === "rust" ? "map_rust" : "map_go",
-      this.app.layout.isPortrait(),
-    );
+    this.app.assets?.prefetch(`map_${this.land}`, this.app.layout.isPortrait());
   }
 
   controls(): Buttons[] {
@@ -245,9 +460,17 @@ export class LandsScene implements Scene {
     }
   }
 
+  wheel(dy: number): void {
+    this.scroll = Math.max(0, Math.min(this.overflow, this.scroll + dy));
+  }
+
   key(name: string): void {
     if (name === "left" || name === "right" || name === "a" || name === "d") {
-      this.land = this.land === "rust" ? "go" : "rust";
+      // A cycle over every land, in the order the plates are drawn, so the
+      // keys walk the column the way the eye does.
+      const step = name === "left" || name === "a" ? -1 : 1;
+      const i = LANDS.indexOf(this.land);
+      this.land = LANDS[(i + step + LANDS.length) % LANDS.length];
       this.app.chip.blip();
     }
   }
@@ -279,7 +502,16 @@ export class LandsScene implements Scene {
       }
     }
     header(g, this.app, t("lands.title"));
-    const f = frame(layout, layout.isPortrait() ? 0.46 : 0.34, 0.07);
+    // A third of the width was right for two tall plates side by side with the
+    // category panel. It is wrong for four: at 1280×720 it leaves a column
+    // 379px across, which is under twice `MIN_COL`, so the grid falls back to
+    // one column, the plates keep their full height, and **Python ends up
+    // entirely below the bottom of the screen** — the same "I only see rust
+    // and go" this screen was supposed to have stopped having. Half the width
+    // fits two plates of ~285 and still leaves the three category rows more
+    // room than they use.
+    const wide = layout.isPortrait() ? 0.46 : LANDS.length > 2 ? 0.5 : 0.34;
+    const f = frame(layout, wide, 0.07);
     const s = f.scale;
     const fonts = ensureFonts(s);
     this.landBtns.reset();
@@ -296,15 +528,69 @@ export class LandsScene implements Scene {
       const gap = Math.round(10 * s);
       const [lx, ly, lw, lh] = f.left;
       // Equal. The chosen land is not a *bigger* plate, it is a *brighter* one
-      // — see `drawLandPlate`. A column that resizes its two halves as you
-      // switch between them draws the eye to the movement rather than to the
-      // choice, and at the extremes it looked like a collapsed panel.
-      const h = Math.floor((lh - gap) / 2);
-      let y = ly;
-      for (const land of ["rust", "go"] as Land[]) {
-        this.drawLandPlate(g, [lx, y, lw, h], land, land === this.land);
-        this.landBtns.add({ id: `land:${land}`, rect: [lx, y, lw, h], label: "" });
-        y += h + gap;
+      // — see `drawLandPlate`. A column that resizes its plates as you switch
+      // between them draws the eye to the movement rather than to the choice,
+      // and at the extremes it looked like a collapsed panel.
+      //
+      // Equal, and never below the height the contents actually need: share
+      // the column out when there is room, and take the floor when there is
+      // not, which is what turns the surplus into scroll instead of into
+      // four squashed plates.
+      // **Two across, when two across fit.** One plate per row is right for two
+      // lands and wasteful for four: the plate is the full width of the column
+      // and its contents are a 76px mascot and a centred sentence, so a second
+      // land fits beside the first without either of them giving up anything
+      // that matters. Four lands then occupy the vertical room two used to,
+      // and every land is on screen at once — which is the point of this
+      // screen. A land you have to go looking for is a land nobody picks.
+      //
+      // `MIN_COL` is where a plate stops being able to hold its own sentence
+      // in a sane number of lines; below it, one column and scroll instead.
+      const MIN_COL = Math.round(260 * s);
+      // The width the heights have to be measured against is decided by the
+      // same rule `landGrid` uses, so ask it once for the shape, measure, then
+      // ask again for the final geometry. The first call's heights are only
+      // ever used to pick a column count, which does not depend on them.
+      const shape = landGrid(f.left, LANDS.length, gap, MIN_COL, 0, 0, 0, 0);
+      const grid = landGrid(
+        f.left,
+        LANDS.length,
+        gap,
+        MIN_COL,
+        this.plateHeight(s, shape.pw, 52),
+        this.plateHeight(s, shape.pw),
+        LANDS.indexOf(this.land),
+        this.scroll,
+      );
+      this.overflow = grid.overflow;
+      this.scroll = grid.scroll;
+      const h = grid.ph;
+      const total = grid.total;
+
+      g.save();
+      // Clipped, because a plate that is half past the end of the column must
+      // stop at the column and not paint over the screen below it.
+      g.beginPath();
+      g.rect(lx, ly, lw, lh);
+      g.clip();
+      LANDS.forEach((land, i) => {
+        const { x: px, y: py } = grid.origins[i];
+        this.drawLandPlate(g, [px, py, grid.pw, h], land, land === this.land);
+        // The hit box is where the plate *is*, which is the scrolled position.
+        this.landBtns.add({ id: `land:${land}`, rect: [px, py, grid.pw, h], label: "" });
+      });
+      g.restore();
+
+      if (this.overflow > 0) {
+        // A column that scrolls and does not say so is a column nobody
+        // scrolls — the same rule the quest brief and the console follow.
+        const trackW = Math.max(2, Math.round(3 * s));
+        const tx = lx + lw - trackW;
+        fill(g, Theme.dim, tx, ly, trackW, lh, 0.35);
+        const frac = lh / total;
+        const barH = Math.max(Math.round(16 * s), Math.floor(lh * frac));
+        const by = ly + Math.round((lh - barH) * (this.scroll / this.overflow));
+        fill(g, landColour(this.land), tx, by, trackW, barH, 0.9);
       }
     });
 
@@ -336,7 +622,7 @@ export class LandsScene implements Scene {
       const right = titledPanel(
         g,
         f.right,
-        t("lands.category", { land: this.land.toUpperCase() }),
+        t("lands.category", { land: landName(this.land) }),
         Theme.coin,
       );
 
@@ -346,7 +632,7 @@ export class LandsScene implements Scene {
       const rec = this.record(this.land);
       const recH = fonts.stationSm.height + Math.round(14 * s);
       fill(g, Theme.navy, right[0], right[1], right[2], recH, 0.9);
-      fill(g, this.land === "rust" ? RUST : GO, right[0], right[1], Math.round(3 * s), recH);
+      fill(g, landColour(this.land), right[0], right[1], Math.round(3 * s), recH);
       g.fillStyle = css(Theme.cream);
       printf(
         g,
@@ -403,7 +689,7 @@ export class LandsScene implements Scene {
         const barW = right[2];
         const slide = Math.round(lit * 8 * s);
         const rx = right[0] + slide;
-        const accent = this.land === "rust" ? RUST : GO;
+        const accent = landColour(this.land);
 
         fill(g, empty ? Theme.dim : Theme.navy, rx, y, barW, rowH, empty ? 0.35 : 0.9);
         // The lit face is the land's own colour at a whisper, so hovering GO

@@ -28,10 +28,19 @@ import type { App, Scene } from "../app";
 import { ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme, type RGBA } from "../engine/theme";
 import { clipped, fill, type Ctx, type Rect } from "../engine/ui";
-import { arriving, Buttons, footer, frame, GO, header, RUST, titledPanel } from "../ui/chrome";
+import {
+  arriving,
+  Buttons,
+  footer,
+  frame,
+  header,
+  landColour,
+  titledPanel,
+  landName,
+} from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { WireError } from "../net/client";
-import { playerText } from "../net/protocol";
+import { isLand, LANDS, playerText } from "../net/protocol";
 import type { AttemptBrief, Award, Category, Land, MistakeStat, Responses } from "../net/protocol";
 import { unbuilt, unbuiltLine } from "../net/milestone";
 import { t as T, tn } from "../i18n";
@@ -51,8 +60,33 @@ const TABS = (): ReadonlyArray<{ id: Tab; label: string }> => [
   { id: "log", label: T("stats.log") },
 ];
 
+/**
+ * Where a land's row sits in the record panel, two to a line.
+ *
+ * One per line is what this was, and it was silently wrong the moment there
+ * were four lands: the panel had room for two, the draw loop skipped any row
+ * that would not fit, and a player who had cleared a C++ street saw a record
+ * with no C++ in it. Lost progress is what that reads as, so the pairing is
+ * pulled out here where it can be checked rather than left in the loop.
+ */
+export function landRowAt(
+  i: number,
+  x: number,
+  y: number,
+  cell: number,
+  gap: number,
+  rowH: number,
+): { x: number; y: number } {
+  return { x: x + (i % 2) * (cell + gap), y: y + Math.floor(i / 2) * rowH };
+}
+
+/** How many lines `n` land rows take, two to a line. */
+export function landRowLines(n: number): number {
+  return Math.ceil(n / 2);
+}
+
 /** A fixed order, never the server's — `by_land` came back alphabetical. */
-const LAND_ORDER: readonly Land[] = ["rust", "go"];
+const LAND_ORDER: readonly Land[] = LANDS;
 
 /** The colour a verdict is drawn in, in the log. Green only for accepted. */
 function verdictCol(v: string): RGBA {
@@ -210,7 +244,7 @@ export class StatsScene implements Scene {
     const parts = questId.split(".");
     if (parts.length < 2) return;
     const [land, category] = parts as [Land, Category];
-    if (land !== "rust" && land !== "go") return;
+    if (!isLand(land)) return;
     if (category !== "basic" && category !== "advanced" && category !== "hacker") return;
     this.app.chip.select();
     void this.app.go(new QuestScene(this.app, land, category, questId), "forward");
@@ -313,19 +347,32 @@ export class StatsScene implements Scene {
     // Per land, in a fixed order. The server returned them alphabetically —
     // `go` before `rust` — and a record whose rows swap places between servers
     // is a record you cannot read at a glance.
-    for (const land of LAND_ORDER) {
-      const row = sum.by_land?.find((l) => l.land === land);
-      if (!row || cy + fonts.stationSm.height + Math.round(10 * s) > floor) continue;
-      const accent: RGBA = land === "go" ? GO : RUST;
-      fill(g, accent, x, cy, Math.round(3 * s), fonts.stationSm.height + Math.round(6 * s));
+    // Two to a line, like the four facts above, and for the same reason: a
+    // land row is a word and a fraction, nowhere near the width of the panel.
+    // Stacked one per line the four of them did not fit under the totals, and
+    // the `floor` test below silently dropped the last two — so a player who
+    // had cleared a C++ street saw a record with no C++ in it, which reads as
+    // lost progress rather than as a layout running out of room.
+    const lgap = Math.round(8 * s);
+    const lcell = Math.floor((w - lgap) / 2);
+    const rowH = fonts.stationSm.height + Math.round(19 * s);
+    const landRows = LAND_ORDER.map((land) => ({
+      land,
+      row: sum.by_land?.find((l) => l.land === land),
+    })).filter((e): e is { land: Land; row: NonNullable<typeof e.row> } => e.row !== undefined);
+    landRows.forEach(({ land, row }, i) => {
+      const { x: lx, y: ly } = landRowAt(i, x, cy, lcell, lgap, rowH);
+      if (ly + fonts.stationSm.height + Math.round(10 * s) > floor) return;
+      const accent: RGBA = landColour(land);
+      fill(g, accent, lx, ly, Math.round(3 * s), fonts.stationSm.height + Math.round(6 * s));
       g.fillStyle = css(Theme.cream);
       printf(
         g,
         fonts.stationSm,
-        land.toUpperCase(),
-        x + Math.round(10 * s),
-        cy + Math.round(3 * s),
-        w,
+        landName(land),
+        lx + Math.round(10 * s),
+        ly + Math.round(3 * s),
+        lcell,
         "left",
       );
       g.fillStyle = css(accent);
@@ -333,25 +380,20 @@ export class StatsScene implements Scene {
         g,
         fonts.stationSm,
         `${row.cleared} / ${row.total}`,
-        x,
-        cy + Math.round(3 * s),
-        w,
+        lx,
+        ly + Math.round(3 * s),
+        lcell,
         "right",
       );
-      const lineY = cy + fonts.stationSm.height + Math.round(7 * s);
-      fill(g, Theme.ink, x + Math.round(10 * s), lineY, w - Math.round(10 * s), 2, 0.7);
+      const lineY = ly + fonts.stationSm.height + Math.round(7 * s);
+      const barX = lx + Math.round(10 * s);
+      const barW = lcell - Math.round(10 * s);
+      fill(g, Theme.ink, barX, lineY, barW, 2, 0.7);
       if (row.total > 0) {
-        fill(
-          g,
-          accent,
-          x + Math.round(10 * s),
-          lineY,
-          Math.round(((w - Math.round(10 * s)) * row.cleared) / row.total),
-          2,
-        );
+        fill(g, accent, barX, lineY, Math.round((barW * row.cleared) / row.total), 2);
       }
-      cy = lineY + Math.round(12 * s);
-    }
+    });
+    cy += landRowLines(landRows.length) * rowH;
 
     // The shelf, in miniature, in the room the record leaves under it.
     //

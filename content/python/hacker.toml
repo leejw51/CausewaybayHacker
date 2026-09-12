@@ -1,0 +1,4303 @@
+# PYTHON LAND — HACKER. The fourth interview. HKU, Chow Yei Ching Building,
+# Room 7-32 again, a clock on the wall, and this time the language has no
+# compiler to catch anything and a recursion limit of one thousand.
+#
+# Every quest here carries `time_limit_s` — the player's clock for the whole
+# quest, not the per-run `timeout_ms` — and at least one hidden case.
+# See docs/decisions.md, 2026-09-11, for where that key lives in the TOML.
+#
+# The 34 problems mirror content/rust/hacker.toml node for node, with the same
+# stdin and expected output wherever the problem is the same problem, so a
+# player can sit the same interview in any land. The ids mirror too — the LRU
+# boss is `python.hacker.28.lru` at node 34, exactly as it is in Rust and Go —
+# because SPEC §12 makes the id an identity and `node` the position.
+#
+# Two hidden cases are smaller than their Rust counterparts, because a correct
+# Python answer would not clear the Rust size inside any honest run limit:
+# range-queries runs 300000 operations instead of four million, and the
+# one-letter palindrome case is 8000 characters instead of 20000. Both were
+# re-checked against the Rust reference on the new input. Every other big case
+# is byte-identical, and the quests that carry one run with `timeout_ms =
+# 10000`, measured well inside it on this machine.
+#
+# Every program is one main.py, run as `python3 -I main.py`, stdlib only, and
+# nothing in it needs anything newer than Python 3.10.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+
+pack = "python.hacker"
+land = "python"
+category = "hacker"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id           = "python.hacker.01.two-sum"
+node         = 1
+title        = "TWO FARES"
+difficulty   = 3
+time_limit_s = 600
+story        = "Room 7-32, fourth time. The first question is the one everybody gets, and the clock starts on the way in."
+concepts     = ["hashing", "complexity", "collections"]
+requires     = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` integers.
+
+Print the **1-based** indices `i j` of two different entries that add up to
+`target`, as `i j` with `i < j`. If more than one pair works, give the one
+whose second index is smallest; if that still ties, the smallest first index.
+If no pair works, print `-1`.
+
+```
+input:  4 9
+        2 7 11 15
+output: 1 2
+```
+
+The hidden cases here are small: they check the tie-break and the
+no-answer case, not your speed. The question is still the linear one — one
+pass, one dict — because a real `n` is 200000 and the nested loop is what
+this question exists to weed out. Write the answer the question is asking for,
+not the one that happens to clear these four cases.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, target = data[0], data[1]
+    nums = data[2:2 + n]
+
+    seen = {}
+    _ = (nums, target, seen)
+    print(-1)
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, target = data[0], data[1]
+    nums = data[2:2 + n]
+
+    seen = {}
+    for j, x in enumerate(nums):
+        i = seen.get(target - x)
+        if i is not None:
+            print(f"{i + 1} {j + 1}")
+            return
+        seen.setdefault(x, j)
+    print(-1)
+
+
+main()
+'''
+hints = [
+  "One pass. For each value ask whether target minus it has already been seen.",
+  "seen.setdefault(x, j) keeps the first index of a repeated value, which is the tie-break the statement asks for.",
+  "Print and return the moment you find it — the first hit as you scan is already the smallest second index.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "4 9\n2 7 11 15\n",      expect = "1 2\n",  visible = true },
+  { name = "late",    stdin = "5 10\n1 2 3 4 6\n",     expect = "4 5\n",  visible = false },
+  { name = "none",    stdin = "3 100\n1 2 3\n",        expect = "-1\n",   visible = false },
+  { name = "signed",  stdin = "6 0\n-3 4 3 90 -1 1\n", expect = "1 3\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id           = "python.hacker.02.window"
+node         = 2
+title        = "NO REPEATS"
+difficulty   = 4
+time_limit_s = 900
+story        = "The second question is on the board before you have put the marker down."
+concepts     = ["two-pointers", "strings", "complexity"]
+requires     = ["python.hacker.01.two-sum"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief        = '''
+One line of text, no spaces.
+
+Print the length of the longest run of characters with no repeat in it, then
+the run itself. If several runs tie, print the leftmost.
+
+```
+input:  abcabcbb
+output: 3
+        abc
+```
+
+The window only ever moves right. If you find yourself rescanning from the
+start after a repeat, you have written the quadratic one.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    text = sys.stdin.read().strip()
+
+    last = {}
+    _ = (text, last)
+
+    # print the best length, then the run itself
+    print(0)
+    print("?")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def main():
+    text = sys.stdin.read().strip()
+
+    last = {}
+    start = 0
+    best_len = 0
+    best_start = 0
+
+    for i, c in enumerate(text):
+        previous = last.get(c)
+        if previous is not None and previous >= start:
+            start = previous + 1
+        last[c] = i
+        length = i - start + 1
+        if length > best_len:
+            best_len = length
+            best_start = start
+
+    print(best_len)
+    print(text[best_start:best_start + best_len])
+
+
+main()
+'''
+hints = [
+  "Keep the index where each character was last seen, and the index the window starts at.",
+  "A repeat only matters if its last position is inside the current window — that is the `previous >= start` test.",
+  "Record the best length *and* where it started, or you cannot print the run at the end.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "abcabcbb\n",    expect = "3\nabc\n",      visible = true },
+  { name = "one",     stdin = "bbbbb\n",       expect = "1\nb\n",        visible = false },
+  { name = "middle",  stdin = "pwwkew\n",      expect = "3\nwke\n",      visible = false },
+  { name = "street",  stdin = "causewaybay\n", expect = "7\nusewayb\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id           = "python.hacker.03.intervals"
+node         = 3
+title        = "THE SHIFT ROTA"
+difficulty   = 4
+time_limit_s = 900
+story        = "They hand you the Lucky Mac rota and ask which hours are actually covered."
+concepts     = ["intervals", "sorting", "complexity"]
+requires     = ["python.hacker.02.window"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are `<start> <end>` with `start <= end`.
+
+Merge every pair that overlaps or touches, and print the result in increasing
+order, one `<start> <end>` per line, then `COUNT <k>`.
+
+```
+input:  4
+        1 3
+        2 6
+        8 10
+        15 18
+output: 1 6
+        8 10
+        15 18
+        COUNT 3
+```
+
+Touching counts as overlapping: `1 4` and `4 5` merge into `1 5`.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n = data[0]
+    spans = [(data[1 + 2 * i], data[2 + 2 * i]) for i in range(n)]
+
+    # sort, sweep, merge, print, then COUNT <k>
+    print(f"COUNT {len(spans)}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n = data[0]
+    spans = [(data[1 + 2 * i], data[2 + 2 * i]) for i in range(n)]
+    spans.sort()
+
+    merged = []
+    for start, end in spans:
+        if merged and start <= merged[-1][1]:
+            if end > merged[-1][1]:
+                merged[-1][1] = end
+        else:
+            merged.append([start, end])
+
+    for start, end in merged:
+        print(f"{start} {end}")
+    print(f"COUNT {len(merged)}")
+
+
+main()
+'''
+hints = [
+  "Sort by start first. After that one left-to-right pass is enough and you never look backwards more than one interval.",
+  "Extend the last merged interval when the new start is <= its end; otherwise append a new one. Store the merged ones as lists, not tuples, so the end can be changed in place.",
+  "Extend to max(last.end, end) — a short interval swallowed by a long one must not shrink it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "4\n1 3\n2 6\n8 10\n15 18\n", expect = "1 6\n8 10\n15 18\nCOUNT 3\n", visible = true },
+  { name = "touching", stdin = "2\n1 4\n4 5\n",              expect = "1 5\nCOUNT 1\n",              visible = false },
+  { name = "point",    stdin = "1\n5 5\n",                   expect = "5 5\nCOUNT 1\n",              visible = false },
+  { name = "unsorted", stdin = "3\n5 6\n1 2\n3 4\n",         expect = "1 2\n3 4\n5 6\nCOUNT 3\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id           = "python.hacker.04.grid"
+node         = 4
+title        = "OUT OF THE BUILDING"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A floor plan on the whiteboard, a fire door at the far corner, and the interviewer watching the clock rather than the marker."
+concepts     = ["graphs", "stacks-queues", "complexity"]
+requires     = ["python.hacker.03.intervals"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are the floor: `.` is open, `#` is wall.
+
+Start at the top-left `(0,0)` and reach the bottom-right `(r-1, c-1)`, moving
+up, down, left or right through open cells only.
+
+Print the number of **steps** on a shortest route, or `-1` if there is none.
+Then print `REACHED <k>`: how many open cells are reachable from the start,
+counting the start itself.
+
+```
+input:  3 3
+        ...
+        .#.
+        ...
+output: 4
+        REACHED 8
+```
+
+Breadth first, not depth first. A depth-first walk finds *a* route; the
+question asks for the shortest one. And a queue is `collections.deque` —
+`list.pop(0)` is `O(n)` and turns the whole search quadratic.
+'''
+starter      = '''
+import sys
+from collections import deque
+
+
+def main():
+    data = sys.stdin.read().split()
+    rows, cols = int(data[0]), int(data[1])
+    grid = data[2:2 + rows]
+
+    queue = deque()
+    _ = (grid, cols, queue)
+
+    # print the shortest step count or -1, then REACHED <k>
+    print(-1)
+    print("REACHED 0")
+
+
+main()
+'''
+solution     = '''
+import sys
+from collections import deque
+
+
+def main():
+    data = sys.stdin.read().split()
+    rows, cols = int(data[0]), int(data[1])
+    grid = data[2:2 + rows]
+
+    dist = [[-1] * cols for _ in range(rows)]
+    queue = deque()
+    reached = 0
+
+    if grid[0][0] == ".":
+        dist[0][0] = 0
+        queue.append((0, 0))
+        reached = 1
+
+    steps = ((-1, 0), (1, 0), (0, -1), (0, 1))
+    while queue:
+        r, c = queue.popleft()
+        nxt = dist[r][c] + 1
+        for dr, dc in steps:
+            nr, nc = r + dr, c + dc
+            # a negative index is not out of range in Python: grid[-1] is the
+            # last row, silently, so the bounds check has to be explicit
+            if nr < 0 or nr >= rows or nc < 0 or nc >= cols:
+                continue
+            if grid[nr][nc] != "." or dist[nr][nc] >= 0:
+                continue
+            dist[nr][nc] = nxt
+            reached += 1
+            queue.append((nr, nc))
+
+    print(dist[rows - 1][cols - 1])
+    print(f"REACHED {reached}")
+
+
+main()
+'''
+hints = [
+  "deque.popleft() is the whole difference between BFS and DFS here; a list used as a stack would be the other one.",
+  "Mark a cell when you push it, not when you pop it, or it goes into the queue several times.",
+  "The distance grid doubles as the visited set: -1 means not seen yet, so you need no second structure.",
+  "grid[r - 1] when r is 0 does not raise. It reads the last row, and the search leaks out through the bottom of the map. Check nr < 0 by hand — this is the one bounds error Python will not report for you.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 3\n...\n.#.\n...\n",              expect = "4\nREACHED 8\n",   visible = true },
+  { name = "blocked", stdin = "2 2\n.#\n#.\n",                     expect = "-1\nREACHED 1\n",  visible = false },
+  { name = "single",  stdin = "1 1\n.\n",                          expect = "0\nREACHED 1\n",   visible = false },
+  { name = "maze",    stdin = "4 5\n.....\n###.#\n.....\n.#.#.\n", expect = "7\nREACHED 14\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id           = "python.hacker.05.binary-search"
+node         = 5
+title        = "HOW BIG A VAN"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The depot wants the smallest van that clears the day's dockets in the days they have. They will not tell you which van; they will tell you if one you name is too small."
+concepts     = ["binary-search", "complexity", "slices"]
+requires     = ["python.hacker.04.grid"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief        = '''
+Line one is `n d`. Line two is `n` package weights, in the order they must be
+loaded — the order cannot change.
+
+Find the smallest van capacity that ships all `n` packages in at most `d`
+days, loading in order and never splitting a package.
+
+Print the capacity, then `MAX <heaviest package>`.
+
+```
+input:  10 5
+        1 2 3 4 5 6 7 8 9 10
+output: 15
+        MAX 10
+```
+
+You are not searching the list. You are searching the **answer**: the
+capacities from `max(weights)` to `sum(weights)`, on which "does it fit in
+`d` days" is false, false, false, then true forever. Binary search that.
+`bisect` cannot help here — there is no list to bisect, only a predicate —
+so this one is written by hand.
+'''
+starter      = '''
+import sys
+
+
+def days_needed(weights, capacity):
+    # how many days does this capacity take, loading in order?
+    _ = (weights, capacity)
+    return 0
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, days = data[0], data[1]
+    weights = data[2:2 + n]
+
+    _ = (days, days_needed(weights, 0))
+    print(0)
+    print(f"MAX {max(weights)}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def days_needed(weights, capacity):
+    days = 1
+    load = 0
+    for w in weights:
+        if load + w > capacity:
+            days += 1
+            load = 0
+        load += w
+    return days
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, days = data[0], data[1]
+    weights = data[2:2 + n]
+
+    low = max(weights)
+    high = sum(weights)
+    while low < high:
+        mid = (low + high) // 2
+        if days_needed(weights, mid) <= days:
+            high = mid
+        else:
+            low = mid + 1
+
+    print(low)
+    print(f"MAX {max(weights)}")
+
+
+main()
+'''
+hints = [
+  "The lower bound is the heaviest single package — anything smaller can never carry it.",
+  "The upper bound is the total: one day, everything on it.",
+  "(low + high) // 2 cannot overflow in Python, and move `high` down to `mid` on success so you keep the smallest capacity that worked.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5\n1 2 3 4 5 6 7 8 9 10\n", expect = "15\nMAX 10\n", visible = true },
+  { name = "tight",  stdin = "3 3\n3 2 2\n",                 expect = "3\nMAX 3\n",   visible = false },
+  { name = "spread", stdin = "5 4\n1 2 3 1 1\n",             expect = "3\nMAX 3\n",   visible = false },
+  { name = "one",    stdin = "1 1\n7\n",                     expect = "7\nMAX 7\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id           = "python.hacker.06.stack"
+node         = 6
+title        = "THE NEXT BIGGER ONE"
+difficulty   = 4
+time_limit_s = 900
+story        = "A column of fares on the board and one question: for each of them, which is the next one after it that is bigger."
+concepts     = ["stacks-queues", "slices", "complexity"]
+requires     = ["python.hacker.05.binary-search"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+For each entry print the first entry **to its right** that is strictly
+greater, or `-1` if there is none. Put them on one line, space separated. Then
+print `NONE <k>`, how many of them were `-1`.
+
+```
+input:  4
+        2 1 2 4
+output: 4 2 4 -1
+        NONE 1
+```
+
+Keep a stack of positions whose answer is still unknown, and it stays
+decreasing from the bottom up. Each position is pushed once and popped once,
+so the whole thing is one pass however it looks. A Python list is the stack:
+`append` and `pop` from the end are both `O(1)`.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n = data[0]
+    nums = data[1:1 + n]
+
+    answer = [-1] * n
+    pending = []
+    _ = (nums, pending)
+
+    print(" ".join(str(v) for v in answer))
+    print(f"NONE {n}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n = data[0]
+    nums = data[1:1 + n]
+
+    answer = [-1] * n
+    pending = []
+
+    for i, value in enumerate(nums):
+        while pending and nums[pending[-1]] < value:
+            answer[pending.pop()] = value
+        pending.append(i)
+
+    print(" ".join(str(v) for v in answer))
+    print(f"NONE {answer.count(-1)}")
+
+
+main()
+'''
+hints = [
+  "The stack holds indices that are still waiting for their answer, not values.",
+  "When the new value beats the value at the top of the stack, that index's answer is the new value — and keep popping, it may beat several.",
+  "Strictly greater, so equal values do not resolve each other; they stack up and resolve together later.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "4\n2 1 2 4\n",     expect = "4 2 4 -1\nNONE 1\n",        visible = true },
+  { name = "descending", stdin = "3\n5 4 3\n",       expect = "-1 -1 -1\nNONE 3\n",        visible = false },
+  { name = "ascending",  stdin = "5\n1 2 3 4 5\n",   expect = "2 3 4 5 -1\nNONE 1\n",      visible = false },
+  { name = "plateau",    stdin = "6\n2 2 2 1 3 1\n", expect = "3 3 3 3 -1 -1\nNONE 2\n",   visible = false },
+  { name = "single",     stdin = "1\n5\n",           expect = "-1\nNONE 1\n",              visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id           = "python.hacker.07.coins"
+node         = 7
+title        = "EXACT CHANGE"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The Percival Street till has three coin trays and a customer who will not take a note."
+concepts     = ["dynamic-programming", "complexity", "slices"]
+requires     = ["python.hacker.06.stack"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` coin values. Every coin is available
+in unlimited quantity.
+
+Print the smallest number of coins that makes `target` exactly, or `-1` if it
+cannot be made. Then print `REACH <k>`: how many of the amounts `0..target`
+can be made at all, counting `0`.
+
+```
+input:  3 11
+        1 2 5
+output: 3
+        REACH 12
+```
+
+The hidden cases are small, so what they catch is wrongness rather than
+slowness — and one of them catches the usual wrong answer. Greedy, taking the
+biggest coin that fits and repeating, makes `6` out of `3 4` by grabbing the
+`4` and then failing, and there is a case for exactly that. The other bad
+answer, plain recursion with no table, is not caught here and still is not
+the one to write: `target` is 100000 in the real thing, the same amount gets
+recomputed thousands of times, and in Python the recursion itself hits the
+frame limit long before that.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, target = data[0], data[1]
+    coins = data[2:2 + n]
+
+    unreachable = None
+    best = [unreachable] * (target + 1)
+    _ = coins
+
+    # fill the table bottom up, then print the answer and REACH <k>
+    _ = best
+    print(-1)
+    print("REACH 0")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, target = data[0], data[1]
+    coins = data[2:2 + n]
+
+    unreachable = None
+    best = [unreachable] * (target + 1)
+    best[0] = 0
+
+    for amount in range(1, target + 1):
+        for coin in coins:
+            if coin <= amount and best[amount - coin] is not None:
+                candidate = best[amount - coin] + 1
+                if best[amount] is None or candidate < best[amount]:
+                    best[amount] = candidate
+
+    print(-1 if best[target] is None else best[target])
+    print(f"REACH {sum(1 for v in best if v is not None)}")
+
+
+main()
+'''
+hints = [
+  "best[0] = 0, and best[a] is one more than the cheapest best[a - coin] over every coin that fits.",
+  "None is the honest `unreachable` in Python — there is no i64::MAX to overflow, and `is not None` reads as what it means. Check it before you add one.",
+  "REACH is just how many cells of the finished table are not still None.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "3 11\n1 2 5\n", expect = "3\nREACH 12\n", visible = true },
+  { name = "impossible", stdin = "1 3\n2\n",      expect = "-1\nREACH 2\n", visible = false },
+  { name = "not-greedy", stdin = "2 6\n3 4\n",    expect = "2\nREACH 4\n",  visible = false },
+  { name = "zero",       stdin = "3 0\n1 2 5\n",  expect = "0\nREACH 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id           = "python.hacker.08.top-k"
+node         = 8
+title        = "FIVE MOST ASKED"
+difficulty   = 4
+time_limit_s = 900
+story        = "Warm-up round. They ask for the five words that came up most in last year's tickets, and they time it anyway."
+concepts     = ["hashing", "sorting", "complexity"]
+requires     = ["python.hacker.07.coins", "python.hacker.01.two-sum"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief        = '''
+Line one is `n k`. Line two is `n` words separated by spaces.
+
+Print the `k` most frequent words, most frequent first, ties broken by the
+word ascending, one per line. If there are fewer than `k` distinct words,
+print all of them. Then print `DISTINCT <d>`.
+
+```
+input:  6 2
+        tram tram bus bus bus mtr
+output: bus
+        tram
+        DISTINCT 3
+```
+
+Count with a `Counter`, then rank. The tie-break is not decoration.
+`Counter.most_common` breaks ties by **insertion order** — the order the
+words first appeared in the input — which is not what the statement says
+and is not what the interviewer is listening for. Making the comparison
+**total** — count descending, then the word ascending — is what fixes it,
+and `sorted` with a tuple key is how you say it.
+'''
+starter      = '''
+import sys
+from collections import Counter
+
+
+def main():
+    tokens = sys.stdin.read().split()
+    k = int(tokens[1])
+    words = tokens[2:]
+
+    counts = Counter()
+    _ = (words, k)
+
+    # count, rank by count descending then word ascending, print k of them,
+    # then DISTINCT <d>
+    print(f"DISTINCT {len(counts)}")
+
+
+main()
+'''
+solution     = '''
+import sys
+from collections import Counter
+
+
+def main():
+    tokens = sys.stdin.read().split()
+    k = int(tokens[1])
+    words = tokens[2:]
+
+    counts = Counter(words)
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+
+    for word, _ in ranked[:k]:
+        print(word)
+    print(f"DISTINCT {len(ranked)}")
+
+
+main()
+'''
+hints = [
+  "Counter(words) is the whole counting loop. Do not try to keep the ranking up to date while counting.",
+  "key=lambda item: (-item[1], item[0]) — count descending by negating it, then the word ascending.",
+  "ranked[:k] is safe when there are fewer than k — a slice past the end stops at the end instead of raising.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "6 2\ntram tram bus bus bus mtr\n", expect = "bus\ntram\nDISTINCT 3\n", visible = true },
+  { name = "one",       stdin = "4 1\na b a c\n",                   expect = "a\nDISTINCT 3\n",         visible = false },
+  { name = "ties",      stdin = "5 3\nx y z x y\n",                 expect = "x\ny\nz\nDISTINCT 3\n",   visible = false },
+  { name = "k-too-big", stdin = "3 5\nq q q\n",                     expect = "q\nDISTINCT 1\n",         visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id           = "python.hacker.09.linked-list"
+node         = 9
+title        = "THE CHAIN"
+difficulty   = 4
+time_limit_s = 900
+story        = "They want it without a list. Nodes that point at nodes, because that is the shape the question is really about."
+concepts     = ["linked-lists", "two-pointers", "structs"]
+requires     = ["python.hacker.08.top-k"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers, in order.
+
+Build a singly linked list from them — a `Node` class with `value` and
+`next` — and then answer from the nodes. The reversal, the middle and the
+length all come from walking the chain, not from the list you read the input
+into; collecting the output in a list to `join` it at the end is fine. Print
+three lines:
+
+1. the list reversed, space separated
+2. the value at the middle node (for an even `n`, the second of the two)
+3. `LEN <n>` counted by walking the list, not by trusting the input
+
+```
+input:  5
+        1 2 3 4 5
+output: 5 4 3 2 1
+        3
+        LEN 5
+```
+
+The middle is the runner: one pointer one step at a time, one two steps at a
+time, and when the fast one runs out the slow one is there. One pass.
+
+Reverse it with a loop, not a recursion. A recursive reverse is three
+pretty lines and a `RecursionError` at a thousand nodes, and the version of
+this question with a hundred thousand nodes is the one that gets asked.
+'''
+starter      = '''
+import sys
+
+
+class Node:
+    __slots__ = ("value", "next")
+
+    def __init__(self, value, next=None):
+        self.value = value
+        self.next = next
+
+
+def main():
+    values = [int(t) for t in sys.stdin.read().split()[1:]]
+
+    head = None
+
+    # build the list, reverse it, find the middle by walking twice as fast
+    _ = (head, values)
+    print("?")
+    print(0)
+    print("LEN 0")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+class Node:
+    __slots__ = ("value", "next")
+
+    def __init__(self, value, next=None):
+        self.value = value
+        self.next = next
+
+
+def main():
+    values = [int(t) for t in sys.stdin.read().split()[1:]]
+
+    # build it back to front, so each new node points at what we had
+    head = None
+    for value in reversed(values):
+        head = Node(value, head)
+
+    # walk it to count, and run a second pointer at half speed for the middle
+    length = 0
+    slow = fast = head
+    while fast is not None:
+        length += 1
+        fast = fast.next
+        if fast is not None:
+            length += 1
+            fast = fast.next
+            slow = slow.next
+    middle = slow.value if slow is not None else 0
+
+    # reverse by moving nodes off the front of one list onto the front of another
+    reversed_head = None
+    cursor = head
+    while cursor is not None:
+        following = cursor.next
+        cursor.next = reversed_head
+        reversed_head = cursor
+        cursor = following
+
+    out = []
+    walk = reversed_head
+    while walk is not None:
+        out.append(str(walk.value))
+        walk = walk.next
+
+    print(" ".join(out))
+    print(middle)
+    print(f"LEN {length}")
+
+
+main()
+'''
+hints = [
+  "Building back to front is the easy direction: each new node takes the old head as its next.",
+  "Save cursor.next before you overwrite it. Once cursor.next points backwards, the rest of the old list is unreachable.",
+  "For the middle, advance slow only on the steps where fast managed two.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "odd",    stdin = "5\n1 2 3 4 5\n", expect = "5 4 3 2 1\n3\nLEN 5\n", visible = true },
+  { name = "even",   stdin = "4\n7 8 9 10\n",  expect = "10 9 8 7\n9\nLEN 4\n",  visible = false },
+  { name = "single", stdin = "1\n42\n",        expect = "42\n42\nLEN 1\n",       visible = false },
+  { name = "signed", stdin = "3\n-1 0 1\n",    expect = "1 0 -1\n0\nLEN 3\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id           = "python.hacker.10.tree-walk"
+node         = 10
+title        = "THREE WAYS ROUND A TREE"
+difficulty   = 4
+time_limit_s = 900
+story        = "A tree on the whiteboard and the question nobody should have to think about twice: name the three orders."
+concepts     = ["trees", "recursion", "stacks-queues"]
+requires     = ["python.hacker.09.linked-list"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` values in **level order**, where `-1` means
+"no node here" — so the tree is stored the way a heap is: the children of
+index `i` are `2i+1` and `2i+2`.
+
+Print four lines: the **preorder**, **inorder** and **postorder** walks, each
+space separated, and then `DEPTH <d>` — the number of nodes on the longest
+root-to-leaf path.
+
+```
+input:  5
+        1 2 3 -1 4
+output: 1 2 4 3
+        2 4 1 3
+        4 2 3 1
+        DEPTH 3
+```
+
+Preorder is node, left, right. Inorder is left, node, right. Postorder is
+left, right, node. The recursion is the same three lines each time and only
+the position of the `append` moves. The recursion here is as deep as the
+tree, which for a heap-shaped array is `log n`, so the frame limit is not a
+concern — say that out loud, because it will be asked.
+'''
+starter      = '''
+import sys
+
+
+def walk(tree, i, order, out):
+    # order 0 = preorder, 1 = inorder, 2 = postorder
+    _ = (tree, i, order, out)
+
+
+def depth(tree, i):
+    _ = (tree, i)
+    return 0
+
+
+def main():
+    tree = [int(t) for t in sys.stdin.read().split()[1:]]
+
+    for order in range(3):
+        out = []
+        walk(tree, 0, order, out)
+        print(" ".join(str(v) for v in out))
+    print(f"DEPTH {depth(tree, 0)}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def present(tree, i):
+    return i < len(tree) and tree[i] != -1
+
+
+def walk(tree, i, order, out):
+    if not present(tree, i):
+        return
+    if order == 0:
+        out.append(tree[i])
+    walk(tree, 2 * i + 1, order, out)
+    if order == 1:
+        out.append(tree[i])
+    walk(tree, 2 * i + 2, order, out)
+    if order == 2:
+        out.append(tree[i])
+
+
+def depth(tree, i):
+    if not present(tree, i):
+        return 0
+    return 1 + max(depth(tree, 2 * i + 1), depth(tree, 2 * i + 2))
+
+
+def main():
+    tree = [int(t) for t in sys.stdin.read().split()[1:]]
+
+    for order in range(3):
+        out = []
+        walk(tree, 0, order, out)
+        print(" ".join(str(v) for v in out))
+    print(f"DEPTH {depth(tree, 0)}")
+
+
+main()
+'''
+hints = [
+  "One recursive function with the append in three possible places beats three near-identical functions.",
+  "The base case is both conditions at once: past the end of the array, or sitting on a -1.",
+  "Depth is 1 + the deeper of the two children, and 0 for a missing node.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n1 2 3 -1 4\n",        expect = "1 2 4 3\n2 4 1 3\n4 2 3 1\nDEPTH 3\n", visible = true },
+  { name = "leaf",   stdin = "1\n9\n",                 expect = "9\n9\n9\nDEPTH 1\n",                   visible = false },
+  { name = "left",   stdin = "7\n1 2 -1 3 -1 -1 -1\n", expect = "1 2 3\n3 2 1\n3 2 1\nDEPTH 3\n",       visible = false },
+  { name = "full",   stdin = "7\n4 2 6 1 3 5 7\n",     expect = "4 2 1 3 6 5 7\n1 2 3 4 5 6 7\n1 3 2 5 7 6 4\nDEPTH 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id           = "python.hacker.11.bst"
+node         = 11
+title        = "IS IT ACTUALLY A BST"
+difficulty   = 4
+time_limit_s = 900
+story        = "The follow-up. Everyone checks the two children and everyone is wrong the first time."
+concepts     = ["trees", "recursion", "binary-search"]
+requires     = ["python.hacker.10.tree-walk"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief        = '''
+Same level-order encoding as the last quest: `-1` is a missing node, children
+of `i` are `2i+1` and `2i+2`.
+
+Line one is `n q`. Line two is the `n` tree values. Line three is `q` query
+values.
+
+Print `VALID` or `INVALID` — is this a binary search tree, with every value in
+the left subtree strictly smaller than the node and every value in the right
+strictly larger? Then one line per query: `<value> FOUND <depth>` if it is in
+the tree, `<value> ABSENT` if not, where the root is depth 1.
+
+```
+input:  7 2
+        4 2 6 1 3 5 7
+        3 8
+output: VALID
+        3 FOUND 3
+        8 ABSENT
+```
+
+Checking `left < node < right` at each node **is not enough** — a value deep
+in the left subtree can still be larger than an ancestor. Carry the open
+interval down instead. Python has no `i64::MIN`; the bounds start as
+`None`, meaning "no bound yet", and `None` needs its own check because
+`x <= None` is a `TypeError`.
+
+A query is answered by the **descent**: compare with the node, go left when
+you are smaller and right otherwise, and report `ABSENT` when you fall off
+the tree. That matters because the tree is not promised to be a BST, and in
+one that is not, a value can sit in the array somewhere the descent never
+looks. It is `ABSENT` — you are being asked what the lookup does, not what a
+scan of the array would find.
+'''
+starter      = '''
+import sys
+
+
+def present(tree, i):
+    return i < len(tree) and tree[i] != -1
+
+
+def valid(tree, i, low, high):
+    # the node must sit strictly inside (low, high), and each child
+    # inherits a narrower window; None means no bound on that side
+    _ = (tree, i, low, high)
+    return True
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, q = data[0], data[1]
+    tree = data[2:2 + n]
+    queries = data[2 + n:2 + n + q]
+
+    print("VALID" if valid(tree, 0, None, None) else "INVALID")
+    for target in queries:
+        _ = (target, present(tree, 0))
+        print(f"{target} ABSENT")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def present(tree, i):
+    return i < len(tree) and tree[i] != -1
+
+
+def valid(tree, i, low, high):
+    if not present(tree, i):
+        return True
+    value = tree[i]
+    if low is not None and value <= low:
+        return False
+    if high is not None and value >= high:
+        return False
+    return valid(tree, 2 * i + 1, low, value) and valid(tree, 2 * i + 2, value, high)
+
+
+def find(tree, target):
+    i = 0
+    depth = 1
+    while present(tree, i):
+        if tree[i] == target:
+            return depth
+        i = 2 * i + 1 if target < tree[i] else 2 * i + 2
+        depth += 1
+    return None
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, q = data[0], data[1]
+    tree = data[2:2 + n]
+    queries = data[2 + n:2 + n + q]
+
+    print("VALID" if valid(tree, 0, None, None) else "INVALID")
+    for target in queries:
+        depth = find(tree, target)
+        if depth is None:
+            print(f"{target} ABSENT")
+        else:
+            print(f"{target} FOUND {depth}")
+
+
+main()
+'''
+hints = [
+  "Pass an open interval (low, high) down. The root gets (None, None); a left child gets (low, node), a right child gets (node, high).",
+  "A missing node is vacuously valid — that is the base case, and it returns True, not False.",
+  "The lookup is the binary search: smaller goes left, otherwise right, and the depth is how many hops it took.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "7 2\n4 2 6 1 3 5 7\n3 8\n",  expect = "VALID\n3 FOUND 3\n8 ABSENT\n",  visible = true },
+  { name = "sneaky",    stdin = "7 1\n5 1 7 -1 6 -1 -1\n6\n", expect = "INVALID\n6 ABSENT\n",           visible = false },
+  { name = "root",      stdin = "1 1\n10\n10\n",              expect = "VALID\n10 FOUND 1\n",           visible = false },
+  { name = "left-only", stdin = "3 2\n8 4 -1\n4 8\n",         expect = "VALID\n4 FOUND 2\n8 FOUND 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id           = "python.hacker.12.heap"
+node         = 12
+title        = "K SORTED QUEUES"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Every Lucky Mac branch sends its dockets already in order. Merge them into one line without sorting the lot again."
+concepts     = ["heaps", "sorting", "complexity"]
+requires     = ["python.hacker.11.bst"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief        = '''
+Line one is `k`. Then `k` lines, each a count followed by that many integers,
+already sorted ascending.
+
+Print all of them merged into one ascending line, space separated, then
+`POPS <total count>`.
+
+```
+input:  3
+        3 1 4 5
+        2 1 3
+        2 2 6
+output: 1 1 2 3 4 5 6
+        POPS 7
+```
+
+`heapq` is a **min**-heap over a plain list, and it orders tuples the way
+tuples compare: first element first. So the entry is
+`(value, which list, how far into it)`, and the tie-break on equal values is
+the list index — which is fine, because it only has to be *some* order.
+
+The heap holds one entry per list, not one per element, so it stays at size
+`k` however long the lists are. `heapq.merge` does exactly this and is the
+one-line answer in production; here, write the loop, because the loop is the
+question.
+'''
+starter      = '''
+import heapq
+import sys
+
+
+def main():
+    values = iter(int(t) for t in sys.stdin.read().split())
+    k = next(values)
+
+    lists = []
+    for _ in range(k):
+        count = next(values)
+        lists.append([next(values) for _ in range(count)])
+
+    heap = []
+
+    # seed the heap with the head of each list, then pop and refill
+    _ = (heap, lists, heapq)
+    print("?")
+    print("POPS 0")
+
+
+main()
+'''
+solution     = '''
+import heapq
+import sys
+
+
+def main():
+    values = iter(int(t) for t in sys.stdin.read().split())
+    k = next(values)
+
+    lists = []
+    for _ in range(k):
+        count = next(values)
+        lists.append([next(values) for _ in range(count)])
+
+    # (value, which list, how far into it)
+    heap = []
+    for which, items in enumerate(lists):
+        if items:
+            heap.append((items[0], which, 0))
+    heapq.heapify(heap)
+
+    out = []
+    while heap:
+        value, which, at = heapq.heappop(heap)
+        out.append(str(value))
+        if at + 1 < len(lists[which]):
+            heapq.heappush(heap, (lists[which][at + 1], which, at + 1))
+
+    print(" ".join(out))
+    print(f"POPS {len(out)}")
+
+
+main()
+'''
+hints = [
+  "The heap entry has to carry where the value came from, or you cannot refill after popping it.",
+  "(value, which, at) orders by value first, which is exactly what you want; heapify once after seeding is cheaper than k pushes.",
+  "Push the next element of a list only when you pop one of its elements — that keeps the heap at k.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3\n3 1 4 5\n2 1 3\n2 2 6\n", expect = "1 1 2 3 4 5 6\nPOPS 7\n", visible = true },
+  { name = "one",    stdin = "1\n3 -5 0 5\n",              expect = "-5 0 5\nPOPS 3\n",         visible = false },
+  { name = "ragged", stdin = "3\n1 9\n0\n4 1 2 3 4\n",     expect = "1 2 3 4 9\nPOPS 5\n",      visible = false },
+  { name = "dupes",  stdin = "2\n2 2 2\n2 2 2\n",          expect = "2 2 2 2\nPOPS 4\n",        visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id           = "python.hacker.13.backtracking"
+node         = 13
+title        = "EVERY COMBINATION"
+difficulty   = 4
+time_limit_s = 900
+story        = "List every way the shop could be laid out. All of them, in a fixed order, and do not print the same one twice."
+concepts     = ["backtracking", "recursion", "slices"]
+requires     = ["python.hacker.12.heap"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` distinct integers **already in ascending
+order**.
+
+Print every subset, one per line, values space separated, the empty subset as
+`-`. Order them the way the obvious recursion produces them: at each position,
+first the branch that **takes** the element, then the branch that skips it.
+Then print `SUBSETS <2^n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 2 3
+        1 2
+        1 3
+        1
+        2 3
+        2
+        3
+        -
+        SUBSETS 8
+```
+
+Push, recurse, **pop**. The pop is the part people leave out, and the symptom
+is every line after the first being too long. `itertools.combinations` would
+give you the subsets in a different order; the order here is the recursion's
+own, and that is what is being checked.
+'''
+starter      = '''
+import sys
+
+
+def build(nums, at, chosen, out):
+    # at the end of the list, record `chosen`; otherwise take it, recurse,
+    # undo, then skip it and recurse
+    _ = (nums, at, chosen, out)
+
+
+def main():
+    nums = [int(t) for t in sys.stdin.read().split()[1:]]
+
+    out = []
+    build(nums, 0, [], out)
+
+    for line in out:
+        print(line)
+    print(f"SUBSETS {len(out)}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def build(nums, at, chosen, out):
+    if at == len(nums):
+        out.append(" ".join(str(v) for v in chosen) if chosen else "-")
+        return
+
+    chosen.append(nums[at])
+    build(nums, at + 1, chosen, out)
+    chosen.pop()
+
+    build(nums, at + 1, chosen, out)
+
+
+def main():
+    nums = [int(t) for t in sys.stdin.read().split()[1:]]
+
+    out = []
+    build(nums, 0, [], out)
+
+    for line in out:
+        print(line)
+    print(f"SUBSETS {len(out)}")
+
+
+main()
+'''
+hints = [
+  "Two recursive calls per element: one with it appended, one without. Take first, and the order in the sample falls out.",
+  "chosen.pop() goes between the two calls. That is the `undo` in try-recurse-undo.",
+  "The base case is at == len(nums), and the empty selection there is the empty subset, which still counts.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n", expect = "1 2 3\n1 2\n1 3\n1\n2 3\n2\n3\n-\nSUBSETS 8\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",     expect = "5\n-\nSUBSETS 2\n",                             visible = false },
+  { name = "two",   stdin = "2\n-1 4\n",  expect = "-1 4\n-1\n4\n-\nSUBSETS 4\n",                   visible = false },
+  { name = "none",  stdin = "0\n\n",      expect = "-\nSUBSETS 1\n",                                visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id           = "python.hacker.14.word-search"
+node         = 14
+title        = "IS THE WORD IN THE GRID"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A board of letters and a name. They want to know whether the name is written in it, and they want the count of dead ends."
+concepts     = ["backtracking", "matrix", "graphs"]
+requires     = ["python.hacker.13.backtracking"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are a grid of lowercase letters. The
+last line is the word.
+
+The word is in the grid if you can spell it by moving up, down, left or right
+between **adjacent** cells, never using the same cell twice in one attempt.
+
+Print `FOUND` or `ABSENT`, then `STARTS <k>`: how many cells hold the word's
+first letter.
+
+```
+input:  3 4
+        abce
+        sfcs
+        adee
+        abcced
+output: FOUND
+        STARTS 2
+```
+
+Mark the cell used on the way in and **unmark it on the way out**. A cell
+that stays marked after a failed branch makes later branches fail for a reason
+that is not in the grid. A Python `str` cannot be marked in place — it is
+immutable — so the grid has to become a list of lists of characters first.
+'''
+starter      = '''
+import sys
+
+
+def search(grid, r, c, word, at):
+    _ = (grid, r, c, word, at)
+    return False
+
+
+def main():
+    data = sys.stdin.read().split()
+    rows, cols = int(data[0]), int(data[1])
+    grid = [list(line) for line in data[2:2 + rows]]
+    word = data[2 + rows]
+
+    starts = 0
+    _ = (cols, search(grid, 0, 0, word, 0))
+
+    print("ABSENT")
+    print(f"STARTS {starts}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def search(grid, r, c, word, at):
+    if grid[r][c] != word[at]:
+        return False
+    if at + 1 == len(word):
+        return True
+
+    here = grid[r][c]
+    grid[r][c] = "#"
+
+    # `or` short-circuits, so the first direction that spells the rest of the
+    # word stops the other three from being tried at all
+    found = (
+        (r > 0 and search(grid, r - 1, c, word, at + 1))
+        or (r + 1 < len(grid) and search(grid, r + 1, c, word, at + 1))
+        or (c > 0 and search(grid, r, c - 1, word, at + 1))
+        or (c + 1 < len(grid[r]) and search(grid, r, c + 1, word, at + 1))
+    )
+
+    grid[r][c] = here
+    return found
+
+
+def main():
+    data = sys.stdin.read().split()
+    rows, cols = int(data[0]), int(data[1])
+    grid = [list(line) for line in data[2:2 + rows]]
+    word = data[2 + rows]
+
+    # count the starting letters before any cell is marked
+    starts = sum(row.count(word[0]) for row in grid)
+
+    # stop at the first cell the word spells out from; `any` short-circuits
+    found = any(
+        search(grid, r, c, word, 0) for r in range(rows) for c in range(cols)
+    )
+
+    print("FOUND" if found else "ABSENT")
+    print(f"STARTS {starts}")
+
+
+main()
+'''
+hints = [
+  "Overwrite the cell with a character the word cannot contain, recurse, then put the original back.",
+  "Count the starting letters in a separate pass before you search, or the '#' marks will confuse the count.",
+  "The success base case is `at + 1 == len(word)` — checked after matching this cell, not before.",
+  "Chain the four directions with `or` rather than four ifs and a `found` flag: `or` already stops at the first branch that succeeds, and so does `any` over the starting cells. Carrying on after a hit is work you were asked not to do.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 4\nabce\nsfcs\nadee\nabcced\n", expect = "FOUND\nSTARTS 2\n",  visible = true },
+  { name = "absent",  stdin = "3 4\nabce\nsfcs\nadee\nabcb\n",   expect = "ABSENT\nSTARTS 2\n", visible = false },
+  { name = "reuse",   stdin = "1 3\naba\naba\n",                 expect = "FOUND\nSTARTS 2\n",  visible = false },
+  { name = "single",  stdin = "1 1\na\na\n",                     expect = "FOUND\nSTARTS 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id           = "python.hacker.15.topo-sort"
+node         = 15
+title        = "WHAT ORDER DOES IT BUILD IN"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Eleven packages and a dependency graph. Name an install order, or name the cycle that means there is not one."
+concepts     = ["graphs", "stacks-queues", "sorting"]
+requires     = ["python.hacker.14.word-search"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief        = '''
+Line one is `n m`: `n` tasks numbered `0..n-1` and `m` edges. The next `m`
+lines are `<a> <b>`, meaning `a` must be built before `b`.
+
+Print a build order on one line, space separated. When several tasks are ready
+at once, take the **lowest numbered** one, so the answer is unique. If no
+order exists, print `CYCLE` instead. Then print `DONE <how many you ordered>`.
+
+```
+input:  4 4
+        0 1
+        0 2
+        1 3
+        2 3
+output: 0 1 2 3
+        DONE 4
+```
+
+Kahn's algorithm: count how many things each task waits on, start with the
+ones waiting on nothing, and when you take a task, decrement its dependents.
+If you finish with tasks left over, those tasks are the cycle. The ready set
+is a `heapq`, so "lowest numbered" costs `log n` rather than a scan.
+'''
+starter      = '''
+import heapq
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, m = data[0], data[1]
+
+    after = [[] for _ in range(n)]
+    waiting = [0] * n
+    for e in range(m):
+        a, b = data[2 + 2 * e], data[3 + 2 * e]
+        after[a].append(b)
+        waiting[b] += 1
+
+    ready = []
+
+    # start with everything waiting on nothing, take the smallest each time
+    _ = (ready, after, waiting, heapq)
+    print("CYCLE")
+    print("DONE 0")
+
+
+main()
+'''
+solution     = '''
+import heapq
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, m = data[0], data[1]
+
+    after = [[] for _ in range(n)]
+    waiting = [0] * n
+    for e in range(m):
+        a, b = data[2 + 2 * e], data[3 + 2 * e]
+        after[a].append(b)
+        waiting[b] += 1
+
+    ready = [task for task in range(n) if waiting[task] == 0]
+    heapq.heapify(ready)
+
+    order = []
+    while ready:
+        task = heapq.heappop(ready)
+        order.append(task)
+        for nxt in after[task]:
+            waiting[nxt] -= 1
+            if waiting[nxt] == 0:
+                heapq.heappush(ready, nxt)
+
+    if len(order) < n:
+        print("CYCLE")
+    else:
+        print(" ".join(str(v) for v in order))
+    print(f"DONE {len(order)}")
+
+
+main()
+'''
+hints = [
+  "waiting[b] is the in-degree of b — how many edges point at it.",
+  "A plain deque gives *an* order; a min-heap gives *the* order the statement asks for.",
+  "You never detect the cycle directly. You notice that fewer than n tasks came out, and the ones left are in it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "diamond", stdin = "4 4\n0 1\n0 2\n1 3\n2 3\n", expect = "0 1 2 3\nDONE 4\n",   visible = true },
+  { name = "cycle",   stdin = "3 3\n0 1\n1 2\n2 0\n",      expect = "CYCLE\nDONE 0\n",     visible = false },
+  { name = "loose",   stdin = "3 0\n",                     expect = "0 1 2\nDONE 3\n",     visible = false },
+  { name = "chain",   stdin = "5 4\n4 3\n3 2\n2 1\n1 0\n", expect = "4 3 2 1 0\nDONE 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id           = "python.hacker.16.union-find"
+node         = 16
+title        = "WHO IS CONNECTED TO WHOM"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The tram network, the MTR and the minibus routes on one sheet. How many separate networks are there really."
+concepts     = ["disjoint-set", "graphs", "complexity"]
+requires     = ["python.hacker.15.topo-sort"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief        = '''
+Line one is `n m`: `n` stops numbered `0..n-1`, `m` undirected links. The next
+`m` lines are `<a> <b>`.
+
+Print three lines: how many separate networks there are, the size of the
+largest, and `REDUNDANT <k>` — how many of the links joined two stops that
+were already connected.
+
+```
+input:  6 4
+        0 1
+        1 2
+        3 4
+        0 2
+output: 3
+        3
+        REDUNDANT 1
+```
+
+Union-find: every stop points at a parent, `find` walks to the root, `union`
+points one root at the other. Compress the path on the way back out of `find`
+and the whole thing is effectively constant time per query.
+
+Write `find` as a loop. The recursive one is the textbook version and it is
+a `RecursionError` on a chain a thousand long — which is exactly the shape
+union-by-size exists to prevent, and exactly the shape a hostile input has
+before the first `find` ever compresses it.
+'''
+starter      = '''
+import sys
+
+
+def find(parent, x):
+    # walk to the root, and flatten what you walked over
+    _ = parent
+    return x
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, m = data[0], data[1]
+
+    parent = list(range(n))
+    size = [1] * n
+    redundant = 0
+
+    for e in range(m):
+        a, b = data[2 + 2 * e], data[3 + 2 * e]
+        _ = (find(parent, a), find(parent, b), size)
+
+    print(n)
+    print(1)
+    print(f"REDUNDANT {redundant}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def find(parent, x):
+    root = x
+    while parent[root] != root:
+        root = parent[root]
+    # path compression: point everything we walked over straight at the root
+    while parent[x] != root:
+        parent[x], x = root, parent[x]
+    return root
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, m = data[0], data[1]
+
+    parent = list(range(n))
+    size = [1] * n
+    groups = n
+    redundant = 0
+
+    for e in range(m):
+        a = find(parent, data[2 + 2 * e])
+        b = find(parent, data[3 + 2 * e])
+        if a == b:
+            redundant += 1
+            continue
+        # hang the smaller tree under the bigger one
+        if size[a] < size[b]:
+            a, b = b, a
+        parent[b] = a
+        size[a] += size[b]
+        groups -= 1
+
+    largest = max((size[x] for x in range(n) if parent[x] == x), default=0)
+
+    print(groups)
+    print(largest)
+    print(f"REDUNDANT {redundant}")
+
+
+main()
+'''
+hints = [
+  "Start with every stop as its own parent and n groups; each successful union drops the count by one.",
+  "An edge whose two ends already have the same root is the redundant one — count it and move on.",
+  "Only a root's size entry is meaningful, so read the largest off the roots, not off every index. max(..., default=0) covers n = 0 without a special case.",
+  "parent[x], x = root, parent[x] compresses in one line: the right-hand side is evaluated in full before either assignment happens, so the old parent[x] is read before it is overwritten.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "6 4\n0 1\n1 2\n3 4\n0 2\n", expect = "3\n3\nREDUNDANT 1\n", visible = true },
+  { name = "islands",   stdin = "4 0\n",                     expect = "4\n1\nREDUNDANT 0\n", visible = false },
+  { name = "one-net",   stdin = "3 2\n0 1\n1 2\n",           expect = "1\n3\nREDUNDANT 0\n", visible = false },
+  { name = "all-dupes", stdin = "2 3\n0 1\n0 1\n1 0\n",      expect = "1\n2\nREDUNDANT 2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id           = "python.hacker.17.lis"
+node         = 17
+title        = "THE LONGEST RUN UP"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A year of daily takings. They want the longest stretch of improving days, and they do not have to be consecutive."
+concepts     = ["dynamic-programming", "binary-search", "complexity"]
+requires     = ["python.hacker.16.union-find"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+Print the length of the longest **strictly increasing subsequence** — the
+values keep their order but need not be adjacent. Then print
+`TAILS <k>` where `k` is that same length, read off the patience-sorting pile
+count.
+
+```
+input:  8
+        10 9 2 5 3 7 101 18
+output: 4
+        TAILS 4
+```
+
+The `O(n²)` table is the answer you should be able to write cold. The `O(n log n)`
+one keeps, for each length, the smallest value a subsequence of that length can
+end on — a list that is always sorted, so the position of a new value is a
+binary search, and in Python that search is one call to `bisect_left`. Either
+passes here; the cases are small and say so. Write the second one anyway,
+because the follow-up is always "and faster?".
+'''
+starter      = '''
+import sys
+from bisect import bisect_left
+
+
+def main():
+    nums = [int(t) for t in sys.stdin.read().split()[1:]]
+
+    tails = []
+
+    # for each value, find where it belongs among the pile tops and put it there
+    _ = (tails, nums, bisect_left)
+    print(0)
+    print("TAILS 0")
+
+
+main()
+'''
+solution     = '''
+import sys
+from bisect import bisect_left
+
+
+def main():
+    nums = [int(t) for t in sys.stdin.read().split()[1:]]
+
+    # tails[i] = the smallest value an increasing subsequence of length i+1
+    # can end on. It is sorted, always.
+    tails = []
+    for value in nums:
+        at = bisect_left(tails, value)
+        if at == len(tails):
+            tails.append(value)
+        else:
+            tails[at] = value
+
+    print(len(tails))
+    print(f"TAILS {len(tails)}")
+
+
+main()
+'''
+hints = [
+  "tails is not a subsequence. Its length is the answer; its contents are only the best ending values.",
+  "Strictly increasing means you replace the first tail that is >= value, which is exactly what bisect_left finds. bisect_right would give you non-decreasing instead.",
+  "Running off the end of tails means this value extends the longest run so far — append it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "8\n10 9 2 5 3 7 101 18\n", expect = "4\nTAILS 4\n", visible = true },
+  { name = "descending", stdin = "4\n5 4 3 2\n",             expect = "1\nTAILS 1\n", visible = false },
+  { name = "flat",       stdin = "5\n7 7 7 7 7\n",           expect = "1\nTAILS 1\n", visible = false },
+  { name = "ascending",  stdin = "6\n1 2 3 4 5 6\n",         expect = "6\nTAILS 6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id           = "python.hacker.18.edit-distance"
+node         = 18
+title        = "HOW FAR APART"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Two spellings of the same street on two different signs. How many single-character edits between them."
+concepts     = ["dynamic-programming", "strings", "matrix"]
+requires     = ["python.hacker.17.lis"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief        = '''
+Two lines, one word each, lowercase. Either line may be **empty**, and then
+the answer is the length of the other one.
+
+Print the **edit distance**: the fewest single-character insertions,
+deletions or substitutions that turn the first into the second. Then print
+`LCS <k>`, the length of their longest common subsequence.
+
+```
+input:  horse
+        ros
+output: 3
+        LCS 2
+```
+
+Two tables over the same two strings, and both are the same three-line
+recurrence with a different tie-break. Fill row by row; the answer is the far
+corner. Row `0` and column `0` are not zero for the edit table — they are the
+cost of deleting or inserting everything.
+
+An empty first line means `sys.stdin.read().split()` would hand you the
+second word as the first. Read by lines, not by tokens, on this one.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    lines = sys.stdin.read().split("\n")
+    a = lines[0].strip() if lines else ""
+    b = lines[1].strip() if len(lines) > 1 else ""
+
+    edit = [[0] * (len(b) + 1) for _ in range(len(a) + 1)]
+    lcs = [[0] * (len(b) + 1) for _ in range(len(a) + 1)]
+
+    # fill both tables; the answers are the bottom-right corners
+    _ = (edit, lcs)
+    print(0)
+    print("LCS 0")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def main():
+    lines = sys.stdin.read().split("\n")
+    a = lines[0].strip() if lines else ""
+    b = lines[1].strip() if len(lines) > 1 else ""
+
+    edit = [[0] * (len(b) + 1) for _ in range(len(a) + 1)]
+    for i in range(len(a) + 1):
+        edit[i][0] = i
+    for j in range(len(b) + 1):
+        edit[0][j] = j
+    for i in range(1, len(a) + 1):
+        for j in range(1, len(b) + 1):
+            if a[i - 1] == b[j - 1]:
+                edit[i][j] = edit[i - 1][j - 1]
+            else:
+                edit[i][j] = 1 + min(edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1])
+
+    lcs = [[0] * (len(b) + 1) for _ in range(len(a) + 1)]
+    for i in range(1, len(a) + 1):
+        for j in range(1, len(b) + 1):
+            if a[i - 1] == b[j - 1]:
+                lcs[i][j] = lcs[i - 1][j - 1] + 1
+            else:
+                lcs[i][j] = max(lcs[i - 1][j], lcs[i][j - 1])
+
+    print(edit[len(a)][len(b)])
+    print(f"LCS {lcs[len(a)][len(b)]}")
+
+
+main()
+'''
+hints = [
+  "edit[i][0] = i and edit[0][j] = j: turning a prefix into nothing costs one deletion per character.",
+  "Matching characters cost nothing and step diagonally; a mismatch costs one and takes the cheapest of the three neighbours.",
+  "LCS is the same walk with max instead of min, and no diagonal step on a mismatch. And [[0] * w for _ in range(h)] — never [[0] * w] * h, which is h references to one row.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "horse\nros\n",         expect = "3\nLCS 2\n", visible = true },
+  { name = "same",    stdin = "causeway\ncauseway\n", expect = "0\nLCS 8\n", visible = false },
+  { name = "nothing", stdin = "abc\nxyz\n",           expect = "3\nLCS 0\n", visible = false },
+  { name = "insert",  stdin = "mtr\nmetro\n",         expect = "2\nLCS 3\n", visible = false },
+  { name = "empty",   stdin = "\nabc\n",              expect = "3\nLCS 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id           = "python.hacker.19.knapsack"
+node         = 19
+title        = "WHAT FITS IN THE BAG"
+difficulty   = 5
+time_limit_s = 1200
+story        = "One rider, one bag, and a board of orders each with a weight and a tip. Greedy picks the wrong ones."
+concepts     = ["dynamic-programming", "greedy", "slices"]
+requires     = ["python.hacker.18.edit-distance"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief        = '''
+Line one is `n cap`. The next `n` lines are `<weight> <value>`. Each item can
+be taken at most **once**.
+
+Print the best total value that fits in `cap`, then `GREEDY <v>`: what you
+would get by repeatedly taking the item with the best value-per-weight that
+still fits. On equal value-per-weight, the lighter item goes first.
+
+```
+input:  3 10
+        6 10
+        5 7
+        5 7
+output: 14
+        GREEDY 10
+```
+
+The two numbers being different is the whole point of the quest, and the
+sample shows it: the best value-per-weight is the `6 10` item at `1.67`, and
+taking it leaves four units of room that nothing fits into. Passing on it and
+taking both `5 7` items is worth `14`. The hidden cases are small, so what
+they check is that you got both numbers right, not that the table is fast.
+
+Compare the ratios exactly. `fractions.Fraction(value, weight)` is an exact
+rational and sorts correctly; `value / weight` is a float, and two ratios
+that are equal on paper can come out a bit apart in binary.
+'''
+starter      = '''
+import sys
+from fractions import Fraction
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, cap = data[0], data[1]
+    items = [(data[2 + 2 * i], data[3 + 2 * i]) for i in range(n)]
+
+    best = [0] * (cap + 1)
+
+    # one row per item, capacities walked downwards so each item is used once
+    _ = (best, items, Fraction)
+    print(0)
+    print("GREEDY 0")
+
+
+main()
+'''
+solution     = '''
+import sys
+from fractions import Fraction
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, cap = data[0], data[1]
+    items = [(data[2 + 2 * i], data[3 + 2 * i]) for i in range(n)]
+
+    best = [0] * (cap + 1)
+    for weight, value in items:
+        # downwards, so this item cannot be picked up twice in one pass
+        for room in range(cap, weight - 1, -1):
+            candidate = best[room - weight] + value
+            if candidate > best[room]:
+                best[room] = candidate
+
+    # best ratio first, lighter first on a tie; the Fraction keeps it exact
+    order = sorted(items, key=lambda item: (-Fraction(item[1], item[0]), item[0]))
+    room = cap
+    greedy = 0
+    for weight, value in order:
+        if weight <= room:
+            room -= weight
+            greedy += value
+
+    print(best[cap])
+    print(f"GREEDY {greedy}")
+
+
+main()
+'''
+hints = [
+  "range(cap, weight - 1, -1) walks the capacities downwards, which is what makes it 0/1 instead of unbounded. Upwards lets the same item be reused.",
+  "Fraction(value, weight) compares exactly; negate it in the key so the best ratio sorts first.",
+  "The greedy pass is a straight loop over the sorted items — no backtracking, which is exactly why it is wrong.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "3 10\n6 10\n5 7\n5 7\n", expect = "14\nGREEDY 10\n", visible = true },
+  { name = "no-room",   stdin = "2 1\n5 100\n9 900\n",    expect = "0\nGREEDY 0\n",   visible = false },
+  { name = "takes-all", stdin = "3 10\n1 1\n2 2\n3 3\n",  expect = "6\nGREEDY 6\n",   visible = false },
+  { name = "one",       stdin = "1 4\n4 9\n",             expect = "9\nGREEDY 9\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id           = "python.hacker.20.bits"
+node         = 20
+title        = "THE ONE THAT IS ALONE"
+difficulty   = 4
+time_limit_s = 600
+story        = "Every docket is scanned twice except one. They will not let you use a dict and they will not let you sort."
+concepts     = ["bit-manipulation", "math", "complexity"]
+requires     = ["python.hacker.19.knapsack"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` non-negative integers, in which every value
+appears exactly twice except one.
+
+Print four lines:
+
+1. the value that appears once, found with **xor** and constant extra space
+2. how many `1` bits are set in it
+3. `POW2 YES` if it is a power of two, `POW2 NO` otherwise (`0` is not)
+4. the value with its lowest set bit cleared, or `0` if it has none
+
+```
+input:  5
+        4 1 2 1 2
+output: 4
+        1
+        POW2 YES
+        0
+```
+
+`x ^ x == 0` and `x ^ 0 == x`, and xor does not care what order it happens in.
+That is the whole first line. `x & (x - 1)` clears the lowest set bit, which
+gives you the third and fourth lines for free. Python ints have no width, so
+there is no sign bit to worry about and `int.bit_count()` exists on 3.10 and
+later — but write the loop once, because the loop is what they ask for.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    nums = [int(t) for t in sys.stdin.read().split()[1:]]
+
+    alone = 0
+
+    # xor everything together, then read the bits off the result
+    _ = nums
+    print(alone)
+    print(0)
+    print("POW2 NO")
+    print(0)
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def main():
+    nums = [int(t) for t in sys.stdin.read().split()[1:]]
+
+    alone = 0
+    for value in nums:
+        alone ^= value
+
+    bits = 0
+    walk = alone
+    while walk:
+        walk &= walk - 1
+        bits += 1
+
+    power_of_two = alone != 0 and alone & (alone - 1) == 0
+    cleared = 0 if alone == 0 else alone & (alone - 1)
+
+    print(alone)
+    print(bits)
+    print("POW2 YES" if power_of_two else "POW2 NO")
+    print(cleared)
+
+
+main()
+'''
+hints = [
+  "The pairs cancel themselves out whatever order they arrive in, so one fold over the list is enough. functools.reduce(operator.xor, nums, 0) is the same loop in one line.",
+  "Counting bits by clearing the lowest one each time runs once per set bit, not once per bit width.",
+  "A power of two has exactly one bit set, so clearing the lowest one leaves zero — and zero itself has to be excluded by hand.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n4 1 2 1 2\n",    expect = "4\n1\nPOW2 YES\n0\n",    visible = true },
+  { name = "seven",  stdin = "3\n7 9 9\n",        expect = "7\n3\nPOW2 NO\n6\n",     visible = false },
+  { name = "single", stdin = "1\n0\n",            expect = "0\n0\nPOW2 NO\n0\n",     visible = false },
+  { name = "big",    stdin = "5\n1024 5 5 8 8\n", expect = "1024\n1\nPOW2 YES\n0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id           = "python.hacker.21.matrix"
+node         = 21
+title        = "TURN THE FLOOR PLAN"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The plan is the wrong way up and there is no room on the table for a second copy of it."
+concepts     = ["matrix", "slices", "iteration"]
+requires     = ["python.hacker.20.bits"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are an `n × n` grid of integers.
+
+Print the grid rotated **90° clockwise**, `n` lines of space-separated values.
+Then print its values in **spiral order** — outer ring clockwise from the top
+left, inwards — on one line.
+
+```
+input:  3
+        1 2 3
+        4 5 6
+        7 8 9
+output: 7 4 1
+        8 5 2
+        9 6 3
+        1 2 3 6 9 8 7 4 5
+```
+
+The rotation is the one to do in place: transpose, then reverse each row.
+Naming that out loud is half the question. Python also has the one-liner —
+`zip(*grid[::-1])` reverses the rows and then transposes, which is the same
+rotation — and you should be able to explain why it works, not only type it.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n = data[0]
+    grid = [data[1 + r * n:1 + (r + 1) * n] for r in range(n)]
+
+    # transpose, reverse each row, print; then walk the spiral
+    _ = grid
+    for _ in range(n):
+        print("?")
+    print("?")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n = data[0]
+    original = [data[1 + r * n:1 + (r + 1) * n] for r in range(n)]
+
+    grid = [row[:] for row in original]
+    for r in range(n):
+        for c in range(r + 1, n):
+            grid[r][c], grid[c][r] = grid[c][r], grid[r][c]
+    for row in grid:
+        row.reverse()
+    for row in grid:
+        print(" ".join(str(v) for v in row))
+
+    spiral = []
+    top, bottom, left, right = 0, n - 1, 0, n - 1
+    while top <= bottom and left <= right:
+        for c in range(left, right + 1):
+            spiral.append(original[top][c])
+        top += 1
+        for r in range(top, bottom + 1):
+            spiral.append(original[r][right])
+        right -= 1
+        if top <= bottom:
+            for c in range(right, left - 1, -1):
+                spiral.append(original[bottom][c])
+            bottom -= 1
+        if left <= right:
+            for r in range(bottom, top - 1, -1):
+                spiral.append(original[r][left])
+            left += 1
+    print(" ".join(str(v) for v in spiral))
+
+
+main()
+'''
+hints = [
+  "Transpose by swapping only above the diagonal — c starting at r + 1 — or you swap everything back. Tuple assignment swaps without a temporary.",
+  "The spiral wants the original grid, so copy it before you rotate in place: [row[:] for row in grid], not grid[:], which copies the outer list and shares every row.",
+  "The two `if` guards inside the spiral loop are what stop a single middle row or column being walked twice.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n4 5 6\n7 8 9\n", expect = "7 4 1\n8 5 2\n9 6 3\n1 2 3 6 9 8 7 4 5\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",                   expect = "5\n5\n",                                   visible = false },
+  { name = "two",   stdin = "2\n1 2\n3 4\n",            expect = "3 1\n4 2\n1 2 4 3\n",                      visible = false },
+  { name = "four",  stdin = "4\n1 2 3 4\n5 6 7 8\n9 10 11 12\n13 14 15 16\n", expect = "13 9 5 1\n14 10 6 2\n15 11 7 3\n16 12 8 4\n1 2 3 4 8 12 16 15 14 13 9 5 6 7 11 10\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id           = "python.hacker.22.trie"
+node         = 22
+title        = "THE PREFIX BOX"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Autocomplete for the stop board — the honest kind, that only completes what is actually on the list."
+concepts     = ["tries", "strings", "collections"]
+requires     = ["python.hacker.21.matrix"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief        = '''
+Line one is `n q`. The next `n` lines are lowercase words to insert. The next
+`q` lines are queries, each `WORD <s>` or `PREFIX <s>`.
+
+Build a trie — a tree of nodes each holding a map from letter to child —
+and answer:
+
+* `WORD <s>` → `YES` if `s` was inserted, `NO` otherwise
+* `PREFIX <s>` → how many of the `n` inserted words start with `s`
+
+The `n` words are not promised to be distinct, and `PREFIX` counts
+**insertions**, not distinct words: insert `tram` twice and `PREFIX tram` is
+`2`. `NODES` counts nodes, so the second insertion adds none.
+
+Then print `NODES <k>`, the number of nodes in the trie including the root.
+
+```
+input:  3 3
+        tram
+        tramway
+        train
+        WORD tram
+        PREFIX tra
+        WORD tra
+output: YES
+        3
+        NO
+        NODES 10
+```
+
+Keep a count on every node of how many inserted words pass through it, and
+`PREFIX` is a walk with no counting at the end. A node is a small class with
+`__slots__`, or a dict; either way the children are a dict keyed by the
+letter, because a 26-slot list is the C answer and the dict is the Python
+one.
+'''
+starter      = '''
+import sys
+
+
+class Node:
+    __slots__ = ("children", "through", "terminal")
+
+    def __init__(self):
+        self.children = {}
+        self.through = 0
+        self.terminal = False
+
+
+def main():
+    lines = sys.stdin.read().split("\n")
+    n, q = (int(t) for t in lines[0].split())
+
+    root = Node()
+    nodes = 1
+
+    for i in range(n):
+        word = lines[1 + i].strip()
+        # walk down, creating nodes as needed, bumping `through`
+        _ = word
+
+    for i in range(q):
+        query = lines[1 + n + i].split()
+        _ = query
+        print("NO")
+    _ = root
+    print(f"NODES {nodes}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+class Node:
+    __slots__ = ("children", "through", "terminal")
+
+    def __init__(self):
+        self.children = {}
+        self.through = 0
+        self.terminal = False
+
+
+def main():
+    lines = sys.stdin.read().split("\n")
+    n, q = (int(t) for t in lines[0].split())
+
+    root = Node()
+    nodes = 1
+
+    for i in range(n):
+        word = lines[1 + i].strip()
+        at = root
+        for letter in word:
+            child = at.children.get(letter)
+            if child is None:
+                child = Node()
+                at.children[letter] = child
+                nodes += 1
+            child.through += 1
+            at = child
+        at.terminal = True
+
+    for i in range(q):
+        parts = lines[1 + n + i].split()
+        kind = parts[0]
+        text = parts[1] if len(parts) > 1 else ""
+
+        at = root
+        for letter in text:
+            at = at.children.get(letter)
+            if at is None:
+                break
+
+        if kind == "WORD":
+            print("YES" if at is not None and at.terminal else "NO")
+        else:
+            print(at.through if at is not None else 0)
+
+    print(f"NODES {nodes}")
+
+
+main()
+'''
+hints = [
+  "children.get(letter) returns None for a missing child, and None is the signal both to create one on insert and to stop on lookup.",
+  "`through` is bumped on the node you step *onto*, so the root never counts itself.",
+  "A query that falls off the trie leaves `at` as None, and None answers NO and 0 without a special case.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 3\ntram\ntramway\ntrain\nWORD tram\nPREFIX tra\nWORD tra\n", expect = "YES\n3\nNO\nNODES 10\n", visible = true },
+  { name = "missing", stdin = "1 2\nmtr\nPREFIX z\nWORD mtr\n",                              expect = "0\nYES\nNODES 4\n",     visible = false },
+  { name = "nested",  stdin = "2 2\na\nab\nPREFIX a\nWORD a\n",                              expect = "2\nYES\nNODES 3\n",     visible = false },
+  { name = "empty-q", stdin = "2 1\nhku\nhk\nPREFIX hk\n",                                   expect = "2\nNODES 4\n",          visible = false },
+  { name = "twice",   stdin = "3 3\ntram\ntram\ntrap\nPREFIX tram\nPREFIX tra\nWORD tram\n",  expect = "2\n3\nYES\nNODES 6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id           = "python.hacker.23.prefix-sums"
+node         = 23
+title        = "HOW MANY WAYS TO HIT THE TARGET"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A day of takings and a number the auditor wants to see. How many runs of consecutive hours add up to exactly that."
+concepts     = ["prefix-sums", "hashing", "complexity"]
+requires     = ["python.hacker.22.trie"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief        = '''
+Line one is `n k`. Line two is `n` integers, which may be negative.
+
+Print how many contiguous runs sum to exactly `k`, then `RANGE <s>`, the sum
+of the whole list, read off the last prefix sum rather than by adding again.
+
+```
+input:  5 3
+        1 2 3 -3 3
+output: 5
+        RANGE 6
+```
+
+Negative values kill the sliding window — a window that is too big cannot be
+fixed by shrinking it. What survives is prefix sums: a run `i..j` sums to `k`
+exactly when `prefix[j] - prefix[i] == k`, so count how many earlier prefixes
+equal `prefix[j] - k`. Seed the map with `0 → 1` for runs that start at the
+beginning.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, k = data[0], data[1]
+    nums = data[2:2 + n]
+
+    seen = {0: 1}
+
+    # running prefix; for each one, how many earlier prefixes were prefix - k
+    _ = (seen, nums, k)
+    print(0)
+    print("RANGE 0")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def main():
+    data = [int(t) for t in sys.stdin.read().split()]
+    n, k = data[0], data[1]
+    nums = data[2:2 + n]
+
+    seen = {0: 1}
+
+    prefix = 0
+    runs = 0
+    for value in nums:
+        prefix += value
+        runs += seen.get(prefix - k, 0)
+        seen[prefix] = seen.get(prefix, 0) + 1
+
+    print(runs)
+    print(f"RANGE {prefix}")
+
+
+main()
+'''
+hints = [
+  "Look the earlier prefix up *before* you record the current one, or a run of length zero counts itself when k is 0.",
+  "seen = {0: 1} up front is what lets a run that starts at index 0 be found at all.",
+  "The final prefix is the total, so the second line costs nothing extra. collections.defaultdict(int) would save the .get(…, 0)s, and Counter would too.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "5 3\n1 2 3 -3 3\n",  expect = "5\nRANGE 6\n",  visible = true },
+  { name = "zeroes",   stdin = "3 0\n0 0 0\n",       expect = "6\nRANGE 0\n",  visible = false },
+  { name = "none",     stdin = "3 9\n1 1 1\n",       expect = "0\nRANGE 3\n",  visible = false },
+  { name = "negative", stdin = "4 -2\n-1 -1 2 -2\n", expect = "3\nRANGE -2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id           = "python.hacker.24.inversions"
+node         = 24
+title        = "THE ONE THE CLOCK CATCHES"
+difficulty   = 5
+time_limit_s = 1500
+story        = "First question of the afternoon round. The naive answer is correct, and it is the wrong answer."
+concepts     = ["sorting", "complexity", "recursion"]
+requires     = ["python.hacker.23.prefix-sums"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief        = '''
+Standard input is two integers, `n` and `seed`. There is no array in the input
+— you build it, with **exactly** this generator, in 64-bit arithmetic that
+wraps:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (mod 2^64)
+    next value = (x >> 33) % 1000000007
+```
+
+Count the **inversions**: pairs `i < j` where `a[i] > a[j]`. Print the count,
+then `MAX <largest value>`.
+
+```
+input:  8 1
+output: 19
+        MAX 908834774
+```
+
+For `8 1` the array is
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`.
+
+**This quest enforces its complexity, and it is the only kind that can.** One
+hidden case is `n = 200000`. The `O(n²)` double loop — which is what the
+starter is — is `2 × 10^10` comparisons and does not finish inside the ten
+second run limit; in Python it would not finish inside an hour. Counting
+inversions during a merge sort is `O(n log n)` and finishes in about a third
+of a second. Measured, on this machine, with these two programs.
+
+Two things this language decides differently. Python integers do not wrap —
+they grow — so the generator has to be masked by hand: `& 0xFFFFFFFFFFFFFFFF`
+after every step, or the "64-bit" state silently becomes a 128-bit one and
+every value after the first is wrong. And the answer, `9990744366`, would not
+fit in a 32-bit `int` in any other language; here that is not a concern, and
+saying *why* it is not is part of the answer.
+'''
+starter      = '''
+import sys
+
+MASK = (1 << 64) - 1
+
+
+def generate(n, seed):
+    x = seed
+    values = []
+    for _ in range(n):
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        values.append((x >> 33) % 1000000007)
+    return values
+
+
+def main():
+    n, seed = (int(t) for t in sys.stdin.read().split())
+
+    values = generate(n, seed)
+    largest = max(values) if values else 0
+
+    # correct, and far too slow: this is what the big hidden case rejects
+    inversions = 0
+    for i in range(n):
+        for j in range(i + 1, n):
+            if values[i] > values[j]:
+                inversions += 1
+
+    print(inversions)
+    print(f"MAX {largest}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+MASK = (1 << 64) - 1
+
+
+def generate(n, seed):
+    x = seed
+    values = []
+    for _ in range(n):
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        values.append((x >> 33) % 1000000007)
+    return values
+
+
+def sort_count(values):
+    """Merge sort, returning the sorted list and how many inversions it removed."""
+    if len(values) < 2:
+        return values, 0
+    mid = len(values) // 2
+    left, a = sort_count(values[:mid])
+    right, b = sort_count(values[mid:])
+
+    merged = []
+    inversions = a + b
+    i = j = 0
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            merged.append(left[i])
+            i += 1
+        else:
+            # left[i:] are all greater than right[j]
+            inversions += len(left) - i
+            merged.append(right[j])
+            j += 1
+    merged.extend(left[i:])
+    merged.extend(right[j:])
+    return merged, inversions
+
+
+def main():
+    n, seed = (int(t) for t in sys.stdin.read().split())
+
+    values = generate(n, seed)
+    largest = max(values) if values else 0
+
+    _, inversions = sort_count(values)
+
+    print(inversions)
+    print(f"MAX {largest}")
+
+
+main()
+'''
+hints = [
+  "Take the max before you sort, or off the original list. The merge sort hands back a new list and leaves the input alone here, but do not rely on that in a version that sorts in place.",
+  "When the right-hand value wins the merge, every remaining element of the left half is greater than it — that is `len(left) - i` inversions in one go, and it is the whole trick.",
+  "The recursion is log2(200000), about eighteen frames deep — nowhere near the limit. A Fenwick tree over the compressed values is the other O(n log n) answer and is worth naming in the room.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 1\n",          expect = "19\nMAX 908834774\n",          visible = true },
+  { name = "single", stdin = "1 7\n",          expect = "0\nMAX 59165271\n",            visible = false },
+  { name = "dozen",  stdin = "12 99\n",        expect = "33\nMAX 998275676\n",          visible = false },
+  { name = "big",    stdin = "200000 12345\n", expect = "9990744366\nMAX 999991076\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id           = "python.hacker.25.test-cases"
+node         = 25
+title        = "T TEST CASES FOLLOW"
+difficulty   = 3
+time_limit_s = 900
+story        = "The shape every screen uses, and the bug every candidate writes at least once: the second case remembers the first."
+concepts     = ["io", "collections", "control-flow", "sorting"]
+requires     = ["python.hacker.24.inversions"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief        = '''
+Line one is `T`, the number of independent test cases. Each case is a line
+with `n`, then a line with `n` integers — and when `n` is `0` that second line
+is empty.
+
+For each case print the **second largest distinct** value, or `NONE` if there
+are fewer than two distinct values. After all of them print `CASES <T>`.
+
+```
+input:  3
+        5
+        3 1 4 1 5
+        3
+        7 7 7
+        0
+
+output: 4
+        NONE
+        NONE
+        CASES 3
+```
+
+This is the standard competitive-screen wrapper and it fails candidates for
+one reason: state that should have been per-case was declared before the
+loop. Every accumulator, every set, every `best` goes **inside** the `for`.
+
+Read by whitespace token rather than by line, and the empty line for `n = 0`
+stops being a special case at all — which is the second thing this shape
+teaches.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    tokens = iter(sys.stdin.read().split())
+    cases = int(next(tokens))
+
+    # declared once, reused for every case — this is the bug
+    distinct = set()
+
+    for _ in range(cases):
+        n = int(next(tokens))
+        for _ in range(n):
+            distinct.add(int(next(tokens)))
+        ranked = sorted(distinct)
+        print(ranked[-2] if len(ranked) >= 2 else "NONE")
+    print(f"CASES {cases}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def main():
+    tokens = iter(sys.stdin.read().split())
+    cases = int(next(tokens))
+
+    for _ in range(cases):
+        # fresh for every case
+        distinct = set()
+
+        n = int(next(tokens))
+        for _ in range(n):
+            distinct.add(int(next(tokens)))
+
+        ranked = sorted(distinct)
+        print(ranked[-2] if len(ranked) >= 2 else "NONE")
+    print(f"CASES {cases}")
+
+
+main()
+'''
+hints = [
+  "Move the set inside the loop. That is the entire fix, and it is the entire quest.",
+  "A set de-duplicates and sorted() orders it, so ranked[-2] is the second largest distinct value.",
+  "ranked[-2] on a list of one raises IndexError, which is why the length check comes first; there is no nth() that quietly gives None here.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3\n5\n3 1 4 1 5\n3\n7 7 7\n0\n\n",         expect = "4\nNONE\nNONE\nCASES 3\n",     visible = true },
+  { name = "one",    stdin = "1\n2\n10 -10\n",                           expect = "-10\nCASES 1\n",               visible = false },
+  { name = "pairs",  stdin = "2\n1\n5\n4\n2 2 3 3\n",                    expect = "NONE\n2\nCASES 2\n",           visible = false },
+  { name = "leaky",  stdin = "4\n3\n9 8 7\n1\n1\n2\n4 4\n3\n-1 -2 -3\n", expect = "8\nNONE\nNONE\n-2\nCASES 4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id           = "python.hacker.26.statistics"
+node         = 26
+title        = "SIX DECIMAL PLACES"
+difficulty   = 3
+time_limit_s = 900
+story        = "They want the numbers rounded the way the spec says, not the way your language happens to print them."
+concepts     = ["math", "sorting", "types"]
+requires     = ["python.hacker.25.test-cases"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+Print three lines, each to **six decimal places**: the mean, the **population**
+standard deviation (divide by `n`, not `n - 1`), and the median — which for an
+even `n` is the average of the two middle values.
+
+```
+input:  5
+        2 4 4 4 5
+output: 3.800000
+        0.979796
+        4.000000
+```
+
+This quest is judged with `match = "float:1e-6"`, so the comparison is
+numeric: `3.8` and `3.800000` both pass, and a value that is off by `1e-7`
+passes too. That is deliberate — the point is not your formatter, it is that
+`sum // n` gives `3`, and that the even-length median is a boundary people get
+wrong under a clock.
+
+Population, not sample. The standard library has both, under names that say
+which is which: `statistics.pstdev` divides by `n` and `statistics.stdev`
+divides by `n - 1`. Read the statement twice; on a real screen the difference
+between the two is the whole submission.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    values = sorted(int(t) for t in sys.stdin.read().split()[1:])
+
+    # integer division, so the mean is wrong before anything else is
+    mean = sum(values) // len(values)
+
+    print(f"{mean}.000000")
+    print("0.000000")
+    print(f"{values[len(values) // 2]}.000000")
+
+
+main()
+'''
+solution     = '''
+import statistics
+import sys
+
+
+def main():
+    values = sorted(int(t) for t in sys.stdin.read().split()[1:])
+
+    mean = sum(values) / len(values)
+    deviation = statistics.pstdev(values)
+
+    middle = len(values) // 2
+    if len(values) % 2 == 1:
+        median = float(values[middle])
+    else:
+        median = (values[middle - 1] + values[middle]) / 2
+
+    print(f"{mean:.6f}")
+    print(f"{deviation:.6f}")
+    print(f"{median:.6f}")
+
+
+main()
+'''
+hints = [
+  "`/` is true division in Python 3 and gives a float; `//` is the floor division the starter used, and it has already thrown the fraction away.",
+  "statistics.pstdev is the population one; statistics.stdev is the sample one and is wrong here. Writing the loop yourself — mean of the squared deviations, then math.sqrt — is equally correct.",
+  "For an even count the median is the average of values[n//2 - 1] and values[n//2], and that subtraction is where the off-by-one lives. statistics.median does this for you, and knowing that it does is fine too.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "float:1e-6"
+cases = [
+  { name = "odd",    stdin = "5\n2 4 4 4 5\n", expect = "3.800000\n0.979796\n4.000000\n", visible = true },
+  { name = "even",   stdin = "4\n1 2 3 4\n",   expect = "2.500000\n1.118034\n2.500000\n", visible = false },
+  { name = "single", stdin = "1\n7\n",         expect = "7.000000\n0.000000\n7.000000\n", visible = false },
+  { name = "signed", stdin = "2\n-3 3\n",      expect = "0.000000\n3.000000\n0.000000\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id           = "python.hacker.27.commands"
+node         = 27
+title        = "THE INPUT IS THE PROBLEM"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The till log comes off the machine wrapped at eighty columns, and the count at the top is a count of commands, not of words."
+concepts     = ["io", "stacks-queues", "control-flow"]
+requires     = ["python.hacker.26.statistics"]
+map          = { x = 0.199, y = 0.742, kind = "quest" }
+brief        = '''
+Line one is `k`, the number of **commands** that follow. The commands are
+whitespace-separated tokens packed across the remaining lines however they
+happened to wrap — any number per line, any amount of spacing, possibly a
+trailing blank line.
+
+| command | tokens | effect |
+| --- | --- | --- |
+| `ADD <cents>` | two | push an item |
+| `VOID` | one | remove the last item, or do nothing if there is none |
+| `TOTAL` | one | print the current sum |
+| `CLEAR` | one | remove everything |
+
+After the `k` commands, print `COMMANDS <k>` and `ITEMS <how many are left>`.
+
+```
+input:  5
+        ADD 600 ADD 2800 TOTAL VOID TOTAL
+output: 3400
+        600
+        COMMANDS 5
+        ITEMS 1
+```
+
+`k` counts commands, and `ADD` is one command made of two tokens — so a loop
+that runs `k` times and reads one token per turn stops in the wrong place.
+Read `k` commands, pulling the argument only when the command has one — and
+the tool for "pull the next token when I ask for it" is an **iterator** over
+the token list, with `next(tokens, "")` so the end of input is a value and
+not an exception.
+
+`VOID` on an empty till and `TOTAL` before anything was added both have to
+work. There is no line in the statement saying they cannot happen, and on a
+real screen that silence is the specification. `list.pop()` on an empty list
+raises `IndexError`; the guard is yours to write.
+'''
+starter      = '''
+import sys
+
+
+def main():
+    tokens = iter(sys.stdin.read().split())
+    commands = int(next(tokens))
+
+    items = []
+
+    # one token per command — which is wrong for ADD
+    for _ in range(commands):
+        command = next(tokens, "")
+        if command == "TOTAL":
+            print(sum(items))
+
+    print(f"COMMANDS {commands}")
+    print(f"ITEMS {len(items)}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+
+def main():
+    tokens = iter(sys.stdin.read().split())
+    commands = int(next(tokens))
+
+    items = []
+
+    for _ in range(commands):
+        command = next(tokens, "")
+        if command == "ADD":
+            # the argument is a second token of the same command
+            items.append(int(next(tokens, "0")))
+        elif command == "VOID":
+            if items:
+                items.pop()
+        elif command == "TOTAL":
+            print(sum(items))
+        elif command == "CLEAR":
+            items.clear()
+
+    print(f"COMMANDS {commands}")
+    print(f"ITEMS {len(items)}")
+
+
+main()
+'''
+hints = [
+  "str.split() with no argument collapses every run of spaces, tabs and newlines, so the wrapping in the file stops mattering the moment you stop reading lines.",
+  "Pull the ADD argument inside the ADD branch, from the same iterator. The loop counter counts commands, not tokens.",
+  "`if items: items.pop()` — the guard is two words, and without it VOID on an empty till is an IndexError.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\nADD 600 ADD 2800 TOTAL VOID TOTAL\n",              expect = "3400\n600\nCOMMANDS 5\nITEMS 1\n", visible = true },
+  { name = "ragged", stdin = "6\nADD 100\n  ADD 200   TOTAL\nVOID\n\nVOID TOTAL\n", expect = "300\n0\nCOMMANDS 6\nITEMS 0\n",    visible = false },
+  { name = "empty",  stdin = "3\nVOID TOTAL VOID\n",                                expect = "0\nCOMMANDS 3\nITEMS 0\n",         visible = false },
+  { name = "clear",  stdin = "6\nADD 1 ADD 2 TOTAL CLEAR TOTAL ADD 9\n",            expect = "3\n0\nCOMMANDS 6\nITEMS 1\n",      visible = false },
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id           = "python.hacker.29.dijkstra"
+node         = 28
+title        = "NOT EVERY STREET IS THE SAME LENGTH"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Every map you have cleared so far counted hops. The tram does not care how many stops there are; it cares how long they take."
+concepts     = ["graphs", "heaps", "complexity"]
+requires     = ["python.hacker.27.commands"]
+map          = { x = 0.114, y = 0.663, kind = "quest" }
+brief        = '''
+Standard input is `n m seed`: `n` stops, `m` undirected weighted edges. Build
+the graph yourself, with **exactly** this generator, in 64-bit arithmetic that
+wraps (mask it by hand — Python's ints will not):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for i in 1..n:                  # a spanning tree first, so it is connected
+    p = next() % i
+    w = next() % 1000 + 1
+    edge (p, i, w)
+for the remaining m - (n-1) edges:
+    a = next() % n
+    b = next() % n
+    w = next() % 1000 + 1
+    edge (a, b, w)
+```
+
+Print the sum of the shortest distances from stop `0` to every reachable stop
+(including `0` itself, which is `0`), then `MAX <the largest of them>`.
+
+```
+input:  6 8 1
+output: 4594
+        MAX 1582
+```
+
+**The complexity here is enforced.** One hidden case is `n = 100000`,
+`m = 200000`. Dijkstra is the right algorithm either way; what the clock
+decides is the priority queue. Scanning every unvisited node for the minimum
+is `O(V²)` — `10^10` steps, and in Python that is not sixteen seconds, it is
+the rest of the afternoon — against a ten second run limit. A `heapq` makes
+it `O((V + E) log V)` and it finishes in about a third of a second. Both
+measured on this machine, with the two programs that ship in this quest: the
+starter is the scanning version.
+
+Worth seeing clearly, because it is the most common way to fail a timed
+screen: **the starter is not wrong.** It prints exactly the right answer. It
+is rejected only for arriving far too late.
+
+`heapq` is a min-heap, so push `(distance, node)` and the tuple order does the
+rest. It has no decrease-key, and you do not need one: push the improved
+distance as a new entry and skip any entry you pop whose distance is already
+worse than the one you have recorded. That "stale entry" skip is the line
+people forget, and without it the heap grows without bound.
+'''
+starter      = '''
+import sys
+
+MASK = (1 << 64) - 1
+
+
+class Rng:
+    def __init__(self, seed):
+        self.x = seed
+
+    def next(self):
+        self.x = (self.x * 6364136223846793005 + 1442695040888963407) & MASK
+        return self.x >> 33
+
+
+def build(n, m, seed):
+    rng = Rng(seed)
+    graph = [[] for _ in range(n)]
+    for i in range(1, n):
+        p = rng.next() % i
+        w = rng.next() % 1000 + 1
+        graph[p].append((i, w))
+        graph[i].append((p, w))
+    for _ in range(max(0, m - (n - 1))):
+        a = rng.next() % n
+        b = rng.next() % n
+        w = rng.next() % 1000 + 1
+        graph[a].append((b, w))
+        graph[b].append((a, w))
+    return graph
+
+
+def main():
+    n, m, seed = (int(t) for t in sys.stdin.read().split())
+
+    graph = build(n, m, seed)
+    unreached = None
+    dist = [unreached] * n
+    done = [False] * n
+    dist[0] = 0
+
+    # correct, and far too slow: the minimum is found by scanning every node
+    for _ in range(n):
+        best = None
+        best_dist = None
+        for u in range(n):
+            if not done[u] and dist[u] is not None:
+                if best_dist is None or dist[u] < best_dist:
+                    best_dist = dist[u]
+                    best = u
+        if best is None:
+            break
+        done[best] = True
+        for v, w in graph[best]:
+            if dist[v] is None or best_dist + w < dist[v]:
+                dist[v] = best_dist + w
+
+    reached = [d for d in dist if d is not None]
+    print(sum(reached))
+    print(f"MAX {max(reached) if reached else 0}")
+
+
+main()
+'''
+solution     = '''
+import heapq
+import sys
+
+MASK = (1 << 64) - 1
+
+
+class Rng:
+    def __init__(self, seed):
+        self.x = seed
+
+    def next(self):
+        self.x = (self.x * 6364136223846793005 + 1442695040888963407) & MASK
+        return self.x >> 33
+
+
+def build(n, m, seed):
+    rng = Rng(seed)
+    graph = [[] for _ in range(n)]
+    for i in range(1, n):
+        p = rng.next() % i
+        w = rng.next() % 1000 + 1
+        graph[p].append((i, w))
+        graph[i].append((p, w))
+    for _ in range(max(0, m - (n - 1))):
+        a = rng.next() % n
+        b = rng.next() % n
+        w = rng.next() % 1000 + 1
+        graph[a].append((b, w))
+        graph[b].append((a, w))
+    return graph
+
+
+def main():
+    n, m, seed = (int(t) for t in sys.stdin.read().split())
+
+    graph = build(n, m, seed)
+    unreached = float("inf")
+    dist = [unreached] * n
+    dist[0] = 0
+
+    heap = [(0, 0)]
+    while heap:
+        d, u = heapq.heappop(heap)
+        # a stale entry: we already found a shorter way to u
+        if d > dist[u]:
+            continue
+        for v, w in graph[u]:
+            candidate = d + w
+            if candidate < dist[v]:
+                dist[v] = candidate
+                heapq.heappush(heap, (candidate, v))
+
+    reached = [d for d in dist if d < unreached]
+    print(sum(reached))
+    print(f"MAX {max(reached) if reached else 0}")
+
+
+main()
+'''
+hints = [
+  "(distance, node) tuples in a heapq: distance first is what orders the entries, and heapq is already a min-heap.",
+  "`if d > dist[u]: continue` is the stale-entry skip. Without it the algorithm is still correct and the heap fills with obsolete entries.",
+  "float(\"inf\") is the honest `unreached`: it compares greater than every int and needs no None check in the relaxation. The spanning-tree half of the generator guarantees every node is reachable, so the final filter never removes anything — keep it anyway, because the version of this question with an unreachable node is the follow-up.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "6 8 1\n",           expect = "4594\nMAX 1582\n",      visible = true },
+  { name = "pair",   stdin = "2 1 5\n",           expect = "774\nMAX 774\n",        visible = false },
+  { name = "ten",    stdin = "10 12 3\n",         expect = "12277\nMAX 2237\n",     visible = false },
+  { name = "big",    stdin = "100000 200000 7\n", expect = "249521722\nMAX 6142\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id           = "python.hacker.30.range-queries"
+node         = 29
+title        = "TOTALS THAT KEEP CHANGING"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Three hundred thousand till operations from one day across the whole chain, half of them corrections, and somebody wants the running totals."
+concepts     = ["prefix-sums", "complexity", "collections"]
+requires     = ["python.hacker.29.dijkstra"]
+map          = { x = 0.059, y = 0.950, kind = "quest" }
+brief        = '''
+Standard input is `n q seed`. Build an array of `n` values and then run `q`
+operations, all from the same generator, in 64-bit arithmetic that wraps
+(mask it by hand):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+values[i] = next() % 1000            for i in 0..n
+
+for each of the q operations:
+    a = next(); b = next(); c = next()
+    if a % 2 == 0:   UPDATE  values[b % n] += (c % 1000) + 1
+    else:            QUERY   l = b % n, r = c % n, swap them if l > r,
+                             and add sum(values[l..r]) to a running total
+```
+
+Print the running total of every query answer, then `UPDATES <k>`.
+
+```
+input:  8 6 1
+output: 4112
+        UPDATES 3
+```
+
+**The complexity here is enforced.** The naive answer — `sum(values[l:r+1])`
+for every query — is `O(n)` per query, and the slice and the sum both run in
+C, which makes it deceptively quick on anything small. So the big hidden case
+is `n = 500000, q = 300000`, where the naive answer touches on the order of
+`2 × 10^10` elements and took **over three minutes** on this machine, against
+a ten second run limit. A Fenwick tree does the whole thing in under a
+second. Both measured, with the two programs in this quest.
+
+(The Rust and Go versions of this quest run four million operations. Python
+runs three hundred thousand, because a correct Fenwick tree in Python would
+not clear four million inside any honest limit either — and the point is to
+separate the right structure from the wrong one, not Python from C.)
+
+The lesson is the one an interviewer is fishing for: *point update, range sum*
+is the exact shape a Fenwick tree exists for. Three short functions — add,
+prefix, and range as the difference of two prefixes — and `i & -i` is how you
+step by the lowest set bit, which works on a Python int exactly as it does
+on a two's-complement one.
+'''
+starter      = '''
+import sys
+
+MASK = (1 << 64) - 1
+
+
+def main():
+    n, q, seed = (int(t) for t in sys.stdin.read().split())
+
+    x = seed
+
+    def nxt():
+        nonlocal x
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        return x >> 33
+
+    values = [nxt() % 1000 for _ in range(n)]
+
+    total = 0
+    updates = 0
+    for _ in range(q):
+        a, b, c = nxt(), nxt(), nxt()
+        if a % 2 == 0:
+            values[b % n] += c % 1000 + 1
+            updates += 1
+        else:
+            l, r = b % n, c % n
+            if l > r:
+                l, r = r, l
+            # correct, and far too slow at three hundred thousand operations
+            total += sum(values[l:r + 1])
+
+    print(total)
+    print(f"UPDATES {updates}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+MASK = (1 << 64) - 1
+
+
+class Fenwick:
+    """Fenwick tree, 1-based internally. `add` and `prefix` are both O(log n)."""
+
+    def __init__(self, n):
+        self.tree = [0] * (n + 1)
+
+    def add(self, index, delta):
+        i = index + 1
+        tree = self.tree
+        while i < len(tree):
+            tree[i] += delta
+            i += i & -i  # step up by the lowest set bit
+
+    def prefix(self, upto):
+        i = upto
+        total = 0
+        tree = self.tree
+        while i > 0:
+            total += tree[i]
+            i -= i & -i
+        return total
+
+    def range(self, l, r):
+        return self.prefix(r + 1) - self.prefix(l)
+
+
+def main():
+    n, q, seed = (int(t) for t in sys.stdin.read().split())
+
+    x = seed
+
+    def nxt():
+        nonlocal x
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        return x >> 33
+
+    fenwick = Fenwick(n)
+    for i in range(n):
+        fenwick.add(i, nxt() % 1000)
+
+    total = 0
+    updates = 0
+    for _ in range(q):
+        a, b, c = nxt(), nxt(), nxt()
+        if a % 2 == 0:
+            fenwick.add(b % n, c % 1000 + 1)
+            updates += 1
+        else:
+            l, r = b % n, c % n
+            if l > r:
+                l, r = r, l
+            total += fenwick.range(l, r)
+
+    print(total)
+    print(f"UPDATES {updates}")
+
+
+main()
+'''
+hints = [
+  "Build the tree by calling add once per initial value. The O(n) bottom-up build is a nice optimisation and is not what the clock is testing.",
+  "i & -i isolates the lowest set bit — Python's negative ints behave as if two's complement for bitwise operations, so no wrapping_neg is needed. Adding it walks up the tree; subtracting it walks down.",
+  "range(l, r) is prefix(r + 1) - prefix(l), and getting that pair of off-by-ones right is most of the debugging. Binding self.tree to a local inside the loops is a real speed-up in CPython, and it is the only micro-optimisation this quest needs.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 6 1\n",           expect = "4112\nUPDATES 3\n",            visible = true },
+  { name = "no-ups", stdin = "5 4 9\n",           expect = "4458\nUPDATES 0\n",            visible = false },
+  { name = "mid",    stdin = "1000 2000 3\n",     expect = "249603264\nUPDATES 987\n",     visible = false },
+  { name = "big",    stdin = "500000 300000 7\n", expect = "14403406318963\nUPDATES 149814\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id           = "python.hacker.31.palindrome"
+node         = 30
+title        = "THE SAME BACKWARDS"
+difficulty   = 4
+time_limit_s = 1200
+story        = "Top-twenty question, asked in some form in most screens, and the one most people have written once and never understood."
+concepts     = ["strings", "two-pointers", "complexity"]
+requires     = ["python.hacker.30.range-queries"]
+map          = { x = 0.260, y = 0.857, kind = "quest" }
+brief        = '''
+Standard input is `n alphabet seed`. Build the string yourself, in 64-bit
+arithmetic that wraps (mask it by hand):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+s[i] = 'a' + (next() % alphabet)      for i in 0..n
+```
+
+Print the length of the longest palindromic substring, then `AT <index>` — the
+0-based start of the **leftmost** one of that length.
+
+```
+input:  12 3 5
+output: 5
+        AT 1
+```
+
+Expand around each centre. There are `2n - 1` centres, not `n`: every
+character is a centre for the odd-length palindromes, and every gap between
+two characters is a centre for the even-length ones. Forgetting the gaps is
+why a correct-looking solution returns `1` on `abba` — and it is what the
+starter does.
+
+**What the tests do and do not enforce**, plainly. The hidden case that does
+the work is `n = 8000` over a **one**-letter alphabet. It is the worst case
+for expand-around-centre — every centre runs to the end of the string — so the
+right answer does its full `O(n²)` there, thirty-two million character
+comparisons in a Python loop, and finishes in about **1.3 s**. It also rejects
+check-every-substring-and-test-each-one: `s[i:j] == s[i:j][::-1]` runs in C,
+which is exactly why that cubic loop feels fast on small inputs, and at `n =
+8000` it is still about **forty seconds** against the ten second limit.
+
+(Rust runs this case at `n = 20000`. Python runs it at `8000`, because the
+quadratic answer in a Python loop would take eight seconds at the Rust size,
+and a limit that a correct program clears by a whisker is not a limit.)
+
+The other big case, `n = 20000` over a two-letter alphabet, is a
+**correctness** case and not a speed one: on a random binary string the
+palindrome test fails after a character or two. It checks that your generator
+and your leftmost-index tie-break agree with ours at scale.
+
+So: the tests reject cubic and accept quadratic. They do **not** demand
+Manacher's algorithm, which is the `O(n)` answer. Know that it exists and what
+it does, because "and can you do better than quadratic?" is the follow-up this
+question is usually asked to set up.
+'''
+starter      = '''
+import sys
+
+MASK = (1 << 64) - 1
+
+
+def main():
+    n, alphabet, seed = (int(t) for t in sys.stdin.read().split())
+
+    x = seed
+    chars = []
+    for _ in range(n):
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        chars.append(chr(ord("a") + (x >> 33) % alphabet))
+    s = "".join(chars)
+
+    # only the odd centres, so every even-length palindrome is invisible
+    best_len = 0
+    best_start = 0
+    for centre in range(n):
+        i, j = centre, centre
+        while i >= 0 and j < n and s[i] == s[j]:
+            i -= 1
+            j += 1
+        length = j - i - 1
+        if length > best_len:
+            best_len = length
+            best_start = i + 1
+
+    print(best_len)
+    print(f"AT {best_start}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+MASK = (1 << 64) - 1
+
+
+def main():
+    n, alphabet, seed = (int(t) for t in sys.stdin.read().split())
+
+    x = seed
+    chars = []
+    for _ in range(n):
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        chars.append(chr(ord("a") + (x >> 33) % alphabet))
+    s = "".join(chars)
+
+    best_len = 0
+    best_start = 0
+    for centre in range(n):
+        # odd length: one character at the middle; even length: the gap to
+        # the right of it
+        for i, j in ((centre, centre), (centre, centre + 1)):
+            while i >= 0 and j < n and s[i] == s[j]:
+                i -= 1
+                j += 1
+            # i and j have each stepped one too far
+            length = j - i - 1
+            if length > best_len:
+                best_len = length
+                best_start = i + 1
+
+    print(best_len)
+    print(f"AT {best_start}")
+
+
+main()
+'''
+hints = [
+  "Two expansions per centre: (c, c) for odd lengths and (c, c + 1) for even ones. The starter is missing the second.",
+  "When the loop stops, i and j have both moved one past the palindrome — so it starts at i + 1 and its length is j - i - 1.",
+  "Only update on a strictly longer palindrome, and the leftmost of each length is the one you keep, which is what AT is asking for. And `i >= 0` has to be checked by hand: s[-1] is a valid index in Python and it is the wrong character.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "12 3 5\n",    expect = "5\nAT 1\n",      visible = true },
+  { name = "one",     stdin = "1 4 2\n",     expect = "1\nAT 0\n",      visible = false },
+  { name = "random",  stdin = "20000 2 9\n", expect = "41\nAT 2166\n",  visible = false },
+  { name = "all-one", stdin = "8000 1 9\n",  expect = "8000\nAT 0\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id           = "python.hacker.32.modular"
+node         = 31
+title        = "MODULO ONE BILLION AND SEVEN"
+difficulty   = 5
+time_limit_s = 1500
+story        = "The phrase appears at the bottom of the statement and half the room does not know what it is asking them to do."
+concepts     = ["math", "complexity", "recursion"]
+requires     = ["python.hacker.31.palindrome"]
+map          = { x = 0.335, y = 0.936, kind = "quest" }
+brief        = '''
+Standard input is `n q seed`. Generate `q` queries, in 64-bit arithmetic that
+wraps (mask it by hand):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the q queries:
+    a = next() % (n + 1)
+    b = next() % (a + 1)          # so 0 <= b <= a <= n
+```
+
+For each query compute the binomial coefficient `C(a, b)` **modulo
+1000000007**. Print the sum of all `q` answers, itself modulo `1000000007`,
+then `LAST <the final query's answer>`.
+
+```
+input:  10 5 3
+output: 209
+        LAST 1
+```
+
+`C(a, b)` has hundreds of thousands of digits at these sizes. Python would
+actually compute it — `math.comb(200000, 100000)` exists and returns the
+whole thing — and that is the trap in this language: it is correct, it takes
+tens of milliseconds per query, and it is not what "modulo a prime" means.
+Every multiplication is reduced as you go. The problem is the division:
+`a! / (b! (a-b)!)` has no meaning in modular arithmetic. What replaces it is
+the **modular inverse**, and because `1000000007` is prime, Fermat's little
+theorem gives it to you: `inverse(v) = v^(p-2) mod p`. Python's three-argument
+`pow(v, p - 2, p)` is that, in C, in one call.
+
+So: precompute `factorial[0..n]` once, and answer each query as
+`f[a] * inv(f[b]) * inv(f[a-b])`.
+
+**The complexity here is enforced.** One hidden case is `n = 200000`,
+`q = 200000`. Computing each coefficient independently — multiply `b` terms,
+divide by `b` terms, one modular inverse each — does not finish in the ten
+second run limit; that is the starter. One shared factorial table finishes
+in about half a second. Both measured on this machine.
+
+Every intermediate is a product of two values below `2^30`, so it would fit
+in an `i64`; in Python nothing overflows regardless, and the reason to reduce
+after every multiplication is speed, not correctness. In a language with a
+32-bit `int` it would be both, and that is the other half of why this
+question gets asked.
+'''
+starter      = '''
+import sys
+
+MASK = (1 << 64) - 1
+P = 1000000007
+
+
+def main():
+    n, q, seed = (int(t) for t in sys.stdin.read().split())
+
+    x = seed
+
+    def nxt():
+        nonlocal x
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        return x >> 33
+
+    total = 0
+    last = 0
+    for _ in range(q):
+        a = nxt() % (n + 1)
+        b = nxt() % (a + 1)
+
+        # correct, and far too slow: b multiplications and a modular inverse
+        # for every single query
+        numerator = 1
+        denominator = 1
+        for k in range(b):
+            numerator = numerator * (a - k) % P
+            denominator = denominator * (k + 1) % P
+        value = numerator * pow(denominator, P - 2, P) % P
+
+        total = (total + value) % P
+        last = value
+
+    print(total)
+    print(f"LAST {last}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+MASK = (1 << 64) - 1
+P = 1000000007
+
+
+def inverse(v):
+    # P is prime, so Fermat gives v^(P-2) as the inverse of v; pow does the
+    # repeated squaring in C
+    return pow(v, P - 2, P)
+
+
+def main():
+    n, q, seed = (int(t) for t in sys.stdin.read().split())
+
+    # one shared factorial table for every query
+    factorial = [1] * (n + 1)
+    for i in range(1, n + 1):
+        factorial[i] = factorial[i - 1] * i % P
+
+    x = seed
+
+    def nxt():
+        nonlocal x
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        return x >> 33
+
+    total = 0
+    last = 0
+    for _ in range(q):
+        a = nxt() % (n + 1)
+        b = nxt() % (a + 1)
+
+        value = factorial[a] * inverse(factorial[b]) % P * inverse(factorial[a - b]) % P
+
+        total = (total + value) % P
+        last = value
+
+    print(total)
+    print(f"LAST {last}")
+
+
+main()
+'''
+hints = [
+  "Reduce after every multiplication. Python will not overflow, but a 200000-digit intermediate is slow to multiply, and % P keeps every number under 2^30.",
+  "pow(v, P - 2, P) is the modular inverse, and it only works because P is prime — that is the whole content of Fermat's little theorem here. Python 3.8 and later also accept pow(v, -1, P), which is the same thing said directly.",
+  "Precomputing inverse factorials as well, backwards from inverse(factorial[n]), removes the two pow() calls per query. Not needed to pass, and worth saying out loud.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5 3\n",           expect = "209\nLAST 1\n",               visible = true },
+  { name = "tiny",   stdin = "1 1 1\n",            expect = "1\nLAST 1\n",                 visible = false },
+  { name = "mid",    stdin = "100 50 4\n",         expect = "707023692\nLAST 689856059\n", visible = false },
+  { name = "big",    stdin = "200000 200000 11\n", expect = "390914381\nLAST 201898882\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id           = "python.hacker.33.grid-paths"
+node         = 32
+title        = "ACROSS THE BLOCK, NEVER BACKWARDS"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The delivery grid with three streets closed for bamboo. How many ways across, and which way is cheapest."
+concepts     = ["dynamic-programming", "matrix", "math"]
+requires     = ["python.hacker.32.modular"]
+map          = { x = 0.538, y = 0.857, kind = "quest" }
+brief        = '''
+Standard input is `r c pct seed`. Build the grid yourself, in row-major order,
+drawing **two** values for every cell, in 64-bit arithmetic that wraps (mask
+it by hand):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for i in 0..r, for j in 0..c:
+    a = next(); b = next()
+    the cell is BLOCKED if  a % 100 < pct,
+        except (0,0) and (r-1,c-1), which are never blocked
+    the cell costs  (b % 9) + 1
+```
+
+Move only **right** or **down**, through open cells. Print:
+
+1. `PATHS <k>` — how many distinct routes from `(0,0)` to `(r-1,c-1)`, modulo
+   `1000000007`
+2. `MIN <cost>` — the smallest total cost of a route, counting both endpoints,
+   or `-1` if there is no route
+
+```
+input:  3 4 30 2
+output: PATHS 9
+        MIN 27
+```
+
+One pass in row-major order does both: a cell's routes are the sum of the
+routes into it from above and from the left, and its best cost is its own cost
+plus the cheaper of those two. Because you only ever move right or down, the
+two cells you need are always already finished — which is why this needs no
+recursion and no visited set. A memoised recursion would also be linear in
+the cells, and on the `1000 × 1000` case it would also be two thousand
+frames deep, which is twice Python's limit; the loop is the answer here for
+that reason as well as the usual one.
+
+The `PATHS` count is taken modulo `1000000007` for the usual reason: on the
+`1000 × 1000` hidden case the true number has over six hundred digits. Python
+would hold it. Reduce as you add anyway; the statement said so, and the
+unreduced number is the wrong answer.
+
+**What the big case enforces:** it rejects any answer that enumerates routes.
+There are more of them than there are atoms in the room.
+'''
+starter      = '''
+import sys
+
+MASK = (1 << 64) - 1
+P = 1000000007
+
+
+def main():
+    rows, cols, pct, seed = (int(t) for t in sys.stdin.read().split())
+
+    x = seed
+
+    def nxt():
+        nonlocal x
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        return x >> 33
+
+    open_cell = [[True] * cols for _ in range(rows)]
+    cost = [[0] * cols for _ in range(rows)]
+    for i in range(rows):
+        for j in range(cols):
+            a = nxt()
+            b = nxt()
+            corner = (i == 0 and j == 0) or (i == rows - 1 and j == cols - 1)
+            if not corner and a % 100 < pct:
+                open_cell[i][j] = False
+            cost[i][j] = b % 9 + 1
+
+    # fill `ways` and `best` in row-major order
+    ways = [[0] * cols for _ in range(rows)]
+    best = [[None] * cols for _ in range(rows)]
+    _ = (open_cell, cost, ways, best)
+
+    print("PATHS 0")
+    print("MIN -1")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+MASK = (1 << 64) - 1
+P = 1000000007
+
+
+def main():
+    rows, cols, pct, seed = (int(t) for t in sys.stdin.read().split())
+
+    x = seed
+
+    def nxt():
+        nonlocal x
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        return x >> 33
+
+    open_cell = [[True] * cols for _ in range(rows)]
+    cost = [[0] * cols for _ in range(rows)]
+    for i in range(rows):
+        for j in range(cols):
+            a = nxt()
+            b = nxt()
+            corner = (i == 0 and j == 0) or (i == rows - 1 and j == cols - 1)
+            if not corner and a % 100 < pct:
+                open_cell[i][j] = False
+            cost[i][j] = b % 9 + 1
+
+    # None means unreachable; a cell with no open neighbour above or left
+    # stays that way
+    ways = [[0] * cols for _ in range(rows)]
+    best = [[None] * cols for _ in range(rows)]
+
+    for i in range(rows):
+        for j in range(cols):
+            if not open_cell[i][j]:
+                continue
+            if i == 0 and j == 0:
+                ways[0][0] = 1
+                best[0][0] = cost[0][0]
+                continue
+            routes = 0
+            cheapest = None
+            if i > 0 and best[i - 1][j] is not None:
+                routes += ways[i - 1][j]
+                cheapest = best[i - 1][j]
+            if j > 0 and best[i][j - 1] is not None:
+                routes += ways[i][j - 1]
+                if cheapest is None or best[i][j - 1] < cheapest:
+                    cheapest = best[i][j - 1]
+            ways[i][j] = routes % P
+            best[i][j] = None if cheapest is None else cheapest + cost[i][j]
+
+    print(f"PATHS {ways[rows - 1][cols - 1]}")
+    final = best[rows - 1][cols - 1]
+    print(f"MIN {-1 if final is None else final}")
+
+
+main()
+'''
+hints = [
+  "Draw both values for every cell, including the two corners — the generator does not skip them, it only refuses to block them.",
+  "An open cell with no open neighbour above or left is reachable by zero routes and has no best cost; None is the honest `unreachable`, and `is not None` is the guard before you compare or add.",
+  "The destination can be open and still unreachable, which is exactly when PATHS is 0 and MIN is -1. One of the hidden cases is that.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "3 4 30 2\n",        expect = "PATHS 9\nMIN 27\n",           visible = true },
+  { name = "one-cell", stdin = "1 1 0 1\n",         expect = "PATHS 1\nMIN 4\n",            visible = false },
+  { name = "walled",   stdin = "5 5 60 4\n",        expect = "PATHS 0\nMIN -1\n",           visible = false },
+  { name = "big",      stdin = "1000 1000 20 13\n", expect = "PATHS 442990855\nMIN 6890\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id           = "python.hacker.34.stable-sort"
+node         = 33
+title        = "TIES KEEP THEIR PLACE"
+difficulty   = 4
+time_limit_s = 900
+story        = "Two riders finished on the same score and the leaderboard puts them in a different order every time it redraws."
+concepts     = ["sorting", "slices", "complexity"]
+requires     = ["python.hacker.33.grid-paths"]
+map          = { x = 0.605, y = 0.932, kind = "quest" }
+brief        = '''
+Standard input is `n buckets seed`. Build `n` riders, where rider `i` has
+index `i` and a score, in 64-bit arithmetic that wraps (mask it by hand):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+score[i] = next() % buckets           for i in 0..n
+```
+
+Sort the riders by score **descending**. Riders with the same score must keep
+the order they arrived in. Print their indices, space separated, then
+`TIES <k>` — how many adjacent pairs in your sorted order have equal scores.
+
+```
+input:  8 3 5
+output: 1 5 6 0 2 3 4 7
+        TIES 6
+```
+
+`buckets` is small, so almost everything is a tie, and the answer is almost
+entirely decided by what happens to them.
+
+**This is the quest about knowing which sort you are holding.** Python's
+`sorted` and `list.sort` are **stable**, always — Timsort promises it — and
+`reverse=True` is documented to keep that promise: equal elements stay in
+their original order even when the sort is reversed. What is *not* stable is
+sorting ascending and then flipping the list with `[::-1]`: that reverses the
+ties along with everything else, and it is what the starter does. On the
+sample it visibly scrambles them; on a real input it always will.
+
+There are two correct answers and you should be able to give both. Sort
+descending with `reverse=True`, or with a negated key, and let stability do
+the rest. **Or** make the comparison **total** — sort by `(-score, index)` so
+no two elements ever compare equal and stability stops being a question. The
+second is what to reach for by default; a total order has nothing to prove.
+'''
+starter      = '''
+import sys
+
+MASK = (1 << 64) - 1
+
+
+def main():
+    n, buckets, seed = (int(t) for t in sys.stdin.read().split())
+
+    x = seed
+    riders = []
+    for i in range(n):
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        riders.append(((x >> 33) % buckets, i))
+
+    # ascending, then reversed — so the ties come out backwards
+    riders = sorted(riders, key=lambda r: r[0])[::-1]
+
+    print(" ".join(str(r[1]) for r in riders))
+    ties = sum(1 for a, b in zip(riders, riders[1:]) if a[0] == b[0])
+    print(f"TIES {ties}")
+
+
+main()
+'''
+solution     = '''
+import sys
+
+MASK = (1 << 64) - 1
+
+
+def main():
+    n, buckets, seed = (int(t) for t in sys.stdin.read().split())
+
+    x = seed
+    riders = []
+    for i in range(n):
+        x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+        riders.append(((x >> 33) % buckets, i))
+
+    # sorted is stable and reverse=True keeps it so: equal scores stay in
+    # arrival order. The equally correct alternative is
+    #     sorted(riders, key=lambda r: (-r[0], r[1]))
+    # which makes the comparison total and so needs no stability at all.
+    riders = sorted(riders, key=lambda r: r[0], reverse=True)
+
+    print(" ".join(str(r[1]) for r in riders))
+    ties = sum(1 for a, b in zip(riders, riders[1:]) if a[0] == b[0])
+    print(f"TIES {ties}")
+
+
+main()
+'''
+hints = [
+  "Delete the [::-1] and add reverse=True. That is the stable answer, and the documentation promises it: reverse=True does not reverse the ties.",
+  "The other answer sorts by key=lambda r: (-r[0], r[1]) — a total order, so there are no ties left to be unstable about. Never sort the tuples bare: (score, index) compares the index on a tie, which is ascending, and you wanted descending score with ascending index.",
+  "TIES counts adjacent equal scores in the finished order, and that count is the same whichever of the two you wrote — it is the index order that gives you away.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 3 5\n",    expect = "1 5 6 0 2 3 4 7\nTIES 6\n", visible = true },
+  { name = "three",  stdin = "3 2 1\n",    expect = "1 0 2\nTIES 1\n",           visible = false },
+  { name = "sixty",  stdin = "60 3 11\n",  expect = "2 9 11 12 14 15 16 19 22 23 31 33 36 38 47 48 52 56 57 58 0 1 4 5 6 13 17 18 20 24 27 32 34 35 39 40 42 44 45 46 50 51 53 54 59 3 7 8 10 21 25 26 28 29 30 37 41 43 49 55\nTIES 57\n", visible = false },
+  { name = "many",   stdin = "200 10 4\n", expect = "30 32 45 51 62 71 83 86 87 94 103 118 128 130 142 149 164 170 172 176 180 190 191 194 18 19 20 23 31 38 48 74 91 113 116 129 141 146 148 168 175 187 5 15 17 24 28 50 58 68 88 102 110 124 132 137 188 193 196 198 199 0 9 12 25 26 46 49 52 55 70 75 78 84 97 108 112 134 156 158 163 4 10 21 35 42 73 99 104 106 107 114 120 121 125 131 136 150 160 166 173 174 177 2 8 11 13 16 39 40 41 54 65 72 82 93 95 119 123 143 169 178 179 195 197 7 27 36 47 56 61 64 67 69 76 100 126 140 153 157 161 162 181 1 37 57 60 77 85 92 96 98 105 111 117 133 135 138 159 167 186 192 3 6 14 43 53 59 63 66 80 81 101 109 115 122 127 144 145 151 154 155 165 171 183 189 22 29 33 34 44 79 89 90 139 147 152 182 184 185\nTIES 190\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 34  BOSS
+[[quest]]
+id           = "python.hacker.28.lru"
+node         = 34
+title        = "THE RECURSION LIMIT"
+difficulty   = 5
+time_limit_s = 1800
+story        = "Room 7-32, last question, fourth time. The interviewer turns the monitor off, and the language on the whiteboard is the one that stops at a thousand frames."
+concepts     = ["collections", "linked-lists", "recursion", "complexity"]
+requires     = ["python.hacker.34.stable-sort", "python.hacker.24.inversions"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief        = '''
+Line one is `cap q`, and then either `q` lines of operations, each
+`PUT <key> <value>` or `GET <key>` — or, when line one carries a **third**
+number `seed`, no further lines at all, and the `q` operations come from the
+generator below.
+
+Implement a fixed-capacity cache that evicts the **least recently used** entry
+when it is full. A `GET` and a `PUT` both count as using a key. A `PUT` of a
+key the cache already holds replaces its value and makes it the most recent —
+it adds no entry, so it evicts nothing however full the cache is.
+
+For each `GET` print the value, or `-1` if it is not there. At the end print
+the surviving keys, most-recently-used first, space separated — or `-` if the
+cache is empty — and then `EVICTED <k>`.
+
+```
+input:  2 6
+        PUT 1 10
+        PUT 2 20
+        GET 1
+        PUT 3 30
+        GET 2
+        GET 3
+output: 10
+        -1
+        30
+        3 1
+        EVICTED 1
+```
+
+Follow the sample through: `GET 1` makes `1` recent again, so when `PUT 3`
+needs room it is `2` that goes. `GET 2` misses. `GET 3` hits and makes `3` the
+most recent, which is why the survivors print as `3 1`.
+
+The generated form, in 64-bit arithmetic that wraps (mask it by hand):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the q operations:
+    a   = next()
+    key = next() % (2 * cap)
+    if a % 4 == 0:   GET key
+    else:            PUT key (next() % 100)        # the value is a third draw
+```
+
+**The starter is correct.** Run it on the sample and on every case you can
+type, and it is right every time. It processes the operations the way a
+functional language would — handle the first one, recurse on the rest — and
+Python is not a functional language. It has no tail-call elimination, every
+call is a real frame, and `sys.getrecursionlimit()` is `1000`. The hidden
+generated case has two thousand operations, and the starter dies on it with
+
+```
+RecursionError: maximum recursion depth exceeded
+```
+
+That is the boss. `sys.setrecursionlimit(10000)` makes it go away, and it is
+the wrong answer: the limit is there because the C stack under the
+interpreter is finite, and raising it high enough turns a clean exception
+into a segmentation fault. The recursion was never the shape of this problem.
+The operations are a sequence; a sequence is a `for` loop. (And `ops[1:]` on
+every call copies the rest of the list, so the recursive version was also
+quadratic, which nobody noticed because it never got far enough for that to
+matter.)
+
+Then the cache itself. The textbook answer is a hash map into a doubly linked
+list, and Python has one in the standard library with the pointers hidden:
+`collections.OrderedDict`. `move_to_end(key)` is the "touch" and
+`popitem(last=False)` is the eviction from the cold end, both `O(1)`, so
+every operation here is `O(1)` and you can say so without hedging. (A plain
+`dict` is insertion-ordered since 3.7 and lacks only `move_to_end`; deleting
+and re-inserting the key is the same trick spelled by hand.) The starter's
+cache is a dict of `(value, stamp)` pairs with a scan for the oldest stamp on
+eviction, which is `O(cap)` — correct, and the second thing to fix.
+'''
+starter      = '''
+import sys
+
+MASK = (1 << 64) - 1
+
+
+def read_operations(header, lines):
+    cap, q = int(header[0]), int(header[1])
+    ops = []
+    if len(header) == 3:
+        x = int(header[2])
+
+        def nxt():
+            nonlocal x
+            x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+            return x >> 33
+
+        for _ in range(q):
+            a = nxt()
+            key = nxt() % (2 * cap)
+            if a % 4 == 0:
+                ops.append(("GET", key, None))
+            else:
+                ops.append(("PUT", key, nxt() % 100))
+    else:
+        for line in lines[:q]:
+            parts = line.split()
+            value = int(parts[2]) if len(parts) > 2 else None
+            ops.append((parts[0], int(parts[1]), value))
+    return cap, ops
+
+
+def run(ops, cache, cap, clock, evicted, out):
+    # head, then recurse on the tail: the functional habit, one frame per op
+    if not ops:
+        return evicted
+    op, key, value = ops[0]
+    clock += 1
+
+    if op == "GET":
+        entry = cache.get(key)
+        if entry is None:
+            out.append("-1")
+        else:
+            cache[key] = (entry[0], clock)
+            out.append(str(entry[0]))
+    else:
+        if key not in cache and len(cache) == cap:
+            oldest = min(cache, key=lambda k: cache[k][1])
+            del cache[oldest]
+            evicted += 1
+        cache[key] = (value, clock)
+
+    return run(ops[1:], cache, cap, clock, evicted, out)
+
+
+def main():
+    lines = sys.stdin.read().split("\n")
+    cap, ops = read_operations(lines[0].split(), lines[1:])
+
+    cache = {}
+    out = []
+    evicted = run(ops, cache, cap, 0, 0, out)
+
+    alive = sorted(cache.items(), key=lambda item: -item[1][1])
+    for line in out:
+        print(line)
+    print(" ".join(str(key) for key, _ in alive) if alive else "-")
+    print(f"EVICTED {evicted}")
+
+
+main()
+'''
+solution     = '''
+import sys
+from collections import OrderedDict
+
+MASK = (1 << 64) - 1
+
+
+def read_operations(header, lines):
+    cap, q = int(header[0]), int(header[1])
+    ops = []
+    if len(header) == 3:
+        x = int(header[2])
+
+        def nxt():
+            nonlocal x
+            x = (x * 6364136223846793005 + 1442695040888963407) & MASK
+            return x >> 33
+
+        for _ in range(q):
+            a = nxt()
+            key = nxt() % (2 * cap)
+            if a % 4 == 0:
+                ops.append(("GET", key, None))
+            else:
+                ops.append(("PUT", key, nxt() % 100))
+    else:
+        for line in lines[:q]:
+            parts = line.split()
+            value = int(parts[2]) if len(parts) > 2 else None
+            ops.append((parts[0], int(parts[1]), value))
+    return cap, ops
+
+
+def main():
+    lines = sys.stdin.read().split("\n")
+    cap, ops = read_operations(lines[0].split(), lines[1:])
+
+    # cold end first, hot end last: move_to_end is the touch, popitem(last=False)
+    # is the eviction, and both are O(1)
+    cache = OrderedDict()
+    evicted = 0
+    out = []
+
+    # a sequence of operations is a for loop, however it was handed to you
+    for op, key, value in ops:
+        if op == "GET":
+            if key in cache:
+                cache.move_to_end(key)
+                out.append(str(cache[key]))
+            else:
+                out.append("-1")
+            continue
+
+        if key in cache:
+            cache[key] = value
+            cache.move_to_end(key)
+            continue
+        if len(cache) >= cap and cache:
+            cache.popitem(last=False)
+            evicted += 1
+        cache[key] = value
+
+    for line in out:
+        print(line)
+    print(" ".join(str(key) for key in reversed(cache)) if cache else "-")
+    print(f"EVICTED {evicted}")
+
+
+main()
+'''
+hints = [
+  "Read the traceback: it ends in RecursionError and it is a thousand lines of the same function. The fix for that half is a for loop over ops, and nothing else changes.",
+  "OrderedDict: `move_to_end(key)` on every hit and every overwrite, `popitem(last=False)` when a new key arrives and the cache is full. Overwriting a key that is already present is not an eviction — check membership before you decide the cache is full.",
+  "The survivors are the OrderedDict read from the hot end: reversed(cache) is most-recent-first, so the last line needs no sort and no stamps.",
+  "sys.setrecursionlimit is not a fix, and knowing why is the answer they want: it moves the limit, it does not remove it, and past a certain point the interpreter stops raising and starts crashing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "2 6\nPUT 1 10\nPUT 2 20\nGET 1\nPUT 3 30\nGET 2\nGET 3\n", expect = "10\n-1\n30\n3 1\nEVICTED 1\n", visible = true },
+  { name = "overwrite", stdin = "1 3\nPUT 5 1\nPUT 5 2\nGET 5\n",                           expect = "2\n5\nEVICTED 0\n",           visible = false },
+  { name = "miss",      stdin = "2 2\nGET 9\nGET 8\n",                                      expect = "-1\n-1\n-\nEVICTED 0\n",      visible = false },
+  { name = "churn",     stdin = "1 4\nPUT 1 1\nPUT 2 2\nPUT 3 3\nGET 1\n",                  expect = "-1\n3\nEVICTED 2\n",          visible = false },
+  { name = "depth",     stdin = "3 2000 7\n",                                               expect = "-1\n-1\n80\n-1\n-1\n44\n72\n83\n35\n88\n-1\n33\n-1\n7\n7\n7\n-1\n-1\n-1\n-1\n-1\n5\n-1\n-1\n-1\n-1\n-1\n-1\n90\n12\n-1\n48\n-1\n48\n-1\n-1\n-1\n66\n-1\n-1\n-1\n80\n-1\n-1\n2\n-1\n-1\n-1\n43\n50\n-1\n88\n-1\n-1\n35\n-1\n-1\n-1\n90\n90\n18\n18\n-1\n63\n65\n14\n41\n-1\n-1\n82\n66\n9\n-1\n-1\n-1\n-1\n38\n-1\n40\n-1\n-1\n10\n-1\n-1\n42\n-1\n59\n85\n20\n-1\n-1\n24\n-1\n-1\n58\n55\n-1\n-1\n24\n-1\n-1\n-1\n-1\n-1\n19\n38\n-1\n89\n89\n63\n61\n77\n-1\n-1\n-1\n-1\n31\n31\n31\n-1\n-1\n-1\n-1\n47\n84\n47\n-1\n12\n95\n-1\n58\n-1\n-1\n13\n-1\n-1\n-1\n34\n34\n-1\n61\n-1\n82\n87\n52\n68\n-1\n-1\n-1\n-1\n84\n68\n78\n-1\n-1\n-1\n-1\n21\n-1\n-1\n73\n73\n-1\n-1\n-1\n39\n4\n52\n52\n-1\n-1\n-1\n-1\n62\n-1\n-1\n-1\n11\n-1\n49\n93\n-1\n-1\n70\n70\n-1\n70\n-1\n-1\n-1\n-1\n32\n93\n32\n-1\n-1\n-1\n44\n-1\n-1\n35\n13\n81\n-1\n-1\n-1\n49\n58\n-1\n-1\n-1\n66\n66\n-1\n-1\n-1\n76\n-1\n62\n62\n86\n34\n-1\n97\n66\n95\n-1\n-1\n79\n37\n61\n-1\n4\n-1\n27\n-1\n99\n11\n3\n69\n69\n12\n-1\n98\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n28\n-1\n-1\n-1\n29\n21\n68\n89\n55\n-1\n-1\n55\n80\n44\n-1\n-1\n91\n12\n-1\n-1\n-1\n-1\n2\n-1\n33\n2\n-1\n5\n46\n-1\n4\n-1\n4\n-1\n97\n-1\n9\n64\n-1\n-1\n-1\n-1\n-1\n59\n-1\n54\n-1\n-1\n41\n-1\n-1\n98\n-1\n-1\n60\n17\n54\n74\n7\n64\n76\n9\n-1\n-1\n55\n73\n-1\n42\n-1\n7\n81\n-1\n74\n90\n-1\n10\n-1\n-1\n-1\n-1\n-1\n-1\n52\n-1\n71\n74\n-1\n75\n-1\n11\n-1\n49\n-1\n58\n95\n-1\n41\n98\n-1\n16\n45\n-1\n0\n-1\n99\n-1\n-1\n39\n39\n-1\n78\n78\n-1\n62\n-1\n-1\n10\n75\n-1\n-1\n-1\n78\n-1\n35\n-1\n-1\n-1\n-1\n61\n-1\n80\n-1\n-1\n2\n-1\n2\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n42\n-1\n-1\n74\n7\n7\n-1\n58\n-1\n-1\n47\n68\n71\n61\n-1\n66\n-1\n36\n-1\n-1\n87\n-1\n-1\n-1\n50\n-1\n79\n54\n-1\n89\n-1\n-1\n-1\n57\n59\n39\n39\n-1\n-1\n-1\n-1\n70\n-1\n98\n-1\n81\n96\n96\n96\n96\n90\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n38\n-1\n38\n-1\n63\n24\n-1\n83\n24\n21\n-1\n-1\n42\n16\n28\n28\n45\n22\n-1\n-1\n-1\n-1\n91\n-1\n35\n-1\n-1\n28\n84\n-1\n43\n43\n-1\n-1\n-1\n-1\n47\n8\n-1\n-1\n0 1 2\nEVICTED 787\n",        visible = false },
+]

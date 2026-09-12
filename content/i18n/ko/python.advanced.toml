@@ -1,0 +1,737 @@
+# PYTHON LAND — ADVANCED, in Korean. A translation pack (SPEC §12.1): the prose
+# of `content/python/advanced.toml`, quest by quest, and nothing else. Code
+# blocks, identifiers, sample input and output and the exact strings a program
+# must print are the English pack's and are copied verbatim, never translated.
+
+pack   = "python.advanced"
+locale = "ko"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.advanced.01.threads"
+title = "노점 열둘, 바닥 하나"
+story = "12:30, SOGO 지하. 노점 열두 곳이 동시에 주문을 받고, 합계를 걷으러 온 심부름꾼은 아무도 적기 전에 게시판을 읽는다."
+brief = '''
+표준 입력은 개수 `n`, 그다음 정수 `n`개입니다.
+
+값마다 `threading.Thread` 하나를 시작해서 그 제곱을 계산해 `results[i]`에
+저장하게 하세요 — 각자의 칸이므로 두 스레드가 같은 자리에 쓰는 일은 없습니다.
+모든 스레드를 `join`한 뒤 결과를 **인덱스 순서로** 한 줄에 하나씩 출력하고,
+그다음 `THREADS <n>`을 출력하세요.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+스레드는 아무것도 돌려주지 않습니다. `Thread(target=f)`는 `f`를 실행하고 그
+반환값을 버립니다. 그래서 결과는 `join` 뒤에 메인 스레드가 읽을 수 있는 어딘가에
+써 두어야 합니다. 스레드마다 칸 하나인 리스트가 그런 자리 중 가장 단순합니다:
+모든 인덱스에 정확히 한 스레드만 쓰므로 잠글 것이 없습니다.
+
+스타터의 스레드는 시작하자마자 전부 죽는데, 프로그램은 그래도 끝까지 가서
+출력합니다. `args=` 없는 `target=square`는 `square()`를 빈손으로 호출하고,
+`TypeError`는 스레드 안에 떨어져 표준 오류로 출력되고, `results`는 `None`으로
+가득 찬 채 남습니다. 죽는 스레드는 자기만 데리고 갑니다 — stderr를 읽으세요.
+아니면 영영 모릅니다.
+'''
+hints = [
+  "Thread에 args=(i, v). 타깃은 square(*args) 로 호출되는데, 스타터는 아무것도 넘기지 않습니다.",
+  "모든 스레드를 start한 다음, 모든 스레드를 join하세요. 같은 루프 반복 안에서 start와 join을 하면 맞긴 하지만 하나씩 차례로 돌아갑니다.",
+  "results는 main의 지역 리스트를 붙잡은 클로저입니다. 중첩 함수는 같은 리스트를 보며, 그래서 join 뒤에 쓴 내용이 보이는 것입니다.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.advanced.02.lock"
+title = "서랍 하나, 손 여덟"
+story = "지하의 모든 노점이 푸드홀 사무실의 현금 서랍 하나에 돈을 넣는데, 마감 때 서랍은 비어 있고 노점마다 냈다고 맹세한다."
+brief = '''
+표준 입력은 개수 `n`, 그다음 정수 `n`개입니다.
+
+값마다 스레드 하나를 시작해서 **하나의 공유 합계**에 더하고 공유 히트 수를
+하나 올리게 하세요. 전부 join한 뒤 `TOTAL <sum>`과 `HITS <n>`을 출력하세요.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+스타터는 결정적으로 `TOTAL 0`을 출력하고, 워커마다 stderr에 트레이스백을
+남깁니다. 워커 안의 `total += value`는 main의 `total`을 건드리지 않습니다:
+`int`는 불변이고, 거기에 `+=`를 하면 이름이 다시 묶이며, 함수 안에서 대입된
+이름은 `nonlocal`이라고 말하지 않는 한 그 함수의 **지역** 변수입니다. 워커마다
+자기 `total`을 만들어서, 더하고, 버린 것입니다.
+
+고치는 방법은 워커들이 제자리에서 변경하는 컨테이너 — 원소 하나짜리 리스트나
+작은 클래스 — **그리고 `Lock`**입니다. 후반부는 선택이 아닙니다. GIL은 한 번에
+바이트코드 하나가 실행된다는 것만 보장합니다. `drawer[0] += value`는
+바이트코드 셋(load, add, store)이고, load와 store 사이에 스레드가 바뀌면
+갱신 하나를 잃습니다. 스레드 넷이 숫자 넷을 더할 때는 일어나지 않습니다.
+새벽 2시에 마흔 개일 때 일어납니다.
+
+`with lock:`은 락을 잡고 나가는 길에 풀어 줍니다. 예외로 나가는 길에도요.
+'''
+hints = [
+  "스타터를 실행하세요: UnboundLocalError로 죽습니다. `total += value` 가 total을 pay의 지역 변수로 만들고, 존재하기도 전에 읽기 때문입니다. 그 오류가 진단의 전부입니다.",
+  "딕셔너리나 리스트는 제자리에서 변경되므로 `drawer[\"total\"] += value` 는 모든 스레드가 공유하는 그 하나의 객체를 바꿉니다. `nonlocal total` 도 통하며, 그것이 또 하나의 정직한 답입니다.",
+  "main에서 threading.Lock() 한 번, 읽고-고치고-쓰기 주위에 `with lock:`. GIL은 당신 데이터의 락이 아닙니다. 인터프리터의 락입니다.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.advanced.03.queue"
+title = "누가 창구를 닫나"
+story = "로스트 구스 카운터는 모든 주문을 창구로 주방에 넘기는데, 마지막 주문 뒤에도 주방은 영영 오지 않을 다음 것을 기다리며 서 있다."
+brief = '''
+표준 입력은 개수 `n`, 그다음 정수 `n`개입니다.
+
+생산자 스레드 하나가 각 값에 10을 곱해 `queue.Queue`에 넣고, 그다음
+**센티널**을 넣습니다. 메인 스레드는 센티널을 볼 때까지 큐에서 꺼내며 각 값을
+출력하고 합계를 유지한 뒤, `SUM <total>`과 `CLOSED`를 출력합니다.
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+`queue.Queue`에는 `close`가 없습니다. 큐 위의 어떤 것도 소비자에게 더 이상
+없다는 것을 알릴 수 없습니다. 그것은 항목이어야 하고, 보통은 `None`입니다.
+스타터는 그것을 절대 보내지 않으므로 `get()`은 기다릴 것이 없는데도 영원히
+막히고, 러너가 시간 제한에서 프로그램을 죽입니다. 파이썬에는 교착 상태
+감지기가 없습니다. 프로그램이 그냥 응답을 멈추는 것이고, 밖에서 보는 "행"이란
+그런 모습입니다.
+
+센티널은 생산자가 보냅니다. 절대 소비자가 아닙니다 — 스트림이 끝났다는 것을
+아는 쪽이 끝내는 쪽입니다.
+'''
+hints = [
+  "kitchen 끝에 한 줄: hatch.put(None).",
+  "소비자는 이미 `is None` 을 검사하고 있습니다. 생산자가 보내지 않은 것을 기다리고 있었을 뿐입니다.",
+  "값이 정당하게 None일 수 있다면 센티널은 비공개 객체입니다: SENTINEL = object(), `is` 로 비교합니다.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.advanced.04.thread-pool"
+title = "짐꾼 여덟"
+story = "SOGO 하역장에 상자 마흔 개, 짐꾼 여덟 명. 아무도 짐꾼 마흔 명을 원하지 않는다. 여덟 명이 한 번도 멈춰 서지 않기를 원한다."
+brief = '''
+표준 입력은 정수 `w`와 `n`, 그다음 값 `n`개입니다.
+
+워커 `w`개짜리 `ThreadPoolExecutor`를 열고, 값마다 `(index, value * value)`를
+돌려주는 작업 하나를 `submit`하고, `as_completed`로 결과를 모으세요. 인덱스로
+정렬해서 `<index> <value>`를 한 줄에 하나씩 출력하고, 그다음 `WORKERS <w>`를
+출력하세요.
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+`submit`은 결과가 아니라 `Future`를 돌려줍니다. `as_completed`는 퓨처들을
+**끝난** 순서로 — 풀이 내키는 대로의 순서로 — 돌려주고, `future.result()`가
+값을 꺼내는 방법입니다 — 아니면 작업이 죽으면서 낸 예외를 다시 일으키는데,
+그것이 이 메서드를 호출하는 또 하나의 이유입니다.
+
+스타터는 퓨처를 그대로 출력합니다. 결과에 인덱스를 실어 보내는 것이 출력을
+매번 같게 만드는 방법이고, 그것으로 정렬하는 것은 답의 첫 줄이 아니라 마지막
+줄입니다.
+'''
+hints = [
+  "스타터는 Future를 언패킹하다 죽습니다: `for index, value in sorted(results)` 는 튜플이 아닌 객체를 언패킹할 수 없습니다. 튜플은 future.result() 안에 있습니다.",
+  "as_completed는 작업이 끝나는 대로 내놓습니다. 결과 안의 인덱스가 각각이 어디서 왔는지에 대한 유일한 기록입니다.",
+  "with ThreadPoolExecutor(...) as pool: 은 나가는 길에 제출된 모든 작업을 기다리므로, 출력할 때 돌고 있는 것은 없습니다. pool.map 도 여기서 통하고 순서도 지켜 주지만, as_completed를 배우지 못하는 대가가 있습니다.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.advanced.05.asyncio"
+title = "async는 실제로 어디서 도는가"
+story = "메이는 4년 동안 `async def`를 써 왔지만 그것을 굴리는 물건을 한 번도 본 적이 없다. 지하의 주문판에는 루프 하나가 있고 모든 노점이 그 위에서 차례를 기다린다."
+brief = '''
+표준 입력은 개수 `n`, 그다음 정수 `n`개입니다.
+
+이벤트 루프에 한 번 양보하고 — `await asyncio.sleep(0)` — 값의 두 배를
+돌려주는 `async def double(value)`를 작성하세요. `n`개 전부를
+`asyncio.gather`로 실행하고, 각 결과를 입력 순서로 출력한 뒤 `SUM <total>`과
+`TASKS <n>`을 출력하세요.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+`async def`를 호출해도 실행되지 않습니다. **코루틴 객체**를 만들어 돌려줄 뿐,
+무언가가 await하기 전까지는 안의 어떤 것도 일어나지 않습니다. 스타터의
+리스트는 await되지 않은 코루틴 셋이고, 파이썬은 stderr에 그렇게 말합니다 —
+`RuntimeWarning: coroutine 'double' was never awaited` — 그리고 출력은
+`<coroutine object double at 0x...>` 세 줄입니다.
+
+`gather`는 코루틴들을 받아 하나의 루프에 전부 스케줄하고, 어떤 순서로 끝났든
+**넘긴 순서대로** 결과를 돌려줍니다. 손으로 쓴 `await` 루프 대신 이것을 쓰는
+이유가 바로 그것입니다: 루프는 맞지만 순차적이고, `gather`는 맞으면서
+교차 실행됩니다.
+
+여기에는 정확히 스레드 하나가 있습니다. `await`는 코루틴이 다른 코루틴이 쓸
+수 있도록 루프에 스레드를 돌려주는 지점입니다. 아무것도 병렬로 돌지 않습니다.
+멈출 수 있다고 말한 자리에서, **차례로** 돕니다.
+'''
+hints = [
+  "await asyncio.gather(*coroutines) — 별표가 리스트를 인자로 펼치고, await가 그것들을 실행하는 것입니다.",
+  "asyncio.run(...) 이 실행기입니다: 루프를 만들고, 코루틴 하나를 끝까지 실행하고, 루프를 닫습니다. 프로그램마다 맨 위에 하나 있습니다.",
+  "gather는 인자 순서로 결과를 돌려줍니다. 끝나는 순서대로 필요하다면 그것은 asyncio.as_completed이고, 그때는 스레드 풀과 똑같이 인덱스를 직접 실어 날라야 합니다.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.advanced.06.async-queue"
+title = "누가 끝났다고 말하나"
+story = "심부름꾼 셋이 지하의 주문 큐를 처리하고, 층 매니저는 큐가 비었다고 말하기를 기다린다. 큐는 절대 그렇게 말하지 않는다. 티켓 하나가 끝났다고 아무도 알려 주지 않았으니까."
+brief = '''
+표준 입력은 정수 `w`와 `n`, 그다음 값 `n`개입니다.
+
+`(index, value)` 쌍을 `asyncio.Queue`에 넣으세요. 쌍을 꺼내서 `value * 10`을
+`results[index]`에 쓰고 `task_done()`을 호출하는 것을 영원히 반복하는 소비자
+태스크 `w`개를 시작하세요. 메인 코루틴은 `queue.join()`을 await한 뒤, 소비자를
+취소하고, 결과를 인덱스 순서로 출력한 다음 `CONSUMERS <w>`를 출력합니다.
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+`queue.join()`은 `put`된 모든 항목에 짝이 되는 `task_done()`이 있었을 때
+돌아옵니다. 스타터의 소비자는 그것을 절대 호출하지 않으므로 `join`은 영원히
+기다리고, 루프에는 실행할 다른 것이 없고, 프로그램은 러너가 죽일 때까지
+멈춥니다. 스레드 퀘스트와 같은 행, 다른 철자 — 그리고 고치는 것도 다시 한 줄,
+소비자 쪽입니다.
+
+소비자는 `while True` 루프입니다. join 뒤에 main이 취소하기 때문에 끝나며,
+`queue.get()`에 멈춰 있는 태스크를 취소하는 것은 태스크를 멈추는 정상적이고
+의도된 방법입니다. 취소된 태스크를 `gather(..., return_exceptions=True)`로
+await해서 취소가 보고되지 않고 수거되게 하세요.
+'''
+hints = [
+  "항목 하나를 처리할 때마다 queue.task_done(). join은 put과 task_done의 수를 맞춰 볼 뿐, 다른 것은 보지 않습니다.",
+  "create_task는 await하지 않고 소비자를 스케줄합니다. main이 다음에 무언가를 await할 때 루프가 그것을 실행하는데, 그것이 join입니다.",
+  "get()을 await하는 중에 취소된 태스크는 그 안에서 CancelledError가 일어나고, 그것이 while True를 끝냅니다. return_exceptions=True 는 gather가 그것을 당신에게 다시 던지지 않게 합니다.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.advanced.07.context-managers"
+title = "셔터는 어쨌든 내려온다"
+story = "지하의 한 노점은 주문마다 셔터를 올리고 끝나면 내린다. 12:40에 잘못된 주문을 받은 노점은 그때부터 계속 열려 있다. 닫는 코드가 실패한 줄 뒤에 있었으니까."
+brief = '''
+표준 입력은 개수 `n`, 그다음 `<STALL> <CENTS>` 형식의 줄 `n`개이며,
+`CENTS`는 정수여야 합니다.
+
+`contextlib.contextmanager`로, 들어갈 때 `OPEN <STALL>`을, 나올 때
+`SHUT <STALL>`을 출력하는 컨텍스트 매니저 `opened(stall)`을 작성하세요 —
+**본문이 예외를 냈든 아니든**. 그 안에서 센트를 파싱해 합계에 더하세요.
+센트가 파싱되지 않는 줄은 셔터가 닫힌 뒤에 `BAD <STALL>`로 보고합니다.
+마지막으로 `TOTAL <sum>`과 `REJECTED <k>`를 출력하세요.
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+`@contextmanager`는 제너레이터를 컨텍스트 매니저로 바꿉니다: `yield` 앞의
+전부가 `__enter__`, 뒤의 전부가 `__exit__`입니다. 본문이 예외를 내면 그 예외는
+**`yield` 지점에서 제너레이터 안으로** 던져지므로, 그 뒤의 코드는 `yield`가
+`try`/`finally` 안에 있을 때만 실행됩니다. 스타터에는 `finally`가 없고,
+`WONG`의 셔터는 영영 닫히지 않습니다.
+
+클래스 철자 — `__enter__`와 `__exit__(self, exc_type, exc, tb)` — 는 같은
+일을 더 많은 줄로 하고, `True`를 돌려줘서 예외를 삼킬 수 있습니다. 여기서는
+삼키지 마세요. 호출자가 `BAD`를 출력하고 싶어 합니다.
+'''
+hints = [
+  "try: yield / finally: print(SHUT). 그 finally가 모든 경로에서 실행되는 __exit__입니다.",
+  "예외는 제너레이터를 통과해 with 문 밖으로 나가므로 main의 except가 여전히 그것을 봅니다 — 그래서 BAD가 SHUT 뒤에 출력되는 것입니다.",
+  "with opened(stall) as x: 는 제너레이터가 yield하는 것을 묶습니다. 여기서는 아무것도 yield하지 않으며, 그래도 괜찮습니다.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.advanced.08.pipeline"
+title = "라인 쿡"
+story = "지하 주방의 보 셰프 라인: 한 스테이션이 주문을 제곱하고, 다음 스테이션이 누계를 유지하고, 아무도 한 배치 전체를 기다리지 않는다."
+brief = '''
+표준 입력은 개수 `n`, 그다음 정수 `n`개입니다.
+
+**제너레이터** 두 단계로 된 파이프라인을 만드세요:
+
+1. `squares(values)`는 각 값의 제곱을 내놓습니다
+2. `running(stream)`은 숫자로 된 아무 이터러블이나 받아 누계를 유지하며
+   `(value, total)` 쌍을 내놓습니다
+
+`main`은 각 쌍을 `<square> <total>`로 출력하고, 그다음 `PIPE <n>`을 출력합니다.
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+어느 단계도 리스트를 만들지 않습니다. 각 `yield`는 항목 하나를 다음 단계에
+건네고 멈춥니다. `main`이 당기고, `running`이 `squares`에서 당기고,
+`squares`가 입력에서 당깁니다. 원하기 전에는 아무것도 계산되지 않고, 파이프라인
+전체에 떠 있는 항목은 하나입니다. 같은 함수 셋이 1억 줄짜리 파일에도 통하는
+이유가 그것입니다.
+
+스타터의 두 번째 단계는 `yield`가 있어야 할 자리에 `return`이 있어서, 최종
+합계 — `int` — 를 돌려주는 평범한 함수이고, `main`은 그것을 순회하려 합니다.
+'''
+hints = [
+  "오류는 TypeError: cannot unpack non-iterable int object 입니다 — running이 쌍을 yield하는 대신 숫자를 반환했습니다.",
+  "루프 안에서 yield value, total. 어디든 yield가 하나라도 있는 함수는 제너레이터이고, 그 반환값은 호출자가 보는 것이 아닙니다.",
+  "running(squares(nums)) 이 조합되는 것은 제너레이터가 이터러블이기 때문입니다. running은 자기 입력이 또 다른 제너레이터라는 것을 알지도 못하고 상관하지도 않습니다.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.advanced.09.itertools"
+title = "선반 위의 공구함"
+story = "지하 사무실에는 아무도 열지 않는 공구 선반이 있고, 직원은 매일 오후 똑같은 티켓이 연달아 나온 횟수를 손으로 센다."
+brief = '''
+표준 입력은 정수 한 줄입니다.
+
+세 줄을 출력하되, 각각 `itertools`로만 만들고 손수 짠 것은 쓰지 마세요:
+
+1. `SUMS` 뒤에 누적 합 — `accumulate`
+2. `RUNS` 뒤에 **인접한** 같은 값의 각 연속 구간을 `<v>x<k>`로 — `groupby`
+3. `PAIRS <k>`: **서로 다른** 값들로 만들 수 있는 순서 없는 쌍의 수 — 정렬된
+   서로 다른 값들에 대한 `combinations`
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+`groupby`는 **인접한** 같은 항목만 묶습니다. `Counter`가 아니며, 샘플은 둘이
+다르게 나오도록 골랐습니다: `1`은 네 번 나오지만 두 구간입니다. 스타터는 둘째
+줄에 횟수 딕셔너리를 쓰고, 정확히 그 입력에서 틀립니다.
+
+이것들은 하나같이 지연 이터레이터를 돌려줍니다. 특히 `groupby`의 그룹은 다음
+그룹으로 넘어가기 전까지만 유효하므로, 넘어가기 전에 각 그룹을 읽으세요 —
+루프 안에서 `len(list(group))`, 나중을 위해 저장해 둔 그룹 리스트가 아니라.
+'''
+hints = [
+  "accumulate(nums) 는 원소마다 그 시점의 누계를 내놓습니다. 마지막 것이 합계입니다.",
+  "for value, group in groupby(nums): 에서 group은 그 구간에 대한 이터레이터이고 한 번만 소비됩니다. len(list(group)) 이 그 길이입니다.",
+  "combinations(distinct, 2) 는 순서 없는 각 쌍을 한 번씩 내놓습니다. 세어 보면 n*(n-1)/2 이고, 그것을 손으로 확인해 보면 n이 맞는지 알 수 있습니다.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.advanced.10.functools"
+title = "계산한 것을 기억하기"
+story = "두부 노점은 점심 전까지 같은 두 숫자에서 같은 날의 가격을 만천 번 계산한다. 매번, 처음부터."
+brief = '''
+표준 입력은 `n k bits`입니다: 정수 둘과 이진 숫자로 된 문자열 하나.
+
+네 줄을 출력하세요:
+
+1. `FIB <fib(n)>` — `functools.lru_cache`로 메모이즈한 **재귀** `fib`에서
+2. `PRODUCT <k!>` — `1..k`에 대해 `operator.mul`을 쓴 `functools.reduce`,
+   `k = 0`이면 `1`이 나오도록 초깃값을 줘서
+3. `BIN <value>` — `base=2`를 준 `int`의 `functools.partial`로 `bits`를 파싱
+4. `MISSES <m>` — `fib.cache_info().misses`, 재귀가 실제로 본문을 실행한 횟수
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n`은 최대 `400`이므로 재귀는 파이썬의 프레임 한계 안에 머뭅니다. 캐시가
+없으면 `fib(35)`는 약 3천만 번의 호출이고 `fib(90)`은 끝나지 않습니다.
+캐시가 있으면 모든 `fib(i)`는 한 번만 실행되고 `MISSES`는 `n + 1`입니다.
+`lru_cache`는 데코레이터이며, 인자가 해시 가능하기 때문에 동작합니다 — 리스트
+인자는 첫 호출에서 `TypeError`를 냅니다.
+
+`partial`은 함수 인자의 일부를 고정해 새 함수를 줍니다. `reduce`는 두 인자
+함수를 시퀀스에 걸쳐 접습니다. 어느 것도 영리하지 않습니다. 둘 다 면접에서
+물어봅니다.
+'''
+hints = [
+  "def fib 위에 @functools.lru_cache(maxsize=None). 스타터가 마지막 줄에서 죽는 것은 평범한 함수에는 cache_info가 없기 때문입니다.",
+  "functools.reduce(operator.mul, range(1, k + 1), 1) — 세 번째 인자가 시작 값이고, 빈 range가 1을 내놓게 하는 것이 그것입니다.",
+  "functools.partial(int, base=2) 는 문자열을 받아 base=2를 스스로 공급하는 호출 가능 객체입니다. functools.cache 는 3.9 이상에서 lru_cache(maxsize=None) 과 같습니다. 어느 이름이든 괜찮습니다.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.advanced.11.protocol"
+title = "그릴 수만 있으면 된다"
+story = "SOGO 지하 안내판은 노점과 카운터를 나열하는데, 둘은 서로 다른 프로그램이 찍어 내고, 안내판은 각각이 자기를 그릴 수 있다는 것만 알고 싶어 한다."
+brief = '''
+표준 입력은 개수 `n`, 그다음 다음 중 하나인 줄 `n`개입니다
+
+* `STALL <NAME> <AISLE>` — `<NAME> / A<AISLE>`로 렌더링
+* `COUNTER <NUMBER>` — `COUNTER <NUMBER>`로 렌더링
+
+메서드 `render()` 하나를 가진 `typing.Protocol`인 `Sign`을 선언하세요.
+`Stall`과 `Counter`를 평범한 클래스로 — **`Sign`을 상속하지 않고** — 작성하고,
+렌더링을 출력하는 함수 `show(sign: Sign)` 하나를 작성하세요. 모든 표지판을
+출력한 뒤, `isinstance(x, Sign)`으로 센 `SIGNS <n>`과 `isinstance(x, Stall)`로
+센 `STALLS <k>`를 출력하세요.
+
+```
+input:  3
+        STALL LAM 4
+        COUNTER 2
+        STALL WONG 1
+output: LAM / A4
+        COUNTER 2
+        WONG / A1
+        SIGNS 3
+        STALLS 2
+```
+
+`Protocol`은 **구조적** 타입입니다: 클래스는 그렇다고 선언해서가 아니라
+메서드를 가지고 있어서 그것을 만족합니다. 타입 검사기가 읽을 수 있는 이름이
+붙은 덕 타이핑입니다. 실행 시점에 프로토콜은 `@runtime_checkable`로 표시되지
+않는 한 아무것도 하지 않으며, 표시되면 `isinstance`가 이름으로 메서드가
+있는지 검사합니다. 스타터의 `Sign`에는 그 데코레이터가 없고, `isinstance`는
+예외를 냅니다:
+
+```
+TypeError: Instance and class checks can only be used with @runtime_checkable protocols
+```
+
+`show`는 실행 시점에 속성 조회로 디스패치합니다 — `sign.render()`는 객체가
+가진 어떤 `render`든 찾아냅니다. 대신 고를 정적 디스패치는 없습니다. 파이썬에는
+메커니즘이 하나뿐이고, 이것이 그것입니다.
+'''
+hints = [
+  "class Sign(Protocol) 위에 @runtime_checkable, typing에서 임포트. 그것이 수정의 전부입니다.",
+  "Stall도 Counter도 어디에서도 Sign을 언급하지 않습니다. render() 를 가짐으로써 만족하는 것이고, 구조적이라는 말이 뜻하는 것이 그것입니다.",
+  "runtime-checkable 프로토콜에 대한 isinstance는 메서드가 존재하는지만 검사하고, 시그니처나 반환 타입은 검사하지 않습니다. 그것은 타입 검사기가 검사하고, 인터프리터는 절대 하지 않습니다.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.advanced.12.frozen"
+title = "바뀌지 않는다"
+story = "그날의 인쇄된 가격표가 06:00에 모든 노점에 배부되는데, 12:30이 되면 세 곳이 그 위에 뭔가를 적었고 한 곳은 없는 열을 하나 추가했다."
+brief = '''
+표준 입력은 개수 `n`, 그다음 `<NAME> <CENTS>` 형식의 줄 `n`개입니다.
+
+각 줄을 **frozen** 데이터클래스 `Price(name, cents)`로 만드세요. 그다음
+가격마다 그 `cents`를 덮어쓰려 시도하고, 시도가 예외를 내면 `FROZEN <NAME>`을
+출력하세요. 다음으로 `__slots__ = ("count",)`를 가진 `Tally` 클래스:
+`tally.count`를 설정한 뒤, 철자가 틀린 `tally.cuont`를 설정하려 시도하고,
+*그것이* 예외를 내면 `SLOTS YES`를 출력하세요. 마지막으로 가격들로 만든
+`set`의 크기인 `IN_SET <k>`와 `TOTAL <sum>`을 출력하세요.
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SLOTS YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+frozen 데이터클래스가 사 주는 것 셋, 그리고 스타터에는 그중 하나도 없습니다.
+`frozen=True`는 필드에 대한 대입이 `FrozenInstanceError`를 내게 하므로,
+가격표 위에 뭔가를 적을 수 없습니다. 또한 인스턴스를 **해시 가능**하게 만듭니다
+— 가변 데이터클래스는 `__hash__`를 `None`으로 두고, 스타터의 가격들로 `set()`을
+만들면 `TypeError: unhashable type`이 납니다. 필드가 같으면 해시가 같으므로,
+`LAM 1200` 두 줄은 집합의 원소 하나입니다.
+
+`__slots__`는 또 다른 종류의 고정된 모양입니다: 인스턴스는 정확히 이름이
+지정된 속성만 가지고 `__dict__`가 없으므로, 속성 이름의 오타는 아무도 읽지
+않는 조용한 새 필드가 아니라 대입 시점의 `AttributeError`입니다. 모든
+인스턴스를 더 작게 만들기도 하는데, 그래서 "이게 천만 개 있는데요"에 대한
+답이 이것입니다.
+'''
+hints = [
+  "@dataclass(frozen=True). 인자 하나면 루프 안의 대입이 예외를 내기 시작합니다.",
+  "클래스 본문에, __init__ 앞에 __slots__ = (\"count\",). 뒤의 쉼표에 주의하세요: (\"count\") 는 튜플이 아니라 문자열입니다.",
+  "TOTAL은 원래 센트의 합인데, 그것은 대입이 실패했기 때문에만 성립합니다. 스타터에서는 그 시점에 모든 가격이 0이고 TOTAL은 0입니다 — 변경이 허용되기만 한 게 아니라 실제로 통했습니다.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.advanced.13.exceptions"
+title = "당신만의 오류"
+story = "쌀 카운터 가격 계산의 네 층이 저마다 다른 것을 던지고, 카운터 앞단은 그중 하나를 잡고 나머지에 쓰러진다."
+brief = '''
+표준 입력은 개수 `n`, 그다음 kg 단위 무게여야 하는 줄 `n`개입니다.
+
+예외 계층을 정의하세요: 기반으로 `PriceError(Exception)`, 그 아래에
+`NotANumber(PriceError)`와 `Negative(PriceError)`. `Negative`는 무게를
+지니고 그 메시지는 `negative weight: <kg>`입니다. `NotANumber`의 메시지는
+`not a number`입니다. `price(text)`는 텍스트를 변환하며, 잡은 `ValueError`
+**from**으로 `NotANumber`를 일으키고, 음수 무게를 거부하고, 그 외에는
+`500 + 100 * kg`을 돌려줍니다.
+
+각 가격 또는 오류의 메시지를 출력한 뒤 `ERRORS <k>`를 출력하세요. **기반
+클래스**를, 한 번만 잡으세요.
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative weight: -2
+        ERRORS 2
+```
+
+스타터는 `Negative`만 잡고 다른 것은 잡지 않으므로, `xx` 줄이 잡히지 않은
+`NotANumber`로 프로그램을 쓰러뜨립니다. `except PriceError as err:` 하나가
+계층의 모든 구성원을 잡고, `str(err)`가 메시지입니다 — `super().__init__`에
+넘긴 인자로부터 `Exception.__str__`이 만들어 주는 것이므로, 메시지는 핸들러가
+아니라 클래스 안에 삽니다.
+
+`raise NotANumber() from err`는 `ValueError`를 원인으로 기록합니다. 여기서는
+아무것도 그것을 출력하지 않지만, 트레이스백이라면 둘을 위아래로 함께 보여 주며
+*The above exception was the direct cause of the following exception*이라고
+적습니다. 그 연결 고리가 `from`을 쓰는 이유입니다.
+'''
+hints = [
+  "except PriceError as err: — 기반 클래스가 두 서브클래스를 모두 잡고, 기반 클래스를 두는 이유가 그것입니다.",
+  "print(err) 는 str(err) 를 출력하는데, 그것은 super().__init__ 에 건넨 메시지입니다. __str__ 오버라이드는 필요 없습니다.",
+  "except 절이 여럿이면 순서가 중요합니다: 기반 클래스 절 뒤의 서브클래스 절은 죽은 코드이고, 파이썬은 경고해 주지 않습니다.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.advanced.14.iterator"
+title = "다음, 멈출 때까지"
+story = "지하 입구의 번호표 기계는 시작 번호부터 정해진 간격으로 번호를 나눠 주면서 그 목록을 어디에도 두지 않고, 대기 안내판은 그것을 여느 리스트처럼 돌고 싶어 한다."
+brief = '''
+표준 입력은 정수 세 개입니다: `start`, `step`, `count`.
+
+**이터레이터 프로토콜을 손수** 구현하는 클래스 `Tickets`를 작성하세요:
+`__iter__`는 `self`를 돌려주고, `__next__`는 다음 값을 돌려주거나 값
+`count`개를 다 나눠 줬으면 `StopIteration`을 일으킵니다. 각 값을 한 줄에
+하나씩 출력한 뒤, 두 번째 `Tickets`를 `sum`에 넘겨 계산한 `SUM <total>`을
+출력하세요.
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+이것이 제너레이터가 대신 써 주는 것입니다. `for` 루프는 그 대상에 `iter()`를
+한 번 호출한 뒤, 결과에 `StopIteration`이 날 때까지 `next()`를 호출합니다.
+`sum`, `list`, `max`, `in`도 같은 일을 합니다. `__next__`는 있고 `__iter__`는
+없는 객체는 `for`가 거부하는 이터레이터이고 — `TypeError: 'Tickets' object
+is not iterable` — 그것이 스타터입니다.
+
+`self`를 돌려주는 `__iter__`는 **이터레이터**의 표식입니다: 한 번 걸을 수
+있고 그러면 소진됩니다. **컨테이너**는 `__iter__`마다 새 이터레이터를 돌려주고
+반복해서 걸을 수 있습니다. 기초 길의 `Bag`이 그것이었습니다. 어느 쪽을 쓰는지
+분명히 하세요. 그 차이는 누군가가 두 번째로 루프를 돌 때 드러납니다.
+'''
+hints = [
+  "def __iter__(self): return self. 두 줄이면 for가 동작하기 시작합니다.",
+  "StopIteration은 반환하는 것이 아니라 일으키는 것입니다. for 루프가 그것을 잡으며, 당신은 그것을 볼 일이 없습니다.",
+  "전진하기 전에 돌려줄 값을 먼저 저장하세요. 아니면 한 스텝 어긋납니다.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.advanced.15.collections"
+title = "알맞은 컨테이너"
+story = "지하 사무실은 그날의 티켓을 긴 리스트 하나에 두고, 그것에 대한 모든 질문에 맨 위부터 읽어서 답한다."
+brief = '''
+표준 입력 세 줄: 단어 한 줄, 이미 **오름차순으로 정렬된** 정수 한 줄, 그리고
+정수 `x` 하나.
+
+네 줄을 출력하세요:
+
+1. `TOP <word> <count>` — 가장 잦은 단어, 동률은 단어 오름차순 —
+   `collections.Counter`로
+2. `BISECT <l> <r>` — 정렬된 정수들에서 `x`의 `bisect_left`와 `bisect_right`
+3. `SMALLEST3` 뒤에 가장 작은 정수 셋 — `heapq.nsmallest` — 셋보다 적으면
+   있는 만큼
+4. `GROUPS` 뒤에 단어들의 각 첫 글자에 대해 `<letter>:<k>`, 글자 오름차순 —
+   첫 글자를 키로 하는 `collections.defaultdict(list)`
+
+```
+input:  tofu egg tofu egg fish
+        1 3 3 5 8
+        3
+output: TOP egg 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS e:2 f:1 t:2
+```
+
+`Counter.most_common(1)`은 동률을 **삽입 순서**로 가르는데, 여기서는 `tofu`이고
+문제는 `egg`라고 합니다. 스타터는 `most_common`을 믿습니다. 대신 뜻하는 바를
+말하는 키로 항목을 정렬하세요.
+
+`bisect`는 루프 없이 "이것이 어디에 들어갈까"에 답합니다: `bisect_left`는
+`x`보다 작지 않은 첫 위치, `bisect_right`는 `x`보다 큰 첫 위치이고, 둘의
+차이가 `x`의 개수입니다. `heapq.nsmallest`는 `k`는 작고 `n`은 그렇지 않을 때
+맞는 호출입니다. 앞에서 값 셋을 읽으려고 리스트 전체를 정렬하는 것이 바로
+그것이 피하려고 존재하는 일입니다.
+'''
+hints = [
+  "min(counts.items(), key=lambda item: (-item[1], item[0])) 이 동률 처리를 명시한 최다 단어입니다. 같은 키로 정렬해서 [0] 을 취해도 같은 답입니다.",
+  "bisect_left와 bisect_right는 절대 예외를 내지 않습니다. list.index는 x가 없으면 ValueError를 내고, 숨겨진 케이스 하나가 정확히 그것입니다.",
+  "defaultdict(list) 는 첫 접근에 리스트를 만들어 주므로 groups[letter].append(w) 에는 검사가 필요 없습니다. 출력 전에 항목을 정렬하세요. defaultdict도 여느 딕셔너리처럼 삽입 순서입니다.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.advanced.16.timeouts"
+title = "그만 기다리기"
+story = "주문판이 노점마다 대기 시간을 물어보는데, 카드 단말기가 죽은 노점은 영영 대답하지 않고, 그래서 주문판은 영영 다시 그려지지 않는다."
+brief = '''
+표준 입력은 개수 `n`, 그다음 `<STALL> <SECONDS>` 형식의 줄 `n`개이며,
+`SECONDS`는 즉시 대답하는 노점이면 `0`, 제때 대답하지 않는 노점이면 `1`입니다.
+
+노점마다 그 `fetch(stall, seconds)` — 그만큼 sleep합니다 — 를 **0.2초**
+타임아웃의 `asyncio.wait_for` 아래에서 `await`하고, `<STALL> OK` 또는
+`<STALL> TIMEOUT`을 입력 순서로 출력하세요. 그다음 영원히 반복하는 `watch()`
+태스크를 시작하고, 취소하고, await해서, 그 `except asyncio.CancelledError`에서
+`CANCELLED`를, `finally`에서 `CLEANUP`을 출력하게 하세요. 마지막으로
+`TIMEOUTS <k>`를 출력하세요.
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+`wait_for`는 어웨이터블을 기한을 두고 실행합니다. 기한이 지나면 안쪽 태스크를
+**취소**하고 당신에게 `asyncio.TimeoutError`를 일으킵니다. 그 이름을 잡으세요
+— 3.11 이상에서는 내장 `TimeoutError`이고 3.10에서는 아니지만,
+`asyncio.TimeoutError`는 양쪽에서 맞습니다.
+
+스타터는 `fetch`를 직접 await하므로 `WONG`이 꼬박 1초를 쓴 뒤 `OK`를 출력하고,
+`watch`를 await하지 않고 취소하므로 루프가 닫히기 전에 태스크의 `except`와
+`finally`가 실행될 기회를 얻지 못합니다. 취소된 태스크는 다음에 스케줄되어
+안에서 `CancelledError`가 전달되기 전까지는 멈춘 것이 아닙니다. await하는
+것이 그 차례를 주는 일입니다. `CancelledError`를 처리한 뒤에는 다시
+일으키세요 — 삼키는 것이 태스크가 취소 불가능해지는 길입니다.
+'''
+hints = [
+  "try 안에 asyncio.wait_for(fetch(stall, seconds), timeout=0.2), except asyncio.TimeoutError와 함께.",
+  "watcher.cancel() 은 취소를 요청할 뿐입니다. `await watcher` 가 태스크에 except와 finally를 실행할 기회를 줍니다. 그것은 당신에게 CancelledError를 다시 일으키므로, 그것도 잡으세요.",
+  "create_task 뒤의 await asyncio.sleep(0) 은 워처에게 실제로 시작할 한 차례를 줘서, 그냥 스케줄만 된 태스크가 아니라 돌고 있는 태스크를 취소하게 합니다.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.advanced.17.gil"
+title = "GIL"
+story = "SOGO 지하, 노점 열둘, 층 전체에 락 하나. 동시에 일어났어야 할 모든 일이 하나씩 차례로 일어났고, 합계는 아무것도 아닌 것으로 돌아왔다."
+brief = '''
+표준 입력은 정수 `k`와 `n`입니다.
+
+`1..n`을 연속된 덩어리 `k`개로 나누고 — 덩어리 `i`는 `n*i//k + 1`부터
+`n*(i+1)//k`까지, 양 끝 포함 — 각 덩어리를 자기 스레드에 주어 그 범위의
+제곱 합을 구하게 하세요: CPU 위주 루프, 라이브러리 호출 없이. 모든 스레드는
+자기 결과를 락 아래에서 **하나의 공유 합계**에 더하고, 자기 칸에도 기록합니다.
+전부 join하세요. 덩어리마다 인덱스 순서로 `CHUNK <i> <sum>`을 출력한 뒤
+`TOTAL <sum>`, 그다음 `THREADS <k>`를 출력하세요.
+
+```
+input:  3 10
+output: CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        THREADS 3
+```
+
+스타터는 타이밍과 아무 상관 없는 이유로 실패합니다. `work`는 합계를 반환하고
+`main`은 `t.join()`을 모으는데, `join`은 타깃이 무엇을 반환했든 `None`을
+돌려줍니다 — 스레드에는 반환값이 없습니다. 첫 `+=`가 `TypeError`입니다. 그것이
+작은 버그입니다. 락 퀘스트에서 한 방식으로 고치세요: 공유 컨테이너, 갱신 주위의
+`with lock:`, 그리고 정확히 한 스레드만 쓰는 덩어리별 칸.
+
+큰 것은 보스이고, 당신이 고칠 수 있는 버그가 아닙니다. 이것을 `k = 4`,
+`n = 4000000`으로 돌려 시간을 재고, 그다음 `k = 1`로 돌려 보세요. 걸리는
+시간이 같습니다. CPython에는 **전역 인터프리터 락**이 있습니다: 어느 순간에도
+파이썬 바이트코드를 실행하는 스레드는 하나이고, CPU 위주 스레드는 몇
+밀리초마다 락을 내놓아 다른 스레드가 차례를 얻게 합니다. 코어 넷 위의 스레드
+넷은 코어 하나에서 번갈아 제곱 합을 구하고, 거기에 전환 비용이 얹힙니다.
+파이썬의 스레드는 기다리기 위한 것입니다 — 소켓을, 파일을, `sleep`을 — 기다리는
+동안 락이 풀리고 동시성이 진짜가 되는 곳. CPU 작업의 답은 `multiprocessing`이나
+`concurrent.futures.
+ProcessPoolExecutor`이며, 이것들은 락이 따로 있는 별개의 인터프리터를 돌리고
+인자를 복사하는 것으로 그 값을 치릅니다.
+
+출력이 결정적인 이유는 덩어리가 인덱스로 출력되고 합계가 덩어리들의 합이지,
+스레드가 끝난 순서가 아니기 때문입니다. `TOTAL`은 칸들을 합쳐서가 아니라 락
+아래의 합계에서 출력하세요 — 락이 이 지도가 다루는 것이고, 둘은 일치해야
+합니다.
+'''
+hints = [
+  "join() 은 None을 돌려줍니다. work에 인덱스와 쓸 칸, 그리고 더해 넣을 락 걸린 딕셔너리를 주세요. 그것이 스레드에서 값이 나오는 방법입니다.",
+  "전부 start, 그다음 전부 join, 그다음 출력. 스레드 안에서 출력하면 뒤섞이지만, join 뒤에 칸에서 출력하면 그럴 수 없습니다.",
+  "n*(n+1)*(2n+1)/6 이 합계의 닫힌 식입니다. TOTAL을 그것과 한 번 대조하면 덩어리 경계가 맞는지 알 수 있습니다.",
+  "큰 n에서 k=1과 k=4의 시간을 재 보세요. 둘이 같을 때, 당신은 GIL을 만난 것입니다. 그것은 이 퀘스트의 버그가 아닙니다. 이 프로그램의 다음 버전이 ProcessPoolExecutor인 이유입니다.",
+]

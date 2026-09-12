@@ -9,9 +9,12 @@ interviewer rather than as their author, listing what a screen could ask that
 a cleared player would still not recognise, and then closing what was worth
 closing. **The residual list in §5 is the important part of this document.**
 
-State of the content: **138 quests** — 18 + 18 `basic`, 17 + 17 `advanced`,
-34 + 34 `hacker`. Every reference solution compiles and runs against every
-case through the real toolchain; every starter is proven to fail.
+State of the content: **278 quests** across four lands. `basic` is 18 in Rust
+and Go and 19 in C++ and Python, `advanced` is 17 everywhere, `hacker` is 34
+everywhere. The two extra `basic` quests are the hash table (`cpp`) and the
+dict comprehension (`python`), which the other two lands cover inside existing
+quests. Every reference solution compiles and runs against every case through
+the real toolchain; every starter is proven to fail.
 
 ---
 
@@ -177,7 +180,7 @@ constraint no test enforces*:
   be. `19.knapsack` is the one other quest whose test punishes a *wrong
   strategy* (greedy) rather than a slow one, and its brief points at the case
   that catches it.
-* All 138 quests use `harness = "stdio"`. `cargo` and `gotest` (SPEC §5.2) are
+* All 278 quests use `harness = "stdio"`. `cargo` and `gotest` (SPEC §5.2) are
   still unused, which is why the two `testing` quests teach the table shape
   rather than running under `#[test]` / `go test`. A harness for both is being
   built separately; when it lands, §5 item 1 becomes writable.

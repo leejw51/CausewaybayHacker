@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<work>/main.py", line 4, in <module>
+    totl += i
+    ^^^^
+NameError: name 'totl' is not defined. Did you mean: 'total'?

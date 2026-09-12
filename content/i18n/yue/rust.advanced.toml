@@ -1,0 +1,605 @@
+# RUST LAND — ADVANCED, in Cantonese (colloquial written Cantonese, traditional
+# characters). A translation pack (SPEC §12.1): the prose of
+# `content/rust/advanced.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "rust.advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.advanced.01.threads"
+title = "兩部收銀機，一個櫃檯"
+story = "時代廣場分店中午開第二部收銀機，條隊終於郁。間舖其他嘢乜都冇變。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+每個值開一條 thread 計佢嘅平方。**跟你 spawn 嘅次序** join 佢哋，每個結果
+印一行，然後印 `THREADS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+跟次序 join 就係令每次行輸出都一樣嘅原因。一條自己印嘢嘅 thread 就唔會。
+'''
+hints = [
+  "thread::spawn 返回一個 JoinHandle<T>，T 就係個 closure 返回嘅嘢。",
+  "join() 畀你 Result<T, _> —— 個 Err 係 panic，喺呢度 unwrap 係老實嘅。",
+  "喺迴圈之前先攞個數量；以值 iterate 個 Vec 會消耗咗佢。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.advanced.02.move"
+title = "帶埋佢走"
+story = "Alex 將個地址寫喺唯一一張單度交咗畀個車手，然後叫櫃檯讀返個地址出嚟。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行文字。
+
+每一行開一條 thread，返回嗰行嘅大楷版本。跟次序 join，逐個印，然後印
+`DONE`。
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        DONE
+```
+
+個 starter 編譯唔到：個 closure 係借 `line`，而 `thread::spawn` 完全唔知
+條 thread 會行幾耐，所以證明唔到個借用會活得過佢。將個字串直接交畀條
+thread，而唔係交一個 view 畀佢。
+'''
+hints = [
+  "個錯誤係 E0373：closure may outlive the current function。",
+  "喺個 closure 前面加一個關鍵字，佢就由借變做擁有。",
+  "line 每一次迴圈都已經係一個新鮮嘅 String，所以送走佢一啲成本都冇。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.advanced.03.channels"
+title = "一個窗口，好多車手"
+story = "四十個車手，時代廣場廚房後面得一個出餐窗。所有嘢都經個窗出，而個窗從來唔塞。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+每個值開一條 thread。每條 thread 將 `(index, value * 10)` 送落同一條
+`mpsc` channel。main thread 收晒佢哋，按 index 排序，印 `<index> <value>`
+一行一個，然後印 `RECV <n>`。
+
+```
+input:  3
+        1 2 3
+output: 0 10
+        1 20
+        2 30
+        RECV 3
+```
+
+用 iterate `rx` 嚟接收，要**每一個** sender 都 drop 咗先會完 —— `main` 手上
+仲揸住嗰個都計。Drop 佢，唔係個程式永遠都完唔到。
+'''
+hints = [
+  "每條 thread 要有自己嘅 Sender：喺 move closure 之前 tx.clone()。",
+  "迴圈之後 drop(tx)。唔做嘅話個 receiver 會永遠等緊一個坐喺 main 度嘅 sender。",
+  "rx.iter() 會一直產出直到條 channel 閂咗，所以 collect() 就已經係成個接收迴圈。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.advanced.04.mutex"
+title = "一個錢櫃，八隻手"
+story = "兩部收銀機都由同一個錢櫃攞現金，收舖嗰陣個錢櫃同佢哋兩個嘅數都對唔上。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+每個值開一條 thread，將佢加落**同一個共享嘅總數**。全部 join 完，然後印
+`TOTAL <sum>` 同 `THREADS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        THREADS 4
+```
+
+個 starter 編譯到，但係錯嘅：`i64` 係 `Copy`，所以每個 `move` closure 都攞咗
+一個自己私人嘅總數，然後掉咗佢。共享一個，然後鎖住佢。
+'''
+hints = [
+  "Arc 係共享擁有；Mutex 係獨佔存取。兩樣都要，跟呢個次序：Arc<Mutex<i64>>。",
+  "喺迴圈入面、move closure 之前 Arc::clone(&total) —— 每條 thread 攞走嘅就係嗰個 clone。",
+  "lock() 攞到嘅 guard 可以 deref 去個值；*guard += value，而個 guard 離開 scope 就自動解鎖。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.advanced.05.rwlock"
+title = "好多讀者，一個寫者"
+story = "希慎廣場個指示牌一分鐘俾人讀三百次，一日改兩次，而個鎖分唔到呢兩樣嘢有乜分別。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個字。
+
+揸住一個 `Arc<RwLock<HashMap<String, i64>>>`。每個字開一條 thread，攞**寫**鎖，
+將嗰個字嘅計數加一。全部 join 完，然後攞一個**讀**鎖，按字排序印每個
+`<word> <count>`，然後印 `TOTAL <sum>`。
+
+```
+input:  3
+        tram
+        bus
+        tram
+output: bus 1
+        tram 2
+        TOTAL 3
+```
+
+個 starter 編譯唔到。佢攞咗讀鎖就想透過佢寫嘢，而 `RwLockReadGuard` 唔會
+畀 `&mut` 你。
+'''
+hints = [
+  "write() 返回一個 deref 做 &mut 嘅 guard；read() 返回嘅淨係 deref 做 &。",
+  "排序 Vec<(&String, &i64)> 會先按個字排，正正係輸出想要嘅。",
+  "iterate 嗰陣將個讀 guard 揸喺一個 binding 度，唔係個臨時值會喺你未用完之前就 drop 咗。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.advanced.06.lifetimes"
+title = "嗰樣嘢有效到幾時"
+story = "個班次板揸住嘅係時間表嘅一個 view，唔係一個副本，而冇人寫低個時間表幾時會俾人掉。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行。
+
+寫一個 `Board`，入面揸住輸入嘅**借用** `&str` slice —— 冇 `String`，冇副本
+—— 同埋畀佢 `longest()`（打和嘅話第一行贏）同 `bytes()`。
+
+印最長嗰行，然後印有幾多行，然後印佢哋加埋嘅 byte 長度。
+
+```
+input:  3
+        tram
+        percival street
+        mtr
+output: percival street
+        3
+        22
+```
+
+個 starter 編譯唔到：一個揸住 reference 嘅 struct 一定要講明嗰個 reference
+有效到幾時。嗰個係 E0106，修法係喺個 struct、個 `impl`，同埋 `longest`
+返回嘅嘢上面加一個 lifetime 參數。
+'''
+hints = [
+  "struct Board<'a> { lines: Vec<&'a str> } —— 個 struct 而家係對一個 lifetime generic。",
+  "impl<'a> Board<'a> —— 用之前先宣告，同型參數一樣。",
+  "longest 返回 &'a str，唔係 &str：個答案活得過對 self 嘅借用，佢係屬於輸入嘅。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.advanced.07.generics"
+title = "寫一次就夠"
+story = "Alex 已經寫咗四次 largest —— 車費一次、分鐘一次、車手一次、站名一次 —— 而第五次要喺更完之前交。"
+brief = '''
+標準輸入係兩行：第一行係整數，第二行係字。
+
+寫**一個** `largest`，兩種都食得，同埋一個 generic 嘅 `Pair<T>`，有
+`larger()` 同 `smaller()`。
+
+印最大嘅整數、最大嘅字，然後用頭兩個整數砌一個 `Pair`，印
+`PAIR <larger> <smaller>`。打和嘅話當 `a` 係大嗰個。
+
+```
+input:  4 8 15 16
+        tram bus mtr
+output: 16
+        tram
+        PAIR 8 4
+```
+
+個 starter 編譯唔到：`largest` 釘死咗喺 `i64`，所以將啲字交畀佢就係 E0308。
+'''
+hints = [
+  "largest<T: PartialOrd + Copy> —— PartialOrd 用嚟比較，Copy 係因為個迴圈由個 slice 度攞值出嚟。",
+  "&str 係 Copy 又係 PartialOrd，所以同一個 function 原封不動就食到個字列表。",
+  "個 bound 係放喺 impl block，唔係放喺 struct：impl<T: PartialOrd> Pair<T>。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.advanced.08.iterator"
+title = "你自己嘅 for 迴圈"
+story = "架電車由筲箕灣到堅尼地城逐個站列出嚟，但係喺邊度都冇存住一張站表。"
+brief = '''
+標準輸入係三個整數：`start`、`step`、`count`。
+
+為 `Stops` 實現 `Iterator`，等佢由 `start` 開始、每次前進 `step`，產出
+`count` 個值。每個印一行，然後印 `SUM <total>`，要用個 iterator 自己嘅
+`sum()` 計。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+一有咗 `next`，`for`、`sum`、`map`、`take` 同其餘嗰啲你就免費攞到。呢個
+就係實現一個 trait 換到嘅嘢。
+'''
+hints = [
+  "冇嘢剩嘅時候 next 返回 None，而嗰個 None 就係結束 for 迴圈嘅嘢。",
+  "前進之前先儲低你準備返回嘅值，唔係就會差一步。",
+  "left 係倒數；每交一個值出去就減一。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.advanced.09.pipeline"
+title = "流水線廚師"
+story = "Bo 師傅個夜間廚房係一條流水線咁行：一個崗位將柯打平方，下一個保持住個累計數，冇人等成批嘢出齊。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+用兩條 `mpsc` channel 同兩條 thread 砌一條兩級嘅 pipeline：
+
+1. 第一級將每個值平方送出去
+2. 第二級收嗰啲值，保持住一個累計總數，送出 `(square, total)`
+
+`main` 將收到嘅每一對印做 `<square> <total>`，然後印 `PIPE <n>`。
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+每一級嘅 sender 都係**move 入**佢條 thread 嘅，所以條 thread 一完佢就 drop，
+所以下一級嘅 `for` 迴圈先會完。喺任何地方留一個副本，個程式就會 hang。
+'''
+hints = [
+  "將 nums move 入第一條 thread 之前先攞個數量。",
+  "第二條 thread 入面嘅 for square in rx1 係一個接收迴圈，第一級 drop 咗 tx1 佢就完。",
+  "main 對 rx2 嘅迴圈喺第二條 thread 完嘅時候完，所以之後先 join 唔會 hang。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.advanced.10.async"
+title = "async 到底喺邊度行"
+story = "阿薇寫咗四年 async Rust，但係從來冇見過推動佢嘅嗰樣嘢。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+呢度冇 runtime —— 冇 tokio，一個 crate 都冇。自己寫個 executor。
+
+完成 `block_on`，佢會一直 poll 一個 future 直到佢係 `Ready`，然後返回個值
+**同埋佢 poll 咗幾多次**。然後用 `block_on` 行一個 `async` block，跟次序對
+每個值 await `double(v)`，逐個結果印出嚟，然後印 `SUM <total>` 同
+`POLLS <k>`。
+
+`double` 返回之前會 yield 一次，所以每個值多花一次 poll：`POLLS` 係
+`n + 1`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        POLLS 4
+```
+
+一個 `async fn` 係一個實現咗 `Future` 嘅 state machine，而 `.await` 係
+「poll 入面嗰個；佢係 `Pending` 嘅話就返回 `Pending`，記住我行到邊」。
+冇嘢 poll 佢之前乜都唔會行。嗰樣嘢係三十行碼，親手寫一次好過讀五次。
+'''
+hints = [
+  "Box::pin 唔使任何 unsafe 就畀到你一個 Pin<Box<F>>，而 .as_mut() 將佢變做 poll 想要嘅 Pin<&mut F>。",
+  "Context::from_waker(&waker) 就係成套儀式 —— 個 Waker 係一個真正嘅 runtime 用嚟重新排你入隊嘅嘢。",
+  "呢個 executor 遇到 Pending 就 busy-loop。真正嘅 executor 會將條 thread park 住直到個 waker 響，而呢個係唯一有趣嘅分別。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.advanced.11.send-sync"
+title = "點解佢過唔到去"
+story = "同一段碼，同一個 Vec，得一個字唔同，而兩個之中有一個編譯唔到。講出係邊個字，同埋點解。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+透過一個共享嘅總數，用兩條 thread 加埋佢哋，然後印：
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        SEND ARC OK
+        SYNC MUTEX OK
+```
+
+最後兩行淨係喺 `assert_send` 同 `assert_sync` 接受個 handle 嘅時候先會印
+—— 而呢兩個 function 執行嗰陣乜都唔做。佢哋係
+`fn assert_send<T: Send>(_: &T) {}`：個檢查就係個 bound，喺編譯嗰陣發生，
+唔係嘅話就完全唔會發生。
+
+個 starter 編譯唔到，而個錯誤就係今堂嘅課。`Rc` 唔係 `Send`，因為佢個
+refcount 係一個普通、非 atomic 嘅整數 —— 兩條 thread clone 同一個 `Rc`
+會喺上面 race，所以編譯器索性唔畀 `Rc` 跨過 thread 邊界。`Arc` 係同一樣嘢
+但係用 atomic 計數，而佢係 `Send`。
+
+`Sync` 係另一半：`&T` 係 `Send` 嘅時候，`T` 就係 `Sync`。`Mutex<T>` 對任何
+`T: Send` 都係 `Sync`，因為個鎖就係令共享存取變安全嘅嘢。
+'''
+hints = [
+  "個錯誤係 E0277：`Rc<Mutex<i64>>` cannot be sent between threads safely。改一個型名，連埋一個 import。",
+  "Rc 個 refcount 係普通 usize；Arc 嗰個係 AtomicUsize。呢一個分別就係點解一個係 Send 另一個唔係嘅全部理由。",
+  "assert_sync(&*total) 問嘅係個 Mutex 本身，唔係包住佢嘅 Arc —— 只要 T 係 Send，Mutex<T> 就係 Sync。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.advanced.12.dispatch"
+title = "而家定係遲啲"
+story = "同樣兩個舖面，同樣嘅 render，而個面試官想兩種寫法一齊喺塊板度出現。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `SHOP <NAME> <FLOOR>` 或者
+`STOP <ROUTE>`。
+
+每個牌 render **兩次**：一次透過 `render_static<T: Sign>(sign: &T)`，一次
+透過 `render_dynamic(sign: &dyn Sign)`，跟呢個次序 —— 先晒所有 static
+嘅，再晒所有 dynamic 嘅。然後印 `DYNAMIC <k>`，即係個
+`Vec<Box<dyn Sign>>` 嘅長度。
+
+```
+input:  3
+        SHOP HYSAN 4
+        STOP 2
+        SHOP SOGO 1
+output: HYSAN / F4
+        TRAM 2
+        SOGO / F1
+        HYSAN / F4
+        TRAM 2
+        SOGO / F1
+        DYNAMIC 3
+```
+
+兩個出嚟嘅文字一模一樣，但係佢哋唔係同一樣嘢。`render_static` 係
+monomorphise 嘅：編譯器為每個具體嘅型印一份，個呼叫係直接、可以 inline
+嘅 —— 但係個型一定要**喺呼叫點**已經知道，所以 static 嗰一輪一定要喺
+parse 嗰個分支入面做，即係你仲知自己砌咗乜嘅時候。
+
+`render_dynamic` 攞一個 fat pointer —— 數據加 vtable —— 執行嗰陣先查個
+method，而佢唔理自己揸住嘅係乜。呢個就係一個 `Vec` 可以同時裝住兩種嘅
+唯一原因。
+'''
+hints = [
+  "render_static 一定要喺具體嘅型仲見得到嘅地方呼叫 —— 喺 match 嘅 arm 入面，個值俾人 box 之前。",
+  "sign.as_ref() 將 &Box<dyn Sign> 變做 &dyn Sign；直接交個 box 就要多一次 deref。",
+  "兩個 function 嘅 body 都係同一行。分別完全喺個簽名度，完全喺個 method lookup 喺邊度發生。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.advanced.13.interior-mutability"
+title = "透過共享 reference 改嘢"
+story = "門口個計數器要一路加上去，而同時有四段唔同嘅碼淨係望住佢。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+印四行：
+
+1. `CELL <k>` —— 一個 `Cell<usize>`，每個值加一次，用 `.get()` 讀返出嚟，
+   全部透過一個普通嘅 `&` reference
+2. `REF <sum>` —— 一本用啲值填滿再加埋嘅帳
+3. `RC <k>` —— 本帳係一個 `Rc<RefCell<Vec<i64>>>`，而你揸住**兩個** handle；
+   兩個都仲生存嘅時候印 `Rc::strong_count`
+4. `DOUBLE panic` —— 故意對同一個 `RefCell` 同時攞兩個 `borrow_mut()`，
+   然後用 `std::panic::catch_unwind` 接住個 panic
+
+```
+input:  3
+        1 2 3
+output: CELL 3
+        REF 6
+        RC 2
+        DOUBLE panic
+```
+
+`&T` 正常嚟講即係冇人可以改佢。`Cell` 同 `RefCell` 係獲准嘅例外，而佢哋
+用唔同嘅貨幣付鈔：`Cell` 淨係將成個值搬入搬出，所以完全唔使檢查；
+`RefCell` 交出真正嘅 reference，所以一定要執行 borrow 規則 —— 喺執行嗰陣，
+用 panic，而唔係喺編譯嗰陣用錯誤。
+
+`Rc<RefCell<T>>` 係個個最終都會伸手攞嘅一對，而講得出每一半做乜係值得嘅。
+`Rc` 畀個值多過一個擁有者 —— 非 atomic 嘅 refcount，所以佢唔係 `Send`，過唔到
+thread（嗰個係 `send-sync` 張地圖）。`RefCell` 畀嗰啲擁有者改嘢嘅權利。兩個都
+唔係 `Mutex`。共享**兼且**可變正正係 borrow checker 喺編譯嗰陣拒絕嘅嘢，所以
+呢個 pattern 係喺執行嗰陣買返佢，而你搞錯嘅時候就收你一個 panic。
+
+嗰個 panic 唔係呢條街嘅 bug。佢係個價，而見一次就係重點。
+'''
+hints = [
+  "Cell 冇 borrow()：你用 get() 攞一個副本出嚟，用 set() 放一整個值入去。所以佢唔使執行時記帳。",
+  "ledger.borrow_mut().push(v) 寫做一句，個 guard 就喺分號度 drop，呢樣就係令個迴圈合法嘅嘢。",
+  "catch_unwind 要用 AssertUnwindSafe 包住個 closure，因為佢捕獲咗一個 &RefCell；個 panic 訊息照樣去 stderr，而測試唔會讀嗰度。",
+  "Rc::clone(&ledger) 咁樣寫而唔係 .clone()，係等讀嘅人睇得出佢複製嘅係一個 handle 而唔係個 Vec。兩個 handle 都生存嘅時候 Rc::strong_count 讀到 2，而 panic 測試入面嗰兩個 borrow_mut() 可以一個 handle 一個 —— 佢哋係同一個 RefCell，佢會一齊計。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.advanced.14.custom-error"
+title = "你自己嘅錯誤"
+story = "車費服務四層每一層都發明咗自己嘅失敗型，而冇一個肯轉換。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行，每行應該係一個以 km 為單位嘅距離。
+
+定義 `enum FareError { NotANumber, Negative(i64) }`，為佢實現 `Display`
+同 `std::error::Error`，再實現
+`From<std::num::ParseIntError> for FareError`，等 `?` 可以自己轉換。
+
+`fare(text) -> Result<i64, FareError>` 用 `?` parse，拒絕負數距離，否則
+返回 `500 + 100 * km`。印每個結果或者個錯誤嘅 `Display` 文字，然後印
+`ERRORS <k>`。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative distance: -2
+        ERRORS 2
+```
+
+個 starter 編譯唔到。`?` 唔止係傳遞 —— 佢出去嗰陣會呼叫 `From::from`，而冇
+嗰個 impl，就冇路由 `ParseIntError` 去到你嘅型。實現 `From` 就係令 `?` 跨到
+一層邊界嘅嘢，而呢個就係錯誤 enum 值得存在嘅全部理由。
+
+`map_err` 係答案嘅另一半，係你想附加上下文而唔係轉換型嘅時候用。佢哋問
+嘅話提一提；呢度唔需要。
+'''
+hints = [
+  "個錯誤係 `?` 上面嘅 E0277：the trait From<ParseIntError> is not implemented for FareError。",
+  "六行：impl From<ParseIntError> for FareError，入面 fn from 返回 FareError::NotANumber。",
+  "Display 係 {} 印嘅嘢；Debug 係 {:?} 印嘅嘢；Error trait 係令佢入得到 Box<dyn Error> 嘅嘢。三樣都值得有，呢度淨係需要一樣。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.advanced.15.atomics"
+title = "一個字，冇鎖"
+story = "閘機個計數唔需要鎖。機房入面其他嘢全部都需要，而分得出邊樣係邊樣就係份工。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+每個值開一條 thread。每條將自己個值加落一個共享嘅 `AtomicI64`，再將一個
+共享嘅 `AtomicUsize` 加一 —— 邊度都冇 `Mutex`。全部 join 完，印
+`TOTAL <sum>` 同 `HITS <n>`。
+
+然後：喺 `main` 嘅**最頂**宣告兩個 `Guard` 值，叫 `first` 同 `second`，佢哋
+嘅 `Drop` 會印 `DROP <name>`。佢哋喺 `main` 嘅最尾、其他嘢全部做完之後行，
+跟宣告嘅相反次序。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+        DROP second
+        DROP first
+```
+
+atomic 唔係一個平啲嘅 mutex；佢係另一件工具，用嚟喺一個指令入面
+read-modify-write 一個機器字。你一需要兩個欄位互相一致，個鎖就返嚟 ——
+冇一個 atomic 係做「呢兩樣嘢，一齊」嘅。
+
+呢度 `Ordering::Relaxed` 已經夠，因為冇嘢依賴呢啲加法相對於任何其他寫入
+*幾時*變得可見，淨係要冇一個唔見咗。呢一句就係追問嗰條問題，亦都係
+`Relaxed` 嘅全部意思。
+'''
+hints = [
+  "fetch_add 返回之前嘅值，並且 atomic 咁做個加法；冇鎖，冇 guard。",
+  "個 Arc 仲係需要嘅 —— atomic 令*存取*安全，唔係令*共享*安全。",
+  "Drop 跟宣告嘅相反次序行，所以 `second` 先走。用 _first 同 _second 綁住佢哋可以令佢哋活到 main 嘅尾；淨係一個 `_` 就會即刻 drop 咗佢哋。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.advanced.16.closure-kinds"
+title = "三種 closure"
+story = "個面試官喺塊板寫 `Fn`、`FnMut` 同 `FnOnce`，問個 callback 應該係邊一種。係有正確答案嘅。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數，`n` 至少係一。
+
+每一種 closure 用一個：
+
+* `apply_fn<F: Fn(i64) -> i64>` —— 以複製捕獲第一個值，將佢加落每個值。
+  逐個結果印出嚟。
+* `apply_fn_mut<F: FnMut(i64)>` —— 將一個住喺 `main` 嘅計數器加上去。印
+  `SEEN <k>`。
+* `apply_once<F: FnOnce() -> String>` —— 將一個 `String` 由佢嘅捕獲入面
+  **move** 出嚟並且返回佢。印 `TAKEN <s>`，個字串係 `<n> items`。
+
+```
+input:  3
+        10 20 30
+output: 20
+        30
+        40
+        SEEN 3
+        TAKEN 3 items
+```
+
+呢三個 trait 係一個層級，唔係一張餐牌：每個 `Fn` 都係 `FnMut`，每個
+`FnMut` 都係 `FnOnce`。一個 closure 實現邊個，係由佢對佢嘅捕獲*做啲乜*
+決定 —— 讀佢哋（`Fn`）、改佢哋（`FnMut`），定係消耗佢哋（`FnOnce`）——
+而 `move` 改嘅係佢哋點樣俾人捕獲，唔係出嚟邊個 trait。
+
+個 starter 編譯唔到。`apply_once` 要求 `Fn`，而一個將自己個 `String` 送走
+嘅 closure 淨係可以呼叫一次，所以佢係 `FnOnce`，冇其他。揀個呼叫點頂得住
+嘅最弱 bound：你淨係呼叫一次就要求 `FnOnce`，咁你就唔會無緣無故排除晒
+其他所有 closure。
+'''
+hints = [
+  "個錯誤係 E0525：expected a closure implementing Fn, but this one only implements FnOnce。",
+  "改一個字：apply_once 上面個 bound。個 closure 本身已經係啱嘅。",
+  "apply_fn_mut 攞 `mut f: F` —— 個參數本身要係可變嘅，個 closure 先可以改佢自己嘅捕獲。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.advanced.17.deadlock"
+title = "死鎖"
+story = "時代廣場個機房，落兩層。兩個鎖、兩條 thread，而兩條扶手電梯喺同一秒停晒。"
+brief = '''
+兩個戶口 `A` 同 `B`，每個係一個 `Arc<Mutex<i64>>`。
+
+標準輸入第一行係起始結餘，第二行係一個數量 `n`，然後 `n` 行
+`<FROM> <TO> <AMOUNT>`，`FROM`／`TO` 係 `{A, B}` 之一。
+
+每個轉帳用自己一條 thread 行，全部 join 完，然後印 `A <balance>`、
+`B <balance>`、`MOVED <n>`。
+
+```
+input:  100 100
+        2
+        A B 30
+        B A 10
+output: A 80
+        B 120
+        MOVED 2
+```
+
+個 starter 有兩樣嘢係錯嘅，但係淨係得一樣會喺輸出度睇到。佢扣咗來源，
+但係從來冇加落目的地 —— 呢個係睇得見嘅 bug。另一樣係個形狀：*先鎖來源*
+即係話兩個方向相反嘅轉帳可以各自揸住一個鎖，然後等對方，永遠等落去。
+
+兩個鎖都攞，**永遠跟同一個全局次序** —— 先 `A` 再 `B`，唔理啲錢向邊個方向
+行 —— 個圈就冇得形成。
+'''
+hints = [
+  "掂任何一邊結餘之前先鎖住兩個戶口，而且永遠跟同一個次序。",
+  "錢嘅方向決定邊個 guard 食個減號，唔係邊個鎖先攞。",
+  "兩個 guard 喺 transfer 完結嗰陣跟相反次序 drop，咁樣冇問題 —— 緊要嘅係攞鎖嘅次序。",
+]

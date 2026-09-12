@@ -5,8 +5,10 @@
 -- `docs/art.md` §2 names as the register for this game too: "Super Mario
 -- World sky and Wonder Boy candy, not neon cyberpunk."
 --
--- Added here: the two land tints from art.md §2, which are what separates
--- RUST LAND from GO LAND without a second set of sprites.
+-- Added here: the land tints from art.md §2, which are what separates
+-- RUST LAND from GO LAND without a second set of sprites — and, since the
+-- same trick scales, C++ LAND (ISO C++ blue, #00599C) and PYTHON LAND
+-- (Python gold, #FFD43B) from both.
 
 local T = {}
 
@@ -30,10 +32,18 @@ T.dim = { 120 / 255, 104 / 255, 88 / 255, 1 }
 T.land = {
   rust = { 0.95, 0.47, 0.16, 1 },
   go = { 80 / 255, 216 / 255, 248 / 255, 1 },
+  cpp = { 0 / 255, 89 / 255, 156 / 255, 1 },
+  python = { 255 / 255, 212 / 255, 59 / 255, 1 },
 }
+-- The haze is the tint at map strength: a deep blue over the typhoon
+-- shelter at noon, a warm amber over the wet market at dawn. Python's is
+-- the faintest because gold over a whole plate reads as a sepia filter
+-- before it reads as a colour.
 T.haze = {
   rust = { 0.95, 0.47, 0.16, 0.16 },
   go = { 80 / 255, 216 / 255, 248 / 255, 0.14 },
+  cpp = { 0 / 255, 89 / 255, 156 / 255, 0.18 },
+  python = { 255 / 255, 212 / 255, 59 / 255, 0.12 },
 }
 
 -- The editor's colours, keyed by `src/editor.lua`'s span kinds. Chosen out of

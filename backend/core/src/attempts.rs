@@ -102,6 +102,17 @@ pub fn insert(conn: &Connection, record: &AttemptRecord) -> Result<()> {
     Ok(())
 }
 
+/// The name the source is saved under, per land — the one the runner compiles
+/// it as, so a file opened from the home is the file that was judged.
+pub fn source_filename(lang: &str) -> &'static str {
+    match lang {
+        "go" => "main.go",
+        "cpp" => "main.cpp",
+        "python" => "main.py",
+        _ => "main.rs",
+    }
+}
+
 /// `users/<address>/attempts/<attempt_id>/` — the source as the player typed
 /// it, the two streams whole, and the verdict as JSON.
 pub fn write_to_disk(
@@ -113,11 +124,7 @@ pub fn write_to_disk(
 ) -> Result<()> {
     let dir = home.attempt_dir(&record.address, &record.id);
     ensure_dir(&dir)?;
-    let filename = if record.lang == "go" {
-        "main.go"
-    } else {
-        "main.rs"
-    };
+    let filename = source_filename(&record.lang);
     write_private(&dir.join(filename), record.source.as_bytes())?;
     write_private(&dir.join("stdout.txt"), stdout.as_bytes())?;
     write_private(&dir.join("stderr.txt"), stderr.as_bytes())?;

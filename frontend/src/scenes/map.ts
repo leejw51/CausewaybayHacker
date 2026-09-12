@@ -37,29 +37,37 @@ import {
   header,
   stars as drawStars,
   Buttons,
-  GO,
-  RUST,
+  landColour,
   footerH,
+  landName,
 } from "../ui/chrome";
 import { motionScale, reducedMotion, seconds, Tween } from "../engine/motion";
-import type { Category, Land, MapNode } from "../net/protocol";
+import { LANDS, type Category, type Land, type MapNode } from "../net/protocol";
 import { LandsScene } from "./lands";
 import { PlaygroundScene } from "./playground";
 import { QuestScene } from "./quest";
 import { AUX_BAR, openAux } from "../ui/auxnav";
-import { t } from "../i18n";
+import { locale, t } from "../i18n";
 import { NeonRail } from "../gfx/neon";
 
-/** The overworld art, per land. Two places, not one plate and a tint. */
-const PLATE: Record<Land, string> = { rust: "map_rust", go: "map_go" };
+/**
+ * The overworld art, per land. Rust and Go are two places, not one plate and a
+ * tint; C++ and Python reuse the rust plate under their own haze until they
+ * have a plate of their own (docs/art.md: the haze is what separates them).
+ */
+const PLATE: Record<Land, string> = {
+  rust: "map_rust",
+  go: "map_go",
+  cpp: "map_cpp",
+  python: "map_python",
+};
 
 /**
- * The six maps, laid out the way the switcher shows them: two lands across
+ * The twelve maps, laid out the way the switcher shows them: four lands across
  * three categories. The order is the order of the bar and the order the keys
- * cycle in, and there is one of each so the player can see all six places from
- * any one of them.
+ * cycle in (`LANDS` comes from the protocol so every screen agrees on it), and
+ * there is one of each so the player can see every place from any one of them.
  */
-const LANDS: readonly Land[] = ["rust", "go"];
 const CATEGORIES: readonly Category[] = ["basic", "advanced", "hacker"];
 
 /**
@@ -78,20 +86,28 @@ const LAST_AT = new Map<string, string>();
 const slot = (land: Land, category: Category): string => `${land}.${category}`;
 
 /**
- * The face at the end of each category, keyed by the quest it guards.
+ * The face at the end of each map, keyed by the map it closes.
  *
- * By quest id rather than by node number: the number is a position in a pack
- * and the art is a portrait of one specific antagonist. THE AUTOCOMPLETE is
- * node 12 of rust/basic today and the sprite should follow the quest if that
- * ever changes.
+ * By map rather than by quest id: the wire already says which node is the
+ * boss (`MapNode.kind === "boss"`, exactly one per map), and a quest id has
+ * its number baked in, so a table of ids went quietly stale the first time a
+ * pack was renumbered and the portraits simply stopped appearing. The art is
+ * still a portrait of one specific antagonist; that antagonist is whichever
+ * node the pack marks as the boss.
  */
 const BOSS: Record<string, string> = {
-  "rust.basic.12.traits": "boss_autocomplete",
-  "rust.advanced.10.deadlock": "boss_deadlock",
-  "rust.hacker.08.top-k": "boss_whiteboard",
-  "go.basic.12.nil-and-order": "boss_nullptr",
-  "go.advanced.10.race": "boss_race",
-  "go.hacker.08.kth-largest": "boss_clock",
+  "rust.basic": "boss_autocomplete",
+  "rust.advanced": "boss_deadlock",
+  "rust.hacker": "boss_whiteboard",
+  "go.basic": "boss_nullptr",
+  "go.advanced": "boss_race",
+  "go.hacker": "boss_clock",
+  "cpp.basic": "boss_segfault",
+  "cpp.advanced": "boss_dangling",
+  "cpp.hacker": "boss_linker",
+  "python.basic": "boss_none",
+  "python.advanced": "boss_gil",
+  "python.hacker": "boss_recursion",
 };
 
 /** Four scaled pixels, rounded — the gap between a label and its value. */
@@ -103,6 +119,8 @@ export class MapScene implements Scene {
   readonly name = "map";
   readonly mood = "map" as const;
   private nodes: MapNode[] = [];
+  /** The UI locale the nodes' titles were asked in; see `update`. */
+  private askedLocale: string | null = null;
   /** Pairs of quest ids (PROTOCOL §4.7), given so a client never infers them. */
   private edges: Array<[string, string]> = [];
   private selected = 0;
@@ -216,9 +234,13 @@ export class MapScene implements Scene {
 
   private async refresh(): Promise<void> {
     try {
+      // §4.7: titles in the UI language where a translation pack has them;
+      // each node says which language its title is in.
+      this.askedLocale = locale();
       const res = await this.app.client.request("world.map", {
         land: this.land,
         category: this.category,
+        locale: this.askedLocale,
       });
       const first = this.nodes.length === 0;
       this.nodes = res.nodes.slice().sort((a, b) => a.node - b.node);
@@ -249,6 +271,13 @@ export class MapScene implements Scene {
   }
 
   update(dt: number): void {
+    if (this.askedLocale !== null && this.askedLocale !== locale()) {
+      // F7 under an open map: the titles came from the server in the old
+      // language. `refresh` sets the guard before it awaits, so this fires
+      // once per change and not once per frame.
+      this.askedLocale = locale();
+      void this.refresh();
+    }
     this.neon.update(dt);
     this.t += dt;
     this.plateIn.update(dt);
@@ -342,7 +371,7 @@ export class MapScene implements Scene {
     return [
       ...LANDS.map((l) => ({
         id: `land:${l}`,
-        label: l === "rust" ? t("map.rust") : t("map.go"),
+        label: t(`map.${l}` as "map.rust"),
         lit: l === this.land,
         group: 0,
       })),
@@ -445,10 +474,11 @@ export class MapScene implements Scene {
   }
 
   /**
-   * RUST | GO and BASIC | ADVANCED | HACKER, across the top of the overworld.
+   * RUST | GO | C++ | PYTHON and BASIC | ADVANCED | HACKER, across the top of
+   * the overworld.
    *
-   * The lit land wears its own colour (the same orange and cyan the lands
-   * screen and the map haze use) rather than the generic gold, so "which land
+   * The lit land wears its own colour (the same orange, cyan, blue and gold
+   * the lands screen and the map haze use) rather than the generic gold, so "which land
    * am I in" is answered by a colour the player has already learnt; the lit
    * category is gold like every other selected thing in the game.
    */
@@ -467,7 +497,7 @@ export class MapScene implements Scene {
       const land = item.id.startsWith("land:") ? (item.id.slice(5) as Land) : null;
       if (land && item.lit) {
         // The one button `pixBtn` cannot draw: a face in the track's colour.
-        panel(g, x, y, w, h, land === "rust" ? RUST : GO);
+        panel(g, x, y, w, h, landColour(land));
         g.fillStyle = css(Theme.ink);
         printf(g, f, item.label, x, y + 8 + Math.floor((h - 8 - f.height) * 0.5), w, "center");
       } else {
@@ -803,7 +833,7 @@ export class MapScene implements Scene {
 
   draw(g: Ctx): void {
     const { layout } = this.app;
-    const accent = this.land === "rust" ? RUST : GO;
+    const accent = landColour(this.land);
     // The WebGL sky is already behind, so this clears rather than fills — but
     // only when there *is* one. Without WebGL the same call would leave the
     // map floating on the page background, so the app decides.
@@ -830,7 +860,7 @@ export class MapScene implements Scene {
     });
     g.restore();
 
-    header(g, this.app, `${this.land.toUpperCase()} · ${this.category.toUpperCase()}`);
+    header(g, this.app, `${landName(this.land)} · ${this.category.toUpperCase()}`);
     // Outside the plate's lift and alpha: the switcher is chrome, and chrome
     // that fades in with the ground reads as part of the ground.
     this.drawBar(g, Math.round(38 * s) + Math.round(8 * s));
@@ -1275,14 +1305,14 @@ export class MapScene implements Scene {
     fill(g, accent, x + 6, top + 8, Math.round(4 * s), h - Math.round(14 * s));
 
     const stampW = Math.round(96 * s);
-    const boss =
-      n.state === "cleared" ? null : (this.app.assets?.picture(BOSS[n.quest_id] ?? "") ?? null);
+    const bossArt = n.kind === "boss" ? (BOSS[slot(this.land, this.category)] ?? "") : "";
+    const boss = n.state === "cleared" ? null : (this.app.assets?.picture(bossArt) ?? null);
     const artW = n.state === "cleared" || boss ? stampW : 0;
     const textW = iw - artW - (artW ? Math.round(14 * s) : 0);
 
     if (boss) {
       const d = Math.min(h - Math.round(12 * s), Math.round(96 * s));
-      const box = this.app.assets?.box.get(BOSS[n.quest_id] ?? "");
+      const box = this.app.assets?.box.get(bossArt);
       const bs = d / boss.naturalHeight;
       const feet = box ? box.feet * bs : d;
       g.save();

@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
  * | `Ctrl/Cmd+Enter` | submit — the login field and the editor both. A bare Enter in either inserts a newline, deliberately, so a phrase pasted across two lines does not fire a login halfway through |
  * | `F1` | pin the orientation |
  * | `F3` | log out, from anywhere, including mid-quest |
- * | `←` `→` | lands: toggle RUST / GO. There is no way to *set* it |
+ * | `←` `→` | lands: cycle RUST / GO / C++ / PYTHON. `pickLand` clicks the land button instead |
  * | `←` `→` `↑` `↓` | map: move between nodes |
  * | `Enter` | map: open the selected node; result: back to the map |
  * | `Escape` | back one screen |
@@ -48,6 +48,10 @@ import { fileURLToPath } from "node:url";
 
 export const SCREENS = ["boot", "login", "lands", "map", "quest", "result"] as const;
 export type Screen = (typeof SCREENS)[number];
+
+/** The lands, in the order the lands screen draws them (`frontend/src/net/protocol.ts`). */
+export const LANDS = ["rust", "go", "cpp", "python"] as const;
+export type Land = (typeof LANDS)[number];
 
 /** `frontend/src/dev/capture.ts`, as much of it as this suite uses. */
 export interface CaptureApi {
@@ -300,8 +304,8 @@ export async function pickCategory(page: Page, category = "basic"): Promise<void
   await atScreen(page, "map");
 }
 
-/** Choose the land. `land:rust` / `land:go` — a click, not a blind toggle. */
-export async function pickLand(page: Page, land: "rust" | "go"): Promise<void> {
+/** Choose the land. `land:rust`, `land:cpp`, … — a click, not a blind toggle. */
+export async function pickLand(page: Page, land: Land): Promise<void> {
   await atScreen(page, "lands");
   await clickButton(page, `land:${land}`);
 }
@@ -346,7 +350,7 @@ export async function editorText(page: Page): Promise<string> {
  * Which quest did the UI just open?
  *
  * The scan in `pickFirstCategory` clicks its way across the lands plate, and
- * some of those clicks land on the **land** buttons, which toggle RUST/GO.
+ * some of those clicks land on the **land** buttons, which change the land.
  * Nothing on the page reports the current land, so the scan can arrive at a
  * perfectly good map of the wrong land — and the symptom, before this
  * existed, was a submission to `go.basic.01.package-main` while the test
@@ -390,12 +394,12 @@ export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string 
   // first and the search stops at the first match.
   //
   // This used to skip `locked` nodes, which kept the search short by
-  // accident. §4.7 made every node playable, so without a cap this walks all
-  // 116 quests in both lands — 116 round trips per attempt, four attempts per
-  // test — and the test times out rather than failing on anything real. That
-  // is what it did.
-  const isGo = /^package\s+main\b/m.test(shown);
-  const lands = isGo ? (["go"] as const) : (["rust"] as const);
+  // accident. §4.7 made every node playable, so without a cap this walks
+  // every quest in every land — hundreds of round trips per attempt, four
+  // attempts per test — and the test times out rather than failing on
+  // anything real. That is what it did.
+  const guess = landOfStarter(shown);
+  const lands: readonly Land[] = guess ? [guess] : LANDS;
   const LOOK_AT = 8;
   for (const land of lands) {
     const nodes = (await wire.mapOf(land)).sort((a, b) => a.node - b.node).slice(0, LOOK_AT);
@@ -407,9 +411,21 @@ export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string 
   }
   // No exact match within the first few nodes. The language is still a
   // strong signal, and for the retry loop — which only needs to know whether
-  // to flip the land — that is enough.
-  if (isGo) return "go.unknown";
-  if (/\bfn\s+main\s*\(/.test(shown)) return "rust.unknown";
+  // to change the land — that is enough.
+  return guess ? `${guess}.unknown` : null;
+}
+
+/**
+ * Which land a starter belongs to, from its shape alone. Each language has one
+ * line no other language's `main` would carry, and a `package main` or an
+ * `#include` is checked before Python's much vaguer `print(` so a C++ starter
+ * that prints is not mistaken for a Python one.
+ */
+function landOfStarter(src: string): Land | null {
+  if (/^package\s+main\b/m.test(src)) return "go";
+  if (/^#include\b/m.test(src)) return "cpp";
+  if (/\bfn\s+main\s*\(/.test(src)) return "rust";
+  if (/^(def |import |from |print\()/m.test(src)) return "python";
   return null;
 }
 
@@ -581,7 +597,7 @@ export class Wire {
     return this.mapOf("rust");
   }
 
-  async mapOf(land: "rust" | "go", category = "basic"): Promise<MapNode[]> {
+  async mapOf(land: Land, category = "basic"): Promise<MapNode[]> {
     const p = await this.ok("world.map", { land, category });
     return (p.nodes ?? []) as MapNode[];
   }

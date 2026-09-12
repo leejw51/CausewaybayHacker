@@ -1,0 +1,408 @@
+-- The edit stack: the three rules that decide whether a button is live, the
+-- one rule that decides what text an undo puts in the editor, and the five
+-- messages that carry all of it.
+--
+-- Headless, because `src/net/edits.lua` and `src/editor.lua` are both
+-- LÖVE-free — which is the whole reason the decisions live there rather than
+-- in the scene. What cannot be asserted without a window is the geometry of
+-- the three buttons, and that case is guarded and runs under `make test`.
+
+local T = require("tests.framework")
+local Edits = require("src.net.edits")
+local Editor = require("src.editor")
+
+--- A session that answers whatever the test tells it to and remembers every
+--- request it was given. The real one is `src/session.lua`; all this half of
+--- the client needs from it is `request(type, payload, cb)`.
+local function fake_session(answer)
+  local self = { sent = {} }
+  function self:request(type_name, payload, cb)
+    self.sent[#self.sent + 1] = { type = type_name, payload = payload }
+    local ok, reply, why = answer(type_name, payload)
+    if cb then cb(ok, reply, why) end
+    return "c-" .. #self.sent
+  end
+  return self
+end
+
+--- An `EditState` as the server sends it, for the cases that only care about
+--- the two numbers.
+local function state(cursor, depth, source)
+  return { quest_id = "q", cursor = cursor, depth = depth, source = source }
+end
+
+return function()
+  T.section("the edit stack — what each button is allowed to do")
+
+  T.case("the module never touches love", function()
+    -- `src/net/*` is in the Makefile's LAYERED list, which is what lets this
+    -- whole suite run without a window.
+    T.no_love("src/net/edits.lua")
+  end)
+
+  T.case("UNDO, REDO and CLEAR are decided by the cursor and the depth", function()
+    -- PROTOCOL: `can_undo` is `cursor > 0` and `can_redo` is `cursor < depth`.
+    -- Derived here rather than read off the payload so that the caption
+    -- `stack 3/5` and the greyness of the button beside it cannot come to
+    -- different conclusions about the same two numbers.
+    local rows = {
+      -- cursor depth  undo   redo   clear
+      { 0, 0, false, false, false },  -- nothing has happened yet
+      { 1, 1, true,  false, true  },  -- one edit, nothing to redo
+      { 0, 3, false, true,  true  },  -- undone all the way to the starter
+      { 2, 3, true,  true,  true  },  -- in the middle of the history
+      { 3, 3, true,  false, true  },  -- at the top
+    }
+    for _, r in ipairs(rows) do
+      local s = state(r[1], r[2])
+      local tag = ("cursor %d of %d"):format(r[1], r[2])
+      T.eq(Edits.can_undo(s), r[3], tag .. ": undo")
+      T.eq(Edits.can_redo(s), r[4], tag .. ": redo")
+      T.eq(Edits.can_clear(s), r[5], tag .. ": clear")
+    end
+  end)
+
+  T.case("no state at all greys all three, which is the degradation", function()
+    -- A server that has never heard of `edit.*` answers an error, the scene
+    -- keeps `nil`, and the quest screen goes on working. Every predicate has
+    -- to say `false` for that, and for anything else that is not a state.
+    for _, nothing in ipairs({ "nil", "a string", 7, true }) do
+      local s = nothing ~= "nil" and nothing or nil
+      T.eq(Edits.can_undo(s), false)
+      T.eq(Edits.can_redo(s), false)
+      T.eq(Edits.can_clear(s), false)
+    end
+    T.eq(Edits.can_undo(nil), false)
+    T.eq(Edits.can_redo(nil), false)
+    T.eq(Edits.can_clear(nil), false)
+  end)
+
+  T.case("a reply is clamped rather than believed", function()
+    local s = Edits.normalize({ quest_id = "q", cursor = 9, depth = 3, source = "x" })
+    T.eq(s.cursor, 3, "a cursor past the top of the stack is the top")
+    T.eq(s.depth, 3)
+    T.eq(s.source, "x")
+    local empty = Edits.normalize({})
+    T.eq(empty.cursor, 0)
+    T.eq(empty.depth, 0)
+    T.eq(empty.source, nil)
+    T.eq(empty.quest_id, nil)
+    -- Not a table is not a state: "the server has not answered" and "the
+    -- stack is empty" must stay distinguishable, because the first greys
+    -- three buttons and the second greys two.
+    T.eq(Edits.normalize(nil), nil)
+    T.eq(Edits.normalize("{}"), nil)
+  end)
+
+  T.section("the edit stack — what an undo puts in the editor")
+
+  T.case("undo and redo replace the editor's text with what came back", function()
+    local ed = Editor.new({ text = "fn main() { the player's own code }" })
+    -- Undo: the entry the cursor moved back to.
+    ed:replace_all(Edits.text_for(state(1, 2, "fn main() { an earlier draft }"), "STARTER"))
+    T.eq(ed:text(), "fn main() { an earlier draft }")
+    -- Redo: forward again, to the entry the tail still holds.
+    ed:replace_all(Edits.text_for(state(2, 2, "fn main() { the player's own code }"), "STARTER"))
+    T.eq(ed:text(), "fn main() { the player's own code }")
+    -- And `replace_all` is one undo step, which is what makes the editor's
+    -- own ctrl-Z enough protection for a button that rewrites the buffer.
+    ed:undo()
+    T.eq(ed:text(), "fn main() { an earlier draft }")
+  end)
+
+  T.case("the bottom of the stack is the starter, not an empty buffer", function()
+    -- `source: null` on the wire — already `nil` by the time a scene sees it,
+    -- because `src/net/client.lua` strips the sentinel — means the cursor is
+    -- at the bottom and nothing has been applied.
+    local ed = Editor.new({ text = "whatever was typed" })
+    ed:replace_all(Edits.text_for(state(0, 2, nil), "fn main() {}"))
+    T.eq(ed:text(), "fn main() {}")
+    -- An **empty** entry is still an entry: somebody who cleared the buffer
+    -- and pressed RUN gets an empty buffer back, not the starter.
+    T.eq(Edits.text_for(state(1, 1, ""), "fn main() {}"), "")
+    -- And a quest with no starter either is an empty buffer rather than a
+    -- crash inside a draw call.
+    T.eq(Edits.text_for(state(0, 0, nil), nil), "")
+    T.eq(Edits.text_for(nil, "fn main() {}"), "fn main() {}")
+  end)
+
+  T.section("the edit stack — the five messages")
+
+  T.case("each call sends its own type, with the quest id", function()
+    local reply = { quest_id = "q1", cursor = 2, depth = 2, source = "s" }
+    local session = fake_session(function() return true, reply end)
+    local seen = {}
+    local function keep(ok, st) seen[#seen + 1] = { ok = ok, state = st } end
+
+    Edits.state(session, "q1", keep)
+    Edits.undo(session, "q1", keep)
+    Edits.redo(session, "q1", keep)
+    Edits.clear(session, "q1", keep)
+    Edits.push(session, "q1", "fn main() {}", keep)
+
+    local types = {}
+    for i, entry in ipairs(session.sent) do
+      types[i] = entry.type
+      T.eq(entry.payload.quest_id, "q1", entry.type .. " carries the quest id")
+    end
+    T.same(types, { "edit.state", "edit.undo", "edit.redo", "edit.clear", "edit.push" })
+    -- Only the push carries a source; the other four are a quest id and
+    -- nothing else, and every one of the five answers the whole state.
+    T.eq(session.sent[5].payload.source, "fn main() {}")
+    T.eq(session.sent[1].payload.source, nil)
+    T.eq(#seen, 5)
+    for _, entry in ipairs(seen) do
+      T.eq(entry.ok, true)
+      T.eq(entry.state.cursor, 2)
+      T.eq(entry.state.depth, 2)
+    end
+  end)
+
+  T.case("a failure hands back no state, and says whether the feature exists", function()
+    local session = fake_session(function()
+      return false, { code = "not_found" }, { player = "Not here yet." }
+    end)
+    local got
+    Edits.undo(session, "q1", function(ok, st, payload, why)
+      got = { ok = ok, state = st, payload = payload, why = why }
+    end)
+    T.eq(got.ok, false)
+    T.eq(got.state, nil, "nothing to draw, so the buttons stay grey")
+    T.eq(Edits.unsupported(got.payload), true)
+    T.eq(got.why.player, "Not here yet.")
+    -- A server that is there but broke is **not** a server without the
+    -- feature: greying the buttons for the rest of the visit would be the
+    -- wrong answer to a hiccup.
+    T.eq(Edits.unsupported({ code = "internal" }), false)
+    T.eq(Edits.unsupported({ code = "rate_limited" }), false)
+    T.eq(Edits.unsupported(nil), false)
+  end)
+
+  T.case("no session at all is an error, not a crash", function()
+    -- The scene calls these from a callback that may outlive the screen.
+    local got
+    Edits.state(nil, "q1", function(ok, st, payload) got = { ok, st, payload } end)
+    T.eq(got[1], false)
+    T.eq(got[2], nil)
+    T.eq(got[3].code, "internal")
+  end)
+
+  T.section("the edit stack — how the quest screen is wired to it")
+
+  --- The house's own pattern for asserting a scene it cannot load headlessly:
+  --- read the source, with comments stripped so a sentence about a rule is
+  --- never mistaken for the rule.
+  local function code_of(path)
+    local fh = io.open(path, "r")
+    if not fh then return nil end
+    local body = fh:read("*a")
+    fh:close()
+    body = body:gsub("%-%-%[%[.-%]%]", " ")
+    local out = {}
+    for line in (body .. "\n"):gmatch("(.-)\n") do
+      out[#out + 1] = line:gsub("%-%-.*$", "")
+    end
+    return table.concat(out, "\n")
+  end
+
+  T.case("the screen asks once on open, and pushes at the moments that mean something", function()
+    local code = code_of("src/scenes/quest.lua")
+    if not code then
+      T.skip("src/scenes/quest.lua", "not readable from this working directory")
+      return
+    end
+    -- `true` is `adopt`: the stack wins over the draft on open (PROTOCOL
+    -- §4.11c), because the idle push puts typing on the stack that a draft —
+    -- a read of the last attempt — never sees. Asserted with the argument, so
+    -- dropping it silently cannot pass.
+    T.ok(code:find("self:edit_ask(Edits.state, true)", 1, true) ~= nil,
+      "the stack is asked for when the quest screen opens, and adopted")
+    -- In `enter` and not in `refresh`: `refresh` fires again on every
+    -- language change, and the stack is the same bytes in every language.
+    local enter = code:match("function Quest:enter%(params%).-\nend")
+    T.ok(enter ~= nil and enter:find("edit_ask(Edits.state, true)", 1, true) ~= nil,
+      "asked from `enter`")
+    local refresh = code:match("function Quest:refresh%(%).-\nend")
+    T.ok(refresh ~= nil and refresh:find("edit_ask", 1, true) == nil,
+      "and not from `refresh`, which re-fires on every language change")
+    -- RUN and SUBMIT are the two moments the buffer already leaves the
+    -- machine, so they are the two moments a stack step is unambiguous.
+    local execute = code:match("function Quest:execute%(mode%).-\nend")
+    T.ok(execute ~= nil and execute:find("self:edit_push()", 1, true) ~= nil,
+      "a run and a submit each put the buffer on the stack")
+  end)
+
+  T.case("a reply can never provoke a push of its own text", function()
+    local code = code_of("src/scenes/quest.lua")
+    if not code then return end
+    -- The bug this guards: undo replaces the buffer, which bumps the
+    -- editor's revision, which the idle timer reads as typing — and a push
+    -- truncates the redo tail. One undo, a pause, and redo is gone for good.
+    local tick = code:match("function Quest:tick_stack%(dt%).-\nend")
+    T.ok(tick ~= nil, "the idle push is one function")
+    tick = tick or ""
+    T.ok(tick:find("rev == self.edit_rev", 1, true) ~= nil,
+      "the timer compares against the revision the last reply left behind")
+    T.ok(tick:find("Quest.PUSH_IDLE_S", 1, true) ~= nil,
+      "and only fires once the typing has actually stopped")
+    for _, fn in ipairs({ "edit_reply", "adopt_stack_text" }) do
+      local body = code:match("function Quest:" .. fn .. "%b().-\nend")
+      T.ok(body ~= nil and body:find("self.edit_rev = ", 1, true) ~= nil,
+        fn .. " records the revision it leaves behind")
+    end
+  end)
+
+  T.case("undo and redo go through replace_all, and the starter rule is shared", function()
+    local code = code_of("src/scenes/quest.lua")
+    if not code then return end
+    T.ok(code:find("editor:replace_all(Edits.text_for(state, starter))", 1, true) ~= nil,
+      "one undo step, and the null-means-starter rule is `src/net/edits.lua`'s")
+    local adopt = code:match("function Quest:adopt_stack_text%(state%).-\nend") or ""
+    T.nope(adopt:find("editor:set_text", 1, true),
+      "set_text would drop the entry that makes the editor's own ctrl-Z enough")
+    T.ok(code:find("self:edit_ask(Edits.undo, true)", 1, true) ~= nil, "UNDO adopts the text")
+    T.ok(code:find("self:edit_ask(Edits.redo, true)", 1, true) ~= nil, "REDO adopts the text")
+    -- Clearing a history is not an edit, so it leaves the buffer alone.
+    T.ok(code:find("self:edit_ask(Edits.clear, false,", 1, true) ~= nil,
+      "CLEAR keeps whatever text the editor is showing")
+    -- And says so only once the server has agreed, the way SOLVE takes its
+    -- hint counter from the payload rather than guessing it.
+    local clear = code:match("function Quest:stack_clear%(%).-\nend") or ""
+    T.ok(clear:find('function() self.stack_note = "cleared" end', 1, true) ~= nil,
+      "the note is set from the reply, not before it")
+  end)
+
+  T.case("the buttons and their captions read the same two numbers", function()
+    local code = code_of("src/scenes/quest.lua")
+    if not code then return end
+    for _, call in ipairs({ "Edits.can_undo(stack)", "Edits.can_redo(stack)",
+                            "Edits.can_clear(stack)" }) do
+      T.ok(code:find(call, 1, true) ~= nil, call .. " decides the button")
+    end
+    -- A missing stack greys them without touching `self.error`, which is the
+    -- brief pane's red band: a node whose history is unavailable is not a
+    -- node that failed to load.
+    local reply = code:match("function Quest:edit_reply%b().-\nend") or ""
+    T.ok(reply:find("Edits.unsupported(payload)", 1, true) ~= nil,
+      "an unbuilt feature is branched on, not lumped in with errors")
+    T.nope(reply:find("self.error", 1, true),
+      "and never lands in the brief pane's failure register")
+  end)
+
+  T.case("the stack's keys do not take the editor's own ctrl-Z away", function()
+    local code = code_of("src/scenes/quest.lua")
+    if not code then return end
+    -- `src/editor.lua` keeps the fine-grained history — one keystroke — and
+    -- the server keeps the coarse one. Inside the editor the chord stays the
+    -- editor's; on the brief, where the editor has no claim on it, it drives
+    -- the server's stack. The browser client draws the same line around
+    -- CodeMirror.
+    T.ok(code:find('key == "z" and self.focus ~= "editor"', 1, true) ~= nil,
+      "ctrl-Z drives the server's stack only where the editor does not want it")
+    -- SHIFT-F6 beside F6's reset, and the chord tested first so the bare key
+    -- still restores the starter.
+    local chord = code:find('key == "f6" and mods.shift', 1, true)
+    local reset = code:find('key == "f6" then self:reset', 1, true)
+    T.ok(chord ~= nil and reset ~= nil and chord < reset,
+      "SHIFT-F6 clears the stack; plain F6 still restores the starter")
+  end)
+
+  T.case("one dropped frame does not take the feature away for the visit", function()
+    -- The whole point of this test: `edit.state` is asked exactly once, when
+    -- the screen opens. A socket caught mid-reconnect answers
+    -- `internal: not connected` the instant it is asked, and a screen that
+    -- threw its state away on that would grey three working buttons for the
+    -- rest of the visit — and never push again, because the idle timer bails
+    -- when there is no state. Only `not_found` and `unavailable` are
+    -- permanent, because only they mean the feature is not there.
+    local Quest = require("src.scenes.quest")
+    local scene = setmetatable({ editor = Editor.new({ text = "x" }) },
+      { __index = Quest })
+    scene.edit = Edits.normalize({ quest_id = "q", cursor = 2, depth = 3 })
+
+    scene:edit_reply(false, nil, { code = "internal" }, { player = "Something broke." })
+    T.nope(scene.edit_unsupported, "a hiccup is not a missing feature")
+    T.ok(Edits.can_undo(scene.edit), "and the buttons the server said were live stay live")
+    T.eq(scene.edit_busy, false, "the slot is free for the next press")
+    T.eq(scene.stack_note, "Something broke.", "with the reason on screen")
+
+    scene:edit_reply(false, nil, { code = "not_found" }, { player = "Not here yet." })
+    T.eq(scene.edit_unsupported, true, "a server without the feature is permanent")
+    T.eq(scene.edit, nil)
+    T.eq(Edits.can_undo(scene.edit), false, "and all three go grey")
+  end)
+
+  T.section("the edit stack — the three buttons on the screen")
+
+  T.case("the stack's cluster stands inside the well, clear of everything else", function()
+    if not (love and love.graphics) then
+      T.skip("the stack's buttons", "needs fonts, so needs LÖVE")
+      return
+    end
+    local Layout = require("src.layout")
+    local Quest = require("src.scenes.quest")
+    local was_font, was_mode, was_vw, was_vh = Layout.font, Layout.mode, Layout.vw, Layout.vh
+    local app = { session = { authed = true }, land = "go", category = "basic" }
+    local I18n = require("src.i18n")
+    local was_lang = I18n.lang
+    for _, lang in ipairs(I18n.LANGS) do
+      I18n.set(lang)
+      for _, step in ipairs({ 1, 2, 4 }) do
+        Layout.font = step
+        for _, shape in ipairs({ { "landscape", 1280, 720 }, { "portrait", 720, 1280 },
+                                 { "portrait", 720, 1000 } }) do
+          Layout.mode, Layout.vw, Layout.vh = shape[1], shape[2], shape[3]
+          local q = Quest.new(app)
+          q.quest = { id = "x", land = "go", tests = { visible = {}, hidden_count = 2 } }
+          local _, well = q:panes()
+          local b = q:button_band(well)
+          local tag = ("%s step %d %s %dx%d"):format(lang, step, shape[1], shape[2], shape[3])
+          -- Inside the well, across and down.
+          T.ok(b.ux >= well.x, tag .. ": the cluster starts inside the well")
+          T.ok(b.clx + b.cw <= well.x + well.w, tag .. ": and ends inside it")
+          T.ok(b.uy >= well.y and b.uy + b.bh <= well.y + well.h,
+            tag .. ": and stands on a row of the well")
+          -- The three do not overlap each other.
+          T.ok(b.rdx >= b.ux + b.uw, tag .. ": REDO is clear of UNDO")
+          T.ok(b.clx >= b.rdx + b.rw, tag .. ": CLEAR is clear of REDO")
+          -- Nor the buffer pair, on whichever row each of them ended up on.
+          if b.uy == b.ly then
+            T.ok(b.ux >= b.fx + b.fw, tag .. ": sharing a row, it starts past FORMAT")
+          end
+          -- **Never over RUN or SUBMIT.** Reaching for the reflex button must
+          -- not land on a control that rewrites the buffer.
+          if b.uy == b.by then
+            T.ok(b.clx + b.cw <= b.rx, tag .. ": on the button row, it stops short of RUN")
+          end
+          -- And the band never takes more of the well than the code has.
+          T.ok(b.reserve <= well.h * 0.6 + b.bh,
+            tag .. ": the band leaves the well to the code, reserve " .. b.reserve)
+          -- The console, with the note plate up over it. Both are laid out
+          -- from the same `band_top`, so a note is the one thing that can
+          -- squeeze the log — and **this screen already has that limit**: at
+          -- the largest type step in a 720 px window, SOLVE's four-line
+          -- aftermath leaves the console no row either. That is a pre-existing
+          -- property of the note plate and not this round's to fix, so what is
+          -- asserted is the thing that is actually in this round's gift: the
+          -- confirmation must cost the log **no more** than the sentence that
+          -- was already here, and the console must stay in the well whatever
+          -- is on the plate.
+          q.run_attempt = { verdict = "compile_error", tests_passed = 0, tests_total = 1 }
+          q.show_log = true
+          q.edit = { quest_id = "x", cursor = 1, depth = 1 }
+          q.solve_note = "solved"
+          local was = q:console_rect(well, b)
+          q.solve_note, q.stack_note = nil, "confirm"
+          local c = q:console_rect(well, b)
+          T.ok(c.log_rows >= was.log_rows,
+            tag .. ": the confirmation costs the log no more than SOLVE's note ("
+              .. c.log_rows .. " vs " .. was.log_rows .. ")")
+          T.ok(c.open and c.y >= well.y and c.y + c.h <= Quest.band_top(b),
+            tag .. ": and the console stays inside the well, above the band")
+        end
+      end
+    end
+    I18n.set(was_lang)
+    Layout.font, Layout.mode, Layout.vw, Layout.vh = was_font, was_mode, was_vw, was_vh
+  end)
+end

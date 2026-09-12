@@ -355,6 +355,15 @@ async fn dispatch(
         "quest.hint" => handlers::quest_hint(state, session, payload),
         "quest.solve" => handlers::quest_solve(state, session, payload),
         "quest.reset" => handlers::quest_reset(state, session, payload),
+        // The edit stack (PROTOCOL §4.11c). None of the five compiles anything,
+        // so they stay on this synchronous path beside `quest.hint`: each is a
+        // handful of rows and at most one 256 KiB file, and putting them on the
+        // execution slot would mean an UNDO answered `busy` while a submit runs.
+        "edit.state" => handlers::edit_state(state, session, payload),
+        "edit.push" => handlers::edit_push(state, session, payload),
+        "edit.undo" => handlers::edit_undo(state, session, payload),
+        "edit.redo" => handlers::edit_redo(state, session, payload),
+        "edit.clear" => handlers::edit_clear(state, session, payload),
         "stats.summary" => handlers::stats_summary(state, session),
         "stats.mistakes" => handlers::stats_mistakes(state, session, payload),
         "stats.history" => handlers::stats_history(state, session, payload),

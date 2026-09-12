@@ -28,8 +28,10 @@ fn lang_for_path(path: &Path) -> Result<&'static str> {
     match path.extension().and_then(|e| e.to_str()) {
         Some("rs") => Ok("rust"),
         Some("go") => Ok("go"),
+        Some("cpp") => Ok("cpp"),
+        Some("py") => Ok("python"),
         _ => Err(error::usage(format!(
-            "cannot tell what language {} is; the playground takes a .rs or a .go file",
+            "cannot tell what language {} is; the playground takes a .rs, .go, .cpp or .py file",
             path.display()
         ))),
     }

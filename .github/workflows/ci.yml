@@ -4,8 +4,11 @@
 # its own job and fails separately:
 #
 #   backend   the Rust workspace (core, runner, server, cli) — fmt, clippy, tests.
-#             The runner tests compile and run real Rust and Go programs, so
-#             both toolchains are installed even though only Rust is built.
+#             The runner tests compile and run real Rust, Go, C++ and Python
+#             programs, so all four toolchains are present even though only
+#             Rust is built: Go and Python are installed, and the C++ compiler
+#             is the one ubuntu-24.04 ships (g++ 13); only clang-format, which
+#             the C++ format tests need, has to be added by hand.
 #   cli       the terminal client, its own crate with its own conformance suite.
 #   frontend  tsc, vitest, and the production build the server ships.
 #   love2d    the LÖVE client: the key library (Rust), the headless suite under
@@ -58,6 +61,14 @@ env:
   RUST_TOOLCHAIN: "1.97.1"
   # What the runner hands submitted Go programs to; matches `make doctor`.
   GO_VERSION: "1.27"
+  # What the runner hands submitted Python programs to (SPEC §5.1 needs 3.10+;
+  # this is the version development happens on).
+  PYTHON_VERSION: "3.13"
+  # The C++ compiler is not installed but pinned by the runner image: `c++`
+  # on ubuntu-24.04 is g++ 13, which has all of C++20 the quests use. This
+  # records the expectation so a runner-image bump that changes it is a
+  # deliberate edit here, not a surprise in a fixture diff.
+  CXX_EXPECTED: "g++ (Ubuntu 13"
   NODE_VERSION: "24"
 
 jobs:
@@ -93,6 +104,22 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
+
+      # The runner also hands programs to `c++` and `python3`. The compiler is
+      # the image's own (pinned above by expectation, checked here); Python
+      # is installed to the version the fixtures were captured with; and
+      # clang-format is the one piece the image does not carry, needed by
+      # the C++ `code.format` tests.
+      - name: Check the image's C++ compiler and install clang-format
+        run: |
+          c++ --version | head -1
+          c++ --version | head -1 | grep -F "$CXX_EXPECTED"
+          sudo apt-get update -q && sudo apt-get install -y -q clang-format
+          clang-format --version
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -202,12 +229,29 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
-      # The sweep RUNs a Go program, so the server needs Go to compile it.
+      # The sweep RUNs a program in every land, so the server needs Go to
+      # compile the Go one, and `c++` and `python3` for the other two.
       - name: Install Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
+
+      # The runner also hands programs to `c++` and `python3`. The compiler is
+      # the image's own (pinned above by expectation, checked here); Python
+      # is installed to the version the fixtures were captured with; and
+      # clang-format is the one piece the image does not carry, needed by
+      # the C++ `code.format` tests.
+      - name: Check the image's C++ compiler and install clang-format
+        run: |
+          c++ --version | head -1
+          c++ --version | head -1 | grep -F "$CXX_EXPECTED"
+          sudo apt-get update -q && sudo apt-get install -y -q clang-format
+          clang-format --version
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -292,9 +336,21 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: false
 
+      # The runner also hands programs to `c++` and `python3`. The compiler is
+      # the image's own (pinned above by expectation, checked here); Python
+      # is installed to the version the fixtures were captured with; and
+      # clang-format is the one piece the image does not carry, needed by
+      # the C++ `code.format` tests.
+      - name: Check the image's C++ compiler and install clang-format
+        run: |
+          c++ --version | head -1
+          c++ --version | head -1 | grep -F "$CXX_EXPECTED"
+          sudo apt-get update -q && sudo apt-get install -y -q clang-format
+          clang-format --version
+
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       # The data-race fixture is checked with `go run -race`, and the first
       # `-race` build on a fresh runner instruments the standard library from
@@ -346,6 +402,26 @@ jobs:
           python3 tests/content/verify_pack.py --complete
           content/rust/basic.toml content/rust/advanced.toml content/rust/hacker.toml
           content/go/basic.toml content/go/advanced.toml content/go/hacker.toml
+          content/cpp/basic.toml content/cpp/advanced.toml content/cpp/hacker.toml
+          content/python/basic.toml content/python/advanced.toml content/python/hacker.toml
+
+      # Every translation file under content/i18n/<locale>/ that EXISTS keeps
+      # every rule of SPEC §12.1: real quest ids, matching hint counts, '''
+      # strings, and the English brief's fenced code blocks verbatim. A
+      # language nobody has started yet is reported, not failed.
+      #
+      # That split is deliberate. Translating 207 quests into five languages
+      # is incremental, and a gate that only goes green on the last one is red
+      # for months and so tells nobody anything — while the defects that
+      # actually matter (a half-written file left by an interrupted session, a
+      # hint dropped so every later hint is off by one) are exactly the ones
+      # this catches today. `--require-complete` is for the final sweep.
+      #
+      # `content/i18n` is a directory of translations, not a pack, so the
+      # packs are named land by land rather than with `content/*/*.toml`.
+      - run: >
+          python3 tests/content/verify_pack.py --i18n
+          content/rust/*.toml content/go/*.toml content/cpp/*.toml content/python/*.toml
 
   # A dry run of the server tarball, on every push and pull request. It is the
   # whole release path minus signing: the frontend and both binaries are

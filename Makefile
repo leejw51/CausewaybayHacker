@@ -330,6 +330,9 @@ package-love: ## just the .love archive (any platform with zip)
 doctor: ## check the toolchains and the server's own view of things
 	@command -v cargo >/dev/null && cargo --version   || echo "MISSING: rust   — https://rustup.rs"
 	@command -v go    >/dev/null && go version        || echo "MISSING: go     — needed for the go land"
+	@command -v c++   >/dev/null && c++ --version | head -1 || echo "MISSING: c++    — needed for the cpp land (clang or gcc)"
+	@command -v python3 >/dev/null && python3 --version || echo "MISSING: python3 — needed for the python land (3.10+)"
+	@command -v clang-format >/dev/null && clang-format --version || echo "no clang-format on PATH — optional; the cpp land has no fmt without it"
 	@command -v node  >/dev/null && node --version    || echo "MISSING: node   — needed for the browser client"
 	@command -v love  >/dev/null && love --version    || echo "no love on PATH — 'make -C love2d love-bin' fetches it"
 	@test -x $(BACK_BIN) && CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) $(BACK_BIN) doctor \

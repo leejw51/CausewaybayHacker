@@ -445,3 +445,519 @@ fn e0373_is_a_lifetime_lesson() {
     );
     assert_eq!(kinds(&closure_outlives), vec!["lifetime".to_string()]);
 }
+
+// ---------------------------------------------------------------------------
+// C++ (SPEC §7.1's third column)
+// ---------------------------------------------------------------------------
+
+/// clang's wordings and gcc's, side by side: the kind must not depend on
+/// which driver `c++` turned out to be.
+#[test]
+fn every_cpp_row_of_the_table_maps_for_both_compilers() {
+    for (message, level, kind, code) in [
+        (
+            "use of undeclared identifier 'tolal'",
+            "error",
+            "unknown-name",
+            "cpp:undeclared-identifier",
+        ),
+        (
+            "'tolal' was not declared in this scope",
+            "error",
+            "unknown-name",
+            "cpp:undeclared-identifier",
+        ),
+        (
+            "unknown type name 'strng'",
+            "error",
+            "unknown-name",
+            "cpp:undeclared-identifier",
+        ),
+        (
+            "'strng' does not name a type",
+            "error",
+            "unknown-name",
+            "cpp:undeclared-identifier",
+        ),
+        (
+            "no member named 'size' in 'Stall'",
+            "error",
+            "unknown-name",
+            "cpp:undeclared-identifier",
+        ),
+        (
+            "no matching function for call to 'total'",
+            "error",
+            "type-mismatch",
+            "cpp:no-matching-function",
+        ),
+        (
+            "no matching member function for call to 'push_back'",
+            "error",
+            "type-mismatch",
+            "cpp:no-matching-function",
+        ),
+        (
+            "no match for 'operator+' (operand types are 'Stall' and 'int')",
+            "error",
+            "type-mismatch",
+            "cpp:no-matching-function",
+        ),
+        (
+            "no viable conversion from 'int' to 'std::string'",
+            "error",
+            "type-mismatch",
+            "cpp:cannot-convert",
+        ),
+        (
+            "cannot convert 'int' to 'std::string' in initialization",
+            "error",
+            "type-mismatch",
+            "cpp:cannot-convert",
+        ),
+        (
+            "cannot initialize a variable of type 'int' with an lvalue of type 'const char[3]'",
+            "error",
+            "type-mismatch",
+            "cpp:cannot-convert",
+        ),
+        (
+            "invalid conversion from 'const char*' to 'int'",
+            "error",
+            "type-mismatch",
+            "cpp:cannot-convert",
+        ),
+        (
+            "expected ';' after expression",
+            "error",
+            "syntax",
+            "cpp:expected-token",
+        ),
+        (
+            "expected '}' at end of input",
+            "error",
+            "syntax",
+            "cpp:expected-token",
+        ),
+        (
+            "expected primary-expression before ')' token",
+            "error",
+            "syntax",
+            "cpp:expected-token",
+        ),
+        (
+            "missing terminating \" character",
+            "error",
+            "syntax",
+            "cpp:expected-token",
+        ),
+        (
+            "cannot assign to variable 'c' with const-qualified type 'const int'",
+            "error",
+            "mutability",
+            "cpp:const-discard",
+        ),
+        (
+            "assignment of read-only variable 'c'",
+            "error",
+            "mutability",
+            "cpp:const-discard",
+        ),
+        (
+            "passing 'const Stall' as 'this' argument discards qualifiers",
+            "error",
+            "mutability",
+            "cpp:const-discard",
+        ),
+        (
+            "cannot bind non-const lvalue reference of type 'int&' to an rvalue of type 'int'",
+            "error",
+            "mutability",
+            "cpp:const-discard",
+        ),
+        (
+            "unused variable 'unused'",
+            "warning",
+            "unused",
+            "cpp:unused",
+        ),
+        (
+            "variable 'n' set but not used",
+            "warning",
+            "unused",
+            "cpp:unused",
+        ),
+        (
+            "'a' used after it was moved",
+            "warning",
+            "borrow-after-move",
+            "cpp:use-after-move",
+        ),
+        (
+            "invalid use of moved-from object",
+            "error",
+            "borrow-after-move",
+            "cpp:use-after-move",
+        ),
+    ] {
+        assert_eq!(
+            mistakes::cpp_kind(message, level),
+            (kind, code),
+            "{message:?} should be {kind}/{code}"
+        );
+    }
+}
+
+#[test]
+fn a_cpp_diagnostic_keeps_its_location_and_the_notes_are_not_mistakes() {
+    // What clang prints for one bad `push_back`: the error, the source echo,
+    // the caret, two notes from inside <vector>, and the trailer.
+    let stderr = "\
+main.cpp:9:27: error: no matching member function for call to 'push_back'
+    9 |     std::vector<int> v; v.push_back(\"x\");
+      |                         ~~^~~~~~~~~
+/usr/include/c++/v1/__vector/vector.h:455:60: note: candidate function not viable: no known conversion from 'const char[2]' to 'const value_type' (aka 'const int') for 1st argument
+  455 |   void push_back(const_reference __x) { emplace_back(__x); }
+      |                                                            ^
+main.cpp:10:22: error: expected ';' after expression
+   10 |     std::cout << \"hi\"
+      |                      ^
+2 errors generated.
+";
+    let found = mistakes::classify_compile("cpp", stderr);
+    assert_eq!(found.len(), 2, "{found:?}");
+    assert_eq!(found[0].kind, "type-mismatch");
+    assert_eq!(found[0].code.as_deref(), Some("cpp:no-matching-function"));
+    assert_eq!((found[0].line, found[0].col), (Some(9), Some(27)));
+    assert_eq!(found[1].kind, "syntax");
+    assert_eq!((found[1].line, found[1].col), (Some(10), Some(22)));
+    assert!(
+        found[0].message.contains("push_back"),
+        "the player's own words stay in the message: {}",
+        found[0].message
+    );
+}
+
+/// gcc frames the same diagnostic with a function header line and the same
+/// `file:line:col:` prefix.
+#[test]
+fn a_gcc_diagnostic_classifies_the_same_way() {
+    let stderr = "\
+main.cpp: In function 'int main()':
+main.cpp:3:18: error: 'tolal' was not declared in this scope
+    3 |     std::cout << tolal;
+      |                  ^~~~~
+";
+    let found = mistakes::classify_compile("cpp", stderr);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].kind, "unknown-name");
+    assert_eq!(found[0].code.as_deref(), Some("cpp:undeclared-identifier"));
+    assert_eq!((found[0].line, found[0].col), (Some(3), Some(18)));
+}
+
+#[test]
+fn an_unrecognised_cpp_message_is_other_with_its_identity_kept() {
+    let stderr = "main.cpp:4:5: error: something the table has never seen\n";
+    let found = mistakes::classify_compile("cpp", stderr);
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].kind, "other");
+    assert_eq!(found[0].code.as_deref(), Some("cpp:other"));
+    assert_eq!(found[0].line, Some(4));
+}
+
+#[test]
+fn a_link_error_is_kept_and_not_dropped() {
+    let stderr = "\
+Undefined symbols for architecture arm64:
+  \"foo(int)\", referenced from:
+      _main in main-abc123.o
+ld: symbol(s) not found for architecture arm64
+clang++: error: linker command failed with exit code 1 (use -v to see invocation)
+";
+    let found = mistakes::classify_compile("cpp", stderr);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].code.as_deref(), Some("cpp:undefined-symbol"));
+    assert_eq!(found[0].kind, "other");
+}
+
+#[test]
+fn cpp_runtime_signals_and_exceptions_classify() {
+    let segv = "the program was killed by signal 11 (SIGSEGV: segmentation fault)\n";
+    let found = mistakes::classify_runtime("cpp", segv);
+    assert_eq!(found[0].kind, "nil-deref");
+    assert_eq!(found[0].code.as_deref(), Some("cpp:segfault"));
+
+    // libc++ (macOS) and libstdc++ (Linux) announce an uncaught exception
+    // differently; both name the type.
+    for stderr in [
+        "libc++abi: terminating due to uncaught exception of type std::out_of_range: vector\nthe program was killed by signal 6 (SIGABRT: abort)\n",
+        "terminate called after throwing an instance of 'std::out_of_range'\n  what():  vector::_M_range_check\n",
+    ] {
+        let found = mistakes::classify_runtime("cpp", stderr);
+        assert!(
+            found.iter().any(|m| m.kind == "index-range" && m.code.as_deref() == Some("cpp:out-of-range")),
+            "{found:?}"
+        );
+        assert!(
+            !found.iter().any(|m| m.code.as_deref() == Some("cpp:abort")),
+            "an out_of_range is one lesson, not two: {found:?}"
+        );
+    }
+    let found = mistakes::classify_runtime(
+        "cpp",
+        "libc++abi: terminating due to uncaught exception of type std::runtime_error: boom\n",
+    );
+    assert_eq!(found[0].kind, "unhandled-error");
+    assert_eq!(found[0].code.as_deref(), Some("cpp:abort"));
+
+    let found = mistakes::classify_runtime(
+        "cpp",
+        "the program was killed by signal 6 (SIGABRT: abort)\n",
+    );
+    assert_eq!(found[0].code.as_deref(), Some("cpp:abort"));
+
+    // QA's captures spell a signal death as `<signal N>`; signal 1 is not
+    // signal 11.
+    assert_eq!(
+        mistakes::classify_runtime("cpp", "<signal 11>\n")[0]
+            .code
+            .as_deref(),
+        Some("cpp:segfault")
+    );
+    assert_eq!(
+        mistakes::classify_runtime("cpp", "<signal 6>\n")[0]
+            .code
+            .as_deref(),
+        Some("cpp:abort")
+    );
+    assert!(mistakes::classify_runtime("cpp", "<signal 1>\n").is_empty());
+
+    assert!(mistakes::classify_runtime("cpp", "").is_empty());
+    assert!(mistakes::classify_runtime("cpp", "just some output\n").is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// Python (SPEC §7.1's fourth column)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn every_python_row_of_the_table_maps() {
+    for (class, message, kind, code) in [
+        (
+            "NameError",
+            "name 'tolal' is not defined",
+            "unknown-name",
+            "py:name-error",
+        ),
+        (
+            "TypeError",
+            "can only concatenate str (not \"int\") to str",
+            "type-mismatch",
+            "py:type-error",
+        ),
+        (
+            "AttributeError",
+            "'NoneType' object has no attribute 'price'",
+            "nil-deref",
+            "py:none-attribute",
+        ),
+        (
+            "AttributeError",
+            "'Stall' object has no attribute 'price'",
+            "missing-trait",
+            "py:attribute-error",
+        ),
+        (
+            "IndexError",
+            "list index out of range",
+            "index-range",
+            "py:index-error",
+        ),
+        ("KeyError", "'k'", "index-range", "py:key-error"),
+        (
+            "ZeroDivisionError",
+            "division by zero",
+            "unhandled-error",
+            "py:zero-division",
+        ),
+        (
+            "ValueError",
+            "invalid literal for int() with base 10: 'x'",
+            "unhandled-error",
+            "py:value-error",
+        ),
+        (
+            "RecursionError",
+            "maximum recursion depth exceeded",
+            "wrong-answer",
+            "py:recursion",
+        ),
+        ("SyntaxError", "invalid syntax", "syntax", "py:syntax"),
+        (
+            "IndentationError",
+            "expected an indented block",
+            "syntax",
+            "py:syntax",
+        ),
+    ] {
+        assert_eq!(
+            mistakes::python_kind(class, message),
+            Some((kind, code)),
+            "{class}: {message} should be {kind}/{code}"
+        );
+    }
+}
+
+#[test]
+fn a_python_traceback_carries_the_innermost_frame_of_the_players_file() {
+    let stderr = "\
+Traceback (most recent call last):
+  File \"/home/build/python/att_1/main.py\", line 4, in <module>
+    g()
+    ~^^
+  File \"/home/build/python/att_1/main.py\", line 3, in g
+    return x.price
+           ^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'price'
+";
+    let found = mistakes::classify_runtime("python", stderr);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].kind, "nil-deref");
+    assert_eq!(found[0].code.as_deref(), Some("py:none-attribute"));
+    assert_eq!(found[0].line, Some(3));
+    assert!(
+        found[0].message.starts_with("AttributeError:"),
+        "{}",
+        found[0].message
+    );
+}
+
+/// A chained traceback ends with the exception that actually escaped.
+#[test]
+fn a_chained_python_traceback_classifies_the_one_that_escaped() {
+    let stderr = "\
+Traceback (most recent call last):
+  File \"main.py\", line 2, in <module>
+    d['k']
+KeyError: 'k'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File \"main.py\", line 4, in <module>
+    raise ValueError('no such stall')
+ValueError: no such stall
+";
+    let found = mistakes::classify_runtime("python", stderr);
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].code.as_deref(), Some("py:value-error"));
+    assert_eq!(found[0].line, Some(4));
+}
+
+#[test]
+fn an_exception_nobody_named_is_unhandled_error_with_its_class_kept() {
+    let stderr = "Traceback (most recent call last):\n  File \"main.py\", line 1, in <module>\n    raise RuntimeError('closed')\nRuntimeError: closed\n";
+    let found = mistakes::classify_runtime("python", stderr);
+    assert_eq!(found[0].kind, "unhandled-error");
+    assert_eq!(found[0].code.as_deref(), Some("py:exception"));
+    assert!(
+        found[0].message.contains("RuntimeError"),
+        "{}",
+        found[0].message
+    );
+
+    // A player's own exception class is still an exception.
+    let stderr = "Traceback (most recent call last):\n  File \"main.py\", line 5, in <module>\n    raise StallClosedError()\n__main__.StallClosedError\n";
+    let found = mistakes::classify_runtime("python", stderr);
+    assert!(
+        found.is_empty() || found[0].kind == "unhandled-error",
+        "{found:?}"
+    );
+}
+
+#[test]
+fn py_compile_output_is_syntax_with_the_parsers_line() {
+    let stderr =
+        "  File \"main.py\", line 1\n    def f(:\n          ^\nSyntaxError: invalid syntax\n";
+    let found = mistakes::classify_compile("python", stderr);
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].kind, "syntax");
+    assert_eq!(found[0].code.as_deref(), Some("py:syntax"));
+    assert_eq!(found[0].line, Some(1));
+
+    // The `Sorry:` form py_compile uses for an IndentationError.
+    let stderr = "Sorry: IndentationError: expected an indented block after 'if' statement on line 1 (main.py, line 2)\n";
+    let found = mistakes::classify_compile("python", stderr);
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].kind, "syntax");
+    assert_eq!(found[0].line, Some(2));
+
+    assert!(mistakes::classify_compile("python", "").is_empty());
+}
+
+/// Four lands, four wordings; the dispatcher keeps them apart.
+#[test]
+fn the_four_lands_runtime_wordings_do_not_cross() {
+    let py = "Traceback (most recent call last):\n  File \"main.py\", line 1, in <module>\nKeyError: 'k'\n";
+    let cpp = "the program was killed by signal 11 (SIGSEGV: segmentation fault)\n";
+    assert_eq!(
+        mistakes::classify_runtime("python", py)[0].kind,
+        "index-range"
+    );
+    assert_eq!(mistakes::classify_runtime("cpp", cpp)[0].kind, "nil-deref");
+    assert!(mistakes::classify_runtime("rust", py).is_empty());
+    assert!(mistakes::classify_runtime("go", py).is_empty());
+    assert!(mistakes::classify_runtime("cpp", py).is_empty());
+    assert!(mistakes::classify_runtime("python", cpp).is_empty());
+}
+
+/// The §2 additions of docs/concepts.md: every new slug is reachable from a
+/// mistake kind, and every slug named here is in the vocabulary.
+#[test]
+fn the_new_concepts_are_reachable_from_the_taxonomy() {
+    for (kind, slug) in [
+        ("borrow-after-move", "move-semantics"),
+        ("borrow-after-move", "raii"),
+        ("lifetime", "raii"),
+        ("lifetime", "pointers"),
+        ("nil-deref", "pointers"),
+        ("nil-deref", "undefined-behaviour"),
+        ("index-range", "undefined-behaviour"),
+        ("type-mismatch", "duck-typing"),
+        ("missing-trait", "duck-typing"),
+        ("unknown-name", "decorators"),
+        ("wrong-answer", "comprehensions"),
+        ("wrong-answer", "generators"),
+        ("timeout", "generators"),
+    ] {
+        assert!(
+            mistakes::concepts_for(kind).contains(&slug),
+            "{kind} should reach {slug}"
+        );
+    }
+    for kind in [
+        "borrow-after-move",
+        "borrow-conflict",
+        "lifetime",
+        "type-mismatch",
+        "unknown-name",
+        "missing-trait",
+        "unused",
+        "mutability",
+        "nil-deref",
+        "index-range",
+        "data-race",
+        "deadlock",
+        "unhandled-error",
+        "syntax",
+        "wrong-answer",
+        "timeout",
+    ] {
+        for slug in mistakes::concepts_for(kind) {
+            assert!(
+                cwbhacker_core::content::CONCEPT_VOCABULARY.contains(slug),
+                "{kind} names '{slug}', which is outside the vocabulary"
+            );
+        }
+    }
+}

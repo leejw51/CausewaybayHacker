@@ -32,9 +32,8 @@ import {
   footer,
   footerH,
   frame,
-  GO,
   header,
-  RUST,
+  landColour,
   titledPanel,
 } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
@@ -42,7 +41,7 @@ import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import type { Category, Drill, DrillMode, Land, MistakeStat, Quest } from "../net/protocol";
 import { unbuilt, unbuiltLine } from "../net/milestone";
-import { t as T } from "../i18n";
+import { locale, t as T } from "../i18n";
 import { auxHeight, auxRow, drawAux, AUX_HINT, openAux } from "../ui/auxnav";
 import { drawNotice, type Notice } from "../ui/notice";
 import { emptyDrill, isLearned, type CoachContext } from "../ui/coach";
@@ -204,7 +203,11 @@ export class AiScene implements Scene {
     if (!session || this.busy) return;
     this.busy = true;
     try {
-      const res = await this.app.client.request("ai.next", { drill_id: session.drill.id });
+      // §4.16: the same `locale` as quest.get, since this opens the same screen.
+      const res = await this.app.client.request("ai.next", {
+        drill_id: session.drill.id,
+        locale: locale(),
+      });
       session.quest = res.quest;
       session.why = res.why ?? "";
       session.position = res.position;
@@ -407,6 +410,8 @@ export class AiScene implements Scene {
       ["land:any", T("ai.any"), null],
       ["land:rust", T("ai.rust"), "rust"],
       ["land:go", T("ai.go"), "go"],
+      ["land:cpp", T("ai.cpp"), "cpp"],
+      ["land:python", T("ai.python"), "python"],
     ] as Array<[string, string, Land | null]>) {
       const cw = width(fonts.stationSm, label) + Math.round(14 * s);
       const on = value === this.landFilter;
@@ -566,7 +571,7 @@ export class AiScene implements Scene {
     // --- the quest --------------------------------------------------------
     const q = session.quest;
     if (q) {
-      const accent: RGBA = q.land === "go" ? GO : RUST;
+      const accent: RGBA = landColour(q.land);
       g.fillStyle = css(accent);
       // Built from the parts that exist rather than from a template with holes
       // in it. `weakness` and `repeat` hand over uncleared quests, where `stars`

@@ -30,8 +30,11 @@ local PURE = {
   "tests.test_screens",
   "tests.test_walk",
   "tests.test_mapswitch",
+  "tests.test_lands",
   "tests.test_editor",
   "tests.test_wallet",
+  "tests.test_edits",
+  "tests.test_stats",
 }
 
 --- Suites that need a LÖVE graphics context.

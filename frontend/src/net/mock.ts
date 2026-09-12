@@ -286,6 +286,9 @@ function mapNodes(address: string): MapNode[] {
       kind: "quest" as const,
       requires: q.requires,
       attempts: row.attempts,
+      // The mock has no translation packs, so every title is the English one
+      // and says so — the same answer a real server gives for `locale: "xx"`.
+      text_locale: "en",
     };
   });
 }
@@ -299,6 +302,7 @@ function publicQuest(q: MockQuest, row: Row): Quest {
     title: q.title,
     brief: q.brief,
     story: q.story,
+    text_locale: "en",
     difficulty: q.difficulty,
     time_limit_s: q.time_limit_s,
     starter: q.starter,
@@ -477,14 +481,17 @@ export function mockTransport(): TransportFactory {
                   { category: "hacker", total: 0, cleared: 0, stars: 0, open: false },
                 ],
               },
-              {
-                land: "go",
+              // The other three lands exist and are empty: enough for the lands
+              // screen to draw four plates and for a click on any of them to
+              // reach a map that says "no streets here yet".
+              ...(["go", "cpp", "python"] as const).map((land) => ({
+                land,
                 categories: [
-                  { category: "basic", total: 0, cleared: 0, stars: 0, open: false },
-                  { category: "advanced", total: 0, cleared: 0, stars: 0, open: false },
-                  { category: "hacker", total: 0, cleared: 0, stars: 0, open: false },
+                  { category: "basic" as const, total: 0, cleared: 0, stars: 0, open: false },
+                  { category: "advanced" as const, total: 0, cleared: 0, stars: 0, open: false },
+                  { category: "hacker" as const, total: 0, cleared: 0, stars: 0, open: false },
                 ],
-              },
+              })),
             ],
           });
         }

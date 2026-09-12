@@ -1,0 +1,673 @@
+# PYTHON LAND — BASIC, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/python/basic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "python.basic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.basic.01.six-oclock"
+title = "Šest ráno"
+story = "06:00 na Bowrington Road. Rolety jdou nahoru, podlaha je už mokrá a první cenovka dne je prázdná."
+brief = '''
+Vypiš přesně:
+
+```
+hello, causewaybay
+```
+
+Malá písmena, jedna čárka, jedna mezera, jeden řádek. Nic jiného.
+
+`print` přidá konec řádku za tebe. Přidá také mezeru mezi argumenty, a to je
+první věc, kterou na něm lidé udělají špatně: `print("hello,",
+"causewaybay")` je v pořádku, ale `print("hello, ", "causewaybay")` má
+v sobě mezery dvě.
+'''
+hints = [
+  "print(\"hello, causewaybay\") je celý program.",
+  "Řetězec musí být přesný: malá písmena, jedna čárka, za ní jedna mezera.",
+  "Nech volání `main()` dole tak, jak je. Funkce, kterou nikdo nezavolá, nic nevypíše — a přesně to starter dělá.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.basic.02.price-board"
+title = "Cenová tabule"
+story = "Tabule u stánku s tofu ukazuje jedno číslo a pak dvě prázdná místa tam, kde bývala cena za dva kusy a cena za čtverec."
+brief = '''
+Načti ze standardního vstupu jedno celé číslo `n`.
+
+Vypiš tři řádky: `n`, pak dvojnásobek `n`, pak `n` vynásobené samo sebou.
+
+`n` může být záporné. Vejde se do čehokoli, co Python zrovna chce, protože
+celá čísla v Pythonu nemají šířku.
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+
+`input()` ti dá **řetězec**. `"12" * 2` je `"1212"` a `"12" * "12"`
+je `TypeError`. Nejdřív převeď.
+'''
+hints = [
+  "Starter spadne na třetím printu: TypeError, can't multiply sequence by non-int of type 'str'. Přečti si tu hlášku; říká ti, co n je.",
+  "int(input()) převádí rovnou při čtení. int() za tebe zároveň ořeže bílé znaky.",
+  "Záporné n na druhou je kladné. Test to ví.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.basic.03.conversions"
+title = "Tři podoby, jedno jméno"
+story = "Sešit u stánku s rybami drží cenu jako text, jako číslo a jako dolary, a všem třem říká price."
+brief = '''
+Načti jeden řádek: částku v centech, jako číslice.
+
+Vypiš tři řádky:
+
+1. kolik znaků má oříznutý text
+2. částku jako číslo
+3. částku v dolarech s přesně dvěma desetinnými místy
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+Částka je nezáporná. Udělej to s **jedním jménem**, třikrát znovu
+navázaným — `str`, pak `int`, pak zase `str`. Python dovolí, aby jméno drželo
+cokoli a rozmyslelo si to; cena za to je, že nic ti neřekne, co `cents`
+zrovna teď je, kromě přečtení kódu nad tím.
+
+Na dolary nechoď přes `float`. `1234 / 100` je dnes `12.34`, ale
+`0.1 + 0.2` je `0.30000000000000004` každý den. Celočíselné dělení a modulo
+ti dají obě poloviny přesně a `f"{cents % 100:02d}"` tu druhou doplní nulou.
+'''
+hints = [
+  "len(cents), dokud je cents ještě řetězec, je první řádek.",
+  "cents = int(cents) není převod na místě; je to nová hodnota navázaná na staré jméno. Řetězec je po něm pryč.",
+  ":02d uvnitř f-stringu je šířka dva, doplněno nulami, desítkově. 5 centů je 0.05, ne 0.5.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.basic.04.control-flow"
+title = "Která ulička"
+story = "Čísla uliček na tržnici jsou namalovaná na podlaze a cedule u dveří má říkat, co se ve které uličce prodává. Říká pokaždé jen to číslo."
+brief = '''
+Načti jedno celé číslo `n`. Pro každé `i` od `1` do `n` vypiš jeden řádek:
+
+* `FISHVEG`, pokud je `i` dělitelné třemi i pěti
+* `FISH`, pokud je `i` dělitelné třemi
+* `VEG`, pokud je `i` dělitelné pěti
+* jinak samotné `i`
+
+Pak čti dál celá čísla, jedno na řádek, dokud nenačteš `0`, a vypiš
+`SKIPPED <k>` — kolik nenulových řádků jsi cestou přečetl.
+
+```
+input:  5
+        7
+        8
+        0
+output: 1
+        2
+        FISH
+        4
+        VEG
+        SKIPPED 2
+```
+
+Dva cykly, dva druhy. První ví, kolikrát poběží, ještě než začne:
+`for i in range(1, n + 1)`. Druhý to neví: `while True` s `break`, protože
+o počtu rozhoduje to, co načteš. `range` v Pythonu se zastaví **před** svým
+koncem a `range(1, n)` je chyba o jedničku, kterou tady každý jednou napíše.
+'''
+hints = [
+  "Nejdřív otestuj případ „obojí“, jinak se nikdy nespustí. Dělitelné třemi a pěti znamená dělitelné patnácti.",
+  "range(1, n) končí na n - 1. Starter tuhle chybu má; ukázkový výstup končí o řádek dřív.",
+  "while True s break je způsob, jak Python zapisuje cyklus, jehož východ je uprostřed. Žádné do-while není.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.basic.05.lists"
+title = "Prostředek fronty"
+story = "Čtyřicet lidí stojí frontu na pečenou husu v suterénu SOGO. Pult vidí začátek fronty a její konec a nic mezi tím."
+brief = '''
+Na standardním vstupu je na prvním řádku počet `n` a na druhém `n` celých
+čísel oddělených mezerami.
+
+Vypiš tři řádky: první hodnotu, poslední hodnotu a součet všeho ostře mezi
+nimi. Při méně než třech hodnotách je ten součet `0`.
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+`nums[1:-1]` je prostředek: řez (slice), což je **nový seznam** — Python při
+řezání kopíruje, na rozdíl od slice v Rustu nebo sub-slice v Go. `nums[-1]`
+je poslední prvek a záporné indexy jsou celý důvod, proč v Pythonu nikdy
+nepíšeš `nums[len(nums) - 1]`.
+
+S jedinou hodnotou je `nums[1:-1]` prázdné a `sum` z něj je `0`, takže
+ochrana, kterou ostatní jazyky potřebují, je tady zadarmo. To stojí za to
+vědět — a stojí za to si to ověřit, ne předpokládat.
+'''
+hints = [
+  "nums[-1] je poslední prvek; nums[-2] je ten před ním.",
+  "nums[1:-1] je všechno kromě prvního a posledního a prázdný řez dá sám od sebe součet 0.",
+  "sys.stdin.read().split() načte všechno naráz a rozdělí to na libovolných bílých znacích, takže na koncích řádků přestane záležet.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.basic.06.strings"
+title = "Bajty nejsou písmena"
+story = "Orientační tabule v suterénu SOGO usekne 銅鑼灣 po třech bajtech a vypíše jeden znak a otazník."
+brief = '''
+Načti jeden řádek. Vypiš tři řádky:
+
+1. jeho délku v **bajtech**, zakódovaného v UTF-8
+2. jeho délku ve **znacích**
+3. řádek se znaky v obráceném pořadí
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+Řádek může obsahovat znaky mimo ASCII a pak si první dvě čísla nejsou
+rovna. `str` v Pythonu je posloupnost kódových bodů, takže `len` je počet
+znaků; o bajty si musíš říct, přes `.encode("utf-8")`, a `len` **z toho** je
+to druhé číslo.
+
+`s[::-1]` obrátí řetězec. Je to řez s krokem `-1` a funguje na jakékoli
+posloupnosti.
+'''
+hints = [
+  "len(line) jsou znaky. len(line.encode(\"utf-8\")) jsou bajty. Starter vypisuje jako první to nesprávné.",
+  "line[::-1] je celé obrácení. Řez ze str dává str.",
+  "Obrácený bajtový řetězec by rozsekl vícebajtový znak napůl; obrácení str ne, protože str v sobě žádné bajty nemá.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.basic.07.dicts"
+title = "Co tržnice křičí"
+story = "Bowrington Road v sedm: každý stánek něco vyvolává a tabule na konci u Canal Road chce pořadí."
+brief = '''
+Načti celý standardní vstup a rozděl ho na bílých znacích.
+
+Vypiš každé různé slovo jednou, jako `<word> <count>`, seřazené podle počtu
+sestupně a při shodě podle slova vzestupně.
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+Dict si pamatuje pořadí vkládání, a to není pořadí, které chceš. `sorted`
+s `key`, který vrací n-tici, řadí podle prvního prvku a shody rozhoduje
+podle druhého, a negace počtu je způsob, jak dostat sestupné pořadí v jednom
+poli, zatímco druhé zůstane vzestupné.
+'''
+hints = [
+  "Starter umře s KeyError na prvním slově: counts[word] += 1 čte dřív, než zapíše, a není co číst. counts.get(word, 0) dodá tu nulu.",
+  "sorted(counts.items(), key=...) ti dá dvojice (word, count) v pořadí, o které sis řekl. Dict sám zůstává v pořadí vkládání.",
+  "key=lambda item: (-item[1], item[0]) — počet sestupně, pak slovo vzestupně, v jedné n-tici.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.basic.08.sets"
+title = "Co mají oba stánky"
+story = "Dva zelinářské stánky, po jednom na každé straně uličky, a zákaznice, která chce vědět, co dostane u kteréhokoli z nich, aniž by dvakrát přecházela mokrou podlahu."
+brief = '''
+Dva řádky standardního vstupu, každý je zboží jednoho stánku oddělené
+mezerami. Stánek může tutéž věc uvést dvakrát; počítá se jednou.
+
+Vypiš tři řádky:
+
+1. `BOTH` a za ním všechno, co je na obou seznamech, seřazené, oddělené
+   mezerami — nebo `BOTH -`, pokud není nic
+2. `ONLY_A <k>`: kolik věcí je na prvním seznamu a ne na druhém
+3. `ALL <k>`: kolik různých věcí je na kterémkoli z obou seznamů
+
+```
+input:  choisum tofu gailan tofu
+        gailan egg
+output: BOTH gailan
+        ONLY_A 2
+        ALL 4
+```
+
+`set` nemá duplicity ani pořadí a `&`, `-` a `|` jsou ty tři operace.
+`sorted` na množině ti dá seznam, což je jediný způsob, jak ji vypsat
+v pevném pořadí.
+'''
+hints = [
+  "set(input().split()) postaví množinu rovnou z tokenů; duplicitní tofu zmizí už cestou dovnitř.",
+  "a & b je průnik, a - b je rozdíl, a | b je sjednocení. len každého z nich je ten počet.",
+  "\" \".join(sorted(both)) potřebuje řetězce — a to už jsou — a `if both else \"-\"` pokryje prázdný případ v jednom výrazu.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.basic.09.functions"
+title = "Za catty"
+story = "Každá cenovka na Bowrington Road je za catty, pokud neříká jinak, a tiskárna cenovek trvá na tom, aby jí to někdo řekl pokaždé."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků ve tvaru `<NAME> <CENTS>`
+nebo `<NAME> <CENTS> <UNIT>`.
+
+Napiš `tag(name, cents, unit="catty")`, která vrací `<NAME> $<dollars>/<unit>`
+se dvěma desetinnými místy, a vypiš jednu cenovku na řádek.
+
+```
+input:  3
+        CHOISUM 1200
+        EGG 250 each
+        GARLIC 800
+output: CHOISUM $12.00/catty
+        EGG $2.50/each
+        GARLIC $8.00/catty
+```
+
+`tag` ve starteru nemá výchozí hodnotu, takže ji dvoutokenové řádky shodí:
+`TypeError: tag() missing 1 required positional argument`. Výchozí hodnota
+argumentu je součást smlouvy funkce — říká, co volající smí vynechat a co
+dostane, když to udělá.
+
+Rozděl řádek pomocí `.split()` a po převedení centů předej kousky přes
+`tag(*parts)`. `*` rozbalí seznam do pozičních argumentů, takže se do jedné
+signatury vejde dvouprvkový i tříprvkový seznam.
+'''
+hints = [
+  "unit=\"catty\" na řádku s def. To je celá oprava.",
+  "Výchozí hodnoty jdou až za parametry bez nich — def tag(name, cents, unit=\"catty\") — a výchozí hodnota, která je seznam nebo dict, se sdílí mezi voláními, což je doplňující otázka.",
+  "tag(*parts) rozprostře seznam; při dvou kouscích doplní třetí výchozí hodnota.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.basic.10.exceptions"
+title = "Řádek, který není číslo"
+story = "Váha u stánku s rybami tiskne sloupec hmotností a uprostřed něj je něčí telefonní číslo."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků. Každý řádek má být celé
+číslo.
+
+Pro každý řádek vypiš buď hodnotu zdvojenou, nebo `BAD <line>`, pokud se
+nedá načíst. Nakonec vypiš `SUM <total>`, kde total je součet hodnot, které
+jsi vypsal.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+`int("xx")` vyhodí `ValueError`. To je jediný způsob, jak ti Python řekne, že
+převod selhal — není žádný `Result`, žádné `(value, ok)`; selhání je
+výjimka a kód, který čekal číslo, musí říct, co s tím udělá, pomocí
+`try`/`except ValueError`.
+
+Chytej **`ValueError`**, ne `Exception`. Holé `except:` by spolklo i
+`KeyboardInterrupt` a překlep ve tvém vlastním kódu, a tak se programy učí
+selhávat potichu.
+'''
+hints = [
+  "Starter umře na xx s ValueError: invalid literal for int() with base 10. Ta hláška je výjimka, kterou chytáš.",
+  "Blok try drž malý: dovnitř patří jen volání, které může selhat, a print i součet jdou až za něj.",
+  "continue uvnitř except přeskočí zbytek těla cyklu pro ten řádek, takže špatný řádek nic nepřičte.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.basic.11.comprehensions"
+title = "Jedním průchodem po Bowrington Road"
+story = "Alex říká, že to jde třemi cykly for. Ulička je široká na jednoho člověka a podlaha je mokrá; máš jeden průchod."
+brief = '''
+Na standardním vstupu je jeden řádek celých čísel oddělených mezerami.
+
+Vypiš tři řádky:
+
+1. součet sudých hodnot (`0`, pokud žádné nejsou)
+2. každou hodnotu větší než `10`, zdvojenou, v pořadí, spojené jednotlivými
+   mezerami — nebo `-`, pokud žádné nejsou
+3. kolik je různých hodnot
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+Použij comprehension, ne indexové cykly: generátorový výraz uvnitř `sum`,
+list comprehension s `if` pro druhý řádek a set comprehension pro třetí.
+`if` jde na konec a filtruje; výraz vpředu transformuje.
+
+`" ".join(...)` chce řetězce, takže druhá comprehension musí vyrábět
+`str(v * 2)`, ne `v * 2`. Ten `TypeError: sequence item 0: expected str
+instance, int found` je ten, který na tomhle řádku potká každý.
+'''
+hints = [
+  "sum(v for v in nums if v % 2 == 0) — generátorový výraz nepotřebuje další závorky, když je jediným argumentem.",
+  "[str(v * 2) for v in nums if v > 10] — transformace vpředu, filtr vzadu.",
+  "{v for v in nums} je set comprehension; set(nums) je totéž a tady je v pořádku obojí.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.basic.12.sorting"
+title = "Tabule s pořadím"
+story = "Kancelář tržnice každé ráno vyvěšuje nejlevnější choi sum a úředník řadí stánky ručně, se dvěma seznamy a tužkou."
+brief = '''
+Dva řádky standardního vstupu: na prvním jména stánků, na druhém jejich ceny
+v centech, ve stejném pořadí.
+
+Vypiš stánky seřazené od nejlevnějšího jako `<rank>. <NAME> <cents>`,
+s pořadím začínajícím na `1` a shodami rozhodnutými podle jména vzestupně.
+Pak vypiš `CHEAPEST <NAME>`.
+
+```
+input:  LAM WONG CHAN
+        1200 900 1200
+output: 1. WONG 900
+        2. CHAN 1200
+        3. LAM 1200
+        CHEAPEST WONG
+```
+
+`zip` oba seznamy spáruje; `sorted` s `key` dvojice seřadí;
+`enumerate(..., start=1)` je očísluje. Tři vestavěné funkce a nikde žádná
+indexová aritmetika — verze s `for i in range(len(names))` je ta, která
+u třetího stánku pokazí rozhodnutí shody.
+'''
+hints = [
+  "zip(names, prices) dává n-tice (name, price), jednu na stánek, a končí u kratšího seznamu.",
+  "key=lambda pair: (pair[1], pair[0]) řadí podle ceny a pak podle jména; sorted je stabilní, ale to nepotřebuješ, když je klíč úplný.",
+  "enumerate(ranked, start=1) dává (rank, (name, price)) a vnořená n-tice se rozbalí na řádku s for.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.basic.13.classes"
+title = "Sešit stánku"
+story = "Každý stánek na Bowrington Road si vede vlastní sešit denních prodejů a stánek s tofu má každý řádek napsaný na obálce místo uvnitř."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků ve tvaru `<ITEM> <CENTS>`.
+
+Postav třídu `Notebook`, která položky sbírá, pak vypiš každou položku zpět
+jako `<ITEM> <CENTS>`, v pořadí, v jakém přišla, pak `TOTAL <sum>` a nakonec
+sešit samotný přes `print(book)` — jeho `__repr__` musí dát
+`Notebook(items=<n>, total=<sum>)`.
+
+```
+input:  2
+        TOFU 600
+        SET 2800
+output: TOFU 600
+        SET 2800
+        TOTAL 3400
+        Notebook(items=2, total=3400)
+```
+
+`n` může být `0` a pak jsou ty řádky `TOTAL 0` a
+`Notebook(items=0, total=0)`.
+
+Starter má chybu, po které se tenhle quest jmenuje: `items = []` sedí
+v **těle třídy**, takže je to jeden seznam sdílený každým `Notebook`, který
+kdy vznikne, ne jeden na sešit. Cokoli vytvořené v `__init__` přes `self`
+patří instanci; cokoli v těle třídy patří třídě. Měnitelné atributy třídy
+jsou chyba Pythonu, která nejčastěji přežije code review, protože program
+funguje přesně do chvíle, kdy jsou dva.
+'''
+hints = [
+  "Spusť starter a podívej se na první řádek výstupu: PENCIL 0, ze sešitu, do kterého to nikdo nenapsal. To je ten sdílený seznam.",
+  "def __init__(self): self.items = [] — vytvořeno pro každou instanci, v konstruktoru, přes self.",
+  "print(book) volá repr(book), když není __str__, takže __repr__ je ta jedna metoda, kterou napsat. Ať vypadá jako volání konstruktoru, které by ho znovu postavilo; to je konvence.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.basic.14.dataclasses"
+title = "Kdo kupuje"
+story = "Pult s rýží v suterénu SOGO účtuje každé kartě plnou cenu, včetně těch, které nejsou dospělé, a té jedné, která není karta."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků ve tvaru `<TYPE> <KG>`.
+
+Základní cena je `500 + 100 * KG` centů. Pro každý řádek vypiš jedno z:
+
+* `ADULT` — základní cenu
+* `STUDENT` — polovinu základní ceny, celočíselným dělením
+* `SENIOR` — vždy `200`
+* cokoli jiného — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+Namodeluj řádek jako zmrazený `@dataclass` — `Order(kind: str, kg: int)` —
+a o ceně rozhodni **jedním** `match` nad objednávkou. `match` umí dataclass
+rozložit podle klíčových slov — `case Order(kind="ADULT", kg=kg):` — a jeho
+poslední větev, `case Order(kind=other):`, naváže cokoli, co se nechytilo.
+
+`match` ve starteru má jednu větev a pak propadové `case _:`, které vypíše
+`UNKNOWN` pro všechno, včetně těch tří druhů, které má znát. Větve se
+zkoušejí po pořadě a vyhraje první shoda, takže zástupný vzor musí být
+poslední a musí být jediný, který je zástupný.
+'''
+hints = [
+  "Jedna case na druh: case Order(kind=\"STUDENT\"): a tak dále. Dataclass se porovnává podle jmen svých polí.",
+  "// je celočíselné dělení; / by ti dalo 450.0 a test chce 450.",
+  "case Order(kind=other): je zachytávací vzor — vždy se shodne a naváže značku — takže jde poslední, přesně jako větev `other =>` v matchi v Rustu.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.basic.15.generators"
+title = "Vlastní cyklus for"
+story = "Ticker u stánku s rybami vypisuje každou cenu od otevírací výš v pevných krocích a nikde si o nich nevede seznam."
+brief = '''
+Na standardním vstupu jsou tři celá čísla: `start`, `step`, `count`.
+
+Napiš **generátor** `ticker(start, step, count)`, který dává (yield) `count`
+hodnot počínaje `start` a postupujících o `step`. Každou vypiš na vlastní
+řádek, pak `SUM <total>` spočítaný tak, že druhý ticker předáš do `sum`.
+
+```
+input:  5 2 4
+output: 5
+        7
+        9
+        11
+        SUM 32
+        generator
+```
+
+Poslední řádek je `type(ticker(...)).__name__`, který vypisuje `main` ze
+starteru tak, jak je. Teď říká `list`.
+
+Funkce, ve které je `yield`, se při zavolání nespustí. Vrátí generátor a
+tělo běží po jednom kroku, pokaždé když si někdo řekne o další hodnotu.
+Proto na něm funguje `for`, proto na něm funguje `sum` a proto dokáže vyrobit
+milion hodnot, aniž by kdy existoval seznam o milionu hodnot.
+
+Starter seznam postaví a vrátí ho, což je správně a není to ta otázka.
+Seznam jsou všechny hodnoty naráz; generátor je jedna hodnota na požádání.
+Změň `append` na `yield` a seznam smaž.
+'''
+hints = [
+  "Poslední řádek výstupu je jméno typu a test chce `generator`. To je to, co vrací def s yield uvnitř.",
+  "yield value a pak posun. Funkce se na yield zastaví a při další žádosti pokračuje za ním.",
+  "Generátor se dá spotřebovat jen jednou. Proto si main pro součet staví čerstvý ticker, místo aby použil ten, který cyklus vyčerpal.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.basic.16.decorators"
+title = "Zabalené"
+story = "Kancelář tržnice chce vědět, kolikrát se dnes volala funkce s cenou, a ta funkce nechce vědět, že ji někdo sleduje."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` hmotností v kg.
+
+`price(kg)` je `500 + 100 * kg`. Ozdob ji dekorátorem `@counted` tak, aby
+se každé volání počítalo, aniž by o tom `price` věděla. Vypiš jednu cenu na
+hmotnost, pak `CALLS <n>`, pak `NAME <price.__name__>` — a to musí pořád
+říkat `price`.
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        CALLS 3
+        NAME price
+```
+
+Dekorátor je funkce, která bere funkci a vrací funkci. Ta vrácená je obvykle
+uzávěr jménem `wrapper`, který něco udělá a pak zavolá originál — a pokud
+neřekneš jinak, je `wrapper` to, na co teď jméno `price` ukazuje,
+i s `__name__`. `functools.wraps` zkopíruje jméno a docstring originálu na
+wrapper. Starter na to zapomněl a poslední řádek říká `NAME wrapper`.
+
+Kde má počítadlo žít? Ne v globální proměnné. Připni ho na wrapper —
+`wrapper.calls = 0` — a potom čti `price.calls`. Funkce je objekt a bere
+atributy jako kterýkoli jiný.
+'''
+hints = [
+  "@functools.wraps(func) na řádku nad def wrapper. Jeden dekorátor uvnitř tvého dekorátoru.",
+  "@counted nad def price je totéž jako price = counted(price) za ní. Jméno se znovu naváže na to, co counted vrátil.",
+  "*args, **kwargs je způsob, jak wrapper přepošle jakoukoli signaturu, aniž by ji znal, a to dělá dekorátor znovupoužitelným.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.basic.17.duck-typing"
+title = "Když to kváká"
+story = "Igelitka od stánku s vejci. Nikdo se neptal, co to je; ptali se, kolik toho v ní je, jestli jsou uvnitř kachní vejce, a chtěli ji projít kus po kuse."
+brief = '''
+Na standardním vstupu je jeden řádek zboží odděleného mezerami a pak jeden
+řádek s jediným slovem, které se má hledat.
+
+Dej zboží do `Bag` a vypiš:
+
+1. `LEN <k>` — z `len(bag)`
+2. zboží, jeden kus na řádek — z `for item in bag`
+3. `HAS <WORD> YES` nebo `HAS <WORD> NO` — z `word in bag`
+4. `LONGEST <item>` — z `max(bag, key=len)`, při shodě ten první
+
+```
+input:  egg duckegg tofu
+        duckegg
+output: LEN 3
+        egg
+        duckegg
+        tofu
+        HAS duckegg YES
+        LONGEST duckegg
+```
+
+`Bag` nedědí z `list` a nemusí. `len` volá `__len__`, `for` volá `__iter__`,
+`in` volá `__contains__` a `max` potřebuje jen `__iter__`. Python se nikdy
+neptá, co věc *je*; ptá se, jestli má tu metodu, ve chvíli, kdy ji potřebuje.
+Starter nemá ani jednu a první chyba je `TypeError: object of type 'Bag'
+has no len()`.
+
+`__contains__` je nepovinné: bez něj `in` spadne na iterování a porovnávání,
+což je správně a pomaleji. Napiš ho stejně, protože přesně to má člověk
+u pohovoru na mysli, když řekne „udělej z toho kontejner“.
+'''
+hints = [
+  "def __len__(self): return len(self._goods) — tři metody, každá na jeden řádek.",
+  "__iter__ může vrátit iter(self._goods); nemusí to být generátor, i když `yield from self._goods` funguje také.",
+  "max(bag, key=len) si nechá první z položek stejné délky, a proto ukázka říká duckegg a ne něco pozdějšího.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "python.basic.18.none"
+title = "None"
+story = "05:59 na Bowrington Road. Cenová tabule se ptá sešitu na stánek, který ještě neotevřel, sešit odpoví ničím a tabule vypíše cenu toho ničeho."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků ve tvaru `<STALL> <CENTS>`
+— stánky, které otevřely — pak počet `q` a `q` jmen stánků k vyhledání.
+
+Pro každý dotaz vypiš `<STALL> <cents>`, nebo `<STALL> NONE`, pokud ten
+stánek není otevřený. Pak vypiš `MISSING <k>` a `CHEAPEST <STALL>` — otevřený
+stánek s nejnižší cenou, při shodě podle jména — nebo `CHEAPEST NONE`, pokud
+není otevřeno nic.
+
+```
+input:  2
+        LAM 1200
+        WONG 900
+        3
+        WONG
+        CHAN
+        LAM
+output: WONG 900
+        CHAN NONE
+        LAM 1200
+        MISSING 1
+        CHEAPEST WONG
+```
+
+Starter spadne na `CHAN`:
+
+```
+AttributeError: 'NoneType' object has no attribute 'cents'
+```
+
+Tenhle řádek je boss. Nikdy neukazuje na chybu. Ukazuje na místo, kde bylo
+`None` nakonec *použito*, a to může být libovolně daleko od místa, kde
+*vzniklo* — a ve starteru vzniklo na dvou různých místech. `lookup` vrací
+`None` pro stánek, který tam není, záměrně, a volající z něj čte `.cents`,
+aniž by se zeptal. A `cheapest` na jedné cestě nemá `return`, takže vrací
+`None` **implicitně**, a volající tomu udělá totéž.
+
+Každá funkce v Pythonu něco vrací. Funkce, která doběhne na konec, vrací
+`None`. `dict.get` bez výchozí hodnoty vrací `None`. Ani jedno není chyba
+v tu chvíli; obojí se chybou stane později. Oprava je v obou případech
+stejná: kód, který může `None` dostat, ho zkontroluje, pomocí `is None`,
+dřív než sáhne na atribut. Ne `== None`, ne `if not stall` — stánek s cenou
+`0` je skutečný stánek a `not` by ho zahodil.
+
+Ať `lookup` a `cheapest` vracejí `Optional[Stall]` **záměrně**, řekni to
+v anotaci a `None` ošetři tam, kam dopadne.
+'''
+hints = [
+  "Čti traceback odspodu nahoru: AttributeError je na printu, ale None vyšlo z lookup o řádek dřív a z board.get ještě před tím.",
+  "if stall is None: je ta kontrola. `is`, protože None je jediný objekt a identita je poctivé porovnání; `==` se dá přepsat a `not stall` je špatně pro hodnotu, která je falsy, ale skutečná.",
+  "cheapest má dvě cesty a jen jedna z nich má return. Python na to neupozorní; podá volajícímu None a nechá ho, ať na to přijde. Dej prázdnému případu explicitní `return None`, aby čtenář viděl, že to bylo myšleno.",
+  "Optional[Stall] v anotaci interpret nevynucuje. Je to poznámka pro čtenáře a pro type checker, a čtenář je ten, komu běží čas.",
+]

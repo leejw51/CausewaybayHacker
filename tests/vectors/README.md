@@ -191,16 +191,19 @@ good input passes by accident.
 
 ## `mistakes/` — SPEC §9.7, mistake classification
 
-One source file per row of the SPEC §7.1 taxonomy, **actually compiled** on
-this machine, with the compiler's real output captured beside it. BE's
-classifier can be unit-tested against `rust/*.rustc.json` with no toolchain
-installed at all, which is the point: a classifier tested against
+One source file per row of the SPEC §7.1 taxonomy, in each of the four
+lands, **actually compiled** on this machine, with the compiler's real output
+captured beside it. BE's classifier can be unit-tested against
+`rust/*.rustc.json`, `go/*.gobuild.txt`, `cpp/*.cxx.txt` and
+`python/*.pycompile.txt` (and the `*.runtime.txt` next to them) with no
+toolchain installed at all, which is the point: a classifier tested against
 hand-written "what rustc probably says" is a classifier tested against a
 guess.
 
 **Toolchain:** `rustc 1.97.1 (8bab26f4f 2026-07-14)`, `go1.27.1 darwin/arm64`,
-Darwin 25.6.0 arm64. Recorded in `expected.json` under `toolchain`, because a
-diagnostic is a property of a compiler version, not of a language.
+Apple clang 21 as `c++`, Python 3.13, Darwin 25.6.0 arm64. Recorded in
+`expected.json` under `toolchain`, because a diagnostic is a property of a
+compiler version, not of a language.
 
 **Commands**, exactly SPEC §5.1's:
 
@@ -209,12 +212,26 @@ rustc --edition 2021 -O --error-format=json main.rs -o prog    # then ./prog
 go build -o prog main.go                                        # then ./prog
 go vet ./main.go            # the unhandled-error row only
 go run -race main.go        # the data-race row only
+c++ -std=c++20 -O2 -pthread -o prog main.cpp                    # then ./prog
+python3 -m py_compile main.py                                   # then python3 -I main.py
 ```
 
-Each source is copied into a fresh temp directory as `main.rs` / `main.go` and
-compiled there, so the `file_name` in every captured span is the relative
-`main.rs` — not an absolute path from this machine baked into a fixture that
-runs on another.
+Each source is copied into a fresh temp directory as `main.rs` / `main.go` /
+`main.cpp` / `main.py` and compiled there, so the `file_name` in every
+captured span is the relative `main.rs` — not an absolute path from this
+machine baked into a fixture that runs on another.
+
+**C++ captures are per toolchain.** `c++` is clang on macOS and gcc on Linux,
+and they word one mistake two ways (`use of undeclared identifier` versus
+`was not declared in this scope`), so a C++ case is captured once per
+toolchain id — `cpp/segfault.clang-darwin.cxx.txt`, and `gcc-linux` beside it
+once a Linux machine has run the generator — with the id in the case as
+`cxx` and the list under `cpp_toolchains_captured`. A machine regenerates and
+checks only the toolchain it has and carries the others over untouched; a
+toolchain the repo has no captures for is a note from `--check`, not a
+failure, because the machine reporting the gap is the one that cannot fill
+it. A segfault prints nothing, so the runtime capture for it is the
+placeholder `<signal 11>` and the case records `run_signal`.
 
 ### `expected.json` shape
 
@@ -258,8 +275,8 @@ behave alike:
 
 ### Two groups of cases
 
-* **27 synthetic sources** under `rust/` and `go/`, one or more per taxonomy
-  row, written to isolate one diagnostic each.
+* **42 synthetic sources** under `rust/`, `go/`, `cpp/` and `python/`, one or
+  more per taxonomy row, written to isolate one diagnostic each.
 * **6 real starters** from the shipped content, under `content_starter_cases`
   in `expected.json`. These are worth more than the synthetic ones beside
   them: they are the exact bytes a player's editor opens with, so the
@@ -283,8 +300,10 @@ behave alike:
 
 ### Coverage, honestly
 
-33 of 33 cases verified against the real toolchain. Fifteen of the taxonomy's
-seventeen kinds have at least one verified fixture.
+48 of 48 cases verified against the real toolchains. Sixteen of the
+taxonomy's seventeen kinds have at least one verified fixture — `wrong-answer`
+joined the list with Python's `RecursionError`, the one place §7.1 gives that
+verdict a compiler identity.
 
 **Not covered, and why:**
 

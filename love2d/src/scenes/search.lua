@@ -223,7 +223,7 @@ function Search:draw_results(x, y, w, h)
   end
   if not self.hits then
     for _, line in ipairs(UI.wrap(
-      I18n.t("Type and press ENTER. It searches every quest in both lands — "
+      I18n.t("Type and press ENTER. It searches every quest in every land — "
         .. "titles, briefs, concepts and the story text."), w - 40, 8)) do
       cy = cy + UI.text(line, x + 16, cy, 8, Theme.withAlpha(Theme.cream, 0.6)) + 4
     end

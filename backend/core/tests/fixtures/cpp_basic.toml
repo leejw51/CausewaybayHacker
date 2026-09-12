@@ -1,0 +1,75 @@
+# A throwaway pack for the backend's own tests: the C++ land, small enough to
+# compile in a test and shaped like the shipped content. NOT the shipped
+# content.
+pack = "cpp.basic"
+land = "cpp"
+category = "basic"
+version = 1
+
+[[quest]]
+id          = "cpp.basic.01.hello"
+node        = 1
+title       = "THE NOON DAY GUN"
+difficulty  = 1
+story       = "Something wrote to the right register, and the gun fired."
+concepts    = ["io", "pointers"]
+requires    = []
+map         = { x = 0.15, y = 0.70, kind = "quest" }
+brief       = '''
+Print `hello, causewaybay` and nothing else.
+'''
+starter     = '''
+#include <iostream>
+
+int main() {
+    // your code here
+}
+'''
+solution    = '''
+#include <iostream>
+
+int main() {
+    std::cout << "hello, causewaybay\n";
+}
+'''
+hints = [
+  "`std::cout << \"...\\n\"` — the newline is yours to write.",
+]
+
+[quest.tests]
+harness      = "stdio"
+timeout_ms   = 5000
+match        = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]
+
+[[quest]]
+id          = "cpp.basic.02.testing"
+node        = 2
+title       = "A HARNESS FROM THE WRONG LAND"
+difficulty  = 1
+story       = "Some doors are drawn on the map before they are cut."
+concepts    = ["functions", "raii"]
+requires    = []
+map         = { x = 0.25, y = 0.66, kind = "quest" }
+brief       = '''
+This quest declares the `gotest` harness on a C++ quest, which no build will
+ever run. It exists so the "refuse without recording anything" rule stays
+tested in this land too.
+'''
+starter     = '''
+int main() {}
+'''
+solution    = '''
+int main() {}
+'''
+hints = []
+
+[quest.tests]
+harness      = "gotest"
+timeout_ms   = 5000
+match        = "trim"
+cases = [
+  { name = "runs", stdin = "", expect = "ok\n", visible = true },
+]

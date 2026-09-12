@@ -219,8 +219,12 @@ mod tests {
         let (_d, store) = temp();
         let rust = path_for(&store, "0xA", &quest("rust.basic.01.hello", "rust"));
         let go = path_for(&store, "0xA", &quest("go.basic.01.hello", "go"));
+        let cpp = path_for(&store, "0xA", &quest("cpp.basic.01.hello", "cpp"));
+        let py = path_for(&store, "0xA", &quest("python.basic.01.hello", "python"));
         assert!(rust.ends_with("rust.basic.01.hello.rs"));
         assert!(go.ends_with("go.basic.01.hello.go"));
+        assert!(cpp.ends_with("cpp.basic.01.hello.cpp"));
+        assert!(py.ends_with("python.basic.01.hello.py"));
     }
 
     /// The rule the whole editor loop rests on.

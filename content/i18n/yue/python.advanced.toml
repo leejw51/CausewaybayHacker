@@ -1,0 +1,714 @@
+# PYTHON LAND — ADVANCED, in Cantonese. A translation pack (SPEC §12.1): the
+# prose of `content/python/advanced.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+#
+# Register: colloquial written Cantonese in traditional characters, as
+# `frontend/src/i18n/yue.ts` fixes it; technical nouns are the standard ones.
+
+pack   = "python.advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.advanced.01.threads"
+title = "十二個檔口，一層樓"
+story = "12:30，崇光地庫。十二個檔口同時落單，而負責收集總數嘅跑腿，喺佢哋一個都未寫上塊板之前就已經讀咗塊板。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+每個值開一條 `threading.Thread`，計佢嘅平方，存入 `results[i]` ——
+佢自己嗰格，咁就冇兩條 thread 會寫同一個位。`join` 晒每一條 thread，
+然後**按索引次序**印啲結果，一行一個，再印 `THREADS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+thread 唔會返回任何嘢。`Thread(target=f)` 會行 `f`，然後將佢嘅返回值掉走，
+所以個結果一定要寫落一個主 thread 喺 `join` 之後讀得到嘅地方。每條 thread
+一格嘅 list 係最簡單嘅一種：每個索引啱啱好由一條 thread 寫，所以冇嘢需要鎖。
+
+個 starter 啲 thread 一開始就全部仆街，但個程式照樣行完照樣印。`target=square`
+冇 `args=`，即係乜都唔畀就叫 `square()`，個 `TypeError` 落喺條 thread 入面，
+印咗去標準錯誤，而 `results` 就成個都係 `None`。一條 thread 死咗淨係帶走佢自己
+—— 要睇 stderr，唔係你永遠都唔會知。
+'''
+hints = [
+  "Thread 度加 args=(i, v)。個 target 係以 square(*args) 咁叫嘅，而個 starter 乜都冇畀。",
+  "先 start 晒每一條 thread，再 join 晒每一條。喺同一次循環入面又 start 又 join 係啱嘅，不過就會逐條逐條咁行。",
+  "results 係一個對 main 本地 list 嘅閉包；入面嗰個 function 見到嘅係同一個 list，所以 join 之後啲寫入係睇得到嘅。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.advanced.02.lock"
+title = "一個錢櫃，八隻手"
+story = "地庫每個檔口都係交錢入美食廣場辦公室嗰一個錢櫃，收工嗰陣個錢櫃入面乜都冇，而每個檔口都發誓自己交咗。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+每個值開一條 thread，將佢加入**一個共用嘅總數**，同時將一個共用嘅次數加一。
+join 晒佢哋，然後印 `TOTAL <sum>` 同 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+個 starter 印 `TOTAL 0`，次次都係咁，而且 stderr 度每個 worker 都有一段
+traceback。worker 入面嘅 `total += value` 掂唔到 main 嘅 `total`：`int`
+係不可變嘅，對佢 `+=` 係重新綁定個名，而 function 入面賦值過嘅名係嗰個
+function 嘅**本地變數**，除非佢講明 `nonlocal`。每個 worker 都整咗自己嘅
+`total`，加落去，然後掉咗。
+
+修法係用一個 worker 可以就地改嘅容器 —— 一個單元素 list 或者一個細 class ——
+**再加一個 `Lock`**。後半部分唔係可有可無。GIL 保證嘅係一次淨係行一個
+bytecode；`drawer[0] += value` 係三個 bytecode（load、add、store），
+喺 load 同 store 之間切換 thread 就會唔見咗一次更新。四條 thread 加四個數
+唔會發生。凌晨兩點四十條 thread 就會發生。
+
+`with lock:` 會攞住個鎖，出去嗰陣放返 —— 包括由例外出去嗰條路。
+'''
+hints = [
+  "行下個 starter：佢會 UnboundLocalError 死咗，因為 `total += value` 令 total 變咗 pay 嘅本地變數，而且未存在就讀佢。呢個錯誤就係成個診斷。",
+  "dict 或者 list 係就地改嘅，所以 `drawer[\"total\"] += value` 改嘅係每條 thread 共用嘅同一個物件。`nonlocal total` 都得，係另一個老實嘅答案。",
+  "main 入面整一次 threading.Lock()，讀-改-寫嗰段用 `with lock:` 包住。GIL 唔係鎖住你啲數據嘅鎖；佢係鎖住個直譯器嘅鎖。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.advanced.03.queue"
+title = "邊個閂個窗口"
+story = "燒鵝檔每張單都經個窗口遞入廚房，最後一張之後，廚房就企喺度等一張永遠唔會嚟嘅下一張。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+一條生產者 thread 將每個值乘十放上一個 `queue.Queue`，然後放一個**哨兵**。
+主 thread 由個 queue 度攞嘢，攞到見到哨兵為止，每個值印出嚟同時計住總數，
+然後印 `SUM <total>` 同 `CLOSED`。
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+`queue.Queue` 冇 `close`。上面冇任何嘢可以話畀消費者知已經冇下一個；
+呢個信息本身一定要係一個項目，而 `None` 係慣常嗰個。個 starter 從來冇送過佢，
+所以 `get()` 永遠塞住，明明已經冇嘢好等，執行器就喺時限到咗嗰陣殺咗個程式。
+Python 冇死鎖偵測器。個程式就係唔再應你，由外面睇就係「hang 咗」嘅樣。
+
+哨兵由生產者送。永遠唔係消費者 —— 知道條流完咗嗰一邊，先係結束佢嗰一邊。
+'''
+hints = [
+  "一行，放喺 kitchen 最尾：hatch.put(None)。",
+  "消費者已經有 check `is None`。佢一直等緊一樣生產者從來冇送過嘅嘢。",
+  "如果啲值本身可以合法地係 None，哨兵就要係一個私有物件：SENTINEL = object()，用 `is` 嚟比較。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.advanced.04.thread-pool"
+title = "八個搬運工"
+story = "崇光卸貨區有四十箱貨，八個搬運工。冇人想要四十個搬運工；佢哋想要嗰八個永遠冇停過手。"
+brief = '''
+標準輸入係兩個整數 `w` 同 `n`，然後 `n` 個值。
+
+開一個有 `w` 個 worker 嘅 `ThreadPoolExecutor`，每個值 `submit` 一個工作，
+返回 `(index, value * value)`，然後用 `as_completed` 收集結果。按索引排序，
+一行印一個 `<index> <value>`，然後印 `WORKERS <w>`。
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+`submit` 返回嘅係一個 `Future`，唔係結果。`as_completed` 會按佢哋**完成**
+嘅次序交返啲 future 畀你，即係個 pool 高興點就點嘅次序，而 `future.result()`
+先係攞個值出嚟嘅方法 —— 或者重新拋出個工作死嗰陣嘅例外，呢個係要叫佢嘅
+另一個原因。
+
+個 starter 印嘅係啲 future。將索引放入結果入面帶住，先令輸出次次行都一樣；
+按佢排序係答案嘅最後一行，唔係第一行。
+'''
+hints = [
+  "個 starter 拆 Future 嗰陣死咗：`for index, value in sorted(results)` 拆唔開一個唔係 tuple 嘅物件。個 tuple 喺 future.result() 入面。",
+  "as_completed 係邊個工作完成就 yield 邊個；結果入面嘅索引係每一個由邊度嚟嘅唯一記錄。",
+  "with ThreadPoolExecutor(...) as pool: 出去嗰陣會等晒所有 submit 咗嘅工作，所以你印嘅時候冇嘢仲行緊。pool.map 喺呢度都得，仲會幫你保持次序，代價係學唔到 as_completed。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.advanced.05.asyncio"
+title = "async 到底喺邊度行"
+story = "阿薇寫咗四年 `async def`，一次都未見過推動佢嗰樣嘢。地庫個落單板得一個 loop，每個檔口輪流喺上面行。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+寫一個 `async def double(value)`，佢向 event loop 讓一次 ——
+`await asyncio.sleep(0)` —— 然後返回個值嘅兩倍。用 `asyncio.gather`
+一次過行晒 `n` 個，按輸入次序印每個結果，然後印 `SUM <total>` 同
+`TASKS <n>`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+叫一個 `async def` 唔會行佢。佢砌一個 **coroutine 物件**交返畀你，
+入面乜都唔會發生，直到有嘢 await 佢。個 starter 個 list 係三個冇 await 過
+嘅 coroutine，Python 喺 stderr 度有講 —— `RuntimeWarning: coroutine
+'double' was never awaited` —— 而輸出就係三行
+`<coroutine object double at 0x...>`。
+
+`gather` 接收啲 coroutine，全部排上嗰一個 loop，然後**按你傳入嘅次序**
+返回佢哋嘅結果，無論佢哋係咩次序完成。呢個就係揀佢而唔係自己手寫一個
+`await` 循環嘅全部原因：手寫循環係啱嘅但係逐個行，`gather` 係啱嘅而且
+係交錯行。
+
+呢度啱啱好得一條 thread。`await` 係一個 coroutine 將條 thread 交返畀個
+loop、等第二個用嘅時刻。冇嘢係平行行嘅；啲嘢係**輪流**行，喺佢哋話可以
+停嘅地方停。
+'''
+hints = [
+  "await asyncio.gather(*coroutines) —— 個星將個 list 攤開做參數，而個 await 先係真正行佢哋嘅嘢。",
+  "asyncio.run(...) 就係執行者：佢整個 loop，將一個 coroutine 行到完，然後閂個 loop。一個程式得一個，喺最頂。",
+  "gather 按參數次序返回結果。如果你要邊個完成先攞邊個，嗰個係 asyncio.as_completed，咁你就要自己帶住個索引，同 thread pool 一模一樣。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.advanced.06.async-queue"
+title = "邊個話做完"
+story = "三個跑腿喺地庫清緊條落單隊，樓面經理等緊條隊話自己空咗。佢永遠唔會咁講，因為冇人話過佢知有張飛做完咗。"
+brief = '''
+標準輸入係兩個整數 `w` 同 `n`，然後 `n` 個值。
+
+將 `(index, value)` 對放上一個 `asyncio.Queue`。開 `w` 個消費者 task，
+永遠循環：攞一對，將 `value * 10` 寫入 `results[index]`，然後叫
+`task_done()`。主 coroutine await `queue.join()`，然後取消啲消費者，
+然後按索引次序印啲結果同 `CONSUMERS <w>`。
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+`queue.join()` 會喺每一個 `put` 過嘅項目都有一個對應嘅 `task_done()` 之後
+返回。個 starter 啲消費者從來冇叫過佢，所以 `join` 永遠等落去，個 loop 冇
+其他嘢可以行，個程式就 hang 到執行器殺佢為止。同 thread 嗰條街一樣嘅 hang，
+寫法唔同 —— 而修法又係一行，喺消費者嗰邊。
+
+啲消費者係 `while True` 循環。佢哋結束係因為 main 喺 join 之後取消佢哋，
+而取消一個停喺 `queue.get()` 度嘅 task 係正常、預期嘅停法。用
+`gather(..., return_exceptions=True)` await 啲被取消嘅 task，咁個取消
+就會被收集，而唔係被報告。
+'''
+hints = [
+  "每處理完一個項目就 queue.task_done()。join 淨係將 put 同 task_done 對數，其他嘢佢唔理。",
+  "create_task 將個消費者排上去但唔 await 佢；下次 main await 任何嘢嗰陣個 loop 先會行佢，即係嗰個 join。",
+  "一個喺 await get() 嗰陣被取消嘅 task，入面會拋 CancelledError，咁就結束咗個 while True。return_exceptions=True 令 gather 唔會將佢重新拋返畀你。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.advanced.07.context-managers"
+title = "捲閘照樣落"
+story = "地庫有個檔口，每張單都開一次捲閘，做完就閂。12:40 收到張壞單嗰個檔口，捲閘由嗰陣一直開到而家，因為閂閘嘅碼寫喺出事嗰行後面。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<STALL> <CENTS>`，`CENTS` 本來應該係
+一個整數。
+
+用 `contextlib.contextmanager` 寫一個 context manager `opened(stall)`，
+入去嗰陣印 `OPEN <STALL>`，出嚟嗰陣印 `SHUT <STALL>` —— **無論主體有冇拋
+例外**。喺入面解析啲仙，加入總數。仙解析唔到嘅行，喺捲閘閂咗之後報
+`BAD <STALL>`。最後印 `TOTAL <sum>` 同 `REJECTED <k>`。
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+`@contextmanager` 將一個 generator 變做 context manager：`yield` 之前嘅
+所有嘢係 `__enter__`，之後嘅所有嘢係 `__exit__`。主體拋例外嗰陣，個例外
+會**喺 `yield` 嗰個位掟入個 generator**，所以 `yield` 之後嘅碼淨係喺
+`yield` 包喺 `try`/`finally` 入面嘅時候先會行。個 starter 冇 `finally`，
+`WONG` 個捲閘就永遠閂唔到。
+
+用 class 嘅寫法 —— `__enter__` 同 `__exit__(self, exc_type, exc, tb)` ——
+做同一樣嘢，多幾行，而且可以靠返回 `True` 吞咗個例外。呢度唔好吞：
+叫佢嘅人想印 `BAD`。
+'''
+hints = [
+  "try: yield / finally: print(SHUT)。個 finally 就係每一條路都會行嘅 __exit__。",
+  "個例外會穿過個 generator，走出個 with 語句，所以 main 嘅 except 照樣見到佢 —— 所以 BAD 係喺 SHUT 之後先印。",
+  "with opened(stall) as x: 會綁住個 generator yield 出嚟嘅嘢。呢度佢乜都冇 yield，咁樣冇問題。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.advanced.08.pipeline"
+title = "廚房流水線"
+story = "波哥喺地庫廚房條流水線：一個崗位將張單平方，下一個崗位計住累計數，冇人會等成批做完。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個整數。
+
+砌一條兩級嘅 **generator** 流水線：
+
+1. `squares(values)` 逐個 yield 每個值嘅平方
+2. `running(stream)` 接收任何可迭代嘅數字，保持一個累計總數，
+   逐個 yield `(value, total)` 對
+
+`main` 將每對印做 `<square> <total>`，然後印 `PIPE <n>`。
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+兩級都唔會砌 list。每個 `yield` 將一個項目交畀下一級然後停低；`main` 拉，
+`running` 由 `squares` 拉，`squares` 由輸入拉。有人要之前冇嘢會計，
+成條流水線同一時間淨係得一個項目喺途中。呢樣就係令同樣三個 function
+可以處理一個一億行嘅檔案嘅原因。
+
+個 starter 嘅第二級寫咗 `return`，本來應該係 `yield`，所以佢係一個普通
+function，返回最終總數 —— 一個 `int` —— 然後 `main` 就試圖迭代佢。
+'''
+hints = [
+  "個錯誤係 TypeError: cannot unpack non-iterable int object —— running 返回咗一個數，而唔係 yield 啲對。",
+  "循環入面 yield value, total。一個入面任何地方有 yield 嘅 function 就係 generator，佢嘅返回值唔係叫佢嘅人見到嘅嘢。",
+  "running(squares(nums)) 夾到埋，係因為 generator 係可迭代嘅；running 從來唔知、亦都唔在乎佢嘅輸入係另一個 generator。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.advanced.09.itertools"
+title = "架上嗰個工具箱"
+story = "地庫辦公室有一架冇人開過嘅工具，職員每日下晝都用手數住一張張連住嘅相同飛。"
+brief = '''
+標準輸入係一行整數。
+
+印三行，每一行都用 `itertools` 砌，唔准自己手寫：
+
+1. `SUMS` 後面跟住累計和 —— `accumulate`
+2. `RUNS` 後面跟住每一段**相鄰**相等值，格式 `<v>x<k>` —— `groupby`
+3. `PAIRS <k>`：**唔同**嘅值可以組成幾多對無序對 —— 對排好序嘅唔同值
+   用 `combinations`
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+`groupby` 淨係將**相鄰**嘅相等項目分組。佢唔係 `Counter`，而個示例係特登
+揀到令兩者唔一致嘅：`1` 出現四次，分兩段。個 starter 第二行用咗一個計數
+dict，正正喺呢個輸入度係錯嘅。
+
+呢啲每一個都返回一個惰性迭代器。特別係 `groupby` 嘅每個組，淨係喺你行去
+下一組之前先有效，所以要喺行落去之前先讀晒嗰一組 —— 循環入面
+`len(list(group))`，唔係存低一個組嘅 list 留返遲啲用。
+'''
+hints = [
+  "accumulate(nums) 每個元素之後 yield 一次累計總數；最後嗰個就係總和。",
+  "for value, group in groupby(nums): 個 group 係嗰一段嘅迭代器，淨係可以耗用一次。len(list(group)) 就係佢嘅長度。",
+  "combinations(distinct, 2) 每對無序對 yield 一次。數目係 n*(n-1)/2，用手驗一驗就知你個 n 啱唔啱。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.advanced.10.functools"
+title = "記住你計過嘅嘢"
+story = "豆腐檔由同樣兩個數計同一日嘅價錢，食晏之前計咗一萬一千次，次次由頭計過。"
+brief = '''
+標準輸入係 `n k bits`：兩個整數同一串二進制數字。
+
+印四行：
+
+1. `FIB <fib(n)>` —— 由一個**遞歸**嘅 `fib` 計，用 `functools.lru_cache`
+   記憶化
+2. `PRODUCT <k!>` —— 用 `functools.reduce` 配 `operator.mul` 摺 `1..k`，
+   要有初始值，令 `k = 0` 得到 `1`
+3. `BIN <value>` —— 用一個 `int` 加 `base=2` 嘅 `functools.partial`
+   解析 `bits`
+4. `MISSES <m>` —— `fib.cache_info().misses`，即係個遞歸真正行過主體幾多次
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` 最多係 `400`，所以個遞歸唔會超出 Python 嘅 frame 上限。冇 cache 嘅話，
+`fib(35)` 大約係三千萬次呼叫，`fib(90)` 就行唔完。有 cache，每個 `fib(i)`
+淨係行一次，`MISSES` 就係 `n + 1`。`lru_cache` 係一個 decorator，佢行得通
+係因為啲參數係可雜湊嘅 —— 一個 list 參數會喺第一次呼叫就拋 `TypeError`。
+
+`partial` 將一個 function 嘅部分參數釘死，畀你一個新嘅 function；`reduce`
+將一個雙參數 function 摺過成個序列。兩樣都唔算聰明。兩樣面試都會問。
+'''
+hints = [
+  "def fib 上面加 @functools.lru_cache(maxsize=None)。個 starter 喺最後一行死咗，因為普通 function 冇 cache_info。",
+  "functools.reduce(operator.mul, range(1, k + 1), 1) —— 第三個參數係起始值，正係佢令空嘅 range 得到 1。",
+  "functools.partial(int, base=2) 係一個可呼叫物件，接收個字串，自己補上 base=2。functools.cache 喺 3.9 或以後同 lru_cache(maxsize=None) 係同一樣嘢；兩個名都得。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.advanced.11.protocol"
+title = "佢淨係要識畫自己"
+story = "崇光地庫塊指示牌列咗啲檔口同櫃檯，由兩個唔同嘅程式印出嚟，而塊板淨係想知佢哋每一個都識畫自己出嚟。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行，每行係以下其中一種
+
+* `STALL <NAME> <AISLE>` —— 畫出嚟係 `<NAME> / A<AISLE>`
+* `COUNTER <NUMBER>` —— 畫出嚟係 `COUNTER <NUMBER>`
+
+宣告一個叫 `Sign` 嘅 `typing.Protocol`，得一個方法 `render()`。將
+`Stall` 同 `Counter` 寫做普通 class —— **唔准繼承 `Sign`** —— 再寫一個
+function `show(sign: Sign)`，印出畫嘅結果。印每一個 sign，然後印
+`SIGNS <n>`（用 `isinstance(x, Sign)` 數），再印 `STALLS <k>`（用
+`isinstance(x, Stall)` 數）。
+
+```
+input:  3
+        STALL LAM 4
+        COUNTER 2
+        STALL WONG 1
+output: LAM / A4
+        COUNTER 2
+        WONG / A1
+        SIGNS 3
+        STALLS 2
+```
+
+`Protocol` 係一種**結構性**型別：一個 class 只要有齊嗰啲方法就滿足佢，
+唔使講明。呢個就係鴨子類型，不過有個型別檢查器讀得明嘅名。執行時，
+protocol 乜都唔會做，除非佢標咗 `@runtime_checkable`，咁 `isinstance`
+就會按名 check 有冇嗰個方法。個 starter 嘅 `Sign` 漏咗個 decorator，
+佢嘅 `isinstance` 就拋：
+
+```
+TypeError: Instance and class checks can only be used with @runtime_checkable protocols
+```
+
+`show` 係執行時靠屬性查找分派嘅 —— `sign.render()` 搵到個物件有嘅嗰個
+`render`。冇靜態分派可以揀；Python 得一種機制，就係呢種。
+'''
+hints = [
+  "class Sign(Protocol) 上面加 @runtime_checkable，由 typing import。成個修正就係咁。",
+  "Stall 同 Counter 都冇喺任何地方提過 Sign。佢哋靠有 render() 嚟滿足佢；呢個就係「結構性」嘅意思。",
+  "對住一個 runtime-checkable 嘅 protocol 用 isinstance，淨係 check 個方法存唔存在，唔 check 簽名或者返回型別。嗰啲係型別檢查器 check 嘅；直譯器從來唔會。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.advanced.12.frozen"
+title = "佢係唔會變嘅"
+story = "當日印好嘅價目表 06:00 派晒畀每個檔口，到 12:30，其中三個已經喺上面寫過嘢，仲有一個加咗一欄根本唔存在嘅嘢。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<NAME> <CENTS>`。
+
+將每行砌做一個 **frozen** 嘅 dataclass `Price(name, cents)`。然後對每個
+price，試下覆寫佢嘅 `cents`，嗰次嘗試拋例外嗰陣就印 `FROZEN <NAME>`。
+跟住寫一個有 `__slots__ = ("count",)` 嘅 `Tally` class：設定 `tally.count`，
+然後試下設定一個串錯字嘅 `tally.cuont`，*嗰個*拋例外嗰陣就印 `SLOTS YES`。
+最後印 `IN_SET <k>`，即係將啲 price 放入 `set` 之後嘅大小，同 `TOTAL <sum>`。
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SLOTS YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+frozen 嘅 dataclass 買到三樣嘢，個 starter 一樣都冇。`frozen=True` 令對
+欄位嘅賦值拋 `FrozenInstanceError`，咁張表就冇得寫落去。佢仲令個 instance
+變成**可雜湊** —— 可變嘅 dataclass 會將 `__hash__` 設做 `None`，將個
+starter 啲 price 放入 `set()` 會拋 `TypeError: unhashable type`。欄位相等，
+hash 就相等，所以兩行 `LAM 1200` 喺個 set 入面係同一個成員。
+
+`__slots__` 係另一種固定形狀：個 instance 啱啱好得嗰啲寫明嘅屬性，冇
+`__dict__`，所以屬性名串錯字會喺賦值嗰陣即刻 `AttributeError`，而唔係
+靜靜雞多咗個冇人讀嘅新欄位。佢仲令每個 instance 細啲，所以「我哋有一千萬
+個呢啲嘢」嘅答案就係佢。
+'''
+hints = [
+  "@dataclass(frozen=True)。一個參數，循環入面嘅賦值就會開始拋例外。",
+  "class 主體入面、__init__ 之前寫 __slots__ = (\"count\",)。留意尾嗰個逗號：(\"count\") 係一個字串，唔係 tuple。",
+  "TOTAL 係原本啲仙嘅總和，呢樣淨係喺啲賦值失敗咗嘅前提下先成立。喺個 starter 入面，到嗰陣每個 price 都係 0，TOTAL 就係 0 —— 個改動唔單止畀佢做，仲真係做咗。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.advanced.13.exceptions"
+title = "自己嘅錯誤"
+story = "米檔計價嗰四層，每層都拋自己嗰款嘢，而個櫃檯嘅前端捉到其中一款，就畀其餘嗰啲打冧。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行，每行本來應該係一個以 kg 計嘅重量。
+
+定義一個例外階層：`PriceError(Exception)` 做基底，有 `NotANumber(PriceError)`
+同 `Negative(PriceError)`。`Negative` 帶住個重量，佢嘅訊息係
+`negative weight: <kg>`；`NotANumber` 嘅訊息係 `not a number`。
+`price(text)` 轉換段文字，由佢捉到嘅 `ValueError` **from** 出一個
+`NotANumber`，拒絕負數重量，否則返回 `500 + 100 * kg`。
+
+印每個價錢或者個錯誤嘅訊息，然後印 `ERRORS <k>`。捉**基底 class**，
+捉一次。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative weight: -2
+        ERRORS 2
+```
+
+個 starter 淨係捉 `Negative`，所以 `xx` 嗰行會用一個冇人捉嘅 `NotANumber`
+將成個程式打冧。一句 `except PriceError as err:` 就捉到成個階層嘅每一個
+成員，而 `str(err)` 就係個訊息 —— 呢個係 `Exception.__str__` 由你交畀
+`super().__init__` 嘅參數整出嚟嘅，所以個訊息住喺個 class 入面，唔係住喺
+個 handler 度。
+
+`raise NotANumber() from err` 會將個 `ValueError` 記錄做原因。呢度冇嘢會印
+佢，但一段 traceback 會兩個都顯示，一個喺上一個喺下，中間有句 *The above
+exception was the direct cause of the following exception*。嗰條鏈就係
+寫 `from` 嘅原因。
+'''
+hints = [
+  "except PriceError as err: —— 基底 class 兩個子類都捉到，有基底 class 嘅意義就係咁。",
+  "print(err) 印嘅係 str(err)，即係交畀 super().__init__ 嘅訊息。唔使覆寫 __str__。",
+  "有幾個 except 子句嘅時候次序好緊要：子類嘅子句放喺佢基底 class 嘅子句後面就係死碼，而 Python 唔會警告你。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.advanced.14.iterator"
+title = "下一個，直到停"
+story = "地庫入口部派籌機由一個起始數以固定步幅派號碼，邊度都冇存低一張表，而個排隊板想好似對住普通 list 咁循環佢。"
+brief = '''
+標準輸入係三個整數：`start`、`step`、`count`。
+
+寫一個 class `Tickets`，**用手實現迭代器協定**：`__iter__` 返回 `self`，
+`__next__` 返回下一個值，派夠 `count` 個值之後就拋 `StopIteration`。
+每個值印一行，然後印 `SUM <total>`，個 total 係將第二個 `Tickets` 交畀
+`sum` 計出嚟嘅。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+呢個就係 generator 幫你寫嘅嘢。`for` 循環對嗰樣嘢叫一次 `iter()`，然後
+對結果不斷叫 `next()`，直到佢拋 `StopIteration`；`sum`、`list`、`max`
+同 `in` 都係咁做。一個有 `__next__` 冇 `__iter__` 嘅物件係一個 `for`
+唔肯要嘅迭代器 —— `TypeError: 'Tickets' object is not iterable` ——
+個 starter 就係咁。
+
+`__iter__` 返回 `self` 係**迭代器**嘅標記：佢淨係可以行一次，行完就用完。
+**容器**每次由 `__iter__` 返回一個新嘅迭代器，可以行好多次；基礎路嘅
+`Bag` 就係一個。講清楚你寫緊邊一種；個分別會喺第二次有人循環嘅時候浮現。
+'''
+hints = [
+  "def __iter__(self): return self。兩行，for 就開始行得。",
+  "StopIteration 係拋出嚟嘅，唔係返回嘅。for 循環會捉佢；你永遠唔會見到佢。",
+  "前進之前先存低你準備返回嘅值，唔係你就差咗一步。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.advanced.15.collections"
+title = "啱嘅容器"
+story = "地庫辦公室將當日啲飛全部放喺一條長長嘅 list 度，每一條關於佢哋嘅問題都係由頭讀一次嚟答。"
+brief = '''
+標準輸入有三行：一行字，一行**已經升序排好**嘅整數，同一個整數 `x`。
+
+印四行：
+
+1. `TOP <word> <count>` —— 出現最多次嘅字，打和就按字升序 —— 用
+   `collections.Counter`
+2. `BISECT <l> <r>` —— `x` 喺啲排好序嘅整數入面嘅 `bisect_left` 同
+   `bisect_right`
+3. `SMALLEST3` 後面跟住最細嘅三個整數 —— `heapq.nsmallest` —— 唔夠三個
+   就有幾多印幾多
+4. `GROUPS` 後面跟住每個字嘅首字母嘅 `<letter>:<k>`，字母升序 —— 一個
+   以首字母做 key 嘅 `collections.defaultdict(list)`
+
+```
+input:  tofu egg tofu egg fish
+        1 3 3 5 8
+        3
+output: TOP egg 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS e:2 f:1 t:2
+```
+
+`Counter.most_common(1)` 打和係按**插入次序**嘅，喺呢度即係 `tofu`，
+而題目要 `egg`。個 starter 信咗 `most_common`。改用一個講明你意思嘅 key
+將啲項目排序。
+
+`bisect` 唔使循環就答到「呢個應該放喺邊」：`bisect_left` 係第一個唔細過
+`x` 嘅位置，`bisect_right` 係第一個大過 `x` 嘅位置，兩者之差就係 `x` 有
+幾多個。`heapq.nsmallest` 係 `k` 細而 `n` 唔細嗰陣嘅正確選擇；為咗由頭
+讀三個值而將成個 list 排晒序，正正就係佢存在嘅目的係要避免嘅嘢。
+'''
+hints = [
+  "min(counts.items(), key=lambda item: (-item[1], item[0])) 就係最多嗰個字，連打和規則都寫明。用同一個 key 排序再攞 [0] 係同一個答案。",
+  "bisect_left 同 bisect_right 永遠唔會拋例外；x 唔存在嗰陣 list.index 會拋 ValueError，而其中一個隱藏測試正正就係咁。",
+  "defaultdict(list) 第一次存取就會整個 list 出嚟，所以 groups[letter].append(w) 永遠唔使 check。印之前先排序啲項目；defaultdict 同任何 dict 一樣係插入次序。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.advanced.16.timeouts"
+title = "唔等喇"
+story = "落單板逐個檔口 ping 佢哋嘅等候時間，而嗰個讀卡機壞咗嘅檔口永遠唔答，所以塊板永遠唔會重畫。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<STALL> <SECONDS>`，`SECONDS` 係 `0`
+代表即刻答嘅檔口，`1` 代表唔會準時答嘅檔口。
+
+對每個檔口，喺 `asyncio.wait_for` 之下、以 **0.2 秒** 超時，`await` 佢嘅
+`fetch(stall, seconds)` —— 佢會瞓咁耐 —— 然後按輸入次序印 `<STALL> OK`
+或者 `<STALL> TIMEOUT`。跟住開一個永遠循環嘅 `watch()` task，取消佢，
+await 佢，等佢由自己嘅 `except asyncio.CancelledError` 印 `CANCELLED`，
+再由 `finally` 印 `CLEANUP`。最後印 `TIMEOUTS <k>`。
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+`wait_for` 帶住個限期去行個 awaitable；限期過咗，佢會**取消**入面嗰個
+task，然後向你拋 `asyncio.TimeoutError`。捉呢個名 —— 喺 3.11 或以後佢就係
+內置嘅 `TimeoutError`，喺 3.10 唔係，而 `asyncio.TimeoutError` 兩邊都啱。
+
+個 starter 直接 await `fetch`，所以 `WONG` 用足一秒然後印 `OK`；佢又取消
+咗 `watch` 而冇 await 佢，所以個 task 嘅 `except` 同 `finally` 喺個 loop
+閂之前根本冇機會行。一個被取消嘅 task 要到佢下次被排上去、`CancelledError`
+送到佢入面嗰陣先真正停；await 佢就係畀佢嗰一輪。處理完 `CancelledError`
+之後要重新拋出佢 —— 吞咗佢就係一個 task 變成冇得取消嘅方法。
+'''
+hints = [
+  "asyncio.wait_for(fetch(stall, seconds), timeout=0.2) 放喺 try 入面，配 except asyncio.TimeoutError。",
+  "watcher.cancel() 淨係要求取消。`await watcher` 先係畀個 task 行佢嘅 except 同 finally 嘅嘢；佢會向你重新拋 CancelledError，所以嗰個都要捉埋。",
+  "create_task 之後嘅 await asyncio.sleep(0) 畀個 watcher 一輪真正開始，咁先有一個行緊嘅 task 畀你取消，而唔係得個排咗隊嘅。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.advanced.17.gil"
+title = "GIL"
+story = "崇光地庫，十二個檔口，成層樓一個鎖。所有本來應該同時發生嘅嘢都變咗逐件逐件咁發生，而啲總數返嚟嗰陣乜都冇。"
+brief = '''
+標準輸入係兩個整數 `k` 同 `n`。
+
+將 `1..n` 分做 `k` 段連續嘅塊 —— 第 `i` 塊係 `n*i//k + 1` 到
+`n*(i+1)//k`，包括兩端 —— 每一塊交畀佢自己嘅 thread，由佢加總自己範圍
+入面嘅平方：一個食 CPU 嘅循環，唔准用 library 呼叫。每條 thread 喺鎖之下
+將自己嘅結果加入**一個共用嘅總數**，同時記入自己嗰格。join 晒佢哋。
+按索引次序每塊印 `CHUNK <i> <sum>`，然後印 `TOTAL <sum>`，再印
+`THREADS <k>`。
+
+```
+input:  3 10
+output: CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        THREADS 3
+```
+
+個 starter 失敗嘅原因同時間完全無關。`work` 返回佢嘅總和，`main` 收集
+`t.join()`，而 `join` 無論 target 返回乜都係返回 `None` —— thread 係冇
+返回值嘅。第一個 `+=` 就係一個 `TypeError`。呢個係細嗰隻蟲。用鎖嗰條街
+嘅方法修佢：一個共用容器，更新嗰段用 `with lock:` 包住，每塊嗰格啱啱好
+由一條 thread 寫。
+
+大嗰樣嘢先係大佬，而佢唔係一隻你修得到嘅蟲。用 `k = 4` 同 `n = 4000000`
+行一次計時，再用 `k = 1` 行一次。佢哋用嘅時間係一樣嘅。CPython 有一個
+**全局直譯器鎖**：任何一刻淨係得一條 thread 行緊 Python bytecode，而一條
+食 CPU 嘅 thread 每隔幾毫秒就會放個鎖出嚟等其他人輪一輪。四條 thread
+喺四個核心上面，係輪流、喺一個核心上面加總啲平方，仲要加埋切換嘅成本。
+Python 嘅 thread 係用嚟等嘢嘅 —— 等 socket、等檔案、等 `sleep` —— 等嗰陣
+個鎖係放咗嘅，並發先係真嘅。CPU 嘅工作，答案係 `multiprocessing`，或者
+`concurrent.futures.ProcessPoolExecutor`，佢哋行嘅係各自有各自鎖嘅獨立
+直譯器，代價係要複製啲參數。
+
+輸出係確定嘅，因為啲塊係按索引印嘅，而總數係啲塊嘅和，唔係啲 thread
+完成嘅次序。`TOTAL` 要由鎖住嗰個總數印，唔係將啲格加埋 —— 個鎖先係呢張
+地圖講嘅嘢，而兩者一定要一致。
+'''
+hints = [
+  "join() 返回 None。畀 work 一個索引同一格可以寫，再畀一個鎖住嘅 dict 可以加落去；值就係咁樣由 thread 出嚟嘅。",
+  "先 start 晒，再 join 晒，再印。喺 thread 入面印會交錯；join 完之後由啲格印，就唔會。",
+  "n*(n+1)*(2n+1)/6 係總數嘅封閉式。用佢驗一次 TOTAL，你就知啲塊嘅邊界啱唔啱。",
+  "喺大嘅 n 度，k=1 同 k=4 計下時。兩者一樣嗰陣，你就遇到 GIL 喇。嗰個唔係呢條街嘅蟲；佢係呢個程式下一個版本會係 ProcessPoolExecutor 嘅原因。",
+]

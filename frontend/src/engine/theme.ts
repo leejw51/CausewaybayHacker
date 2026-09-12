@@ -49,13 +49,18 @@ export const TRACK_COL: Record<string, RGBA> = {
   // unmistakably Ferris. The previous 242,120,41 was off-grid and it was the
   // identity colour of a whole land.
   rust: c(248, 152, 56),
-  python: c(92, 158, 236),
+  // ISO C++ blue #00599C and Python gold #FFD43B, each snapped to the grid.
+  cpp: c(0, 88, 152),
+  python: c(248, 208, 56),
 };
 
 export const TRACK_HAZE: Record<string, RGBA> = {
   go: [0.02, 0.02, 0.1, 0.22],
   rust: [0.32, 0.08, 0.02, 0.26],
-  python: [0.02, 0.1, 0.22, 0.28],
+  // C++ LAND is noon on the typhoon shelter: a deep blue off the water.
+  // PYTHON LAND is the wet market at dawn: a warm amber under fluorescent light.
+  cpp: [0.0, 0.12, 0.3, 0.28],
+  python: [0.3, 0.2, 0.02, 0.24],
 };
 
 /** A colour a canvas will take, with an optional alpha override. */

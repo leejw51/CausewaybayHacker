@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<work>/main.py", line 4, in <module>
+    print(price + 3)
+          ~~~~~~^~~
+TypeError: can only concatenate str (not "int") to str

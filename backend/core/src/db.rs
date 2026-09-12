@@ -43,6 +43,23 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0007_interviews",
         include_str!("../migrations/0007_interviews.sql"),
     ),
+    (
+        8,
+        "0008_more_lands",
+        include_str!("../migrations/0008_more_lands.sql"),
+    ),
+    // Versions must stay ascending here: `migrate` stamps `user_version` after
+    // each one, so an entry listed out of order is silently skipped forever.
+    (
+        9,
+        "0009_quest_text",
+        include_str!("../migrations/0009_quest_text.sql"),
+    ),
+    (
+        10,
+        "0010_edit_stack",
+        include_str!("../migrations/0010_edit_stack.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {
@@ -132,6 +149,15 @@ pub fn assert_fts5(conn: &Connection) -> Result<()> {
 
 /// Apply every migration above `PRAGMA user_version`, each in its own
 /// transaction, in order.
+///
+/// Foreign keys are off while a migration runs and checked before it
+/// commits, which is the procedure the SQLite manual gives for altering a
+/// table (0008 rebuilds three). With them on, `DROP TABLE quests` is an
+/// implicit `DELETE FROM quests` that cascades through progress, attempts and
+/// mistakes before the copy is renamed into place. The pragma is a no-op
+/// inside a transaction, so it is set before `BEGIN` and restored after
+/// `COMMIT`; `foreign_key_check` inside the transaction is what makes sure
+/// nothing dangling gets committed in between.
 pub fn migrate(conn: &Connection) -> Result<()> {
     let current: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
     for (version, name, sql) in MIGRATIONS {
@@ -139,17 +165,43 @@ pub fn migrate(conn: &Connection) -> Result<()> {
             continue;
         }
         tracing::info!(version, name, "applying migration");
+        conn.pragma_update(None, "foreign_keys", "OFF")?;
         conn.execute_batch("BEGIN IMMEDIATE")?;
         let applied = conn
             .execute_batch(sql)
-            .and_then(|_| conn.execute_batch(&format!("PRAGMA user_version = {version}")));
-        match applied {
-            Ok(()) => conn.execute_batch("COMMIT")?,
+            .and_then(|_| conn.execute_batch(&format!("PRAGMA user_version = {version}")))
+            .and_then(|_| foreign_keys_hold(conn));
+        let committed = match applied {
+            Ok(()) => conn.execute_batch("COMMIT"),
             Err(e) => {
                 let _ = conn.execute_batch("ROLLBACK");
-                return Err(internal(format!("migration {name} failed: {e}")));
+                Err(e)
             }
+        };
+        // Restored whatever happened above; a failed migration must not leave
+        // the connection with its foreign keys off.
+        conn.pragma_update(None, "foreign_keys", "ON")?;
+        if let Err(e) = committed {
+            return Err(internal(format!("migration {name} failed: {e}")));
         }
+    }
+    Ok(())
+}
+
+/// `PRAGMA foreign_key_check` returns one row per violation; the migration is
+/// only allowed to commit when it returns none.
+fn foreign_keys_hold(conn: &Connection) -> rusqlite::Result<()> {
+    let mut stmt = conn.prepare("PRAGMA foreign_key_check")?;
+    let mut rows = stmt.query([])?;
+    if let Some(row) = rows.next()? {
+        let table: String = row.get(0)?;
+        let parent: String = row.get(2)?;
+        return Err(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_CONSTRAINT),
+            Some(format!(
+                "{table} has a row that no longer points at {parent}"
+            )),
+        ));
     }
     Ok(())
 }

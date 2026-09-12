@@ -2,6 +2,16 @@
 """Verify a Causewaybay Hacker content pack against SPEC.md §5 and §12.
 
 Usage: verify_pack.py content/rust/basic.toml [more.toml ...]
+       verify_pack.py --i18n content/rust/basic.toml [more.toml ...]
+
+`--i18n` checks the translations of the given English packs instead (SPEC
+§12.1). For every locale in ko yue zh ja cs, a file
+`content/i18n/<locale>/<pack>.toml` that exists must keep every rule: cover
+only real quest ids, keep each quest's hint count, use ''' for
+`brief`/`story`, and carry the English brief's fenced code blocks verbatim.
+Breaking a rule fails; not having started a language does not — coverage is
+printed per locale, and `--require-complete` makes it a failure for the
+final sweep. Nothing is compiled in this mode.
 
 For every quest it:
   * checks the structural rules of SPEC §12 (id shape, node contiguity,
@@ -50,7 +60,7 @@ SCRATCH = pathlib.Path(
 )
 CACHE = pathlib.Path(os.environ.get("CWBHACKER_CI_CACHE", _root / "cache"))
 
-ID_RE = re.compile(r"^(rust|go)\.(basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
+ID_RE = re.compile(r"^(rust|go|cpp|python)\.(basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
 
 MISTAKE_MAP_HEADING = "## 2. Mistake kind → concepts"
 
@@ -135,12 +145,36 @@ def build(lang, src, workdir):
             ["rustc", "--edition", "2021", "-O", "--error-format=json",
              "main.rs", "-o", "prog"],
             cwd=workdir, capture_output=True, text=True, timeout=180)
-    else:
+    elif lang == "go":
         f = workdir / "main.go"
         f.write_text(src)
         p = subprocess.run(
             ["go", "build", "-o", "prog", "main.go"],
             cwd=workdir, capture_output=True, text=True, timeout=180, env=go_env())
+    elif lang == "cpp":
+        # The same line the runner uses (SPEC §5.1): C++20, optimised, with
+        # threads linked, because the advanced road is std::thread and
+        # std::mutex and a quest that cannot link them is not a quest.
+        f = workdir / "main.cpp"
+        f.write_text(src)
+        p = subprocess.run(
+            ["c++", "-std=c++20", "-O2", "-pthread", "-Wall", "-o", "prog", "main.cpp"],
+            cwd=workdir, capture_output=True, text=True, timeout=180)
+    elif lang == "python":
+        # Python has no compile step; the "build" is a syntax check, so a
+        # SyntaxError lands as compile_error the way it does in the runner,
+        # and `prog` is a tiny launcher so run_case stays one code path.
+        f = workdir / "main.py"
+        f.write_text(src)
+        p = subprocess.run(
+            ["python3", "-m", "py_compile", "main.py"],
+            cwd=workdir, capture_output=True, text=True, timeout=60)
+        if p.returncode == 0:
+            launcher = workdir / "prog"
+            launcher.write_text("#!/bin/sh\nexec python3 -I \"$(dirname \"$0\")/main.py\"\n")
+            launcher.chmod(0o755)
+    else:
+        raise ValueError(f"no toolchain for land {lang!r}")
     return p.returncode == 0, p.stderr
 
 
@@ -326,8 +360,186 @@ def structural(pack, path, vocab):
     return errs, turns
 
 
+# ---------------------------------------------------------------- i18n
+TEXT_LOCALES = ("ko", "yue", "zh", "ja", "cs")
+TRANSLATION_CODE_FIELDS = ("brief", "story")
+
+
+def fenced_blocks(text):
+    """The fenced code blocks of a markdown brief, in order, verbatim.
+
+    SPEC §12.1: code blocks, sample I/O and the strings a program must print
+    are the English pack's and are not translated. Comparing the blocks is
+    the cheapest check that a translator did not "helpfully" localise the
+    expected output — which would make the brief disagree with the tests in
+    a way the player cannot see.
+    """
+    out, inside, buf = [], False, []
+    for line in text.split("\n"):
+        if line.strip().startswith("```"):
+            if inside:
+                out.append("\n".join(buf))
+            inside, buf = not inside, []
+            continue
+        if inside:
+            buf.append(line)
+    return out
+
+
+def basic_string_lines(raw, fields):
+    """Line numbers where one of `fields` is opened with a \"\"\" string.
+
+    The same raw-text scan the importer does (`reject_basic_strings`): a TOML
+    parser cannot say which quote style a string used, and a \"\"\" string
+    has already eaten the backslash escapes in the brief's code blocks by the
+    time it is parsed.
+    """
+    hits = []
+    for number, line in enumerate(raw.split("\n"), 1):
+        stripped = line.lstrip()
+        for field in fields:
+            if not stripped.startswith(field):
+                continue
+            rest = stripped[len(field):].lstrip()
+            if rest.startswith("=") and rest[1:].lstrip().startswith('"""'):
+                hits.append((number, field))
+    return hits
+
+
+def check_translation(english, pack_path, locale):
+    """One locale × pack: the file exists and keeps to SPEC §12.1.
+
+    Returns `(problems, untranslated_ids)`, and the split is the whole point:
+    a quest a translator has not reached yet is a coverage gap, and a rule
+    broken in one they have is a mistake. Only the second fails CI — see
+    `main_i18n`. So a file that does not exist at all is the emptiest possible
+    coverage gap, every quest untranslated and nothing wrong, rather than an
+    error: the language has not been started, which is not a defect in it.
+    """
+    path = REPO / "content" / "i18n" / locale / f"{english['pack']}.toml"
+    rel = path.relative_to(REPO)
+    if not path.exists():
+        return [], [q["id"] for q in english["quest"]]
+    raw = path.read_text()
+    errs = []
+    for number, field in basic_string_lines(raw, TRANSLATION_CODE_FIELDS):
+        errs.append(f"{rel}:{number}: `{field}` uses a \"\"\" basic string; use '''")
+    try:
+        tr = tomllib.loads(raw)
+    except tomllib.TOMLDecodeError as e:
+        # The importer refuses the file whole, so nothing in it reaches a
+        # player however many quests it contains: every id is untranslated.
+        return errs + [f"{rel}: not valid TOML: {e}"], [q["id"] for q in english["quest"]]
+    if tr.get("pack") != english["pack"]:
+        errs.append(f"{rel}: pack = {tr.get('pack')!r}, want {english['pack']!r}")
+    if tr.get("locale") != locale:
+        errs.append(f"{rel}: locale = {tr.get('locale')!r} but the file sits under i18n/{locale}/")
+    for key in ("land", "category"):
+        if key in tr:
+            errs.append(f"{rel}: carries `{key}`; a translation names only its pack")
+    by_id = {q["id"]: q for q in english["quest"]}
+    seen = set()
+    for q in tr.get("quest", []):
+        qid = q.get("id")
+        if qid in seen:
+            errs.append(f"{rel}: duplicate id {qid!r}")
+        seen.add(qid)
+        src = by_id.get(qid)
+        if src is None:
+            errs.append(f"{rel}: {qid!r} is not a quest of {english['pack']}")
+            continue
+        for key in ("node", "starter", "solution", "tests", "difficulty", "map", "requires", "concepts"):
+            if key in q:
+                errs.append(f"{rel}: {qid}: carries `{key}`, which belongs to the English pack alone")
+        if not str(q.get("title", "")).strip():
+            errs.append(f"{rel}: {qid}: empty title")
+        if not str(q.get("brief", "")).strip():
+            errs.append(f"{rel}: {qid}: empty brief")
+        if src.get("story", "").strip() and not str(q.get("story", "")).strip():
+            errs.append(f"{rel}: {qid}: empty story (the English has one)")
+        want, got = len(src.get("hints", [])), len(q.get("hints", []))
+        if want != got:
+            errs.append(f"{rel}: {qid}: {got} hints, the English has {want} — "
+                        f"hints are revealed by index and the counts must match")
+        eb, tb = fenced_blocks(src["brief"]), fenced_blocks(q.get("brief", ""))
+        if eb != tb:
+            errs.append(f"{rel}: {qid}: fenced code blocks differ from the English brief — "
+                        f"code, sample I/O and expected output are copied verbatim, never translated")
+    missing = [qid for qid in by_id if qid not in seen]
+    return errs, missing
+
+
+def main_i18n(argv):
+    """`--i18n`: given English packs, check the translations beside them. No
+    toolchain runs; a translation has no code to build.
+
+    Two different questions, and only one of them is a build failure:
+
+    **Is every translation file that exists correct?** Always enforced. A file
+    whose hint count disagrees with the English, whose fenced code blocks were
+    translated, which carries a `solution`, or which is not valid TOML at all,
+    is a defect — it will mis-render or fail to import, and somebody has to fix
+    it. This is what the exit status means.
+
+    **Is every language finished?** Reported, never enforced. Translating 207
+    quests into five languages is incremental by nature, and a gate that only
+    goes green on the last one is a gate that is red for months and therefore
+    tells nobody anything. The per-locale coverage lines and the summary at the
+    bottom say exactly how far along each language is, and `--require-complete`
+    turns that into a failure for whoever is doing the final sweep.
+    """
+    require_complete = "--require-complete" in argv
+    argv = [a for a in argv if a != "--require-complete"]
+    all_ok = True
+    covered = {}
+    for arg in argv:
+        path = pathlib.Path(arg)
+        if not path.is_absolute():
+            path = REPO / path
+        english = tomllib.loads(path.read_text())
+        rel = path.relative_to(REPO) if path.is_relative_to(REPO) else path
+        print(f"\n=== {rel}  (pack={english['pack']}  {len(english['quest'])} quests) — translations ===")
+        total = len(english["quest"])
+        for locale in TEXT_LOCALES:
+            errs, missing = check_translation(english, path, locale)
+            name = f"content/i18n/{locale}/{english['pack']}.toml"
+            for e in errs:
+                print(f"  {locale:<4} FAIL     {e}")
+            if missing and len(missing) == total and not errs:
+                print(f"  {locale:<4} TODO     {name}: not started")
+            elif missing:
+                done = total - len(missing)
+                print(f"  {locale:<4} TODO     {name}: {done}/{total} translated"
+                      + (", and those pass every rule" if not errs else "")
+                      + "; untranslated: " + " ".join(missing[:6])
+                      + (" …" if len(missing) > 6 else ""))
+            if errs:
+                all_ok = False
+            if not errs and not missing:
+                print(f"  {locale:<4} OK       {name} covers all {total} quests")
+            tally = covered.setdefault(locale, [0, 0])
+            tally[0] += total - len(missing)
+            tally[1] += total
+
+    print("\n=== coverage (reported, not enforced) ===")
+    short = []
+    for locale in TEXT_LOCALES:
+        done, tot = covered.get(locale, (0, 0))
+        flag = "" if done == tot else "   <-- unfinished"
+        print(f"  {locale:<4} {done:>3}/{tot} quests translated{flag}")
+        if done != tot:
+            short.append(locale)
+    if require_complete and short:
+        print("\n=== --require-complete: " + " ".join(short) + " are unfinished ===")
+        all_ok = False
+    print(f"\n=== {'ALL TRANSLATIONS VERIFIED' if all_ok else 'TRANSLATION FILES ARE WRONG ABOVE'} ===")
+    return 0 if all_ok else 1
+
+
 # ---------------------------------------------------------------- main
 def main(argv):
+    if "--i18n" in argv:
+        return main_i18n([a for a in argv if a != "--i18n"])
     complete = "--complete" in argv
     argv = [a for a in argv if a != "--complete"]
     vocab, kindmap = load_vocab()

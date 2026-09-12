@@ -114,7 +114,8 @@ end
 function Ai:next()
   if not self.drill or self.busy then return end
   self.busy = true
-  self.app.session:request("ai.next", { drill_id = self.drill.id },
+  -- §4.16: the same `locale` as quest.get, since this opens the same screen.
+  self.app.session:request("ai.next", { drill_id = self.drill.id, locale = I18n.lang },
     function(ok, payload, why)
       self.busy = false
       if not ok then

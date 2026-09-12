@@ -7,6 +7,7 @@
 
 local T = require("tests.framework")
 local Map = require("src.scenes.map")
+local Land = require("src.land")
 
 --- A Map with just enough around it to switch, and a record of every
 --- `world.map` the switch asked for.
@@ -57,8 +58,25 @@ return function()
     end
   end)
 
+  T.case("TAB walks rust → go → cpp → python and wraps to rust", function()
+    -- SPEC §0's order, the same one the land cards come in, so what TAB does
+    -- on the map is what RIGHT does on the land screen.
+    T.same(Land.ORDER, { "rust", "go", "cpp", "python" })
+    local map, asked, app = fake_map("rust", "advanced")
+    local seen = {}
+    for _ = 1, #Land.ORDER do
+      map:cycle_land()
+      seen[#seen + 1] = map.land
+      T.eq(map.category, "advanced", "the category never moves")
+      T.eq(app.land, map.land, "the app followed")
+    end
+    T.same(seen, { "go", "cpp", "python", "rust" })
+    T.same(asked, { "go.advanced", "cpp.advanced", "python.advanced", "rust.advanced" },
+      "one world.map per step, each for the right map")
+  end)
+
   T.case("TAB wraps back", function()
-    local map = fake_map("go", "advanced")
+    local map = fake_map("python", "advanced")
     map:cycle_land()
     T.eq(map.land, "rust")
     T.eq(map.category, "advanced")

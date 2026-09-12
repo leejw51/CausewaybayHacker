@@ -63,10 +63,13 @@ impl Home {
             home.build_dir(),
             home.build_lang_dir("rust"),
             home.build_lang_dir("go"),
+            home.build_lang_dir("cpp"),
+            home.build_lang_dir("python"),
             home.root.join("build/go/gocache"),
             home.root.join("build/go/gomodcache"),
             home.root.join("build/rust/cargo-home"),
             home.root.join("build/rust/target"),
+            home.edits_dir(),
             home.logs_dir(),
         ] {
             ensure_dir(&dir)?;
@@ -91,6 +94,21 @@ impl Home {
     }
     pub fn build_lang_dir(&self, lang: &str) -> PathBuf {
         self.build_dir().join(lang)
+    }
+    /// `edits/` — the undo/redo stacks' content store (`edits.rs`). A root of
+    /// its own rather than a corner of `users/`, because what is under it is
+    /// not the player's saved work but the trail behind it: `cwbhacker prune`
+    /// may throw the whole tree away and lose nothing that was ever submitted.
+    pub fn edits_dir(&self) -> PathBuf {
+        self.root.join("edits")
+    }
+    /// `edits/<address>/<quest_id>/` — one directory per stack, holding the
+    /// `<sha>.<ext>` blobs its rows name. The address is lowercased for the
+    /// same reason `user_dir` lowercases it (SPEC §3.4).
+    pub fn edit_dir(&self, address: &str, quest_id: &str) -> PathBuf {
+        self.edits_dir()
+            .join(address.to_ascii_lowercase())
+            .join(quest_id)
     }
     pub fn logs_dir(&self) -> PathBuf {
         self.root.join("logs")

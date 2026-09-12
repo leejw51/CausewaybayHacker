@@ -42,12 +42,21 @@ local runlog = require("src.net.runlog")
 local Playground = {}
 Playground.__index = Playground
 
-local LANGS = { "rust", "go" }
+local Land = require("src.land")
+
+-- TAB walks the languages in the lands' order, and the starter is the same
+-- program in each: the smallest thing that compiles and prints, so the desk
+-- proves the toolchain is there before anybody types.
+local LANGS = Land.ORDER
 
 local STARTER = {
   rust = 'fn main() {\n    println!("hello");\n}\n',
   go = 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hello")\n}\n',
+  cpp = '#include <iostream>\n\nint main() {\n    std::cout << "hello\\n";\n}\n',
+  python = 'print("hello")\n',
 }
+Playground.LANGS = LANGS
+Playground.STARTER = STARTER
 
 --- §5.9's `outcome`, in plain words. Not one of them is a verdict: every line
 --- describes what the program did, which is all that happened.

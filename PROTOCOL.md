@@ -363,7 +363,7 @@ The land/category select screen.
 One overworld.
 
 ```json
-→ payload: { "land": "rust", "category": "basic" }
+→ payload: { "land": "rust", "category": "basic", "locale": "ko" }     locale optional
 ← payload: {
     "land": "rust", "category": "basic",
     "nodes": [ MapNode, … ],              §5.2, ordered by node
@@ -373,6 +373,14 @@ One overworld.
 
 `edges` are the paths the map draws, derived from `requires`. They are given
 explicitly so a client never has to infer the overworld's shape.
+
+`locale` is the client's UI language, and it is optional. Where a translation
+of a quest exists in that language (SPEC §12.1) its `MapNode.title` is the
+translated one and `MapNode.text_locale` names the language; everywhere else
+the title is the English and `text_locale` is `"en"`. It is per node, not per
+map, because a translation may cover a pack partially. A `locale` the server
+has no packs for — `"xx"`, `"en"`, an empty string — means English, never an
+error: a client's language is its own business.
 
 **Every node is playable. Nothing is locked.** `requires` and `edges` describe
 the *suggested* route — the order the content was written to be learned in, and
@@ -393,13 +401,23 @@ exhaustive client, and because a future mode may want it.
 ### 4.8 `quest.get`
 
 ```json
-→ payload: { "quest_id": "rust.basic.03.shadowing" }
+→ payload: { "quest_id": "rust.basic.03.shadowing", "locale": "ko" }   locale optional
 ← payload: { "quest": Quest }             §5.3
 ```
 
 `Quest.solution` is **omitted
 entirely** unless the player has cleared it — not sent as null, not sent
 empty.
+
+**`locale`** works as it does on `world.map`: when a translation of this quest
+exists in that language, `title`, `story`, `brief` and the hints `quest.hint`
+will hand out are in it, and `Quest.text_locale` says so; otherwise the English
+goes out and `text_locale` is `"en"`. The code — `starter`, `solution`,
+`tests` — is the same in every language, because the program the player must
+write is the same program. A client compares `text_locale` with the language
+it is showing and, when they differ, tells the player the brief is in English
+rather than letting it read as a translation somebody abandoned. `ai.next`
+(§4.16) takes the same field, since it opens the same screen.
 
 **`Quest.draft`** is the source of the player's own most recent attempt at
 this quest — a run or a submit, either counts — or `null` on a quest nobody
@@ -568,8 +586,11 @@ each** — the same ceiling as a submission, because it is the same question
 ### 4.9d `code.format`
 
 Run the language's own formatter over the source and hand it back. `rustfmt`
-for Rust, `gofmt` for Go — the tools the player's colleagues would use, not a
-house style invented here.
+for Rust, `gofmt` for Go, `clang-format` for C++ — the tools the player's
+colleagues would use, not a house style invented here. Python has none, and
+C++ has one only while `clang-format` is on the server's PATH; a `code.format`
+for a language without a formatter is answered with an `.err`, never with the
+source handed back untouched as if it had been looked at.
 
 ```json
 → payload: { "lang": "rust", "source": "fn main(){let x=1;}" }
@@ -604,12 +625,17 @@ source over the submit cap is refused the same way.
 ### 4.10 `quest.hint`
 
 ```json
-→ payload: { "quest_id": "…", "index": 0 }      0-based
+→ payload: { "quest_id": "…", "index": 0, "locale": "ko" }      0-based; locale optional
 ← payload: { "hint": "…", "index": 0, "total": 2, "hints_used": 1 }
 ```
 
 Taking a hint costs stars (SPEC §6.3) and is permanent. Re-requesting a hint
 already taken does not cost again. `not_found` when `index` is past `total`.
+
+`locale` selects the language of `hint`, on the same terms as §4.8. It is the
+same `index` into an array of the same length — the importer refuses a
+translation whose hint count differs from the English — so a hint paid for in
+one language is the same hint, free, in another.
 
 ### 4.11b `quest.solve`
 
@@ -703,6 +729,121 @@ that happened.
 Gives back the starter code. **Does not** touch progress, attempts, stars or
 hints — it is an editor convenience, not an undo.
 
+### 4.11c The edit stack
+
+`quest.reset` above says plainly that it is not an undo. This is the undo: one
+stack per `(player, quest)`, held on the server, so it survives a reload and is
+the same stack in the browser and in the LÖVE client. Five messages, all
+requiring auth, all naming a quest:
+
+| type | payload | `.ok` payload |
+| --- | --- | --- |
+| `edit.state` | `{quest_id}` | `EditState` — §5.12 |
+| `edit.push` | `{quest_id, source}` | `EditState` |
+| `edit.undo` | `{quest_id}` | `EditState` |
+| `edit.redo` | `{quest_id}` | `EditState` |
+| `edit.clear` | `{quest_id}` | `EditState` |
+
+```json
+→ edit.push  payload: { "quest_id":"rust.basic.03.shadowing", "source":"fn main(){ … }" }
+← payload: { "quest_id":"rust.basic.03.shadowing", "source":"fn main(){ … }",
+             "cursor":4, "depth":4, "can_undo":true, "can_redo":false }
+
+→ edit.undo  payload: { "quest_id":"rust.basic.03.shadowing" }
+← payload: { "quest_id":"rust.basic.03.shadowing", "source":"<the text before that push>",
+             "cursor":3, "depth":4, "can_undo":true, "can_redo":true }
+```
+
+**The reply payload *is* the `EditState`**, not a wrapper around one, and all
+five return the whole of it as it stands after the operation. A client
+therefore never keeps a model of the stack that it could be wrong about — it
+renders what it is told. The state names its own `quest_id` as a convenience
+rather than as the correlation mechanism — that is the envelope's `id` (§2.2) —
+so a client holding two open editors can route a reply without consulting its
+own table of requests in flight.
+
+**It is one list with a cursor, not an undo stack and a redo stack.**
+
+```
+entries:  [e1, e2, e3, e4, e5]      depth 5
+cursor:             ^ 3             source = e3, can_undo, can_redo
+```
+
+`cursor` is how many entries are applied, the current source is
+`entries[cursor - 1]`, and `cursor == 0` is the quest's starter — which is why
+`source` is nullable rather than carrying a copy of the starter the client
+already has. Undo and redo move the cursor and touch nothing else. Two stacks
+would mean shifting entries from one to the other on every operation, and an
+invariant the code has to keep; one list and an integer is a row order plus a
+number, which is exactly the pair that survives a restart — restored, not
+approximated.
+
+**A push after an undo drops the redo tail.** `edit.push` truncates everything
+above the cursor before it appends, which is what every editor the player has
+ever used does. The reason is worth stating rather than assuming: an entry
+above the cursor describes a future that the new edit has just replaced, and
+keeping it would let a later `edit.redo` silently throw away what the player
+just typed and call that a redo.
+
+**A push of the text already at the cursor is a no-op** — the same state comes
+back and `depth` does not move. Clients push on an idle timer (below), so
+without this the stack would fill with copies of one text and UNDO would appear
+to do nothing several times before it did something.
+
+**Undo at the bottom, redo at the top, and `edit.clear` on an empty stack are
+`.ok`, not errors.** They return the state unchanged. `can_undo` and `can_redo`
+already told the client what was possible, and a held-down key or a second open
+window must not be able to turn that race into an error the player sees.
+
+**The stack is capped at 100 entries per quest.** A push beyond the cap drops
+the oldest entry from the bottom and leaves the cursor on the same text. A
+trainer that grows without bound inside the player's home directory is a bug,
+and SPEC §2.3 says what the cap actually costs on disk, which is very little.
+The consequence a client author should expect: once entries have been dropped,
+undoing all the way down goes from the oldest *surviving* entry straight to
+`cursor: 0` and `source: null` — the starter. History past the cap is gone,
+not hidden, and `can_undo` says so honestly rather than pretending.
+
+**`edit.clear` drops every entry and leaves the editor alone.** `depth` and
+`cursor` go to zero and `source` comes back `null`, but the text on screen is
+the player's work and throwing the history away is not an edit to it. This is
+the one reply whose `source` is not an instruction to replace the buffer.
+
+**When to push, so two clients agree.** The server never pushes on a player's
+behalf; the stack holds exactly what a client put in it, and clients that
+choose different moments hand the same player two different histories. Push
+where the draft is already being saved — around `quest.run` and `quest.submit`
+— and on a debounced idle of about 1.5 s after typing stops. A step on this
+stack should be a thought rather than a keystroke; the editor's own local
+history is the fine-grained one and stays in the editor.
+
+**`Quest.draft` and `EditState.source` can disagree, and the stack wins.**
+`draft` (§4.8) is a read of the last attempt's source, so it moves only when
+the player runs or submits, while the stack also moves on undo and redo. A
+client opening a quest asks for both and shows the stack's `source` whenever
+`depth > 0`; `draft ?? starter` is the fallback for a quest with no stack yet,
+which is every quest before its first push.
+
+**Nothing is broadcast when the stack changes.** Unlike `progress.update`
+(§4.19), there is no server-initiated event here: two windows open on the same
+quest do not stay in step live, and each learns the truth the next time it
+asks. That is deliberate. A cleared node is a fact about the world and belongs
+in both windows at once; an editor buffer is not, and a window that replaced
+the text under somebody's cursor because another window pressed UNDO would be
+destroying work rather than syncing it. Send `edit.state` when the quest screen
+opens and trust the replies after that.
+
+The stack works during an interview (§4.9e). It is an editor convenience, like
+`quest.reset`, and it reveals nothing — no hint, no solution, only what the
+candidate themselves typed. A live screen with no undo is a worse simulation of
+one, not a stricter one.
+
+`.err` cases: `unauthorized` (all five need a session), `not_found` (no such
+quest), and `bad_request` for a `source` over 256 KiB — the same ceiling
+`quest.submit` and the playground use, because it is the same question ("a
+source file this server will take") asked a third time. There is no `busy`:
+nothing here compiles anything.
+
 ### 4.12 `search.query`
 
 ```json
@@ -781,7 +922,7 @@ that does not exist — it makes every other badge mean nothing.
                      mode: "repeat" | "weakness" | "spaced"
 ← ai.plan.ok payload: { "drill": Drill }         §5.8
 
-→ ai.next   payload: { "drill_id": "drl_…" }
+→ ai.next   payload: { "drill_id": "drl_…", "locale": "ko" }       locale optional, as §4.8
 ← ai.next.ok payload: { "quest": Quest, "position": 2, "total": 5,
                         "why": "you hit borrow-after-move 6 times" }
 ```
@@ -913,6 +1054,7 @@ type MapNode = {
   kind: "quest" | "boss" | "gate";
   requires: string[];                    // quest ids
   attempts: number;
+  text_locale: "en" | "ko" | "yue" | "zh" | "ja" | "cs";   // the language `title` is in (§4.7)
 };
 ```
 
@@ -920,8 +1062,12 @@ type MapNode = {
 
 ```ts
 type Quest = {
-  id: string; land: "rust"|"go"; category: "basic"|"advanced"|"hacker";
+  id: string; land: "rust"|"go"|"cpp"|"python"; category: "basic"|"advanced"|"hacker";
   node: number; title: string; brief: string; story: string;
+  /** §4.8 — the language of title, story, brief and the hints. "en" unless a
+   *  translation (SPEC §12.1) was substituted for the `locale` the client
+   *  asked with. The code fields are never translated. */
+  text_locale: "en" | "ko" | "yue" | "zh" | "ja" | "cs";
   difficulty: 1|2|3|4|5;
   time_limit_s: number | null;           // null = untimed
   opened_at: string | null;              // §4.8b — server time the clock started
@@ -985,7 +1131,7 @@ cleared" — re-solving a cleared quest reports `verdict: "accepted"` with
 ```ts
 type PlaygroundRun = {
   attempt_id: string;                    // for correlating the stream only
-  lang: "rust" | "go";
+  lang: "rust" | "go" | "cpp" | "python";
   outcome: "ok" | "compile_error" | "runtime_error" | "timeout" | "output_limit";
   compile_ms: number; run_ms: number;
   exit_code: number | null;
@@ -999,7 +1145,7 @@ type PlaygroundRun = {
 
 type Snippet = {
   id: string;                            // "pg_" + 16 hex
-  name: string; lang: "rust" | "go"; source: string;
+  name: string; lang: "rust" | "go" | "cpp" | "python"; source: string;
   created_at: string; updated_at: string;
 };
 type SnippetBrief = Omit<Snippet, "source"> & { bytes: number };
@@ -1093,6 +1239,25 @@ type Drill = {
   created_at: string;
 };
 ```
+
+### 5.12 `EditState`
+
+```ts
+type EditState = {
+  quest_id: string;
+  source: string | null;                 // the text at the cursor; null is the
+                                         // quest's starter, which is what an
+                                         // empty stack and cursor 0 both mean
+  cursor: number;                        // 0..depth — how many entries apply
+  depth: number;                         // entries on the stack, 0..100
+  can_undo: boolean;                     // cursor > 0
+  can_redo: boolean;                     // cursor < depth
+};
+```
+
+`can_undo` and `can_redo` follow from `cursor` and `depth` and are sent anyway:
+they are exactly what the two buttons are enabled by, and a client that derives
+them is a client that can derive them differently. §4.11c has the model.
 
 ---
 

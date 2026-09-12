@@ -11,6 +11,7 @@ pub mod awards;
 pub mod content;
 pub mod db;
 pub mod drills;
+pub mod edits;
 pub mod error;
 pub mod eth;
 pub mod ids;

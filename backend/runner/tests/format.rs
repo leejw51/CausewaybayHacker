@@ -131,3 +131,31 @@ fn a_formatter_gets_a_timeout_of_its_own() {
     );
     assert!(out.source.contains("let _x = 1;"));
 }
+
+/// `clang-format` does not ship with `c++`, so the C++ answer to
+/// `is_supported` is asked of PATH. Where it is installed it must behave
+/// like the other two; where it is not, the gate must be closed and the
+/// source must still come back untouched.
+#[test]
+fn clang_format_tidies_cpp_where_it_exists() {
+    let untidy = "#include <iostream>\nint main(){std::cout<<\"hi\";}\n";
+    if !have("clang-format") {
+        assert!(!format::is_supported("cpp"));
+        let out = format::format("cpp", untidy).unwrap();
+        assert_eq!(out.source, untidy);
+        assert!(!out.changed);
+        assert!(out.problem.unwrap().contains("clang-format"));
+        return;
+    }
+    assert!(format::is_supported("cpp"));
+    let out = format::format("cpp", untidy).unwrap();
+    assert!(out.changed, "{out:?}");
+    assert!(out.source.contains("int main() {"), "{}", out.source);
+    assert!(out.problem.is_none());
+
+    // clang-format formats what it can of broken code rather than
+    // refusing, so the property under test is only that nothing is lost.
+    let broken = "int main() {\n";
+    let out = format::format("cpp", broken).unwrap();
+    assert!(out.source.contains("int main()"), "{out:?}");
+}

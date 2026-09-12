@@ -11,6 +11,7 @@ local UI = require("src.ui")
 local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Anim = require("src.anim")
+local Land = require("src.land")
 
 local Categories = {}
 Categories.__index = Categories
@@ -37,8 +38,6 @@ local function ordered(categories)
   end)
   return out
 end
-
-local MASCOT = { rust = "sprite_ferris", go = "sprite_gogo" }
 
 function Categories.new(app)
   return setmetatable({
@@ -184,9 +183,9 @@ function Categories:draw()
 
   -- The land's own mascot beside the title, idling, so the screen says which
   -- land it is without reading.
-  Assets.sprite(MASCOT[self.land], 40, m.title_y + m.title_h * 0.9 + Anim.bob(t, { amount = 2 }),
+  Assets.sprite(Land.mascot(self.land), 40, m.title_y + m.title_h * 0.9 + Anim.bob(t, { amount = 2 }),
     math.max(44, m.title_h * 1.4))
-  UI.text(self.land:upper() .. " LAND", 72, m.title_y, 16, tint)
+  UI.text(I18n.t("%s LAND", Land.name(self.land)), 72, m.title_y, 16, tint)
 
   local rows = self.categories or {}
   local pad, w, rh = m.pad, m.w, m.rh

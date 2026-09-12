@@ -5,22 +5,25 @@
 In Causeway Bay, a Rust coder wakes up and cannot write a `for` loop. The
 vibe-coding was never a convenience — it was Skynet's long game, and it worked.
 Every skill is still in there somewhere. You get them back one street at a time,
-in Rust and in Go, and then you go and fight the thing that took them.
+in Rust, in Go, in C++ and in Python, and then you go and fight the thing that
+took them.
 
-Two lands — **RUST LAND** and **GO LAND**. Three roads through each:
+Four lands — **RUST LAND**, **GO LAND**, **C++ LAND** and **PYTHON LAND**. Three
+roads through each:
 
 | | |
 | --- | --- |
-| **BASIC** | the grammar: bindings, shadowing, slices, errors, structs, traits/interfaces |
-| **ADVANCED** | threads, channels, mutexes, lifetimes, goroutines, `select`, async |
-| **HACKER** | the live interview: timed HackerRank-shaped quests, hidden tests |
+| **BASIC** | the grammar: bindings, shadowing, slices, errors, structs, traits/interfaces, pointers, dicts |
+| **ADVANCED** | threads, channels, mutexes, lifetimes, goroutines, `select`, async, RAII, generators |
+| **HACKER** | the live interview: timed HackerRank-shaped quests, hidden tests, the same 34 problems in every land |
 
 Each road is a Super Mario World overworld. Clear a node, it is stamped
 `CLEARED`, for good.
 
 **The code is really compiled.** Rust goes through `rustc`/`cargo`, Go through
-`go build`/`go test`, on your machine, against hidden tests. There is no
-pretend-verdict.
+`go build`/`go test`, C++ through the system `c++` (clang or gcc, `-std=c++20`),
+Python through `py_compile` and then `python3 -I`, on your machine, against
+hidden tests. There is no pretend-verdict.
 
 **Your mistakes are the curriculum.** Every attempt is kept — the source, the
 verdict, the compiler's own error codes. `E0382` five times in a week is not a
@@ -46,7 +49,9 @@ make test       # everything
 make help       # the rest
 ```
 
-Needs Rust, Go and Node. `make doctor` says which of them it cannot find.
+Needs Rust, Go, a C++ compiler, Python 3 and Node. `make doctor` says which of
+them it cannot find (`clang-format` is optional; without it the C++ land just
+has no `fmt`).
 
 **From a phone, use port 5390 — not the dev server's 5291.** The page and the
 websocket have to share an origin: the built bundle derives the socket from the
@@ -97,7 +102,7 @@ GitHub release with checksums.
 | [`PLAN.md`](PLAN.md) | what gets built, in what order, by whom |
 | [`backend/`](backend/) | Rust: axum, tokio, SQLite (FTS5 + vectors), the runner |
 | [`frontend/`](frontend/) | TypeScript, Vite, three.js, the 16-bit engine |
-| [`content/`](content/) | the quests |
+| [`content/`](content/) | the quests, one directory per land, and `content/i18n/` for their translations |
 
 Art and engine lineage: [`CausewaybayRaiden`](../CausewaybayRaiden) for the
 sprite look and the chip audio, [`CausewaybayGolang`](../CausewaybayGolang) for

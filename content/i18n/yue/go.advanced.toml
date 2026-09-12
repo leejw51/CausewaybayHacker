@@ -1,0 +1,602 @@
+# GO LAND — ADVANCED, in Cantonese. A translation pack (SPEC §12.1): the prose
+# of `content/go/advanced.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong developers actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "go.advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "go.advanced.01.goroutines"
+title = "四十個騎手"
+story = "12:30。八架單車，四十張單，個調度員仲係一張一張咁嗌。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個整數。
+
+每個值開一個 goroutine。每個 goroutine 將 `{index, value * value}` 送落同一條
+channel。收齊全部 `n` 個結果，按 index 排序，每行印一個 `<index> <value>`，然後印
+`GOROUTINES <n>`。
+
+```
+input:  3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        GOROUTINES 3
+```
+
+啲結果係 scheduler 想點嚟就點嚟嘅。帶住個 index 先係令個程式每次行都答同一個
+答案嘅原因。
+
+呢個 pack 入面每個 goroutine 都係用 **parameter** 收 loop 變數嘅。由 Go 1.22
+開始 — 而且只係喺 `go` directive 寫住 `1.22` 或者更新嘅 module 入面 — `for` loop
+會畀每次迭代自己嘅 `i` 同 `v`，所以喺嗰度直接捕捉佢哋係安全嘅；其他任何地方，
+直接捕捉佢哋就係 Go 最常見嘅一個 bug。傳入去係喺每個版本都啱嘅做法，而且個
+signature 寫得清清楚楚個 goroutine 准睇啲乜。
+'''
+hints = [
+  "一條容量 n 嘅 buffered channel 即係冇 sender 會 block，所以你提早停都唔會漏 goroutine。",
+  "啱啱好收 n 次。喺呢度冇其他方法知道佢哋全部做完。",
+  "用 sort.Slice 按 index 排，就可以攞返 scheduler 攞走咗嘅次序。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.advanced.02.waitgroup"
+title = "冇人可以早走"
+story = "最後一個騎手未報到，調度員就已經睇個板，個板得一半嘢。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個字。
+
+每個字開一個 goroutine，將個字轉做大楷寫入 `out[i]` — 佢自己個 index，所以唔會有
+兩個 goroutine 掂同一個元素。用 `sync.WaitGroup` 等齊佢哋全部，然後按次序印 `out`，
+再印 `WAITED <n>`。
+
+```
+input:  2
+        lucky
+        mac
+output: LUCKY
+        MAC
+        WAITED 2
+```
+
+`go` 之前 `wg.Add(1)`，入到 goroutine 第一件事 `defer wg.Done()`，讀任何嘢之前
+`wg.Wait()`。喺 goroutine 入面先 Add，就係同 `Wait` 本身鬥快。
+'''
+hints = [
+  "好多個 goroutine 寫 out[i] 係安全嘅，因為每個 i 都啱啱好得一個 goroutine 寫。",
+  "defer wg.Done() 放喺 goroutine 第一行，咁 panic 咗都仲會放開個 wait。",
+  "wg.Add(1) 放喺 loop 入面、go 語句之前 — 唔係 goroutine 入面。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.advanced.03.close"
+title = "邊個閂出餐口"
+story = "最後一張單之後個廚房出餐口仲係開住，櫃檯企喺度等多一張。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個整數。
+
+一個 goroutine 將每個值乘十送出去，然後 **close** 條 channel。`main` range 條
+channel，印每個值同埋計住總和，然後印 `SUM <total>` 同 `CLOSED`。
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+`range` 一條 channel，要到條 channel close 咗先會完，之前唔會。唔記得 `close`
+嘅話，Go runtime 會一字不漏咁話你知發生咗咩事：
+*all goroutines are asleep — deadlock!*
+
+由 sender close。永遠唔係 receiver。
+'''
+hints = [
+  "一行，放喺送嘢嗰個 goroutine 嘅最尾。",
+  "喺 goroutine 開頭 defer close(ch) 做嘅係同一件事，而且提早 return 都照樣行。",
+  "由收嘢嗰邊 close 會令 sender 送嘢嗰陣 panic — 所以條規矩先係 sender close。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.advanced.04.select"
+title = "兩個月台"
+story = "1 號月台同 2 號月台都駁住同一個大堂計數器，而個計數器一次只可以望住其中一個。"
+brief = '''
+標準輸入係兩個整數 `a` 同 `b`。
+
+一個 goroutine 喺電車 channel 送 `a` 個值然後 close 佢；另一個喺港鐵 channel 送
+`b` 個然後 close 佢。`main` 用一個 `select` loop 將**兩條**都抽乾，數住邊條嚟咗
+幾多。
+
+印 `TRAM <a>`、`MTR <b>`、`TOTAL <a+b>`。
+
+```
+input:  3 2
+output: TRAM 3
+        MTR 2
+        TOTAL 5
+```
+
+喺一條 close 咗嘅 channel 上面 receive 會即刻回傳，永遠都係 — 所以一個留住嗰個
+arm 嘅 `select` 會空轉。竅門係：`v, ok := <-ch`，`ok` 係 false 嗰陣就將嗰個
+channel 變數設做 `nil`。喺 **nil** channel 上面 receive 會永遠 block，喺 `select`
+入面即係嗰個 arm 就咁閂咗。兩條之中仲有一條唔係 nil 就繼續 loop。
+'''
+hints = [
+  "喺 select case 入面 v, ok := <-ch：條 channel close 咗而且抽乾咗，ok 先會係 false。",
+  "將 channel 變數設做 nil 就會停用嗰個 case。nil channel 永遠唔會 ready。",
+  "loop 條件係 `tramCh != nil || mtrCh != nil`，所以兩個 arm 都閂咗佢先會完。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.advanced.05.mutex"
+title = "一個錢櫃，八隻手"
+story = "兩部收銀機都由同一個錢櫃攞現金，收舖嗰陣個錢櫃同佢哋兩部都對唔上數。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個整數。
+
+寫埋個 `Counter`：`Add` 攞個 lock，加落總數度，再將命中次數加一；`Snapshot` 攞
+個 lock 然後將兩樣都回傳。每個值開一個 goroutine，等齊佢哋，然後印 `TOTAL <sum>`
+同 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+個 mutex 住喺佢保護嘅 struct **入面**，就喺佢守住嘅 field 隔籬，而每個掂到嗰啲
+field 嘅 method 都要攞佢。你一唔記得用 pointer receiver，個 `Counter` 就會即刻
+被 copy 一份 — `go vet` 會話你知。
+'''
+hints = [
+  "c.mu.Lock() 然後 defer c.mu.Unlock() 就係成個 pattern，而且提早 return 個 defer 都照行。",
+  "Snapshot 讀兩個 field；喺同一個 lock 下面讀佢哋，先令呢對數係一致嘅。",
+  "兩個 method 都要用 pointer receiver，唔係每次呼叫都係 lock 住個 mutex 嘅 copy，乜都守唔到。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.advanced.06.atomic"
+title = "一次，得一次"
+story = "每個騎手嘅 app 一開就開一條去車廠嘅連線，而家車廠有四十條連線，得一個 socket。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個整數。
+
+每個值開一個 goroutine。佢哋每一個都呼叫同一個 `sync.Once`，佢會印 `INIT` — 所以
+`INIT` 啱啱好出現一次，邊個 goroutine 先到都好。之後每個 goroutine 將自己個值加
+落一個 `atomic.Int64` 總數，再將一個 `atomic.Int64` 計數加一。
+
+佢哋全部做完之後，印 `TOTAL <sum>` 同 `COUNT <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: INIT
+        TOTAL 10
+        COUNT 4
+```
+
+atomic 計數器唔係一個平啲嘅 mutex — 佢係另一件工具，專門做呢樣嘢：一個 word，
+read-modify-write，周圍冇 critical section。任何闊過一個 word 嘅嘢，仲係要用
+mutex。
+'''
+hints = [
+  "once.Do(func(){ ... }) 第一次會行佢個 argument，其他人就會 block 住直到佢做完。",
+  "atomic.Int64 有 Add 同 Load 呢兩個 method — 唔使攞地址，唔使 mutex。",
+  "INIT 一定喺 TOTAL 之前出現，因為印 INIT 係喺 goroutine 入面發生，而 TOTAL 係 Wait 之後先印。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.advanced.07.context"
+title = "唔好再送"
+story = "個客三條街之前已經閂咗個 app，廚房仲喺度煮緊佢張單。"
+brief = '''
+標準輸入係兩個整數 `n` 同 `k`。
+
+開一個 producer goroutine，佢本來會將 `1..n` 逐個送落一條 **unbuffered** channel，
+但係佢個 `context` 一被取消就即刻停，而且會報返佢實際送到幾多個。
+
+`main` 啱啱好收 `k` 個值並且印出嚟，呼叫 `cancel()`，印 `CANCELLED`，然後印
+producer 報返嚟嘅 `SENT <count>`。
+
+```
+input:  5 3
+output: 1
+        2
+        3
+        CANCELLED
+        SENT 3
+```
+
+producer 個 loop body 係一個有兩個 arm 嘅 `select`：`<-ctx.Done()` 同個 send。
+一冇人 receive，個 send 就永遠唔會 ready，所以唯一可以觸發嘅就係取消。呢樣嘢
+先令到個結果係確定嘅，而唔係靠彩數。
+'''
+hints = [
+  "ctx.Done() 係一條 channel，cancel 一呼叫佢就會 close，所以 receive 佢就係一個普通嘅 select arm。",
+  "producer 兩條路都一定要報數：被取消嗰陣 return，同埋個 loop 行完嗰陣。",
+  "就算你自己會呼叫 cancel，main 入面嘅 defer cancel() 都唔係可有可無 — 佢係釋放個 context 嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.advanced.08.worker-pool"
+title = "八架單車"
+story = "四十張單，八架單車。冇人想要四十架單車；佢哋想要嗰八架永遠唔停低。"
+brief = '''
+標準輸入係兩個整數 `w` 同 `n`，然後 `n` 個值。
+
+砌一個 worker pool：`w` 個 worker range 一條 `jobs` channel，每個將
+`{index, value * value}` 推落一條 `results` channel。一個 goroutine 負責餵 job
+然後 close `jobs`；另一個等齊啲 worker 然後 close `results`。`main` range
+`results` 直到佢 close，按 index 排序，印 `<index> <value>`，然後印 `WORKERS <w>`。
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+三個 close，而且得一個次序行得通：餵嘢嗰個 close `jobs`，啲 worker 嘅 `range`
+先會完；啲 worker 做完，個 `WaitGroup` 先會放；等嘅嗰個 close `results`，`main`
+嘅 `range` 先會完。
+'''
+hints = [
+  "啲 worker 唔使有自己嘅 index；個 job 自己帶住。",
+  "close(results) 唔可以喺 worker 入面做 — 有 w 個 worker，但係 close 只可以合法地做一次。",
+  "多出嚟嗰個 goroutine 就係為咗呢樣嘢：wg.Wait() 然後 close(results)，而 main 仲喺度抽緊嘢。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.advanced.09.errors-in-flight"
+title = "唔知邊個嘅午餐單"
+story = "四十張單一齊 parse，其中一張係手寫嘅，講緊粥。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行，每行應該係一個整數。
+
+**同時** parse 佢哋 — 每行一個 goroutine — 將 `{index, value, err}` 送落同一條
+channel。收齊全部 `n` 個，按 index 排序，每個要麼印個值嘅兩倍，要麼印 `BAD <line>`。
+然後印你印過嗰啲值嘅 `SUM <total>`，同埋 `ERRORS <count>`。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+        ERRORS 1
+```
+
+goroutine 入面嘅 error 一定要好似其他結果咁樣運返出嚟。`go` 語句係冇
+`return err` 呢回事嘅，而一個遇到壞行就 panic 嘅 goroutine 會拖埋成個程式一齊死。
+'''
+hints = [
+  "個 error 係結果 struct 上面嘅一個 field。成個諗頭就係咁：error 同個值一齊行。",
+  "parse 失敗都要送 — main 數緊啱啱好 n 次 receive，唔係嘅話會差一個而 hang 住。",
+  "印之前先按 index 排序，唔係個輸出就係 scheduler 想點就點。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.advanced.10.context-tree"
+title = "佢係向下取消嘅"
+story = "一個客閂咗個 app，上游九樣嘢仲喺度煮緊、派緊、收緊錢。"
+brief = '''
+標準輸入係一個整數 `n`。
+
+用 `context.WithCancel` 整一個 parent context。由佢衍生 `n` 個 child：
+**雙數**嗰啲用 `context.WithCancel(parent)`，**單數**嗰啲用
+`context.WithDeadline(parent, <一個鐘之前>)`。
+
+每個 child 開一個 goroutine，等 `<-child.Done()`，然後報返佢個 index 同
+`child.Err().Error()`。取消個 parent，收齊全部 `n` 份報告，按 index 排序印出嚟。
+然後印 parent 自己個 error，同埋如果 `errors.Is(parent.Err(), context.Canceled)`
+就印 `IS_CANCELED YES`。
+
+```
+input:  3
+output: 0 context canceled
+        1 context deadline exceeded
+        2 context canceled
+        PARENT context canceled
+        IS_CANCELED YES
+```
+
+取消係喺 context tree 入面**向下**流嘅，永遠唔會向上。一個 deadline 已經過咗嘅
+child，一整出嚟就已經死咗，parent 做乜都冇分別 — 所以單數嗰啲報嘅係另一個 error，
+亦都所以個輸出每次行都一樣，而唔係一場 race。
+
+你整嘅每一個 context 都要 `defer cancel()`，呢樣唔係禮貌。一個你永遠唔 cancel
+嘅 context，會令佢 parent 個 child list 一路長，呢種 leak 入面一個 goroutine 都冇。
+'''
+hints = [
+  "將 `done` buffer 做 n，咁一個 deadline 已經過咗嘅 child 就可以唔使等 receiver 都報到數。",
+  "開始收集之前先取消個 parent，唔係你 block 喺條 channel 度嗰陣，雙數嗰啲 child 仲喺度等緊。",
+  "ctx.Err() 係 context.Canceled 或者 context.DeadlineExceeded，分辨佢哋要用 errors.Is，唔係比較啲字串。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.advanced.11.rwmutex"
+title = "三百個讀者"
+story = "希慎個指示牌一分鐘畀人讀三百次，一日改兩次，而一個普通嘅 Mutex 令啲讀者白白排喺對方後面。"
+brief = '''
+第一行係 `n q`。下一行係要儲起嘅 `n` 個字，再下一行係要查嘅 `q` 個字。
+
+圍住一個 `map[string]int` 同一個 `sync.RWMutex` 砌一個 `Directory`。`Set` 攞
+write lock；`Get` 同 `Size` 攞 **read** lock。順序將每個字對住佢嘅位置儲起 — 後面
+重複嘅會覆蓋前面嘅。然後將全部 `q` 個查詢**同時**行，收集返嚟，按查詢次序印
+`<word> <index>` 或者 `<word> MISSING`，然後印 `SIZE <k>`。
+
+```
+input:  3 2
+        tram bus mtr
+        bus zzz
+output: bus 1
+        zzz MISSING
+        SIZE 3
+```
+
+`RLock` 可以畀任何數量嘅讀者同時揸住，淨係會同 writer 互相 block。佢存在嘅全部
+理由就係咁，而只要有一個讀者攞咗 `Lock`，佢就一文不值。
+
+啲寫入係刻意順序做嘅：同一個字同時 `Set`，儲落去嘅 index 就會係碰巧最後行嗰個
+goroutine 嘅，而一條答案要睇 scheduler 面色嘅題，就係一條會隨機失敗嘅題。
+'''
+hints = [
+  "讀者用 RLock/RUnlock，writer 用 Lock/Unlock。撈亂咗照樣 compile 到，只係好處靜靜雞冇咗。",
+  "每個 goroutine 寫 answers[slot]，冇兩個共用同一個 slot，所以個 slice 唔使自己再有 lock。",
+  "讀 map 嘅 comma-ok 寫法先分得開「唔存在」同「存在但係零」。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.advanced.12.chan-directions"
+title = "佢係行邊個方向"
+story = "個 producer 由自己條輸出 channel 度 receive 咗成個星期，而且 compile 到，因為冇人寫低個箭嘴。"
+brief = '''
+第一行係 `n b`，`b` 至少係 `n`。
+
+整一條 buffer 係 `b` 嘅 channel。`produce(out chan<- int, n int)` 送 `0..n-1`
+然後 close 佢。`consume(in <-chan int) int` range 佢然後回傳總和。印：
+
+```
+input:  3 5
+output: CAP 5
+        LEN 3
+        SUM 3
+        LEN_AFTER 0
+```
+
+`CAP` 同 `LEN` 係 produce **之後**、consume 之前攞嘅 `cap(ch)` 同 `len(ch)`：
+`cap` 係 buffer 嘅大細，`len` 係入面而家坐住幾多個。
+
+個 starter compile 唔到。`consume` 收嘅係 `<-chan int` — 只收唔送 — 但係佢試圖
+向佢送嘢。方向係 **type** 嘅一部分，compile 嗰陣就 check，而將一條雙向 channel
+轉做單向係免費嘅，而且係單程嘅。呢個係成種語言最平嘅文件：一個 signature 講
+明呢個 function 揸住條喉嘅邊一頭。
+'''
+hints = [
+  "個 error 講到明：invalid operation, cannot send to receive-only channel。刪咗嗰行。",
+  "produce 喺呢度可以喺 main goroutine 行，純粹因為個 buffer 夠大裝晒所有嘢；b < n 嘅話佢會永遠 block。",
+  "range 一條 close 咗而且抽乾咗嘅 channel 會完 — 所以 produce close 佢，consume 先可以 return。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.advanced.13.select-default"
+title = "試下，但係唔等"
+story = "條 metrics channel 滿咗，部收銀機唔會為咗等佢而停止服務啲客。"
+brief = '''
+第一行係 `b n`：一條 buffer 係 `b` 嘅 channel，同埋 `n` 個要塞畀佢嘅值。
+
+用 **non-blocking** send 塞 `1..n` — 一個有 `default` 嘅 `select`，塞唔入就放棄，
+唔會等。然後用 non-blocking receive 抽乾佢，再試多一次。印：
+
+```
+input:  2 5
+output: SENT 2
+        DROPPED 3
+        GOT 2
+        EMPTY yes
+```
+
+有 `default` 嘅 `select` 永遠唔會 block：呢一刻冇其他 case ready 嘅話，就行
+`default`。咁就將「send」變成「試下 send」，metrics 或者 log channel 就應該係
+咁樣運作 — 滿咗就掉，唔係塞住。
+
+`b = 0` 而且冇人 receive 嘅時候，**每一個** send 都會被掉，因為 unbuffered send
+要有 receiver 已經喺度等緊先會 ready。
+'''
+hints = [
+  "一個有 default 同一個 case 嘅 select 就係成個 non-blocking 慣用法；冇 TrySend 呢個 function。",
+  "抽乾用同一個形狀：有值 ready 就 receive，等 default 去結束個 loop。",
+  "唔好用 close channel 嚟測試空唔空 — 喺 close 咗嘅 channel 上面 receive 永遠都 ready，會報 `no`。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.advanced.14.happens-before"
+title = "點解呢個係安全嘅"
+story = "白板上面四段碼。三段係正確同步嘅，一段唔係，而 race detector 都係咁話。"
+brief = '''
+標準輸入係一個整數 `n`。
+
+砌四樣正確同步嘅嘢，印每樣嘢嘅結果：
+
+1. `CHAN <v>` — 一個 goroutine 寫一個普通嘅 `int`，**然後**喺一條 channel 上面
+   send；個 receive 先係令個寫入變得可見嘅嘢。寫 `42`。
+2. `ONCE <k>` — `n` 個 goroutine 全部呼叫同一個 `sync.Once`；`k` 係個 function
+   實際行咗幾多次。
+3. `MUTEX <k>` — `n` 個 goroutine 喺 `sync.Mutex` 下面將一個計數器加一。
+4. `WG <k>` — `n` 個 goroutine 各自寫一個 slice 嘅自己嗰格，而 `wg.Wait()` 先係
+   令全部 `n` 個寫入對讀者可見嘅嘢。
+
+```
+input:  4
+output: CHAN 42
+        ONCE 1
+        MUTEX 4
+        WG 4
+```
+
+呢啲每一樣都係一條 *happens-before* 邊，而你需要嘅就只係呢四個形狀：send 發生
+喺對應嘅 receive 完成之前；`Once.Do` 要嗰一次呼叫做完之後先會 return；unlock
+發生喺下一個 lock 之前；`wg.Wait` 要對應嘅 `Done` 呼叫做完之後先會 return。
+
+呢度冇一樣嘢係靠時間先安全嘅。隨便抽走一條邊，`-race` 就會搵到佢，就算嗰部機
+從來冇出過一次錯數。
+'''
+hints = [
+  "close(ready) 然後 <-ready 係 Go 入面最平嘅發佈邊，而且佢帶埋個 goroutine 喺佢之前做嘅每一個寫入。",
+  "once.Do 入面嘅 runs++ 唔使自己再有 lock — Once 已經保證佢啱啱好發生一次，而且喺其他每個 Do return 之前。",
+  "每個 goroutine 擁有自己一格，所以永遠冇兩個會掂同一舊記憶；唯一需要嘅邊就係讀晒佢哋之前嗰個 Wait。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.advanced.15.generic-constraints"
+title = "個 type 要應承啲乜"
+story = "三個 helper，三種唔同嘅承諾，得一個在乎個 type 做到啲乜。"
+brief = '''
+第一行係 `n`。第二行係 `n` 個細楷嘅字。
+
+寫三個泛型 helper，每個用一種唔同嘅 constraint：
+
+* `Names[T Named](xs []T) []string` — 一個有 **method** 嘅 constraint
+* `Max[T Ordered](xs []T) T` — 一個係 **type set** 嘅 constraint，
+  `~string | ~int64`
+* `Distinct[T comparable](xs []T) int` — 內置嘅 constraint
+
+將每個字包入一個有 `Name() string` method 嘅 `Stop`。印啲名，用空格連埋，然後印
+`MAX <w>`（字典序最大嗰個字）同 `DISTINCT <k>`。
+
+```
+input:  3
+        tram bus mtr
+output: tram bus mtr
+        MAX tram
+        DISTINCT 3
+```
+
+constraint 係一個用喺 type parameter 位置嘅 interface，而佢可以裝兩樣普通
+interface 裝唔到嘅嘢：一個 **type set**（`~string` 匹配任何 underlying type 係
+`string` 嘅 type）同埋預先聲明嘅 `comparable`。
+
+同一個 `interface{ Name() string }` **parameter** 嘅分別，係值得大聲講出嚟嗰個：
+`Names[T Named]` 係 monomorphise 咗嘅，個呼叫係 static 嘅，而且唔使 boxing。
+`func Names(xs []Named)` 就要喺每個 call site 人手砌一個唔同嘅 slice。
+'''
+hints = [
+  "喺 Names 入面 x.Name() 過到 type check，係因為個 constraint 應承咗有呢個 method — 呢個就係 method constraint 換返嚟嘅嘢。",
+  "Max 可以用 >，純粹因為 Ordered 係一個支援佢嘅 type 嘅 type set；`any` 就 compile 唔到。",
+  "map[T]struct{} 要 T 係 comparable，啱啱好就係嗰個 constraint，而 struct{} 係嗰個零闊度嘅值，講緊「係 set，唔係 map」。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.advanced.16.gotchas"
+title = "三樣睇落唔係嗰回事嘅嘢"
+story = "唔係演算法題。三段碼，面試官淨係想知每段印啲乜。"
+brief = '''
+標準輸入係個數量 `n`（至少 4），然後 `n` 個整數。
+
+砌 `a := make([]int, n, n+4)` 然後填滿佢。然後啱啱好出四行：
+
+1. `ALIAS <a[2]>` — 做完 `b := a[:2]` 同 `b = append(b, 99)` 之後。
+2. `NILIFACE <bool>` — 將一個 **nil 嘅 `*Thing`** assign 入一個 `Fooer` interface
+   變數，報返嗰個變數係咪 `!= nil`。
+3. `DEFER_CLOSURE <v>` — 由讀 `x` 嘅 `defer func(){ ... }()` 印。
+4. `DEFER_ARG <v>` — 由 `defer fmt.Printf(..., x)` 印。
+
+喺兩個 defer 登記**之前**設 `x := a[0]`，喺 `main` 最最尾設 `x = a[n-1]`。（`n`
+至少係 4，係為咗 `a[n-1]` 永遠唔會係 aliasing 嗰步覆蓋嘅嗰格 — `n = 3` 嘅話就
+會係，而呢個係第四個驚喜，呢條題刻意將佢擺埋一邊。）
+
+```
+input:  4
+        1 2 3 4
+output: ALIAS 99
+        NILIFACE true
+        DEFER_CLOSURE 4
+        DEFER_ARG 1
+```
+
+三個答案都令人意外，而三個都係同一個原因：Go 求值嘅時間，比睇落去早啲或者遲啲。
+
+**Aliasing。** `a[:2]` 共用 `a` 嘅 backing array，而且保留佢嘅 capacity，所以
+個 `append` 有位，就直接寫落 `a[2]` 而唔係重新分配。切 slice 唔係 copy。
+`a[:2:2]` — 三個 index 嘅寫法 — 會封住個 capacity，就係咁樣先擋得住。
+
+**Typed nil。** 一個 interface 值係一對 (type, value)。放一個 nil `*Thing` 入去，
+你得到嘅係 `(*Thing, nil)`，唔係 nil *interface*。所以一個回傳 nil 具體 error
+pointer 嘅 function 會令 `if err != nil` 觸發，呢兩行係 Go 入面最貴嘅兩行。
+
+**Defer。** deferred 呼叫嘅 argument 係 **行到 `defer` 嗰陣**求值嘅，唔係個呼叫
+行嗰陣。一個唔收 argument 嘅 deferred closure 就係呼叫嗰陣先讀啲變數。兩個
+defer 見到嘅係同一個 `x`；佢哋唔一樣，係因為其中一個早就 copy 咗一份。而且
+佢哋係 LIFO 咁行，所以後寫嗰個先印。
+'''
+hints = [
+  "喺任何嘢改 x 之前先登記兩個 defer，記住佢哋係後入先出咁行。",
+  "cap(a[:2]) 係 cap(a)，唔係 2 — 成個 aliasing 答案就係咁。之後試下 a[:2:2]，睇下 ALIAS 變返原本個值。",
+  "boxed 揸住嘅係 (*Thing, nil)。同 nil 比較係比較成對嘢，而 type 嗰半唔係 nil。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "go.advanced.17.race"
+title = "競賽"
+story = "銅鑼灣轉車站，2 號月台。兩個計數器，一個數，而個數錯咗幾多，冇人可以重現到兩次一樣。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行 `<IN|OUT> <K>`。
+
+每行開一個 goroutine。每個將自己個計數器加 `K` 次，一次加一 — 唔係 `+= K`，係
+一次加一，因為閘機就係咁做嘅。等齊佢哋全部，然後印 `IN <a>`、`OUT <b>`、
+`NET <a-b>`。
+
+```
+input:  2
+        IN 3
+        OUT 1
+output: IN 3
+        OUT 1
+        NET 2
+```
+
+隱藏測試入面 `K` 去到六位數，呢個正正係重點：幾個 goroutine 一齊做普通嘅
+`in++`，去到呢個規模唔係*可能*會漏數，係實會漏，每次行都漏，每次漏嘅數都唔同。
+`in++` 係一個 load、一個 add 同一個 store，冇嘢將呢三步綁埋一齊。
+
+用 `sync/atomic`（或者 `sync.Mutex`），然後用真正答案畀人驗證嘅方法去驗證佢：
+`go test -race` / `go run -race`，佢報嘅係嗰個未同步嘅存取本身，而唔係佢產生嘅
+錯總數。
+'''
+hints = [
+  "atomic.Int64 配 Add(1) 係令呢樣嘢正確嘅最細改動。",
+  "用一個 sync.Mutex 圍住兩個計數器都得，只係慢啲；每次加一攞一次 lock 先係公平嘅比較。",
+  "Wait 之後先讀兩個計數器，唔係中途讀 — 半路攞嘅 snapshot 係另一種錯。",
+]
