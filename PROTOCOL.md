@@ -310,6 +310,14 @@ On first login for an address the user is created. `name` seeds the display
 name; if omitted the server assigns `hacker-<first 6 of address>`. Names are
 free-form and **not unique** — the address is the identity.
 
+The reply also carries **`position`** — a `Position` (§5.13), or `null` for a
+player who has never been anywhere. This is SPEC §1.3: the client keeps the
+session and nothing else durable, so the land, category and stage come back
+with the login, from whichever client the player used last. `auth.resume`
+(§4.4) carries it too, so a reconnect mid-session does not have to be told
+again. A client that has been handed `null` chooses for itself; it must not
+read that as "rust".
+
 ### 4.4 `auth.resume`
 
 Trade a stored session token for an authenticated connection, without touching
@@ -1367,3 +1375,20 @@ against a running server; each client's own suite should check its half.
 10. It does not send a second `quest.submit` while one is in flight.
 11. It survives a `server.bye` followed by a close, and a close without one.
 12. It sends `ping` every 20 s if it does not answer websocket pings.
+
+### 5.13 `Position`
+
+```json
+{ "land": "rust", "category": "basic",
+  "quest_id": "rust.basic.02.sum", "updated_at": "2026-09-13T00:00:00Z" }
+```
+
+`category` and `quest_id` are `null` when the player was in a lobby rather than
+on a stage — a real place, and not the same as never having played. A bookmark
+onto a quest that no longer exists comes back with `quest_id: null` and its
+land and category intact, rather than pointing at something the client cannot
+open.
+
+The server keeps it from the navigation it already receives (SPEC §1.3); there
+is no message for setting it, and a client that wants to be somewhere goes
+there in the ordinary way.

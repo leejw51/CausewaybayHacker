@@ -343,6 +343,18 @@ export interface Weak {
   reason: "stuck" | "costly";
 }
 
+/**
+ * §5.13. Where the server last saw this player. `category` and `quest_id` are
+ * null when they were in a lobby rather than on a stage — a real place to be,
+ * and not the same as never having played.
+ */
+export interface Position {
+  land: Land;
+  category: Category | null;
+  quest_id: string | null;
+  updated_at: string;
+}
+
 /** §5.7 */
 export interface AttemptBrief {
   id: string;
@@ -510,8 +522,9 @@ export interface Requests {
 export interface Responses {
   ping: { t: string };
   "auth.challenge": { nonce: string; message: string; expires_at: string };
-  "auth.login": { token: string; user: User };
-  "auth.resume": { token: string; user: User };
+  /** §4.3. `position` is null for a player who has never been anywhere. */
+  "auth.login": { token: string; user: User; position: Position | null };
+  "auth.resume": { token: string; user: User; position: Position | null };
   "profile.update": { user: User };
   "world.lands": { lands: Array<{ land: Land; categories: CategorySummary[] }> };
   "world.map": {

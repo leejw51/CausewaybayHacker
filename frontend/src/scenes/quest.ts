@@ -346,6 +346,11 @@ export class QuestScene implements Scene {
   ) {}
 
   async enter(): Promise<void> {
+    // §1.3. `quest.get` below tells the server the same thing; this keeps the
+    // lobby and the map in step for the rest of this window.
+    this.app.land = this.land;
+    this.app.category = this.category;
+    this.app.questId = this.questId;
     this.offs.push(
       // §4.17–4.18: both may arrive at any time, including after the reply
       // they relate to. Filtering on `attempt_id` is what keeps a stale event

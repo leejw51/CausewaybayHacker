@@ -30,6 +30,7 @@ import type {
   EventType,
   Requests,
   Responses,
+  Position,
   RequestType,
   User,
 } from "./protocol";
@@ -92,6 +93,13 @@ export class Client {
 
   state: ConnState = "offline";
   user: User | null = null;
+  /**
+   * §5.13. Where the server last saw this player, as of the login or resume
+   * that authed this connection. The client stores nothing durable of its own
+   * — the session and this are both handed over by the server, and the server
+   * is what two clients share.
+   */
+  position: Position | null = null;
   /**
    * Set when the server said `revoked`, or answered `unauthorized` to a
    * resume. The boot and map scenes read it to decide between "reconnecting"
@@ -390,11 +398,15 @@ export class Client {
       name ? { address, signature, name } : { address, signature },
     );
     this.adopt(res.token, res.user);
+    this.position = res.position;
     return res.user;
   }
 
   async resume(token: string): Promise<User> {
     const res = await this.request("auth.resume", { token });
+    // §4.4 carries the place too, so a reconnect mid-session does not have to
+    // be told again where the player is.
+    this.position = res.position;
     // §4.4 / §8.7: the server rotates on use. Storing the one we sent would
     // work until it didn't, on whichever reconnect happened to be the second.
     this.adopt(res.token, res.user);

@@ -128,6 +128,39 @@ then the window shutting; without it the file would lag until the next clear.
 The close write is best-effort, because a player whose disk is full should
 still get a clean close.
 
+### 1.3 Where the player is
+
+One row per player in `user_position`: `land`, an optional `category`, an
+optional `quest_id`. **The server owns it.** A client stores the session and
+nothing else durable — logging out and back in restores the land, the category
+and the stage, and so does opening the other client, because the browser and
+the LÖVE desktop client talk to one server and therefore share one place.
+
+Nothing new is asked of a client to keep it current. The server already
+receives every move as a request: `world.map` names the land and category the
+player just chose, `quest.get` names the stage they just opened. The bookmark
+is written from that traffic, after the request has resolved, so a land that
+does not exist or a quest the player cannot reach never becomes somewhere they
+get put back. Writing it from the traffic rather than from a "save my place"
+message is also what stops the two clients drifting: neither of them is the one
+keeping score.
+
+`quest_id` is null when they are in a lobby rather than on a stage, and that is
+a real state — "I chose rust/basic and have not opened anything" should restore
+to the map they were reading, not to a quest they never opened. Walking back
+out to a lobby clears it.
+
+It is a bookmark, not a history; the history is `attempts`, kept forever. The
+row is deliberately not a foreign key onto `quests`: a bookmark pointing at a
+quest a reimport has dropped degrades to the lobby of that land, because the
+land outlives any particular pack and sending a client to a quest id it cannot
+open is worse than sending it one screen out.
+
+Handed to the client by `auth.login` and `auth.resume` (PROTOCOL §4.3, §4.4),
+and written into `progress.json` as `position` so the file and the game never
+disagree. An account that stopped playing before this existed has no row, and
+the file falls back to the last quest its `attempts` trail names.
+
 ### 1.1 The LÖVE client's own store
 
 `~/.causewaybayhacker` is the **server's**. The LÖVE desktop client is a

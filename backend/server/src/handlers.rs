@@ -9,8 +9,8 @@
 use cwbhacker_core::error::{bad_request, not_found, unauthorized, Error, Result};
 use cwbhacker_core::Connection;
 use cwbhacker_core::{
-    attempts, auth, awards, drills, edits, eth, interviews, mistakes, progress, quests, search,
-    snapshot, stats, users, world,
+    attempts, auth, awards, drills, edits, eth, interviews, mistakes, position, progress, quests,
+    search, snapshot, stats, users, world,
 };
 use serde_json::json;
 
@@ -126,10 +126,14 @@ pub fn auth_login(
     snapshot::write(&conn, state.store.home(), &address)?;
     let token = auth::mint_session(&conn, &address)?;
     let user = user_json(&conn, &user)?;
+    // §4.3: the whole point of keeping the place on the server. A client holds
+    // the session and nothing else durable; where the player is comes back
+    // with the login, from whichever client they used last.
+    let position = position::get(&conn, &address)?;
     drop(conn);
 
     session.address = Some(address);
-    Ok(json!({ "token": token, "user": user }))
+    Ok(json!({ "token": token, "user": user, "position": position }))
 }
 
 /// §4.4. The token is **rotated**: the one that comes back is the one to keep.
@@ -144,9 +148,10 @@ pub fn auth_resume(
     session.must_not_change_user(&address)?;
     let user = users::upsert(&conn, &address)?;
     let user = user_json(&conn, &user)?;
+    let position = position::get(&conn, &address)?;
     drop(conn);
     session.address = Some(address);
-    Ok(json!({ "token": fresh, "user": user }))
+    Ok(json!({ "token": fresh, "user": user, "position": position }))
 }
 
 pub fn profile_update(
@@ -186,6 +191,12 @@ pub fn world_map(
     let locale = opt_str_field(payload, "locale");
     let conn = state.store.conn();
     let map = world::map_localized(&conn, address, &land, &category, locale.as_deref())?;
+    // The bookmark is written from the traffic that is already here (SPEC
+    // §1.3): asking for this map *is* choosing this land and category, so no
+    // client has to remember to say so separately, and two clients cannot
+    // disagree about where one person is. Only after the map resolved — a
+    // request for a land that does not exist is not a place to go back to.
+    position::mark_lobby(&conn, address, &land, Some(&category))?;
     Ok(json!({
         "land": land,
         "category": category,
@@ -237,6 +248,9 @@ pub fn quest_get(
             "quest": quest.to_wire_under_interview(quest_state, row.stars, opened_at.as_deref())
         }));
     }
+    // Opening a stage is the other half of §1.3. After `readable_quest`, so a
+    // quest the player cannot reach never becomes the place they are put back.
+    position::mark_quest(&conn, address, &quest_id)?;
     let draft = attempts::latest_source(&conn, address, &quest_id)?;
     Ok(json!({
         "quest": quest.to_wire(

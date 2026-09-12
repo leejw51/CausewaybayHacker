@@ -16,7 +16,7 @@
 //! stands — depth, cursor, whether undo and redo are available — which is the
 //! part that survives a prune as a statement about the player.
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 
 use crate::error::Result;
@@ -31,9 +31,10 @@ use crate::time::now_stamp;
 pub struct Snapshot {
     pub address: String,
     pub written_at: String,
-    /// The last quest touched, and the land it is in. `None` for an account
-    /// that has never attempted anything — which is not the same as being at
-    /// the start of rust, and is not reported as if it were.
+    /// Where the player is (§1.3) — the same answer login hands the client, so
+    /// the file and the game never disagree about it. `None` for an account
+    /// that has never been anywhere, which is not the same as being at the
+    /// start of rust and is not reported as if it were.
     pub position: Option<Position>,
     pub totals: stats::Summary,
     /// Weakest first. See [`weakest`] for what "weak" is taken to mean.
@@ -42,16 +43,58 @@ pub struct Snapshot {
     pub quests: Vec<QuestRecord>,
 }
 
+/// Where the player is, written out for a person rather than for a client.
+///
+/// `category` and `quest_id` are absent when they were in a lobby, and the
+/// quest's own `node`, `title` and `cleared` come with `quest_id` or not at
+/// all — a file saying `node: 0, title: ""` would read as a real place.
 #[derive(Debug, Clone, Serialize)]
 pub struct Position {
     pub land: String,
-    pub category: String,
-    pub node: i64,
-    pub quest_id: String,
-    pub title: String,
-    pub cleared: bool,
-    /// When they were last on it.
+    pub category: Option<String>,
+    pub quest_id: Option<String>,
+    pub node: Option<i64>,
+    pub title: Option<String>,
+    pub cleared: Option<bool>,
+    /// When they were last there.
     pub at: String,
+}
+
+/// Fill a bookmark out with what the quest it names knows about itself.
+fn resolve(conn: &Connection, address: &str, at: &crate::position::Position) -> Result<Position> {
+    let mut out = Position {
+        land: at.land.clone(),
+        category: at.category.clone(),
+        quest_id: at.quest_id.clone(),
+        node: None,
+        title: None,
+        cleared: None,
+        at: at.updated_at.clone(),
+    };
+    if let Some(quest_id) = at.quest_id.as_deref() {
+        let found = conn
+            .query_row(
+                "SELECT q.node, q.title, coalesce(p.state = 'cleared', 0)
+                   FROM quests q
+                   LEFT JOIN progress p ON p.address = ?2 AND p.quest_id = q.id
+                  WHERE q.id = ?1",
+                params![quest_id, address],
+                |r| {
+                    Ok((
+                        r.get::<_, i64>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, i64>(2)? != 0,
+                    ))
+                },
+            )
+            .optional()?;
+        if let Some((node, title, cleared)) = found {
+            out.node = Some(node);
+            out.title = Some(title);
+            out.cleared = Some(cleared);
+        }
+    }
+    Ok(out)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -211,14 +254,35 @@ pub fn build(conn: &Connection, address: &str) -> Result<Snapshot> {
         })?
         .collect::<rusqlite::Result<_>>()?;
 
-    // The most recent thing they touched, by attempt rather than by progress
-    // row: `updated_at` moves when a hint is taken or a clock opens, and
-    // "where was I" means the quest they were last actually working on.
-    //
-    // `rowid` breaks the tie because `created_at` is second-resolution and two
-    // submits inside one second are common — a player alt-tabbing between two
-    // quests would otherwise get whichever the query happened to reach first,
-    // and "where was I" would flicker.
+    // The bookmark, when there is one. `user_position` arrived in 0011, so an
+    // account that stopped playing before it has none — and the trail it left
+    // still answers the question, which is what the fallback below reads.
+    let position = match crate::position::get(conn, address)? {
+        Some(at) => Some(resolve(conn, address, &at)?),
+        None => derived_position(conn, address)?,
+    };
+
+    Ok(Snapshot {
+        address: address.to_ascii_lowercase(),
+        written_at: now_stamp(),
+        position,
+        totals: stats::summary(conn, address)?,
+        weakest: weakest(conn, address, WEAKEST_IN_FILE)?,
+        quests,
+    })
+}
+
+/// Where the trail says they were, for accounts older than the bookmark.
+///
+/// By attempt rather than by progress row: `updated_at` moves when a hint is
+/// taken or a clock opens, and "where was I" means the quest they were last
+/// actually working on.
+///
+/// `rowid` breaks the tie because `created_at` is second-resolution and two
+/// submits inside one second are common — a player alt-tabbing between two
+/// quests would otherwise get whichever the query happened to reach first, and
+/// "where was I" would flicker.
+fn derived_position(conn: &Connection, address: &str) -> Result<Option<Position>> {
     let position = conn
         .query_row(
             "SELECT q.land, q.category, q.node, q.id, q.title,
@@ -232,25 +296,17 @@ pub fn build(conn: &Connection, address: &str) -> Result<Snapshot> {
             |r| {
                 Ok(Position {
                     land: r.get(0)?,
-                    category: r.get(1)?,
-                    node: r.get(2)?,
-                    quest_id: r.get(3)?,
-                    title: r.get(4)?,
-                    cleared: r.get::<_, i64>(5)? != 0,
+                    category: Some(r.get(1)?),
+                    node: Some(r.get(2)?),
+                    quest_id: Some(r.get(3)?),
+                    title: Some(r.get(4)?),
+                    cleared: Some(r.get::<_, i64>(5)? != 0),
                     at: r.get(6)?,
                 })
             },
         )
         .ok();
-
-    Ok(Snapshot {
-        address: address.to_ascii_lowercase(),
-        written_at: now_stamp(),
-        position,
-        totals: stats::summary(conn, address)?,
-        weakest: weakest(conn, address, WEAKEST_IN_FILE)?,
-        quests,
-    })
+    Ok(position)
 }
 
 const QUEST_SQL: &str = "\

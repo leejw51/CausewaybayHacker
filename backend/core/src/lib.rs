@@ -18,6 +18,7 @@ pub mod ids;
 pub mod interviews;
 pub mod mistakes;
 pub mod paths;
+pub mod position;
 pub mod progress;
 pub mod quests;
 pub mod search;

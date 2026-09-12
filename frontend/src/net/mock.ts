@@ -26,7 +26,7 @@
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { decode, encode } from "./codec";
-import type { Attempt, MapNode, Quest, User } from "./protocol";
+import type { Attempt, Category, Land, MapNode, Position, Quest, User } from "./protocol";
 import type { Transport, TransportFactory, TransportHandlers } from "./transport";
 
 interface MockQuest extends Quest {
@@ -203,12 +203,17 @@ const world = {
   tokens: new Map<string, string>(),
   users: new Map<string, User>(),
   progress: new Map<string, Map<string, Row>>(),
+  // §1.3. Kept here rather than faked at login, so the mock reproduces the
+  // actual mechanism: the place is written from the navigation requests, not
+  // from anything the client says about itself.
+  positions: new Map<string, Position>(),
 };
 
 type Saved = {
   tokens: Array<[string, string]>;
   users: Array<[string, User]>;
   progress: Array<[string, Array<[string, Row]>]>;
+  positions?: Array<[string, Position]>;
 };
 
 function loadWorld(): void {
@@ -219,6 +224,8 @@ function loadWorld(): void {
     world.tokens = new Map(s.tokens);
     world.users = new Map(s.users);
     world.progress = new Map(s.progress.map(([a, rows]) => [a, new Map(rows)]));
+    // Optional: a blob written before §1.3 existed is still a good world.
+    world.positions = new Map(s.positions ?? []);
   } catch {
     /* a corrupt blob just means a fresh world, which is what a dev wants */
   }
@@ -230,6 +237,7 @@ function saveWorld(): void {
       tokens: [...world.tokens],
       users: [...world.users],
       progress: [...world.progress].map(([a, rows]) => [a, [...rows]]),
+      positions: [...world.positions],
     };
     sessionStorage.setItem(WORLD_KEY, JSON.stringify(s));
   } catch {
@@ -432,7 +440,7 @@ export function mockTransport(): TransportFactory {
           world.tokens.set(token, claimed);
           progressFor(claimed);
           saveWorld();
-          return ok(id, type, { token, user });
+          return ok(id, type, { token, user, position: world.positions.get(claimed) ?? null });
         }
 
         case "auth.resume": {
@@ -447,7 +455,11 @@ export function mockTransport(): TransportFactory {
           const rotated = randomHex(24);
           world.tokens.set(rotated, owner);
           saveWorld();
-          return ok(id, type, { token: rotated, user: world.users.get(owner)! });
+          return ok(id, type, {
+            token: rotated,
+            user: world.users.get(owner)!,
+            position: world.positions.get(owner) ?? null,
+          });
         }
 
         case "profile.update": {
@@ -504,6 +516,13 @@ export function mockTransport(): TransportFactory {
           }
           const edges: Array<[string, string]> = [];
           for (const q of QUESTS) for (const r of q.requires) edges.push([r, q.id]);
+          world.positions.set(address!, {
+            land: land as Land,
+            category: category as Category,
+            quest_id: null,
+            updated_at: now(),
+          });
+          saveWorld();
           return ok(id, type, { land, category, nodes: mapNodes(address!), edges });
         }
 
@@ -514,6 +533,13 @@ export function mockTransport(): TransportFactory {
           if (row.state === "locked") {
             return err(id, type, "locked", `${q.id} is locked`, { requires: q.requires });
           }
+          world.positions.set(address!, {
+            land: q.land as Land,
+            category: q.category as Category,
+            quest_id: q.id,
+            updated_at: now(),
+          });
+          saveWorld();
           return ok(id, type, { quest: publicQuest(q, row) });
         }
 

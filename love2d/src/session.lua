@@ -146,9 +146,9 @@ function Session:try_resume()
     self.resuming = false
     if ok then
       -- §8 point 7: store the token that came *back*, not the one sent.
-      self:adopt(payload.token, payload.user)
+      self:adopt(payload.token, payload.user, payload.position)
       self.log("info", "resumed as " .. tostring(self.user and self.user.name))
-      self:fire("auth", { user = self.user, resumed = true })
+      self:fire("auth", { user = self.user, position = self.position, resumed = true })
       -- §6 rule 5: "Refetch `world.map` for the screen the player is on. Do
       -- not trust a map cached across a disconnect."
       self:fire("reconnected", { user = self.user })
@@ -166,9 +166,13 @@ function Session:try_resume()
   end)
 end
 
-function Session:adopt(token, user)
+function Session:adopt(token, user, position)
   self.token = token
   self.user = user
+  -- SPEC §1.3. Where the player is comes from the server, not from this
+  -- machine: the same person may have been playing in the browser, and this
+  -- client keeps nothing durable but the session itself.
+  self.position = position
   self.authed = true
   self.last_error = nil
   -- Persistence is a convenience; the session is live either way. A store
@@ -266,8 +270,8 @@ function Session:login(secret, index, name, cb)
         cb(false, why.player)
         return
       end
-      self:adopt(payload2.token, payload2.user)
-      self:fire("auth", { user = self.user, resumed = false })
+      self:adopt(payload2.token, payload2.user, payload2.position)
+      self:fire("auth", { user = self.user, position = self.position, resumed = false })
       cb(true, nil)
     end)
   end)

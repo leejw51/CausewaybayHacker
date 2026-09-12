@@ -335,6 +335,11 @@ export class LoginScene implements Scene {
     this.status = t("login.loggingIn");
     const user = await this.app.client.login(address.eip55, signature);
     this.app.addressLabel = user.address;
+    // §1.3: the client keeps nothing durable of its own. Where this player is
+    // comes back with the login, from whichever client they used last — the
+    // browser and the LÖVE desktop client share one server and therefore one
+    // place.
+    this.app.restorePlace(this.app.client.position);
     // Past the point of no return for the phrase, and the screen is leaving.
     this.minted = null;
     this.app.chip.start();

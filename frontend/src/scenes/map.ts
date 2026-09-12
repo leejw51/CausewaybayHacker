@@ -186,6 +186,11 @@ export class MapScene implements Scene {
   ) {}
 
   async enter(): Promise<void> {
+    // Being on this map is being in this land and category. The server records
+    // the same thing from the `world.map` request below (§1.3); this is the
+    // in-window half, so ESC back to the lobby lands where the player is.
+    this.app.land = this.land;
+    this.app.category = this.category;
     this.app.chip.music("stage");
     // PROTOCOL §6.5: never trust a map cached across a disconnect — a
     // `progress.update` may have been missed while the socket was down.

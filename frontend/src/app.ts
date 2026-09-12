@@ -19,7 +19,7 @@ import { expInOut } from "./engine/ease";
 import { Backdrop, type Mood } from "./gfx/backdrop";
 import { Crt } from "./gfx/crt";
 import { Client } from "./net/client";
-import type { Land } from "./net/protocol";
+import type { Category, Land } from "./net/protocol";
 import type { Buttons } from "./ui/chrome";
 import { Chip } from "./audio/sfx";
 import { wipe as wipeKey } from "./wallet/wallet";
@@ -142,6 +142,27 @@ export class App {
 
   /** Set at login, cleared at logout. Display only, and the logout button. */
   addressLabel = "";
+  /**
+   * Where the player is (§1.3), for as long as this window is open.
+   *
+   * The server owns the durable copy and hands it over at login; this is the
+   * in-window mirror, so that walking out of a quest lands in the lobby the
+   * player was actually in. Nine places construct `LandsScene`, and before
+   * this each of them rebuilt it at "rust" — the land was in scope at the call
+   * site and dropped on the floor. Keeping it here fixes all nine without
+   * threading a parameter through any of them.
+   */
+  land: Land = "rust";
+  category: Category | null = null;
+  questId: string | null = null;
+
+  /** Adopt the place the server just handed us, if it sent one. */
+  restorePlace(at: { land: Land; category: Category | null; quest_id: string | null } | null): void {
+    if (!at) return;
+    this.land = at.land;
+    this.category = at.category;
+    this.questId = at.quest_id;
+  }
   /**
    * Where the header drew its logout chip this frame, and whether the pointer
    * is over it. The header is app-level furniture on every authed screen, so

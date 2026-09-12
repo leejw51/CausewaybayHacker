@@ -99,11 +99,11 @@ fn position_is_the_quest_last_worked_on() {
 
     let snap = snapshot::build(&conn, ALICE).unwrap();
     let pos = snap.position.expect("a position");
-    assert_eq!(pos.quest_id, SUM);
+    assert_eq!(pos.quest_id.as_deref(), Some(SUM));
     assert_eq!(pos.land, "rust");
-    assert_eq!(pos.category, "basic");
-    assert_eq!(pos.node, 2);
-    assert!(!pos.cleared, "they are still on it");
+    assert_eq!(pos.category.as_deref(), Some("basic"));
+    assert_eq!(pos.node, Some(2));
+    assert_eq!(pos.cleared, Some(false), "they are still on it");
 }
 
 #[test]

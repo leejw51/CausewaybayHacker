@@ -196,6 +196,8 @@ export class LandsScene implements Scene {
   readonly mood = "lands" as const;
   private lands: Lands = [];
   /** Read by `App` to tint the city behind the screen. */
+  // Seeded from the app, which was seeded from the server. This used to be a
+  // literal "rust", which is why walking out of a quest lost the land.
   land: Land = "rust";
   /** Two lists: the land buttons are painted by the shared pixel-button
    *  painter, the category rows paint themselves and only need a hit box. */
@@ -404,6 +406,10 @@ export class LandsScene implements Scene {
   }
 
   async enter(): Promise<void> {
+    // Every route into this screen goes through here, which is why the land is
+    // taken now rather than in the constructor: `new LandsScene(app)` is
+    // written in nine places and none of them should have to know about this.
+    this.land = this.app.land;
     this.app.chip.music("title");
     try {
       const res = await this.app.client.request("world.lands", {});
@@ -453,6 +459,7 @@ export class LandsScene implements Scene {
     this.app.chip.select();
     if (hit.id.startsWith("land:")) {
       this.land = hit.id.slice(5) as Land;
+      this.app.land = this.land;
       return;
     }
     if (hit.id === "auto") {
@@ -512,6 +519,7 @@ export class LandsScene implements Scene {
       const step = name === "left" || name === "a" ? -1 : 1;
       const i = LANDS.indexOf(this.land);
       this.land = LANDS[(i + step + LANDS.length) % LANDS.length];
+      this.app.land = this.land;
       this.app.chip.blip();
     }
   }

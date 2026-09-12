@@ -60,6 +60,11 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0010_edit_stack",
         include_str!("../migrations/0010_edit_stack.sql"),
     ),
+    (
+        11,
+        "0011_position",
+        include_str!("../migrations/0011_position.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {

@@ -271,6 +271,15 @@ function App:load()
   end)
 
   self.session:on("auth", function(payload)
+    -- §1.3: adopt the place before choosing a screen, so `lands` opens on the
+    -- land this player was actually in — including one they were last in from
+    -- the web client, since both talk to the same server.
+    local at = payload.position
+    if at then
+      self.land = at.land or self.land
+      self.category = at.category
+      self.quest_id = at.quest_id
+    end
     -- A resumed session still gets the title card: it is the game's front
     -- door, not a login prompt, and `make gui` resumes every launch — so a
     -- boot that skipped it would be a game nobody ever saw the name of. The

@@ -117,22 +117,27 @@ impl Client {
     /// a later reply would be asserting its own helper rather than the
     /// server. That mistake cost an hour once; hence this comment.
     async fn login(&mut self, key_hex: &str) -> (String, String) {
+        let login = self.login_reply(key_hex).await;
+        (
+            login["user"]["address"].as_str().unwrap().to_string(),
+            login["token"].as_str().unwrap().to_string(),
+        )
+    }
+
+    /// The whole `auth.login` reply. `login` throws away everything but the
+    /// address and the token, and §4.3 carries the player's place too.
+    async fn login_reply(&mut self, key_hex: &str) -> Value {
         let key = signing_key(key_hex);
         let claimed = eth::address_from_pubkey(key.verifying_key());
         let challenge = self
             .ok("auth.challenge", json!({ "address": claimed }))
             .await;
         let signature = sign(&key, challenge["message"].as_str().unwrap());
-        let login = self
-            .ok(
-                "auth.login",
-                json!({ "address": claimed, "signature": signature }),
-            )
-            .await;
-        (
-            login["user"]["address"].as_str().unwrap().to_string(),
-            login["token"].as_str().unwrap().to_string(),
+        self.ok(
+            "auth.login",
+            json!({ "address": claimed, "signature": signature }),
         )
+        .await
     }
 
     /// Submit and return the `Attempt`.
@@ -1465,10 +1470,13 @@ async fn auto_select_sends_a_player_to_the_stage_that_is_beating_them() {
 
     assert_eq!(caught_up["weakest"][0]["reason"], "stuck");
     assert_eq!(caught_up["weakest"][1]["quest_id"], HELLO);
-    // A RUN is not a failure (§4.9b) but it *is* where they were: the two
-    // questions are different, and SHADOWING answers only the second. It is
-    // absent from `weakest` above and is the position here.
-    assert_eq!(caught_up["position"]["quest_id"], SHADOWING);
+    // `position` is the bookmark of §1.3 — where the player navigated to, which
+    // is what putting them back needs — and the last thing opened here was SUM
+    // via `quest.get`. The RUN on SHADOWING moved nothing: submitting or running
+    // code on a quest is not walking to it, and a client that wants to be
+    // somewhere opens it. It is absent from `weakest` above for the separate
+    // reason that a RUN is never a failure (§4.9b).
+    assert_eq!(caught_up["position"]["quest_id"], SUM);
     // The undo sources stay in edits/; only the stack's position is mirrored.
     assert!(caught_up["quests"][0]["edits"]["depth"].is_i64());
 }
@@ -1497,4 +1505,119 @@ async fn one_players_weakness_is_never_another_players() {
     );
     let hers = alice.ok("stats.weakest", json!({})).await;
     assert_eq!(hers["weakest"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn logging_out_and_back_in_puts_the_player_back_where_they_were() {
+    // SPEC §1.3. The complaint this answers: the land, the category and the
+    // stage were not loaded on login, and walking out of a quest reset the
+    // lobby to rust. The place is the server's now, so the round trip below is
+    // the whole feature — no client is asked to remember anything.
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let src = content_src(tmp.path());
+    let server = start(&home, &src).await;
+
+    let mut first = Client::connect(server.port).await;
+    let login = first.login_reply(ALICE_KEY).await;
+    assert_eq!(
+        login["position"],
+        Value::Null,
+        "a player who has never been anywhere is not reported as being in rust"
+    );
+
+    // Walk in: choose a land and category, then open a stage. Nothing here is
+    // a "save my place" message — these are the ordinary navigation requests.
+    first
+        .ok("world.map", json!({ "land": "rust", "category": "basic" }))
+        .await;
+    first.ok("quest.get", json!({ "quest_id": SUM })).await;
+
+    // Log out by dropping the socket, then come back as a new connection.
+    drop(first);
+    let mut again = Client::connect(server.port).await;
+    let back = again.login_reply(ALICE_KEY).await;
+
+    assert_eq!(back["position"]["land"], "rust");
+    assert_eq!(back["position"]["category"], "basic");
+    assert_eq!(
+        back["position"]["quest_id"], SUM,
+        "the stage is loaded too, not just the land"
+    );
+
+    // Walking back out to a lobby is itself a move. Restoring them into the
+    // quest they just left would ignore the walk.
+    again
+        .ok("world.map", json!({ "land": "rust", "category": "basic" }))
+        .await;
+    drop(again);
+
+    let mut third = Client::connect(server.port).await;
+    let lobby = third.login_reply(ALICE_KEY).await;
+    assert_eq!(lobby["position"]["land"], "rust");
+    assert_eq!(lobby["position"]["category"], "basic");
+    assert_eq!(lobby["position"]["quest_id"], Value::Null);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_two_clients_share_one_place_and_never_each_others() {
+    // A player may use the browser or the LÖVE client; both talk to this
+    // server, so moving in one is moving. Two sockets is exactly that shape.
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let src = content_src(tmp.path());
+    let server = start(&home, &src).await;
+
+    let mut web = Client::connect(server.port).await;
+    web.login(ALICE_KEY).await;
+    web.ok("quest.get", json!({ "quest_id": HELLO })).await;
+
+    let mut desktop = Client::connect(server.port).await;
+    let resumed = desktop.login_reply(ALICE_KEY).await;
+    assert_eq!(
+        resumed["position"]["quest_id"], HELLO,
+        "the other client picks up where this one left off"
+    );
+
+    // And Bob is somewhere else entirely.
+    let mut bob = Client::connect(server.port).await;
+    let his = bob.login_reply(BOB_KEY).await;
+    assert_eq!(his["position"], Value::Null);
+
+    // §4.4 carries it too, so a mid-session reconnect is not told to forget.
+    // The token comes from `desktop`'s login: a connection that has already
+    // authed refuses a second one, which is §4.3 and not a bug to work around.
+    let token = resumed["token"].as_str().unwrap().to_string();
+    let mut dropped = Client::connect(server.port).await;
+    let after = dropped.ok("auth.resume", json!({ "token": token })).await;
+    assert_eq!(after["position"]["quest_id"], HELLO);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_place_is_only_recorded_once_the_move_actually_worked() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let src = content_src(tmp.path());
+    let server = start(&home, &src).await;
+
+    let mut alice = Client::connect(server.port).await;
+    alice.login(ALICE_KEY).await;
+    alice
+        .ok("world.map", json!({ "land": "rust", "category": "basic" }))
+        .await;
+
+    // A quest that does not exist is not a place to be sent back to.
+    alice
+        .call("quest.get", json!({ "quest_id": "rust.basic.99.nope" }))
+        .await;
+
+    drop(alice);
+    let mut again = Client::connect(server.port).await;
+    let back = again.login_reply(ALICE_KEY).await;
+    assert_eq!(back["position"]["category"], "basic");
+    assert_eq!(
+        back["position"]["quest_id"],
+        Value::Null,
+        "the failed open must not have moved them, nor destroyed where they were"
+    );
 }
