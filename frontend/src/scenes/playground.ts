@@ -38,7 +38,7 @@ import { Overlay } from "../ui/overlay";
 import { LogBuffer } from "../net/logbuf";
 import { WireError } from "../net/client";
 import { isLand, LANDS, playerText } from "../net/protocol";
-import { t } from "../i18n";
+import { onLocale, t } from "../i18n";
 import type { Land, PlaygroundRun, RunStage, SnippetBrief } from "../net/protocol";
 import { LandsScene } from "./lands";
 
@@ -121,6 +121,7 @@ export class PlaygroundScene implements Scene {
   private readonly buttons = new Buttons();
   private readonly rows = new Buttons();
   private offs: Array<() => void> = [];
+  private offLocale?: () => void;
   private readonly onBlur = () => void this.save();
 
   constructor(private readonly app: App) {
@@ -128,6 +129,9 @@ export class PlaygroundScene implements Scene {
     el.className = "cwb-field";
     el.spellcheck = false;
     el.placeholder = t("pg.stdinHint");
+    this.offLocale = onLocale(() => {
+      el.placeholder = t("pg.stdinHint");
+    });
     this.stdinEl = el;
   }
 
@@ -166,6 +170,8 @@ export class PlaygroundScene implements Scene {
     removeEventListener("blur", this.onBlur);
     for (const off of this.offs) off();
     this.offs = [];
+    this.offLocale?.();
+    this.offLocale = undefined;
     this.overlay?.destroy();
     this.stdinOverlay?.destroy();
     this.editor?.destroy();

@@ -69,7 +69,7 @@ import {
   unlock,
 } from "../wallet/wallet";
 import { LandsScene } from "./lands";
-import { LOCALES, locale, nextLocale, setLocale, t } from "../i18n";
+import { LOCALES, locale, nextLocale, onLocale, setLocale, t } from "../i18n";
 import { StoryScene } from "./story";
 
 /** The empty field's own instructions, restored whenever it is handed back. */
@@ -136,6 +136,8 @@ export class LoginScene implements Scene {
   private readonly leftIn = new Tween(seconds("panel"));
   private readonly rightIn = new Tween(seconds("panel"), seconds("stagger"));
 
+  private offLocale?: () => void;
+
   constructor(private readonly app: App) {
     const el = document.createElement("textarea");
     el.className = "cwb-field";
@@ -147,6 +149,13 @@ export class LoginScene implements Scene {
     // pasted phrase is legible.
     el.classList.add("cwb-masked");
     el.placeholder = FIELD_HINT();
+    // The field is DOM, so its hint is a cached string and does not follow the
+    // language the way everything drawn on the canvas does. Three places change
+    // the language — this screen's button, F7 from anywhere, the title card —
+    // and re-setting it at each of them would leave the fourth one wrong.
+    this.offLocale = onLocale(() => {
+      el.placeholder = FIELD_HINT();
+    });
     // The preview is derived on every keystroke so the player sees the address
     // they are about to become before committing to it. It never leaves here.
     el.addEventListener("input", () => this.derivePreview());
@@ -173,6 +182,8 @@ export class LoginScene implements Scene {
     this.field.classList.add("cwb-masked");
     this.minted = null;
     this.stopWait?.(false);
+    this.offLocale?.();
+    this.offLocale = undefined;
     this.overlay.destroy();
   }
 

@@ -42,7 +42,7 @@ import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import type { Category, Land, NodeState, SearchHit, SearchMode } from "../net/protocol";
 import { unbuilt, unbuiltLine } from "../net/milestone";
-import { t } from "../i18n";
+import { onLocale, t } from "../i18n";
 import { auxHeight, auxRow, drawAux, AUX_HINT, openAux } from "../ui/auxnav";
 import { drawNotice, type Notice } from "../ui/notice";
 import { emptySearch } from "../ui/coach";
@@ -91,6 +91,7 @@ export class SearchScene implements Scene {
 
   private readonly field: HTMLTextAreaElement;
   private readonly overlay: Overlay;
+  private offLocale?: () => void;
   private fieldRect: Rect = [0, 0, 0, 0];
 
   private readonly chips = new Buttons();
@@ -130,6 +131,9 @@ export class SearchScene implements Scene {
     el.autocomplete = "off";
     el.setAttribute("autocorrect", "off");
     el.placeholder = t("search.placeholder");
+    this.offLocale = onLocale(() => {
+      el.placeholder = t("search.placeholder");
+    });
     // Its own listener, because `App` forwards a keystroke out of the overlay
     // only when Ctrl or Cmd is held — a bare Enter inside a field never reaches
     // `Scene.key`, and wiring it there would look like a dead button.
@@ -147,6 +151,8 @@ export class SearchScene implements Scene {
   }
 
   leave(): void {
+    this.offLocale?.();
+    this.offLocale = undefined;
     this.overlay.destroy();
   }
 

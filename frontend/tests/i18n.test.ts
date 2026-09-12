@@ -20,7 +20,7 @@ import { yue } from "../src/i18n/yue";
 import { zh } from "../src/i18n/zh";
 import { ja } from "../src/i18n/ja";
 import { cs } from "../src/i18n/cs";
-import { LOCALES, locale, setLocale, t, tn } from "../src/i18n";
+import { LOCALES, locale, onLocale, setLocale, t, tn } from "../src/i18n";
 
 const OTHERS = { ko, yue, zh, ja, cs } as const;
 type Key = keyof typeof en;
@@ -145,5 +145,65 @@ describe("lookup", () => {
     expect(tn("quest.hintsLeft", 1)).toBe(tn("quest.hintsLeft", 7).replace("7", "1"));
     await setLocale("en", false);
     expect(locale()).toBe("en");
+  });
+});
+
+/**
+ * The DOM side of a language change.
+ *
+ * Canvas text needs no help: every frame re-reads `t()`, so a screen is in the
+ * new language by the next draw. A placeholder on a real `<input>` is a string
+ * copied once, and it stayed in whatever language was loaded when the field was
+ * built — the game shipped with an English interface whose seed-phrase field
+ * still read 열두 단어. These are the keys that reach the DOM that way.
+ */
+describe("a language change reaches strings held in the DOM", () => {
+  const HELD_IN_DOM = [
+    "login.fieldHint",
+    "search.placeholder",
+    "pg.stdinHint",
+  ] as const;
+
+  // Presence only, deliberately. `search.placeholder` is "borrow checker" in
+  // Czech too, because that is what a Czech Rust programmer calls it — a value
+  // matching English is a translator's decision here, not a missing key.
+  it("every DOM-held hint has a value in all six languages", () => {
+    for (const key of HELD_IN_DOM) {
+      for (const [name, table] of Object.entries(OTHERS)) {
+        expect(table[key], `${name} is missing ${key}`).toBeTruthy();
+      }
+    }
+  });
+
+  it("onLocale fires on a change, so a cached placeholder can be re-read", async () => {
+    await setLocale("en", false);
+    // Exactly what a scene does: copy the string once, then keep it current.
+    let placeholder = t("login.fieldHint");
+    const off = onLocale(() => {
+      placeholder = t("login.fieldHint");
+    });
+
+    await setLocale("ko", false);
+    expect(placeholder).toBe(ko["login.fieldHint"]);
+    await setLocale("en", false);
+    expect(placeholder).toBe(en["login.fieldHint"]);
+
+    // And stops when the scene leaves, or the set retains dead scenes and the
+    // detached elements they point at.
+    off();
+    await setLocale("ja", false);
+    expect(placeholder).toBe(en["login.fieldHint"]);
+  });
+
+  it("fires synchronously, before the font resolves", async () => {
+    await setLocale("en", false);
+    let seen = "";
+    const off = onLocale(() => (seen = t("login.fieldHint")));
+    // No await: the strings are the new language on the call itself, which is
+    // what lets the boot screen put the right words up immediately.
+    void setLocale("ko", false);
+    expect(seen).toBe(ko["login.fieldHint"]);
+    off();
+    await setLocale("en", false);
   });
 });

@@ -158,6 +158,26 @@ export function locale(): Locale {
   return active;
 }
 
+/**
+ * Run `fn` whenever the language changes.
+ *
+ * Canvas text needs nothing like this: every frame re-reads `t()`, so a screen
+ * is already in the new language by the next draw. A DOM node is the exception
+ * — a placeholder or a title assigned once is a cached string, and it is the
+ * same kind of stale as the cached widths `remeasure` exists to throw away.
+ * Anything holding one of those subscribes here.
+ *
+ * Returns the unsubscribe. A scene that registers in its constructor calls it
+ * in `leave`, or the set retains dead scenes and the detached elements they
+ * point at.
+ */
+const watchers = new Set<() => void>();
+
+export function onLocale(fn: () => void): () => void {
+  watchers.add(fn);
+  return () => watchers.delete(fn);
+}
+
 export function localeInfo(id: Locale = active): LocaleInfo {
   return LOCALES.find((l) => l.id === id) ?? LOCALES[0];
 }
@@ -280,6 +300,9 @@ export function setLocale(id: Locale, remember = true): Promise<void> {
   // the words changed and every cached width is for the old ones, and once
   // when the font lands, because the same words are a different width in it.
   remeasure();
+  // Synchronously, and only here: the strings are already the new language,
+  // and they do not change again when the face arrives.
+  for (const fn of watchers) fn();
   pending = loadFont(info).then((ok) => {
     if (locale() !== info.id) return;
     setCjkFamily(ok && info.font ? info.font.family : "");
