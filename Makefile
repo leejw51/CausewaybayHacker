@@ -77,7 +77,26 @@ SERVER_PKG := causewaybay-hacker-server-$(VERSION)-$(TARGET)
 held = p=$$(lsof -nP -iTCP:$(1) -sTCP:LISTEN -t 2>/dev/null | head -1); \
        [ -n "$$p" ] && ps -o comm= -p $$p 2>/dev/null | grep -qE '$(2)'
 
-.PHONY: help start stop restart status logs remote art gui serve web build test test-all test-all-list test-be test-fe \
+# The two "is what we built still current?" questions. Both are *staleness*,
+# not existence: guarding a rebuild on `dist/index.html` being present means a
+# pull that changes the frontend is never rebuilt, and the server goes on
+# serving the previous bundle with no sign that it is doing so. That is a
+# silent wrong answer, which is worse than a slow one.
+#
+# npm >= 7 writes node_modules/.package-lock.json when it installs, so the
+# lockfile being newer than that marker is exactly "someone added a dependency
+# since the last install". Missing marker means no install has ever happened.
+deps_stale = [ ! -f frontend/node_modules/.package-lock.json ] || \
+             [ frontend/package-lock.json -nt frontend/node_modules/.package-lock.json ]
+
+# `art` rsyncs with -a (which implies -t), so frontend/public/art keeps the
+# mtimes of art/ and including public/ here does not re-trigger on every start.
+DIST_SRC := frontend/src frontend/public frontend/index.html \
+            frontend/package.json frontend/vite.config.ts frontend/tsconfig.json
+dist_stale = [ ! -f frontend/dist/index.html ] || \
+             [ -n "$$(find $(DIST_SRC) -newer frontend/dist/index.html 2>/dev/null | head -1)" ]
+
+.PHONY: help start stop restart status logs remote art rebuild _deps _bundle gui serve web build test test-all test-all-list test-be test-fe \
         fmt-check check version package release package-server package-server-verify package-gui package-love \
         test-love test-e2e smoke fmt lint doctor clean clean-home
 
@@ -106,12 +125,9 @@ start: ## start both servers in the background
 	  echo "building the backend (the first one is slow)…"; \
 	  ( cd backend && cargo build -p cwbhacker 2>&1 | tail -3 ) || exit 1; \
 	fi
-	@if [ ! -x "$(VITE)" ]; then echo "installing frontend deps…"; cd frontend && npm install; fi
+	@$(MAKE) -s _deps
 	@$(MAKE) -s art
-	@if $(call held,$(BACK_PORT),cwbhacker); then :; elif [ ! -f frontend/dist/index.html ]; then \
-	  echo "building the frontend (the server serves it on $(BACK_PORT))…"; \
-	  cd frontend && npm run build >/dev/null 2>&1 || { echo "  frontend build failed — run 'cd frontend && npm run build'"; exit 1; }; \
-	fi
+	@if $(call dist_stale); then $(MAKE) -s _bundle; fi
 	@if $(call held,$(BACK_PORT),cwbhacker); then :; else \
 	  CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) nohup $(BACK_BIN) serve --bind $(BIND):$(BACK_PORT) \
 	    < /dev/null > $(RUN)/backend.log 2>&1 & echo $$! > $(RUN)/backend.pid; \
@@ -184,6 +200,34 @@ serve: ## the backend in the foreground, for a stack trace
 
 web: ## the frontend in the foreground
 	cd frontend && npm run dev
+
+rebuild: ## rebuild the frontend bundle the game server serves
+	@$(MAKE) -s _deps
+	@$(MAKE) -s art
+	@$(MAKE) -s _bundle
+	@if $(call held,$(BACK_PORT),cwbhacker); then \
+	  echo "  reload the page on $(BACK_PORT) — the server reads dist/ per request"; \
+	else \
+	  echo "  'make start' to bring the server up"; \
+	fi
+
+# Install only when the lockfile has moved since the last install. Checking
+# that the vite binary exists answers a different question, and answers it yes
+# for every dependency added after the first install.
+_deps:
+	@if $(call deps_stale); then \
+	  echo "installing frontend deps…"; \
+	  ( cd frontend && npm install ) || exit 1; \
+	fi
+
+# The one place the bundle is built. `start` calls it behind `dist_stale`,
+# `rebuild` calls it unconditionally. Output is kept on failure — the reason a
+# build failed (a missing module, a type error) is the whole message, and
+# sending it to /dev/null leaves "frontend build failed" and nothing to act on.
+_bundle:
+	@echo "building the frontend (the server serves it on $(BACK_PORT))…"
+	@( cd frontend && npm run build 2>&1 | tail -5 ) || \
+	  { echo "  frontend build failed — see above"; exit 1; }
 
 art: ## copy art/ into the frontend's public/ (it serves its own copy)
 	@rsync -a --delete --exclude tools/ --exclude raw/ --exclude prompts.toml art/ frontend/public/art/
