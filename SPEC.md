@@ -59,6 +59,8 @@ directory holds a user's own work and nothing else on the machine needs it.
 ├── users/
 │   └── <address>/                  lowercase 0x-hex, 42 chars — see §3.4
 │       ├── profile.json            display name, chosen land, settings
+│       ├── progress.json           where they are, what each quest cost,
+│       │                           and the stages they are weakest at (§1.2)
 │       └── attempts/
 │           └── <attempt_id>/       one directory per submission, kept
 │               ├── main.rs | main.go | main.cpp | main.py
@@ -86,6 +88,41 @@ a sandbox, and the rlimits and the timeout do not change it. An earlier version
 of this paragraph did not draw that line and read as a containment guarantee
 the implementation has never made. If you want containment, do not expose the
 port (§5.3) — the file system is not where it comes from.
+
+### 1.2 `progress.json`
+
+The same bargain `profile.json` makes, for the rest of what the database knows:
+**sqlite is the truth, and this is so a player can read their own directory
+without it.** Nothing reads it back. If it disagrees with `hacker.db` the file
+is wrong, and the next write fixes it.
+
+It holds, for one address: `position` (the quest last worked on, `null` for an
+account that has attempted nothing — which is *not* the same as being at the
+start of rust), `totals` (the `stats.summary` figures), `weakest`, and a
+`quests` table of every quest they have touched — state, stars, submits,
+failures, hints, timings, and where that quest's undo stack stands.
+
+The undo/redo **sources** are not copied in. They stay in `edits/` for the
+reason given above: that tree is the trail behind the work, not the work, and
+`cwbhacker prune` may drop all of it. What lands here is the stack's position —
+depth, cursor, whether undo and redo are available.
+
+`weakest` is the only part that is a judgement rather than a copy, and the
+obvious ranking is wrong: ordering by raw failure count returns the quests a
+player has *practised* most, which for anyone working steadily through a land
+is simply the ones they have reached. Two groups, in this order:
+
+1. `stuck` — failed submits, still not cleared. It is beating them now.
+2. `costly` — cleared, but it took failures. Real weakness, already survived.
+
+Within a group: more failures first, then the higher failure rate, so four
+failures out of four outranks four out of twenty. Ties break on `quest_id` so
+the order is total and the file does not churn between writes. RUN attempts are
+never counted — §4.9b — and a quest never failed is not weakness.
+
+Written on login and on a clear, not on every attempt: it is a whole-account
+snapshot, and a clear is the only event that moves an entry between the two
+groups.
 
 ### 1.1 The LÖVE client's own store
 

@@ -10,7 +10,7 @@ use cwbhacker_core::error::{bad_request, not_found, unauthorized, Error, Result}
 use cwbhacker_core::Connection;
 use cwbhacker_core::{
     attempts, auth, awards, drills, edits, eth, interviews, mistakes, progress, quests, search,
-    stats, users, world,
+    snapshot, stats, users, world,
 };
 use serde_json::json;
 
@@ -118,6 +118,12 @@ pub fn auth_login(
     let conn = state.store.conn();
     let user = users::upsert_named(&conn, &address, name.as_deref())?;
     users::write_profile(state.store.home(), &user)?;
+    // The readable mirror of §1, refreshed at the two moments it can have
+    // moved without this process seeing it: a login (another client, or the
+    // CLI, has been playing) and a clear (`submit.rs`). Not on every attempt —
+    // it is a whole-account snapshot, and rewriting it per submit would put a
+    // few hundred KB through the disk on every RUN.
+    snapshot::write(&conn, state.store.home(), &address)?;
     let token = auth::mint_session(&conn, &address)?;
     let user = user_json(&conn, &user)?;
     drop(conn);

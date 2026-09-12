@@ -21,6 +21,7 @@ pub mod paths;
 pub mod progress;
 pub mod quests;
 pub mod search;
+pub mod snapshot;
 pub mod snippets;
 pub mod stats;
 pub mod store;

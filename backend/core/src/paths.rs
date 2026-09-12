@@ -126,6 +126,12 @@ impl Home {
     pub fn profile_path(&self, address: &str) -> PathBuf {
         self.user_dir(address).join("profile.json")
     }
+    /// `users/<address>/progress.json` — the readable mirror of what the
+    /// database knows about this player (`snapshot.rs`). Beside `profile.json`
+    /// and for the same reason: the home is human-shaped on purpose.
+    pub fn progress_path(&self, address: &str) -> PathBuf {
+        self.user_dir(address).join("progress.json")
+    }
     pub fn attempt_dir(&self, address: &str, attempt_id: &str) -> PathBuf {
         self.user_dir(address).join("attempts").join(attempt_id)
     }

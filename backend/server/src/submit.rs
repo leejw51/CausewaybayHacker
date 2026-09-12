@@ -18,7 +18,7 @@ use std::time::Instant;
 
 use cwbhacker_core::attempts::Mode;
 use cwbhacker_core::error::{bad_request, unavailable, Result};
-use cwbhacker_core::{attempts, ids, mistakes, progress, quests, world};
+use cwbhacker_core::{attempts, ids, mistakes, progress, quests, snapshot, world};
 use cwbhacker_runner::{Event, Submission, TestSpec, Verdict};
 use serde_json::json;
 
@@ -292,6 +292,12 @@ pub fn run(
             stars = progress::get(&conn, address, &quest_id)?.stars;
         }
         cleared_total = progress::cleared_total(&conn, address)?;
+        // A clear is the event worth spending a snapshot on: it is the only
+        // one that moves `weakest` from "stuck" to "costly", and it is rare
+        // where submits are not.
+        if just_cleared {
+            snapshot::write(&conn, state.store.home(), address)?;
+        }
         unlocked = if just_cleared {
             world::unlocked_by(&conn, address, &quest_id)?
         } else {
