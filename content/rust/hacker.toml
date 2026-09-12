@@ -136,6 +136,15 @@ output: 3
 
 The window only ever moves right. If you find yourself rescanning from the
 start after a repeat, you have written the quadratic one.
+
+The cases here are small and the clock is not measuring them — and no bigger
+case would. A generated string cannot catch the quadratic answer: over 200000
+random letters the longest repeat-free run is nineteen, so "restart at every
+position and extend until a repeat" does about nineteen steps per start and
+comes home in six milliseconds, the same as the window. What punishes the
+quadratic version is text with long repeat-free stretches, which is an
+adversarial input rather than a random one. Write the window because a real
+input is adversarial, not because these four cases insisted.
 '''
 starter      = '''
 use std::collections::HashMap;
@@ -444,59 +453,74 @@ cases = [
 id           = "rust.hacker.05.binary-search"
 node         = 5
 title        = "HOW BIG A VAN"
-difficulty   = 4
-time_limit_s = 1200
+difficulty   = 5
+time_limit_s = 1500
 story        = "The depot wants the smallest van that clears the day's dockets in the days they have. They will not tell you which van; they will tell you if one you name is too small."
 concepts     = ["binary-search", "complexity", "slices"]
 requires     = ["rust.hacker.04.grid"]
 map          = { x = 0.604, y = 0.137, kind = "quest" }
 brief        = '''
-Line one is `n d`. Line two is `n` package weights, in the order they must be
-loaded — the order cannot change.
+Standard input is two integers, `n` and `seed`. There are no weights in the
+input — you build them, with **exactly** this generator, in `u64` arithmetic
+that wraps:
 
-Find the smallest van capacity that ships all `n` packages in at most `d`
-days, loading in order and never splitting a package.
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+weights[i] = next() % 1000 + 1        for i in 0..n
+```
+
+The depot has **three** days, always. Find the smallest van capacity that
+ships all `n` packages in at most three days, loading them in the order the
+generator produced, never reordering and never splitting a package.
 
 Print the capacity, then `MAX <heaviest package>`.
 
 ```
-input:  10 5
-        1 2 3 4 5 6 7 8 9 10
-output: 15
-        MAX 10
+input:  8 1
+output: 1702
+        MAX 903
 ```
 
+For `8 1` the weights are `775 154 197 871 35 796 131 903`. A van of `1701`
+needs four days; `1702` does it in three.
+
 You are not searching the list. You are searching the **answer**: the
-capacities from `max(weight)` to `sum(weights)`, on which "does it fit in `d`
-days" is false, false, false, then true forever. Binary search that.
+capacities from `max(weight)` to `sum(weights)`, on which "does it fit in
+three days" is false, false, false, then true forever. Binary search that.
+
+**This quest enforces its complexity.** One hidden case is `n = 200000`, where
+the answer is `33355734` and the heaviest package is `1000` — so the capacity
+you are looking for sits thirty-three million steps above where the search
+starts. Walking up one capacity at a time is correct, and it is the starter,
+and it **did not finish in two minutes** against a five second run limit.
+Halving the range instead is twenty-seven probes of `O(n)` each and finishes
+in **10 milliseconds**. Both measured on this machine, with the two programs
+in this quest.
+
+Both ends of the range are sums rather than single values: `sum(weights)` for
+the big case is just over `10^8`. That still fits an `i32`, but only because
+the generator caps a package at `1000`. Keep it in `i64` and the question
+stops being interesting, which is what you want from it.
 '''
 starter      = '''
 use std::io::Read;
 
-fn days_needed(weights: &[i64], capacity: i64) -> i64 {
-    let _ = (weights, capacity);
-    // how many days does this capacity take, loading in order?
-    0
-}
+const DAYS: i64 = 3;
 
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let values: Vec<i64> = input
-        .split_whitespace()
-        .map(|t| t.parse().unwrap())
-        .collect();
-    let n = values[0] as usize;
-    let days = values[1];
-    let weights = &values[2..2 + n];
+struct Rng(u64);
 
-    let _ = (days, days_needed(weights, 0));
-    println!("0");
-    println!("MAX {}", weights.iter().max().unwrap());
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
 }
-'''
-solution     = '''
-use std::io::Read;
 
 fn days_needed(weights: &[i64], capacity: i64) -> i64 {
     let mut days = 1i64;
@@ -514,19 +538,74 @@ fn days_needed(weights: &[i64], capacity: i64) -> i64 {
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let values: Vec<i64> = input
+    let parts: Vec<u64> = input
         .split_whitespace()
         .map(|t| t.parse().unwrap())
         .collect();
-    let n = values[0] as usize;
-    let days = values[1];
-    let weights = &values[2..2 + n];
+    let (n, seed) = (parts[0] as usize, parts[1]);
 
-    let mut low = *weights.iter().max().unwrap();
+    let mut rng = Rng(seed);
+    let weights: Vec<i64> = (0..n).map(|_| (rng.next() % 1000 + 1) as i64).collect();
+    let heaviest = *weights.iter().max().unwrap();
+
+    // correct, and far too slow: every capacity in turn, one at a time
+    let mut capacity = heaviest;
+    while days_needed(&weights, capacity) > DAYS {
+        capacity += 1;
+    }
+
+    println!("{}", capacity);
+    println!("MAX {}", heaviest);
+}
+'''
+solution     = '''
+use std::io::Read;
+
+const DAYS: i64 = 3;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
+fn days_needed(weights: &[i64], capacity: i64) -> i64 {
+    let mut days = 1i64;
+    let mut load = 0i64;
+    for &w in weights {
+        if load + w > capacity {
+            days += 1;
+            load = 0;
+        }
+        load += w;
+    }
+    days
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let parts: Vec<u64> = input
+        .split_whitespace()
+        .map(|t| t.parse().unwrap())
+        .collect();
+    let (n, seed) = (parts[0] as usize, parts[1]);
+
+    let mut rng = Rng(seed);
+    let weights: Vec<i64> = (0..n).map(|_| (rng.next() % 1000 + 1) as i64).collect();
+    let heaviest = *weights.iter().max().unwrap();
+
+    let mut low = heaviest;
     let mut high = weights.iter().sum::<i64>();
     while low < high {
         let mid = low + (high - low) / 2;
-        if days_needed(weights, mid) <= days {
+        if days_needed(&weights, mid) <= DAYS {
             high = mid;
         } else {
             low = mid + 1;
@@ -534,7 +613,7 @@ fn main() {
     }
 
     println!("{}", low);
-    println!("MAX {}", weights.iter().max().unwrap());
+    println!("MAX {}", heaviest);
 }
 '''
 hints = [
@@ -550,12 +629,11 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "sample", stdin = "10 5\n1 2 3 4 5 6 7 8 9 10\n", expect = "15\nMAX 10\n", visible = true },
-  { name = "tight",  stdin = "3 3\n3 2 2\n",                 expect = "3\nMAX 3\n",   visible = false },
-  { name = "spread", stdin = "5 4\n1 2 3 1 1\n",             expect = "3\nMAX 3\n",   visible = false },
-  { name = "one",    stdin = "1 1\n7\n",                     expect = "7\nMAX 7\n",   visible = false },
+  { name = "sample", stdin = "8 1\n",          expect = "1702\nMAX 903\n",      visible = true },
+  { name = "single", stdin = "1 7\n",          expect = "279\nMAX 279\n",       visible = false },
+  { name = "dozen",  stdin = "12 99\n",        expect = "1859\nMAX 759\n",      visible = false },
+  { name = "big",    stdin = "200000 12345\n", expect = "33355734\nMAX 1000\n", visible = false },
 ]
-
 # ---------------------------------------------------------------- 06
 [[quest]]
 id           = "rust.hacker.06.stack"
@@ -584,6 +662,16 @@ output: 4 2 4 -1
 Keep a stack of positions whose answer is still unknown, and it stays
 decreasing from the bottom up. Each position is pushed once and popped once,
 so the whole thing is one pass however it looks.
+
+The cases here are small: they check the plateau and the all-descending run,
+not your speed. A big random case would not help either. The distance from a
+value to the next greater one averages about `ln n`, so scanning right from
+every position does 2.1 million inner steps over 200000 random values and
+finishes in six milliseconds — indistinguishable from the stack. The input
+that makes that answer quadratic is a descending list, and a generator would
+have to be built to produce one rather than happen to. The stack is still the
+answer, one push and one pop per position whatever the data; it is just not
+the clock here that is telling you so.
 '''
 starter      = '''
 use std::io::Read;
@@ -808,6 +896,12 @@ on the next run, and no amount of sort *stability* saves it, because the input
 to the sort was already arbitrary. Making the comparison **total** — count
 descending, then the word ascending — is what fixes it, and it is the answer
 the interviewer is listening for.
+
+The hidden cases here are small: they check the tie-break and the `k` bigger
+than the number of distinct words, and nothing at all about speed. The input
+is words, which is the one shape a generator cannot produce convincingly — so
+the bar this question holds is the correctness bar above, and it holds it
+honestly rather than by the clock.
 '''
 starter      = '''
 use std::collections::HashMap;
@@ -1313,6 +1407,12 @@ whole Rust-specific trick, and it is what the question is checking.
 
 The heap holds one entry per list, not one per element, so it stays at size
 `k` however long the lists are.
+
+The cases here are small and the clock is not measuring them. The heap is
+still the answer — rescanning all `k` heads for every element is `O(N·k)`, and
+a real `k` is in the thousands — but nothing in these four cases is large
+enough to tell the two apart, and a `k`-way input is not a shape this road's
+generator produces.
 '''
 starter      = '''
 use std::cmp::Reverse;
@@ -1818,6 +1918,11 @@ output: 3
 Union-find: every stop points at a parent, `find` walks to the root, `union`
 points one root at the other. Compress the path on the way back out of `find`
 and the whole thing is effectively constant time per query.
+
+The cases here are small: they check the redundant-link count and the repeated
+link, not your speed. "Effectively constant" is a claim about a million
+queries and these are four links — path compression is still what you write,
+and these cases are not what proves it.
 '''
 starter      = '''
 use std::io::Read;
@@ -2308,6 +2413,13 @@ output: 4
 `x ^ x == 0` and `x ^ 0 == x`, and xor does not care what order it happens in.
 That is the whole first line. `x & (x - 1)` clears the lowest set bit, which
 gives you the third and fourth lines for free.
+
+The cases here are small, and making them big would prove nothing. What the
+question asks for is **constant extra space**, and a clock cannot measure
+space: at any `n` this road would use, a hash map and a sort both come home
+well inside the run limit while being exactly the two answers the question
+ruled out. These tests check that the four lines are right. The person across
+the table checks how you got them.
 '''
 starter      = '''
 use std::io::Read;
@@ -2686,75 +2798,140 @@ id           = "rust.hacker.23.prefix-sums"
 node         = 23
 title        = "HOW MANY WAYS TO HIT THE TARGET"
 difficulty   = 5
-time_limit_s = 1200
+time_limit_s = 1500
 story        = "A day of takings and a number the auditor wants to see. How many runs of consecutive hours add up to exactly that."
 concepts     = ["prefix-sums", "hashing", "complexity"]
 requires     = ["rust.hacker.22.trie"]
 map          = { x = 0.750, y = 0.724, kind = "quest" }
 brief        = '''
-Line one is `n k`. Line two is `n` integers, which may be negative.
+Standard input is two integers, `n` and `seed`. There is no list in the input
+and no target either — you build both, with **exactly** this generator, in
+`u64` arithmetic that wraps:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+k = (next() % 9) - 4                  # the target, drawn first
+values[i] = (next() % 9) - 4          for i in 0..n
+```
 
 Print how many contiguous runs sum to exactly `k`, then `RANGE <s>`, the sum
 of the whole list, read off the last prefix sum rather than by adding again.
 
 ```
-input:  5 3
-        1 2 3 -3 3
-output: 5
-        RANGE 6
+input:  8 1
+output: 4
+        RANGE 0
 ```
+
+For `8 1` the target is `1` and the values are `-1 -1 -1 -4 4 1 3 -1`.
 
 Negative values kill the sliding window — a window that is too big cannot be
 fixed by shrinking it. What survives is prefix sums: a run `i..j` sums to `k`
 exactly when `prefix[j] - prefix[i] == k`, so count how many earlier prefixes
 equal `prefix[j] - k`. Seed the map with `0 → 1` for runs that start at the
 beginning.
+
+**This quest enforces its complexity.** One hidden case is `n = 500000`.
+Summing every run from its own start is `1.25 × 10^11` additions — that is the
+starter, it is correct, and it takes **51 seconds** against a five second run
+limit. The prefix-and-map answer is one pass, `O(n)`, and finishes in **14
+milliseconds**. Both measured on this machine, with the two programs in this
+quest.
+
+`n` is 500000 rather than the 200000 a double loop usually deserves, and the
+reason is worth having. The naive inner loop here is one add and one compare
+over a contiguous slice, which the compiler vectorises happily: at 200000 it
+still came home in **under nine seconds** — over the limit, but not twice
+over, and a faster machine would have waved it through. A bar you can clear by buying a
+better laptop is not a bar.
+
+The count is large — `53075531` for the big case — and it still fits an `i32`,
+as does the running prefix, because the values are in `-4..4` and 500000 of
+them sum to a couple of thousand. Nothing here is silently wrong at the wrong
+width. It is only slow.
 '''
 starter      = '''
-use std::collections::HashMap;
 use std::io::Read;
+
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
 
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let values: Vec<i64> = input
+    let parts: Vec<u64> = input
         .split_whitespace()
         .map(|t| t.parse().unwrap())
         .collect();
-    let n = values[0] as usize;
-    let k = values[1];
-    let nums = &values[2..2 + n];
+    let (n, seed) = (parts[0] as usize, parts[1]);
 
-    let mut seen: HashMap<i64, i64> = HashMap::new();
-    seen.insert(0, 1);
+    let mut rng = Rng(seed);
+    let k = (rng.next() % 9) as i64 - 4;
+    let values: Vec<i64> = (0..n).map(|_| (rng.next() % 9) as i64 - 4).collect();
 
-    // running prefix; for each one, how many earlier prefixes were prefix - k
-    let _ = (seen, nums, k);
-    println!("0");
-    println!("RANGE 0");
+    // correct, and far too slow: every run is summed from its own start
+    let mut runs = 0i64;
+    for i in 0..n {
+        let mut sum = 0i64;
+        for j in i..n {
+            sum += values[j];
+            if sum == k {
+                runs += 1;
+            }
+        }
+    }
+
+    println!("{}", runs);
+    println!("RANGE {}", values.iter().sum::<i64>());
 }
 '''
 solution     = '''
 use std::collections::HashMap;
 use std::io::Read;
 
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+}
+
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let values: Vec<i64> = input
+    let parts: Vec<u64> = input
         .split_whitespace()
         .map(|t| t.parse().unwrap())
         .collect();
-    let n = values[0] as usize;
-    let k = values[1];
-    let nums = &values[2..2 + n];
+    let (n, seed) = (parts[0] as usize, parts[1]);
+
+    let mut rng = Rng(seed);
+    let k = (rng.next() % 9) as i64 - 4;
+    let values: Vec<i64> = (0..n).map(|_| (rng.next() % 9) as i64 - 4).collect();
 
     let mut seen: HashMap<i64, i64> = HashMap::new();
     seen.insert(0, 1);
 
     let mut prefix = 0i64;
     let mut runs = 0i64;
-    for &value in nums {
+    for &value in &values {
         prefix += value;
         runs += *seen.get(&(prefix - k)).unwrap_or(&0);
         *seen.entry(prefix).or_insert(0) += 1;
@@ -2777,12 +2954,11 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "sample",   stdin = "5 3\n1 2 3 -3 3\n", expect = "5\nRANGE 6\n",  visible = true },
-  { name = "zeroes",   stdin = "3 0\n0 0 0\n",      expect = "6\nRANGE 0\n",  visible = false },
-  { name = "none",     stdin = "3 9\n1 1 1\n",      expect = "0\nRANGE 3\n",  visible = false },
-  { name = "negative", stdin = "4 -2\n-1 -1 2 -2\n", expect = "3\nRANGE -2\n", visible = false },
+  { name = "sample", stdin = "8 1\n",          expect = "4\nRANGE 0\n",           visible = true },
+  { name = "single", stdin = "1 7\n",          expect = "1\nRANGE 4\n",           visible = false },
+  { name = "dozen",  stdin = "12 99\n",        expect = "12\nRANGE -3\n",         visible = false },
+  { name = "big",    stdin = "500000 12345\n", expect = "53075531\nRANGE 2969\n", visible = false },
 ]
-
 # ---------------------------------------------------------------- 24
 [[quest]]
 id           = "rust.hacker.24.inversions"
