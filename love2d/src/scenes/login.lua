@@ -72,10 +72,14 @@ function Login.new(app)
     -- than overwriting what the player typed.
     server = "",
     server_error = nil,
+    -- Pixels the panel is scrolled by, when it is taller than the window.
+    scroll = 0,
+    field_rects = {},
   }, Login)
 end
 
 function Login:enter()
+  self.scroll = 0
   local remembered = self.app.session.remembered
   if remembered and remembered.name then
     self.name = remembered.name
@@ -252,52 +256,134 @@ function Login:watch_story()
 end
 
 -- ------------------------------------------------------------------ drawing
+--
+-- ## Laid out from the type, not from numbers
+--
+-- The first version of this screen put every row at a fixed y — the phrase
+-- field at 70, the name at 132, the server at 196, the buttons at 248 — and
+-- those numbers were written against the 8 px type ladder. `Layout.ui` then
+-- doubled the ladder and gave the player four steps of it, and the numbers
+-- did not move: every label printed through the field above it, the field
+-- text was a 16 px face rattling around a box sized for 24, and at the
+-- larger steps the whole panel collapsed into one band of overprinted
+-- lines. (The report was "font broken, text out of text box", and it was.)
+--
+-- Now each panel is a list of rows, each measured from the face it is drawn
+-- in, stacked with a cursor. The panel is sized to the stack and, when the
+-- stack is taller than the room above the footer — the largest type step in
+-- a short landscape window — it scrolls behind a scissor and keeps the
+-- focused row in view rather than drawing rows through each other.
+
+--- The panel's inset, all four sides.
+local PAD = 20
+--- Air between rows.
+local GAP = 10
+--- Room kept clear for Ferris in the corner of the sign-in panel.
+local FERRIS_H = 72
+
+--- The face a field is typed in: VT323, following the type step like every
+--- label does. Half again the label size, because VT323 is a narrow face and
+--- at the same pixel height it reads a step smaller than Press Start 2P.
+local function field_font()
+  return Assets.mono(math.floor(Layout.ui(8) * 1.5))
+end
+
+local function field_height()
+  return field_font():getHeight() + 14
+end
+
+--- A row: `h` pixels tall, drawn by `draw(y)` with `y` the row's top in
+--- panel coordinates. `focus` marks the row `draw` keeps in view when the
+--- panel scrolls.
+local function stack()
+  local rows, cursor = {}, 0
+  local function put(h, draw, extra)
+    local row = { y = cursor, h = h, draw = draw }
+    if extra then for k, v in pairs(extra) do row[k] = v end end
+    rows[#rows + 1] = row
+    cursor = cursor + h + (extra and extra.gap or GAP)
+    return row
+  end
+  local function height()
+    local last = rows[#rows]
+    return last and (last.y + last.h) or 0
+  end
+  return put, rows, height
+end
+
+--- One line of label at `size`, as a row.
+local function text_row(put, text, size, color, gap)
+  return put(UI.lineHeight(size), function(y)
+    UI.text(text, 0, y, size, color)
+  end, { gap = gap })
+end
+
+--- A wrapped paragraph at `size`, as one row. `max_lines` clips it.
+local function lines_row(put, text, width, size, color, gap, max_lines)
+  local lines = UI.wrap(text, width, size)
+  if max_lines and #lines > max_lines then
+    for i = #lines, max_lines + 1, -1 do lines[i] = nil end
+  end
+  local step = UI.lineHeight(size) + 2
+  return put(math.max(0, #lines * step - 2), function(y)
+    for i, line in ipairs(lines) do
+      UI.text(line, 0, y + (i - 1) * step, size, color)
+    end
+  end, { gap = gap })
+end
 
 local function field_box(y, w, h, label, shown, focused, hint)
-  UI.text(label, 0, y - 14, 8, Theme.withAlpha(Theme.cream, 0.75))
+  local lh = UI.lineHeight(8)
+  UI.text(label, 0, y, 8, Theme.withAlpha(Theme.cream, 0.75))
+  local by = y + lh + 4
   UI.setColor(Theme.void, 0.85)
-  love.graphics.rectangle("fill", 0, y, w, h)
+  love.graphics.rectangle("fill", 0, by, w, h)
   love.graphics.setLineWidth(2)
   UI.setColor(focused and Theme.coin or Theme.withAlpha(Theme.cream, 0.35))
-  love.graphics.rectangle("line", 1, y + 1, w - 2, h - 2)
+  love.graphics.rectangle("line", 1, by + 1, w - 2, h - 2)
   love.graphics.setColor(1, 1, 1, 1)
-  local font = Assets.mono(math.floor(h * 0.62))
+  local font = field_font()
   love.graphics.setFont(font)
+  local ty = by + (h - font:getHeight()) / 2
   if shown == "" then
     UI.setColor(Theme.withAlpha(Theme.cream, 0.35))
-    love.graphics.print(hint or "", 8, y + (h - font:getHeight()) / 2)
+    love.graphics.print(hint or "", 8, ty)
   else
     UI.setColor(Theme.cream)
     -- Scroll so the tail is visible while typing a twelve-word phrase.
-    local text = shown
-    while font:getWidth(text) > w - 20 and #text > 1 do
-      text = text:sub(2)
+    -- **By character, not by byte**: a name typed in Korean is three bytes a
+    -- glyph, and `sub(2)` on it prints the broken tail as mojibake.
+    local chars = UI.chars(shown)
+    local first = 1
+    local function tail() return table.concat(chars, "", first) end
+    local text = tail()
+    while font:getWidth(text) > w - 20 and first < #chars do
+      first = first + 1
+      text = tail()
     end
-    love.graphics.print(text, 8, y + (h - font:getHeight()) / 2)
+    love.graphics.print(text, 8, ty)
   end
   love.graphics.setColor(1, 1, 1, 1)
+  return { y = by, h = h }
 end
 
 --- The panel this screen lives in. Both orientations, one function.
+---
+--- Sized to the rows: `ph` is the stack plus the inset, capped at the room
+--- above the footer. The cap is what makes `draw` scroll.
 function Login:panel_rect()
   local vw, vh = Layout.vw, Layout.vh
   local portrait = Layout.isPortrait()
-  local tall = self.mode == "new_show"
-  local pw = math.min(vw - 40, portrait and (vw - 32) or (tall and 760 or 720))
-  -- The word grid is three columns of four in landscape and two of six in
-  -- portrait, so the panel is shorter in the orientation with more room
-  -- across. Sized to the content rather than to the screen.
-  -- Sized to the content. The word grid is three columns of four in
-  -- landscape and two of six in portrait, so the panel is shorter in the
-  -- orientation with more room across; the confirmation step that used to
-  -- need the extra height is gone.
-  -- The WRITE THIS DOWN panel is 400 in landscape rather than 330: at the
-  -- doubled type ladder its twelve words, the address, the four-line warning
-  -- and the button do not fit in 330, and what gave way was the red line
-  -- saying this is the only copy — printed under the word grid's own plate
-  -- and invisible. That line is the whole screen.
-  local ph = math.min(vh - 48, portrait and 560 or (tall and 400 or 460))
-  return (vw - pw) / 2, (vh - ph) / 2 - (portrait and 30 or 0), pw, ph
+  -- Landscape: 720 at the default type step, and a wider panel at the steps
+  -- above it, because the same labels are half again as wide there and a
+  -- panel that stayed 720 would wrap `CWBH_SERVER=…` three deep.
+  local want_w = portrait and (vw - 32)
+    or math.floor(720 * math.max(1, Layout.fontScale() / 1.5))
+  local pw = math.min(vw - 40, want_w)
+  local room = vh - UI.footerHeight() - 24
+  local content = self.content_h or 0
+  local ph = math.min(room, content + PAD * 2)
+  return math.floor((vw - pw) / 2), math.floor((room + 24 - ph) / 2), pw, ph
 end
 
 function Login:draw()
@@ -307,35 +393,61 @@ function Login:draw()
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
 
+  -- Measure first, so the panel is the size of what goes in it.
+  local _, _, pw0 = self:panel_rect()
+  local inner = pw0 - PAD * 2
+  local rows, content_h
+  if not self.app.wallet_lib then
+    rows, content_h = self:rows_no_library(inner)
+  elseif self.mode == "new_show" then
+    rows, content_h = self:rows_new_show(inner)
+  else
+    rows, content_h = self:rows_signin(inner)
+  end
+  self.content_h = content_h
+
   local px, py, pw, ph = self:panel_rect()
   UI.panel(px, py, pw, ph, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = Theme.land.rust })
 
-  love.graphics.push()
-  love.graphics.translate(px + 20, py + 18)
-  local inner = pw - 40
-
-  if not self.app.wallet_lib then
-    self:draw_no_library(inner, ph)
-  elseif self.mode == "new_show" then
-    self:draw_new_show(inner, ph)
-  else
-    self:draw_signin(inner, ph)
-  end
-
-  local message = self.error or self.status
-  if message then
-    local color = self.error and Theme.red or Theme.coin
-    for i, line in ipairs(UI.wrap(message, inner, 8)) do
-      if i <= 2 then
-        UI.text(line, 0, ph - 54 + (i - 1) * 11, 8, color)
-      end
+  -- Scroll: nothing, unless the stack is taller than the panel. Then clamp,
+  -- and keep the focused row inside the window whatever the wheel did.
+  local view_h = ph - PAD * 2
+  local max_scroll = math.max(0, content_h - view_h)
+  self.scroll = math.max(0, math.min(self.scroll or 0, max_scroll))
+  for _, row in ipairs(rows) do
+    if row.focus then
+      if row.y < self.scroll then self.scroll = row.y end
+      if row.y + row.h > self.scroll + view_h then self.scroll = row.y + row.h - view_h end
     end
   end
+  self.view = { x = px + PAD, y = py + PAD, w = inner, h = view_h }
 
+  love.graphics.push()
+  love.graphics.translate(px + PAD, py + PAD - self.scroll)
+  local sx, sy, sw, sh = love.graphics.getScissor()
+  love.graphics.setScissor(px + 2, py + PAD - 2, pw - 4, view_h + 4)
+  for _, row in ipairs(rows) do
+    row.draw(row.y)
+  end
+  love.graphics.setScissor(sx, sy, sw, sh)
   love.graphics.pop()
 
-  if self.mode == "signin" then
-    Assets.sprite("sprite_ferris", px + pw - 56, py + ph - 16, 72)
+  if max_scroll > 0 then
+    -- A thin track, so a panel that is taller than it looks says so.
+    local track_h = view_h
+    local knob_h = math.max(24, track_h * view_h / content_h)
+    local knob_y = (track_h - knob_h) * (self.scroll / max_scroll)
+    UI.setColor(Theme.withAlpha(Theme.cream, 0.15))
+    love.graphics.rectangle("fill", px + pw - 8, py + PAD, 3, track_h)
+    UI.setColor(Theme.withAlpha(Theme.coin, 0.8))
+    love.graphics.rectangle("fill", px + pw - 8, py + PAD + knob_y, 3, knob_h)
+    love.graphics.setColor(1, 1, 1, 1)
+  end
+
+  -- Ferris stands in the corner only while the panel holds still: over a
+  -- scrolling stack he would be standing on whichever row went past.
+  if self.mode == "signin" and self.app.wallet_lib and max_scroll == 0 then
+    Assets.sprite("sprite_ferris", px + pw - 56, py + ph - 16, FERRIS_H)
   end
 
   local hints = {
@@ -348,192 +460,250 @@ function Login:draw()
   self.app:footer(hints[self.mode] or "")
 end
 
-function Login:draw_signin(inner, ph)
-  UI.text(I18n.t("SIGN IN"), 0, 0, 16, Theme.coin)
-  -- Under the heading rather than through it: `22` was written against an
-  -- 8 px ladder and the heading is 32 px tall at the doubled one.
-  UI.text(I18n.t("your wallet is your account"), 0, UI.lineHeight(16) + 4, 8,
-    Theme.withAlpha(Theme.cream, 0.7))
+--- The error or status line, two lines at most, always reserved so the
+--- panel does not grow the moment something goes wrong.
+function Login:message_row(put, width)
+  local step = UI.lineHeight(8) + 2
+  put(step * 2 - 2, function(y)
+    local message = self.error or self.status
+    if not message then return end
+    local color = self.error and Theme.red or Theme.coin
+    for i, line in ipairs(UI.wrap(message, width, 8)) do
+      if i <= 2 then UI.text(line, 0, y + (i - 1) * step, 8, color) end
+    end
+  end, { gap = 0 })
+end
 
-  field_box(70, inner, 34, I18n.t("MNEMONIC OR PRIVATE KEY  (F2 SHOWS IT)"),
-    self:masked(), self.focus == 1, I18n.t("twelve words, or 0x + 64 hex"))
-  field_box(132, inner, 30, I18n.t("DISPLAY NAME  (OPTIONAL)"),
-    self.name, self.focus == 2, "hacker")
+function Login:rows_signin(inner)
+  local put, rows, height = stack()
+  local lh8, lh7 = UI.lineHeight(8), UI.lineHeight(7)
+  local fh = field_height()
+  local dim = Theme.withAlpha(Theme.cream, 0.55)
 
-  local words = 0
-  for _ in self.secret:gmatch("%S+") do words = words + 1 end
-  local shape = ""
-  if Wallet.looks_like_private_key(self.secret) then
-    shape = I18n.t("private key")
-  elseif words > 0 then
-    -- Singular and plural as two strings; see the streak on the stats
-    -- screen for why "%d word(s)" is not an option in the source language.
-    shape = words == 1 and I18n.t("%d word", 1) or I18n.t("%d words", words)
+  text_row(put, I18n.t("SIGN IN"), 16, Theme.coin, 4)
+  text_row(put, I18n.t("your wallet is your account"), 8, Theme.withAlpha(Theme.cream, 0.7), 14)
+
+  self.field_rects = self.field_rects or {}
+  local function field(index, label, shown, hint, gap)
+    put(lh8 + 4 + fh, function(y)
+      self.field_rects[index] = field_box(y, inner, fh, label, shown, self.focus == index, hint)
+    end, { focus = self.focus == index, gap = gap })
   end
-  UI.text(shape, 0, 168, 8, Theme.withAlpha(Theme.cream, 0.6))
-  UI.text("m/44'/60'/0'/0/0", inner - UI.textWidth("m/44'/60'/0'/0/0", 8), 168, 8,
-    Theme.withAlpha(Theme.cream, 0.5))
+
+  field(1, I18n.t("MNEMONIC OR PRIVATE KEY  (F2 SHOWS IT)"), self:masked(),
+    I18n.t("twelve words, or 0x + 64 hex"), 4)
+
+  -- What the phrase looks like so far, and the derivation path it will go
+  -- through, on one row under the field.
+  put(lh8, function(y)
+    local words = 0
+    for _ in self.secret:gmatch("%S+") do words = words + 1 end
+    local shape = ""
+    if Wallet.looks_like_private_key(self.secret) then
+      shape = I18n.t("private key")
+    elseif words > 0 then
+      -- Singular and plural as two strings; see the streak on the stats
+      -- screen for why "%d word(s)" is not an option in the source language.
+      shape = words == 1 and I18n.t("%d word", 1) or I18n.t("%d words", words)
+    end
+    UI.text(shape, 0, y, 8, Theme.withAlpha(Theme.cream, 0.6))
+    local path = "m/44'/60'/0'/0/0"
+    UI.text(path, inner - UI.textWidth(path, 8), y, 8, Theme.withAlpha(Theme.cream, 0.5))
+  end)
+
+  field(2, I18n.t("DISPLAY NAME  (OPTIONAL)"), self.name, "hacker")
 
   -- The server. On this screen because `CWBH_SERVER` is not discoverable
   -- from inside the game, and the backend now runs on `0.0.0.0` so a phone
   -- on the same tailnet is a real thing somebody wants to point at.
-  local override = self.app.server_override
-  field_box(196, inner, 30, I18n.t("SERVER  (ENTER APPLIES)"),
-    self.server, self.focus == 3, App.DEFAULT_SERVER)
-  self.server_box = { y = 196, h = 30 }
+  field(3, I18n.t("SERVER  (ENTER APPLIES)"), self.server, App.DEFAULT_SERVER, 4)
 
-  if self.server_error then
-    UI.text(self.server_error, 0, 230, 7, Theme.red)
-  elseif override then
-    -- Precedence, said out loud. The field still saves; it just does not win
-    -- this run, and pretending otherwise would make the control a lie.
-    -- Spaced by the line's own height: `9` was written against a 7 px ladder,
-    -- so at the doubled one the second line was printed through the SIGN IN
-    -- button underneath it.
-    local step = UI.lineHeight(7) + 2
-    for i, line in ipairs(UI.wrap(
-      I18n.t("CWBH_SERVER=%s is overriding this run — the field is saved for next launch",
-        override), inner, 7)) do
-      if i <= 2 then UI.text(line, 0, 230 + (i - 1) * step, 7, Theme.coin) end
+  -- The line under it: a refusal, the override, or the live state. Two lines
+  -- reserved, because the override sentence is two lines in most languages.
+  local note_step = lh7 + 2
+  put(note_step * 2 - 2, function(y)
+    local override = self.app.server_override
+    if self.server_error then
+      for i, line in ipairs(UI.wrap(self.server_error, inner, 7)) do
+        if i <= 2 then UI.text(line, 0, y + (i - 1) * note_step, 7, Theme.red) end
+      end
+    elseif override then
+      -- Precedence, said out loud. The field still saves; it just does not
+      -- win this run, and pretending otherwise would make the control a lie.
+      for i, line in ipairs(UI.wrap(
+        I18n.t("CWBH_SERVER=%s is overriding this run — the field is saved for next launch",
+          override), inner, 7)) do
+        if i <= 2 then UI.text(line, 0, y + (i - 1) * note_step, 7, Theme.coin) end
+      end
+    else
+      local live = self.app.client and self.app.client.state or "idle"
+      UI.text(I18n.t("in use: %s  [%s]", self.app.server, live), 0, y, 7,
+        Theme.withAlpha(Theme.cream, 0.5))
     end
-  else
-    local live = self.app.client and self.app.client.state or "idle"
-    UI.text(I18n.t("in use: %s  [%s]", self.app.server, live), 0, 230, 7,
-      Theme.withAlpha(Theme.cream, 0.5))
-  end
+  end)
 
-  local bh = 32
-  local by = 248
-  UI.button(0, by, inner, bh, self.busy and "SIGNING…" or "SIGN IN  [ENTER]",
-    self:can_submit() and "hot" or "disabled")
-  self.signin_button = { y = by, h = bh }
+  -- The buttons, at the display controls' height: a thing a finger hits.
+  local bh = UI.chipHeight()
+  put(bh, function(y)
+    UI.button(0, y, inner, bh, self.busy and "SIGNING…" or "SIGN IN  [ENTER]",
+      self:can_submit() and "hot" or "disabled", UI.CHIP_SIZE)
+    self.signin_button = { y = y, h = bh }
+  end)
 
-  -- The way in for somebody who has never had a wallet. Given equal weight to
-  -- the sign-in button rather than tucked in a corner: on a first run it is
-  -- the only button that can do anything.
-  local ny = by + bh + 10
-  UI.button(0, ny, inner, bh, "NEW WALLET  [N]", self.busy and "disabled" or "normal")
-  self.new_button = { y = ny, h = bh }
+  -- The way in for somebody who has never had a wallet. Given equal weight
+  -- to the sign-in button rather than tucked in a corner: on a first run it
+  -- is the only button that can do anything.
+  put(bh, function(y)
+    UI.button(0, y, inner, bh, "NEW WALLET  [N]", self.busy and "disabled" or "normal",
+      UI.CHIP_SIZE)
+    self.new_button = { y = y, h = bh }
+  end, { gap = GAP + 2 })
 
   -- The way back into the opening, which is the browser client's `STORY`
-  -- button in this client's furniture. It is on the login screen for the same
-  -- reason it is there: the opening plays once, on the first launch, and
-  -- after that the only place anybody would think to look for it is the
+  -- button in this client's furniture. It is on the login screen for the
+  -- same reason it is there: the opening plays once, on the first launch,
+  -- and after that the only place anybody would think to look for it is the
   -- screen they arrive at. Narrower than the two buttons above it and set to
   -- one side, because it is the one control here that is not the way in.
-  local sy = ny + bh + 12
-  local swide = math.max(140, UI.textWidth(I18n.t("STORY  [F10]"), 8) + 28)
-  UI.button(0, sy, swide, bh - 4, I18n.t("STORY  [F10]"), "normal", 8)
-  self.story_button = { y = sy, h = bh - 4, w = swide }
-  UI.text(I18n.t("watch the opening again"), swide + 12,
-    sy + (bh - 4 - UI.lineHeight(7)) / 2, 7, Theme.withAlpha(Theme.cream, 0.55))
+  local story = I18n.t("STORY  [F10]")
+  local swide = math.min(inner, math.max(140, UI.textWidth(story, 8) + 28))
+  local caption = UI.wrap(I18n.t("watch the opening again"), math.max(40, inner - swide - 12), 7)
+  local sh = math.max(bh - 4, math.min(#caption, 2) * note_step - 2)
+  put(sh, function(y)
+    UI.button(0, y, swide, bh - 4, story, "normal", 8)
+    self.story_button = { y = y, h = bh - 4, w = swide }
+    local cy = y + (bh - 4 - math.min(#caption, 2) * note_step + 2) / 2
+    for i, line in ipairs(caption) do
+      if i <= 2 then UI.text(line, swide + 12, cy + (i - 1) * note_step, 7, dim) end
+    end
+  end)
 
-  -- Wrapped, not printed straight: at the doubled type ladder this sentence
-  -- is wider than the panel it is in, and an unwrapped `UI.text` runs off the
-  -- right edge and over Ferris.
-  local ny2 = sy + bh + 10
-  for _, line in ipairs(UI.wrap(
-    I18n.t("nothing typed here is ever sent. only a signature leaves this machine."),
-    inner, 7)) do
-    ny2 = ny2 + UI.text(line, 0, ny2, 7, Theme.withAlpha(Theme.cream, 0.55)) + 2
-  end
+  -- Wrapped, and wrapped short of Ferris, who stands in the corner under it.
+  lines_row(put, I18n.t("nothing typed here is ever sent. only a signature leaves this machine."),
+    inner - 84, 7, dim, 6)
+  self:message_row(put, inner - 84)
+
+  return rows, height()
 end
 
-function Login:draw_new_show(inner, ph)
-  if not self.words then return end
-    UI.text(I18n.t("WRITE THIS DOWN"), 0, 0, 15, Theme.coin)
+function Login:rows_new_show(inner)
+  local put, rows, height = stack()
+  if not self.words then return rows, 0 end
+  local lh8 = UI.lineHeight(8)
+
+  text_row(put, I18n.t("WRITE THIS DOWN"), 16, Theme.coin, 4)
   -- The copy is doing the work now that nothing gates the button.
-  UI.text(I18n.t("this is the only copy. there is no reset."), 0, UI.lineHeight(15) + 4, 8,
-    Theme.red)
+  text_row(put, I18n.t("this is the only copy. there is no reset."), 8, Theme.red, 12)
 
   -- The grid: three columns of four in landscape, two of six in portrait, so
-  -- the numbers stay in reading order either way.
+  -- the numbers stay in reading order either way. The words are set in the
+  -- editor face at a step above the labels: they are the one thing on this
+  -- screen a player copies letter by letter.
   local portrait = Layout.isPortrait()
   local cols = portrait and 2 or 3
-  local rows = math.ceil(#self.words / cols)
+  local rows_n = math.ceil(#self.words / cols)
   local cw = inner / cols
-  -- Measured from the two lines above it rather than fixed at 46, which was
-  -- written against an 8 px ladder and now starts inside the red line.
-  local top = UI.lineHeight(15) + UI.lineHeight(8) + 16
-  local rh = math.max(26, UI.lineHeight(8) + 10)
-
-  UI.setColor(Theme.void, 0.8)
-  love.graphics.rectangle("fill", 0, top - 6, inner, rows * rh + 12)
-  love.graphics.setLineWidth(2)
-  UI.setColor(Theme.coin)
-  love.graphics.rectangle("line", 1, top - 5, inner - 2, rows * rh + 10)
-  love.graphics.setColor(1, 1, 1, 1)
-
-  local font = Assets.mono(20)
-  for i, word in ipairs(self.words) do
-    local col = math.floor((i - 1) / rows)
-    local row = (i - 1) % rows
-    local x = col * cw + 10
-    local y = top + row * rh
-    UI.text(("%2d"):format(i), x, y + 4, 8, Theme.withAlpha(Theme.cream, 0.45))
-    love.graphics.setFont(font)
-    UI.setColor(Theme.cream)
-    love.graphics.print(word, x + 26, y)
+  local font = Assets.mono(math.floor(Layout.ui(8) * 1.5))
+  local rh = math.max(font:getHeight() + 8, lh8 + 10)
+  local num_w = UI.textWidth("12", 8) + 10
+  put(rows_n * rh + 12, function(top)
+    UI.setColor(Theme.void, 0.8)
+    love.graphics.rectangle("fill", 0, top, inner, rows_n * rh + 12)
+    love.graphics.setLineWidth(2)
+    UI.setColor(Theme.coin)
+    love.graphics.rectangle("line", 1, top + 1, inner - 2, rows_n * rh + 10)
     love.graphics.setColor(1, 1, 1, 1)
-  end
+    for i, word in ipairs(self.words) do
+      local col = math.floor((i - 1) / rows_n)
+      local row = (i - 1) % rows_n
+      local x = col * cw + 10
+      local y = top + 6 + row * rh
+      UI.text(("%2d"):format(i), x, y + (rh - lh8) / 2, 8, Theme.withAlpha(Theme.cream, 0.45))
+      love.graphics.setFont(font)
+      UI.setColor(Theme.cream)
+      love.graphics.print(word, x + num_w, y + (rh - font:getHeight()) / 2)
+      love.graphics.setColor(1, 1, 1, 1)
+    end
+  end, { gap = 12 })
 
-  local y = top + rows * rh + 16
   -- Kept on screen on purpose: it is how a player checks later that the
   -- paper in the drawer is the account they are signed in to.
-  UI.text(I18n.t("this wallet:  ") .. tostring(self.new_address), 0, y, 7,
-    Theme.withAlpha(Theme.coin, 0.85))
-  y = y + 16
+  -- Uncapped: a 42-character address is one "word" to `UI.wrap`, and in a
+  -- narrow panel it breaks into as many pieces as it needs. All of them are
+  -- the address.
+  lines_row(put, I18n.t("this wallet:  ") .. tostring(self.new_address), inner, 7,
+    Theme.withAlpha(Theme.coin, 0.85), 8)
 
-  for _, line in ipairs(UI.wrap(
-    I18n.t("Write them on paper, in order. Anyone who reads them owns the account, "
-      .. "and nobody — not this game, not the server — can recover them for you."),
-    inner, 8)) do
-    y = y + UI.text(line, 0, y, 8, Theme.cream) + 3
-  end
+  lines_row(put, I18n.t("Write them on paper, in order. Anyone who reads them owns the account, "
+    .. "and nobody — not this game, not the server — can recover them for you."),
+    inner, 8, Theme.cream, 12)
 
-  local bh = 30
-  local by = math.min(ph - 78, y + 12)
   -- **Size 8, said out loud.** `UI.button`'s default is a third of its own
   -- height, which at this ladder is 24 px a character: thirty-one characters
   -- of `I HAVE WRITTEN IT DOWN  [ENTER]` then wrap to a second line inside a
   -- thirty-pixel button and the `[ENTER]` half is drawn through the bottom
   -- edge. This is the longest label in the client and it is the one button
   -- that has to be read before it is pressed.
-  UI.button(0, by, inner, bh,
-    self.busy and "SIGNING…" or "I HAVE WRITTEN IT DOWN  [ENTER]",
-    self.busy and "disabled" or "hot", 8)
-  self.show_button = { y = by, h = bh }
-  UI.text(I18n.t("this signs in and takes you to the map."), 0, by + bh + 8, 7,
-    Theme.withAlpha(Theme.cream, 0.55))
+  -- And the first size at or under 8 the label fits the panel at: in a
+  -- landscape panel one type step up, 8 is still a character too wide and
+  -- `[ENTER]` wraps under the button's bottom edge.
+  local label = "I HAVE WRITTEN IT DOWN  [ENTER]"
+  local label_size = 8
+  while label_size > 5 and UI.textWidth(label, label_size) > inner - 16 do
+    label_size = label_size - 1
+  end
+  local bh = math.max(UI.chipHeight(), lh8 + 14)
+  put(bh, function(y)
+    UI.button(0, y, inner, bh, self.busy and "SIGNING…" or label,
+      self.busy and "disabled" or "hot", label_size)
+    self.show_button = { y = y, h = bh }
+  end, { focus = true, gap = 8 })
+  text_row(put, I18n.t("this signs in and takes you to the map."), 7,
+    Theme.withAlpha(Theme.cream, 0.55), 8)
+  self:message_row(put, inner)
+
+  return rows, height()
 end
 
-function Login:draw_no_library(inner, ph)
-  UI.text(I18n.t("SIGN IN"), 0, 0, 16, Theme.coin)
-  UI.text(I18n.t("your wallet is your account"), 0, UI.lineHeight(16) + 4, 8,
-    Theme.withAlpha(Theme.cream, 0.7))
+function Login:rows_no_library(inner)
+  local put, rows, height = stack()
+  local lh8, lh7 = UI.lineHeight(8), UI.lineHeight(7)
 
-  local box_y = 48
-  UI.setColor(Theme.red, 0.18)
-  love.graphics.rectangle("fill", 0, box_y, inner, ph - box_y - 70)
-  love.graphics.setLineWidth(2)
-  UI.setColor(Theme.red)
-  love.graphics.rectangle("line", 1, box_y + 1, inner - 2, ph - box_y - 72)
-  love.graphics.setColor(1, 1, 1, 1)
-  UI.text(I18n.t("KEY LIBRARY NOT BUILT"), 10, box_y + 10, 10, Theme.red)
-  local lines = UI.wrap(
+  text_row(put, I18n.t("SIGN IN"), 16, Theme.coin, 4)
+  text_row(put, I18n.t("your wallet is your account"), 8, Theme.withAlpha(Theme.cream, 0.7), 12)
+
+  -- The red box, measured from what goes in it.
+  local body = UI.wrap(
     I18n.t("Deriving an address needs the small Rust library in love2d/ffi. "
       .. "Build it once and restart:"), inner - 20, 8)
-  local y = box_y + 30
-  for _, line in ipairs(lines) do
-    y = y + UI.text(line, 10, y, 8, Theme.cream) + 3
-  end
-  UI.text("make -C love2d ffi", 10, y + 6, 12, Theme.coin)
   local detail = tostring(self.app.wallet_error or Wallet.last_error() or "")
-  for i, line in ipairs(UI.wrap(detail:match("^[^\n]*") or "", inner - 20, 7)) do
-    if i <= 2 then
-      UI.text(line, 10, ph - 100 + (i - 1) * 10, 7, Theme.withAlpha(Theme.cream, 0.6))
+  local detail_lines = UI.wrap(detail:match("^[^\n]*") or "", inner - 20, 7)
+  local box_h = 10 + UI.lineHeight(10) + 8
+    + #body * (lh8 + 3) + 6 + UI.lineHeight(12) + 10
+    + math.min(#detail_lines, 2) * (lh7 + 2) + 10
+  put(box_h, function(box_y)
+    UI.setColor(Theme.red, 0.18)
+    love.graphics.rectangle("fill", 0, box_y, inner, box_h)
+    love.graphics.setLineWidth(2)
+    UI.setColor(Theme.red)
+    love.graphics.rectangle("line", 1, box_y + 1, inner - 2, box_h - 2)
+    love.graphics.setColor(1, 1, 1, 1)
+    local y = box_y + 10
+    y = y + UI.text(I18n.t("KEY LIBRARY NOT BUILT"), 10, y, 10, Theme.red) + 8
+    for _, line in ipairs(body) do
+      y = y + UI.text(line, 10, y, 8, Theme.cream) + 3
     end
-  end
+    y = y + 6
+    y = y + UI.text("make -C love2d ffi", 10, y, 12, Theme.coin) + 10
+    for i, line in ipairs(detail_lines) do
+      if i <= 2 then
+        y = y + UI.text(line, 10, y, 7, Theme.withAlpha(Theme.cream, 0.6)) + 2
+      end
+    end
+  end, { gap = 12 })
+  self:message_row(put, inner)
+
+  return rows, height()
 end
 
 -- -------------------------------------------------------------------- input
@@ -623,11 +793,18 @@ function Login:keypressed(key, mods)
   return false
 end
 
+--- A click, in panel coordinates: inside the inset and past the scroll.
+function Login:panel_point(x, y)
+  local v = self.view
+  if not v then return nil end
+  if x < v.x or x > v.x + v.w or y < v.y or y > v.y + v.h then return nil end
+  return x - v.x, y - v.y + (self.scroll or 0)
+end
+
 function Login:mousepressed(x, y)
   if not self.app.wallet_lib then return end
-  local px, py, pw = self:panel_rect()
-  local lx, ly = x - px - 20, y - py - 18
-  if lx < 0 or lx > pw - 40 then return end
+  local lx, ly = self:panel_point(x, y)
+  if not lx then return end
 
   local function hit(rect)
     return rect and ly >= rect.y and ly <= rect.y + rect.h
@@ -638,17 +815,21 @@ function Login:mousepressed(x, y)
     return
   end
 
-  if self.story_button and ly >= self.story_button.y
-    and ly <= self.story_button.y + self.story_button.h
-    and lx <= self.story_button.w then
+  if hit(self.story_button) and lx <= self.story_button.w then
     self:watch_story()
     return
   end
-  if ly >= 70 and ly <= 104 then self.focus = 1 end
-  if ly >= 132 and ly <= 162 then self.focus = 2 end
-  if ly >= 196 and ly <= 226 then self.focus = 3 end
+  for i = 1, #FIELDS do
+    if hit(self.field_rects and self.field_rects[i]) then self.focus = i end
+  end
   if hit(self.signin_button) then self:submit() end
   if hit(self.new_button) then self:new_wallet() end
+end
+
+--- The wheel scrolls the panel when there is more panel than window; `draw`
+--- clamps whatever this leaves.
+function Login:wheelmoved(_, dy)
+  self.scroll = (self.scroll or 0) - dy * 40
 end
 
 return Login

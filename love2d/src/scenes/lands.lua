@@ -228,7 +228,16 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
   })
 
   local pad = 12
-  local title_h = UI.lineHeight(14)
+  -- The title at 14, or the first size under it that fits the card: in a
+  -- landscape quarter of a 1080-wide canvas "PYTHON 랜드" is wider than the
+  -- card, and `printf` then wraps the suffix onto a second line that the
+  -- blurb is printed through.
+  local title = I18n.t("%s LAND", Land.name(key))
+  local title_size = 14
+  while title_size > 9 and UI.textWidth(title, title_size) > w - pad * 2 do
+    title_size = title_size - 1
+  end
+  local title_h = UI.lineHeight(title_size)
   local rows = land and #land.categories or 3
   -- A row is its own type plus a bar and air, never less than the sprite.
   local row_h = math.max(UI.lineHeight(9) + 20, 32)
@@ -254,7 +263,7 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
   Assets.sprite(Land.mascot(key), x + w / 2, top + mascot + bob, mascot)
 
   local ty = top + mascot + 6
-  UI.text(I18n.t("%s LAND", Land.name(key)), x, ty, 14, tint, "center", w)
+  UI.text(title, x, ty, title_size, tint, "center", w)
   for i, line in ipairs(blurb_lines) do
     UI.text(line, x, ty + title_h + 2 + (i - 1) * UI.lineHeight(8), 8,
       Theme.withAlpha(Theme.cream, 0.7), "center", w)

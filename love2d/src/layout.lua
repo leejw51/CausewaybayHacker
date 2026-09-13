@@ -51,6 +51,10 @@ local Layout = {
 -- sit in a tiny letterbox.
 local MAX_STRETCH = 1.5
 
+-- How far under the design size a window is shown at 1× — with less canvas
+-- — before the canvas is shrunk to fit instead. See `updateViewport`.
+local SHRINK_FLOOR = 0.7
+
 --- How much bigger every authored type size is than it used to be.
 ---
 --- **The measured reason, not a preference.** The ladder this client was
@@ -444,14 +448,19 @@ Layout.baseSize = baseSize
 
 function Layout.ensureCanvas()
   local w, h = math.max(1, math.floor(Layout.vw)), math.max(1, math.floor(Layout.vh))
-  if Layout.canvas and Layout.canvas:getWidth() == w and Layout.canvas:getHeight() == h then
-    return
+  if not (Layout.canvas and Layout.canvas:getWidth() == w and Layout.canvas:getHeight() == h) then
+    if Layout.canvas then
+      Layout.canvas:release()
+    end
+    Layout.canvas = love.graphics.newCanvas(w, h)
   end
-  if Layout.canvas then
-    Layout.canvas:release()
-  end
-  Layout.canvas = love.graphics.newCanvas(w, h)
-  Layout.canvas:setFilter("nearest", "nearest")
+  -- Nearest at an integer scale, which is what keeps the pixels pixels.
+  -- Under `SHRINK_FLOOR` the scale is a fraction, and nearest then throws
+  -- rows away; linear blurs them instead, which is the lesser loss. Set on
+  -- every pass, not only on a new canvas: the scale can change under a
+  -- canvas that stays the same size.
+  local filter = Layout.scale >= 1 and "nearest" or "linear"
+  Layout.canvas:setFilter(filter, filter)
 end
 
 function Layout.updateViewport()
@@ -474,11 +483,20 @@ function Layout.updateViewport()
   local s = math.min(ww / bw, wh / bh)
   if s >= 2 then
     Layout.scale = math.floor(s)
-  else
+  elseif s >= SHRINK_FLOOR then
     -- Fill the window: grow the virtual canvas along the longer axis instead
     -- of letterboxing (a landscape layout on a portrait screen, a tall
-    -- window). Fonts stay at design size below 1×.
-    Layout.scale = s >= 1 and 1 or math.max(0.35, s)
+    -- window) — and, **a little under 1×, show less rather than shrink.**
+    --
+    -- A landscape window on a 1080×1920 panel is 1000 wide against a 1280
+    -- design, `s` is 0.84, and the canvas used to be drawn at 0.84 through a
+    -- nearest filter: every fifth column and row of it dropped, which on a
+    -- one-pixel Unifont stem is a stroke gone. Korean read as broken type.
+    -- At 1× the same window shows a 1000-wide canvas instead, and every
+    -- scene already lays itself out from `vw` and `vh`.
+    Layout.scale = 1
+  else
+    Layout.scale = math.max(0.35, s)
   end
   Layout.vw = math.min(math.floor(ww / Layout.scale), math.floor(bw * MAX_STRETCH))
   Layout.vh = math.min(math.floor(wh / Layout.scale), math.floor(bh * MAX_STRETCH))

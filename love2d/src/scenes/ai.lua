@@ -186,11 +186,11 @@ function Ai:draw()
   y = self:draw_modes(pad, y, w) + 10
 
   if self.drill and self.quest then
-    self:draw_step(pad, y, w, vh - y - 40)
+    self:draw_step(pad, y, w, vh - y - UI.footerHeight() - 8)
   elseif self.summary then
-    self:draw_summary(pad, y, w, vh - y - 40)
+    self:draw_summary(pad, y, w, vh - y - UI.footerHeight() - 8)
   else
-    self:draw_idle(pad, y, w, vh - y - 40)
+    self:draw_idle(pad, y, w, vh - y - UI.footerHeight() - 8)
   end
 
   self.app:footer(I18n.t("ARROWS mode   ENTER start   N next   F finish   ESC back"))
@@ -274,8 +274,9 @@ function Ai:draw_idle(x, y, w, h)
   local cy = y + 16
 
   if self.unavailable then
-    UI.text(I18n.t("NOT BUILT YET"), x + 16, cy, 10, Theme.coin)
-    cy = cy + 18
+    -- Advanced by the line's own height: `18` was written against a 10 px
+    -- heading, and at the doubled ladder the paragraph printed through it.
+    cy = cy + UI.text(I18n.t("NOT BUILT YET"), x + 16, cy, 10, Theme.coin) + 6
     local said = self.unavailable.milestone
       and I18n.t("A drill picked from your own mistakes, and a line saying "
         .. "why. It opens in chapter %s.", tostring(self.unavailable.milestone))
@@ -291,7 +292,7 @@ function Ai:draw_idle(x, y, w, h)
       cy = cy + UI.text(line, x + 16, cy, 7, Theme.withAlpha(Theme.cream, 0.55)) + 3
     end
     if self.unavailable.message then
-      UI.text(self.unavailable.message, x + 16, y + h - 18, 7,
+      UI.text(self.unavailable.message, x + 16, y + h - 10 - UI.lineHeight(7), 7,
         Theme.withAlpha(Theme.cream, 0.35))
     end
     return
@@ -305,8 +306,8 @@ function Ai:draw_idle(x, y, w, h)
   -- Somebody with no history. A drill over an empty record is an empty drill,
   -- and the useful thing is to say what fills it.
   if self.mistakes and #self.mistakes == 0 then
-    UI.text(I18n.t("NOTHING TO DRILL YET"), x + 16, cy, 10, Theme.withAlpha(Theme.cream, 0.8))
-    cy = cy + 18
+    cy = cy + UI.text(I18n.t("NOTHING TO DRILL YET"), x + 16, cy, 10,
+      Theme.withAlpha(Theme.cream, 0.8)) + 6
     for _, line in ipairs(UI.wrap(
       I18n.t("This builds a session out of the mistakes you have actually "
         .. "made, so it needs you to have made some. Play a few streets — the "
@@ -318,8 +319,7 @@ function Ai:draw_idle(x, y, w, h)
   end
 
   if self.mistakes and #self.mistakes > 0 then
-    UI.text(I18n.t("READY"), x + 16, cy, 10, Theme.admit)
-    cy = cy + 18
+    cy = cy + UI.text(I18n.t("READY"), x + 16, cy, 10, Theme.admit) + 6
     local top = self.mistakes[1]
     for _, line in ipairs(UI.wrap(
       I18n.t("Your most frequent is %s, %d times. Press ENTER and this will "
@@ -353,31 +353,32 @@ function Ai:draw_step(x, y, w, h)
     cy = cy + 8
   end
 
-  UI.text(tostring(self.quest.title or self.quest.id), x + 16, cy, 10, Theme.cream)
-  cy = cy + 16
-  UI.text(tostring(self.quest.id), x + 16, cy, 7, Theme.withAlpha(Theme.cream, 0.45))
-  cy = cy + 14
+  cy = cy + UI.text(tostring(self.quest.title or self.quest.id), x + 16, cy, 10, Theme.cream) + 4
+  cy = cy + UI.text(tostring(self.quest.id), x + 16, cy, 7, Theme.withAlpha(Theme.cream, 0.45)) + 4
   if self.quest.concepts and #self.quest.concepts > 0 then
-    UI.text(table.concat(self.quest.concepts, ", "), x + 16, cy, 7,
-      Theme.withAlpha(Theme.cyan, 0.85))
-    cy = cy + 16
+    cy = cy + UI.text(table.concat(self.quest.concepts, ", "), x + 16, cy, 7,
+      Theme.withAlpha(Theme.cyan, 0.85)) + 6
   end
 
-  UI.button(x + 16, y + h - 60, 150, 28, "PLAY  [ENTER]", "hot", 9)
-  self.play_rect = { x = x + 16, y = y + h - 60, w = 150, h = 28 }
-  UI.button(x + 176, y + h - 60, 110, 28, "SKIP  [N]", "normal", 9)
-  self.next_rect = { x = x + 176, y = y + h - 60, w = 110, h = 28 }
+  -- Sized from their labels and set at the display controls' height, so
+  -- they are still buttons — and still legible — at every type step.
+  local bh = UI.chipHeight()
+  local by = y + h - 32 - bh
+  local pw = UI.textWidth("PLAY  [ENTER]", UI.CHIP_SIZE) + 28
+  local sw = UI.textWidth("SKIP  [N]", UI.CHIP_SIZE) + 28
+  UI.button(x + 16, by, pw, bh, "PLAY  [ENTER]", "hot", UI.CHIP_SIZE)
+  self.play_rect = { x = x + 16, y = by, w = pw, h = bh }
+  UI.button(x + 16 + pw + 10, by, sw, bh, "SKIP  [N]", "normal", UI.CHIP_SIZE)
+  self.next_rect = { x = x + 16 + pw + 10, y = by, w = sw, h = bh }
 end
 
 function Ai:draw_summary(x, y, w, h)
   UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = Theme.admit })
   local cy = y + 16
-  UI.text(I18n.t("DRILL FINISHED"), x + 16, cy, 11, Theme.admit)
-  cy = cy + 22
+  cy = cy + UI.text(I18n.t("DRILL FINISHED"), x + 16, cy, 11, Theme.admit) + 8
   local sm = self.summary
-  UI.text(I18n.t("attempted %d   cleared %d", sm.attempted or 0, sm.cleared or 0),
-    x + 16, cy, 9, Theme.cream)
-  cy = cy + 18
+  cy = cy + UI.text(I18n.t("attempted %d   cleared %d", sm.attempted or 0, sm.cleared or 0),
+    x + 16, cy, 9, Theme.cream) + 6
   if sm.kinds_improved and #sm.kinds_improved > 0 then
     UI.text(I18n.t("improved: ") .. table.concat(sm.kinds_improved, ", "), x + 16, cy, 8,
       Theme.withAlpha(Theme.cyan, 0.9))

@@ -316,9 +316,18 @@ end
 
 -- ------------------------------------------------------------------ drawing
 
+--- The header band's height, measured from the two lines of type in it —
+--- the same rule as `Quest:header_h`, for the same reason: it was a hard
+--- 46 px, which fitted a 14 px title over a 7 px name, and at the doubled
+--- ladder the name was printed through the title.
+function Playground:header_h()
+  return math.max(46, 8 + UI.lineHeight(14) + 2 + UI.lineHeight(7) + 8)
+end
+
 function Playground:panes()
   local vw, vh = Layout.vw, Layout.vh
-  local top, bottom = 46, 54
+  local top = self:header_h()
+  local bottom = UI.footerHeight() + 8
   local pad = 10
   if Layout.isPortrait() then
     local h = vh - top - bottom
@@ -350,23 +359,31 @@ function Playground:draw()
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
 
+  local head = self:header_h()
   UI.setColor(Theme.ink, 0.9)
-  love.graphics.rectangle("fill", 0, 0, vw, 46)
+  love.graphics.rectangle("fill", 0, 0, vw, head)
   love.graphics.setColor(1, 1, 1, 1)
-    UI.text(I18n.t("PLAYGROUND"), 12, 8, 14, Theme.cyan)
-  UI.text(self.name and tostring(self.name) or "unsaved", 12, 28, 7,
+  local ty = 8 + UI.text(I18n.t("PLAYGROUND"), 12, 8, 14, Theme.cyan) + 2
+  UI.text(self.name and tostring(self.name) or "unsaved", 12, ty, 7,
     Theme.withAlpha(Theme.cream, 0.55))
 
-  -- The language, as a toggle rather than a menu.
-  local lw = 64
+  -- The language, as a toggle rather than a menu. Sized from its label and
+  -- set at the display controls' height, with its key to the left of it —
+  -- measured, so `TAB` is next to the button and not under it.
+  local lh = UI.chipHeight()
+  local lw = math.max(64, UI.textWidth(self.lang:upper(), UI.CHIP_SIZE) + 28)
   local lx = vw - lw - 12
-  UI.button(lx, 8, lw, 28, self.lang:upper(), "normal", 9)
-  self.lang_rect = { x = lx, y = 8, w = lw, h = 28 }
-  UI.text(I18n.t("TAB"), lx - 26, 16, 7, Theme.withAlpha(Theme.cream, 0.4))
+  local ly = math.floor((head - lh) / 2)
+  UI.button(lx, ly, lw, lh, self.lang:upper(), "normal", UI.CHIP_SIZE)
+  self.lang_rect = { x = lx, y = ly, w = lw, h = lh }
+  local tab = I18n.t("TAB")
+  local tab_x = lx - UI.textWidth(tab, 7) - 8
+  local cap_y = math.floor((head - UI.lineHeight(7)) / 2)
+  UI.text(tab, tab_x, cap_y, 7, Theme.withAlpha(Theme.cream, 0.4))
 
   if self.saved_at and Anim.now() - self.saved_at < 2.2 then
     local text = "saved"
-    UI.text(text, lx - 26 - UI.textWidth(text, 7) - 10, 16, 7,
+    UI.text(text, tab_x - UI.textWidth(text, 7) - 10, cap_y, 7,
       Theme.withAlpha(Theme.admit, 0.9))
   end
 
@@ -384,14 +401,17 @@ function Playground:draw_snippets(rect)
     tint = self.focus == "snippets" and Theme.coin or Theme.cyan,
   })
   UI.text(I18n.t("SNIPPETS"), rect.x + 10, rect.y + 8, 8, Theme.withAlpha(Theme.cream, 0.7))
-  local y = rect.y + 26
+  local y = rect.y + 8 + UI.lineHeight(8) + 6
+  -- A row is the label's own height plus air: `20` was the row at a 7 px
+  -- label, and at the doubled ladder the names printed over each other.
+  local row = UI.lineHeight(7) + 6
   self.snippet_rects = {}
   for i, brief in ipairs(self.snippets or {}) do
-    if y > rect.y + rect.h - 22 then break end
+    if y > rect.y + rect.h - row - 2 then break end
     local here = brief.id == self.snippet_id
     if here then
       UI.setColor(Theme.coin, 0.22)
-      love.graphics.rectangle("fill", rect.x + 4, y - 2, rect.w - 8, 20)
+      love.graphics.rectangle("fill", rect.x + 4, y - 2, rect.w - 8, row)
       love.graphics.setColor(1, 1, 1, 1)
     end
     local label = tostring(brief.name or brief.id)
@@ -402,15 +422,15 @@ function Playground:draw_snippets(rect)
       here and Theme.coin or Theme.withAlpha(Theme.cream, 0.85))
     UI.text(tostring(brief.lang):sub(1, 1):upper(), rect.x + rect.w - 14, y, 7,
       Theme.withAlpha(Theme.cream, 0.4))
-    self.snippet_rects[i] = { x = rect.x, y = y - 2, w = rect.w, h = 20 }
-    y = y + 20
+    self.snippet_rects[i] = { x = rect.x, y = y - 2, w = rect.w, h = row }
+    y = y + row
   end
   if not self.snippets then
     UI.text("…", rect.x + 10, y, 8, Theme.dim)
   elseif #self.snippets == 0 then
     UI.text(I18n.t("nothing saved yet"), rect.x + 10, y, 7, Theme.withAlpha(Theme.cream, 0.45))
   end
-  UI.text(I18n.t("CTRL-N new"), rect.x + 10, rect.y + rect.h - 16, 7,
+  UI.text(I18n.t("CTRL-N new"), rect.x + 10, rect.y + rect.h - 8 - UI.lineHeight(7), 7,
     Theme.withAlpha(Theme.cream, 0.4))
 end
 
@@ -424,7 +444,18 @@ function Playground:draw_code(rect)
   -- it the last digit of the line number touches the first character of an
   -- unindented line and `1` reads as part of `fn`.
   local gutter = font:getWidth("0000 ")
-  local rows = math.max(1, math.floor((rect.h - 64) / line_h))
+  -- The strip under the code — the stdin field, the two buttons, and the
+  -- line count — measured from what is in it. It was a hard 64 px: a 7 px
+  -- caption over a 22 px field and a 24 px button, and at the doubled ladder
+  -- the caption printed through the field and `FORMAT F2` wrapped inside
+  -- its own button.
+  local cap_h = UI.lineHeight(7)
+  local field_font = Assets.mono(Layout.ui(8))
+  local field_h = field_font:getHeight() + 6
+  local bh = UI.chipHeight()
+  local row_h = math.max(field_h, bh)
+  local strip = 6 + cap_h + 2 + row_h + 4 + cap_h + 6
+  local rows = math.max(1, math.floor((rect.h - strip - 12) / line_h))
   self.editor:ensure_visible(rows)
   self.visible_rows = rows
   self.code_rect = rect
@@ -432,7 +463,7 @@ function Playground:draw_code(rect)
   self.gutter = gutter
   self.mono_font = font
 
-  love.graphics.setScissor(rect.x + 3, rect.y + 3, rect.w - 6, rect.h - 60)
+  love.graphics.setScissor(rect.x + 3, rect.y + 3, rect.w - 6, rect.h - strip - 6)
   love.graphics.setFont(font)
   local x0, y0 = rect.x + 8, rect.y + 6
   self.pane:frame(rect, font, gutter, x0, y0, line_h, rows)
@@ -480,37 +511,43 @@ function Playground:draw_code(rect)
   love.graphics.setScissor()
   love.graphics.setColor(1, 1, 1, 1)
 
-  -- stdin, and the buttons.
-  local sy = rect.y + rect.h - 52
-  UI.text(I18n.t("STDIN"), rect.x + 8, sy - 10, 7, Theme.withAlpha(Theme.cream, 0.5))
+  -- stdin, and the buttons. The buttons are as wide as the widest label
+  -- they can wear, so RUN and RUNNING… are the same button.
+  local strip_top = rect.y + rect.h - strip
+  UI.text(I18n.t("STDIN"), rect.x + 8, strip_top + 6, 7, Theme.withAlpha(Theme.cream, 0.5))
+  local sy = strip_top + 6 + cap_h + 2
+  local bw = 0
+  for _, label in ipairs({ "RUN  F5", "RUNNING…", "FORMAT F2" }) do
+    bw = math.max(bw, UI.textWidth(label, 8) + 20)
+  end
+  local field_w = math.max(60, rect.w - 12 - (bw * 2 + 16))
+  local fy = sy + math.floor((row_h - field_h) / 2)
   UI.setColor(Theme.void, 0.9)
-  love.graphics.rectangle("fill", rect.x + 6, sy, rect.w - 210, 22)
+  love.graphics.rectangle("fill", rect.x + 6, fy, field_w, field_h)
   love.graphics.setLineWidth(2)
   UI.setColor(self.focus == "stdin" and Theme.coin or Theme.withAlpha(Theme.cream, 0.3))
-  love.graphics.rectangle("line", rect.x + 7, sy + 1, rect.w - 212, 20)
+  love.graphics.rectangle("line", rect.x + 7, fy + 1, field_w - 2, field_h - 2)
   love.graphics.setColor(1, 1, 1, 1)
-  local small = Assets.mono(15)
-  love.graphics.setFont(small)
+  love.graphics.setFont(field_font)
   UI.setColor(Theme.cream)
-  love.graphics.print((self.stdin:gsub("\n", "⏎")), rect.x + 12, sy + 3)
+  love.graphics.print((self.stdin:gsub("\n", "⏎")), rect.x + 12, fy + 3)
   love.graphics.setColor(1, 1, 1, 1)
-  self.stdin_rect = { x = rect.x + 6, y = sy, w = rect.w - 210, h = 22 }
+  self.stdin_rect = { x = rect.x + 6, y = fy, w = field_w, h = field_h }
 
-  local bh = 24
-  local bw = 88
+  local by = sy + math.floor((row_h - bh) / 2)
   local rx = rect.x + rect.w - bw - 8
-  UI.button(rx, sy, bw, bh, self.running and "RUNNING…" or "RUN  F5",
+  UI.button(rx, by, bw, bh, self.running and "RUNNING…" or "RUN  F5",
     self.running and "disabled" or "hot", 8)
-  self.run_rect = { x = rx, y = sy, w = bw, h = bh }
+  self.run_rect = { x = rx, y = by, w = bw, h = bh }
   local fx = rx - bw - 8
-  UI.button(fx, sy, bw, bh, self.formatting and "…" or "FORMAT F2",
+  UI.button(fx, by, bw, bh, self.formatting and "…" or "FORMAT F2",
     self.format_unsupported and "disabled" or "normal", 8)
-  self.format_rect = { x = fx, y = sy, w = bw, h = bh }
+  self.format_rect = { x = fx, y = by, w = bw, h = bh }
 
   local info = I18n.t("%d lines   %d bytes%s",
     self.editor:line_count(), #self.editor:text(),
     self.editor.dirty and "   ·" or "")
-  UI.text(info, rect.x + 8, rect.y + rect.h - 18, 7, Theme.withAlpha(Theme.cream, 0.4))
+  UI.text(info, rect.x + 8, sy + row_h + 4, 7, Theme.withAlpha(Theme.cream, 0.4))
 end
 
 --- What the program did.
@@ -543,18 +580,21 @@ function Playground:draw_output(rect)
     head = I18n.t("nothing has run yet")
     colour = Theme.withAlpha(Theme.cream, 0.45)
   end
-  UI.text(head, rect.x + 10, y, 8, colour, "left", rect.w - 20)
-  y = y + 18
+  -- Every advance below is the line's own height: the constants they
+  -- replace (18, 10, 12) were written against 7 and 8 px type, and at the
+  -- doubled ladder each line was printed through the one above it.
+  local small = UI.lineHeight(7) + 2
+  y = y + UI.text(head, rect.x + 10, y, 8, colour, "left", rect.w - 20) + 4
 
   if self.problem then
     for _, line in ipairs(UI.wrap(self.problem, rect.w - 24, 7)) do
       UI.text(line, rect.x + 10, y, 7, Theme.coin)
-      y = y + 10
+      y = y + small
     end
   elseif self.note then
     for _, line in ipairs(UI.wrap(self.note, rect.w - 24, 7)) do
       UI.text(line, rect.x + 10, y, 7, Theme.withAlpha(Theme.cyan, 0.9))
-      y = y + 10
+      y = y + small
     end
   end
 
@@ -563,8 +603,7 @@ function Playground:draw_output(rect)
 
   local function block(label, text, alpha)
     if not text or text == "" then return end
-    UI.text(label, rect.x + 10, y, 7, Theme.withAlpha(Theme.cream, 0.4))
-    y = y + 12
+    y = y + UI.text(label, rect.x + 10, y, 7, Theme.withAlpha(Theme.cream, 0.4)) + 4
     love.graphics.setFont(font)
     UI.setColor(Theme.cream, alpha)
     for line in (text .. "\n"):gmatch("(.-)\n") do
@@ -579,22 +618,21 @@ function Playground:draw_output(rect)
     block("STDOUT", self.result.stdout, 1)
     block("STDERR", self.result.stderr, 0.8)
     if self.result.diagnostics and #self.result.diagnostics > 0 then
-      UI.text(I18n.t("WHAT THE COMPILER SAID"), rect.x + 10, y, 7,
-        Theme.withAlpha(Theme.cream, 0.4))
-      y = y + 12
+      y = y + UI.text(I18n.t("WHAT THE COMPILER SAID"), rect.x + 10, y, 7,
+        Theme.withAlpha(Theme.cream, 0.4)) + 4
       for _, d in ipairs(self.result.diagnostics) do
         local head_line = ("%s%s"):format(d.kind or "",
           d.code and (" [" .. d.code .. "]") or "")
         UI.text(head_line, rect.x + 10, y, 7, Theme.withAlpha(Theme.cyan, 0.9))
-        y = y + 10
+        y = y + small
         for _, line in ipairs(UI.wrap(d.message or "", rect.w - 34, 7)) do
           UI.text("  " .. line, rect.x + 10, y, 7, Theme.withAlpha(Theme.cream, 0.8))
-          y = y + 10
+          y = y + small
         end
         if d.line then
           UI.text(("  line %d%s"):format(d.line, d.col and (":" .. d.col) or ""),
             rect.x + 10, y, 7, Theme.withAlpha(Theme.cream, 0.45))
-          y = y + 10
+          y = y + small
         end
         y = y + 4
       end

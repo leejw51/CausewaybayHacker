@@ -131,7 +131,7 @@ function Stats:draw()
 
   y = self:draw_summary(pad, y, w) + 10
   y = self:draw_shelf(pad, y, w) + 10
-  self:draw_mistakes(pad, y, w, vh - y - 44)
+  self:draw_mistakes(pad, y, w, vh - y - UI.footerHeight() - 8)
 
   self.app:footer(I18n.t("R refresh   H history   ARROWS scroll   ESC back"))
 end
@@ -169,10 +169,19 @@ function Stats:draw_summary(x, y, w)
       and I18n.t("%d day", 1) or I18n.t("%d days", sm.streak_days or 0) },
   }
   local cw = w / #cells
+  -- The figure at 14, unless a tile cannot hold it — "0 / 279" in a
+  -- portrait fifth at the doubled ladder — where it steps down rather than
+  -- wraps: `printf` breaks a figure that is wider than its column into two
+  -- lines, and the second line was printed through the lands underneath.
+  local fig = 14
+  for _, cell in ipairs(cells) do
+    while fig > 8 and UI.textWidth(cell[2], fig) > cw - 8 do fig = fig - 2 end
+  end
+  local fig_top = y + 10 + cap_h + 2 + (fig_h - UI.lineHeight(fig)) / 2
   for i, cell in ipairs(cells) do
     local cx = x + (i - 1) * cw
     UI.text(cell[1], cx, y + 10, 7, Theme.withAlpha(Theme.cream, 0.55), "center", cw)
-    UI.text(cell[2], cx, y + 10 + cap_h + 2, 14, Theme.cream, "center", cw)
+    UI.text(cell[2], cx, fig_top, fig, Theme.cream, "center", cw)
   end
   UI.bar(x + 14, y + 10 + cap_h + 2 + fig_h + 10, w - 28, 9,
     (sm.total or 0) > 0 and (sm.cleared or 0) / sm.total or 0, Theme.admit)

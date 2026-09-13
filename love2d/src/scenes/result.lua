@@ -81,7 +81,10 @@ function Result:draw()
   -- punctuation on a rejection, not a punishment, and the panel below it
   -- holds still so the compiler's words stay readable.
   local drop = Ease.expOut(math.min(1, self.t / 0.45))
-  local by = -40 + drop * 84
+  -- The banner is as tall as its own word plus air: a hard 56 held an 18 px
+  -- label at the first type step and cut it at every step above.
+  local banner_h = math.max(56, UI.lineHeight(18) + 20)
+  local by = -banner_h + 16 + drop * 84
   local sx, sy = 0, 0
   if not accepted and not is_run then
     sx, sy = Anim.shake(self:age(), { duration = 0.34, amount = 5 })
@@ -89,22 +92,24 @@ function Result:draw()
   love.graphics.push()
   love.graphics.translate(sx, sy)
   UI.setColor(color, 0.92)
-  love.graphics.rectangle("fill", 0, by, vw, 56)
+  love.graphics.rectangle("fill", 0, by, vw, banner_h)
   UI.setColor(Theme.ink)
   love.graphics.setLineWidth(3)
-  love.graphics.rectangle("line", 0, by, vw, 56)
+  love.graphics.rectangle("line", 0, by, vw, banner_h)
   love.graphics.setColor(1, 1, 1, 1)
   UI.text(is_run and "SAMPLE RUN" or (VERDICT_LABEL[a.verdict] or a.verdict:upper()),
-    0, by + 18, 18, Theme.cream, "center", vw)
+    0, by + math.floor((banner_h - UI.lineHeight(18)) / 2), 18, Theme.cream, "center", vw)
   love.graphics.pop()
 
   local pad = Layout.isPortrait() and 14 or 60
   local x = pad
-  local y = by + 76
+  local y = by + banner_h + 20
   local w = vw - pad * 2
-
-  UI.panel(x, y, w, vh - y - 56, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = color })
-  love.graphics.setScissor(x + 4, y + 4, w - 8, vh - y - 64)
+  -- Down to the footer, whatever the type step has made of its height, with
+  -- one caption's worth of room under the panel for the attempt id.
+  local foot = UI.footerHeight() + UI.lineHeight(7) + 12
+  UI.panel(x, y, w, vh - y - foot, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = color })
+  love.graphics.setScissor(x + 4, y + 4, w - 8, vh - y - foot - 8)
   local cx = x + 16
   local cy = y + 12 - self.scroll
   local column = w - 32
@@ -215,7 +220,7 @@ function Result:draw()
   self.content_height = cy - (y + 12 - self.scroll)
   love.graphics.setScissor()
 
-  UI.text(a.id or "", x + 10, vh - 48, 7, Theme.withAlpha(Theme.cream, 0.4))
+  UI.text(a.id or "", x + 10, vh - foot + 6, 7, Theme.withAlpha(Theme.cream, 0.4))
   self.app:footer(I18n.t("ENTER retry   ESC map   ARROWS scroll"))
 end
 
