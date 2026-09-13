@@ -372,7 +372,18 @@ export class MapScene implements Scene {
    * between groups is wider than the gap inside one, and a group is kept whole
    * on a line where it can be.
    */
+  /**
+   * The bar's face: the button face, or the chrome face on a phone, where
+   * ten buttons a finger tall wrapped to five rows and the overworld under
+   * them was a stamp.
+   */
+  private barFont(s: number) {
+    const fonts = ensureFonts(s);
+    return this.app.layout.isPhone() ? fonts.stationSm : fonts.button;
+  }
+
   private barItems(): Array<{ id: string; label: string; lit: boolean; group: number }> {
+    const phone = this.app.layout.isPhone();
     return [
       ...LANDS.map((l) => ({
         id: `land:${l}`,
@@ -390,16 +401,26 @@ export class MapScene implements Scene {
       // did, but a keystroke printed in the footer is not a control — the
       // player who wants the chooser is exactly the player who does not yet
       // know where anything is.
-      { id: "menu", label: MENU_LABEL(), lit: false, group: 2 },
+      { id: "menu", label: phone ? t("map.allMapsShort") : MENU_LABEL(), lit: false, group: 2 },
       // The scratchpad. It is not one of the six maps and it is not styled
       // like one: nothing there is scored, and a button that looked like a
       // category would promise otherwise.
-      { id: "play", label: PLAY_LABEL(), lit: false, group: 2 },
+      { id: "play", label: phone ? t("map.playgroundShort") : PLAY_LABEL(), lit: false, group: 2 },
       // Search, stats and AI mode. They were on F4/F5/F6 and nowhere else,
       // which meant three finished screens that a player could only reach by
       // being told they existed. The ids are `ui/auxnav.ts`'s own, so
       // `openAux` opens them here with no second table of names to drift.
-      ...AUX_BAR().map((a) => ({ id: a.id, label: a.label, lit: false, group: 3 })),
+      // On a phone the five ways off this map are one row of short words,
+      // and one group, so the bar is three rows — lands, roads, ways out —
+      // rather than the five it wrapped to at the long names.
+      // The ids are `auxnav`'s own (`aux:search`, …), so the short label is
+      // looked up by the same suffix rather than by a second list of names.
+      ...AUX_BAR().map((a) => ({
+        id: a.id,
+        label: phone ? t(`aux.${a.id.replace("aux:", "")}Short` as "aux.searchShort") : a.label,
+        lit: false,
+        group: phone ? 2 : 3,
+      })),
     ];
   }
 
@@ -422,7 +443,7 @@ export class MapScene implements Scene {
   private barLayout(): { h: number; rows: Rect[] } {
     const { layout } = this.app;
     const s = layout.uiScale();
-    const f = ensureFonts(s).button;
+    const f = this.barFont(s);
     const gap = Math.round(f.size * 0.5);
     const split = gap * 3;
     const pad = f.size * 2;
@@ -489,7 +510,7 @@ export class MapScene implements Scene {
    */
   private drawBar(g: Ctx, y0: number): void {
     const s = this.app.layout.uiScale();
-    const f = ensureFonts(s).button;
+    const f = this.barFont(s);
     const { rows } = this.barLayout();
     this.bar.reset();
     const labels = this.barItems();
@@ -762,17 +783,22 @@ export class MapScene implements Scene {
     const { layout } = this.app;
     const s = layout.uiScale();
     const f = ensureFonts(s);
-    const facts = Math.max(difficultyH(), f.stationSm.height + f8(s) + f.small.height);
+    // On a phone the title takes two lines and the facts stack — see
+    // `drawInfo` — and the plate is measured for both.
+    const phone = layout.isPhone();
+    const facts = phone
+      ? difficultyH() + Math.round(8 * s) + f.stationSm.height + f8(s) + f.small.height
+      : Math.max(difficultyH(), f.stationSm.height + f8(s) + f.small.height);
     return (
       Math.round(14 * s) +
-      f.station.height +
+      f.station.height * (phone ? 2 : 1) +
       Math.round(10 * s) +
       facts +
       Math.round(12 * s) +
       // Two lines for the last line: "CLEARED · 2/3 STARS · ENTER to walk
       // back in" wraps beside the stamp, and one line's room put "walk back
       // in" over the plate's bottom rim.
-      f.small.height * 2 +
+      f.small.height * (phone ? 3 : 2) +
       Math.round(14 * s) +
       (layout.isPortrait() ? Math.round(30 * s) : 0)
     );
@@ -1341,16 +1367,15 @@ export class MapScene implements Scene {
     }
 
     g.fillStyle = css(accent);
-    printf(
-      g,
-      fonts.station,
-      `${String(n.node).padStart(2, "0")}  ${n.title}${n.kind === "boss" ? `  ·  ${t("map.boss")}` : ""}`,
-      ix,
-      iy,
-      textW,
-      "left",
-    );
-    iy += fonts.station.height + Math.round(10 * s);
+    const titleText = `${String(n.node).padStart(2, "0")}  ${n.title}${n.kind === "boss" ? `  ·  ${t("map.boss")}` : ""}`;
+    // Wrapped, and advanced by the lines it took: a title that wrapped on a
+    // phone was printed through the facts under it.
+    const titleLines = wrap(fonts.station, titleText, textW).slice(0, 2);
+    for (const line of titleLines) {
+      printf(g, fonts.station, line, ix, iy, textW, "left");
+      iy += fonts.station.height;
+    }
+    iy += Math.round(10 * s);
 
     /**
      * The row of facts.
@@ -1365,9 +1390,13 @@ export class MapScene implements Scene {
     // Three columns across the whole width of the plate, not three things
     // huddled at the left end of it. The slab is as wide as the overworld and
     // the facts have to be laid out as if that width were on purpose.
-    const col = textW / 3;
-    const barW = Math.min(Math.round(150 * s), Math.round(col * 0.8));
+    // Three columns, or — on a phone, where three columns are each a word
+    // wide — the difficulty on a row of its own and the two counts under it.
+    const stacked = layout.isPhone();
+    const col = stacked ? textW / 2 : textW / 3;
+    const barW = Math.min(Math.round(150 * s), Math.round((stacked ? textW : col) * 0.8));
     drawDifficulty(g, ix, iy, barW, n.difficulty, 5);
+    if (stacked) iy += difficultyH() + Math.round(8 * s);
 
     const label = (text: string, lx: number, col2 = Theme.dim) => {
       g.fillStyle = css(col2);
@@ -1375,7 +1404,7 @@ export class MapScene implements Scene {
     };
     const valueY = iy + fonts.stationSm.height + Math.round(f8(s));
 
-    const starX = ix + Math.round(col);
+    const starX = stacked ? ix : ix + Math.round(col);
     label(t("map.stars"), starX);
     drawStars(
       g,
@@ -1386,12 +1415,14 @@ export class MapScene implements Scene {
       3,
     );
 
-    const tryX = ix + Math.round(col * 2);
+    const tryX = stacked ? ix + Math.round(col) : ix + Math.round(col * 2);
     label(t("map.tries"), tryX);
     g.fillStyle = css(n.attempts > 0 ? Theme.cream : Theme.dim);
     printf(g, fonts.small, String(n.attempts), tryX, valueY, textW, "left");
 
-    iy += difficultyH() + Math.round(12 * s);
+    iy += stacked
+      ? fonts.stationSm.height + Math.round(f8(s)) + fonts.small.height + Math.round(12 * s)
+      : difficultyH() + Math.round(12 * s);
 
     // The one line that says what to do about it. `requires` is given by the
     // server (§5.2) so the lock can name the street it is waiting on rather
@@ -1410,7 +1441,7 @@ export class MapScene implements Scene {
       line = n.kind === "boss" ? t("map.bossHere") : t("map.enterToGo");
     }
     g.fillStyle = css(colour);
-    for (const l of wrap(fonts.small, line, textW).slice(0, 2)) {
+    for (const l of wrap(fonts.small, line, textW).slice(0, layout.isPhone() ? 3 : 2)) {
       printf(g, fonts.small, l, ix, iy, textW, "left");
       iy += fonts.small.height;
     }

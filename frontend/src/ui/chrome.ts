@@ -13,6 +13,7 @@ import type { Land } from "../net/protocol";
 import { bodyFontAt, ensureFonts, font, printf, width, type Font } from "../engine/text";
 import {
   btnBox,
+  clipped,
   fill,
   inRect,
   panel,
@@ -168,20 +169,30 @@ export function header(g: Ctx, app: App, title: string): void {
   fill(g, Theme.ink, 0, h - 1, layout.vw, 1);
   const f = ensureFonts(s).station;
   const ty = Math.round((h - 3 - f.height) / 2);
-  g.fillStyle = css(Theme.cream);
-  printf(g, f, title, Math.round(8 * s), ty, layout.vw, "left");
-
-  app.logoutRect = null;
-  if (!app.addressLabel) return;
-
   const sm = ensureFonts(s).stationSm;
   // The address is abbreviated because the full forty hex characters is not
   // information anybody reads — the ends are what you check against a wallet.
-  const who = `${app.addressLabel.slice(0, 6)}…${app.addressLabel.slice(-4)}`;
-  const label = `${who}  ${t("chrome.logout")}`;
+  // The address is dropped on a phone: `0x90C2…8Ee9` is forty per cent of a
+  // phone's header and the screen's own name was the half that gave way. It
+  // is checkable on the stats screen, and what a thumb needs here is the way
+  // out. Everywhere else it stays, because that is where it is checked.
+  const who =
+    app.addressLabel && !layout.isPhone()
+      ? `${app.addressLabel.slice(0, 6)}…${app.addressLabel.slice(-4)}`
+      : "";
+  const label = who ? `${who}  ${t("chrome.logout")}` : t("chrome.logout");
   const pad = Math.round(8 * s);
-  const w = width(sm, label) + pad * 2;
+  const w = app.addressLabel ? width(sm, label) + pad * 2 : 0;
   const bx = layout.vw - w - Math.round(6 * s);
+  // The title stops short of the address chip rather than running under
+  // it: on a phone `RUST · BASIC` and `0x90C2…8Ee9` shared the same pixels.
+  g.fillStyle = css(Theme.cream);
+  clipped(g, 0, 0, Math.max(1, bx - Math.round(6 * s)), h, () =>
+    printf(g, f, title, Math.round(8 * s), ty, layout.vw, "left"),
+  );
+
+  app.logoutRect = null;
+  if (!app.addressLabel) return;
   const by = Math.round((h - 3 - sm.height) / 2) - Math.round(4 * s);
   const bh = sm.height + Math.round(8 * s);
   const hot = app.logoutHover;

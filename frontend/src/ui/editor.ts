@@ -144,6 +144,16 @@ export class Editor {
       doc,
       extensions: [
         base,
+        // A phone's keyboard, told this is code. Without these iOS
+        // capitalises the first letter of `fn main`, turns `"hello"` into
+        // “hello” and autocorrects `println` — and every one of those is a
+        // compile error the player did not type.
+        EditorView.contentAttributes.of({
+          autocorrect: "off",
+          autocapitalize: "off",
+          spellcheck: "false",
+          autocomplete: "off",
+        }),
         MODE[lang](),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChange?.();

@@ -770,7 +770,15 @@ export class LandsScene implements Scene {
       // PLAYGROUND. Both are "somewhere other than a land plate to go", and
       // they are the same size because neither is the primary action here.
       const rowsBottom = right[1] + right[3] - playH * 2 - gap * 3;
-      const rowH = Math.max(minRowH, Math.floor((rowsBottom - rowsTop) / cats.length) - gap);
+      // The rows share what the column has. Both heights above are
+      // preferences, not floors — including the finger floor: in a phone's
+      // browser, with its own chrome taking a fifth of the screen, three
+      // rows at `minTouchH` ran under the two buttons below them and HACKER
+      // was a road nobody could see. A row shorter than a fingertip can
+      // still be read and still be tapped; a row behind a button cannot.
+      const share = Math.floor((rowsBottom - rowsTop) / cats.length) - gap;
+      const floorH = fonts.button.height + Math.round(14 * s);
+      const rowH = Math.max(floorH, Math.min(minRowH, share));
 
       let y = rowsTop;
       for (const c of cats) {

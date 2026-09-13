@@ -202,6 +202,17 @@ export class Layout {
    * stays readable when the canvas is squeezed into a phone. 1 on anything
    * that is not touched, and on a tablet, where the fit is already close.
    */
+  /**
+   * A phone: touched, and so small that a virtual pixel is under three
+   * quarters of a CSS pixel. A tablet is touched and is not this; a phone
+   * held sideways is still this. The screens that have a *phone register* —
+   * fewer chips, stacked facts, the code full-screen — ask here, so a
+   * desktop window of any shape never sees it.
+   */
+  isPhone(): boolean {
+    return this.touch && this.cssScale < 0.75;
+  }
+
   touchBoost(): number {
     if (!this.touch) return 1;
     return Math.min(TOUCH_BOOST_MAX, Math.max(1, TOUCH_READABLE / this.cssScale));

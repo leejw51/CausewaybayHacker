@@ -14,7 +14,7 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { btnBox, rowsIn, clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, rowsIn, clipped, fill, inRect, pixBtn, well, type Ctx, type Rect } from "../engine/ui";
 import {
   arriving,
   Buttons,
@@ -338,6 +338,15 @@ export class QuestScene implements Scene {
    * from a device class: a phone held sideways, or a tablet, is not narrow.
    */
   private compactMode = false;
+  /**
+   * CODE: the editor and nothing else. On a phone the brief, the bench and
+   * the toolbar leave the code four lines, and four lines is not a place to
+   * write a program. In this mode the editor has the screen and one button —
+   * BACK, top right — puts the furniture back. ESC does the same. Nothing
+   * is run or submitted from here: this is for writing, and the bench is
+   * one tap away.
+   */
+  private focus = false;
 
   constructor(
     private readonly app: App,
@@ -1102,6 +1111,10 @@ export class QuestScene implements Scene {
       if (name === "end") return void (this.logScroll = 0);
     }
     if (name === "escape") {
+      if (this.focus) {
+        this.focus = false;
+        return;
+      }
       void this.leaveTo("map");
       return;
     }
@@ -1158,6 +1171,12 @@ export class QuestScene implements Scene {
     if (!hit) return;
     this.app.chip.select();
     switch (hit.id) {
+      case "focus":
+        this.focus = true;
+        break;
+      case "unfocus":
+        this.focus = false;
+        break;
       case "run":
         void this.run();
         break;
@@ -1290,6 +1309,10 @@ export class QuestScene implements Scene {
     const fonts = ensureFonts(s);
     this.buttons.reset();
     this.bar.reset();
+    if (this.focus) {
+      this.drawFocus(g, s);
+      return;
+    }
 
     header(
       g,
@@ -1307,7 +1330,11 @@ export class QuestScene implements Scene {
     const pad = Math.round(10 * s);
     const toolW = layout.vw - pad * 2;
     const fullRows = rowsIn(fonts.stationSm, this.toolLabels(false), toolW, layout.minTouchH());
-    this.compactMode = layout.touch && fullRows > 1;
+    // **A phone is compact in both orientations.** Held sideways the toolbar
+    // fits on one row, so "compact when it wraps" left the phone's landscape
+    // exactly as crowded as its portrait was — an eighteen-pixel editor with
+    // a full bench under it.
+    this.compactMode = layout.isPhone() || (layout.touch && fullRows > 1);
     const toolRows = this.compactMode
       ? rowsIn(fonts.stationSm, this.toolLabels(), toolW, layout.minTouchH())
       : fullRows;
@@ -1395,7 +1422,12 @@ export class QuestScene implements Scene {
     // the keyboard has its own paste, the map is one tap away, and three
     // rows of toolbar were the editor's rows.
     const keep = (id: string) =>
-      !compact || id === "back" || id === "stack" || id === "fontdown" || id === "fontup";
+      !compact ||
+      id === "back" ||
+      id === "stack" ||
+      id === "fontdown" ||
+      id === "fontup" ||
+      id === "focus";
     return [
       // Leaving, first and leftmost: the top-left of a screen is where a
       // person looks for the way back out of it.
@@ -1413,6 +1445,7 @@ export class QuestScene implements Scene {
       { id: "stack", label: this.side ? t("quest.briefSide") : t("quest.briefTop") },
       { id: "fontdown", label: t("quest.fontDown"), dim: this.fontMul <= FONT_MIN + 0.001 },
       { id: "fontup", label: t("quest.fontUp"), dim: this.fontMul >= FONT_MAX - 0.001 },
+      { id: "focus", label: t("quest.code") },
     ].filter((i) => keep(i.id));
   }
 
@@ -1465,7 +1498,38 @@ export class QuestScene implements Scene {
       { id: "console", label: this.consoleOpen ? t("quest.hideLog") : t("quest.log") },
       { id: "reset", label: t("quest.reset") },
       { id: "clearstack", label: t("quest.clearStack"), dim: !steps.clear },
+      // **On a phone SOLVE is a chip on the bench, not a line of its own.**
+      // Its own row plus the price beside it is a fifth of a sideways
+      // phone's screen, and that fifth belongs to the editor. It goes last —
+      // the far end of the last row, which is as far from RUN as this bench
+      // has — and the price still arrives, in the note the press puts up.
+      ...(this.compactMode
+        ? [{ id: "solve", label: t("quest.solve"), dim: !this.quest || this.solving }]
+        : []),
     ];
+  }
+
+  /** CODE mode: the editor, edge to edge, and BACK in the top right corner. */
+  private drawFocus(g: Ctx, s: number): void {
+    const { layout } = this.app;
+    const fonts = ensureFonts(s);
+    const pad = Math.round(6 * s);
+    const label = t("quest.leaveCode");
+    const [bw, bh] = btnBox(fonts.stationSm, [label], 0, fonts.stationSm.size * 2, layout.minTouchH());
+    const bx = layout.vw - pad - bw;
+    const by = pad;
+    const top = by + bh + pad;
+    well(g, pad, top, layout.vw - pad * 2, layout.vh - top - pad);
+    const editorRect: Rect = [pad + 4, top + 4, layout.vw - pad * 2 - 8, layout.vh - top - pad - 8];
+    if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
+    else this.overlay?.hide();
+    // The file's name where the panel title was, so the screen still says
+    // what is being edited.
+    g.fillStyle = css(Theme.dim);
+    printf(g, fonts.stationSm, MAIN_FILE[this.land], pad + Math.round(8 * s),
+      by + Math.round((bh - fonts.stationSm.height) / 2), bx - pad * 2, "left");
+    pixBtn(g, fonts.stationSm, bx, by, bw, bh, label, { hover: this.bar.hovered === "unfocus" });
+    this.bar.add({ id: "unfocus", rect: [bx, by, bw, bh], label });
   }
 
   /**
@@ -1686,7 +1750,21 @@ export class QuestScene implements Scene {
       rowW,
       layout.minTouchH(),
     );
-    const bandH = rows * btnH + (rows - 1) * rowGap;
+    let bandH = rows * btnH + (rows - 1) * rowGap;
+    // **The editor wins the argument on a phone.** The bench is a row of
+    // controls; the editor is the screen's purpose. Where the two cannot both
+    // have what they want — a 402-pixel-tall window held sideways — the
+    // buttons come down to their labels plus air rather than the code coming
+    // down to one line. `minTouchH` is a floor for a finger, and a finger
+    // that cannot see the code has nothing to aim at.
+    let benchBtnH = btnH;
+    if (this.compactMode) {
+      const cap = Math.round(inner[3] * (layout.isPortrait() ? 0.42 : 0.34));
+      if (bandH > cap) {
+        benchBtnH = Math.max(bench.height + 8, Math.floor((cap - (rows - 1) * rowGap) / rows));
+        bandH = rows * benchBtnH + (rows - 1) * rowGap;
+      }
+    }
 
     // The answer key gets its own line under the bench, and the reasons are
     // the same two the RUN/SUBMIT pair already established here.
@@ -1709,7 +1787,7 @@ export class QuestScene implements Scene {
     // Twice the gap between the bench's own wrapped rows, measured rather than
     // guessed: at 1280 the rows sit 12 virtual pixels apart, and a control that
     // wipes the editor must not be one slip below HINT either.
-    const solveGap = Math.round(fonts.button.size);
+    const solveGap = this.compactMode ? 0 : Math.round(fonts.button.size);
     const [solveW, solveBtnH] = btnBox(
       fonts.stationSm,
       [t("quest.solve")],
@@ -1719,8 +1797,14 @@ export class QuestScene implements Scene {
     );
     const noteX = inner[0] + solveW + Math.round(10 * s);
     const noteW = Math.max(1, inner[0] + inner[2] - noteX);
-    const noteLines = wrap(fonts.stationSm, t("quest.solveNote"), noteW);
-    const noteH = Math.max(solveBtnH, noteLines.length * fonts.stationSm.height);
+    // The price beside SOLVE is two lines of prose. On a phone those two
+    // lines are a tenth of the screen spent on a sentence that the press
+    // itself puts up anyway, so there the button stands alone and the
+    // sentence arrives when it is relevant.
+    const noteLines = this.compactMode ? [] : wrap(fonts.stationSm, t("quest.solveNote"), noteW);
+    const noteH = this.compactMode
+      ? 0
+      : Math.max(solveBtnH, noteLines.length * fonts.stationSm.height);
 
     const editorH = Math.max(
       40,
@@ -1740,22 +1824,24 @@ export class QuestScene implements Scene {
     } else this.overlay?.hide();
 
     const rowY = inner[1] + editorH + Math.round(8 * s);
-    this.buttons.row(bench, [inner[0], rowY, rowW, bandH], rowItems, layout.minTouchH());
+    this.buttons.row(bench, [inner[0], rowY, rowW, bandH], rowItems, benchBtnH);
     this.buttons.add({
       id: "submit",
-      rect: [inner[0] + inner[2] - subW, rowY, subW, btnH],
+      rect: [inner[0] + inner[2] - subW, rowY, subW, benchBtnH],
       label: this.stage === "idle" ? t("quest.submit") : "…",
       dim: this.stage !== "idle",
       strong: this.stage === "idle",
     });
 
     const solveY = rowY + bandH + solveGap;
-    this.bar.add({
-      id: "solve",
-      rect: [inner[0], solveY, solveW, solveBtnH],
-      label: t("quest.solve"),
-      dim: !this.quest || this.solving,
-    });
+    if (!this.compactMode) {
+      this.bar.add({
+        id: "solve",
+        rect: [inner[0], solveY, solveW, solveBtnH],
+        label: t("quest.solve"),
+        dim: !this.quest || this.solving,
+      });
+    }
     // Coin, not red and not dim: this is what a star costs, and stars on this
     // screen and on the map are already that colour. Dim would read as small
     // print, which is exactly the wrong register for a price.

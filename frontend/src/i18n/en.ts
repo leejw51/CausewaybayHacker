@@ -163,6 +163,8 @@ export const en = {
   // -- the map -------------------------------------------------------------
   "map.allMaps": "ALL MAPS",
   "map.playground": "PLAYGROUND",
+  "map.allMapsShort": "MAPS",
+  "map.playgroundShort": "PLAY",
   "map.basic": "BASIC",
   "map.advanced": "ADVANCED",
   "map.hacker": "HACKER",
@@ -225,6 +227,8 @@ export const en = {
   "quest.briefTop": "BRIEF: TOP",
   "quest.fontDown": "A-",
   "quest.fontUp": "A+",
+  "quest.code": "CODE",
+  "quest.leaveCode": "BACK",
   "quest.fontSize": "code size {percent}%",
   "quest.leaveMapTitle": "BACK TO THE MAP?",
   "quest.leaveLobbyTitle": "BACK TO THE LOBBY?",
@@ -338,6 +342,9 @@ export const en = {
   "aux.search": "SEARCH",
   "aux.stats": "STATS",
   "aux.ai": "AI MODE",
+  "aux.searchShort": "FIND",
+  "aux.statsShort": "STATS",
+  "aux.aiShort": "AI",
   "aux.allMaps": "ALL MAPS",
   "aux.hint": "F4 SEARCH   F5 STATS   F6 AI   ESC MAPS",
 
