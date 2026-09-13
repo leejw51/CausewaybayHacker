@@ -480,14 +480,18 @@ test("3e: display controls — orientation (F1), CRT (F2), fullscreen, language 
   await shot(page, "26-crt-toggled");
   await page.keyboard.press("F2");
 
-  // Fullscreen: is there any control at all?
-  const ids = await buttonIds(page);
-  const fsCtl = ids.filter((i) => /full/i.test(i));
-  console.log(`[display] fullscreen controls on lands: ${fsCtl.join(",") || "(none)"}`);
-  test.info().annotations.push({
-    type: "fullscreen",
-    description: fsCtl.length ? fsCtl.join(",") : "no fullscreen control found",
-  });
+  // Fullscreen: F11 from any screen. Headless Chromium grants the request
+  // and reports it through `document.fullscreenElement`, which is what the
+  // app reads, so the toggle is observable even without a real display.
+  await page.keyboard.press("F11");
+  await page.waitForTimeout(500);
+  const fsOn = await page.evaluate(() => !!document.fullscreenElement);
+  await page.keyboard.press("F11");
+  await page.waitForTimeout(500);
+  const fsOff = await page.evaluate(() => !!document.fullscreenElement);
+  console.log(`[display] F11 fullscreen: ${fsOn} -> ${fsOff}`);
+  expect(fsOn).toBe(true);
+  expect(fsOff).toBe(false);
 
   // Language: F7 walks every locale round.
   const order: string[] = [];
@@ -515,6 +519,17 @@ test("3f: every language on the login screen, via the LANG button", async ({ pag
   }
   console.log(`[lang] LANG button cycle: ${order.join(" -> ")}`);
   expect(new Set(order).size).toBe(6);
+
+  // And the fullscreen button beside it, which says the state it moves to.
+  const ids = await buttonIds(page);
+  expect(ids).toContain("fullscreen");
+  await clickButton(page, "fullscreen");
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  await shot(page, "29-fullscreen-login");
+  await clickButton(page, "fullscreen");
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(false);
 });
 
 test("5: every code-size step on the quest screen (en)", async ({ page }) => {

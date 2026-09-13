@@ -419,6 +419,11 @@ export class LoginScene implements Scene {
       void setLocale(next);
       this.status = "";
     }
+    if (hit.id === "fullscreen") {
+      void this.app.toggleFullscreen().then((on) => {
+        this.app.say(on ? t("app.fullscreenOn") : t("app.fullscreenOff"));
+      });
+    }
   }
 
   /**
@@ -550,21 +555,31 @@ export class LoginScene implements Scene {
     // the card has to be told how many rows that turns out to be — a card sized
     // for one row and drawn with two puts its last button outside itself, which
     // leaves its last button outside its own panel.
-    const btnRows = rowsFor(fonts.button, w - Math.round(24 * s), [
+    // Measured at the width the row is laid out in — the panel's inner
+    // width, `titledPanel`'s 6 + 8 each side — not a guess at it: the two
+    // disagreed by a few pixels, and with seven buttons that was a fourth
+    // row the card was not sized for.
+    const btnRows = rowsFor(fonts.button, w - 28, [
       t("login.enter"),
       t("login.newWallet"),
       t("login.story"),
       this.revealed ? t("login.hide") : t("login.reveal"),
       t("login.clear"),
       localeInfoLabel(),
+      this.app.isFullscreen() ? t("login.windowed") : t("login.fullscreen"),
     ]);
+    // The frame's own overhead is `titledPanel`'s: 8 above the title bar,
+    // the bar, 8 under it, 6 + 8 at the bottom. It was a flat 30, which is
+    // short by most of the bar, and the last button row stood on the rim.
+    const frameH = 8 + fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9) + 8 + 14;
     const cardH =
-      Math.round(30 * s) +
+      frameH +
       fieldH +
       pad +
       fonts.stationSm.height +
+      Math.round(4 * s) +
       fonts.small.height +
-      pad * 2 +
+      pad +
       btnH * btnRows +
       (btnRows - 1) * Math.round(fonts.button.size * 0.5) +
       pad;
@@ -620,6 +635,13 @@ export class LoginScene implements Scene {
         // chosen, so this cycles rather than taking six buttons' worth of a
         // card that is sized to its contents.
         { id: "lang", label: localeInfoLabel() },
+        // Fullscreen, beside the language for the same reason: it is a
+        // display choice, and the login card is where the display choices
+        // live. It says the state it is about to put the window in.
+        {
+          id: "fullscreen",
+          label: this.app.isFullscreen() ? t("login.windowed") : t("login.fullscreen"),
+        },
       ],
       layout.minTouchH(),
     );
@@ -648,9 +670,16 @@ export class LoginScene implements Scene {
     const warn = t("login.mintWarning");
     const warnLines = wrap(fonts.small, warn, w - Math.round(24 * s)).length;
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
-    const btnRows = layout.isPortrait() ? 2 : 1;
+    // Measured, not "one in landscape, two in portrait": I HAVE WRITTEN IT
+    // DOWN and CANCEL wrap in a landscape card too, and the assumed single
+    // row put CANCEL on the rim.
+    const btnRows = rowsFor(fonts.button, w - 28, [
+      this.waiting ? t("login.mintWaiting") : this.busy ? "…" : t("login.mintKeep"),
+      t("login.mintCancel"),
+    ]);
+    const frameH = 8 + fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9) + 8 + 14;
     const cardH =
-      Math.round(30 * s) +
+      frameH +
       gridH +
       pad +
       warnLines * fonts.small.height +

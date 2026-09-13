@@ -33,6 +33,8 @@ export const en = {
   "app.orientLandscape": "orientation: landscape",
   "app.crtOn": "crt: on",
   "app.crtOff": "crt: off",
+  "app.fullscreenOn": "fullscreen: on",
+  "app.fullscreenOff": "fullscreen: off",
   "app.language": "language: {name}",
   "chrome.logout": "LOG OUT",
   "chrome.difficulty": "DIFFICULTY",
@@ -65,7 +67,7 @@ export const en = {
   "title.press": "PRESS SPACE",
   "title.anyKey": "— or any key, or a click —",
   "title.tap": "or tap anywhere",
-  "title.footer": "SPACE  START      F7  LANGUAGE      F1  ORIENTATION      F2  CRT",
+  "title.footer": "SPACE  START      F7  LANGUAGE      F1  ORIENTATION      F2  CRT      F11  FULLSCREEN",
 
   // -- the opening ---------------------------------------------------------
   "story.skipKey": "ANY KEY  SKIP",
@@ -104,6 +106,8 @@ export const en = {
   "login.reveal": "REVEAL",
   "login.hide": "HIDE",
   "login.clear": "CLEAR",
+  "login.fullscreen": "FULLSCREEN",
+  "login.windowed": "WINDOWED",
   "login.custody": "The phrase never leaves this tab. The server only ever sees a signature.",
   "login.footer":
     "ENTER  LOG IN      REVEAL  SHOW THE PHRASE      F7  LANGUAGE      F1  ORIENTATION",

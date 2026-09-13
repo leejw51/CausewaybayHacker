@@ -226,6 +226,7 @@ export class App {
 
     addEventListener("resize", () => this.measure());
     addEventListener("orientationchange", () => this.measure());
+    document.addEventListener("fullscreenchange", () => this.measure());
     addEventListener("blur", () => this.input.releaseAll());
     this.wirePointer();
     this.wireKeys();
@@ -497,6 +498,32 @@ export class App {
   }
 
   /** Turn the tube on or off, and remember which. */
+  /**
+   * Fullscreen, the way the LÖVE client has it and this one did not: F11 and
+   * a button on the login card. The browser owns the state — `Escape` leaves
+   * fullscreen without telling anybody — so nothing is remembered here; the
+   * `fullscreenchange` listener in the constructor re-measures whichever way
+   * it went. Resolves to the state the document is now in.
+   */
+  async toggleFullscreen(): Promise<boolean> {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return false;
+      }
+      await document.documentElement.requestFullscreen();
+      return true;
+    } catch {
+      // Refused (a frame without allowfullscreen, or a call not made from a
+      // user gesture): say which way it stayed rather than pretend.
+      return !!document.fullscreenElement;
+    }
+  }
+
+  isFullscreen(): boolean {
+    return !!document.fullscreenElement;
+  }
+
   toggleCrt(): boolean {
     this.crt.enabled = !this.crt.enabled;
     try {
@@ -892,6 +919,16 @@ export class App {
               ? t("app.orientPortrait")
               : t("app.orientLandscape"),
         );
+        return;
+      }
+      // F11 is fullscreen. The browser's own F11 does the same thing on a
+      // desktop, but not in every browser and never on a phone's keyboard,
+      // and a control that only exists as a browser habit is not a control.
+      if (name === "f11") {
+        ev.preventDefault();
+        void this.toggleFullscreen().then((on) => {
+          this.say(on ? t("app.fullscreenOn") : t("app.fullscreenOff"));
+        });
         return;
       }
       // F2 is the tube. On by default and remembered, because a scanline mask
