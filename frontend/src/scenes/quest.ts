@@ -111,6 +111,23 @@ export function openingSource(
 }
 
 /**
+ * Whether ANSWER should empty the buffer as it opens.
+ *
+ * The starter is the server's boilerplate — `fn main() { // your code here }`
+ * — and against the answer it is simply wrong text, so the mode would open
+ * on a screenful of red that nobody typed. It goes.
+ *
+ * **Only when it is exactly what the quest shipped.** `openingSource` may
+ * have opened the editor on a saved draft instead, and a draft is the
+ * player's own writing: clearing that would be this mode destroying work in
+ * order to tidy its own display. Trimmed on both sides, because a trailing
+ * newline is not a decision anybody made.
+ */
+export function clearsForAnswer(buffer: string, starter: string): boolean {
+  return starter.trim().length > 0 && buffer.trim() === starter.trim();
+}
+
+/**
  * Hints still for sale. Clamped, because `quest.solve` (§4.11b) moves
  * `hints_used` to the quest's own hint count and a server that ever moved it
  * past `hints_total` would otherwise print "-1 HINTS LEFT" at the player.
@@ -748,6 +765,10 @@ export class QuestScene implements Scene {
     if (this.answerOn) {
       this.answerOn = false;
       this.editor.setAnswer(null);
+      // The caret goes back where the typing happens, for the reason every
+      // other canvas button on this screen hands it over: the player pressed
+      // a button and the next thing they want to do is write.
+      this.focusEditorSoon();
       this.app.chip.select();
       return;
     }
@@ -775,10 +796,14 @@ export class QuestScene implements Scene {
         this.answerBusy = false;
       }
     }
+    // The boilerplate goes first, as one undoable edit — ctrl-Z puts it back
+    // — so the count starts at zero of the answer rather than at a screen of
+    // red the player did not write.
+    if (clearsForAnswer(this.editor.source, this.quest.starter)) this.editor.replaceAll("");
     this.answerOn = true;
     this.editor.setAnswer(this.answerText);
     this.answerProg = answerProgress(this.editor.source, this.answerText);
-    this.editor.focus();
+    this.focusEditorSoon();
     this.app.chip.coin();
   }
 
@@ -824,6 +849,20 @@ export class QuestScene implements Scene {
       this.spark(at, 16, Theme.coin);
       this.app.chip.blip();
     }
+  }
+
+  /**
+   * Put the caret back in the editor after a canvas button was pressed.
+   *
+   * **On the next turn, not on this one.** A press arrives as `pointerdown`,
+   * and the browser's own default handling of that event blurs whatever was
+   * focused — *after* the listener has run. A `focus()` called straight from
+   * the handler is therefore undone a moment later, which is why pressing a
+   * button while the caret was already in the editor left it on `<body>` and
+   * the next thing the player typed went nowhere.
+   */
+  private focusEditorSoon(): void {
+    setTimeout(() => this.editor?.focus(), 0);
   }
 
   private caretVirtual(): [number, number] | null {
@@ -924,7 +963,7 @@ export class QuestScene implements Scene {
     // The caret goes back into the editor for the same reason PASTE hands it
     // over: the player pressed a canvas button and the next thing they want to
     // do is type.
-    this.editor.focus();
+    this.focusEditorSoon();
   }
 
   /**

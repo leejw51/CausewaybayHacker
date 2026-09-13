@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import {
   briefNeedsNote,
+  clearsForAnswer,
   editControls,
   editorTextFor,
   hintsRemaining,
@@ -190,5 +191,37 @@ describe("what an undo or a redo puts in the editor", () => {
     // body who selected all, deleted, and paused has an empty string on the
     // stack; handing back the starter would read as UNDO skipping a step.
     expect(editorTextFor(state({ source: "" }), "starter")).toBe("");
+  });
+});
+
+/**
+ * ANSWER opening on an empty page.
+ *
+ * The starter is boilerplate and against the answer it is wrong text, so it
+ * goes — but a *draft* is the player's own writing, and the mode tidying its
+ * own display is not a reason to throw that away. The line between the two is
+ * the only thing this decides, so it is the thing worth holding.
+ */
+describe("clearsForAnswer", () => {
+  const starter = "fn main() {\n    // your code here\n}\n";
+
+  it("clears the starter the quest shipped", () => {
+    expect(clearsForAnswer(starter, starter)).toBe(true);
+  });
+
+  it("ignores whitespace nobody decided on", () => {
+    expect(clearsForAnswer(starter.trimEnd(), starter)).toBe(true);
+    expect(clearsForAnswer(`\n${starter}  `, starter)).toBe(true);
+  });
+
+  it("never clears a draft, however small the difference", () => {
+    expect(clearsForAnswer(`${starter}// mine\n`, starter)).toBe(false);
+    expect(clearsForAnswer("fn main() {\n    let x = 1;\n}\n", starter)).toBe(false);
+    expect(clearsForAnswer("", starter)).toBe(false);
+  });
+
+  it("does nothing when the quest shipped no starter at all", () => {
+    expect(clearsForAnswer("", "")).toBe(false);
+    expect(clearsForAnswer("   ", "  \n ")).toBe(false);
   });
 });

@@ -136,28 +136,34 @@ function ghostFor(view: EditorView): DecorationSet {
   const doc = view.state.doc;
   const want = answer.split("\n");
   const out: Range<Decoration>[] = [];
-  const shared = Math.min(doc.lines, want.length);
-  for (let i = 1; i <= shared; i++) {
+  const last = doc.lines;
+  for (let i = 1; i <= last; i++) {
     const line = doc.line(i);
-    const target = want[i - 1];
+    const target = i <= want.length ? want[i - 1] : null;
+    if (target === null) {
+      // Typed past the end of the answer: all of this line is the divergence.
+      if (line.text.length > 0) {
+        out.push(Decoration.mark({ class: "cwb-wrong" }).range(line.from, line.to));
+      }
+      continue;
+    }
     let k = 0;
     while (k < line.text.length && k < target.length && line.text[k] === target[k]) k++;
     if (k < line.text.length) {
       out.push(Decoration.mark({ class: "cwb-wrong" }).range(line.from + k, line.to));
     }
-    if (k < target.length) {
-      out.push(
-        Decoration.widget({ widget: new GhostText(target.slice(k), false), side: 1 }).range(line.to),
-      );
+    // **One widget per line, and the tail merged into the last of them.**
+    // The lines past the end of the document used to be a block widget of
+    // their own, which on an empty document — which is exactly what ANSWER
+    // opens on now that it clears the starter — lands at the same position
+    // as this line's inline one. Two widgets at one position is a range set
+    // CodeMirror will not take, the plugin that built it is dropped, and the
+    // ghost silently does not appear at all.
+    let rest = target.slice(k);
+    if (i === last && want.length > last) rest += "\n" + want.slice(last).join("\n");
+    if (rest.length > 0) {
+      out.push(Decoration.widget({ widget: new GhostText(rest, false), side: 1 }).range(line.to));
     }
-  }
-  if (want.length > doc.lines) {
-    const rest = want.slice(doc.lines).join("\n");
-    out.push(
-      Decoration.widget({ widget: new GhostText(rest, true), side: 1, block: true }).range(
-        doc.length,
-      ),
-    );
   }
   return Decoration.set(out, true);
 }
