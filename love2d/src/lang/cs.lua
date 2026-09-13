@@ -208,6 +208,8 @@ return {
   -- PROTOCOL §4.11b — the answer, and what it costs.
   ["SOLVE  SHIFT-F7"] = "ŘEŠENÍ  SHIFT-F7",
   ["ANSWER"] = "PŘEDLOHA",
+  ["BLANKS"] = "DOPLŇOVAČKA",
+  ["TAB fills the blank"] = "TAB DOPLNÍ MEZERU",
   ["ESC done   F5 run   F2 format"] = "ESC HOTOVO   F5 SPUSTIT   F2 FORMÁT",
   ["FORMAT"] = "FORMÁT",
   ["CODE"] = "KÓD",

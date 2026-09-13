@@ -121,9 +121,22 @@ class GhostText extends WidgetType {
   }
 }
 
-const setAnswer = StateEffect.define<string | null>();
+/** A hole in the answer, as `[from, to)` character offsets. */
+export interface Blank {
+  from: number;
+  to: number;
+}
 
-const answerField = StateField.define<string | null>({
+/** What the editor is aiming at: the answer, and the holes cut in it. */
+export interface Target {
+  text: string;
+  /** Empty in plain ANSWER; the gaps to be typed in BLANKS. */
+  blanks: Blank[];
+}
+
+const setAnswer = StateEffect.define<Target | null>();
+
+const answerField = StateField.define<Target | null>({
   create: () => null,
   update(value, tr) {
     for (const e of tr.effects) if (e.is(setAnswer)) return e.value;
@@ -131,17 +144,107 @@ const answerField = StateField.define<string | null>({
   },
 });
 
+/**
+ * The holes, chosen once per target.
+ *
+ * **Words, not characters.** A gap in the middle of `println` is a typing
+ * exercise; a gap where `println` was is a memory one, and memory is what
+ * this mode is for. Roughly a third of the identifiers and numbers, taken
+ * by a seeded generator so the same quest gives the same drill for as long
+ * as it is open — a set that reshuffled under the player every keystroke
+ * would be unplayable.
+ *
+ * The rest of the program stays on screen. That is the whole point of the
+ * mode: you read the shape and remember the pieces.
+ */
+export function answerBlanks(answer: string, seed = 1): Blank[] {
+  const words: Blank[] = [];
+  const re = /[A-Za-z_][A-Za-z0-9_]*|[0-9]+/g;
+  for (let m = re.exec(answer); m !== null; m = re.exec(answer)) {
+    words.push({ from: m.index, to: m.index + m[0].length });
+  }
+  if (words.length === 0) return [];
+  let r = (seed >>> 0) || 1;
+  const next = (): number => {
+    r = (Math.imul(r, 1664525) + 1013904223) >>> 0;
+    return r / 4294967296;
+  };
+  const out = words.filter(() => next() < 0.34);
+  // Never a drill with nothing in it: a short answer whose every word the
+  // generator happened to skip would be ANSWER with extra steps.
+  if (out.length === 0) out.push(words[Math.floor(words.length / 2)]);
+  return out;
+}
+
+/** True while `at` is inside a hole — the part that is the player's to type. */
+function blankAt(blanks: Blank[], at: number): Blank | undefined {
+  return blanks.find((b) => at >= b.from && at < b.to);
+}
+
+/**
+ * What the editor should fill in for the player right now.
+ *
+ * In BLANKS the answer is on the screen except for its holes, so everything
+ * between one hole and the next is typed *for* you the moment you arrive at
+ * it. What comes back is the run from the caret to the start of the next
+ * hole — or `null` when the caret is inside a hole (yours to type), when the
+ * buffer has stopped being the answer (fix it first), or when there is
+ * nothing left.
+ */
+export function blanksFill(typed: string, target: Target): string | null {
+  const { text, blanks } = target;
+  if (blanks.length === 0) return null;
+  const { matched } = answerProgress(typed, text);
+  if (typed.length !== matched) return null;
+  if (blankAt(blanks, matched)) return null;
+  const next = blanks.find((b) => b.from >= matched);
+  const upto = next ? next.from : text.length;
+  return upto > matched ? text.slice(matched, upto) : null;
+}
+
+/** TAB in BLANKS: the hole you are standing in, and no more. */
+export function blankCompletion(typed: string, target: Target): string | null {
+  const { text, blanks } = target;
+  const { matched } = answerProgress(typed, text);
+  if (typed.length !== matched) return null;
+  const here = blankAt(blanks, matched);
+  return here ? text.slice(matched, here.to) : null;
+}
+
+/**
+ * The answer as the *ghost* should show it: holes masked.
+ *
+ * Drawing the real text inside a hole would hand the player the very word
+ * the drill is asking them for. The mask keeps the line's shape — and its
+ * width — so the program on screen still reads as the program.
+ */
+export function maskBlanks(target: Target): string {
+  const { text, blanks } = target;
+  if (blanks.length === 0) return text;
+  let out = "";
+  let at = 0;
+  for (const b of blanks) {
+    out += text.slice(at, b.from) + "_".repeat(b.to - b.from);
+    at = b.to;
+  }
+  return out + text.slice(at);
+}
+
 function ghostFor(view: EditorView): DecorationSet {
-  const answer = view.state.field(answerField, false) ?? null;
-  if (answer === null) return Decoration.none;
+  const target = view.state.field(answerField, false) ?? null;
+  if (target === null) return Decoration.none;
   const doc = view.state.doc;
-  const want = answer.split("\n");
+  // Two readings of the same answer: what is drawn (holes masked) and what
+  // is compared against (the answer itself). Comparing against the mask
+  // would call a correctly typed word a divergence.
+  const want = target.text.split("\n");
+  const shown = maskBlanks(target).split("\n");
   const out: Range<Decoration>[] = [];
   const last = doc.lines;
   for (let i = 1; i <= last; i++) {
     const line = doc.line(i);
-    const target = i <= want.length ? want[i - 1] : null;
-    if (target === null) {
+    const line_target = i <= want.length ? want[i - 1] : null;
+    if (line_target === null) {
       // Typed past the end of the answer: all of this line is the divergence.
       if (line.text.length > 0) {
         out.push(Decoration.mark({ class: "cwb-wrong" }).range(line.from, line.to));
@@ -149,7 +252,7 @@ function ghostFor(view: EditorView): DecorationSet {
       continue;
     }
     let k = 0;
-    while (k < line.text.length && k < target.length && line.text[k] === target[k]) k++;
+    while (k < line.text.length && k < line_target.length && line.text[k] === line_target[k]) k++;
     if (k < line.text.length) {
       out.push(Decoration.mark({ class: "cwb-wrong" }).range(line.from + k, line.to));
     }
@@ -160,8 +263,8 @@ function ghostFor(view: EditorView): DecorationSet {
     // as this line's inline one. Two widgets at one position is a range set
     // CodeMirror will not take, the plugin that built it is dropped, and the
     // ghost silently does not appear at all.
-    let rest = target.slice(k);
-    if (i === last && want.length > last) rest += "\n" + want.slice(last).join("\n");
+    let rest = (shown[i - 1] ?? line_target).slice(k);
+    if (i === last && want.length > last) rest += "\n" + shown.slice(last).join("\n");
     if (rest.length > 0) {
       out.push(Decoration.widget({ widget: new GhostText(rest, false), side: 1 }).range(line.to));
     }
@@ -249,10 +352,16 @@ const answerTab: Extension = Prec.highest(
     {
       key: "Tab",
       run: (view) => {
-        const answer = view.state.field(answerField, false) ?? null;
+        const target = view.state.field(answerField, false) ?? null;
         // ANSWER off: TAB is the editor's own, and indents.
-        if (answer === null) return false;
-        const insert = answerCompletion(view.state.doc.toString(), answer);
+        if (target === null) return false;
+        const typed = view.state.doc.toString();
+        // In BLANKS the pedal fills the hole you are in and nothing else —
+        // the code around it is already on the screen.
+        const insert =
+          target.blanks.length > 0
+            ? blankCompletion(typed, target)
+            : answerCompletion(typed, target.text);
         // **ANSWER on owns the key even when it has nothing to give.** With
         // the answer typed out, falling through to `indentWithTab` puts a tab
         // into a buffer that was exactly right a moment ago — the count goes
@@ -260,7 +369,7 @@ const answerTab: Extension = Prec.highest(
         // divergence the same applies: the thing to do is fix it, not indent
         // it. So the press is consumed and nothing happens.
         if (insert === null) return true;
-        const at = view.state.doc.length;
+        const at = typed.length;
         view.dispatch({
           changes: { from: at, insert },
           selection: { anchor: at + insert.length },
@@ -408,8 +517,23 @@ export class Editor {
    * what the player has typed is theirs, and the answer is a target behind
    * it rather than a replacement for it.
    */
-  setAnswer(text: string | null): void {
-    this.view.dispatch({ effects: setAnswer.of(text) });
+  setAnswer(target: Target | null): void {
+    this.view.dispatch({ effects: setAnswer.of(target) });
+  }
+
+  /**
+   * Put text in at the end and leave the caret after it.
+   *
+   * BLANKS uses it to type the parts that are not the drill: the answer
+   * arrives around the holes as the player reaches them.
+   */
+  appendAtEnd(text: string): void {
+    const at = this.view.state.doc.length;
+    this.view.dispatch({
+      changes: { from: at, insert: text },
+      selection: { anchor: at + text.length },
+      scrollIntoView: true,
+    });
   }
 
   /** Where the caret is on the page, for an effect thrown at it. */

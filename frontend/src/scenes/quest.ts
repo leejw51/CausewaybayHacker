@@ -26,7 +26,15 @@ import {
   type Stack,
 } from "../ui/chrome";
 import { CLOCK, clockPulse, reducedMotion, seconds, Tween } from "../engine/motion";
-import { Editor, MAIN_FILE, answerProgress, type AnswerProgress } from "../ui/editor";
+import {
+  Editor,
+  MAIN_FILE,
+  answerBlanks,
+  answerProgress,
+  blanksFill,
+  type AnswerProgress,
+  type Target,
+} from "../ui/editor";
 import { burstPlan } from "../engine/burst";
 import { Overlay } from "../ui/overlay";
 import { Sparks } from "../ui/sparks";
@@ -378,6 +386,17 @@ export class QuestScene implements Scene {
    */
   private answerText: string | null = null;
   private answerOn = false;
+  /**
+   * BLANKS: the answer on the screen with holes cut in it.
+   *
+   * ANSWER asks you to type a program you can see; this asks you to
+   * remember the words in one. The code stays up — that is the point of it,
+   * and the reason it is a second button rather than a harder ANSWER —
+   * while a third of the identifiers are gaps you fill. What is between the
+   * gaps is typed for you as you reach it, so the only keystrokes the drill
+   * costs are the ones it is asking about.
+   */
+  private blanksOn = false;
   private answerBusy = false;
   private answerProg: AnswerProgress = { matched: 0, wrong: 0, done: false, total: 0 };
   /**
@@ -764,6 +783,7 @@ export class QuestScene implements Scene {
     if (!this.quest || !this.editor || this.answerBusy) return;
     if (this.answerOn) {
       this.answerOn = false;
+      this.blanksOn = false;
       this.editor.setAnswer(null);
       // The caret goes back where the typing happens, for the reason every
       // other canvas button on this screen hands it over: the player pressed
@@ -801,10 +821,85 @@ export class QuestScene implements Scene {
     // red the player did not write.
     if (clearsForAnswer(this.editor.source, this.quest.starter)) this.editor.replaceAll("");
     this.answerOn = true;
-    this.editor.setAnswer(this.answerText);
-    this.answerProg = answerProgress(this.editor.source, this.answerText);
+    this.armTarget();
     this.focusEditorSoon();
     this.app.chip.coin();
+  }
+
+  /**
+   * BLANKS on, BLANKS off. It needs the answer, so it fetches it the way
+   * ANSWER does — one star, once — and switches ANSWER on with it.
+   */
+  private async toggleBlanks(): Promise<void> {
+    if (!this.quest || !this.editor || this.answerBusy) return;
+    if (this.blanksOn) {
+      this.blanksOn = false;
+      this.armTarget();
+      this.focusEditorSoon();
+      this.app.chip.select();
+      return;
+    }
+    if (!this.answerOn) {
+      await this.toggleAnswer();
+      if (!this.answerOn) return;
+    }
+    this.blanksOn = true;
+    // **The drill starts at the beginning.** Switching it on with the answer
+    // already typed out — by hand or by TAB — would otherwise be a button
+    // that visibly does nothing: every hole is behind the caret. What is in
+    // the buffer in ANSWER mode is the answer's own prefix, so nothing of
+    // the player's is lost by winding it back; the drill is what they just
+    // asked for.
+    this.editor.replaceAll("");
+    this.armTarget();
+    this.focusEditorSoon();
+    this.app.chip.coin();
+  }
+
+  /** The answer as the editor should aim at it, with or without holes. */
+  private target(): Target | null {
+    if (!this.answerOn || this.answerText === null) return null;
+    return {
+      text: this.answerText,
+      // Seeded from the quest, so the same drill comes back for as long as
+      // the screen is open rather than reshuffling under the player.
+      blanks: this.blanksOn ? answerBlanks(this.answerText, this.blankSeed()) : [],
+    };
+  }
+
+  private blankSeed(): number {
+    const id = this.quest?.id ?? "";
+    let h = 2166136261;
+    for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+    return h >>> 0;
+  }
+
+  /** Hand the target to the editor and fill in everything that is not a hole. */
+  private armTarget(): void {
+    const target = this.target();
+    if (!this.editor) return;
+    this.editor.setAnswer(target);
+    if (target) {
+      this.fillBlanks(target);
+      this.answerProg = answerProgress(this.editor.source, target.text);
+    }
+  }
+
+  /**
+   * Type the parts that are not the drill.
+   *
+   * Looped, because filling up to one hole can leave the caret at the start
+   * of the next the moment a hole is finished, and a player who typed the
+   * last character of a word should not have to wait a keystroke for the
+   * line to catch up.
+   */
+  private fillBlanks(target: Target): void {
+    if (!this.editor || target.blanks.length === 0) return;
+    for (let i = 0; i < 200; i++) {
+      const add = blanksFill(this.editor.source, target);
+      if (add === null) break;
+      this.editor.appendAtEnd(add);
+    }
   }
 
   /**
@@ -818,6 +913,10 @@ export class QuestScene implements Scene {
   private answerTick(): void {
     if (!this.answerOn || this.answerText === null || !this.editor) return;
     const was = this.answerProg;
+    // The gaps close themselves: everything between one hole and the next is
+    // typed for the player as they arrive at it.
+    const target = this.target();
+    if (target) this.fillBlanks(target);
     const now = answerProgress(this.editor.source, this.answerText);
     this.answerProg = now;
     const at = this.caretVirtual();
@@ -1356,6 +1455,9 @@ export class QuestScene implements Scene {
       case "answer":
         void this.toggleAnswer();
         break;
+      case "blanks":
+        void this.toggleBlanks();
+        break;
       case "run":
         void this.run();
         break;
@@ -1734,6 +1836,10 @@ export class QuestScene implements Scene {
       // `strong` while it is on: a different colour rather than a louder one,
       // because ANSWER is a *mode* the screen is in, not the thing to press.
       { id: "answer", label: t("quest.answer"), dim: this.answerBusy, strong: this.answerOn },
+      // BLANKS turns ANSWER on if it is not already: it is the same answer,
+      // read a harder way, and a button that silently did nothing until you
+      // had pressed another one first would be a button nobody trusts.
+      { id: "blanks", label: t("quest.blanks"), dim: this.answerBusy, strong: this.blanksOn },
     ];
     const rowW = Math.max(f.size * 4, bx - pad * 2);
     const rows = rowsIn(
@@ -1767,9 +1873,10 @@ export class QuestScene implements Scene {
         ? `   ${t("quest.answerMatched")}`
         : prog.wrong > 0
           ? `   ${t("quest.answerDiverged")}`
-          : `   ${t("quest.answerTab")}`;
+          : `   ${this.blanksOn ? t("quest.blanksTab") : t("quest.answerTab")}`;
+    const drill = this.blanksOn ? `   ${t("quest.blanks")}` : "";
     const status = on
-      ? `${MAIN_FILE[this.land]}   ${prog.matched} / ${prog.total}${tail}`
+      ? `${MAIN_FILE[this.land]}${drill}   ${prog.matched} / ${prog.total}${tail}`
       : MAIN_FILE[this.land];
     g.fillStyle = css(
       !on ? Theme.dim : prog.done ? Theme.admit : prog.wrong > 0 ? Theme.red : Theme.coin,

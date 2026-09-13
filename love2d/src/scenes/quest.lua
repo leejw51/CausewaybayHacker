@@ -171,6 +171,9 @@ function Quest.new(app)
     answer_busy = false,
     answer_prog = { matched = 0, wrong = 0, done = false, total = 0 },
     answer_seen = nil,
+    -- BLANKS: the same answer with holes cut in it. See `answer_blanks`.
+    blanks_on = false,
+    blanks = nil,
     sparks = Sparks.new(),
     -- The server's edit stack. `nil` means "this screen has not been told",
     -- which is also what a server without the feature leaves behind, and
@@ -553,6 +556,98 @@ function Quest.answer_completion(typed, answer)
   return nl and rest:sub(1, nl - 1) or rest
 end
 
+--- The holes BLANKS cuts in the answer, as `{ from, to }` byte offsets.
+---
+--- **Words, not characters.** A gap in the middle of `println` is a typing
+--- exercise; a gap where `println` was is a memory one, and memory is what
+--- this mode is for. Roughly a third of the identifiers and numbers, chosen
+--- by a seeded generator so the same quest gives the same drill for as long
+--- as it is open — a set that reshuffled every keystroke would be
+--- unplayable. The rest of the program stays on the screen: that is the
+--- point of the mode, and why it is a second button rather than a harder
+--- ANSWER.
+function Quest.answer_blanks(answer, seed)
+  local words = {}
+  local at = 1
+  while true do
+    local from, to = answer:find("[%a_][%w_]*", at)
+    if not from then
+      from, to = answer:find("%d+", at)
+    end
+    if not from then break end
+    words[#words + 1] = { from = from - 1, to = to }
+    at = to + 1
+  end
+  if #words == 0 then return {} end
+  local r = (seed or 1) % 2147483647
+  if r <= 0 then r = 1 end
+  local function nextf()
+    r = (r * 1103515245 + 12345) % 2147483648
+    return r / 2147483648
+  end
+  local out = {}
+  for _, w in ipairs(words) do
+    if nextf() < 0.34 then out[#out + 1] = w end
+  end
+  -- Never a drill with nothing in it.
+  if #out == 0 then out[1] = words[math.max(1, math.floor(#words / 2))] end
+  return out
+end
+
+--- The hole `at` is standing in, if any. Offsets are 0-based, as the spans.
+local function blank_at(blanks, at)
+  for _, b in ipairs(blanks or {}) do
+    if at >= b.from and at < b.to then return b end
+  end
+  return nil
+end
+
+--- What the editor should type in for the player right now.
+---
+--- In BLANKS the answer is on the screen except for its holes, so everything
+--- between one hole and the next is typed *for* you the moment you arrive at
+--- it. `nil` when the caret is inside a hole (yours to type), when the buffer
+--- has stopped being the answer (fix it first), or when there is nothing
+--- left.
+function Quest.blanks_fill(typed, answer, blanks)
+  if not blanks or #blanks == 0 then return nil end
+  local p = Quest.answer_progress(typed, answer)
+  if #typed ~= p.matched then return nil end
+  if blank_at(blanks, p.matched) then return nil end
+  local upto = #answer
+  for _, b in ipairs(blanks) do
+    if b.from >= p.matched then upto = b.from; break end
+  end
+  if upto <= p.matched then return nil end
+  return answer:sub(p.matched + 1, upto)
+end
+
+--- TAB in BLANKS: the hole you are standing in, and no more.
+function Quest.blank_completion(typed, answer, blanks)
+  local p = Quest.answer_progress(typed, answer)
+  if #typed ~= p.matched then return nil end
+  local here = blank_at(blanks, p.matched)
+  if not here then return nil end
+  return answer:sub(p.matched + 1, here.to)
+end
+
+--- The answer as the *ghost* should show it: holes masked.
+---
+--- Drawing the real text inside a hole would hand the player the very word
+--- the drill is asking for. The mask keeps the line's shape — and its width
+--- — so the program on screen still reads as the program.
+function Quest.mask_blanks(answer, blanks)
+  if not blanks or #blanks == 0 then return answer end
+  local out, at = {}, 0
+  for _, b in ipairs(blanks) do
+    out[#out + 1] = answer:sub(at + 1, b.from)
+    out[#out + 1] = ("_"):rep(b.to - b.from)
+    at = b.to
+  end
+  out[#out + 1] = answer:sub(at + 1)
+  return table.concat(out)
+end
+
 --- Whether ANSWER should empty the buffer as it opens.
 ---
 --- The starter is the server's boilerplate and against the answer it is
@@ -584,6 +679,8 @@ function Quest:toggle_answer()
   end
   if self.answer_on then
     self.answer_on = false
+    self.blanks_on = false
+    self.blanks = nil
     SFX.play("move")
     return
   end
@@ -624,8 +721,15 @@ function Quest:arm_answer()
     self.editor:replace_all("")
   end
   self.answer_on = true
+  -- Two readings of the same answer: what is drawn (holes masked) and what
+  -- is compared against (the answer itself). Comparing against the mask
+  -- would call a correctly typed word a divergence.
+  self.blanks = self.blanks_on
+    and Quest.answer_blanks(self.answer_text, Quest.blank_seed(self.quest and self.quest.id))
+    or nil
   self.answer_lines = {}
-  for chunk in (self.answer_text .. "\n"):gmatch("(.-)\n") do
+  local shown = Quest.mask_blanks(self.answer_text, self.blanks)
+  for chunk in (shown .. "\n"):gmatch("(.-)\n") do
     self.answer_lines[#self.answer_lines + 1] = chunk
   end
   -- `gmatch` over `text .. "\n"` gives one trailing empty piece for a source
@@ -633,9 +737,69 @@ function Quest:arm_answer()
   if self.answer_text:sub(-1) == "\n" then
     self.answer_lines[#self.answer_lines] = nil
   end
+  self:fill_blanks()
   self.answer_prog = Quest.answer_progress(self.editor:text(), self.answer_text)
   self.answer_seen = self.editor:text()
   SFX.play("select")
+end
+
+--- A seed from the quest's id, so the drill is the same for as long as the
+--- screen is open rather than reshuffling under the player.
+function Quest.blank_seed(id)
+  -- djb2, and no bitwise operators: this file is LuaJIT's, where `~` is not
+  -- one. Any spread will do — all the seed has to be is the same number for
+  -- the same quest.
+  local h = 5381
+  for i = 1, #(id or "") do
+    h = (h * 33 + id:byte(i)) % 2147483648
+  end
+  return h
+end
+
+--- Type the parts that are not the drill.
+---
+--- Looped, because filling up to one hole can leave the caret at the start of
+--- the next the moment a hole is finished, and a player who typed the last
+--- character of a word should not wait a keystroke for the line to catch up.
+function Quest:fill_blanks()
+  if not self.blanks_on or not self.blanks or not self.editor or not self.answer_text then
+    return
+  end
+  for _ = 1, 200 do
+    local add = Quest.blanks_fill(self.editor:text(), self.answer_text, self.blanks)
+    if not add then break end
+    self.editor:move("doc_end")
+    self.editor:insert(add)
+  end
+end
+
+--- BLANKS on, BLANKS off. It needs the answer, so it fetches it the way
+--- ANSWER does — one star, once — and switches ANSWER on with it.
+function Quest:toggle_blanks()
+  if not self.quest or self.answer_busy or self.solve_unsupported then
+    if self.solve_unsupported then SFX.play("locked") end
+    return
+  end
+  if self.blanks_on then
+    self.blanks_on = false
+    self:arm_answer()
+    SFX.play("move")
+    return
+  end
+  if not self.answer_text then
+    -- Fetch first; the toggle comes back through `arm_answer` and the flag
+    -- below is read there.
+    self.blanks_on = true
+    self:toggle_answer()
+    return
+  end
+  self.blanks_on = true
+  -- **The drill starts at the beginning.** Switching it on with the answer
+  -- already typed out would otherwise be a button that visibly does nothing:
+  -- every hole is behind the caret. What is in the buffer in ANSWER mode is
+  -- the answer's own prefix, so nothing of the player's is lost.
+  self.editor:replace_all("")
+  self:arm_answer()
 end
 
 --- What the last keystroke did to the target, as something to look at.
@@ -648,6 +812,9 @@ function Quest:answer_tick()
   if not self.answer_on or not self.answer_text or not self.editor then return end
   local text = self.editor:text()
   if text == self.answer_seen then return end
+  self.answer_seen = text
+  self:fill_blanks()
+  text = self.editor:text()
   self.answer_seen = text
   local was = self.answer_prog
   local now = Quest.answer_progress(text, self.answer_text)
@@ -1091,6 +1258,9 @@ function Quest:draw_code()
     { id = "answer", label = I18n.t("ANSWER"),
       state = self.answer_on and "hot"
         or ((usable and not self.solve_unsupported) and "normal" or "disabled") },
+    { id = "blanks", label = I18n.t("BLANKS"),
+      state = self.blanks_on and "hot"
+        or ((usable and not self.solve_unsupported) and "normal" or "disabled") },
   }
   self.code_rects = {}
   local x, y = pad, pad
@@ -1117,6 +1287,7 @@ function Quest:draw_code()
   local colour = Theme.withAlpha(Theme.cream, 0.55)
   if self.answer_on then
     local p = self.answer_prog
+    if self.blanks_on then status = status .. "   " .. I18n.t("BLANKS") end
     status = ("%s   %d / %d"):format(status, p.matched, p.total)
     if p.done then
       status = status .. "   " .. I18n.t("MATCHED")
@@ -1125,7 +1296,9 @@ function Quest:draw_code()
       status = status .. "   " .. I18n.t("FIX THE RED")
       colour = Theme.red
     else
-      status = status .. "   " .. I18n.t("TAB completes the line")
+      status = status .. "   "
+        .. (self.blanks_on and I18n.t("TAB fills the blank")
+          or I18n.t("TAB completes the line"))
       colour = Theme.coin
     end
   end
@@ -1139,7 +1312,10 @@ function Quest:draw_code()
     UI.button(r.x, r.y, r.w, r.h, item.label, item.state, 8)
   end
   UI.button(dx, pad, dw, bh, done_label, "normal", 8)
-  UI.text(status, pad + 4, rowsb + 4, 7, colour)
+  -- At the size the strip can hold it: with a drill on, this line carries a
+  -- file, a mode, a count and a key, and at the larger type steps that is
+  -- wider than a phone.
+  UI.text(status, pad + 4, rowsb + 4, UI.fitSize(status, vw - pad * 2 - 8, 7, 4), colour)
 
   local top = strip + 6
   self:draw_editor({ x = pad, y = top, w = vw - pad * 2, h = vh - top - pad },
@@ -1463,8 +1639,10 @@ function Quest:button_band(rect)
   -- Neither writes an attempt, and neither must read as another way to
   -- submit — the same rule SOLVE and FORMAT are here under.
   local answer_label = I18n.t("ANSWER")
+  local blanks_label = I18n.t("BLANKS")
   local code_label = I18n.t("CODE")
   local aw = UI.textWidth(answer_label, 8) + 16
+  local blw = UI.textWidth(blanks_label, 8) + 16
   local cdw = UI.textWidth(code_label, 8) + 16
   local uw = UI.textWidth(undo_label, 8) + 16
   local rw = UI.textWidth(redo_label, 8) + 16
@@ -1473,13 +1651,13 @@ function Quest:button_band(rect)
   local row = rect.w - 20
   -- The same rule for the left pair: when SOLVE and FORMAT with their keys
   -- do not fit a row of the well, the keys go.
-  if sw + left_gap + fw + left_gap + aw + left_gap + cdw > row then
+  if sw + left_gap + fw + left_gap + aw + left_gap + blw + left_gap + cdw > row then
     solve_label = self.solving and solve_label or bare(solve_label)
     format_label = self.formatting and format_label or bare(format_label)
     sw = UI.textWidth(solve_label, 8) + 16
     fw = UI.textWidth(format_label, 8) + 16
   end
-  local buffer_w = sw + left_gap + fw + left_gap + aw + left_gap + cdw
+  local buffer_w = sw + left_gap + fw + left_gap + aw + left_gap + blw + left_gap + cdw
   local stack_w = uw + left_gap + rw + left_gap + cw
   local left_room = rx - rect.x - 20
   local upper = by - bh - 6 - cap
@@ -1554,12 +1732,13 @@ function Quest:button_band(rect)
   -- Narrower still: the members of a cluster give way together rather than
   -- one eating the other, with a floor that still shows something.
   if buffer_w > buffer_room then
-    local scale = (buffer_room - 3 * left_gap) / (sw + fw + aw + cdw)
-    sw = math.max(40, math.floor(sw * scale))
-    fw = math.max(40, math.floor(fw * scale))
-    aw = math.max(40, math.floor(aw * scale))
-    cdw = math.max(40, math.floor(cdw * scale))
-    buffer_w = sw + left_gap + fw + left_gap + aw + left_gap + cdw
+    local scale = (buffer_room - 4 * left_gap) / (sw + fw + aw + blw + cdw)
+    sw = math.max(36, math.floor(sw * scale))
+    fw = math.max(36, math.floor(fw * scale))
+    aw = math.max(36, math.floor(aw * scale))
+    blw = math.max(36, math.floor(blw * scale))
+    cdw = math.max(36, math.floor(cdw * scale))
+    buffer_w = sw + left_gap + fw + left_gap + aw + left_gap + blw + left_gap + cdw
   end
   if stack_w > stack_room then
     local scale = (stack_room - 2 * left_gap) / (uw + rw + cw)
@@ -1572,7 +1751,8 @@ function Quest:button_band(rect)
   local vx = rect.x + 10
   local fx = vx + sw + left_gap
   local ax = fx + fw + left_gap
-  local cdx = ax + aw + left_gap
+  local blx = ax + aw + left_gap
+  local cdx = blx + blw + left_gap
   -- The stack follows the buffer pair when they share a row, and otherwise
   -- starts at the left margin of its own.
   local ux = (uy == ly) and (vx + buffer_w + left_gap) or (rect.x + 10)
@@ -1581,8 +1761,8 @@ function Quest:button_band(rect)
   return {
     run_label = run_label, submit_label = submit_label,
     format_label = format_label, solve_label = solve_label,
-    answer_label = answer_label, code_label = code_label,
-    ax = ax, cdx = cdx, aw = aw, cdw = cdw,
+    answer_label = answer_label, blanks_label = blanks_label, code_label = code_label,
+    ax = ax, blx = blx, cdx = cdx, aw = aw, blw = blw, cdw = cdw,
     undo_label = undo_label, redo_label = redo_label, clear_label = clear_label,
     bh = bh, cap = cap, bw = bw,
     by = by, sx = sx, rx = rx, ly = ly, uy = uy,
@@ -1794,6 +1974,10 @@ function Quest:draw_editor(rect, tint, bare)
     self.answer_on and "hot"
       or ((usable and not self.solve_unsupported) and "normal" or "disabled"), 8)
   self.answer_rect = { x = band.ax, y = ly, w = band.aw, h = bh }
+  UI.button(band.blx, ly, band.blw, bh, band.blanks_label,
+    self.blanks_on and "hot"
+      or ((usable and not self.solve_unsupported) and "normal" or "disabled"), 8)
+  self.blanks_rect = { x = band.blx, y = ly, w = band.blw, h = bh }
   UI.button(band.cdx, ly, band.cdw, bh, band.code_label,
     self.quest and "normal" or "disabled", 8)
   self.code_rect = { x = band.cdx, y = ly, w = band.cdw, h = bh }
@@ -2363,7 +2547,9 @@ function Quest:keypressed(key, mods)
   -- past a divergence the thing to do is fix it, not indent it.
   if key == "tab" and not cmd and not mods.shift
     and self.answer_on and self.focus == "editor" and self.editor then
-    local insert = Quest.answer_completion(self.editor:text(), self.answer_text)
+    local insert = self.blanks_on
+      and Quest.blank_completion(self.editor:text(), self.answer_text, self.blanks)
+      or Quest.answer_completion(self.editor:text(), self.answer_text)
     if insert then
       self.editor:move("doc_end")
       self.editor:insert(insert)
@@ -2413,6 +2599,7 @@ function Quest:mousepressed(x, y, button)
     if inside(r.undo) then self:stack_undo(); return end
     if inside(r.redo) then self:stack_redo(); return end
     if inside(r.answer) then self:toggle_answer(); return end
+    if inside(r.blanks) then self:toggle_blanks(); return end
     -- Anything else is a click into the code, and it goes through the same
     -- pane the framed screen uses — so the caret lands where it was aimed,
     -- a drag selects, and a double click takes a word, here as there.
@@ -2431,6 +2618,7 @@ function Quest:mousepressed(x, y, button)
   if inside(self.solve_rect) then self:solve(); return end
   if inside(self.format_rect) then self:format(); return end
   if inside(self.answer_rect) then self:toggle_answer(); return end
+  if inside(self.blanks_rect) then self:toggle_blanks(); return end
   if inside(self.code_rect) then self:enter_code(); return end
   if inside(self.undo_rect) then self:stack_undo(); return end
   if inside(self.redo_rect) then self:stack_redo(); return end

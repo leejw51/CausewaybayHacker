@@ -189,6 +189,8 @@ return {
   -- PROTOCOL §4.11b — the answer, and what it costs.
   ["SOLVE  SHIFT-F7"] = "解答  SHIFT-F7",
   ["ANSWER"] = "なぞり書き",
+  ["BLANKS"] = "穴うめ",
+  ["TAB fills the blank"] = "TAB 穴をうめる",
   ["ESC done   F5 run   F2 format"] = "ESC 完了   F5 実行   F2 整形",
   ["FORMAT"] = "整形",
   ["CODE"] = "コード",

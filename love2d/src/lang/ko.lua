@@ -187,6 +187,8 @@ return {
   -- PROTOCOL §4.11b — the answer, and what it costs.
   ["SOLVE  SHIFT-F7"] = "정답  SHIFT-F7",
   ["ANSWER"] = "따라치기",
+  ["BLANKS"] = "빈칸 따라치기",
+  ["TAB fills the blank"] = "TAB 빈칸 채우기",
   ["ESC done   F5 run   F2 format"] = "ESC 완료   F5 실행   F2 정렬",
   ["FORMAT"] = "정렬",
   ["CODE"] = "코드",

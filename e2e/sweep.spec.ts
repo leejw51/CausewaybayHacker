@@ -379,6 +379,34 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   expect(await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length)).toBe(0);
   await shot(page, "64-answer-tabbed");
 
+  // BLANKS: the same answer with holes in it. The code is on the screen and
+  // only the gaps are the player's to type — so the buffer arrives mostly
+  // filled, with underscores where the words were taken out.
+  const blanks = await page.evaluate(() => window.__cwbCapture!.buttonAt("blanks"));
+  expect(blanks).not.toBeNull();
+  await page.mouse.click(blanks![0], blanks![1]);
+  await page.waitForTimeout(900);
+  const drill = await docText();
+  expect(drill.length).toBeGreaterThan(0);
+  // Something is filled in for you, and something is left to do.
+  expect(await ghosts()).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.body.innerText.includes("_"))).toBe(true);
+  await shot(page, "65-blanks");
+
+  // TAB fills the hole you are in; pressed until it stops, the drill is done
+  // and the buffer is the answer again.
+  for (let i = 0; i < 60 && (await ghosts()) > 0; i++) {
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(110);
+  }
+  await page.waitForTimeout(400);
+  expect(await ghosts()).toBe(0);
+  expect(await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length)).toBe(0);
+  await shot(page, "66-blanks-done");
+  // Back to plain ANSWER for the checks below.
+  await page.mouse.click(blanks![0], blanks![1]);
+  await page.waitForTimeout(500);
+
   // ANSWER shows the solution; it never writes it. Toggle off, type
   // something of the player's own, toggle back on: the writing stays.
   await page.mouse.click(answer![0], answer![1]);

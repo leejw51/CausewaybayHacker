@@ -86,6 +86,40 @@ add({ until_ = function(app)
       print(("mistake: wrong=%d bursts=%d"):format(s.answer_prog.wrong, #s.sparks.bursts))
       return true end, timeout = 5 })
 add({ shot = "A5-answer-mistake.png" })
+-- BLANKS: the same answer with holes in it. The code is on the screen and
+-- only the words are the player's to type.
+add({ click = function(app) local r = app.scene.code_rects.blanks; return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ until_ = function(app) return app.scene.blanks_on end, note = "BLANKS on", timeout = 10 })
+add({ wait = 0.5 })
+add({ until_ = function(app)
+      local s = app.scene
+      check(s.blanks ~= nil and #s.blanks > 0, "no holes were cut")
+      check(#s.editor:text() > 0, "the drill did not fill anything in for the player")
+      check(#s.editor:text() < #s.answer_text, "the drill left nothing to type")
+      local masked = table.concat(s.answer_lines, "\n")
+      check(masked:find("_", 1, true) ~= nil, "the ghost is not masking the holes")
+      print(("blanks: %d holes, buffer %d of %d, first hole at %d"):format(
+        #s.blanks, #s.editor:text(), #s.answer_text, s.blanks[1].from))
+      return true end, timeout = 5 })
+add({ shot = "A8-blanks.png" })
+-- TAB fills the hole you are in; pressed until it stops, the drill is done.
+add({ until_ = function(app)
+      for _ = 1, 80 do
+        local before = app.scene.editor:text()
+        app.scene:keypressed("tab", {})
+        app.scene:fill_blanks()
+        if app.scene.editor:text() == before then break end
+      end
+      check(app.scene.editor:text() == app.scene.answer_text,
+        "the drill did not play out to the answer: " .. string.format("%q", app.scene.editor:text()))
+      return true end, note = "TAB fills the blanks", timeout = 5 })
+add({ wait = 0.4 })
+add({ until_ = function(app)
+      check(app.scene.answer_prog.done, "the drill finished but the count does not say done")
+      print(("blanks done: %d/%d"):format(app.scene.answer_prog.matched, app.scene.answer_prog.total))
+      return true end, timeout = 5 })
+add({ shot = "A9-blanks-done.png" })
+
 -- DONE goes back to the quest, not to the map.
 add({ click = function(app) local r = app.scene.code_done_rect; return { r.x + r.w / 2, r.y + r.h / 2 } end })
 add({ until_ = function(app)

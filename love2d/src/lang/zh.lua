@@ -190,6 +190,8 @@ return {
   -- PROTOCOL §4.11b — the answer, and what it costs.
   ["SOLVE  SHIFT-F7"] = "答案  SHIFT-F7",
   ["ANSWER"] = "对照输入",
+  ["BLANKS"] = "填空",
+  ["TAB fills the blank"] = "TAB 填上空格",
   ["ESC done   F5 run   F2 format"] = "ESC 完成   F5 运行   F2 格式化",
   ["FORMAT"] = "格式化",
   ["CODE"] = "代码",

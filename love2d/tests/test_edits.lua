@@ -460,4 +460,64 @@ return function()
     T.nope(Quest.clears_for_answer("", starter), "and an empty buffer is not the starter")
     T.nope(Quest.clears_for_answer("", ""), "a quest with no starter clears nothing")
   end)
+
+  T.case("BLANKS cuts holes at words, and the fill keeps the prefix true", function()
+    local Quest = require("src.scenes.quest")
+    local answer = 'fn main() {\n    println!("hi");\n}\n'
+
+    -- Every hole is a whole word of the answer, never part of one.
+    local words = {}
+    local at = 1
+    while true do
+      local from, to = answer:find("[%a_][%w_]*", at)
+      if not from then break end
+      words[(from - 1) .. ":" .. to] = true
+      at = to + 1
+    end
+    for _, b in ipairs(Quest.answer_blanks(answer, 7)) do
+      T.ok(words[b.from .. ":" .. b.to], "a hole is a word, not a slice of one")
+    end
+
+    -- The same seed is the same drill, and there is always something to do.
+    local a = Quest.answer_blanks(answer, 3)
+    local b = Quest.answer_blanks(answer, 3)
+    T.eq(#a, #b, "the same seed gives the same number of holes")
+    for i = 1, #a do T.eq(a[i].from, b[i].from, "and the same holes") end
+    for _, seed in ipairs({ 1, 2, 3, 99, 12345 }) do
+      T.ok(#Quest.answer_blanks(answer, seed) > 0, "a drill always has a hole in it")
+    end
+
+    -- The mask hides the holes and nothing else, at the same width.
+    local blanks = { { from = 3, to = 7 } } -- `main`
+    local masked = Quest.mask_blanks(answer, blanks)
+    T.eq(#masked, #answer, "the mask does not change the shape of the program")
+    T.eq(masked:sub(4, 7), "____", "the hole is hidden")
+    T.eq(masked:sub(1, 3), "fn ", "and the rest of the line is not")
+
+    -- The fill types everything that is not the drill, and stops at a hole.
+    T.eq(Quest.blanks_fill("", answer, blanks), "fn ", "up to the hole")
+    T.eq(Quest.blanks_fill("fn ", answer, blanks), nil, "the hole is the player's")
+    T.eq(Quest.blanks_fill("fn ma", answer, blanks), nil, "mid-hole, still theirs")
+    T.eq(Quest.blanks_fill("fn main", answer, blanks), answer:sub(8), "then it carries on")
+    T.eq(Quest.blanks_fill("fn maim", answer, blanks), nil, "never past a divergence")
+
+    -- TAB gives the hole and only the hole.
+    T.eq(Quest.blank_completion("fn ", answer, blanks), "main", "the whole word")
+    T.eq(Quest.blank_completion("fn ma", answer, blanks), "in", "or what is left of it")
+    T.eq(Quest.blank_completion("fn main", answer, blanks), nil, "and nothing outside one")
+
+    -- Filling and TABbing in turn lands exactly on the answer.
+    local typed = ""
+    for _ = 1, 500 do
+      local add = Quest.blanks_fill(typed, answer, blanks)
+      if add then
+        typed = typed .. add
+      else
+        local hole = Quest.blank_completion(typed, answer, blanks)
+        if not hole then break end
+        typed = typed .. hole
+      end
+    end
+    T.eq(typed, answer, "the drill, played out, is the answer")
+  end)
 end
