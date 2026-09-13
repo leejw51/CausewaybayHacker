@@ -346,9 +346,17 @@ export class LandsScene implements Scene {
     // Capped to the same number of rows `plateHeight` budgeted for, with the
     // last one ended in an ellipsis so a cut sentence reads as cut rather than
     // as one that simply stops mid-thought.
+    // **Only the lines the plate actually has room for.** The cap used to be
+    // `BLURB_LINES` whatever the height, which is fine while every plate is
+    // tall enough for two — and on a phone, where all four lands share the
+    // column so that all four can be reached, it is not: the sentence ran
+    // past the plate's bottom edge and printed through the record. The
+    // record is the information and the sentence is flavour, so the sentence
+    // is what gives way.
+    const fits = Math.max(0, Math.floor((inner[3] - recH) / fonts.small.height));
     const blurb = capLines(
       wrap(fonts.small, BLURB[land](), inner[2]),
-      BLURB_LINES,
+      Math.min(BLURB_LINES, fits),
       (l) => width(fonts.small, l) <= inner[2],
     );
     const blurbH = blurb.length * fonts.small.height;
@@ -629,19 +637,36 @@ export class LandsScene implements Scene {
       //
       // `MIN_COL` is where a plate stops being able to hold its own sentence
       // in a sane number of lines; below it, one column and scroll instead.
-      const MIN_COL = Math.round(260 * s);
+      //
+      // **Lower on a phone, because there the alternative is worse.** One
+      // column of four on a phone is four plates so short that none of them
+      // has room for a mascot — and the mascot is most of what tells the
+      // lands apart at a glance. Two of two gives each plate half the height
+      // and half the width, which is a plate you can actually see somebody
+      // standing on. The sentence wraps narrower and is cut to fit, which it
+      // is built to do.
+      const phone = layout.isPhone();
+      const MIN_COL = Math.round((phone ? 150 : 260) * s);
       // The width the heights have to be measured against is decided by the
       // same rule `landGrid` uses, so ask it once for the shape, measure, then
       // ask again for the final geometry. The first call's heights are only
       // ever used to pick a column count, which does not depend on them.
       const shape = landGrid(f.left, LANDS.length, gap, MIN_COL, 0, 0, 0, 0);
+      // **On a phone every land is on screen, mascot or no mascot.**
+      // The floors below are "a plate tall enough to be worth looking at",
+      // and on a phone insisting on them made the column taller than the
+      // screen: two of the four lands were scrolled out of it, and — with
+      // no wheel and no arrow keys — a player had no way to bring them
+      // back. C++ and PYTHON had no hit box at all. A land you cannot
+      // reach is worse than a land drawn small, so here the plates take
+      // the fair share of the column and the mascot goes if it must.
       const grid = landGrid(
         f.left,
         LANDS.length,
         gap,
         MIN_COL,
-        this.plateHeight(s, shape.pw, 52),
-        this.plateHeight(s, shape.pw),
+        phone ? 0 : this.plateHeight(s, shape.pw, 52),
+        phone ? 0 : this.plateHeight(s, shape.pw),
         LANDS.indexOf(this.land),
         this.scroll,
       );
@@ -769,7 +794,17 @@ export class LandsScene implements Scene {
       // Two buttons stack under the category rows now: AUTO SELECT above
       // PLAYGROUND. Both are "somewhere other than a land plate to go", and
       // they are the same size because neither is the primary action here.
-      const rowsBottom = right[1] + right[3] - playH * 2 - gap * 3;
+      // **Side by side when the column cannot afford two rows of them.**
+      // A phone held sideways gives this panel about four hundred pixels,
+      // and three roads plus two full-width buttons do not fit in it: the
+      // buttons were drawn over HACKER, which is a road the player could
+      // then neither read nor reach. One row for the pair costs their
+      // captions and keeps the roads.
+      const floorH = fonts.button.height + Math.round(14 * s);
+      const needed = cats.length * (floorH + gap) + playH * 2 + gap * 3;
+      const pair = needed > right[3] - (rowsTop - right[1]);
+      const buttonBand = pair ? playH + gap * 2 : playH * 2 + gap * 3;
+      const rowsBottom = right[1] + right[3] - buttonBand;
       // The rows share what the column has. Both heights above are
       // preferences, not floors — including the finger floor: in a phone's
       // browser, with its own chrome taking a fifth of the screen, three
@@ -777,7 +812,6 @@ export class LandsScene implements Scene {
       // was a road nobody could see. A row shorter than a fingertip can
       // still be read and still be tapped; a row behind a button cannot.
       const share = Math.floor((rowsBottom - rowsTop) / cats.length) - gap;
-      const floorH = fonts.button.height + Math.round(14 * s);
       const rowH = Math.max(floorH, Math.min(minRowH, share));
 
       let y = rowsTop;
@@ -896,8 +930,18 @@ export class LandsScene implements Scene {
           : empty
             ? t("lands.empty")
             : `${c.cleared}/${c.total}  ★${c.stars}`;
-        const countBelow =
-          width(fonts.button, catName) + width(fonts.stationSm, count) + Math.round(16 * s) > tw;
+        // The count goes under the name when the two would touch — but only
+        // when the row is tall enough to hold a second line. In a short row
+        // (a phone held sideways, three roads and two buttons in four hundred
+        // pixels) there is no second line, and a count drawn into one is a
+        // count cut in half by the road underneath. The bar along the row
+        // still says how far along it is.
+        const oneLine =
+          width(fonts.button, catName) + width(fonts.stationSm, count) + Math.round(16 * s) <= tw;
+        const twoLines =
+          rowH >= fonts.button.height + fonts.stationSm.height + Math.round(20 * s);
+        const countBelow = !oneLine && twoLines;
+        const showCount = oneLine || twoLines;
         g.fillStyle = css(empty ? Theme.dim : Theme.cream);
         printf(g, fonts.button, catName, tx, titleY, tw, "left");
         // What the road is, from the bible. Only when the row is tall enough
@@ -924,16 +968,18 @@ export class LandsScene implements Scene {
         // Under the title, not across the row: the right of the row belongs to
         // the emblem now, and a count floating over it read as a caption for
         // the picture rather than as the score for the road.
-        g.fillStyle = css(empty ? Theme.dim : Theme.coin);
-        printf(
-          g,
-          fonts.stationSm,
-          count,
-          tx + Math.round(4 * s),
-          titleY + Math.round(2 * s) + (countBelow ? fonts.button.height + Math.round(2 * s) : 0),
-          tw,
-          countBelow ? "left" : "right",
-        );
+        if (showCount) {
+          g.fillStyle = css(empty ? Theme.dim : Theme.coin);
+          printf(
+            g,
+            fonts.stationSm,
+            count,
+            tx + Math.round(4 * s),
+            titleY + Math.round(2 * s) + (countBelow ? fonts.button.height + Math.round(2 * s) : 0),
+            tw,
+            countBelow ? "left" : "right",
+          );
+        }
         // The chevron that says a row is a door. It only exists while the row
         // is lit, and it nudges with the same value the row slides on.
         if (lit > 0.02 && !empty) {
@@ -978,15 +1024,17 @@ export class LandsScene implements Scene {
         fonts.button.size * 2,
         layout.minTouchH(),
       );
-      const abw = Math.max(aw, Math.round(right[2] * 0.4));
-      const aby = right[1] + right[3] - playH * 2 - gap;
+      const abw = pair ? Math.floor((right[2] - gap) / 2) : Math.max(aw, Math.round(right[2] * 0.4));
+      const aby = pair ? right[1] + right[3] - playH : right[1] + right[3] - playH * 2 - gap;
       const ahov = this.landBtns.hovered === "auto";
       pixBtn(g, fonts.button, right[0], aby, abw, playH, t("lands.autoSelect"), {
         hover: ahov,
         quiet: !ahov,
       });
-      noteBeside(g, fonts.small, this.autoNote ?? t("lands.autoNote"),
-        right[0] + abw + Math.round(12 * s), aby, right[2] - abw - Math.round(12 * s), playH);
+      if (!pair) {
+        noteBeside(g, fonts.small, this.autoNote ?? t("lands.autoNote"),
+          right[0] + abw + Math.round(12 * s), aby, right[2] - abw - Math.round(12 * s), playH);
+      }
       this.landBtns.add({
         id: "auto",
         rect: [right[0], aby, abw, playH],
@@ -1002,18 +1050,21 @@ export class LandsScene implements Scene {
       );
       // Painted here rather than through `Buttons.draw`: the land plates use
       // that list for hit boxes only, and nothing on this screen paints it.
-      const pbw = Math.max(pw, Math.round(right[2] * 0.4));
+      const pbw = pair ? right[2] - abw - gap : Math.max(pw, Math.round(right[2] * 0.4));
       const pby = right[1] + right[3] - playH;
+      const pbx = pair ? right[0] + abw + gap : right[0];
       const phov = this.landBtns.hovered === "playground";
-      pixBtn(g, fonts.button, right[0], pby, pbw, playH, t("lands.playground"), {
+      pixBtn(g, fonts.button, pbx, pby, pbw, playH, t("lands.playground"), {
         hover: phov,
         quiet: !phov,
       });
-      noteBeside(g, fonts.small, t("lands.playgroundNote"),
-        right[0] + pbw + Math.round(12 * s), pby, right[2] - pbw - Math.round(12 * s), playH);
+      if (!pair) {
+        noteBeside(g, fonts.small, t("lands.playgroundNote"),
+          right[0] + pbw + Math.round(12 * s), pby, right[2] - pbw - Math.round(12 * s), playH);
+      }
       this.landBtns.add({
         id: "playground",
-        rect: [right[0], pby, pbw, playH],
+        rect: [pbx, pby, pbw, playH],
         label: t("lands.playground"),
       });
 
