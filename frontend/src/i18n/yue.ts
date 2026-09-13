@@ -218,7 +218,7 @@ export const yue: Partial<Catalogue> = {
   "quest.fontDown": "細",
   "quest.fontUp": "大",
   "quest.code": "代碼",
-  "quest.leaveCode": "返回",
+  "quest.codeDone": "完成",
   "quest.fontSize": "碼嘅字大細 {percent}%",
   "quest.leaveMapTitle": "返地圖？",
   "quest.leaveLobbyTitle": "返大堂？",

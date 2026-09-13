@@ -221,7 +221,7 @@ export const cs: Partial<Catalogue> = {
   "quest.fontDown": "A-",
   "quest.fontUp": "A+",
   "quest.code": "KÓD",
-  "quest.leaveCode": "ZPĚT",
+  "quest.codeDone": "HOTOVO",
   "quest.fontSize": "velikost kódu {percent} %",
   "quest.leaveMapTitle": "ZPĚT NA MAPU?",
   "quest.leaveLobbyTitle": "ZPĚT DO HALY?",

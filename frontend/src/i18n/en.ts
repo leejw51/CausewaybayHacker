@@ -228,7 +228,7 @@ export const en = {
   "quest.fontDown": "A-",
   "quest.fontUp": "A+",
   "quest.code": "CODE",
-  "quest.leaveCode": "BACK",
+  "quest.codeDone": "DONE",
   "quest.fontSize": "code size {percent}%",
   "quest.leaveMapTitle": "BACK TO THE MAP?",
   "quest.leaveLobbyTitle": "BACK TO THE LOBBY?",

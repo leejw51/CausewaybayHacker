@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { expect, freshAccount, login, openSelectedNode, pickCategory, pickLand, test } from "./fixtures.js";
+import { expect, freshAccount, login, openSelectedNode, pickCategory, pickLand, sceneNow, test } from "./fixtures.js";
 
 const SHOTS = process.env.PHONE_SHOTS ?? "test-results/phone";
 mkdirSync(SHOTS, { recursive: true });
@@ -76,8 +76,13 @@ test("phone: the quest screen", async ({ page }) => {
   });
   console.log(`[phone] code mode ${JSON.stringify(focus)}`);
   expect(focus.rect[3]).toBeGreaterThan(500);
+  // DONE returns to the quest screen — and is still *signed in*. The header
+  // is not drawn in CODE mode, and its LOG OUT hit box used to outlive it in
+  // exactly this corner, so the button that ends a writing session logged
+  // the player out and landed them on the login screen.
   await page.mouse.click(focus.back![0], focus.back![1]);
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(900);
+  expect(await sceneNow(page)).toBe("quest");
   expect(await page.evaluate(() => window.__cwbCapture!.buttonAt("focus"))).not.toBeNull();
   await page.screenshot({ path: `${SHOTS}/05-back-from-code.png` });
   await page.keyboard.press("Escape");

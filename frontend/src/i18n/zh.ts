@@ -204,7 +204,7 @@ export const zh: Partial<Catalogue> = {
   "quest.fontDown": "小",
   "quest.fontUp": "大",
   "quest.code": "代码",
-  "quest.leaveCode": "返回",
+  "quest.codeDone": "完成",
   "quest.fontSize": "代码字号 {percent}%",
   "quest.leaveMapTitle": "回到地图吗？",
   "quest.leaveLobbyTitle": "回到大厅吗？",

@@ -1509,12 +1509,28 @@ export class QuestScene implements Scene {
     ];
   }
 
-  /** CODE mode: the editor, edge to edge, and BACK in the top right corner. */
+  /**
+   * CODE mode: the editor, edge to edge, and DONE in the top right corner.
+   *
+   * **DONE, not BACK.** The button has always returned to the quest screen —
+   * the brief, the bench, RUN and SUBMIT — but "BACK" on a screen whose only
+   * other exit leads to the map reads as leaving the quest, and nobody
+   * presses a button they think will throw their work away. The word names
+   * what it does: the writing is finished, put the tools back.
+   */
   private drawFocus(g: Ctx, s: number): void {
     const { layout } = this.app;
     const fonts = ensureFonts(s);
+    // **The header is not drawn here, so its hit box must not survive.**
+    // `header()` is what clears and re-sets `logoutRect`, and `App`'s pointer
+    // handler tests that rect *before* the scene sees the press. Left over
+    // from the last framed frame it sits exactly where DONE is — the top
+    // right corner — so the button that ends a writing session was logging
+    // the player out and landing them on the login screen.
+    this.app.logoutRect = null;
+    this.app.logoutHover = false;
     const pad = Math.round(6 * s);
-    const label = t("quest.leaveCode");
+    const label = t("quest.codeDone");
     const [bw, bh] = btnBox(fonts.stationSm, [label], 0, fonts.stationSm.size * 2, layout.minTouchH());
     const bx = layout.vw - pad - bw;
     const by = pad;

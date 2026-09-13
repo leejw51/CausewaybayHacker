@@ -306,6 +306,32 @@ test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async 
   }
 });
 
+test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ page }) => {
+  // The header is not drawn in CODE mode, and `app.logoutRect` is only ever
+  // cleared by `header()`. Left over from the previous frame it sits in the
+  // top right corner — under DONE — and `App`'s pointer handler tests it
+  // before the scene sees the press, so the button that ends a writing
+  // session logged the player out. On a desktop the chip carries the address
+  // as well as the word, which makes it wide enough to swallow DONE whole.
+  const account = freshAccount();
+  await login(page, account);
+  await pickLand(page, "rust");
+  await pickCategory(page, "basic");
+  await openSelectedNode(page);
+  const code = await page.evaluate(() => window.__cwbCapture!.buttonAt("focus"));
+  expect(code).not.toBeNull();
+  await page.mouse.click(code![0], code![1]);
+  await page.waitForTimeout(700);
+  await shot(page, "60-code-mode");
+  const done = await page.evaluate(() => window.__cwbCapture!.buttonAt("unfocus"));
+  expect(done).not.toBeNull();
+  await page.mouse.click(done![0], done![1]);
+  await page.waitForTimeout(900);
+  expect(await sceneNow(page)).toBe("quest");
+  expect(await page.evaluate(() => window.__cwbCapture!.buttonAt("focus"))).not.toBeNull();
+  await shot(page, "61-done-back-on-the-quest");
+});
+
 test("4b: AUTO SELECT with no failures says so and stays put", async ({ page }) => {
   const account = freshAccount();
   await signIn(page, account);

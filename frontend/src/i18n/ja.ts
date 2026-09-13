@@ -208,7 +208,7 @@ export const ja: Partial<Catalogue> = {
   "quest.fontDown": "小",
   "quest.fontUp": "大",
   "quest.code": "コード",
-  "quest.leaveCode": "戻る",
+  "quest.codeDone": "完了",
   "quest.fontSize": "コードの大きさ {percent}%",
   "quest.leaveMapTitle": "マップへ戻りますか？",
   "quest.leaveLobbyTitle": "ロビーへ戻りますか？",

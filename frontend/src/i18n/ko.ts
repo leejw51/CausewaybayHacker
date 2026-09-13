@@ -210,7 +210,7 @@ export const ko: Partial<Catalogue> = {
   "quest.fontDown": "가-",
   "quest.fontUp": "가+",
   "quest.code": "코드",
-  "quest.leaveCode": "돌아가기",
+  "quest.codeDone": "완료",
   "quest.fontSize": "코드 크기 {percent}%",
   "quest.leaveMapTitle": "지도로 돌아갈까요?",
   "quest.leaveLobbyTitle": "로비로 돌아갈까요?",
