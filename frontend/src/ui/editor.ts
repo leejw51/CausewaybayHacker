@@ -12,15 +12,26 @@
  * an autocomplete engine would be a second, wrong, opinion about code the
  * server is the judge of.
  */
-import { EditorState, type Extension } from "@codemirror/state";
 import {
+  EditorState,
+  StateEffect,
+  StateField,
+  type Extension,
+  type Range,
+} from "@codemirror/state";
+import {
+  Decoration,
   EditorView,
+  ViewPlugin,
+  WidgetType,
   keymap,
   lineNumbers,
   highlightActiveLine,
   highlightActiveLineGutter,
   drawSelection,
   rectangularSelection,
+  type DecorationSet,
+  type ViewUpdate,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import {
@@ -73,6 +84,121 @@ const retro = HighlightStyle.define([
   { tag: t.operator, color: hex(Theme.panel) },
   { tag: t.invalid, color: hex(Theme.red) },
 ]);
+
+/**
+ * ANSWER mode: the reference solution as ghost text, in the editor's own
+ * layout.
+ *
+ * **Inside CodeMirror, not behind it.** A second element under the editor
+ * would have to reproduce the gutter width, the line height and the padding
+ * exactly, and would drift apart from them at the first type-size change.
+ * These are decorations in the document's own flow, so they are aligned by
+ * construction: the rest of a line hangs off the end of what you have typed,
+ * and the lines you have not reached yet sit under the last one.
+ *
+ * What you typed that is *not* the answer is marked rather than hidden. The
+ * point of the mode is to notice the divergence and fix it.
+ */
+class GhostText extends WidgetType {
+  constructor(
+    readonly text: string,
+    readonly block: boolean,
+  ) {
+    super();
+  }
+  eq(other: GhostText): boolean {
+    return other.text === this.text && other.block === this.block;
+  }
+  toDOM(): HTMLElement {
+    const el = document.createElement(this.block ? "div" : "span");
+    el.className = "cwb-ghost";
+    el.textContent = this.text;
+    return el;
+  }
+  ignoreEvent(): boolean {
+    return false;
+  }
+}
+
+const setAnswer = StateEffect.define<string | null>();
+
+const answerField = StateField.define<string | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setAnswer)) return e.value;
+    return value;
+  },
+});
+
+function ghostFor(view: EditorView): DecorationSet {
+  const answer = view.state.field(answerField, false) ?? null;
+  if (answer === null) return Decoration.none;
+  const doc = view.state.doc;
+  const want = answer.split("\n");
+  const out: Range<Decoration>[] = [];
+  const shared = Math.min(doc.lines, want.length);
+  for (let i = 1; i <= shared; i++) {
+    const line = doc.line(i);
+    const target = want[i - 1];
+    let k = 0;
+    while (k < line.text.length && k < target.length && line.text[k] === target[k]) k++;
+    if (k < line.text.length) {
+      out.push(Decoration.mark({ class: "cwb-wrong" }).range(line.from + k, line.to));
+    }
+    if (k < target.length) {
+      out.push(
+        Decoration.widget({ widget: new GhostText(target.slice(k), false), side: 1 }).range(line.to),
+      );
+    }
+  }
+  if (want.length > doc.lines) {
+    const rest = want.slice(doc.lines).join("\n");
+    out.push(
+      Decoration.widget({ widget: new GhostText(rest, true), side: 1, block: true }).range(
+        doc.length,
+      ),
+    );
+  }
+  return Decoration.set(out, true);
+}
+
+const ghost = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = ghostFor(view);
+    }
+    update(u: ViewUpdate): void {
+      const changed = u.transactions.some((tr) => tr.effects.some((e) => e.is(setAnswer)));
+      if (u.docChanged || changed || u.viewportChanged) this.decorations = ghostFor(u.view);
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
+
+/**
+ * How far the typed text still *is* the answer, and whether it has stopped
+ * being it.
+ *
+ * A prefix, deliberately: ANSWER mode is a typing target read from the top,
+ * and "the first place the two part company" is the thing a player needs
+ * pointed at. Pure, so `tests/editor.test.ts` can hold the rules.
+ */
+export interface AnswerProgress {
+  /** Characters typed that match the answer from the start. */
+  matched: number;
+  /** Characters typed past that point — the divergence, if any. */
+  wrong: number;
+  /** Every character of the answer, typed exactly. */
+  done: boolean;
+  total: number;
+}
+
+export function answerProgress(typed: string, answer: string): AnswerProgress {
+  let k = 0;
+  while (k < typed.length && k < answer.length && typed[k] === answer[k]) k++;
+  return { matched: k, wrong: typed.length - k, done: typed === answer, total: answer.length };
+}
 
 const base: Extension = [
   lineNumbers(),
@@ -144,6 +270,8 @@ export class Editor {
       doc,
       extensions: [
         base,
+        answerField,
+        ghost,
         // A phone's keyboard, told this is code. Without these iOS
         // capitalises the first letter of `fn main`, turns `"hello"` into
         // “hello” and autocorrects `println` — and every one of those is a
@@ -200,6 +328,21 @@ export class Editor {
    */
   get focused(): boolean {
     return this.view.hasFocus;
+  }
+
+  /**
+   * Show (or clear) the answer as ghost text. The buffer is not touched:
+   * what the player has typed is theirs, and the answer is a target behind
+   * it rather than a replacement for it.
+   */
+  setAnswer(text: string | null): void {
+    this.view.dispatch({ effects: setAnswer.of(text) });
+  }
+
+  /** Where the caret is on the page, for an effect thrown at it. */
+  caretClient(): [number, number] | null {
+    const c = this.view.coordsAtPos(this.view.state.selection.main.head);
+    return c ? [c.left, (c.top + c.bottom) / 2] : null;
   }
 
   focus(): void {

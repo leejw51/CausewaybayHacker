@@ -9,7 +9,7 @@
  * source that was already tidy.
  */
 import { describe, expect, it } from "vitest";
-import { narrowEdit } from "../src/ui/editor";
+import { answerProgress, narrowEdit } from "../src/ui/editor";
 
 const apply = (cur: string, e: { from: number; to: number; insert: string }) =>
   cur.slice(0, e.from) + e.insert + cur.slice(e.to);
@@ -64,5 +64,49 @@ describe("narrowEdit", () => {
       const e = narrowEdit(cur, next)!;
       expect(apply(cur, e)).toBe(next);
     }
+  });
+});
+
+/**
+ * ANSWER mode's arithmetic.
+ *
+ * The rule is a *prefix*: the mode is a typing target read from the top, and
+ * what a player needs pointed at is the first place their text stops being
+ * the answer. Everything the screen does — the count, the red mark, the three
+ * bursts — is read off these three numbers, so they are the thing worth
+ * holding still.
+ */
+describe("answerProgress", () => {
+  const answer = "fn main() {\n    println!(\"hi\");\n}\n";
+
+  it("an empty buffer has typed none of it and got none of it wrong", () => {
+    const p = answerProgress("", answer);
+    expect(p).toEqual({ matched: 0, wrong: 0, done: false, total: answer.length });
+  });
+
+  it("counts the characters that are the answer, from the start", () => {
+    expect(answerProgress("fn main", answer).matched).toBe(7);
+    expect(answerProgress("fn main", answer).wrong).toBe(0);
+    expect(answerProgress("fn main", answer).done).toBe(false);
+  });
+
+  it("stops counting at the divergence and calls the rest wrong", () => {
+    const p = answerProgress("fn maim() {", answer);
+    expect(p.matched).toBe(6);
+    expect(p.wrong).toBe(5);
+  });
+
+  it("is done only on every character, exactly", () => {
+    expect(answerProgress(answer, answer).done).toBe(true);
+    expect(answerProgress(answer.trimEnd(), answer).done).toBe(false);
+    expect(answerProgress(answer + " ", answer).done).toBe(false);
+    expect(answerProgress(answer + " ", answer).wrong).toBe(1);
+  });
+
+  it("a line finished is a newline crossing, which is what the effect fires on", () => {
+    const before = answerProgress("fn main() {", answer);
+    const after = answerProgress("fn main() {\n", answer);
+    expect(after.matched).toBeGreaterThan(before.matched);
+    expect(answer.slice(before.matched, after.matched)).toContain("\n");
   });
 });

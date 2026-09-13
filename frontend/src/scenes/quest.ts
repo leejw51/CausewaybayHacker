@@ -13,8 +13,8 @@
  */
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, width, wrap } from "../engine/text";
-import { css, Theme } from "../engine/theme";
-import { btnBox, rowsIn, clipped, fill, inRect, pixBtn, well, type Ctx, type Rect } from "../engine/ui";
+import { css, Theme, type RGBA } from "../engine/theme";
+import { btnBox, rowsIn, clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
 import {
   arriving,
   Buttons,
@@ -26,8 +26,10 @@ import {
   type Stack,
 } from "../ui/chrome";
 import { CLOCK, clockPulse, reducedMotion, seconds, Tween } from "../engine/motion";
-import { Editor, MAIN_FILE } from "../ui/editor";
+import { Editor, MAIN_FILE, answerProgress, type AnswerProgress } from "../ui/editor";
+import { burstPlan } from "../engine/burst";
 import { Overlay } from "../ui/overlay";
+import { Sparks } from "../ui/sparks";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import type { Attempt, Category, EditState, Land, Quest, RunStage } from "../net/protocol";
@@ -347,6 +349,28 @@ export class QuestScene implements Scene {
    * one tap away.
    */
   private focus = false;
+  /**
+   * ANSWER mode: the reference solution behind what the player types.
+   *
+   * It is the same answer SOLVE fetches and it is priced the same way
+   * (§4.11b — a star), because it is the same knowledge. What is different
+   * is what happens to it: SOLVE *replaces* the buffer and the session is
+   * over; ANSWER puts it behind the caret as a target and the player types
+   * every character themselves. That is the difference between being told
+   * and remembering, and remembering is what this game is for.
+   */
+  private answerText: string | null = null;
+  private answerOn = false;
+  private answerBusy = false;
+  private answerProg: AnswerProgress = { matched: 0, wrong: 0, done: false, total: 0 };
+  /**
+   * Effects thrown at the caret — on their own layer *over* the editor.
+   *
+   * Both game canvases are under `#overlay` and the editor's face is all but
+   * opaque, so a burst painted on the game canvas would land behind the code
+   * and be seen by nobody. See `ui/sparks.ts`.
+   */
+  private sparks: Sparks | null = null;
 
   constructor(
     private readonly app: App,
@@ -410,6 +434,9 @@ export class QuestScene implements Scene {
       // starts the idle timer that eventually takes a copy.
       this.editor = new Editor(this.land, this.opened, () => this.touched());
       this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
+      // After the editor, so it is painted over it. It is empty until ANSWER
+      // is on and something happens worth looking at.
+      this.sparks = new Sparks(this.app.overlay, this.app.layout);
       queueMicrotask(() => this.editor?.focus());
       // Deliberately *not* inside this try. The stack is an addition to the
       // bench and a server without it must not make the quest itself look
@@ -431,9 +458,11 @@ export class QuestScene implements Scene {
     this.offs.length = 0;
     this.cancelPush();
     this.overlay?.destroy();
+    this.sparks?.destroy();
     this.editor?.destroy();
     this.editor = null;
     this.overlay = null;
+    this.sparks = null;
   }
 
   // -- actions -------------------------------------------------------------
@@ -710,6 +739,107 @@ export class QuestScene implements Scene {
     }
   }
 
+  /**
+   * ANSWER on, ANSWER off. The first press pays for the answer; every press
+   * after it is free, because the star is spent on knowing, not on looking.
+   */
+  private async toggleAnswer(): Promise<void> {
+    if (!this.quest || !this.editor || this.answerBusy) return;
+    if (this.answerOn) {
+      this.answerOn = false;
+      this.editor.setAnswer(null);
+      this.app.chip.select();
+      return;
+    }
+    if (this.answerText === null) {
+      this.answerBusy = true;
+      try {
+        const res = await this.app.client.request("quest.solve", { quest_id: this.quest.id });
+        this.quest.hints_used = res.hints_used;
+        this.answerText = res.source;
+      } catch (e) {
+        // The same two situations `solve` distinguishes, said the same way:
+        // an interview withholds the answer on purpose, and an older server
+        // does not have it at all, and the wire cannot tell them apart.
+        const code = e instanceof WireError ? e.payload.code : null;
+        this.error =
+          code === "not_found"
+            ? t("quest.noSolve")
+            : code
+              ? playerText(code)
+              : t("quest.solveSilent");
+        this.notice = code === "not_found";
+        this.app.chip.fail();
+        return;
+      } finally {
+        this.answerBusy = false;
+      }
+    }
+    this.answerOn = true;
+    this.editor.setAnswer(this.answerText);
+    this.answerProg = answerProgress(this.editor.source, this.answerText);
+    this.editor.focus();
+    this.app.chip.coin();
+  }
+
+  /**
+   * What the last keystroke did to the target, as something to look at.
+   *
+   * Three moments, and only the *moments* — a burst on every keystroke while
+   * a line is wrong would be noise, and noise is what a player stops seeing.
+   * The divergence fires once, when it opens; a line fires when it closes;
+   * and the whole answer fires once, at the end.
+   */
+  private answerTick(): void {
+    if (!this.answerOn || this.answerText === null || !this.editor) return;
+    const was = this.answerProg;
+    const now = answerProgress(this.editor.source, this.answerText);
+    this.answerProg = now;
+    const at = this.caretVirtual();
+    if (!at) return;
+    if (now.done && !was.done) {
+      // Every character, typed. The one big one.
+      this.spark(at, 70, Theme.admit);
+      this.app.chip.coin();
+      return;
+    }
+    if (now.wrong > was.wrong || now.matched < was.matched) {
+      // **The divergence *growing*, not merely existing.** A quest opens with
+      // `// your code here` in the buffer, which is already not the answer —
+      // so "wrong where it was right before" would never fire on the very
+      // screen it is for. Each keystroke that takes you further from the
+      // target gets its own small burst, at the caret, where the fix is.
+      this.spark(at, 10, Theme.red);
+      this.app.chip.fail();
+      return;
+    }
+    if (was.wrong > 0 && now.wrong === 0) {
+      // Back on the target. Worth as much as finishing a line, and the
+      // moment a player most wants told.
+      this.spark(at, 20, Theme.cyan);
+      this.app.chip.blip();
+      return;
+    }
+    if (now.matched > was.matched && this.answerText.slice(was.matched, now.matched).includes("\n")) {
+      this.spark(at, 16, Theme.coin);
+      this.app.chip.blip();
+    }
+  }
+
+  private caretVirtual(): [number, number] | null {
+    const c = this.editor?.caretClient();
+    if (!c) return null;
+    return this.app.layout.toVirtual(c[0], c[1]);
+  }
+
+  /** One burst, in one colour, at a point. */
+  private spark(at: [number, number], n: number, colour: RGBA): void {
+    const plan = burstPlan(at[0], at[1], n);
+    for (const p of plan.particles) p.color = colour;
+    for (const r of plan.rings) r.color = colour;
+    this.sparks?.add(plan, this.t);
+  }
+
   private async reset(): Promise<void> {
     if (!this.quest || !this.editor) return;
     try {
@@ -837,6 +967,7 @@ export class QuestScene implements Scene {
    * entry.
    */
   private touched(): void {
+    this.answerTick();
     if (this.editGone) return;
     this.cancelPush();
     this.pushTimer = window.setTimeout(() => {
@@ -1177,6 +1308,9 @@ export class QuestScene implements Scene {
       case "unfocus":
         this.focus = false;
         break;
+      case "answer":
+        void this.toggleAnswer();
+        break;
       case "run":
         void this.run();
         break;
@@ -1385,6 +1519,7 @@ export class QuestScene implements Scene {
 
     this.buttons.draw(g, this.compactMode ? fonts.stationSm : fonts.button);
     this.bar.draw(g, fonts.stationSm);
+    this.sparks?.draw(this.t);
     if (this.error) {
       // A bar rather than a loose line: the message crosses both panels, and
       // bare text laid over a panel border is unreadable at the seam.
@@ -1530,22 +1665,78 @@ export class QuestScene implements Scene {
     this.app.logoutRect = null;
     this.app.logoutHover = false;
     const pad = Math.round(6 * s);
-    const label = t("quest.codeDone");
-    const [bw, bh] = btnBox(fonts.stationSm, [label], 0, fonts.stationSm.size * 2, layout.minTouchH());
-    const bx = layout.vw - pad - bw;
-    const by = pad;
-    const top = by + bh + pad;
+    const f = fonts.stationSm;
+    const done = t("quest.codeDone");
+    const [dw, dh] = btnBox(f, [done], 0, f.size * 2, layout.minTouchH());
+    const bx = layout.vw - pad - dw;
+
+    // The four controls the hands actually use while writing, and ANSWER.
+    // Everything else this screen has — the brief, the log, the two
+    // irreversible ones — is one tap away on the quest screen. CODE is for
+    // writing, and a row that carried all twelve would be the crowding this
+    // mode exists to escape.
+    const steps = editControls(this.edit, this.editBusy);
+    const items = [
+      {
+        id: "run",
+        label: this.stage === "idle" ? t("quest.run") : "…",
+        dim: this.stage !== "idle",
+        primary: this.stage === "idle",
+      },
+      { id: "format", label: t("quest.format"), dim: this.formatting },
+      { id: "undo", label: t("quest.undo"), dim: !steps.undo },
+      { id: "redo", label: t("quest.redo"), dim: !steps.redo },
+      // `strong` while it is on: a different colour rather than a louder one,
+      // because ANSWER is a *mode* the screen is in, not the thing to press.
+      { id: "answer", label: t("quest.answer"), dim: this.answerBusy, strong: this.answerOn },
+    ];
+    const rowW = Math.max(f.size * 4, bx - pad * 2);
+    const rows = rowsIn(
+      f,
+      items.map((i) => i.label),
+      rowW,
+      layout.minTouchH(),
+    );
+    const rowGap = Math.round(f.size * 0.5);
+    const bandH = rows * dh + (rows - 1) * rowGap;
+    // The strip these sit on. Same treatment as the quest screen's toolbar
+    // and for the same reason: this is a row of small controls over a
+    // photograph of a street, and a lit window behind a label is a label
+    // nobody can read.
+    const strip = pad + Math.max(bandH, dh) + Math.round(3 * s) + f.height + Math.round(4 * s);
+    fill(g, Theme.ink, 0, 0, layout.vw, strip, 0.82);
+    fill(g, Theme.dim, 0, strip, layout.vw, 1, 0.5);
+    this.bar.row(f, [pad, pad, rowW, bandH], items, layout.minTouchH());
+    this.bar.add({ id: "unfocus", rect: [bx, pad, dw, dh], label: done });
+    this.bar.draw(g, f);
+
+    // The file — and, in ANSWER mode, how much of it is already yours. The
+    // count is the whole scoreboard: characters you have typed that *are*
+    // the answer, out of the answer.
+    const statusY = pad + Math.max(bandH, dh) + Math.round(3 * s);
+    const prog = this.answerProg;
+    const on = this.answerOn && this.answerText !== null;
+    const tail = !on
+      ? ""
+      : prog.done
+        ? `   ${t("quest.answerMatched")}`
+        : prog.wrong > 0
+          ? `   ${t("quest.answerDiverged")}`
+          : "";
+    const status = on
+      ? `${MAIN_FILE[this.land]}   ${prog.matched} / ${prog.total}${tail}`
+      : MAIN_FILE[this.land];
+    g.fillStyle = css(
+      !on ? Theme.dim : prog.done ? Theme.admit : prog.wrong > 0 ? Theme.red : Theme.coin,
+    );
+    printf(g, f, status, pad + Math.round(8 * s), statusY, layout.vw - pad * 2, "left");
+
+    const top = strip + Math.round(6 * s);
     well(g, pad, top, layout.vw - pad * 2, layout.vh - top - pad);
     const editorRect: Rect = [pad + 4, top + 4, layout.vw - pad * 2 - 8, layout.vh - top - pad - 8];
     if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     else this.overlay?.hide();
-    // The file's name where the panel title was, so the screen still says
-    // what is being edited.
-    g.fillStyle = css(Theme.dim);
-    printf(g, fonts.stationSm, MAIN_FILE[this.land], pad + Math.round(8 * s),
-      by + Math.round((bh - fonts.stationSm.height) / 2), bx - pad * 2, "left");
-    pixBtn(g, fonts.stationSm, bx, by, bw, bh, label, { hover: this.bar.hovered === "unfocus" });
-    this.bar.add({ id: "unfocus", rect: [bx, by, bw, bh], label });
+    this.sparks?.draw(this.t);
   }
 
   /**

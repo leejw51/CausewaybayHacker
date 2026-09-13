@@ -124,6 +124,27 @@ body {
 .cwb-editor .cm-content ::selection {
   background: rgba(248, 120, 168, 0.35) !important;
 }
+/* The spark layer: over the editor, and untouchable. `#overlay > *` makes
+   every child absolute and clickable; this one opts out of the second half. */
+.cwb-sparks {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none !important;
+}
+
+/* ANSWER mode. The target is faint enough to type over and solid enough to
+   read; what has been typed *instead of* it is marked in the failure colour,
+   because the whole point of the mode is to see the divergence and fix it. */
+.cwb-editor .cwb-ghost {
+  color: rgba(252, 236, 200, 0.32);
+  white-space: pre-wrap;
+}
+.cwb-editor .cwb-wrong {
+  background: rgba(216, 40, 0, 0.32);
+  border-radius: 2px;
+}
+
 .cwb-hidden {
   display: none !important;
 }

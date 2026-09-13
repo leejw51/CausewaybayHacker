@@ -325,6 +325,68 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   await shot(page, "60-code-mode");
   const done = await page.evaluate(() => window.__cwbCapture!.buttonAt("unfocus"));
   expect(done).not.toBeNull();
+  // The controls a writing session actually uses are on this screen too.
+  const onCode = await buttonIds(page);
+  for (const id of ["run", "format", "undo", "redo", "answer", "unfocus"]) {
+    expect(onCode).toContain(id);
+  }
+
+  // ANSWER: the reference solution as ghost text *behind* what is typed —
+  // the buffer is untouched, the ghost is in the editor's own layout, and
+  // what has been typed instead of the answer is marked.
+  const answer = await page.evaluate(() => window.__cwbCapture!.buttonAt("answer"));
+  // The *document*, with the ghost taken back out. `editorText` scrapes the
+  // rendered lines, and the ghost is rendered inside them on purpose — which
+  // is exactly why the buffer has to be read without it here.
+  const docText = () =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll(".cm-line"))
+        .map((line) => {
+          const copy = line.cloneNode(true) as HTMLElement;
+          copy.querySelectorAll(".cwb-ghost").forEach((gh) => gh.remove());
+          return (copy.textContent ?? "").replace(/\u200b/g, "");
+        })
+        .join("\n"),
+    );
+  const before = await docText();
+  await page.mouse.click(answer![0], answer![1]);
+  await expect
+    .poll(async () => page.evaluate(() => document.querySelectorAll(".cwb-ghost").length), {
+      timeout: 30_000,
+      message: "waiting for the answer ghost",
+    })
+    .toBeGreaterThan(0);
+  // ANSWER shows the solution; it does not write it. SOLVE is the one that
+  // replaces the buffer, and the two must not be confused.
+  expect(await docText()).toBe(before);
+  expect(await editorText(page)).not.toBe(before);
+  await shot(page, "62-answer-ghost");
+
+  // A character that is not the answer is marked, not swallowed.
+  await page.keyboard.press("Control+Home");
+  await page.keyboard.type("zz");
+  await page.waitForTimeout(500);
+  expect(
+    await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length),
+  ).toBeGreaterThan(0);
+  await shot(page, "63-answer-diverged");
+
+  // The effects are painted on their own layer *over* the editor, because
+  // both game canvases are under the overlay and the editor's face is all
+  // but opaque. A burst on the game canvas would be a burst nobody sees.
+  const sparks = await page.evaluate(() => {
+    const el = document.querySelector(".cwb-sparks") as HTMLCanvasElement | null;
+    if (!el) return null;
+    const ed = document.querySelector(".cwb-editor");
+    return {
+      over: !!(ed && el.compareDocumentPosition(ed) & Node.DOCUMENT_POSITION_PRECEDING),
+      clicks: getComputedStyle(el).pointerEvents,
+    };
+  });
+  expect(sparks).not.toBeNull();
+  expect(sparks!.over).toBe(true);
+  expect(sparks!.clicks).toBe("none");
+
   await page.mouse.click(done![0], done![1]);
   await page.waitForTimeout(900);
   expect(await sceneNow(page)).toBe("quest");
