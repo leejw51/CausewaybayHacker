@@ -659,8 +659,16 @@ export class LandsScene implements Scene {
       LANDS.forEach((land, i) => {
         const { x: px, y: py } = grid.origins[i];
         this.drawLandPlate(g, [px, py, grid.pw, h], land, land === this.land);
-        // The hit box is where the plate *is*, which is the scrolled position.
-        this.landBtns.add({ id: `land:${land}`, rect: [px, py, grid.pw, h], label: "" });
+        // The hit box is where the plate *is*, which is the scrolled position
+        // — **cut to the column**, as the paint is. A plate scrolled past the
+        // column's end is invisible, and on a phone it lies under the
+        // category panel; `pointer` tests the plates first, so an uncut box
+        // there took the tap meant for BASIC and switched the land instead.
+        const top = Math.max(py, ly);
+        const bottom = Math.min(py + h, ly + lh);
+        if (bottom > top) {
+          this.landBtns.add({ id: `land:${land}`, rect: [px, top, grid.pw, bottom - top], label: "" });
+        }
       });
       g.restore();
 

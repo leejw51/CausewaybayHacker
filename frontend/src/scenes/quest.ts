@@ -330,6 +330,14 @@ export class QuestScene implements Scene {
   private fontMul = readNumberPref(FONT_KEY, 1, FONT_MIN, FONT_MAX);
   /** Where the toolbar was this frame, so the panels start under it. */
   private barH = 0;
+  /**
+   * The narrow-touch register. On a phone the full toolbar wraps to three
+   * rows and the bench's eight buttons, each a finger tall, stack one to a
+   * row — and the editor, the thing the screen is for, was left one line
+   * tall under them. Decided from a measurement of the toolbar rather than
+   * from a device class: a phone held sideways, or a tablet, is not narrow.
+   */
+  private compactMode = false;
 
   constructor(
     private readonly app: App,
@@ -1298,7 +1306,11 @@ export class QuestScene implements Scene {
     // not have, and the last thing in them lands outside it.
     const pad = Math.round(10 * s);
     const toolW = layout.vw - pad * 2;
-    const toolRows = rowsIn(fonts.stationSm, this.toolLabels(), toolW, layout.minTouchH());
+    const fullRows = rowsIn(fonts.stationSm, this.toolLabels(false), toolW, layout.minTouchH());
+    this.compactMode = layout.touch && fullRows > 1;
+    const toolRows = this.compactMode
+      ? rowsIn(fonts.stationSm, this.toolLabels(), toolW, layout.minTouchH())
+      : fullRows;
     const toolRowH = Math.max(layout.minTouchH(), fonts.stationSm.height + 20);
     const toolGap = Math.round(fonts.stationSm.size * 0.5);
     this.barH = toolRows * toolRowH + (toolRows - 1) * toolGap;
@@ -1344,7 +1356,7 @@ export class QuestScene implements Scene {
     });
     arriving(g, f, "right", this.benchIn, () => this.drawWorkbench(g, right, accent));
 
-    this.buttons.draw(g, fonts.button);
+    this.buttons.draw(g, this.compactMode ? fonts.stationSm : fonts.button);
     this.bar.draw(g, fonts.stationSm);
     if (this.error) {
       // A bar rather than a loose line: the message crosses both panels, and
@@ -1377,8 +1389,13 @@ export class QuestScene implements Scene {
    * PLAYGROUND on the map screen, recorded in decisions.md as a class rather
    * than as one bug.
    */
-  private toolItems(): Array<{ id: string; label: string; dim?: boolean }> {
+  private toolItems(compact = this.compactMode): Array<{ id: string; label: string; dim?: boolean }> {
     const noOutput = !this.runResult && this.log.lines.length === 0;
+    // In the compact register the clipboard chips and LOBBY go: on a phone
+    // the keyboard has its own paste, the map is one tap away, and three
+    // rows of toolbar were the editor's rows.
+    const keep = (id: string) =>
+      !compact || id === "back" || id === "stack" || id === "fontdown" || id === "fontup";
     return [
       // Leaving, first and leftmost: the top-left of a screen is where a
       // person looks for the way back out of it.
@@ -1396,11 +1413,11 @@ export class QuestScene implements Scene {
       { id: "stack", label: this.side ? t("quest.briefSide") : t("quest.briefTop") },
       { id: "fontdown", label: t("quest.fontDown"), dim: this.fontMul <= FONT_MIN + 0.001 },
       { id: "fontup", label: t("quest.fontUp"), dim: this.fontMul >= FONT_MAX - 0.001 },
-    ];
+    ].filter((i) => keep(i.id));
   }
 
-  private toolLabels(): string[] {
-    return this.toolItems().map((i) => i.label);
+  private toolLabels(compact = this.compactMode): string[] {
+    return this.toolItems(compact).map((i) => i.label);
   }
 
   /**
@@ -1628,10 +1645,13 @@ export class QuestScene implements Scene {
     const { layout } = this.app;
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
+    // The bench's face: the button face, or the smaller chrome face in the
+    // compact register, where eight labels a finger tall each took a row.
+    const bench = this.compactMode ? fonts.stationSm : fonts.button;
     const label = MAIN_FILE[this.land];
     const inner = titledPanel(g, rect, `${label}   ${this.stageLabel()}`, accent);
 
-    const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
+    const btnH = Math.max(layout.minTouchH(), bench.height + 20);
     const consoleH = this.consoleOpen
       ? Math.round(inner[3] * (layout.isPortrait() ? 0.36 : 0.32))
       : 0;
@@ -1640,18 +1660,18 @@ export class QuestScene implements Scene {
     // the one control on this screen that spends an attempt, and a control that
     // can be hit on the way to RUN is a control that will be.
     const [subW] = btnBox(
-      fonts.button,
+      bench,
       [t("quest.submit")],
       0,
-      fonts.button.size * 2,
+      bench.size * 2,
       layout.minTouchH(),
     );
-    const gap = Math.round(fonts.button.size * 1.6);
+    const gap = Math.round(bench.size * 1.6);
     const rowW = inner[2] - subW - gap;
     // Measured, not assumed. At 1280 across, RESET wraps onto a second line,
     // and a band sized for one row put that button straight through the run
     // report underneath it — the report lost its first line to a button.
-    const rowGap = Math.round(fonts.button.size * 0.5);
+    const rowGap = Math.round(bench.size * 0.5);
     // The row's labels, in order, written once. The measurement below and the
     // layout further down are handed the *same* list for the reason this file
     // already carries a scar for: two lists that can disagree about how many
@@ -1661,7 +1681,7 @@ export class QuestScene implements Scene {
     // than it did when there were five.
     const rowItems = this.benchItems();
     const rows = rowsIn(
-      fonts.button,
+      bench,
       rowItems.map((i) => i.label),
       rowW,
       layout.minTouchH(),
@@ -1720,7 +1740,7 @@ export class QuestScene implements Scene {
     } else this.overlay?.hide();
 
     const rowY = inner[1] + editorH + Math.round(8 * s);
-    this.buttons.row(fonts.button, [inner[0], rowY, rowW, bandH], rowItems, layout.minTouchH());
+    this.buttons.row(bench, [inner[0], rowY, rowW, bandH], rowItems, layout.minTouchH());
     this.buttons.add({
       id: "submit",
       rect: [inner[0] + inner[2] - subW, rowY, subW, btnH],
