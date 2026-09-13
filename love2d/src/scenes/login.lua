@@ -312,7 +312,10 @@ local function stack()
 end
 
 --- One line of label at `size`, as a row.
-local function text_row(put, text, size, color, gap)
+local function text_row(put, text, size, color, gap, width)
+  -- At the size that fits the panel when a width is given: `your wallet
+  -- is your account` ran off the panel's edge at the largest type step.
+  if width then size = UI.fitSize(text, width, size, 5) end
   return put(UI.lineHeight(size), function(y)
     UI.text(text, 0, y, size, color)
   end, { gap = gap })
@@ -334,7 +337,7 @@ end
 
 local function field_box(y, w, h, label, shown, focused, hint)
   local lh = UI.lineHeight(8)
-  UI.text(label, 0, y, 8, Theme.withAlpha(Theme.cream, 0.75))
+  UI.text(label, 0, y, UI.fitSize(label, w, 8, 5), Theme.withAlpha(Theme.cream, 0.75))
   local by = y + lh + 4
   UI.setColor(Theme.void, 0.85)
   love.graphics.rectangle("fill", 0, by, w, h)
@@ -481,7 +484,8 @@ function Login:rows_signin(inner)
   local dim = Theme.withAlpha(Theme.cream, 0.55)
 
   text_row(put, I18n.t("SIGN IN"), 16, Theme.coin, 4)
-  text_row(put, I18n.t("your wallet is your account"), 8, Theme.withAlpha(Theme.cream, 0.7), 14)
+  text_row(put, I18n.t("your wallet is your account"), 8, Theme.withAlpha(Theme.cream, 0.7), 14,
+    inner)
 
   self.field_rects = self.field_rects or {}
   local function field(index, label, shown, hint, gap)
@@ -670,7 +674,8 @@ function Login:rows_no_library(inner)
   local lh8, lh7 = UI.lineHeight(8), UI.lineHeight(7)
 
   text_row(put, I18n.t("SIGN IN"), 16, Theme.coin, 4)
-  text_row(put, I18n.t("your wallet is your account"), 8, Theme.withAlpha(Theme.cream, 0.7), 12)
+  text_row(put, I18n.t("your wallet is your account"), 8, Theme.withAlpha(Theme.cream, 0.7), 12,
+    inner)
 
   -- The red box, measured from what goes in it.
   local body = UI.wrap(

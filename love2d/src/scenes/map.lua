@@ -589,6 +589,23 @@ function Map:draw_header()
     wanted = wanted - tab_tag - q_tag
     tab_tag, q_tag = 0, 0
   end
+  -- Then the type steps down, land and category together, before any
+  -- width is squeezed: squeezing first gave the four land names most of
+  -- the row and left the category tabs to shrink to nothing.
+  while wanted > vw and land_size > 5 do
+    land_size = land_size - 1
+    cat_size = math.max(4, cat_size - 1)
+    label_h = UI.lineHeight(land_size)
+    land_w = 0
+    for _, land in ipairs(LANDS) do
+      land_w = math.max(land_w, mascot + 8 + UI.textWidth(I18n.t(Land.name(land)), land_size) + 10)
+    end
+    cat_w = 0
+    for _, category in ipairs(CATEGORIES) do
+      cat_w = math.max(cat_w, UI.textWidth(I18n.t(category:upper()), cat_size) + 16)
+    end
+    wanted = 10 + #LANDS * (land_w + 6) + tab_tag + #CATEGORIES * (cat_w + 4) + q_tag + 10
+  end
   if wanted > vw then
     local squeeze = (vw - 20 - #LANDS * 6 - #CATEGORIES * 4)
       / math.max(1, #LANDS * land_w + #CATEGORIES * cat_w)
@@ -609,8 +626,12 @@ function Map:draw_header()
     love.graphics.setColor(1, 1, 1, 1)
     Assets.sprite(Land.mascot(land), x + 4 + mascot / 2, by + bh - 4, mascot,
       { alpha = on and 1 or 0.45 })
+    -- At the size that fits the button, before the scissor cuts: `RU` and
+    -- `C+` were what the largest type step left of the land names.
+    local name = I18n.t(Land.name(land))
+    local fit = UI.fitSize(name, land_w - mascot - 12, land_size, 3)
     love.graphics.setScissor(x, by, land_w, bh)
-    UI.text(I18n.t(Land.name(land)), x + mascot + 6, by + (bh - label_h) / 2, land_size,
+    UI.text(name, x + mascot + 6, by + (bh - UI.lineHeight(fit)) / 2, fit,
       on and Theme.ink or Theme.withAlpha(Theme.cream, 0.55))
     love.graphics.setScissor()
     self.land_rects[land] = { x = x, y = by, w = land_w, h = bh }
@@ -633,9 +654,10 @@ function Map:draw_header()
     love.graphics.rectangle("line", x + 1, cy + 1, cat_w - 2, ch - 2)
     love.graphics.setColor(1, 1, 1, 1)
     local label = I18n.t(category:upper())
+    local fit = UI.fitSize(label, cat_w - 8, cat_size, 3)
     love.graphics.setScissor(x, cy, cat_w, ch)
-    UI.text(label, x + (cat_w - UI.textWidth(label, cat_size)) / 2,
-      cy + (ch - UI.lineHeight(cat_size)) / 2, cat_size,
+    UI.text(label, x + (cat_w - UI.textWidth(label, fit)) / 2,
+      cy + (ch - UI.lineHeight(fit)) / 2, fit,
       on and Theme.ink or Theme.withAlpha(Theme.cream, 0.6))
     love.graphics.setScissor()
     self.category_rects[category] = { x = x, y = cy, w = cat_w, h = ch }
@@ -866,8 +888,23 @@ function Map:draw_node_card(node)
   local title = ("%02d  %s"):format(node.node, node.title or "")
   local title_lines = math.max(1, #UI.wrap(title, title_w, 11))
   local id_lines = math.max(1, #UI.wrap(node.quest_id or "", title_w, 7))
-  local h = 10 + title_lines * title_h + 2 + id_lines * id_h + 6 + state_h + 6
-    + math.max(meta_h, UI.lineHeight(8)) + 6 + id_h + 8
+  -- The two rows under the id each hold a left thing and a right thing —
+  -- the state and the stars, the difficulty and the attempts. When the
+  -- pair would touch, the right thing takes a row of its own: `OPEN` was
+  -- printed through `STARS` and `DIFFICULTY` through `0 ATTEMPTS` at the
+  -- largest type step.
+  local star = math.max(10, math.floor(UI.lineHeight(7) * 0.8))
+  local pip = math.max(6, math.floor(star * 0.6))
+  local state_w = UI.textWidth(I18n.t((node.state or "?"):upper()), 9)
+  local stars_w = UI.textWidth(I18n.t("STARS") .. " ", 7) + 3 * (star + 3)
+  local split3 = state_w + stars_w + 16 > title_w
+  local diff_w = UI.textWidth(I18n.t("DIFFICULTY") .. " ", 7) + UI.pipsWidth(pip)
+  local attempts = I18n.t("%d ATTEMPTS", node.attempts or 0)
+  local split4 = diff_w + UI.textWidth(attempts, 8) + 16 > title_w
+  local row3_h = state_h + (split3 and (meta_h + 4) or 0)
+  local row4_h = math.max(meta_h, UI.lineHeight(8)) + (split4 and (UI.lineHeight(8) + 4) or 0)
+  local h = 10 + title_lines * title_h + 2 + id_lines * id_h + 6 + row3_h + 6
+    + row4_h + 6 + id_h + 8
   local x = portrait and 12 or (vw - w - 16)
   local y = vh - h - UI.footerHeight() - 10
 
@@ -884,7 +921,9 @@ function Map:draw_node_card(node)
   local r1 = y + 10
   local r2 = r1 + title_lines * title_h + 2
   local r3 = r2 + id_lines * id_h + 6
-  local r4 = r3 + state_h + 6
+  local r3b = split3 and (r3 + state_h + 4) or r3
+  local r4 = r3 + row3_h + 6
+  local r4b = split4 and (r4 + math.max(meta_h, UI.lineHeight(8)) + 4) or r4
   UI.text(title, x + 12, r1, 11, color, "left", title_w)
   UI.text(node.quest_id or "", x + 12, r2, 7, Theme.withAlpha(color, 0.6),
     "left", title_w)
@@ -894,18 +933,15 @@ function Map:draw_node_card(node)
   UI.text(I18n.t((node.state or "?"):upper()), x + 12, r3, 9, state_color)
   -- Difficulty is a segmented bar; stars are stars. Two scales, two shapes,
   -- and a row of text between them (design review §4).
-  local star = math.max(10, math.floor(UI.lineHeight(7) * 0.8))
-  local pip = math.max(6, math.floor(star * 0.6))
   local dl = I18n.t("DIFFICULTY") .. " "
   UI.text(dl, x + 12, r4, 7, Theme.withAlpha(color, 0.6))
   UI.pips(x + 12 + UI.textWidth(dl, 7), r4, node.difficulty or 1, pip)
-  local attempts = I18n.t("%d ATTEMPTS", node.attempts or 0)
-  UI.text(attempts, x + w - 12 - boss_w - UI.textWidth(attempts, 8), r4, 8,
-    Theme.withAlpha(color, 0.7))
+  local ax = split4 and (x + 12) or (x + w - 12 - boss_w - UI.textWidth(attempts, 8))
+  UI.text(attempts, ax, r4b, 8, Theme.withAlpha(color, 0.7))
   local sl = I18n.t("STARS") .. " "
-  UI.text(sl, x + w - 12 - boss_w - 3 * (star + 3) - UI.textWidth(sl, 7), r3, 7,
-    Theme.withAlpha(color, 0.6))
-  UI.stars(x + w - 12 - boss_w - 3 * (star + 3), r3, node.stars or 0, star)
+  local stx = split3 and (x + 12 + UI.textWidth(sl, 7)) or (x + w - 12 - boss_w - 3 * (star + 3))
+  UI.text(sl, stx - UI.textWidth(sl, 7), r3b, 7, Theme.withAlpha(color, 0.6))
+  UI.stars(stx, r3b, node.stars or 0, star)
 
   -- `requires` is the suggested route, and saying so is the whole point: it
   -- answers "where next" without ever being a refusal.

@@ -337,7 +337,10 @@ function Playground:panes()
         h = h - math.floor(h * 0.52) - pad },
       { x = pad, y = top, w = 0, h = 0 }
   end
-  local list_w = math.min(190, math.floor(vw * 0.18))
+  -- Wide enough for its own title at the current type, never more than
+  -- a third of the canvas: at the largest type step 18 % was six letters.
+  local list_w = math.min(math.floor(vw * 0.3),
+    math.max(190, UI.textWidth(I18n.t("SNIPPETS"), 8) + 40))
   local rest = vw - list_w - pad * 3
   return
     { x = pad + list_w + pad, y = top, w = math.floor(rest * 0.56), h = vh - top - bottom },
@@ -400,7 +403,8 @@ function Playground:draw_snippets(rect)
     fill = Theme.withAlpha(Theme.navy, 0.9),
     tint = self.focus == "snippets" and Theme.coin or Theme.cyan,
   })
-  UI.text(I18n.t("SNIPPETS"), rect.x + 10, rect.y + 8, 8, Theme.withAlpha(Theme.cream, 0.7))
+  UI.text(I18n.t("SNIPPETS"), rect.x + 10, rect.y + 8,
+    UI.fitSize(I18n.t("SNIPPETS"), rect.w - 20, 8, 5), Theme.withAlpha(Theme.cream, 0.7))
   local y = rect.y + 8 + UI.lineHeight(8) + 6
   -- A row is the label's own height plus air: `20` was the row at a 7 px
   -- label, and at the doubled ladder the names printed over each other.
@@ -428,9 +432,11 @@ function Playground:draw_snippets(rect)
   if not self.snippets then
     UI.text("…", rect.x + 10, y, 8, Theme.dim)
   elseif #self.snippets == 0 then
-    UI.text(I18n.t("nothing saved yet"), rect.x + 10, y, 7, Theme.withAlpha(Theme.cream, 0.45))
+    UI.paragraph(I18n.t("nothing saved yet"), rect.x + 10, y, rect.w - 20, 7,
+      Theme.withAlpha(Theme.cream, 0.45))
   end
-  UI.text(I18n.t("CTRL-N new"), rect.x + 10, rect.y + rect.h - 8 - UI.lineHeight(7), 7,
+  UI.text(I18n.t("CTRL-N new"), rect.x + 10, rect.y + rect.h - 8 - UI.lineHeight(7),
+    UI.fitSize(I18n.t("CTRL-N new"), rect.w - 20, 7, 4),
     Theme.withAlpha(Theme.cream, 0.4))
 end
 
@@ -520,6 +526,9 @@ function Playground:draw_code(rect)
   for _, label in ipairs({ "RUN  F5", "RUNNING…", "FORMAT F2" }) do
     bw = math.max(bw, UI.textWidth(label, 8) + 20)
   end
+  -- Never wider than half the pane: the pair used to run off its left
+  -- edge, and `UI.button` fits the label to whatever width this leaves.
+  bw = math.min(bw, math.floor((rect.w - 24) / 2))
   local field_w = math.max(60, rect.w - 12 - (bw * 2 + 16))
   local fy = sy + math.floor((row_h - field_h) / 2)
   UI.setColor(Theme.void, 0.9)
@@ -584,7 +593,7 @@ function Playground:draw_output(rect)
   -- replace (18, 10, 12) were written against 7 and 8 px type, and at the
   -- doubled ladder each line was printed through the one above it.
   local small = UI.lineHeight(7) + 2
-  y = y + UI.text(head, rect.x + 10, y, 8, colour, "left", rect.w - 20) + 4
+  y = y + UI.paragraph(head, rect.x + 10, y, rect.w - 20, 8, colour) + 4
 
   if self.problem then
     for _, line in ipairs(UI.wrap(self.problem, rect.w - 24, 7)) do

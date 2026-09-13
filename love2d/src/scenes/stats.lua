@@ -207,10 +207,14 @@ function Stats:draw_summary(x, y, w)
     cells[1][2] = ("%d/%d"):format(sm.cleared or 0, sm.total or 0)
     while fig > 7 and UI.textWidth(cells[1][2], fig) > cw - 8 do fig = fig - 1 end
   end
+  -- And the captions at the size all five fit their tiles: `CLEARED` was
+  -- wrapping to `CLEARE / D` over its own figure.
+  local cap = 7
+  for _, cell in ipairs(cells) do cap = math.min(cap, UI.fitSize(cell[1], cw - 6, 7, 5)) end
   local fig_top = y + 10 + cap_h + 2 + (fig_h - UI.lineHeight(fig)) / 2
   for i, cell in ipairs(cells) do
     local cx = x + (i - 1) * cw
-    UI.text(cell[1], cx, y + 10, 7, Theme.withAlpha(Theme.cream, 0.55), "center", cw)
+    UI.text(cell[1], cx, y + 10, cap, Theme.withAlpha(Theme.cream, 0.55), "center", cw)
     UI.text(cell[2], cx, fig_top, fig, Theme.cream, "center", cw)
   end
   UI.bar(x + 14, y + 10 + cap_h + 2 + fig_h + 10, w - 28, 9,
@@ -307,10 +311,10 @@ function Stats:draw_mistakes(x, y, w, h, scroll)
     return
   end
 
-  cy = cy + UI.text(I18n.t("YOUR MISTAKES — THIS IS THE CURRICULUM"), x + 14, cy, 9,
-    Theme.brick, "left", w - 28) + 4
-  cy = cy + UI.text(I18n.t("a kind leaves the drill after five clean submits"),
-    x + 14, cy, 7, Theme.withAlpha(Theme.cream, 0.5), "left", w - 28) + 12
+  cy = cy + UI.paragraph(I18n.t("YOUR MISTAKES — THIS IS THE CURRICULUM"), x + 14, cy,
+    w - 28, 9, Theme.brick) + 4
+  cy = cy + UI.paragraph(I18n.t("a kind leaves the drill after five clean submits"),
+    x + 14, cy, w - 28, 7, Theme.withAlpha(Theme.cream, 0.5)) + 12
 
   if not self.mistakes then
     UI.text(self.errors["stats.mistakes"] and self.errors["stats.mistakes"].player
@@ -411,12 +415,12 @@ function Stats:draw_mistake(x, y, w, m)
   y = y + math.max(22, UI.lineHeight(7) + 10, note_h + 8)
 
   if m.concepts and #m.concepts > 0 then
-    y = y + UI.text(I18n.t("drill: %s", table.concat(m.concepts, ", ")), x + 22, y, 7,
-      Theme.withAlpha(Theme.cyan, 0.85), "left", w - 44) + 3
+    y = y + UI.paragraph(I18n.t("drill: %s", table.concat(m.concepts, ", ")), x + 22, y,
+      w - 44, 7, Theme.withAlpha(Theme.cyan, 0.85)) + 3
   end
   if m.example_quest_id then
-    y = y + UI.text(I18n.t("last seen on %s", tostring(m.example_quest_id)), x + 22, y, 7,
-      Theme.withAlpha(Theme.cream, 0.4), "left", w - 44) + 2
+    y = y + UI.paragraph(I18n.t("last seen on %s", tostring(m.example_quest_id)), x + 22, y,
+      w - 44, 7, Theme.withAlpha(Theme.cream, 0.4)) + 2
   end
   return y
 end

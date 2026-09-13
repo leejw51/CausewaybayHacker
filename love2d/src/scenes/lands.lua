@@ -233,14 +233,35 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
   -- card, and `printf` then wraps the suffix onto a second line that the
   -- blurb is printed through.
   local title = I18n.t("%s LAND", Land.name(key))
-  local title_size = 14
-  while title_size > 9 and UI.textWidth(title, title_size) > w - pad * 2 do
-    title_size = title_size - 1
-  end
-  local title_h = UI.lineHeight(title_size)
+  local title_size = UI.fitSize(title, w - pad * 2, 14, 5)
+  -- Two lines when even the smallest title is wider than the card, and the
+  -- head is measured for both: a wrapped title was printed through the
+  -- rows under it.
+  local title_lines = UI.wrap(title, w - pad * 2, title_size)
+  local title_h = UI.lineHeight(title_size) * math.max(1, #title_lines)
   local rows = land and #land.categories or 3
+  -- The row's type: 9, or the first size under it at which the widest
+  -- category name and its count share the row. At the largest type step
+  -- in a landscape card `ADVANCED 0/17` is twice the card's width at 9.
+  local sprite_size = 34
+  local row_room = w - pad * 2 - sprite_size - 8 - 26 - 8
+  local row_size = 9
+  local show_count = true
+  for _, cat in ipairs(land and land.categories or {}) do
+    local probe = I18n.t(cat.category:upper()) .. "  " .. ("%d/%d"):format(cat.cleared, cat.total)
+    row_size = math.min(row_size, UI.fitSize(probe, row_room, 9, 5))
+    -- When the floor still cannot hold both, the count goes and the bar
+    -- under the name carries the progress on its own.
+    if UI.textWidth(probe, row_size) > row_room then show_count = false end
+  end
+  if not show_count then
+    row_size = 9
+    for _, cat in ipairs(land and land.categories or {}) do
+      row_size = math.min(row_size, UI.fitSize(I18n.t(cat.category:upper()), row_room, 9, 5))
+    end
+  end
   -- A row is its own type plus a bar and air, never less than the sprite.
-  local row_h = math.max(UI.lineHeight(9) + 20, 32)
+  local row_h = math.max(UI.lineHeight(row_size) + 20, 32)
   local rows_h = rows * row_h
 
   -- **The blurb is measured, not assumed to be one line.** In landscape the
@@ -253,17 +274,31 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
 
   local head_h = title_h + 2 + blurb_h
   local free = h - pad * 2 - rows_h - head_h - 6
+  -- The blurb is the first thing to go when the card cannot hold the
+  -- mascot, the title, the blurb and the rows: at the largest type step
+  -- in a 720-tall landscape window it cannot, and the rows were printed
+  -- through the blurb and the title through the rows.
+  if free < 48 and #blurb_lines > 0 then
+    blurb_lines = {}
+    blurb_h = 0
+    head_h = title_h + 2
+    free = h - pad * 2 - rows_h - head_h - 6
+  end
   -- The mascot takes the slack, and the block sits a little above centre in
   -- what is left — a portrait card is tall enough that a bottom-anchored
   -- stack leaves a hole in the middle of it.
-  local mascot = math.max(48, math.min(h * 0.42, free))
+  -- And when even that leaves no room, the mascot gives way before the
+  -- rows do: a 48 px floor under it pushed the title into the first row.
+  local mascot = free >= 48 and math.max(48, math.min(h * 0.42, free)) or math.max(0, free)
   local top = y + pad + math.max(0, (free - mascot) * 0.45)
 
   local bob = Anim.bob(t, { amount = selected and 3 or 1.5, phase = Land.phase(key) })
   Assets.sprite(Land.mascot(key), x + w / 2, top + mascot + bob, mascot)
 
   local ty = top + mascot + 6
-  UI.text(title, x, ty, title_size, tint, "center", w)
+  for i, line in ipairs(title_lines) do
+    UI.text(line, x, ty + (i - 1) * UI.lineHeight(title_size), title_size, tint, "center", w)
+  end
   for i, line in ipairs(blurb_lines) do
     UI.text(line, x, ty + title_h + 2 + (i - 1) * UI.lineHeight(8), 8,
       Theme.withAlpha(Theme.cream, 0.7), "center", w)
@@ -271,7 +306,7 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
 
   local row = y + h - pad - rows_h
   if land then
-    local sprite_size = math.min(row_h - 6, 34)
+    sprite_size = math.min(row_h - 6, 34)
     for i, cat in ipairs(land.categories) do
       local color = cat.open and Theme.cream or Theme.dim
       local sprite = ("mascot_%s_%s"):format(key, cat.category)
@@ -282,12 +317,14 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
 
       local label_x = x + pad + sprite_size + 8
       local count = ("%d/%d"):format(cat.cleared, cat.total)
-      local count_w = UI.textWidth(count, 9)
+      local count_w = UI.textWidth(count, row_size)
       local badge = 26
-      UI.text(I18n.t(cat.category:upper()), label_x, row + 3, 9, color)
-      UI.text(count, x + w - pad - badge - count_w, row + 3, 9, color)
+      UI.text(I18n.t(cat.category:upper()), label_x, row + 3, row_size, color)
+      if show_count then
+        UI.text(count, x + w - pad - badge - count_w, row + 3, row_size, color)
+      end
 
-      local bar_y = row + 6 + UI.lineHeight(9)
+      local bar_y = row + 6 + UI.lineHeight(row_size)
       UI.bar(label_x, bar_y, x + w - pad - badge - 6 - label_x, 5,
         cat.total > 0 and cat.cleared / cat.total or 0,
         cat.open and Theme.admit or Theme.dim)

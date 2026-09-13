@@ -888,9 +888,14 @@ function Quest:draw()
   local cluster = self.quest and (UI.textWidth(I18n.t("DIFFICULTY") .. " ", 7)
     + math.max(UI.pipsWidth(math.max(6, math.floor(math.max(10, math.floor(UI.lineHeight(7) * 0.8)) * 0.6))),
       3 * (math.max(10, math.floor(UI.lineHeight(7) * 0.8)) + 3)) + 24) or 0
+  -- And at the size that fits that room, before the scissor: `THE FARE B`
+  -- is not a title.
+  local title_room = math.max(40, vw - cluster - 12) - 12
+  local title_size = UI.fitSize(title, title_room, 13, 7)
+  local id_size = UI.fitSize(self.quest_id or "", title_room, 7, 4)
   love.graphics.setScissor(0, 0, math.max(40, vw - cluster - 12), head)
-  UI.text(title, 12, row1, 13, tint)
-  UI.text(self.quest_id or "", 12, row2, 7, Theme.withAlpha(Theme.cream, 0.55))
+  UI.text(title, 12, row1 + (UI.lineHeight(13) - UI.lineHeight(title_size)) / 2, title_size, tint)
+  UI.text(self.quest_id or "", 12, row2, id_size, Theme.withAlpha(Theme.cream, 0.55))
   love.graphics.setScissor()
   self:draw_clock(vw)
 
@@ -997,6 +1002,10 @@ function Quest:draw_brief(rect, tint)
   local y = rect.y + 10 - self.brief_scroll
   -- The text column, in pixels: the panel minus its padding.
   local column = rect.w - 24
+  -- The prose at 8, or the first size under it that puts fourteen
+  -- characters on a line: a brief column eight characters wide at the
+  -- largest type step in landscape wrapped `tram-stop` as `tram-sto` / `p`.
+  local prose = UI.fitSize(("M"):rep(14), column, 8, 5)
   local indent = column - 10
 
   if self.error then
@@ -1013,13 +1022,13 @@ function Quest:draw_brief(rect, tint)
     -- Korean interface is what a Korean programmer's editor looks like, and
     -- `refresh` asks again the moment the language changes (see `update`).
     if self.quest.story and self.quest.story ~= "" then
-      for _, line in ipairs(UI.wrap(self.quest.story, column, 8)) do
-        y = y + UI.text(line, x, y, 8, Theme.withAlpha(Theme.coin, 0.9)) + 3
+      for _, line in ipairs(UI.wrap(self.quest.story, column, prose)) do
+        y = y + UI.text(line, x, y, prose, Theme.withAlpha(Theme.coin, 0.9)) + 3
       end
       y = y + 8
     end
-    for _, line in ipairs(UI.wrap(self.quest.brief or "", column, 8)) do
-      y = y + UI.text(line, x, y, 8, Theme.cream) + 3
+    for _, line in ipairs(UI.wrap(self.quest.brief or "", column, prose)) do
+      y = y + UI.text(line, x, y, prose, Theme.cream) + 3
     end
     y = y + 10
 
@@ -1035,9 +1044,9 @@ function Quest:draw_brief(rect, tint)
     -- A `("…"):format(…)` call, which is why the sweep that found every
     -- `I18n.t` site walked past it: it does not look like a string being
     -- drawn until you read the line. Given a width for the same reason.
-    y = y + UI.text(I18n.t("TESTS  match %s   %d hidden",
-      tostring(tests.match or "?"), tests.hidden_count or 0), x, y, 8,
-      Theme.withAlpha(Theme.cream, 0.6), "left", indent) + 6
+    y = y + UI.paragraph(I18n.t("TESTS  match %s   %d hidden",
+      tostring(tests.match or "?"), tests.hidden_count or 0), x, y, indent, 8,
+      Theme.withAlpha(Theme.cream, 0.6)) + 6
     for _, case in ipairs(tests.visible or {}) do
       y = y + UI.text("· " .. tostring(case.name), x, y, 8, Theme.cream) + 2
       if case.stdin and case.stdin ~= "" then
@@ -1449,12 +1458,21 @@ function Quest:draw_editor(rect, tint)
   -- Singular and plural as two translatable strings, the same as the streak
   -- on the stats screen. One "%d samples" for both reads "1 samples" in the
   -- source language, which is the language that has no excuse.
-  UI.text(self.run_unsupported and I18n.t("not on this server")
-      or (visible == 1 and I18n.t("%d sample", 1) or I18n.t("%d samples", visible)),
-    rx, by - cap, 7, Theme.withAlpha(self.run_unsupported and Theme.dim or Theme.cyan, 0.9))
-  -- Under the SUBMIT button, so it gets the button's width and no more.
-  UI.text(hidden > 0 and I18n.t("+%d hidden", hidden) or I18n.t("all cases"),
-    sx, by - cap, 7, Theme.withAlpha(Theme.coin, 0.8), "left", bw)
+  -- Each caption gets its button's width and no more, at the size that
+  -- fits it: "1 sample" ran into "all cases" and "cases" was printed over
+  -- SUBMIT when the buttons were narrower than the captions.
+  local run_cap = self.run_unsupported and I18n.t("not on this server")
+    or (visible == 1 and I18n.t("%d sample", 1) or I18n.t("%d samples", visible))
+  local sub_cap = hidden > 0 and I18n.t("+%d hidden", hidden) or I18n.t("all cases")
+  local cap_size = math.min(UI.fitSize(run_cap, bw - 4, 7, 5), UI.fitSize(sub_cap, bw - 4, 7, 5))
+  -- Clipped to the button's column rather than wrapped: a caption that
+  -- still does not fit at the floor would otherwise wrap onto the button.
+  love.graphics.setScissor(rx, by - cap, bw, cap)
+  UI.text(run_cap, rx, by - cap, cap_size,
+    Theme.withAlpha(self.run_unsupported and Theme.dim or Theme.cyan, 0.9))
+  love.graphics.setScissor(sx, by - cap, bw, cap)
+  UI.text(sub_cap, sx, by - cap, cap_size, Theme.withAlpha(Theme.coin, 0.8))
+  love.graphics.setScissor()
 
   -- **What SOLVE costs, said before it is pressed.** Under its own button, in
   -- the same caption row and the same register as `+2 hidden`: revealing the

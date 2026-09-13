@@ -181,7 +181,43 @@ function UI.wrap(text, width, size)
   return lines
 end
 
+--- The largest authored size at or under `size` at which `text` fits
+--- `width` on one line, never under `floor`.
+---
+--- **This is what "font size doesn't break layout" costs at the top of the
+--- ladder.** At step 4 an authored 8 is 40 px a character, and `ADVANCED`
+--- alone is wider than a landscape land card. Every screen that draws a
+--- label into a slot it does not own — a button, a tab, a tile caption —
+--- asks this first, so the type gives way one step at a time before the
+--- label is printed through its neighbour or out of its box.
+function UI.fitSize(text, width, size, floor)
+  size = size or 8
+  floor = floor or 5
+  while size > floor and UI.textWidth(text, size) > width do
+    size = size - 1
+  end
+  return size
+end
+
+--- A paragraph, wrapped to `width` and drawn line by line. Returns the
+--- height it took, so a caller can advance by what was drawn rather than by
+--- one line — which is how "drill: …" was printed through "last seen on …"
+--- on the stats screen.
+function UI.paragraph(text, x, y, width, size, color, max_lines)
+  local lines = UI.wrap(text, width, size)
+  local step = UI.lineHeight(size) + 2
+  local n = max_lines and math.min(#lines, max_lines) or #lines
+  for i = 1, n do
+    UI.text(lines[i], x, y + (i - 1) * step, size, color)
+  end
+  return math.max(0, n * step - 2)
+end
+
 --- A button. `state` is "normal" | "hot" | "disabled".
+---
+--- The label is drawn at the largest size at or under `size` that fits the
+--- button: a label wider than its button used to wrap inside it, and the
+--- second half was printed through the bottom edge (`SOL` / `VE`).
 function UI.button(x, y, w, h, label, state, size)
   local fill = Theme.panel
   local ink = Theme.ink
@@ -196,7 +232,7 @@ function UI.button(x, y, w, h, label, state, size)
   love.graphics.setLineWidth(2)
   UI.setColor(Theme.ink)
   love.graphics.rectangle("line", x + 1, y + 1, w - 2, h - 2)
-  size = size or math.max(8, math.floor(h * 0.34))
+  size = UI.fitSize(label, w - 8, size or math.max(8, math.floor(h * 0.34)), 3)
   local font = Assets.font(Layout.ui(size))
   love.graphics.setFont(font)
   UI.setColor(ink)
@@ -714,8 +750,12 @@ function UI.toast(text, alpha)
   -- The box is measured from the type rather than fixed at 24 px: the type
   -- size is now a player setting, and a toast that kept a hard height would
   -- clip its own message at the larger steps.
-  local h = font:getHeight() + 12
+  -- Wrapped to the canvas, and as tall as the lines that makes: at the
+  -- largest type step a welcome is two lines, and one line's box showed
+  -- the first over the second.
   local w = math.min(Layout.vw - 40, font:getWidth(text) + 24)
+  local lines = UI.wrap(text, w - 24, size)
+  local h = #lines * font:getHeight() + 12
   local x = (Layout.vw - w) / 2
   local y = Layout.vh - UI.footerHeight() - h - 20
   UI.setColor(Theme.ink, 0.85 * alpha)
@@ -725,7 +765,9 @@ function UI.toast(text, alpha)
   love.graphics.rectangle("line", x + 1, y + 1, w - 2, h - 2)
   love.graphics.setFont(font)
   UI.setColor(Theme.cream, alpha)
-  love.graphics.printf(text, x, y + (h - font:getHeight()) / 2, w, "center")
+  for i, line in ipairs(lines) do
+    love.graphics.printf(line, x, y + 6 + (i - 1) * font:getHeight(), w, "center")
+  end
   love.graphics.setColor(1, 1, 1, 1)
 end
 
