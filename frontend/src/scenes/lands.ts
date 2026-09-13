@@ -190,6 +190,36 @@ const CAT_LINE: Record<Category, () => string> = {
   hacker: () => t("lands.hackerBlurb"),
 };
 
+/**
+ * A caption beside a button: one line when it fits, two when the button is
+ * tall enough, and cut with an ellipsis rather than left to run into the
+ * caption under it — which is what "the stage beating you most" did to
+ * "nothing here is scored" in a landscape window.
+ */
+function noteBeside(
+  g: Ctx,
+  font: ReturnType<typeof ensureFonts>["small"],
+  text: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
+  if (w < font.height * 3) return;
+  const lines = wrap(font, text, w);
+  // Two lines at most beside a button, however tall the button: three
+  // lines of caption beside a one-line label reads as a paragraph.
+  const fit = Math.max(1, Math.min(lines.length, 2, Math.floor(h / font.height)));
+  const use = lines.slice(0, fit);
+  if (lines.length > fit) use[fit - 1] = use[fit - 1].replace(/.{0,2}$/u, "…");
+  g.fillStyle = css(Theme.cream, 0.55);
+  let ly = y + Math.round((h - use.length * font.height) / 2);
+  for (const line of use) {
+    printf(g, font, line, x, ly, w, "left");
+    ly += font.height;
+  }
+}
+
 export class LandsScene implements Scene {
   readonly name = "lands";
   readonly mood = "lands" as const;
@@ -723,7 +753,11 @@ export class LandsScene implements Scene {
       const minRowH = Math.max(layout.minTouchH(), Math.round(fonts.button.height + 52 * s));
       // The scratchpad lives under the three roads, with its own band of air,
       // because it is not a fourth road: nothing there is scored.
-      const playH = Math.max(layout.minTouchH(), fonts.button.height + 20);
+      const playH = Math.max(
+        layout.minTouchH(),
+        fonts.button.height + 20,
+        fonts.small.height * 2 + Math.round(4 * s),
+      );
       // Two buttons stack under the category rows now: AUTO SELECT above
       // PLAYGROUND. Both are "somewhere other than a land plate to go", and
       // they are the same size because neither is the primary action here.
@@ -837,11 +871,23 @@ export class LandsScene implements Scene {
         const tw = Math.max(Math.round(120 * s), textW - Math.round(28 * s));
         const lineH = fonts.small.height;
         const titleY = y + Math.round(12 * s);
+        // The name and the count share a line only while both fit: "POKROČILÉ"
+        // ran into its "0/17" in Czech, so the count drops under the name
+        // when the two would touch.
+        const catName = t(`map.${c.category}` as "map.basic");
+        const count = missing
+          ? t("lands.notInstalled")
+          : empty
+            ? t("lands.empty")
+            : `${c.cleared}/${c.total}  ★${c.stars}`;
+        const countBelow =
+          width(fonts.button, catName) + width(fonts.stationSm, count) + Math.round(16 * s) > tw;
         g.fillStyle = css(empty ? Theme.dim : Theme.cream);
-        printf(g, fonts.button, t(`map.${c.category}` as "map.basic"), tx, titleY, tw, "left");
+        printf(g, fonts.button, catName, tx, titleY, tw, "left");
         // What the road is, from the bible. Only when the row is tall enough
         // to hold it — in a short portrait window the count is what matters.
-        const lineY = titleY + fonts.button.height + Math.round(6 * s);
+        const lineY =
+          titleY + fonts.button.height + Math.round(6 * s) + (countBelow ? fonts.stationSm.height : 0);
         // Only the lines that fit inside the row. In portrait the text column
         // is narrow and this wraps to four; a row that let the fourth spill
         // over its own bottom edge was the first thing the eye found.
@@ -866,15 +912,11 @@ export class LandsScene implements Scene {
         printf(
           g,
           fonts.stationSm,
-          missing
-            ? t("lands.notInstalled")
-            : empty
-              ? t("lands.empty")
-              : `${c.cleared}/${c.total}  ★${c.stars}`,
+          count,
           tx + Math.round(4 * s),
-          titleY + Math.round(2 * s),
+          titleY + Math.round(2 * s) + (countBelow ? fonts.button.height + Math.round(2 * s) : 0),
           tw,
-          "right",
+          countBelow ? "left" : "right",
         );
         // The chevron that says a row is a door. It only exists while the row
         // is lit, and it nudges with the same value the row slides on.
@@ -927,16 +969,8 @@ export class LandsScene implements Scene {
         hover: ahov,
         quiet: !ahov,
       });
-      g.fillStyle = css(Theme.cream, 0.55);
-      printf(
-        g,
-        fonts.small,
-        this.autoNote ?? t("lands.autoNote"),
-        right[0] + abw + Math.round(12 * s),
-        aby + Math.round((playH - fonts.small.height) / 2),
-        right[2] - abw - Math.round(12 * s),
-        "left",
-      );
+      noteBeside(g, fonts.small, this.autoNote ?? t("lands.autoNote"),
+        right[0] + abw + Math.round(12 * s), aby, right[2] - abw - Math.round(12 * s), playH);
       this.landBtns.add({
         id: "auto",
         rect: [right[0], aby, abw, playH],
@@ -959,16 +993,8 @@ export class LandsScene implements Scene {
         hover: phov,
         quiet: !phov,
       });
-      g.fillStyle = css(Theme.cream, 0.55);
-      printf(
-        g,
-        fonts.small,
-        t("lands.playgroundNote"),
-        right[0] + pbw + Math.round(12 * s),
-        pby + Math.round((playH - fonts.small.height) / 2),
-        right[2] - pbw - Math.round(12 * s),
-        "left",
-      );
+      noteBeside(g, fonts.small, t("lands.playgroundNote"),
+        right[0] + pbw + Math.round(12 * s), pby, right[2] - pbw - Math.round(12 * s), playH);
       this.landBtns.add({
         id: "playground",
         rect: [right[0], pby, pbw, playH],

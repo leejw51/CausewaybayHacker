@@ -11,9 +11,9 @@
  * drill you on later (SPEC §7).
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, width } from "../engine/text";
+import { ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { clipped, fill, well, type Ctx, type Rect } from "../engine/ui";
+import { clipped, fill, rowsIn, well, type Ctx, type Rect } from "../engine/ui";
 import { burstPlan, type Plan } from "../engine/burst";
 import { cosine, expOut } from "../engine/ease";
 import { seconds, Tween } from "../engine/motion";
@@ -231,7 +231,7 @@ export class ResultScene implements Scene {
    * sharing it, because the drawing walks the same list in the same order —
    * the pair is checked by eye on the two screens it produces.
    */
-  private rightHeight(s: number, fonts: ReturnType<typeof ensureFonts>): number {
+  private rightHeight(s: number, fonts: ReturnType<typeof ensureFonts>, w: number): number {
     let h = Math.round(52 * s);
     const rowH = Math.max(fonts.small.height, fonts.stationSm.height);
     for (const c of this.attempt.cases) {
@@ -240,7 +240,14 @@ export class ResultScene implements Scene {
     }
     if (this.attempt.mistakes.length > 0) {
       h += fonts.stationSm.height + Math.round(14 * s);
-      h += this.attempt.mistakes.length * (fonts.small.height + fonts.codeSm.height);
+      // The message is measured at the width it will wrap in: "the output
+      // did not match" was counted as one line and clipped at the panel's
+      // bottom edge whenever the kind above it took a line of its own.
+      for (const m of this.attempt.mistakes) {
+        h += fonts.small.height;
+        h += wrap(fonts.codeSm, m.message, w).length * fonts.codeSm.height;
+      }
+      h += Math.round(12 * s);
     }
     if (this.attempt.stderr) h += fonts.codeSm.height * 2 + Math.round(8 * s);
     return h;
@@ -262,11 +269,27 @@ export class ResultScene implements Scene {
           ? t("result.stillGood")
           : t("result.notYet"),
     );
-    const full = frame(layout, 0.42, 0.05);
+    const whole = frame(layout, 0.42, 0.05);
+    // The button band is measured before the panels are placed: at the
+    // default type size in portrait "TRY AGAIN" and "BACK TO THE MAP" wrap to
+    // two rows, and a band sized for one drew the second under the footer,
+    // where it could not be pressed.
+    const btnLabels = [ok ? t("result.again") : t("result.tryAgain"), t("result.backToMap")];
+    const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
+    const btnRows = rowsIn(fonts.button, btnLabels, whole.body[2], layout.minTouchH());
+    const btnGap = Math.round(fonts.button.size * 0.5);
+    const bandH = btnRows * btnH + (btnRows - 1) * btnGap + Math.round(6 * s) + 8;
+    const trim = (r: Rect): Rect => [r[0], r[1], r[2], r[3] - bandH];
+    const full: typeof whole = layout.isPortrait()
+      ? { ...whole, body: trim(whole.body), left: whole.left, right: trim(whole.right) }
+      : { ...whole, body: trim(whole.body), left: trim(whole.left), right: trim(whole.right) };
     // Sized to what is on it. A 50/50 split stretched to the window, holding
     // five short rows on one side and one line on the other, reads as a screen
     // that has not been finished rather than as one that is breathing.
-    const want = Math.max(this.leftHeight(s, fonts, ok), this.rightHeight(s, fonts));
+    const want = Math.max(
+      this.leftHeight(s, fonts, ok),
+      this.rightHeight(s, fonts, full.right[2] - Math.round(24 * s)),
+    );
     const h = Math.min(full.body[3], Math.max(want, Math.round(full.body[3] * 0.45)));
     const dy = layout.isPortrait() ? 0 : Math.round((full.body[3] - h) / 2);
     const f: typeof full = layout.isPortrait()
@@ -488,22 +511,20 @@ export class ResultScene implements Scene {
 
     this.drawConfetti(g);
 
+    const rowsH = btnRows * btnH + (btnRows - 1) * btnGap;
     const btnRect: Rect = [
       f.body[0],
-      layout.vh -
-        footerH(layout) -
-        Math.max(layout.minTouchH(), fonts.button.height + 20) -
-        Math.round(6 * s),
+      layout.vh - footerH(layout) - rowsH - Math.round(6 * s),
       f.body[2],
-      Math.max(layout.minTouchH(), fonts.button.height + 20),
+      rowsH,
     ];
     fill(g, Theme.void, btnRect[0], btnRect[1] - 4, btnRect[2], btnRect[3] + 8, 0.8);
     this.buttons.row(
       fonts.button,
       btnRect,
       [
-        { id: "retry", label: ok ? t("result.again") : t("result.tryAgain") },
-        { id: "map", label: t("result.backToMap") },
+        { id: "retry", label: btnLabels[0] },
+        { id: "map", label: btnLabels[1] },
       ],
       layout.minTouchH(),
     );

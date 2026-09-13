@@ -25,7 +25,7 @@
  * it.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf } from "../engine/text";
+import { ensureFonts, printf, wrap } from "../engine/text";
 import { css, Theme, TRACK_HAZE } from "../engine/theme";
 import { btnBox, clipped, fill, panel, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import {
@@ -769,7 +769,10 @@ export class MapScene implements Scene {
       Math.round(10 * s) +
       facts +
       Math.round(12 * s) +
-      f.small.height +
+      // Two lines for the last line: "CLEARED · 2/3 STARS · ENTER to walk
+      // back in" wraps beside the stamp, and one line's room put "walk back
+      // in" over the plate's bottom rim.
+      f.small.height * 2 +
       Math.round(14 * s) +
       (layout.isPortrait() ? Math.round(30 * s) : 0)
     );
@@ -1407,7 +1410,10 @@ export class MapScene implements Scene {
       line = n.kind === "boss" ? t("map.bossHere") : t("map.enterToGo");
     }
     g.fillStyle = css(colour);
-    printf(g, fonts.small, line, ix, iy, textW, "left");
+    for (const l of wrap(fonts.small, line, textW).slice(0, 2)) {
+      printf(g, fonts.small, l, ix, iy, textW, "left");
+      iy += fonts.small.height;
+    }
   }
 
   resized(): void {

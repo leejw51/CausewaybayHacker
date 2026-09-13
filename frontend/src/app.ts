@@ -984,7 +984,20 @@ export class App {
   /** The banner's own height: the line in it, or the old minimum. */
   private toastH(): number {
     const s = this.layout.uiScale();
-    return Math.max(Math.round(26 * s), ensureFonts(s).stationSm.height + Math.round(8 * s));
+    const f = ensureFonts(s).stationSm;
+    return Math.max(Math.round(26 * s), this.toastLines().length * f.height + Math.round(8 * s));
+  }
+
+  /**
+   * The banner's text, wrapped to the width it is drawn in. One line used to
+   * be assumed, and the SOLVE toast in portrait lost its last word under the
+   * footer.
+   */
+  private toastLines(): string[] {
+    if (!this.toast) return [];
+    const s = this.layout.uiScale();
+    const f = ensureFonts(s).stationSm;
+    return wrap(f, this.toast.text.toUpperCase(), this.layout.vw - Math.round(24 * s)).slice(0, 3);
   }
 
   private drawToast(g: Ctx): void {
@@ -1007,7 +1020,12 @@ export class App {
     g.textBaseline = "middle";
     g.textAlign = "center";
     g.fillStyle = "rgba(252,236,200,1)";
-    g.fillText(toast.text.toUpperCase(), vw / 2, top + h / 2);
+    const lines = this.toastLines();
+    let ly = top + h / 2 - ((lines.length - 1) * f.height) / 2;
+    for (const line of lines) {
+      g.fillText(line, vw / 2, ly);
+      ly += f.height;
+    }
     g.textBaseline = "top";
     g.textAlign = "left";
   }

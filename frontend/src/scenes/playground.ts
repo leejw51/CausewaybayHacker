@@ -641,19 +641,24 @@ export class PlaygroundScene implements Scene {
       fonts.button.size * 2,
       this.app.layout.minTouchH(),
     );
+    // NEW and DELETE share the bottom row while both fit; in a narrow list
+    // panel DELETE is painted last and used to cover NEW's last letter, so
+    // there NEW takes the row above.
+    const [dw] = btnBox(
+      fonts.button,
+      [t("pg.delete")],
+      0,
+      fonts.button.size * 2,
+      this.app.layout.minTouchH(),
+    );
+    const together = !this.held.id || nw + dw + Math.round(8 * s) <= inner[2];
+    const newY = inner[1] + inner[3] - nh - (together ? 0 : nh + Math.round(6 * s));
     this.buttons.add({
       id: "new",
-      rect: [inner[0], inner[1] + inner[3] - nh, nw, nh],
+      rect: [inner[0], newY, nw, nh],
       label: t("pg.new"),
     });
     if (this.held.id) {
-      const [dw] = btnBox(
-        fonts.button,
-        [t("pg.delete")],
-        0,
-        fonts.button.size * 2,
-        this.app.layout.minTouchH(),
-      );
       this.buttons.add({
         id: "delete",
         rect: [inner[0] + inner[2] - dw, inner[1] + inner[3] - nh, dw, nh],
@@ -687,9 +692,17 @@ export class PlaygroundScene implements Scene {
     const langH = langBoxes[0].bh;
     const langGap = Math.round(fonts.button.size * 0.5);
     const langsW = langBoxes.reduce((n, b) => n + b.bw, 0) + langGap * (langBoxes.length - 1);
-    const rowW = inner[2] - langsW - langGap - Math.round(fonts.button.size * 1.6);
+    // Beside the actions when the row is wide enough for RUN and the four
+    // lands together; on a row of their own above them when it is not. In
+    // portrait the lands took the whole width and RUN was drawn underneath
+    // RUST with one letter showing.
+    const [runW] = btnBox(fonts.button, [t("pg.run")], 0, fonts.button.size * 2, layout.minTouchH());
+    const beside = inner[2] - langsW - langGap * 2 >= runW + Math.round(fonts.button.size * 1.6);
+    const rowW = beside ? inner[2] - langsW - langGap - Math.round(fonts.button.size * 1.6) : inner[2];
     const rows = rowsIn(fonts.button, labels, rowW, layout.minTouchH());
-    const bandH = rows * btnH + (rows - 1) * Math.round(fonts.button.size * 0.5);
+    const rowGap = Math.round(fonts.button.size * 0.5);
+    const langBand = beside ? 0 : langH + rowGap;
+    const bandH = rows * btnH + (rows - 1) * rowGap + langBand;
     const editorH = Math.max(60, inner[3] - bandH - stdinH - outH - gap * 3);
 
     well(g, inner[0], inner[1], inner[2], editorH);
@@ -721,10 +734,10 @@ export class PlaygroundScene implements Scene {
     if (this.benchIn.finished) this.stdinOverlay?.place(stdinRect, fonts.codeSm.size);
     else this.stdinOverlay?.hide();
 
-    const rowY = stdinY + stdinH + gap;
+    const rowY = stdinY + stdinH + gap + langBand;
     this.buttons.row(
       fonts.button,
-      [inner[0], rowY, rowW, bandH],
+      [inner[0], rowY, rowW, bandH - langBand],
       [
         {
           id: "run",
@@ -741,7 +754,7 @@ export class PlaygroundScene implements Scene {
 
     // RUST | GO | C++ | PYTHON, at the far end of the band, laid right to left
     // so the last land sits flush with the edge whatever the labels measure.
-    const langY = rowY + Math.round((btnH - langH) / 2);
+    const langY = beside ? rowY + Math.round((btnH - langH) / 2) : rowY - langBand;
     let bx = inner[0] + inner[2];
     for (const { land: id, label, bw } of [...langBoxes].reverse()) {
       bx -= bw;

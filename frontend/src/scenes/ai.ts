@@ -25,7 +25,7 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme, type RGBA } from "../engine/theme";
-import { clipped, fill, pixBtn, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, clipped, fill, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import {
   arriving,
   Buttons,
@@ -497,11 +497,13 @@ export class AiScene implements Scene {
     const btnH = Math.max(touch, fonts.button.height + 20);
 
     if (this.notice) {
-      drawNotice(g, this.app, [x, y, w, h - btnH - Math.round(10 * s)], this.notice);
-      this.drawActions(g, [x, y + h - btnH, w, btnH], s, [
+      const acts = [
         { id: "again", label: T("ai.tryAnother") },
         { id: "maps", label: T("ai.toTheMaps") },
-      ]);
+      ];
+      const ah = this.actionsH(s, w, btnH, acts);
+      drawNotice(g, this.app, [x, y, w, h - ah - Math.round(10 * s)], this.notice);
+      this.drawActions(g, [x, y + h - ah, w, ah], s, acts);
       this.overflow = 0;
       return;
     }
@@ -517,11 +519,13 @@ export class AiScene implements Scene {
     }
 
     if (session.done) {
-      this.drawSummary(g, [x, y, w, h - btnH - Math.round(10 * s)], s);
-      this.drawActions(g, [x, y + h - btnH, w, btnH], s, [
+      const acts = [
         { id: "again", label: T("ai.anotherPlan") },
         { id: "maps", label: T("ai.toTheMaps") },
-      ]);
+      ];
+      const ah = this.actionsH(s, w, btnH, acts);
+      this.drawSummary(g, [x, y, w, h - ah - Math.round(10 * s)], s);
+      this.drawActions(g, [x, y + h - ah, w, ah], s, acts);
       this.overflow = 0;
       return;
     }
@@ -691,6 +695,29 @@ export class AiScene implements Scene {
     }
   }
 
+  /**
+   * Whether the actions share one row or stack: an equal split of the panel
+   * held "TRY ANOTHER PLAN" only until the type grew, and then the label
+   * wrapped and "PLAN" was painted under the button, over the panel's rim.
+   */
+  private actionsFit(s: number, w: number, items: ReadonlyArray<{ label: string }>): boolean {
+    const fonts = ensureFonts(s);
+    const gap = Math.round(6 * s);
+    const bw = Math.floor((w - gap * (items.length - 1)) / items.length);
+    return items.every((i) => btnBox(fonts.button, [i.label], 0, fonts.button.size * 2)[0] <= bw);
+  }
+
+  /** The band the actions need: one row, or one row per action when stacked. */
+  private actionsH(
+    s: number,
+    w: number,
+    btnH: number,
+    items: ReadonlyArray<{ label: string }>,
+  ): number {
+    if (this.actionsFit(s, w, items)) return btnH;
+    return items.length * btnH + (items.length - 1) * Math.round(6 * s);
+  }
+
   private drawActions(
     g: Ctx,
     rect: Rect,
@@ -700,16 +727,19 @@ export class AiScene implements Scene {
     const fonts = ensureFonts(s);
     const [x, y, w, h] = rect;
     const gap = Math.round(6 * s);
-    const bw = Math.floor((w - gap * (items.length - 1)) / items.length);
+    const across = this.actionsFit(s, w, items);
+    const bw = across ? Math.floor((w - gap * (items.length - 1)) / items.length) : w;
+    const bh = across ? h : Math.floor((h - gap * (items.length - 1)) / items.length);
     for (let i = 0; i < items.length; i++) {
-      const bx = x + i * (bw + gap);
+      const bx = across ? x + i * (bw + gap) : x;
+      const by = across ? y : y + i * (bh + gap);
       const item = items[i];
-      pixBtn(g, fonts.button, bx, y, bw, h, item.label, {
+      pixBtn(g, fonts.button, bx, by, bw, bh, item.label, {
         lit: item.primary,
         hover: this.acts.hovered === item.id,
         quiet: !item.primary,
       });
-      this.acts.add({ id: item.id, rect: [bx, y, bw, h], label: item.label });
+      this.acts.add({ id: item.id, rect: [bx, by, bw, bh], label: item.label });
     }
   }
 

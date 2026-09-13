@@ -1328,7 +1328,10 @@ export class QuestScene implements Scene {
     // painted across the bottom of the body over whatever was there, and with
     // the button row wrapped to two lines that was RESET. The panels give up
     // its height instead, so nothing is ever drawn under it.
-    const msgH = this.error ? fonts.small.height + Math.round(8 * s) : 0;
+    // The bar is as tall as the lines the message wraps to: one line's
+    // height put "back" of the SOLVE note under the footer in portrait.
+    const msgLines = this.error ? wrap(fonts.small, this.error, f.body[2] - Math.round(16 * s)) : [];
+    const msgH = this.error ? msgLines.length * fonts.small.height + Math.round(8 * s) : 0;
     const room = msgH > 0 ? msgH + Math.round(6 * s) : 0;
     const left: Rect = [f.left[0], f.left[1], f.left[2], f.left[3] - room];
     const right: Rect = [f.right[0], f.right[1], f.right[2], f.right[3] - room];
@@ -1355,7 +1358,11 @@ export class QuestScene implements Scene {
       fill(g, Theme.ink, f.body[0], barY, f.body[2], msgH, 0.92);
       fill(g, tone, f.body[0], barY, f.body[2], Math.max(1, Math.round(s)));
       g.fillStyle = css(this.notice ? Theme.cream : Theme.red);
-      printf(g, fonts.small, this.error, f.body[0], barY + Math.round(4 * s), f.body[2], "center");
+      let my = barY + Math.round(4 * s);
+      for (const line of msgLines) {
+        printf(g, fonts.small, line, f.body[0], my, f.body[2], "center");
+        my += fonts.small.height;
+      }
     }
     // The keys that are *only* keys. `ESC MAP` used to sit under a button that
     // already said MAP, which is the footer explaining the screen to itself.
