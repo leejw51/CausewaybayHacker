@@ -14,7 +14,6 @@
  */
 import {
   EditorState,
-  Prec,
   StateEffect,
   StateField,
   type Extension,
@@ -202,15 +201,6 @@ export function blanksFill(typed: string, target: Target): string | null {
   return upto > matched ? text.slice(matched, upto) : null;
 }
 
-/** TAB in BLANKS: the hole you are standing in, and no more. */
-export function blankCompletion(typed: string, target: Target): string | null {
-  const { text, blanks } = target;
-  const { matched } = answerProgress(typed, text);
-  if (typed.length !== matched) return null;
-  const here = blankAt(blanks, matched);
-  return here ? text.slice(matched, here.to) : null;
-}
-
 /**
  * The answer as the *ghost* should show it: holes masked.
  *
@@ -305,19 +295,20 @@ export interface AnswerProgress {
 }
 
 /**
- * What TAB completes in ANSWER mode: the rest of the line you are on.
+ * One line of the answer, for the button that asks for one.
  *
- * **The rest of the line, and at a line's end the next line's indentation.**
- * Typing a whole solution character by character is the exercise; typing the
- * eight spaces at the start of a continuation line is not, and neither is the
- * tail of a line you have clearly already remembered. TAB is the pedal for
- * both.
+ * **A line at a time, on a press.** It was a TAB binding and that was wrong:
+ * TAB is the editor's key, a person writing code reaches for it to indent,
+ * and a mode that quietly took it made the editor feel broken. A button asks
+ * for exactly as much as it says and takes nothing away from typing.
  *
- * `null` when there is nothing to complete: the answer is typed, or — and
- * this is the one worth being strict about — what is in the buffer has
- * stopped being the answer. Completing *past* a divergence would bury the
- * mistake under correct text and leave a buffer that cannot compile with no
- * sign of where it went wrong.
+ * The rest of the line you are on, or — standing at a line's end — the
+ * newline and the next line's indentation, because typing eight spaces from
+ * memory teaches nobody anything.
+ *
+ * `null` when there is nothing to give: the answer is typed, or the buffer
+ * has stopped being the answer. Completing past a divergence would bury the
+ * mistake under correct text.
  */
 export function answerCompletion(typed: string, answer: string): string | null {
   const { matched } = answerProgress(typed, answer);
@@ -338,48 +329,6 @@ export function answerProgress(typed: string, answer: string): AnswerProgress {
   while (k < typed.length && k < answer.length && typed[k] === answer[k]) k++;
   return { matched: k, wrong: typed.length - k, done: typed === answer, total: answer.length };
 }
-
-/**
- * TAB, while ANSWER is on: take the completion and put the caret after it.
- *
- * `Prec.highest` because `indentWithTab` is in the base keymap and would
- * otherwise get there first. It gives the key back — returns false — when
- * there is nothing to complete, so TAB still indents on a quest without the
- * mode on, and still indents once the answer has been typed out.
- */
-const answerTab: Extension = Prec.highest(
-  keymap.of([
-    {
-      key: "Tab",
-      run: (view) => {
-        const target = view.state.field(answerField, false) ?? null;
-        // ANSWER off: TAB is the editor's own, and indents.
-        if (target === null) return false;
-        const typed = view.state.doc.toString();
-        // In BLANKS the pedal fills the hole you are in and nothing else —
-        // the code around it is already on the screen.
-        const insert =
-          target.blanks.length > 0
-            ? blankCompletion(typed, target)
-            : answerCompletion(typed, target.text);
-        // **ANSWER on owns the key even when it has nothing to give.** With
-        // the answer typed out, falling through to `indentWithTab` puts a tab
-        // into a buffer that was exactly right a moment ago — the count goes
-        // from MATCHED to a line of red the player did not type. Past a
-        // divergence the same applies: the thing to do is fix it, not indent
-        // it. So the press is consumed and nothing happens.
-        if (insert === null) return true;
-        const at = typed.length;
-        view.dispatch({
-          changes: { from: at, insert },
-          selection: { anchor: at + insert.length },
-          scrollIntoView: true,
-        });
-        return true;
-      },
-    },
-  ]),
-);
 
 const base: Extension = [
   lineNumbers(),
@@ -452,7 +401,6 @@ export class Editor {
       extensions: [
         base,
         answerField,
-        answerTab,
         ghost,
         // A phone's keyboard, told this is code. Without these iOS
         // capitalises the first letter of `fn main`, turns `"hello"` into

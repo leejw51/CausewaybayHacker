@@ -13,7 +13,6 @@ import {
   answerBlanks,
   answerCompletion,
   answerProgress,
-  blankCompletion,
   blanksFill,
   maskBlanks,
   narrowEdit,
@@ -120,48 +119,6 @@ describe("answerProgress", () => {
 });
 
 /**
- * What TAB gives you in ANSWER mode.
- *
- * The pedal has to be honest about two things: it never completes past a
- * mistake (that would bury the divergence under correct text), and at the end
- * of a line it gives the next line's indentation rather than its content —
- * typing the solution is the exercise, typing eight spaces is not.
- */
-describe("answerCompletion", () => {
-  const answer = 'fn main() {\n    println!("hi");\n}\n';
-
-  it("completes the rest of the line you are on", () => {
-    expect(answerCompletion("", answer)).toBe("fn main() {");
-    expect(answerCompletion("fn ma", answer)).toBe("in() {");
-  });
-
-  it("at a line's end, gives the newline and the next line's indent", () => {
-    expect(answerCompletion("fn main() {", answer)).toBe("\n    ");
-    expect(answerCompletion('fn main() {\n    println!("hi");', answer)).toBe("\n");
-  });
-
-  it("refuses to complete past a divergence", () => {
-    expect(answerCompletion("fn maim", answer)).toBeNull();
-    expect(answerCompletion("zzz", answer)).toBeNull();
-    expect(answerCompletion(answer + " ", answer)).toBeNull();
-  });
-
-  it("has nothing to give once the answer is typed", () => {
-    expect(answerCompletion(answer, answer)).toBeNull();
-  });
-
-  it("typed end to end, it lands exactly on the answer", () => {
-    let typed = "";
-    for (let i = 0; i < 200; i++) {
-      const next = answerCompletion(typed, answer);
-      if (next === null) break;
-      typed += next;
-    }
-    expect(typed).toBe(answer);
-  });
-});
-
-/**
  * BLANKS: the answer on the screen with holes cut in it.
  *
  * The invariant that makes the whole mode work is that the buffer is always
@@ -225,13 +182,9 @@ describe("blanksFill", () => {
     expect(blanksFill("fn maim", target)).toBeNull();
   });
 
-  it("TAB in a hole gives the hole, and only the hole", () => {
-    expect(blankCompletion("fn ", target)).toBe("main");
-    expect(blankCompletion("fn ma", target)).toBe("in");
-    expect(blankCompletion("fn main", target)).toBeNull();
-  });
-
-  it("fill and type together land exactly on the answer", () => {
+  it("filling and typing the holes lands exactly on the answer", () => {
+    // What the player does, in miniature: the gaps between the holes arrive
+    // on their own, and the holes themselves are typed.
     let typed = "";
     for (let i = 0; i < 500; i++) {
       const add = blanksFill(typed, target);
@@ -239,9 +192,46 @@ describe("blanksFill", () => {
         typed += add;
         continue;
       }
-      const hole = blankCompletion(typed, target);
-      if (hole === null) break;
-      typed += hole;
+      if (typed.length >= answer.length) break;
+      typed += answer[typed.length];
+    }
+    expect(typed).toBe(answer);
+  });
+});
+
+/**
+ * What the +LINE button hands over.
+ *
+ * It was a TAB binding once; TAB is the editor's key and a mode that took it
+ * made indenting impossible, so the same rule now sits behind a button. The
+ * rule itself is unchanged and is the thing worth holding: a line at a time,
+ * the next line's indent at a line's end, and never past a mistake.
+ */
+describe("answerCompletion", () => {
+  const answer = 'fn main() {\n    println!("hi");\n}\n';
+
+  it("gives the rest of the line you are on", () => {
+    expect(answerCompletion("", answer)).toBe("fn main() {");
+    expect(answerCompletion("fn ma", answer)).toBe("in() {");
+  });
+
+  it("at a line's end, gives the newline and the next line's indent", () => {
+    expect(answerCompletion("fn main() {", answer)).toBe("\n    ");
+    expect(answerCompletion('fn main() {\n    println!("hi");', answer)).toBe("\n");
+  });
+
+  it("refuses past a divergence, and has nothing to give once it is typed", () => {
+    expect(answerCompletion("fn maim", answer)).toBeNull();
+    expect(answerCompletion(answer + " ", answer)).toBeNull();
+    expect(answerCompletion(answer, answer)).toBeNull();
+  });
+
+  it("pressed until it stops, it lands exactly on the answer", () => {
+    let typed = "";
+    for (let i = 0; i < 200; i++) {
+      const next = answerCompletion(typed, answer);
+      if (next === null) break;
+      typed += next;
     }
     expect(typed).toBe(answer);
   });

@@ -530,19 +530,19 @@ function Quest.answer_progress(typed, answer)
   return { matched = k, wrong = #typed - k, done = typed == answer, total = #answer }
 end
 
---- What TAB completes in ANSWER mode: the rest of the line you are on.
+--- One line of the answer, for the button that asks for one.
 ---
---- **The rest of the line, and at a line's end the next line's indentation.**
---- Typing a whole solution character by character is the exercise; typing the
---- eight spaces at the start of a continuation line is not, and neither is the
---- tail of a line you have clearly already remembered. TAB is the pedal for
---- both.
+--- **A line at a time, on a press.** It was a TAB binding and that was
+--- wrong: TAB is the editor's key, a person writing code reaches for it to
+--- indent, and a mode that quietly took it made the editor feel broken. A
+--- button asks for exactly as much as it says and takes nothing away from
+--- typing.
 ---
---- `nil` when there is nothing to complete: the answer is typed, or — and
---- this is the one worth being strict about — the buffer has stopped being
---- the answer. Completing past a divergence would bury the mistake under
---- correct text and leave a buffer that cannot compile with no sign of where
---- it went wrong.
+--- The rest of the line you are on, or — standing at a line's end — the
+--- newline and the next line's indentation, because typing eight spaces from
+--- memory teaches nobody anything. `nil` when the answer is typed, or when
+--- the buffer has stopped being the answer: completing past a mistake would
+--- bury it under correct text.
 function Quest.answer_completion(typed, answer)
   if not answer or answer == "" then return nil end
   local p = Quest.answer_progress(typed, answer)
@@ -554,6 +554,24 @@ function Quest.answer_completion(typed, answer)
   end
   local nl = rest:find("\n", 1, true)
   return nl and rest:sub(1, nl - 1) or rest
+end
+
+--- Hand over one line of the answer.
+---
+--- In BLANKS the line arrives with its holes filled — asking for a line is
+--- asking for the whole line — and the fill carries on from there to the
+--- next hole on its own.
+function Quest:complete_line()
+  if not self.answer_on or not self.answer_text or not self.editor then return end
+  local insert = Quest.answer_completion(self.editor:text(), self.answer_text)
+  if not insert then
+    SFX.play("locked")
+    return
+  end
+  self.editor:move("doc_end")
+  self.editor:insert(insert)
+  self:fill_blanks()
+  SFX.play("move")
 end
 
 --- The holes BLANKS cuts in the answer, as `{ from, to }` byte offsets.
@@ -620,15 +638,6 @@ function Quest.blanks_fill(typed, answer, blanks)
   end
   if upto <= p.matched then return nil end
   return answer:sub(p.matched + 1, upto)
-end
-
---- TAB in BLANKS: the hole you are standing in, and no more.
-function Quest.blank_completion(typed, answer, blanks)
-  local p = Quest.answer_progress(typed, answer)
-  if #typed ~= p.matched then return nil end
-  local here = blank_at(blanks, p.matched)
-  if not here then return nil end
-  return answer:sub(p.matched + 1, here.to)
 end
 
 --- The answer as the *ghost* should show it: holes masked.
@@ -1261,6 +1270,12 @@ function Quest:draw_code()
     { id = "blanks", label = I18n.t("BLANKS"),
       state = self.blanks_on and "hot"
         or ((usable and not self.solve_unsupported) and "normal" or "disabled") },
+    -- One line of the answer, on a press. It used to be TAB, and TAB is the
+    -- editor's key — a person writing code reaches for it to indent.
+    { id = "complete", label = I18n.t("+LINE"),
+      state = (self.answer_on and self.answer_text
+        and Quest.answer_completion(self.editor:text(), self.answer_text))
+        and "normal" or "disabled" },
   }
   self.code_rects = {}
   local x, y = pad, pad
@@ -1296,9 +1311,6 @@ function Quest:draw_code()
       status = status .. "   " .. I18n.t("FIX THE RED")
       colour = Theme.red
     else
-      status = status .. "   "
-        .. (self.blanks_on and I18n.t("TAB fills the blank")
-          or I18n.t("TAB completes the line"))
       colour = Theme.coin
     end
   end
@@ -2538,26 +2550,6 @@ function Quest:keypressed(key, mods)
     self.focus = self.focus == "editor" and "brief" or "editor"
     return true
   end
-  -- **TAB is ANSWER's pedal while ANSWER is on.** It takes the rest of the
-  -- line, and at a line's end the next line's indentation. When there is
-  -- nothing to take — the answer is typed out, or the buffer has stopped
-  -- being the answer — the press is *consumed and does nothing* rather than
-  -- falling through to indent: a tab put into a buffer that was exactly
-  -- right a moment ago turns MATCHED into a line of red nobody typed, and
-  -- past a divergence the thing to do is fix it, not indent it.
-  if key == "tab" and not cmd and not mods.shift
-    and self.answer_on and self.focus == "editor" and self.editor then
-    local insert = self.blanks_on
-      and Quest.blank_completion(self.editor:text(), self.answer_text, self.blanks)
-      or Quest.answer_completion(self.editor:text(), self.answer_text)
-    if insert then
-      self.editor:move("doc_end")
-      self.editor:insert(insert)
-      SFX.play("move")
-    end
-    return true
-  end
-
   if self.focus == "editor" then
     if self.editor:keypressed(key, mods) then return true end
   else
@@ -2600,6 +2592,7 @@ function Quest:mousepressed(x, y, button)
     if inside(r.redo) then self:stack_redo(); return end
     if inside(r.answer) then self:toggle_answer(); return end
     if inside(r.blanks) then self:toggle_blanks(); return end
+    if inside(r.complete) then self:complete_line(); return end
     -- Anything else is a click into the code, and it goes through the same
     -- pane the framed screen uses — so the caret lands where it was aimed,
     -- a drag selects, and a double click takes a word, here as there.

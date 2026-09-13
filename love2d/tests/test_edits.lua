@@ -428,7 +428,7 @@ return function()
     T.eq(Quest.answer_progress(answer .. " ", answer).wrong, 1, "it is one wrong")
   end)
 
-  T.case("TAB takes the line, and refuses to take it past a mistake", function()
+  T.case("+LINE takes a line, and refuses to take one past a mistake", function()
     local Quest = require("src.scenes.quest")
     local answer = 'fn main() {\n    println!("hi");\n}\n'
 
@@ -439,15 +439,14 @@ return function()
     T.eq(Quest.answer_completion("fn maim", answer), nil, "never past a divergence")
     T.eq(Quest.answer_completion(answer, answer), nil, "and nothing once it is typed")
 
-    -- Pressed until it stops giving, it lands exactly on the answer. That is
-    -- the whole of what the pedal promises.
+    -- Pressed until it stops giving, it lands exactly on the answer.
     local typed = ""
     for _ = 1, 200 do
       local next_ = Quest.answer_completion(typed, answer)
       if not next_ then break end
       typed = typed .. next_
     end
-    T.eq(typed, answer, "TAB alone types the answer out, exactly")
+    T.eq(typed, answer, "the button alone types the answer out, exactly")
   end)
 
   T.case("the boilerplate goes, a draft never does", function()
@@ -501,21 +500,17 @@ return function()
     T.eq(Quest.blanks_fill("fn main", answer, blanks), answer:sub(8), "then it carries on")
     T.eq(Quest.blanks_fill("fn maim", answer, blanks), nil, "never past a divergence")
 
-    -- TAB gives the hole and only the hole.
-    T.eq(Quest.blank_completion("fn ", answer, blanks), "main", "the whole word")
-    T.eq(Quest.blank_completion("fn ma", answer, blanks), "in", "or what is left of it")
-    T.eq(Quest.blank_completion("fn main", answer, blanks), nil, "and nothing outside one")
-
-    -- Filling and TABbing in turn lands exactly on the answer.
+    -- What the player does, in miniature: the gaps between the holes arrive
+    -- on their own and the holes themselves are typed.
     local typed = ""
     for _ = 1, 500 do
       local add = Quest.blanks_fill(typed, answer, blanks)
       if add then
         typed = typed .. add
+      elseif #typed < #answer then
+        typed = typed .. answer:sub(#typed + 1, #typed + 1)
       else
-        local hole = Quest.blank_completion(typed, answer, blanks)
-        if not hole then break end
-        typed = typed .. hole
+        break
       end
     end
     T.eq(typed, answer, "the drill, played out, is the answer")

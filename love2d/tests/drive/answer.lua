@@ -55,26 +55,34 @@ add({ until_ = function(app)
       print(("typed line 1: matched=%d wrong=%d"):format(p.matched, p.wrong))
       return true end, timeout = 5 })
 add({ shot = "A4-answer-on-target.png" })
--- TAB takes the rest of the line, until there is nothing left to take.
+-- **TAB indents.** It is the editor's key and ANSWER must not take it —
+-- that conflict is why the completion moved to a button.
 add({ until_ = function(app)
-      for _ = 1, 40 do
-        local before = app.scene.editor:text()
-        app.scene:keypressed("tab", {})
-        if app.scene.editor:text() == before then break end
-      end
       local s = app.scene
+      local was = s.editor:text()
+      s:keypressed("tab", {})
+      check(s.editor:text() ~= was, "TAB did not indent — something is eating the key")
+      for _ = 1, #s.editor:text() - #was do s.editor:backspace() end
+      check(s.editor:text() == was, "the indent did not come back out")
+      return true end, note = "TAB indents", timeout = 5 })
+-- +LINE hands over a line at a time. Pressed until it stops, it is the answer.
+add({ until_ = function(app)
+      local s = app.scene
+      for _ = 1, 40 do
+        local before = s.editor:text()
+        s:complete_line()
+        if s.editor:text() == before then break end
+      end
       check(s.editor:text() == s.answer_text,
-        "TAB did not land on the answer: " .. string.format("%q", s.editor:text()))
-      return true end, note = "TAB completes", timeout = 5 })
--- The count is a display value, refreshed by `answer_tick` on the next
--- frame, so it is read after one rather than in the same breath.
+        "+LINE did not land on the answer: " .. string.format("%q", s.editor:text()))
+      return true end, note = "+LINE completes", timeout = 5 })
 add({ wait = 0.4 })
 add({ until_ = function(app)
       local p = app.scene.answer_prog
       check(p.done, ("the count does not say done: %d/%d"):format(p.matched, p.total))
-      print(("tab: %d/%d done=%s"):format(p.matched, p.total, tostring(p.done)))
+      print(("+line: %d/%d done=%s"):format(p.matched, p.total, tostring(p.done)))
       return true end, timeout = 5 })
-add({ shot = "A7-answer-tabbed.png" })
+add({ shot = "A7-answer-typed.png" })
 
 -- Now a character that is not the answer: a burst, and the count stops.
 add({ text = "z" })
@@ -102,17 +110,20 @@ add({ until_ = function(app)
         #s.blanks, #s.editor:text(), #s.answer_text, s.blanks[1].from))
       return true end, timeout = 5 })
 add({ shot = "A8-blanks.png" })
--- TAB fills the hole you are in; pressed until it stops, the drill is done.
+-- The holes are typed, one character at a time; the gaps between them
+-- arrive on their own.
 add({ until_ = function(app)
-      for _ = 1, 80 do
-        local before = app.scene.editor:text()
-        app.scene:keypressed("tab", {})
-        app.scene:fill_blanks()
-        if app.scene.editor:text() == before then break end
+      local s = app.scene
+      for _ = 1, 400 do
+        s:fill_blanks()
+        local typed = s.editor:text()
+        if typed == s.answer_text then break end
+        local ch = s.answer_text:sub(#typed + 1, #typed + 1)
+        s.editor:insert(ch)
       end
       check(app.scene.editor:text() == app.scene.answer_text,
         "the drill did not play out to the answer: " .. string.format("%q", app.scene.editor:text()))
-      return true end, note = "TAB fills the blanks", timeout = 5 })
+      return true end, note = "the holes are filled in", timeout = 10 })
 add({ wait = 0.4 })
 add({ until_ = function(app)
       check(app.scene.answer_prog.done, "the drill finished but the count does not say done")

@@ -364,20 +364,29 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   expect(await editorText(page)).not.toBe("");
   await shot(page, "62-answer-ghost");
 
-  // TAB takes the rest of the line. Pressed until it stops giving, it lands
-  // exactly on the answer — checked here, on a clean buffer, because past a
-  // divergence TAB is supposed to refuse instead (see below).
+  // **TAB indents.** It is the editor's key, and ANSWER must not take it —
+  // taking it made indenting impossible, which is why the completion is a
+  // button now.
+  const beforeTab = await docText();
+  await page.keyboard.press("Tab");
+  await page.waitForTimeout(250);
+  expect(await docText()).not.toBe(beforeTab);
+  for (let i = 0; i < 8; i++) await page.keyboard.press("Backspace");
+  await page.waitForTimeout(250);
+
+  // +LINE hands over a line at a time. Pressed until it stops, it is the
+  // answer — which is the whole of what the button promises.
+  const line = await page.evaluate(() => window.__cwbCapture!.buttonAt("complete"));
+  expect(line).not.toBeNull();
   const ghosts = () => page.evaluate(() => document.querySelectorAll(".cwb-ghost").length);
   for (let i = 0; i < 40 && (await ghosts()) > 0; i++) {
-    await page.keyboard.press("Tab");
-    await page.waitForTimeout(120);
+    await page.mouse.click(line![0], line![1]);
+    await page.waitForTimeout(140);
   }
   await page.waitForTimeout(400);
   expect(await ghosts()).toBe(0);
-  // Exactly the answer, and nothing past it: a TAB with nothing left to
-  // complete is consumed rather than left to indent a buffer that is right.
   expect(await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length)).toBe(0);
-  await shot(page, "64-answer-tabbed");
+  await shot(page, "64-answer-completed");
 
   // BLANKS: the same answer with holes in it. The code is on the screen and
   // only the gaps are the player's to type — so the buffer arrives mostly
@@ -393,11 +402,11 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   expect(await page.evaluate(() => document.body.innerText.includes("_"))).toBe(true);
   await shot(page, "65-blanks");
 
-  // TAB fills the hole you are in; pressed until it stops, the drill is done
-  // and the buffer is the answer again.
+  // +LINE hands a whole line over, holes and all; pressed until it stops,
+  // the drill is done and the buffer is the answer again.
   for (let i = 0; i < 60 && (await ghosts()) > 0; i++) {
-    await page.keyboard.press("Tab");
-    await page.waitForTimeout(110);
+    await page.mouse.click(line![0], line![1]);
+    await page.waitForTimeout(130);
   }
   await page.waitForTimeout(400);
   expect(await ghosts()).toBe(0);
@@ -426,10 +435,11 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   expect(
     await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length),
   ).toBeGreaterThan(0);
-  // And TAB refuses while the buffer has stopped being the answer: completing
-  // past a mistake would bury it under correct text.
+  // And +LINE refuses while the buffer has stopped being the answer:
+  // completing past a mistake would bury it under correct text. (TAB, by
+  // contrast, indents — it is the editor's key and this mode leaves it be.)
   const stuck = await docText();
-  await page.keyboard.press("Tab");
+  await page.mouse.click(line![0], line![1]);
   await page.waitForTimeout(250);
   expect(await docText()).toBe(stuck);
   await shot(page, "63-answer-diverged");

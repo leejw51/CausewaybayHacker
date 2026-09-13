@@ -30,6 +30,7 @@ import {
   Editor,
   MAIN_FILE,
   answerBlanks,
+  answerCompletion,
   answerProgress,
   blanksFill,
   type AnswerProgress,
@@ -856,6 +857,34 @@ export class QuestScene implements Scene {
     this.app.chip.coin();
   }
 
+  /** Whether there is a line of the answer left to hand over. */
+  private canComplete(): boolean {
+    const target = this.target();
+    if (!target || !this.editor) return false;
+    return answerCompletion(this.editor.source, target.text) !== null;
+  }
+
+  /**
+   * Hand over one line of the answer.
+   *
+   * In BLANKS the line arrives with its holes filled — asking for a line is
+   * asking for the whole line — and the fill carries on from there to the
+   * next hole on its own.
+   */
+  private completeLine(): void {
+    const target = this.target();
+    if (!target || !this.editor) return;
+    const insert = answerCompletion(this.editor.source, target.text);
+    if (insert === null) {
+      this.app.chip.fail();
+      return;
+    }
+    this.editor.appendAtEnd(insert);
+    this.fillBlanks(target);
+    this.focusEditorSoon();
+    this.app.chip.blip();
+  }
+
   /** The answer as the editor should aim at it, with or without holes. */
   private target(): Target | null {
     if (!this.answerOn || this.answerText === null) return null;
@@ -1458,6 +1487,9 @@ export class QuestScene implements Scene {
       case "blanks":
         void this.toggleBlanks();
         break;
+      case "complete":
+        this.completeLine();
+        break;
       case "run":
         void this.run();
         break;
@@ -1840,6 +1872,9 @@ export class QuestScene implements Scene {
       // read a harder way, and a button that silently did nothing until you
       // had pressed another one first would be a button nobody trusts.
       { id: "blanks", label: t("quest.blanks"), dim: this.answerBusy, strong: this.blanksOn },
+      // One line of the answer, on a press. It used to be TAB and TAB is the
+      // editor's key — a person writing code reaches for it to indent.
+      { id: "complete", label: t("quest.completeLine"), dim: !this.canComplete() },
     ];
     const rowW = Math.max(f.size * 4, bx - pad * 2);
     const rows = rowsIn(
@@ -1873,7 +1908,7 @@ export class QuestScene implements Scene {
         ? `   ${t("quest.answerMatched")}`
         : prog.wrong > 0
           ? `   ${t("quest.answerDiverged")}`
-          : `   ${this.blanksOn ? t("quest.blanksTab") : t("quest.answerTab")}`;
+          : "";
     const drill = this.blanksOn ? `   ${t("quest.blanks")}` : "";
     const status = on
       ? `${MAIN_FILE[this.land]}${drill}   ${prog.matched} / ${prog.total}${tail}`
