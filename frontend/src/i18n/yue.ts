@@ -222,6 +222,7 @@ export const yue: Partial<Catalogue> = {
   "quest.answer": "對照輸入",
   "quest.answerMatched": "完全一致",
   "quest.answerDiverged": "改紅色嗰度",
+  "quest.answerTab": "TAB  補完呢行",
   "quest.fontSize": "碼嘅字大細 {percent}%",
   "quest.leaveMapTitle": "返地圖？",
   "quest.leaveLobbyTitle": "返大堂？",

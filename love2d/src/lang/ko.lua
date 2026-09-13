@@ -193,6 +193,7 @@ return {
   ["DONE"] = "완료",
   ["MATCHED"] = "완전 일치",
   ["FIX THE RED"] = "빨간 부분을 고치세요",
+  ["TAB completes the line"] = "TAB 줄 완성",
   ["costs a star"] = "별 하나를 씁니다",
   ["no answer key here"] = "여기에는 정답이 없습니다",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "정답이 에디터에 들어왔습니다 — CTRL-Z 로 원래 코드가 돌아옵니다. 클리어는 그대로 되지만 별 셋은 아닙니다. 보는 것은 시도가 아니고, 기록은 SUBMIT 만 남깁니다",

@@ -9,7 +9,7 @@
  * source that was already tidy.
  */
 import { describe, expect, it } from "vitest";
-import { answerProgress, narrowEdit } from "../src/ui/editor";
+import { answerCompletion, answerProgress, narrowEdit } from "../src/ui/editor";
 
 const apply = (cur: string, e: { from: number; to: number; insert: string }) =>
   cur.slice(0, e.from) + e.insert + cur.slice(e.to);
@@ -108,5 +108,47 @@ describe("answerProgress", () => {
     const after = answerProgress("fn main() {\n", answer);
     expect(after.matched).toBeGreaterThan(before.matched);
     expect(answer.slice(before.matched, after.matched)).toContain("\n");
+  });
+});
+
+/**
+ * What TAB gives you in ANSWER mode.
+ *
+ * The pedal has to be honest about two things: it never completes past a
+ * mistake (that would bury the divergence under correct text), and at the end
+ * of a line it gives the next line's indentation rather than its content —
+ * typing the solution is the exercise, typing eight spaces is not.
+ */
+describe("answerCompletion", () => {
+  const answer = 'fn main() {\n    println!("hi");\n}\n';
+
+  it("completes the rest of the line you are on", () => {
+    expect(answerCompletion("", answer)).toBe("fn main() {");
+    expect(answerCompletion("fn ma", answer)).toBe("in() {");
+  });
+
+  it("at a line's end, gives the newline and the next line's indent", () => {
+    expect(answerCompletion("fn main() {", answer)).toBe("\n    ");
+    expect(answerCompletion('fn main() {\n    println!("hi");', answer)).toBe("\n");
+  });
+
+  it("refuses to complete past a divergence", () => {
+    expect(answerCompletion("fn maim", answer)).toBeNull();
+    expect(answerCompletion("zzz", answer)).toBeNull();
+    expect(answerCompletion(answer + " ", answer)).toBeNull();
+  });
+
+  it("has nothing to give once the answer is typed", () => {
+    expect(answerCompletion(answer, answer)).toBeNull();
+  });
+
+  it("typed end to end, it lands exactly on the answer", () => {
+    let typed = "";
+    for (let i = 0; i < 200; i++) {
+      const next = answerCompletion(typed, answer);
+      if (next === null) break;
+      typed += next;
+    }
+    expect(typed).toBe(answer);
   });
 });

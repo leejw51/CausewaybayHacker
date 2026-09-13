@@ -199,6 +199,7 @@ return {
   ["DONE"] = "完成",
   ["MATCHED"] = "完全一致",
   ["FIX THE RED"] = "改紅色嗰度",
+  ["TAB completes the line"] = "TAB 補完呢行",
   ["costs a star"] = "要用一粒星",
   ["no answer key here"] = "呢度冇答案",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "答案已經入咗編輯器 — CTRL-Z 可以攞返你自己嘅碼。呢題仲可以通關，不過就攞唔到三粒星；睇答案唔算一次嘗試，淨係 SUBMIT 先會記低",

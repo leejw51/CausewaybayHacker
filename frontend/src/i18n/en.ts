@@ -232,6 +232,7 @@ export const en = {
   "quest.answer": "ANSWER",
   "quest.answerMatched": "MATCHED — EVERY CHARACTER",
   "quest.answerDiverged": "FIX THE RED",
+  "quest.answerTab": "TAB  COMPLETE THE LINE",
   "quest.fontSize": "code size {percent}%",
   "quest.leaveMapTitle": "BACK TO THE MAP?",
   "quest.leaveLobbyTitle": "BACK TO THE LOBBY?",

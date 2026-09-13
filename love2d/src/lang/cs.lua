@@ -214,6 +214,7 @@ return {
   ["DONE"] = "HOTOVO",
   ["MATCHED"] = "SHODA",
   ["FIX THE RED"] = "OPRAV ČERVENÉ",
+  ["TAB completes the line"] = "TAB DOPLNÍ ŘÁDEK",
   ["costs a star"] = "stojí hvězdu",
   ["no answer key here"] = "tady řešení není",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "řešení je v editoru — CTRL-Z vrátí to tvoje. Úlohu pořád splníš, jen už ne na tři hvězdy; podívat se není pokus, zapíše ho teprve SUBMIT",

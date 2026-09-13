@@ -212,6 +212,7 @@ export const ja: Partial<Catalogue> = {
   "quest.answer": "なぞり書き",
   "quest.answerMatched": "完全一致",
   "quest.answerDiverged": "赤を直す",
+  "quest.answerTab": "TAB  行を補完",
   "quest.fontSize": "コードの大きさ {percent}%",
   "quest.leaveMapTitle": "マップへ戻りますか？",
   "quest.leaveLobbyTitle": "ロビーへ戻りますか？",

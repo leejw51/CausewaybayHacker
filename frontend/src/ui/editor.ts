@@ -14,6 +14,7 @@
  */
 import {
   EditorState,
+  Prec,
   StateEffect,
   StateField,
   type Extension,
@@ -200,11 +201,76 @@ export interface AnswerProgress {
   total: number;
 }
 
+/**
+ * What TAB completes in ANSWER mode: the rest of the line you are on.
+ *
+ * **The rest of the line, and at a line's end the next line's indentation.**
+ * Typing a whole solution character by character is the exercise; typing the
+ * eight spaces at the start of a continuation line is not, and neither is the
+ * tail of a line you have clearly already remembered. TAB is the pedal for
+ * both.
+ *
+ * `null` when there is nothing to complete: the answer is typed, or — and
+ * this is the one worth being strict about — what is in the buffer has
+ * stopped being the answer. Completing *past* a divergence would bury the
+ * mistake under correct text and leave a buffer that cannot compile with no
+ * sign of where it went wrong.
+ */
+export function answerCompletion(typed: string, answer: string): string | null {
+  const { matched } = answerProgress(typed, answer);
+  if (typed.length !== matched) return null;
+  const rest = answer.slice(matched);
+  if (rest.length === 0) return null;
+  if (rest.startsWith("\n")) {
+    const next = rest.slice(1);
+    const indent = /^[ \t]*/.exec(next)?.[0] ?? "";
+    return "\n" + indent;
+  }
+  const nl = rest.indexOf("\n");
+  return nl === -1 ? rest : rest.slice(0, nl);
+}
+
 export function answerProgress(typed: string, answer: string): AnswerProgress {
   let k = 0;
   while (k < typed.length && k < answer.length && typed[k] === answer[k]) k++;
   return { matched: k, wrong: typed.length - k, done: typed === answer, total: answer.length };
 }
+
+/**
+ * TAB, while ANSWER is on: take the completion and put the caret after it.
+ *
+ * `Prec.highest` because `indentWithTab` is in the base keymap and would
+ * otherwise get there first. It gives the key back — returns false — when
+ * there is nothing to complete, so TAB still indents on a quest without the
+ * mode on, and still indents once the answer has been typed out.
+ */
+const answerTab: Extension = Prec.highest(
+  keymap.of([
+    {
+      key: "Tab",
+      run: (view) => {
+        const answer = view.state.field(answerField, false) ?? null;
+        // ANSWER off: TAB is the editor's own, and indents.
+        if (answer === null) return false;
+        const insert = answerCompletion(view.state.doc.toString(), answer);
+        // **ANSWER on owns the key even when it has nothing to give.** With
+        // the answer typed out, falling through to `indentWithTab` puts a tab
+        // into a buffer that was exactly right a moment ago — the count goes
+        // from MATCHED to a line of red the player did not type. Past a
+        // divergence the same applies: the thing to do is fix it, not indent
+        // it. So the press is consumed and nothing happens.
+        if (insert === null) return true;
+        const at = view.state.doc.length;
+        view.dispatch({
+          changes: { from: at, insert },
+          selection: { anchor: at + insert.length },
+          scrollIntoView: true,
+        });
+        return true;
+      },
+    },
+  ]),
+);
 
 const base: Extension = [
   lineNumbers(),
@@ -277,6 +343,7 @@ export class Editor {
       extensions: [
         base,
         answerField,
+        answerTab,
         ghost,
         // A phone's keyboard, told this is code. Without these iOS
         // capitalises the first letter of `fn main`, turns `"hello"` into

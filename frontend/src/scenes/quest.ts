@@ -1343,6 +1343,12 @@ export class QuestScene implements Scene {
     switch (hit.id) {
       case "focus":
         this.focus = true;
+        // **Effects only on the code page.** Nothing on the way here starts
+        // music — every screen that does stops it as it leaves — but this
+        // page is somebody working, and a stray loop over a writing session
+        // is the thing you cannot un-hear. Said once, here, so no future
+        // route into it can bring one along.
+        this.app.chip.music("stop");
         break;
       case "unfocus":
         this.focus = false;
@@ -1761,7 +1767,7 @@ export class QuestScene implements Scene {
         ? `   ${t("quest.answerMatched")}`
         : prog.wrong > 0
           ? `   ${t("quest.answerDiverged")}`
-          : "";
+          : `   ${t("quest.answerTab")}`;
     const status = on
       ? `${MAIN_FILE[this.land]}   ${prog.matched} / ${prog.total}${tail}`
       : MAIN_FILE[this.land];

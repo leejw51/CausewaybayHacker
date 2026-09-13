@@ -364,6 +364,21 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   expect(await editorText(page)).not.toBe("");
   await shot(page, "62-answer-ghost");
 
+  // TAB takes the rest of the line. Pressed until it stops giving, it lands
+  // exactly on the answer — checked here, on a clean buffer, because past a
+  // divergence TAB is supposed to refuse instead (see below).
+  const ghosts = () => page.evaluate(() => document.querySelectorAll(".cwb-ghost").length);
+  for (let i = 0; i < 40 && (await ghosts()) > 0; i++) {
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(120);
+  }
+  await page.waitForTimeout(400);
+  expect(await ghosts()).toBe(0);
+  // Exactly the answer, and nothing past it: a TAB with nothing left to
+  // complete is consumed rather than left to indent a buffer that is right.
+  expect(await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length)).toBe(0);
+  await shot(page, "64-answer-tabbed");
+
   // ANSWER shows the solution; it never writes it. Toggle off, type
   // something of the player's own, toggle back on: the writing stays.
   await page.mouse.click(answer![0], answer![1]);
@@ -383,6 +398,12 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   expect(
     await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length),
   ).toBeGreaterThan(0);
+  // And TAB refuses while the buffer has stopped being the answer: completing
+  // past a mistake would bury it under correct text.
+  const stuck = await docText();
+  await page.keyboard.press("Tab");
+  await page.waitForTimeout(250);
+  expect(await docText()).toBe(stuck);
   await shot(page, "63-answer-diverged");
 
   // The effects are painted on their own layer *over* the editor, because

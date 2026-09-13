@@ -405,4 +405,59 @@ return function()
     I18n.set(was_lang)
     Layout.font, Layout.mode, Layout.vw, Layout.vh = was_font, was_mode, was_vw, was_vh
   end)
+
+  T.section("quest — ANSWER (the type-along target)")
+
+  T.case("the progress is a prefix, and it says where the two part company", function()
+    local Quest = require("src.scenes.quest")
+    local answer = 'fn main() {\n    println!("hi");\n}\n'
+
+    local empty = Quest.answer_progress("", answer)
+    T.eq(empty.matched, 0, "nothing typed is nothing matched")
+    T.eq(empty.wrong, 0, "and nothing wrong")
+    T.eq(empty.total, #answer, "out of the whole answer")
+    T.nope(empty.done, "and it is not done")
+
+    T.eq(Quest.answer_progress("fn main", answer).matched, 7, "a prefix counts")
+    local bad = Quest.answer_progress("fn maim() {", answer)
+    T.eq(bad.matched, 6, "the count stops at the divergence")
+    T.eq(bad.wrong, 5, "and the rest is the divergence")
+
+    T.ok(Quest.answer_progress(answer, answer).done, "every character, exactly")
+    T.nope(Quest.answer_progress(answer .. " ", answer).done, "one past it is not done")
+    T.eq(Quest.answer_progress(answer .. " ", answer).wrong, 1, "it is one wrong")
+  end)
+
+  T.case("TAB takes the line, and refuses to take it past a mistake", function()
+    local Quest = require("src.scenes.quest")
+    local answer = 'fn main() {\n    println!("hi");\n}\n'
+
+    T.eq(Quest.answer_completion("", answer), "fn main() {", "the line you are on")
+    T.eq(Quest.answer_completion("fn ma", answer), "in() {", "from where you are in it")
+    T.eq(Quest.answer_completion("fn main() {", answer), "\n    ",
+      "at a line's end, the newline and the next line's indent")
+    T.eq(Quest.answer_completion("fn maim", answer), nil, "never past a divergence")
+    T.eq(Quest.answer_completion(answer, answer), nil, "and nothing once it is typed")
+
+    -- Pressed until it stops giving, it lands exactly on the answer. That is
+    -- the whole of what the pedal promises.
+    local typed = ""
+    for _ = 1, 200 do
+      local next_ = Quest.answer_completion(typed, answer)
+      if not next_ then break end
+      typed = typed .. next_
+    end
+    T.eq(typed, answer, "TAB alone types the answer out, exactly")
+  end)
+
+  T.case("the boilerplate goes, a draft never does", function()
+    local Quest = require("src.scenes.quest")
+    local starter = "fn main() {\n    // your code here\n}\n"
+    T.ok(Quest.clears_for_answer(starter, starter), "the starter the quest shipped")
+    T.ok(Quest.clears_for_answer("\n" .. starter .. "  ", starter),
+      "whitespace nobody decided on is not a difference")
+    T.nope(Quest.clears_for_answer(starter .. "// mine\n", starter), "a draft stays")
+    T.nope(Quest.clears_for_answer("", starter), "and an empty buffer is not the starter")
+    T.nope(Quest.clears_for_answer("", ""), "a quest with no starter clears nothing")
+  end)
 end

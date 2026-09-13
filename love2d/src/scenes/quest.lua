@@ -527,6 +527,32 @@ function Quest.answer_progress(typed, answer)
   return { matched = k, wrong = #typed - k, done = typed == answer, total = #answer }
 end
 
+--- What TAB completes in ANSWER mode: the rest of the line you are on.
+---
+--- **The rest of the line, and at a line's end the next line's indentation.**
+--- Typing a whole solution character by character is the exercise; typing the
+--- eight spaces at the start of a continuation line is not, and neither is the
+--- tail of a line you have clearly already remembered. TAB is the pedal for
+--- both.
+---
+--- `nil` when there is nothing to complete: the answer is typed, or — and
+--- this is the one worth being strict about — the buffer has stopped being
+--- the answer. Completing past a divergence would bury the mistake under
+--- correct text and leave a buffer that cannot compile with no sign of where
+--- it went wrong.
+function Quest.answer_completion(typed, answer)
+  if not answer or answer == "" then return nil end
+  local p = Quest.answer_progress(typed, answer)
+  if #typed ~= p.matched then return nil end
+  local rest = answer:sub(p.matched + 1)
+  if rest == "" then return nil end
+  if rest:sub(1, 1) == "\n" then
+    return "\n" .. (rest:sub(2):match("^[ \t]*") or "")
+  end
+  local nl = rest:find("\n", 1, true)
+  return nl and rest:sub(1, nl - 1) or rest
+end
+
 --- Whether ANSWER should empty the buffer as it opens.
 ---
 --- The starter is the server's boilerplate and against the answer it is
@@ -1099,6 +1125,7 @@ function Quest:draw_code()
       status = status .. "   " .. I18n.t("FIX THE RED")
       colour = Theme.red
     else
+      status = status .. "   " .. I18n.t("TAB completes the line")
       colour = Theme.coin
     end
   end
@@ -2325,6 +2352,23 @@ function Quest:keypressed(key, mods)
   -- switch-pane gesture everywhere else anyway, and TAB alone still indents.
   if key == "tab" and cmd then
     self.focus = self.focus == "editor" and "brief" or "editor"
+    return true
+  end
+  -- **TAB is ANSWER's pedal while ANSWER is on.** It takes the rest of the
+  -- line, and at a line's end the next line's indentation. When there is
+  -- nothing to take — the answer is typed out, or the buffer has stopped
+  -- being the answer — the press is *consumed and does nothing* rather than
+  -- falling through to indent: a tab put into a buffer that was exactly
+  -- right a moment ago turns MATCHED into a line of red nobody typed, and
+  -- past a divergence the thing to do is fix it, not indent it.
+  if key == "tab" and not cmd and not mods.shift
+    and self.answer_on and self.focus == "editor" and self.editor then
+    local insert = Quest.answer_completion(self.editor:text(), self.answer_text)
+    if insert then
+      self.editor:move("doc_end")
+      self.editor:insert(insert)
+      SFX.play("move")
+    end
     return true
   end
 
