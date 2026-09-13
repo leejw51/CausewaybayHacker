@@ -71,6 +71,7 @@ impl Home {
             home.root.join("build/rust/target"),
             home.edits_dir(),
             home.logs_dir(),
+            home.backups_dir(),
         ] {
             ensure_dir(&dir)?;
         }
@@ -112,6 +113,13 @@ impl Home {
     }
     pub fn logs_dir(&self) -> PathBuf {
         self.root.join("logs")
+    }
+    /// `backups/hacker-<stamp>.db` — a copy of the database taken at every
+    /// start, before the migrations touch it (`db::backup`). The record is
+    /// the player's weeks of clears; a home that was wiped, or a migration
+    /// that went wrong, must not be the end of it.
+    pub fn backups_dir(&self) -> PathBuf {
+        self.root.join("backups")
     }
     pub fn log_file(&self) -> PathBuf {
         self.logs_dir().join("server.jsonl")

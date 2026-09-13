@@ -71,8 +71,68 @@ pub fn latest_version() -> i64 {
     MIGRATIONS.last().map(|m| m.0).unwrap_or(0)
 }
 
+/// How many startup backups are kept. Seven starts is a week of `make
+/// start`s for somebody who plays daily and a month for somebody who does
+/// not, and the newest is the one that matters.
+pub const BACKUPS_KEPT: usize = 7;
+
+/// Copy the database into `dir` as `hacker-<stamp>.db`, consistently, with
+/// the WAL folded in — `VACUUM INTO`, not a file copy, which would miss
+/// every write still sitting in `hacker.db-wal`. Taken **before** `open`
+/// runs the migrations, so what is kept is the database as the last server
+/// left it. A missing or empty database is nothing to back up. The oldest
+/// copies past `BACKUPS_KEPT` are removed.
+///
+/// Best effort, said so out loud: a disk too full to take a copy is a
+/// reason to warn, not a reason to refuse to serve the player's record.
+pub fn backup(path: &Path, dir: &Path) -> Result<Option<std::path::PathBuf>> {
+    let size = match std::fs::metadata(path) {
+        Ok(meta) => meta.len(),
+        Err(_) => return Ok(None),
+    };
+    if size == 0 {
+        return Ok(None);
+    }
+    let stamp = crate::time::now_stamp()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect::<String>();
+    let target = dir.join(format!("hacker-{stamp}.db"));
+    let conn = Connection::open(path)?;
+    conn.execute("VACUUM INTO ?1", [target.to_string_lossy().as_ref()])?;
+    drop(conn);
+    set_private(&target, 0o600)?;
+    // Prune: the names sort by stamp, so the oldest are the first.
+    let mut copies: Vec<_> = std::fs::read_dir(dir)?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.starts_with("hacker-") && n.ends_with(".db"))
+                .unwrap_or(false)
+        })
+        .collect();
+    copies.sort();
+    while copies.len() > BACKUPS_KEPT {
+        let old = copies.remove(0);
+        let _ = std::fs::remove_file(old);
+    }
+    Ok(Some(target))
+}
+
 /// Open `hacker.db`, apply everything, hand back a ready connection.
 pub fn open(path: &Path) -> Result<Connection> {
+    // Said before it happens: a database that is not there is a record that
+    // starts empty, and when that is not what somebody expected — a home
+    // that was moved, a `--home` pointing somewhere new — this line in the
+    // log is the one that explains where their clears went.
+    let fresh = !std::fs::metadata(path)
+        .map(|m| m.len() > 0)
+        .unwrap_or(false);
+    if fresh {
+        tracing::warn!(db = %path.display(), "no database here — starting an empty record");
+    }
     let conn = Connection::open(path)?;
     configure(&conn)?;
     // SQLite creates the db and its sidecars under the umask; §1 says every

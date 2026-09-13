@@ -22,6 +22,12 @@ impl Store {
     /// Open (or create) the home and the database inside it.
     pub fn open(root: &Path) -> Result<Store> {
         let home = Home::open(root)?;
+        // A copy of the record before this version's migrations touch it.
+        match crate::db::backup(&home.db_path(), &home.backups_dir()) {
+            Ok(Some(copy)) => tracing::info!(backup = %copy.display(), "database backed up"),
+            Ok(None) => {}
+            Err(e) => tracing::warn!(error = %e, "could not back the database up"),
+        }
         let conn = crate::db::open(&home.db_path())?;
         Ok(Store {
             home,
