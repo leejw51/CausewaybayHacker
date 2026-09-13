@@ -349,6 +349,7 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
         .join("\n"),
     );
   const before = await docText();
+  expect(before.trim().length).toBeGreaterThan(0);
   await page.mouse.click(answer![0], answer![1]);
   await expect
     .poll(async () => page.evaluate(() => document.querySelectorAll(".cwb-ghost").length), {
@@ -356,11 +357,24 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
       message: "waiting for the answer ghost",
     })
     .toBeGreaterThan(0);
-  // ANSWER shows the solution; it does not write it. SOLVE is the one that
-  // replaces the buffer, and the two must not be confused.
-  expect(await docText()).toBe(before);
-  expect(await editorText(page)).not.toBe(before);
+  // The starter goes: it is the server's boilerplate, and against the answer
+  // it is a screenful of red nobody typed.
+  expect((await docText()).trim()).toBe("");
+  // But the ghost is there to type over, so the *rendered* lines are not.
+  expect(await editorText(page)).not.toBe("");
   await shot(page, "62-answer-ghost");
+
+  // ANSWER shows the solution; it never writes it. Toggle off, type
+  // something of the player's own, toggle back on: the writing stays.
+  await page.mouse.click(answer![0], answer![1]);
+  await page.waitForTimeout(400);
+  await page.keyboard.type("let mine = 1;");
+  await page.waitForTimeout(300);
+  const mine = await docText();
+  expect(mine).toContain("let mine = 1;");
+  await page.mouse.click(answer![0], answer![1]);
+  await page.waitForTimeout(600);
+  expect(await docText()).toBe(mine);
 
   // A character that is not the answer is marked, not swallowed.
   await page.keyboard.press("Control+Home");

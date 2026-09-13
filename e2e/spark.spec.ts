@@ -15,6 +15,16 @@ test("a burst is painted where the mistake is", async ({ page }) => {
     .toBeGreaterThan(0);
   // Type a character that is not the answer, then look immediately — no
   // settle, because settling ages the particles past their life.
+  // Pressing a canvas button hands the caret back to the editor — on the
+  // next turn, because the browser's own handling of the press blurs it
+  // after the handler has run. Waited for rather than raced: without this
+  // the keystrokes below went to the page and the burst never fired, which
+  // is a flake in the test and not a fault in the product.
+  await expect
+    .poll(async () => page.evaluate(() => document.activeElement?.className ?? ""), {
+      message: "waiting for the caret to go back into the editor",
+    })
+    .toMatch(/cm-content/);
   await page.keyboard.press("Control+Home");
   await page.keyboard.type("q");
   await page.waitForTimeout(260);
