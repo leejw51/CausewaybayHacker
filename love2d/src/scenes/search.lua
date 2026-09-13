@@ -130,49 +130,80 @@ function Search:draw()
     local pad = Layout.isPortrait() and 12 or 46
   local w = vw - pad * 2
 
+  -- The header band is as tall as its title (see `stats.lua`), the box as
+  -- tall as the face typed into it, and the mode buttons as tall as the
+  -- display controls. All three were constants written against the 8 px
+  -- ladder, and at the largest type step the title, the box and the buttons
+  -- were printed through one another.
+  local head = math.max(44, UI.lineHeight(15) + 20)
   UI.setColor(Theme.ink, 0.9)
-  love.graphics.rectangle("fill", 0, 0, vw, 44)
+  love.graphics.rectangle("fill", 0, 0, vw, head)
   love.graphics.setColor(1, 1, 1, 1)
-  UI.text(I18n.t("SEARCH"), 12, 12, 15, Theme.cyan)
+  UI.text(I18n.t("SEARCH"), 12, math.floor((head - UI.lineHeight(15)) / 2), 15, Theme.cyan)
 
-  -- The box.
-  local by = 54
+  -- The box. The face follows the type step, like the login fields.
+  local font = Assets.mono(math.floor(Layout.ui(8) * 1.5))
+  local bh = font:getHeight() + 12
+  local by = head + 10
   UI.setColor(Theme.void, 0.9)
-  love.graphics.rectangle("fill", pad, by, w, 32)
+  love.graphics.rectangle("fill", pad, by, w, bh)
   love.graphics.setLineWidth(2)
   UI.setColor(Theme.coin)
-  love.graphics.rectangle("line", pad + 1, by + 1, w - 2, 30)
+  love.graphics.rectangle("line", pad + 1, by + 1, w - 2, bh - 2)
   love.graphics.setColor(1, 1, 1, 1)
-  local font = Assets.mono(20)
   love.graphics.setFont(font)
+  local ty = by + 6
   if self.q == "" then
     UI.setColor(Theme.withAlpha(Theme.cream, 0.35))
-    love.graphics.print("borrow checker, goroutines, lifetimes…", pad + 10, by + 6)
+    love.graphics.print("borrow checker, goroutines, lifetimes…", pad + 10, ty)
   else
     UI.setColor(Theme.cream)
-    love.graphics.print(self.q, pad + 10, by + 6)
+    love.graphics.print(self.q, pad + 10, ty)
     if (love.timer.getTime() * 2) % 2 < 1.2 then
       UI.setColor(Theme.coin)
-      love.graphics.rectangle("fill", pad + 10 + font:getWidth(self.q), by + 6, 2, font:getHeight())
+      love.graphics.rectangle("fill", pad + 10 + font:getWidth(self.q), ty, 2, font:getHeight())
     end
   end
   love.graphics.setColor(1, 1, 1, 1)
 
   -- The three modes, as a row, because §8 gives them equal standing.
-  local my = by + 38
-  local mw = math.min(120, (w - 16) / 3)
+  local my = by + bh + 8
+  local mh = UI.chipHeight()
+  -- The label size steps down until SEMANTIC fits a third of the row: at
+  -- the largest type step it does not at the button face, and `printf`
+  -- then wraps its last letter under the button.
+  local size = UI.CHIP_SIZE
+  local mw
+  while true do
+    mw = 0
+    for _, mode in ipairs(MODES) do
+      mw = math.max(mw, UI.textWidth(mode:upper(), size) + 24)
+    end
+    if mw <= (w - 16) / 3 or size <= 6 then break end
+    size = size - 1
+  end
+  mw = math.min(mw, (w - 16) / 3)
   self.mode_rects = {}
   for i, mode in ipairs(MODES) do
     local mx = pad + (i - 1) * (mw + 8)
     local on = mode == self.mode
-    UI.button(mx, my, mw, 22, mode:upper(), on and "hot" or "normal", 8)
-    self.mode_rects[mode] = { x = mx, y = my, w = mw, h = 22 }
+    UI.button(mx, my, mw, mh, mode:upper(), on and "hot" or "normal", size)
+    self.mode_rects[mode] = { x = mx, y = my, w = mw, h = mh }
   end
-  UI.text(I18n.t(MODE_BLURB[self.mode] or ""), pad + 3 * (mw + 8) + 6, my + 7, 7,
-    Theme.withAlpha(Theme.cream, 0.55))
-
-  local ly = my + 32
-  self:draw_results(pad, ly, w, vh - ly - 40)
+  -- The blurb beside the row when it fits, under it when it does not.
+  local blurb = I18n.t(MODE_BLURB[self.mode] or "")
+  local bx = pad + 3 * (mw + 8) + 6
+  local ly = my + mh + 10
+  if UI.textWidth(blurb, 7) <= w - (bx - pad) then
+    UI.text(blurb, bx, my + math.floor((mh - UI.lineHeight(7)) / 2), 7,
+      Theme.withAlpha(Theme.cream, 0.55))
+  else
+    for _, line in ipairs(UI.wrap(blurb, w, 7)) do
+      ly = ly + UI.text(line, pad, ly, 7, Theme.withAlpha(Theme.cream, 0.55)) + 2
+    end
+    ly = ly + 4
+  end
+  self:draw_results(pad, ly, w, vh - ly - UI.footerHeight() - 8)
 
   self.app:footer(I18n.t("TYPE to search   ENTER go   TAB mode   ARROWS pick   ESC back"))
 end
@@ -186,8 +217,7 @@ function Search:draw_results(x, y, w, h)
     -- §3.3: real, but not built yet. Said in the story's voice, with no retry
     -- offered — retrying something that does not exist is the thing this code
     -- exists to avoid.
-    UI.text(I18n.t("NOT BUILT YET"), x + 16, cy, 10, Theme.coin)
-    cy = cy + 18
+    cy = cy + UI.text(I18n.t("NOT BUILT YET"), x + 16, cy, 10, Theme.coin) + 6
     local said = self.unavailable.milestone
       and I18n.t("One box over every quest, in three rankings at once. It "
         .. "opens in chapter %s.", tostring(self.unavailable.milestone))
@@ -204,7 +234,7 @@ function Search:draw_results(x, y, w, h)
       cy = cy + UI.text(line, x + 16, cy, 7, Theme.withAlpha(Theme.cream, 0.55)) + 3
     end
     if self.unavailable.message then
-      UI.text(self.unavailable.message, x + 16, y + h - 18, 7,
+      UI.text(self.unavailable.message, x + 16, y + h - 10 - UI.lineHeight(7), 7,
         Theme.withAlpha(Theme.cream, 0.35))
     end
     love.graphics.setScissor()

@@ -170,19 +170,23 @@ function Ai:draw()
     local pad = Layout.isPortrait() and 12 or 46
   local w = vw - pad * 2
 
+  -- The header band is as tall as its title (see `stats.lua`).
+  local head = math.max(44, UI.lineHeight(15) + 20)
+  local title_y = math.floor((head - UI.lineHeight(15)) / 2)
   UI.setColor(Theme.ink, 0.9)
-  love.graphics.rectangle("fill", 0, 0, vw, 44)
+  love.graphics.rectangle("fill", 0, 0, vw, head)
   love.graphics.setColor(1, 1, 1, 1)
-  UI.text(I18n.t("AI MODE"), 12, 10, 15, Theme.cyan)
+  UI.text(I18n.t("AI MODE"), 12, title_y, 15, Theme.cyan)
   -- Measured rather than guessed at: the title's width changes with
   -- `uiScale`, and a fixed offset had the subtitle sitting on top of it.
   local caption = I18n.t("built from your own record, not from a language model")
   local cx = 12 + UI.textWidth("AI MODE", 15) + 16
   if cx + UI.textWidth(caption, 7) < vw - 12 then
-    UI.text(caption, cx, 18, 7, Theme.withAlpha(Theme.cream, 0.45))
+    UI.text(caption, cx, math.floor((head - UI.lineHeight(7)) / 2), 7,
+      Theme.withAlpha(Theme.cream, 0.45))
   end
 
-  local y = 54
+  local y = head + 10
   y = self:draw_modes(pad, y, w) + 10
 
   if self.drill and self.quest then
@@ -211,6 +215,9 @@ end
 --- `categories.lua` worked out: at their own aspect, as tall as the row,
 --- anchored **right** with a short fade on its left edge, and the words kept
 --- in their own gutter beside it rather than on top of it.
+--- The least the panel under the mode cards is ever given; see `draw_modes`.
+Ai.MIN_PANEL = 140
+
 function Ai:draw_modes(x, y, w)
   -- Measured from the type, and tall enough for two lines of blurb. The
   -- fixed 76 was right for an 11 px title over 7 px body; at twice that the
@@ -219,6 +226,14 @@ function Ai:draw_modes(x, y, w)
   local title_h, body_h = UI.lineHeight(11), UI.lineHeight(7)
   local h = 8 + title_h + 6 + body_h * 2 + 8
   local gap = 8
+  -- **Compact when the three would not leave the panel under them room.**
+  -- At the largest type step in a short landscape window three cards with
+  -- their blurbs are the whole height of the screen, and the panel that
+  -- says what the drill found — the point of the screen — was drawn under
+  -- the footer. Then the cards are their titles alone.
+  local bottom = Layout.vh - UI.footerHeight() - 8
+  local compact = y + #MODES * (h + gap) + Ai.MIN_PANEL > bottom
+  if compact then h = 8 + title_h + 8 end
   self.mode_rects = {}
   for i, mode in ipairs(MODES) do
     local my = y + (i - 1) * (h + gap)
@@ -259,7 +274,7 @@ function Ai:draw_modes(x, y, w)
       on and Theme.coin or Theme.cream)
     local lines = UI.wrap(I18n.t(MODE_TEXT[mode].blurb), text_w, 7)
     local body_top = my + 8 + title_h + 6
-    local room = math.max(1, math.floor((my + h - 8 - body_top) / body_h))
+    local room = compact and 0 or math.max(1, math.floor((my + h - 8 - body_top) / body_h))
     for j = 1, math.min(room, #lines) do
       UI.text(lines[j], x + 10, body_top + (j - 1) * body_h, 7,
         Theme.withAlpha(Theme.cream, on and 0.85 or 0.5))

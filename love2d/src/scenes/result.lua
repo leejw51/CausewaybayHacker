@@ -40,6 +40,88 @@ function Result:enter(params)
   self.log = params.log
   self.t = 0
   self.started = Anim.now()
+  self.next_id = nil
+  self:find_next()
+end
+
+--- Which node comes after this one, so NEXT has somewhere to go.
+---
+--- Asked of the server rather than remembered from the map: `world.map` is
+--- what the map screen itself draws from, and the node after this one is a
+--- fact about the pack, not about which screen the player came through. The
+--- next node by number; the last node of a map has no NEXT and the button
+--- says so by not being there.
+function Result:find_next()
+  local id = self.attempt and self.attempt.quest_id or self.app.quest_id
+  local land, category = self.app.land, self.app.category
+  if not id or not land or not category or not self.app.session then return end
+  self.app.session:request("world.map",
+    { land = land, category = category, locale = I18n.lang },
+    function(ok, payload)
+      if not ok or not payload or not payload.nodes then return end
+      local nodes = {}
+      for _, node in ipairs(payload.nodes) do nodes[#nodes + 1] = node end
+      table.sort(nodes, function(a, b) return (a.node or 0) < (b.node or 0) end)
+      for i, node in ipairs(nodes) do
+        if node.quest_id == id then
+          self.next_id = nodes[i + 1] and nodes[i + 1].quest_id or nil
+          return
+        end
+      end
+    end)
+end
+
+--- RETRY, NEXT and MAP — the three ways off this screen, each with its key
+--- printed on it. NEXT is lit after an acceptance, RETRY after anything
+--- else, and NEXT is absent on the last node of a map.
+---
+--- Laid into rows of `width`: at the largest type step three labels are
+--- wider than a portrait panel, and a button that did not fit used to be a
+--- button that was not drawn. The label size steps down to 7 first; what
+--- still does not fit on one row starts another.
+function Result:button_rows(width, accepted)
+  local wanted = {
+    { id = "retry", label = "RETRY  [ENTER]", state = accepted and "normal" or "hot",
+      act = function() self:retry() end },
+  }
+  if self.next_id then
+    wanted[#wanted + 1] = { id = "next", label = "NEXT  [N]",
+      state = accepted and "hot" or "normal", act = function() self:next_quest() end }
+  end
+  wanted[#wanted + 1] = { id = "map", label = "MAP  [ESC]", state = "normal",
+    act = function() self.app:back() end }
+
+  local size = UI.CHIP_SIZE
+  while size > 7 do
+    local total = -10
+    for _, b in ipairs(wanted) do total = total + UI.textWidth(b.label, size) + 28 + 10 end
+    if total <= width then break end
+    size = size - 1
+  end
+  local rows, row, used = {}, {}, 0
+  for _, b in ipairs(wanted) do
+    b.size = size
+    b.w = math.min(width, UI.textWidth(b.label, size) + 28)
+    if #row > 0 and used + 10 + b.w > width then
+      rows[#rows + 1] = row
+      row, used = {}, 0
+    end
+    row[#row + 1] = b
+    used = used + (#row > 1 and 10 or 0) + b.w
+  end
+  if #row > 0 then rows[#rows + 1] = row end
+  return rows
+end
+
+--- RETRY: the same quest again.
+function Result:retry()
+  self.app:go("quest", { quest_id = self.attempt and self.attempt.quest_id or self.app.quest_id })
+end
+
+--- NEXT: the node after this one, straight into its editor.
+function Result:next_quest()
+  if not self.next_id then return end
+  self.app:go("quest", { quest_id = self.next_id })
 end
 
 --- Seconds since this verdict arrived.
@@ -84,7 +166,8 @@ function Result:draw()
   -- The banner is as tall as its own word plus air: a hard 56 held an 18 px
   -- label at the first type step and cut it at every step above.
   local banner_h = math.max(56, UI.lineHeight(18) + 20)
-  local by = -banner_h + 16 + drop * 84
+  -- It lands 16 px under the top edge, from fully above it.
+  local by = -banner_h + drop * (banner_h + 16)
   local sx, sy = 0, 0
   if not accepted and not is_run then
     sx, sy = Anim.shake(self:age(), { duration = 0.34, amount = 5 })
@@ -109,7 +192,13 @@ function Result:draw()
   -- one caption's worth of room under the panel for the attempt id.
   local foot = UI.footerHeight() + UI.lineHeight(7) + 12
   UI.panel(x, y, w, vh - y - foot, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = color })
-  love.graphics.setScissor(x + 4, y + 4, w - 8, vh - y - foot - 8)
+  -- The buttons' rows, at the display controls' height, kept clear at the
+  -- bottom of the panel: the verdict scrolls, the way on does not. Laid out
+  -- first, because how many rows they need decides where the verdict ends.
+  local bh = UI.chipHeight()
+  local rows = self:button_rows(w - 24, accepted)
+  local row_h = #rows * (bh + 8) + 12
+  love.graphics.setScissor(x + 4, y + 4, w - 8, vh - y - foot - 8 - row_h)
   local cx = x + 16
   local cy = y + 12 - self.scroll
   local column = w - 32
@@ -220,13 +309,34 @@ function Result:draw()
   self.content_height = cy - (y + 12 - self.scroll)
   love.graphics.setScissor()
 
+  self.buttons = {}
+  local by = vh - foot - 10 - #rows * (bh + 8) + 8
+  for _, row in ipairs(rows) do
+    local bx = x + 12
+    for _, b in ipairs(row) do
+      UI.button(bx, by, b.w, bh, b.label, b.state, b.size)
+      self.buttons[#self.buttons + 1] =
+        { id = b.id, x = bx, y = by, w = b.w, h = bh, act = b.act }
+      bx = bx + b.w + 10
+    end
+    by = by + bh + 8
+  end
+
   UI.text(a.id or "", x + 10, vh - foot + 6, 7, Theme.withAlpha(Theme.cream, 0.4))
-  self.app:footer(I18n.t("ENTER retry   ESC map   ARROWS scroll"))
+  self.app:footer(I18n.t("ENTER retry   N next   ESC map   ARROWS scroll"))
 end
 
 function Result:keypressed(key)
   if key == "return" or key == "kpenter" then
-    self.app:go("quest", { quest_id = self.attempt and self.attempt.quest_id or self.app.quest_id })
+    self:retry()
+    return true
+  end
+  if key == "n" then
+    self:next_quest()
+    return true
+  end
+  if key == "m" then
+    self.app:back()
     return true
   end
   if key == "up" then self.scroll = math.max(0, self.scroll - 30); return true end
@@ -234,6 +344,15 @@ function Result:keypressed(key)
   if key == "pageup" then self.scroll = math.max(0, self.scroll - 200); return true end
   if key == "pagedown" then self.scroll = self.scroll + 200; return true end
   return false
+end
+
+function Result:mousepressed(x, y)
+  for _, b in ipairs(self.buttons or {}) do
+    if x >= b.x and x <= b.x + b.w and y >= b.y and y <= b.y + b.h then
+      b.act()
+      return
+    end
+  end
 end
 
 function Result:wheelmoved(_, dy)

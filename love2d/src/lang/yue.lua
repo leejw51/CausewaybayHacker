@@ -181,7 +181,7 @@ return {
   ["looking for the stage beating you most…"] = "搵緊最難倒你嘅關卡…",
   ["nothing has beaten you yet — pick a land"] = "重未有關卡難倒你 — 揀塊地啦",
   ["ARROWS mode   ENTER start   N next   F finish   ESC back"] = "方向鍵揀模式   ENTER 開始   N 下一個   F 完   ESC 返去",
-  ["ENTER retry   ESC map   ARROWS scroll"] = "ENTER 再試   ESC 地圖   方向鍵捲動",
+  ["ENTER retry   N next   ESC map   ARROWS scroll"] = "ENTER 再試   N 下一關   ESC 地圖   方向鍵捲動",
   ["R refresh   H history   ARROWS scroll   ESC back"] = "R 更新   H 歷史   方向鍵捲動   ESC 返去",
   ["TYPE to search   ENTER go   TAB mode   ARROWS pick   ESC back"] = "打字搵嘢   ENTER 去   TAB 模式   方向鍵揀   ESC 返去",
   ["F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"] = "F5 執行   F2 格式化   TAB 語言   CTRL-S 儲存   CTRL-N 新嘅   ESC 返去",

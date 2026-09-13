@@ -177,7 +177,7 @@ return {
   ["looking for the stage beating you most…"] = "最も詰まっている段階を探しています…",
   ["nothing has beaten you yet — pick a land"] = "まだ詰まった所はありません — 土地を選んでください",
   ["ARROWS mode   ENTER start   N next   F finish   ESC back"] = "矢印キー モード   ENTER 開始   N 次へ   F 終了   ESC 戻る",
-  ["ENTER retry   ESC map   ARROWS scroll"] = "ENTER 再挑戦   ESC マップ   矢印キー スクロール",
+  ["ENTER retry   N next   ESC map   ARROWS scroll"] = "ENTER 再挑戦   N 次へ   ESC マップ   矢印キー スクロール",
   ["R refresh   H history   ARROWS scroll   ESC back"] = "R 更新   H 履歴   矢印キー スクロール   ESC 戻る",
   ["TYPE to search   ENTER go   TAB mode   ARROWS pick   ESC back"] = "入力して検索   ENTER 実行   TAB モード   矢印キー 選択   ESC 戻る",
   ["F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"] = "F5 実行   F2 整形   TAB 言語   CTRL-S 保存   CTRL-N 新規   ESC 戻る",

@@ -190,7 +190,7 @@ return {
   ["looking for the stage beating you most…"] = "hledám úroveň, která tě poráží nejvíc…",
   ["nothing has beaten you yet — pick a land"] = "zatím tě nic neporazilo — vyber si zemi",
   ["ARROWS mode   ENTER start   N next   F finish   ESC back"] = "ŠIPKY režim   ENTER start   N další   F konec   ESC zpět",
-  ["ENTER retry   ESC map   ARROWS scroll"] = "ENTER znovu   ESC mapa   ŠIPKY posun",
+  ["ENTER retry   N next   ESC map   ARROWS scroll"] = "ENTER znovu   N další   ESC mapa   ŠIPKY posun",
   ["R refresh   H history   ARROWS scroll   ESC back"] = "R obnovit   H historie   ŠIPKY posun   ESC zpět",
   ["TYPE to search   ENTER go   TAB mode   ARROWS pick   ESC back"] = "PIŠ pro hledání   ENTER dál   TAB režim   ŠIPKY výběr   ESC zpět",
   -- Two spaces between the pairs rather than three, and the imperative

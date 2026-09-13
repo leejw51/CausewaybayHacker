@@ -175,7 +175,7 @@ return {
   ["looking for the stage beating you most…"] = "가장 많이 막힌 단계를 찾는 중…",
   ["nothing has beaten you yet — pick a land"] = "아직 막힌 곳이 없습니다 — 땅을 고르세요",
   ["ARROWS mode   ENTER start   N next   F finish   ESC back"] = "방향키 모드   ENTER 시작   N 다음   F 종료   ESC 뒤로",
-  ["ENTER retry   ESC map   ARROWS scroll"] = "ENTER 다시   ESC 지도   방향키 스크롤",
+  ["ENTER retry   N next   ESC map   ARROWS scroll"] = "ENTER 다시   N 다음   ESC 지도   방향키 스크롤",
   ["R refresh   H history   ARROWS scroll   ESC back"] = "R 새로고침   H 기록   방향키 스크롤   ESC 뒤로",
   ["TYPE to search   ENTER go   TAB mode   ARROWS pick   ESC back"] = "입력하여 검색   ENTER 이동   TAB 모드   방향키 선택   ESC 뒤로",
   ["F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"] = "F5 실행   F2 정렬   TAB 언어   CTRL-S 저장   CTRL-N 새로   ESC 뒤로",

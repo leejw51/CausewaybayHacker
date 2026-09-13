@@ -120,18 +120,41 @@ function Stats:draw()
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
 
-    UI.setColor(Theme.ink, 0.9)
-  love.graphics.rectangle("fill", 0, 0, vw, 44)
+    -- The header band is as tall as its title: 44 held a 15 px title at the
+  -- first type step and the title ran into the summary at every step above.
+  local head = math.max(44, UI.lineHeight(15) + 20)
+  UI.setColor(Theme.ink, 0.9)
+  love.graphics.rectangle("fill", 0, 0, vw, head)
   love.graphics.setColor(1, 1, 1, 1)
-  UI.text(I18n.t("STATS"), 12, 12, 15, Theme.coin)
+  UI.text(I18n.t("STATS"), 12, math.floor((head - UI.lineHeight(15)) / 2), 15, Theme.coin)
 
   local pad = Layout.isPortrait() and 12 or 46
   local w = vw - pad * 2
-  local y = 52
+  local top = head + 8
+  local bottom = vh - UI.footerHeight() - 8
 
-  y = self:draw_summary(pad, y, w) + 10
-  y = self:draw_shelf(pad, y, w) + 10
-  self:draw_mistakes(pad, y, w, vh - y - UI.footerHeight() - 8)
+  -- The column scrolls before the mistakes panel does. At the largest type
+  -- step in a short landscape window the summary and the shelf between
+  -- them are taller than the screen, and the mistakes panel — the point of
+  -- this screen — was left with a negative height (and a crash in
+  -- `setScissor`). So: the panel is never shorter than `MIN_MISTAKES`, the
+  -- arrow keys first lift the whole column up under the header until the
+  -- panel has that much, and only then scroll what is inside it.
+  local column_h = (self.summary_h or 0) + 10 + (self.shelf_h or 0) + 10
+  local overflow = math.max(0, column_h + Stats.MIN_MISTAKES - (bottom - top))
+  local lift = math.min(self.scroll, overflow)
+  local inner = self.scroll - lift
+
+  love.graphics.setScissor(0, head, vw, math.max(0, bottom - head))
+  local y = top - lift
+  local after = self:draw_summary(pad, y, w)
+  self.summary_h = after - y
+  y = after + 10
+  after = self:draw_shelf(pad, y, w)
+  self.shelf_h = after - y
+  y = after + 10
+  self:draw_mistakes(pad, y, w, math.max(Stats.MIN_MISTAKES, bottom - y), inner)
+  love.graphics.setScissor()
 
   self.app:footer(I18n.t("R refresh   H history   ARROWS scroll   ESC back"))
 end
@@ -175,7 +198,14 @@ function Stats:draw_summary(x, y, w)
   -- lines, and the second line was printed through the lands underneath.
   local fig = 14
   for _, cell in ipairs(cells) do
-    while fig > 8 and UI.textWidth(cell[2], fig) > cw - 8 do fig = fig - 2 end
+    while fig > 7 and UI.textWidth(cell[2], fig) > cw - 8 do fig = fig - 1 end
+  end
+  -- And when even 8 is too wide — a landscape fifth at the largest step —
+  -- the spaces go before the figure does: "2/278" rather than "2 /" over
+  -- "278".
+  if UI.textWidth(cells[1][2], fig) > cw - 8 then
+    cells[1][2] = ("%d/%d"):format(sm.cleared or 0, sm.total or 0)
+    while fig > 7 and UI.textWidth(cells[1][2], fig) > cw - 8 do fig = fig - 1 end
   end
   local fig_top = y + 10 + cap_h + 2 + (fig_h - UI.lineHeight(fig)) / 2
   for i, cell in ipairs(cells) do
@@ -255,18 +285,25 @@ function Stats:draw_shelf(x, y, w)
   return y + h
 end
 
-function Stats:draw_mistakes(x, y, w, h)
+--- The least the mistakes panel is ever given, before the column above it
+--- starts to scroll away instead. See `draw`.
+Stats.MIN_MISTAKES = 160
+
+function Stats:draw_mistakes(x, y, w, h, scroll)
   local red = self.tab == "mistakes"
   UI.panel(x, y, w, h, {
     fill = Theme.withAlpha(Theme.navy, 0.94),
     tint = red and Theme.brick or Theme.cyan,
   })
-  love.graphics.setScissor(x + 4, y + 4, w - 8, h - 8)
-  local cy = y + 10 - self.scroll
+  -- Inside the column's own scissor, so a panel that runs under the footer
+  -- is clipped there rather than at its own bottom edge.
+  local sx, sy, sw, sh = love.graphics.getScissor()
+  love.graphics.intersectScissor(x + 4, y + 4, w - 8, h - 8)
+  local cy = y + 10 - (scroll or self.scroll)
 
   if self.tab == "history" then
     self:draw_history_rows(x, cy, w)
-    love.graphics.setScissor()
+    love.graphics.setScissor(sx, sy, sw, sh)
     return
   end
 
@@ -279,7 +316,7 @@ function Stats:draw_mistakes(x, y, w, h)
     UI.text(self.errors["stats.mistakes"] and self.errors["stats.mistakes"].player
       or I18n.t("asking the server…"), x + 14, cy, 8,
       Theme.withAlpha(Theme.cream, 0.6), "left", w - 28)
-    love.graphics.setScissor()
+    love.graphics.setScissor(sx, sy, sw, sh)
     return
   end
 
@@ -292,14 +329,14 @@ function Stats:draw_mistakes(x, y, w, h)
         .. "playing, not by trying to fill it up."), w - 40, 8)) do
       cy = cy + UI.text(line, x + 14, cy, 8, Theme.withAlpha(Theme.cream, 0.7)) + 4
     end
-    love.graphics.setScissor()
+    love.graphics.setScissor(sx, sy, sw, sh)
     return
   end
 
   for _, m in ipairs(self.mistakes) do
     cy = self:draw_mistake(x, cy, w, m) + 14
   end
-  love.graphics.setScissor()
+  love.graphics.setScissor(sx, sy, sw, sh)
 end
 
 --- One mistake kind, with `cleared_since` given the weight it deserves.

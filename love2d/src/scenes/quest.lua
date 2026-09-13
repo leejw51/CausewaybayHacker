@@ -1555,8 +1555,14 @@ function Quest:draw_editor(rect, tint)
     -- gap and needs only a little. `I18n.is_cjk` was written for this ("so a
     -- layout can give it room rather than discover it needs some") and had no
     -- caller until now.
-    local lh = UI.lineHeight(7) + (I18n.is_cjk() and 5 or 2)
-    local shown = math.min(#lines, 5)
+    -- `UI.lineHeight` already carries the CJK overshoot; only the air here.
+    local lh = UI.lineHeight(7) + 2
+    -- Five lines, or as many as the well has room for above the band: at
+    -- the largest type step in a short landscape window five Korean lines
+    -- are taller than the well, and a plate that starts above it is drawn
+    -- over the brief.
+    local room = math.max(0, math.floor((Quest.band_top(band) - rect.y - 12) / lh))
+    local shown = math.min(#lines, 5, room)
     local top = Quest.band_top(band) - shown * lh
     UI.setColor(Theme.ink, 0.88)
     love.graphics.rectangle("fill", rect.x + 4, top - 5, rect.w - 8, shown * lh + 10)
@@ -1614,8 +1620,11 @@ function Quest:console_rect(rect, band)
     or self:solve_said()
   if said then
     local lines = UI.wrap(said, rect.w - 28, 7)
-    local lh = UI.lineHeight(7) + (I18n.is_cjk() and 5 or 2)
-    top_of_band = top_of_band - math.min(#lines, 5) * lh - 10
+    -- `UI.lineHeight` already carries the CJK overshoot; only the air here.
+    local lh = UI.lineHeight(7) + 2
+    -- The same cap as the plate's own draw, so the two agree.
+    local room = math.max(0, math.floor((top_of_band - rect.y - 12) / lh))
+    top_of_band = top_of_band - math.min(#lines, 5, room) * lh - 10
   end
   local bottom = top_of_band - 6
   -- Everything the well has above the band, keeping two code rows when it

@@ -178,7 +178,7 @@ return {
   ["looking for the stage beating you most…"] = "正在查找最难倒你的关卡…",
   ["nothing has beaten you yet — pick a land"] = "还没有难倒你的关卡 — 请选一块地",
   ["ARROWS mode   ENTER start   N next   F finish   ESC back"] = "方向键选模式   ENTER 开始   N 下一个   F 结束   ESC 返回",
-  ["ENTER retry   ESC map   ARROWS scroll"] = "ENTER 重试   ESC 地图   方向键滚动",
+  ["ENTER retry   N next   ESC map   ARROWS scroll"] = "ENTER 重试   N 下一关   ESC 地图   方向键滚动",
   ["R refresh   H history   ARROWS scroll   ESC back"] = "R 刷新   H 历史   方向键滚动   ESC 返回",
   ["TYPE to search   ENTER go   TAB mode   ARROWS pick   ESC back"] = "输入以搜索   ENTER 进入   TAB 模式   方向键选择   ESC 返回",
   ["F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"] = "F5 运行   F2 格式化   TAB 语言   CTRL-S 保存   CTRL-N 新建   ESC 返回",

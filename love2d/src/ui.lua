@@ -69,7 +69,7 @@ function UI.text(text, x, y, size, color, align, width)
     love.graphics.print(text, x, y)
   end
   love.graphics.setColor(1, 1, 1, 1)
-  return font:getHeight()
+  return UI.lineHeight(size)
 end
 
 function UI.textWidth(text, size)
@@ -78,8 +78,18 @@ end
 
 --- The pixel height of a line at an authored size — the number a layout
 --- needs when it is deciding how far apart two rows go.
+---
+--- **An eighth taller in a CJK language.** Measured, not guessed: at every
+--- size the faces are drawn at, Press Start 2P inks rows 0 to ⅞ of the line
+--- and GNU Unifont — which LÖVE aligns to it by baseline — inks rows ¼ to
+--- 1⅛. A Korean title at 64 px reaches eight pixels under its own line box,
+--- and a layout that advanced by the box printed the next line through it.
+--- The room is given here, once, so every stack that measures its rows from
+--- this gets it without knowing why.
 function UI.lineHeight(size)
-  return Assets.font(Layout.ui(size or 12)):getHeight()
+  local h = Assets.font(Layout.ui(size or 12)):getHeight()
+  if I18n.is_cjk() then h = h + math.floor(h / 8) end
+  return h
 end
 
 --- Split a string into UTF-8 characters.
