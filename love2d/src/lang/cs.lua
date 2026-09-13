@@ -207,6 +207,13 @@ return {
 
   -- PROTOCOL §4.11b — the answer, and what it costs.
   ["SOLVE  SHIFT-F7"] = "ŘEŠENÍ  SHIFT-F7",
+  ["ANSWER"] = "PŘEDLOHA",
+  ["ESC done   F5 run   F2 format"] = "ESC HOTOVO   F5 SPUSTIT   F2 FORMÁT",
+  ["FORMAT"] = "FORMÁT",
+  ["CODE"] = "KÓD",
+  ["DONE"] = "HOTOVO",
+  ["MATCHED"] = "SHODA",
+  ["FIX THE RED"] = "OPRAV ČERVENÉ",
   ["costs a star"] = "stojí hvězdu",
   ["no answer key here"] = "tady řešení není",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "řešení je v editoru — CTRL-Z vrátí to tvoje. Úlohu pořád splníš, jen už ne na tři hvězdy; podívat se není pokus, zapíše ho teprve SUBMIT",

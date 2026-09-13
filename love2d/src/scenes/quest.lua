@@ -89,6 +89,8 @@ local Assets = require("src.assets")
 local UI = require("src.ui")
 local I18n = require("src.i18n")
 local SFX = require("src.sfx")
+local Sparks = require("src.sparks")
+local Land = require("src.land")
 local Editor = require("src.editor")
 local CodePane = require("src.codepane")
 local runlog = require("src.net.runlog")
@@ -153,6 +155,23 @@ function Quest.new(app)
     solve_note = nil,
     solve_unsupported = false,
     solving = false,
+    -- CODE: the editor with the screen to itself. The brief, the band and
+    -- the console are one press away and the code is what the screen is for.
+    code_mode = false,
+    -- ANSWER: the reference solution behind what the player types.
+    --
+    -- It is the same answer SOLVE fetches and it is priced the same way
+    -- (§4.11b, a star), because it is the same knowledge. What differs is
+    -- what happens to it: SOLVE *replaces* the buffer and the sitting is
+    -- over; ANSWER puts it behind the caret as a target and every character
+    -- is typed by the player. That is the difference between being told and
+    -- remembering, and remembering is the point of this trainer.
+    answer_text = nil,
+    answer_on = false,
+    answer_busy = false,
+    answer_prog = { matched = 0, wrong = 0, done = false, total = 0 },
+    answer_seen = nil,
+    sparks = Sparks.new(),
     -- The server's edit stack. `nil` means "this screen has not been told",
     -- which is also what a server without the feature leaves behind, and
     -- every predicate in `src/net/edits.lua` answers `false` for it — so the
@@ -496,6 +515,150 @@ end
 --- (§4.9e, interview) or "this server predates §4.11b" — identical on the
 --- wire, the same trap RUN documents above. So the message says what is true
 --- of both rather than guessing which.
+--- How far the typed text still *is* the answer, and where it stopped.
+---
+--- A prefix, deliberately: ANSWER is a typing target read from the top, and
+--- "the first place the two part company" is the thing to point at. Pure, so
+--- `tests/test_quest.lua` can hold the rules.
+function Quest.answer_progress(typed, answer)
+  local k = 0
+  local n = math.min(#typed, #answer)
+  while k < n and typed:byte(k + 1) == answer:byte(k + 1) do k = k + 1 end
+  return { matched = k, wrong = #typed - k, done = typed == answer, total = #answer }
+end
+
+--- Whether ANSWER should empty the buffer as it opens.
+---
+--- The starter is the server's boilerplate and against the answer it is
+--- simply wrong text, so the mode would open on a screenful of red nobody
+--- typed. It goes — **but only when it is exactly what the quest shipped.**
+--- The editor may have opened on a saved draft instead, and a draft is the
+--- player's own writing; clearing that would be this mode destroying work to
+--- tidy its own display.
+function Quest.clears_for_answer(buffer, starter)
+  if not starter or starter:match("^%s*$") then return false end
+  local function trim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
+  return trim(buffer) == trim(starter)
+end
+
+--- CODE on. ESC, or the DONE button, comes back.
+function Quest:enter_code()
+  if not self.quest then return end
+  self.code_mode = true
+  self.focus = "editor"
+  SFX.play("select")
+end
+
+--- ANSWER on, ANSWER off. The first press pays for the answer; every press
+--- after it is free, because the star is spent on knowing, not on looking.
+function Quest:toggle_answer()
+  if not self.quest or self.answer_busy or self.solve_unsupported then
+    if self.solve_unsupported then SFX.play("locked") end
+    return
+  end
+  if self.answer_on then
+    self.answer_on = false
+    SFX.play("move")
+    return
+  end
+  if self.answer_text then
+    self:arm_answer()
+    return
+  end
+  self.answer_busy = true
+  self.app.session:request("quest.solve", { quest_id = self.quest.id },
+    function(ok, payload, why)
+      self.answer_busy = false
+      if not ok then
+        SFX.play("locked")
+        if payload.code == "not_found" then
+          self.solve_unsupported = true
+          self.solve_note = "unavailable"
+        else
+          self.solve_note = why.player
+        end
+        return
+      end
+      if payload.hints_used then self.quest.hints_used = payload.hints_used end
+      self.answer_text = payload.source or ""
+      self:arm_answer()
+    end)
+end
+
+--- Switch the target on, clearing the boilerplate if that is all there is.
+function Quest:arm_answer()
+  if not self.answer_text then return end
+  -- Written out rather than folded into an `or`: `tests/test_screens.lua`
+  -- guards this file against ever reaching for the starter as a *fallback*
+  -- (§4.8 opens on `draft ?? starter`), and the guard is a text search. What
+  -- is wanted here is the starter itself, to compare against.
+  local starter
+  if self.quest then starter = self.quest.starter end
+  if Quest.clears_for_answer(self.editor:text(), starter) then
+    self.editor:replace_all("")
+  end
+  self.answer_on = true
+  self.answer_lines = {}
+  for chunk in (self.answer_text .. "\n"):gmatch("(.-)\n") do
+    self.answer_lines[#self.answer_lines + 1] = chunk
+  end
+  -- `gmatch` over `text .. "\n"` gives one trailing empty piece for a source
+  -- that already ended in a newline; it is not a line of the answer.
+  if self.answer_text:sub(-1) == "\n" then
+    self.answer_lines[#self.answer_lines] = nil
+  end
+  self.answer_prog = Quest.answer_progress(self.editor:text(), self.answer_text)
+  self.answer_seen = self.editor:text()
+  SFX.play("select")
+end
+
+--- What the last keystroke did to the target, as something to look at.
+---
+--- Four moments, and only the *moments*: a burst on every keystroke while a
+--- line is wrong is noise, and noise is what a player stops seeing. The
+--- divergence fires as it grows, getting back on target fires once, a line
+--- fires when it closes, and the whole answer fires once, at the end.
+function Quest:answer_tick()
+  if not self.answer_on or not self.answer_text or not self.editor then return end
+  local text = self.editor:text()
+  if text == self.answer_seen then return end
+  self.answer_seen = text
+  local was = self.answer_prog
+  local now = Quest.answer_progress(text, self.answer_text)
+  self.answer_prog = now
+  local x, y = self:caret_xy()
+  if not x then return end
+  if now.done and not was.done then
+    self.sparks:add(x, y, 70, Theme.admit)
+    SFX.play("accepted")
+  elseif now.wrong > was.wrong or now.matched < was.matched then
+    -- **The divergence *growing*, not merely existing.** A quest opens with
+    -- boilerplate in the buffer that is already not the answer, so "wrong
+    -- where it was right before" would never fire on the screen it is for.
+    self.sparks:add(x, y, 10, Theme.red)
+    SFX.play("rejected")
+  elseif was.wrong > 0 and now.wrong == 0 then
+    self.sparks:add(x, y, 20, Theme.cyan)
+    SFX.play("move")
+  elseif now.matched > was.matched
+    and self.answer_text:sub(was.matched + 1, now.matched):find("\n", 1, true) then
+    self.sparks:add(x, y, 16, Theme.coin)
+    SFX.play("move")
+  end
+end
+
+--- Where the caret is on screen, for an effect thrown at it.
+function Quest:caret_xy()
+  local geo = self.editor_geo
+  if not geo or not self.editor then return nil end
+  local row = self.editor.line - self.editor.scroll
+  if row < 1 or row > (self.visible_rows or 0) then return nil end
+  local line = self.editor.lines[self.editor.line] or ""
+  local x = geo.x0 + geo.gutter + geo.font:getWidth(line:sub(1, self.editor.col - 1))
+  local y = geo.y0 + (row - 1) * geo.line_h + geo.line_h / 2
+  return x, y
+end
+
 function Quest:solve()
   -- `running_mode` is in the list because the button is painted `disabled`
   -- while a run or a submit is in flight, and a press that does something a
@@ -791,6 +954,8 @@ function Quest:update(dt)
     self:refresh()
   end
   self.t = self.t + dt
+  self.sparks:update(dt)
+  self:answer_tick()
   self:tick_clock()
   if self.running_mode then
     self.elapsed_ms = self.elapsed_ms + dt * 1000
@@ -860,8 +1025,108 @@ function Quest:panes()
     { x = brief_w + pad, y = top, w = vw - brief_w - pad * 2, h = vh - top - bottom }
 end
 
+--- CODE mode: the editor with the screen to itself.
+---
+--- The brief, the console and the rest of the band are one press away and
+--- the code is what the screen is for. The strip carries the four controls
+--- the hands use while writing, ANSWER, and DONE — which ends the writing
+--- session rather than the quest, and says so.
+function Quest:draw_code()
+  local vw, vh = Layout.vw, Layout.vh
+  local land = (self.quest and self.quest.land) or self.app.land or "rust"
+  Assets.cover(Quest.backdrop(land, self.quest and self.quest.category
+    or self.app.category), 0, 0, vw, vh)
+  love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.86)
+  love.graphics.rectangle("fill", 0, 0, vw, vh)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  local pad = 8
+  local bh = math.max(28, UI.lineHeight(9) + 12)
+  local gap = 8
+  local busy = self.running_mode ~= nil
+  local usable = (self.quest ~= nil) and not busy
+  local live = usable and not self.edit_unsupported
+
+  local done_label = I18n.t("DONE")
+  local dw = UI.textWidth(done_label, 8) + 20
+  local dx = vw - pad - dw
+
+  -- The row, flowed left to right and wrapped when the screen is narrow —
+  -- a phone in portrait, or the largest type step.
+  local items = {
+    { id = "run", label = self.running_mode == "quest.run" and I18n.t("RUNNING…") or I18n.t("RUN  F5"),
+      state = (usable and not self.run_unsupported) and "hot" or "disabled" },
+    { id = "format", label = I18n.t("FORMAT"),
+      state = (usable and not self.format_unsupported) and "normal" or "disabled" },
+    { id = "undo", label = I18n.t("UNDO"),
+      state = (live and Edits.can_undo(self.edit)) and "normal" or "disabled" },
+    { id = "redo", label = I18n.t("REDO"),
+      state = (live and Edits.can_redo(self.edit)) and "normal" or "disabled" },
+    { id = "answer", label = I18n.t("ANSWER"),
+      state = self.answer_on and "hot"
+        or ((usable and not self.solve_unsupported) and "normal" or "disabled") },
+  }
+  self.code_rects = {}
+  local x, y = pad, pad
+  local room = dx - pad * 2
+  for _, item in ipairs(items) do
+    local w = UI.textWidth(item.label, 8) + 20
+    if x > pad and x + w > pad + room then
+      x = pad
+      y = y + bh + 6
+    end
+    UI.button(x, y, w, bh, item.label, item.state, 8)
+    self.code_rects[item.id] = { x = x, y = y, w = w, h = bh }
+    x = x + w + gap
+  end
+  UI.button(dx, pad, dw, bh, done_label, "normal", 8)
+  self.code_done_rect = { x = dx, y = pad, w = dw, h = bh }
+
+  -- The file, and — in ANSWER mode — how much of it is already yours. The
+  -- count is the whole scoreboard: characters typed that *are* the answer.
+  local rowsb = y + bh
+  -- The land, rather than a filename this client has never had: what the
+  -- strip owes the player here is which language they are writing.
+  local status = I18n.t(Land.name(land))
+  local colour = Theme.withAlpha(Theme.cream, 0.55)
+  if self.answer_on then
+    local p = self.answer_prog
+    status = ("%s   %d / %d"):format(status, p.matched, p.total)
+    if p.done then
+      status = status .. "   " .. I18n.t("MATCHED")
+      colour = Theme.admit
+    elseif p.wrong > 0 then
+      status = status .. "   " .. I18n.t("FIX THE RED")
+      colour = Theme.red
+    else
+      colour = Theme.coin
+    end
+  end
+  local strip = rowsb + 4 + UI.lineHeight(7) + 4
+  UI.setColor(Theme.ink, 0.82)
+  love.graphics.rectangle("fill", 0, 0, vw, strip)
+  love.graphics.setColor(1, 1, 1, 1)
+  -- Painted after the plate, so the plate is behind them and not over them.
+  for _, item in ipairs(items) do
+    local r = self.code_rects[item.id]
+    UI.button(r.x, r.y, r.w, r.h, item.label, item.state, 8)
+  end
+  UI.button(dx, pad, dw, bh, done_label, "normal", 8)
+  UI.text(status, pad + 4, rowsb + 4, 7, colour)
+
+  local top = strip + 6
+  self:draw_editor({ x = pad, y = top, w = vw - pad * 2, h = vh - top - pad },
+    Theme.land[land] or Theme.coin, true)
+  self.sparks:draw()
+end
+
 function Quest:draw()
   local vw, vh = Layout.vw, Layout.vh
+  if self.code_mode then
+    self:draw_code()
+    self.app:footer(I18n.t("ESC done   F5 run   F2 format"))
+    return
+  end
   local land = (self.quest and self.quest.land) or self.app.land or "rust"
   Assets.cover(Quest.backdrop(land, self.quest and self.quest.category
     or self.app.category), 0, 0, vw, vh)
@@ -920,6 +1185,7 @@ function Quest:draw()
 
   if self:console_open() then
     self:draw_run_overlay(self.console_rect_drawn)
+    self.sparks:draw()
   end
 
   -- **Not** a second listing of F5, F10 and F2. Those three are printed on
@@ -1166,6 +1432,13 @@ function Quest:button_band(rect)
   -- be reached by a press that was aimed a centimetre wide of RUN.
   local sw = UI.textWidth(solve_label, 8) + 16
   local fw = UI.textWidth(format_label, 8) + 16
+  -- ANSWER and CODE join the cluster that only ever changes the *buffer*.
+  -- Neither writes an attempt, and neither must read as another way to
+  -- submit — the same rule SOLVE and FORMAT are here under.
+  local answer_label = I18n.t("ANSWER")
+  local code_label = I18n.t("CODE")
+  local aw = UI.textWidth(answer_label, 8) + 16
+  local cdw = UI.textWidth(code_label, 8) + 16
   local uw = UI.textWidth(undo_label, 8) + 16
   local rw = UI.textWidth(redo_label, 8) + 16
   local cw = UI.textWidth(clear_label, 8) + 16
@@ -1173,13 +1446,13 @@ function Quest:button_band(rect)
   local row = rect.w - 20
   -- The same rule for the left pair: when SOLVE and FORMAT with their keys
   -- do not fit a row of the well, the keys go.
-  if sw + left_gap + fw > row then
+  if sw + left_gap + fw + left_gap + aw + left_gap + cdw > row then
     solve_label = self.solving and solve_label or bare(solve_label)
     format_label = self.formatting and format_label or bare(format_label)
     sw = UI.textWidth(solve_label, 8) + 16
     fw = UI.textWidth(format_label, 8) + 16
   end
-  local buffer_w = sw + left_gap + fw
+  local buffer_w = sw + left_gap + fw + left_gap + aw + left_gap + cdw
   local stack_w = uw + left_gap + rw + left_gap + cw
   local left_room = rx - rect.x - 20
   local upper = by - bh - 6 - cap
@@ -1254,10 +1527,12 @@ function Quest:button_band(rect)
   -- Narrower still: the members of a cluster give way together rather than
   -- one eating the other, with a floor that still shows something.
   if buffer_w > buffer_room then
-    local scale = (buffer_room - left_gap) / (sw + fw)
-    sw = math.max(44, math.floor(sw * scale))
-    fw = math.max(44, math.floor(fw * scale))
-    buffer_w = sw + left_gap + fw
+    local scale = (buffer_room - 3 * left_gap) / (sw + fw + aw + cdw)
+    sw = math.max(40, math.floor(sw * scale))
+    fw = math.max(40, math.floor(fw * scale))
+    aw = math.max(40, math.floor(aw * scale))
+    cdw = math.max(40, math.floor(cdw * scale))
+    buffer_w = sw + left_gap + fw + left_gap + aw + left_gap + cdw
   end
   if stack_w > stack_room then
     local scale = (stack_room - 2 * left_gap) / (uw + rw + cw)
@@ -1269,6 +1544,8 @@ function Quest:button_band(rect)
 
   local vx = rect.x + 10
   local fx = vx + sw + left_gap
+  local ax = fx + fw + left_gap
+  local cdx = ax + aw + left_gap
   -- The stack follows the buffer pair when they share a row, and otherwise
   -- starts at the left margin of its own.
   local ux = (uy == ly) and (vx + buffer_w + left_gap) or (rect.x + 10)
@@ -1277,6 +1554,8 @@ function Quest:button_band(rect)
   return {
     run_label = run_label, submit_label = submit_label,
     format_label = format_label, solve_label = solve_label,
+    answer_label = answer_label, code_label = code_label,
+    ax = ax, cdx = cdx, aw = aw, cdw = cdw,
     undo_label = undo_label, redo_label = redo_label, clear_label = clear_label,
     bh = bh, cap = cap, bw = bw,
     by = by, sx = sx, rx = rx, ly = ly, uy = uy,
@@ -1299,7 +1578,13 @@ function Quest.band_top(band)
   return math.min(band.by, band.ly, band.uy) - band.cap - 6
 end
 
-function Quest:draw_editor(rect, tint)
+--- The code well.
+---
+--- `bare` is CODE mode: no band, no console, no captions — the rows take the
+--- whole well and the controls live on the strip above it. The one function
+--- either way, because two copies of a per-line draw loop is how a ghost, a
+--- caret and a selection come to disagree about where a character is.
+function Quest:draw_editor(rect, tint, bare)
   UI.well(rect.x, rect.y, rect.w, rect.h,
     self.focus == "editor" and Theme.coin or tint)
 
@@ -1322,8 +1607,9 @@ function Quest:draw_editor(rect, tint)
   -- browser client subtracts a console height from the editor before laying
   -- anything out (`consoleH` in `frontend/src/scenes/quest.ts`), and this is
   -- the same rule: the code rows give up the space, the band keeps its row.
-  local console = self:console_rect(rect, band)
-  local rows = math.max(1, math.floor((rect.h - 12 - band.reserve - console.reserve) / line_h))
+  local console = bare and { open = false, reserve = 0 } or self:console_rect(rect, band)
+  local rows = math.max(1,
+    math.floor((rect.h - 12 - (bare and 0 or band.reserve) - console.reserve) / line_h))
   self.editor:ensure_visible(rows)
   self.visible_rows = rows
   self.editor_rect = rect
@@ -1337,6 +1623,9 @@ function Quest:draw_editor(rect, tint)
 
   local x0 = rect.x + 8
   local y0 = rect.y + 6
+  -- Kept so `caret_xy` can throw an effect where the caret is without
+  -- re-deriving a layout that already exists here.
+  self.editor_geo = { x0 = x0, y0 = y0, gutter = gutter, font = font, line_h = line_h }
   -- The numbers the draw actually used, handed to the pane so a click is
   -- tested against what is on screen rather than a re-derivation of it.
   self.pane:frame(rect, font, gutter, x0, y0, line_h, rows)
@@ -1386,6 +1675,34 @@ function Quest:draw_editor(rect, tint)
       cx = cx + font:getWidth(span.text)
     end
 
+    -- ANSWER's target: the rest of this line of the answer, hung off the end
+    -- of what has been typed, and a mark under whatever was typed *instead*
+    -- of it. The divergence is marked rather than hidden — noticing it is
+    -- the exercise.
+    if self.answer_on and self.answer_lines then
+      local want = self.answer_lines[index]
+      local typed_w = font:getWidth(line)
+      if want then
+        local k, n = 0, math.min(#line, #want)
+        while k < n and line:byte(k + 1) == want:byte(k + 1) do k = k + 1 end
+        if k < #line then
+          local wx = x0 + gutter + font:getWidth(line:sub(1, k))
+          UI.setColor(Theme.red, 0.3)
+          love.graphics.rectangle("fill", wx, y,
+            math.max(2, font:getWidth(line:sub(k + 1))), line_h)
+        end
+        if k < #want then
+          UI.setColor(Theme.withAlpha(Theme.cream, 0.3))
+          love.graphics.print(want:sub(k + 1), x0 + gutter + typed_w, y)
+        end
+      elseif #line > 0 then
+        -- Typed past the end of the answer: all of this line is divergence.
+        UI.setColor(Theme.red, 0.3)
+        love.graphics.rectangle("fill", x0 + gutter, y, math.max(2, typed_w), line_h)
+      end
+      love.graphics.setColor(1, 1, 1, 1)
+    end
+
     if index == self.editor.line and self.focus == "editor" then
       local caret = x0 + gutter + font:getWidth(line:sub(1, self.editor.col - 1))
       if (love.timer.getTime() * 2) % 2 < 1.2 then
@@ -1394,6 +1711,20 @@ function Quest:draw_editor(rect, tint)
       end
     end
   end
+  -- The lines of the answer the document has not reached yet, under the last
+  -- one it has, for as many rows as the well still has.
+  if self.answer_on and self.answer_lines then
+    local after = self.editor:line_count()
+    local row = after - self.editor.scroll + 1
+    UI.setColor(Theme.withAlpha(Theme.cream, 0.3))
+    for i = after + 1, #self.answer_lines do
+      if row > rows then break end
+      love.graphics.print(self.answer_lines[i], x0 + gutter, y0 + (row - 1) * line_h)
+      row = row + 1
+    end
+    love.graphics.setColor(1, 1, 1, 1)
+  end
+
   self.pane:draw_brackets()
   love.graphics.setScissor()
   love.graphics.setColor(1, 1, 1, 1)
@@ -1408,6 +1739,8 @@ function Quest:draw_editor(rect, tint)
     love.graphics.rectangle("fill", rect.x + rect.w - 6, ky, 3, knob)
     love.graphics.setColor(1, 1, 1, 1)
   end
+
+  if bare then return end
 
   -- RUN and SUBMIT, with a deliberate gap between them, and SOLVE and FORMAT
   -- on the left. The geometry is `button_band`'s — worked out at the top of
@@ -1428,6 +1761,15 @@ function Quest:draw_editor(rect, tint)
   UI.button(fx, ly, fw, bh, format_label,
     (usable and not self.format_unsupported) and "normal" or "disabled", 8)
   self.format_rect = { x = fx, y = ly, w = fw, h = bh }
+  -- ANSWER wears `hot` while it is on: the screen is in a mode, and a mode
+  -- that does not say so is a mode a player forgets they are in.
+  UI.button(band.ax, ly, band.aw, bh, band.answer_label,
+    self.answer_on and "hot"
+      or ((usable and not self.solve_unsupported) and "normal" or "disabled"), 8)
+  self.answer_rect = { x = band.ax, y = ly, w = band.aw, h = bh }
+  UI.button(band.cdx, ly, band.cdw, bh, band.code_label,
+    self.quest and "normal" or "disabled", 8)
+  self.code_rect = { x = band.cdx, y = ly, w = band.cdw, h = bh }
 
   -- The stack's three, drawn from the state the server last sent and from
   -- nothing else. `src/net/edits.lua` owns the three predicates so that the
@@ -1921,6 +2263,14 @@ function Quest:textinput(text)
 end
 
 function Quest:keypressed(key, mods)
+  -- ESC ends the writing session before it ends the quest: a player in CODE
+  -- pressing it means "put the furniture back", and taking them to the map
+  -- would throw away the thing they were doing.
+  if self.code_mode and key == "escape" then
+    self.code_mode = false
+    SFX.play("back")
+    return true
+  end
   -- RUN keeps F5, the reflex key. SUBMIT is F10 — far enough away on the
   -- keyboard that neither is a slip of the other — and ctrl-shift-Enter for
   -- anyone whose hands already know that idiom.
@@ -2007,12 +2357,37 @@ function Quest:mousepressed(x, y, button)
   local function inside(r)
     return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
   end
+  if self.code_mode then
+    if inside(self.code_done_rect) then
+      self.code_mode = false
+      SFX.play("back")
+      return
+    end
+    local r = self.code_rects or {}
+    if inside(r.run) then self:run(); return end
+    if inside(r.format) then self:format(); return end
+    if inside(r.undo) then self:stack_undo(); return end
+    if inside(r.redo) then self:stack_redo(); return end
+    if inside(r.answer) then self:toggle_answer(); return end
+    -- Anything else is a click into the code, and it goes through the same
+    -- pane the framed screen uses — so the caret lands where it was aimed,
+    -- a drag selects, and a double click takes a word, here as there.
+    local shift = love.keyboard.isDown("lshift", "rshift")
+    if self.pane:mousepressed(x, y, button, shift) then
+      self.focus = "editor"
+      return
+    end
+    self.focus = "editor"
+    return
+  end
   -- The buttons sit inside the code well, so they are tested first. They also
   -- fire on the press and not the release, which is what makes a drag that
   -- started in the text and ended over SUBMIT harmless: the release does
   -- nothing at all.
   if inside(self.solve_rect) then self:solve(); return end
   if inside(self.format_rect) then self:format(); return end
+  if inside(self.answer_rect) then self:toggle_answer(); return end
+  if inside(self.code_rect) then self:enter_code(); return end
   if inside(self.undo_rect) then self:stack_undo(); return end
   if inside(self.redo_rect) then self:stack_redo(); return end
   if inside(self.clear_rect) then self:stack_clear(); return end

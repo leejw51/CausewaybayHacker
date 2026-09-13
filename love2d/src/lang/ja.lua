@@ -188,6 +188,13 @@ return {
 
   -- PROTOCOL §4.11b — the answer, and what it costs.
   ["SOLVE  SHIFT-F7"] = "解答  SHIFT-F7",
+  ["ANSWER"] = "なぞり書き",
+  ["ESC done   F5 run   F2 format"] = "ESC 完了   F5 実行   F2 整形",
+  ["FORMAT"] = "整形",
+  ["CODE"] = "コード",
+  ["DONE"] = "完了",
+  ["MATCHED"] = "完全一致",
+  ["FIX THE RED"] = "赤を直す",
   ["costs a star"] = "星を1つ使います",
   ["no answer key here"] = "ここに解答はありません",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "解答がエディタに入りました — CTRL-Z で元のコードに戻せます。クリアはできますが、星3つにはなりません。見ただけでは記録されず、記録に残るのは SUBMIT だけです",

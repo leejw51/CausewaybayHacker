@@ -189,6 +189,13 @@ return {
 
   -- PROTOCOL §4.11b — the answer, and what it costs.
   ["SOLVE  SHIFT-F7"] = "答案  SHIFT-F7",
+  ["ANSWER"] = "对照输入",
+  ["ESC done   F5 run   F2 format"] = "ESC 完成   F5 运行   F2 格式化",
+  ["FORMAT"] = "格式化",
+  ["CODE"] = "代码",
+  ["DONE"] = "完成",
+  ["MATCHED"] = "完全一致",
+  ["FIX THE RED"] = "修正红色处",
   ["costs a star"] = "要花一颗星",
   ["no answer key here"] = "这里没有答案",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "答案已经放进编辑器 — CTRL-Z 可以退回你自己的代码。这道题仍然可以通关，只是拿不到三颗星了；看答案不算一次尝试，只有 SUBMIT 才会记录",

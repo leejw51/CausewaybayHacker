@@ -186,6 +186,13 @@ return {
 
   -- PROTOCOL §4.11b — the answer, and what it costs.
   ["SOLVE  SHIFT-F7"] = "정답  SHIFT-F7",
+  ["ANSWER"] = "따라치기",
+  ["ESC done   F5 run   F2 format"] = "ESC 완료   F5 실행   F2 정렬",
+  ["FORMAT"] = "정렬",
+  ["CODE"] = "코드",
+  ["DONE"] = "완료",
+  ["MATCHED"] = "완전 일치",
+  ["FIX THE RED"] = "빨간 부분을 고치세요",
   ["costs a star"] = "별 하나를 씁니다",
   ["no answer key here"] = "여기에는 정답이 없습니다",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "정답이 에디터에 들어왔습니다 — CTRL-Z 로 원래 코드가 돌아옵니다. 클리어는 그대로 되지만 별 셋은 아닙니다. 보는 것은 시도가 아니고, 기록은 SUBMIT 만 남깁니다",
