@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   answerBlanks,
   answerCompletion,
+  answerIndent,
   answerProgress,
   blanksFill,
   maskBlanks,
@@ -234,5 +235,59 @@ describe("answerCompletion", () => {
       typed += next;
     }
     expect(typed).toBe(answer);
+  });
+});
+
+/**
+ * Indentation, which the player must never have to type.
+ *
+ * A Go answer is tab-indented and a Rust one is four spaces; the editor's
+ * auto-indent guesses one width of spaces for every language. Against a tab
+ * that guess is a divergence the player did not type and cannot fix by
+ * typing — the line stays red and the quest cannot be finished. It was
+ * reported exactly that way.
+ */
+describe("answerIndent", () => {
+  const tabs = "func main() {\n\tswitch {\n\tcase 1:\n\t}\n}\n";
+  const spaces = "fn main() {\n    println!(\"hi\");\n}\n";
+
+  it("gives the answer's own indentation, whatever it is made of", () => {
+    expect(answerIndent("func main() {\n", tabs)).toBe("\t");
+    expect(answerIndent("fn main() {\n", spaces)).toBe("    ");
+  });
+
+  it("only at the start of a line", () => {
+    expect(answerIndent("func main() {", tabs)).toBeNull();
+    expect(answerIndent("func main() {\n\tswi", tabs)).toBeNull();
+  });
+
+  it("nothing when the line does not start with any", () => {
+    expect(answerIndent("", spaces)).toBeNull();
+    expect(answerIndent("fn main() {\n    println!(\"hi\");\n", spaces)).toBeNull();
+  });
+
+  it("refuses past a divergence, like everything else in the mode", () => {
+    expect(answerIndent("func maim() {\n", tabs)).toBeNull();
+  });
+
+  it("with it, the answer is typed without the player ever typing a tab", () => {
+    // The player types the code; the mode puts the indentation in. This is
+    // the property that was broken: on a tab-indented answer there was no
+    // key at all that advanced the count.
+    let typed = "";
+    const byHand: string[] = [];
+    for (let i = 0; i < 400; i++) {
+      const indent = answerIndent(typed, tabs);
+      if (indent !== null) {
+        typed += indent;
+        continue;
+      }
+      if (typed.length >= tabs.length) break;
+      const ch = tabs[typed.length];
+      byHand.push(ch);
+      typed += ch;
+    }
+    expect(typed).toBe(tabs);
+    expect(byHand).not.toContain("\t");
   });
 });

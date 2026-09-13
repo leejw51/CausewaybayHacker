@@ -31,6 +31,7 @@ import {
   MAIN_FILE,
   answerBlanks,
   answerCompletion,
+  answerIndent,
   answerProgress,
   blanksFill,
   type AnswerProgress,
@@ -923,9 +924,15 @@ export class QuestScene implements Scene {
    * line to catch up.
    */
   private fillBlanks(target: Target): void {
-    if (!this.editor || target.blanks.length === 0) return;
+    if (!this.editor) return;
     for (let i = 0; i < 200; i++) {
-      const add = blanksFill(this.editor.source, target);
+      // The answer's own indentation, then — in BLANKS — everything up to
+      // the next hole. Indentation goes in either mode: it cannot be typed
+      // against an answer that indents differently from the editor, and it
+      // was never the thing being asked.
+      const add =
+        answerIndent(this.editor.source, target.text) ??
+        (target.blanks.length > 0 ? blanksFill(this.editor.source, target) : null);
       if (add === null) break;
       this.editor.appendAtEnd(add);
     }

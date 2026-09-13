@@ -530,6 +530,26 @@ function Quest.answer_progress(typed, answer)
   return { matched = k, wrong = #typed - k, done = typed == answer, total = #answer }
 end
 
+--- The answer's own indentation at the start of a line, to be filled in.
+---
+--- **Indentation is never the exercise, and it cannot be typed anyway.** A Go
+--- answer is tab-indented (gofmt), a Rust one is four spaces (rustfmt), and
+--- this editor's newline guesses `tab_width` spaces for every language — so
+--- on a Go quest the space bar could never match the answer's tab, the line
+--- stayed red, and no key would fix it. That was reported, and the quest was
+--- unfinishable.
+---
+--- So the mode fills the run of spaces and tabs that starts a line, exactly
+--- as the answer has it, and the player types the code.
+function Quest.answer_indent(typed, answer)
+  if not answer or answer == "" then return nil end
+  local p = Quest.answer_progress(typed, answer)
+  if #typed ~= p.matched then return nil end
+  if p.matched > 0 and answer:sub(p.matched, p.matched) ~= "\n" then return nil end
+  local run = answer:sub(p.matched + 1):match("^[ \t]+")
+  return run
+end
+
 --- One line of the answer, for the button that asks for one.
 ---
 --- **A line at a time, on a press.** It was a TAB binding and that was
@@ -771,11 +791,16 @@ end
 --- the next the moment a hole is finished, and a player who typed the last
 --- character of a word should not wait a keystroke for the line to catch up.
 function Quest:fill_blanks()
-  if not self.blanks_on or not self.blanks or not self.editor or not self.answer_text then
-    return
-  end
+  if not self.answer_on or not self.editor or not self.answer_text then return end
   for _ = 1, 200 do
-    local add = Quest.blanks_fill(self.editor:text(), self.answer_text, self.blanks)
+    -- The answer's own indentation, then — in BLANKS — everything up to the
+    -- next hole. Indentation goes in either mode: it cannot be typed against
+    -- an answer that indents differently from this editor, and it was never
+    -- the thing being asked.
+    local add = Quest.answer_indent(self.editor:text(), self.answer_text)
+    if not add and self.blanks_on and self.blanks then
+      add = Quest.blanks_fill(self.editor:text(), self.answer_text, self.blanks)
+    end
     if not add then break end
     self.editor:move("doc_end")
     self.editor:insert(add)
@@ -2550,6 +2575,17 @@ function Quest:keypressed(key, mods)
     self.focus = self.focus == "editor" and "brief" or "editor"
     return true
   end
+  -- **ENTER is a plain newline while the mode is on.** `Editor:newline`
+  -- guesses an indent — `tab_width` spaces — and against an answer indented
+  -- any other way that guess is a divergence the player did not type and
+  -- cannot remove by typing. `fill_blanks` puts the answer's own indentation
+  -- in a moment later, so the editor must not put its guess in first.
+  if self.answer_on and self.focus == "editor" and self.editor
+    and (key == "return" or key == "kpenter") and not cmd then
+    self.editor:insert("\n")
+    return true
+  end
+
   if self.focus == "editor" then
     if self.editor:keypressed(key, mods) then return true end
   else

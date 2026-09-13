@@ -14,6 +14,7 @@
  */
 import {
   EditorState,
+  Prec,
   StateEffect,
   StateField,
   type Extension,
@@ -33,7 +34,13 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  insertNewline,
+} from "@codemirror/commands";
 import {
   HighlightStyle,
   bracketMatching,
@@ -111,7 +118,9 @@ class GhostText extends WidgetType {
   }
   toDOM(): HTMLElement {
     const el = document.createElement(this.block ? "div" : "span");
-    el.className = "cwb-ghost";
+    // An empty ghost is not a ghost: it is the marker for a divergence that
+    // has no width of its own — a stray blank line past the end.
+    el.className = this.text === "" ? "cwb-wrong cwb-wrong-empty" : "cwb-ghost";
     el.textContent = this.text;
     return el;
   }
@@ -238,6 +247,15 @@ function ghostFor(view: EditorView): DecorationSet {
       // Typed past the end of the answer: all of this line is the divergence.
       if (line.text.length > 0) {
         out.push(Decoration.mark({ class: "cwb-wrong" }).range(line.from, line.to));
+      } else {
+        // **An empty line is a divergence with no width.** A mark over it is
+        // a zero-length range, which draws nothing — so the count said FIX
+        // THE RED with no red anywhere on screen. A stray blank line is the
+        // commonest way to be past the end of an answer, so it gets a mark
+        // of its own.
+        out.push(
+          Decoration.widget({ widget: new GhostText("", false), side: 1 }).range(line.to),
+        );
       }
       continue;
     }
@@ -324,11 +342,53 @@ export function answerCompletion(typed: string, answer: string): string | null {
   return nl === -1 ? rest : rest.slice(0, nl);
 }
 
+/**
+ * The answer's own indentation at the start of a line, to be filled in.
+ *
+ * **Indentation is never the exercise, and it cannot be typed anyway.** A Go
+ * answer is tab-indented (gofmt), a Rust one is four spaces (rustfmt), and
+ * the editor's auto-indent guesses one of them for every language — so on a
+ * Go quest the space bar could never match the answer's tab, the line stayed
+ * red, and there was no key that would fix it. That was reported, and it was
+ * unfinishable.
+ *
+ * So the mode fills the run of spaces and tabs that starts a line, exactly as
+ * the answer has it, and the player types the code.
+ */
+export function answerIndent(typed: string, answer: string): string | null {
+  const { matched } = answerProgress(typed, answer);
+  if (typed.length !== matched) return null;
+  if (matched > 0 && answer[matched - 1] !== "\n") return null;
+  const run = /^[ \t]+/.exec(answer.slice(matched))?.[0] ?? "";
+  return run.length > 0 ? run : null;
+}
+
 export function answerProgress(typed: string, answer: string): AnswerProgress {
   let k = 0;
   while (k < typed.length && k < answer.length && typed[k] === answer[k]) k++;
   return { matched: k, wrong: typed.length - k, done: typed === answer, total: answer.length };
 }
+
+/**
+ * ENTER, while the mode is on: a plain newline.
+ *
+ * The editor's own `insertNewlineAndIndent` guesses an indent — spaces, at
+ * its own width — and against an answer indented any other way that guess is
+ * a divergence the player did not type and cannot remove by typing. The mode
+ * puts the answer's own indentation in a moment later (`answerIndent`), so
+ * the editor must not put its guess in first.
+ */
+const answerEnter: Extension = Prec.highest(
+  keymap.of([
+    {
+      key: "Enter",
+      run: (view) => {
+        if ((view.state.field(answerField, false) ?? null) === null) return false;
+        return insertNewline(view);
+      },
+    },
+  ]),
+);
 
 const base: Extension = [
   lineNumbers(),
@@ -401,6 +461,7 @@ export class Editor {
       extensions: [
         base,
         answerField,
+        answerEnter,
         ghost,
         // A phone's keyboard, told this is code. Without these iOS
         // capitalises the first letter of `fn main`, turns `"hello"` into

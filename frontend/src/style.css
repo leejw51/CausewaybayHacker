@@ -140,6 +140,10 @@ body {
   color: rgba(252, 236, 200, 0.32);
   white-space: pre-wrap;
 }
+.cwb-editor .cwb-wrong-empty {
+  display: inline-block;
+  width: 0.6em;
+}
 .cwb-editor .cwb-wrong {
   background: rgba(216, 40, 0, 0.32);
   border-radius: 2px;

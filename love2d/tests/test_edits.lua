@@ -449,6 +449,42 @@ return function()
     T.eq(typed, answer, "the button alone types the answer out, exactly")
   end)
 
+  T.case("indentation is filled in, because it cannot be typed", function()
+    local Quest = require("src.scenes.quest")
+    -- Go, as gofmt writes it: tabs. This editor's newline guesses spaces, so
+    -- against this answer the space bar never matched and the quest could not
+    -- be finished. Reported exactly that way.
+    local tabs = "func main() {\n\tswitch {\n\tcase 1:\n\t}\n}\n"
+    local spaces = 'fn main() {\n    println!("hi");\n}\n'
+
+    T.eq(Quest.answer_indent("func main() {\n", tabs), "\t", "the answer's own tab")
+    T.eq(Quest.answer_indent("fn main() {\n", spaces), "    ", "or its own spaces")
+    T.eq(Quest.answer_indent("func main() {", tabs), nil, "only at the start of a line")
+    T.eq(Quest.answer_indent("func main() {\n\tswi", tabs), nil, "and only the run itself")
+    T.eq(Quest.answer_indent("", spaces), nil, "nothing when a line starts with code")
+    T.eq(Quest.answer_indent("func maim() {\n", tabs), nil, "never past a divergence")
+
+    -- The property that was broken: the answer can be typed out without the
+    -- player ever typing a tab.
+    local typed, by_hand = "", {}
+    for _ = 1, 400 do
+      local indent = Quest.answer_indent(typed, tabs)
+      if indent then
+        typed = typed .. indent
+      elseif #typed < #tabs then
+        local ch = tabs:sub(#typed + 1, #typed + 1)
+        by_hand[#by_hand + 1] = ch
+        typed = typed .. ch
+      else
+        break
+      end
+    end
+    T.eq(typed, tabs, "typed out, it is the answer")
+    for _, ch in ipairs(by_hand) do
+      T.nope(ch == "\t", "the player never has to type a tab")
+    end
+  end)
+
   T.case("the boilerplate goes, a draft never does", function()
     local Quest = require("src.scenes.quest")
     local starter = "fn main() {\n    // your code here\n}\n"

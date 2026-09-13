@@ -467,6 +467,68 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   await shot(page, "61-done-back-on-the-quest");
 });
 
+test("3h: a tab-indented answer can be finished — ENTER leaves no red", async ({ page }) => {
+  // The report: on a Go quest — gofmt indents with tabs — the ANSWER target
+  // stuck at 161 / 333 and the space bar would not clear the red. It could
+  // not: the editor's auto-indent puts *spaces* in, the answer wanted a tab,
+  // and no key a player could press would make the two agree. The mode fills
+  // a line's indentation itself now, and ENTER no longer guesses one.
+  const account = freshAccount();
+  await login(page, account);
+  await pickLand(page, "go");
+  await pickCategory(page, "basic");
+  await openSelectedNode(page);
+  const code = await page.evaluate(() => window.__cwbCapture!.buttonAt("focus"));
+  await page.mouse.click(code![0], code![1]);
+  await page.waitForTimeout(500);
+  const answer = await page.evaluate(() => window.__cwbCapture!.buttonAt("answer"));
+  await page.mouse.click(answer![0], answer![1]);
+  await expect
+    .poll(async () => page.evaluate(() => document.querySelectorAll(".cwb-ghost").length), {
+      timeout: 30_000,
+      message: "waiting for the answer ghost",
+    })
+    .toBeGreaterThan(0);
+
+  // Walk down the file the way a player does — a line, then ENTER, then a
+  // line — and the red must never appear. ENTER is the moment the bug
+  // happened: the editor put its own spaces in where the answer had a tab.
+  const docText = () =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll(".cm-line"))
+        .map((l) => {
+          const copy = l.cloneNode(true) as HTMLElement;
+          copy.querySelectorAll(".cwb-ghost").forEach((g) => g.remove());
+          return (copy.textContent ?? "").replace(/\u200b/g, "");
+        })
+        .join("\n"),
+    );
+  const wrongNow = () =>
+    page.evaluate(() => document.querySelectorAll(".cwb-wrong").length);
+  const line = await page.evaluate(() => window.__cwbCapture!.buttonAt("complete"));
+  for (let i = 0; i < 16; i++) {
+    const doc = await docText();
+    if (doc.includes("\t")) break;
+    if (doc.endsWith("\n") || doc.length === 0) {
+      // At a line start: take the line's content.
+      await page.mouse.click(line![0], line![1]);
+    } else {
+      // At a line end: ENTER, which is the moment the bug happened.
+      await page.keyboard.press("Enter");
+    }
+    await page.waitForTimeout(160);
+    expect(await wrongNow()).toBe(0);
+  }
+
+  // And the tab is in the buffer without the player having typed one: the
+  // mode filled the answer's own indentation.
+  const doc = await docText();
+  console.log(`[tabs] ${JSON.stringify(doc)}`);
+  expect(doc).toContain("\t");
+  expect(await wrongNow()).toBe(0);
+  await shot(page, "67-tab-indent");
+});
+
 test("4b: AUTO SELECT with no failures says so and stays put", async ({ page }) => {
   const account = freshAccount();
   await signIn(page, account);
