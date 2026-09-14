@@ -224,6 +224,7 @@ export const cs: Partial<Catalogue> = {
   "quest.codeDone": "HOTOVO",
   "quest.answer": "PŘEDLOHA",
   "quest.blanks": "DOPLŇOVAČKA",
+  "quest.solutionOnly": "JEN ŘEŠENÍ",
   "quest.completeLine": "+ŘÁDEK",
   "quest.answerMatched": "SHODA — ZNAK ZA ZNAKEM",
   "quest.answerDiverged": "OPRAV ČERVENÉ",

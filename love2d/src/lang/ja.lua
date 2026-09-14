@@ -190,6 +190,7 @@ return {
   ["SOLVE  SHIFT-F7"] = "解答  SHIFT-F7",
   ["ANSWER"] = "なぞり書き",
   ["BLANKS"] = "穴うめ",
+  ["ANSWER ONLY"] = "答えだけ",
   ["+LINE"] = "1行",
   ["ESC done   F5 run   F2 format"] = "ESC 完了   F5 実行   F2 整形",
   ["FORMAT"] = "整形",

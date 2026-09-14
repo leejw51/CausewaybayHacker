@@ -184,6 +184,69 @@ export function answerBlanks(answer: string, seed = 1): Blank[] {
   return out;
 }
 
+/**
+ * The holes for "type only the answer": everything the quest did *not* give
+ * you.
+ *
+ * A quest ships a starter — the imports, the `func main`, the scaffold — and
+ * the answer is that with a solution written into it. Typing the scaffold
+ * back out teaches nobody anything, so this cuts the holes at exactly the
+ * lines the answer has and the starter does not: the scaffold types itself
+ * and the player writes the part that is the actual work.
+ *
+ * Line-based, by longest common subsequence, so a solution in two places —
+ * an import up here, a loop down there — leaves the untouched middle alone
+ * instead of swallowing it in one span. A hole starts after a line's
+ * indentation, which the mode fills on its own.
+ */
+export function solutionBlanks(answer: string, starter: string): Blank[] {
+  const a = answer.split("\n");
+  const b = (starter ?? "").split("\n");
+  // LCS over lines. The texts are a screenful, so the table is cheap and the
+  // result is the thing that matters: which answer lines are *new*.
+  const table: number[][] = Array.from({ length: a.length + 1 }, () =>
+    new Array<number>(b.length + 1).fill(0),
+  );
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      table[i][j] =
+        a[i] === b[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+    }
+  }
+  const shared = new Array<boolean>(a.length).fill(false);
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      shared[i] = true;
+      i++;
+      j++;
+    } else if (table[i + 1][j] >= table[i][j + 1]) {
+      i++;
+    } else {
+      j++;
+    }
+  }
+  // A quest whose answer is its starter *minus* a line — a "delete the bug"
+  // quest — shares every line it has, and would leave the player nothing to
+  // type at all. There is no scaffold to skip there, so the honest reading is
+  // that the whole thing is theirs.
+  if (!shared.some((s, k) => !s && a[k].trim() !== "")) shared.fill(false);
+
+  const out: Blank[] = [];
+  let at = 0;
+  for (let k = 0; k < a.length; k++) {
+    const line = a[k];
+    if (!shared[k]) {
+      const indent = (/^[ \t]*/.exec(line)?.[0] ?? "").length;
+      // A line that is only whitespace has nothing to type.
+      if (indent < line.length) out.push({ from: at + indent, to: at + line.length });
+    }
+    at += line.length + 1;
+  }
+  return out;
+}
+
 /** True while `at` is inside a hole — the part that is the player's to type. */
 function blankAt(blanks: Blank[], at: number): Blank | undefined {
   return blanks.find((b) => at >= b.from && at < b.to);

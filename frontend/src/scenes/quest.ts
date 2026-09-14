@@ -34,7 +34,9 @@ import {
   answerIndent,
   answerProgress,
   blanksFill,
+  solutionBlanks,
   type AnswerProgress,
+  type Blank,
   type Target,
 } from "../ui/editor";
 import { burstPlan } from "../engine/burst";
@@ -398,7 +400,8 @@ export class QuestScene implements Scene {
    * gaps is typed for you as you reach it, so the only keystrokes the drill
    * costs are the ones it is asking about.
    */
-  private blanksOn = false;
+  /** Which drill is on: none, random gaps, or "type only the answer". */
+  private drill: "none" | "blanks" | "solution" = "none";
   private answerBusy = false;
   private answerProg: AnswerProgress = { matched: 0, wrong: 0, done: false, total: 0 };
   /**
@@ -785,7 +788,7 @@ export class QuestScene implements Scene {
     if (!this.quest || !this.editor || this.answerBusy) return;
     if (this.answerOn) {
       this.answerOn = false;
-      this.blanksOn = false;
+      this.drill = "none";
       this.editor.setAnswer(null);
       // The caret goes back where the typing happens, for the reason every
       // other canvas button on this screen hands it over: the player pressed
@@ -834,8 +837,8 @@ export class QuestScene implements Scene {
    */
   private async toggleBlanks(): Promise<void> {
     if (!this.quest || !this.editor || this.answerBusy) return;
-    if (this.blanksOn) {
-      this.blanksOn = false;
+    if (this.drill === "blanks") {
+      this.drill = "none";
       this.armTarget();
       this.focusEditorSoon();
       this.app.chip.select();
@@ -845,7 +848,7 @@ export class QuestScene implements Scene {
       await this.toggleAnswer();
       if (!this.answerOn) return;
     }
-    this.blanksOn = true;
+    this.drill = "blanks";
     // **The drill starts at the beginning.** Switching it on with the answer
     // already typed out — by hand or by TAB — would otherwise be a button
     // that visibly does nothing: every hole is behind the caret. What is in
@@ -886,6 +889,39 @@ export class QuestScene implements Scene {
     this.app.chip.blip();
   }
 
+  /** The holes the drill that is on asks for. */
+  private drillBlanks(answer: string): Blank[] {
+    if (this.drill === "blanks") return answerBlanks(answer, this.blankSeed());
+    if (this.drill === "solution") return solutionBlanks(answer, this.quest?.starter ?? "");
+    return [];
+  }
+
+  /**
+   * "Type only the answer" on, off. Like BLANKS it needs the answer, so it
+   * fetches it the same way — one star, once — and switches ANSWER on.
+   */
+  private async toggleSolution(): Promise<void> {
+    if (!this.quest || !this.editor || this.answerBusy) return;
+    if (this.drill === "solution") {
+      this.drill = "none";
+      this.armTarget();
+      this.focusEditorSoon();
+      this.app.chip.select();
+      return;
+    }
+    if (!this.answerOn) {
+      await this.toggleAnswer();
+      if (!this.answerOn) return;
+    }
+    this.drill = "solution";
+    // From the beginning, for the reason BLANKS is: switching a drill on with
+    // the answer already typed out is a button that visibly does nothing.
+    this.editor.replaceAll("");
+    this.armTarget();
+    this.focusEditorSoon();
+    this.app.chip.coin();
+  }
+
   /** The answer as the editor should aim at it, with or without holes. */
   private target(): Target | null {
     if (!this.answerOn || this.answerText === null) return null;
@@ -893,7 +929,7 @@ export class QuestScene implements Scene {
       text: this.answerText,
       // Seeded from the quest, so the same drill comes back for as long as
       // the screen is open rather than reshuffling under the player.
-      blanks: this.blanksOn ? answerBlanks(this.answerText, this.blankSeed()) : [],
+      blanks: this.drillBlanks(this.answerText),
     };
   }
 
@@ -1494,6 +1530,9 @@ export class QuestScene implements Scene {
       case "blanks":
         void this.toggleBlanks();
         break;
+      case "solution":
+        void this.toggleSolution();
+        break;
       case "complete":
         this.completeLine();
         break;
@@ -1878,7 +1917,21 @@ export class QuestScene implements Scene {
       // BLANKS turns ANSWER on if it is not already: it is the same answer,
       // read a harder way, and a button that silently did nothing until you
       // had pressed another one first would be a button nobody trusts.
-      { id: "blanks", label: t("quest.blanks"), dim: this.answerBusy, strong: this.blanksOn },
+      {
+        id: "blanks",
+        label: t("quest.blanks"),
+        dim: this.answerBusy,
+        strong: this.drill === "blanks",
+      },
+      // "Type only the answer": the quest's own scaffold types itself and
+      // what is left is the work. It needs a starter to diff against, so it
+      // is dim on a quest that shipped none.
+      {
+        id: "solution",
+        label: t("quest.solutionOnly"),
+        dim: this.answerBusy || !this.quest?.starter,
+        strong: this.drill === "solution",
+      },
       // One line of the answer, on a press. It used to be TAB and TAB is the
       // editor's key — a person writing code reaches for it to indent.
       { id: "complete", label: t("quest.completeLine"), dim: !this.canComplete() },
@@ -1916,7 +1969,12 @@ export class QuestScene implements Scene {
         : prog.wrong > 0
           ? `   ${t("quest.answerDiverged")}`
           : "";
-    const drill = this.blanksOn ? `   ${t("quest.blanks")}` : "";
+    const drill =
+      this.drill === "blanks"
+        ? `   ${t("quest.blanks")}`
+        : this.drill === "solution"
+          ? `   ${t("quest.solutionOnly")}`
+          : "";
     const status = on
       ? `${MAIN_FILE[this.land]}${drill}   ${prog.matched} / ${prog.total}${tail}`
       : MAIN_FILE[this.land];

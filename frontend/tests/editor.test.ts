@@ -17,6 +17,7 @@ import {
   blanksFill,
   maskBlanks,
   narrowEdit,
+  solutionBlanks,
 } from "../src/ui/editor";
 
 const apply = (cur: string, e: { from: number; to: number; insert: string }) =>
@@ -289,5 +290,77 @@ describe("answerIndent", () => {
     }
     expect(typed).toBe(tabs);
     expect(byHand).not.toContain("\t");
+  });
+});
+
+/**
+ * "Type only the answer": the holes are what the quest did not give you.
+ *
+ * A quest ships a starter — imports, `func main`, the scaffold — and the
+ * answer is that with a solution written into it. Typing the scaffold back
+ * out teaches nobody anything, so the scaffold types itself and the holes
+ * fall exactly on the lines the answer has and the starter does not.
+ */
+describe("solutionBlanks", () => {
+  const starter = "package main\n\nfunc main() {\n\t// your code here\n}\n";
+  const answer = 'package main\n\nfunc main() {\n\tfmt.Println("hi")\n}\n';
+
+  it("holes only the lines the starter does not have", () => {
+    const holes = solutionBlanks(answer, starter);
+    expect(holes.length).toBe(1);
+    expect(answer.slice(holes[0].from, holes[0].to)).toBe('fmt.Println("hi")');
+  });
+
+  it("leaves a line's indentation out of the hole — the mode fills that", () => {
+    const [hole] = solutionBlanks(answer, starter);
+    expect(answer[hole.from - 1]).toBe("\t");
+  });
+
+  it("keeps an untouched middle out of it when the solution is in two places", () => {
+    const s2 = "import a\n\nfunc main() {\n}\n";
+    const a2 = "import a\nimport b\n\nfunc main() {\n\tgo()\n}\n";
+    const holes = solutionBlanks(a2, s2);
+    const cut = holes.map((h) => a2.slice(h.from, h.to));
+    expect(cut).toEqual(["import b", "go()"]);
+  });
+
+  it("hands over the whole thing when the answer is the starter", () => {
+    // Nothing is new, so nothing would be left to type — the drill is worth
+    // more as plain ANSWER than as an empty one.
+    const holes = solutionBlanks(starter, starter);
+    const cut = holes.map((h) => starter.slice(h.from, h.to));
+    expect(cut).toContain("package main");
+  });
+
+  it("holes everything when the quest shipped no starter at all", () => {
+    const holes = solutionBlanks(answer, "");
+    const cut = holes.map((h) => answer.slice(h.from, h.to));
+    expect(cut).toContain("package main");
+    expect(cut).toContain('fmt.Println("hi")');
+  });
+
+  it("the drill, played out, is the answer", () => {
+    const target = { text: answer, blanks: solutionBlanks(answer, starter) };
+    let typed = "";
+    for (let i = 0; i < 500; i++) {
+      const add = blanksFill(typed, target);
+      if (add !== null) {
+        typed += add;
+        continue;
+      }
+      if (typed.length >= answer.length) break;
+      typed += answer[typed.length];
+    }
+    expect(typed).toBe(answer);
+  });
+  it("gives the whole answer when the starter only loses a line", () => {
+    // A "delete the bug" quest shares every line the answer has; the player
+    // would otherwise have nothing at all to type.
+    const starter = "package main\n\nfunc f() {\n\tbad()\n\tgood()\n}\n";
+    const answer = "package main\n\nfunc f() {\n\tgood()\n}\n";
+    const holes = solutionBlanks(answer, starter);
+    expect(holes.length).toBe(4);
+    expect(answer.slice(holes[0].from, holes[0].to)).toBe("package main");
+    expect(answer.slice(holes[2].from, holes[2].to)).toBe("good()");
   });
 });

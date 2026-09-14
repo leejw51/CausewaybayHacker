@@ -191,6 +191,7 @@ return {
   ["SOLVE  SHIFT-F7"] = "答案  SHIFT-F7",
   ["ANSWER"] = "对照输入",
   ["BLANKS"] = "填空",
+  ["ANSWER ONLY"] = "只打答案",
   ["+LINE"] = "补一行",
   ["ESC done   F5 run   F2 format"] = "ESC 完成   F5 运行   F2 格式化",
   ["FORMAT"] = "格式化",

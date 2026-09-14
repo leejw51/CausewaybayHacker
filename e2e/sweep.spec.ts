@@ -402,6 +402,25 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   expect(await page.evaluate(() => document.body.innerText.includes("_"))).toBe(true);
   await shot(page, "65-blanks");
 
+  // ANSWER ONLY: the quest's own scaffold types itself and what is left to
+  // type is the solution — so the buffer arrives with real code in it, not
+  // just the run up to the first word.
+  const solution = await page.evaluate(() => window.__cwbCapture!.buttonAt("solution"));
+  expect(solution).not.toBeNull();
+  await page.mouse.click(solution![0], solution![1]);
+  await page.waitForTimeout(900);
+  const scaffold = await docText();
+  expect(scaffold).toContain("fn main() {");
+  expect(await ghosts()).toBeGreaterThan(0);
+  await shot(page, "67-answer-only");
+  // Back to plain BLANKS for the rest of the checks — and it really is the
+  // BLANKS drill again, not a drill switched off, or the +LINE loop below
+  // would have nothing to chew on and pass without testing anything.
+  await page.mouse.click(blanks![0], blanks![1]);
+  await page.waitForTimeout(700);
+  expect(await ghosts()).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.body.innerText.includes("_"))).toBe(true);
+
   // +LINE hands a whole line over, holes and all; pressed until it stops,
   // the drill is done and the buffer is the answer again.
   for (let i = 0; i < 60 && (await ghosts()) > 0; i++) {

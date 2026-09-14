@@ -485,6 +485,54 @@ return function()
     end
   end)
 
+  T.case("ANSWER ONLY holes what the quest did not give you", function()
+    local Quest = require("src.scenes.quest")
+    local starter = "package main\n\nfunc main() {\n\t// your code here\n}\n"
+    local answer = 'package main\n\nfunc main() {\n\tfmt.Println("hi")\n}\n'
+
+    local holes = Quest.solution_blanks(answer, starter)
+    T.eq(#holes, 1, "one line differs, so one hole")
+    T.eq(answer:sub(holes[1].from + 1, holes[1].to), 'fmt.Println("hi")',
+      "and the hole is exactly the line the starter does not have")
+    T.eq(answer:sub(holes[1].from, holes[1].from), "\t",
+      "a line's indentation is left out of the hole — the mode fills that")
+
+    -- A solution in two places leaves the untouched middle alone.
+    local s2 = "import a\n\nfunc main() {\n}\n"
+    local a2 = "import a\nimport b\n\nfunc main() {\n\tgo()\n}\n"
+    local two = Quest.solution_blanks(a2, s2)
+    T.eq(#two, 2, "two places, two holes")
+    T.eq(a2:sub(two[1].from + 1, two[1].to), "import b", "the first")
+    T.eq(a2:sub(two[2].from + 1, two[2].to), "go()", "and the second")
+
+    -- A "delete the bug" quest -- the answer is the starter minus a line --
+    -- shares every line it has. There is no scaffold to skip, so the whole
+    -- answer is the player's, which is the one thing better than nothing.
+    local del_s = "func f() {\n\tbad()\n\tgood()\n}\n"
+    local del_a = "func f() {\n\tgood()\n}\n"
+    local del = Quest.solution_blanks(del_a, del_s)
+    T.eq(#del, 3, "every line of it is the drill")
+    T.eq(del_a:sub(del[2].from + 1, del[2].to), "good()", "including the line it kept")
+
+    T.ok(#Quest.solution_blanks(starter, starter) > 0, "the same text is a whole drill, not an empty one")
+    T.ok(#Quest.solution_blanks(answer, nil) > 0, "a quest with no starter holes everything")
+
+    -- Played out, the drill is the answer.
+    local typed = ""
+    for _ = 1, 500 do
+      local add = Quest.blanks_fill(typed, answer, holes)
+      if not add then add = Quest.answer_indent(typed, answer) end
+      if add then
+        typed = typed .. add
+      elseif #typed < #answer then
+        typed = typed .. answer:sub(#typed + 1, #typed + 1)
+      else
+        break
+      end
+    end
+    T.eq(typed, answer, "the drill, played out, is the answer")
+  end)
+
   T.case("the boilerplate goes, a draft never does", function()
     local Quest = require("src.scenes.quest")
     local starter = "fn main() {\n    // your code here\n}\n"

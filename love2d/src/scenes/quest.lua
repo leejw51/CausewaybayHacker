@@ -171,8 +171,10 @@ function Quest.new(app)
     answer_busy = false,
     answer_prog = { matched = 0, wrong = 0, done = false, total = 0 },
     answer_seen = nil,
-    -- BLANKS: the same answer with holes cut in it. See `answer_blanks`.
-    blanks_on = false,
+    -- Which drill is on: "none", "blanks" (random gaps) or "solution"
+    -- (everything the quest did not give you). See `answer_blanks` and
+    -- `solution_blanks`.
+    drill = "none",
     blanks = nil,
     sparks = Sparks.new(),
     -- The server's edit stack. `nil` means "this screen has not been told",
@@ -632,6 +634,78 @@ function Quest.answer_blanks(answer, seed)
   return out
 end
 
+--- The holes for "type only the answer": everything the quest did not give.
+---
+--- A quest ships a starter — the imports, the `func main`, the scaffold —
+--- and the answer is that with a solution written into it. Typing the
+--- scaffold back out teaches nobody anything, so this cuts the holes at
+--- exactly the lines the answer has and the starter does not: the scaffold
+--- types itself and the player writes the part that is the actual work.
+---
+--- Line-based, by longest common subsequence, so a solution in two places —
+--- an import up here, a loop down there — leaves the untouched middle alone
+--- instead of swallowing it in one span. A hole starts after a line's
+--- indentation, which the mode fills on its own.
+function Quest.solution_blanks(answer, starter)
+  local function split(text)
+    local out = {}
+    for line in ((text or "") .. "\n"):gmatch("(.-)\n") do out[#out + 1] = line end
+    if #out > 0 then out[#out] = nil end
+    return out
+  end
+  local a, b = split(answer), split(starter)
+  -- The table is a screenful square, and what it buys is knowing which of
+  -- the answer's lines are *new*.
+  local t = {}
+  for i = #a + 1, 1, -1 do
+    t[i] = {}
+    for j = #b + 1, 1, -1 do
+      if i > #a or j > #b then
+        t[i][j] = 0
+      elseif a[i] == b[j] then
+        t[i][j] = t[i + 1][j + 1] + 1
+      else
+        t[i][j] = math.max(t[i + 1][j], t[i][j + 1])
+      end
+    end
+  end
+  local shared = {}
+  local i, j = 1, 1
+  while i <= #a and j <= #b do
+    if a[i] == b[j] then
+      shared[i] = true
+      i, j = i + 1, j + 1
+    elseif t[i + 1][j] >= t[i][j + 1] then
+      i = i + 1
+    else
+      j = j + 1
+    end
+  end
+  -- A quest whose answer is its starter *minus* a line -- a "delete the bug"
+  -- quest -- shares every line it has, and would leave the player nothing to
+  -- type at all. There is no scaffold to skip there, so the honest reading is
+  -- that the whole thing is theirs.
+  local any = false
+  for k = 1, #a do
+    if not shared[k] and a[k]:match("%S") then any = true end
+  end
+  if not any then shared = {} end
+
+  local out, at = {}, 0
+  for k = 1, #a do
+    local line = a[k]
+    if not shared[k] then
+      local indent = #(line:match("^[ \t]*") or "")
+      -- A line that is only whitespace has nothing to type.
+      if indent < #line then
+        out[#out + 1] = { from = at + indent, to = at + #line }
+      end
+    end
+    at = at + #line + 1
+  end
+  return out
+end
+
 --- The hole `at` is standing in, if any. Offsets are 0-based, as the spans.
 local function blank_at(blanks, at)
   for _, b in ipairs(blanks or {}) do
@@ -708,7 +782,7 @@ function Quest:toggle_answer()
   end
   if self.answer_on then
     self.answer_on = false
-    self.blanks_on = false
+    self.drill = "none"
     self.blanks = nil
     SFX.play("move")
     return
@@ -753,9 +827,7 @@ function Quest:arm_answer()
   -- Two readings of the same answer: what is drawn (holes masked) and what
   -- is compared against (the answer itself). Comparing against the mask
   -- would call a correctly typed word a divergence.
-  self.blanks = self.blanks_on
-    and Quest.answer_blanks(self.answer_text, Quest.blank_seed(self.quest and self.quest.id))
-    or nil
+  self.blanks = self:drill_blanks()
   self.answer_lines = {}
   local shown = Quest.mask_blanks(self.answer_text, self.blanks)
   for chunk in (shown .. "\n"):gmatch("(.-)\n") do
@@ -770,6 +842,49 @@ function Quest:arm_answer()
   self.answer_prog = Quest.answer_progress(self.editor:text(), self.answer_text)
   self.answer_seen = self.editor:text()
   SFX.play("select")
+end
+
+--- The holes the drill that is on asks for.
+function Quest:drill_blanks()
+  if not self.answer_text then return nil end
+  if self.drill == "blanks" then
+    return Quest.answer_blanks(self.answer_text, Quest.blank_seed(self.quest and self.quest.id))
+  end
+  if self.drill == "solution" then
+    -- Written out rather than folded into an `or`: `tests/test_screens.lua`
+    -- guards this file against reaching for the starter as a *fallback*
+    -- (§4.8 opens on `draft ?? starter`), and the guard is a text search.
+    -- What is wanted here is the starter itself, to diff against.
+    local starter
+    if self.quest then starter = self.quest.starter end
+    return Quest.solution_blanks(self.answer_text, starter)
+  end
+  return nil
+end
+
+--- "Type only the answer" on, off. Like BLANKS it needs the answer, so it
+--- fetches it the same way — one star, once — and switches ANSWER on.
+function Quest:toggle_solution()
+  if not self.quest or self.answer_busy or self.solve_unsupported then
+    if self.solve_unsupported then SFX.play("locked") end
+    return
+  end
+  if self.drill == "solution" then
+    self.drill = "none"
+    self:arm_answer()
+    SFX.play("move")
+    return
+  end
+  if not self.answer_text then
+    self.drill = "solution"
+    self:toggle_answer()
+    return
+  end
+  self.drill = "solution"
+  -- From the beginning, for the reason BLANKS is: switching a drill on with
+  -- the answer already typed out is a button that visibly does nothing.
+  self.editor:replace_all("")
+  self:arm_answer()
 end
 
 --- A seed from the quest's id, so the drill is the same for as long as the
@@ -798,7 +913,7 @@ function Quest:fill_blanks()
     -- an answer that indents differently from this editor, and it was never
     -- the thing being asked.
     local add = Quest.answer_indent(self.editor:text(), self.answer_text)
-    if not add and self.blanks_on and self.blanks then
+    if not add and self.drill ~= "none" and self.blanks then
       add = Quest.blanks_fill(self.editor:text(), self.answer_text, self.blanks)
     end
     if not add then break end
@@ -814,8 +929,8 @@ function Quest:toggle_blanks()
     if self.solve_unsupported then SFX.play("locked") end
     return
   end
-  if self.blanks_on then
-    self.blanks_on = false
+  if self.drill == "blanks" then
+    self.drill = "none"
     self:arm_answer()
     SFX.play("move")
     return
@@ -823,11 +938,11 @@ function Quest:toggle_blanks()
   if not self.answer_text then
     -- Fetch first; the toggle comes back through `arm_answer` and the flag
     -- below is read there.
-    self.blanks_on = true
+    self.drill = "blanks"
     self:toggle_answer()
     return
   end
-  self.blanks_on = true
+  self.drill = "blanks"
   -- **The drill starts at the beginning.** Switching it on with the answer
   -- already typed out would otherwise be a button that visibly does nothing:
   -- every hole is behind the caret. What is in the buffer in ANSWER mode is
@@ -1293,8 +1408,14 @@ function Quest:draw_code()
       state = self.answer_on and "hot"
         or ((usable and not self.solve_unsupported) and "normal" or "disabled") },
     { id = "blanks", label = I18n.t("BLANKS"),
-      state = self.blanks_on and "hot"
+      state = self.drill == "blanks" and "hot"
         or ((usable and not self.solve_unsupported) and "normal" or "disabled") },
+    -- "Type only the answer": the quest's own scaffold types itself and what
+    -- is left is the work. It needs a starter to diff against.
+    { id = "solution", label = I18n.t("ANSWER ONLY"),
+      state = self.drill == "solution" and "hot"
+        or ((usable and not self.solve_unsupported and self.quest and self.quest.starter)
+          and "normal" or "disabled") },
     -- One line of the answer, on a press. It used to be TAB, and TAB is the
     -- editor's key — a person writing code reaches for it to indent.
     { id = "complete", label = I18n.t("+LINE"),
@@ -1327,7 +1448,11 @@ function Quest:draw_code()
   local colour = Theme.withAlpha(Theme.cream, 0.55)
   if self.answer_on then
     local p = self.answer_prog
-    if self.blanks_on then status = status .. "   " .. I18n.t("BLANKS") end
+    if self.drill == "blanks" then
+      status = status .. "   " .. I18n.t("BLANKS")
+    elseif self.drill == "solution" then
+      status = status .. "   " .. I18n.t("ANSWER ONLY")
+    end
     status = ("%s   %d / %d"):format(status, p.matched, p.total)
     if p.done then
       status = status .. "   " .. I18n.t("MATCHED")
@@ -2012,7 +2137,7 @@ function Quest:draw_editor(rect, tint, bare)
       or ((usable and not self.solve_unsupported) and "normal" or "disabled"), 8)
   self.answer_rect = { x = band.ax, y = ly, w = band.aw, h = bh }
   UI.button(band.blx, ly, band.blw, bh, band.blanks_label,
-    self.blanks_on and "hot"
+    self.drill == "blanks" and "hot"
       or ((usable and not self.solve_unsupported) and "normal" or "disabled"), 8)
   self.blanks_rect = { x = band.blx, y = ly, w = band.blw, h = bh }
   UI.button(band.cdx, ly, band.cdw, bh, band.code_label,
@@ -2628,6 +2753,7 @@ function Quest:mousepressed(x, y, button)
     if inside(r.redo) then self:stack_redo(); return end
     if inside(r.answer) then self:toggle_answer(); return end
     if inside(r.blanks) then self:toggle_blanks(); return end
+    if inside(r.solution) then self:toggle_solution(); return end
     if inside(r.complete) then self:complete_line(); return end
     -- Anything else is a click into the code, and it goes through the same
     -- pane the framed screen uses — so the caret lands where it was aimed,

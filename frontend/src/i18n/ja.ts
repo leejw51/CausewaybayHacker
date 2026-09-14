@@ -211,6 +211,7 @@ export const ja: Partial<Catalogue> = {
   "quest.codeDone": "完了",
   "quest.answer": "なぞり書き",
   "quest.blanks": "穴うめ",
+  "quest.solutionOnly": "答えだけ",
   "quest.completeLine": "1行",
   "quest.answerMatched": "完全一致",
   "quest.answerDiverged": "赤を直す",

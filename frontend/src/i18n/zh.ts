@@ -207,6 +207,7 @@ export const zh: Partial<Catalogue> = {
   "quest.codeDone": "完成",
   "quest.answer": "对照输入",
   "quest.blanks": "填空",
+  "quest.solutionOnly": "只打答案",
   "quest.completeLine": "补一行",
   "quest.answerMatched": "完全一致",
   "quest.answerDiverged": "修正红色处",

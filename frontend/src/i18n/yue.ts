@@ -221,6 +221,7 @@ export const yue: Partial<Catalogue> = {
   "quest.codeDone": "完成",
   "quest.answer": "對照輸入",
   "quest.blanks": "填空",
+  "quest.solutionOnly": "只打答案",
   "quest.completeLine": "補一行",
   "quest.answerMatched": "完全一致",
   "quest.answerDiverged": "改紅色嗰度",

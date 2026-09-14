@@ -13,12 +13,25 @@ add({ until_ = function(app) return app.scene_name == "login" or app.session.aut
 add({ text = MNEMONIC, when = on_login }) add({ key = "return", when = on_login })
 add({ until_ = scene("lands"), timeout = 25 })
 add({ until_ = function(app) return app.scene.lands ~= nil end, timeout = 10 })
+-- **Pin the land and the buffer.** The server remembers where a player was
+-- (§1.3) and keeps their draft (§4.8), so a run that inherited either would
+-- be testing whatever the last run left behind.
+add({ until_ = function(app)
+      for i, land in ipairs(app.scene.lands or {}) do
+        if land.land == "rust" then app.scene.cursor = i; app.scene.land = "rust" end
+      end
+      return app.scene.land == "rust" end, note = "RUST land", timeout = 5 })
 add({ key = "return" }) add({ until_ = function(app) return app.scene_name == "categories" and app.scene.categories end, timeout = 10 })
 add({ key = "return" }) add({ until_ = function(app) return app.scene_name == "map" and app.scene.nodes end, timeout = 10 })
 add({ until_ = function(app) app.scene.cursor = 1; app.scene.at = 1; app.scene.walk = nil; return true end, timeout = 3 })
 add({ key = "return" })
 add({ until_ = function(app) return app.scene_name == "quest" and app.scene.quest end, timeout = 20 })
 add({ wait = 0.6 })
+-- RESET puts the quest's own starter back, whatever the last run left.
+add({ key = "f6" })
+add({ until_ = function(app)
+      return app.scene.quest and app.scene.editor:text() == app.scene.quest.starter
+    end, note = "the starter is back", timeout = 15 })
 add({ shot = "A1-quest-band.png" })
 -- CODE, by its button.
 add({ until_ = function(app)
@@ -97,7 +110,7 @@ add({ shot = "A5-answer-mistake.png" })
 -- BLANKS: the same answer with holes in it. The code is on the screen and
 -- only the words are the player's to type.
 add({ click = function(app) local r = app.scene.code_rects.blanks; return { r.x + r.w / 2, r.y + r.h / 2 } end })
-add({ until_ = function(app) return app.scene.blanks_on end, note = "BLANKS on", timeout = 10 })
+add({ until_ = function(app) return app.scene.drill == "blanks" end, note = "BLANKS on", timeout = 10 })
 add({ wait = 0.5 })
 add({ until_ = function(app)
       local s = app.scene
@@ -130,6 +143,47 @@ add({ until_ = function(app)
       print(("blanks done: %d/%d"):format(app.scene.answer_prog.matched, app.scene.answer_prog.total))
       return true end, timeout = 5 })
 add({ shot = "A9-blanks-done.png" })
+
+-- ANSWER ONLY: the quest's own scaffold types itself, and what is left to
+-- type is the solution. The buffer therefore starts much fuller than in
+-- BLANKS, and the holes are whole lines rather than words.
+add({ click = function(app) local r = app.scene.code_rects.solution; return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ until_ = function(app) return app.scene.drill == "solution" end, note = "ANSWER ONLY on", timeout = 10 })
+add({ wait = 0.5 })
+add({ until_ = function(app)
+      local s = app.scene
+      check(s.blanks ~= nil and #s.blanks > 0, "no holes were cut from the starter")
+      local typed = s.editor:text()
+      check(#typed > 0, "the scaffold did not type itself")
+      check(#typed < #s.answer_text, "there is nothing left for the player to type")
+      -- Every hole is a line the starter does not have.
+      local starter = s.quest.starter or ""
+      for _, b in ipairs(s.blanks) do
+        local cut = s.answer_text:sub(b.from + 1, b.to)
+        check(not starter:find(cut, 1, true), "a hole was cut from a line the quest gave: " .. cut)
+      end
+      print(("answer only: %d holes, scaffold typed %d of %d"):format(
+        #s.blanks, #typed, #s.answer_text))
+      return true end, timeout = 5 })
+add({ shot = "B1-answer-only.png" })
+add({ until_ = function(app)
+      local s = app.scene
+      for _ = 1, 4000 do
+        s:fill_blanks()
+        local typed = s.editor:text()
+        if typed == s.answer_text then break end
+        if #typed >= #s.answer_text then break end
+        local ch = s.answer_text:sub(#typed + 1, #typed + 1)
+        if ch == "\n" then s:keypressed("return", {}) else s:textinput(ch) end
+      end
+      check(s.editor:text() == s.answer_text, "the drill did not play out to the answer")
+      return true end, note = "the solution is typed", timeout = 20 })
+add({ wait = 0.4 })
+add({ until_ = function(app)
+      check(app.scene.answer_prog.done, "the drill finished but the count does not say done")
+      print(("answer only done: %d/%d"):format(app.scene.answer_prog.matched, app.scene.answer_prog.total))
+      return true end, timeout = 5 })
+add({ shot = "B2-answer-only-done.png" })
 
 -- DONE goes back to the quest, not to the map.
 add({ click = function(app) local r = app.scene.code_done_rect; return { r.x + r.w / 2, r.y + r.h / 2 } end })

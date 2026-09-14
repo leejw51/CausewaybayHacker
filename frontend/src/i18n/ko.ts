@@ -213,6 +213,7 @@ export const ko: Partial<Catalogue> = {
   "quest.codeDone": "완료",
   "quest.answer": "따라치기",
   "quest.blanks": "빈칸 따라치기",
+  "quest.solutionOnly": "답만 타이핑",
   "quest.completeLine": "한 줄",
   "quest.answerMatched": "완전 일치",
   "quest.answerDiverged": "빨간 부분을 고치세요",

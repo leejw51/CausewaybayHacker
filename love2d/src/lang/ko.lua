@@ -188,6 +188,7 @@ return {
   ["SOLVE  SHIFT-F7"] = "정답  SHIFT-F7",
   ["ANSWER"] = "따라치기",
   ["BLANKS"] = "빈칸 따라치기",
+  ["ANSWER ONLY"] = "답만 타이핑",
   ["+LINE"] = "한 줄",
   ["ESC done   F5 run   F2 format"] = "ESC 완료   F5 실행   F2 정렬",
   ["FORMAT"] = "정렬",

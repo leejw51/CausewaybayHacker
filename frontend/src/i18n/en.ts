@@ -231,6 +231,7 @@ export const en = {
   "quest.codeDone": "DONE",
   "quest.answer": "ANSWER",
   "quest.blanks": "BLANKS",
+  "quest.solutionOnly": "ANSWER ONLY",
   "quest.completeLine": "+LINE",
   "quest.answerMatched": "MATCHED — EVERY CHARACTER",
   "quest.answerDiverged": "FIX THE RED",

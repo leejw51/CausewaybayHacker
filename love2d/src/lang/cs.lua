@@ -209,6 +209,7 @@ return {
   ["SOLVE  SHIFT-F7"] = "ŘEŠENÍ  SHIFT-F7",
   ["ANSWER"] = "PŘEDLOHA",
   ["BLANKS"] = "DOPLŇOVAČKA",
+  ["ANSWER ONLY"] = "JEN ŘEŠENÍ",
   ["+LINE"] = "+ŘÁDEK",
   ["ESC done   F5 run   F2 format"] = "ESC HOTOVO   F5 SPUSTIT   F2 FORMÁT",
   ["FORMAT"] = "FORMÁT",
