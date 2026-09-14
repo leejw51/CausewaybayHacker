@@ -639,7 +639,11 @@ export class PlaygroundScene implements Scene {
       return;
     }
     header(g, this.app, t("pg.title", { name: this.heldName().toUpperCase() }));
-    const f = frame(layout, layout.isPortrait() ? 0.26 : 0.26, 0.07);
+    // Full-bleed, like the map and the quest screen and for their reason:
+    // this is a screen somebody works on, and room to read beats room to
+    // look. The 7 % inset was spending a twentieth of the window on either
+    // side of a bench whose editor was already the thing running out of room.
+    const f = frame(layout, 0.26, 0);
     const s = f.scale;
     this.buttons.reset();
     this.rows.reset();
@@ -813,16 +817,27 @@ export class PlaygroundScene implements Scene {
    * on a phone, and this is the screen people reach for on a phone. Each says
    * the state it is **in**, not the state it would move to — a toggle whose
    * value is invisible gets pressed twice, once to find out and once to put
-   * it back. The labels are the LÖVE client's, verbatim, because the two
-   * clients should not disagree about what this button is called.
+   * it back.
+   *
+   * Translated, where the LÖVE client's are not. That client draws a glyph
+   * on each chip — a screen, a rotating rectangle — so `AUTO` on it is a
+   * state next to a picture of what the state is about. Here the word is on
+   * its own, and a button reading `AUTO` over a code editor says nothing
+   * about orientation to anybody: it was reported as a missing control on a
+   * screen that already had it.
    */
   private displayItems(): Array<{ id: string; label: string; strong?: boolean }> {
     const choice = this.app.layout.choice;
     return [
-      { id: "fullscreen", label: this.app.isFullscreen() ? "FULL" : "WINDOW" },
+      { id: "fullscreen", label: this.app.isFullscreen() ? t("pg.full") : t("pg.window") },
       {
         id: "orient",
-        label: choice === null ? "AUTO" : choice === "portrait" ? "PORT" : "LAND",
+        label:
+          choice === null
+            ? t("pg.orientAuto")
+            : choice === "portrait"
+              ? t("pg.orientPort")
+              : t("pg.orientLand"),
         strong: choice !== null,
       },
     ];
@@ -954,7 +969,15 @@ export class PlaygroundScene implements Scene {
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
     const gap = Math.round(8 * s);
     const stdinH = Math.max(Math.round(46 * s), fonts.codeSm.height * 2 + Math.round(16 * s));
-    const outH = Math.round(inner[3] * (layout.isPortrait() ? 0.3 : 0.28));
+    // A share of the panel, but never more of it than there is output to
+    // read: eight lines and the timing line under them. Past that the pane
+    // is reserving room for blank space, and the room comes straight out of
+    // the editor — on a desktop the bench is large enough that 28 % of it
+    // was a tall empty box under a program whose last brace was cut off.
+    const outH = Math.min(
+      Math.round(inner[3] * (layout.isPortrait() ? 0.3 : 0.28)),
+      fonts.codeSm.height * 8 + fonts.stationSm.height + Math.round(16 * s),
+    );
     // The language buttons are laid out first and taken out of the row's
     // width, like SUBMIT on the quest screen: they are a *state*, not an
     // action, and the chosen one is painted lit so the screen says which file
