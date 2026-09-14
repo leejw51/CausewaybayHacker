@@ -69,6 +69,14 @@ const OUTCOME: Record<PlaygroundRun["outcome"], () => string> = {
  */
 type Held = { id: string | null; name: string; lang: Land; source: string; dirty?: boolean };
 
+/**
+ * The name an unsaved pad wears until somebody gives it one.
+ *
+ * A sentinel rather than a name: the screen shows it translated, the server
+ * is never told it, and RENAME treats a pad still wearing it as unnamed.
+ */
+const SCRATCH = "SCRATCH";
+
 export class PlaygroundScene implements Scene {
   readonly name = "playground";
   readonly mood = "lands" as const;
@@ -91,17 +99,25 @@ export class PlaygroundScene implements Scene {
   private renaming = false;
 
   private snippets: SnippetBrief[] = [];
-  private held: Held = { id: null, name: "SCRATCH", lang: "rust", source: STARTER.rust };
+  private held: Held = { id: null, name: SCRATCH, lang: "rust", source: STARTER.rust };
   /** The unsaved pad's name, translated. The stored `name` stays as it is. */
   private heldName(): string {
     // A pad renamed before it was ever saved keeps the name it was given:
     // `SCRATCH` is the placeholder, not a name somebody chose.
-    if (this.held.id === null && this.held.name === "SCRATCH") return t("pg.scratch");
+    if (this.held.id === null && this.held.name === SCRATCH) return t("pg.scratch");
     return this.held.name;
   }
   /** What the server last confirmed, so an identical save is not sent at all. */
   private savedSource = "";
   private savedLang: Land = "rust";
+  /**
+   * The name the server last confirmed.
+   *
+   * Kept beside the source and the language for the same reason they are: a
+   * save that cannot tell what changed either sends everything every time or
+   * — as this one did — decides nothing changed and sends nothing at all.
+   */
+  private savedName = "";
   private dirtyFor = 0;
   private dirty = false;
   private saving = false;
@@ -204,7 +220,7 @@ export class PlaygroundScene implements Scene {
   /** Open the field over the name, with the current one selected. */
   private startRename(): void {
     this.renaming = true;
-    this.nameEl.value = this.held.id === null && this.held.name === "SCRATCH" ? "" : this.held.name;
+    this.nameEl.value = this.held.id === null && this.held.name === SCRATCH ? "" : this.held.name;
     this.nameEl.placeholder = this.heldName();
     setTimeout(() => {
       this.nameEl.focus();
@@ -291,7 +307,7 @@ export class PlaygroundScene implements Scene {
       if (typeof v.source !== "string") return;
       this.held = {
         id: typeof v.id === "string" ? v.id : null,
-        name: typeof v.name === "string" ? v.name : "SCRATCH",
+        name: typeof v.name === "string" ? v.name : SCRATCH,
         lang: isLand(v.lang) ? v.lang : "rust",
         source: v.source,
         dirty: v.dirty === true,
@@ -331,6 +347,7 @@ export class PlaygroundScene implements Scene {
       };
       this.savedSource = res.snippet.source;
       this.savedLang = res.snippet.lang;
+      this.savedName = res.snippet.name;
       this.dirty = false;
       this.land = res.snippet.lang;
       this.editor?.load(res.snippet.lang, res.snippet.source);
@@ -354,7 +371,16 @@ export class PlaygroundScene implements Scene {
     const source = this.editor?.source ?? this.held.source;
     this.held.source = source;
     this.writeLocal();
-    if (!this.dirty || (source === this.savedSource && this.held.lang === this.savedLang)) {
+    // A rename is a change even when not one character of the program moved.
+    // Without this, RENAME on a saved pad went no further than the screen it
+    // was typed on: the early return took it for an autosave with nothing to
+    // do, and the list — which is the server's answer — never heard about it.
+    const named = this.held.name !== SCRATCH;
+    const renamed = named && this.held.name !== this.savedName;
+    if (
+      (!this.dirty && !renamed) ||
+      (source === this.savedSource && this.held.lang === this.savedLang && !renamed)
+    ) {
       this.dirty = false;
       return;
     }
@@ -362,6 +388,10 @@ export class PlaygroundScene implements Scene {
     try {
       const res = await this.app.client.request("playground.save", {
         ...(this.held.id ? { id: this.held.id } : {}),
+        // Only when it is a name somebody chose. `SCRATCH` is the placeholder
+        // an unsaved pad wears, and sending it would make the server call the
+        // first save SCRATCH instead of naming it after the day.
+        ...(named ? { name: this.held.name } : {}),
         lang: this.held.lang,
         source,
       });
@@ -369,6 +399,7 @@ export class PlaygroundScene implements Scene {
       this.held.name = res.snippet.name;
       this.savedSource = source;
       this.savedLang = this.held.lang;
+      this.savedName = res.snippet.name;
       this.dirty = false;
       this.saveNote = "saved";
       this.writeLocal();
@@ -460,11 +491,12 @@ export class PlaygroundScene implements Scene {
     void this.save();
     this.held = {
       id: null,
-      name: "SCRATCH",
+      name: SCRATCH,
       lang: this.held.lang,
       source: STARTER[this.held.lang],
     };
     this.savedSource = "";
+    this.savedName = "";
     this.dirty = true;
     this.result = null;
     this.log = new LogBuffer("");

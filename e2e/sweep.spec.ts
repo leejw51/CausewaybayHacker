@@ -719,16 +719,38 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   const after = await page.evaluate(() => window.__cwbCapture!.orientation());
   console.log(`[playground] ORIENT button: ${before} -> ${after}`);
 
-  // RENAME: the pad's own name, typed over in place.
+  // RENAME: the pad's own name, typed over in place — and the list is what
+  // has to show it. The name lived only on the screen it was typed on: the
+  // save never sent it, the reply overwrote it, and a rename that moved no
+  // code was taken for an autosave with nothing to do.
+  await clickButton(page, "unfocus");
+  await page.waitForTimeout(600);
+  await clickButton(page, "save");
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() =>
+          window.__cwbCapture!.buttons().some((b) => b.id.startsWith("snip:")),
+        ),
+      { timeout: 30_000, message: "the saved pad reaches the list" },
+    )
+    .toBe(true);
   await clickButton(page, "rename");
   await page.waitForTimeout(400);
   await page.keyboard.type("kettle");
   await page.keyboard.press("Enter");
-  await page.waitForTimeout(600);
-  await clickButton(page, "unfocus");
-  await page.waitForTimeout(600);
-  const named = await page.evaluate(() => window.__cwbCapture!.buttons().length >= 0);
-  expect(named).toBe(true);
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() =>
+          window
+            .__cwbCapture!.buttons()
+            .some((b) => b.id.startsWith("snip:") && b.label === "kettle"),
+        ),
+      { timeout: 30_000, message: "the new name reaches the list" },
+    )
+    .toBe(true);
+  console.log("[playground] RENAME reached the list");
   await shot(page, "23c-playground-renamed");
 
   await clickButton(page, "back");
