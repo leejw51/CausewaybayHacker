@@ -662,20 +662,45 @@ export class PlaygroundScene implements Scene {
     let y = inner[1];
     const pad = Math.round(8 * s);
 
+    // What the buttons at the foot of this panel will take, measured before
+    // anything above them is drawn — in portrait this panel is a quarter of
+    // the window and the blurb ran straight under them.
+    const listItems = [
+      { id: "new", label: t("pg.new") },
+      { id: "rename", label: t("pg.rename") },
+      ...(this.held.id ? [{ id: "delete", label: t("pg.delete") }] : []),
+    ];
+    const [, listBtnH] = btnBox(
+      fonts.button,
+      listItems.map((b) => b.label),
+      0,
+      fonts.button.size * 2,
+      this.app.layout.minTouchH(),
+    );
+    const listGap = Math.round(6 * s);
+    const listRows = rowsIn(
+      fonts.button,
+      listItems.map((b) => b.label),
+      inner[2],
+      this.app.layout.minTouchH(),
+    );
+    const listH = listRows * listBtnH + (listRows - 1) * listGap;
+    const listTop = inner[1] + inner[3] - listH;
+
     // The rule, stated once, where it cannot be missed. It is the opposite of
     // the quest screen's rule and the player has to be told which one they are
     // standing on.
     g.fillStyle = css(Theme.cream, 0.7);
     const note = t("pg.notScored");
-    const lines = wrap(fonts.small, note, inner[2]);
-    for (const line of lines) {
+    for (const line of wrap(fonts.small, note, inner[2])) {
+      if (y + fonts.small.height > listTop - pad) break;
       printf(g, fonts.small, line, inner[0], y, inner[2], "left");
       y += fonts.small.height;
     }
     y += pad;
 
     const rowH = Math.max(this.app.layout.minTouchH(), fonts.small.height + Math.round(14 * s));
-    const room = inner[1] + inner[3] - y - rowH - pad;
+    const room = listTop - pad - y;
     clipped(g, inner[0], y, inner[2], Math.max(0, room), () => {
       let ry = y;
       for (const snip of this.snippets) {
@@ -738,33 +763,13 @@ export class PlaygroundScene implements Scene {
       }
     });
 
-    const [, nh] = btnBox(
-      fonts.button,
-      [t("pg.new")],
-      0,
-      fonts.button.size * 2,
-      this.app.layout.minTouchH(),
-    );
     // NEW, RENAME and whichever of DELETE applies, laid by the row helper so
     // three of them wrap in a narrow list panel instead of the third being
     // painted over the second's last letter.
-    const list = [
-      { id: "new", label: t("pg.new") },
-      { id: "rename", label: t("pg.rename") },
-      ...(this.held.id ? [{ id: "delete", label: t("pg.delete") }] : []),
-    ];
-    const listRows = rowsIn(
-      fonts.button,
-      list.map((b) => b.label),
-      inner[2],
-      this.app.layout.minTouchH(),
-    );
-    const listGap = Math.round(6 * s);
-    const listH = listRows * nh + (listRows - 1) * listGap;
     this.buttons.row(
       fonts.button,
-      [inner[0], inner[1] + inner[3] - listH, inner[2], listH],
-      list,
+      [inner[0], listTop, inner[2], listH],
+      listItems,
       this.app.layout.minTouchH(),
     );
   }
@@ -918,21 +923,6 @@ export class PlaygroundScene implements Scene {
     const gap = Math.round(8 * s);
     const stdinH = Math.max(Math.round(46 * s), fonts.codeSm.height * 2 + Math.round(16 * s));
     const outH = Math.round(inner[3] * (layout.isPortrait() ? 0.3 : 0.28));
-    const actions = [
-      {
-        id: "run",
-        label: this.stage === "idle" ? t("pg.run") : "…",
-        dim: this.stage !== "idle",
-        primary: this.stage === "idle",
-      },
-      { id: "format", label: t("pg.format"), dim: this.formatting },
-      { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
-      // The way out of the crowding, on the screen that is crowded.
-      { id: "code", label: t("pg.code") },
-      ...this.displayItems(),
-      { id: "back", label: t("pg.maps") },
-    ];
-    const labels = actions.map((a) => a.label);
     // The language buttons are laid out first and taken out of the row's
     // width, like SUBMIT on the quest screen: they are a *state*, not an
     // action, and the chosen one is painted lit so the screen says which file
@@ -945,6 +935,75 @@ export class PlaygroundScene implements Scene {
     const langH = langBoxes[0].bh;
     const langGap = Math.round(fonts.button.size * 0.5);
     const langsW = langBoxes.reduce((n, b) => n + b.bw, 0) + langGap * (langBoxes.length - 1);
+    // **Wrapped, not run off the edge.** The four were laid in one run from
+    // the panel's right edge and simply kept going left; in Korean, where
+    // the labels are wider, RUST ended up outside the bench entirely — drawn
+    // past the left edge of a phone screen, unreachable. Lay them into as
+    // many rows as they need.
+    const langLines: Array<typeof langBoxes> = [];
+    {
+      let line: typeof langBoxes = [];
+      let used = 0;
+      for (const box of langBoxes) {
+        const add = box.bw + (line.length ? langGap : 0);
+        if (line.length && used + add > inner[2]) {
+          langLines.push(line);
+          line = [];
+          used = 0;
+        }
+        line.push(box);
+        used += box.bw + (line.length > 1 ? langGap : 0);
+      }
+      if (line.length) langLines.push(line);
+    }
+    const langRowsH = langLines.length * langH + (langLines.length - 1) * langGap;
+    const minOut = fonts.codeSm.height * 3 + Math.round(10 * s);
+    // Its label and one whole line of what you typed. Anything less is a box
+    // that says STDIN over a sliver of a character, which is how it looked
+    // when the editor was allowed to take the last of it.
+    const minStdin = fonts.stationSm.height + fonts.codeSm.height + Math.round(12 * s);
+    // **The band gives way before the editor does.**
+    //
+    // Eleven touch-sized buttons — four lands, four actions, CODE and the two
+    // display toggles — is five rows on a phone held upright, and five rows
+    // is most of the panel. Served in that order the editor came out at its
+    // 60-pixel floor: one line of code, which is the screen that was
+    // reported. So the optional ones are dropped from the *framed* bench
+    // until the editor has its share, last-listed first. Nothing is lost:
+    // CODE carries the display toggles and is one tap away, and ESC is MAPS.
+    const core = [
+      {
+        id: "run",
+        label: this.stage === "idle" ? t("pg.run") : "…",
+        dim: this.stage !== "idle",
+        primary: this.stage === "idle",
+      },
+      { id: "format", label: t("pg.format"), dim: this.formatting },
+      { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
+      // The way out of the crowding, on the screen that is crowded. Never
+      // dropped: on a phone it is the only way the editor gets the window.
+      { id: "code", label: t("pg.code") },
+    ];
+    const optional = [...this.displayItems(), { id: "back", label: t("pg.maps") }];
+    // Five code lines. Below that the editor is a label rather than a place
+    // to write, and the bench is better off one button shorter.
+    const editorFloor = fonts.codeSm.height * 5 + Math.round(12 * s);
+    let actions = [...core, ...optional];
+    const bandFor = (items: typeof actions) => {
+      const ls = items.map((a) => a.label);
+      const besideW0 = inner[2] - langsW - langGap * 2;
+      const side = besideW0 > 0 && rowsIn(fonts.button, ls, besideW0, layout.minTouchH()) === 1;
+      const w = side ? besideW0 : inner[2];
+      const r = rowsIn(fonts.button, ls, w, layout.minTouchH());
+      const g0 = Math.round(fonts.button.size * 0.5);
+      return r * btnH + (r - 1) * g0 + (side ? 0 : langRowsH + g0);
+    };
+    for (let drop = 0; drop < optional.length; drop++) {
+      const room = inner[3] - bandFor(actions) - minStdin - minOut - gap * 3;
+      if (room >= editorFloor) break;
+      actions = [...core, ...optional.slice(0, optional.length - 1 - drop)];
+    }
+    const labels = actions.map((a) => a.label);
     // Beside the actions only when *all* of them still fit on one row next to
     // the four lands — not merely when RUN does. The old test asked about one
     // label and answered for the whole band, so in landscape, where the bench
@@ -958,7 +1017,7 @@ export class PlaygroundScene implements Scene {
     const rowW = beside ? besideW : inner[2];
     const rows = rowsIn(fonts.button, labels, rowW, layout.minTouchH());
     const rowGap = Math.round(fonts.button.size * 0.5);
-    const langBand = beside ? 0 : langH + rowGap;
+    const langBand = beside ? 0 : langRowsH + rowGap;
     const bandH = rows * btnH + (rows - 1) * rowGap + langBand;
 
     // **The editor is served first.** It used to be served last — whatever a
@@ -968,11 +1027,6 @@ export class PlaygroundScene implements Scene {
     // and the shortfall comes out of the output first, because the output
     // scrolls and the thing being typed into does not.
     const wantEditor = Math.round(inner[3] * (layout.isPortrait() ? 0.34 : 0.36));
-    const minOut = fonts.codeSm.height * 3 + Math.round(10 * s);
-    // Its label and one whole line of what you typed. Anything less is a box
-    // that says STDIN over a sliver of a character, which is how it looked
-    // when the editor was allowed to take the last of it.
-    const minStdin = fonts.stationSm.height + fonts.codeSm.height + Math.round(12 * s);
     let outRoom = outH;
     let stdinRoom = stdinH;
     let editorH = inner[3] - bandH - stdinRoom - outRoom - gap * 3;
@@ -1027,30 +1081,33 @@ export class PlaygroundScene implements Scene {
 
     // RUST | GO | C++ | PYTHON, at the far end of the band, laid right to left
     // so the last land sits flush with the edge whatever the labels measure.
-    const langY = beside ? rowY + Math.round((btnH - langH) / 2) : rowY - langBand;
-    let bx = inner[0] + inner[2];
-    for (const { land: id, label, bw } of [...langBoxes].reverse()) {
-      bx -= bw;
-      const on = this.held.lang === id;
-      const hover = this.buttons.hovered === id;
-      if (on) {
-        panel(g, bx, langY, bw, langH, landColour(id));
-        g.fillStyle = css(Theme.ink);
-        printf(
-          g,
-          fonts.button,
-          label,
-          bx,
-          langY + 8 + Math.floor((langH - 8 - fonts.button.height) * 0.5),
-          bw,
-          "center",
-        );
-      } else {
-        pixBtn(g, fonts.button, bx, langY, bw, langH, label, { hover, quiet: true });
+    const langTop = beside ? rowY + Math.round((btnH - langH) / 2) : rowY - langBand;
+    langLines.forEach((line, li) => {
+      const langY = langTop + li * (langH + langGap);
+      let bx = inner[0] + inner[2];
+      for (const { land: id, label, bw } of [...line].reverse()) {
+        bx -= bw;
+        const on = this.held.lang === id;
+        const hover = this.buttons.hovered === id;
+        if (on) {
+          panel(g, bx, langY, bw, langH, landColour(id));
+          g.fillStyle = css(Theme.ink);
+          printf(
+            g,
+            fonts.button,
+            label,
+            bx,
+            langY + 8 + Math.floor((langH - 8 - fonts.button.height) * 0.5),
+            bw,
+            "center",
+          );
+        } else {
+          pixBtn(g, fonts.button, bx, langY, bw, langH, label, { hover, quiet: true });
+        }
+        this.buttons.add({ id, rect: [bx, langY, bw, langH], label });
+        bx -= langGap;
       }
-      this.buttons.add({ id, rect: [bx, langY, bw, langH], label });
-      bx -= langGap;
-    }
+    });
 
     // The actions start at `rowY` and are `bandH - langBand` tall — the land
     // band sits *above* `rowY`, and `rowY` already stepped over it. Adding the
