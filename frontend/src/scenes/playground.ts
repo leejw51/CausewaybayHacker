@@ -515,6 +515,14 @@ export class PlaygroundScene implements Scene {
     this.land = lang;
     if (pristine) this.held.source = STARTER[lang];
     this.editor?.load(lang, this.held.source);
+    // The last run described a file that no longer exists. Leaving it up put
+    // `main.rs:1:9 — expected one of `!` or `::`` under a panel titled
+    // `main.go`, which reads as the wrong compiler having been used rather
+    // than as an old answer nobody cleared away.
+    this.result = null;
+    this.log = new LogBuffer("");
+    this.status = "";
+    this.outputScroll = 0;
     this.dirty = true;
     this.dirtyFor = 0;
     this.writeLocal();
@@ -1159,7 +1167,10 @@ export class PlaygroundScene implements Scene {
         } else {
           pixBtn(g, fonts.button, bx, langY, bw, langH, label, { hover, quiet: true });
         }
-        this.buttons.add({ id, rect: [bx, langY, bw, langH], label });
+        // Painted here, in the land's own colour when it is the live one, so
+        // the row says which compiler will run this file. `painted` keeps
+        // `Buttons.draw` from putting a plain button over the top of it.
+        this.buttons.add({ id, rect: [bx, langY, bw, langH], label, painted: true });
         bx -= langGap;
       }
     });

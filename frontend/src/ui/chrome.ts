@@ -275,6 +275,16 @@ export interface Button {
   primary?: boolean;
   /** The action that commits. Its own colour, not a louder primary. */
   strong?: boolean;
+  /**
+   * The scene painted this one itself; `draw` only registers it.
+   *
+   * For a control whose look carries information the generic button cannot —
+   * the playground's language boxes, each lit in its own land's colour to say
+   * which compiler is live. Without this the scene draws the lit box and
+   * `draw`, which repaints every registered item, puts a plain button over
+   * the top of it: the hit box is right, the state is invisible.
+   */
+  painted?: boolean;
 }
 
 export class Buttons {
@@ -332,6 +342,7 @@ export class Buttons {
     // If the row names a primary action, everything else on it goes quiet.
     const hasPrimary = this.items.some((b) => b.primary);
     for (const b of this.items) {
+      if (b.painted) continue;
       pixBtn(g, f, b.rect[0], b.rect[1], b.rect[2], b.rect[3], b.label, {
         hover: this.hovered === b.id,
         dim: b.dim,

@@ -685,6 +685,47 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   await page.waitForTimeout(800);
   await shot(page, "24-playground-output");
 
+  // Which compiler is live, on the button itself. The row hand-paints the
+  // chosen land in its own colour; `Buttons.draw` used to repaint every
+  // registered item, so the lit box was covered by a plain button and all
+  // four looked identical whatever was selected.
+  // Sampled just inside the button's left edge rather than at its middle:
+  // the middle is where the label is, so a centre pixel reports the colour
+  // of a glyph or of the gap between two, depending on the word.
+  const landPixels = async (id: string) => {
+    const box = await page.evaluate(
+      (b) => window.__cwbCapture!.buttons().find((x) => x.id === b)?.client ?? null,
+      id,
+    );
+    if (!box) return null;
+    return page.evaluate(([x, y, w, h]) => {
+      const c = document.querySelector("#game") as HTMLCanvasElement;
+      const g = c.getContext("2d")!;
+      const r = c.getBoundingClientRect();
+      const px = Math.round(((x + w * 0.12 - r.left) / r.width) * c.width);
+      const py = Math.round(((y + h * 0.5 - r.top) / r.height) * c.height);
+      const d = g.getImageData(px, py, 1, 1).data;
+      return `${d[0]},${d[1]},${d[2]}`;
+    }, box);
+  };
+  const rustLit = await landPixels("rust");
+  const goUnlit = await landPixels("go");
+  expect(rustLit, "the selected land is painted").not.toBeNull();
+  expect(rustLit, "the chosen land does not look like an unchosen one").not.toBe(goUnlit);
+  await clickButton(page, "go");
+  await page.waitForTimeout(700);
+  const goLit = await landPixels("go");
+  const rustUnlit = await landPixels("rust");
+  console.log(`[playground] lands rust ${rustLit}->${rustUnlit}, go ${goUnlit}->${goLit}`);
+  // Each land wears its own colour when it is live — rust orange, go cyan —
+  // so the lit ones differ from each other as well as from the unlit.
+  expect(goLit, "GO lights when GO is chosen").not.toBe(goUnlit);
+  expect(rustUnlit, "RUST goes dark when GO is chosen").toBe(goUnlit);
+  expect(goLit).not.toBe(rustLit);
+  await shot(page, "23d-playground-lang");
+  await clickButton(page, "rust");
+  await page.waitForTimeout(700);
+
   // CODE: the editor and nothing else. The bench is a list, an editor, a
   // stdin box, a band of buttons and an output panel, and the report that
   // started this was that it is very hard to use — so what is asserted is
