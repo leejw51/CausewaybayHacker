@@ -33,6 +33,9 @@ import {
   answerCompletion,
   answerIndent,
   answerProgress,
+  CODE_FONT_KEY,
+  CODE_FONT_MAX,
+  CODE_FONT_MIN,
   blanksFill,
   solutionBlanks,
   type AnswerProgress,
@@ -72,11 +75,11 @@ type Stage = "idle" | RunStage;
  * BRIEF: TOP rather than H and V.
  */
 const STACK_KEY = "quest.stack";
-const FONT_KEY = "quest.font";
+const FONT_KEY = CODE_FONT_KEY;
 const STACKS = ["auto", "row", "column"] as const;
 /** Half again down, two and a half times up, in steps somebody can feel. */
-const FONT_MIN = 0.7;
-const FONT_MAX = 2.4;
+const FONT_MIN = CODE_FONT_MIN;
+const FONT_MAX = CODE_FONT_MAX;
 const FONT_STEP = 0.15;
 
 /**

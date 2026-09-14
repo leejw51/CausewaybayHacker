@@ -62,6 +62,17 @@ const MODE: Record<Land, () => Extension> = { rust, go, cpp, python };
  * The file the server compiles for each land (SPEC §5.1), which is what the
  * editor's panel title calls the thing you are typing into.
  */
+/**
+ * How big the player likes code, as a multiple of the screen's own size.
+ *
+ * One preference, not one per screen: "how big I like my code" is a fact
+ * about the person, and a quest screen and a scratchpad that disagreed about
+ * it would be two settings to keep in step by hand.
+ */
+export const CODE_FONT_KEY = "quest.font";
+export const CODE_FONT_MIN = 0.7;
+export const CODE_FONT_MAX = 2.4;
+
 export const MAIN_FILE: Record<Land, string> = {
   rust: "main.rs",
   go: "main.go",

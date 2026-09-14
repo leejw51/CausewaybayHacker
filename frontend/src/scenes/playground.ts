@@ -33,7 +33,14 @@ import {
 } from "../engine/ui";
 import { Buttons, footer, frame, header, landColour, titledPanel, landName } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
-import { Editor, MAIN_FILE } from "../ui/editor";
+import {
+  CODE_FONT_KEY,
+  CODE_FONT_MAX,
+  CODE_FONT_MIN,
+  Editor,
+  MAIN_FILE,
+} from "../ui/editor";
+import { readNumberPref, writePref } from "../ui/prefs";
 import { Overlay } from "../ui/overlay";
 import { LogBuffer } from "../net/logbuf";
 import { WireError } from "../net/client";
@@ -134,6 +141,14 @@ export class PlaygroundScene implements Scene {
    * place in the game where a person sits down to *write*.
    */
   private focus = false;
+  /**
+   * How big the code is drawn, as a multiple of the screen's own size.
+   *
+   * The quest screen's control, on the screen people sit at for longest.
+   * Shared with it through one preference, because the size somebody can
+   * read is a fact about them rather than about which screen they are on.
+   */
+  private fontMul = readNumberPref(CODE_FONT_KEY, 1, CODE_FONT_MIN, CODE_FONT_MAX);
 
   private stage: RunStage | "idle" = "idle";
   private attemptId: string | null = null;
@@ -215,6 +230,27 @@ export class PlaygroundScene implements Scene {
     // A pad the server knows about has to be told; an unsaved one carries the
     // name into its first save.
     if (this.held.id !== null) void this.save();
+  }
+
+  /** One step of code size, kept on the same rails as the quest screen's. */
+  private sizeFont(by: number): void {
+    const next = Math.min(
+      CODE_FONT_MAX,
+      Math.max(CODE_FONT_MIN, Math.round((this.fontMul + by) * 100) / 100),
+    );
+    if (next === this.fontMul) return;
+    this.fontMul = next;
+    writePref(CODE_FONT_KEY, String(next));
+    this.saveNote = t("quest.fontSize", { percent: Math.round(next * 100) });
+    this.app.chip.blip();
+  }
+
+  /** The two size buttons, for the bench and for CODE alike. */
+  private fontItems(): Array<{ id: string; label: string; dim?: boolean }> {
+    return [
+      { id: "fontdown", label: t("quest.fontDown"), dim: this.fontMul <= CODE_FONT_MIN + 0.001 },
+      { id: "fontup", label: t("quest.fontUp"), dim: this.fontMul >= CODE_FONT_MAX - 0.001 },
+    ];
   }
 
   /** Open the field over the name, with the current one selected. */
@@ -587,6 +623,10 @@ export class PlaygroundScene implements Scene {
       this.app.chip.select();
       return;
     }
+    if (hit.id === "fontdown" || hit.id === "fontup") {
+      this.sizeFont(hit.id === "fontup" ? 0.1 : -0.1);
+      return;
+    }
     if (hit.id === "rename") {
       this.startRename();
       return;
@@ -900,6 +940,7 @@ export class PlaygroundScene implements Scene {
       { id: "format", label: t("pg.format"), dim: this.formatting },
       { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
       { id: "rename", label: t("pg.rename") },
+      ...this.fontItems(),
       ...this.displayItems(),
     ];
     const rowW = Math.max(f.size * 4, bx - pad * 2);
@@ -946,7 +987,7 @@ export class PlaygroundScene implements Scene {
     const editorH = layout.vh - top - pad - (hasOut ? outH + pad : 0);
     well(g, pad, top, layout.vw - pad * 2, editorH);
     const editorRect: Rect = [pad + 4, top + 4, layout.vw - pad * 2 - 8, editorH - 8];
-    if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size);
+    if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     else this.overlay?.hide();
     if (hasOut) {
       this.drawOutput(g, [pad, top + editorH + pad, layout.vw - pad * 2, outH], s);
@@ -1046,6 +1087,10 @@ export class PlaygroundScene implements Scene {
       // The way out of the crowding, on the screen that is crowded. Never
       // dropped: on a phone it is the only way the editor gets the window.
       { id: "code", label: t("pg.code") },
+      // Never dropped either. Text somebody cannot read is the one fault a
+      // narrower screen must not be allowed to introduce, and these two are
+      // the narrowest buttons on the row.
+      ...this.fontItems(),
     ];
     const optional = [...this.displayItems(), { id: "back", label: t("pg.maps") }];
     // Five code lines. Below that the editor is a label rather than a place
@@ -1107,7 +1152,9 @@ export class PlaygroundScene implements Scene {
 
     well(g, inner[0], inner[1], inner[2], editorH);
     const editorRect: Rect = [inner[0] + 4, inner[1] + 4, inner[2] - 8, editorH - 8];
-    if (this.editor && this.benchIn.finished) this.overlay?.place(editorRect, fonts.codeSm.size);
+    if (this.editor && this.benchIn.finished) {
+      this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
+    }
     else this.overlay?.hide();
 
     // The stdin box. It matters here in a way it never does on a quest screen:

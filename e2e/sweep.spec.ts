@@ -685,6 +685,30 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   await page.waitForTimeout(800);
   await shot(page, "24-playground-output");
 
+  // Code size. Measured off the rendered editor rather than off the button,
+  // because a size control that draws its own buttons and changes nothing is
+  // exactly the failure worth catching.
+  const codePx = () =>
+    page.evaluate(() => {
+      const el = document.querySelector(".cm-content") as HTMLElement | null;
+      return el ? parseFloat(getComputedStyle(el).fontSize) : 0;
+    });
+  const beforeFont = await codePx();
+  await clickButton(page, "fontup");
+  await page.waitForTimeout(500);
+  await clickButton(page, "fontup");
+  await page.waitForTimeout(500);
+  const bigger = await codePx();
+  await clickButton(page, "fontdown");
+  await page.waitForTimeout(500);
+  const smaller = await codePx();
+  console.log(`[playground] code size ${beforeFont} -> ${bigger} -> ${smaller}`);
+  expect(bigger, "A+ makes the code bigger").toBeGreaterThan(beforeFont);
+  expect(smaller, "A- takes it back down").toBeLessThan(bigger);
+  // It is the same preference the quest screen keeps, so it survives a visit
+  // to another screen and back.
+  expect(await pref(page, "quest.font")).not.toBe("");
+
   // Which compiler is live, on the button itself. The row hand-paints the
   // chosen land in its own colour; `Buttons.draw` used to repaint every
   // registered item, so the lit box was covered by a plain button and all
