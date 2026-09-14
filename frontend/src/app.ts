@@ -645,6 +645,26 @@ export class App {
   }
 
   /**
+   * Landscape, portrait, automatic — the F1 key, and the button a scene draws
+   * for the same thing. One method because it is one control: a screen that
+   * cycled the layout without recording the choice would forget it on the
+   * next launch, and one that recorded it without re-measuring would be a
+   * button that did nothing until the window was touched.
+   */
+  cycleOrientation(): void {
+    const picked = this.layout.cycleOrientation();
+    this.remeasure();
+    this.saveOrientation(picked);
+    this.say(
+      picked === "auto"
+        ? t("app.orientAuto")
+        : picked === "portrait"
+          ? t("app.orientPortrait")
+          : t("app.orientLandscape"),
+    );
+  }
+
+  /**
    * Read back the saved orientation.
    *
    * Three things can be in there and they are three different values, which is
@@ -909,16 +929,7 @@ export class App {
       // both orientations first-class, so the toggle cannot belong to the map.
       if (name === "f1") {
         ev.preventDefault();
-        const picked = this.layout.cycleOrientation();
-        this.remeasure();
-        this.saveOrientation(picked);
-        this.say(
-          picked === "auto"
-            ? t("app.orientAuto")
-            : picked === "portrait"
-              ? t("app.orientPortrait")
-              : t("app.orientLandscape"),
-        );
+        this.cycleOrientation();
         return;
       }
       // F11 is fullscreen. The browser's own F11 does the same thing on a

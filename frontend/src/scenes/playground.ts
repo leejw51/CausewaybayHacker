@@ -79,12 +79,25 @@ export class PlaygroundScene implements Scene {
   private overlay: Overlay | null = null;
   private readonly stdinEl: HTMLTextAreaElement;
   private stdinOverlay: Overlay | null = null;
+  /**
+   * RENAME: the pad's own name, edited in place.
+   *
+   * A one-line field rather than a dialogue, because the name is already
+   * drawn at the top of this panel and the honest way to change a thing you
+   * can see is to type over it. Null when nobody is renaming.
+   */
+  private readonly nameEl: HTMLInputElement;
+  private nameOverlay: Overlay | null = null;
+  private renaming = false;
 
   private snippets: SnippetBrief[] = [];
   private held: Held = { id: null, name: "SCRATCH", lang: "rust", source: STARTER.rust };
   /** The unsaved pad's name, translated. The stored `name` stays as it is. */
   private heldName(): string {
-    return this.held.id === null ? t("pg.scratch") : this.held.name;
+    // A pad renamed before it was ever saved keeps the name it was given:
+    // `SCRATCH` is the placeholder, not a name somebody chose.
+    if (this.held.id === null && this.held.name === "SCRATCH") return t("pg.scratch");
+    return this.held.name;
   }
   /** What the server last confirmed, so an identical save is not sent at all. */
   private savedSource = "";
@@ -93,6 +106,18 @@ export class PlaygroundScene implements Scene {
   private dirty = false;
   private saving = false;
   private formatting = false;
+
+  /**
+   * CODE: the editor and nothing else.
+   *
+   * The bench is a list, an editor, a stdin box, a band of buttons and an
+   * output panel, and on a phone held upright that is five things sharing
+   * 700 pixels — the editor ends up a few lines tall and the screen is, in
+   * the words of the report, very hard to use. This is the quest screen's
+   * answer to the same problem, on the screen that needs it more: the one
+   * place in the game where a person sits down to *write*.
+   */
+  private focus = false;
 
   private stage: RunStage | "idle" = "idle";
   private attemptId: string | null = null;
@@ -133,6 +158,58 @@ export class PlaygroundScene implements Scene {
       el.placeholder = t("pg.stdinHint");
     });
     this.stdinEl = el;
+
+    const name = document.createElement("input");
+    name.type = "text";
+    name.className = "cwb-field";
+    name.spellcheck = false;
+    name.maxLength = 48;
+    // Enter commits, Escape puts it back — the two keys anybody renaming a
+    // file already has in their hands. Handled here rather than through the
+    // canvas key path because this element has the focus while it is open.
+    name.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        this.commitRename();
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        this.renaming = false;
+        this.nameOverlay?.hide();
+      }
+    });
+    name.addEventListener("blur", () => {
+      // Clicking away is not a cancel: it is the same as pressing Enter on a
+      // field you have finished typing into.
+      if (this.renaming) this.commitRename();
+    });
+    this.nameEl = name;
+  }
+
+  /** Take what is in the field, if it is anything. */
+  private commitRename(): void {
+    if (!this.renaming) return;
+    this.renaming = false;
+    this.nameOverlay?.hide();
+    const want = this.nameEl.value.trim().slice(0, 48);
+    if (!want || want === this.held.name) return;
+    this.held.name = want;
+    this.dirty = true;
+    this.dirtyFor = 0;
+    this.app.chip.select();
+    // A pad the server knows about has to be told; an unsaved one carries the
+    // name into its first save.
+    if (this.held.id !== null) void this.save();
+  }
+
+  /** Open the field over the name, with the current one selected. */
+  private startRename(): void {
+    this.renaming = true;
+    this.nameEl.value = this.held.id === null && this.held.name === "SCRATCH" ? "" : this.held.name;
+    this.nameEl.placeholder = this.heldName();
+    setTimeout(() => {
+      this.nameEl.focus();
+      this.nameEl.select();
+    }, 0);
   }
 
   async enter(): Promise<void> {
@@ -173,6 +250,7 @@ export class PlaygroundScene implements Scene {
     this.offLocale = undefined;
     this.overlay?.destroy();
     this.stdinOverlay?.destroy();
+    this.nameOverlay?.destroy();
     this.editor?.destroy();
     this.app.chip.music("stop");
   }
@@ -184,6 +262,8 @@ export class PlaygroundScene implements Scene {
     this.editor = new Editor(this.held.lang, this.held.source, () => this.touched());
     this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
     this.stdinOverlay = new Overlay(this.app.overlay, this.app.layout, this.stdinEl);
+    this.nameOverlay = new Overlay(this.app.overlay, this.app.layout, this.nameEl);
+    this.nameOverlay.hide();
     queueMicrotask(() => this.editor?.focus());
   }
 
@@ -453,6 +533,24 @@ export class PlaygroundScene implements Scene {
     if (phase !== "down") return;
     const hit = this.buttons.hit(x, y) ?? this.rows.hit(x, y);
     if (!hit) return;
+    if (this.display(hit.id)) return;
+    if (hit.id === "code") {
+      this.focus = true;
+      this.app.chip.select();
+      // Same race the quest screen has: a `focus()` inside a pointer handler
+      // is undone by the browser's own blur on the way out of it.
+      setTimeout(() => this.editor?.focus(), 0);
+      return;
+    }
+    if (hit.id === "unfocus") {
+      this.focus = false;
+      this.app.chip.select();
+      return;
+    }
+    if (hit.id === "rename") {
+      this.startRename();
+      return;
+    }
     if (hit.id === "run") void this.run();
     else if (hit.id === "format") void this.format();
     else if (hit.id === "save") void this.save();
@@ -501,6 +599,13 @@ export class PlaygroundScene implements Scene {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
     this.drawRoom(g);
+    if (this.focus) {
+      this.buttons.reset();
+      this.rows.reset();
+      this.drawFocus(g, layout.uiScale());
+      this.buttons.draw(g, ensureFonts(layout.uiScale()).stationSm);
+      return;
+    }
     header(g, this.app, t("pg.title", { name: this.heldName().toUpperCase() }));
     const f = frame(layout, layout.isPortrait() ? 0.26 : 0.26, 0.07);
     const s = f.scale;
@@ -633,36 +738,160 @@ export class PlaygroundScene implements Scene {
       }
     });
 
-    const [nw, nh] = btnBox(
+    const [, nh] = btnBox(
       fonts.button,
       [t("pg.new")],
       0,
       fonts.button.size * 2,
       this.app.layout.minTouchH(),
     );
-    // NEW and DELETE share the bottom row while both fit; in a narrow list
-    // panel DELETE is painted last and used to cover NEW's last letter, so
-    // there NEW takes the row above.
-    const [dw] = btnBox(
+    // NEW, RENAME and whichever of DELETE applies, laid by the row helper so
+    // three of them wrap in a narrow list panel instead of the third being
+    // painted over the second's last letter.
+    const list = [
+      { id: "new", label: t("pg.new") },
+      { id: "rename", label: t("pg.rename") },
+      ...(this.held.id ? [{ id: "delete", label: t("pg.delete") }] : []),
+    ];
+    const listRows = rowsIn(
       fonts.button,
-      [t("pg.delete")],
-      0,
-      fonts.button.size * 2,
+      list.map((b) => b.label),
+      inner[2],
       this.app.layout.minTouchH(),
     );
-    const together = !this.held.id || nw + dw + Math.round(8 * s) <= inner[2];
-    const newY = inner[1] + inner[3] - nh - (together ? 0 : nh + Math.round(6 * s));
-    this.buttons.add({
-      id: "new",
-      rect: [inner[0], newY, nw, nh],
-      label: t("pg.new"),
-    });
-    if (this.held.id) {
-      this.buttons.add({
-        id: "delete",
-        rect: [inner[0] + inner[2] - dw, inner[1] + inner[3] - nh, dw, nh],
-        label: t("pg.delete"),
+    const listGap = Math.round(6 * s);
+    const listH = listRows * nh + (listRows - 1) * listGap;
+    this.buttons.row(
+      fonts.button,
+      [inner[0], inner[1] + inner[3] - listH, inner[2], listH],
+      list,
+      this.app.layout.minTouchH(),
+    );
+  }
+
+  /**
+   * The two display toggles, as buttons rather than only as keys.
+   *
+   * F1 and F11 have always done this on every screen; a key is not a control
+   * on a phone, and this is the screen people reach for on a phone. Each says
+   * the state it is **in**, not the state it would move to — a toggle whose
+   * value is invisible gets pressed twice, once to find out and once to put
+   * it back. The labels are the LÖVE client's, verbatim, because the two
+   * clients should not disagree about what this button is called.
+   */
+  private displayItems(): Array<{ id: string; label: string; strong?: boolean }> {
+    const choice = this.app.layout.choice;
+    return [
+      { id: "fullscreen", label: this.app.isFullscreen() ? "FULL" : "WINDOW" },
+      {
+        id: "orient",
+        label: choice === null ? "AUTO" : choice === "portrait" ? "PORT" : "LAND",
+        strong: choice !== null,
+      },
+    ];
+  }
+
+  /** Press one of them. Shared by the bench and by CODE. */
+  private display(id: string): boolean {
+    if (id === "fullscreen") {
+      void this.app.toggleFullscreen().then((on) => {
+        this.app.say(on ? t("app.fullscreenOn") : t("app.fullscreenOff"));
       });
+      return true;
+    }
+    if (id === "orient") {
+      this.app.cycleOrientation();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * CODE: the editor, the few controls a writing hand uses, and nothing else.
+   *
+   * Modelled on the quest screen's mode of the same name, down to the DONE in
+   * the corner — and with the same trap in it. `header()` is what clears and
+   * re-sets `App.logoutRect`, this mode does not draw a header, and a stale
+   * rect sits exactly where DONE does. Left alone, the button that ends a
+   * writing session logs the player out.
+   */
+  private drawFocus(g: Ctx, s: number): void {
+    const { layout } = this.app;
+    this.app.logoutRect = null;
+    this.app.logoutHover = false;
+    // The bench's other DOM overlay is not drawn here and must not be left
+    // floating over the editor: an element nobody placed this frame keeps the
+    // rectangle it had in the framed layout.
+    this.stdinOverlay?.hide();
+    const fonts = ensureFonts(s);
+    const f = fonts.stationSm;
+    const pad = Math.round(6 * s);
+    const done = t("pg.codeDone");
+    const [dw, dh] = btnBox(f, [done], 0, f.size * 2, layout.minTouchH());
+    const bx = layout.vw - pad - dw;
+
+    const items = [
+      {
+        id: "run",
+        label: this.stage === "idle" ? t("pg.run") : "…",
+        dim: this.stage !== "idle",
+        primary: this.stage === "idle",
+      },
+      { id: "format", label: t("pg.format"), dim: this.formatting },
+      { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
+      { id: "rename", label: t("pg.rename") },
+      ...this.displayItems(),
+    ];
+    const rowW = Math.max(f.size * 4, bx - pad * 2);
+    const rows = rowsIn(
+      f,
+      items.map((i) => i.label),
+      rowW,
+      layout.minTouchH(),
+    );
+    const rowGap = Math.round(f.size * 0.5);
+    const bandH = rows * dh + (rows - 1) * rowGap;
+    const strip = pad + Math.max(bandH, dh) + Math.round(3 * s) + f.height + Math.round(4 * s);
+    fill(g, Theme.ink, 0, 0, layout.vw, strip, 0.82);
+    fill(g, Theme.dim, 0, strip, layout.vw, 1, 0.5);
+    this.buttons.row(f, [pad, pad, rowW, bandH], items, layout.minTouchH());
+    this.buttons.add({ id: "unfocus", rect: [bx, pad, dw, dh], label: done });
+
+    // Which pad, in which language, and whether it is safe on the server —
+    // the three things the framed screen says in its title that a person
+    // writing still needs to know.
+    const statusY = pad + Math.max(bandH, dh) + Math.round(3 * s);
+    const note = this.saveNote || this.status;
+    const status = `${MAIN_FILE[this.held.lang]}   ${this.heldName().toUpperCase()}${
+      this.dirty ? `   ${t("pg.unsaved")}` : ""
+    }${note ? `   ${note}` : ""}`;
+    g.fillStyle = css(this.dirty ? Theme.coin : Theme.dim);
+    printf(g, f, status, pad + Math.round(8 * s), statusY, layout.vw - pad * 2, "left");
+    if (this.renaming) {
+      const h = Math.max(layout.minTouchH(), f.height + 12);
+      this.nameOverlay?.place(
+        [pad, statusY - Math.round(2 * s), Math.min(layout.vw - pad * 2, Math.round(260 * s)), h],
+        f.size,
+      );
+    } else {
+      this.nameOverlay?.hide();
+    }
+
+    // Output only once there is any: a scratchpad whose whole purpose is to
+    // run things must not hide what they printed, and an empty panel would
+    // be spending the room this mode exists to hand to the editor.
+    const hasOut = this.log.lines.length > 0 || this.result !== null;
+    const outH = hasOut ? Math.round((layout.vh - strip) * (layout.isPortrait() ? 0.24 : 0.26)) : 0;
+    const top = strip + Math.round(6 * s);
+    const editorH = layout.vh - top - pad - (hasOut ? outH + pad : 0);
+    well(g, pad, top, layout.vw - pad * 2, editorH);
+    const editorRect: Rect = [pad + 4, top + 4, layout.vw - pad * 2 - 8, editorH - 8];
+    if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size);
+    else this.overlay?.hide();
+    if (hasOut) {
+      this.drawOutput(g, [pad, top + editorH + pad, layout.vw - pad * 2, outH], s);
+    } else {
+      this.outputRect = [0, 0, 0, 0];
     }
   }
 
@@ -673,12 +902,37 @@ export class PlaygroundScene implements Scene {
     const accent = landColour(this.held.lang);
     const label = MAIN_FILE[this.held.lang];
     const inner = titledPanel(g, rect, `${label}   ${this.stageLabel()}`, accent);
+    // The field, when somebody is renaming: over the title of the panel whose
+    // name it is, so the change happens where the name is written.
+    if (this.renaming) {
+      const h = Math.max(layout.minTouchH(), fonts.button.height + 12);
+      this.nameOverlay?.place(
+        [rect[0] + 8, rect[1] + 4, Math.min(rect[2] - 16, Math.round(260 * s)), h],
+        fonts.button.size,
+      );
+    } else {
+      this.nameOverlay?.hide();
+    }
 
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
     const gap = Math.round(8 * s);
     const stdinH = Math.max(Math.round(46 * s), fonts.codeSm.height * 2 + Math.round(16 * s));
     const outH = Math.round(inner[3] * (layout.isPortrait() ? 0.3 : 0.28));
-    const labels = [t("pg.run"), t("pg.format"), t("pg.save"), t("pg.maps")];
+    const actions = [
+      {
+        id: "run",
+        label: this.stage === "idle" ? t("pg.run") : "…",
+        dim: this.stage !== "idle",
+        primary: this.stage === "idle",
+      },
+      { id: "format", label: t("pg.format"), dim: this.formatting },
+      { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
+      // The way out of the crowding, on the screen that is crowded.
+      { id: "code", label: t("pg.code") },
+      ...this.displayItems(),
+      { id: "back", label: t("pg.maps") },
+    ];
+    const labels = actions.map((a) => a.label);
     // The language buttons are laid out first and taken out of the row's
     // width, like SUBMIT on the quest screen: they are a *state*, not an
     // action, and the chosen one is painted lit so the screen says which file
@@ -691,18 +945,48 @@ export class PlaygroundScene implements Scene {
     const langH = langBoxes[0].bh;
     const langGap = Math.round(fonts.button.size * 0.5);
     const langsW = langBoxes.reduce((n, b) => n + b.bw, 0) + langGap * (langBoxes.length - 1);
-    // Beside the actions when the row is wide enough for RUN and the four
-    // lands together; on a row of their own above them when it is not. In
-    // portrait the lands took the whole width and RUN was drawn underneath
-    // RUST with one letter showing.
-    const [runW] = btnBox(fonts.button, [t("pg.run")], 0, fonts.button.size * 2, layout.minTouchH());
-    const beside = inner[2] - langsW - langGap * 2 >= runW + Math.round(fonts.button.size * 1.6);
-    const rowW = beside ? inner[2] - langsW - langGap - Math.round(fonts.button.size * 1.6) : inner[2];
+    // Beside the actions only when *all* of them still fit on one row next to
+    // the four lands — not merely when RUN does. The old test asked about one
+    // label and answered for the whole band, so in landscape, where the bench
+    // is the narrow half of the frame, the lands took the width and the
+    // actions came back seven rows of one button each: 380 pixels of buttons
+    // over a panel 476 tall, and an editor at its 60-pixel floor. That is the
+    // screen that was reported as very hard to use.
+    const besideW = inner[2] - langsW - langGap * 2;
+    const beside =
+      besideW > 0 && rowsIn(fonts.button, labels, besideW, layout.minTouchH()) === 1;
+    const rowW = beside ? besideW : inner[2];
     const rows = rowsIn(fonts.button, labels, rowW, layout.minTouchH());
     const rowGap = Math.round(fonts.button.size * 0.5);
     const langBand = beside ? 0 : langH + rowGap;
     const bandH = rows * btnH + (rows - 1) * rowGap + langBand;
-    const editorH = Math.max(60, inner[3] - bandH - stdinH - outH - gap * 3);
+
+    // **The editor is served first.** It used to be served last — whatever a
+    // fixed stdin box, a percentage-of-panel output panel and however many
+    // rows of buttons happened to leave — which is an editor that vanishes
+    // exactly when the screen gets tight. It now claims a share of the panel
+    // and the shortfall comes out of the output first, because the output
+    // scrolls and the thing being typed into does not.
+    const wantEditor = Math.round(inner[3] * (layout.isPortrait() ? 0.34 : 0.36));
+    const minOut = fonts.codeSm.height * 3 + Math.round(10 * s);
+    // Its label and one whole line of what you typed. Anything less is a box
+    // that says STDIN over a sliver of a character, which is how it looked
+    // when the editor was allowed to take the last of it.
+    const minStdin = fonts.stationSm.height + fonts.codeSm.height + Math.round(12 * s);
+    let outRoom = outH;
+    let stdinRoom = stdinH;
+    let editorH = inner[3] - bandH - stdinRoom - outRoom - gap * 3;
+    if (editorH < wantEditor) {
+      const fromOut = Math.min(wantEditor - editorH, Math.max(0, outRoom - minOut));
+      outRoom -= fromOut;
+      editorH += fromOut;
+    }
+    if (editorH < wantEditor) {
+      const fromStdin = Math.min(wantEditor - editorH, Math.max(0, stdinRoom - minStdin));
+      stdinRoom -= fromStdin;
+      editorH += fromStdin;
+    }
+    editorH = Math.max(60, editorH);
 
     well(g, inner[0], inner[1], inner[2], editorH);
     const editorRect: Rect = [inner[0] + 4, inner[1] + 4, inner[2] - 8, editorH - 8];
@@ -713,7 +997,7 @@ export class PlaygroundScene implements Scene {
     // there is no test case to supply the input, so without this there is no
     // way to write a program that reads anything.
     const stdinY = inner[1] + editorH + gap;
-    well(g, inner[0], stdinY, inner[2], stdinH, [0.06, 0.05, 0.14, 0.98]);
+    well(g, inner[0], stdinY, inner[2], stdinRoom, [0.06, 0.05, 0.14, 0.98]);
     g.fillStyle = css(Theme.dim);
     printf(
       g,
@@ -728,26 +1012,16 @@ export class PlaygroundScene implements Scene {
       inner[0] + 4,
       stdinY + fonts.stationSm.height + Math.round(4 * s),
       inner[2] - 8,
-      stdinH - fonts.stationSm.height - Math.round(8 * s),
+      stdinRoom - fonts.stationSm.height - Math.round(8 * s),
     ];
     if (this.benchIn.finished) this.stdinOverlay?.place(stdinRect, fonts.codeSm.size);
     else this.stdinOverlay?.hide();
 
-    const rowY = stdinY + stdinH + gap + langBand;
+    const rowY = stdinY + stdinRoom + gap + langBand;
     this.buttons.row(
       fonts.button,
       [inner[0], rowY, rowW, bandH - langBand],
-      [
-        {
-          id: "run",
-          label: this.stage === "idle" ? t("pg.run") : "…",
-          dim: this.stage !== "idle",
-          primary: this.stage === "idle",
-        },
-        { id: "format", label: t("pg.format"), dim: this.formatting },
-        { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
-        { id: "back", label: t("pg.maps") },
-      ],
+      actions,
       layout.minTouchH(),
     );
 
@@ -778,14 +1052,14 @@ export class PlaygroundScene implements Scene {
       bx -= langGap;
     }
 
+    // The actions start at `rowY` and are `bandH - langBand` tall — the land
+    // band sits *above* `rowY`, and `rowY` already stepped over it. Adding the
+    // whole of `bandH` here counted that band twice and pushed the output
+    // panel off the bottom of the bench by exactly its height.
+    const outTop = rowY + (bandH - langBand) + gap;
     this.drawOutput(
       g,
-      [
-        inner[0],
-        rowY + bandH + gap,
-        inner[2],
-        Math.max(24, inner[1] + inner[3] - rowY - bandH - gap),
-      ],
+      [inner[0], outTop, inner[2], Math.max(24, inner[1] + inner[3] - outTop)],
       s,
     );
   }

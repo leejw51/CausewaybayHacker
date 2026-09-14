@@ -94,6 +94,13 @@ function Playground.new(app)
     dirty_at = nil,
     saved_at = nil,
     t = 0,
+    -- CODE: the editor and nothing else. The quest screen has the same mode
+    -- for the same reason — this screen is five panes in one window, and on
+    -- a phone that leaves the thing you are typing into a few lines tall.
+    big = false,
+    -- What is in the name field while somebody is renaming. Nil when nobody
+    -- is: `focus == "name"` and this are set and cleared together.
+    name_edit = nil,
   }, Playground)
 end
 
@@ -350,6 +357,7 @@ function Playground:panes()
 end
 
 function Playground:draw()
+  if self.big then return self:draw_big() end
   local vw, vh = Layout.vw, Layout.vh
   Assets.cover(Assets.pick(
     Layout.isPortrait() and "bg_playground_p" or "bg_playground",
@@ -367,8 +375,10 @@ function Playground:draw()
   love.graphics.rectangle("fill", 0, 0, vw, head)
   love.graphics.setColor(1, 1, 1, 1)
   local ty = 8 + UI.text(I18n.t("PLAYGROUND"), 12, 8, 14, Theme.cyan) + 2
-  UI.text(self.name and tostring(self.name) or "unsaved", 12, ty, 7,
-    Theme.withAlpha(Theme.cream, 0.55))
+  local shown = self.name and tostring(self.name) or I18n.t("unsaved")
+  if self.focus == "name" then shown = (self.name_edit or "") .. "_" end
+  UI.text(shown, 12, ty, 7,
+    self.focus == "name" and Theme.coin or Theme.withAlpha(Theme.cream, 0.55))
 
   -- The language, as a toggle rather than a menu. Sized from its label and
   -- set at the display controls' height, with its key to the left of it —
@@ -379,6 +389,27 @@ function Playground:draw()
   local ly = math.floor((head - lh) / 2)
   UI.button(lx, ly, lw, lh, self.lang:upper(), "normal", UI.CHIP_SIZE)
   self.lang_rect = { x = lx, y = ly, w = lw, h = lh }
+
+  -- CODE and RENAME, left of the language. Laid right to left so they sit
+  -- against it however wide their own labels measure, and dropped rather
+  -- than overlapped when the header has no room for them — the name and the
+  -- language are what this strip is for.
+  local rx = lx - 8
+  for _, item in ipairs({
+    { id = "code", label = I18n.t("CODE") },
+    { id = "rename", label = I18n.t("RENAME") },
+  }) do
+    local w = math.max(64, UI.textWidth(item.label, UI.CHIP_SIZE) + 24)
+    if rx - w < 200 then break end
+    rx = rx - w
+    UI.button(rx, ly, w, lh, item.label, "normal", UI.CHIP_SIZE)
+    if item.id == "code" then
+      self.code_button_rect = { x = rx, y = ly, w = w, h = lh }
+    else
+      self.rename_rect = { x = rx, y = ly, w = w, h = lh }
+    end
+    rx = rx - 8
+  end
   local tab = I18n.t("TAB")
   local tab_x = lx - UI.textWidth(tab, 7) - 8
   local cap_y = math.floor((head - UI.lineHeight(7)) / 2)
@@ -394,6 +425,78 @@ function Playground:draw()
   if list.w > 0 then self:draw_snippets(list) end
   self:draw_code(code)
   self:draw_output(out)
+
+  self.app:footer(I18n.t("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"))
+end
+
+--- CODE: one strip of controls, and the editor under it.
+---
+--- The display chips are the footer's, which every screen draws, so
+--- fullscreen and orientation are here without this screen owning them.
+function Playground:draw_big()
+  local vw, vh = Layout.vw, Layout.vh
+  Assets.cover(Assets.pick(
+    Layout.isPortrait() and "bg_playground_p" or "bg_playground",
+    "bg_playground", "bg_datacentre", "bg_flat"), 0, 0, vw, vh)
+  love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.72)
+  love.graphics.rectangle("fill", 0, 0, vw, vh)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  local pad = 8
+  local bh = UI.chipHeight()
+  local cap_h = UI.lineHeight(7)
+  local strip = pad + bh + 3 + cap_h + 4
+  UI.setColor(Theme.ink, 0.86)
+  love.graphics.rectangle("fill", 0, 0, vw, strip)
+  UI.setColor(Theme.withAlpha(Theme.dim, 0.5))
+  love.graphics.rectangle("fill", 0, strip, vw, 1)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  -- DONE in the corner, then the writing controls from the left. Measured
+  -- from the widest label each can wear so a button does not change width
+  -- when its own state changes.
+  local done = I18n.t("DONE")
+  local dw = math.max(72, UI.textWidth(done, 8) + 20)
+  local dx = vw - dw - pad
+  UI.button(dx, pad, dw, bh, done, "normal", 8)
+  self.done_rect = { x = dx, y = pad, w = dw, h = bh }
+
+  local items = {
+    -- Literals, as the framed strip has them: these are key names with a
+    -- word in front, and the suite asks for a translation of every string
+    -- that goes through `I18n.t`.
+    { id = "run", label = self.running and "RUNNING…" or "RUN  F5",
+      every = { "RUNNING…", "RUN  F5" },
+      state = self.running and "disabled" or "hot" },
+    { id = "format", label = self.formatting and "…" or "FORMAT F2",
+      every = { "FORMAT F2" },
+      state = self.format_unsupported and "disabled" or "normal" },
+    { id = "save", label = I18n.t("SAVE"), every = { I18n.t("SAVE") }, state = "normal" },
+    { id = "rename", label = I18n.t("RENAME"), every = { I18n.t("RENAME") }, state = "normal" },
+    { id = "lang", label = self.lang:upper(), every = { "PYTHON" }, state = "normal" },
+  }
+  local bx = pad
+  self.big_rects = {}
+  for _, item in ipairs(items) do
+    local w = 0
+    for _, label in ipairs(item.every) do w = math.max(w, UI.textWidth(label, 8) + 20) end
+    if bx + w > dx - pad then break end
+    UI.button(bx, pad, w, bh, item.label, item.state, 8)
+    self.big_rects[item.id] = { x = bx, y = pad, w = w, h = bh }
+    bx = bx + w + 6
+  end
+
+  -- Which file, what it is called, and whether it is safe on the server.
+  local name = self.name and tostring(self.name) or I18n.t("unsaved")
+  if self.focus == "name" then name = (self.name_edit or "") .. "_" end
+  local info = ("%s   %s%s"):format(self.lang:upper(), name,
+    self.editor.dirty and "   ·" or "")
+  UI.text(info, pad + 4, pad + bh + 3, 7,
+    self.focus == "name" and Theme.coin or Theme.withAlpha(Theme.cream, 0.5))
+
+  local top = strip + 6
+  self:draw_code({ x = pad, y = top, w = vw - pad * 2,
+    h = vh - top - UI.footerHeight() - 6 }, true)
 
   self.app:footer(I18n.t("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"))
 end
@@ -440,7 +543,12 @@ function Playground:draw_snippets(rect)
     Theme.withAlpha(Theme.cream, 0.4))
 end
 
-function Playground:draw_code(rect)
+--- The editor.
+---
+--- `bare` leaves off the strip under it — the stdin field, RUN and FORMAT and
+--- the line count — because in CODE those controls are along the top and the
+--- whole of the rest of the window is for the code.
+function Playground:draw_code(rect, bare)
   UI.well(rect.x, rect.y, rect.w, rect.h,
     self.focus == "editor" and Theme.coin or Theme.cyan)
 
@@ -461,6 +569,7 @@ function Playground:draw_code(rect)
   local bh = UI.chipHeight()
   local row_h = math.max(field_h, bh)
   local strip = 6 + cap_h + 2 + row_h + 4 + cap_h + 6
+  if bare then strip = 0 end
   local rows = math.max(1, math.floor((rect.h - strip - 12) / line_h))
   self.editor:ensure_visible(rows)
   self.visible_rows = rows
@@ -516,6 +625,14 @@ function Playground:draw_code(rect)
   self.pane:draw_brackets()
   love.graphics.setScissor()
   love.graphics.setColor(1, 1, 1, 1)
+
+  if bare then
+    -- Nothing below the code: the rects the strip would have set must not
+    -- survive from the framed layout, or a tap lands on a button that is not
+    -- on the screen.
+    self.stdin_rect, self.run_rect, self.format_rect = nil, nil, nil
+    return
+  end
 
   -- stdin, and the buttons. The buttons are as wide as the widest label
   -- they can wear, so RUN and RUNNING… are the same button.
@@ -669,7 +786,9 @@ end
 -- -------------------------------------------------------------------- input
 
 function Playground:textinput(text)
-  if self.focus == "editor" then
+  if self.focus == "name" then
+    if #(self.name_edit or "") < 48 then self.name_edit = (self.name_edit or "") .. text end
+  elseif self.focus == "editor" then
     self.editor:textinput(text)
     SFX.play("type")
   elseif self.focus == "stdin" then
@@ -677,9 +796,40 @@ function Playground:textinput(text)
   end
 end
 
+--- Open the name field, with what it is called already in it.
+function Playground:start_rename()
+  self.focus = "name"
+  self.name_edit = self.name and tostring(self.name) or ""
+end
+
+--- Take what is in the field, if it is anything, and save under it.
+function Playground:commit_rename()
+  local want = (self.name_edit or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  self.focus = "editor"
+  self.name_edit = nil
+  if want == "" or want == self.name then return end
+  self.name = want
+  self.editor.dirty = true
+  self:save()
+  SFX.play("select")
+end
+
 function Playground:keypressed(key, mods)
   mods = mods or {}
   local cmd = mods.ctrl or mods.gui
+
+  -- The name field owns every key while it is open: a rename that ran F5
+  -- because the name has an "f5" in it would be a field nobody trusts.
+  if self.focus == "name" then
+    if key == "backspace" then
+      self.name_edit = (self.name_edit or ""):sub(1, -2)
+    elseif key == "return" or key == "kpenter" then
+      self:commit_rename()
+    elseif key == "escape" then
+      self.focus, self.name_edit = "editor", nil
+    end
+    return true
+  end
 
   if key == "f5" or (cmd and not mods.shift and (key == "return" or key == "kpenter")) then
     self:run(); return true
@@ -712,6 +862,15 @@ function Playground:keypressed(key, mods)
     return true
   end
 
+  -- In CODE, ESC is the way back to the framed screen, not out of it: the
+  -- mode is a place you are, and the key that leaves a place leaves the
+  -- innermost one first.
+  if key == "escape" and self.big then
+    self.big = false
+    SFX.play("select")
+    return true
+  end
+
   if self.editor:keypressed(key, mods) then return true end
   return false
 end
@@ -726,6 +885,20 @@ function Playground:mousepressed(x, y, button)
   local function inside(r)
     return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
   end
+  if self.big then
+    if inside(self.done_rect) then self.big = false; SFX.play("select"); return end
+    local r = self.big_rects or {}
+    if inside(r.run) then self:run(); return end
+    if inside(r.format) then self:format(); return end
+    if inside(r.save) then self:save(); SFX.play("select"); return end
+    if inside(r.rename) then self:start_rename(); return end
+    if inside(r.lang) then self:toggle_lang(); return end
+    local shift = love.keyboard.isDown("lshift", "rshift")
+    if self.pane:mousepressed(x, y, button, shift) then self.focus = "editor" end
+    return
+  end
+  if inside(self.code_button_rect) then self.big = true; SFX.play("select"); return end
+  if inside(self.rename_rect) then self:start_rename(); return end
   if inside(self.lang_rect) then self:toggle_lang(); return end
   if inside(self.run_rect) then self:run(); return end
   if inside(self.format_rect) then self:format(); return end

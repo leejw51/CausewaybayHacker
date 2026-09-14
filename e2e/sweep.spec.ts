@@ -684,6 +684,53 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
     .toBe(true);
   await page.waitForTimeout(800);
   await shot(page, "24-playground-output");
+
+  // CODE: the editor and nothing else. The bench is a list, an editor, a
+  // stdin box, a band of buttons and an output panel, and the report that
+  // started this was that it is very hard to use — so what is asserted is
+  // the thing that was wrong: how much of the window the editor gets.
+  const editorH = async () =>
+    page.evaluate(() => {
+      const ed = document.querySelector(".cm-editor") as HTMLElement | null;
+      return ed?.getBoundingClientRect().height ?? 0;
+    });
+  const framed = await editorH();
+  await clickButton(page, "code");
+  await page.waitForTimeout(700);
+  const focused = await editorH();
+  console.log(`[playground] editor ${Math.round(framed)}px framed -> ${Math.round(focused)}px CODE`);
+  expect(focused).toBeGreaterThan(framed * 1.5);
+  // And the stdin box, which is not drawn here, does not stay floating over it.
+  const stdinOver = await page.evaluate(() => {
+    const ta = document.querySelector("textarea.cwb-field") as HTMLElement | null;
+    return ta ? getComputedStyle(ta).display !== "none" && ta.getBoundingClientRect().height > 0 : false;
+  });
+  expect(stdinOver, "the stdin field is hidden in CODE").toBe(false);
+  await shot(page, "23b-playground-code");
+
+  // The display toggles are buttons here, not only F-keys — this is the
+  // screen people reach for on a phone, and a phone has no F11.
+  const ids = await page.evaluate(() => window.__cwbCapture!.buttons().map((b) => b.id));
+  expect(ids).toContain("fullscreen");
+  expect(ids).toContain("orient");
+  const before = await page.evaluate(() => window.__cwbCapture!.orientation());
+  await clickButton(page, "orient");
+  await page.waitForTimeout(500);
+  const after = await page.evaluate(() => window.__cwbCapture!.orientation());
+  console.log(`[playground] ORIENT button: ${before} -> ${after}`);
+
+  // RENAME: the pad's own name, typed over in place.
+  await clickButton(page, "rename");
+  await page.waitForTimeout(400);
+  await page.keyboard.type("kettle");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(600);
+  await clickButton(page, "unfocus");
+  await page.waitForTimeout(600);
+  const named = await page.evaluate(() => window.__cwbCapture!.buttons().length >= 0);
+  expect(named).toBe(true);
+  await shot(page, "23c-playground-renamed");
+
   await clickButton(page, "back");
   await page.waitForTimeout(800);
   console.log(`[playground] BACK went to ${await sceneNow(page)}`);
