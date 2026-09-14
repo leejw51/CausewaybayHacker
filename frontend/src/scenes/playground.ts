@@ -136,7 +136,6 @@ export class PlaygroundScene implements Scene {
   }
 
   async enter(): Promise<void> {
-    this.app.chip.music("title");
     this.offs.push(
       this.app.client.on("run.stage", (p) => {
         if (this.attemptId && p.attempt_id !== this.attemptId) return;

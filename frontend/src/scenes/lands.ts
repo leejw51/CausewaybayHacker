@@ -447,7 +447,6 @@ export class LandsScene implements Scene {
     // taken now rather than in the constructor: `new LandsScene(app)` is
     // written in nine places and none of them should have to know about this.
     this.land = this.app.land;
-    this.app.chip.music("title");
     try {
       const res = await this.app.client.request("world.lands", {});
       this.lands = res.lands;
@@ -457,6 +456,9 @@ export class LandsScene implements Scene {
   }
 
   leave(): void {
+    // Nothing to stop: the opening is the last thing that sings. Left here as
+    // a stop rather than nothing at all, so a screen reached mid-tune — the
+    // title card, on the way back — is quiet by the time it is drawn.
     this.app.chip.music("stop");
   }
 

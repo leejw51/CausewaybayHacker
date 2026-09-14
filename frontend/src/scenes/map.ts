@@ -191,7 +191,6 @@ export class MapScene implements Scene {
     // in-window half, so ESC back to the lobby lands where the player is.
     this.app.land = this.land;
     this.app.category = this.category;
-    this.app.chip.music("stage");
     // PROTOCOL §6.5: never trust a map cached across a disconnect — a
     // `progress.update` may have been missed while the socket was down.
     this.offState = this.app.client.onState((s) => {
