@@ -104,11 +104,25 @@ add({ shot = "S3-login-with-story-button.png", when = function() return first_ru
 -- The way back in. Aimed at the rectangle the draw actually recorded, so the
 -- test is about the control rather than about arithmetic in the test.
 add({ note = "STORY on the login screen", when = function() return first_run end })
+-- The panel scrolls, and at the taller type steps or a short window this row
+-- starts below the fold. So: turn the wheel the way a player would until the
+-- button is inside the view, then aim at where the *scene* says it is —
+-- `view` and `scroll` — rather than at padding this script guessed.
+add({ until_ = function(app)
+      local s = app.scene
+      local b, v = s.story_button, s.view
+      if not (b and v) then return false end
+      if b.y + b.h <= (s.scroll or 0) + v.h then return true end
+      s:wheelmoved(0, -1)
+      return false
+    end, note = "scrolled the STORY button into view", timeout = 5,
+      when = function() return first_run end })
 add({ click = function(app)
-      local px, py, pw = app.scene:panel_rect()
-      local b = app.scene.story_button
+      local s = app.scene
+      local b, v = s.story_button, s.view
       assert(b, "no STORY button was drawn")
-      return { px + 20 + b.w / 2, py + 18 + b.y + b.h / 2 }
+      assert(v, "the login panel drew no view to scroll")
+      return { v.x + b.w / 2, v.y + b.y + b.h / 2 - (s.scroll or 0) }
     end, when = function() return first_run end })
 add({ until_ = scene("story"), note = "the replay", timeout = 5,
       when = function() return first_run end })

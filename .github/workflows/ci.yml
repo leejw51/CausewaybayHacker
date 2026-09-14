@@ -312,6 +312,7 @@ jobs:
           home=$(mktemp -d)
           xvfb-run -a make -C love2d drive SCRIPT=tests/drive/story.lua ARGS="--home $home"
           xvfb-run -a make -C love2d drive SCRIPT=tests/drive/story.lua ARGS="--home $home"
+          xvfb-run -a make -C love2d drive SCRIPT=tests/drive/loginerror.lua ARGS="--home $(mktemp -d)"
 
       - name: Server log
         if: always()

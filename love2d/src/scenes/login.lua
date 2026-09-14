@@ -408,6 +408,9 @@ function Login:draw()
     rows, content_h = self:rows_signin(inner)
   end
   self.content_h = content_h
+  -- Kept for the drives: where each row landed is the only way a test can
+  -- ask whether the player could actually see one.
+  self.last_rows = rows
 
   local px, py, pw, ph = self:panel_rect()
   UI.panel(px, py, pw, ph, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = Theme.land.rust })
@@ -417,12 +420,31 @@ function Login:draw()
   local view_h = ph - PAD * 2
   local max_scroll = math.max(0, content_h - view_h)
   self.scroll = math.max(0, math.min(self.scroll or 0, max_scroll))
-  for _, row in ipairs(rows) do
-    if row.focus then
-      if row.y < self.scroll then self.scroll = row.y end
-      if row.y + row.h > self.scroll + view_h then self.scroll = row.y + row.h - view_h end
+  -- Follow the focus when it **moves**, and only then. Doing it every frame
+  -- pins the panel to whichever field has the caret: the wheel turns, the
+  -- next draw drags it straight back, and everything under that row — the
+  -- buttons included — is unreachable by mouse.
+  local function bring_into_view(row)
+    if row.y < self.scroll then self.scroll = row.y end
+    if row.y + row.h > self.scroll + view_h then self.scroll = row.y + row.h - view_h end
+  end
+  if self.focus ~= self.followed_focus then
+    self.followed_focus = self.focus
+    for _, row in ipairs(rows) do
+      if row.focus then bring_into_view(row) end
     end
   end
+  -- A refusal the player cannot see is a screen that did not answer. The
+  -- message is the last row in a stack taller than the panel, so on a
+  -- default window it lands well past the fold — carry the panel to it the
+  -- once, when the words change.
+  local said = self.error or self.status
+  if said and said ~= self.followed_said then
+    for _, row in ipairs(rows) do
+      if row.message then bring_into_view(row) end
+    end
+  end
+  self.followed_said = said
   self.view = { x = px + PAD, y = py + PAD, w = inner, h = view_h }
 
   love.graphics.push()
@@ -474,7 +496,7 @@ function Login:message_row(put, width)
     for i, line in ipairs(UI.wrap(message, width, 8)) do
       if i <= 2 then UI.text(line, 0, y + (i - 1) * step, 8, color) end
     end
-  end, { gap = 0 })
+  end, { gap = 0, message = true })
 end
 
 function Login:rows_signin(inner)
@@ -523,9 +545,13 @@ function Login:rows_signin(inner)
   field(3, I18n.t("SERVER  (ENTER APPLIES)"), self.server, App.DEFAULT_SERVER, 4)
 
   -- The line under it: a refusal, the override, or the live state. Two lines
-  -- reserved, because the override sentence is two lines in most languages.
+  -- when there is something two lines long to say — the override sentence is
+  -- two lines in most languages — and one when there is not. The reserve was
+  -- unconditional, which spent 24 pixels of a panel that has none to spare on
+  -- a blank line under `in use: … [open]`.
   local note_step = lh7 + 2
-  put(note_step * 2 - 2, function(y)
+  local note_lines = (self.server_error or self.app.server_override) and 2 or 1
+  put(note_step * note_lines - 2, function(y)
     local override = self.app.server_override
     if self.server_error then
       for i, line in ipairs(UI.wrap(self.server_error, inner, 7)) do
