@@ -587,6 +587,7 @@ export const en = {
   "clip.copyDenied": "the browser refused the clipboard — click the page once and try again",
   "clip.pasteDenied":
     "the browser refused to read the clipboard — allow it in the site permissions",
+  "clip.pasteByKey": "this page cannot read the clipboard — press Cmd+V or Ctrl+V in the editor instead",
   "clip.unsupported":
     "this browser has no clipboard here — a page served over http:// usually has none",
   "clip.silent": "the clipboard did not answer",

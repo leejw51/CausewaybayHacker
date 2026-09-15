@@ -553,6 +553,7 @@ export const ko: Partial<Catalogue> = {
   "clip.emptyClipboard": "클립보드가 비어 있습니다",
   "clip.copyDenied": "브라우저가 클립보드를 거부했습니다 — 페이지를 한 번 클릭하고 다시 하세요",
   "clip.pasteDenied": "브라우저가 클립보드 읽기를 거부했습니다 — 사이트 권한에서 허용하세요",
+  "clip.pasteByKey": "이 페이지는 클립보드를 읽을 수 없습니다 — 편집기에서 Cmd+V 또는 Ctrl+V를 누르세요",
   "clip.unsupported":
     "이 브라우저에는 여기서 쓸 클립보드가 없습니다 — http:// 로 열린 페이지는 보통 없습니다",
   "clip.silent": "클립보드가 응답하지 않았습니다",

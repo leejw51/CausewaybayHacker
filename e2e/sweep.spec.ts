@@ -818,6 +818,38 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   }
   await shot(page, "23e-code-output");
 
+  // The same two buttons on a page with **no async clipboard** — which is
+  // every `http://` origin, and so every phone reaching this over a tailnet.
+  // `127.0.0.1` is a secure context, so everything above proves nothing about
+  // the case that was reported. Run first: COPY OUTPUT with nothing to copy
+  // correctly writes nothing, and a stale capture then looks like a bug.
+  await page.evaluate(() => {
+    const w = window as unknown as { __copied?: string };
+    w.__copied = "";
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    document.execCommand = (cmd: string) => {
+      if (cmd === "copy") {
+        const el = document.activeElement as HTMLTextAreaElement | null;
+        w.__copied = el && "value" in el ? el.value : "<not a field>";
+      }
+      return true;
+    };
+  });
+  const grab = async (id: string) => {
+    await page.evaluate(() => ((window as unknown as { __copied?: string }).__copied = ""));
+    await clickButton(page, id);
+    await page.waitForTimeout(500);
+    return page.evaluate(() => (window as unknown as { __copied?: string }).__copied ?? "");
+  };
+  const fbCode = await grab("copycode");
+  const fbOut = await grab("copyout");
+  console.log(
+    `[playground] no-async: code ${JSON.stringify(fbCode.slice(0, 26))} out ${JSON.stringify(fbOut.slice(0, 26))}`,
+  );
+  expect(fbCode, "COPY CODE works with no async clipboard").toContain("fn main");
+  expect(fbOut.length, "COPY OUTPUT copies something").toBeGreaterThan(0);
+  expect(fbOut, "COPY OUTPUT copies the run, not the code").not.toContain("fn main");
+
   // The display toggles are buttons here, not only F-keys — this is the
   // screen people reach for on a phone, and a phone has no F11.
   const ids = await page.evaluate(() => window.__cwbCapture!.buttons().map((b) => b.id));

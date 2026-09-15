@@ -52,16 +52,63 @@ function reason(e: unknown): "denied" | "failed" {
   return name === "NotAllowedError" || name === "SecurityError" ? "denied" : "failed";
 }
 
+/**
+ * The old way: a textarea nobody sees, selected, and `execCommand("copy")`.
+ *
+ * Deprecated, synchronous, and the only thing that works where the async
+ * clipboard is not allowed to exist — which is every page served over plain
+ * `http://`. That is not an edge case here: the whole point of this game
+ * having a server on a tailnet is playing it from a phone at
+ * `http://100.93.166.76:5390`, and on that page `navigator.clipboard` is
+ * undefined, so COPY told people their browser had no clipboard and did
+ * nothing. It does have one. It just will not hand it over asynchronously.
+ *
+ * The element is positioned off-screen rather than hidden: `display:none` and
+ * `visibility:hidden` are not selectable, so neither is copyable. Focus is put
+ * back where it was, because this runs while somebody is typing in the editor.
+ */
+function copyByExec(text: string): boolean {
+  if (typeof document === "undefined" || !document.body) return false;
+  const was = document.activeElement as HTMLElement | null;
+  const el = document.createElement("textarea");
+  el.value = text;
+  el.setAttribute("readonly", "");
+  el.style.cssText = "position:fixed;top:-1000px;left:-1000px;opacity:0;";
+  document.body.appendChild(el);
+  let ok = false;
+  try {
+    el.select();
+    el.setSelectionRange(0, text.length);
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  el.remove();
+  // Restoring the caret matters more than it looks: without it a copy from
+  // CODE leaves the editor blurred and the next keystroke goes nowhere.
+  try {
+    was?.focus?.();
+  } catch {
+    /* the element went away while we held it */
+  }
+  return ok;
+}
+
 export async function copyText(text: string): Promise<ClipResult> {
   if (!text) return { ok: false, why: "empty" };
   const clip = api();
-  if (!clip?.writeText) return { ok: false, why: "unsupported" };
-  try {
-    await clip.writeText(text);
-    return { ok: true, text };
-  } catch (e) {
-    return { ok: false, why: reason(e) };
+  if (clip?.writeText) {
+    try {
+      await clip.writeText(text);
+      return { ok: true, text };
+    } catch (e) {
+      // Fall through: a refusal from the async API is not proof the old one
+      // will be refused too, and trying costs nothing.
+      if (copyByExec(text)) return { ok: true, text };
+      return { ok: false, why: reason(e) };
+    }
   }
+  return copyByExec(text) ? { ok: true, text } : { ok: false, why: "unsupported" };
 }
 
 export async function readText(): Promise<ClipResult> {
@@ -104,7 +151,14 @@ export function clipMessage(
         notice: false,
       };
     case "unsupported":
-      return { text: t("clip.unsupported"), notice: false };
+      // Writing has a fallback; **reading has none** — `execCommand("paste")`
+      // is refused by every browser, on purpose. So on a page where this
+      // happens the honest thing is to name the key that does work, since the
+      // editor is a real text field and the browser will paste into it.
+      return {
+        text: verb === "copy" ? t("clip.unsupported") : t("clip.pasteByKey"),
+        notice: false,
+      };
     default:
       return { text: t("clip.silent"), notice: false };
   }
