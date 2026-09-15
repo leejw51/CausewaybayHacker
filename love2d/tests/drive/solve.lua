@@ -22,12 +22,6 @@
 --   6. and then SUBMIT of the revealed answer: it clears, and it does **not**
 --      clear at three stars.
 
--- Its own account, and a fresh one per run: the star this spends is spent for
--- good, so a second run wants `CWBH_MNEMONIC="…twelve words…"` rather than the
--- assertions below quietly softening on a quest that is already solved.
-local MNEMONIC = os.getenv("CWBH_MNEMONIC")
-  or "erupt horror wash enhance game remove dragon steak loud lizard praise stable"
-
 local MINE = 'fn main() {\nprintln!("mine, not the answer");'
 
 local function scene(name)
@@ -42,8 +36,19 @@ add({ orient = "landscape" })
 add({ wait = 0.6 })
 add({ until_ = function(app) return app.scene_name == "login" or app.session.authed end,
       timeout = 15 })
-add({ text = MNEMONIC, when = on_login })
-add({ key = "return", when = on_login })
+-- **A wallet minted here, not a phrase written above.**
+--
+-- `use_solve` is a high-water mark: the star this script spends is spent for
+-- good. A fixed mnemonic means the second run is played on an account where
+-- the quest is already solved, and the assertions below quietly soften into
+-- nothing — which is exactly what happened once every other drive had been
+-- through the same account and left it somewhere else entirely. NEW WALLET
+-- is one key, and it is a different account every time.
+add({ key = "n", when = on_login })
+add({ until_ = function(app)
+      return app.session.authed or app.scene.mode == "new_show"
+    end, note = "a phrase and its address", timeout = 20 })
+add({ key = "return", when = function(app) return app.scene_name == "login" end })
 add({ until_ = scene("lands"), note = "signed in", timeout = 25 })
 add({ until_ = function(app)
       print("signed in as " .. tostring(app.session:short_address()))

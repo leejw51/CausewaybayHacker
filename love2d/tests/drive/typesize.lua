@@ -131,9 +131,16 @@ add({ orient = "landscape" })
 add({ wait = 0.6 })
 add({ until_ = function(app) return app.scene_name == "login" or app.session.authed end,
       timeout = 15 })
-add({ text = "legal winner thank year wave sausage worth useful legal winner thank yellow",
-      when = on_login })
-add({ key = "return", when = on_login })
+-- **A wallet minted here, not a phrase shared with every other drive.** What
+-- this script measures is how wide things are drawn, and half of that is the
+-- text in them: a quest opened on a draft another drive left behind is a
+-- different string of a different width, and the answer to "does anything run
+-- off the canvas" changed with it. NEW WALLET is one key and a fresh account.
+add({ key = "n", when = on_login })
+add({ until_ = function(app)
+      return app.session.authed or app.scene.mode == "new_show"
+    end, note = "a phrase and its address", timeout = 20 })
+add({ key = "return", when = function(app) return app.scene_name == "login" end })
 add({ until_ = scene("lands"), note = "signed in", timeout = 25 })
 
 -- ------------------------------------------------------------ the playground

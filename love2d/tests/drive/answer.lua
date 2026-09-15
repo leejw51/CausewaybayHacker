@@ -1,6 +1,5 @@
 -- CODE mode and ANSWER, on the real server.
 local Layout = require("src.layout")
-local MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 local function scene(n) return function(app) return app.scene_name == n end end
 local on_login = scene("login")
 local steps = {}
@@ -10,7 +9,15 @@ local function check(ok, why) if not ok then print("FAIL: " .. why); failed = fa
 
 add({ orient = "landscape" }) add({ resize = { 1280, 720 } }) add({ wait = 0.6 })
 add({ until_ = function(app) return app.scene_name == "login" or app.session.authed end, timeout = 15 })
-add({ text = MNEMONIC, when = on_login }) add({ key = "return", when = on_login })
+-- **A wallet minted here.** ANSWER spends a star through `quest.solve`, and
+-- `use_solve` is a high-water mark: on a second run of the same account the
+-- quest is already solved and the assertions below are watching a screen that
+-- got there some other way. NEW WALLET is one key and a fresh account.
+add({ key = "n", when = on_login })
+add({ until_ = function(app)
+      return app.session.authed or app.scene.mode == "new_show"
+    end, note = "a phrase and its address", timeout = 20 })
+add({ key = "return", when = function(app) return app.scene_name == "login" end })
 add({ until_ = scene("lands"), timeout = 25 })
 add({ until_ = function(app) return app.scene.lands ~= nil end, timeout = 10 })
 -- **Pin the land and the buffer.** The server remembers where a player was

@@ -52,13 +52,18 @@ return {
   { until_ = scene("login"), note = "login screen", timeout = 20 },
   { shot = "01-login.png" },
 
-  { note = "typing the mnemonic — derived locally, never sent" },
-  { text = MNEMONIC },
-  { key = "tab" },
-  { text = "mei" },
-  { wait = 0.2 },
+  -- **A wallet minted here, not a phrase written above.** This script plays
+  -- a quest through to ACCEPTED and then asserts `cleared=1`, which is only
+  -- true on an account that has not cleared it already — and every other
+  -- drive signs in as the same phrase and leaves its own progress behind.
+  -- NEW WALLET is one key and a different account every run.
+  { note = "NEW WALLET — a fresh account, so `cleared` means this run" },
+  { key = "n" },
+  { until_ = function(app)
+      return app.session.authed or app.scene.mode == "new_show"
+    end, note = "a phrase and its address", timeout = 20 },
   { shot = "02-login-filled.png" },
-  { key = "return" },
+  { key = "return", when = function(app) return app.scene_name == "login" end },
 
   { until_ = scene("lands"), note = "auth.challenge + sign + auth.login", timeout = 20 },
   { wait = 0.8 },
