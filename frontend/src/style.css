@@ -53,6 +53,21 @@ body {
   src: url("/fonts/VT323-Regular.ttf") format("truetype");
   font-display: block;
 }
+/* The two code faces, subset to what a code pane can contain: ASCII, the
+   Latin supplements, and the handful of marks the editor draws. Iosevka's
+   full Latin subset is 984 KB and this is 18. Both SIL OFL 1.1; the licences
+   sit beside them. `swap` rather than `block` — these are a *choice*, and a
+   choice nobody has made yet must not hold the first frame of the editor. */
+@font-face {
+  font-family: "IosevkaCode";
+  src: url("/fonts/Iosevka-Code.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrainsMonoCode";
+  src: url("/fonts/JetBrainsMono-Code.woff2") format("woff2");
+  font-display: swap;
+}
 
 /* --- the retro chrome the DOM bits borrow from the canvas panels --- */
 .cwb-field {
@@ -102,7 +117,15 @@ body {
   color: #fcecc8;
 }
 .cwb-editor .cm-scroller {
-  font-family: "VT323", ui-monospace, monospace;
+  /* One source of truth with the canvas: `setCodeFace` writes this property
+     and the editor, which is a DOM element and not painted by us, follows
+     the same choice. Without it the face button changed every drawn glyph
+     and left the one box people actually type into alone. */
+  font-family: var(--cwb-code, "VT323", ui-monospace, monospace);
+  /* And the same size factor the canvas uses: a face drawn at VT323's
+     nominal size is a different size to the eye, and switching would change
+     how big the code looks rather than how much of it fits. */
+  font-size: calc(1em * var(--cwb-code-scale, 1));
   line-height: 1.15;
 }
 .cwb-editor .cm-gutters {

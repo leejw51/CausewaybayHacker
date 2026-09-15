@@ -488,6 +488,10 @@ function Playground:draw_big()
     { id = "copycode", label = I18n.t("COPY CODE"), every = { I18n.t("COPY CODE") },
       state = "normal" },
     { id = "pastecode", label = I18n.t("PASTE"), every = { I18n.t("PASTE") }, state = "normal" },
+    -- The face code is drawn in, cycled. Says the face it is **in**, like
+    -- every other toggle on this strip.
+    { id = "face", label = Assets.CODE_FACE_NAME[Assets.codeFace()],
+      every = { "JETBRAINS" }, state = "normal" },
     { id = "copyin", label = I18n.t("COPY INPUT"), every = { I18n.t("COPY INPUT") },
       state = (self.stdin or "") ~= "" and "normal" or "disabled" },
     { id = "pastein", label = I18n.t("PASTE INPUT"), every = { I18n.t("PASTE INPUT") },
@@ -1030,6 +1034,23 @@ function Playground:searchable()
   return #(self.snippets or {}) >= 5 or (self.query or "") ~= ""
 end
 
+--- The code face, cycled and remembered.
+---
+--- One preference for both code panes, because how somebody likes to read
+--- code is a fact about them and not about which screen they are on.
+function Playground:cycle_face()
+  local faces = Assets.CODE_FACES
+  local at = 1
+  for i, name in ipairs(faces) do
+    if name == Assets.codeFace() then at = i end
+  end
+  local next_face = faces[(at % #faces) + 1]
+  Assets.setCodeFace(next_face)
+  require("src.store").set_face(next_face)
+  self.note = Assets.CODE_FACE_NAME[next_face]
+  SFX.play("select")
+end
+
 --- What the run said, as text somebody can paste somewhere else.
 ---
 --- Canvas output is pixels: nothing in that pane can be selected with a
@@ -1213,6 +1234,7 @@ function Playground:mousepressed(x, y, button)
     if inside(r.copycode) then self:clip("code"); return end
     if inside(r.pastecode) then self:clip("paste"); return end
     if inside(r.copyout) then self:clip("out"); return end
+    if inside(r.face) then self:cycle_face(); return end
     if inside(r.copyin) then self:clip("copyin"); return end
     if inside(r.pastein) then self:clip("in"); return end
     -- CODE draws the stdin field itself, above the editor. Without this the

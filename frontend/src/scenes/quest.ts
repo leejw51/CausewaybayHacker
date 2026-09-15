@@ -12,7 +12,16 @@
  * editor's box as a drawer that opens when a run starts.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, width, wrap } from "../engine/text";
+import {
+  CODE_FACE_NAME,
+  CODE_FACES,
+  ensureFonts,
+  getCodeFace,
+  printf,
+  setCodeFace,
+  width,
+  wrap,
+} from "../engine/text";
 import { css, Theme, type RGBA } from "../engine/theme";
 import { btnBox, rowsIn, clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
 import {
@@ -33,6 +42,7 @@ import {
   answerCompletion,
   answerIndent,
   answerProgress,
+  CODE_FACE_KEY,
   CODE_FONT_KEY,
   CODE_FONT_MAX,
   CODE_FONT_MIN,
@@ -1429,6 +1439,17 @@ export class QuestScene implements Scene {
     return this.stack === "auto" ? !this.app.layout.isPortrait() : this.stack === "row";
   }
 
+  /** The code face, cycled. Shared with the playground through one key. */
+  private cycleFace(): void {
+    const at = CODE_FACES.indexOf(getCodeFace());
+    const next = CODE_FACES[(at + 1) % CODE_FACES.length];
+    setCodeFace(next);
+    writePref(CODE_FACE_KEY, next);
+    this.app.remeasure();
+    this.error = t("quest.codeFace", { name: CODE_FACE_NAME[next] });
+    this.notice = true;
+  }
+
   private sizeFont(by: number): void {
     const next = Math.min(
       FONT_MAX,
@@ -1596,6 +1617,9 @@ export class QuestScene implements Scene {
         break;
       case "fontup":
         this.sizeFont(FONT_STEP);
+        break;
+      case "face":
+        this.cycleFace();
         break;
     }
   }
@@ -1790,6 +1814,7 @@ export class QuestScene implements Scene {
       id === "stack" ||
       id === "fontdown" ||
       id === "fontup" ||
+      id === "face" ||
       id === "focus";
     return [
       // Leaving, first and leftmost: the top-left of a screen is where a
@@ -1808,6 +1833,9 @@ export class QuestScene implements Scene {
       { id: "stack", label: this.side ? t("quest.briefSide") : t("quest.briefTop") },
       { id: "fontdown", label: t("quest.fontDown"), dim: this.fontMul <= FONT_MIN + 0.001 },
       { id: "fontup", label: t("quest.fontUp"), dim: this.fontMul >= FONT_MAX - 0.001 },
+      // Says the face it is **in**, and cycles. The same preference the
+      // playground's button sets: one answer to "how do I like my code".
+      { id: "face", label: CODE_FACE_NAME[getCodeFace()] },
       { id: "focus", label: t("quest.code") },
     ].filter((i) => keep(i.id));
   }

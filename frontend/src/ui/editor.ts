@@ -70,6 +70,8 @@ const MODE: Record<Land, () => Extension> = { rust, go, cpp, python };
  * it would be two settings to keep in step by hand.
  */
 export const CODE_FONT_KEY = "quest.font";
+/** Which face code is drawn in. Beside the size, and shared the same way. */
+export const CODE_FACE_KEY = "quest.face";
 export const CODE_FONT_MIN = 0.7;
 export const CODE_FONT_MAX = 2.4;
 

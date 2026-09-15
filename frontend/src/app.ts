@@ -11,7 +11,17 @@
 import { Layout, type Orientation } from "./engine/layout";
 import { Input, loveKey } from "./engine/input";
 import { Assets } from "./engine/assets";
-import { ensureFonts, printf, remeasure, wrap } from "./engine/text";
+import {
+  CODE_FACES,
+  ensureFonts,
+  printf,
+  remeasure,
+  setCodeFace,
+  wrap,
+  type CodeFace,
+} from "./engine/text";
+import { CODE_FACE_KEY } from "./ui/editor";
+import { readEnumPref } from "./ui/prefs";
 import { css, Theme } from "./engine/theme";
 import { btnBox, fill, inRect, panel, pixBtn, type Ctx, type Rect } from "./engine/ui";
 import { seconds, reducedMotion, Tween } from "./engine/motion";
@@ -218,6 +228,9 @@ export class App {
     this.backdrop = Backdrop.create(fx);
 
     this.restoreOrientation();
+    // The code face, before the first frame: a face chosen last time and
+    // applied on the second frame is a screen that visibly re-lays itself.
+    setCodeFace(readEnumPref<CodeFace>(CODE_FACE_KEY, CODE_FACES, "game"));
     try {
       this.crt.enabled = localStorage.getItem(CRT_KEY) !== "off";
     } catch {

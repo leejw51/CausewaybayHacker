@@ -319,6 +319,13 @@ function Store.replay(records)
         -- records would mean two ways for them to disagree.
         font = tonumber(record.font),
       }
+    elseif kind == "face.set" and type(record.face) == "string" then
+      -- **Its own record, like the language and for the same reason.** Which
+      -- face somebody reads code in survives a change of window and a change
+      -- of machine, where the orientation and the type step are facts about
+      -- one window; folding it into `display.set` would rewrite it on every
+      -- F1 press.
+      folded.face = record.face
     elseif kind == "lang.set" and type(record.lang) == "string" then
       -- **Its own record, not a field on `display.set`.** The orientation,
       -- the fullscreen pin and the type size are one setting — how this
@@ -423,6 +430,8 @@ function Store.fold(record)
     state.sessions[record.server] = nil
   elseif record.kind == "display.set" then
     state.display = folded.display
+  elseif record.kind == "face.set" then
+    state.face = folded.face
   elseif record.kind == "lang.set" then
     state.lang = folded.lang
   elseif record.kind == "story.seen" then
@@ -648,6 +657,15 @@ end
 
 function Store.set_lang(code)
   return Store.append({ kind = "lang.set", lang = code })
+end
+
+--- The face code is drawn in, across launches.
+function Store.saved_face()
+  return state and state.face or nil
+end
+
+function Store.set_face(face)
+  return Store.append({ kind = "face.set", face = face })
 end
 
 -- --------------------------------------------------------------- the opening

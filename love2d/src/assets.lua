@@ -56,6 +56,44 @@ local KNOCKOUT = {
 
 local FONT_FILE = "assets/fonts/PressStart2P-Regular.ttf"
 local MONO_FILE = "assets/fonts/VT323-Regular.ttf"
+
+--- The faces a code pane can be set in, in the order the button cycles them.
+---
+--- `game` is the one the rest of the screen is drawn in and stays the
+--- default: changing what somebody already knows is not an improvement. The
+--- other two are code faces proper — VT323's `0` and `O` are the same shape
+--- and `1`, `l` and `I` nearly so, where both of these separate all five and
+--- fit half again as much on a line. Subset to what a code pane can hold, so
+--- the pair costs 125 KB rather than a megabyte. Both SIL OFL 1.1.
+A.CODE_FACES = { "game", "iosevka", "jetbrains" }
+A.CODE_FACE_NAME = { game = "VT323", iosevka = "IOSEVKA", jetbrains = "JETBRAINS" }
+local CODE_FILE = {
+  game = MONO_FILE,
+  iosevka = "assets/fonts/Iosevka-Code.ttf",
+  jetbrains = "assets/fonts/JetBrainsMono-Code.ttf",
+}
+--- How big to draw each face, against the size asked for.
+---
+--- **Not every face is the same size at the same size.** VT323 is a terminal
+--- face with a small cap height on a narrow em: drawn at the same nominal
+--- size as Iosevka it is smaller to the eye and narrower per character, so
+--- the swap *loses* columns, which is the opposite of the reason to offer it.
+--- Each face is drawn at the size that matches VT323's apparent size, and
+--- then the comparison is the one worth making.
+local CODE_SCALE = { game = 1, iosevka = 0.68, jetbrains = 0.68 }
+local code_face = "game"
+
+--- Which face `A.mono` hands back. Clears the cache: the sizes already made
+--- are the old face at those sizes.
+function A.setCodeFace(face)
+  if not CODE_FILE[face] or face == code_face then return end
+  code_face = face
+  for key in pairs(A.fonts) do
+    if key:sub(1, 1) == "m" then A.fonts[key] = nil end
+  end
+end
+
+function A.codeFace() return code_face end
 --- GNU Unifont, 5.1 MB, taken whole from `CausewaybayOffice/love2d`.
 ---
 --- **One face for every script this interface speaks.** 58,909 glyphs — the
@@ -347,12 +385,16 @@ end
 --- paste a Chinese comment into the editor, and a box where a character
 --- should be would look like the client had corrupted their program.
 function A.mono(size)
-  size = A.snap8(size)
-  local key = "m" .. size
+  size = A.snap8(math.max(8, math.floor(size * (CODE_SCALE[code_face] or 1))))
+  local key = "m" .. size .. code_face
   if not A.fonts[key] then
     local font
-    if love.filesystem.getInfo(MONO_FILE) then
-      font = love.graphics.newFont(MONO_FILE, size, "mono")
+    -- The chosen face, or the game's own if the file is not there: a client
+    -- built without the code faces still draws code.
+    local file = CODE_FILE[code_face] or MONO_FILE
+    if not love.filesystem.getInfo(file) then file = MONO_FILE end
+    if love.filesystem.getInfo(file) then
+      font = love.graphics.newFont(file, size, "mono")
     else
       font = love.graphics.newFont(size)
     end

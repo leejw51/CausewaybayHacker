@@ -92,6 +92,84 @@ const back = () => (cjk ? `"${cjk}",${CJK}` : CJK);
 const PIXEL = () => `"PressStart2P","VT323",ui-monospace,monospace,${back()}`;
 const BODY = () => `"VT323","PressStart2P",ui-monospace,monospace,${back()}`;
 
+/**
+ * The faces a code pane can be set in, in the order the button cycles them.
+ *
+ * `game` is the one the rest of the screen is drawn in and stays the default:
+ * changing what somebody already knows is not an improvement. The other two
+ * are code faces proper — where VT323's `0` and `O` are the same shape and
+ * `1`, `l` and `I` nearly so, both of these separate all five, and both fit
+ * half again as much on a line. Measured at a 402px phone pane: VT323 gives
+ * 28 columns, JetBrains Mono 42, Iosevka 50.
+ *
+ * Each names the next face in the stack, so a glyph one subset lacks is
+ * drawn by the game's own face before it reaches the machine's.
+ */
+export const CODE_FACES = ["game", "iosevka", "jetbrains"] as const;
+export type CodeFace = (typeof CODE_FACES)[number];
+
+/**
+ * How big to draw each face, against the size the game asks for.
+ *
+ * **Not every face is the same size at the same size.** VT323 is a terminal
+ * face with a small cap height on a narrow em: at 22px it is both smaller to
+ * the eye and narrower per character than Iosevka at 22px. Drawn at the same
+ * nominal size the swap *loses* columns — 90 to 72 to 60, measured — which is
+ * the opposite of the reason to offer it.
+ *
+ * So each face is drawn at the size that matches VT323's *apparent* size, and
+ * then the comparison is the one worth making: at a 402px pane VT323 gives 28
+ * columns, JetBrains Mono 42 and Iosevka 50.
+ */
+export const CODE_FACE_SCALE: Record<CodeFace, number> = {
+  game: 1,
+  iosevka: 0.68,
+  jetbrains: 0.68,
+};
+
+/** What to call each on the button. Its own name, not a description. */
+export const CODE_FACE_NAME: Record<CodeFace, string> = {
+  game: "VT323",
+  iosevka: "IOSEVKA",
+  jetbrains: "JETBRAINS",
+};
+
+let codeFace: CodeFace = "game";
+
+const CODE_STACK = (): string => {
+  if (codeFace === "iosevka") {
+    return `"IosevkaCode","VT323",ui-monospace,monospace,${back()}`;
+  }
+  if (codeFace === "jetbrains") {
+    return `"JetBrainsMonoCode","VT323",ui-monospace,monospace,${back()}`;
+  }
+  return BODY();
+};
+
+/** Which face code is drawn in. */
+export function setCodeFace(face: CodeFace): void {
+  if (face === codeFace) return;
+  codeFace = face;
+  scaleKey = "";
+  widths = new Map();
+  inks.clear();
+  // The editor is a DOM element and nothing here paints it, so it is told
+  // separately — through one custom property `style.css` reads, rather than
+  // a second copy of the stack that could drift from this one.
+  try {
+    const root = document.documentElement.style;
+    root.setProperty("--cwb-code", CODE_STACK());
+    root.setProperty("--cwb-code-scale", String(CODE_FACE_SCALE[face]));
+  } catch {
+    /* no document in a unit test; the canvas half is what those measure */
+  }
+}
+
+export function getCodeFace(): CodeFace {
+  return codeFace;
+}
+
+
 /** The two stacks, for the font-coverage test. */
 export function fontStacks(): { pixel: string; body: string } {
   return { pixel: PIXEL(), body: BODY() };
@@ -200,12 +278,14 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
   // The active CJK family is part of the key. Without it, switching language
   // hands back the record built for the previous one and every Korean string
   // on screen is measured — and drawn — in a stack that cannot render it.
-  const key = `${Math.round(s * 100)}\n${cjk}\n${floorPx}`;
+  const key = `${Math.round(s * 100)}\n${cjk}\n${floorPx}\n${codeFace}`;
   if (key === scaleKey && fonts) return fonts;
   scaleKey = key;
   widths = new Map();
   const pixel = PIXEL();
   const body = BODY();
+  const code = CODE_STACK();
+  const faceScale = CODE_FACE_SCALE[codeFace];
   /**
    * No smaller than the floor, whatever the role asked for — except for the
    * two code faces. What is in the editor and in a sample well is Rust or Go,
@@ -220,8 +300,8 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
     subtitle: make(at(40 * s), body),
     ui: make(at(snap8(20 * s)), pixel),
     small: make(at(30 * s), body),
-    code: make(28 * s, body),
-    codeSm: make(22 * s, body),
+    code: make(28 * s * faceScale, code),
+    codeSm: make(22 * s * faceScale, code),
     bubble: make(at(30 * s), body),
     station: make(at(snap8(20 * s)), pixel),
     // The small chrome face — panel titles, the footer key bar, captions, the

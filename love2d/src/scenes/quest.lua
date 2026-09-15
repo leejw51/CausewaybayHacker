@@ -765,6 +765,22 @@ function Quest.clears_for_answer(buffer, starter)
   return trim(buffer) == trim(starter)
 end
 
+--- The code face, cycled and remembered. One preference for both code panes:
+--- how somebody likes to read code is a fact about them, not about which
+--- screen they are on.
+function Quest:cycle_face()
+  local faces = Assets.CODE_FACES
+  local at = 1
+  for i, name in ipairs(faces) do
+    if name == Assets.codeFace() then at = i end
+  end
+  local next_face = faces[(at % #faces) + 1]
+  Assets.setCodeFace(next_face)
+  require("src.store").set_face(next_face)
+  self.solve_note = Assets.CODE_FACE_NAME[next_face]
+  SFX.play("select")
+end
+
 --- CODE on. ESC, or the DONE button, comes back.
 function Quest:enter_code()
   if not self.quest then return end
@@ -1422,6 +1438,10 @@ function Quest:draw_code()
       state = (self.answer_on and self.answer_text
         and Quest.answer_completion(self.editor:text(), self.answer_text))
         and "normal" or "disabled" },
+    -- The face code is drawn in, cycled. Here rather than on the framed
+    -- band, which is already the thing that took the editor's room at the
+    -- largest type step.
+    { id = "face", label = Assets.CODE_FACE_NAME[Assets.codeFace()], state = "normal" },
   }
   self.code_rects = {}
   local x, y = pad, pad
@@ -2782,6 +2802,7 @@ function Quest:mousepressed(x, y, button)
     if inside(r.blanks) then self:toggle_blanks(); return end
     if inside(r.solution) then self:toggle_solution(); return end
     if inside(r.complete) then self:complete_line(); return end
+    if inside(r.face) then self:cycle_face(); return end
     -- Anything else is a click into the code, and it goes through the same
     -- pane the framed screen uses — so the caret lands where it was aimed,
     -- a drag selects, and a double click takes a word, here as there.

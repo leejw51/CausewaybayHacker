@@ -212,6 +212,11 @@ function App:load()
   if not (wanted and I18n.NAMES[wanted]) then wanted = Store.saved_lang() end
   if wanted then I18n.set(wanted) end
 
+  -- The code face, before the first frame: a face chosen last time and
+  -- applied on the second is a screen that visibly re-lays itself.
+  local face = Store.saved_face()
+  if face then Assets.setCodeFace(face) end
+
   -- A missing key library is *not* fatal: the login screen renders the
   -- reason and the build command, because "run `make -C love2d ffi`" is a
   -- thing a person can act on and a crash is not.

@@ -35,12 +35,19 @@ import {
 import { Buttons, footer, frame, header, landColour, titledPanel, landName } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import {
+  CODE_FACE_KEY,
   CODE_FONT_KEY,
   CODE_FONT_MAX,
   CODE_FONT_MIN,
   Editor,
   MAIN_FILE,
 } from "../ui/editor";
+import {
+  CODE_FACE_NAME,
+  CODE_FACES,
+  getCodeFace,
+  setCodeFace,
+} from "../engine/text";
 import { readNumberPref, writePref } from "../ui/prefs";
 import { Overlay } from "../ui/overlay";
 import { clipMessage, copyText, readText } from "../ui/clip";
@@ -393,11 +400,30 @@ export class PlaygroundScene implements Scene {
     this.app.chip.blip();
   }
 
+  /**
+   * The face the code is set in, cycled by one button that says which it is.
+   *
+   * A preference, kept beside the size one and shared with the quest screen
+   * for the same reason: this is a fact about the person, not about which
+   * screen they are on.
+   */
+  private cycleFace(): void {
+    const at = CODE_FACES.indexOf(getCodeFace());
+    const next = CODE_FACES[(at + 1) % CODE_FACES.length];
+    setCodeFace(next);
+    writePref(CODE_FACE_KEY, next);
+    this.app.remeasure();
+    this.saveNote = t("pg.codeFace", { name: CODE_FACE_NAME[next] });
+    this.app.chip.blip();
+  }
+
   /** The two size buttons, for the bench and for CODE alike. */
   private fontItems(): Array<{ id: string; label: string; dim?: boolean }> {
     return [
       { id: "fontdown", label: t("quest.fontDown"), dim: this.fontMul <= CODE_FONT_MIN + 0.001 },
       { id: "fontup", label: t("quest.fontUp"), dim: this.fontMul >= CODE_FONT_MAX - 0.001 },
+      // Says the face it is **in**, like every other toggle on this screen.
+      { id: "face", label: CODE_FACE_NAME[getCodeFace()] },
     ];
   }
 
@@ -802,6 +828,10 @@ export class PlaygroundScene implements Scene {
     if (hit.id === "copyout") return void this.clip("out");
     if (hit.id === "copyin") return void this.clip("copyin");
     if (hit.id === "pastein") return void this.clip("in");
+    if (hit.id === "face") {
+      this.cycleFace();
+      return;
+    }
     if (hit.id === "fontdown" || hit.id === "fontup") {
       this.sizeFont(hit.id === "fontup" ? 0.1 : -0.1);
       return;

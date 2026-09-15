@@ -208,6 +208,53 @@ add({ until_ = function(app)
       return true
     end, note = "the clipboard is in stdin", timeout = 5 })
 
+-- The code face, cycled by a button that says which face it is. Asserted on
+-- the font the editor actually draws with — a face button that changes a
+-- label and not the glyphs looks identical from outside.
+add({ until_ = function(app)
+      local s = pg(app)
+      local Assets = require("src.assets")
+      check(s.big_rects.face ~= nil, "no face button in CODE")
+      check(Assets.codeFace() == "game", "the default face is not the game's")
+      s.probe_face = { Assets.codeFace() }
+      s.probe_w = { s.mono_font:getWidth("MMMMMMMMMM") }
+      return true
+    end, note = "the face button is there", timeout = 5 })
+add({ click = function(app) local r = pg(app).big_rects.face
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ wait = 0.4 })
+add({ until_ = function(app)
+      local s = pg(app)
+      local Assets = require("src.assets")
+      s.probe_face[#s.probe_face + 1] = Assets.codeFace()
+      s.probe_w[#s.probe_w + 1] = s.mono_font:getWidth("MMMMMMMMMM")
+      return true
+    end, timeout = 5 })
+add({ click = function(app) local r = pg(app).big_rects.face
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ wait = 0.4 })
+add({ until_ = function(app)
+      local s = pg(app)
+      local Assets = require("src.assets")
+      s.probe_face[#s.probe_face + 1] = Assets.codeFace()
+      s.probe_w[#s.probe_w + 1] = s.mono_font:getWidth("MMMMMMMMMM")
+      print(("faces: %s  ten-M widths: %s"):format(
+        table.concat(s.probe_face, " -> "), table.concat(s.probe_w, " -> ")))
+      check(s.probe_face[2] ~= s.probe_face[1], "the button did not change the face")
+      check(s.probe_face[3] ~= s.probe_face[2], "and not again, to a third")
+      -- The glyphs, not the name: a code face that is narrower fits more.
+      check(s.probe_w[2] ~= s.probe_w[1] or s.probe_w[3] ~= s.probe_w[1],
+        "every face drew the same width — the label changed and nothing else")
+      check(require("src.store").saved_face() == s.probe_face[3],
+        "the choice was not written down")
+      return true
+    end, note = "the face changed the glyphs", timeout = 5 })
+add({ shot = "PA-code-face.png" })
+-- Back to the game's own face, so the shots below are the usual screen.
+add({ click = function(app) local r = pg(app).big_rects.face
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ wait = 0.4 })
+
 -- Run something, so there is output to place — and in a landscape window it
 -- goes **beside** the code rather than under it. Stacked there it costs a
 -- quarter of the few lines a wide-but-short window has.

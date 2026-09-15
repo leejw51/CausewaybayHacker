@@ -709,6 +709,44 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   // to another screen and back.
   expect(await pref(page, "quest.font")).not.toBe("");
 
+  // The code face, cycled by a button that says which face it is. Measured
+  // off the rendered editor: a face button that changes a label and not the
+  // glyphs is the failure worth catching, and it looks identical.
+  const faceOf = () =>
+    page.evaluate(() => {
+      const el = document.querySelector(".cm-content") as HTMLElement | null;
+      return el ? getComputedStyle(el).fontFamily.split(",")[0].replace(/"/g, "") : "";
+    });
+  const colsOf = async () =>
+    page.evaluate(() => {
+      const el = document.querySelector(".cm-content") as HTMLElement | null;
+      if (!el) return 0;
+      const st = getComputedStyle(el);
+      const g = document.createElement("canvas").getContext("2d")!;
+      g.font = `${st.fontSize} ${st.fontFamily}`;
+      const adv = g.measureText("MMMMMMMMMM").width / 10;
+      return Math.round(el.getBoundingClientRect().width / adv);
+    });
+  const face0 = await faceOf();
+  const cols0 = await colsOf();
+  await clickButton(page, "face");
+  await page.waitForTimeout(700);
+  const face1 = await faceOf();
+  const cols1 = await colsOf();
+  await clickButton(page, "face");
+  await page.waitForTimeout(700);
+  const face2 = await faceOf();
+  const cols2 = await colsOf();
+  console.log(`[playground] columns ${face0}=${cols0} ${face1}=${cols1} ${face2}=${cols2}`);
+  console.log(`[playground] code face ${face0} -> ${face1} -> ${face2}`);
+  expect(face1, "the face button changes the face").not.toBe(face0);
+  expect(face2, "and again, to a third").not.toBe(face1);
+  expect(await pref(page, "quest.face"), "the choice is remembered").toBeTruthy();
+  // Round the cycle and back to where it started.
+  await clickButton(page, "face");
+  await page.waitForTimeout(700);
+  expect(await faceOf(), "the cycle comes back round").toBe(face0);
+
   // Which compiler is live, on the button itself. The row hand-paints the
   // chosen land in its own colour; `Buttons.draw` used to repaint every
   // registered item, so the lit box was covered by a plain button and all
