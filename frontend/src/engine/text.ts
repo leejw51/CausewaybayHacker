@@ -115,6 +115,8 @@ export interface Font {
   css: string;
   size: number;
   height: number;
+  /** Where the baseline sits below the top, for `textBaseline: "top"`. */
+  asc: number;
 }
 
 /** Press Start 2P only looks right on multiples of eight. */
@@ -186,7 +188,7 @@ function make(size: number, family: string): Font {
   // both families and only affects how tall a panel comes out.
   const asc = m.fontBoundingBoxAscent ?? px;
   const desc = m.fontBoundingBoxDescent ?? px * 0.2;
-  return { css, size: px, height: Math.max(px, Math.round(asc + desc)) };
+  return { css, size: px, height: Math.max(px, Math.round(asc + desc)), asc };
 }
 
 /**
@@ -242,11 +244,55 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
   return fonts;
 }
 
+/**
+ * Where a particular string actually puts ink, relative to its baseline.
+ *
+ * `Font.height` is measured once from `Hg`, which is the right box to lay
+ * *lines* out on and the wrong one to centre a label in. The faces this game
+ * draws buttons with are Latin-only, so a Korean or Japanese label is served
+ * by whatever the browser falls back to, and that face's ink does not sit
+ * where the measured one's does: at 20px VT323 the box is 20 tall, `RUN` inks
+ * from 4.8 to 16.0 inside it, and `실행` inks from -0.1 to 17.4 — over the top
+ * edge, with two and a half pixels of slack underneath. Centred on the box
+ * they are two different vertical positions; centred on their own ink they
+ * are one.
+ *
+ * Cached against font and string, because it is asked for every button every
+ * frame and `measureText` is not free.
+ */
+const inks = new Map<string, { asc: number; desc: number }>();
+export function inkBox(f: Font, text: string): { asc: number; desc: number } {
+  const key = `${f.css}\u0000${text}`;
+  const hit = inks.get(key);
+  if (hit) return hit;
+  const g = ctx2d();
+  g.font = f.css;
+  const m = g.measureText(text);
+  // Undefined on an engine that does not report it: fall back to the font's
+  // own box, which is what every caller did before this existed.
+  const box =
+    m.actualBoundingBoxAscent === undefined || m.actualBoundingBoxDescent === undefined
+      ? { asc: f.asc, desc: f.height - f.asc }
+      : { asc: m.actualBoundingBoxAscent, desc: m.actualBoundingBoxDescent };
+  inks.set(key, box);
+  return box;
+}
+
+/**
+ * The `y` to hand `printf` so one line of `text` is centred **by its ink**
+ * inside a box, rather than by the font's nominal line height.
+ */
+export function inkCentreY(f: Font, text: string, boxY: number, boxH: number): number {
+  const { asc, desc } = inkBox(f, text);
+  return Math.round(boxY + (boxH - (asc + desc)) * 0.5 - f.asc + asc);
+}
+
 /** Forget every measurement. Called once the real fonts finish downloading:
  *  anything measured against the fallback is the wrong width. */
 export function remeasure(): void {
   scaleKey = "";
   widths = new Map();
+  inks.clear();
   sized.clear();
 }
 

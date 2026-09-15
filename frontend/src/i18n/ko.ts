@@ -290,6 +290,8 @@ export const ko: Partial<Catalogue> = {
   "pg.scratch": "메모장",
   "pg.scratchpads": "메모장 목록",
   "pg.notScored": "여기는 기록에 남지 않습니다. 무엇이든 쓰고, 무엇이든 망가뜨리세요.",
+  "pg.search": "검색",
+  "pg.noMatch": "그런 이름의 메모장이 없습니다",
   "pg.nothingSaved": "아직 저장된 것이 없습니다",
   "pg.new": "새로",
   "pg.rename": "이름 변경",
@@ -303,6 +305,7 @@ export const ko: Partial<Catalogue> = {
   "pg.orientAuto": "자동",
   "pg.orientLand": "가로",
   "pg.orientPort": "세로",
+  "pg.pasteIn": "입력 붙여넣기",
   "pg.code": "코드",
   "pg.codeDone": "완료",
   "pg.maps": "지도",
@@ -556,5 +559,6 @@ export const ko: Partial<Catalogue> = {
   "clip.sameAlready": "클립보드 내용이 편집기의 내용과 이미 같습니다",
   "clip.theBrief": "과제",
   "clip.yourCode": "당신의 코드",
+  "clip.theInput": "입력",
   "clip.theOutput": "출력",
 };

@@ -773,6 +773,23 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   expect(stdinOver, "the stdin field is hidden in CODE").toBe(false);
   await shot(page, "23b-playground-code");
 
+  // Copy and paste, which is the only way anything leaves a canvas: there is
+  // nothing here to select with a mouse. The round trip is asserted, not the
+  // button — a copy that puts the wrong text on the clipboard looks identical.
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await clickButton(page, "copycode");
+  await page.waitForTimeout(600);
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  console.log(`[playground] copied ${JSON.stringify(copied.slice(0, 40))}`);
+  expect(copied, "COPY CODE puts the editor on the clipboard").toContain("fn main");
+  await page.evaluate(() => navigator.clipboard.writeText("fn main() { /* from the clipboard */ }\n"));
+  await clickButton(page, "pastecode");
+  await page.waitForTimeout(700);
+  expect(await editorText(page), "PASTE replaces the editor").toContain("from the clipboard");
+  await clickButton(page, "copycode");
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("from the clipboard");
+
   // The display toggles are buttons here, not only F-keys — this is the
   // screen people reach for on a phone, and a phone has no F11.
   const ids = await page.evaluate(() => window.__cwbCapture!.buttons().map((b) => b.id));
@@ -802,6 +819,19 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
     .toBe(true);
   await clickButton(page, "rename");
   await page.waitForTimeout(400);
+  // Selected whole with the caret at the **front**: typing replaces the name,
+  // and one press of Left is the start of it for somebody editing what is
+  // already there. `select()` alone leaves the caret at the far end.
+  const sel = await page.evaluate(() => {
+    const el = document.activeElement as HTMLInputElement | null;
+    if (!el || el.tagName !== "INPUT") return null;
+    return { start: el.selectionStart, end: el.selectionEnd, dir: el.selectionDirection, len: el.value.length };
+  });
+  console.log(`[playground] rename selection ${JSON.stringify(sel)}`);
+  expect(sel, "the name field has the focus").not.toBeNull();
+  expect(sel!.start, "selected from the front").toBe(0);
+  expect(sel!.end, "selected to the end").toBe(sel!.len);
+  expect(sel!.dir, "caret at the front, not the end").toBe("backward");
   await page.keyboard.type("kettle");
   await page.keyboard.press("Enter");
   await expect

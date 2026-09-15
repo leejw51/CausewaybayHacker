@@ -288,6 +288,8 @@ export const ja: Partial<Catalogue> = {
   "pg.scratch": "スクラッチ",
   "pg.scratchpads": "スクラッチパッド",
   "pg.notScored": "ここは記録に残りません。何でも書いて、何でも壊してください。",
+  "pg.search": "検索",
+  "pg.noMatch": "その名前のメモはありません",
   "pg.nothingSaved": "まだ何も保存されていません",
   "pg.new": "新規",
   "pg.rename": "名前変更",
@@ -301,6 +303,7 @@ export const ja: Partial<Catalogue> = {
   "pg.orientAuto": "自動",
   "pg.orientLand": "横",
   "pg.orientPort": "縦",
+  "pg.pasteIn": "入力を貼付",
   "pg.code": "コード",
   "pg.codeDone": "完了",
   "pg.maps": "マップ",
@@ -557,5 +560,6 @@ export const ja: Partial<Catalogue> = {
   "clip.sameAlready": "クリップボードの中身はエディタの中身とすでに同じです",
   "clip.theBrief": "課題",
   "clip.yourCode": "あなたのコード",
+  "clip.theInput": "入力",
   "clip.theOutput": "出力",
 };

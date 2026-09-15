@@ -17,9 +17,10 @@
  * on every keystroke, so a reload or a dropped socket cannot cost work either.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, wrap } from "../engine/text";
+import { ensureFonts, inkBox, inkCentreY, printf, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import {
+  BTN_FRAME,
   btnBox,
   clipped,
   fill,
@@ -42,6 +43,7 @@ import {
 } from "../ui/editor";
 import { readNumberPref, writePref } from "../ui/prefs";
 import { Overlay } from "../ui/overlay";
+import { clipMessage, copyText, readText } from "../ui/clip";
 import { LogBuffer } from "../net/logbuf";
 import { WireError } from "../net/client";
 import { isLand, LANDS, playerText } from "../net/protocol";
@@ -84,6 +86,9 @@ type Held = { id: string | null; name: string; lang: Land; source: string; dirty
  */
 const SCRATCH = "SCRATCH";
 
+/** How many pads there have to be before the list offers to narrow itself. */
+const SEARCH_FROM = 5;
+
 export class PlaygroundScene implements Scene {
   readonly name = "playground";
   readonly mood = "lands" as const;
@@ -104,6 +109,17 @@ export class PlaygroundScene implements Scene {
   private readonly nameEl: HTMLInputElement;
   private nameOverlay: Overlay | null = null;
   private renaming = false;
+  /**
+   * Narrowing the list by name.
+   *
+   * The pads are a flat list in most-recently-touched order, which is the
+   * right order to have and the wrong one to hunt through: by the time
+   * somebody has a dozen named scratchpads, the one they want is the one they
+   * remember the name of. Shown once there are enough of them to be worth it.
+   */
+  private readonly searchEl: HTMLInputElement;
+  private searchOverlay: Overlay | null = null;
+  private query = "";
 
   private snippets: SnippetBrief[] = [];
   private held: Held = { id: null, name: SCRATCH, lang: "rust", source: STARTER.rust };
@@ -214,6 +230,57 @@ export class PlaygroundScene implements Scene {
       if (this.renaming) this.commitRename();
     });
     this.nameEl = name;
+
+    const find = document.createElement("input");
+    find.type = "text";
+    find.className = "cwb-field";
+    find.spellcheck = false;
+    find.maxLength = 48;
+    find.placeholder = t("pg.search");
+    find.addEventListener("input", () => {
+      this.query = find.value;
+    });
+    find.addEventListener("keydown", (ev) => {
+      // Escape empties it rather than leaving a filter nobody can see the
+      // bottom of. Enter opens the only match, which is what a search box
+      // that found one thing should do.
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        find.value = "";
+        this.query = "";
+        find.blur();
+      } else if (ev.key === "Enter") {
+        ev.preventDefault();
+        const hits = this.visibleSnippets();
+        if (hits.length > 0) void this.load(hits[0].id);
+        find.blur();
+      }
+    });
+    this.offs.push(
+      onLocale(() => {
+        find.placeholder = t("pg.search");
+      }),
+    );
+    this.searchEl = find;
+  }
+
+  /** The pads the list is showing: all of them, or those the query matches. */
+  private visibleSnippets(): SnippetBrief[] {
+    const q = this.query.trim().toLowerCase();
+    if (!q) return this.snippets;
+    return this.snippets.filter((s) => s.name.toLowerCase().includes(q));
+  }
+
+  /**
+   * Whether the box is worth its row.
+   *
+   * Four pads fit on any screen and are read in one glance; a search field
+   * over them is a control that costs height and saves nothing. It stays once
+   * it is in use, or the act of filtering down to two results would take the
+   * box away and strand the filter.
+   */
+  private searchable(): boolean {
+    return this.snippets.length >= SEARCH_FROM || this.query !== "";
   }
 
   /** Take what is in the field, if it is anything. */
@@ -230,6 +297,54 @@ export class PlaygroundScene implements Scene {
     // A pad the server knows about has to be told; an unsaved one carries the
     // name into its first save.
     if (this.held.id !== null) void this.save();
+  }
+
+  /**
+   * What the run said, as text.
+   *
+   * Canvas output is pixels: there is nothing in this panel to select with a
+   * mouse, so this is the only way a compiler error leaves the screen — which
+   * is the thing somebody wants to hand to an assistant and ask about.
+   */
+  private outputText(): string {
+    const out: string[] = [];
+    if (this.result) {
+      out.push(OUTCOME[this.result.outcome]?.() ?? this.result.outcome);
+      out.push("");
+    }
+    for (const line of this.log.lines) out.push(line.text);
+    return out.join("\n").trim();
+  }
+
+  /** Say what the clipboard did, on the line that says what saving did. */
+  private clipSaid(what: string, res: Awaited<ReturnType<typeof copyText>>, verb: "copy" | "paste") {
+    this.saveNote = clipMessage(what, res, verb).text;
+    if (res.ok) this.app.chip.blip();
+    else this.app.chip.fail();
+  }
+
+  /** Copy, paste — the two halves of working with something else. */
+  private async clip(which: "code" | "out" | "in" | "paste"): Promise<void> {
+    if (which === "code") {
+      return this.clipSaid(t("clip.yourCode"), await copyText(this.editor?.source ?? ""), "copy");
+    }
+    if (which === "out") {
+      return this.clipSaid(t("clip.theOutput"), await copyText(this.outputText()), "copy");
+    }
+    if (which === "in") {
+      const res = await readText();
+      if (res.ok) this.stdinEl.value = res.text ?? "";
+      return this.clipSaid(t("clip.theInput"), res, "paste");
+    }
+    const res = await readText();
+    if (!res.ok || !this.editor) return this.clipSaid(t("clip.yourCode"), res, "paste");
+    if (res.text === this.editor.source) {
+      this.saveNote = t("clip.sameAlready");
+      return;
+    }
+    this.editor.replaceAll(res.text ?? "");
+    this.touched();
+    this.clipSaid(t("clip.yourCode"), res, "paste");
   }
 
   /** One step of code size, kept on the same rails as the quest screen's. */
@@ -260,7 +375,12 @@ export class PlaygroundScene implements Scene {
     this.nameEl.placeholder = this.heldName();
     setTimeout(() => {
       this.nameEl.focus();
-      this.nameEl.select();
+      // Selected whole, with the caret at the **start** rather than the end.
+      // Typing replaces the lot, which is the common case; one press of Left
+      // or Home collapses to the front to edit what is there, where `select()`
+      // leaves the caret at the end and makes the front the far side of the
+      // word. `"backward"` is what puts it there.
+      this.nameEl.setSelectionRange(0, this.nameEl.value.length, "backward");
     }, 0);
   }
 
@@ -303,6 +423,7 @@ export class PlaygroundScene implements Scene {
     this.overlay?.destroy();
     this.stdinOverlay?.destroy();
     this.nameOverlay?.destroy();
+    this.searchOverlay?.destroy();
     this.editor?.destroy();
     this.app.chip.music("stop");
   }
@@ -316,6 +437,8 @@ export class PlaygroundScene implements Scene {
     this.stdinOverlay = new Overlay(this.app.overlay, this.app.layout, this.stdinEl);
     this.nameOverlay = new Overlay(this.app.overlay, this.app.layout, this.nameEl);
     this.nameOverlay.hide();
+    this.searchOverlay = new Overlay(this.app.overlay, this.app.layout, this.searchEl);
+    this.searchOverlay.hide();
     queueMicrotask(() => this.editor?.focus());
   }
 
@@ -623,6 +746,10 @@ export class PlaygroundScene implements Scene {
       this.app.chip.select();
       return;
     }
+    if (hit.id === "copycode") return void this.clip("code");
+    if (hit.id === "pastecode") return void this.clip("paste");
+    if (hit.id === "copyout") return void this.clip("out");
+    if (hit.id === "pastein") return void this.clip("in");
     if (hit.id === "fontdown" || hit.id === "fontup") {
       this.sizeFont(hit.id === "fontup" ? 0.1 : -0.1);
       return;
@@ -773,21 +900,59 @@ export class PlaygroundScene implements Scene {
 
     // The rule, stated once, where it cannot be missed. It is the opposite of
     // the quest screen's rule and the player has to be told which one they are
-    // standing on.
+    // standing on. It gives up its room to the search box first: by the time
+    // there are pads to hunt through, the rule has been read.
+    const finding = this.searchable();
+    const findH = finding
+      ? Math.max(this.app.layout.minTouchH(), fonts.small.height + Math.round(14 * s))
+      : 0;
+    const noteRoom = listTop - pad - (finding ? findH + pad : 0);
+    // Clipped to its room rather than trusted to stop: a Hangul line inks
+    // below the nominal line height it is measured by, so "does the next line
+    // fit?" let half a row of glyphs through and the buttons were drawn
+    // across the middle of them.
+    const noteTop = y;
+    const noteH = Math.max(0, noteRoom - pad - noteTop);
     g.fillStyle = css(Theme.cream, 0.7);
     const note = t("pg.notScored");
-    for (const line of wrap(fonts.small, note, inner[2])) {
-      if (y + fonts.small.height > listTop - pad) break;
-      printf(g, fonts.small, line, inner[0], y, inner[2], "left");
-      y += fonts.small.height;
-    }
+    clipped(g, inner[0], noteTop, inner[2], noteH, () => {
+      // Laid out on the **taller** of the nominal line box and what these
+      // lines actually ink. The body face is Latin-only, so a Hangul line is
+      // served by a fallback whose ink is half again the height it was
+      // measured by: stepping by the nominal box let a line in that did not
+      // fit, and the clip then sliced its glyphs through the middle.
+      const lines = wrap(fonts.small, note, inner[2]);
+      const step = lines.reduce((n, l) => {
+        const ink = inkBox(fonts.small, l);
+        return Math.max(n, ink.asc + ink.desc);
+      }, fonts.small.height);
+      let ny = noteTop;
+      for (const line of lines) {
+        if (ny + step > noteTop + noteH) break;
+        printf(g, fonts.small, line, inner[0], ny, inner[2], "left");
+        ny += step;
+      }
+      y = ny;
+    });
     y += pad;
+
+    if (finding) {
+      well(g, inner[0], y, inner[2], findH, [0.06, 0.05, 0.14, 0.98]);
+      this.searchOverlay?.place(
+        [inner[0] + 4, y + 3, inner[2] - 8, findH - 6],
+        fonts.small.size,
+      );
+      y += findH + pad;
+    } else {
+      this.searchOverlay?.hide();
+    }
 
     const rowH = Math.max(this.app.layout.minTouchH(), fonts.small.height + Math.round(14 * s));
     const room = listTop - pad - y;
     clipped(g, inner[0], y, inner[2], Math.max(0, room), () => {
       let ry = y;
-      for (const snip of this.snippets) {
+      const shown = this.visibleSnippets();
+      for (const snip of shown) {
         if (ry + rowH > y + room) break;
         const id = `snip:${snip.id}`;
         const open = snip.id === this.held.id;
@@ -829,9 +994,17 @@ export class PlaygroundScene implements Scene {
         this.rows.add({ id, rect: [inner[0], ry, inner[2], rowH - 2], label: snip.name });
         ry += rowH;
       }
-      if (this.snippets.length === 0) {
+      if (shown.length === 0) {
         g.fillStyle = css(Theme.dim);
-        printf(g, fonts.small, t("pg.nothingSaved"), inner[0], y + pad, inner[2], "center");
+        printf(
+          g,
+          fonts.small,
+          this.snippets.length === 0 ? t("pg.nothingSaved") : t("pg.noMatch"),
+          inner[0],
+          y + pad,
+          inner[2],
+          "center",
+        );
       }
       if (this.saveNote) {
         g.fillStyle = css(Theme.coin, 0.85);
@@ -923,6 +1096,7 @@ export class PlaygroundScene implements Scene {
     // floating over the editor: an element nobody placed this frame keeps the
     // rectangle it had in the framed layout.
     this.stdinOverlay?.hide();
+    this.searchOverlay?.hide();
     const fonts = ensureFonts(s);
     const f = fonts.stationSm;
     const pad = Math.round(6 * s);
@@ -940,6 +1114,14 @@ export class PlaygroundScene implements Scene {
       { id: "format", label: t("pg.format"), dim: this.formatting },
       { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
       { id: "rename", label: t("pg.rename") },
+      // In and out of the screen. Nothing on a canvas can be selected with a
+      // mouse, so without these the code and the compiler's answer cannot
+      // leave it at all — which is what somebody pasting into an assistant
+      // and pasting the reply back needs.
+      { id: "copycode", label: t("quest.copyCode") },
+      { id: "pastecode", label: t("quest.paste") },
+      { id: "copyout", label: t("quest.copyOutput"), dim: !this.result && this.log.lines.length === 0 },
+      { id: "pastein", label: t("pg.pasteIn") },
       ...this.fontItems(),
       ...this.displayItems(),
     ];
@@ -963,9 +1145,13 @@ export class PlaygroundScene implements Scene {
     // writing still needs to know.
     const statusY = pad + Math.max(bandH, dh) + Math.round(3 * s);
     const note = this.saveNote || this.status;
+    // Stdin is not drawn in CODE, so pasted input would otherwise land
+    // somewhere invisible and the button would look like it did nothing.
+    const stdin = this.stdinEl.value.trim();
+    const fed = stdin ? `   ${t("pg.stdin")} ${stdin.split("\n")[0].slice(0, 24)}` : "";
     const status = `${MAIN_FILE[this.held.lang]}   ${this.heldName().toUpperCase()}${
       this.dirty ? `   ${t("pg.unsaved")}` : ""
-    }${note ? `   ${note}` : ""}`;
+    }${fed}${note ? `   ${note}` : ""}`;
     g.fillStyle = css(this.dirty ? Theme.coin : Theme.dim);
     printf(g, f, status, pad + Math.round(8 * s), statusY, layout.vw - pad * 2, "left");
     if (this.renaming) {
@@ -1207,7 +1393,7 @@ export class PlaygroundScene implements Scene {
             fonts.button,
             label,
             bx,
-            langY + 8 + Math.floor((langH - 8 - fonts.button.height) * 0.5),
+            inkCentreY(fonts.button, label, langY + 8, langH - BTN_FRAME),
             bw,
             "center",
           );

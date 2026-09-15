@@ -51,7 +51,7 @@
  * sent.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, wrap } from "../engine/text";
+import { ensureFonts, printf, wrap, type Font } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { clipped, fill, neonPrint, well, type Ctx, type Rect } from "../engine/ui";
 import { btnBox } from "../engine/ui";
@@ -81,7 +81,7 @@ const FIELD_HINT = (): string => t("login.fieldHint");
  * `chrome.ts`, because the answer depends on the exact label list.
  */
 function rowsFor(
-  f: { size: number; css: string; height: number },
+  f: Font,
   width: number,
   labels: string[],
 ) {

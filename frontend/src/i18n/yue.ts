@@ -298,6 +298,8 @@ export const yue: Partial<Catalogue> = {
   "pg.scratch": "草稿",
   "pg.scratchpads": "草稿簿",
   "pg.notScored": "呢度啲嘢唔計入你嘅記錄。想寫乜就寫乜，想搞爛乜就搞爛乜。",
+  "pg.search": "搜尋",
+  "pg.noMatch": "冇呢個名嘅草稿",
   "pg.nothingSaved": "仲未儲過嘢",
   "pg.new": "新",
   "pg.rename": "重新命名",
@@ -311,6 +313,7 @@ export const yue: Partial<Catalogue> = {
   "pg.orientAuto": "自動",
   "pg.orientLand": "橫向",
   "pg.orientPort": "直向",
+  "pg.pasteIn": "貼上輸入",
   "pg.code": "代碼",
   "pg.codeDone": "完成",
   "pg.maps": "地圖",
@@ -560,5 +563,6 @@ export const yue: Partial<Catalogue> = {
   "clip.sameAlready": "剪貼簿入面嘅嘢同編輯器入面嘅已經一樣",
   "clip.theBrief": "任務",
   "clip.yourCode": "你嘅碼",
+  "clip.theInput": "輸入",
   "clip.theOutput": "輸出",
 };

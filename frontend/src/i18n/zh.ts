@@ -284,6 +284,8 @@ export const zh: Partial<Catalogue> = {
   "pg.scratch": "草稿",
   "pg.scratchpads": "草稿本",
   "pg.notScored": "这里的东西不计入你的记录。随便写，随便弄坏。",
+  "pg.search": "搜索",
+  "pg.noMatch": "没有这个名字的草稿",
   "pg.nothingSaved": "还没有保存过什么",
   "pg.new": "新建",
   "pg.rename": "重命名",
@@ -297,6 +299,7 @@ export const zh: Partial<Catalogue> = {
   "pg.orientAuto": "自动",
   "pg.orientLand": "横向",
   "pg.orientPort": "纵向",
+  "pg.pasteIn": "粘贴输入",
   "pg.code": "代码",
   "pg.codeDone": "完成",
   "pg.maps": "地图",
@@ -547,5 +550,6 @@ export const zh: Partial<Catalogue> = {
   "clip.sameAlready": "剪贴板里的内容和编辑器里的已经一样了",
   "clip.theBrief": "任务",
   "clip.yourCode": "你的代码",
+  "clip.theInput": "输入",
   "clip.theOutput": "输出",
 };

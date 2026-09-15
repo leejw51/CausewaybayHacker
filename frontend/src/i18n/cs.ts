@@ -305,6 +305,8 @@ export const cs: Partial<Catalogue> = {
   "pg.scratch": "ŠPALÍČEK",
   "pg.scratchpads": "ŠPALÍČKY",
   "pg.notScored": "Nic tady se nepočítá do tvého záznamu. Piš cokoli, rozbij cokoli.",
+  "pg.search": "HLEDAT",
+  "pg.noMatch": "žádný zápisník toho jména",
   "pg.nothingSaved": "zatím nic uloženého",
   "pg.new": "NOVÝ",
   "pg.rename": "PŘEJMENOVAT",
@@ -318,6 +320,7 @@ export const cs: Partial<Catalogue> = {
   "pg.orientAuto": "AUTO",
   "pg.orientLand": "ŠÍŘKA",
   "pg.orientPort": "VÝŠKA",
+  "pg.pasteIn": "VLOŽIT VSTUP",
   "pg.code": "KÓD",
   "pg.codeDone": "HOTOVO",
   "pg.maps": "MAPY",
@@ -573,5 +576,6 @@ export const cs: Partial<Catalogue> = {
   "clip.sameAlready": "schránka už se shoduje s tím, co je v editoru",
   "clip.theBrief": "zadání",
   "clip.yourCode": "tvůj kód",
+  "clip.theInput": "vstup",
   "clip.theOutput": "výstup",
 };

@@ -311,6 +311,8 @@ export const en = {
   "pg.scratch": "SCRATCH",
   "pg.scratchpads": "SCRATCHPADS",
   "pg.notScored": "Nothing here is part of your record. Write anything, break anything.",
+  "pg.search": "SEARCH",
+  "pg.noMatch": "no pad by that name",
   "pg.nothingSaved": "nothing saved yet",
   "pg.new": "NEW",
   "pg.rename": "RENAME",
@@ -324,6 +326,7 @@ export const en = {
   "pg.orientAuto": "AUTO",
   "pg.orientLand": "LAND",
   "pg.orientPort": "PORT",
+  "pg.pasteIn": "PASTE INPUT",
   "pg.code": "CODE",
   "pg.codeDone": "DONE",
   "pg.maps": "MAPS",
@@ -590,5 +593,6 @@ export const en = {
   "clip.sameAlready": "the clipboard already matches what is in the editor",
   "clip.theBrief": "the brief",
   "clip.yourCode": "your code",
+  "clip.theInput": "the input",
   "clip.theOutput": "the output",
 } as const;

@@ -8,7 +8,7 @@
  * itself — the pixel button, the star and the outlined caption.
  */
 import { css, RGBA, Theme } from "./theme";
-import { Font, print, printf, width } from "./text";
+import { Font, inkCentreY, print, printf, width } from "./text";
 
 export type Ctx = CanvasRenderingContext2D;
 export type Rect = readonly [number, number, number, number];
@@ -152,8 +152,16 @@ export function pixBtn(
   panel(g, x, y, w, h, face);
   const pale = (opts.quiet || (opts.strong && !opts.hover)) && !opts.dim;
   g.fillStyle = css(pale ? Theme.cream : Theme.ink, opts.dim ? 0.5 : 1);
-  // Centre the ink inside the panel's inner face, not the whole box.
-  const ty = y + 8 + Math.floor((h - BTN_FRAME - font.height) * 0.5);
+  // Centre the label's **ink** inside the panel's inner face.
+  //
+  // Centring the font's nominal box instead put Latin and Hangul at two
+  // different heights in the same row: these faces are Latin-only, a Korean
+  // label is drawn by whatever the browser falls back to, and that face's ink
+  // does not sit where the measured one's does. At 20px the box is 20 tall,
+  // `RUN` inks from 4.8 to 16.0 within it and `실행` from -0.1 to 17.4 — out
+  // over the top edge with the slack all underneath, which is the uneven
+  // padding this fixes.
+  const ty = inkCentreY(font, label, y + 8, h - BTN_FRAME);
   printf(g, font, label, x, ty, w, "center");
 }
 
