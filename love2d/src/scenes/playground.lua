@@ -482,7 +482,10 @@ function Playground:draw_big()
       state = "normal" },
     { id = "pastecode", label = I18n.t("PASTE"), every = { I18n.t("PASTE") }, state = "normal" },
     { id = "copyout", label = I18n.t("COPY OUTPUT"), every = { I18n.t("COPY OUTPUT") },
-      state = self.result or self.log and "normal" or "disabled" },
+      -- Parenthesised, and it matters: `a or b and c or d` binds as
+      -- `a or ((b and c) or d)`, so after a run this handed `UI.button` the
+      -- result *table* where it wanted the word "normal".
+      state = (self.result or self.log) and "normal" or "disabled" },
     { id = "pastein", label = I18n.t("PASTE INPUT"), every = { I18n.t("PASTE INPUT") },
       state = "normal" },
     { id = "lang", label = self.lang:upper(), every = { "PYTHON" }, state = "normal" },

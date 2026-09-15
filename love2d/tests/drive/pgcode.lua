@@ -141,6 +141,30 @@ add({ until_ = function(app)
     end, note = "output beside the code", timeout = 5 })
 add({ shot = "P7-code-output-beside.png" })
 
+-- COPY OUTPUT: the run, not whatever the editor happens to hold. On the web
+-- these two looked like separate bugs and were one — a copy that wrote
+-- nothing left the clipboard holding the code — so it is asserted here by
+-- what lands on the clipboard rather than by the button being pressable.
+add({ until_ = function(app)
+      local s = pg(app)
+      check(s.big_rects.copyout ~= nil, "no COPY OUTPUT button after a run")
+      check(type(s.big_rects.copyout) == "table", "COPY OUTPUT drew no rect")
+      love.system.setClipboardText("")
+      return true
+    end, timeout = 5 })
+add({ click = function(app) local r = pg(app).big_rects.copyout
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ until_ = function(app)
+      local got = love.system.getClipboardText() or ""
+      print("copied output: " .. got:gsub("\n", " | "):sub(1, 60))
+      check(got ~= "", "COPY OUTPUT put nothing on the clipboard")
+      check(got:find("side by side", 1, true) ~= nil,
+        "the output does not carry what the program printed: " .. got:sub(1, 60))
+      check(got:find("fn main", 1, true) == nil,
+        "COPY OUTPUT copied the code instead of the run: " .. got:sub(1, 60))
+      return true
+    end, note = "the run is on the clipboard", timeout = 5 })
+
 add({ orient = "portrait" })
 add({ wait = 0.6 })
 add({ until_ = function(app)
