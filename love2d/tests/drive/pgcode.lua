@@ -103,18 +103,6 @@ add({ until_ = function(app)
         "PASTE did not replace the editor: " .. text:sub(1, 40))
       return true
     end, note = "the clipboard is in the editor", timeout = 5 })
-add({ until_ = function()
-      love.system.setClipboardText("7 11\n")
-      return true
-    end, timeout = 3 })
-add({ click = function(app) local r = pg(app).big_rects.pastein
-      return { r.x + r.w / 2, r.y + r.h / 2 } end })
-add({ until_ = function(app)
-      check((pg(app).stdin or ""):find("7 11", 1, true) ~= nil,
-        "PASTE INPUT did not reach stdin: " .. tostring(pg(app).stdin))
-      return true
-    end, note = "the clipboard is in stdin", timeout = 5 })
-
 -- Run something, so there is output to place — and in a landscape window it
 -- goes **beside** the code rather than under it. Stacked there it costs a
 -- quarter of the few lines a wide-but-short window has.
@@ -146,15 +134,13 @@ add({ shot = "P7-code-output-beside.png" })
 -- nothing left the clipboard holding the code — so it is asserted here by
 -- what lands on the clipboard rather than by the button being pressable.
 add({ until_ = function(app)
-      local s = pg(app)
-      check(s.big_rects.copyout ~= nil, "no COPY OUTPUT button after a run")
-      check(type(s.big_rects.copyout) == "table", "COPY OUTPUT drew no rect")
+      check(pg(app).big_rects.copyout ~= nil, "no COPY OUTPUT button after a run")
       love.system.setClipboardText("")
       return true
     end, timeout = 5 })
 add({ click = function(app) local r = pg(app).big_rects.copyout
       return { r.x + r.w / 2, r.y + r.h / 2 } end })
-add({ until_ = function(app)
+add({ until_ = function()
       local got = love.system.getClipboardText() or ""
       print("copied output: " .. got:gsub("\n", " | "):sub(1, 60))
       check(got ~= "", "COPY OUTPUT put nothing on the clipboard")

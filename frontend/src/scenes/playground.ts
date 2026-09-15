@@ -324,29 +324,12 @@ export class PlaygroundScene implements Scene {
   }
 
   /** Copy, paste — the two halves of working with something else. */
-  private async clip(which: "code" | "out" | "in" | "paste"): Promise<void> {
+  private async clip(which: "code" | "out" | "paste"): Promise<void> {
     if (which === "code") {
       return this.clipSaid(t("clip.yourCode"), await copyText(this.editor?.source ?? ""), "copy");
     }
     if (which === "out") {
       return this.clipSaid(t("clip.theOutput"), await copyText(this.outputText()), "copy");
-    }
-    if (which === "in") {
-      const res = await readText();
-      if (res.ok) {
-        this.stdinEl.value = res.text ?? "";
-        return this.clipSaid(t("clip.theInput"), res, "paste");
-      }
-      // The shared "press Cmd+V instead" line is the editor's advice, and
-      // following it here would put the program's *input* into its *source*.
-      // Stdin has its own box, on the framed screen, and that is where a
-      // page with no clipboard read has to send somebody.
-      if (res.why === "unsupported") {
-        this.saveNote = t("clip.pasteInputByKey");
-        this.app.chip.fail();
-        return;
-      }
-      return this.clipSaid(t("clip.theInput"), res, "paste");
     }
     const res = await readText();
     if (!res.ok || !this.editor) return this.clipSaid(t("clip.yourCode"), res, "paste");
@@ -761,7 +744,6 @@ export class PlaygroundScene implements Scene {
     if (hit.id === "copycode") return void this.clip("code");
     if (hit.id === "pastecode") return void this.clip("paste");
     if (hit.id === "copyout") return void this.clip("out");
-    if (hit.id === "pastein") return void this.clip("in");
     if (hit.id === "fontdown" || hit.id === "fontup") {
       this.sizeFont(hit.id === "fontup" ? 0.1 : -0.1);
       return;
@@ -1133,7 +1115,6 @@ export class PlaygroundScene implements Scene {
       { id: "copycode", label: t("quest.copyCode") },
       { id: "pastecode", label: t("quest.paste") },
       { id: "copyout", label: t("quest.copyOutput"), dim: !this.result && this.log.lines.length === 0 },
-      { id: "pastein", label: t("pg.pasteIn") },
       ...this.fontItems(),
       ...this.displayItems(),
     ];

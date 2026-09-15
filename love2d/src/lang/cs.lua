@@ -223,7 +223,6 @@ return {
   ["COPY CODE"] = "KOPÍROVAT KÓD",
   ["PASTE"] = "VLOŽIT",
   ["COPY OUTPUT"] = "KOPÍROVAT VÝSTUP",
-  ["PASTE INPUT"] = "VLOŽIT VSTUP",
   ["SEARCH"] = "HLEDAT",
   ["no pad by that name"] = "žádný zápisník toho jména",
   ["DONE"] = "HOTOVO",

@@ -486,8 +486,6 @@ function Playground:draw_big()
       -- `a or ((b and c) or d)`, so after a run this handed `UI.button` the
       -- result *table* where it wanted the word "normal".
       state = (self.result or self.log) and "normal" or "disabled" },
-    { id = "pastein", label = I18n.t("PASTE INPUT"), every = { I18n.t("PASTE INPUT") },
-      state = "normal" },
     { id = "lang", label = self.lang:upper(), every = { "PYTHON" }, state = "normal" },
   }
   -- **Wrapped, not truncated.** The row used to stop at the first button that
@@ -979,13 +977,6 @@ function Playground:clip(which)
     if text == "" then self.note = I18n.t("nothing has run yet"); return end
     love.system.setClipboardText(text)
     self.note = I18n.t("copied")
-  elseif which == "in" then
-    -- Checked like the editor's paste is: an empty clipboard silently
-    -- wiping the program's input is a button that looks like it worked.
-    local text = love.system.getClipboardText() or ""
-    if text == "" then self.note = I18n.t("the clipboard is empty"); return end
-    self.stdin = text
-    self.note = I18n.t("pasted")
   elseif which == "paste" and self.editor then
     local text = love.system.getClipboardText() or ""
     if text == "" then self.note = I18n.t("the clipboard is empty"); return end
@@ -1108,7 +1099,6 @@ function Playground:mousepressed(x, y, button)
     if inside(r.copycode) then self:clip("code"); return end
     if inside(r.pastecode) then self:clip("paste"); return end
     if inside(r.copyout) then self:clip("out"); return end
-    if inside(r.pastein) then self:clip("in"); return end
     if inside(r.lang) then self:toggle_lang(); return end
     local shift = love.keyboard.isDown("lshift", "rshift")
     if self.pane:mousepressed(x, y, button, shift) then self.focus = "editor" end

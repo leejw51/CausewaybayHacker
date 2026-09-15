@@ -326,7 +326,6 @@ export const en = {
   "pg.orientAuto": "AUTO",
   "pg.orientLand": "LAND",
   "pg.orientPort": "PORT",
-  "pg.pasteIn": "PASTE INPUT",
   "pg.code": "CODE",
   "pg.codeDone": "DONE",
   "pg.maps": "MAPS",
@@ -587,7 +586,6 @@ export const en = {
   "clip.copyDenied": "the browser refused the clipboard — click the page once and try again",
   "clip.pasteDenied":
     "the browser refused to read the clipboard — allow it in the site permissions",
-  "clip.pasteInputByKey": "this page cannot read the clipboard — leave CODE and paste into the STDIN box",
   "clip.pasteByKey": "this page cannot read the clipboard — press Cmd+V or Ctrl+V in the editor instead",
   "clip.unsupported":
     "this browser has no clipboard here — a page served over http:// usually has none",
@@ -595,6 +593,5 @@ export const en = {
   "clip.sameAlready": "the clipboard already matches what is in the editor",
   "clip.theBrief": "the brief",
   "clip.yourCode": "your code",
-  "clip.theInput": "the input",
   "clip.theOutput": "the output",
 } as const;

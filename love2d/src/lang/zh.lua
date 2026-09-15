@@ -205,7 +205,6 @@ return {
   ["COPY CODE"] = "复制代码",
   ["PASTE"] = "粘贴",
   ["COPY OUTPUT"] = "复制输出",
-  ["PASTE INPUT"] = "粘贴输入",
   ["SEARCH"] = "搜索",
   ["no pad by that name"] = "没有这个名字的草稿",
   ["DONE"] = "完成",

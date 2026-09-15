@@ -208,7 +208,6 @@ return {
   ["COPY CODE"] = "複製代碼",
   ["PASTE"] = "貼上",
   ["COPY OUTPUT"] = "複製輸出",
-  ["PASTE INPUT"] = "貼上輸入",
   ["SEARCH"] = "搜尋",
   ["no pad by that name"] = "冇呢個名嘅草稿",
   ["DONE"] = "完成",

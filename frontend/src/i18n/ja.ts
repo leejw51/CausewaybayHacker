@@ -303,7 +303,6 @@ export const ja: Partial<Catalogue> = {
   "pg.orientAuto": "自動",
   "pg.orientLand": "横",
   "pg.orientPort": "縦",
-  "pg.pasteIn": "入力を貼付",
   "pg.code": "コード",
   "pg.codeDone": "完了",
   "pg.maps": "マップ",
@@ -554,7 +553,6 @@ export const ja: Partial<Catalogue> = {
     "ブラウザがクリップボードを拒否しました — ページを一度クリックしてからもう一度どうぞ",
   "clip.pasteDenied":
     "ブラウザがクリップボードの読み取りを拒否しました — サイトの権限で許可してください",
-  "clip.pasteInputByKey": "このページはクリップボードを読めません — 完了してから標準入力の欄に貼り付けてください",
   "clip.pasteByKey": "このページはクリップボードを読めません — エディタで Cmd+V か Ctrl+V を押してください",
   "clip.unsupported":
     "このブラウザではここでクリップボードが使えません — http:// で開いたページはたいてい使えません",
@@ -562,6 +560,5 @@ export const ja: Partial<Catalogue> = {
   "clip.sameAlready": "クリップボードの中身はエディタの中身とすでに同じです",
   "clip.theBrief": "課題",
   "clip.yourCode": "あなたのコード",
-  "clip.theInput": "入力",
   "clip.theOutput": "出力",
 };

@@ -202,7 +202,6 @@ return {
   ["COPY CODE"] = "코드 복사",
   ["PASTE"] = "붙여넣기",
   ["COPY OUTPUT"] = "출력 복사",
-  ["PASTE INPUT"] = "입력 붙여넣기",
   ["SEARCH"] = "검색",
   ["no pad by that name"] = "그런 이름의 메모장이 없습니다",
   ["DONE"] = "완료",

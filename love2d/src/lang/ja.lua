@@ -204,7 +204,6 @@ return {
   ["COPY CODE"] = "コードをコピー",
   ["PASTE"] = "貼り付け",
   ["COPY OUTPUT"] = "出力をコピー",
-  ["PASTE INPUT"] = "入力を貼付",
   ["SEARCH"] = "検索",
   ["no pad by that name"] = "その名前のメモはありません",
   ["DONE"] = "完了",
