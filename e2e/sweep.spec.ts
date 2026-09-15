@@ -790,6 +790,34 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   await page.waitForTimeout(600);
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("from the clipboard");
 
+  // With output on screen, a landscape window puts it **beside** the code and
+  // an upright one under it. Measured off the editor's width: stacked, it has
+  // the whole panel; beside, it gives up a third of it.
+  await clickButton(page, "run");
+  await expect
+    .poll(async () => page.evaluate(() => document.body.innerText.length >= 0), { timeout: 120_000 })
+    .toBe(true);
+  await page.waitForTimeout(3000);
+  const edBox = async () =>
+    page.evaluate(() => {
+      const el = document.querySelector(".cm-editor") as HTMLElement | null;
+      const r = el?.getBoundingClientRect();
+      return r ? { w: r.width, h: r.height, vw: window.innerWidth, vh: window.innerHeight } : null;
+    });
+  const laid = await edBox();
+  const wide = (laid?.vw ?? 0) > (laid?.vh ?? 0);
+  const share = (laid!.w / laid!.vw);
+  console.log(
+    `[playground] CODE editor ${Math.round(laid!.w)}x${Math.round(laid!.h)} of ${laid!.vw}x${laid!.vh}` +
+      ` (${wide ? "landscape" : "portrait"}, ${(share * 100).toFixed(0)}% wide)`,
+  );
+  if (wide) {
+    expect(share, "landscape gives the output a column beside the code").toBeLessThan(0.8);
+  } else {
+    expect(share, "upright keeps the code full width").toBeGreaterThan(0.85);
+  }
+  await shot(page, "23e-code-output");
+
   // The display toggles are buttons here, not only F-keys — this is the
   // screen people reach for on a phone, and a phone has no F11.
   const ids = await page.evaluate(() => window.__cwbCapture!.buttons().map((b) => b.id));

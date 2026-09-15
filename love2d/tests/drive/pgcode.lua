@@ -76,6 +76,87 @@ add({ until_ = function(app)
       return true
     end, note = "renamed", timeout = 6 })
 
+-- Copy and paste: the only way anything leaves a canvas.
+add({ until_ = function(app)
+      local s = pg(app)
+      love.system.setClipboardText("")
+      s.editor:set_text("package main\n// the original\n")
+      return true
+    end, timeout = 5 })
+add({ click = function(app) local r = pg(app).big_rects.copycode
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ until_ = function()
+      local got = love.system.getClipboardText() or ""
+      check(got:find("the original", 1, true) ~= nil,
+        "COPY CODE did not put the editor on the clipboard: " .. got:sub(1, 40))
+      return true
+    end, note = "the code is on the clipboard", timeout = 5 })
+add({ until_ = function()
+      love.system.setClipboardText("package main\n// from the clipboard\n")
+      return true
+    end, timeout = 3 })
+add({ click = function(app) local r = pg(app).big_rects.pastecode
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ until_ = function(app)
+      local text = pg(app).editor:text()
+      check(text:find("from the clipboard", 1, true) ~= nil,
+        "PASTE did not replace the editor: " .. text:sub(1, 40))
+      return true
+    end, note = "the clipboard is in the editor", timeout = 5 })
+add({ until_ = function()
+      love.system.setClipboardText("7 11\n")
+      return true
+    end, timeout = 3 })
+add({ click = function(app) local r = pg(app).big_rects.pastein
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ until_ = function(app)
+      check((pg(app).stdin or ""):find("7 11", 1, true) ~= nil,
+        "PASTE INPUT did not reach stdin: " .. tostring(pg(app).stdin))
+      return true
+    end, note = "the clipboard is in stdin", timeout = 5 })
+
+-- Run something, so there is output to place — and in a landscape window it
+-- goes **beside** the code rather than under it. Stacked there it costs a
+-- quarter of the few lines a wide-but-short window has.
+add({ until_ = function(app)
+      pg(app).editor:set_text('fn main() { println!("side by side"); }\n')
+      return true
+    end, timeout = 5 })
+add({ key = "f5", note = "run it" })
+add({ until_ = function(app) return pg(app).result ~= nil end,
+      note = "the run came back", timeout = 120 })
+add({ wait = 0.4 })
+add({ until_ = function(app)
+      local s = pg(app)
+      local code, out = s.code_rect, s.out_rect
+      check(code and out, "no code or output rect after a run")
+      if code and out then
+        print(("landscape: code x=%d w=%d, out x=%d w=%d")
+          :format(code.x, code.w, out.x, out.w))
+        check(out.x >= code.x + code.w,
+          "landscape put the output under the code instead of beside it")
+        check(math.abs(out.y - code.y) < 4, "the output is not level with the code")
+      end
+      return true
+    end, note = "output beside the code", timeout = 5 })
+add({ shot = "P7-code-output-beside.png" })
+
+add({ orient = "portrait" })
+add({ wait = 0.6 })
+add({ until_ = function(app)
+      local s = pg(app)
+      local code, out = s.code_rect, s.out_rect
+      if code and out then
+        print(("portrait: code y=%d h=%d, out y=%d h=%d"):format(code.y, code.h, out.y, out.h))
+        check(out.y >= code.y + code.h,
+          "upright put the output beside the code instead of under it")
+      end
+      return true
+    end, note = "output under the code, upright", timeout = 5 })
+add({ shot = "P8-code-output-under.png" })
+add({ orient = "landscape" })
+add({ wait = 0.5 })
+
 -- ESC leaves CODE, not the screen.
 add({ key = "escape" })
 add({ until_ = function(app)
@@ -83,6 +164,37 @@ add({ until_ = function(app)
       if not s then check(false, "ESC left the playground instead of leaving CODE"); return true end
       return s.big == false
     end, note = "ESC came back to the framed screen", timeout = 5 })
+
+-- The search box: shown once there are enough pads, and it narrows the list.
+add({ until_ = function(app)
+      local s = pg(app)
+      -- Six pads, without saving six times: the list is what the box reads.
+      s.snippets = {}
+      for i = 1, 6 do
+        s.snippets[i] = { id = "pg_" .. i, name = (i == 3) and "kettle" or ("pad " .. i),
+          lang = "rust" }
+      end
+      return true
+    end, timeout = 5 })
+add({ wait = 0.3 })
+add({ until_ = function(app)
+      local s = pg(app)
+      check(s.find_rect ~= nil, "no search box with six pads in the list")
+      check(#s:visible_snippets() == 6, "an empty query hides pads")
+      s.query = "kett"
+      return true
+    end, note = "the search box is there", timeout = 5 })
+add({ wait = 0.3 })
+add({ until_ = function(app)
+      local hits = pg(app):visible_snippets()
+      check(#hits == 1, ("the query matched %d pads, not 1"):format(#hits))
+      check(hits[1].brief.name == "kettle", "the wrong pad matched")
+      -- And the index is the one `load` wants, not the position in the view.
+      check(hits[1].index == 3, "a filtered row would open the wrong pad")
+      return true
+    end, note = "the query narrows the list", timeout = 5 })
+add({ shot = "P6-playground-search.png" })
+add({ until_ = function(app) pg(app).query = ""; return true end, timeout = 3 })
 
 -- And the whole of it again, upright.
 add({ orient = "portrait" })

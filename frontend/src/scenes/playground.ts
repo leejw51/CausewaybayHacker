@@ -1167,16 +1167,30 @@ export class PlaygroundScene implements Scene {
     // Output only once there is any: a scratchpad whose whole purpose is to
     // run things must not hide what they printed, and an empty panel would
     // be spending the room this mode exists to hand to the editor.
+    // **Beside the code when the window is wide, under it when it is tall.**
+    //
+    // A landscape window has width to spare and height to spare nothing: an
+    // output pane stacked under the editor there takes a quarter of the few
+    // lines the screen has, to show four lines of its own. Held upright it is
+    // the other way round — the width is the scarce half, and a column of
+    // output beside the code would be too narrow to read a compiler error in.
     const hasOut = this.log.lines.length > 0 || this.result !== null;
-    const outH = hasOut ? Math.round((layout.vh - strip) * (layout.isPortrait() ? 0.24 : 0.26)) : 0;
     const top = strip + Math.round(6 * s);
-    const editorH = layout.vh - top - pad - (hasOut ? outH + pad : 0);
-    well(g, pad, top, layout.vw - pad * 2, editorH);
-    const editorRect: Rect = [pad + 4, top + 4, layout.vw - pad * 2 - 8, editorH - 8];
+    const side = !layout.isPortrait() && hasOut;
+    const bodyW = layout.vw - pad * 2;
+    const bodyH = layout.vh - top - pad;
+    const outW = side ? Math.round(bodyW * 0.38) : 0;
+    const outH = hasOut && !side ? Math.round(bodyH * 0.26) : 0;
+    const editorW = side ? bodyW - outW - pad : bodyW;
+    const editorH = hasOut && !side ? bodyH - outH - pad : bodyH;
+    well(g, pad, top, editorW, editorH);
+    const editorRect: Rect = [pad + 4, top + 4, editorW - 8, editorH - 8];
     if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     else this.overlay?.hide();
-    if (hasOut) {
-      this.drawOutput(g, [pad, top + editorH + pad, layout.vw - pad * 2, outH], s);
+    if (side) {
+      this.drawOutput(g, [pad + editorW + pad, top, outW, bodyH], s);
+    } else if (hasOut) {
+      this.drawOutput(g, [pad, top + editorH + pad, bodyW, outH], s);
     } else {
       this.outputRect = [0, 0, 0, 0];
     }
