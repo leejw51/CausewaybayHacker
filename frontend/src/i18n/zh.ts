@@ -545,6 +545,7 @@ export const zh: Partial<Catalogue> = {
   "clip.emptyClipboard": "剪贴板是空的",
   "clip.copyDenied": "浏览器拒绝了剪贴板 — 先点一下页面再试",
   "clip.pasteDenied": "浏览器拒绝读取剪贴板 — 请在网站权限里允许",
+  "clip.pasteInputByKey": "此页面无法读取剪贴板 — 请退出代码模式，粘贴到标准输入框",
   "clip.pasteByKey": "此页面无法读取剪贴板 — 请在编辑器中按 Cmd+V 或 Ctrl+V",
   "clip.unsupported": "这个浏览器在这里没有剪贴板 — 用 http:// 打开的页面通常没有",
   "clip.silent": "剪贴板没有回应",

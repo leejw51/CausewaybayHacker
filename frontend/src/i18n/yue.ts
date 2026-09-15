@@ -558,6 +558,7 @@ export const yue: Partial<Catalogue> = {
   "clip.emptyClipboard": "剪貼簿係空嘅",
   "clip.copyDenied": "瀏覽器唔畀用剪貼簿 — 撳一下版面再試",
   "clip.pasteDenied": "瀏覽器唔畀讀剪貼簿 — 喺網站權限度開返佢",
+  "clip.pasteInputByKey": "呢版讀唔到剪貼簿 — 撳完成，貼上去標準輸入格",
   "clip.pasteByKey": "呢版讀唔到剪貼簿 — 喺編輯器撳 Cmd+V 或者 Ctrl+V",
   "clip.unsupported": "呢個瀏覽器喺度冇剪貼簿用 — 用 http:// 開嘅版面通常都冇",
   "clip.silent": "剪貼簿冇覆",

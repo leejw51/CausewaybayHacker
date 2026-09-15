@@ -333,7 +333,19 @@ export class PlaygroundScene implements Scene {
     }
     if (which === "in") {
       const res = await readText();
-      if (res.ok) this.stdinEl.value = res.text ?? "";
+      if (res.ok) {
+        this.stdinEl.value = res.text ?? "";
+        return this.clipSaid(t("clip.theInput"), res, "paste");
+      }
+      // The shared "press Cmd+V instead" line is the editor's advice, and
+      // following it here would put the program's *input* into its *source*.
+      // Stdin has its own box, on the framed screen, and that is where a
+      // page with no clipboard read has to send somebody.
+      if (res.why === "unsupported") {
+        this.saveNote = t("clip.pasteInputByKey");
+        this.app.chip.fail();
+        return;
+      }
       return this.clipSaid(t("clip.theInput"), res, "paste");
     }
     const res = await readText();

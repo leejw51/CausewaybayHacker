@@ -571,6 +571,7 @@ export const cs: Partial<Catalogue> = {
   "clip.emptyClipboard": "schránka je prázdná",
   "clip.copyDenied": "prohlížeč odmítl schránku — klikni jednou do stránky a zkus to znovu",
   "clip.pasteDenied": "prohlížeč odmítl číst schránku — povol to v oprávněních webu",
+  "clip.pasteInputByKey": "tato stránka nemůže číst schránku — opusťte KÓD a vložte do pole STDIN",
   "clip.pasteByKey": "tato stránka nemůže číst schránku — stiskněte Cmd+V nebo Ctrl+V v editoru",
   "clip.unsupported": "tento prohlížeč tu schránku nemá — stránka přes http:// ji obvykle nemá",
   "clip.silent": "schránka neodpověděla",

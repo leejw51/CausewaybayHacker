@@ -980,7 +980,11 @@ function Playground:clip(which)
     love.system.setClipboardText(text)
     self.note = I18n.t("copied")
   elseif which == "in" then
-    self.stdin = love.system.getClipboardText() or ""
+    -- Checked like the editor's paste is: an empty clipboard silently
+    -- wiping the program's input is a button that looks like it worked.
+    local text = love.system.getClipboardText() or ""
+    if text == "" then self.note = I18n.t("the clipboard is empty"); return end
+    self.stdin = text
     self.note = I18n.t("pasted")
   elseif which == "paste" and self.editor then
     local text = love.system.getClipboardText() or ""
