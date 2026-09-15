@@ -904,7 +904,7 @@ export class PlaygroundScene implements Scene {
     const s = f.scale;
     this.buttons.reset();
     this.rows.reset();
-    this.drawList(g, f.left, s);
+    this.drawList(g, f.left, s, f.portrait);
     this.drawBench(g, f.right, s);
     this.buttons.draw(g, ensureFonts(s).button);
     footer(g, layout, t("pg.footer"));
@@ -948,9 +948,29 @@ export class PlaygroundScene implements Scene {
     fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.5);
   }
 
-  /** The saved snippets, and the one line that says what this screen is. */
-  private drawList(g: Ctx, rect: Rect, s: number): void {
+  /**
+   * The saved snippets, and the one line that says what this screen is.
+   *
+   * `stacked` is the frame's own decision rather than the window's, and it
+   * picks the face the panel reads in. Side by side this is a full-height
+   * column and the body face is right. **Stacked it is a quarter of the
+   * window** — and `small` there (30·s, so 40 virtual px at the scale a
+   * 1080x1750 window asks for) drew the rule *larger than the panel's own
+   * title bar*, which is `stationSm`. Two lines of rule and a row and a half
+   * of pads were the whole panel.
+   *
+   * So the stacked panel drops to `stationSm`: the small chrome face the title
+   * bar and the language tag on every row already use. That is one step, not
+   * an arbitrary shrink — in a CJK language the floor arithmetic in `text.ts`
+   * pins `small` to 30·s and `stationSm` to max(20·s, 24·s) = 24·s, so this is
+   * the smallest size Korean is allowed to be drawn at and no smaller.
+   * Everything measured off the face follows it down — the row height, the
+   * search well, the centring — so the panel holds four pads where it held
+   * one and a half.
+   */
+  private drawList(g: Ctx, rect: Rect, s: number, stacked: boolean): void {
     const fonts = ensureFonts(s);
+    const body = stacked ? fonts.stationSm : fonts.small;
     const inner = titledPanel(g, rect, t("pg.scratchpads"), Theme.coin);
     let y = inner[1];
     const pad = Math.round(8 * s);
@@ -986,7 +1006,7 @@ export class PlaygroundScene implements Scene {
     // there are pads to hunt through, the rule has been read.
     const finding = this.searchable();
     const findH = finding
-      ? Math.max(this.app.layout.minTouchH(), fonts.small.height + Math.round(14 * s))
+      ? Math.max(this.app.layout.minTouchH(), body.height + Math.round(14 * s))
       : 0;
     const noteRoom = listTop - pad - (finding ? findH + pad : 0);
     // Clipped to its room rather than trusted to stop: a Hangul line inks
@@ -1003,15 +1023,15 @@ export class PlaygroundScene implements Scene {
       // served by a fallback whose ink is half again the height it was
       // measured by: stepping by the nominal box let a line in that did not
       // fit, and the clip then sliced its glyphs through the middle.
-      const lines = wrap(fonts.small, note, inner[2]);
+      const lines = wrap(body, note, inner[2]);
       const step = lines.reduce((n, l) => {
-        const ink = inkBox(fonts.small, l);
+        const ink = inkBox(body, l);
         return Math.max(n, ink.asc + ink.desc);
-      }, fonts.small.height);
+      }, body.height);
       let ny = noteTop;
       for (const line of lines) {
         if (ny + step > noteTop + noteH) break;
-        printf(g, fonts.small, line, inner[0], ny, inner[2], "left");
+        printf(g, body, line, inner[0], ny, inner[2], "left");
         ny += step;
       }
       y = ny;
@@ -1020,16 +1040,13 @@ export class PlaygroundScene implements Scene {
 
     if (finding) {
       well(g, inner[0], y, inner[2], findH, [0.06, 0.05, 0.14, 0.98]);
-      this.searchOverlay?.place(
-        [inner[0] + 4, y + 3, inner[2] - 8, findH - 6],
-        fonts.small.size,
-      );
+      this.searchOverlay?.place([inner[0] + 4, y + 3, inner[2] - 8, findH - 6], body.size);
       y += findH + pad;
     } else {
       this.searchOverlay?.hide();
     }
 
-    const rowH = Math.max(this.app.layout.minTouchH(), fonts.small.height + Math.round(14 * s));
+    const rowH = Math.max(this.app.layout.minTouchH(), body.height + Math.round(14 * s));
     const room = listTop - pad - y;
     clipped(g, inner[0], y, inner[2], Math.max(0, room), () => {
       let ry = y;
@@ -1056,10 +1073,10 @@ export class PlaygroundScene implements Scene {
         g.fillStyle = css(open ? Theme.coin : Theme.cream, hover ? 1 : 0.85);
         printf(
           g,
-          fonts.small,
+          body,
           snip.name,
           inner[0] + Math.round(10 * s),
-          ry + Math.round((rowH - fonts.small.height) / 2),
+          ry + Math.round((rowH - body.height) / 2),
           inner[2] - Math.round(20 * s) - tagW,
           "left",
         );
@@ -1080,7 +1097,7 @@ export class PlaygroundScene implements Scene {
         g.fillStyle = css(Theme.dim);
         printf(
           g,
-          fonts.small,
+          body,
           this.snippets.length === 0 ? t("pg.nothingSaved") : t("pg.noMatch"),
           inner[0],
           y + pad,
@@ -1092,10 +1109,10 @@ export class PlaygroundScene implements Scene {
         g.fillStyle = css(Theme.coin, 0.85);
         printf(
           g,
-          fonts.small,
+          body,
           this.saveNote,
           inner[0],
-          y + room - wrap(fonts.small, this.saveNote, inner[2]).length * fonts.small.height,
+          y + room - wrap(body, this.saveNote, inner[2]).length * body.height,
           inner[2],
           "left",
         );
