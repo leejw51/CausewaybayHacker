@@ -642,9 +642,13 @@ function Playground:draw_big()
   if has_out and wide then
     local out_w = math.floor(body_w * 0.38)
     local x = pad + body_w - out_w
-    fed(x, top, out_w)
+    -- A share of the column rather than a single line: input is usually
+    -- several lines -- a count and then the numbers -- and a box that shows
+    -- one of them is a box you cannot check what you typed in.
+    local in_h = math.max(fed_h, math.floor(body_h * 0.26))
+    fed(x, top, out_w, in_h)
     self:draw_code({ x = pad, y = top, w = body_w - out_w - pad, h = body_h }, true)
-    self:draw_output({ x = x, y = top + fed_h + 5, w = out_w, h = body_h - fed_h - 5 })
+    self:draw_output({ x = x, y = top + in_h + 5, w = out_w, h = body_h - in_h - 5 })
   elseif has_out then
     local band_h = math.max(fed_h, math.floor(body_h * 0.28))
     local y = top + body_h - band_h

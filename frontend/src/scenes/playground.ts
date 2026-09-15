@@ -1299,8 +1299,12 @@ export class PlaygroundScene implements Scene {
       const outW = Math.round(bodyW * 0.38);
       editorW = bodyW - outW - pad;
       const x = pad + editorW + pad;
-      fed(x, top, outW);
-      this.drawOutput(g, [x, top + fedH + gap, outW, bodyH - fedH - gap], s);
+      // A share of the column rather than a single line: input is usually
+      // several lines — a count and then the numbers — and a box that shows
+      // one of them is a box you cannot check what you typed in.
+      const inH = Math.max(fedH, Math.round(bodyH * 0.26));
+      fed(x, top, outW, inH);
+      this.drawOutput(g, [x, top + inH + gap, outW, bodyH - inH - gap], s);
     } else if (hasOut) {
       const bandH = Math.max(fedH, Math.round(bodyH * 0.28));
       editorH = bodyH - bandH - pad;
