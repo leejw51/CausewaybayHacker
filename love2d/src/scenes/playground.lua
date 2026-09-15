@@ -570,39 +570,88 @@ function Playground:draw_big()
   -- no test cases, so this box is the only way a program that reads anything
   -- is fed at all. One line rather than the framed screen's row, with its
   -- label beside it rather than over it.
+  -- **Input and output keep each other company, across the short axis.**
+  -- Wide window: the output is a column beside the code and stdin sits at the
+  -- top of it, so the editor keeps its width. Tall window: the output is a
+  -- band under the code and stdin takes the left of it, so the editor keeps
+  -- its height. Either way the pair costs the editor one dimension, not two.
   local field_font = Assets.mono(Layout.ui(8))
   local fed_h = math.max(field_font:getHeight() + 8, UI.lineHeight(7) + 8)
-  local fed_y = strip + 6
   local label = I18n.t("STDIN")
   local label_w = UI.textWidth(label, 7) + 14
-  UI.setColor(Theme.void, 0.9)
-  love.graphics.rectangle("fill", pad, fed_y, vw - pad * 2, fed_h)
-  love.graphics.setLineWidth(2)
-  UI.setColor(self.focus == "stdin" and Theme.coin or Theme.withAlpha(Theme.cream, 0.3))
-  love.graphics.rectangle("line", pad + 1, fed_y + 1, vw - pad * 2 - 2, fed_h - 2)
-  love.graphics.setColor(1, 1, 1, 1)
-  UI.text(label, pad + 6, fed_y + math.floor((fed_h - UI.lineHeight(7)) / 2), 7,
-    Theme.withAlpha(Theme.cream, 0.5))
-  love.graphics.setFont(field_font)
-  UI.setColor(Theme.cream)
-  local shown = (self.stdin or ""):gsub("\n", "⏎")
-  if self.focus == "stdin" then shown = shown .. "_" end
-  love.graphics.print(shown, pad + label_w, fed_y + math.floor((fed_h - field_font:getHeight()) / 2))
-  love.graphics.setColor(1, 1, 1, 1)
-  self.stdin_rect = { x = pad, y = fed_y, w = vw - pad * 2, h = fed_h }
+  -- `h` because the box is not always one line: set beside the output it
+  -- matches the output's height, so the pair reads as one band rather than as
+  -- a full panel with a sliver next to it.
+  local function fed(x, y, w, h)
+    h = h or fed_h
+    UI.setColor(Theme.void, 0.9)
+    love.graphics.rectangle("fill", x, y, w, h)
+    love.graphics.setLineWidth(2)
+    UI.setColor(self.focus == "stdin" and Theme.coin or Theme.withAlpha(Theme.cream, 0.3))
+    love.graphics.rectangle("line", x + 1, y + 1, w - 2, h - 2)
+    love.graphics.setColor(1, 1, 1, 1)
+    -- **The label goes over the field when there is a field to go over.**
+    -- Beside it, `표준 입력` is two thirds of a narrow box's width and the
+    -- input is typed into the third that is left. On a single line there is
+    -- no room above, so there it stays alongside.
+    local stacked = h >= fed_h * 1.6
+    love.graphics.setColor(1, 1, 1, 1)
+    local tx, ty
+    if stacked then
+      UI.text(label, x + 6, y + 3, 7, Theme.withAlpha(Theme.cream, 0.5))
+      tx, ty = x + 6, y + 3 + UI.lineHeight(7) + 2
+    else
+      UI.text(label, x + 6, y + math.floor((fed_h - UI.lineHeight(7)) / 2), 7,
+        Theme.withAlpha(Theme.cream, 0.5))
+      tx, ty = x + label_w, y + math.floor((fed_h - field_font:getHeight()) / 2)
+    end
+    love.graphics.setFont(field_font)
+    UI.setColor(Theme.cream)
+    local caret = self.focus == "stdin"
+    if stacked then
+      -- Real lines when there is height for them, so multi-line input reads
+      -- as what it is rather than as a row of pilcrows.
+      local line_h = field_font:getHeight()
+      local yy = ty
+      local text = (self.stdin or "") .. (caret and "_" or "")
+      for line in (text .. "\n"):gmatch("(.-)\n") do
+        if yy + line_h > y + h - 4 then break end
+        love.graphics.print(line, tx, yy)
+        yy = yy + line_h
+      end
+    else
+      local shown = (self.stdin or ""):gsub("\n", "⏎")
+      if caret then shown = shown .. "_" end
+      love.graphics.print(shown, tx, ty)
+    end
+    love.graphics.setColor(1, 1, 1, 1)
+    self.stdin_rect = { x = x, y = y, w = w, h = h }
+  end
 
-  local top = fed_y + fed_h + 5
-  local body_w, body_h = vw - pad * 2, vh - top - UI.footerHeight() - 6
   local has_out = (self.result ~= nil) or (self.log ~= nil) or self.running
-  local side = not Layout.isPortrait() and has_out
-  if side then
+  local wide = not Layout.isPortrait()
+  local top = strip + 6
+  local body_w = vw - pad * 2
+  -- Nothing run yet: no column or band to join, so a line of its own. Never
+  -- hidden — it is the only way a program that reads is fed at all.
+  if not has_out then
+    fed(pad, top, body_w)
+    top = top + fed_h + 5
+  end
+  local body_h = vh - top - UI.footerHeight() - 6
+  if has_out and wide then
     local out_w = math.floor(body_w * 0.38)
+    local x = pad + body_w - out_w
+    fed(x, top, out_w)
     self:draw_code({ x = pad, y = top, w = body_w - out_w - pad, h = body_h }, true)
-    self:draw_output({ x = pad + body_w - out_w, y = top, w = out_w, h = body_h })
+    self:draw_output({ x = x, y = top + fed_h + 5, w = out_w, h = body_h - fed_h - 5 })
   elseif has_out then
-    local out_h = math.floor(body_h * 0.28)
-    self:draw_code({ x = pad, y = top, w = body_w, h = body_h - out_h - pad }, true)
-    self:draw_output({ x = pad, y = top + body_h - out_h, w = body_w, h = out_h })
+    local band_h = math.max(fed_h, math.floor(body_h * 0.28))
+    local y = top + body_h - band_h
+    local in_w = math.floor(body_w * 0.4)
+    fed(pad, y, in_w, band_h)
+    self:draw_code({ x = pad, y = top, w = body_w, h = body_h - band_h - pad }, true)
+    self:draw_output({ x = pad + in_w + pad, y = y, w = body_w - in_w - pad, h = band_h })
   else
     self:draw_code({ x = pad, y = top, w = body_w, h = body_h }, true)
   end

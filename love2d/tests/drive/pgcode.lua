@@ -228,7 +228,12 @@ add({ until_ = function(app)
           :format(code.x, code.w, out.x, out.w))
         check(out.x >= code.x + code.w,
           "landscape put the output under the code instead of beside it")
-        check(math.abs(out.y - code.y) < 4, "the output is not level with the code")
+        -- Wide: stdin is stacked **on top of** the output, in its column.
+        local fed = s.stdin_rect
+        check(fed ~= nil, "no stdin field after a run")
+        print(("landscape stdin: x=%d y=%d w=%d"):format(fed.x, fed.y, fed.w))
+        check(fed.x >= code.x + code.w, "stdin is not in the output's column")
+        check(out.y >= fed.y + fed.h, "stdin is not stacked above the output")
       end
       return true
     end, note = "output beside the code", timeout = 5 })
@@ -265,6 +270,16 @@ add({ until_ = function(app)
         print(("portrait: code y=%d h=%d, out y=%d h=%d"):format(code.y, code.h, out.y, out.h))
         check(out.y >= code.y + code.h,
           "upright put the output beside the code instead of under it")
+        -- Tall: stdin is **beside** the output, in the band under the code.
+        local fed = s.stdin_rect
+        check(fed ~= nil, "no stdin field upright")
+        print(("portrait stdin: x=%d y=%d w=%d"):format(fed.x, fed.y, fed.w))
+        check(out.x >= fed.x + fed.w, "stdin is not beside the output")
+        check(math.abs(out.y - fed.y) < 6, "stdin is not level with the output")
+        -- Side by side means the same height: a full panel with a one-line
+        -- sliver next to it does not read as a pair.
+        check(math.abs(fed.h - out.h) < 6,
+          ("stdin is %d tall beside an output %d tall"):format(fed.h, out.h))
       end
       return true
     end, note = "output under the code, upright", timeout = 5 })

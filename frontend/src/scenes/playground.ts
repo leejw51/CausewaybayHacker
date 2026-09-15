@@ -1204,8 +1204,17 @@ export class PlaygroundScene implements Scene {
     const status = `${MAIN_FILE[this.held.lang]}   ${this.heldName().toUpperCase()}${
       this.dirty ? `   ${t("pg.unsaved")}` : ""
     }${note ? `   ${note}` : ""}`;
+    // **One line, elided.** `printf` wraps, the strip reserves the height of a
+    // single line, and a long note — `이 서버에는 아직 저장되지 않습니다…` — put
+    // its second line over the top of the editor.
+    const statusW = layout.vw - pad * 2 - Math.round(8 * s);
+    let shown = status;
+    if (width(f, shown) > statusW) {
+      while (shown.length > 1 && width(f, shown + "…") > statusW) shown = shown.slice(0, -1);
+      shown += "…";
+    }
     g.fillStyle = css(this.dirty ? Theme.coin : Theme.dim);
-    printf(g, f, status, pad + Math.round(8 * s), statusY, layout.vw - pad * 2, "left");
+    printf(g, f, shown, pad + Math.round(8 * s), statusY, statusW, "left");
     if (this.renaming) {
       const h = Math.max(layout.minTouchH(), f.height + 12);
       this.nameOverlay?.place(
@@ -1226,52 +1235,86 @@ export class PlaygroundScene implements Scene {
     // lines the screen has, to show four lines of its own. Held upright it is
     // the other way round — the width is the scarce half, and a column of
     // output beside the code would be too narrow to read a compiler error in.
-    // **One line of stdin, kept.** CODE exists to give the editor the window,
-    // and this is the one thing it cannot take back from it: a scratchpad has
-    // no test cases, so the box is the only way a program that reads anything
-    // is fed at all — which is most of the HackerRank-shaped practice this
-    // game is for. One line rather than the bench's two, and its label sits
-    // beside it rather than above.
-    const fedTop = strip + Math.round(6 * s);
+    // **Input and output keep each other company, across the short axis.**
+    //
+    // Wide window: the output is a column beside the code, and stdin sits at
+    // the top of that same column — stacked with it, so the editor keeps its
+    // width. Tall window: the output is a band under the code, and stdin
+    // takes the left of that band — beside it, so the editor keeps its
+    // height. Either way the pair costs the editor one dimension, not two.
+    //
+    // With nothing run yet there is no column or band to join, so stdin is a
+    // line of its own above the editor: it is never hidden, because it is the
+    // only way a program that reads is fed at all.
     const fedH = Math.max(layout.minTouchH(), fonts.codeSm.height + Math.round(10 * s));
-    well(g, pad, fedTop, layout.vw - pad * 2, fedH, [0.06, 0.05, 0.14, 0.98]);
-    g.fillStyle = css(Theme.dim);
+    const hasOut = this.log.lines.length > 0 || this.result !== null;
+    const wide = !layout.isPortrait();
+    const gap = Math.round(5 * s);
+    const bodyW = layout.vw - pad * 2;
+
     const fedLabel = t("pg.stdin");
     const labelW = Math.round(width(f, fedLabel) + 12 * s);
-    printf(
-      g,
-      f,
-      fedLabel,
-      pad + Math.round(6 * s),
-      inkCentreY(f, fedLabel, fedTop, fedH),
-      labelW,
-      "left",
-    );
-    this.stdinOverlay?.place(
-      [pad + labelW, fedTop + 3, layout.vw - pad * 2 - labelW - 6, fedH - 6],
-      fonts.codeSm.size,
-    );
+    // `h` because the box is not always one line: set beside the output it
+    // matches the output's height, so the pair reads as one band rather than
+    // as a full panel with a sliver next to it. The label sits on the first
+    // line either way.
+    const fed = (x: number, y: number, w: number, h = fedH) => {
+      well(g, x, y, w, h, [0.06, 0.05, 0.14, 0.98]);
+      g.fillStyle = css(Theme.dim);
+      // **The label goes over the field when there is a field to go over.**
+      // Beside it, `표준 입력` is two thirds of a narrow box's width and the
+      // input is typed into the third that is left. On a single line there is
+      // no room above, so there it stays alongside.
+      const stacked = h >= fedH * 1.6;
+      if (stacked) {
+        printf(g, f, fedLabel, x + Math.round(6 * s), y + Math.round(3 * s), w, "left");
+        const lh = f.height + Math.round(5 * s);
+        this.stdinOverlay?.place(
+          [x + 4, y + lh, w - 8, h - lh - 4],
+          fonts.codeSm.size,
+        );
+      } else {
+        printf(
+          g,
+          f,
+          fedLabel,
+          x + Math.round(6 * s),
+          inkCentreY(f, fedLabel, y, fedH),
+          labelW,
+          "left",
+        );
+        this.stdinOverlay?.place([x + labelW, y + 3, w - labelW - 6, h - 6], fonts.codeSm.size);
+      }
+    };
 
-    const hasOut = this.log.lines.length > 0 || this.result !== null;
-    const top = fedTop + fedH + Math.round(5 * s);
-    const side = !layout.isPortrait() && hasOut;
-    const bodyW = layout.vw - pad * 2;
+    let top = strip + Math.round(6 * s);
+    if (!hasOut) {
+      fed(pad, top, bodyW);
+      top += fedH + gap;
+    }
     const bodyH = layout.vh - top - pad;
-    const outW = side ? Math.round(bodyW * 0.38) : 0;
-    const outH = hasOut && !side ? Math.round(bodyH * 0.26) : 0;
-    const editorW = side ? bodyW - outW - pad : bodyW;
-    const editorH = hasOut && !side ? bodyH - outH - pad : bodyH;
+    let editorW = bodyW;
+    let editorH = bodyH;
+    if (hasOut && wide) {
+      const outW = Math.round(bodyW * 0.38);
+      editorW = bodyW - outW - pad;
+      const x = pad + editorW + pad;
+      fed(x, top, outW);
+      this.drawOutput(g, [x, top + fedH + gap, outW, bodyH - fedH - gap], s);
+    } else if (hasOut) {
+      const bandH = Math.max(fedH, Math.round(bodyH * 0.28));
+      editorH = bodyH - bandH - pad;
+      const y = top + editorH + pad;
+      const inW = Math.round(bodyW * 0.4);
+      fed(pad, y, inW, bandH);
+      this.drawOutput(g, [pad + inW + pad, y, bodyW - inW - pad, bandH], s);
+    } else {
+      this.outputRect = [0, 0, 0, 0];
+    }
     well(g, pad, top, editorW, editorH);
     const editorRect: Rect = [pad + 4, top + 4, editorW - 8, editorH - 8];
     if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     else this.overlay?.hide();
-    if (side) {
-      this.drawOutput(g, [pad + editorW + pad, top, outW, bodyH], s);
-    } else if (hasOut) {
-      this.drawOutput(g, [pad, top + editorH + pad, bodyW, outH], s);
-    } else {
-      this.outputRect = [0, 0, 0, 0];
-    }
   }
 
   /** The editor, the stdin box, the buttons and whatever the program said. */
@@ -1517,6 +1560,12 @@ export class PlaygroundScene implements Scene {
     const [x, y, w, h] = rect;
     const fonts = ensureFonts(s);
     const pad = Math.round(6 * s);
+    // A plate under the whole panel, header included. The well below covers
+    // only the log, so in CODE — where this sits straight on a photograph of
+    // a room rather than inside a framed panel — the outcome and the timings
+    // were read against a lit window. The LÖVE client has always drawn its
+    // whole rect as a well and this is that, in the browser's terms.
+    fill(g, Theme.ink, x, y, w, h, 0.78);
     let ty = y + pad;
 
     const r = this.result;
@@ -1535,14 +1584,25 @@ export class PlaygroundScene implements Scene {
       );
       g.fillStyle = css(Theme.dim);
       const exit = r.exit_code === null ? "" : t("pg.exit", { code: r.exit_code });
+      const timings = t("pg.timings", { compile: r.compile_ms, run: r.run_ms, exit });
+      // **Only on the same line when both fit on it.** The outcome is drawn
+      // left and the timings right against the same baseline, which is one
+      // line as long as the panel is wide. Beside the code it is not, and
+      // `실행됐습니다` and `컴파일 970 ms …` were printed through each other.
+      const together =
+        width(fonts.stationSm, OUTCOME[r.outcome]()) +
+          width(fonts.stationSm, timings) +
+          pad * 3 <=
+        w;
+      if (!together) ty += fonts.stationSm.height + Math.round(2 * s);
       printf(
         g,
         fonts.stationSm,
-        t("pg.timings", { compile: r.compile_ms, run: r.run_ms, exit }),
-        x,
+        timings,
+        together ? x : x + pad,
         ty + Math.round(3 * s),
         w - pad,
-        "right",
+        together ? "right" : "left",
       );
       ty += fonts.stationSm.height + Math.round(6 * s);
     } else if (this.status) {

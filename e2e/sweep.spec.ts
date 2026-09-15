@@ -820,10 +820,55 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
     `[playground] CODE editor ${Math.round(laid!.w)}x${Math.round(laid!.h)} of ${laid!.vw}x${laid!.vh}` +
       ` (${wide ? "landscape" : "portrait"}, ${(share * 100).toFixed(0)}% wide)`,
   );
+  // And stdin keeps the output company across the short axis: stacked above
+  // it in the column when wide, beside it in the band when tall.
+  const boxes = await page.evaluate(() => {
+    const el = (q: string) => document.querySelector(q)?.getBoundingClientRect();
+    const ed = el(".cm-editor");
+    const ta = el("textarea.cwb-field");
+    return ed && ta
+      ? {
+          ed: { x: Math.round(ed.x), y: Math.round(ed.y), w: Math.round(ed.width), h: Math.round(ed.height) },
+          ta: { x: Math.round(ta.x), y: Math.round(ta.y), w: Math.round(ta.width), h: Math.round(ta.height) },
+        }
+      : null;
+  });
+  console.log(`[playground] stdin ${JSON.stringify(boxes?.ta)} editor ${JSON.stringify(boxes?.ed)}`);
+  expect(boxes, "both the editor and stdin are on screen").not.toBeNull();
   if (wide) {
     expect(share, "landscape gives the output a column beside the code").toBeLessThan(0.8);
+    expect(boxes!.ta.x, "stdin is in the column beside the code").toBeGreaterThanOrEqual(
+      boxes!.ed.x + boxes!.ed.w - 4,
+    );
   } else {
     expect(share, "upright keeps the code full width").toBeGreaterThan(0.85);
+    expect(boxes!.ta.y, "stdin is in the band under the code").toBeGreaterThanOrEqual(
+      boxes!.ed.y + boxes!.ed.h - 4,
+    );
+    expect(boxes!.ta.w, "and it takes only part of that band's width").toBeLessThan(
+      boxes!.ed.w * 0.6,
+    );
+    // Side by side means the same height: a full panel with a one-line sliver
+    // beside it does not read as a pair.
+    const outH = await page.evaluate(() => {
+      const c = document.querySelector("#game") as HTMLCanvasElement;
+      return Math.round(c.getBoundingClientRect().height);
+    });
+    expect(boxes!.ta.h, "stdin is a band, not a sliver, beside the output").toBeGreaterThan(
+      outH * 0.1,
+    );
+    // The label is over the field, not beside it: alongside, `표준 입력` takes
+    // two thirds of a narrow box and the input gets the third that is left.
+    const band = await page.evaluate(() => {
+      const c = document.querySelector("#game") as HTMLCanvasElement;
+      const r = c.getBoundingClientRect();
+      const ta = document.querySelector("textarea.cwb-field")!.getBoundingClientRect();
+      return { taW: Math.round(ta.width), taX: Math.round(ta.x), canvasX: Math.round(r.x) };
+    });
+    console.log(`[playground] stdin field ${band.taW}px wide in a band`);
+    expect(band.taW, "the field has most of its box's width").toBeGreaterThan(
+      boxes!.ed.w * 0.3,
+    );
   }
   await shot(page, "23e-code-output");
 
