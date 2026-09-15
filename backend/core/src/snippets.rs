@@ -29,6 +29,10 @@ pub struct Snippet {
     pub name: String,
     pub lang: String,
     pub source: String,
+    /// What the program reads when it runs. A scratchpad has no test cases,
+    /// so this is the only input it will ever get, and it belongs to the pad
+    /// rather than to whichever client happened to be open.
+    pub stdin: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -63,7 +67,7 @@ fn clean_name(name: Option<&str>) -> Option<String> {
 
 pub fn get(conn: &Connection, address: &str, id: &str) -> Result<Snippet> {
     conn.query_row(
-        "SELECT id, name, lang, source, created_at, updated_at
+        "SELECT id, name, lang, source, stdin, created_at, updated_at
            FROM snippets WHERE id = ?1 AND address = ?2",
         params![id, address],
         |r| {
@@ -72,8 +76,9 @@ pub fn get(conn: &Connection, address: &str, id: &str) -> Result<Snippet> {
                 name: r.get(1)?,
                 lang: r.get(2)?,
                 source: r.get(3)?,
-                created_at: r.get(4)?,
-                updated_at: r.get(5)?,
+                stdin: r.get(4)?,
+                created_at: r.get(5)?,
+                updated_at: r.get(6)?,
             })
         },
     )
@@ -116,6 +121,7 @@ pub fn save(
     name: Option<&str>,
     lang: &str,
     source: &str,
+    stdin: Option<&str>,
 ) -> Result<Snippet> {
     check_lang(lang)?;
     if source.len() > MAX_SNIPPET_BYTES {
@@ -133,13 +139,15 @@ pub fn save(
             if existing.source == source
                 && existing.lang == lang
                 && name.as_ref().is_none_or(|n| *n == existing.name)
+                && stdin.is_none_or(|v| v == existing.stdin)
             {
                 // Nothing changed. An autosave that finds the file unchanged
                 // should cost one SELECT and no write at all.
                 return Ok(existing);
             }
             conn.execute(
-                "UPDATE snippets SET name = ?3, lang = ?4, source = ?5, updated_at = ?6
+                "UPDATE snippets SET name = ?3, lang = ?4, source = ?5, stdin = ?6,
+                        updated_at = ?7
                   WHERE id = ?1 AND address = ?2",
                 params![
                     id,
@@ -147,6 +155,10 @@ pub fn save(
                     name.unwrap_or(existing.name),
                     lang,
                     source,
+                    // Absent means "not mentioned", which is what an older
+                    // client sends: keep what the pad already had rather than
+                    // emptying it on somebody's behalf.
+                    stdin.unwrap_or(&existing.stdin),
                     now
                 ],
             )?;
@@ -167,9 +179,10 @@ pub fn save(
             let id = ids::snippet_id();
             let name = name.unwrap_or_else(|| format!("scratch {}", &now[..10]));
             conn.execute(
-                "INSERT INTO snippets (id, address, name, lang, source, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
-                params![id, address, name, lang, source, now],
+                "INSERT INTO snippets
+                     (id, address, name, lang, source, stdin, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
+                params![id, address, name, lang, source, stdin.unwrap_or(""), now],
             )?;
             get(conn, address, &id)?
         }

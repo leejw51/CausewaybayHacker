@@ -299,6 +299,8 @@ export const zh: Partial<Catalogue> = {
   "pg.orientAuto": "自动",
   "pg.orientLand": "横向",
   "pg.orientPort": "纵向",
+  "pg.copyIn": "复制输入",
+  "pg.pasteIn": "粘贴输入",
   "pg.code": "代码",
   "pg.codeDone": "完成",
   "pg.maps": "地图",
@@ -550,5 +552,7 @@ export const zh: Partial<Catalogue> = {
   "clip.sameAlready": "剪贴板里的内容和编辑器里的已经一样了",
   "clip.theBrief": "任务",
   "clip.yourCode": "你的代码",
+  "clip.theInput": "输入",
+  "clip.pasteInputByKey": "此页面无法读取剪贴板 — 请直接粘贴到标准输入框",
   "clip.theOutput": "输出",
 };

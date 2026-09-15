@@ -55,7 +55,6 @@ add({ until_ = function(app)
       check((s.visible_rows or 0) > framed_rows,
         ("CODE gave the editor no more room: %d rows against %d framed")
           :format(s.visible_rows or 0, framed_rows))
-      check(s.stdin_rect == nil, "the stdin field's hit box outlived the strip it was in")
       return true
     end, timeout = 5 })
 add({ shot = "P2-playground-code.png" })
@@ -103,6 +102,112 @@ add({ until_ = function(app)
         "PASTE did not replace the editor: " .. text:sub(1, 40))
       return true
     end, note = "the clipboard is in the editor", timeout = 5 })
+-- The stdin field, in CODE. Not "is it drawn" but "does what is typed there
+-- reach the program": a box that looks right and feeds nothing is the whole
+-- reason it is worth keeping at all.
+add({ until_ = function(app)
+      local s = pg(app)
+      check(s.stdin_rect ~= nil, "CODE drew no stdin field")
+      return s.stdin_rect ~= nil
+    end, note = "the stdin field is in CODE", timeout = 5 })
+add({ click = function(app) local r = pg(app).stdin_rect
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ until_ = function(app) return pg(app).focus == "stdin" end,
+      note = "the stdin field takes the caret", timeout = 5 })
+add({ text = "41" })
+add({ until_ = function(app)
+      check((pg(app).stdin or ""):find("41", 1, true) ~= nil,
+        "typing in CODE did not reach stdin: " .. tostring(pg(app).stdin))
+      return true
+    end, note = "typed into stdin", timeout = 5 })
+add({ until_ = function(app)
+      local s = pg(app)
+      s.focus = "editor"
+      s.editor:set_text(
+        'use std::io::Read;\nfn main(){let mut s=String::new();' ..
+        'std::io::stdin().read_to_string(&mut s).unwrap();' ..
+        'println!("read {}", s.trim());}\n')
+      return true
+    end, timeout = 5 })
+add({ key = "f5", note = "run it with that input" })
+add({ until_ = function(app) return pg(app).result ~= nil end,
+      note = "the run came back", timeout = 120 })
+add({ until_ = function(app)
+      local got = pg(app).result.stdout or ""
+      print("stdin reached the program: " .. got:gsub("\n", " "):sub(1, 40))
+      check(got:find("read 41", 1, true) ~= nil,
+        "the program did not receive what CODE's stdin field held: " .. got:sub(1, 40))
+      return true
+    end, note = "the program read it", timeout = 5 })
+add({ shot = "P9-code-stdin.png" })
+
+-- **One entry, two things.** The input is part of the pad, so it has to
+-- survive a save and come back with the code — otherwise reopening a pad
+-- hands back a program without the thing it needs to run.
+add({ until_ = function(app)
+      local s = pg(app)
+      s.name = "fed"
+      s:save()
+      return true
+    end, note = "saved with its input", timeout = 5 })
+add({ until_ = function(app) return pg(app).snippet_id ~= nil end,
+      note = "the save came back", timeout = 30 })
+add({ wait = 0.6 })
+add({ until_ = function(app)
+      local s = pg(app)
+      -- Open something else, then come back to it.
+      s.stdin = ""
+      s.editor:set_text("// gone\n")
+      s:list()
+      return true
+    end, timeout = 5 })
+add({ until_ = function(app) return (pg(app).snippets or {})[1] ~= nil end,
+      note = "the list came back", timeout = 30 })
+add({ until_ = function(app)
+      local s = pg(app)
+      for i, brief in ipairs(s.snippets) do
+        if brief.name == "fed" then s:load(i); return true end
+      end
+      check(false, "the saved pad is not in the list")
+      return true
+    end, note = "reopened it", timeout = 10 })
+add({ until_ = function(app)
+      local s = pg(app)
+      if (s.stdin or "") == "" then return false end
+      print("reopened with stdin: " .. tostring(s.stdin))
+      check(s.stdin:find("41", 1, true) ~= nil,
+        "the pad came back without its input: " .. tostring(s.stdin))
+      return true
+    end, note = "the input came back with the code", timeout = 30 })
+
+-- COPY INPUT and PASTE INPUT, the pair the output pane cannot have.
+add({ until_ = function(app)
+      local s = pg(app)
+      s.big = true
+      love.system.setClipboardText("")
+      return true
+    end, timeout = 5 })
+add({ wait = 0.4 })
+add({ click = function(app) local r = pg(app).big_rects.copyin
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ until_ = function()
+      local got = love.system.getClipboardText() or ""
+      check(got:find("41", 1, true) ~= nil,
+        "COPY INPUT did not put stdin on the clipboard: " .. got)
+      return true
+    end, note = "the input is on the clipboard", timeout = 5 })
+add({ until_ = function()
+      love.system.setClipboardText("99\n")
+      return true
+    end, timeout = 3 })
+add({ click = function(app) local r = pg(app).big_rects.pastein
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ until_ = function(app)
+      check((pg(app).stdin or ""):find("99", 1, true) ~= nil,
+        "PASTE INPUT did not reach stdin: " .. tostring(pg(app).stdin))
+      return true
+    end, note = "the clipboard is in stdin", timeout = 5 })
+
 -- Run something, so there is output to place — and in a landscape window it
 -- goes **beside** the code rather than under it. Stacked there it costs a
 -- quarter of the few lines a wide-but-short window has.

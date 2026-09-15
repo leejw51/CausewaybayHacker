@@ -17,7 +17,7 @@
  * on every keystroke, so a reload or a dropped socket cannot cost work either.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, inkBox, inkCentreY, printf, wrap } from "../engine/text";
+import { ensureFonts, inkBox, inkCentreY, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import {
   BTN_FRAME,
@@ -76,7 +76,15 @@ const OUTCOME: Record<PlaygroundRun["outcome"], () => string> = {
  * server must be able to say so after a reload, or the next visit would fetch
  * the older server copy over the top of it and the loss would be silent.
  */
-type Held = { id: string | null; name: string; lang: Land; source: string; dirty?: boolean };
+type Held = {
+  id: string | null;
+  name: string;
+  lang: Land;
+  source: string;
+  /** What the program reads. Part of the pad, not of the session. */
+  stdin: string;
+  dirty?: boolean;
+};
 
 /**
  * The name an unsaved pad wears until somebody gives it one.
@@ -122,7 +130,7 @@ export class PlaygroundScene implements Scene {
   private query = "";
 
   private snippets: SnippetBrief[] = [];
-  private held: Held = { id: null, name: SCRATCH, lang: "rust", source: STARTER.rust };
+  private held: Held = { id: null, name: SCRATCH, lang: "rust", source: STARTER.rust, stdin: "" };
   /** The unsaved pad's name, translated. The stored `name` stays as it is. */
   private heldName(): string {
     // A pad renamed before it was ever saved keeps the name it was given:
@@ -141,6 +149,8 @@ export class PlaygroundScene implements Scene {
    * — as this one did — decides nothing changed and sends nothing at all.
    */
   private savedName = "";
+  /** The input the server last confirmed, beside the source and the name. */
+  private savedStdin = "";
   private dirtyFor = 0;
   private dirty = false;
   private saving = false;
@@ -203,6 +213,13 @@ export class PlaygroundScene implements Scene {
     el.placeholder = t("pg.stdinHint");
     this.offLocale = onLocale(() => {
       el.placeholder = t("pg.stdinHint");
+    });
+    el.addEventListener("input", () => {
+      // The pad's input is part of the pad, so touching it is an edit like
+      // any other: without this the autosave never carries what was typed.
+      if (this.held.stdin === el.value) return;
+      this.dirty = true;
+      this.dirtyFor = 0;
     });
     this.stdinEl = el;
 
@@ -324,12 +341,33 @@ export class PlaygroundScene implements Scene {
   }
 
   /** Copy, paste — the two halves of working with something else. */
-  private async clip(which: "code" | "out" | "paste"): Promise<void> {
+  private async clip(which: "code" | "out" | "copyin" | "in" | "paste"): Promise<void> {
     if (which === "code") {
       return this.clipSaid(t("clip.yourCode"), await copyText(this.editor?.source ?? ""), "copy");
     }
     if (which === "out") {
       return this.clipSaid(t("clip.theOutput"), await copyText(this.outputText()), "copy");
+    }
+    if (which === "copyin") {
+      return this.clipSaid(t("clip.theInput"), await copyText(this.stdinEl.value), "copy");
+    }
+    if (which === "in") {
+      const res = await readText();
+      if (res.ok) {
+        this.stdinEl.value = res.text ?? "";
+        this.held.stdin = this.stdinEl.value;
+        this.dirty = true;
+        this.dirtyFor = 0;
+        return this.clipSaid(t("clip.theInput"), res, "paste");
+      }
+      // The shared "press Cmd+V instead" line is the editor's advice, and
+      // following it here would put the program's *input* into its *source*.
+      if (res.why === "unsupported") {
+        this.saveNote = t("clip.pasteInputByKey");
+        this.app.chip.fail();
+        return;
+      }
+      return this.clipSaid(t("clip.theInput"), res, "paste");
     }
     const res = await readText();
     if (!res.ok || !this.editor) return this.clipSaid(t("clip.yourCode"), res, "paste");
@@ -464,6 +502,7 @@ export class PlaygroundScene implements Scene {
         name: typeof v.name === "string" ? v.name : SCRATCH,
         lang: isLand(v.lang) ? v.lang : "rust",
         source: v.source,
+        stdin: typeof v.stdin === "string" ? v.stdin : "",
         dirty: v.dirty === true,
       };
       // Unsaved text from last time is still unsaved: it stays on screen, it is
@@ -498,10 +537,14 @@ export class PlaygroundScene implements Scene {
         name: res.snippet.name,
         lang: res.snippet.lang,
         source: res.snippet.source,
+        stdin: res.snippet.stdin ?? "",
       };
+      this.stdinEl.value = this.held.stdin;
+      this.savedStdin = this.held.stdin;
       this.savedSource = res.snippet.source;
       this.savedLang = res.snippet.lang;
       this.savedName = res.snippet.name;
+      this.savedStdin = res.snippet.stdin ?? this.held.stdin;
       this.dirty = false;
       this.land = res.snippet.lang;
       this.editor?.load(res.snippet.lang, res.snippet.source);
@@ -529,11 +572,19 @@ export class PlaygroundScene implements Scene {
     // Without this, RENAME on a saved pad went no further than the screen it
     // was typed on: the early return took it for an autosave with nothing to
     // do, and the list — which is the server's answer — never heard about it.
+    // Stdin belongs to the pad: a scratchpad has no test cases, so this is
+    // the only input its program will ever get, and reopening the pad without
+    // it hands back a program that cannot be run.
+    this.held.stdin = this.stdinEl.value;
     const named = this.held.name !== SCRATCH;
     const renamed = named && this.held.name !== this.savedName;
+    const refed = this.held.stdin !== this.savedStdin;
     if (
-      (!this.dirty && !renamed) ||
-      (source === this.savedSource && this.held.lang === this.savedLang && !renamed)
+      (!this.dirty && !renamed && !refed) ||
+      (source === this.savedSource &&
+        this.held.lang === this.savedLang &&
+        !renamed &&
+        !refed)
     ) {
       this.dirty = false;
       return;
@@ -548,12 +599,14 @@ export class PlaygroundScene implements Scene {
         ...(named ? { name: this.held.name } : {}),
         lang: this.held.lang,
         source,
+        stdin: this.held.stdin,
       });
       this.held.id = res.snippet.id;
       this.held.name = res.snippet.name;
       this.savedSource = source;
       this.savedLang = this.held.lang;
       this.savedName = res.snippet.name;
+      this.savedStdin = res.snippet.stdin ?? this.held.stdin;
       this.dirty = false;
       this.saveNote = "saved";
       this.writeLocal();
@@ -648,7 +701,10 @@ export class PlaygroundScene implements Scene {
       name: SCRATCH,
       lang: this.held.lang,
       source: STARTER[this.held.lang],
+      stdin: "",
     };
+    this.stdinEl.value = "";
+    this.savedStdin = "";
     this.savedSource = "";
     this.savedName = "";
     this.dirty = true;
@@ -744,6 +800,8 @@ export class PlaygroundScene implements Scene {
     if (hit.id === "copycode") return void this.clip("code");
     if (hit.id === "pastecode") return void this.clip("paste");
     if (hit.id === "copyout") return void this.clip("out");
+    if (hit.id === "copyin") return void this.clip("copyin");
+    if (hit.id === "pastein") return void this.clip("in");
     if (hit.id === "fontdown" || hit.id === "fontup") {
       this.sizeFont(hit.id === "fontup" ? 0.1 : -0.1);
       return;
@@ -1089,7 +1147,6 @@ export class PlaygroundScene implements Scene {
     // The bench's other DOM overlay is not drawn here and must not be left
     // floating over the editor: an element nobody placed this frame keeps the
     // rectangle it had in the framed layout.
-    this.stdinOverlay?.hide();
     this.searchOverlay?.hide();
     const fonts = ensureFonts(s);
     const f = fonts.stationSm;
@@ -1114,7 +1171,13 @@ export class PlaygroundScene implements Scene {
       // and pasting the reply back needs.
       { id: "copycode", label: t("quest.copyCode") },
       { id: "pastecode", label: t("quest.paste") },
-      { id: "copyout", label: t("quest.copyOutput"), dim: !this.result && this.log.lines.length === 0 },
+      {
+        id: "copyout",
+        label: t("quest.copyOutput"),
+        dim: !this.result && this.log.lines.length === 0,
+      },
+      { id: "copyin", label: t("pg.copyIn"), dim: this.stdinEl.value === "" },
+      { id: "pastein", label: t("pg.pasteIn") },
       ...this.fontItems(),
       ...this.displayItems(),
     ];
@@ -1138,13 +1201,9 @@ export class PlaygroundScene implements Scene {
     // writing still needs to know.
     const statusY = pad + Math.max(bandH, dh) + Math.round(3 * s);
     const note = this.saveNote || this.status;
-    // Stdin is not drawn in CODE, so pasted input would otherwise land
-    // somewhere invisible and the button would look like it did nothing.
-    const stdin = this.stdinEl.value.trim();
-    const fed = stdin ? `   ${t("pg.stdin")} ${stdin.split("\n")[0].slice(0, 24)}` : "";
     const status = `${MAIN_FILE[this.held.lang]}   ${this.heldName().toUpperCase()}${
       this.dirty ? `   ${t("pg.unsaved")}` : ""
-    }${fed}${note ? `   ${note}` : ""}`;
+    }${note ? `   ${note}` : ""}`;
     g.fillStyle = css(this.dirty ? Theme.coin : Theme.dim);
     printf(g, f, status, pad + Math.round(8 * s), statusY, layout.vw - pad * 2, "left");
     if (this.renaming) {
@@ -1167,8 +1226,34 @@ export class PlaygroundScene implements Scene {
     // lines the screen has, to show four lines of its own. Held upright it is
     // the other way round — the width is the scarce half, and a column of
     // output beside the code would be too narrow to read a compiler error in.
+    // **One line of stdin, kept.** CODE exists to give the editor the window,
+    // and this is the one thing it cannot take back from it: a scratchpad has
+    // no test cases, so the box is the only way a program that reads anything
+    // is fed at all — which is most of the HackerRank-shaped practice this
+    // game is for. One line rather than the bench's two, and its label sits
+    // beside it rather than above.
+    const fedTop = strip + Math.round(6 * s);
+    const fedH = Math.max(layout.minTouchH(), fonts.codeSm.height + Math.round(10 * s));
+    well(g, pad, fedTop, layout.vw - pad * 2, fedH, [0.06, 0.05, 0.14, 0.98]);
+    g.fillStyle = css(Theme.dim);
+    const fedLabel = t("pg.stdin");
+    const labelW = Math.round(width(f, fedLabel) + 12 * s);
+    printf(
+      g,
+      f,
+      fedLabel,
+      pad + Math.round(6 * s),
+      inkCentreY(f, fedLabel, fedTop, fedH),
+      labelW,
+      "left",
+    );
+    this.stdinOverlay?.place(
+      [pad + labelW, fedTop + 3, layout.vw - pad * 2 - labelW - 6, fedH - 6],
+      fonts.codeSm.size,
+    );
+
     const hasOut = this.log.lines.length > 0 || this.result !== null;
-    const top = strip + Math.round(6 * s);
+    const top = fedTop + fedH + Math.round(5 * s);
     const side = !layout.isPortrait() && hasOut;
     const bodyW = layout.vw - pad * 2;
     const bodyH = layout.vh - top - pad;

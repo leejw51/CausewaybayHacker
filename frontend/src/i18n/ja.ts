@@ -303,6 +303,8 @@ export const ja: Partial<Catalogue> = {
   "pg.orientAuto": "自動",
   "pg.orientLand": "横",
   "pg.orientPort": "縦",
+  "pg.copyIn": "入力をコピー",
+  "pg.pasteIn": "入力を貼付",
   "pg.code": "コード",
   "pg.codeDone": "完了",
   "pg.maps": "マップ",
@@ -560,5 +562,7 @@ export const ja: Partial<Catalogue> = {
   "clip.sameAlready": "クリップボードの中身はエディタの中身とすでに同じです",
   "clip.theBrief": "課題",
   "clip.yourCode": "あなたのコード",
+  "clip.theInput": "入力",
+  "clip.pasteInputByKey": "このページはクリップボードを読めません — 標準入力の欄に直接貼り付けてください",
   "clip.theOutput": "出力",
 };

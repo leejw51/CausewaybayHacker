@@ -320,6 +320,8 @@ export const cs: Partial<Catalogue> = {
   "pg.orientAuto": "AUTO",
   "pg.orientLand": "ŠÍŘKA",
   "pg.orientPort": "VÝŠKA",
+  "pg.copyIn": "KOPÍROVAT VSTUP",
+  "pg.pasteIn": "VLOŽIT VSTUP",
   "pg.code": "KÓD",
   "pg.codeDone": "HOTOVO",
   "pg.maps": "MAPY",
@@ -576,5 +578,7 @@ export const cs: Partial<Catalogue> = {
   "clip.sameAlready": "schránka už se shoduje s tím, co je v editoru",
   "clip.theBrief": "zadání",
   "clip.yourCode": "tvůj kód",
+  "clip.theInput": "vstup",
+  "clip.pasteInputByKey": "tato stránka nemůže číst schránku — vložte přímo do pole STDIN",
   "clip.theOutput": "výstup",
 };

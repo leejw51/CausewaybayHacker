@@ -65,6 +65,11 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0011_position",
         include_str!("../migrations/0011_position.sql"),
     ),
+    (
+        12,
+        "0012_snippet_stdin",
+        include_str!("../migrations/0012_snippet_stdin.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {

@@ -1,0 +1,12 @@
+-- 0012_snippet_stdin — a scratchpad keeps its input as well as its code.
+--
+-- A playground snippet is the one place in the game where somebody writes a
+-- program that reads: quests are fed by their test cases (§5.2), and a
+-- scratchpad has none, so whatever it reads has to be typed. That input was
+-- held in the client and nowhere else, which meant reopening a pad gave back
+-- the program and not the thing it needs to run — and the two clients could
+-- not agree on it at all, because neither ever sent it.
+--
+-- Empty by default, and empty is the honest value for every row that exists
+-- now: nobody has been able to save one yet.
+ALTER TABLE snippets ADD COLUMN stdin TEXT NOT NULL DEFAULT '';

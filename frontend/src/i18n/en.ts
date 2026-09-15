@@ -326,6 +326,8 @@ export const en = {
   "pg.orientAuto": "AUTO",
   "pg.orientLand": "LAND",
   "pg.orientPort": "PORT",
+  "pg.copyIn": "COPY INPUT",
+  "pg.pasteIn": "PASTE INPUT",
   "pg.code": "CODE",
   "pg.codeDone": "DONE",
   "pg.maps": "MAPS",
@@ -593,5 +595,7 @@ export const en = {
   "clip.sameAlready": "the clipboard already matches what is in the editor",
   "clip.theBrief": "the brief",
   "clip.yourCode": "your code",
+  "clip.theInput": "the input",
+  "clip.pasteInputByKey": "this page cannot read the clipboard — leave CODE and paste into the STDIN box",
   "clip.theOutput": "the output",
 } as const;

@@ -305,6 +305,8 @@ export const ko: Partial<Catalogue> = {
   "pg.orientAuto": "자동",
   "pg.orientLand": "가로",
   "pg.orientPort": "세로",
+  "pg.copyIn": "입력 복사",
+  "pg.pasteIn": "입력 붙여넣기",
   "pg.code": "코드",
   "pg.codeDone": "완료",
   "pg.maps": "지도",
@@ -559,5 +561,7 @@ export const ko: Partial<Catalogue> = {
   "clip.sameAlready": "클립보드 내용이 편집기의 내용과 이미 같습니다",
   "clip.theBrief": "과제",
   "clip.yourCode": "당신의 코드",
+  "clip.theInput": "입력",
+  "clip.pasteInputByKey": "이 페이지는 클립보드를 읽을 수 없습니다 — 표준 입력 상자에 직접 붙여넣으세요",
   "clip.theOutput": "출력",
 };

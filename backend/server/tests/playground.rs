@@ -302,6 +302,70 @@ async fn the_limits_still_bite_in_the_playground() {
     server.handle.abort();
 }
 
+/// A pad holds its **input** as well as its code (§4.9c).
+///
+/// A scratchpad has no test cases, so whatever a program reads has to be
+/// typed — and until this it was typed into the client and nowhere else, so
+/// reopening a pad gave back a program without the thing it needs to run, and
+/// the two clients could not agree about it because neither ever sent it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_snippet_keeps_its_stdin() {
+    let server = start().await;
+    let mut client = Client::connect(server.port).await;
+    client.login(ALICE_KEY).await;
+
+    let made = client
+        .ok(
+            "playground.save",
+            json!({ "lang": "rust", "source": HELLO, "stdin": "7 11\n" }),
+        )
+        .await["snippet"]
+        .clone();
+    let id = made["id"].as_str().unwrap().to_string();
+    assert_eq!(made["stdin"].as_str().unwrap(), "7 11\n");
+
+    // It comes back with the pad, which is the whole point.
+    let got = client.ok("playground.load", json!({ "id": id })).await["snippet"].clone();
+    assert_eq!(got["stdin"].as_str().unwrap(), "7 11\n");
+    assert_eq!(got["source"].as_str().unwrap(), HELLO);
+
+    // Changed on its own, with not a character of the program moving.
+    let again = client
+        .ok(
+            "playground.save",
+            json!({ "id": id, "lang": "rust", "source": HELLO, "stdin": "42\n" }),
+        )
+        .await["snippet"]
+        .clone();
+    assert_eq!(again["stdin"].as_str().unwrap(), "42\n");
+
+    // **Absent is not empty.** A client that does not know about this field
+    // must not wipe what another one saved by staying silent about it.
+    let quiet = client
+        .ok(
+            "playground.save",
+            json!({ "id": id, "lang": "rust", "source": "fn main() {}\n" }),
+        )
+        .await["snippet"]
+        .clone();
+    assert_eq!(
+        quiet["stdin"].as_str().unwrap(),
+        "42\n",
+        "a save that says nothing about stdin leaves it alone"
+    );
+
+    // And a pad nobody gave input to has an empty one, never a null.
+    let bare = client
+        .ok(
+            "playground.save",
+            json!({ "lang": "go", "source": "package main\n" }),
+        )
+        .await["snippet"]
+        .clone();
+    assert_eq!(bare["stdin"].as_str().unwrap(), "");
+    server.handle.abort();
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn snippets_save_load_list_and_delete() {
     let server = start().await;

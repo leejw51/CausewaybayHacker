@@ -171,12 +171,8 @@ fn running_it_again_changes_nothing() {
 }
 
 #[test]
-fn the_newest_migration_is_the_one_that_added_the_players_place() {
-    // A specific check on top of the generic ones, so this file also documents
-    // what the last field actually was — and fails loudly if a future
-    // migration is added without extending the tests above.
-    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
-    let conn = database_at_version(previous);
+fn the_players_place_arrives_with_its_own_migration() {
+    let conn = database_at_version(10);
     let has_position = |c: &Connection| -> i64 {
         c.query_row(
             "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='user_position'",
@@ -188,4 +184,30 @@ fn the_newest_migration_is_the_one_that_added_the_players_place() {
     assert_eq!(has_position(&conn), 0, "not there before 0011");
     db::prepare(&conn).unwrap();
     assert_eq!(has_position(&conn), 1, "and there afterwards, unprompted");
+}
+
+#[test]
+fn the_newest_migration_is_the_one_that_gave_a_scratchpad_its_input() {
+    // A specific check on top of the generic ones, so this file also documents
+    // what the last field actually was — and fails loudly if a future
+    // migration is added without extending the tests above.
+    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
+    let conn = database_at_version(previous);
+    let has_stdin = |c: &Connection| -> i64 {
+        c.query_row(
+            "SELECT count(*) FROM pragma_table_info('snippets') WHERE name='stdin'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap()
+    };
+    assert_eq!(has_stdin(&conn), 0, "not there before 0012");
+    db::prepare(&conn).unwrap();
+    assert_eq!(has_stdin(&conn), 1, "and there afterwards, unprompted");
+    // Every pad that already existed keeps its code and gains an empty input,
+    // which is the only honest value: nobody could have saved one yet.
+    let empty: String = conn
+        .query_row("SELECT coalesce(max(stdin), '') FROM snippets", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(empty, "", "an existing pad's input is empty, not null");
 }

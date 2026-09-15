@@ -313,6 +313,8 @@ export const yue: Partial<Catalogue> = {
   "pg.orientAuto": "自動",
   "pg.orientLand": "橫向",
   "pg.orientPort": "直向",
+  "pg.copyIn": "複製輸入",
+  "pg.pasteIn": "貼上輸入",
   "pg.code": "代碼",
   "pg.codeDone": "完成",
   "pg.maps": "地圖",
@@ -563,5 +565,7 @@ export const yue: Partial<Catalogue> = {
   "clip.sameAlready": "剪貼簿入面嘅嘢同編輯器入面嘅已經一樣",
   "clip.theBrief": "任務",
   "clip.yourCode": "你嘅碼",
+  "clip.theInput": "輸入",
+  "clip.pasteInputByKey": "呢版讀唔到剪貼簿 — 直接貼上去標準輸入格",
   "clip.theOutput": "輸出",
 };

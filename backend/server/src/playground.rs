@@ -169,6 +169,9 @@ pub fn save(
     let name = opt_str_field(payload, "name");
     let lang = str_field(payload, "lang")?;
     let source = str_field(payload, "source")?;
+    // Optional on purpose: a client that does not send it leaves the pad's
+    // input as it was, rather than clearing it by omission.
+    let stdin = opt_str_field(payload, "stdin");
     let conn = state.store.conn();
     let snippet = snippets::save(
         &conn,
@@ -178,6 +181,7 @@ pub fn save(
         name.as_deref(),
         &lang,
         &source,
+        stdin.as_deref(),
     )?;
     Ok(json!({ "snippet": snippet }))
 }

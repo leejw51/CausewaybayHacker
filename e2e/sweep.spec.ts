@@ -765,12 +765,21 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   const focused = await editorH();
   console.log(`[playground] editor ${Math.round(framed)}px framed -> ${Math.round(focused)}px CODE`);
   expect(focused).toBeGreaterThan(framed * 1.5);
-  // And the stdin box, which is not drawn here, does not stay floating over it.
-  const stdinOver = await page.evaluate(() => {
+  // And stdin is **kept** here, on its own line above the editor. It is the
+  // one thing CODE cannot take back from the code: a scratchpad has no test
+  // cases, so this box is the only way a program that reads gets fed at all.
+  const stdinHere = await page.evaluate(() => {
     const ta = document.querySelector("textarea.cwb-field") as HTMLElement | null;
-    return ta ? getComputedStyle(ta).display !== "none" && ta.getBoundingClientRect().height > 0 : false;
+    const r = ta?.getBoundingClientRect();
+    return r ? { h: Math.round(r.height), top: Math.round(r.top) } : null;
   });
-  expect(stdinOver, "the stdin field is hidden in CODE").toBe(false);
+  const codeTop = await page.evaluate(
+    () => Math.round((document.querySelector(".cm-editor") as HTMLElement).getBoundingClientRect().top),
+  );
+  console.log(`[playground] CODE stdin ${JSON.stringify(stdinHere)} above editor at ${codeTop}`);
+  expect(stdinHere, "the stdin field is on screen in CODE").not.toBeNull();
+  expect(stdinHere!.h, "and it is one line tall, not collapsed").toBeGreaterThan(10);
+  expect(stdinHere!.top, "above the editor, not over it").toBeLessThan(codeTop);
   await shot(page, "23b-playground-code");
 
   // Copy and paste, which is the only way anything leaves a canvas: there is
@@ -849,6 +858,56 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   expect(fbCode, "COPY CODE works with no async clipboard").toContain("fn main");
   expect(fbOut.length, "COPY OUTPUT copies something").toBeGreaterThan(0);
   expect(fbOut, "COPY OUTPUT copies the run, not the code").not.toContain("fn main");
+
+  // **One entry, two things.** The input belongs to the pad: a scratchpad has
+  // no test cases, so this is the only thing its program will ever read, and
+  // a pad that came back without it would come back unrunnable.
+  const stdinBox = page.locator("textarea.cwb-field").first();
+  await stdinBox.fill("7 11\n");
+  await page.waitForTimeout(400);
+  await clickButton(page, "save");
+  await page.waitForTimeout(800);
+  // Back to the framed screen: the pad list is not drawn in CODE, so there is
+  // nothing there to find the saved pad among.
+  await clickButton(page, "unfocus");
+  await page.waitForTimeout(700);
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() =>
+          window.__cwbCapture!.buttons().some((b) => b.id.startsWith("snip:")),
+        ),
+      { timeout: 30_000, message: "the pad reaches the list" },
+    )
+    .toBe(true);
+  const padId = await page.evaluate(
+    () => window.__cwbCapture!.buttons().find((b) => b.id.startsWith("snip:"))?.id ?? "",
+  );
+  // Away and back, through the server rather than through this page's memory.
+  await page.reload();
+  await page.waitForFunction(() => typeof window.__cwbCapture?.settle === "function");
+  // A reload lands where the server remembers the player being (§1.3), which
+  // is the lobby — the scratchpad is not a place in the world.
+  await expect
+    .poll(async () => sceneNow(page), { timeout: 60_000 })
+    .not.toMatch(/^(boot|login|title|story)$/);
+  if ((await sceneNow(page)) !== "lands") {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
+    if ((await sceneNow(page)) === "map") await clickButton(page, "menu");
+  }
+  await atScreen(page, "lands");
+  await clickButton(page, "playground");
+  await expect.poll(async () => sceneNow(page), { timeout: 30_000 }).toBe("playground");
+  await page.waitForSelector(".cm-editor");
+  await page.waitForTimeout(900);
+  await clickButton(page, padId);
+  await page.waitForTimeout(1200);
+  const fedBack = await page.locator("textarea.cwb-field").first().inputValue();
+  console.log(`[playground] pad reopened with stdin ${JSON.stringify(fedBack)}`);
+  expect(fedBack, "the pad kept its input").toContain("7 11");
+  await clickButton(page, "code");
+  await page.waitForTimeout(800);
 
   // The display toggles are buttons here, not only F-keys — this is the
   // screen people reach for on a phone, and a phone has no F11.

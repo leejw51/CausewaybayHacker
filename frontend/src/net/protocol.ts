@@ -432,12 +432,14 @@ export interface Snippet {
   name: string;
   lang: Land;
   source: string;
+  /** What the program reads. A scratchpad has no test cases to supply it. */
+  stdin: string;
   created_at: string;
   updated_at: string;
 }
 
 /** The same thing without the text, for the list. */
-export type SnippetBrief = Omit<Snippet, "source"> & { bytes: number };
+export type SnippetBrief = Omit<Snippet, "source" | "stdin"> & { bytes: number };
 
 /**
  * The edit stack for one quest: a stack with a cursor, which is what makes
@@ -503,7 +505,7 @@ export interface Requests {
   // §4.9d. Never recorded: formatting is not an attempt at the problem.
   "code.format": { lang: Land; source: string };
   "playground.run": { lang: Land; source: string; stdin?: string };
-  "playground.save": { id?: string; name?: string; lang: Land; source: string };
+  "playground.save": { id?: string; name?: string; lang: Land; source: string; stdin?: string };
   "playground.list": Record<string, never>;
   "playground.load": { id: string };
   "playground.delete": { id: string };

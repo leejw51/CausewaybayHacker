@@ -157,6 +157,10 @@ function Playground:save()
   local payload = {
     lang = self.lang,
     source = self.editor:text(),
+    -- The pad's input belongs to the pad: a scratchpad has no test cases, so
+    -- this is the only thing its program will ever read, and reopening the
+    -- pad without it hands back a program that cannot be run.
+    stdin = self.stdin or "",
   }
   if self.snippet_id then payload.id = self.snippet_id end
   if self.name then payload.name = self.name end
@@ -169,6 +173,7 @@ function Playground:save()
     local snippet = reply.snippet
     self.snippet_id = snippet.id
     self.name = snippet.name
+    self.stdin = snippet.stdin or self.stdin or ""
     self.saved_at = Anim.now()
     self.editor.dirty = false
     self.dirty_at = nil
@@ -186,6 +191,8 @@ function Playground:load(index)
     self.name = snippet.name
     self.lang = snippet.lang
     self.editor:set_text(snippet.source or "")
+    -- The input comes back with the code: one entry, two things.
+    self.stdin = snippet.stdin or ""
     self.editor.dirty = false
     self.dirty_at = nil
     self.result = nil
@@ -481,6 +488,10 @@ function Playground:draw_big()
     { id = "copycode", label = I18n.t("COPY CODE"), every = { I18n.t("COPY CODE") },
       state = "normal" },
     { id = "pastecode", label = I18n.t("PASTE"), every = { I18n.t("PASTE") }, state = "normal" },
+    { id = "copyin", label = I18n.t("COPY INPUT"), every = { I18n.t("COPY INPUT") },
+      state = (self.stdin or "") ~= "" and "normal" or "disabled" },
+    { id = "pastein", label = I18n.t("PASTE INPUT"), every = { I18n.t("PASTE INPUT") },
+      state = "normal" },
     { id = "copyout", label = I18n.t("COPY OUTPUT"), every = { I18n.t("COPY OUTPUT") },
       -- Parenthesised, and it matters: `a or b and c or d` binds as
       -- `a or ((b and c) or d)`, so after a run this handed `UI.button` the
@@ -554,7 +565,33 @@ function Playground:draw_big()
   -- stacked under the editor there costs a quarter of the few lines the screen
   -- has. Upright it is the other way round, and a column of output beside the
   -- code would be too narrow to read a compiler error in.
-  local top = strip + 6
+  -- **One line of stdin, kept.** CODE exists to give the editor the window,
+  -- and this is the one thing it cannot take back from it: a scratchpad has
+  -- no test cases, so this box is the only way a program that reads anything
+  -- is fed at all. One line rather than the framed screen's row, with its
+  -- label beside it rather than over it.
+  local field_font = Assets.mono(Layout.ui(8))
+  local fed_h = math.max(field_font:getHeight() + 8, UI.lineHeight(7) + 8)
+  local fed_y = strip + 6
+  local label = I18n.t("STDIN")
+  local label_w = UI.textWidth(label, 7) + 14
+  UI.setColor(Theme.void, 0.9)
+  love.graphics.rectangle("fill", pad, fed_y, vw - pad * 2, fed_h)
+  love.graphics.setLineWidth(2)
+  UI.setColor(self.focus == "stdin" and Theme.coin or Theme.withAlpha(Theme.cream, 0.3))
+  love.graphics.rectangle("line", pad + 1, fed_y + 1, vw - pad * 2 - 2, fed_h - 2)
+  love.graphics.setColor(1, 1, 1, 1)
+  UI.text(label, pad + 6, fed_y + math.floor((fed_h - UI.lineHeight(7)) / 2), 7,
+    Theme.withAlpha(Theme.cream, 0.5))
+  love.graphics.setFont(field_font)
+  UI.setColor(Theme.cream)
+  local shown = (self.stdin or ""):gsub("\n", "⏎")
+  if self.focus == "stdin" then shown = shown .. "_" end
+  love.graphics.print(shown, pad + label_w, fed_y + math.floor((fed_h - field_font:getHeight()) / 2))
+  love.graphics.setColor(1, 1, 1, 1)
+  self.stdin_rect = { x = pad, y = fed_y, w = vw - pad * 2, h = fed_h }
+
+  local top = fed_y + fed_h + 5
   local body_w, body_h = vw - pad * 2, vh - top - UI.footerHeight() - 6
   local has_out = (self.result ~= nil) or (self.log ~= nil) or self.running
   local side = not Layout.isPortrait() and has_out
@@ -725,7 +762,9 @@ function Playground:draw_code(rect, bare)
     -- Nothing below the code: the rects the strip would have set must not
     -- survive from the framed layout, or a tap lands on a button that is not
     -- on the screen.
-    self.stdin_rect, self.run_rect, self.format_rect = nil, nil, nil
+    -- `stdin_rect` is not cleared: in CODE the field is drawn by `draw_big`,
+    -- above the editor rather than under it, and it owns that rect.
+    self.run_rect, self.format_rect = nil, nil
     return
   end
 
@@ -894,6 +933,10 @@ function Playground:textinput(text)
     SFX.play("type")
   elseif self.focus == "stdin" then
     self.stdin = self.stdin .. text
+    -- Part of the pad, so touching it is an edit: without this the autosave
+    -- never carries what was typed into it.
+    self.editor.dirty = true
+    self.dirty_at = Anim.now()
   end
 end
 
@@ -977,6 +1020,20 @@ function Playground:clip(which)
     if text == "" then self.note = I18n.t("nothing has run yet"); return end
     love.system.setClipboardText(text)
     self.note = I18n.t("copied")
+  elseif which == "copyin" then
+    local text = self.stdin or ""
+    if text == "" then self.note = I18n.t("nothing to copy"); return end
+    love.system.setClipboardText(text)
+    self.note = I18n.t("copied")
+  elseif which == "in" then
+    -- Checked like the editor's paste is: an empty clipboard silently wiping
+    -- the program's input is a button that looks like it worked.
+    local text = love.system.getClipboardText() or ""
+    if text == "" then self.note = I18n.t("the clipboard is empty"); return end
+    self.stdin = text
+    self.editor.dirty = true
+    self.dirty_at = Anim.now()
+    self.note = I18n.t("pasted")
   elseif which == "paste" and self.editor then
     local text = love.system.getClipboardText() or ""
     if text == "" then self.note = I18n.t("the clipboard is empty"); return end
@@ -1099,6 +1156,11 @@ function Playground:mousepressed(x, y, button)
     if inside(r.copycode) then self:clip("code"); return end
     if inside(r.pastecode) then self:clip("paste"); return end
     if inside(r.copyout) then self:clip("out"); return end
+    if inside(r.copyin) then self:clip("copyin"); return end
+    if inside(r.pastein) then self:clip("in"); return end
+    -- CODE draws the stdin field itself, above the editor. Without this the
+    -- box took no caret and nothing could be typed into it.
+    if inside(self.stdin_rect) then self.focus = "stdin"; return end
     if inside(r.lang) then self:toggle_lang(); return end
     local shift = love.keyboard.isDown("lshift", "rshift")
     if self.pane:mousepressed(x, y, button, shift) then self.focus = "editor" end
