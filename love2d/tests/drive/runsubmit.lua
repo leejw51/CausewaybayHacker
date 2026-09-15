@@ -88,6 +88,14 @@ add({ until_ = function(app)
       print("server answered quest.get with: " .. tostring(app.scene.error or "the quest"))
       return true
     end, timeout = 8 })
+-- **Wait for the quest to actually open.** When there is no locked node to
+-- probe, the two steps above return on the frame they are reached — so ESC
+-- was pressed while the screen was still the map and `quest.get` was in
+-- flight. It went back a level from *there*, and the quest arrived
+-- afterwards to sit on screen until the timeout.
+add({ until_ = function(app)
+      return app.scene_name == "quest" and (app.scene.quest ~= nil or app.scene.error ~= nil)
+    end, note = "the quest is open", timeout = 25 })
 add({ key = "escape" })
 add({ until_ = function(app) return app.scene_name == "map" and app.scene.nodes end, timeout = 10 })
 add({ wait = 0.6 })

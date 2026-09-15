@@ -332,9 +332,12 @@ return function()
       "a display button is at least 32 px tall, got " .. tostring(floor_h))
     local chip_size = tonumber(code:match("UI%.CHIP_SIZE = (%d+)"))
     local _, quest = strings_of("src/scenes/quest.lua")
-    local button_size = quest and tonumber(quest:match("submit_label, usable and \"hot\" or \"disabled\", (%d+)"))
+    -- SUBMIT's size is a variable now — the band shrinks a step at a time
+    -- when it would otherwise take more of the editor pane than it leaves —
+    -- so this reads the size it starts at rather than a literal at the call.
+    local button_size = quest and tonumber(quest:match("local b9 = math%.max%(5, (%d+) %- drop%)"))
     T.eq(chip_size, button_size,
-      "the chips are set in the same face SUBMIT is, not in the caption face")
+      "the chips are set in the same face SUBMIT starts in, not the caption face")
     -- `btnBox`: every label the button can ever wear, not the one it happens
     -- to be showing. A fixed width clips `WINDOW` or leaves `EN` ragged, and
     -- `YUE` is half again as wide as `EN`.

@@ -379,6 +379,35 @@ function Layout.codeSize(base)
   return math.max(8, math.floor((base or 18) * Layout.fontScale()))
 end
 
+--- The largest code size at or below the player's step that still leaves
+--- `rows` lines in a pane `height` tall.
+---
+--- **A type step is a preference; one line of code is not a code pane.** At
+--- step 4 the line height is 45 px, and a landscape window 562 tall has, after
+--- its header, footer, control strip and output pane, room for exactly one of
+--- them — which `math.max(1, …)` then presents as a working editor showing a
+--- single line. This is `UI.fitSize` for code: the same rule that shrinks a
+--- label until it fits its button, applied to the one box where the text
+--- cannot be allowed to win.
+---
+--- It only ever shrinks, and never below `floor`, so a window too small for
+--- even that is left saying so rather than quietly drawing nothing.
+function Layout.codeSizeFor(base, height, rows, floor_px)
+  local want = Layout.codeSize(base)
+  local least = floor_px or 12
+  rows = rows or 3
+  if not height or height <= 0 then return want end
+  local size = want
+  while size > least do
+    -- The rasteriser's line height is what decides this, not the nominal
+    -- size: the two differ by the face's own leading.
+    local lh = require("src.assets").mono(size):getHeight()
+    if math.floor(height / lh) >= rows then break end
+    size = size - 1
+  end
+  return math.max(least, size)
+end
+
 --- The size to draw **interface** type at.
 ---
 --- The authored size, doubled (`TEXT_BASE`) and taken through the player's

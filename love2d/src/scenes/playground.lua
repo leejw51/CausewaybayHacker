@@ -737,17 +737,14 @@ function Playground:draw_code(rect, bare)
   UI.well(rect.x, rect.y, rect.w, rect.h,
     self.focus == "editor" and Theme.coin or Theme.cyan)
 
-  local font = Assets.mono(Layout.codeSize(18))
-  local line_h = font:getHeight()
-  -- The trailing space is not decoration: `%4d` right-aligns, so without
-  -- it the last digit of the line number touches the first character of an
-  -- unindented line and `1` reads as part of `fn`.
-  local gutter = font:getWidth("0000 ")
   -- The strip under the code — the stdin field, the two buttons, and the
   -- line count — measured from what is in it. It was a hard 64 px: a 7 px
   -- caption over a 22 px field and a 24 px button, and at the doubled ladder
   -- the caption printed through the field and `FORMAT F2` wrapped inside
   -- its own button.
+  --
+  -- Measured **first**, because what is left over decides how big the code
+  -- can be drawn: none of it depends on the code font.
   local cap_h = UI.lineHeight(7)
   local field_font = Assets.mono(Layout.ui(8))
   local field_h = field_font:getHeight() + 6
@@ -755,6 +752,13 @@ function Playground:draw_code(rect, bare)
   local row_h = math.max(field_h, bh)
   local strip = 6 + cap_h + 2 + row_h + 4 + cap_h + 6
   if bare then strip = 0 end
+
+  local font = Assets.mono(Layout.codeSizeFor(18, rect.h - strip - 12, 6))
+  local line_h = font:getHeight()
+  -- The trailing space is not decoration: `%4d` right-aligns, so without
+  -- it the last digit of the line number touches the first character of an
+  -- unindented line and `1` reads as part of `fn`.
+  local gutter = font:getWidth("0000 ")
   local rows = math.max(1, math.floor((rect.h - strip - 12) / line_h))
   self.editor:ensure_visible(rows)
   self.visible_rows = rows

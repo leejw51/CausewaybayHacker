@@ -40,8 +40,16 @@ local function watch_i18n()
   I18n.__watched = true
   local real = I18n.t
   -- English on purpose: proper nouns and a key name.
-  local english = { CAUSEWAYBAY = true, HACKER = true, TAB = true,
-    RUST = true, GO = true }
+  --
+  -- **The land names come from `Land.NAME` rather than being listed here.**
+  -- `RUST` and `GO` were written out when there were two lands, and `C++` and
+  -- `PYTHON` arriving later were reported as English on a Korean screen by a
+  -- check that was right about every other string. A fifth land would have
+  -- done it again.
+  local english = { CAUSEWAYBAY = true, HACKER = true, TAB = true }
+  for _, land in ipairs(require("src.land").ORDER) do
+    english[require("src.land").NAME[land]] = true
+  end
   I18n.t = function(english_key, ...)
     -- Only once the switch has happened. The login screen draws several
     -- frames in English before the drive sets the language, and counting

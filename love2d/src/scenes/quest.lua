@@ -1714,7 +1714,15 @@ end
 --- bottom — which put the last lines of a long program, and the caret with
 --- them, behind the SOLVE button. It was one row's worth of hidden text
 --- before this round and would have been three.
-function Quest:button_band(rect)
+function Quest:button_band(rect, drop)
+  -- `drop` shrinks every label a step at a time. **Chrome gives way before
+  -- the thing being typed into does**: at type step 4 in a 562-tall landscape
+  -- window this band wanted three rows and 204 pixels of an editor pane 214
+  -- tall, which left the code pane with -2 and the editor showing one line.
+  drop = drop or 0
+  local b9 = math.max(5, 9 - drop)
+  local b8 = math.max(5, 8 - drop)
+  local b7 = math.max(5, 7 - drop)
   -- RUN and SUBMIT, with a deliberate gap between them.
   --
   -- RUN is the reflex button and keeps F5, the key it has always had here.
@@ -1746,9 +1754,9 @@ function Quest:button_band(rect)
   local undo_label = I18n.t("UNDO")
   local redo_label = I18n.t("REDO")
   local clear_label = I18n.t("CLEAR  SHIFT-F6")
-  local bh = math.max(28, UI.lineHeight(9) + 12)
+  local bh = math.max(28, UI.lineHeight(b9) + 12)
   local gap = 22
-  local want = math.max(UI.textWidth(run_label, 9), UI.textWidth(submit_label, 9)) + 20
+  local want = math.max(UI.textWidth(run_label, b9), UI.textWidth(submit_label, b9)) + 20
   -- A label wider than its button is printed through the neighbour. When
   -- the pair cannot have the width their full labels want, the key comes
   -- off — `RUN` and `SUBMIT` — rather than the word: the keys are in the
@@ -1758,7 +1766,7 @@ function Quest:button_band(rect)
   if want > room_pair then
     run_label = self.running_mode == "quest.run" and run_label or bare(run_label)
     submit_label = self.running_mode == "quest.submit" and submit_label or bare(submit_label)
-    want = math.max(UI.textWidth(run_label, 9), UI.textWidth(submit_label, 9)) + 20
+    want = math.max(UI.textWidth(run_label, b9), UI.textWidth(submit_label, b9)) + 20
   end
   -- The left of the well is two clusters now — SOLVE and FORMAT, which only
   -- ever change the buffer, and UNDO, REDO and CLEAR, which only ever move
@@ -1778,7 +1786,7 @@ function Quest:button_band(rect)
   -- The caption row's height, needed here as well as below: when the buffer
   -- buttons take a row of their own, the captions belonging to RUN and SUBMIT
   -- have to fit *between* the two rows rather than through the upper one.
-  local cap = UI.lineHeight(7) + 3
+  local cap = UI.lineHeight(b7) + 3
   local room = math.floor((rect.w - 30 - gap - left_floor - 10) / 2)
   local bw = math.max(60, math.min(want, room))
   local by = rect.y + rect.h - bh - 8
@@ -1795,20 +1803,20 @@ function Quest:button_band(rect)
   -- SOLVE is the far-left button on purpose: FORMAT stands between it and
   -- RUN, so the one control on this screen that gives the answer away cannot
   -- be reached by a press that was aimed a centimetre wide of RUN.
-  local sw = UI.textWidth(solve_label, 8) + 16
-  local fw = UI.textWidth(format_label, 8) + 16
+  local sw = UI.textWidth(solve_label, b8) + 16
+  local fw = UI.textWidth(format_label, b8) + 16
   -- ANSWER and CODE join the cluster that only ever changes the *buffer*.
   -- Neither writes an attempt, and neither must read as another way to
   -- submit — the same rule SOLVE and FORMAT are here under.
   local answer_label = I18n.t("ANSWER")
   local blanks_label = I18n.t("BLANKS")
   local code_label = I18n.t("CODE")
-  local aw = UI.textWidth(answer_label, 8) + 16
-  local blw = UI.textWidth(blanks_label, 8) + 16
-  local cdw = UI.textWidth(code_label, 8) + 16
-  local uw = UI.textWidth(undo_label, 8) + 16
-  local rw = UI.textWidth(redo_label, 8) + 16
-  local cw = UI.textWidth(clear_label, 8) + 16
+  local aw = UI.textWidth(answer_label, b8) + 16
+  local blw = UI.textWidth(blanks_label, b8) + 16
+  local cdw = UI.textWidth(code_label, b8) + 16
+  local uw = UI.textWidth(undo_label, b8) + 16
+  local rw = UI.textWidth(redo_label, b8) + 16
+  local cw = UI.textWidth(clear_label, b8) + 16
   -- A whole row of the well, which is the most any cluster can ever have.
   local row = rect.w - 20
   -- The same rule for the left pair: when SOLVE and FORMAT with their keys
@@ -1816,8 +1824,8 @@ function Quest:button_band(rect)
   if sw + left_gap + fw + left_gap + aw + left_gap + blw + left_gap + cdw > row then
     solve_label = self.solving and solve_label or bare(solve_label)
     format_label = self.formatting and format_label or bare(format_label)
-    sw = UI.textWidth(solve_label, 8) + 16
-    fw = UI.textWidth(format_label, 8) + 16
+    sw = UI.textWidth(solve_label, b8) + 16
+    fw = UI.textWidth(format_label, b8) + 16
   end
   local buffer_w = sw + left_gap + fw + left_gap + aw + left_gap + blw + left_gap + cdw
   local stack_w = uw + left_gap + rw + left_gap + cw
@@ -1854,7 +1862,7 @@ function Quest:button_band(rect)
   -- difference between two rows and three.
   if uy < ly and clear_label ~= bare(clear_label) then
     clear_label = bare(clear_label)
-    cw = UI.textWidth(clear_label, 8) + 16
+    cw = UI.textWidth(clear_label, b8) + 16
     stack_w = uw + left_gap + rw + left_gap + cw
     ly, uy = choose()
   end
@@ -1927,6 +1935,7 @@ function Quest:button_band(rect)
     ax = ax, blx = blx, cdx = cdx, aw = aw, blw = blw, cdw = cdw,
     undo_label = undo_label, redo_label = redo_label, clear_label = clear_label,
     bh = bh, cap = cap, bw = bw,
+    b9 = b9, b8 = b8, b7 = b7,
     by = by, sx = sx, rx = rx, ly = ly, uy = uy,
     vx = vx, fx = fx, sw = sw, fw = fw,
     ux = ux, rdx = rdx, clx = clx, uw = uw, rw = rw, cw = cw,
@@ -1962,12 +1971,17 @@ function Quest:draw_editor(rect, tint, bare)
   -- in `src/scenes/playground.lua`, which is how the two would have drifted
   -- the first time either was tuned.
   local font = Assets.mono(Layout.codeSize(18))
-  local line_h = font:getHeight()
-  -- The trailing space is not decoration: `%4d` right-aligns, so without
-  -- it the last digit of the line number touches the first character of an
-  -- unindented line and `1` reads as part of `fn`.
-  local gutter = font:getWidth("0000 ")
+  -- **The band gives way before the code does.** Measured at the player's own
+  -- step first, and shrunk a step at a time only while it is taking more than
+  -- half the pane — which at type step 4 in a 562-tall landscape window it
+  -- was: 204 pixels of an editor 214 tall, leaving the code -2 and one line
+  -- on screen. Four steps is as far as it goes; past that the window is too
+  -- small for this screen and saying so beats drawing chrome nobody can use.
   local band = self:button_band(rect)
+  for drop = 1, 4 do
+    if band.reserve <= rect.h * 0.55 then break end
+    band = self:button_band(rect, drop)
+  end
   -- The console — the run's stages, its log and what it came back with —
   -- is **part of the layout, not a float**. It used to be a panel pinned to
   -- the bottom of the screen at a fixed 300 px, which in portrait sat on top
@@ -1977,8 +1991,21 @@ function Quest:draw_editor(rect, tint, bare)
   -- anything out (`consoleH` in `frontend/src/scenes/quest.ts`), and this is
   -- the same rule: the code rows give up the space, the band keeps its row.
   local console = bare and { open = false, reserve = 0 } or self:console_rect(rect, band)
-  local rows = math.max(1,
-    math.floor((rect.h - 12 - (bare and 0 or band.reserve) - console.reserve) / line_h))
+  -- **A type step is a preference; one line of code is not a code pane.** At
+  -- step 4 the line height is 45 px, and a landscape window 562 tall has room
+  -- for exactly one of them once the band and the console have taken theirs
+  -- — which `math.max(1, …)` then presents as a working editor showing a
+  -- single line. The band and the console are measured against the step's own
+  -- size first, which over-states what they need when the code then shrinks,
+  -- and over-stating is the safe side of this.
+  local room = rect.h - 12 - (bare and 0 or band.reserve) - console.reserve
+  font = Assets.mono(Layout.codeSizeFor(18, room, 6))
+  local line_h = font:getHeight()
+  -- The trailing space is not decoration: `%4d` right-aligns, so without
+  -- it the last digit of the line number touches the first character of an
+  -- unindented line and `1` reads as part of `fn`.
+  local gutter = font:getWidth("0000 ")
+  local rows = math.max(1, math.floor(room / line_h))
   self.editor:ensure_visible(rows)
   self.visible_rows = rows
   self.editor_rect = rect
@@ -2125,23 +2152,23 @@ function Quest:draw_editor(rect, tint, bare)
   local busy = self.running_mode ~= nil
   local usable = (self.quest ~= nil) and not busy
   UI.button(vx, ly, sw, bh, solve_label,
-    (usable and not self.solve_unsupported) and "normal" or "disabled", 8)
+    (usable and not self.solve_unsupported) and "normal" or "disabled", band.b8)
   self.solve_rect = { x = vx, y = ly, w = sw, h = bh }
   UI.button(fx, ly, fw, bh, format_label,
-    (usable and not self.format_unsupported) and "normal" or "disabled", 8)
+    (usable and not self.format_unsupported) and "normal" or "disabled", band.b8)
   self.format_rect = { x = fx, y = ly, w = fw, h = bh }
   -- ANSWER wears `hot` while it is on: the screen is in a mode, and a mode
   -- that does not say so is a mode a player forgets they are in.
   UI.button(band.ax, ly, band.aw, bh, band.answer_label,
     self.answer_on and "hot"
-      or ((usable and not self.solve_unsupported) and "normal" or "disabled"), 8)
+      or ((usable and not self.solve_unsupported) and "normal" or "disabled"), band.b8)
   self.answer_rect = { x = band.ax, y = ly, w = band.aw, h = bh }
   UI.button(band.blx, ly, band.blw, bh, band.blanks_label,
     self.drill == "blanks" and "hot"
-      or ((usable and not self.solve_unsupported) and "normal" or "disabled"), 8)
+      or ((usable and not self.solve_unsupported) and "normal" or "disabled"), band.b8)
   self.blanks_rect = { x = band.blx, y = ly, w = band.blw, h = bh }
   UI.button(band.cdx, ly, band.cdw, bh, band.code_label,
-    self.quest and "normal" or "disabled", 8)
+    self.quest and "normal" or "disabled", band.b8)
   self.code_rect = { x = band.cdx, y = ly, w = band.cdw, h = bh }
 
   -- The stack's three, drawn from the state the server last sent and from
@@ -2151,18 +2178,18 @@ function Quest:draw_editor(rect, tint, bare)
   local stack = self.edit
   local live = usable and not self.edit_unsupported
   UI.button(ux, uy, uw, bh, band.undo_label,
-    (live and Edits.can_undo(stack)) and "normal" or "disabled", 8)
+    (live and Edits.can_undo(stack)) and "normal" or "disabled", band.b8)
   self.undo_rect = { x = ux, y = uy, w = uw, h = bh }
   UI.button(rdx, uy, rw, bh, band.redo_label,
-    (live and Edits.can_redo(stack)) and "normal" or "disabled", 8)
+    (live and Edits.can_redo(stack)) and "normal" or "disabled", band.b8)
   self.redo_rect = { x = rdx, y = uy, w = rw, h = bh }
   UI.button(clx, uy, cw, bh, band.clear_label,
-    (live and Edits.can_clear(stack)) and "normal" or "disabled", 8)
+    (live and Edits.can_clear(stack)) and "normal" or "disabled", band.b8)
   self.clear_rect = { x = clx, y = uy, w = cw, h = bh }
 
   UI.button(rx, by, bw, bh, run_label,
-    (usable and not self.run_unsupported) and "normal" or "disabled", 9)
-  UI.button(sx, by, bw, bh, submit_label, usable and "hot" or "disabled", 9)
+    (usable and not self.run_unsupported) and "normal" or "disabled", band.b9)
+  UI.button(sx, by, bw, bh, submit_label, usable and "hot" or "disabled", band.b9)
   self.run_rect = { x = rx, y = by, w = bw, h = bh }
   self.submit_rect = { x = sx, y = by, w = bw, h = bh }
 
@@ -2199,8 +2226,8 @@ function Quest:draw_editor(rect, tint, bare)
   -- One line, or nothing: a caption wrapped to two lines lands on the
   -- button it captions.
   local price = self.solve_unsupported and I18n.t("no answer key here") or I18n.t("costs a star")
-  if UI.textWidth(price, 7) <= sw then
-    UI.text(price, vx, ly - cap, 7,
+  if UI.textWidth(price, band.b7) <= sw then
+    UI.text(price, vx, ly - cap, band.b7,
       Theme.withAlpha(self.solve_unsupported and Theme.dim or Theme.coin, 0.85))
   end
 
@@ -2212,8 +2239,8 @@ function Quest:draw_editor(rect, tint, bare)
   -- history to exist. Dropped rather than overprinted when the cluster is too
   -- narrow to hold it, the same rule the price above follows.
   local stack_caption, stack_dim = self:stack_caption()
-  if UI.textWidth(stack_caption, 7) <= band.stack_w then
-    UI.text(stack_caption, ux, uy - cap, 7,
+  if UI.textWidth(stack_caption, band.b7) <= band.stack_w then
+    UI.text(stack_caption, ux, uy - cap, band.b7,
       Theme.withAlpha(stack_dim and Theme.dim or Theme.cyan, 0.85))
   end
 

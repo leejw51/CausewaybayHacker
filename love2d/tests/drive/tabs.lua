@@ -39,6 +39,15 @@ add({ until_ = function(app)
 add({ key = "return" })
 add({ until_ = function(app) return app.scene_name == "quest" and app.scene.quest end, timeout = 20 })
 add({ wait = 0.5 })
+-- **RESET first.** This account is shared with every other drive script, and
+-- §4.8 opens a quest on `draft ?? starter` — so a buffer left behind by an
+-- earlier run is what ANSWER finds. It then correctly declines to clear it
+-- (only an untouched starter is thrown away, never somebody's work), typing
+-- appends to that draft, and nothing matches from the first character.
+add({ key = "f6" })
+add({ until_ = function(app)
+      return app.scene.quest and app.scene.editor:text() == app.scene.quest.starter
+    end, note = "the starter is back", timeout = 15 })
 -- ANSWER on, through its own button on the band.
 add({ click = function(app) local r = app.scene.answer_rect; return { r.x + r.w / 2, r.y + r.h / 2 } end })
 add({ until_ = function(app) return app.scene.answer_on end, note = "ANSWER on", timeout = 30 })
@@ -46,8 +55,9 @@ add({ until_ = function(app)
       local s = app.scene
       check(s.answer_text:find("\t", 1, true) ~= nil,
         "this quest's answer has no tabs in it — the drive is not testing what it says")
-      print(("answer: %d chars, tabs=%s"):format(#s.answer_text,
-        tostring(s.answer_text:find("\t", 1, true) ~= nil)))
+      print(("answer: %d chars, tabs=%s buffer=%d %q"):format(#s.answer_text,
+        tostring(s.answer_text:find("\t", 1, true) ~= nil),
+        #s.editor:text(), s.editor:text():sub(1, 24)))
       return true end, timeout = 5 })
 -- Typed out through the real key path. Never a tab.
 add({ until_ = function(app)

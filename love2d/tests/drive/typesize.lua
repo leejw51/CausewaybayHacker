@@ -146,6 +146,11 @@ add({ key = "a", mods = { ctrl = true } })
 add({ key = "backspace" })
 add({ text = SOURCE })
 add({ wait = 0.3 })
+-- **At step 1, not at whatever step the app happens to open in.** This probe
+-- is one half of the "the cycle comes back to where it started" check at the
+-- foot of this script, and it was measuring the default step 2 against a
+-- step 1 reached later — a comparison that could never hold.
+add_all(set_step(1))
 add({ until_ = probe("playground/1 land"), timeout = 5 })
 
 add_all(set_step(4))
@@ -197,6 +202,7 @@ add({ key = "backspace" })
 add({ text = SOURCE })
 add({ key = "end" })
 add({ wait = 0.3 })
+add_all(set_step(1))
 add({ until_ = probe("quest/1 land"), timeout = 5 })
 
 add_all(set_step(4))
