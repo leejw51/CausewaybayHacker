@@ -26,6 +26,34 @@ import { addressFromPublicKey, fromHex, toHex, type Address } from "./address";
 export const EVM_PATH = (index = 0) => `m/44'/60'/0'/0/${index}`;
 
 /**
+ * The largest account index the path's last element can hold. It is a
+ * non-hardened child, so it runs to 2^31 - 1.
+ */
+export const MAX_ACCOUNT_INDEX = 2147483647;
+
+/**
+ * Read an account index out of whatever is in a text box.
+ *
+ * Lives here rather than in the login screen because it is the other half of
+ * `EVM_PATH`: the number this returns is the number that goes into the path,
+ * and its edge cases are all the ways a text box fails to be a number. Every
+ * one of them resolves to **an index**, never to a throw — a person midway
+ * through clearing the box to type a new number is not making an error, and a
+ * login screen that reported one would be shouting at them for backspacing.
+ *
+ * Empty, blank, or not a number at all is account 0, which is the account
+ * somebody who never thought about this is asking for. Anything past the end
+ * of the path is clamped rather than wrapped, so a pasted twenty-digit number
+ * derives the last real account instead of silently becoming `Infinity` — or,
+ * worse, wrapping round to a different one.
+ */
+export function parseAccountIndex(raw: string): number {
+  const n = Number.parseInt(raw.trim(), 10);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(n, MAX_ACCOUNT_INDEX);
+}
+
+/**
  * Derive without keeping anything. Used by the tests and by the login screen's
  * "this is the address you are about to log in as" preview.
  */

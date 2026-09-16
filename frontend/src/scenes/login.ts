@@ -63,10 +63,12 @@ import { deterministicUsername } from "../wallet/username";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import {
+  MAX_ACCOUNT_INDEX,
   addressFromMnemonic,
   addressFromPrivateKeyHex,
   current,
   newMnemonic,
+  parseAccountIndex,
   signMessage,
   unlock,
 } from "../wallet/wallet";
@@ -102,13 +104,6 @@ function localeInfoLabel(): string {
   return LOCALES.find((l) => l.id === locale())?.label ?? "ENGLISH";
 }
 
-/**
- * The largest account index BIP-32 has. The path's last element is a
- * non-hardened child, so it runs to 2^31 - 1; the cap is here to stop a
- * pasted twenty-digit number becoming `Infinity` on the way to the
- * derivation, not because anybody will reach it.
- */
-const MAX_INDEX = 2147483647;
 /** What `users.name` takes before it truncates (`backend/core/src/users.rs`). */
 const NAME_MAX = 48;
 const INDEX_PREF = "cwbhacker.wallet.index";
@@ -215,7 +210,7 @@ export class LoginScene implements Scene {
     idx.inputMode = "numeric";
     idx.autocomplete = "off";
     idx.spellcheck = false;
-    idx.value = String(readNumberPref(INDEX_PREF, 0, 0, MAX_INDEX));
+    idx.value = String(readNumberPref(INDEX_PREF, 0, 0, MAX_ACCOUNT_INDEX));
     idx.addEventListener("input", () => {
       // Digits only, in the field itself, so what is on screen is what will
       // be derived from. A caret at the end is right for a number people
@@ -288,9 +283,7 @@ export class LoginScene implements Scene {
    * person clearing it to type a new number should not be told off mid-edit.
    */
   private walletIndex(): number {
-    const n = Number.parseInt(this.indexField.value, 10);
-    if (!Number.isFinite(n) || n < 0) return 0;
-    return Math.min(n, MAX_INDEX);
+    return parseAccountIndex(this.indexField.value);
   }
 
   enter(): void {
