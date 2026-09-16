@@ -27,6 +27,7 @@ pub mod snippets;
 pub mod stats;
 pub mod store;
 pub mod time;
+pub mod username;
 pub mod users;
 pub mod world;
 

@@ -31,11 +31,21 @@ pub fn upsert_named(conn: &Connection, address: &str, name: Option<&str>) -> Res
     let address = address.to_ascii_lowercase();
     let now = now_stamp();
     let eip55 = to_eip55(&address);
-    // PROTOCOL §4.3: `hacker-<first 6 of address>` when the client does not
-    // seed a name.
+    // The name a client seeded, or one derived from the address. It used to be
+    // `hacker-<first 6 of address>`, which is hex with a word in front and has
+    // hex's problem: `hacker-58a57e` and `hacker-0d3eb2` are two accounts one
+    // player owns, and neither is a name anybody would say out loud or
+    // recognise a day later. `username::deterministic` gives the same address
+    // the same `AdjectiveNoun####` on every client, forever, which is what
+    // makes it safe to fill a login box in with.
+    //
+    // Only ever a **default**. The `ON CONFLICT` below does not touch `name`,
+    // so an account that already exists keeps whatever it has — including the
+    // `hacker-…` names handed out before this, which are still that player's
+    // name until they change it.
     let default_name = match name.map(str::trim).filter(|n| !n.is_empty()) {
         Some(name) => name.chars().take(48).collect::<String>(),
-        None => format!("hacker-{}", &address[2..8]),
+        None => crate::username::deterministic(&address),
     };
     conn.execute(
         "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
