@@ -87,6 +87,8 @@ export const ja: Partial<Catalogue> = {
   "login.cardTitle": "シードフレーズまたは秘密鍵",
   "login.fieldHint": "12 の単語、または 0x + 16 進 64 桁",
   "login.youWillBe": "あなたのアドレス",
+  "login.account": "アカウント番号",
+  "login.accountRaw": "アカウント番号 — 秘密鍵には無関係",
   "login.phraseHidden": "フレーズ非表示",
   "login.phraseVisible": "フレーズ表示中",
   "login.enter": "決定",

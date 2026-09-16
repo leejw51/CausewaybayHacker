@@ -87,6 +87,8 @@ export const zh: Partial<Catalogue> = {
   "login.cardTitle": "助记词或私钥",
   "login.fieldHint": "十二个词，或者 0x + 64 位十六进制",
   "login.youWillBe": "你的地址",
+  "login.account": "账户序号",
+  "login.accountRaw": "账户序号 — 私钥不适用",
   "login.phraseHidden": "助记词已隐藏",
   "login.phraseVisible": "助记词可见",
   "login.enter": "确认",

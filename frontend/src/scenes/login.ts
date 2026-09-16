@@ -58,6 +58,7 @@ import { btnBox } from "../engine/ui";
 import { Buttons, footer, header, RUST, titledPanel } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { Overlay } from "../ui/overlay";
+import { readNumberPref, writePref } from "../ui/prefs";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import {
@@ -80,11 +81,7 @@ const FIELD_HINT = (): string => t("login.fieldHint");
  * `Buttons.row` uses. Kept next to the one screen that needs it rather than in
  * `chrome.ts`, because the answer depends on the exact label list.
  */
-function rowsFor(
-  f: Font,
-  width: number,
-  labels: string[],
-) {
+function rowsFor(f: Font, width: number, labels: string[]) {
   const gap = Math.round(f.size * 0.5);
   let rows = 1;
   let x = 0;
@@ -104,11 +101,36 @@ function localeInfoLabel(): string {
   return LOCALES.find((l) => l.id === locale())?.label ?? "ENGLISH";
 }
 
+/**
+ * The largest account index BIP-32 has. The path's last element is a
+ * non-hardened child, so it runs to 2^31 - 1; the cap is here to stop a
+ * pasted twenty-digit number becoming `Infinity` on the way to the
+ * derivation, not because anybody will reach it.
+ */
+const MAX_INDEX = 2147483647;
+const INDEX_PREF = "cwbhacker.wallet.index";
+
 export class LoginScene implements Scene {
   readonly name = "login";
   readonly mood = "title" as const;
   private readonly field: HTMLTextAreaElement;
   private readonly overlay: Overlay;
+  /**
+   * The account index, `i` in `m/44'/60'/0'/0/i`.
+   *
+   * One phrase is many accounts, and the game could only ever reach the first
+   * of them. Everything under this screen already took the index — the web
+   * wallet's `EVM_PATH(index)`, the LÖVE client's `derive` op — so the whole
+   * of the gap was that nothing asked.
+   *
+   * A typed field rather than a button that counts: somebody restoring an
+   * account they made in another wallet knows the number and it is not
+   * necessarily small, and pressing a chip thirty-seven times is not an
+   * interface.
+   */
+  private readonly indexField: HTMLInputElement;
+  private readonly indexOverlay: Overlay;
+  private indexRect: Rect = [0, 0, 0, 0];
   private readonly buttons = new Buttons();
   private fieldRect: Rect = [0, 0, 0, 0];
   private preview = "";
@@ -161,6 +183,59 @@ export class LoginScene implements Scene {
     el.addEventListener("input", () => this.derivePreview());
     this.field = el;
     this.overlay = new Overlay(app.overlay, app.layout, el);
+
+    // Built *after* the phrase box, so the browser's own tab order runs
+    // phrase -> account without either element having to claim a tabindex.
+    const idx = document.createElement("input");
+    idx.className = "cwb-field cwb-index";
+    idx.type = "text";
+    // `inputmode` rather than `type=number`: the spinner is unusable at this
+    // size, and a number input hands back "" for anything it dislikes, which
+    // would silently mean account 0.
+    idx.inputMode = "numeric";
+    idx.autocomplete = "off";
+    idx.spellcheck = false;
+    idx.value = String(readNumberPref(INDEX_PREF, 0, 0, MAX_INDEX));
+    idx.addEventListener("input", () => {
+      // Digits only, in the field itself, so what is on screen is what will
+      // be derived from. A caret at the end is right for a number people
+      // mostly retype rather than edit in the middle.
+      const cleaned = idx.value.replace(/[^0-9]/g, "").slice(0, 10);
+      if (cleaned !== idx.value) idx.value = cleaned;
+      this.derivePreview();
+    });
+    // Remembered, like the language and the orientation: coming back to the
+    // game on the account you left it on is the only behaviour that is not a
+    // surprise. It is an index, not a secret — the phrase it indexes into is
+    // what this screen is careful with.
+    idx.addEventListener("change", () => writePref(INDEX_PREF, String(this.walletIndex())));
+    // **Bare Enter submits here**, unlike in the phrase box. The reason the
+    // phrase box does not is that twelve words arrive by paste, sometimes
+    // across two lines, and Enter halfway through a paste would fire a login
+    // on half a phrase. A one-line number has no such problem, and a field
+    // you cannot leave by pressing Enter is a field people press Enter in
+    // twice and then look for the button.
+    idx.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      writePref(INDEX_PREF, String(this.walletIndex()));
+      if (this.minted) this.takeMinted();
+      else void this.submit();
+    });
+    this.indexField = idx;
+    this.indexOverlay = new Overlay(app.overlay, app.layout, idx);
+  }
+
+  /**
+   * What is in the account box, as a number the derivation will accept.
+   *
+   * Empty reads as 0 rather than as an error: the box starts full and a
+   * person clearing it to type a new number should not be told off mid-edit.
+   */
+  private walletIndex(): number {
+    const n = Number.parseInt(this.indexField.value, 10);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.min(n, MAX_INDEX);
   }
 
   enter(): void {
@@ -173,6 +248,10 @@ export class LoginScene implements Scene {
       this.app.loggedOutNotice = "";
     }
     queueMicrotask(() => this.field.focus());
+    // The account box survives a logout — it is a preference, not key
+    // material — so the address under it has to be re-derived on arrival or
+    // the number and the address disagree until the first keystroke.
+    this.derivePreview();
   }
 
   leave(): void {
@@ -185,6 +264,7 @@ export class LoginScene implements Scene {
     this.offLocale?.();
     this.offLocale = undefined;
     this.overlay.destroy();
+    this.indexOverlay.destroy();
   }
 
   /** Twelve new words, shown once. Nothing is sent and nothing is stored. */
@@ -262,9 +342,12 @@ export class LoginScene implements Scene {
       return;
     }
     try {
+      // A raw private key **is** the account: there is no path to walk and
+      // the box does not apply to it. Said on the label rather than by
+      // silently deriving something the number had no part in.
       this.preview = /^0x[0-9a-fA-F]{64}$/.test(text)
         ? addressFromPrivateKeyHex(text).eip55
-        : addressFromMnemonic(text).eip55;
+        : addressFromMnemonic(text, this.walletIndex()).eip55;
     } catch {
       // Half a phrase is not an error worth shouting about; it is just not an
       // address yet.
@@ -321,7 +404,7 @@ export class LoginScene implements Scene {
       await this.app.client.restart();
     }
     this.status = t("login.deriving");
-    const address = unlock(text);
+    const address = unlock(text, this.walletIndex());
     // The textarea is emptied before a single byte goes near the socket.
     this.field.value = "";
     this.preview = address.eip55;
@@ -572,9 +655,15 @@ export class LoginScene implements Scene {
     // the bar, 8 under it, 6 + 8 at the bottom. It was a flat 30, which is
     // short by most of the bar, and the last button row stood on the rim.
     const frameH = 8 + fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9) + 8 + 14;
+    // The account row: a label on the left, a box on the right, on one line
+    // between the phrase and the address it produces — which is the order the
+    // three are read in.
+    const idxH = Math.max(layout.minTouchH(), fonts.small.height + Math.round(14 * s));
     const cardH =
       frameH +
       fieldH +
+      pad +
+      idxH +
       pad +
       fonts.stationSm.height +
       Math.round(4 * s) +
@@ -591,6 +680,29 @@ export class LoginScene implements Scene {
     else this.overlay.hide();
 
     let cy = card[1] + fieldH + pad;
+
+    // **The account, beside the phrase that indexes into it.**
+    // Dimmed when the box above holds a raw private key, because that is the
+    // one input this number has nothing to do with: a key is an account
+    // already and there is no path left to walk.
+    const raw = /^0x[0-9a-fA-F]{64}$/.test(this.field.value.trim());
+    const idxW = Math.min(Math.round(140 * s), Math.round(card[2] * 0.4));
+    g.fillStyle = css(raw ? Theme.dim : Theme.cyan);
+    printf(
+      g,
+      fonts.stationSm,
+      raw ? t("login.accountRaw") : t("login.account"),
+      card[0],
+      cy + Math.round((idxH - fonts.stationSm.height) / 2),
+      card[2] - idxW - Math.round(8 * s),
+      "left",
+    );
+    well(g, card[0] + card[2] - idxW, cy, idxW, idxH, [0.06, 0.05, 0.14, 0.98]);
+    this.indexRect = [card[0] + card[2] - idxW + 4, cy + 3, idxW - 8, idxH - 6];
+    if (this.rightIn.finished && !raw) this.indexOverlay.place(this.indexRect, fonts.small.size);
+    else this.indexOverlay.hide();
+    cy += idxH + pad;
+
     g.fillStyle = css(Theme.cyan);
     printf(g, fonts.stationSm, t("login.youWillBe"), card[0], cy, card[2], "left");
     // Said on the right of the same line, so the state of the field is
@@ -748,6 +860,7 @@ export class LoginScene implements Scene {
       layout.minTouchH(),
     );
     this.overlay.hide();
+    this.indexOverlay.hide();
     return y + cardH;
   }
 

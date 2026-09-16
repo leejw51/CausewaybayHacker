@@ -107,6 +107,21 @@ body {
     filter: blur(5px);
   }
 }
+/* The account index. Centred and a little wider-tracked than the phrase
+   field: it holds one short number that people read at a glance rather than a
+   sentence they read along, and a number hard against the left edge of its
+   well reads as the start of something longer. */
+.cwb-index {
+  text-align: center;
+  letter-spacing: 0.12em;
+  /* No vertical padding. `.cwb-field`'s 6px top and bottom is right for a
+     textarea holding twelve words and wrong for a one-line box sized from the
+     type: 30px of glyph plus 12px of padding in a 34px well clipped the digit
+     to a smear, which looked from outside exactly like an empty field. An
+     input centres its own line vertically once the height is fixed. */
+  padding: 0 8px;
+  line-height: 1;
+}
 .cwb-editor {
   overflow: hidden;
   background: rgba(10, 8, 26, 0.96);

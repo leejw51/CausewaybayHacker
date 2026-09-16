@@ -98,6 +98,8 @@ export const en = {
   "login.cardTitle": "SEED PHRASE OR PRIVATE KEY",
   "login.fieldHint": "twelve words, or 0x + 64 hex",
   "login.youWillBe": "YOU WILL BE",
+  "login.account": "ACCOUNT",
+  "login.accountRaw": "ACCOUNT — A RAW KEY IS ITS OWN",
   "login.phraseHidden": "PHRASE HIDDEN",
   "login.phraseVisible": "PHRASE VISIBLE",
   "login.enter": "ENTER",

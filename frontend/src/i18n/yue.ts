@@ -100,6 +100,8 @@ export const yue: Partial<Catalogue> = {
   "login.cardTitle": "助記詞或者私鑰",
   "login.fieldHint": "十二個字，或者 0x + 64 位十六進制",
   "login.youWillBe": "你嘅地址",
+  "login.account": "戶口編號",
+  "login.accountRaw": "戶口編號 — 私鑰唔適用",
   "login.phraseHidden": "助記詞收埋咗",
   "login.phraseVisible": "助記詞睇得到",
   "login.enter": "確認",

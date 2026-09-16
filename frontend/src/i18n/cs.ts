@@ -97,6 +97,8 @@ export const cs: Partial<Catalogue> = {
   "login.cardTitle": "SEED FRÁZE NEBO PRIVÁTNÍ KLÍČ",
   "login.fieldHint": "dvanáct slov, nebo 0x + 64 hex znaků",
   "login.youWillBe": "BUDEŠ",
+  "login.account": "ÚČET",
+  "login.accountRaw": "ÚČET — SYROVÝ KLÍČ JE SÁM SEBOU",
   "login.phraseHidden": "FRÁZE SKRYTA",
   "login.phraseVisible": "FRÁZE VIDITELNÁ",
   "login.enter": "POTVRDIT",

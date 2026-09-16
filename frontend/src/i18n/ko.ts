@@ -88,6 +88,8 @@ export const ko: Partial<Catalogue> = {
   "login.cardTitle": "시드 구문 또는 개인 키",
   "login.fieldHint": "열두 단어, 또는 0x + 16진수 64자리",
   "login.youWillBe": "당신의 주소",
+  "login.account": "계정 번호",
+  "login.accountRaw": "계정 번호 — 개인키에는 해당 없음",
   "login.phraseHidden": "구문 숨김",
   "login.phraseVisible": "구문 보임",
   "login.enter": "확인",
