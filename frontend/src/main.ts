@@ -9,6 +9,7 @@
  */
 import { App } from "./app";
 import { Client } from "./net/client";
+import { browserTabSession } from "./net/tabsession";
 import { chooseTransport } from "./net/endpoint";
 import { BootScene } from "./scenes/boot";
 import { preferredLocale, setLocale } from "./i18n";
@@ -31,7 +32,10 @@ async function main(): Promise<void> {
   void setLocale(preferredLocale(), false);
 
   const { factory, label } = await chooseTransport();
-  const client = new Client({ transport: factory, storage: localStorage });
+  // One session per tab. `localStorage` alone meant two tabs shared one token
+  // and the newest login overwrote the rest, so signing in as two accounts at
+  // once — the thing the account index exists for — could not work.
+  const client = new Client({ transport: factory, storage: browserTabSession() });
   const app = new App(canvas, fx, overlay, client);
   // Useful once, on the first frame, and never again: which server this is.
   console.info(`[causewaybay hacker] talking to ${label}`);
