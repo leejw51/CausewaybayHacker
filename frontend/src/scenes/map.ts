@@ -25,7 +25,7 @@
  * it.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, wrap } from "../engine/text";
+import { ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme, TRACK_HAZE } from "../engine/theme";
 import { btnBox, clipped, fill, panel, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import {
@@ -1094,12 +1094,26 @@ export class MapScene implements Scene {
       // On a locked node the number sits low, so the padlock's shackle stays
       // visible above it — the lock is the whole reason the marker is there.
       const ny = y - nf.height / 2 + (n.state === "locked" ? rr * 0.22 : 0);
+      // **Centred by measurement, not wrapped to the marker.** The limit used
+      // to be `r * 2`, the marker's own diameter, and `printf` wraps to its
+      // limit — so a number too wide for the disc did not overflow it, it
+      // *broke*. `fonts.ui` is Press Start 2P, whose advance is a full em, so
+      // `18` is about twice the type size against a marker of 36·s shrunk
+      // further by the camera: every node from 10 up was drawn as one digit
+      // above the other, and on the bottom row the second digit fell through
+      // the floor of the plate. Node 18 is a boss and drew correctly, which is
+      // the tell — a boss takes `stationSm`, VT323, narrow enough to fit.
+      //
+      // The LÖVE client has always measured this label and centred it on the
+      // measurement (`scenes/map.lua:776`); this is that, in this client.
+      const label = String(n.node);
+      const lim = Math.max(r * 2, width(nf, label));
       g.fillStyle = css(Theme.ink, 0.85);
-      printf(g, nf, String(n.node), x - r + 1, ny + 1, r * 2, "center");
+      printf(g, nf, label, x - lim / 2 + 1, ny + 1, lim, "center");
       // Cream on every state: a padlock marker is busy and a dim number on it
       // is a number nobody can read, which defeats numbering the map at all.
       g.fillStyle = css(Theme.cream, n.state === "locked" ? 0.85 : 1);
-      printf(g, nf, String(n.node), x - r, ny, r * 2, "center");
+      printf(g, nf, label, x - lim / 2, ny, lim, "center");
 
       if (n.state === "cleared") {
         clearRibbon(g, x, y + rr * 0.75, r * 2.6);
