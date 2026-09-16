@@ -6509,3 +6509,50 @@ broken across lines. `unlock` and the card both go through them.
 `e2e/login-phrase.spec.ts` pastes a capitalised, line-broken phrase and a
 prefix-less key into the real card and expects the name to appear.
 
+## 2026-09-16 — LOVE: POSTER and DISK READER
+
+The same picture, from the desktop client: the pad as an LP, the program
+inside the vinyl one whole line per groove, the QR label with the source,
+the address and the EIP-191 signature over the source alone, SIDE B with
+the mascot, the credits under the seal; English on it whatever the screen
+is in; 1024 unless the program or the label needs 2048; proved against the
+file on disk before it is kept; a JPEG beside the PNG. `src/poster.lua`
+carries the same rules as `frontend/src/ui/poster.ts` — pour, fit, payload,
+mascot — and `tests/test_poster.lua` pins them headless with the same cases
+`frontend/tests/poster.test.ts` uses, so the two clients cannot drift.
+
+**What could not be Lua is in the key library.** ABI 4 of `libcwbh_ffi`
+adds `qr` (the label's modules), `recover` (who signed; the inverse of
+`sign`, same digest, same `v`), `png_text` (the proof into the PNG, in
+place — `love.filesystem` cannot reach the player's directory and a 4 MB
+PNG through a JSON string is the wrong door), `jpeg` (LÖVE 11 encodes PNG
+and TGA and nothing else) and `disk_read` (the chunks, and the QR decoded
+from the pixels with `rqrr` at the picture's size and three smaller ones).
+None touches a key; the binding refuses ABI 3 rather than offering a
+button that fails on the label. `ffi/src/disk.rs` tests a label drawn into
+a PNG and decoded back, and `recover` against the wallet's vectors.
+
+**The key, again.** This client forgets the phrase the moment the login
+signature exists, so POSTER with nothing held opens a masked field on the
+status line, derives what is typed at the index login used
+(`Session.index`), keeps it only if it is the account signed in, and holds
+it **for the screen** — `leave` drops it. The browser holds it for the tab;
+a screen is this client's tab.
+
+**DISK READER** takes a path typed into the same line, or a file dropped
+on the window (`love.filedropped`, new in `main.lua`), reads it through the
+library, judges it, and opens the program as a new pad named after the
+poster's title or, for a JPEG, the file with `cwbhacker-` and the stamp
+taken off. The output pane's note is capped at two lines: a saved poster's
+path once wrapped until the scissor under it went negative and the client
+crashed — found by the drive, not by a person.
+
+Tested three ways here too: `tests/test_poster.lua` headless;
+`tests/test_poster_render.lua` under `make test`, which draws both sizes
+with the real library, writes the PNG, stamps it, reads it back from disk
+with the label decoded off the pixels, checks the JPEG's label alone still
+verifies, and calls a doctored copy forged; `tests/drive/poster.lua`
+against a live server, which signs in, presses POSTER, types the phrase
+into the field, finds the PNG and JPEG in `<home>/posters/`, and reads the
+PNG back through DISK READER to the same program, verified.
+

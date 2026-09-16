@@ -209,6 +209,9 @@ end
 --- At no point is `secret` put in a payload, a log line or a file. The only
 --- thing that leaves this function is 65 bytes of signature.
 function Session:login(secret, index, name, cb)
+  -- The account index is not a secret; the playground's POSTER derives
+  -- the stamp key at the same one.
+  self.index = index or 0
   cb = cb or function() end
   if not self.lib then
     cb(false, "the key library is not loaded — " .. Wallet.BUILD_HINT)

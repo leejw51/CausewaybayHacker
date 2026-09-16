@@ -478,6 +478,12 @@ function App:mousereleased(x, y, button)
   end
 end
 
+--- A file dropped on the window. The only screen that wants one is the
+--- playground's DISK READER; anything else lets it fall.
+function App:filedropped(file)
+  if self.scene and self.scene.filedropped then self.scene:filedropped(file) end
+end
+
 function App:wheelmoved(dx, dy)
   if self.scene and self.scene.wheelmoved then self.scene:wheelmoved(dx, dy) end
 end

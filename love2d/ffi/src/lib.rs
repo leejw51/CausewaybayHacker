@@ -46,6 +46,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use zeroize::Zeroizing;
 
+pub mod disk;
+
 pub mod bip32;
 pub mod bip39;
 pub mod evm;
@@ -59,7 +61,10 @@ pub mod evm;
 /// NEW WALLET button to an older library. **3 adds `secure`**, which is not
 /// about keys at all — see below. A mismatch is refused rather than guessed
 /// at.
-pub const ABI_VERSION: i32 = 3;
+/// 4 added the poster's four ops — `qr`, `recover`, `png_text`, `disk_read`
+/// — none of which touch a key. A binding at 3 would offer POSTER and fail
+/// on the label.
+pub const ABI_VERSION: i32 = 4;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -93,6 +98,21 @@ struct Request {
     /// `secure` only: create it as a directory first.
     #[serde(default)]
     directory: Option<bool>,
+    /// `recover` only: `0x` + 130 hex, `r || s || v`.
+    #[serde(default)]
+    signature: Option<String>,
+    /// `png_text` only: the keyword→text pairs to write.
+    #[serde(default)]
+    entries: Option<std::collections::BTreeMap<String, String>>,
+    /// `jpeg` only: where to write it, and how well.
+    #[serde(default)]
+    out: Option<String>,
+    #[serde(default)]
+    quality: Option<u32>,
+    /// `disk_read` only: decode the label even when the chunks answer. The
+    /// pre-save proof wants both halves of the same file.
+    #[serde(default)]
+    label: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -183,7 +203,18 @@ pub fn describe() -> serde_json::Value {
               "in": ["mnemonic|private_key", "index?", "passphrase?", "message|message_hex"],
               "out": ["address","signature","digest","v","recovery_id"] },
             { "op": "secure", "in": ["path", "directory?"], "out": ["mode"],
-              "note": "0700 a directory or 0600 a file; no key material involved" }
+              "note": "0700 a directory or 0600 a file; no key material involved" },
+            { "op": "qr", "in": ["message"], "out": ["size","rows"],
+              "note": "the poster's label: byte mode, EC level M; no key material involved" },
+            { "op": "recover", "in": ["message|message_hex", "signature"],
+              "out": ["address","address_lower"],
+              "note": "who signed: EIP-191 over the message; no key material involved" },
+            { "op": "png_text", "in": ["path", "entries"], "out": ["written"],
+              "note": "adds iTXt chunks to a PNG in place; no key material involved" },
+            { "op": "jpeg", "in": ["path", "out", "quality?"], "out": ["out"],
+              "note": "re-encodes a PNG as a JPEG; no key material involved" },
+            { "op": "disk_read", "in": ["path", "label?"], "out": ["chunks","label"],
+              "note": "a poster's text chunks and/or its QR label; no key material involved" }
         ],
         "never_returns": ["private_key", "seed"],
         "returns_key_material_once": ["generate.mnemonic"]
@@ -352,6 +383,81 @@ fn run(request_json: &str) -> Result<serde_json::Value, String> {
             }))
         }
 
+        // The poster's label. Text in, a grid of `0`/`1` rows out; the Lua
+        // side draws the squares. Nothing about a key.
+        "qr" => {
+            let text = req
+                .message
+                .as_deref()
+                .ok_or_else(|| "no `message` given".to_string())?;
+            let rows = disk::qr_rows(text)?;
+            Ok(json!({ "ok": true, "size": rows.len(), "rows": rows }))
+        }
+
+        // Who signed. The reader's whole verdict rests on this, and it is
+        // the inverse of `sign` above: same digest, same `v` convention.
+        "recover" => {
+            let msg = message_bytes(&req)?;
+            let sig = req
+                .signature
+                .as_deref()
+                .ok_or_else(|| "no `signature` given".to_string())?;
+            let addr = disk::recover(&msg, sig)?;
+            let eip55 = evm::to_eip55(&addr);
+            Ok(json!({ "ok": true, "address": eip55, "address_lower": eip55.to_lowercase() }))
+        }
+
+        // The proof, into the file. The Lua side has written the PNG at
+        // `path` with `love.image`; this reads it, adds the chunks, writes it
+        // back — because `love.filesystem` cannot reach the path and a 4 MB
+        // PNG through a JSON string would be the wrong door.
+        "png_text" => {
+            let path = req
+                .path
+                .as_deref()
+                .ok_or_else(|| "no `path` given".to_string())?;
+            let entries = req.entries.clone().unwrap_or_default();
+            let bytes = std::fs::read(path).map_err(|e| format!("cannot read {path}: {e}"))?;
+            let out = disk::with_png_text(&bytes, &entries)?;
+            std::fs::write(path, &out).map_err(|e| format!("cannot write {path}: {e}"))?;
+            Ok(json!({ "ok": true, "written": entries.len() }))
+        }
+
+        // The same picture as a JPEG, for the places that want one. LÖVE 11
+        // encodes PNG and TGA and nothing else, so the JPEG the browser client
+        // writes beside its PNG is made here from the PNG on disk.
+        "jpeg" => {
+            let path = req
+                .path
+                .as_deref()
+                .ok_or_else(|| "no `path` given".to_string())?;
+            let out = req
+                .out
+                .as_deref()
+                .ok_or_else(|| "no `out` given".to_string())?;
+            let img = image::open(path).map_err(|e| format!("cannot decode {path}: {e}"))?;
+            let file =
+                std::fs::File::create(out).map_err(|e| format!("cannot write {out}: {e}"))?;
+            let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(
+                std::io::BufWriter::new(file),
+                req.quality.unwrap_or(92).clamp(1, 100) as u8,
+            );
+            enc.encode_image(&img.to_rgb8())
+                .map_err(|e| format!("cannot encode {out}: {e}"))?;
+            Ok(json!({ "ok": true, "out": out }))
+        }
+
+        // A picture back into what it says. Chunks when it is our PNG, the
+        // label decoded from the pixels otherwise; the Lua side judges it.
+        "disk_read" => {
+            let path = req
+                .path
+                .as_deref()
+                .ok_or_else(|| "no `path` given".to_string())?;
+            let d = disk::read_disk(path, req.label.unwrap_or(false))?;
+            Ok(json!({ "ok": true, "chunks": d.chunks, "label": d.label }))
+        }
+
         other => Err(format!("unknown op `{other}`")),
     }
 }
@@ -433,6 +539,54 @@ mod tests {
 
     fn call(req: serde_json::Value) -> serde_json::Value {
         serde_json::from_str(&execute(&req.to_string())).unwrap()
+    }
+
+    #[test]
+    fn recover_is_the_inverse_of_sign() {
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let signed = call(json!({ "op": "sign", "mnemonic": phrase, "message": "fn main() {}\n" }));
+        let back = call(json!({
+            "op": "recover", "message": "fn main() {}\n", "signature": signed["signature"]
+        }));
+        assert_eq!(back["ok"], true);
+        assert_eq!(back["address"], signed["address"]);
+        let other = call(json!({
+            "op": "recover", "message": "fn main() {}", "signature": signed["signature"]
+        }));
+        assert_ne!(other["address"], signed["address"]);
+    }
+
+    #[test]
+    fn qr_and_png_text_over_the_abi() {
+        let qr = call(json!({ "op": "qr", "message": "CWBH1\nx\n-\nrust\nfn main() {}" }));
+        assert_eq!(qr["ok"], true);
+        assert_eq!(
+            qr["rows"].as_array().unwrap().len(),
+            qr["size"].as_u64().unwrap() as usize
+        );
+        let dir = std::env::temp_dir().join(format!("cwbh-ffi-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("t.png");
+        let img = image::GrayImage::from_pixel(1, 1, image::Luma([0u8]));
+        img.save(&path).unwrap();
+        let w = call(json!({
+            "op": "png_text", "path": path.to_str().unwrap(),
+            "entries": { "Source": "fn main() {}\n", "Signer": "0xabc" }
+        }));
+        assert_eq!(w["ok"], true);
+        let jpg = dir.join("t.jpg");
+        let j = call(
+            json!({ "op": "jpeg", "path": path.to_str().unwrap(), "out": jpg.to_str().unwrap() }),
+        );
+        assert_eq!(j["ok"], true);
+        assert!(image::open(&jpg).is_ok());
+        let r = call(json!({ "op": "disk_read", "path": path.to_str().unwrap() }));
+        assert_eq!(r["chunks"]["Source"], "fn main() {}\n");
+        assert!(
+            r["label"].is_null(),
+            "chunks answered, so no label was looked for"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

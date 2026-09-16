@@ -33,11 +33,13 @@ local M = {}
 --- The ABI this binding was written against. A library reporting anything
 --- else is refused rather than guessed at.
 ---
---- 3 is the contract with `generate` and `secure` in it. The login screen's
+--- 3 is the contract with `generate` and `secure` in it; 4 added the poster's
+--- ops (`qr`, `recover`, `png_text`, `jpeg`, `disk_read`), none of which
+--- touch a key. The login screen's
 --- NEW WALLET button depends on the first and `src/store.lua`'s `0600` on the
 --- second; a binding that loaded an older library would offer both and fail
 --- on use.
-M.ABI_VERSION = 3
+M.ABI_VERSION = 4
 
 -- Kept byte-identical to love2d/ffi/include/cwbh.h.
 M.CDEF = [[
@@ -286,6 +288,34 @@ end
 --- The digest on its own, for a test that wants to bisect a bad signature.
 function M.eip191(lib, message)
   return M.execute(lib, { op = "eip191", message = message })
+end
+
+-- ------------------------------------------------------------- the poster
+
+--- The QR for `text`: `{ size = n, rows = { "0110…", … } }`.
+function M.qr(lib, text)
+  return M.execute(lib, { op = "qr", message = text })
+end
+
+--- Who signed `message`: `{ address, address_lower }`, or nil and why.
+function M.recover(lib, message, signature)
+  return M.execute(lib, { op = "recover", message = message, signature = signature })
+end
+
+--- Add `iTXt` chunks to the PNG at `path`, in place.
+function M.png_text(lib, path, entries)
+  return M.execute(lib, { op = "png_text", path = path, entries = entries })
+end
+
+--- The PNG at `path` as a JPEG at `out`.
+function M.jpeg(lib, path, out, quality)
+  return M.execute(lib, { op = "jpeg", path = path, out = out, quality = quality })
+end
+
+--- What a picture says: `{ chunks = {…}, label = text|nil }`. `always_label`
+--- decodes the QR even when the chunks answer — the pre-save proof wants both.
+function M.disk_read(lib, path, always_label)
+  return M.execute(lib, { op = "disk_read", path = path, label = always_label or nil })
 end
 
 --- SPEC §3.1: "A raw private key (`0x` + 64 hex) is accepted as an

@@ -27,6 +27,7 @@ local PURE = {
   "tests.test_anim",
   "tests.test_clock",
   "tests.test_playground",
+  "tests.test_poster",
   "tests.test_screens",
   "tests.test_walk",
   "tests.test_mapswitch",
@@ -43,6 +44,7 @@ local PURE = {
 local GRAPHICAL = {
   "tests.test_layout",
   "tests.test_fonts",
+  "tests.test_poster_render",
 }
 
 function M.run()

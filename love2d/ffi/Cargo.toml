@@ -39,6 +39,15 @@ hex = "0.4"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# The poster (love2d/src/poster.lua): the label is a QR, the file carries its
+# proof as PNG text chunks, and DISK READER reads both back. None of that is
+# key material, but a QR encoder, a QR decoder and an image decoder are not
+# things to write in Lua either, and this library is already the one native
+# piece the client ships.
+qrcode = { version = "0.14", default-features = false }
+rqrr = "0.9"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+crc32fast = "1"
 
 [profile.release]
 opt-level = 2

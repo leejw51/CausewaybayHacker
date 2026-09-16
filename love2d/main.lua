@@ -175,6 +175,11 @@ function love.mousereleased(x, y, button)
   app:mousereleased(x, y, button)
 end
 
+function love.filedropped(file)
+  if testing or not app then return end
+  app:filedropped(file)
+end
+
 function love.wheelmoved(dx, dy)
   if testing or not app then return end
   app:wheelmoved(dx, dy)

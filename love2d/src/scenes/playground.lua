@@ -44,6 +44,10 @@ local Playground = {}
 Playground.__index = Playground
 
 local Land = require("src.land")
+local Poster = require("src.poster")
+local Reader = require("src.diskreader")
+local Wallet = require("src.wallet")
+local Store = require("src.store")
 
 -- TAB walks the languages in the lands' order, and the starter is the same
 -- program in each: the smallest thing that compiles and prints, so the desk
@@ -111,6 +115,16 @@ function Playground.new(app)
     -- through once there are a dozen.
     query = "",
     finding = false,
+    -- POSTER and DISK READER (`src/poster.lua`, `src/diskreader.lua`).
+    -- The key for the stamp: this client forgets the phrase the moment the
+    -- login signature exists (SPEC §3.1), so the poster asks for it again,
+    -- in place, and holds it **for this screen only** — `leave` drops it.
+    -- The browser client holds it for the tab; a screen is this client's tab.
+    secret = nil,
+    secret_index = 0,
+    stamp_edit = nil,   -- what is in the key field; nil when it is closed
+    disk_edit = nil,    -- what is in the path field; nil when it is closed
+    postering = false,
   }, Playground)
 end
 
@@ -142,6 +156,9 @@ function Playground:enter()
 end
 
 function Playground:leave()
+  -- The stamp's key does not outlive the screen.
+  Wallet.forget(self, "secret")
+  self.stamp_edit, self.disk_edit = nil, nil
   -- Save on the way out rather than losing the last few seconds of typing.
   if self.editor and self.editor.dirty then self:save() end
   self.app.session:off_all(self.subscriptions)
@@ -420,19 +437,23 @@ function Playground:draw()
   -- than overlapped when the header has no room for them — the name and the
   -- language are what this strip is for.
   local rx = lx - 8
+  self.code_button_rect, self.rename_rect, self.poster_rect, self.reader_rect = nil, nil, nil, nil
   for _, item in ipairs({
     { id = "code", label = I18n.t("CODE") },
     { id = "rename", label = I18n.t("RENAME") },
+    -- Out as a picture, and back in: dropped first when the header is short.
+    { id = "poster", label = I18n.t("POSTER") },
+    { id = "reader", label = I18n.t("DISK READER") },
   }) do
     local w = math.max(64, UI.textWidth(item.label, UI.CHIP_SIZE) + 24)
     if rx - w < 200 then break end
     rx = rx - w
     UI.button(rx, ly, w, lh, item.label, "normal", UI.CHIP_SIZE)
-    if item.id == "code" then
-      self.code_button_rect = { x = rx, y = ly, w = w, h = lh }
-    else
-      self.rename_rect = { x = rx, y = ly, w = w, h = lh }
-    end
+    local rect = { x = rx, y = ly, w = w, h = lh }
+    if item.id == "code" then self.code_button_rect = rect
+    elseif item.id == "rename" then self.rename_rect = rect
+    elseif item.id == "poster" then self.poster_rect = rect
+    else self.reader_rect = rect end
     rx = rx - 8
   end
   local tab = I18n.t("TAB")
@@ -511,6 +532,11 @@ function Playground:draw_big()
       -- `a or ((b and c) or d)`, so after a run this handed `UI.button` the
       -- result *table* where it wanted the word "normal".
       state = (self.result or self.log) and "normal" or "disabled" },
+    -- Out of the screen as a picture, signed; and a picture back in, checked.
+    { id = "poster", label = I18n.t("POSTER"), every = { I18n.t("POSTER") },
+      state = self.postering and "disabled" or "normal" },
+    { id = "reader", label = I18n.t("DISK READER"), every = { I18n.t("DISK READER") },
+      state = "normal" },
     { id = "lang", label = self.lang:upper(), every = { "PYTHON" }, state = "normal" },
   }
   -- **Wrapped, not truncated.** The row used to stop at the first button that
@@ -571,8 +597,23 @@ function Playground:draw_big()
   if self.focus == "name" then name = (self.name_edit or "") .. "_" end
   local info = ("%s   %s%s"):format(self.lang:upper(), name,
     self.editor.dirty and "   ·" or "")
+  local hot = self.focus == "name"
+  -- The key field and the path field take this line while they are open:
+  -- the key masked, the way the login screen masks it.
+  if self.focus == "stamp" then
+    info = ("%s   %s_"):format(I18n.t("POSTER"), (self.stamp_edit or ""):gsub("%S", "*"))
+    hot = true
+  elseif self.focus == "disk" then
+    info = ("%s   %s_"):format(I18n.t("DISK READER"), self.disk_edit or "")
+    hot = true
+  elseif self.note then
+    info = info .. "   " .. tostring(self.note)
+  end
+  -- One line, elided: a saved poster's path is long, and a line that wraps
+  -- here walks down over the editor.
+  info = Poster.elide(info, vw - pad * 2 - 8, function(t) return UI.textWidth(t, 7) end)
   UI.text(info, pad + 4, pad + math.max(band, bh) + 3, 7,
-    self.focus == "name" and Theme.coin or Theme.withAlpha(Theme.cream, 0.5))
+    hot and Theme.coin or Theme.withAlpha(Theme.cream, 0.5))
 
   -- **Beside the code when the window is wide, under it when it is tall.**
   -- A landscape window has width to spare and height to spare nothing: output
@@ -927,13 +968,22 @@ function Playground:draw_output(rect)
       y = y + small
     end
   elseif self.note then
-    for _, line in ipairs(UI.wrap(self.note, rect.w - 24, 7)) do
+    -- Two lines at most, the second elided: a saved poster's path is long,
+    -- and a note that wrapped for as long as it liked once ate the whole
+    -- pane and handed the scissor below a negative height.
+    local wrapped = UI.wrap(self.note, rect.w - 24, 7)
+    for i = 1, math.min(2, #wrapped) do
+      local line = wrapped[i]
+      if i == 2 and #wrapped > 2 then
+        line = Poster.elide(table.concat(wrapped, " ", 2), rect.w - 24,
+          function(t) return UI.textWidth(t, 7) end)
+      end
       UI.text(line, rect.x + 10, y, 7, Theme.withAlpha(Theme.cyan, 0.9))
       y = y + small
     end
   end
 
-  love.graphics.setScissor(rect.x + 4, y, rect.w - 8, rect.y + rect.h - y - 6)
+  love.graphics.setScissor(rect.x + 4, y, rect.w - 8, math.max(0, rect.y + rect.h - y - 6))
   love.graphics.setFont(font)
 
   local function block(label, text, alpha)
@@ -1000,6 +1050,10 @@ function Playground:textinput(text)
     if #(self.name_edit or "") < 48 then self.name_edit = (self.name_edit or "") .. text end
   elseif self.focus == "find" then
     if #(self.query or "") < 48 then self.query = (self.query or "") .. text end
+  elseif self.focus == "stamp" then
+    if #(self.stamp_edit or "") < 400 then self.stamp_edit = (self.stamp_edit or "") .. text end
+  elseif self.focus == "disk" then
+    if #(self.disk_edit or "") < 1024 then self.disk_edit = (self.disk_edit or "") .. text end
   elseif self.focus == "editor" then
     self.editor:textinput(text)
     SFX.play("type")
@@ -1133,6 +1187,213 @@ function Playground:clip(which)
   SFX.play("select")
 end
 
+-- ------------------------------------------------------ POSTER / DISK READER
+
+--- Who signed, through the library: `recover(message, signature) -> address|nil`.
+function Playground:recoverer()
+  local lib = self.app.wallet_lib
+  return function(message, signature)
+    local r = Wallet.recover(lib, message, signature)
+    return r and r.address or nil
+  end
+end
+
+--- POSTER: the pad as one square PNG (and a JPEG), signed, saved to disk.
+---
+--- The signature is EIP-191 over the source and only the source — the same
+--- scheme as the login challenge and as the browser client's poster, so one
+--- reader checks both. Made here because the key is here — or is not: this
+--- client forgets the phrase after login, so with no key held the field opens
+--- and `stamp_with` comes back to this. A stranger's key is dropped again at
+--- once; the right one stays for the screen.
+function Playground:poster()
+  if self.postering then return end
+  local lib = self.app.wallet_lib
+  if not lib then
+    self.note = "libcwbh_ffi is not built — " .. Wallet.BUILD_HINT
+    return
+  end
+  if not self.secret then return self:start_stamp() end
+  self.postering = true
+  local ok, err = pcall(function() self:make_poster(lib) end)
+  self.postering = false
+  if not ok then
+    self.app:log("warn", "poster: " .. tostring(err))
+    self.note = I18n.t("could not make the poster")
+    SFX.play("locked")
+  end
+end
+
+function Playground:make_poster(lib)
+  local source = self.editor and self.editor:text() or ""
+  local address = self.app.session:address()
+  if not address then error("nobody is signed in") end
+  local signed, sign_err = Wallet.sign(lib, self.secret, self.secret_index, source)
+  if not signed then error(sign_err or "the library did not sign") end
+  local signature = signed.signature
+  -- The output as the pane shows it: every stream's whole lines, then the
+  -- partial tail a run may have ended on.
+  local log_lines = {}
+  if self.log then
+    for _, name in ipairs(self.log.order or {}) do
+      local lines, tail = self.log:lines(name)
+      for _, line in ipairs(lines) do log_lines[#log_lines + 1] = { stream = name, text = line } end
+      if tail and tail ~= "" then log_lines[#log_lines + 1] = { stream = name, text = tail } end
+    end
+  end
+  local pad_name = self.name and tostring(self.name) or "scratch"
+  local function qr(text)
+    local r = Wallet.qr(lib, text)
+    if not r then error("no QR holds that label") end
+    return r.rows
+  end
+  local rendered = Poster.make({
+    lang = self.lang,
+    name = pad_name,
+    file = ({ rust = "main.rs", go = "main.go", cpp = "main.cpp", python = "main.py" })[self.lang],
+    source = source,
+    run = Poster.run_of(self.result, log_lines),
+    user = { name = self.app.session:display_name() or "hacker", address = address },
+    signature = signature,
+    at = os.time(),
+    qr = qr,
+    too_dense = function(text)
+      local r = Wallet.qr(lib, text)
+      return (not r) or r.size > Poster.QR_MAX_MODULES
+    end,
+    keccak_hex = function(text)
+      local r = Wallet.keccak(lib, text)
+      return r and r.digest:sub(3) or ("0"):rep(64)
+    end,
+  })
+  -- Where it goes: `<home>/posters/`, made 0700 by the library (LÖVE has no
+  -- mkdir outside its own save directory).
+  local dir = Store.home(self.app.home) .. "/posters"
+  Wallet.secure(lib, dir, true)
+  local path = dir .. "/" .. Poster.file_name(pad_name, os.time())
+  local written, werr = Poster.write_png(rendered.canvas, path)
+  rendered.canvas:release()
+  if not written then error(werr or "could not write the PNG") end
+  local ok, perr = Wallet.png_text(lib, path, {
+    Title = pad_name,
+    Author = self.app.session:display_name() or "hacker",
+    Software = "Causewaybay Hacker",
+    Source = source,
+    Lang = self.lang,
+    Signer = address,
+    Signature = signature,
+    Comment = "Signature is EIP-191 personal_sign over Source, by Signer (Cronos EVM / Ethereum address).",
+  })
+  if not ok then error(perr or "could not write the proof") end
+  -- Proved against the file on disk before it is kept: the signature to the
+  -- address, the chunks to the program, the label off the pixels.
+  local read = Wallet.disk_read(lib, path, true)
+  local problem = Reader.prove(read, read and read.label, source, address, signature,
+    self:recoverer(), rendered.payload)
+  if problem then
+    os.remove(path)
+    self.note = ("%s: %s"):format(I18n.t("not saved — the disk did not read back"), problem)
+    SFX.play("locked")
+    return
+  end
+  Wallet.jpeg(lib, path, (path:gsub("%.png$", ".jpg")), 92)
+  self.note = ("%s · %s + .jpg"):format(I18n.t("poster saved"), path)
+  SFX.play("select")
+end
+
+--- Ask for the key, on the status line.
+function Playground:start_stamp()
+  self.focus = "stamp"
+  self.stamp_edit = ""
+  self.note = I18n.t("paste your phrase or private key to stamp — it stays in this screen")
+end
+
+--- Take what was typed as the key: derived at the index the login used,
+--- kept only if it is the account that is signed in.
+function Playground:stamp_with(text)
+  local typed = (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  if typed == "" then return end
+  local lib = self.app.wallet_lib
+  local index = self.app.session.index or 0
+  local who = Wallet.derive(lib, typed, index)
+  if not who then
+    self.note = I18n.t("that is not a phrase or a private key")
+    SFX.play("locked")
+    return
+  end
+  local me = self.app.session:address() or ""
+  if who.address:lower() ~= me:lower() then
+    self.note = I18n.t("that key is not the account signed in here")
+    SFX.play("locked")
+    return
+  end
+  self.secret, self.secret_index = typed, index
+  SFX.play("select")
+  self:poster()
+end
+
+--- DISK READER: a path field, or a file dropped on the window.
+function Playground:start_disk()
+  self.focus = "disk"
+  self.disk_edit = ""
+  self.note = I18n.t("drop a poster on the window, or type its path and press ENTER")
+end
+
+function Playground:filedropped(file)
+  local path = file.getFilename and file:getFilename() or tostring(file)
+  self:read_disk_path(path)
+end
+
+--- A picture at `path` back into a pad, with the verdict on the status line.
+--- The program opens as a **new, unsaved pad** in its own language, named
+--- after the poster, so reading a disk never overwrites what was being
+--- written.
+function Playground:read_disk_path(path)
+  path = Store.expand_tilde((path or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+  if path == "" then return end
+  local lib = self.app.wallet_lib
+  if not lib then
+    self.note = "libcwbh_ffi is not built — " .. Wallet.BUILD_HINT
+    return
+  end
+  local read, err = Wallet.disk_read(lib, path)
+  if not read then
+    self.note = I18n.t("could not read that file")
+    self.app:log("warn", "disk reader: " .. tostring(err))
+    SFX.play("locked")
+    return
+  end
+  local disk = Reader.from_read(read, self:recoverer())
+  if not disk then
+    self.note = I18n.t("no disk on that picture")
+    SFX.play("locked")
+    return
+  end
+  local short = disk.address:sub(1, 6) .. "…" .. disk.address:sub(-4)
+  if disk.verdict == "hashed" then
+    self.note = I18n.t("the label holds only the hash — the code is on the disc, not the label")
+    SFX.play("locked")
+    return
+  end
+  self:new_snippet()
+  self.lang = disk.lang
+  self.editor.lang = disk.lang
+  self.editor:set_text(disk.source)
+  self.editor.dirty = true
+  self.dirty_at = Anim.now()
+  self.name = disk.title or Reader.name_from_file(path)
+  if disk.verdict == "verified" then
+    self.note = I18n.t("disk read · written and signed by %s · verified"):format(short)
+    SFX.play("select")
+  elseif disk.verdict == "forged" then
+    self.note = I18n.t("disk read · the signature does NOT match %s"):format(short)
+    SFX.play("locked")
+  else
+    self.note = I18n.t("disk read · unsigned · claims %s"):format(short)
+    SFX.play("select")
+  end
+end
+
 --- Take what is in the field, if it is anything, and save under it.
 function Playground:commit_rename()
   local want = (self.name_edit or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -1162,6 +1423,22 @@ function Playground:keypressed(key, mods)
       local hits = self:visible_snippets()
       if #hits > 0 then self:load(hits[1].index) end
       self.focus = "editor"
+    end
+    return true
+  end
+
+  if self.focus == "stamp" or self.focus == "disk" then
+    local field = self.focus == "stamp" and "stamp_edit" or "disk_edit"
+    if key == "backspace" then
+      self[field] = (self[field] or ""):sub(1, -2)
+    elseif cmd and key == "v" then
+      self[field] = (self[field] or "") .. (love.system.getClipboardText() or "")
+    elseif key == "escape" then
+      self[field], self.focus = nil, "editor"
+    elseif key == "return" or key == "kpenter" then
+      local text = self[field] or ""
+      self[field], self.focus = nil, "editor"
+      if field == "stamp_edit" then self:stamp_with(text) else self:read_disk_path(text) end
     end
     return true
   end
@@ -1248,6 +1525,8 @@ function Playground:mousepressed(x, y, button)
     if inside(r.face) then self:cycle_face(); return end
     if inside(r.copyin) then self:clip("copyin"); return end
     if inside(r.pastein) then self:clip("in"); return end
+    if inside(r.poster) then self:poster(); return end
+    if inside(r.reader) then self:start_disk(); return end
     -- CODE draws the stdin field itself, above the editor. Without this the
     -- box took no caret and nothing could be typed into it.
     if inside(self.stdin_rect) then self.focus = "stdin"; return end
@@ -1259,6 +1538,8 @@ function Playground:mousepressed(x, y, button)
   if inside(self.find_rect) then self.focus = "find"; return end
   if inside(self.code_button_rect) then self.big = true; SFX.play("select"); return end
   if inside(self.rename_rect) then self:start_rename(); return end
+  if inside(self.poster_rect) then self:poster(); return end
+  if inside(self.reader_rect) then self:start_disk(); return end
   if inside(self.lang_rect) then self:toggle_lang(); return end
   if inside(self.run_rect) then self:run(); return end
   if inside(self.format_rect) then self:format(); return end
