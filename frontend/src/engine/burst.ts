@@ -15,9 +15,12 @@ import { RGBA, Theme } from "./theme";
 
 /**
  * 0 a soft glowing disc, 1 a four-point star, 2 a tumbling scrap of paper,
- * 3 a spinning gold coin.
+ * 3 a spinning gold coin, 4 a chunk of brick (the piece a deleted character
+ * breaks into), 5 a puff of dust, 6 a soft disc that does not wobble (the
+ * pointer's ribbon). 4 and 5 are pixel-art strips when the art has loaded
+ * and a procedural stand-in when it has not.
  */
-export type Shape = 0 | 1 | 2 | 3;
+export type Shape = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface Particle {
   /** Where it starts, in virtual pixels. */
@@ -285,4 +288,390 @@ export function coinPlan(
   rings.push({ x: tx, y: ty, radius: 46, life: 0.3, delay: firstLanding, color: Theme.coin, glow: true });
   rings.push({ x: tx, y: ty, radius: 70, life: 0.4, delay: lastLanding, color: Theme.cream, glow: false });
   return { plan: { particles, rings }, firstLanding, lastLanding };
+}
+
+// ---------------------------------------------------------------------------
+// The editor's effects. Causewaybay Hacker addition.
+//
+// Typing is the game here, so the keystrokes get the same treatment a right
+// answer does: every plan below is what one gesture in the editor throws into
+// the air, in the editor's own virtual pixels. `cell` is the width and height
+// of one character cell, which is the only size these know — a bigger font is
+// a bigger explosion, and that is right.
+//
+// Same shape as the burst above: plain arithmetic, a `rng` that can be pinned,
+// and nothing that needs a GPU to be looked at.
+// ---------------------------------------------------------------------------
+
+/** How big one character is on screen, in virtual pixels: `[width, height]`. */
+export type Cell = readonly [number, number];
+
+const DUST: RGBA[] = [Theme.dim, Theme.cream, [0.6, 0.55, 0.5, 1], [0.45, 0.4, 0.38, 1]];
+/** The ribbon's colours, cycled through as the pointer travels. */
+const RIBBON: RGBA[] = [Theme.cyan, Theme.pink, Theme.coin, Theme.cream];
+
+/** `col` a little lighter or darker: one brick is never quite its neighbour's colour. */
+function shade(col: RGBA, k: number): RGBA {
+  return [
+    Math.min(1, col[0] * k),
+    Math.min(1, col[1] * k),
+    Math.min(1, col[2] * k),
+    col[3],
+  ];
+}
+
+/** A point on the ribbon's colour cycle, `phase` in 0..1, blended smoothly. */
+export function ribbon(phase: number): RGBA {
+  const u = ((phase % 1) + 1) % 1;
+  const k = u * RIBBON.length;
+  const i = Math.floor(k) % RIBBON.length;
+  const j = (i + 1) % RIBBON.length;
+  const f = k - Math.floor(k);
+  const a = RIBBON[i];
+  const b = RIBBON[j];
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, 1];
+}
+
+/**
+ * What the pointer leaves behind as it crosses the code page: one ember,
+ * on the path.
+ *
+ * A ribbon, not a spray. The first version threw a handful of sparks in
+ * random directions with random colours and a wobble, and read as noise
+ * following the mouse. This is one soft disc per few pixels of travel, put
+ * exactly where the pointer was, drifting only a little *against* the
+ * motion (`vx, vy`, virtual pixels per second) so the tail lengthens with
+ * speed; no gravity, no wobble (shape 6 is the disc that does not), and a
+ * colour that moves slowly round a cycle with `phase`, so neighbours along
+ * the ribbon are neighbours in colour. Its comet tail is the shader's ghost
+ * trail, which is what gives the ribbon its body.
+ */
+export function trailPlan(
+  x: number,
+  y: number,
+  vx: number,
+  vy: number,
+  phase = 0,
+  rng: Rng = Math.random,
+): Plan {
+  const speed = Math.hypot(vx, vy);
+  const nx = speed > 1 ? -vx / speed : 0;
+  const ny = speed > 1 ? -vy / speed : 0;
+  const drift = between(rng, 6, 14) * Math.min(1.5, 0.6 + speed / 1500);
+  const particles: Particle[] = [
+    thrown(x, y, nx * drift, ny * drift, {
+      life: between(rng, 0.42, 0.55),
+      delay: 0,
+      size: 9 + Math.min(5, speed / 300),
+      color: ribbon(phase),
+      shape: 6,
+      trail: true,
+      gravity: 0,
+      seed: rng(),
+    }),
+  ];
+  return { particles, rings: [] };
+}
+
+/**
+ * One character typed: a few sparks off the caret, in the colour the
+ * character will be highlighted in, and a wink of light. `n` is how many
+ * characters arrived at once — a paste is one bigger pop, not a pop per
+ * letter.
+ */
+export function keyPlan(
+  x: number,
+  y: number,
+  cell: Cell,
+  color: RGBA,
+  n = 1,
+  rng: Rng = Math.random,
+): Plan {
+  const [cw, ch] = cell;
+  const k = Math.min(3, Math.sqrt(n));
+  const particles: Particle[] = [];
+  const count = Math.round(4 * k);
+  for (let i = 0; i < count; i++) {
+    // Up and out, biased away from the line being typed on so the sparks
+    // do not sit over the next character.
+    const ang = -Math.PI / 2 + (rng() - 0.5) * Math.PI * 1.1;
+    const reach = between(rng, 0.8, 2.2) * ch * k;
+    particles.push(
+      thrown(x, y, Math.cos(ang) * reach, Math.sin(ang) * reach, {
+        life: between(rng, 0.35, 0.65),
+        delay: rng() * 0.03,
+        size: between(rng, 0.25, 0.5) * ch,
+        // Two in three the token's colour, the third white-hot: a spark has
+        // a core. Counted rather than rolled, so a single keystroke's four
+        // sparks are always mostly the colour of what was typed.
+        color: i % 3 === 2 ? Theme.cream : color,
+        shape: 0,
+        trail: true,
+        gravity: 260,
+        seed: rng(),
+      }),
+    );
+  }
+  const rings: Ring[] = [
+    { x: x + cw / 2, y, radius: ch * 0.9 * k, life: 0.28, delay: 0, color, glow: true },
+  ];
+  return { particles, rings };
+}
+
+/**
+ * ENTER: dust. The caret lands on a new line and kicks up a puff along it —
+ * soft, slow, grey-cream motes that drift up and thin out, the way dust does
+ * when something drops onto a shelf. `x, y` is where the caret landed.
+ */
+export function dustPlan(x: number, y: number, cell: Cell, rng: Rng = Math.random): Plan {
+  const [cw, ch] = cell;
+  const particles: Particle[] = [];
+  const count = 14;
+  for (let i = 0; i < count; i++) {
+    // Along the line, mostly to the right of the caret — that is where the
+    // new line is — and rising, with a little sideways spread.
+    const side = rng() < 0.75 ? 1 : -1;
+    const along = between(rng, 0.5, 9) * cw * side;
+    particles.push(
+      thrown(x + (rng() - 0.3) * cw, y + ch * 0.4, along, -between(rng, 0.3, 1.4) * ch, {
+        life: between(rng, 0.55, 1.0),
+        delay: rng() * 0.08,
+        size: between(rng, 0.6, 1.1) * ch,
+        color: pick(rng, DUST),
+        shape: 5,
+        trail: false,
+        // Negative: dust rises, then hangs.
+        gravity: -40,
+        seed: rng(),
+      }),
+    );
+  }
+  // A few brighter grains in the cloud, so it catches the light.
+  for (let i = 0; i < 4; i++) {
+    particles.push(
+      thrown(x, y + ch * 0.4, between(rng, 1, 6) * cw, -between(rng, 0.5, 1.5) * ch, {
+        life: between(rng, 0.4, 0.7),
+        delay: rng() * 0.05,
+        size: between(rng, 0.15, 0.3) * ch,
+        color: Theme.cream,
+        shape: 0,
+        trail: true,
+        gravity: 120,
+        seed: rng(),
+      }),
+    );
+  }
+  const rings: Ring[] = [
+    { x: x + cw, y: y + ch * 0.3, radius: ch * 1.6, life: 0.4, delay: 0, color: Theme.cream, glow: true },
+  ];
+  return { particles, rings };
+}
+
+/** One character's cell, for `rubblePlan`: its top-left and its colour. */
+export interface Rubble {
+  x: number;
+  y: number;
+  color: RGBA;
+}
+
+/** The most cells one deletion breaks: past this, the rest went quietly. */
+export const RUBBLE_MAX = 400;
+
+/**
+ * Deleted characters break like bricks — every one of them.
+ *
+ * A cell per character, in that character's own syntax colour, so a deleted
+ * line crumbles the way it was written: pink where the keyword was, green
+ * where the string was. Each cell throws its own chunks — right and down for
+ * preference, the way rubble falls off a wall hit from the left — heavy and
+ * spinning, gone in under a second, with a pinch of dust so it is rubble and
+ * not confetti. The cells go in order, a few milliseconds apart, so a whole
+ * line does not vanish in one flash but crumbles across, left to right.
+ *
+ * A big deletion is more rubble, up to a point: the chunks per cell drop
+ * from three to two past forty cells, so a page selected and deleted is a
+ * landslide and not a frame drop.
+ */
+export function rubblePlan(cells: readonly Rubble[], cell: Cell, rng: Rng = Math.random): Plan {
+  const [cw, ch] = cell;
+  const particles: Particle[] = [];
+  const rings: Ring[] = [];
+  const n = Math.min(cells.length, RUBBLE_MAX);
+  if (n === 0) return { particles, rings };
+  const perCell = n > 40 ? 2 : 3;
+  const stagger = n > 40 ? 0.004 : 0.012;
+  for (let i = 0; i < n; i++) {
+    const { x, y, color } = cells[i];
+    const at = i * stagger;
+    for (let k = 0; k < perCell; k++) {
+      const px = x + rng() * cw;
+      const py = y + rng() * ch;
+      const ang = (rng() - 0.35) * Math.PI - Math.PI / 2;
+      const reach = between(rng, 1.2, 3.5) * ch;
+      particles.push(
+        thrown(px, py, Math.cos(ang) * reach + cw * 0.5, Math.sin(ang) * reach, {
+          life: between(rng, 0.55, 0.95),
+          delay: at + rng() * 0.03,
+          size: between(rng, 0.3, 0.55) * ch,
+          color: shade(color, between(rng, 0.6, 1.15)),
+          shape: 4,
+          trail: false,
+          gravity: 900,
+          seed: rng(),
+        }),
+      );
+    }
+    // Dust on every other cell: enough to hang in the air, not a fog.
+    if (i % 2 === 0) {
+      particles.push(
+        thrown(x + rng() * cw, y + ch * 0.6, (rng() - 0.3) * 3 * cw, -between(rng, 0.2, 1) * ch, {
+          life: between(rng, 0.4, 0.8),
+          delay: at + rng() * 0.04,
+          size: between(rng, 0.5, 0.9) * ch,
+          color: pick(rng, DUST),
+          shape: 5,
+          trail: false,
+          gravity: -20,
+          seed: rng(),
+        }),
+      );
+    }
+  }
+  // One flash for the lot, centred on what went, wider the more went.
+  const first = cells[0];
+  const last = cells[n - 1];
+  rings.push({
+    x: (first.x + last.x + cw) / 2,
+    y: (first.y + last.y + ch) / 2,
+    radius: ch * (1.2 + Math.min(3, Math.sqrt(n) * 0.4)),
+    life: 0.3,
+    delay: 0,
+    color: last.color,
+    glow: true,
+  });
+  return { particles, rings };
+}
+
+/**
+ * The caret is beside a bracket and its partner lit up: a couple of sparks
+ * run the line between them, so the eye is led from one to the other.
+ * `a` and `b` are the centres of the two bracket cells.
+ */
+export function linkPlan(
+  a: readonly [number, number],
+  b: readonly [number, number],
+  cell: Cell,
+  rng: Rng = Math.random,
+): Plan {
+  const [, ch] = cell;
+  const ddx = b[0] - a[0];
+  const ddy = b[1] - a[1];
+  const len = Math.max(1, Math.hypot(ddx, ddy));
+  // Bulge away from the straight line, so the runner is visibly a runner and
+  // not a character sliding along the text.
+  const nx = -ddy / len;
+  const ny = ddx / len;
+  const particles: Particle[] = [];
+  for (let i = 0; i < 3; i++) {
+    const lift = between(rng, 0.08, 0.2) * len * (i % 2 === 0 ? 1 : -1);
+    particles.push({
+      x: a[0],
+      y: a[1],
+      dx: 0,
+      dy: 0,
+      tox: ddx,
+      toy: ddy,
+      liftx: nx * lift,
+      lifty: ny * lift,
+      life: between(rng, 0.32, 0.45),
+      delay: i * 0.03,
+      size: between(rng, 0.25, 0.45) * ch,
+      color: Theme.cyan,
+      shape: 0,
+      trail: true,
+      gravity: 0,
+      seed: rng(),
+    });
+  }
+  const rings: Ring[] = [
+    { x: a[0], y: a[1], radius: ch * 0.9, life: 0.3, delay: 0, color: Theme.cyan, glow: true },
+    { x: b[0], y: b[1], radius: ch * 0.9, life: 0.3, delay: 0.3, color: Theme.cyan, glow: true },
+  ];
+  return { particles, rings };
+}
+
+/**
+ * A loop closed: the moment its last brace (or, in Python, its first body
+ * line) is written. Stars run a loop of their own around the block — from
+ * the closing brace up to the keyword along one side and back down the
+ * other — and where they meet, a burst.
+ *
+ * `open` is the centre of the loop's first character, `close` of its last.
+ */
+export function loopPlan(
+  open: readonly [number, number],
+  close: readonly [number, number],
+  cell: Cell,
+  rng: Rng = Math.random,
+): Plan {
+  const [, ch] = cell;
+  const particles: Particle[] = [];
+  const rings: Ring[] = [];
+  const ddx = open[0] - close[0];
+  const ddy = open[1] - close[1];
+  const len = Math.max(ch, Math.hypot(ddx, ddy));
+  const nx = -ddy / len;
+  const ny = ddx / len;
+  // Tall enough to read as a loop even on a one-line `loop {}`.
+  const bulge = Math.max(ch * 2.5, len * 0.35);
+
+  const leg = (from: readonly [number, number], dx: number, dy: number, sign: number, at: number) => {
+    const n = 12;
+    for (let i = 0; i < n; i++) {
+      particles.push({
+        x: from[0],
+        y: from[1],
+        dx: 0,
+        dy: 0,
+        tox: dx,
+        toy: dy,
+        liftx: nx * bulge * sign,
+        lifty: ny * bulge * sign,
+        life: 0.85,
+        delay: at + i * 0.028,
+        size: between(rng, 0.7, 1.1) * ch,
+        color: pick(rng, GOLD),
+        shape: 1,
+        trail: true,
+        gravity: 0,
+        seed: rng(),
+      });
+    }
+  };
+  // Up one side, back down the other, and the two legs overlap a little so
+  // the loop never has a gap in it.
+  leg(close, ddx, ddy, 1, 0);
+  leg(open, -ddx, -ddy, -1, 0.55);
+
+  rings.push({ x: close[0], y: close[1], radius: ch * 2.2, life: 0.4, delay: 0, color: Theme.coin, glow: true });
+  rings.push({ x: open[0], y: open[1], radius: ch * 2.2, life: 0.4, delay: 0.8, color: Theme.coin, glow: true });
+
+  // The finale, where the second leg lands: a right answer's burst, scaled
+  // to the type size rather than to a streak.
+  const finale = burstPlan(close[0], close[1], 28, rng);
+  const scale = ch / 22;
+  for (const p of finale.particles) {
+    p.delay += 1.35;
+    p.dx *= scale;
+    p.dy *= scale;
+    p.size *= Math.max(0.6, scale);
+    p.gravity *= scale;
+  }
+  for (const r of finale.rings) {
+    r.delay += 1.35;
+    r.radius *= scale;
+  }
+  particles.push(...finale.particles);
+  rings.push(...finale.rings);
+  return { particles, rings };
 }

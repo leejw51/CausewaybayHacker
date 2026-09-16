@@ -28,6 +28,7 @@ import {
   CustomBlending,
   DoubleSide,
   Mesh,
+  NearestFilter,
   OneFactor,
   OneMinusSrcAlphaFactor,
   OrthographicCamera,
@@ -35,6 +36,7 @@ import {
   Points,
   Scene,
   ShaderMaterial,
+  Texture,
   WebGLRenderer,
 } from "three";
 
@@ -78,6 +80,7 @@ const VERT = /* glsl */ `
   varying float vSeed;
   varying float vAge;
   varying float vTrail;
+  varying float vT;
 
   // Exponential ease-out: almost all of the distance at once, then a long
   // settle — the shape of a thing thrown hard.
@@ -100,7 +103,7 @@ const VERT = /* glsl */ `
       vAlpha = 0.0;
       return;
     }
-    bool coin = aShape > 2.5;
+    bool coin = abs(aShape - 3.0) < 0.5;
     // The throw eases out; the second leg, if there is one, eases in and out
     // on top of it, so a coin drifts up out of the burst before it goes.
     vec2 p = aOrigin
@@ -108,7 +111,9 @@ const VERT = /* glsl */ `
       + aTo * easeInOutExpo(t)
       + aLift * sin(t * 3.14159)
       + vec2(0.0, aGravity) * age * age * 0.5;
-    if (!coin) {
+    // Only the light wobbles. Paper tumbles, a coin flies true, and a brick
+    // is a brick: it goes where it was thrown.
+    if (aShape < 2.5) {
       p += vec2(
         sin(age * 6.0 + aSeed * 6.2832),
         cos(age * 4.5 + aSeed * 3.1416)
@@ -127,6 +132,11 @@ const VERT = /* glsl */ `
     float ghost = aTrail > 0.5 ? (coin ? back * 0.85 : back * back * 0.7) : 1.0;
     float size = aSize * grow * (0.55 + 0.45 * fade) * mix(0.25, 1.0, back);
     if (coin) size = aSize * grow * mix(0.35, 1.0, back);
+    // Dust spreads as it thins: a puff is small and dense, then wide and gone.
+    if (abs(aShape - 5.0) < 0.5) size = aSize * grow * mix(0.6, 1.4, t);
+    // A ribbon ember only ever shrinks: it is brightest and biggest where the
+    // pointer just was, and gone at the tail.
+    if (aShape > 5.5) size = aSize * (1.0 - 0.6 * t) * mix(0.3, 1.0, back);
 
     vColor = aColor;
     vAlpha = grow * fade * ghost;
@@ -134,6 +144,7 @@ const VERT = /* glsl */ `
     vSeed = aSeed;
     vAge = age;
     vTrail = aTrail;
+    vT = t;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 0.0, 1.0);
     gl_PointSize = size * uScale;
   }
@@ -141,6 +152,13 @@ const VERT = /* glsl */ `
 
 const FRAG = /* glsl */ `
   uniform float uAdditive;
+  // The two sprite strips (Grok-drawn, art/fx_bricks.png and art/fx_dust.png)
+  // and how many frames across each has. A strip that has not arrived has
+  // zero frames and its shape draws the procedural stand-in instead.
+  uniform sampler2D uBrick;
+  uniform float uBrickFrames;
+  uniform sampler2D uDust;
+  uniform float uDustFrames;
 
   varying vec3 vColor;
   varying float vAlpha;
@@ -148,13 +166,63 @@ const FRAG = /* glsl */ `
   varying float vSeed;
   varying float vAge;
   varying float vTrail;
+  varying float vT;
 
   void main() {
     if (vAlpha <= 0.001) discard;
     vec2 q = (gl_PointCoord - 0.5) * 2.0;
     float a;
     vec3 col = vColor;
-    if (vShape > 2.5 && vTrail < 0.5) {
+    if (vShape > 5.5) {
+      // The ribbon's ember: a soft disc with a hot centre, and nothing else.
+      float d = length(q);
+      a = smoothstep(1.0, 0.2, d);
+      a = a * a + smoothstep(0.35, 0.0, d) * 0.8;
+      col = mix(col, vec3(1.0), smoothstep(0.3, 0.0, d) * 0.5);
+    } else if (vShape > 4.5) {
+      // A puff of dust, from the strip: the frame is the particle's age, so
+      // one puff plays through "dense, lobed, breaking, wisps" as it fades.
+      if (uDustFrames < 0.5) {
+        float d = length(q);
+        a = smoothstep(1.0, 0.3, d) * 0.8;
+      } else {
+        // Half of them flipped, so four frames read as more than four.
+        vec2 uv = vec2(vSeed > 0.5 ? 1.0 - gl_PointCoord.x : gl_PointCoord.x, 1.0 - gl_PointCoord.y);
+        float f = min(uDustFrames - 1.0, floor(vT * uDustFrames));
+        vec4 tx = texture2D(uDust, vec2((f + uv.x) / uDustFrames, uv.y));
+        a = tx.a;
+        col = mix(tx.rgb, vColor, 0.25);
+      }
+    } else if (vShape > 3.5) {
+      // A chunk of brick, spinning as it falls.
+      float rot = vSeed * 6.2832 + vAge * (4.0 + vSeed * 8.0) * (vSeed > 0.5 ? 1.0 : -1.0);
+      float c = cos(rot), s = sin(rot);
+      vec2 r = vec2(c * q.x - s * q.y, s * q.x + c * q.y);
+      if (uBrickFrames < 0.5) {
+        // No strip: a bevelled 16-bit block — lit along the top-left edge, in
+        // shadow at the bottom-right, a fleck of highlight in the corner.
+        float box = max(abs(r.x), abs(r.y));
+        a = step(box, 0.62);
+        float face = smoothstep(0.62, 0.42, box);
+        float lit = smoothstep(0.0, 0.5, -(r.x + r.y));
+        vec3 edge = mix(col * 0.45, mix(col, vec3(1.0), 0.45), lit);
+        col = mix(edge, col, face);
+        col += vec3(0.35) * smoothstep(0.25, 0.0, length(r - vec2(-0.28, -0.28))) * face;
+      } else {
+        // The strip's chunk, drawn in the circle the rotation stays inside of
+        // (1/sqrt2 of the point) so a corner is never clipped on a turn. The
+        // art is brick orange; its light and dark are kept and its hue is
+        // the token's, so a deleted string breaks green.
+        vec2 uv = r * 0.7071 * 0.5 + 0.5;
+        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) discard;
+        float f = floor(vSeed * uBrickFrames);
+        f = min(uBrickFrames - 1.0, f);
+        vec4 tx = texture2D(uBrick, vec2((f + uv.x) / uBrickFrames, 1.0 - uv.y));
+        a = tx.a;
+        float lum = dot(tx.rgb, vec3(0.3, 0.59, 0.11));
+        col = vColor * lum * 2.1;
+      }
+    } else if (vShape > 2.5 && vTrail < 0.5) {
       // A gold coin, spinning on its vertical axis: the face narrows to an
       // edge and back, darker at the rim, with a highlight up and left.
       float spin = vAge * (9.0 + vSeed * 5.0) + vSeed * 6.2832;
@@ -338,6 +406,10 @@ class Pool {
         uTrailDt: { value: TRAIL_DT },
         uTrailMax: { value: Math.max(1, trail) },
         uAdditive: { value: additive ? 1 : 0 },
+        uBrick: { value: null },
+        uBrickFrames: { value: 0 },
+        uDust: { value: null },
+        uDustFrames: { value: 0 },
       },
       transparent: true,
       depthTest: false,
@@ -384,6 +456,18 @@ class Pool {
   set(time: number, scale: number): void {
     this.points.material.uniforms.uTime.value = time;
     this.points.material.uniforms.uScale.value = scale;
+  }
+
+  /** Hand this pool one of the sprite strips. */
+  sheet(which: "brick" | "dust", tex: Texture, frames: number): void {
+    const u = this.points.material.uniforms;
+    if (which === "brick") {
+      u.uBrick.value = tex;
+      u.uBrickFrames.value = frames;
+    } else {
+      u.uDust.value = tex;
+      u.uDustFrames.value = frames;
+    }
   }
 }
 
@@ -479,13 +563,46 @@ export class Particles {
     this.scale = layout.scale;
   }
 
+  /**
+   * Give the brick and dust shapes their pixel art. Causewaybay Hacker
+   * addition: the strips are drawn by Grok and cut by `art/tools/strip.py`,
+   * and until they arrive (or if they never do) the two shapes draw a
+   * procedural stand-in, so nothing here waits on a fetch.
+   *
+   * Nearest-neighbour both ways: a 48-pixel chunk blown up on a point sprite
+   * is meant to show its pixels, the same as every other sprite in the game.
+   */
+  sheet(which: "brick" | "dust", img: HTMLImageElement, frames: number): void {
+    if (!this.renderer) return;
+    const tex = new Texture(img);
+    tex.magFilter = NearestFilter;
+    tex.minFilter = NearestFilter;
+    tex.generateMipmaps = false;
+    tex.flipY = false;
+    tex.needsUpdate = true;
+    this.glow.sheet(which, tex, frames);
+    this.paper.sheet(which, tex, frames);
+  }
+
   /** Everything in a plan, starting now. */
   play(plan: Plan): void {
     if (!this.ok) return;
     for (const p of plan.particles) {
-      (p.shape >= 2 ? this.paper : this.glow).emit(p, this.clock);
+      // Light (0, 1, 6) is additive and lives in the glow pool; everything
+      // solid — paper, coins, bricks, dust — is composited over the page.
+      (p.shape >= 2 && p.shape <= 5 ? this.paper : this.glow).emit(p, this.clock);
     }
     for (const ring of plan.rings) this.pending.push({ at: this.clock + ring.delay, ring });
+  }
+
+  /** Whether anything is still alive — for a caller that fades its canvas. */
+  get busy(): boolean {
+    return (
+      this.rings.length > 0 ||
+      this.pending.length > 0 ||
+      this.clock < this.glow.aliveUntil ||
+      this.clock < this.paper.aliveUntil
+    );
   }
 
   private startRing(ring: Ring): void {

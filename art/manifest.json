@@ -1434,6 +1434,118 @@
         "maxx": 89,
         "maxy": 89
       }
+    },
+    {
+      "name": "fx_bricks",
+      "file": "fx_bricks.png",
+      "w": 288,
+      "h": 48,
+      "frames": 6,
+      "fw": 48,
+      "fh": 48,
+      "boxes": [
+        {
+          "cx": 23.0,
+          "feet": 41.0,
+          "h": 35.0,
+          "minx": 5,
+          "miny": 6,
+          "maxx": 41,
+          "maxy": 40
+        },
+        {
+          "cx": 27.0,
+          "feet": 40.0,
+          "h": 32.0,
+          "minx": 10,
+          "miny": 8,
+          "maxx": 44,
+          "maxy": 39
+        },
+        {
+          "cx": 23.5,
+          "feet": 41.0,
+          "h": 35.0,
+          "minx": 8,
+          "miny": 6,
+          "maxx": 39,
+          "maxy": 40
+        },
+        {
+          "cx": 23.0,
+          "feet": 40.0,
+          "h": 32.0,
+          "minx": 5,
+          "miny": 8,
+          "maxx": 41,
+          "maxy": 39
+        },
+        {
+          "cx": 23.5,
+          "feet": 36.0,
+          "h": 24.0,
+          "minx": 11,
+          "miny": 12,
+          "maxx": 36,
+          "maxy": 35
+        },
+        {
+          "cx": 23.5,
+          "feet": 41.0,
+          "h": 35.0,
+          "minx": 6,
+          "miny": 6,
+          "maxx": 41,
+          "maxy": 40
+        }
+      ]
+    },
+    {
+      "name": "fx_dust",
+      "file": "fx_dust.png",
+      "w": 192,
+      "h": 48,
+      "frames": 4,
+      "fw": 48,
+      "fh": 48,
+      "boxes": [
+        {
+          "cx": 23.5,
+          "feet": 40.0,
+          "h": 32.0,
+          "minx": 6,
+          "miny": 8,
+          "maxx": 41,
+          "maxy": 39
+        },
+        {
+          "cx": 23.5,
+          "feet": 41.0,
+          "h": 34.0,
+          "minx": 5,
+          "miny": 7,
+          "maxx": 42,
+          "maxy": 40
+        },
+        {
+          "cx": 23.5,
+          "feet": 41.0,
+          "h": 35.0,
+          "minx": 3,
+          "miny": 6,
+          "maxx": 44,
+          "maxy": 40
+        },
+        {
+          "cx": 23.5,
+          "feet": 40.0,
+          "h": 32.0,
+          "minx": 5,
+          "miny": 8,
+          "maxx": 42,
+          "maxy": 39
+        }
+      ]
     }
   ]
 }

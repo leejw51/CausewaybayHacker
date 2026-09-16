@@ -43,6 +43,7 @@ import {
   Editor,
   MAIN_FILE,
 } from "../ui/editor";
+import { CodeFx } from "../ui/codefx";
 import { CODE_FACE_NAME, CODE_FACES, getCodeFace, setCodeFace } from "../engine/text";
 import { readNumberPref, writePref } from "../ui/prefs";
 import { Overlay } from "../ui/overlay";
@@ -233,6 +234,8 @@ export class PlaygroundScene implements Scene {
    */
   private saveNote = "";
   private t = 0;
+  /** The typing effects, over the editor. See `ui/codefx.ts`. */
+  private fx: CodeFx | null = null;
   private readonly benchIn = new Tween(seconds("panel"));
   private readonly listIn = new Tween(seconds("panel"), seconds("stagger"));
   private readonly buttons = new Buttons();
@@ -512,6 +515,8 @@ export class PlaygroundScene implements Scene {
     this.offLocale?.();
     this.offLocale = undefined;
     this.overlay?.destroy();
+    this.fx?.destroy();
+    this.fx = null;
     this.stdinOverlay?.destroy();
     this.nameOverlay?.destroy();
     this.searchOverlay?.destroy();
@@ -525,6 +530,11 @@ export class PlaygroundScene implements Scene {
     this.land = this.held.lang;
     this.editor = new Editor(this.held.lang, this.held.source, () => this.touched());
     this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
+    // After the editor, so it is painted over it; before the other overlays,
+    // which are fields a person clicks into and must stay on top of it.
+    this.fx?.destroy();
+    this.fx = new CodeFx(this.app.overlay, this.app.layout, this.app.assets, this.app.chip);
+    this.fx.attach(this.editor);
     this.stdinOverlay = new Overlay(this.app.overlay, this.app.layout, this.stdinEl);
     this.nameOverlay = new Overlay(this.app.overlay, this.app.layout, this.nameEl);
     this.nameOverlay.hide();
@@ -896,6 +906,7 @@ export class PlaygroundScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
+    this.fx?.frame(dt);
     this.benchIn.update(dt);
     this.listIn.update(dt);
     // Clamped here rather than in the wheel handler, for the same reason

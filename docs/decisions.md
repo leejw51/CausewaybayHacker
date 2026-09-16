@@ -6237,3 +6237,89 @@ Python fixtures were captured with) and add `clang-format`; `tests/run-all.mjs`
 gates the suites that compile programs on `c++` as well as `go`. The terminal
 client names its scratch file `<quest id>.cpp` / `.py` and its `fmt` knows
 `clang-format`.
+
+## 2026-09-16 — WEB: typing is the game, so the editor throws things
+
+The code screens (the scratchpad and a quest's bench) had a real editor and
+no feedback beyond the characters appearing. The result screen threw
+confetti for a right answer; forty keystrokes of getting there threw nothing.
+And the three.js particle pool in `engine/particles.ts` — ported with the
+engine, a few thousand additive trailing points moved in the vertex shader —
+had never been given a canvas by anything.
+
+Now `ui/codefx.ts` gives it one: a transparent WebGL canvas appended to
+`#overlay` *after* the editor, so it composites over the editor's 96%-opaque
+face (both game canvases are under the overlay; an effect painted there is an
+effect nobody sees — the 2D `Sparks` layer existed for that reason, and is
+now the no-WebGL fallback). The layer takes the game's `Layout`, so a point
+in the scene is the same point here.
+
+The editor reports what a keystroke *was*, not that the document changed
+(`Editor.events`, `EditEvent`): a character typed, with the tone the syntax
+tree gives it; one erased; ENTER; the caret resting by a bracket whose
+partner lit up; a loop closed. Only transactions with a user-event
+annotation count — FORMAT's `replaceAll`, a quest's `load` and BLANKS'
+`appendAtEnd` are silent, or FORMAT would be a wall of bricks. Positions are
+measured in a `requestMeasure` read a frame later, clamped to the document
+(`indentOnInput` dedents the `}` you just typed in a transaction of its own,
+and a stale position past the new end throws). A whitespace-for-text swap is
+that re-indent and throws nothing.
+
+**When a loop counts as closed** is the rule with edges, held in
+`loopClosedBy` and `tests/codefx.test.ts`. Brace languages: the character
+typed must *be* the closer as the parser reads it (a `}` inside the
+unfinished string `"{i` is a character of the string, and everything
+unfinished above it ends at the caret too), the node walked up to must be a
+loop (`ForExpression`/`WhileExpression`/`LoopExpression`; `ForStatement`;
+`ForStatement`/`WhileStatement`/`DoStatement`/`ForRangeLoop` — C++'s
+`do … while` closes on its `;`, which has no node of its own), and the loop
+must contain no parse error. Python has no closer, so the moment is ENTER at
+the end of the loop's *first* body line, and only that line.
+
+**The plans are arithmetic** (`engine/burst.ts`: `trailPlan`, `keyPlan`,
+`dustPlan`, `brickPlan`, `linkPlan`, `loopPlan`), sized from the character
+cell so a bigger face is a bigger explosion, with a pinnable `rng`. Two new
+shapes: 4 a chunk of brick, 5 a puff of dust. Both are Grok-drawn pixel-art
+strips (`art/fx_bricks.png`, six chunks — the first roll gave six identical
+ones, asking for six named shapes gave six shapes — and `art/fx_dust.png`,
+four frames of one puff dispersing, which the shader plays by the particle's
+age), cut by `strip.py --grid`, sampled nearest-neighbour, with a procedural
+stand-in when the art has not loaded. The brick keeps the art's light and
+dark and takes the token's hue. Rubble is **per character** (`rubblePlan`):
+the erase event carries a tone for every character that went and the column
+it started at, so a deleted line crumbles left to right in its own colours —
+pink where the keyword was, green where the string was — three chunks a
+cell, two past forty cells, capped at four hundred cells so a page selected
+and deleted is a landslide and not a frame drop.
+
+The pointer's trail was first a spray — two sparks per step in random
+directions and colours, a star now and then, the shader's wobble on top —
+and read as noise following the mouse. It is now a **ribbon**: one soft
+disc every four virtual pixels of travel, placed exactly on the path,
+drifting only a little against the motion, no gravity, a shape (6) the
+shader does not wobble, and a colour that moves slowly round
+cyan → pink → gold → cream so neighbours along the ribbon are neighbours in
+colour. Its body is the shader's ghost trail, ten copies at earlier moments,
+smaller and fainter down the tail.
+
+**Auto-indent and auto-close.** Reported as "bothersome to enter tab each
+time". ENTER already indented (`insertNewlineAndIndent`), but by
+CodeMirror's default two spaces, which in a 16-bit monospace face barely
+reads as an indent — so people tabbed after every ENTER. The indent unit is
+now the land's formatter's (`INDENT`: four spaces; a tab for Go), and
+`closeBrackets` is on, so `{` puts the `}` after the caret and ENTER between
+them opens the block on its own indented line with the brace below. Behind a
+`Compartment`, off for the ANSWER drill, where a `}` the editor typed for
+you is a divergence you did not make.
+
+The rest is CSS on the house curve `cubic-bezier(0.87, 0, 0.13, 1)`: the
+matching bracket breathes in the caret's cyan, a bracket with no partner is
+red, the editor kicks once (scale 1.012, gold at the edges) when a loop
+closes, and the layer itself fades in. `prefers-reduced-motion` turns the
+trail off, cuts every plan to a quarter (`trim`) and stops the CSS
+animations. The coin sound plays for a closed loop and for nothing else.
+
+Checked in the mock build, frozen mid-effect through `__cwbCapture`: dust
+and sparks at the caret, the star loop from `}` up to `for` and back, rubble
+falling out of a deleted word, the comet trail across the well. LÖVE is
+next, and waits on a look at this first.

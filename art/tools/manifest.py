@@ -66,11 +66,13 @@ ORDER = [
     # that turns SPEC §7.2's 0..5 counter into a shape.
     "emblem_ai_repeat", "emblem_ai_weakness", "emblem_ai_spaced",
     "shackle_break", "fx_shards",
+    # The editor's own effects: rubble for a deleted character, dust for ENTER.
+    "fx_bricks", "fx_dust",
 ]
 
 # Assets that are not one picture. `walk_mei` is four frames in a row; the
 # renderer needs the frame size and a box per frame, not one box for the sheet.
-STRIPS = {"walk_mei": 4, "shackle_break": 6}
+STRIPS = {"walk_mei": 4, "shackle_break": 6, "fx_bricks": 6, "fx_dust": 4}
 
 root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 art = []

@@ -54,7 +54,7 @@ import {
 } from "../ui/editor";
 import { burstPlan } from "../engine/burst";
 import { Overlay } from "../ui/overlay";
-import { Sparks } from "../ui/sparks";
+import { CodeFx } from "../ui/codefx";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import type { Attempt, Category, EditState, Land, Quest, RunStage } from "../net/protocol";
@@ -422,9 +422,10 @@ export class QuestScene implements Scene {
    *
    * Both game canvases are under `#overlay` and the editor's face is all but
    * opaque, so a burst painted on the game canvas would land behind the code
-   * and be seen by nobody. See `ui/sparks.ts`.
+   * and be seen by nobody. See `ui/codefx.ts`, which also listens to the
+   * editor itself: the typing effects are its, not this screen's.
    */
-  private sparks: Sparks | null = null;
+  private fx: CodeFx | null = null;
 
   constructor(
     private readonly app: App,
@@ -488,9 +489,9 @@ export class QuestScene implements Scene {
       // starts the idle timer that eventually takes a copy.
       this.editor = new Editor(this.land, this.opened, () => this.touched());
       this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
-      // After the editor, so it is painted over it. It is empty until ANSWER
-      // is on and something happens worth looking at.
-      this.sparks = new Sparks(this.app.overlay, this.app.layout);
+      // After the editor, so it is painted over it.
+      this.fx = new CodeFx(this.app.overlay, this.app.layout, this.app.assets, this.app.chip);
+      this.fx.attach(this.editor);
       queueMicrotask(() => this.editor?.focus());
       // Deliberately *not* inside this try. The stack is an addition to the
       // bench and a server without it must not make the quest itself look
@@ -512,11 +513,11 @@ export class QuestScene implements Scene {
     this.offs.length = 0;
     this.cancelPush();
     this.overlay?.destroy();
-    this.sparks?.destroy();
+    this.fx?.destroy();
     this.editor?.destroy();
     this.editor = null;
     this.overlay = null;
-    this.sparks = null;
+    this.fx = null;
   }
 
   // -- actions -------------------------------------------------------------
@@ -1029,7 +1030,10 @@ export class QuestScene implements Scene {
       this.app.chip.blip();
       return;
     }
-    if (now.matched > was.matched && this.answerText.slice(was.matched, now.matched).includes("\n")) {
+    if (
+      now.matched > was.matched &&
+      this.answerText.slice(was.matched, now.matched).includes("\n")
+    ) {
       this.spark(at, 16, Theme.coin);
       this.app.chip.blip();
     }
@@ -1060,7 +1064,7 @@ export class QuestScene implements Scene {
     const plan = burstPlan(at[0], at[1], n);
     for (const p of plan.particles) p.color = colour;
     for (const r of plan.rings) r.color = colour;
-    this.sparks?.add(plan, this.t);
+    this.fx?.play(plan);
   }
 
   private async reset(): Promise<void> {
@@ -1626,6 +1630,7 @@ export class QuestScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
+    this.fx?.frame(dt);
     if (this.quest && this.askedLocale !== null && this.askedLocale !== locale()) {
       // F7 changed the language under an open quest. The interface re-reads
       // its own strings for free; the prose came from the server in the old
@@ -1755,7 +1760,9 @@ export class QuestScene implements Scene {
     // its height instead, so nothing is ever drawn under it.
     // The bar is as tall as the lines the message wraps to: one line's
     // height put "back" of the SOLVE note under the footer in portrait.
-    const msgLines = this.error ? wrap(fonts.small, this.error, f.body[2] - Math.round(16 * s)) : [];
+    const msgLines = this.error
+      ? wrap(fonts.small, this.error, f.body[2] - Math.round(16 * s))
+      : [];
     const msgH = this.error ? msgLines.length * fonts.small.height + Math.round(8 * s) : 0;
     const room = msgH > 0 ? msgH + Math.round(6 * s) : 0;
     const left: Rect = [f.left[0], f.left[1], f.left[2], f.left[3] - room];
@@ -1771,7 +1778,6 @@ export class QuestScene implements Scene {
 
     this.buttons.draw(g, this.compactMode ? fonts.stationSm : fonts.button);
     this.bar.draw(g, fonts.stationSm);
-    this.sparks?.draw(this.t);
     if (this.error) {
       // A bar rather than a loose line: the message crosses both panels, and
       // bare text laid over a panel border is unreadable at the seam.
@@ -1803,7 +1809,9 @@ export class QuestScene implements Scene {
    * PLAYGROUND on the map screen, recorded in decisions.md as a class rather
    * than as one bug.
    */
-  private toolItems(compact = this.compactMode): Array<{ id: string; label: string; dim?: boolean }> {
+  private toolItems(
+    compact = this.compactMode,
+  ): Array<{ id: string; label: string; dim?: boolean }> {
     const noOutput = !this.runResult && this.log.lines.length === 0;
     // In the compact register the clipboard chips and LOBBY go: on a phone
     // the keyboard has its own paste, the map is one tap away, and three
@@ -2019,7 +2027,6 @@ export class QuestScene implements Scene {
     const editorRect: Rect = [pad + 4, top + 4, layout.vw - pad * 2 - 8, layout.vh - top - pad - 8];
     if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     else this.overlay?.hide();
-    this.sparks?.draw(this.t);
   }
 
   /**
@@ -2213,13 +2220,7 @@ export class QuestScene implements Scene {
     // the far end of the bench and the everyday buttons flow up to it. It is
     // the one control on this screen that spends an attempt, and a control that
     // can be hit on the way to RUN is a control that will be.
-    const [subW] = btnBox(
-      bench,
-      [t("quest.submit")],
-      0,
-      bench.size * 2,
-      layout.minTouchH(),
-    );
+    const [subW] = btnBox(bench, [t("quest.submit")], 0, bench.size * 2, layout.minTouchH());
     const gap = Math.round(bench.size * 1.6);
     const rowW = inner[2] - subW - gap;
     // Measured, not assumed. At 1280 across, RESET wraps onto a second line,

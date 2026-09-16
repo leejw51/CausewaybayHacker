@@ -13,13 +13,16 @@
  * server is the judge of.
  */
 import {
+  Compartment,
   EditorState,
   Prec,
   StateEffect,
   StateField,
+  Transaction,
   type Extension,
   type Range,
 } from "@codemirror/state";
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import {
   Decoration,
   EditorView,
@@ -44,14 +47,19 @@ import {
 import {
   HighlightStyle,
   bracketMatching,
+  ensureSyntaxTree,
   indentOnInput,
+  indentUnit,
+  matchBrackets,
   syntaxHighlighting,
+  syntaxTree,
 } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import { rust } from "@codemirror/lang-rust";
 import { go } from "@codemirror/lang-go";
 import { cpp } from "@codemirror/lang-cpp";
 import { python } from "@codemirror/lang-python";
+import { RUBBLE_MAX } from "../engine/burst";
 import { Theme } from "../engine/theme";
 import type { Land } from "../net/protocol";
 
@@ -74,6 +82,20 @@ export const CODE_FONT_KEY = "quest.font";
 export const CODE_FACE_KEY = "quest.face";
 export const CODE_FONT_MIN = 0.7;
 export const CODE_FONT_MAX = 2.4;
+
+/**
+ * What one level of indentation is, per land: what each land's formatter
+ * would write, so a block the editor indents on ENTER is a block FORMAT
+ * leaves alone. CodeMirror's default is two spaces, which in a 16-bit
+ * monospace face barely reads as an indent at all — people were reaching for
+ * Tab after every ENTER to get the indentation they expected.
+ */
+export const INDENT: Record<Land, string> = {
+  rust: "    ",
+  go: "\t",
+  cpp: "    ",
+  python: "    ",
+};
 
 export const MAIN_FILE: Record<Land, string> = {
   rust: "main.rs",
@@ -157,6 +179,16 @@ export interface Target {
 
 const setAnswer = StateEffect.define<Target | null>();
 
+/**
+ * Brackets that close themselves — `{` puts a `}` after the caret, ENTER
+ * between the two opens the block on its own indented line — behind a
+ * compartment, because the ANSWER drill compares the buffer to the answer
+ * character by character from the top, and a `}` the editor typed for you
+ * is a divergence you did not make. `setAnswer` turns them off with the
+ * drill and back on after it.
+ */
+const autoClose = new Compartment();
+
 const answerField = StateField.define<Target | null>({
   create: () => null,
   update(value, tr) {
@@ -185,7 +217,7 @@ export function answerBlanks(answer: string, seed = 1): Blank[] {
     words.push({ from: m.index, to: m.index + m[0].length });
   }
   if (words.length === 0) return [];
-  let r = (seed >>> 0) || 1;
+  let r = seed >>> 0 || 1;
   const next = (): number => {
     r = (Math.imul(r, 1664525) + 1013904223) >>> 0;
     return r / 4294967296;
@@ -329,9 +361,7 @@ function ghostFor(view: EditorView): DecorationSet {
         // THE RED with no red anywhere on screen. A stray blank line is the
         // commonest way to be past the end of an answer, so it gets a mark
         // of its own.
-        out.push(
-          Decoration.widget({ widget: new GhostText("", false), side: 1 }).range(line.to),
-        );
+        out.push(Decoration.widget({ widget: new GhostText("", false), side: 1 }).range(line.to));
       }
       continue;
     }
@@ -466,6 +496,192 @@ const answerEnter: Extension = Prec.highest(
   ]),
 );
 
+// ---------------------------------------------------------------------------
+// What typing *does*, as events for the effects layer.
+//
+// The editor is the game's controller on the code screens, and a controller
+// that only reports "the document changed" is a controller with one button.
+// So every user-driven transaction is read for what it was — a character
+// typed, one erased, ENTER pressed, a loop closed, a bracket matched — and
+// handed out with the screen position it happened at, in client pixels, so
+// `ui/codefx.ts` can put something there. Everything here is pure over the
+// editor's state except the final measurement, and `tests/codefx.test.ts`
+// holds the rules.
+// ---------------------------------------------------------------------------
+
+/**
+ * What a character *is*, for the colour of the spark it throws — the same
+ * families the syntax highlighter paints, so the effect is the code's own
+ * colour leaving the caret.
+ */
+export type Tone =
+  | "keyword"
+  | "name"
+  | "call"
+  | "type"
+  | "string"
+  | "number"
+  | "comment"
+  | "operator"
+  | "bracket"
+  | "plain";
+
+/** Client-pixel coordinates: `[x, y]`. */
+export type Pt = readonly [number, number];
+
+export type EditEvent =
+  /** Text arrived at the caret. `at` is the caret after it, top of the line. */
+  | { kind: "type"; at: Pt; text: string; tone: Tone; cell: Pt }
+  /**
+   * Text was removed. `at` is the top-left of where it started, `column`
+   * how far into its line that was (so a second line of it starts `column`
+   * cells left of `at`), and `tones` one per character of `text`, up to
+   * `RUBBLE_MAX` of them.
+   */
+  | { kind: "erase"; at: Pt; text: string; tones: Tone[]; column: number; cell: Pt }
+  /** ENTER. `at` is the caret on the new line. */
+  | { kind: "enter"; at: Pt; cell: Pt }
+  /** A loop was finished: `open` is its keyword's centre, `close` its end. */
+  | { kind: "loop"; open: Pt; close: Pt; cell: Pt }
+  /** The caret sits by a bracket whose partner lit up; both centres. */
+  | { kind: "bracket"; a: Pt; b: Pt; cell: Pt };
+
+/**
+ * The syntax-tree node names that are loops, per language. Read off the
+ * Lezer grammars the editor already ships; a C++ `do … while` closes on its
+ * `;` rather than its brace, which is why the closer set below has one.
+ */
+const LOOPS: Record<Land, ReadonlySet<string>> = {
+  rust: new Set(["ForExpression", "WhileExpression", "LoopExpression"]),
+  go: new Set(["ForStatement"]),
+  cpp: new Set(["ForStatement", "WhileStatement", "DoStatement", "ForRangeLoop"]),
+  python: new Set(["ForStatement", "WhileStatement"]),
+};
+
+/**
+ * The tone of the character ending at `pos` — the one just typed, or the
+ * last one deleted — read from the syntax tree where it has an opinion and
+ * from the character itself where it does not.
+ *
+ * The tree first, because `f` on its own is a name and `f` at the end of
+ * `if` is a keyword, and only the parser knows which. The tree may be behind
+ * the document by a keystroke (it parses on idle), in which case the node
+ * under the caret is a best guess and the character class breaks the tie.
+ */
+export function toneOf(state: EditorState, pos: number, ch: string): Tone {
+  if (ch !== "" && "{}[]()".includes(ch)) return "bracket";
+  const node = syntaxTree(state).resolveInner(Math.max(0, pos), -1);
+  const name = node.name;
+  if (/Comment/.test(name)) return "comment";
+  if (/String|Char|Rune|Format/.test(name)) return "string";
+  if (/Integer|Float|Number|Boolean|None|True|False|Escape/.test(name)) return "number";
+  if (/Type|Primitive|Class|Namespace|Lifetime/.test(name)) return "type";
+  if (/Identifier|VariableName|DefName|FieldName|Macro|PropertyName/.test(name)) {
+    const parent = node.parent?.name ?? "";
+    return /Call|Macro/.test(parent) ? "call" : "name";
+  }
+  // A keyword's node is named after itself: `for`, `fn`, `return`.
+  if (/^[a-z_]+$/.test(name) && name.length > 1) return "keyword";
+  if (/[0-9]/.test(ch)) return "number";
+  if (/["'`]/.test(ch)) return "string";
+  if (/[A-Za-z_]/.test(ch)) return "name";
+  if (/\s/.test(ch) || ch === "") return "plain";
+  return "operator";
+}
+
+/**
+ * Whether inserting `text` at `from` finished a loop, and which one.
+ *
+ * In the brace languages a loop is done when its closing `}` (or, for a C++
+ * `do … while`, its `;`) is typed: the node that ends exactly there is
+ * looked up and walked outward to the first loop. In Python there is no
+ * closing character — a loop is done when its body has something in it — so
+ * ENTER at the end of the *first* body line is the moment, and only that
+ * line, or every line of a long body would be a celebration.
+ *
+ * `null` when nothing was finished. The tree is parsed up to the caret if it
+ * is behind, within a small budget; a parse that cannot make it in time is a
+ * missed effect, not a stall.
+ */
+export function loopClosedBy(
+  state: EditorState,
+  lang: Land,
+  from: number,
+  text: string,
+): { from: number; to: number } | null {
+  if (text.length === 0) return null;
+  const loops = LOOPS[lang];
+  if (lang === "python") {
+    if (text[0] !== "\n") return null;
+    // ENTER at the end of a line, not one splitting a line in two: what
+    // follows the inserted text must be a line break or the end.
+    const after = from + text.length;
+    if (after < state.doc.length && state.doc.sliceString(after, after + 1) !== "\n") return null;
+    const tree = ensureSyntaxTree(state, from, 30);
+    if (!tree) return null;
+    let node: import("@lezer/common").SyntaxNode | null = tree.resolveInner(from, -1);
+    while (node && !loops.has(node.name)) node = node.parent;
+    if (!node) return null;
+    const body = node.getChild("Body");
+    if (!body) return null;
+    let first = body.firstChild;
+    while (first && !/^[A-Z]/.test(first.name)) first = first.nextSibling;
+    if (!first || from < first.from || from > first.to) return null;
+    return { from: node.from, to: from };
+  }
+  const last = text[text.length - 1];
+  if (last !== "}" && !(last === ";" && lang === "cpp")) return null;
+  const pos = from + text.length;
+  const tree = ensureSyntaxTree(state, pos, 30);
+  if (!tree) return null;
+  let node: import("@lezer/common").SyntaxNode | null = tree.resolveInner(pos, -1);
+  // The character has to *be* the closer, as the parser reads it. A `}` typed
+  // inside an unfinished string — `"{i}` on the way to `"{i}"` — is a
+  // character of the string, and everything unfinished above it ends at the
+  // caret too, so without this the loop around it would count as closed. A
+  // `;` has no node of its own in the C++ grammar, so there the innermost
+  // node is the `do` statement it finishes.
+  if (!node || (node.name !== last && !loops.has(node.name))) return null;
+  while (node && node.to === pos) {
+    if (loops.has(node.name)) {
+      // And the loop has to be whole: a body with a parse error in it is
+      // not finished, whatever brace was just typed.
+      return hasError(node) ? null : { from: node.from, to: pos };
+    }
+    node = node.parent;
+  }
+  return null;
+}
+
+/** Whether any node inside `node` is a parse error. */
+function hasError(node: import("@lezer/common").SyntaxNode): boolean {
+  const c = node.cursor();
+  do {
+    if (c.type.isError) return true;
+  } while (c.next() && c.to <= node.to && c.from >= node.from);
+  return false;
+}
+
+/**
+ * The bracket pair the caret is beside, as `[open, close]` offsets, or
+ * `null`.
+ *
+ * The same four looks `bracketMatching` takes, in the same order — a closer
+ * just before the caret, an opener just before it, an opener just after, a
+ * closer just after — so what lights up here is exactly what the highlighter
+ * lit up. `matchBrackets` is directional: `-1` only ever reads a closing
+ * bracket and `1` only an opening one, which is why one call is not enough.
+ */
+export function bracketPairAt(state: EditorState, head: number): [number, number] | null {
+  const m =
+    matchBrackets(state, head, -1) ??
+    (head > 0 ? matchBrackets(state, head - 1, 1) : null) ??
+    matchBrackets(state, head, 1) ??
+    (head < state.doc.length ? matchBrackets(state, head + 1, -1) : null);
+  if (!m || !m.matched || !m.end) return null;
+  return m.start.from < m.end.from ? [m.start.from, m.end.from] : [m.end.from, m.start.from];
+}
+
 const base: Extension = [
   lineNumbers(),
   history(),
@@ -479,7 +695,7 @@ const base: Extension = [
   // `indentWithTab` last so Tab indents rather than leaving the editor. That
   // costs keyboard users their tab-out; Escape-then-Tab still works, which is
   // the accepted trade for a code editor.
-  keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+  keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
   EditorView.theme({
     "&": { height: "100%", backgroundColor: "transparent" },
     ".cm-content": { caretColor: hex(Theme.cyan) },
@@ -519,9 +735,19 @@ export function narrowEdit(
 export class Editor {
   readonly dom = document.createElement("div");
   private view: EditorView;
+  private lang: Land;
+  /**
+   * Where the effects go. Set by the screen that owns the editor; nothing is
+   * measured while it is null, so an editor nobody is decorating pays
+   * nothing for the option.
+   */
+  events: ((e: EditEvent) => void) | null = null;
+  /** The bracket pair last reported, so a caret resting by one reports once. */
+  private lastPair: string | null = null;
 
   constructor(lang: Land, doc: string, onChange?: () => void) {
     this.dom.className = "cwb-editor";
+    this.lang = lang;
     this.view = new EditorView({
       parent: this.dom,
       state: this.stateFor(lang, doc, onChange),
@@ -531,11 +757,128 @@ export class Editor {
 
   private onChange?: () => void;
 
+  /**
+   * Read one update for the events above, and measure them on the next
+   * layout pass.
+   *
+   * Only transactions with a user event are read: the formatter's
+   * `replaceAll`, a quest's `load` and BLANKS' `appendAtEnd` change the
+   * document too, and a wall of bricks every time FORMAT is pressed would
+   * teach people not to press it. The positions are resolved in a
+   * `requestMeasure` read rather than here, because a layout read inside an
+   * update listener forces the browser to lay the whole editor out
+   * synchronously, once per keystroke.
+   */
+  private harvest(u: ViewUpdate): void {
+    if (!this.events) return;
+    type Job = (view: EditorView, cell: Pt) => EditEvent | null;
+    const jobs: Job[] = [];
+    // The read runs a frame later, and the document may have moved on by
+    // then — `indentOnInput` dedents the `}` you just typed in a transaction
+    // of its own, and a position past the new end throws. A keystroke's
+    // position is clamped rather than mapped: the effect is at the caret
+    // either way, and the caret is where the document now ends.
+    const coords = (view: EditorView, pos: number) => {
+      try {
+        return view.coordsAtPos(Math.min(pos, view.state.doc.length));
+      } catch {
+        return null;
+      }
+    };
+    const topLeft = (view: EditorView, pos: number): Pt | null => {
+      const c = coords(view, pos);
+      return c ? [c.left, c.top] : null;
+    };
+    const centre = (view: EditorView, pos: number, cell: Pt): Pt | null => {
+      const c = coords(view, pos);
+      return c ? [c.left + cell[0] / 2, (c.top + c.bottom) / 2] : null;
+    };
+    const lang = this.lang;
+    for (const tr of u.transactions) {
+      if (!tr.docChanged || tr.annotation(Transaction.userEvent) === undefined) continue;
+      tr.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+        const text = inserted.toString();
+        if (toA > fromA) {
+          const gone = tr.startState.doc.sliceString(fromA, toA);
+          // Whitespace swapped for text is a re-indent — `}` typed on an
+          // indented line is pulled back to its block by `indentOnInput` —
+          // and nothing was broken there. Whitespace simply deleted still
+          // was.
+          const reindent = text.length > 0 && gone.trim() === "";
+          if (!reindent) {
+            // A tone per character, so a deleted line crumbles in its own
+            // colours. Read from the tree the text was in, not the one it
+            // has gone from.
+            const tones: Tone[] = [];
+            const limit = Math.min(gone.length, RUBBLE_MAX);
+            for (let i = 0; i < limit; i++) {
+              tones.push(
+                gone[i].trim() === "" ? "plain" : toneOf(tr.startState, fromA + i + 1, gone[i]),
+              );
+            }
+            const column = fromB - tr.state.doc.lineAt(fromB).from;
+            jobs.push((view, cell) => {
+              const at = topLeft(view, fromB);
+              return at ? { kind: "erase", at, text: gone, tones, column, cell } : null;
+            });
+          }
+        }
+        if (text.length === 0) return;
+        if (text[0] === "\n" && text.trim() === "") {
+          jobs.push((view, cell) => {
+            const at = topLeft(view, toB);
+            return at ? { kind: "enter", at, cell } : null;
+          });
+        } else {
+          const tone = toneOf(tr.state, toB, text[text.length - 1]);
+          jobs.push((view, cell) => {
+            const at = topLeft(view, toB);
+            return at ? { kind: "type", at, text, tone, cell } : null;
+          });
+        }
+        const loop = loopClosedBy(tr.state, lang, fromB, text);
+        if (loop) {
+          jobs.push((view, cell) => {
+            const open = centre(view, loop.from, cell);
+            const close = centre(view, Math.max(loop.from, loop.to - 1), cell);
+            return open && close ? { kind: "loop", open, close, cell } : null;
+          });
+        }
+      });
+    }
+    if (u.selectionSet || u.docChanged) {
+      const pair = bracketPairAt(u.state, u.state.selection.main.head);
+      const key = pair ? `${pair[0]}:${pair[1]}` : null;
+      if (key !== this.lastPair) {
+        this.lastPair = key;
+        if (pair) {
+          jobs.push((view, cell) => {
+            const a = centre(view, pair[0], cell);
+            const b = centre(view, pair[1], cell);
+            return a && b ? { kind: "bracket", a, b, cell } : null;
+          });
+        }
+      }
+    }
+    if (jobs.length === 0) return;
+    u.view.requestMeasure({
+      read: (view) => {
+        const cell: Pt = [view.defaultCharacterWidth, view.defaultLineHeight];
+        for (const job of jobs) {
+          const e = job(view, cell);
+          if (e) this.events?.(e);
+        }
+      },
+    });
+  }
+
   private stateFor(lang: Land, doc: string, onChange?: () => void): EditorState {
     return EditorState.create({
       doc,
       extensions: [
         base,
+        indentUnit.of(INDENT[lang]),
+        autoClose.of(closeBrackets()),
         answerField,
         answerEnter,
         ghost,
@@ -552,6 +895,7 @@ export class Editor {
         MODE[lang](),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChange?.();
+          this.harvest(u);
         }),
       ],
     });
@@ -559,6 +903,8 @@ export class Editor {
 
   /** Swap language and document together: a new quest is a new state. */
   load(lang: Land, doc: string): void {
+    this.lang = lang;
+    this.lastPair = null;
     this.view.setState(this.stateFor(lang, doc, this.onChange));
   }
 
@@ -603,7 +949,12 @@ export class Editor {
    * it rather than a replacement for it.
    */
   setAnswer(target: Target | null): void {
-    this.view.dispatch({ effects: setAnswer.of(target) });
+    this.view.dispatch({
+      effects: [
+        setAnswer.of(target),
+        autoClose.reconfigure(target === null ? closeBrackets() : []),
+      ],
+    });
   }
 
   /**

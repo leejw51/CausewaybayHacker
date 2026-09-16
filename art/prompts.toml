@@ -1105,3 +1105,25 @@ generated = "2026-09-12"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A row of interview-room furniture: a plain blank white whiteboard on castors, TWO stacked dark wooden chairs, a small table with a blank round wall clock leaning on it, and a closed laptop. Cold fluorescent light, institutional grey, brown and white. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "fx_bricks"
+kind = "strip"
+aspect = "3:2"
+size = [288, 48]
+generated = "2026-09-16"
+rerolls = 1
+note = "The editor's rubble: what a deleted character breaks into. Six chunks in one 3:2 render, cut by art/tools/strip.py --grid into 48x48 cells. The first roll gave six identical chunks; asking for six named shapes gave six shapes. Drawn in brick orange and tinted to the token's syntax colour by the particle shader, so a deleted string breaks green and a deleted keyword pink."
+prompt = """\
+16-bit SNES pixel art sprite sheet on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not a fragment). SIX separate chunks of broken brick rubble in a single evenly spaced horizontal row, with a wide clear band of plain magenta between each one so they never touch or overlap. IMPORTANT: every chunk has a DIFFERENT jagged shape, left to right: a large triangular wedge, a small square corner piece, a long thin sliver, a lumpy rounded chunk, a small crumb with two bumps, and a big chunk with a bite taken out of it. All are pieces of the same terracotta-orange and burnt-red brick block, with a lighter cream-orange bevel along the top-left edges and a dark maroon shadow along the bottom-right edges, like a block from Super Mario World smashed apart. Chunky hard-edged pixels, bold dark outline round each chunk, flat cel shading, saturated candy colours, no anti-aliasing, no soft gradient, no drop shadow, no ground shadow. Absolutely no text, no letters, no words, no numbers, no frame borders, no grid lines, no boxes round the chunks."""
+
+[[asset]]
+name = "fx_dust"
+kind = "strip"
+aspect = "3:2"
+size = [192, 48]
+generated = "2026-09-16"
+rerolls = 0
+note = "The editor's dust: the puff ENTER kicks up on the new line. Four frames of one puff dispersing, in one 3:2 render, cut by strip.py --grid; the shader picks a frame by how old the particle is, so a puff plays through its four frames as it fades."
+prompt = """\
+16-bit SNES pixel art sprite sheet on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not a cloud). FOUR separate puffs of dust in a single evenly spaced horizontal row, all roughly the same size, with a wide clear band of plain magenta between each one so they never touch or overlap. Each puff is a round, fluffy cartoon dust cloud in pale warm grey and cream, with a bold dark charcoal outline and flat cel shading, exactly like the little dust puff that appears behind a running character's feet in Super Mario World. From left to right the four puffs are four frames of one puff dispersing: FRAME 1 a tight dense round puff, FRAME 2 a slightly bigger puff with three lobes, FRAME 3 a wider puff breaking into pieces, FRAME 4 a thin wispy puff of scattered small clouds. Chunky hard-edged pixels, no anti-aliasing, no soft gradient, no drop shadow, no ground shadow, no pink or magenta anywhere inside the clouds. Absolutely no text, no letters, no words, no numbers, no frame borders, no grid lines, no boxes round the clouds."""
