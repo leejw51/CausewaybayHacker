@@ -69,6 +69,8 @@ import {
   current,
   newMnemonic,
   parseAccountIndex,
+  phraseProblem,
+  privateKeyHexOf,
   signMessage,
   unlock,
 } from "../wallet/wallet";
@@ -106,7 +108,8 @@ function localeInfoLabel(): string {
 
 /** What `users.name` takes before it truncates (`backend/core/src/users.rs`). */
 const NAME_MAX = 48;
-const INDEX_PREF = "cwbhacker.wallet.index";
+/** Shared with the playground, whose POSTER unlocks the same account to stamp with. */
+export const INDEX_PREF = "cwbhacker.wallet.index";
 
 export class LoginScene implements Scene {
   readonly name = "login";
@@ -414,19 +417,31 @@ export class LoginScene implements Scene {
       this.setPreview("");
       return;
     }
-    try {
-      // A raw private key **is** the account: there is no path to walk and
-      // the box does not apply to it. Said on the label rather than by
-      // silently deriving something the number had no part in.
-      this.setPreview(
-        /^0x[0-9a-fA-F]{64}$/.test(text)
-          ? addressFromPrivateKeyHex(text).eip55
-          : addressFromMnemonic(text, this.walletIndex()).eip55,
-      );
-    } catch {
-      // Half a phrase is not an error worth shouting about; it is just not an
-      // address yet.
-      this.setPreview("");
+    // A raw private key **is** the account: there is no path to walk and the
+    // box does not apply to it. Said on the label rather than by silently
+    // deriving something the number had no part in.
+    const hex = privateKeyHexOf(text);
+    if (hex) {
+      this.setPreview(addressFromPrivateKeyHex(hex).eip55);
+      return;
+    }
+    const problem = phraseProblem(text);
+    if (!problem) {
+      this.setPreview(addressFromMnemonic(text, this.walletIndex()).eip55);
+      return;
+    }
+    this.setPreview("");
+    // Half a phrase is not an error worth shouting about — but a phrase that
+    // is *all there* and still not an address is, quietly: the card used to
+    // show a dash for a wrong phrase and a dash for a broken screen, and a
+    // person with one word wrong could not tell which they had.
+    const words = text.split(/\s+/u).length;
+    if (problem.kind === "word" && words >= 12) {
+      this.status = t("login.notAWord", { word: problem.word });
+    } else if (problem.kind === "count" && words >= 12) {
+      this.status = t("login.wordCount", { n: problem.count });
+    } else if (problem.kind === "checksum") {
+      this.status = t("login.badChecksum");
     }
   }
 
