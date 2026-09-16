@@ -172,7 +172,8 @@ is a different fact.
 **P**, from the map or the land select. A scratchpad: no quest, no tests, no
 verdict — write whatever you like in Rust or Go, run it, and it prints what it
 prints. Snippets are saved **server-side**, so the same scratchpad opens in the
-browser and here; autosave is on a four-second timer and `playground.save` is
+browser and here — the SNIPPETS panel lists them (on top in portrait, the
+browser's way, with NEW, RENAME and DELETE at its foot; a click opens one); autosave is on a four-second timer and `playground.save` is
 idempotent by contract.
 
 Nothing here is scored, and the screen says so by how it looks: no red, no

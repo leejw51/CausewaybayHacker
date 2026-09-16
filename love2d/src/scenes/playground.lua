@@ -379,12 +379,24 @@ function Playground:panes()
   local bottom = UI.footerHeight() + 8
   local pad = 10
   if Layout.isPortrait() then
+    -- Stacked, the browser's way: the pads on top at a quarter of the
+    -- height, then the bench. The list used to have no width at all in
+    -- portrait, which left a phone with no way to open a second pad.
     local h = vh - top - bottom
+    -- A quarter, or what the title, the search field, three rows and the
+    -- buttons need — whichever is more, up to two fifths: at the largest
+    -- type step a quarter held one row of the list it exists to show.
+    local need = 8 + UI.lineHeight(8) + 6 + (UI.lineHeight(7) + 14)
+      + 3 * (UI.lineHeight(7) + 10) + 6 + UI.chipHeight() + 12
+    local list_h = math.max(math.floor((h - pad * 2) * 0.26),
+      math.min(math.floor(h * 0.4), need))
+    local rest = h - list_h - pad * 2
+    local code_h = math.floor(rest * 0.6)
     return
-      { x = pad, y = top, w = vw - pad * 2, h = math.floor(h * 0.52) },
-      { x = pad, y = top + math.floor(h * 0.52) + pad, w = vw - pad * 2,
-        h = h - math.floor(h * 0.52) - pad },
-      { x = pad, y = top, w = 0, h = 0 }
+      { x = pad, y = top + list_h + pad, w = vw - pad * 2, h = code_h },
+      { x = pad, y = top + list_h + pad + code_h + pad, w = vw - pad * 2,
+        h = rest - code_h },
+      { x = pad, y = top, w = vw - pad * 2, h = list_h }
   end
   -- Wide enough for its own title at the current type, never more than
   -- a third of the canvas: at the largest type step 18 % was six letters.
@@ -729,7 +741,39 @@ function Playground:draw_snippets(rect)
   local y = rect.y + 8 + UI.lineHeight(8) + 6
   -- A row is the label's own height plus air: `20` was the row at a 7 px
   -- label, and at the doubled ladder the names printed over each other.
-  local row = UI.lineHeight(7) + 6
+  local row = UI.lineHeight(7) + 10
+
+  -- What the buttons at the foot of this panel take, measured before
+  -- anything above them is drawn — in portrait this panel is a quarter of
+  -- the window and the rows ran straight under them. NEW, RENAME, and
+  -- DELETE only while a saved pad is open: the browser's three.
+  local items = {
+    { id = "new", label = I18n.t("NEW") },
+    { id = "rename", label = I18n.t("RENAME") },
+  }
+  if self.snippet_id then items[#items + 1] = { id = "delete", label = I18n.t("DELETE") } end
+  local bh = UI.chipHeight()
+  local gap = 6
+  local widths, total = {}, 0
+  for i, item in ipairs(items) do
+    widths[i] = math.max(56, UI.textWidth(item.label, UI.CHIP_SIZE) + 20)
+    total = total + widths[i]
+  end
+  total = total + gap * (#items - 1)
+  -- One row when they fit across, else one under the other.
+  local across = total <= rect.w - 12
+  local rows_of = across and 1 or #items
+  local foot_h = rows_of * bh + (rows_of - 1) * gap
+  local foot_y = rect.y + rect.h - 6 - foot_h
+  self.list_rects = {}
+  local bx, by = rect.x + 6, foot_y
+  for i, item in ipairs(items) do
+    local w = across and widths[i] or rect.w - 12
+    UI.button(bx, by, w, bh, item.label,
+      self.hover == "list:" .. item.id and "hot" or "normal", UI.CHIP_SIZE)
+    self.list_rects[item.id] = { x = bx, y = by, w = w, h = bh }
+    if across then bx = bx + w + gap else by = by + bh + gap end
+  end
 
   -- The search field, once there are enough pads to be worth hunting through.
   self.find_rect = nil
@@ -749,23 +793,42 @@ function Playground:draw_snippets(rect)
     y = y + fh + 6
   end
 
+  -- The rows scroll to keep the cursor in view: a list that only showed
+  -- its first screen was a list whose sixth pad could not be opened.
+  local hits = self:visible_snippets()
+  local room = math.max(0, math.floor((foot_y - 6 - y) / row))
+  local at = 1
+  for k, hit in ipairs(hits) do
+    if hit.index == self.cursor then at = k end
+  end
+  local first = math.max(1, math.min(at - room + 1, #hits - room + 1))
   self.snippet_rects = {}
-  for _, hit in ipairs(self:visible_snippets()) do
-    local i, brief = hit.index, hit.brief
-    if y > rect.y + rect.h - row - 2 then break end
+  for k = first, math.min(#hits, first + room - 1) do
+    local i, brief = hits[k].index, hits[k].brief
     local here = brief.id == self.snippet_id
-    if here then
-      UI.setColor(Theme.coin, 0.22)
+    local under = self.focus == "snippets" and i == self.cursor
+    if here or under then
+      UI.setColor(Theme.coin, here and 0.22 or 0.1)
       love.graphics.rectangle("fill", rect.x + 4, y - 2, rect.w - 8, row)
       love.graphics.setColor(1, 1, 1, 1)
     end
+    -- The land's colour along the left edge, the browser's way, so a Go
+    -- pad and a Rust pad are told apart before the name is read.
+    UI.setColor(Theme.land[brief.lang] or Theme.dim, 0.9)
+    love.graphics.rectangle("fill", rect.x + 4, y - 2, 3, row)
+    love.graphics.setColor(1, 1, 1, 1)
+    -- The land's initial, right-aligned inside the panel, and the name
+    -- given what is left of the row: it used to be placed 14 px from the
+    -- edge whatever its width, and at the doubled ladder hung outside.
+    local initial = tostring(brief.lang):sub(1, 1):upper()
+    local iw = UI.textWidth(initial, 7)
     local label = tostring(brief.name or brief.id)
-    while UI.textWidth(label, 7) > rect.w - 24 and #label > 3 do
+    while UI.textWidth(label, 7) > rect.w - 30 - iw and #label > 3 do
       label = label:sub(1, -2)
     end
-    UI.text(label, rect.x + 10, y, 7,
+    UI.text(label, rect.x + 12, y + 2, 7,
       here and Theme.coin or Theme.withAlpha(Theme.cream, 0.85))
-    UI.text(tostring(brief.lang):sub(1, 1):upper(), rect.x + rect.w - 14, y, 7,
+    UI.text(initial, rect.x + rect.w - 10 - iw, y + 2, 7,
       Theme.withAlpha(Theme.cream, 0.4))
     self.snippet_rects[i] = { x = rect.x, y = y - 2, w = rect.w, h = row }
     y = y + row
@@ -775,13 +838,10 @@ function Playground:draw_snippets(rect)
   elseif #self.snippets == 0 then
     UI.paragraph(I18n.t("nothing saved yet"), rect.x + 10, y, rect.w - 20, 7,
       Theme.withAlpha(Theme.cream, 0.45))
-  elseif #self:visible_snippets() == 0 then
+  elseif #hits == 0 then
     UI.paragraph(I18n.t("no pad by that name"), rect.x + 10, y, rect.w - 20, 7,
       Theme.withAlpha(Theme.cream, 0.45))
   end
-  UI.text(I18n.t("CTRL-N new"), rect.x + 10, rect.y + rect.h - 8 - UI.lineHeight(7),
-    UI.fitSize(I18n.t("CTRL-N new"), rect.w - 20, 7, 4),
-    Theme.withAlpha(Theme.cream, 0.4))
 end
 
 --- The editor.
@@ -1536,6 +1596,15 @@ function Playground:mousepressed(x, y, button)
     return
   end
   if inside(self.find_rect) then self.focus = "find"; return end
+  local lr = self.list_rects or {}
+  if inside(lr.new) then self:new_snippet(); return end
+  if inside(lr.rename) then self:start_rename(); return end
+  if inside(lr.delete) then
+    for i, brief in ipairs(self.snippets or {}) do
+      if brief.id == self.snippet_id then self:delete(i) end
+    end
+    return
+  end
   if inside(self.code_button_rect) then self.big = true; SFX.play("select"); return end
   if inside(self.rename_rect) then self:start_rename(); return end
   if inside(self.poster_rect) then self:poster(); return end
@@ -1562,6 +1631,12 @@ end
 
 function Playground:mousemoved(x, y)
   if self.pane then self.pane:mousemoved(x, y) end
+  self.hover = nil
+  for id, r in pairs(self.list_rects or {}) do
+    if x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h then
+      self.hover = "list:" .. id
+    end
+  end
   if self.fx then self.fx:pointer(x, y) end
 end
 
