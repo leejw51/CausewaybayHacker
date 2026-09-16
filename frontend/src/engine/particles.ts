@@ -40,7 +40,7 @@ import {
   WebGLRenderer,
 } from "three";
 
-import { Particle, Plan, Ring } from "./burst";
+import { Particle, Plan, Ring, Smear } from "./burst";
 import type { Layout } from "./layout";
 
 /**
@@ -54,6 +54,8 @@ const TRAIL_DT = 0.018;
 const GLOW_CAP = 2400;
 const PAPER_CAP = 900;
 const RING_CAP = 8;
+/** Caret smears alive at once; each is one or two quads. */
+const SMEAR_CAP = 6;
 
 const VERT = /* glsl */ `
   attribute vec2 aOrigin;
@@ -136,7 +138,7 @@ const VERT = /* glsl */ `
     if (abs(aShape - 5.0) < 0.5) size = aSize * grow * mix(0.6, 1.4, t);
     // A ribbon ember only ever shrinks: it is brightest and biggest where the
     // pointer just was, and gone at the tail.
-    if (aShape > 5.5) size = aSize * (1.0 - 0.6 * t) * mix(0.3, 1.0, back);
+    if (abs(aShape - 6.0) < 0.5) size = aSize * (1.0 - 0.6 * t) * mix(0.3, 1.0, back);
 
     vColor = aColor;
     vAlpha = grow * fade * ghost;
@@ -173,7 +175,12 @@ const FRAG = /* glsl */ `
     vec2 q = (gl_PointCoord - 0.5) * 2.0;
     float a;
     vec3 col = vColor;
-    if (vShape > 5.5) {
+    if (vShape > 6.5) {
+      // A grain off a caret jump: a flat streak, a fifth as tall as it is
+      // long and soft at both ends, so it lies along the line it fell on.
+      a = smoothstep(0.22, 0.06, abs(q.y)) * smoothstep(1.0, 0.55, abs(q.x));
+      col = mix(col, vec3(1.0), 0.35 * smoothstep(0.5, 0.0, abs(q.x)));
+    } else if (vShape > 5.5) {
       // The ribbon's ember: a soft disc with a hot centre, and nothing else.
       float d = length(q);
       a = smoothstep(1.0, 0.2, d);
@@ -307,10 +314,83 @@ const RING_FRAG = /* glsl */ `
   }
 `;
 
+// Causewaybay Hacker addition: the caret smear. A quad per straight piece
+// of the path, stretched between the smear's tail and head, which are two
+// fractions of the path that move at different speeds — the head almost at
+// once, the tail on a slow start — so the bar lengthens and then contracts.
+// Across it: a soft body in the caret's colour and a thin white core.
+const SMEAR_VERT = /* glsl */ `
+  uniform vec2 uA;
+  uniform vec2 uB;
+  uniform float uS0;
+  uniform float uS1;
+  uniform float uHead;
+  uniform float uTail;
+  uniform float uWidth;
+  varying vec2 vQ;
+  varying float vF;
+  void main() {
+    float lo = max(uTail, uS0);
+    float hi = min(uHead, uS1);
+    if (hi <= lo + 1e-4) {
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      vQ = vec2(0.0);
+      vF = 0.0;
+      return;
+    }
+    float u = position.x * 0.5 + 0.5;
+    float f = mix(lo, hi, u);
+    float k = (f - uS0) / max(1e-4, uS1 - uS0);
+    vec2 d = uB - uA;
+    vec2 dir = d / max(1e-3, length(d));
+    vec2 n = vec2(-dir.y, dir.x);
+    vec2 p = uA + d * k + n * uWidth * 0.5 * position.y;
+    vQ = vec2(u, position.y);
+    vF = f;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 0.0, 1.0);
+  }
+`;
+
+const SMEAR_FRAG = /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uAlpha;
+  uniform float uCore;
+  uniform float uHead;
+  uniform float uTail;
+  varying vec2 vQ;
+  varying float vF;
+  void main() {
+    float across = abs(vQ.y);
+    // Where along the whole smear this is: 0 at the tail, 1 at the head.
+    float along = clamp((vF - uTail) / max(1e-4, uHead - uTail), 0.0, 1.0);
+    // The body: the caret's rectangle, soft at its edges, fading to the tail.
+    float body = smoothstep(1.0, 0.5, across) * mix(0.1, 0.42, along);
+    // The core: a thread of white down the middle, hottest at the head.
+    float core = smoothstep(0.2, 0.0, across) * uCore * mix(0.25, 1.0, along * along);
+    vec3 col = mix(uColor, vec3(1.0), 0.3 * along) * body + vec3(1.0) * core;
+    float a = (body + core) * uAlpha;
+    if (a <= 0.003) discard;
+    gl_FragColor = vec4(col * uAlpha, a * 0.6);
+  }
+`;
+
 interface Live {
   t: number;
   ring: Ring;
   mesh: Mesh<PlaneGeometry, ShaderMaterial>;
+}
+
+interface LiveSmear {
+  t: number;
+  smear: Smear;
+  /** One quad per straight piece of the path; a straight run leaves the second hidden. */
+  meshes: Mesh<PlaneGeometry, ShaderMaterial>[];
+}
+
+/** Smooth start and stop, for the smear's tail. */
+function smoothstep(t: number): number {
+  const k = Math.max(0, Math.min(1, t));
+  return k * k * (3 - 2 * k);
 }
 
 /** Exponential ease-out for the shockwave: nearly all the way out at once. */
@@ -483,6 +563,8 @@ export class Particles {
   private readonly rings: Live[] = [];
   private readonly ringMeshes: Mesh<PlaneGeometry, ShaderMaterial>[] = [];
   private readonly pending: Array<{ at: number; ring: Ring }> = [];
+  private readonly smears: LiveSmear[] = [];
+  private readonly smearMeshes: Mesh<PlaneGeometry, ShaderMaterial>[][] = [];
   private scale = 1;
   private clock = 0;
   private cleared = true;
@@ -537,6 +619,42 @@ export class Particles {
       mesh.frustumCulled = false;
       this.ringMeshes.push(mesh);
       this.scene.add(mesh);
+    }
+    for (let i = 0; i < SMEAR_CAP; i++) {
+      const pair: Mesh<PlaneGeometry, ShaderMaterial>[] = [];
+      for (let j = 0; j < 2; j++) {
+        const mesh = new Mesh(
+          quad,
+          new ShaderMaterial({
+            vertexShader: SMEAR_VERT,
+            fragmentShader: SMEAR_FRAG,
+            uniforms: {
+              uA: { value: [0, 0] },
+              uB: { value: [0, 0] },
+              uS0: { value: 0 },
+              uS1: { value: 1 },
+              uHead: { value: 0 },
+              uTail: { value: 0 },
+              uWidth: { value: 1 },
+              uColor: { value: [1, 1, 1] },
+              uAlpha: { value: 0 },
+              uCore: { value: 0 },
+            },
+            transparent: true,
+            depthTest: false,
+            depthWrite: false,
+            side: DoubleSide,
+            blending: CustomBlending,
+            blendSrc: OneFactor,
+            blendDst: OneFactor,
+          }),
+        );
+        mesh.visible = false;
+        mesh.frustumCulled = false;
+        pair.push(mesh);
+        this.scene.add(mesh);
+      }
+      this.smearMeshes.push(pair);
     }
     canvas.addEventListener("webglcontextlost", (ev) => {
       ev.preventDefault();
@@ -595,10 +713,55 @@ export class Particles {
     for (const ring of plan.rings) this.pending.push({ at: this.clock + ring.delay, ring });
   }
 
+  /** The caret moved: draw its smear, starting now. */
+  smear(s: Smear): void {
+    if (!this.ok) return;
+    let meshes = this.smearMeshes.find((pair) => !pair[0].visible);
+    if (!meshes) {
+      // All busy: the oldest gives way.
+      const oldest = this.smears.shift();
+      if (!oldest) return;
+      meshes = oldest.meshes;
+    }
+    const { path } = s;
+    let total = 0;
+    const lens: number[] = [];
+    for (let i = 1; i < path.length; i++) {
+      const l = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+      lens.push(l);
+      total += l;
+    }
+    if (total <= 0) return;
+    let s0 = 0;
+    for (let j = 0; j < meshes.length; j++) {
+      const mesh = meshes[j];
+      if (j >= lens.length) {
+        mesh.visible = false;
+        continue;
+      }
+      const s1 = s0 + lens[j] / total;
+      const u = mesh.material.uniforms;
+      u.uA.value = [path[j][0], path[j][1]];
+      u.uB.value = [path[j + 1][0], path[j + 1][1]];
+      u.uS0.value = s0;
+      u.uS1.value = j === lens.length - 1 ? 1 : s1;
+      u.uWidth.value = s.width;
+      u.uColor.value = [s.color[0], s.color[1], s.color[2]];
+      u.uCore.value = s.core;
+      u.uHead.value = 0;
+      u.uTail.value = 0;
+      u.uAlpha.value = 0;
+      mesh.visible = true;
+      s0 = s1;
+    }
+    this.smears.push({ t: 0, smear: s, meshes });
+  }
+
   /** Whether anything is still alive — for a caller that fades its canvas. */
   get busy(): boolean {
     return (
       this.rings.length > 0 ||
+      this.smears.length > 0 ||
       this.pending.length > 0 ||
       this.clock < this.glow.aliveUntil ||
       this.clock < this.paper.aliveUntil
@@ -648,8 +811,35 @@ export class Particles {
       u.uAlpha.value = live.ring.glow ? (1 - k) * (1 - k) : 1 - k * k;
     }
 
+    for (let i = this.smears.length - 1; i >= 0; i--) {
+      const live = this.smears[i];
+      live.t += dt;
+      const k = live.t / live.smear.life;
+      if (k >= 1) {
+        for (const m of live.meshes) m.visible = false;
+        this.smears.splice(i, 1);
+        continue;
+      }
+      // The head is across almost at once; the tail sets off slowly and
+      // catches up as the smear dies, so it stretches and then contracts.
+      // Width and alpha go together, as the caret's afterimage should.
+      const head = easeOutExpo(Math.min(1, k / 0.45));
+      const tail = smoothstep(k);
+      const alpha = 1 - k * k;
+      const width = live.smear.width * (1 - 0.8 * k * k);
+      for (const m of live.meshes) {
+        if (!m.visible) continue;
+        const u = m.material.uniforms;
+        u.uHead.value = head;
+        u.uTail.value = tail;
+        u.uAlpha.value = alpha;
+        u.uWidth.value = width;
+      }
+    }
+
     const busy =
       this.rings.length > 0 ||
+      this.smears.length > 0 ||
       this.pending.length > 0 ||
       this.clock < this.glow.aliveUntil ||
       this.clock < this.paper.aliveUntil;

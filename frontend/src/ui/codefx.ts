@@ -19,7 +19,9 @@
  *
  * What happens when:
  *
- *   * the pointer moves — a comet tail of embers behind it;
+ *   * the caret moves — its rectangle smears from where it was to where it
+ *     is and shrinks back, a white thread down its middle, an L across
+ *     lines; and a *jump* (PageDown, a far click) drops grains on the way;
  *   * a character is typed — a pop of sparks in the token's syntax colour;
  *   * ENTER — a puff of dust along the new line;
  *   * a character is erased — it breaks into brick and falls;
@@ -28,18 +30,21 @@
  *     the editor gives a kick, and the coin sound plays.
  *
  * Without WebGL the 2D `Sparks` canvas takes the same plans, in squares.
- * Under `prefers-reduced-motion` the trail is off and everything else is a
+ * Under `prefers-reduced-motion` the smear is off and everything else is a
  * quarter of itself: feedback, not a performance.
  */
 import type { Assets } from "../engine/assets";
 import {
   RUBBLE_MAX,
+  cornerPlan,
   dustPlan,
+  isJump,
+  jumpPlan,
   keyPlan,
   linkPlan,
   loopPlan,
   rubblePlan,
-  trailPlan,
+  smearFor,
   type Cell,
   type Plan,
   type Rubble,
@@ -66,12 +71,11 @@ const TONE_COLOUR: Record<Tone, RGBA> = {
   plain: Theme.cream,
 };
 
-/** Virtual pixels of pointer travel between one ember and the next. */
-const TRAIL_STEP = 4;
-/** How far round the colour cycle each ember moves: a full turn every ~150. */
-const TRAIL_HUE = 1 / 150;
-/** The most embers one pointer event may leave: a flick is a flick, not a wall. */
-const TRAIL_MAX = 12;
+/**
+ * The longest gap that still counts towards the caret's speed. A click after
+ * a minute's thought is a fast move to where it clicked, not a slow one.
+ */
+const MOVE_GAP = 0.25;
 /** Seconds the editor holds its kick class: matches the CSS animation. */
 const KICK_SECS = 0.6;
 
@@ -79,18 +83,13 @@ export class CodeFx {
   private readonly canvas = document.createElement("canvas");
   private gl: Particles | null = null;
   private flat: Sparks | null = null;
-  /** The scene clock, for the 2D fallback and the pointer's speed. */
+  /** The scene clock, for the 2D fallback and the caret's speed. */
   private now = 0;
   private fitted = "";
   private editor: Editor | null = null;
-  /** The pointer's last virtual position and when it was there. */
-  private last: Pt | null = null;
-  private lastAt = 0;
-  private carry = 0;
-  /** Where on the ribbon's colour cycle the next ember is. */
-  private phase = 0;
+  /** When the caret last moved, for how fast it moved this time. */
+  private movedAt = -1;
   private kick: ReturnType<typeof setTimeout> | null = null;
-  private readonly onMove = (ev: PointerEvent): void => this.moved(ev);
 
   constructor(
     host: HTMLElement,
@@ -122,7 +121,6 @@ export class CodeFx {
     // Faded in by the stylesheet once the class lands, a frame after it is
     // in the document, so the first paint is a fade and not a pop.
     requestAnimationFrame(() => this.canvas.classList.add("cwb-on"));
-    addEventListener("pointermove", this.onMove, { passive: true });
   }
 
   /** Listen to this editor. One at a time; the screen has one. */
@@ -151,7 +149,6 @@ export class CodeFx {
   }
 
   destroy(): void {
-    removeEventListener("pointermove", this.onMove);
     if (this.editor) {
       this.editor.events = null;
       this.editor.dom.classList.remove("cwb-kick");
@@ -221,7 +218,35 @@ export class CodeFx {
         this.chip?.coin();
         return;
       }
+      case "move": {
+        const from = this.virtual(e.from);
+        const to = this.virtual(e.to);
+        if (!from || !to) return;
+        this.moved(from, to, cell);
+        return;
+      }
     }
+  }
+
+  // -- the caret -----------------------------------------------------------
+
+  /**
+   * The smear from where the caret was to where it is, hotter the faster it
+   * went; the corner's wink if it bent; and, only on a jump, the grains.
+   * All of it is motion for its own sake, so none of it under
+   * `prefers-reduced-motion`.
+   */
+  private moved(from: Pt, to: Pt, cell: Cell): void {
+    const t = this.now;
+    const gap = this.movedAt < 0 ? MOVE_GAP : Math.min(MOVE_GAP, Math.max(0.04, t - this.movedAt));
+    this.movedAt = t;
+    if (reducedMotion()) return;
+    const dist = Math.hypot(to[0] - from[0], to[1] - from[1]);
+    const smear = smearFor(from, to, cell, dist / gap);
+    if (this.gl) this.gl.smear(smear);
+    else this.flat?.smear(smear, t);
+    this.play(cornerPlan(smear));
+    if (isJump(from, to, cell)) this.play(jumpPlan(smear));
   }
 
   /**
@@ -242,50 +267,6 @@ export class CodeFx {
       dom.classList.remove("cwb-kick");
       this.kick = null;
     }, KICK_SECS * 1000);
-  }
-
-  // -- the pointer ---------------------------------------------------------
-
-  /**
-   * Embers along the pointer's path.
-   *
-   * Distance-paced rather than event-paced: a pointer moving slowly across a
-   * 240 Hz screen fires far more events per pixel than a flick does, and a
-   * trail that was one ember per event would be dense when still and thin
-   * when moving — the opposite of a tail. So travel is banked and an ember is
-   * spent every `TRAIL_STEP` virtual pixels, placed along the segment.
-   */
-  private moved(ev: PointerEvent): void {
-    if (reducedMotion()) return;
-    const v = this.layout.toVirtual(ev.clientX, ev.clientY);
-    if (!v) return;
-    const t = this.now;
-    const last = this.last;
-    this.last = v;
-    // A pointer that has been still for a while has no path to trail: this
-    // is its first point again, not a jump from where it was.
-    if (!last || t - this.lastAt > 0.25) {
-      this.lastAt = t;
-      this.carry = 0;
-      return;
-    }
-    const dt = Math.max(1 / 240, t - this.lastAt);
-    this.lastAt = t;
-    const dx = v[0] - last[0];
-    const dy = v[1] - last[1];
-    const dist = Math.hypot(dx, dy);
-    if (dist < 0.5) return;
-    this.carry += dist;
-    const n = Math.min(TRAIL_MAX, Math.floor(this.carry / TRAIL_STEP));
-    if (n === 0) return;
-    this.carry -= n * TRAIL_STEP;
-    const vx = dx / dt;
-    const vy = dy / dt;
-    for (let i = 1; i <= n; i++) {
-      const u = i / n;
-      this.phase += TRAIL_HUE;
-      this.play(trailPlan(last[0] + dx * u, last[1] + dy * u, vx, vy, this.phase));
-    }
   }
 
   // -- coordinates ---------------------------------------------------------

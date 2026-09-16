@@ -16,11 +16,11 @@ import { RGBA, Theme } from "./theme";
 /**
  * 0 a soft glowing disc, 1 a four-point star, 2 a tumbling scrap of paper,
  * 3 a spinning gold coin, 4 a chunk of brick (the piece a deleted character
- * breaks into), 5 a puff of dust, 6 a soft disc that does not wobble (the
- * pointer's ribbon). 4 and 5 are pixel-art strips when the art has loaded
- * and a procedural stand-in when it has not.
+ * breaks into), 5 a puff of dust, 6 a soft disc that does not wobble, 7 a
+ * flat streak (the grain a caret jump drops). 4 and 5 are pixel-art strips
+ * when the art has loaded and a procedural stand-in when it has not.
  */
-export type Shape = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type Shape = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export interface Particle {
   /** Where it starts, in virtual pixels. */
@@ -307,9 +307,6 @@ export function coinPlan(
 export type Cell = readonly [number, number];
 
 const DUST: RGBA[] = [Theme.dim, Theme.cream, [0.6, 0.55, 0.5, 1], [0.45, 0.4, 0.38, 1]];
-/** The ribbon's colours, cycled through as the pointer travels. */
-const RIBBON: RGBA[] = [Theme.cyan, Theme.pink, Theme.coin, Theme.cream];
-
 /** `col` a little lighter or darker: one brick is never quite its neighbour's colour. */
 function shade(col: RGBA, k: number): RGBA {
   return [
@@ -320,56 +317,142 @@ function shade(col: RGBA, k: number): RGBA {
   ];
 }
 
-/** A point on the ribbon's colour cycle, `phase` in 0..1, blended smoothly. */
-export function ribbon(phase: number): RGBA {
-  const u = ((phase % 1) + 1) % 1;
-  const k = u * RIBBON.length;
-  const i = Math.floor(k) % RIBBON.length;
-  const j = (i + 1) % RIBBON.length;
-  const f = k - Math.floor(k);
-  const a = RIBBON[i];
-  const b = RIBBON[j];
-  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, 1];
+/**
+ * The caret moved: a smear.
+ *
+ * The first version of the code page's light trail followed the *pointer*,
+ * in a cycle of colours, and read as a website's mouse trail pasted over an
+ * editor. This follows the *caret* — the thing that actually moves when
+ * code is written — and is what a good terminal does: the caret's rectangle
+ * stretches from where it was to where it is and shrinks back, its width and
+ * alpha dying together inside a fifth of a second, with a thin white core
+ * down its middle that gets hotter the faster the caret went. One colour
+ * plus white; the caret's own neon.
+ *
+ * Along a line it is a horizontal beam. Across lines it bends: down the
+ * column first and then along the new line, an L, with a wink of light at
+ * the corner. The path is two or three points in virtual pixels, and the
+ * GPU (`particles.ts`) or the 2D fallback (`ui/sparks.ts`) draws it.
+ */
+export interface Smear {
+  /** Two points for a straight run, three for a bend, `[x, y]` each. */
+  path: ReadonlyArray<readonly [number, number]>;
+  /** Full width in virtual pixels: the caret's height. */
+  width: number;
+  /** Seconds from stretch to gone. */
+  life: number;
+  color: RGBA;
+  /** 0..1, how white the core burns: the caret's speed. */
+  core: number;
+}
+
+/** Virtual pixels per second past which the core is as white as it gets. */
+const SMEAR_HOT = 2400;
+
+/**
+ * The smear for a caret that was at `from` and is now at `to` — both the
+ * top-left of the caret's cell — having got there at `speed` virtual pixels
+ * a second (its distance over the time since it last moved).
+ */
+export function smearFor(
+  from: readonly [number, number],
+  to: readonly [number, number],
+  cell: Cell,
+  speed: number,
+): Smear {
+  const [, ch] = cell;
+  const mid = ch / 2;
+  const a: [number, number] = [from[0], from[1] + mid];
+  const b: [number, number] = [to[0], to[1] + mid];
+  const bend = Math.abs(a[1] - b[1]) > ch * 0.5 && Math.abs(a[0] - b[0]) > 0.5;
+  const path = bend ? [a, [a[0], b[1]] as const, b] : [a, b];
+  const dist = pathLength(path);
+  return {
+    path,
+    width: ch,
+    // A step lives a short life; a jump across the screen a little longer,
+    // so the tail has time to cross what the head crossed.
+    life: Math.min(0.22, 0.12 + dist / 4000),
+    color: Theme.cyan,
+    core: Math.min(1, 0.35 + (0.65 * speed) / SMEAR_HOT),
+  };
+}
+
+/** The bend's wink: a small glow where the smear turns the corner. Nothing on a straight run. */
+export function cornerPlan(smear: Smear): Plan {
+  if (smear.path.length < 3) return { particles: [], rings: [] };
+  const [x, y] = smear.path[1];
+  return {
+    particles: [],
+    rings: [{ x, y, radius: smear.width * 0.9, life: smear.life, delay: 0, color: smear.color, glow: true }],
+  };
+}
+
+export function pathLength(path: ReadonlyArray<readonly [number, number]>): number {
+  let len = 0;
+  for (let i = 1; i < path.length; i++) len += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+  return len;
+}
+
+/** The point `u` (0..1) of the way along `path`, by distance. */
+export function pathPoint(path: ReadonlyArray<readonly [number, number]>, u: number): [number, number] {
+  const total = pathLength(path);
+  let want = Math.max(0, Math.min(1, u)) * total;
+  for (let i = 1; i < path.length; i++) {
+    const [ax, ay] = path[i - 1];
+    const [bx, by] = path[i];
+    const seg = Math.hypot(bx - ax, by - ay);
+    if (want <= seg || i === path.length - 1) {
+      const f = seg > 0 ? Math.min(1, want / seg) : 1;
+      return [ax + (bx - ax) * f, ay + (by - ay) * f];
+    }
+    want -= seg;
+  }
+  return [path[0][0], path[0][1]];
 }
 
 /**
- * What the pointer leaves behind as it crosses the code page: one ember,
- * on the path.
- *
- * A ribbon, not a spray. The first version threw a handful of sparks in
- * random directions with random colours and a wobble, and read as noise
- * following the mouse. This is one soft disc per few pixels of travel, put
- * exactly where the pointer was, drifting only a little *against* the
- * motion (`vx, vy`, virtual pixels per second) so the tail lengthens with
- * speed; no gravity, no wobble (shape 6 is the disc that does not), and a
- * colour that moves slowly round a cycle with `phase`, so neighbours along
- * the ribbon are neighbours in colour. Its comet tail is the shader's ghost
- * trail, which is what gives the ribbon its body.
+ * Whether a caret move is a *jump* — PageDown, a click on a far line, a
+ * search hit — rather than a step. A jump gets grains; a step never does,
+ * so an arrow key held down is a beam and not a game.
  */
-export function trailPlan(
-  x: number,
-  y: number,
-  vx: number,
-  vy: number,
-  phase = 0,
-  rng: Rng = Math.random,
-): Plan {
-  const speed = Math.hypot(vx, vy);
-  const nx = speed > 1 ? -vx / speed : 0;
-  const ny = speed > 1 ? -vy / speed : 0;
-  const drift = between(rng, 6, 14) * Math.min(1.5, 0.6 + speed / 1500);
-  const particles: Particle[] = [
-    thrown(x, y, nx * drift, ny * drift, {
-      life: between(rng, 0.42, 0.55),
-      delay: 0,
-      size: 9 + Math.min(5, speed / 300),
-      color: ribbon(phase),
-      shape: 6,
-      trail: true,
-      gravity: 0,
-      seed: rng(),
-    }),
-  ];
+export function isJump(
+  from: readonly [number, number],
+  to: readonly [number, number],
+  cell: Cell,
+): boolean {
+  const [cw, ch] = cell;
+  return Math.abs(to[1] - from[1]) >= ch * 2.5 || Math.abs(to[0] - from[0]) >= cw * 16;
+}
+
+/**
+ * The grains a jump drops along its smear: a dozen or so flat streaks —
+ * never taller than a fraction of the line — that appear in order along
+ * the path, fall a little, and are gone in half a second. Shape 7 is that
+ * streak. Rare on purpose: this is the moment the smear looks like it was
+ * going too fast, not a thing that happens every keystroke.
+ */
+export function jumpPlan(smear: Smear, rng: Rng = Math.random): Plan {
+  const ch = smear.width;
+  const dist = pathLength(smear.path);
+  const count = Math.round(Math.min(20, 8 + dist / (ch * 4)));
+  const particles: Particle[] = [];
+  for (let i = 0; i < count; i++) {
+    const u = (i + rng()) / count;
+    const [x, y] = pathPoint(smear.path, u);
+    particles.push(
+      thrown(x, y + (rng() - 0.5) * ch * 0.5, (rng() - 0.5) * ch, between(rng, 0.1, 0.4) * ch, {
+        life: between(rng, 0.3, 0.5),
+        delay: u * 0.08 + rng() * 0.03,
+        size: between(rng, 0.45, 0.8) * ch,
+        color: i % 4 === 3 ? Theme.cream : smear.color,
+        shape: 7,
+        trail: false,
+        gravity: 260,
+        seed: rng(),
+      }),
+    );
+  }
   return { particles, rings: [] };
 }
 

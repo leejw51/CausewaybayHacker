@@ -544,7 +544,14 @@ export type EditEvent =
   /** A loop was finished: `open` is its keyword's centre, `close` its end. */
   | { kind: "loop"; open: Pt; close: Pt; cell: Pt }
   /** The caret sits by a bracket whose partner lit up; both centres. */
-  | { kind: "bracket"; a: Pt; b: Pt; cell: Pt };
+  | { kind: "bracket"; a: Pt; b: Pt; cell: Pt }
+  /**
+   * The caret went from one cell to another — by key, click, typing or a
+   * jump. Both are the top-left of the caret's cell, held inside the
+   * editor's visible box, so a caret that came from off the screen comes
+   * from its edge.
+   */
+  | { kind: "move"; from: Pt; to: Pt; cell: Pt };
 
 /**
  * The syntax-tree node names that are loops, per language. Read off the
@@ -756,6 +763,8 @@ export class Editor {
   events: ((e: EditEvent) => void) | null = null;
   /** The bracket pair last reported, so a caret resting by one reports once. */
   private lastPair: string | null = null;
+  /** Where the caret was last measured, for the smear from there to here. */
+  private lastCaret: Pt | null = null;
 
   constructor(lang: Land, doc: string, onChange?: () => void) {
     this.dom.className = "cwb-editor";
@@ -804,6 +813,15 @@ export class Editor {
     const centre = (view: EditorView, pos: number, cell: Pt): Pt | null => {
       const c = coords(view, pos);
       return c ? [c.left + cell[0] / 2, (c.top + c.bottom) / 2] : null;
+    };
+    // A cell held inside the editor's visible box: a PageDown scrolls, and
+    // the caret's old place may now be above the top of it.
+    const inside = (view: EditorView, p: Pt, cell: Pt): Pt => {
+      const box = view.scrollDOM.getBoundingClientRect();
+      return [
+        Math.min(Math.max(p[0], box.left), Math.max(box.left, box.right - cell[0])),
+        Math.min(Math.max(p[1], box.top), Math.max(box.top, box.bottom - cell[1])),
+      ];
     };
     const lang = this.lang;
     for (const tr of u.transactions) {
@@ -872,6 +890,20 @@ export class Editor {
         }
       }
     }
+    if (u.selectionSet || u.docChanged) {
+      const head = u.state.selection.main.head;
+      if (head !== u.startState.selection.main.head || u.docChanged) {
+        jobs.push((view, cell) => {
+          const from = this.lastCaret;
+          const raw = topLeft(view, head);
+          const to = raw ? inside(view, raw, cell) : null;
+          this.lastCaret = to;
+          if (!from || !to) return null;
+          if (Math.abs(from[0] - to[0]) < 0.5 && Math.abs(from[1] - to[1]) < 0.5) return null;
+          return { kind: "move", from, to, cell };
+        });
+      }
+    }
     if (jobs.length === 0) return;
     u.view.requestMeasure({
       read: (view) => {
@@ -917,6 +949,9 @@ export class Editor {
   load(lang: Land, doc: string): void {
     this.lang = lang;
     this.lastPair = null;
+    // A new document: the caret's first place in it is not a move from the
+    // old one.
+    this.lastCaret = null;
     this.view.setState(this.stateFor(lang, doc, this.onChange));
   }
 

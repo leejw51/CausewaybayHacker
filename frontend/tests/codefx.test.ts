@@ -17,13 +17,16 @@ import { python } from "@codemirror/lang-python";
 import { describe, expect, it } from "vitest";
 import {
   RUBBLE_MAX,
+  cornerPlan,
   dustPlan,
+  isJump,
+  jumpPlan,
   keyPlan,
   linkPlan,
   loopPlan,
-  ribbon,
+  pathPoint,
   rubblePlan,
-  trailPlan,
+  smearFor,
   type Plan,
 } from "../src/engine/burst";
 import { Theme } from "../src/engine/theme";
@@ -50,7 +53,7 @@ function finite(plan: Plan): void {
     expect(p.life).toBeGreaterThan(0);
     expect(p.size).toBeGreaterThan(0);
     expect(p.delay).toBeGreaterThanOrEqual(0);
-    expect([0, 1, 2, 3, 4, 5, 6]).toContain(p.shape);
+    expect([0, 1, 2, 3, 4, 5, 6, 7]).toContain(p.shape);
   }
   for (const r of plan.rings) {
     expect(r.radius).toBeGreaterThan(0);
@@ -134,35 +137,82 @@ describe("the plans", () => {
     expect(rubblePlan([], CELL, seeded()).particles).toHaveLength(0);
   });
 
-  it("the pointer's trail is one ember on the path, drifting against the motion", () => {
-    const plan = trailPlan(100, 100, 800, 0, 0.1, seeded());
-    finite(plan);
-    expect(plan.particles).toHaveLength(1);
-    const p = plan.particles[0];
-    expect(p.x).toBe(100);
-    expect(p.y).toBe(100);
-    expect(p.dx).toBeLessThan(0);
-    expect(p.dy).toBeCloseTo(0, 9);
-    expect(p.gravity).toBe(0);
-    expect(p.shape).toBe(6);
-    // A still pointer still gets a mote, just not a directed one.
-    const still = trailPlan(100, 100, 0, 0, 0, seeded());
-    finite(still);
-    expect(still.particles[0].dx).toBeCloseTo(0, 9);
+  it("a caret step along a line is a straight smear, the caret's height and colour", () => {
+    const s = smearFor([100, 100], [130, 100], CELL, 300);
+    expect(s.path).toHaveLength(2);
+    // Through the middle of the caret's cell, not along its top.
+    expect(s.path[0]).toEqual([100, 111]);
+    expect(s.path[1]).toEqual([130, 111]);
+    expect(s.width).toBe(CELL[1]);
+    expect(s.color).toBe(Theme.cyan);
+    expect(s.life).toBeGreaterThanOrEqual(0.12);
+    expect(s.life).toBeLessThanOrEqual(0.22);
+    // No bend, no corner.
+    expect(cornerPlan(s).rings).toHaveLength(0);
   });
 
-  it("the ribbon's colour moves smoothly round its cycle and comes back", () => {
-    expect(ribbon(0)).toEqual([...Theme.cyan.slice(0, 3), 1]);
-    expect(ribbon(1)).toEqual(ribbon(0));
-    // Halfway between two stops is halfway in each channel.
-    const mid = ribbon(0.125);
-    for (let c = 0; c < 3; c++) {
-      expect(mid[c]).toBeCloseTo((Theme.cyan[c] + Theme.pink[c]) / 2, 6);
+  it("a move across lines bends: down the column, then along the line, with a wink at the corner", () => {
+    const s = smearFor([100, 100], [200, 166], CELL, 300);
+    expect(s.path).toHaveLength(3);
+    expect(s.path[1]).toEqual([100, 177]);
+    const corner = cornerPlan(s);
+    expect(corner.rings).toHaveLength(1);
+    expect(corner.rings[0].x).toBe(100);
+    expect(corner.rings[0].y).toBe(177);
+    expect(corner.rings[0].glow).toBe(true);
+    // Straight down is straight: no bend for a column that did not change.
+    expect(smearFor([100, 100], [100, 166], CELL, 300).path).toHaveLength(2);
+  });
+
+  it("the core burns whiter the faster the caret went, and never past white", () => {
+    const slow = smearFor([0, 0], [10, 0], CELL, 0);
+    const quick = smearFor([0, 0], [10, 0], CELL, 1500);
+    const flat = smearFor([0, 0], [10, 0], CELL, 1e6);
+    expect(slow.core).toBeGreaterThan(0);
+    expect(quick.core).toBeGreaterThan(slow.core);
+    expect(flat.core).toBe(1);
+  });
+
+  it("a step is not a jump; PageDown and a far click are", () => {
+    expect(isJump([100, 100], [110, 100], CELL)).toBe(false);
+    expect(isJump([100, 100], [100, 122], CELL)).toBe(false);
+    expect(isJump([100, 100], [100, 100 + CELL[1] * 8], CELL)).toBe(true);
+    expect(isJump([100, 100], [100 + CELL[0] * 30, 100], CELL)).toBe(true);
+  });
+
+  it("a jump drops flat grains along its path, in order, never taller than the line", () => {
+    const s = smearFor([100, 100], [100, 100 + CELL[1] * 12], CELL, 2000);
+    const plan = jumpPlan(s, seeded());
+    finite(plan);
+    expect(plan.particles.length).toBeGreaterThanOrEqual(8);
+    expect(plan.particles.length).toBeLessThanOrEqual(20);
+    let lastDelay = -1;
+    for (const p of plan.particles) {
+      expect(p.shape).toBe(7);
+      expect(p.size).toBeLessThanOrEqual(CELL[1]);
+      expect(p.trail).toBe(false);
+      expect(p.gravity).toBeGreaterThan(0);
+      // Along the column the caret went down, give or take half a cell.
+      expect(Math.abs(p.x - 100)).toBeLessThanOrEqual(CELL[1]);
+      expect(p.y).toBeGreaterThanOrEqual(111 - CELL[1]);
+      expect(p.y).toBeLessThanOrEqual(111 + CELL[1] * 13);
+      // Later along the path, later to appear.
+      expect(p.delay).toBeGreaterThanOrEqual(lastDelay - 0.03);
+      lastDelay = p.delay;
     }
-    // Neighbours along the ribbon are neighbours in colour.
-    const a = ribbon(0.3);
-    const b = ribbon(0.31);
-    for (let c = 0; c < 3; c++) expect(Math.abs(a[c] - b[c])).toBeLessThan(0.05);
+  });
+
+  it("a point along a bent path walks the first leg, then the second", () => {
+    const path = [
+      [0, 0],
+      [0, 100],
+      [100, 100],
+    ] as const;
+    expect(pathPoint(path, 0)).toEqual([0, 0]);
+    expect(pathPoint(path, 0.25)).toEqual([0, 50]);
+    expect(pathPoint(path, 0.5)).toEqual([0, 100]);
+    expect(pathPoint(path, 0.75)).toEqual([50, 100]);
+    expect(pathPoint(path, 1)).toEqual([100, 100]);
   });
 
   it("a bracket link runs from one bracket to the other and lights both", () => {
