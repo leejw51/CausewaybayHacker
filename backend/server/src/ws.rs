@@ -390,7 +390,7 @@ async fn dispatch(
         "playground.load" => playground::load(state, session, payload),
         "playground.save" => playground::save(state, session, payload),
         "playground.delete" => playground::delete(state, session, payload),
-        "search.query" => Err(handlers::unimplemented("search (SPEC §8)")),
+        "search.query" => handlers::search_query(state, session, payload),
         "ai.plan" | "ai.next" | "ai.finish" => {
             Err(handlers::unimplemented("AI drills (SPEC §7.3)"))
         }

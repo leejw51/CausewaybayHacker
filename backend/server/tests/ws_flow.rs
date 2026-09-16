@@ -445,12 +445,106 @@ async fn the_whole_slice_end_to_end() {
     assert!(profile["user"]["level"].is_number());
     assert!(profile["user"]["xp"].is_number());
 
-    // Milestone 2 refuses cleanly rather than panicking the connection, and
-    // says *not yet* rather than *no such thing*.
-    assert_eq!(
-        alice.err("search.query", json!({ "q": "ownership" })).await,
-        "unavailable"
+    // §8: one box over two indexes. The engine, the embedder and the index
+    // were all here; the dispatch answered `unavailable` regardless, so the
+    // screen had three modes and a filter column and could not run a query.
+    let found = alice
+        .ok("search.query", json!({ "q": "shadowing", "limit": 5 }))
+        .await;
+    // A word that is in the fixture, so this fails when the index is empty
+    // rather than passing on a well-shaped answer with nothing in it.
+    let hits = found["hits"].as_array().expect("§4.12: hits is a list");
+    assert!(
+        !hits.is_empty(),
+        "`shadowing` is a concept on rust.basic.03 and must be findable: {found}"
     );
+    let ids: Vec<&str> = hits.iter().filter_map(|h| h["quest_id"].as_str()).collect();
+    assert!(
+        ids.contains(&"rust.basic.03.shadowing"),
+        "the quest that word belongs to is not in {ids:?}"
+    );
+    // Every field the results panel draws, on the hit it draws them from: a
+    // hit missing `title` or `state` is a blank row on screen.
+    let top = &hits[0];
+    for field in ["quest_id", "title", "land", "category", "state"] {
+        assert!(
+            top[field].is_string(),
+            "a hit needs `{field}` to be drawable: {top}"
+        );
+    }
+    assert!(top["score"].is_number(), "the bars are drawn from `score`");
+    assert!(
+        found["took_ms"].is_number(),
+        "the screen draws how long it took"
+    );
+    // The mode that **ran**, which is not always the one that was asked for:
+    // with an empty embedding table the fusion falls back to BM25 alone, and
+    // the client captions what came back rather than what it requested.
+    assert!(
+        matches!(
+            found["mode"].as_str(),
+            Some("unified") | Some("bm25") | Some("semantic")
+        ),
+        "unexpected mode: {found}"
+    );
+    // An empty box is still not a way to ask for everything (§4.12).
+    let empty = alice.ok("search.query", json!({ "q": "   " })).await;
+    assert_eq!(
+        empty["hits"].as_array().map(Vec::len),
+        Some(0),
+        "an empty query returns nothing rather than the whole corpus"
+    );
+
+    // §4.12: the filters narrow rather than decorate. The quest's own land
+    // keeps it; a land it is not in drops it.
+    let kept = alice
+        .ok(
+            "search.query",
+            json!({ "q": "shadowing", "filters": { "land": "rust" } }),
+        )
+        .await;
+    assert!(
+        !kept["hits"].as_array().unwrap().is_empty(),
+        "filtering to the quest's own land dropped it: {kept}"
+    );
+    let dropped = alice
+        .ok(
+            "search.query",
+            json!({ "q": "shadowing", "filters": { "land": "go" } }),
+        )
+        .await;
+    assert_eq!(
+        dropped["hits"].as_array().map(Vec::len),
+        Some(0),
+        "a Rust quest answered a search filtered to Go: {dropped}"
+    );
+
+    // All three modes answer. `semantic` is the one that needs the embedder
+    // and the vector table, so it is the one that would fail quietly if the
+    // index had not been built at startup.
+    for mode in ["unified", "bm25", "semantic"] {
+        let reply = alice
+            .ok("search.query", json!({ "q": "shadowing", "mode": mode }))
+            .await;
+        assert!(
+            reply["hits"].is_array(),
+            "mode {mode} did not answer with hits: {reply}"
+        );
+    }
+
+    // A search box is not a query language (§8). FTS5 would read this as
+    // syntax; somebody typing it deserves a search rather than an error.
+    let punctuation = alice
+        .ok("search.query", json!({ "q": "Box<dyn Error>" }))
+        .await;
+    assert!(
+        punctuation["hits"].is_array(),
+        "punctuation in the box became an error: {punctuation}"
+    );
+
+    // AI drills are still milestone 2: it refuses cleanly rather than
+    // panicking the connection, and says *not yet* rather than *no such
+    // thing*.
     let ai = alice.call("ai.plan", json!({ "mode": "weakness" })).await;
     assert_eq!(ai["payload"]["code"].as_str(), Some("unavailable"));
     assert_eq!(
