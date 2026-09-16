@@ -6321,5 +6321,56 @@ animations. The coin sound plays for a closed loop and for nothing else.
 
 Checked in the mock build, frozen mid-effect through `__cwbCapture`: dust
 and sparks at the caret, the star loop from `}` up to `for` and back, rubble
-falling out of a deleted word, the comet trail across the well. LÖVE is
-next, and waits on a look at this first.
+falling out of a deleted word, the comet trail across the well.
+
+**LÖVE, the same set.** `src/fxplan.lua` is `burst.ts` in Lua — the same
+plans, the same closed-form motion (`fxplan.at`: origin, ease-out reach,
+ease-in-out leg, sin lift, gravity), no `love` in it, so it sits in the
+layering check with the editor and `tests/test_fxplan.lua` holds it
+headlessly. `src/codefx.lua` paints: additive soft discs and stars, paper,
+the two Grok strips through `Assets.strip` quads with a two-line shader that
+keeps the art's light and dark and takes the token's hue, a gold flare round
+the well for the kick, and it takes over ANSWER mode's bursts from
+`src/sparks.lua`, which goes. The editor model gained `on_event`: each
+user-driven edit — `textinput`, `newline`, `backspace`, `delete_forward` —
+reports what it was with `(line, col)`; `set_text`, `replace_all` and a
+scene's own `insert` say nothing. Tones come from `Editor.highlight`, the
+tokenizer that already colours the pane, so the spark is the colour the
+character is drawn in; the loop rules read `Editor.brackets` (which already
+knows a brace in a string is not a brace) and the opener's line up to the
+brace — `for`/`while`/labelled `loop`, `for`, `for`/`while` plus `do … }
+while (…);` on its `;`, and Python's first-body-line ENTER. Auto-close is
+the model's `auto_close`, off by default so `test_editor`'s byte-exact
+program stays byte-exact, on in both scenes, off under the ANSWER drill.
+`codepane.lua`'s rule that the pane itself never animates stands: the
+bracket outlines stay steady, and this is a pass drawn after the pane, the
+way the browser's layer is a canvas over the editor.
+
+## 2026-09-16 — LOVE: a way out
+
+Reported as "in love2d there is no login, logout?". Half right. The login
+screen was there — server field (loopback by default), phrase, display
+name — but a resumed session walks straight past it to the lobby, and once
+in, nothing in the client signed you out again: `Session:logout` existed and
+nobody called it. The only way to another account was deleting the store.
+
+The browser puts LOG OUT on the address chip in the header (the wallet *is*
+the account). This client's every-screen chrome is the footer's control
+row, so the verb sits there as a fifth chip, `LOGOUT` (`OUT` when the row is
+compact), drawn only while `session.authed` — the same list `UI.displayReserve`
+measures, so the row still knows when it has to drop its labels.
+
+`App:logout` does what `App.logout()` does in `frontend/src/app.ts`, in an
+order that matters here: close the socket *while the token is still held*
+(so the "closed with no token" route to the login screen does not fire on
+top of the next step), forget the token here and on disk (`Session:logout`
+→ `need_login` → the login screen), then open a fresh anonymous connection
+for whoever signs in next — the old one was authenticated as somebody who
+has now left. The login screen says `signed out` in its status colour, once,
+from `app.logged_out_notice`. The scene that was open gets its `leave`, so
+the playground saves what was being typed.
+
+`tests/drive/logout.lua`, against a scratch home so it is a throwaway token
+it forgets: chip drawn, pressed, login screen up with the reason, token gone
+from memory and from the store, chip gone, sign in again works.
+

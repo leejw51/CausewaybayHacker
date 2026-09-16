@@ -110,8 +110,8 @@ add({ wait = 0.2 })
 add({ until_ = function(app)
       local s = app.scene
       check(s.answer_prog.wrong > 0, "a wrong character was not counted")
-      check(#s.sparks.bursts > 0, "no burst for the mistake")
-      print(("mistake: wrong=%d bursts=%d"):format(s.answer_prog.wrong, #s.sparks.bursts))
+      check(#s.fx.live > 0, "no burst for the mistake")
+      print(("mistake: wrong=%d particles=%d"):format(s.answer_prog.wrong, #s.fx.live))
       return true end, timeout = 5 })
 add({ shot = "A5-answer-mistake.png" })
 -- BLANKS: the same answer with holes in it. The code is on the screen and

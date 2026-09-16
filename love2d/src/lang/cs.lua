@@ -276,4 +276,5 @@ return {
   ["She starts with println!."] = "Začíná s println!.",
   ["STORY  [F10]"] = "PŘÍBĚH  [F10]",
   ["watch the opening again"] = "přehrát úvod znovu",
+  ["signed out"] = "Odhlášeno",
 }

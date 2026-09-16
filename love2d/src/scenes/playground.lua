@@ -36,6 +36,7 @@ local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Editor = require("src.editor")
 local CodePane = require("src.codepane")
+local CodeFx = require("src.codefx")
 local Anim = require("src.anim")
 local runlog = require("src.net.runlog")
 
@@ -124,6 +125,12 @@ function Playground:enter()
   -- Same pane object as the quest screen's: the hit test, drag-select and the
   -- bracket overlay are one implementation, not two that look alike.
   self.pane = CodePane.new(self.editor)
+  -- The typing effects, over the editor: `src/codefx.lua`.
+  self.fx = self.fx or CodeFx.new()
+  self.fx:clear()
+  self.fx:attach(self.editor, self.pane)
+  self.editor.auto_close = true
+  self.editor.lang = self.lang
   self.editor:set_text(STARTER[self.lang])
   self.editor.dirty = false
 
@@ -325,6 +332,8 @@ end
 
 function Playground:update(dt)
   self.t = self.t + dt
+  if self.fx then self.fx:update(dt) end
+  if self.editor then self.editor.lang = self.lang end
   if self.running then self.elapsed_ms = self.elapsed_ms + dt * 1000 end
 
   -- Autosave. The contract says `playground.save` is cheap and idempotent, so
@@ -442,6 +451,7 @@ function Playground:draw()
   self:draw_code(code)
   self:draw_output(out)
 
+  if self.fx then self.fx:draw() end
   self.app:footer(I18n.t("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"))
 end
 
@@ -664,6 +674,7 @@ function Playground:draw_big()
     self:draw_code({ x = pad, y = top, w = body_w, h = body_h }, true)
   end
 
+  if self.fx then self.fx:draw() end
   self.app:footer(I18n.t("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"))
 end
 
@@ -1270,6 +1281,7 @@ end
 
 function Playground:mousemoved(x, y)
   if self.pane then self.pane:mousemoved(x, y) end
+  if self.fx then self.fx:pointer(x, y) end
 end
 
 function Playground:mousereleased()

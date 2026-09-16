@@ -255,4 +255,5 @@ return {
   ["She starts with println!."] = "그녀는 println! 부터 시작한다.",
   ["STORY  [F10]"] = "이야기  [F10]",
   ["watch the opening again"] = "오프닝을 다시 봅니다",
+  ["signed out"] = "로그아웃했습니다",
 }

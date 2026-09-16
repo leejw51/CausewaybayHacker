@@ -261,4 +261,5 @@ return {
   ["She starts with println!."] = "佢由 println! 開始。",
   ["STORY  [F10]"] = "故事  [F10]",
   ["watch the opening again"] = "再睇一次開場",
+  ["signed out"] = "已登出",
 }

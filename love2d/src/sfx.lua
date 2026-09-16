@@ -58,6 +58,8 @@ local CUES = {
   rejected = { { 330, 0.10 }, { 262, 0.16 } },
   stamp = { { 180, 0.05, "noise", 0.3 }, { 1046, 0.12 } },
   locked = { { 200, 0.08, "noise", 0.18 } },
+  -- A loop closed in the editor: two quick notes going up, a coin picked up.
+  coin = { { 988, 0.05 }, { 1319, 0.12 } },
 }
 
 function SFX.load()

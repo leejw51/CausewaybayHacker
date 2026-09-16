@@ -474,6 +474,16 @@ local function chips(state)
       short = state.lang_code or "EN",
       glyph = "lang",
     },
+    -- The way out, only while there is someone to sign out. Uppercase English
+    -- like its four neighbours: these are controls, not prose, and the toast
+    -- and the login screen say the rest in the player's language.
+    state.authed and {
+      id = "logout",
+      label = "LOGOUT",
+      every = { "LOGOUT" },
+      short = "OUT",
+      glyph = "door",
+    } or nil,
   }
 end
 
@@ -582,6 +592,24 @@ local function glyph_globe(x, y, cell, ink)
   love.graphics.setColor(1, 1, 1, 1)
 end
 
+--- A door with an arrow through it: out.
+local function glyph_door(x, y, cell, ink)
+  local h = UI.chipHeight()
+  local top = y + (h - cell) / 2
+  UI.setColor(ink)
+  love.graphics.setLineWidth(1)
+  -- The frame, open on the right where the arrow leaves.
+  local fw = cell * 0.55
+  love.graphics.line(x + fw, top + 1.5, x + 0.5, top + 1.5, x + 0.5, top + cell - 1.5, x + fw, top + cell - 1.5)
+  -- The arrow.
+  local ay = top + cell / 2
+  local ax = x + cell * 0.35
+  local tip = x + cell - 0.5
+  love.graphics.line(ax, ay, tip, ay)
+  love.graphics.line(tip - cell * 0.3, ay - cell * 0.28, tip, ay, tip - cell * 0.3, ay + cell * 0.28)
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
 --- Where the pointer is, in virtual coordinates, or nil.
 ---
 --- Nil under a drive script and in any frame where the pointer is outside
@@ -643,6 +671,8 @@ function UI.displayControls(state)
       glyph_orient(gx, y, cell, state.shape == "portrait", state.orientation ~= "auto", ink)
     elseif chip.glyph == "lang" then
       glyph_globe(gx, y, cell, ink)
+    elseif chip.glyph == "door" then
+      glyph_door(gx, y, cell, ink)
     else
       glyph_type(gx, y, cell, state.font, ink)
     end

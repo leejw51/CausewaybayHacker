@@ -89,7 +89,7 @@ local Assets = require("src.assets")
 local UI = require("src.ui")
 local I18n = require("src.i18n")
 local SFX = require("src.sfx")
-local Sparks = require("src.sparks")
+local CodeFx = require("src.codefx")
 local Land = require("src.land")
 local Editor = require("src.editor")
 local CodePane = require("src.codepane")
@@ -176,7 +176,9 @@ function Quest.new(app)
     -- `solution_blanks`.
     drill = "none",
     blanks = nil,
-    sparks = Sparks.new(),
+    -- The typing effects, over the editor: `src/codefx.lua`. It also draws
+    -- ANSWER mode's bursts, which `src/sparks.lua` used to.
+    fx = CodeFx.new(),
     -- The server's edit stack. `nil` means "this screen has not been told",
     -- which is also what a server without the feature leaves behind, and
     -- every predicate in `src/net/edits.lua` answers `false` for it — so the
@@ -221,6 +223,11 @@ function Quest:enter(params)
   -- The mouse half of the pane: the hit test, drag-select and the bracket
   -- overlay, shared with the playground so the two cannot drift.
   self.pane = CodePane.new(self.editor)
+  self.fx:clear()
+  self.fx:attach(self.editor, self.pane)
+  -- Brackets close themselves — except under the ANSWER drill, where a `}`
+  -- the editor typed for you is a divergence you did not make.
+  self.editor.auto_close = not self.answer_on
 
   -- Taken back in `leave`: this scene is entered once per visit to a node,
   -- and a subscription that outlived it would keep this scene (and its whole
@@ -798,6 +805,7 @@ function Quest:toggle_answer()
   end
   if self.answer_on then
     self.answer_on = false
+    self.editor.auto_close = true
     self.drill = "none"
     self.blanks = nil
     SFX.play("move")
@@ -840,6 +848,7 @@ function Quest:arm_answer()
     self.editor:replace_all("")
   end
   self.answer_on = true
+  self.editor.auto_close = false
   -- Two readings of the same answer: what is drawn (holes masked) and what
   -- is compared against (the answer itself). Comparing against the mask
   -- would call a correctly typed word a divergence.
@@ -987,20 +996,20 @@ function Quest:answer_tick()
   local x, y = self:caret_xy()
   if not x then return end
   if now.done and not was.done then
-    self.sparks:add(x, y, 70, Theme.admit)
+    self.fx:burst(x, y, 70, Theme.admit)
     SFX.play("accepted")
   elseif now.wrong > was.wrong or now.matched < was.matched then
     -- **The divergence *growing*, not merely existing.** A quest opens with
     -- boilerplate in the buffer that is already not the answer, so "wrong
     -- where it was right before" would never fire on the screen it is for.
-    self.sparks:add(x, y, 10, Theme.red)
+    self.fx:burst(x, y, 10, Theme.red)
     SFX.play("rejected")
   elseif was.wrong > 0 and now.wrong == 0 then
-    self.sparks:add(x, y, 20, Theme.cyan)
+    self.fx:burst(x, y, 20, Theme.cyan)
     SFX.play("move")
   elseif now.matched > was.matched
     and self.answer_text:sub(was.matched + 1, now.matched):find("\n", 1, true) then
-    self.sparks:add(x, y, 16, Theme.coin)
+    self.fx:burst(x, y, 16, Theme.coin)
     SFX.play("move")
   end
 end
@@ -1312,7 +1321,9 @@ function Quest:update(dt)
     self:refresh()
   end
   self.t = self.t + dt
-  self.sparks:update(dt)
+  self.fx:update(dt)
+  -- The land's loop keywords, for the effect a closed loop gets.
+  self.editor.lang = self.quest and self.quest.land or self.app.land
   self:answer_tick()
   self:tick_clock()
   if self.running_mode then
@@ -1502,7 +1513,7 @@ function Quest:draw_code()
   local top = strip + 6
   self:draw_editor({ x = pad, y = top, w = vw - pad * 2, h = vh - top - pad },
     Theme.land[land] or Theme.coin, true)
-  self.sparks:draw()
+  self.fx:draw()
 end
 
 function Quest:draw()
@@ -1570,8 +1581,8 @@ function Quest:draw()
 
   if self:console_open() then
     self:draw_run_overlay(self.console_rect_drawn)
-    self.sparks:draw()
   end
+  self.fx:draw()
 
   -- **Not** a second listing of F5, F10 and F2. Those three are printed on
   -- the buttons they belong to, a few centimetres above this line — `RUN F5`,
@@ -2845,6 +2856,7 @@ end
 
 function Quest:mousemoved(x, y)
   if self.pane then self.pane:mousemoved(x, y) end
+  self.fx:pointer(x, y)
 end
 
 function Quest:mousereleased()

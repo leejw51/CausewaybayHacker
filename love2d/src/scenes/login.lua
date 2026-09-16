@@ -105,6 +105,13 @@ function Login:enter()
   if self.app.session.last_error then
     self.error = self.app.session.last_error
   end
+  -- Sent here by LOGOUT: say so, in the status colour, not the failure one.
+  -- Read once and cleared, so a later visit to this screen does not repeat
+  -- news about a session that is long gone.
+  if self.app.logged_out_notice then
+    self.status = self.app.logged_out_notice
+    self.app.logged_out_notice = nil
+  end
 end
 
 function Login:leave()

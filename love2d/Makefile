@@ -89,7 +89,7 @@ test-all: ffi-test test-headless test ## Everything: Rust, headless Lua, LÖVE
 # `from = "love.filesystem"` — the directory the first migration moved out
 # of, a name that is in every existing player's log and cannot be renamed to
 # please a grep. A quoted word is data, not a call.
-LAYERED := src/json.lua src/editor.lua src/wallet.lua src/store.lua \
+LAYERED := src/json.lua src/editor.lua src/fxplan.lua src/wallet.lua src/store.lua \
            src/anim.lua src/clock.lua src/i18n.lua src/lang/*.lua src/net/*.lua
 
 check-layering: ## Assert net, json, editor, wallet, store, anim, clock and i18n never touch love

@@ -512,6 +512,8 @@ end
 --- different ideas of the state.
 function App:display_state()
   return {
+    -- Signed in: the row grows a fifth button, the way out.
+    authed = (self.session and self.session.authed) and true or false,
     fullscreen = Layout.fullscreen,
     -- "auto" | "portrait" | "landscape" — the *state*, pin included.
     orientation = Layout.orientationLabel(),
@@ -562,7 +564,41 @@ function App:display_pressed(x, y)
     self:set_lang(I18n.cycle())
     return true
   end
+  if inside(rects.logout) then
+    self:logout()
+    return true
+  end
   return false
+end
+
+--- Sign out, from any screen.
+---
+--- The browser client's address chip does this (`frontend/src/ui/chrome.ts`:
+--- the wallet *is* the account, so the thing showing who you are is the
+--- thing that stops being you). Here the verb sits in the footer's control
+--- row beside the other four, drawn only while signed in — this client had
+--- a login with a server field, a phrase and a name, and no way back to it
+--- short of deleting the store by hand.
+---
+--- Order matters. The socket is closed first, while the token is still
+--- held, so the "closed with no token" route to the login screen does not
+--- fire on top of the one below; then the token is forgotten here and on
+--- disk (`Session:logout`, which fires `need_login` and that takes us to the
+--- login screen); then a fresh, anonymous connection is opened for whoever
+--- signs in next — the old one was authenticated with a token that is now
+--- nobody's. The scene that was open gets its `leave`, so the playground
+--- saves what was being typed.
+function App:logout()
+  if not (self.session and self.session.authed) then return false end
+  SFX.play("back")
+  self.logged_out_notice = I18n.t("signed out")
+  self.client:close(1000, "logout")
+  self.session:logout()
+  if self.scene_name ~= "login" then self:go("login") end
+  self.client.auto_reconnect = true
+  self.client:connect()
+  self.toast_left = 0
+  return true
 end
 
 --- Change the interface language, and remember it.

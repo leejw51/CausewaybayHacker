@@ -40,6 +40,10 @@ Editor.__index = Editor
 M.Editor = Editor
 
 M.TAB_WIDTH = 4
+--- The brackets that close themselves when `auto_close` is on, and what
+--- closes them. `"` is in the list because a string is the other thing a
+--- person opens and forgets.
+M.PAIRS = { ["("] = ")", ["["] = "]", ["{"] = "}", ['"'] = '"' }
 --- Typing within this many seconds folds into the previous undo entry, so
 --- ctrl-Z takes back a word rather than a letter.
 M.UNDO_COALESCE_S = 0.6
@@ -93,6 +97,10 @@ function M.byte_at_char(s, n)
   return i
 end
 
+-- Filled in under "events" below; forward-declared because the edits that
+-- report through them are defined first.
+local emit, pending_erase
+
 -- ------------------------------------------------------------------ construct
 
 --- `opts`:
@@ -117,6 +125,19 @@ function M.new(opts)
     -- it is computed once per change and not once per frame.
     rev = 0,
     bracket_cache = nil,
+    -- What the effects layer listens to: `function(ev)`, or nil. Every
+    -- user-driven edit — `textinput`, `newline`, `backspace`,
+    -- `delete_forward` — reports what it was (see `emit` below); the
+    -- programmatic ones (`set_text`, `replace_all`, `insert` called by a
+    -- scene) say nothing, so FORMAT is not a wall of bricks.
+    on_event = nil,
+    -- Whether `(`, `[`, `{` and `"` close themselves. Off by default so a
+    -- test that types a program byte for byte still gets exactly its bytes;
+    -- the scenes turn it on, and the ANSWER drill turns it back off.
+    auto_close = opts.auto_close or false,
+    -- Which land's loop keywords `loop_closed` reads: "rust", "go", "cpp"
+    -- or "python". Nil reads like Rust.
+    lang = opts.lang,
     -- The origin span of a mouse drag: nil when no button is down.
     drag = nil,
     undo_stack = {},
@@ -511,7 +532,10 @@ function Editor:newline()
   if self.read_only then return end
   self:bump()
   self:push_undo(false)
+  local erased = pending_erase(self)
   self:delete_selection()
+  local ol, oc = M.loop_closed_by_newline(self.lines, self.line, self.col, self.lang)
+  local left_line, left_col = self.line, self.col - 1
   local current = self.lines[self.line]
   local head, tail = current:sub(1, self.col - 1), current:sub(self.col)
   local indent = indent_of(current)
@@ -535,6 +559,11 @@ function Editor:newline()
   end
   self.dirty = true
   self.goal_char = nil
+  if erased then emit(self, erased) end
+  emit(self, { kind = "enter", line = self.line, col = self.col })
+  if ol then
+    emit(self, { kind = "loop", open = { ol, oc }, close = { left_line, math.max(1, left_col) } })
+  end
 end
 
 function Editor:backspace()
@@ -542,8 +571,10 @@ function Editor:backspace()
   self:bump()
   if self:has_selection() then
     self:push_undo(false)
+    local erased = pending_erase(self)
     self:delete_selection()
     self.dirty = true
+    emit(self, erased)
     return
   end
   if self.col > 1 then
@@ -551,16 +582,24 @@ function Editor:backspace()
     local line = self.lines[self.line]
     -- Inside leading whitespace, one backspace eats a whole indent level.
     local before = line:sub(1, self.col - 1)
+    local prev = M.prev_boundary(line, self.col)
+    local gone = line:sub(prev, self.col - 1)
     if before:match("^ +$") and #before % self.tab_width == 0 then
       local back = self.tab_width
       self.lines[self.line] = line:sub(1, self.col - 1 - back) .. line:sub(self.col)
       self.col = self.col - back
+      gone = string.rep(" ", back)
+    elseif self.auto_close and M.PAIRS[gone] and line:sub(self.col, self.col) == M.PAIRS[gone] then
+      -- Backspace inside a pair the editor made takes both halves.
+      self.lines[self.line] = line:sub(1, prev - 1) .. line:sub(self.col + 1)
+      self.col = prev
     else
-      local prev = M.prev_boundary(line, self.col)
       self.lines[self.line] = line:sub(1, prev - 1) .. line:sub(self.col)
       self.col = prev
     end
     self.dirty = true
+    emit(self, { kind = "erase", line = self.line, col = self.col, text = gone,
+      tones = { M.tone_at(line, prev) } })
   elseif self.line > 1 then
     self:push_undo(false)
     local above = self.lines[self.line - 1]
@@ -569,6 +608,7 @@ function Editor:backspace()
     self.col = #above + 1
     self.lines[self.line] = above .. here
     self.dirty = true
+    emit(self, { kind = "erase", line = self.line, col = self.col, text = "\n", tones = { "text" } })
   end
   self.goal_char = nil
 end
@@ -578,21 +618,27 @@ function Editor:delete_forward()
   self:bump()
   if self:has_selection() then
     self:push_undo(false)
+    local erased = pending_erase(self)
     self:delete_selection()
     self.dirty = true
+    emit(self, erased)
     return
   end
   local line = self.lines[self.line]
   if self.col <= #line then
     self:push_undo(true)
     local nextb = M.next_boundary(line, self.col)
+    local gone = line:sub(self.col, nextb - 1)
+    local tone = M.tone_at(line, self.col)
     self.lines[self.line] = line:sub(1, self.col - 1) .. line:sub(nextb)
     self.dirty = true
+    emit(self, { kind = "erase", line = self.line, col = self.col, text = gone, tones = { tone } })
   elseif self.line < #self.lines then
     self:push_undo(false)
     local below = table.remove(self.lines, self.line + 1)
     self.lines[self.line] = line .. below
     self.dirty = true
+    emit(self, { kind = "erase", line = self.line, col = self.col, text = "\n", tones = { "text" } })
   end
   self.goal_char = nil
 end
@@ -1101,9 +1147,202 @@ end
 -- ------------------------------------------------------------------- input
 
 --- A printable character from `love.textinput`.
+-- ------------------------------------------------------------------ events
+--
+-- What typing *does*, for the effects layer (`src/codefx.lua`). The editor is
+-- the game's controller on the code screens, and a controller that only says
+-- "the buffer changed" is a controller with one button. So each user-driven
+-- edit reports what it was, with `(line, col)` positions the pane can turn
+-- into pixels:
+--
+--   { kind = "type",  line, col, text, tone }          -- caret after it
+--   { kind = "erase", line, col, text, tones }         -- where it started
+--   { kind = "enter", line, col }                      -- caret on the new line
+--   { kind = "loop",  open = {line, col}, close = {line, col} }
+--
+-- `tone` is the highlighter's kind for the character (keyword, string, …)
+-- or "bracket"; `tones` is one per byte of `text`. Pure, so the rules are
+-- under `tests/test_fxplan.lua`.
+
+emit = function(self, ev)
+  if self.on_event then self.on_event(ev) end
+end
+
+--- The highlighter's kind for the byte at `col` of `line`, "bracket" for a
+--- bracket, "text" for whitespace and anything else.
+function M.tone_at(line, col)
+  local ch = line:sub(col, col)
+  if ch == "" then return "text" end
+  if ("()[]{}"):find(ch, 1, true) then return "bracket" end
+  local spans = M.highlight(line, "code")
+  local at = 1
+  for _, span in ipairs(spans) do
+    if col < at + #span.text then return span.kind end
+    at = at + #span.text
+  end
+  return "text"
+end
+
+--- One tone per byte of `lines[l1]:sub(c1)` … `lines[l2]:sub(1, c2 - 1)`,
+--- read before the range is removed. Newlines are "text".
+local function tones_for(lines, l1, c1, l2, c2)
+  local out = {}
+  for index = l1, l2 do
+    local line = lines[index] or ""
+    local from = (index == l1) and c1 or 1
+    local to = (index == l2) and (c2 - 1) or #line
+    local spans = M.highlight(line, "code")
+    local kinds, at = {}, 1
+    for _, span in ipairs(spans) do
+      for _ = 1, #span.text do
+        kinds[at] = span.kind
+        at = at + 1
+      end
+    end
+    for col = from, to do
+      local ch = line:sub(col, col)
+      if ("()[]{}"):find(ch, 1, true) then
+        out[#out + 1] = "bracket"
+      else
+        out[#out + 1] = kinds[col] or "text"
+      end
+    end
+    if index < l2 then out[#out + 1] = "text" end
+  end
+  return out
+end
+
+--- The loop keywords per land, as the statement a brace closes must start.
+local LOOP_HEAD = {
+  rust = { "^%s*'?[%w_]*:?%s*for%f[^%w_]", "^%s*'?[%w_]*:?%s*while%f[^%w_]", "^%s*'?[%w_]*:?%s*loop%f[^%w_]" },
+  go = { "^%s*for%f[^%w_]" },
+  cpp = { "^%s*for%f[^%w_]", "^%s*while%f[^%w_]" },
+}
+LOOP_HEAD.python = { "^%s*for%f[^%w_]", "^%s*while%f[^%w_]" }
+
+local function loop_head(lang, head)
+  for _, pat in ipairs(LOOP_HEAD[lang] or LOOP_HEAD.rust) do
+    if head:find(pat) then return true end
+  end
+  return false
+end
+
+--- Whether the `}` at `(line, col)` of `lines` closes a loop, and where the
+--- loop's keyword is.
+---
+--- The brace is looked up in the bracket analysis — so a `}` inside a string
+--- or a comment, which the highlighter says is not punctuation, is not a
+--- closer — and its partner's line is read up to the opener: a loop is
+--- `for …`, `while …` or Rust's `loop`, with an optional label. Returns the
+--- keyword's `(line, col)` or nil.
+function M.loop_closed_by_brace(lines, line, col, lang)
+  local at = M.brackets(lines)
+  local entry = at[M.bracket_key(line, col)]
+  if not (entry and entry.char == "}" and entry.partner) then return nil end
+  local opener = entry.partner
+  local head = (lines[opener.line] or ""):sub(1, opener.col - 1)
+  if not loop_head(lang, head) then return nil end
+  local first = head:find("%S") or 1
+  return opener.line, first
+end
+
+--- C++'s `do { … } while (cond);` closes on its `;`, not its brace: the `}`
+--- the `while (…);` follows is looked up and its opener's line must be `do`.
+function M.loop_closed_by_semicolon(lines, line, col, lang)
+  if lang ~= "cpp" then return nil end
+  local text = lines[line] or ""
+  if col ~= #text then return nil end
+  -- The `}` that the `while (…);` follows — wherever on the line it is, so
+  -- `do { x++; } while (x < 3);` on one line counts as well as three.
+  local brace = text:find("}%s*while%s*%b()%s*;$")
+  if not brace then return nil end
+  local at = M.brackets(lines)
+  local entry = at[M.bracket_key(line, brace)]
+  if not (entry and entry.partner) then return nil end
+  local opener = entry.partner
+  local head = (lines[opener.line] or ""):sub(1, opener.col - 1)
+  if not head:find("^%s*do%s*$") then return nil end
+  return opener.line, head:find("%S") or 1
+end
+
+--- Python has no closer, so a loop is done when its body has something in
+--- it: ENTER at the end of the *first* body line — the line right under a
+--- `for …:` / `while …:` header, indented deeper than it — and only that
+--- line, or every line of a long body would be a celebration. `line` is the
+--- line being left, before the newline goes in.
+function M.loop_closed_by_newline(lines, line, col, lang)
+  if lang ~= "python" then return nil end
+  local text = lines[line] or ""
+  if col ~= #text + 1 or text:find("^%s*$") then return nil end
+  local header = lines[line - 1]
+  if not header then return nil end
+  if not (loop_head("python", header) and header:find(":%s*$")) then return nil end
+  local hi = #(header:match("^%s*") or "")
+  local ti = #(text:match("^%s*") or "")
+  if ti <= hi then return nil end
+  return line - 1, hi + 1
+end
+
+--- The erase event for the current selection, computed before it goes.
+pending_erase = function(self)
+  local l1, c1, l2, c2 = self:selection()
+  if not l1 then return nil end
+  return {
+    kind = "erase", line = l1, col = c1,
+    text = self:selected_text(),
+    tones = tones_for(self.lines, l1, c1, l2, c2),
+  }
+end
+
 function Editor:textinput(text)
   if self.read_only then return end
+  local erased = pending_erase(self)
+  local line = self.lines[self.line]
+  local after = line:sub(self.col, self.col)
+  if self.auto_close and not erased and #text == 1 then
+    -- Typing the closer the editor already put there steps over it.
+    if M.PAIRS[text] == nil and (")]}"):find(text, 1, true) and after == text then
+      self:bump()
+      self.col = self.col + 1
+      emit(self, { kind = "type", line = self.line, col = self.col, text = text, tone = "bracket" })
+      return
+    end
+    if text == '"' and after == '"' then
+      self:bump()
+      self.col = self.col + 1
+      emit(self, { kind = "type", line = self.line, col = self.col, text = text, tone = "string" })
+      return
+    end
+    local closer = M.PAIRS[text]
+    -- An opener closes itself when nothing is pressed up against its right:
+    -- end of line, a space, or another closer. Typed against a word it is
+    -- the person's own bracket, and a quote after a letter is an apostrophe
+    -- in disguise.
+    local before = line:sub(self.col - 1, self.col - 1)
+    local open_here = closer and (after == "" or after:match("[%s%)%]}]"))
+      and not (text == '"' and before:match("[%w_]"))
+    if open_here then
+      self:insert(text .. closer, true)
+      self.col = self.col - #closer
+      emit(self, { kind = "type", line = self.line, col = self.col, text = text,
+        tone = text == '"' and "string" or "bracket" })
+      return
+    end
+  end
   self:insert(text, true)
+  if erased then emit(self, erased) end
+  local tone = M.tone_at(self.lines[self.line], self.col - 1)
+  emit(self, { kind = "type", line = self.line, col = self.col, text = text, tone = tone })
+  local last = text:sub(-1)
+  local ol, oc
+  if last == "}" then
+    ol, oc = M.loop_closed_by_brace(self.lines, self.line, self.col - 1, self.lang)
+  elseif last == ";" then
+    ol, oc = M.loop_closed_by_semicolon(self.lines, self.line, self.col - 1, self.lang)
+  end
+  if ol then
+    emit(self, { kind = "loop", open = { ol, oc }, close = { self.line, self.col - 1 } })
+  end
 end
 
 --- A key from `love.keypressed`.
