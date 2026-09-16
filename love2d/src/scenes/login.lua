@@ -45,19 +45,35 @@ local UI = require("src.ui")
 local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Wallet = require("src.wallet")
+local Username = require("src.username")
 local App = require("src.app")
 
 local Login = {}
 Login.__index = Login
 
-local FIELDS = { "secret", "name", "server" }
+-- The rows TAB walks, in the order they are drawn. `index` sits directly under
+-- the phrase because it changes what the phrase *means*: one phrase is many
+-- accounts, and `m/44'/60'/0'/0/i` decides which one you are about to be.
+--- The last account index `m/44'/60'/0'/0/i` can hold: the element is a
+--- non-hardened child, so it runs to 2^31 - 1.
+local MAX_INDEX = 2147483647
+
+local FIELDS = { "secret", "index", "name", "server" }
 
 function Login.new(app)
   return setmetatable({
     app = app,
     mode = "signin",
     secret = "",
+    -- A string rather than a number, because it is a text field: what is on
+    -- screen is what a person is midway through typing, and `""` between
+    -- clearing the box and typing the new number is a state the parser has to
+    -- accept rather than a state to prevent.
+    index = "0",
     name = "",
+    -- Set the moment somebody types in the name box. Until then the name
+    -- follows the address; after it, it is theirs and nothing rewrites it.
+    name_touched = false,
     focus = 1,
     reveal = false,
     status = nil,
@@ -191,6 +207,59 @@ end
 
 -- ------------------------------------------------------------------ signing
 
+--- The account index in the box, as a number the derivation will take.
+---
+--- Every way a text box fails to be a number resolves to **an index**, never
+--- to an error: an empty box is somebody midway through typing and a login
+--- screen that refused it would be shouting at them for pressing backspace.
+--- Past the end of the path it clamps rather than wraps — a pasted twenty
+--- digits lands on the last real account instead of quietly becoming a
+--- different one.
+function Login:account_index()
+  local n = tonumber(self.index)
+  if not n or n ~= n or n < 0 then return 0 end
+  return math.min(math.floor(n), MAX_INDEX)
+end
+
+--- Throw away the derived address, so the next `update` works it out again.
+---
+--- Called from every edit to the phrase or the index. The derivation itself
+--- is not done here: it is PBKDF2 and it belongs on a frame that is not also
+--- handling a keystroke.
+function Login:forget_preview()
+  self.preview = nil
+  self.preview_key = nil
+end
+
+--- Derive the address the current phrase and index produce, at most once per
+--- change, and put the name it implies in the name box.
+---
+--- Deliberately lazy. A phrase is turned into a seed by PBKDF2 with 2048
+--- rounds; doing that on the keystroke would drop frames in the middle of
+--- somebody typing twelve words. Doing it here means the address and the name
+--- appear a frame after the typing stops, which is what they are for.
+function Login:refresh_preview()
+  if not self.app.wallet_lib then return end
+  local key = self.secret .. "\0" .. self.index
+  if self.preview_key == key then return end
+  self.preview_key = key
+  self.preview = nil
+  if self.secret == "" then
+    if not self.name_touched then self.name = "" end
+    return
+  end
+  local ok, reply = pcall(Wallet.derive, self.app.wallet_lib, self.secret, self:account_index())
+  if not ok or type(reply) ~= "table" or not reply.address then
+    -- Half a phrase is not an error worth showing; it is just not an address
+    -- yet. The box keeps whatever it had.
+    return
+  end
+  self.preview = reply.address
+  if not self.name_touched then
+    self.name = Username.of(self.app.wallet_lib, reply.address) or self.name
+  end
+end
+
 --- `phrase` defaults to whatever is in the sign-in field.
 function Login:submit(phrase)
   phrase = phrase or self.secret
@@ -225,7 +294,11 @@ function Login:submit(phrase)
   self.secret = ""
   self:discard()
 
-  self.app.session:login(phrase, 0, self.name ~= "" and self.name or nil, function(ok, message)
+  -- The index the box was showing when ENTER was pressed. `self.index` is
+  -- about to survive this call — it is a preference, not key material — but
+  -- the number is read *now*, beside the phrase it belongs to.
+  local index = self:account_index()
+  self.app.session:login(phrase, index, self.name ~= "" and self.name or nil, function(ok, message)
     self.busy = false
     self.status = nil
     if ok then
@@ -241,6 +314,7 @@ end
 
 function Login:update(dt)
   self.t = self.t + dt
+  if self.mode == "signin" and not self.busy then self:refresh_preview() end
 end
 
 --- Play the opening, on purpose.
@@ -533,16 +607,38 @@ function Login:rows_signin(inner)
       shape = words == 1 and I18n.t("%d word", 1) or I18n.t("%d words", words)
     end
     UI.text(shape, 0, y, 8, Theme.withAlpha(Theme.cream, 0.6))
-    local path = "m/44'/60'/0'/0/0"
+    -- The real path, not a picture of one. It used to read
+    -- `m/44'/60'/0'/0/0` whatever the account was, which was true only
+    -- because there was no way to be any other account.
+    local path = ("m/44'/60'/0'/0/%d"):format(self:account_index())
     UI.text(path, inner - UI.textWidth(path, 8), y, 8, Theme.withAlpha(Theme.cream, 0.5))
   end)
 
-  field(2, I18n.t("DISPLAY NAME  (OPTIONAL)"), self.name, "hacker")
+  -- **The account index, under the phrase it indexes into.**
+  field(2, I18n.t("ACCOUNT  (ONE PHRASE IS MANY)"), self.index, "0")
+
+  -- The address all of it produces, so somebody can see which of their
+  -- wallets they are about to become before pressing ENTER rather than
+  -- finding out by arriving as somebody else.
+  put(lh8, function(y)
+    if self.preview then
+      -- **Fitted, not wrapped.** `UI.text` only wraps when it is given both an
+      -- align and a width, so the obvious `nil, inner` drew the address
+      -- unwrapped and ran it off the side of the panel — which is the exact
+      -- fault `tests/drive/typeaudit.lua` exists to catch, found by it, in
+      -- code written after it. An address is one token and wrapping it across
+      -- two lines reads as two addresses, so it shrinks to fit instead.
+      local size = UI.fitSize(self.preview, inner, 8, 5)
+      UI.text(self.preview, 0, y, size, Theme.coin)
+    end
+  end)
+
+  field(3, I18n.t("DISPLAY NAME  (OPTIONAL)"), self.name, I18n.t("filled in from the address"))
 
   -- The server. On this screen because `CWBH_SERVER` is not discoverable
   -- from inside the game, and the backend now runs on `0.0.0.0` so a phone
   -- on the same tailnet is a real thing somebody wants to point at.
-  field(3, I18n.t("SERVER  (ENTER APPLIES)"), self.server, App.DEFAULT_SERVER, 4)
+  field(4, I18n.t("SERVER  (ENTER APPLIES)"), self.server, App.DEFAULT_SERVER, 4)
 
   -- The line under it: a refusal, the override, or the live state. Two lines
   -- when there is something two lines long to say — the override sentence is
@@ -743,7 +839,18 @@ function Login:textinput(text)
   if self.busy or not self.app.wallet_lib then return end
   if self.mode ~= "signin" then return end
   local name = self:field()
+  if name == "index" then
+    -- Digits only, in the box itself, so what is on screen is what will be
+    -- derived from. Anything else is simply not taken.
+    text = text:gsub("%D", "")
+    if text == "" then return end
+    self[name] = (self[name] .. text):sub(1, 10)
+    self:forget_preview()
+    return
+  end
   self[name] = self[name] .. text
+  if name == "name" then self.name_touched = true end
+  if name == "secret" then self:forget_preview() end
   if name == "server" then self.server_error = nil end
 end
 
@@ -801,12 +908,24 @@ function Login:keypressed(key, mods)
     else
       self[name] = self[name]:sub(1, -2)
     end
+    if name == "name" then self.name_touched = true end
+    if name == "secret" or name == "index" then self:forget_preview() end
     return true
   end
   if key == "v" and cmd then
     local text = love.system.getClipboardText() or ""
+    local name = self:field()
+    if name == "index" then
+      -- A pasted index is digits or it is nothing; a phrase pasted into the
+      -- wrong box should not silently become account 0.
+      self[name] = (self[name] .. text:gsub("%D", "")):sub(1, 10)
+      self:forget_preview()
+      return true
+    end
     -- A pasted phrase arrives with whatever the source wrapped it in.
-    self[self:field()] = self[self:field()] .. text:gsub("%s+", " "):gsub("^%s", "")
+    self[name] = self[name] .. text:gsub("%s+", " "):gsub("^%s", "")
+    if name == "name" then self.name_touched = true end
+    if name == "secret" then self:forget_preview() end
     return true
   end
   if key == "return" or key == "kpenter" then

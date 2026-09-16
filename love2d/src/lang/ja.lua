@@ -28,6 +28,8 @@ return {
   ["COMPILE %dms   RUN %dms   EXIT %s"] = "COMPILE %dms   RUN %dms   EXIT %s",
   ["CWBH_SERVER=%s is overriding this run — the field is saved for next launch"] = "CWBH_SERVER=%s が今回の実行を上書きしています — 入力した値は次回の起動用に保存されます",
   ["DISPLAY NAME  (OPTIONAL)"] = "表示名  (任意)",
+  ["ACCOUNT  (ONE PHRASE IS MANY)"] = "アカウント  (1つのフレーズに複数)",
+  ["filled in from the address"] = "アドレスから自動入力されます",
   ["Deriving an address needs the small Rust library in love2d/ffi. Build it once and restart:"] = "アドレスの導出には love2d/ffi の小さな Rust ライブラリが必要です。一度ビルドして再起動してください:",
   ["ENTER create and sign in   C copy   ESC cancel"] = "ENTER 作成してサインイン   C コピー   ESC キャンセル",
   ["FORMAT is not on this server yet"] = "このサーバーにはまだ FORMAT がありません",

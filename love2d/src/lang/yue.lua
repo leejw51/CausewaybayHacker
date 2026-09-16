@@ -30,6 +30,8 @@ return {
   ["COMPILE %dms   RUN %dms   EXIT %s"] = "COMPILE %dms   RUN %dms   EXIT %s",
   ["CWBH_SERVER=%s is overriding this run — the field is saved for next launch"] = "CWBH_SERVER=%s 蓋過咗今次嘅設定 — 你入嘅值會留到下次開機先用",
   ["DISPLAY NAME  (OPTIONAL)"] = "顯示名稱  (可以唔填)",
+  ["ACCOUNT  (ONE PHRASE IS MANY)"] = "戶口  (一個助記詞可以有好多個)",
+  ["filled in from the address"] = "根據地址自動填",
   ["Deriving an address needs the small Rust library in love2d/ffi. Build it once and restart:"] = "要計出地址就要用 love2d/ffi 入面嗰個細細嘅 Rust library。Build 一次然後重新開過:",
   ["ENTER create and sign in   C copy   ESC cancel"] = "ENTER 建立同登入   C 複製   ESC 取消",
   ["FORMAT is not on this server yet"] = "呢部 server 仲未有 FORMAT",

@@ -29,6 +29,8 @@ return {
   ["COMPILE %dms   RUN %dms   EXIT %s"] = "COMPILE %dms   RUN %dms   EXIT %s",
   ["CWBH_SERVER=%s is overriding this run — the field is saved for next launch"] = "CWBH_SERVER=%s 覆盖了本次运行 — 你填的值会留到下次启动",
   ["DISPLAY NAME  (OPTIONAL)"] = "显示名称  (可选)",
+  ["ACCOUNT  (ONE PHRASE IS MANY)"] = "账户  (一个助记词多个账户)",
+  ["filled in from the address"] = "根据地址自动填写",
   ["Deriving an address needs the small Rust library in love2d/ffi. Build it once and restart:"] = "推导地址需要 love2d/ffi 里的那个小 Rust 库。构建一次然后重新启动:",
   ["ENTER create and sign in   C copy   ESC cancel"] = "ENTER 创建并登录   C 复制   ESC 取消",
   ["FORMAT is not on this server yet"] = "这台服务器上还没有 FORMAT",

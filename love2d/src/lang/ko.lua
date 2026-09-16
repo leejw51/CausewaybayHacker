@@ -26,6 +26,8 @@ return {
   ["COMPILE %dms   RUN %dms   EXIT %s"] = "COMPILE %dms   RUN %dms   EXIT %s",
   ["CWBH_SERVER=%s is overriding this run — the field is saved for next launch"] = "CWBH_SERVER=%s 가 이번 실행을 덮어씁니다 — 입력한 값은 다음 실행을 위해 저장됩니다",
   ["DISPLAY NAME  (OPTIONAL)"] = "표시 이름  (선택)",
+  ["ACCOUNT  (ONE PHRASE IS MANY)"] = "계정  (한 구문에 여러 계정)",
+  ["filled in from the address"] = "주소에서 자동으로 채워집니다",
   ["Deriving an address needs the small Rust library in love2d/ffi. Build it once and restart:"] = "주소를 만들려면 love2d/ffi 에 있는 작은 Rust 라이브러리가 필요합니다. 한 번 빌드하고 다시 시작하세요:",
   ["ENTER create and sign in   C copy   ESC cancel"] = "ENTER 생성 후 로그인   C 복사   ESC 취소",
   ["FORMAT is not on this server yet"] = "이 서버에는 아직 FORMAT 이 없습니다",

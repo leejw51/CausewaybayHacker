@@ -175,6 +175,10 @@ pub fn describe() -> serde_json::Value {
             { "op": "eip191",
               "in": ["message|message_hex"],
               "out": ["digest","message_len"] },
+            { "op": "keccak",
+              "in": ["message|message_hex"],
+              "out": ["digest","message_len"],
+              "note": "raw keccak256, no §3.2 envelope; no key material involved" },
             { "op": "sign",
               "in": ["mnemonic|private_key", "index?", "passphrase?", "message|message_hex"],
               "out": ["address","signature","digest","v","recovery_id"] },
@@ -301,6 +305,28 @@ fn run(request_json: &str) -> Result<serde_json::Value, String> {
             Ok(json!({
                 "ok": true,
                 "digest": format!("0x{}", hex::encode(evm::eip191_digest(&msg))),
+                "message_len": msg.len(),
+            }))
+        }
+
+        // Raw keccak256 over the bytes given, with nothing prepended.
+        //
+        // `eip191` is the other hash this library does and is deliberately not
+        // this one: it prefixes the §3.2 envelope, which is right for a
+        // signature and wrong for anything else. The caller with a use for
+        // this is the login screen, which derives a display name from the
+        // address (`src/username.lua`) and would otherwise need a keccak
+        // implementation in Lua.
+        //
+        // It touches no key material, which is why it is allowed to take
+        // arbitrary input at all: hashing a *secret* here would be a way to
+        // ask this library a question about a key, and it does not answer
+        // those.
+        "keccak" => {
+            let msg = message_bytes(&req)?;
+            Ok(json!({
+                "ok": true,
+                "digest": format!("0x{}", hex::encode(evm::keccak256(&msg))),
                 "message_len": msg.len(),
             }))
         }

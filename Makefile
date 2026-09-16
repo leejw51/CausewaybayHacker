@@ -245,7 +245,13 @@ test-all: ## every suite, one command, with an honest summary of what was skippe
 test-all-list: ## what test-all would run, and why anything would not
 	node tests/run-all.mjs --list
 
-test: test-be test-fe ## the Rust and TypeScript suites (fast; see test-all)
+# All three clients share one protocol and now one derivation — the display
+# name is implemented in Rust, TypeScript and Lua, and the three agree only
+# because the same vectors are asserted in each. Running two of the three and
+# calling it `test` is how they would drift.
+#
+# The LÖVE suite is headless and needs `luajit`, not a LÖVE binary or a window.
+test: test-be test-fe test-love ## the Rust, TypeScript and LÖVE suites (see test-all)
 test-be: ## the Rust suite (add ARGS="-- --ignored" for the content check)
 	cd backend && cargo test --workspace $(ARGS)
 test-fe: ## the TypeScript suite

@@ -38,6 +38,8 @@ return {
   ["COMPILE %dms   RUN %dms   EXIT %s"] = "COMPILE %dms   RUN %dms   EXIT %s",
   ["CWBH_SERVER=%s is overriding this run — the field is saved for next launch"] = "CWBH_SERVER=%s přebíjí tento běh — zadaná hodnota se uloží na příští spuštění",
   ["DISPLAY NAME  (OPTIONAL)"] = "ZOBRAZOVANÉ JMÉNO  (NEPOVINNÉ)",
+  ["ACCOUNT  (ONE PHRASE IS MANY)"] = "ÚČET  (JEDNA FRÁZE, VÍC ÚČTŮ)",
+  ["filled in from the address"] = "vyplněno z adresy",
   ["Deriving an address needs the small Rust library in love2d/ffi. Build it once and restart:"] = "Odvození adresy potřebuje malou Rust knihovnu v love2d/ffi. Jednou ji sestav a restartuj:",
   ["ENTER create and sign in   C copy   ESC cancel"] = "ENTER vytvořit a přihlásit   C kopírovat   ESC zrušit",
   ["FORMAT is not on this server yet"] = "FORMAT na tomto serveru zatím není",

@@ -259,6 +259,15 @@ function M.derive(lib, secret, index)
   return M.execute(lib, req)
 end
 
+--- Raw keccak256 over a string, with no §3.2 envelope in front of it.
+---
+--- The one caller is `src/username.lua`, deriving a display name from an
+--- address. It is deliberately not `M.eip191`: that prefixes the signing
+--- envelope, which is right for a signature and wrong for a name.
+function M.keccak(lib, text)
+  return M.execute(lib, { op = "keccak", message = text })
+end
+
 --- PROTOCOL §4.3: sign the EIP-191 digest of `message`.
 ---
 --- `message` is the server's string **verbatim**. Nothing here rebuilds it
