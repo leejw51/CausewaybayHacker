@@ -116,10 +116,11 @@ function Playground.new(app)
     query = "",
     finding = false,
     -- POSTER and DISK READER (`src/poster.lua`, `src/diskreader.lua`).
-    -- The key for the stamp: this client forgets the phrase the moment the
-    -- login signature exists (SPEC §3.1), so the poster asks for it again,
-    -- in place, and holds it **for this screen only** — `leave` drops it.
-    -- The browser client holds it for the tab; a screen is this client's tab.
+    -- The key for the stamp. The session keeps the phrase it signed in
+    -- with for the run (`Session:signer`), the browser's rule for its tab;
+    -- a session resumed from its token has none, so then the poster asks
+    -- for it, in place, and holds it **for this screen only** — `leave`
+    -- drops it.
     secret = nil,
     secret_index = 0,
     stamp_edit = nil,   -- what is in the key field; nil when it is closed
@@ -1263,8 +1264,9 @@ end
 --- The signature is EIP-191 over the source and only the source — the same
 --- scheme as the login challenge and as the browser client's poster, so one
 --- reader checks both. Made here because the key is here — or is not: this
---- client forgets the phrase after login, so with no key held the field opens
---- and `stamp_with` comes back to this. A stranger's key is dropped again at
+--- client keeps the phrase for the run after a login with one, and a session
+--- resumed from its token has none: then the field opens and `stamp_with`
+--- comes back to this. A stranger's key is dropped again at
 --- once; the right one stays for the screen.
 function Playground:poster()
   if self.postering then return end
@@ -1273,7 +1275,17 @@ function Playground:poster()
     self.note = "libcwbh_ffi is not built — " .. Wallet.BUILD_HINT
     return
   end
-  if not self.secret then return self:start_stamp() end
+  -- The session keeps the key it signed in with (`Session:signer`), the
+  -- way the browser holds it for the tab; a session resumed from its token
+  -- has none, and only then does the field open.
+  if not self.secret then
+    local signer = self.app.session:signer()
+    if signer then
+      self.secret, self.secret_index = signer.secret, signer.index
+    else
+      return self:start_stamp()
+    end
+  end
   self.postering = true
   local ok, err = pcall(function() self:make_poster(lib) end)
   self.postering = false

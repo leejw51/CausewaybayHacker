@@ -55,18 +55,17 @@ add({
   timeout = 3,
 })
 add({ wait = 0.3 })
--- POSTER with no key held: the field opens.
+-- POSTER straight after a login with the phrase: the session kept the key,
+-- so nothing is asked and the stamp is made at once.
 add({
   until_ = function(app)
+    if not app.session:signer() then return false end
     app.scene:poster()
-    return app.scene.focus == "stamp"
+    return app.scene.focus ~= "stamp"
   end,
-  note = "POSTER asks for the key",
+  note = "POSTER signs with the key the login used, without asking",
   timeout = 3,
 })
-add({ shot = "poster-01-key-field.png" })
-add({ text = MNEMONIC })
-add({ key = "return" })
 add({
   until_ = function(app)
     local note = tostring(app.scene.note or "")

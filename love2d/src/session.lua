@@ -203,11 +203,18 @@ end
 ---   1. derive the address locally, so the challenge can be asked for;
 ---   2. ask for the challenge — the server hands back a `message`;
 ---   3. sign **that exact string** (§4.2: "Do not reconstruct it from the
----      parts"), and drop the secret in the same breath;
+---      parts");
 ---   4. send only `{address, signature, name}`.
 ---
 --- At no point is `secret` put in a payload, a log line or a file. The only
 --- thing that leaves this function is 65 bytes of signature.
+---
+--- **The key stays for the run**, the way the browser holds it for the tab
+--- that logged in: once the login is accepted the secret moves to
+--- `self.held_key`, so the playground's POSTER can stamp without asking for
+--- the phrase the player typed a minute ago. A session resumed from its
+--- token never had a key and has no signer. `logout` and a failed login
+--- drop it. Read it through `Session:signer()`; never copy it anywhere.
 function Session:login(secret, index, name, cb)
   -- The account index is not a secret; the playground's POSTER derives
   -- the stamp key at the same one.
@@ -247,15 +254,15 @@ function Session:login(secret, index, name, cb)
     end
 
     local signed, sign_err = Wallet.sign(self.lib, holder.secret, index or 0, message)
-    -- The secret's job is done the instant a signature exists.
-    Wallet.forget(holder, "secret")
     secret = nil
 
     if not signed then
+      Wallet.forget(holder, "secret")
       cb(false, sign_err or "could not sign the challenge")
       return
     end
     if signed.address:lower() ~= account.address:lower() then
+      Wallet.forget(holder, "secret")
       cb(false, "the signature does not match the derived address")
       return
     end
@@ -268,12 +275,16 @@ function Session:login(secret, index, name, cb)
 
     self.client:request("auth.login", login_payload, function(ok2, payload2)
       if not ok2 then
+        Wallet.forget(holder, "secret")
         local why = errors.classify(payload2.code)
         self.last_error = why.player
         cb(false, why.player)
         return
       end
       self:adopt(payload2.token, payload2.user, payload2.position)
+      -- Signed in with a key in hand: keep it, for this account only.
+      self.held_key = { secret = holder.secret, index = index or 0, address = account.address }
+      Wallet.forget(holder, "secret")
       self:fire("auth", { user = self.user, position = self.position, resumed = false })
       cb(true, nil)
     end)
@@ -302,7 +313,29 @@ end
 --- Sign out: forget the token here and on disk. The server keeps the session
 --- alive until it expires, which is fine — nothing on this machine can use it.
 function Session:logout()
+  self:forget_signer()
   self:forget_token(nil)
+end
+
+--- The key this run signed in with — `{ secret, index, address }` — or nil
+--- when the session was resumed from a token and never had one.
+function Session:signer()
+  local s = self.held_key
+  if s and self.user and self.user.address
+    and s.address:lower() ~= tostring(self.user.address):lower() then
+    -- Not the account signed in any more: a stale key is worse than none.
+    self:forget_signer()
+    return nil
+  end
+  return s
+end
+
+function Session:forget_signer()
+  if self.held_key then
+    Wallet.forget(self.held_key, "secret")
+  end
+  self.held_key = nil
+  collectgarbage("step")
 end
 
 -- ----------------------------------------------------------------- requests

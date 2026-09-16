@@ -6532,12 +6532,16 @@ None touches a key; the binding refuses ABI 3 rather than offering a
 button that fails on the label. `ffi/src/disk.rs` tests a label drawn into
 a PNG and decoded back, and `recover` against the wallet's vectors.
 
-**The key, again.** This client forgets the phrase the moment the login
-signature exists, so POSTER with nothing held opens a masked field on the
-status line, derives what is typed at the index login used
-(`Session.index`), keeps it only if it is the account signed in, and holds
-it **for the screen** — `leave` drops it. The browser holds it for the tab;
-a screen is this client's tab.
+**The key, again.** This client used to forget the phrase the moment the
+login signature existed, so POSTER asked for it back a minute after it was
+typed — which read as a stamp that did not work. It now does what the
+browser does for the tab that logged in: `Session:login` keeps the key on
+the session (`Session:signer`, for that account only; `logout` drops it),
+and POSTER signs with it without asking. A session resumed from its token
+never had a key, and only then does the masked field open on the status
+line: it derives what is typed at the index login used (`Session.index`),
+keeps it only if it is the account signed in, and holds it **for the
+screen** — `leave` drops it.
 
 **DISK READER** takes a path typed into the same line, or a file dropped
 on the window (`love.filedropped`, new in `main.lua`), reads it through the

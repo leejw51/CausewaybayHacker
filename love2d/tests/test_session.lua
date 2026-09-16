@@ -346,4 +346,25 @@ return function()
     T.eq(#h.server():sent("auth.challenge"), 0)
     T.eq(#h.server():sent("auth.login"), 0)
   end)
+
+  T.section("session — the key stays for the run, and only for its own account")
+  T.case("the signer is handed out while it is the account signed in, and dropped when it is not", function()
+    local h = harness({ token = "t0" })
+    h.session.user = { address = "0xABC0" }
+    T.eq(h.session:signer(), nil, "a session resumed from its token has no key")
+    h.session.held_key = { secret = "abandon abandon abandon", index = 0, address = "0xabc0" }
+    T.ok(h.session:signer() ~= nil, "same account, case aside: the key is offered")
+    T.eq(h.session:signer().index, 0)
+    h.session.user = { address = "0xDEF0" }
+    T.eq(h.session:signer(), nil, "another account is signed in now: a stale key is worse than none")
+    T.eq(h.session.held_key, nil, "and it was dropped, not just hidden")
+  end)
+  T.case("logout forgets the key with the token", function()
+    local h = harness({ token = "t0" })
+    h.session.user = { address = "0xABC0" }
+    h.session.held_key = { secret = "abandon abandon abandon", index = 0, address = "0xABC0" }
+    h.session:logout()
+    T.eq(h.session.held_key, nil)
+    T.eq(h.session.token, nil)
+  end)
 end
