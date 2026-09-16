@@ -405,14 +405,34 @@ function Stats:draw_mistake(x, y, w, m)
   else
     said = I18n.t("%d clean submits since — %d to go", since, Stats.LEARNED_AT - since)
   end
-  -- Beside the five-step track, in whatever is left of the row.
+  -- **Beside the five-step track when the sentence fits there, under it when
+  -- it does not.** The width used to be `math.max(40, …)`, which guarantees a
+  -- width and not a fit: where the track ate the row that floor handed a
+  -- translated sentence a column forty pixels wide, which is three Hangul
+  -- syllables. It did not overflow — it wrapped, into a tower that ran 191 px
+  -- past the bottom of the panel in Korean and Japanese against 22 px in
+  -- English, and the row below only ever cleared a single line of it.
+  --
+  -- So the sentence is measured against the room beside the track, and takes
+  -- the full width of the row underneath when that room cannot hold it.
+  -- `UI.paragraph` rather than `UI.text`, because `UI.text` returns one line's
+  -- height whatever it drew, and a row that advances by one line past a
+  -- sentence of four is how the tower stayed invisible.
+  local said_colour = learned and Theme.admit or Theme.coin
   local said_x = tx + Stats.LEARNED_AT * (step + gap) + 10
-  UI.text(said, said_x, y + 3, 7, learned and Theme.admit or Theme.coin,
-    "left", math.max(40, x + w - 14 - said_x))
+  local beside = x + w - 14 - said_x
+  local said_h
+  if beside >= UI.textWidth(said, 7) then
+    said_h = UI.paragraph(said, said_x, y + 3, beside, 7, said_colour)
+  else
+    -- From `x + 22` to the row's right margin at `x + w - 14`.
+    said_h = UI.lineHeight(7) + 2
+      + UI.paragraph(said, x + 22, y + 3 + UI.lineHeight(7) + 2, w - 36, 7, said_colour)
+  end
   -- The shackle is taller than the track, and the sentence beside it is a
   -- line of type that grows with the ladder — so this clears whichever of the
   -- three is tallest rather than a number that was right for one of them.
-  y = y + math.max(22, UI.lineHeight(7) + 10, note_h + 8)
+  y = y + math.max(22, said_h + 10, note_h + 8)
 
   if m.concepts and #m.concepts > 0 then
     y = y + UI.paragraph(I18n.t("drill: %s", table.concat(m.concepts, ", ")), x + 22, y,

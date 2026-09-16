@@ -215,18 +215,25 @@ function Result:draw()
   local timing = Clock.verdict_note(a)
   if timing then
     cy = cy + UI.text(timing, cx, cy, 9,
-      a.within_limit and Theme.admit or Theme.coin) + 6
+      a.within_limit and Theme.admit or Theme.coin, "left", column) + 6
   end
 
+  -- **Given the column, like everything else in this stack.** These three
+  -- were the only draws in the panel with no width, which means no wrap —
+  -- and this one is the longest line the screen has: `COMPILE 1595ms   RUN
+  -- 0ms   EXIT 1` ran a hundred pixels past the right edge of the *canvas*
+  -- in portrait, in all six languages. Not past the panel: past the window.
+  -- The other two are translated sentences, which is the same fault waiting
+  -- for a longer language.
   cy = cy + UI.text(I18n.t("COMPILE %dms   RUN %dms   EXIT %s",
     a.compile_ms or 0, a.run_ms or 0,
     a.exit_code == nil and "-" or tostring(a.exit_code)), cx, cy, 8,
-    Theme.withAlpha(Theme.cream, 0.75)) + 10
+    Theme.withAlpha(Theme.cream, 0.75), "left", column) + 10
 
   -- SPEC §0: the node is stamped CLEARED, for good.
   if is_run then
     cy = cy + UI.text(I18n.t("a run never clears a node — SUBMIT does"), cx, cy, 8,
-      Theme.withAlpha(Theme.cyan, 0.9)) + 10
+      Theme.withAlpha(Theme.cyan, 0.9), "left", column) + 10
   elseif a.cleared then
     UI.setColor(Theme.admit, 0.25)
     love.graphics.rectangle("fill", cx, cy, w - 32, 34)
