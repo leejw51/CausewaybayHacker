@@ -29,6 +29,8 @@
     "@noble/hashes": "^2.4.0",
     "@scure/bip32": "^2.4.0",
     "@scure/bip39": "^2.4.0",
+    "jsqr": "^1.4.0",
+    "qrcode-generator": "^1.5.2",
     "three": "^0.185.1"
   },
   "devDependencies": {

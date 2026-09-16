@@ -1127,3 +1127,25 @@ rerolls = 0
 note = "The editor's dust: the puff ENTER kicks up on the new line. Four frames of one puff dispersing, in one 3:2 render, cut by strip.py --grid; the shader picks a frame by how old the particle is, so a puff plays through its four frames as it fades."
 prompt = """\
 16-bit SNES pixel art sprite sheet on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not a cloud). FOUR separate puffs of dust in a single evenly spaced horizontal row, all roughly the same size, with a wide clear band of plain magenta between each one so they never touch or overlap. Each puff is a round, fluffy cartoon dust cloud in pale warm grey and cream, with a bold dark charcoal outline and flat cel shading, exactly like the little dust puff that appears behind a running character's feet in Super Mario World. From left to right the four puffs are four frames of one puff dispersing: FRAME 1 a tight dense round puff, FRAME 2 a slightly bigger puff with three lobes, FRAME 3 a wider puff breaking into pieces, FRAME 4 a thin wispy puff of scattered small clouds. Chunky hard-edged pixels, no anti-aliasing, no soft gradient, no drop shadow, no ground shadow, no pink or magenta anywhere inside the clouds. Absolutely no text, no letters, no words, no numbers, no frame borders, no grid lines, no boxes round the clouds."""
+
+[[asset]]
+name = "bg_poster"
+kind = "bg"
+aspect = "1:1"
+size = [1024, 1024]
+generated = "2026-09-16"
+rerolls = 0
+note = "The poster's sleeve (frontend/src/ui/poster.ts): the one square background in the set, because the poster is square. Night after rain so the sign panels glow; every panel blank, as always, and the ground line kept level so the disc has a table to lie on. First roll accepted."
+prompt = """\
+16-bit SNES pixel art painted background, SQUARE composition, in the style of Super Mario World and Wonder Boy in Monster World: SATURATED candy colours, high contrast, strong dark outlines on every object, NOT pastel, NOT washed out. Causeway Bay, Hong Kong, at night after rain. Looking down a narrow street: coral-pink and mint tenement towers on both sides rising past the top of the frame, gold bamboo scaffolding lashed up one of them, blank vertical shop sign panels in jade green, cyan, orange and violet projecting out over the street one above the other, every sign panel glowing but completely blank, air-conditioner boxes and laundry poles on every floor, a web of overhead tram wires against a deep cobalt night sky at the very top with a few stars, and at the bottom a bright blue double-decker tram nose under a street lamp and a wet reflective pavement. The street and pavement are flat and level across the bottom fifth of the frame. Chunky hard-edged pixels, heavy dithering, no anti-aliasing, no soft gradients, no drop shadow, no bevel, no lens flare. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere — every sign is a blank glowing panel. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "poster_seal"
+kind = "sprite"
+aspect = "1:1"
+size = [192, 192]
+generated = "2026-09-16"
+rerolls = 0
+note = "The wax seal over the poster's credits, greyed out when no key was unlocked to sign with. Deep red on purpose — a crimson with more blue in it would sit inside process.py's magenta predicate and be knocked out with the backdrop. The tram in the relief is the game's own mark; no lettering, as ever. First roll accepted."
+prompt = """\
+16-bit SNES pixel art game icon, ONE object, centred, filling most of the frame, seen flat-on from directly above. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a round wax seal: a thick blob of deep dark red wax with an irregular scalloped rim and a raised circular embossed centre, and embossed in the centre a small side view of a Hong Kong double-decker tram in gold relief. Deep dark red and brick red wax only, warm gold relief, dark brown outline. Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object)."""

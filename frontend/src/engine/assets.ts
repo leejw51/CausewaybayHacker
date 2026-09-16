@@ -181,6 +181,22 @@ export class Assets {
     return { frames: e.frames, fw: e.fw, fh: e.fh, boxes: e.boxes ?? [] };
   }
 
+  /**
+   * One image by name, **once it is here**.
+   *
+   * `picture` is for a frame: it answers with what has arrived and starts the
+   * rest. A render that happens once and is saved to a file — the poster —
+   * cannot draw a background that lands a frame later, so it waits for it.
+   * Null for a name the manifest does not have, or a file that failed.
+   */
+  async image(name: string): Promise<HTMLImageElement | null> {
+    const hit = this.images.get(name);
+    if (hit) return hit;
+    const e = this.entries.get(name);
+    if (!e) return null;
+    return this.fetch(e);
+  }
+
   /** Ask for a background ahead of time, so it is there when the street opens. */
   prefetch(name: string, portrait = false): void {
     this.picture(name, portrait);

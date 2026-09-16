@@ -18,7 +18,7 @@
  * cost work either.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, inkBox, inkCentreY, printf, width, wrap } from "../engine/text";
+import { elide, ensureFonts, inkBox, inkCentreY, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import {
   BTN_FRAME,
@@ -51,9 +51,12 @@ import { clipMessage, copyText, readText } from "../ui/clip";
 import { LogBuffer } from "../net/logbuf";
 import { WireError } from "../net/client";
 import { isLand, LANDS, playerText } from "../net/protocol";
-import { onLocale, t } from "../i18n";
+import { onLocale, t, tEn } from "../i18n";
 import type { Land, PlaygroundRun, RunStage, SnippetBrief } from "../net/protocol";
 import { LandsScene } from "./lands";
+import { isUnlocked, MAX_ACCOUNT_INDEX, signMessage, unlock, wipe } from "../wallet/wallet";
+import { INDEX_PREF } from "./login";
+import { deterministicUsername } from "../wallet/username";
 
 /** Where the open scratchpad is mirrored, so a reload opens it again. */
 /**
@@ -97,6 +100,15 @@ const STARTER: Record<Land, string> = {
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hello, causewaybay")\n}\n',
   cpp: '#include <iostream>\n\nint main() {\n    std::cout << "hello, causewaybay\\n";\n}\n',
   python: 'print("hello, causewaybay")\n',
+};
+
+/** The outcomes as the poster prints them: English, whatever the screen is in. */
+const EN_OUTCOME: Record<PlaygroundRun["outcome"], string> = {
+  ok: tEn("pg.ran"),
+  compile_error: tEn("pg.didNotCompile"),
+  runtime_error: tEn("pg.stopped"),
+  timeout: tEn("pg.timedOut"),
+  output_limit: tEn("pg.tooMuch"),
 };
 
 const OUTCOME: Record<PlaygroundRun["outcome"], () => string> = {
@@ -191,6 +203,23 @@ export class PlaygroundScene implements Scene {
   private dirty = false;
   private saving = false;
   private formatting = false;
+  /** POSTER is a render and a file write; a second press mid-way is ignored. */
+  private postering = false;
+  /** DISK READER's file picker. Made once; the browser owns the dialogue. */
+  private readonly diskEl: HTMLInputElement;
+  /**
+   * POSTER's key field, for the tab that has no key.
+   *
+   * A session resumed from its token — a reload, a second tab, tomorrow —
+   * knows who you are and cannot sign as you: the key was only ever in the
+   * tab that logged in (SPEC §3.1). So the stamp asks for the phrase or the
+   * private key here, in place, checks it derives the address that is signed
+   * in, and holds it for the rest of the tab, the way login does. Masked,
+   * emptied on every exit, never stored.
+   */
+  private readonly keyEl: HTMLInputElement;
+  private keyOverlay: Overlay | null = null;
+  private stamping = false;
 
   /**
    * CODE: the editor and nothing else.
@@ -317,6 +346,90 @@ export class PlaygroundScene implements Scene {
       }),
     );
     this.searchEl = find;
+
+    const disk = document.createElement("input");
+    disk.type = "file";
+    disk.accept = "image/*";
+    disk.style.display = "none";
+    disk.addEventListener("change", () => {
+      const f = disk.files?.[0];
+      disk.value = "";
+      if (f) void this.readDisk(f);
+    });
+    document.body.appendChild(disk);
+    this.diskEl = disk;
+
+    const key = document.createElement("input");
+    key.type = "password";
+    key.className = "cwb-field";
+    key.spellcheck = false;
+    key.autocomplete = "off";
+    key.placeholder = t("pg.stampKey");
+    this.offs.push(
+      onLocale(() => {
+        key.placeholder = t("pg.stampKey");
+      }),
+    );
+    key.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        this.stampWith(key.value);
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        this.stopStamp();
+      }
+    });
+    key.addEventListener("blur", () => {
+      // Clicking away is a cancel here, unlike RENAME: nothing typed into a
+      // key field should sit on screen unattended.
+      if (this.stamping) this.stopStamp();
+    });
+    this.keyEl = key;
+  }
+
+  /** Ask for the key, in the slot the pad's name is edited in. */
+  private startStamp(): void {
+    this.stamping = true;
+    this.keyEl.value = "";
+    this.saveNote = t("pg.stampAsk");
+    setTimeout(() => this.keyEl.focus(), 0);
+  }
+
+  /** Put the field away, and whatever was typed into it with it. */
+  private stopStamp(): void {
+    this.stamping = false;
+    this.keyEl.value = "";
+    this.keyOverlay?.hide();
+  }
+
+  /**
+   * Take what was typed as the key: derive it at the account index login
+   * used, and go on to the poster only if it is the account that is signed
+   * in. Anything else is wiped again at once — a stranger's key must not be
+   * left unlocked in a tab that is logged in as somebody else.
+   */
+  private stampWith(text: string): void {
+    const typed = text.trim();
+    this.stopStamp();
+    if (!typed) return;
+    const index = readNumberPref(INDEX_PREF, 0, 0, MAX_ACCOUNT_INDEX);
+    let who;
+    try {
+      who = unlock(typed, index);
+    } catch {
+      this.saveNote = t("pg.stampBadKey");
+      this.app.chip.fail();
+      return;
+    }
+    const me = this.app.addressLabel;
+    if (who.lower !== me.toLowerCase()) {
+      wipe();
+      this.saveNote = t("pg.stampWrongKey", { address: `${me.slice(0, 6)}…${me.slice(-4)}` });
+      this.app.chip.fail();
+      return;
+    }
+    this.app.chip.select();
+    void this.poster();
   }
 
   /** The pads the list is showing: all of them, or those the query matches. */
@@ -452,6 +565,187 @@ export class PlaygroundScene implements Scene {
     this.app.chip.blip();
   }
 
+  /**
+   * POSTER: the pad as one square PNG, signed by the wallet, saved to disk.
+   *
+   * The signature is EIP-191 over **the source and only the source**, made
+   * here because the key is here — `wallet.ts` hands out signatures and
+   * nothing else, and the server is never asked. After a reload the session
+   * is resumed from its token and the key is *not* in memory, so there is
+   * nothing to sign with: the poster is still made, with the seal greyed out
+   * and a note saying how to get a real one. Refusing to make it at all
+   * would punish the person for the thing the login screen told them was
+   * safe (the key never leaving the tab).
+   *
+   * The rest is in `ui/poster.ts`, loaded on the press: it pulls in the four
+   * grammars' parsers for the colouring and nobody pays for that on the way
+   * into the room.
+   */
+  private async poster(): Promise<void> {
+    if (this.postering) return;
+    if (!isUnlocked()) {
+      // No key in this tab: ask for it, and come back here from `stampWith`.
+      this.startStamp();
+      return;
+    }
+    this.postering = true;
+    try {
+      const source = this.editor?.source ?? this.held.source;
+      const address = this.app.addressLabel;
+      const name = this.app.client.user?.name || deterministicUsername(address);
+      const signature: string | null = signMessage(source);
+      const r = this.result;
+      const run = r
+        ? {
+            // English on the picture, whatever the screen is in: see `tEn`.
+            outcome: EN_OUTCOME[r.outcome] ?? r.outcome,
+            ok: r.outcome === "ok",
+            compileError: r.outcome === "compile_error",
+            timings: tEn("pg.timings", {
+              compile: r.compile_ms,
+              run: r.run_ms,
+              exit: r.exit_code === null ? "" : tEn("pg.exit", { code: r.exit_code }),
+            }),
+            lines: this.log.lines,
+          }
+        : null;
+      const at = new Date();
+      const { makePoster, posterBytes, posterJpeg, posterFileName, savePoster } =
+        await import("../ui/poster");
+      const { canvas } = await makePoster({
+        lang: this.held.lang,
+        name: this.heldName(),
+        file: MAIN_FILE[this.held.lang],
+        source,
+        run,
+        user: { name, address },
+        signature,
+        at,
+        words: {
+          sideA: tEn("poster.sideA"),
+          sideB: tEn("poster.sideB"),
+          nothingRun: tEn("pg.nothingRun"),
+          more: (n) => tEn("poster.more", { n }),
+          by: tEn("poster.by"),
+          unsigned: tEn("poster.unsigned"),
+          how: tEn("poster.how"),
+          hashed: tEn("poster.hashed"),
+        },
+        assets: this.app.assets,
+      });
+      const file = posterFileName(this.heldName(), at);
+      // The proof, in the file: what was signed, by whom, and how — so the
+      // picture can be checked without retyping 130 hex digits off it.
+      const meta: Record<string, string> = {
+        Title: this.heldName(),
+        Author: name,
+        Software: "Causewaybay Hacker",
+        Source: source,
+        Lang: this.held.lang,
+        Signer: address,
+        Comment: signature
+          ? "Signature is EIP-191 personal_sign over Source, by Signer (Cronos EVM / Ethereum address)."
+          : "Unsigned: no key was unlocked when this poster was made.",
+      };
+      if (signature) meta.Signature = signature;
+      // Checked before it is written: the signature against the address, the
+      // chunks against the program, and the label decoded off the very pixels
+      // that will be saved. A failure is said and nothing is saved.
+      const png = await posterBytes(canvas, meta);
+      const { proveDisk, decodeLabelFrom } = await import("../ui/diskreader");
+      const failed = proveDisk(png, decodeLabelFrom(canvas), source, address, signature);
+      if (failed) {
+        this.saveNote = t("pg.posterCheckFailed", { what: failed });
+        this.app.chip.fail();
+        return;
+      }
+      // Both: the PNG is the one with the proof in the file, the JPEG is the
+      // one a gallery or a chat wants. Same picture, same label.
+      const how = await savePoster(
+        [
+          { bytes: png, name: file, type: "image/png" },
+          {
+            bytes: await posterJpeg(canvas),
+            name: file.replace(/\.png$/, ".jpg"),
+            type: "image/jpeg",
+          },
+        ],
+        this.app.layout.isPhone(),
+      );
+      this.saveNote =
+        how === "shared" ? t("pg.posterShared") : t("pg.posterSaved", { file: `${file} + .jpg` });
+      this.app.chip.blip();
+    } catch (e) {
+      console.warn("poster:", e);
+      this.saveNote = t("pg.posterFailed");
+      this.app.chip.fail();
+    } finally {
+      this.postering = false;
+    }
+  }
+
+  /**
+   * DISK READER: a poster back into a pad, with a verdict.
+   *
+   * The picker is the browser's; what comes back goes through
+   * `ui/diskreader.ts` — the file's own text chunks if it is our PNG, the QR
+   * label off its pixels if not — and the signature is checked against the
+   * address the picture names. The program is opened as a **new, unsaved
+   * pad** in its own language, named after the poster, so reading a disk
+   * never overwrites what was being written; the status line says whose it
+   * is and whether that holds.
+   */
+  private async readDisk(file: File): Promise<void> {
+    try {
+      const { readDisk, labelOf } = await import("../ui/diskreader");
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const disk = await readDisk(bytes, () => labelOf(file));
+      if (!disk) {
+        this.saveNote = t("pg.diskNone");
+        this.app.chip.fail();
+        return;
+      }
+      const short = `${disk.address.slice(0, 6)}…${disk.address.slice(-4)}`;
+      if (disk.verdict === "hashed") {
+        this.saveNote = t("pg.diskHashed", { address: short });
+        this.app.chip.fail();
+        return;
+      }
+      // A new pad, so nothing of the open one is lost under the disk.
+      this.fresh();
+      // The poster's own title when the file kept one; else the file's name
+      // with what `posterFileName` added taken off again, so a JPEG of
+      // `scratch` comes back as `scratch`, not `cwbhacker-scratch-20260916-1055`.
+      this.held.name =
+        disk.title?.trim().slice(0, 48) ||
+        file.name
+          .replace(/\.[^.]+$/, "")
+          .replace(/^cwbhacker-/, "")
+          .replace(/-\d{8}-\d{4}$/, "")
+          .slice(0, 48) ||
+        SCRATCH;
+      this.held.lang = disk.lang;
+      this.land = disk.lang;
+      this.held.source = disk.source;
+      this.editor?.load(disk.lang, disk.source);
+      this.dirty = true;
+      this.dirtyFor = 0;
+      this.writeLocal();
+      this.saveNote =
+        disk.verdict === "verified"
+          ? t("pg.diskVerified", { address: short })
+          : disk.verdict === "forged"
+            ? t("pg.diskForged", { address: short })
+            : t("pg.diskUnsigned", { address: short });
+      if (disk.verdict === "forged") this.app.chip.fail();
+      else this.app.chip.blip();
+    } catch (e) {
+      console.warn("disk reader:", e);
+      this.saveNote = t("pg.diskFailed");
+      this.app.chip.fail();
+    }
+  }
+
   /** The two size buttons, for the bench and for CODE alike. */
   private fontItems(): Array<{ id: string; label: string; dim?: boolean }> {
     return [
@@ -514,6 +808,9 @@ export class PlaygroundScene implements Scene {
     this.offs = [];
     this.offLocale?.();
     this.offLocale = undefined;
+    this.diskEl.remove();
+    this.stopStamp();
+    this.keyOverlay?.destroy();
     this.overlay?.destroy();
     this.fx?.destroy();
     this.fx = null;
@@ -540,6 +837,8 @@ export class PlaygroundScene implements Scene {
     this.nameOverlay.hide();
     this.searchOverlay = new Overlay(this.app.overlay, this.app.layout, this.searchEl);
     this.searchOverlay.hide();
+    this.keyOverlay = new Overlay(this.app.overlay, this.app.layout, this.keyEl);
+    this.keyOverlay.hide();
     queueMicrotask(() => this.editor?.focus());
   }
 
@@ -877,6 +1176,8 @@ export class PlaygroundScene implements Scene {
       this.app.chip.select();
       return;
     }
+    if (hit.id === "poster") return void this.poster();
+    if (hit.id === "reader") return void this.diskEl.click();
     if (hit.id === "copycode") return void this.clip("code");
     if (hit.id === "pastecode") return void this.clip("paste");
     if (hit.id === "copyout") return void this.clip("out");
@@ -1126,13 +1427,15 @@ export class PlaygroundScene implements Scene {
         // is long enough to run straight under the tag otherwise.
         const tagW = Math.round(46 * s);
         g.fillStyle = css(open ? Theme.coin : Theme.cream, hover ? 1 : 0.85);
+        // One line, elided: a name that wraps is a row drawn over the next one.
+        const nameW = inner[2] - Math.round(20 * s) - tagW;
         printf(
           g,
           body,
-          snip.name,
+          elide(body, snip.name, nameW),
           inner[0] + Math.round(10 * s),
           ry + Math.round((rowH - body.height) / 2),
-          inner[2] - Math.round(20 * s) - tagW,
+          nameW,
           "left",
         );
         g.fillStyle = css(Theme.dim);
@@ -1161,13 +1464,25 @@ export class PlaygroundScene implements Scene {
         );
       }
       if (this.saveNote) {
+        // One line, on its own band: the note used to wrap upward over the
+        // rows, and a saved poster's file name made four lines of it.
+        const ny = y + room - body.height - Math.round(4 * s);
+        fill(
+          g,
+          Theme.ink,
+          inner[0],
+          ny - Math.round(2 * s),
+          inner[2],
+          body.height + Math.round(6 * s),
+          0.9,
+        );
         g.fillStyle = css(Theme.coin, 0.85);
         printf(
           g,
           body,
-          this.saveNote,
-          inner[0],
-          y + room - wrap(body, this.saveNote, inner[2]).length * body.height,
+          elide(body, this.saveNote, inner[2] - Math.round(8 * s)),
+          inner[0] + Math.round(4 * s),
+          ny,
           inner[2],
           "left",
         );
@@ -1280,6 +1595,11 @@ export class PlaygroundScene implements Scene {
       },
       { id: "copyin", label: t("pg.copyIn"), dim: this.stdinEl.value === "" },
       { id: "pastein", label: t("pg.pasteIn") },
+      // Out of the screen as a picture: the pad, its output and a signature,
+      // for showing off. Dimmed while one is being made.
+      { id: "poster", label: t("pg.poster"), dim: this.postering },
+      // And back in: a poster's program, with its signature checked.
+      { id: "reader", label: t("pg.reader") },
       ...this.fontItems(),
       ...this.displayItems(),
     ];
@@ -1310,11 +1630,7 @@ export class PlaygroundScene implements Scene {
     // single line, and a long note — `이 서버에는 아직 저장되지 않습니다…` — put
     // its second line over the top of the editor.
     const statusW = layout.vw - pad * 2 - Math.round(8 * s);
-    let shown = status;
-    if (width(f, shown) > statusW) {
-      while (shown.length > 1 && width(f, shown + "…") > statusW) shown = shown.slice(0, -1);
-      shown += "…";
-    }
+    const shown = elide(f, status, statusW);
     g.fillStyle = css(this.dirty ? Theme.coin : Theme.dim);
     printf(g, f, shown, pad + Math.round(8 * s), statusY, statusW, "left");
     if (this.renaming) {
@@ -1325,6 +1641,17 @@ export class PlaygroundScene implements Scene {
       );
     } else {
       this.nameOverlay?.hide();
+    }
+    // The key field takes the same slot: wider, because a phrase is twelve
+    // words, and never at the same time as the name.
+    if (this.stamping) {
+      const h = Math.max(layout.minTouchH(), f.height + 12);
+      this.keyOverlay?.place(
+        [pad, statusY - Math.round(2 * s), Math.min(layout.vw - pad * 2, Math.round(520 * s)), h],
+        f.size,
+      );
+    } else {
+      this.keyOverlay?.hide();
     }
 
     // Output only once there is any: a scratchpad whose whole purpose is to
@@ -1438,6 +1765,12 @@ export class PlaygroundScene implements Scene {
     } else {
       this.nameOverlay?.hide();
     }
+    if (this.stamping) {
+      const h = Math.max(layout.minTouchH(), fonts.button.height + 12);
+      this.keyOverlay?.place([rect[0] + 8, rect[1] + 4, rect[2] - 16, h], fonts.button.size);
+    } else {
+      this.keyOverlay?.hide();
+    }
 
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
     const gap = Math.round(8 * s);
@@ -1516,7 +1849,12 @@ export class PlaygroundScene implements Scene {
       // the narrowest buttons on the row.
       ...this.fontItems(),
     ];
-    const optional = [...this.displayItems(), { id: "back", label: t("pg.maps") }];
+    const optional = [
+      { id: "poster", label: t("pg.poster"), dim: this.postering },
+      { id: "reader", label: t("pg.reader") },
+      ...this.displayItems(),
+      { id: "back", label: t("pg.maps") },
+    ];
     // Five code lines. Below that the editor is a label rather than a place
     // to write, and the bench is better off one button shorter.
     const editorFloor = fonts.codeSm.height * 5 + Math.round(12 * s);

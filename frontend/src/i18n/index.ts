@@ -224,6 +224,20 @@ export function t(key: keyof Strings, vars?: Record<string, string | number>): s
   return raw.replace(/\{(\w+)\}/g, (m, name: string) => (name in vars ? String(vars[name]) : m));
 }
 
+/**
+ * `t`, in English whatever the screen is in.
+ *
+ * For the words that go *into a picture*: the poster is made to be shared
+ * with people who do not share the player's language, and a Korean `IT RAN`
+ * over a program means nothing to the person it was posted for. The screen
+ * around the button stays translated; the artefact does not.
+ */
+export function tEn(key: keyof Strings, vars?: Record<string, string | number>): string {
+  const raw = en[key] ?? String(key);
+  if (!vars) return raw;
+  return raw.replace(/\{(\w+)\}/g, (m, name: string) => (name in vars ? String(vars[name]) : m));
+}
+
 /** `t`, choosing between `<key>.one`, `<key>.few` and `<key>.other` on `n`. */
 export function tn(key: string, n: number, vars?: Record<string, string | number>): string {
   const want = `${key}.${plural(n)}` as keyof Strings;

@@ -90,6 +90,10 @@ export const ja: Partial<Catalogue> = {
   "login.account": "アカウント番号",
   "login.accountRaw": "アカウント番号 — 秘密鍵には無関係",
   "login.username": "名前",
+  "login.notAWord": "「{word}」はシード単語ではありません — 綴りを確認してください",
+  "login.wordCount": "{n} 語 — シードフレーズは 12 語か 24 語です",
+  "login.badChecksum":
+    "すべて実在の単語ですが有効なフレーズではありません — 1 語が違うか順番が違います",
   "login.phraseHidden": "フレーズ非表示",
   "login.phraseVisible": "フレーズ表示中",
   "login.enter": "決定",
@@ -336,6 +340,30 @@ export const ja: Partial<Catalogue> = {
   "pg.runSilent": "実行結果が返ってきませんでした",
   "pg.deleteFailed": "削除できませんでした",
   "pg.footer": "CTRL+ENTER  実行   CTRL+SHIFT+F  整形   CTRL+S  保存   ESC  戻る   F1  画面の向き",
+  "pg.poster": "ポスター",
+  "pg.posterSaved": "ポスターを保存しました · {file}",
+  "pg.posterShared": "ポスターを共有シートに渡しました",
+  "pg.posterFailed": "ポスターを作れませんでした",
+  "pg.stampAsk": "スタンプにはフレーズか秘密鍵を貼り付けてください — このタブにだけ残ります",
+  "pg.stampKey": "フレーズまたは 0x 秘密鍵 · ENTER でスタンプ · ESC で取消",
+  "pg.stampBadKey": "フレーズでも秘密鍵でもありません",
+  "pg.stampWrongKey": "その鍵はここでログイン中の {address} のものではありません",
+  "pg.posterCheckFailed": "保存していません — ディスクを読み戻せませんでした: {what}",
+  "pg.reader": "ディスクリーダー",
+  "pg.diskVerified": "ディスク読込 · {address} が作成・署名 · 検証済み",
+  "pg.diskForged": "ディスク読込 · 署名が {address} と一致しません",
+  "pg.diskUnsigned": "ディスク読込 · 未署名 · {address} と主張",
+  "pg.diskHashed":
+    "ラベルには {address} のプログラムのハッシュのみ — コードはディスク上でラベルにはありません",
+  "pg.diskNone": "その画像にディスクはありません — ラベルもテキストチャンクもなし",
+  "pg.diskFailed": "そのファイルを読めませんでした",
+  "poster.sideA": "A面",
+  "poster.sideB": "B面",
+  "poster.more": "… あと {n} 行",
+  "poster.by": "作成・署名",
+  "poster.unsigned": "未署名",
+  "poster.how": "ソースコードへの EIP-191 personal_sign · Cronos EVM",
+  "poster.hashed": "ラベルはハッシュ · コードはディスク上",
 
   "aux.search": "検索",
   "aux.stats": "記録",
@@ -560,7 +588,8 @@ export const ja: Partial<Catalogue> = {
     "ブラウザがクリップボードを拒否しました — ページを一度クリックしてからもう一度どうぞ",
   "clip.pasteDenied":
     "ブラウザがクリップボードの読み取りを拒否しました — サイトの権限で許可してください",
-  "clip.pasteByKey": "このページはクリップボードを読めません — エディタで Cmd+V か Ctrl+V を押してください",
+  "clip.pasteByKey":
+    "このページはクリップボードを読めません — エディタで Cmd+V か Ctrl+V を押してください",
   "clip.unsupported":
     "このブラウザではここでクリップボードが使えません — http:// で開いたページはたいてい使えません",
   "clip.silent": "クリップボードが応答しませんでした",
@@ -568,6 +597,7 @@ export const ja: Partial<Catalogue> = {
   "clip.theBrief": "課題",
   "clip.yourCode": "あなたのコード",
   "clip.theInput": "入力",
-  "clip.pasteInputByKey": "このページはクリップボードを読めません — 標準入力の欄に直接貼り付けてください",
+  "clip.pasteInputByKey":
+    "このページはクリップボードを読めません — 標準入力の欄に直接貼り付けてください",
   "clip.theOutput": "出力",
 };

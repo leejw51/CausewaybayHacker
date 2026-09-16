@@ -1071,6 +1071,27 @@
       "h": 1152
     },
     {
+      "name": "bg_poster",
+      "file": "bg_poster.jpg",
+      "w": 1024,
+      "h": 1024
+    },
+    {
+      "name": "poster_seal",
+      "file": "poster_seal.png",
+      "w": 192,
+      "h": 192,
+      "box": {
+        "cx": 95.5,
+        "feet": 181.0,
+        "h": 171.0,
+        "minx": 11,
+        "miny": 10,
+        "maxx": 180,
+        "maxy": 180
+      }
+    },
+    {
       "name": "badge_stamp",
       "file": "badge_stamp.png",
       "w": 96,

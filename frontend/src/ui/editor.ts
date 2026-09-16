@@ -559,6 +559,27 @@ const LOOPS: Record<Land, ReadonlySet<string>> = {
 };
 
 /**
+ * What a syntax-tree node is, by its name — the half of `toneOf` that does
+ * not need a caret. Null where the tree has no opinion and the character
+ * itself has to say (an operator, a space, a name the grammar left plain).
+ *
+ * Shared with the poster, which colours a whole program from its tree rather
+ * than one keystroke, so the code on the picture is the code in the editor.
+ */
+export function toneOfNode(name: string, parent: string): Tone | null {
+  if (/Comment/.test(name)) return "comment";
+  if (/String|Char|Rune|Format/.test(name)) return "string";
+  if (/Integer|Float|Number|Boolean|None|True|False|Escape/.test(name)) return "number";
+  if (/Type|Primitive|Class|Namespace|Lifetime/.test(name)) return "type";
+  if (/Identifier|VariableName|DefName|FieldName|Macro|PropertyName/.test(name)) {
+    return /Call|Macro/.test(parent) ? "call" : "name";
+  }
+  // A keyword's node is named after itself: `for`, `fn`, `return`.
+  if (/^[a-z_]+$/.test(name) && name.length > 1) return "keyword";
+  return null;
+}
+
+/**
  * The tone of the character ending at `pos` — the one just typed, or the
  * last one deleted — read from the syntax tree where it has an opinion and
  * from the character itself where it does not.
@@ -571,17 +592,8 @@ const LOOPS: Record<Land, ReadonlySet<string>> = {
 export function toneOf(state: EditorState, pos: number, ch: string): Tone {
   if (ch !== "" && "{}[]()".includes(ch)) return "bracket";
   const node = syntaxTree(state).resolveInner(Math.max(0, pos), -1);
-  const name = node.name;
-  if (/Comment/.test(name)) return "comment";
-  if (/String|Char|Rune|Format/.test(name)) return "string";
-  if (/Integer|Float|Number|Boolean|None|True|False|Escape/.test(name)) return "number";
-  if (/Type|Primitive|Class|Namespace|Lifetime/.test(name)) return "type";
-  if (/Identifier|VariableName|DefName|FieldName|Macro|PropertyName/.test(name)) {
-    const parent = node.parent?.name ?? "";
-    return /Call|Macro/.test(parent) ? "call" : "name";
-  }
-  // A keyword's node is named after itself: `for`, `fn`, `return`.
-  if (/^[a-z_]+$/.test(name) && name.length > 1) return "keyword";
+  const byTree = toneOfNode(node.name, node.parent?.name ?? "");
+  if (byTree) return byTree;
   if (/[0-9]/.test(ch)) return "number";
   if (/["'`]/.test(ch)) return "string";
   if (/[A-Za-z_]/.test(ch)) return "name";

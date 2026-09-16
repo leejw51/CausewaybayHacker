@@ -270,6 +270,29 @@ function make(size: number, family: string): Font {
 }
 
 /**
+ * One font at an exact pixel size, outside the twelve the screen is drawn in.
+ *
+ * For the things that are not the screen: the poster is a 2048px square
+ * rendered once, and its type is chosen to fill *that* canvas rather than the
+ * window — a 64px title, a 22px code face, whatever fits — so it needs a font
+ * at a size `ensureFonts` was never asked for, in the same families (with the
+ * same CJK fallback) so it still looks like the game.
+ */
+export function fontAt(px: number, family: "pixel" | "body" | "mono"): Font {
+  const stack =
+    family === "pixel"
+      ? PIXEL()
+      : family === "mono"
+        ? // The clear one. JetBrains Mono is the face for anything a machine
+          // might read back off the picture — the code, an address, a
+          // signature — where VT323's shapes are the point on screen and a
+          // liability under OCR (its `0`/`O` and `1`/`l`/`I` are near twins).
+          `"JetBrainsMonoCode","IosevkaCode",ui-monospace,monospace,${back()}`
+        : BODY();
+  return make(px, stack);
+}
+
+/**
  * Build the twelve fonts for a UI scale. Cheap to call every frame: it does
  * nothing unless the scale actually moved.
  */
@@ -535,6 +558,21 @@ export function print(
 }
 
 /** `love.graphics.printf`: wrapped to `limit` and aligned inside it. */
+/**
+ * `text` cut to one line of `limit`, with an ellipsis where it was cut.
+ *
+ * For the places a string is a *label* and not a paragraph: a pad's name in
+ * a list row, a status line under a toolbar. `printf` wraps, and a wrapped
+ * label walks over whatever is drawn beneath it — a file name in the status
+ * note of the playground once ran four lines up over the pad list.
+ */
+export function elide(f: Font, text: string, limit: number): string {
+  if (width(f, text) <= limit) return text;
+  let cut = text;
+  while (cut.length > 1 && width(f, cut + "…") > limit) cut = cut.slice(0, -1);
+  return cut + "…";
+}
+
 export function printf(
   g: CanvasRenderingContext2D,
   f: Font,

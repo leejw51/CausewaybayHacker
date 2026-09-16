@@ -87,7 +87,52 @@ function privateKeyFromMnemonic(phrase: string, index: number, passphrase: strin
  * and refusing that is a support question rather than a security property.
  */
 export function normalizeMnemonic(phrase: string): string {
-  return phrase.normalize("NFKD").trim().split(/\s+/u).join(" ");
+  return (
+    phrase
+      .normalize("NFKD")
+      // Zero-width joiners and byte-order marks ride along with text copied
+      // out of chat apps and notes; they are not part of any word.
+      .replace(/[\u200b-\u200d\ufeff]/g, "")
+      // The English list is lowercase. A phrase pasted out of a note that
+      // capitalised its first word is the same phrase.
+      .toLowerCase()
+      .trim()
+      .split(/\s+/u)
+      .join(" ")
+  );
+}
+
+/**
+ * Why a phrase is not a phrase, as one sentence's worth of fact, or null
+ * when it is one. `word` is the first word that is not in the list; `count`
+ * is a word count that no phrase has; `checksum` is twelve (or more) real
+ * words in an order that does not check out — one is wrong or misplaced.
+ *
+ * For the login card, which used to answer a wrong phrase with a dash and
+ * nothing else — and a person who had one word wrong could not tell that
+ * from a screen that had stopped working.
+ */
+export function phraseProblem(
+  phrase: string,
+): { kind: "word"; word: string } | { kind: "count"; count: number } | { kind: "checksum" } | null {
+  const words = normalizeMnemonic(phrase)
+    .split(" ")
+    .filter((w) => w !== "");
+  const bad = words.find((w) => !wordlist.includes(w));
+  if (bad !== undefined) return { kind: "word", word: bad };
+  if (![12, 15, 18, 21, 24].includes(words.length)) return { kind: "count", count: words.length };
+  if (!validateMnemonic(words.join(" "), wordlist)) return { kind: "checksum" };
+  return null;
+}
+
+/**
+ * A private key as typed: `0x` or `0X` or no prefix, any case, with the
+ * whitespace a paste across two lines leaves in it. Null when it is not one.
+ */
+export function privateKeyHexOf(text: string): string | null {
+  const flat = text.replace(/[\s\u200b-\u200d\ufeff]/g, "");
+  const m = /^(?:0[xX])?([0-9a-fA-F]{64})$/.exec(flat);
+  return m ? "0x" + m[1].toLowerCase() : null;
 }
 
 /**
@@ -116,10 +161,8 @@ let held: Address | null = null;
 
 /** Take a mnemonic or a `0x`-prefixed private key and hold the result. */
 export function unlock(input: string, index = 0, passphrase = ""): Address {
-  const trimmed = input.trim();
-  const key = /^0x[0-9a-fA-F]{64}$/.test(trimmed)
-    ? fromHex(trimmed)
-    : privateKeyFromMnemonic(trimmed, index, passphrase);
+  const hex = privateKeyHexOf(input);
+  const key = hex ? fromHex(hex) : privateKeyFromMnemonic(input, index, passphrase);
   const address = addressFromPublicKey(secp256k1.getPublicKey(key, false));
   wipe();
   secret = key;
@@ -178,6 +221,38 @@ export function signMessage(message: string): string {
   if (!secret) throw new Error("no key is unlocked");
   const hash = eip191Hash(message);
   return "0x" + toHex(signHash(hash, secret));
+}
+
+/**
+ * Who signed `message` — the address behind an EIP-191 signature — or null
+ * when the bytes are not a signature at all.
+ *
+ * The other half of `signMessage`, and the only verification the client
+ * does: the poster's DISK READER hands it what a picture claims (source,
+ * signature, address) and asks whether the claim holds. No key is needed and
+ * none is touched, which is why it lives here beside the signer rather than
+ * in the reader — the two encodings (`v` as 27/28, keccak over the prefixed
+ * UTF-8 bytes) have to agree byte for byte, and one file is where they do.
+ */
+export function recoverSigner(message: string, signature: string): Address | null {
+  let sig: Uint8Array;
+  try {
+    sig = fromHex(signature);
+  } catch {
+    return null;
+  }
+  if (sig.length !== 65) return null;
+  const v = sig[64] >= 27 ? sig[64] - 27 : sig[64];
+  if (v !== 0 && v !== 1) return null;
+  try {
+    const pub = secp256k1.Signature.fromBytes(sig.subarray(0, 64), "compact")
+      .addRecoveryBit(v)
+      .recoverPublicKey(eip191Hash(message))
+      .toBytes(false);
+    return addressFromPublicKey(pub);
+  } catch {
+    return null;
+  }
 }
 
 /** Exported for the tests, which sign with a fixture key rather than unlocking. */

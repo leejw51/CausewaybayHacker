@@ -67,7 +67,8 @@ export const en = {
   "title.press": "PRESS SPACE",
   "title.anyKey": "— or any key, or a click —",
   "title.tap": "or tap anywhere",
-  "title.footer": "SPACE  START      F7  LANGUAGE      F1  ORIENTATION      F2  CRT      F11  FULLSCREEN",
+  "title.footer":
+    "SPACE  START      F7  LANGUAGE      F1  ORIENTATION      F2  CRT      F11  FULLSCREEN",
 
   // -- the opening ---------------------------------------------------------
   "story.skipKey": "ANY KEY  SKIP",
@@ -101,6 +102,9 @@ export const en = {
   "login.account": "ACCOUNT",
   "login.accountRaw": "ACCOUNT — A RAW KEY IS ITS OWN",
   "login.username": "NAME",
+  "login.notAWord": "“{word}” is not a seed word — check the spelling",
+  "login.wordCount": "{n} words — a seed phrase is 12 or 24",
+  "login.badChecksum": "all real words, but not a valid phrase — one is wrong or out of order",
   "login.phraseHidden": "PHRASE HIDDEN",
   "login.phraseVisible": "PHRASE VISIBLE",
   "login.enter": "ENTER",
@@ -360,6 +364,30 @@ export const en = {
   "pg.deleteFailed": "could not delete it",
   "pg.footer":
     "CTRL+ENTER  RUN   CTRL+SHIFT+F  FORMAT   CTRL+S  SAVE   ESC  BACK   F1  ORIENTATION",
+  "pg.poster": "POSTER",
+  "pg.posterSaved": "poster saved · {file}",
+  "pg.posterShared": "poster handed to the share sheet",
+  "pg.posterFailed": "could not make the poster",
+  "pg.stampAsk": "paste your phrase or private key to stamp — it stays in this tab",
+  "pg.stampKey": "phrase or 0x private key · ENTER stamps · ESC cancels",
+  "pg.stampBadKey": "that is not a phrase or a private key",
+  "pg.stampWrongKey": "that key is not {address}, who is signed in here",
+  "pg.posterCheckFailed": "not saved — the disk did not read back: {what}",
+  "pg.reader": "DISK READER",
+  "pg.diskVerified": "disk read · written and signed by {address} · verified",
+  "pg.diskForged": "disk read · the signature does NOT match {address}",
+  "pg.diskUnsigned": "disk read · unsigned · claims {address}",
+  "pg.diskHashed":
+    "the label holds only the hash of {address}'s program — the code is on the disc, not the label",
+  "pg.diskNone": "no disk on that picture — no label and no text chunks",
+  "pg.diskFailed": "could not read that file",
+  "poster.sideA": "SIDE A",
+  "poster.sideB": "SIDE B",
+  "poster.more": "… {n} more lines",
+  "poster.by": "WRITTEN & SIGNED BY",
+  "poster.unsigned": "UNSIGNED",
+  "poster.how": "EIP-191 personal_sign over the source · Cronos EVM",
+  "poster.hashed": "LABEL HOLDS THE HASH · CODE IS ON THE DISC",
 
   // -- the three screens off the map ---------------------------------------
   "aux.search": "SEARCH",
@@ -593,7 +621,8 @@ export const en = {
   "clip.copyDenied": "the browser refused the clipboard — click the page once and try again",
   "clip.pasteDenied":
     "the browser refused to read the clipboard — allow it in the site permissions",
-  "clip.pasteByKey": "this page cannot read the clipboard — press Cmd+V or Ctrl+V in the editor instead",
+  "clip.pasteByKey":
+    "this page cannot read the clipboard — press Cmd+V or Ctrl+V in the editor instead",
   "clip.unsupported":
     "this browser has no clipboard here — a page served over http:// usually has none",
   "clip.silent": "the clipboard did not answer",
@@ -601,6 +630,7 @@ export const en = {
   "clip.theBrief": "the brief",
   "clip.yourCode": "your code",
   "clip.theInput": "the input",
-  "clip.pasteInputByKey": "this page cannot read the clipboard — leave CODE and paste into the STDIN box",
+  "clip.pasteInputByKey":
+    "this page cannot read the clipboard — leave CODE and paste into the STDIN box",
   "clip.theOutput": "the output",
 } as const;

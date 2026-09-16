@@ -6374,3 +6374,138 @@ the playground saves what was being typed.
 it forgets: chip drawn, pressed, login screen up with the reason, token gone
 from memory and from the store, chip gone, sign in again works.
 
+## 2026-09-16 — the playground's POSTER: the pad as a signed record
+
+Asked for: the code page writes the current source and its result to disk as
+one square PNG, stamped by the wallet, designed like an old record, readable
+by a person, by OCR and by a machine, with the mascot of the language on it,
+for putting on Instagram. Web first; the LÖVE client has no button yet.
+
+**The disc is the code.** `frontend/src/ui/poster.ts` draws a 1024×1024
+sleeve (`bg_poster`, the one square background in the set, under a scrim)
+with a vinyl disc on it, and pours the program into the disc: one line per
+groove, whole, each groove the chord of the disc at that height, cut short
+where it meets the label. A line too long for the groove in front of it
+moves down to one that holds it and the groove it passed stays empty —
+`pour` — because a `HashMap` broken into `co` and `llections` is not the
+program, to a reader or to OCR. Rows beside the label are set to its
+**left only**: OCR reads a row as a line, and a second line on the right of
+the label would be joined to the first. The largest type at which the whole
+program fits is used (`fitDisc`), down to 12px; below that the tail goes to
+`… n more lines` and the QR and the file carry the rest.
+
+**The label is the machine-readable copy.** A QR in the record's centre with
+five newline-separated fields: `CWBH1`, the EIP-55 address, the signature
+(or `-`), the language, and the source verbatim. Everything a verifier
+needs is in the picture, and the QR is what survives Instagram, which
+strips metadata and re-encodes. The label is capped at 105 modules a side —
+denser than that and, at a quarter of the picture's width shown at 1080, a
+phone stops reading it (measured with `jsQR` at 1080 and at 640 as JPEG) —
+so past about 650 bytes of source the fifth field is `keccak256:<hex>` of it
+and the label says `LABEL HOLDS THE HASH · CODE IS ON THE DISC`. The same fields go into the PNG as `iTXt` chunks
+(`Source`, `Signer`, `Signature`, and `Title`/`Author`/`Software`) for a
+reader with the file rather than a photo. `qrcode-generator` (MIT, no
+dependencies, byte mode as UTF-8) is the one new package.
+
+**The signature is EIP-191 `personal_sign` over the source and only the
+source** — no envelope, no output, no name — so what was signed is exactly
+what is printed and what the QR carries. Same scheme as
+`CausewaybayWallet`'s EVM (Cronos) accounts and the login challenge;
+`wallet.ts`'s vectors pin it and `tests/poster.test.ts` recovers the fixture
+key's address from a poster signature. The output is not signed: the server
+produced it, and a signature over it would claim something the key cannot
+know. Made in the tab, because the key is only ever in the tab. After a
+reload the session is resumed from its token and there is no key — which is
+how the first poster anybody made came out `UNSIGNED`. So POSTER asks: a
+masked field in the slot RENAME uses, for the phrase or the `0x` key, derived
+at the account index login used (`INDEX_PREF`) and accepted only if it is the
+address that is signed in — anything else is wiped again at once, so a
+stranger's key is never left unlocked under somebody else's session. The key
+then stays for the tab, as after login. An unsigned poster is no longer
+something the playground makes; the renderer still draws one (greyed seal,
+`UNSIGNED`) because the reader has to name that state for a picture that
+arrives in it.
+
+**English on the picture.** The screen around the button is translated;
+the poster is not (`tEn`, `EN_OUTCOME`). It is made to be shared with people
+who do not share the player's language, and a Korean `IT RAN` over a
+program says nothing to the person it was posted for.
+
+**Clear type where a machine might read.** The code, the address and the
+signature are set in JetBrains Mono (already bundled for the editor), not
+VT323 — whose `0`/`O` and `1`/`l`/`I` are the difference between a
+signature and a picture of one. Press Start 2P stays for the brand, the pad
+name and the labels. Comments are a lighter grey than the editor's, for the
+same reason.
+
+**The rest is the record.** `STEREO · 33⅓ RPM`, a catalogue number from the
+first four hex digits of the address, SIDE A over the disc, SIDE B the
+output column beside it with the land's mascot standing on it — HACKER's
+pose when it ran, BASIC's when it did not compile, ADVANCED's otherwise —
+and the credits along the bottom under `poster_seal`, a Grok wax seal with
+the tram in relief (`art/prompts.toml`). Both new assets came out of the
+existing pipeline (`art/tools/gen.sh`), first roll.
+
+**1024 by default, 2048 when it has to be.** `makePoster` draws the small
+square first and keeps it unless the program did not fit at the 12px floor
+or the QR came out under two pixels a module (the least that still reads
+after Instagram's 1080 JPEG, measured); then it draws the big one.
+The floor is in real pixels, not in the poster's own unit — the one length
+that does not scale — which is what makes the big square hold twice the
+program rather than the same program twice as big. Two files are written,
+`.png` (with the chunks) and `.jpg` (the one a gallery or a chat wants);
+on a phone both go to the Web Share sheet, which is where Instagram is,
+falling back to downloads.
+
+**Checked before it is written.** `proveDisk` (`ui/diskreader.ts`) runs on
+the bytes about to be saved: the signature recovers to the address it will
+be printed beside; the PNG's chunks read back as this program by this
+author; the label decoded from the picture's own pixels says the same (or,
+for a hashed label, is the hash of this program). A failure is put on the
+status line — `not saved — the disk did not read back: label` — and nothing
+is saved. A picture that promises a proof and cannot deliver it is worse
+than none.
+
+**DISK READER** is the other half: the browser's file picker, then the
+file's chunks if it is our PNG, else the label decoded from the pixels
+(`jsQR`, MIT, tried at several scales and cropped to where our label is —
+one pass found it about half the time on a 2048 poster). The signature is
+checked against the address the picture *names*, never taken from it, and
+the verdict is one of `verified`, `forged`, `unsigned`, `hashed`. The
+program opens as a new, unsaved pad in its language, named after the
+poster, so reading a disk never overwrites what was being written.
+`recoverSigner` sits in `wallet.ts` beside `signMessage`, so the two
+encodings cannot drift apart. `POSTER` and `DISK READER` sit on CODE's band
+and, droppable, on the framed bench.
+
+Tested three ways. `tests/poster.test.ts` and `tests/diskreader.test.ts`
+run the arithmetic — the pour, the fit, the tones, the label payload and
+its cap, the chunks, the proof, the verdicts — and recover the fixture
+key's address from a poster signature; `tests/playground-poster.test.ts`
+pins the wiring (a keyless tab is asked, a wrong key is wiped, the proof
+runs before the save). `e2e/poster.spec.ts` does the round trip in a real
+browser, both orientations: log in, write a program, press POSTER, catch
+the two downloads, walk the PNG's chunks in Node and recover the signer
+with the same `wallet.ts`; then hand the file back through DISK READER's
+file chooser and read the program off the editor. It also confirms the key
+never crossed the websocket for it.
+
+## 2026-09-16 — the login card says why a phrase is not a phrase
+
+Reported from an iPad as "automatic username generation doesn't work": a
+phrase in the field, a dash for the address, an empty name box. It was a
+mistyped word. The card had answered a wrong phrase and a broken screen with
+the same dash, so nobody could tell which they had.
+
+`phraseProblem` (`wallet.ts`) says which: the first word that is not in the
+list, a word count no phrase has, or twelve real words whose checksum fails.
+`derivePreview` puts that on the status line — only once twelve words are
+there, because half a phrase is not a mistake yet. And what a paste does to
+text is forgiven, since none of it changes which phrase it is:
+`normalizeMnemonic` lowercases and strips zero-width characters, and
+`privateKeyHexOf` takes a key with `0x`, `0X` or no prefix, in either case,
+broken across lines. `unlock` and the card both go through them.
+`tests/secret.test.ts` covers the parsing and the explanations;
+`e2e/login-phrase.spec.ts` pastes a capitalised, line-broken phrase and a
+prefix-less key into the real card and expects the name to appear.
+

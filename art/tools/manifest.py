@@ -53,6 +53,9 @@ ORDER = [
     "badge_cleared", "badge_locked",
     # The playground: the one room in the game with no problem in it.
     "bg_playground", "bg_playground_p",
+    # The poster (frontend/src/ui/poster.ts): a square night street for the
+    # sleeve, and the wax seal the credits are stamped with.
+    "bg_poster", "poster_seal",
     # The award set (docs/decisions.md, "BE: XP, levels and the badge set").
     # Nine shapes: the silhouette is the family, tiers differ by colour and by
     # the number the engine prints over them.
