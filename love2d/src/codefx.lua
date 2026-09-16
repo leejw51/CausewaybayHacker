@@ -5,7 +5,11 @@
 -- pixels through the pane that drew the code, picks a plan from
 -- `src/fxplan.lua`, and paints it over the pane. What happens when:
 --
---   * the pointer moves — a ribbon of embers along its path;
+--   * the pointer moves — a thin thread of light behind it, the caret's
+--     colour, whiter the faster it goes;
+--   * the caret moves — its rectangle smears from where it was to where it
+--     is and shrinks back, a white thread down its middle, an L across
+--     lines; and a *jump* (PageDown, a far click) drops grains on the way;
 --   * a character is typed — sparks in its syntax colour;
 --   * ENTER — a puff of dust along the new line;
 --   * a character is erased — it breaks into brick, per character, in its
@@ -51,10 +55,14 @@ end
 M.tone_colour = tone_colour
 
 --- Pixels of pointer travel between one ember and the next; the most embers
---- one move may leave; how far round the colour cycle each ember moves.
-M.TRAIL_STEP = 4
-M.TRAIL_MAX = 12
-M.TRAIL_HUE = 1 / 150
+--- one move may leave: a flick is a flick, not a wall.
+M.TRAIL_STEP = 5
+M.TRAIL_MAX = 10
+--- The longest gap that still counts towards the caret's speed. A click after
+--- a minute's thought is a fast move to where it clicked, not a slow one.
+M.MOVE_GAP = 0.25
+--- The most smears alive at once.
+local SMEARS = 6
 --- How many ghosts a trailing particle drags, and how far apart in time.
 local GHOSTS = 6
 local GHOST_DT = 0.018
@@ -68,17 +76,22 @@ function M.new()
     t = 0,
     live = {},
     rings = {},
+    -- Caret smears (`fxplan.smear_for`), each with the clock reading it
+    -- was thrown at.
+    smears = {},
     editor = nil,
     pane = nil,
+    -- Where the caret was last seen — `{ line, col, x, y }`, the pixel pair
+    -- held inside the pane's box — and when it last moved.
+    last_caret = nil,
+    moved_at = -1,
     -- The bracket pair last reported, so a caret resting by one runs once.
     last_pair = nil,
-    -- The pointer's last position and when it was there; banked travel; the
-    -- ribbon's colour phase.
+    -- The pointer's last position and when it was there; banked travel.
     last_x = nil,
     last_y = nil,
     last_at = 0,
     carry = 0,
-    phase = 0,
     kick_at = -1e9,
     brick = nil,
     dust = nil,
@@ -97,6 +110,9 @@ function Fx:attach(editor, pane)
     self:on(ev)
   end
   self.last_pair = nil
+  -- A new document: the caret's first place in it is not a move from the
+  -- old one.
+  self.last_caret = nil
 end
 
 function Fx:detach()
@@ -139,8 +155,19 @@ function Fx:burst(x, y, n, color)
   self:play(plan)
 end
 
+--- The caret moved: its smear, drawn as a stroked path that shortens from
+--- the tail.
+function Fx:smear(s)
+  s.born = self.t
+  self.smears[#self.smears + 1] = s
+  if #self.smears > SMEARS then
+    table.remove(self.smears, 1)
+  end
+end
+
 function Fx:clear()
-  self.live, self.rings = {}, {}
+  self.live, self.rings, self.smears = {}, {}, {}
+  self.last_caret = nil
 end
 
 -- ------------------------------------------------------------------- events
@@ -244,7 +271,7 @@ end
 ---
 --- Distance-paced rather than event-paced: travel is banked and an ember is
 --- spent every `TRAIL_STEP` pixels, placed along the segment, so the trail
---- is a ribbon at any event rate and never a wall on a flick.
+--- is a thread at any event rate and never a wall on a flick.
 function Fx:pointer(x, y)
   local t = self.t
   local lx, ly = self.last_x, self.last_y
@@ -270,9 +297,63 @@ function Fx:pointer(x, y)
   local vx, vy = dx / dt, dy / dt
   for i = 1, n do
     local u = i / n
-    self.phase = self.phase + M.TRAIL_HUE
-    self:play(Plan.trail(lx + dx * u, ly + dy * u, vx, vy, self.phase))
+    self:play(Plan.pointer(lx + dx * u, ly + dy * u, vx, vy))
   end
+end
+
+-- ---------------------------------------------------------------- the caret
+
+--- The top-left of the caret's cell, held inside the pane's visible box: a
+--- PageDown scrolls, and the caret's old place may now be above the top of
+--- it, so a caret that came from off the screen comes from its edge.
+local function caret_px(self, cell)
+  local ed, g = self.editor, self.pane.geom
+  local line = ed.lines[ed.line] or ""
+  local x = g.x0 + g.gutter + g.font:getWidth(line:sub(1, ed.col - 1))
+  local y = g.y0 + (ed.line - ed.scroll - 1) * g.line_h
+  local r = g.rect
+  local left, top = g.x0 + g.gutter, g.y0
+  local right, bottom = r.x + r.w - cell[1], g.y0 + g.rows * g.line_h - cell[2]
+  x = math.min(math.max(x, left), math.max(left, right))
+  y = math.min(math.max(y, top), math.max(top, bottom))
+  return x, y
+end
+
+--- The smear from where the caret was to where it is, hotter the faster it
+--- went; the corner's wink if it bent; and, only on a jump, the grains.
+function Fx:moved(from, to, cell)
+  local t = self.t
+  local gap = self.moved_at < 0 and M.MOVE_GAP
+    or math.min(M.MOVE_GAP, math.max(0.04, t - self.moved_at))
+  self.moved_at = t
+  local dist = math.sqrt((to[1] - from[1]) ^ 2 + (to[2] - from[2]) ^ 2)
+  local smear = Plan.smear_for(from, to, cell, dist / gap)
+  self:smear(smear)
+  self:play(Plan.corner(smear))
+  if Plan.is_jump(from, to, cell) then
+    self:play(Plan.jump(smear))
+  end
+end
+
+--- Read the caret once a frame, and report a move as the pane sees it: by
+--- key, click, typing or a jump. The editor model has no pixels, so this is
+--- measured here rather than emitted there.
+local function watch_caret(self)
+  local ed, pane = self.editor, self.pane
+  if not (ed and pane and pane.geom) then
+    return
+  end
+  local cell = cell_size(self)
+  local x, y = caret_px(self, cell)
+  local was = self.last_caret
+  self.last_caret = { line = ed.line, col = ed.col, x = x, y = y }
+  if not was or (was.line == ed.line and was.col == ed.col) then
+    return
+  end
+  if math.abs(was.x - x) < 0.5 and math.abs(was.y - y) < 0.5 then
+    return
+  end
+  self:moved({ was.x, was.y }, { x, y }, cell)
 end
 
 -- ------------------------------------------------------------------- frames
@@ -291,6 +372,12 @@ function Fx:update(dt)
       table.remove(self.rings, i)
     end
   end
+  for i = #self.smears, 1, -1 do
+    if self.t - self.smears[i].born > self.smears[i].life then
+      table.remove(self.smears, i)
+    end
+  end
+  watch_caret(self)
   -- The bracket pair the caret is beside, reported once per pair.
   if self.editor and self.pane then
     local here = self.editor:bracket_at_caret()
@@ -391,7 +478,7 @@ local function draw_particle(self, p, age, ghost)
     -- A soft disc: a faint wide halo, a firmer middle, a small hot core. Three
     -- flat circles stand in for the shader's falloff; drawn additively, so
     -- a ghost tail reads as light and not as a stack of coins.
-    -- The ribbon's ember is a lone disc with no burst around it, so it is
+    -- The pointer's ember is a lone disc with no burst around it, so it is
     -- drawn a little stronger than a spark that has forty neighbours.
     local k = shape == 6 and 1.7 or 1
     love.graphics.setBlendMode("add")
@@ -401,6 +488,12 @@ local function draw_particle(self, p, age, ghost)
     love.graphics.circle("fill", x, y, size / 3.2, 10)
     set(Theme.cream, alpha * 0.35 * k)
     love.graphics.circle("fill", x, y, size / 7, 8)
+    love.graphics.setBlendMode("alpha")
+  elseif shape == 7 then
+    -- A grain: a flat streak, never taller than a fraction of the line.
+    love.graphics.setBlendMode("add")
+    set(p.color, alpha * 0.9)
+    love.graphics.rectangle("fill", x - size / 2, y - size * 0.1, size, math.max(1, size * 0.2))
     love.graphics.setBlendMode("alpha")
   elseif shape == 1 then
     -- A star stays gold: drawn over, not added, so twelve of them on one
@@ -477,11 +570,72 @@ local function draw_particle(self, p, age, ghost)
   end
 end
 
+--- The points of `smear.path` between `from` and `to` (0..1 along it, by
+--- distance), the corner included when it lies between them.
+local function piece(smear, from, to)
+  local pts = {}
+  local x, y = Plan.path_point(smear.path, from)
+  pts[#pts + 1], pts[#pts + 1] = x, y
+  if #smear.path == 3 then
+    local a, c, b = smear.path[1], smear.path[2], smear.path[3]
+    local first = math.sqrt((c[1] - a[1]) ^ 2 + (c[2] - a[2]) ^ 2)
+    local corner = first / (first + math.sqrt((b[1] - c[1]) ^ 2 + (b[2] - c[2]) ^ 2))
+    if corner > from and corner < to then
+      pts[#pts + 1], pts[#pts + 1] = c[1], c[2]
+    end
+  end
+  x, y = Plan.path_point(smear.path, to)
+  pts[#pts + 1], pts[#pts + 1] = x, y
+  -- LÖVE drops a repeated vertex and then refuses a one-vertex line, so a
+  -- piece that has shrunk to a point is no piece.
+  local out = { pts[1], pts[2] }
+  for i = 3, #pts, 2 do
+    if math.abs(pts[i] - out[#out - 1]) > 0.01 or math.abs(pts[i + 1] - out[#out]) > 0.01 then
+      out[#out + 1], out[#out + 1] = pts[i], pts[i + 1]
+    end
+  end
+  return #out >= 4 and out or nil
+end
+
+--- One smear at one moment: the head across almost at once, the tail on a
+--- slow start, width and alpha dying together; one colour, and a thin white
+--- thread down its middle that burns as hot as the caret went.
+local function draw_smear(self, smear)
+  local k = (self.t - smear.born) / smear.life
+  if k < 0 or k >= 1 then
+    return
+  end
+  local head = E.expOut(math.min(1, k / 0.45))
+  local tail = k * k * (3 - 2 * k)
+  if head <= tail then
+    return
+  end
+  local pts = piece(smear, tail, head)
+  if not pts then
+    return
+  end
+  local fade = 1 - k * k
+  love.graphics.setBlendMode("add")
+  love.graphics.setLineStyle("rough")
+  love.graphics.setLineJoin("miter")
+  set(smear.color, 0.45 * fade)
+  love.graphics.setLineWidth(math.max(1, smear.width * (1 - 0.8 * k * k)))
+  love.graphics.line(pts)
+  set(Theme.cream, smear.core * 0.8 * fade)
+  love.graphics.setLineWidth(math.max(1, smear.width * 0.12))
+  love.graphics.line(pts)
+  love.graphics.setLineWidth(1)
+  love.graphics.setBlendMode("alpha")
+end
+
 function Fx:draw()
-  if #self.live == 0 and #self.rings == 0 and self.t - self.kick_at > KICK then
+  if #self.live == 0 and #self.rings == 0 and #self.smears == 0 and self.t - self.kick_at > KICK then
     return
   end
   ready_art(self)
+  for _, smear in ipairs(self.smears) do
+    draw_smear(self, smear)
+  end
   for _, r in ipairs(self.rings) do
     local age = self.t - r.born
     if age >= 0 and age < r.life then

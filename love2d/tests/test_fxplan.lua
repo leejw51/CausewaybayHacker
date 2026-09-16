@@ -35,7 +35,7 @@ local function finite(plan)
     T.ok(p.life > 0, "a particle lives")
     T.ok(p.size > 0, "a particle has a size")
     T.ok(p.delay >= 0, "no negative delay")
-    T.ok(({ [0] = 1, [1] = 1, [2] = 1, [4] = 1, [5] = 1, [6] = 1 })[p.shape], "a shape the painter knows")
+    T.ok(({ [0] = 1, [1] = 1, [2] = 1, [4] = 1, [5] = 1, [6] = 1, [7] = 1 })[p.shape], "a shape the painter knows")
   end
   for _, r in ipairs(plan.rings) do
     T.ok(r.radius > 0 and r.life > 0, "a ring has size and life")
@@ -221,8 +221,8 @@ return function()
     T.eq(#Plan.rubble({}, CELL, seeded()).particles, 0)
   end)
 
-  T.case("the pointer's trail is one ember on the path, drifting against the motion", function()
-    local plan = Plan.trail(100, 100, 800, 0, 0.1, seeded())
+  T.case("the pointer's thread is one ember on the path, the caret's colour, whiter with speed", function()
+    local plan = Plan.pointer(100, 100, 800, 0, seeded())
     finite(plan)
     T.eq(#plan.particles, 1)
     local p = plan.particles[1]
@@ -232,24 +232,65 @@ return function()
     T.near(p.dy, 0, 1e-9)
     T.eq(p.gravity, 0)
     T.eq(p.shape, 6)
-    local still = Plan.trail(100, 100, 0, 0, 0, seeded())
+    T.ok(p.life < 0.31, "gone inside a third of a second")
+    local still = Plan.pointer(100, 100, 0, 0, seeded())
     T.near(still.particles[1].dx, 0, 1e-9, "a still pointer's mote goes nowhere")
+    T.ok(still.particles[1].size < p.size, "a slow ember is the smaller one")
+    local fast = Plan.pointer(100, 100, 5000, 0, seeded()).particles[1]
+    T.ok(fast.color[1] > still.particles[1].color[1], "whiter the faster it went")
+    T.near(fast.color[3], Theme.cyan[3], 1e-9, "and never off the caret's blue")
   end)
 
-  T.case("the ribbon's colour moves smoothly round its cycle and comes back", function()
-    local c0, c1 = Plan.ribbon(0), Plan.ribbon(1)
-    for i = 1, 3 do
-      T.near(c0[i], Theme.cyan[i], 1e-9)
-      T.near(c1[i], c0[i], 1e-9)
+  T.case("a caret step along a line is a straight smear, the caret's height and colour", function()
+    local s = Plan.smear_for({ 100, 100 }, { 130, 100 }, CELL, 300)
+    T.eq(#s.path, 2)
+    -- Through the middle of the caret's cell, not along its top.
+    T.eq(s.path[1][1], 100); T.eq(s.path[1][2], 111)
+    T.eq(s.path[2][1], 130); T.eq(s.path[2][2], 111)
+    T.eq(s.width, CELL[2])
+    T.eq(s.color, Theme.cyan)
+    T.ok(s.life >= 0.12 and s.life <= 0.22, "a fifth of a second at most")
+    T.ok(s.core > 0.35 and s.core < 1, "warm, not white")
+    T.eq(#Plan.corner(s).rings, 0, "no wink on a straight run")
+    T.nope(Plan.is_jump({ 100, 100 }, { 130, 100 }, CELL), "a step is not a jump")
+  end)
+
+  T.case("across lines the smear bends into an L with a wink at the corner", function()
+    local s = Plan.smear_for({ 100, 100 }, { 40, 144 }, CELL, 2000)
+    T.eq(#s.path, 3)
+    T.eq(s.path[2][1], 100); T.eq(s.path[2][2], 155)
+    local wink = Plan.corner(s)
+    T.eq(#wink.rings, 1)
+    T.ok(wink.rings[1].glow)
+    T.eq(wink.rings[1].x, 100); T.eq(wink.rings[1].y, 155)
+    T.near(Plan.path_length(s.path), 44 + 60, 1e-9)
+    local x, y = Plan.path_point(s.path, 0.5)
+    T.near(x, 100 - 8, 1e-9); T.near(y, 155, 1e-9)
+    T.ok(s.core > Plan.smear_for({ 100, 100 }, { 40, 144 }, CELL, 100).core, "hotter the faster")
+    T.ok(Plan.smear_for({ 0, 0 }, { 0, 0 }, CELL, 9e9).core <= 1)
+  end)
+
+  T.case("only a jump drops grains: flat streaks along the path, in order, that fall", function()
+    T.ok(Plan.is_jump({ 0, 0 }, { 0, CELL[2] * 3 }, CELL), "three lines down is a jump")
+    T.ok(Plan.is_jump({ 0, 0 }, { CELL[1] * 20, 0 }, CELL), "twenty columns along is a jump")
+    T.nope(Plan.is_jump({ 0, 0 }, { 0, CELL[2] }, CELL), "one line is a step")
+    local s = Plan.smear_for({ 0, 0 }, { 0, CELL[2] * 10 }, CELL, 3000)
+    local plan = Plan.jump(s, seeded())
+    finite(plan)
+    T.ok(#plan.particles >= 8 and #plan.particles <= 20, "a dozen or so")
+    local last = -1
+    for _, p in ipairs(plan.particles) do
+      T.eq(p.shape, 7)
+      T.ok(p.gravity > 0, "and they fall")
+      T.ok(p.size <= CELL[2], "never taller than the line")
+      T.ok(p.delay >= last - 0.03, "in order along the path")
+      last = p.delay
     end
-    local mid = Plan.ribbon(0.125)
-    for i = 1, 3 do
-      T.near(mid[i], (Theme.cyan[i] + Theme.pink[i]) / 2, 1e-6)
+    local cream = 0
+    for _, p in ipairs(plan.particles) do
+      if p.color == Theme.cream then cream = cream + 1 end
     end
-    local a, b = Plan.ribbon(0.3), Plan.ribbon(0.31)
-    for i = 1, 3 do
-      T.ok(math.abs(a[i] - b[i]) < 0.05, "neighbours are neighbours in colour")
-    end
+    T.ok(cream > 0 and cream < #plan.particles, "a few are white, most the caret's colour")
   end)
 
   T.case("a bracket link runs from one bracket to the other and lights both", function()

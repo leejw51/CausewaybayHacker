@@ -77,7 +77,7 @@ love . --home ~/somewhere-else       # or --home=~/somewhere-else
 | **F2** | in a quest: **FORMAT** (`rustfmt` / `gofmt`, on the server) |
 | **F6** … **F9** | in a quest: reset · hint · log · `$EDITOR` |
 | **TAB** / **Q** | on the map: switch land · switch category |
-| **P** | the playground — Mei's desk, from the map or the land select |
+| **P** | the playground — Mei's desk, from the map, the land select or the category select; both selects also have it as a button, beside **WEAKEST** on the land select |
 | **S** / **T** / **A** | from the map: search · stats · AI mode |
 | **TAB** / **ESC** | indent · back |
 | **ctrl-]** | in the editor: jump to the matching bracket (shift to select) |

@@ -15,7 +15,8 @@
 --
 -- Shapes, as `codefx.lua` draws them:
 --   0 a soft glowing disc     1 a four-point star     2 a scrap of paper
---   4 a chunk of brick        5 a puff of dust         6 a ribbon ember
+--   4 a chunk of brick        5 a puff of dust         6 a pointer ember
+--   7 a flat streak: the grain a caret jump drops
 -- 4 and 5 are the Grok-drawn strips (`art/fx_bricks.png`, `art/fx_dust.png`)
 -- when they have loaded and a plain square when they have not.
 
@@ -28,9 +29,6 @@ local DUST = { Theme.dim, Theme.cream, { 0.6, 0.55, 0.5, 1 }, { 0.45, 0.4, 0.38,
 local GOLD = { Theme.coin, Theme.cream, { 1, 0.95, 0.7, 1 } }
 local SPARK = { Theme.coin, Theme.pink, Theme.cyan, Theme.cream, Theme.admit }
 local PAPER = { Theme.coin, Theme.pink, Theme.cyan, Theme.cream, Theme.admit, Theme.brick }
---- The pointer ribbon's colours, cycled through as it travels.
-local RIBBON = { Theme.cyan, Theme.pink, Theme.coin, Theme.cream }
-
 --- The most cells one deletion breaks: past this, the rest went quietly.
 M.RUBBLE_MAX = 400
 
@@ -85,37 +83,33 @@ end
 
 -- ---------------------------------------------------------------- the plans
 
---- A point on the ribbon's colour cycle, `phase` in 0..1, blended smoothly.
-function M.ribbon(phase)
-  local u = phase % 1
-  local k = u * #RIBBON
-  local i = math.floor(k) % #RIBBON + 1
-  local j = i % #RIBBON + 1
-  local f = k - math.floor(k)
-  local a, b = RIBBON[i], RIBBON[j]
-  return { a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f, 1 }
-end
+--- Virtual pixels per second past which a core is as white as it gets.
+M.SMEAR_HOT = 2400
 
---- What the pointer leaves behind: one ember, on the path.
+--- What the pointer leaves behind as it crosses the code page: one ember on
+--- the path, in the caret's colour.
 ---
---- A ribbon, not a spray: one soft disc per few pixels of travel, put exactly
---- where the pointer was, drifting a little *against* the motion (`vx, vy`,
---- pixels per second) so the tail lengthens with speed; no gravity; a colour
---- that moves slowly round a cycle with `phase`, so neighbours along the
---- ribbon are neighbours in colour.
-function M.trail(x, y, vx, vy, phase, rng)
+--- Thin and short on purpose. The first version cycled through colours and
+--- was a website's mouse trail pasted over an editor; this is a thread of the
+--- same light the caret smears, and it says only "the pointer went this way".
+--- The ember drifts a little *against* the motion (`vx, vy`, pixels a second)
+--- so the thread lengthens with speed, and it goes whiter the faster the
+--- pointer went.
+function M.pointer(x, y, vx, vy, rng)
   rng = rng or math.random
   local speed = math.sqrt(vx * vx + vy * vy)
   local nx = speed > 1 and -vx / speed or 0
   local ny = speed > 1 and -vy / speed or 0
-  local drift = between(rng, 6, 14) * math.min(1.5, 0.6 + speed / 1500)
+  local heat = math.min(1, speed / M.SMEAR_HOT)
+  local drift = between(rng, 4, 9) * (0.6 + heat)
+  local c = Theme.cyan
   return {
     particles = {
       thrown(x, y, nx * drift, ny * drift, {
-        life = between(rng, 0.42, 0.55),
+        life = between(rng, 0.22, 0.3),
         delay = 0,
-        size = 9 + math.min(5, speed / 300),
-        color = M.ribbon(phase or 0),
+        size = 4 + 3 * heat,
+        color = { c[1] + (1 - c[1]) * heat * 0.6, c[2] + (1 - c[2]) * heat * 0.6, c[3], 1 },
         shape = 6,
         trail = true,
         gravity = 0,
@@ -124,6 +118,122 @@ function M.trail(x, y, vx, vy, phase, rng)
     },
     rings = {},
   }
+end
+
+-- ------------------------------------------------------------- the caret
+
+--- The caret moved: a smear.
+---
+--- The light trail follows the *caret* — the thing that actually moves when
+--- code is written — the way a good terminal's does: the caret's rectangle
+--- stretches from where it was to where it is and shrinks back, its width and
+--- alpha dying together inside a fifth of a second, with a thin white core
+--- down its middle that burns hotter the faster the caret went. One colour
+--- plus white; the caret's own neon.
+---
+--- Along a line it is a horizontal beam. Across lines it bends: down the
+--- column first and then along the new line, an L, with a wink of light at
+--- the corner. A smear is `{ path, width, life, color, core }`: `path` is two
+--- points for a straight run and three for a bend, `{ x, y }` each, through
+--- the middle of the caret's cell; `width` its full width (the cell's
+--- height); `core` 0..1, how white the middle burns. `from` and `to` are the
+--- top-left of the caret's cell; `speed` is pixels a second.
+function M.smear_for(from, to, cell, speed)
+  local ch = cell[2]
+  local mid = ch / 2
+  local a = { from[1], from[2] + mid }
+  local b = { to[1], to[2] + mid }
+  local bend = math.abs(a[2] - b[2]) > ch * 0.5 and math.abs(a[1] - b[1]) > 0.5
+  local path = bend and { a, { a[1], b[2] }, b } or { a, b }
+  local dist = M.path_length(path)
+  return {
+    path = path,
+    width = ch,
+    -- A step lives a short life; a jump across the screen a little longer,
+    -- so the tail has time to cross what the head crossed.
+    life = math.min(0.22, 0.12 + dist / 4000),
+    color = Theme.cyan,
+    core = math.min(1, 0.35 + 0.65 * speed / M.SMEAR_HOT),
+  }
+end
+
+--- The bend's wink: a small glow where the smear turns the corner. Nothing on
+--- a straight run.
+function M.corner(smear)
+  if #smear.path < 3 then
+    return { particles = {}, rings = {} }
+  end
+  local c = smear.path[2]
+  return {
+    particles = {},
+    rings = {
+      { x = c[1], y = c[2], radius = smear.width * 0.9, life = smear.life, delay = 0,
+        color = smear.color, glow = true },
+    },
+  }
+end
+
+function M.path_length(path)
+  local len = 0
+  for i = 2, #path do
+    local ax, ay = path[i - 1][1], path[i - 1][2]
+    local bx, by = path[i][1], path[i][2]
+    len = len + math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
+  end
+  return len
+end
+
+--- The point `u` (0..1) of the way along `path`, by distance: `x, y`.
+function M.path_point(path, u)
+  local total = M.path_length(path)
+  local want = math.max(0, math.min(1, u)) * total
+  for i = 2, #path do
+    local ax, ay = path[i - 1][1], path[i - 1][2]
+    local bx, by = path[i][1], path[i][2]
+    local seg = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
+    if want <= seg or i == #path then
+      local f = seg > 0 and math.min(1, want / seg) or 1
+      return ax + (bx - ax) * f, ay + (by - ay) * f
+    end
+    want = want - seg
+  end
+  return path[1][1], path[1][2]
+end
+
+--- Whether a caret move is a *jump* — PageDown, a click on a far line —
+--- rather than a step. A jump gets grains; a step never does, so an arrow key
+--- held down is a beam and not a game.
+function M.is_jump(from, to, cell)
+  return math.abs(to[2] - from[2]) >= cell[2] * 2.5 or math.abs(to[1] - from[1]) >= cell[1] * 16
+end
+
+--- The grains a jump drops along its smear: a dozen or so flat streaks —
+--- never taller than a fraction of the line — that appear in order along the
+--- path, fall a little, and are gone in half a second. Shape 7 is that
+--- streak. Rare on purpose: this is the moment the smear looks like it was
+--- going too fast, not a thing that happens every keystroke.
+function M.jump(smear, rng)
+  rng = rng or math.random
+  local ch = smear.width
+  local dist = M.path_length(smear.path)
+  local count = math.floor(math.min(20, 8 + dist / (ch * 4)) + 0.5)
+  local particles = {}
+  for i = 0, count - 1 do
+    local u = (i + rng()) / count
+    local x, y = M.path_point(smear.path, u)
+    particles[#particles + 1] = thrown(x, y + (rng() - 0.5) * ch * 0.5, (rng() - 0.5) * ch,
+      between(rng, 0.1, 0.4) * ch, {
+        life = between(rng, 0.3, 0.5),
+        delay = u * 0.08 + rng() * 0.03,
+        size = between(rng, 0.45, 0.8) * ch,
+        color = (i % 4 == 3) and Theme.cream or smear.color,
+        shape = 7,
+        trail = false,
+        gravity = 260,
+        seed = rng(),
+      })
+  end
+  return { particles = particles, rings = {} }
 end
 
 --- One character typed: a few sparks off the caret, in the colour the

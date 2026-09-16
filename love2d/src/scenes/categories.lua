@@ -136,7 +136,7 @@ function Categories.metrics(vw, vh, rows)
 
   -- Rows: what the type needs, stretched to what the screen has.
   local n = math.max(1, #rows)
-  local bottom = vh - UI.footerHeight() - 12
+  local bottom = Categories.band_top(vh) - 10
   local need = 12 + name_h + 4 + blurb_h + 14
   need = math.max(need, 8 + math.max(plate_h, count_h) + 8 + 22)
   if stacked then need = math.max(need, count_y + count_h + 10) end
@@ -159,6 +159,28 @@ function Categories.metrics(vw, vh, rows)
     blurb_y = blurb_y, blurb_lh = blurb_lh, blurb_lines = math.min(blurb_lines, 3),
     count_w = count_w, count_h = count_h, count_y = count_y,
     stacked = stacked, widest = widest,
+  }
+end
+
+--- The band under the rows: one button, PLAYGROUND — the same desk the
+--- lands screen and the map offer, so a player who came one step in does
+--- not have to go back out to find it. `P` still works.
+function Categories.band_height()
+  return math.max(36, UI.lineHeight(10) + 18)
+end
+
+function Categories.band_top(vh)
+  return vh - UI.footerHeight() - 12 - Categories.band_height()
+end
+
+--- The button — one function, read by the draw and by the click.
+function Categories.button_rect(vw, vh)
+  local label = I18n.t("PLAYGROUND") .. "  P"
+  local pad = Layout.isPortrait() and 12 or 60
+  local bw = math.min(vw - pad * 2, math.max(220, UI.textWidth(label, 10) + 40))
+  return {
+    x = math.floor((vw - bw) / 2), y = Categories.band_top(vh),
+    w = bw, h = Categories.band_height(), label = label,
   }
 end
 
@@ -297,7 +319,10 @@ function Categories:draw()
       self.error and Theme.red or Theme.withAlpha(Theme.cream, 0.7), "center", vw)
   end
 
-  self.app:footer(I18n.t("ARROWS choose   ENTER go   ESC back"))
+  local b = Categories.button_rect(vw, vh)
+  UI.button(b.x, b.y, b.w, b.h, b.label, self.hover and "hot" or "normal", 10)
+
+  self.app:footer(I18n.t("ARROWS choose   ENTER go   P playground   ESC back"))
 end
 
 function Categories:keypressed(key)
@@ -311,10 +336,25 @@ function Categories:keypressed(key)
     self.picked_at = Anim.now(); SFX.play("move"); return true
   end
   if key == "return" or key == "kpenter" or key == "space" then self:choose(); return true end
+  -- Mei's own desk (§4.9c), the same key as on the lands screen and the map.
+  if key == "p" then self.app:go("playground"); return true end
   return false
 end
 
+local function inside(r, x, y)
+  return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
+end
+
+function Categories:mousemoved(x, y)
+  self.hover = inside(Categories.button_rect(Layout.vw, Layout.vh), x, y) or nil
+end
+
 function Categories:mousepressed(x, y)
+  if inside(Categories.button_rect(Layout.vw, Layout.vh), x, y) then
+    SFX.play("select")
+    self.app:go("playground")
+    return
+  end
   local rows = self.categories or {}
   -- The same numbers the draw used. This had its own copy — with a different
   -- margin, even — so a press was tested against rows that were not where

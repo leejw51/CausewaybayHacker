@@ -48,6 +48,8 @@ function Lands.new(app)
     -- when it was pressed, so it can push in.
     picked_at = 0,
     pressed_at = nil,
+    -- Which of the two buttons under the cards the pointer is over.
+    hover = nil,
   }, Lands)
 end
 
@@ -139,7 +141,7 @@ function Lands:card_rects()
   -- footer below them both grow when the player asks for bigger type.
   local pad = 16
   local top = math.floor(24 + UI.lineHeight(Lands.title_size(Layout.vw)) + 18)
-  local bottom = vh - UI.footerHeight() - math.floor(UI.lineHeight(9) * 1.6)
+  local bottom = Lands.band_top() - 10
   local out = {}
   if portrait then
     local gap = 14
@@ -159,6 +161,40 @@ function Lands:card_rects()
     end
   end
   return out, n
+end
+
+--- The band under the cards: two buttons, WEAKEST and PLAYGROUND — the
+--- browser's AUTO SELECT and PLAYGROUND row. Both are "somewhere other than
+--- a land to go", and they are the same size because neither is the primary
+--- action here. `W` and `P` still work; the buttons are an addition, because
+--- a key nobody can see is not a feature.
+function Lands.band_height()
+  return math.max(36, UI.lineHeight(10) + 18)
+end
+
+--- Where the band starts: above the note line, which is above the footer.
+function Lands.band_top()
+  return Layout.vh - UI.footerHeight() - math.floor(UI.lineHeight(9) * 1.6) - Lands.band_height()
+end
+
+--- The two buttons — **one function, read by the draw and by the click.**
+function Lands:button_rects()
+  local vw = Layout.vw
+  local pad, gap = 16, 12
+  local bh = Lands.band_height()
+  local y = Lands.band_top()
+  local labels = {
+    weakest = I18n.t("WEAKEST") .. "  W",
+    playground = I18n.t("PLAYGROUND") .. "  P",
+  }
+  local want = math.max(200, UI.textWidth(labels.weakest, 10) + 40,
+    UI.textWidth(labels.playground, 10) + 40)
+  local bw = math.min(math.floor((vw - pad * 2 - gap) / 2), want)
+  local x = math.floor((vw - bw * 2 - gap) / 2)
+  return {
+    weakest = { x = x, y = y, w = bw, h = bh, label = labels.weakest },
+    playground = { x = x + bw + gap, y = y, w = bw, h = bh, label = labels.playground },
+  }
 end
 
 --- The largest size on the ladder at which the title still fits across the
@@ -186,6 +222,14 @@ function Lands:draw()
   for i = 1, n do
     local r = rects[i]
     self:draw_card(r.x, r.y, r.w, r.h, self:land_at(i), LAND_ORDER[i], i == self.cursor)
+  end
+
+  local buttons = self:button_rects()
+  for _, id in ipairs({ "weakest", "playground" }) do
+    local b = buttons[id]
+    local state = (id == "weakest" and self.auto_busy) and "disabled"
+      or (self.hover == id and "hot" or "normal")
+    UI.button(b.x, b.y, b.w, b.h, b.label, state, 10)
   end
 
   local note = self.error or (not self.lands and I18n.t("asking the server…")) or nil
@@ -403,7 +447,31 @@ function Lands:keypressed(key)
   return false
 end
 
+--- Inside `r`?
+local function inside(r, x, y)
+  return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
+end
+
+function Lands:mousemoved(x, y)
+  local buttons = self:button_rects()
+  local over = nil
+  for _, id in ipairs({ "weakest", "playground" }) do
+    if inside(buttons[id], x, y) then over = id end
+  end
+  self.hover = over
+end
+
 function Lands:mousepressed(x, y)
+  local buttons = self:button_rects()
+  if inside(buttons.playground, x, y) then
+    SFX.play("select")
+    self.app:go("playground")
+    return
+  end
+  if inside(buttons.weakest, x, y) then
+    self:auto_select()
+    return
+  end
   local rects, n = self:card_rects()
   for i = 1, n do
     local r = rects[i]
