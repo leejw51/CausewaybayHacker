@@ -13,8 +13,9 @@
  * The other rule is that **the text is the whole point**. There is no starter
  * to fall back on and nothing on the server to re-derive it from, so it is
  * saved three times over: on a debounce while typing, when the window loses
- * focus, and when the screen is left — and it is mirrored into `localStorage`
- * on every keystroke, so a reload or a dropped socket cannot cost work either.
+ * focus, and when the screen is left — and it is mirrored into this tab's
+ * `sessionStorage` on every keystroke, so a reload or a dropped socket cannot
+ * cost work either.
  */
 import type { App, Scene } from "../app";
 import { ensureFonts, inkBox, inkCentreY, printf, width, wrap } from "../engine/text";
@@ -42,12 +43,7 @@ import {
   Editor,
   MAIN_FILE,
 } from "../ui/editor";
-import {
-  CODE_FACE_NAME,
-  CODE_FACES,
-  getCodeFace,
-  setCodeFace,
-} from "../engine/text";
+import { CODE_FACE_NAME, CODE_FACES, getCodeFace, setCodeFace } from "../engine/text";
 import { readNumberPref, writePref } from "../ui/prefs";
 import { Overlay } from "../ui/overlay";
 import { clipMessage, copyText, readText } from "../ui/clip";
@@ -59,7 +55,39 @@ import type { Land, PlaygroundRun, RunStage, SnippetBrief } from "../net/protoco
 import { LandsScene } from "./lands";
 
 /** Where the open scratchpad is mirrored, so a reload opens it again. */
-const LOCAL_KEY = "cwbhacker.playground";
+/**
+ * Where the local mirror of the open pad lives: **in this tab, under this
+ * account**.
+ *
+ * It used to be one key in `localStorage` for the whole origin. With two tabs
+ * signed in as two accounts — which is what the account index is for — one
+ * account's unsaved draft was on offer to the other's playground, carrying
+ * `id` with it: a snippet id belonging to somebody else, which the next
+ * autosave would try to save into. The server scopes every snippet by address
+ * and refuses (`snippets::get` — "somebody else's snippet is not found, not
+ * forbidden"), so nothing could be corrupted; it would show the wrong text and
+ * then fail.
+ *
+ * Two changes, and both are needed. `sessionStorage` puts the draft in the tab,
+ * beside the session that owns it (`net/tabsession.ts`) — it still survives the
+ * reload this exists for, and stops being visible to a tab practising as
+ * somebody else. The address stays in the key because one tab can sign out and
+ * back in as another account, and the draft must not follow it across.
+ */
+const LOCAL_KEY = (address: string) => `cwbhacker.playground.${address.toLowerCase()}`;
+
+/**
+ * The single shared key the mirror used before it was keyed by account.
+ *
+ * Removed rather than migrated. Whose draft it is cannot be known from the
+ * outside, and handing it to whichever account opens the playground first
+ * would be the bug this is fixing, with a coin toss in front of it. What is
+ * lost is at most the few seconds since the last autosave, and only for
+ * somebody who upgrades mid-keystroke.
+ *
+ * It is the one `localStorage` call left in this file, and it only deletes.
+ */
+const LEGACY_LOCAL_KEY = "cwbhacker.playground";
 /** How long after the last keystroke the autosave fires. */
 const AUTOSAVE_AFTER = 2.5;
 
@@ -341,7 +369,11 @@ export class PlaygroundScene implements Scene {
   }
 
   /** Say what the clipboard did, on the line that says what saving did. */
-  private clipSaid(what: string, res: Awaited<ReturnType<typeof copyText>>, verb: "copy" | "paste") {
+  private clipSaid(
+    what: string,
+    res: Awaited<ReturnType<typeof copyText>>,
+    verb: "copy" | "paste",
+  ) {
     this.saveNote = clipMessage(what, res, verb).text;
     if (res.ok) this.app.chip.blip();
     else this.app.chip.fail();
@@ -509,17 +541,32 @@ export class PlaygroundScene implements Scene {
     this.writeLocal();
   }
 
+  /**
+   * Whose mirror this is. Empty until login, and a draft with no owner is one
+   * that cannot be handed back safely — so the mirror simply does not run.
+   */
+  private localKey(): string | null {
+    const address = this.app.addressLabel;
+    return address ? LOCAL_KEY(address) : null;
+  }
+
   private writeLocal(): void {
+    const key = this.localKey();
+    if (!key) return;
     try {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...this.held, dirty: this.dirty }));
+      sessionStorage.setItem(key, JSON.stringify({ ...this.held, dirty: this.dirty }));
     } catch {
       /* private browsing: the server copy is still the real one */
     }
   }
 
   private restoreLocal(): void {
+    const key = this.localKey();
+    if (!key) return;
     try {
-      const raw = localStorage.getItem(LOCAL_KEY);
+      // The unowned, origin-wide key from before this, on the way past.
+      localStorage.removeItem(LEGACY_LOCAL_KEY);
+      const raw = sessionStorage.getItem(key);
       if (!raw) return;
       const v = JSON.parse(raw) as Partial<Held>;
       if (typeof v.source !== "string") return;
@@ -607,10 +654,7 @@ export class PlaygroundScene implements Scene {
     const refed = this.held.stdin !== this.savedStdin;
     if (
       (!this.dirty && !renamed && !refed) ||
-      (source === this.savedSource &&
-        this.held.lang === this.savedLang &&
-        !renamed &&
-        !refed)
+      (source === this.savedSource && this.held.lang === this.savedLang && !renamed && !refed)
     ) {
       this.dirty = false;
       return;
@@ -1316,10 +1360,7 @@ export class PlaygroundScene implements Scene {
       if (stacked) {
         printf(g, f, fedLabel, x + Math.round(6 * s), y + Math.round(3 * s), w, "left");
         const lh = f.height + Math.round(5 * s);
-        this.stdinOverlay?.place(
-          [x + 4, y + lh, w - 8, h - lh - 4],
-          fonts.codeSm.size,
-        );
+        this.stdinOverlay?.place([x + 4, y + lh, w - 8, h - lh - 4], fonts.codeSm.size);
       } else {
         printf(
           g,
@@ -1492,8 +1533,7 @@ export class PlaygroundScene implements Scene {
     // over a panel 476 tall, and an editor at its 60-pixel floor. That is the
     // screen that was reported as very hard to use.
     const besideW = inner[2] - langsW - langGap * 2;
-    const beside =
-      besideW > 0 && rowsIn(fonts.button, labels, besideW, layout.minTouchH()) === 1;
+    const beside = besideW > 0 && rowsIn(fonts.button, labels, besideW, layout.minTouchH()) === 1;
     const rowW = beside ? besideW : inner[2];
     const rows = rowsIn(fonts.button, labels, rowW, layout.minTouchH());
     const rowGap = Math.round(fonts.button.size * 0.5);
@@ -1526,8 +1566,7 @@ export class PlaygroundScene implements Scene {
     const editorRect: Rect = [inner[0] + 4, inner[1] + 4, inner[2] - 8, editorH - 8];
     if (this.editor && this.benchIn.finished) {
       this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
-    }
-    else this.overlay?.hide();
+    } else this.overlay?.hide();
 
     // The stdin box. It matters here in a way it never does on a quest screen:
     // there is no test case to supply the input, so without this there is no
@@ -1599,11 +1638,7 @@ export class PlaygroundScene implements Scene {
     // whole of `bandH` here counted that band twice and pushed the output
     // panel off the bottom of the bench by exactly its height.
     const outTop = rowY + (bandH - langBand) + gap;
-    this.drawOutput(
-      g,
-      [inner[0], outTop, inner[2], Math.max(24, inner[1] + inner[3] - outTop)],
-      s,
-    );
+    this.drawOutput(g, [inner[0], outTop, inner[2], Math.max(24, inner[1] + inner[3] - outTop)], s);
   }
 
   /** What the program printed, and what the compiler thought of it. */
@@ -1641,9 +1676,7 @@ export class PlaygroundScene implements Scene {
       // line as long as the panel is wide. Beside the code it is not, and
       // `실행됐습니다` and `컴파일 970 ms …` were printed through each other.
       const together =
-        width(fonts.stationSm, OUTCOME[r.outcome]()) +
-          width(fonts.stationSm, timings) +
-          pad * 3 <=
+        width(fonts.stationSm, OUTCOME[r.outcome]()) + width(fonts.stationSm, timings) + pad * 3 <=
         w;
       if (!together) ty += fonts.stationSm.height + Math.round(2 * s);
       printf(
