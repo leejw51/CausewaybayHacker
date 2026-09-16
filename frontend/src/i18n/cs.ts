@@ -99,6 +99,7 @@ export const cs: Partial<Catalogue> = {
   "login.youWillBe": "BUDEŠ",
   "login.account": "ÚČET",
   "login.accountRaw": "ÚČET — SYROVÝ KLÍČ JE SÁM SEBOU",
+  "login.username": "JMÉNO",
   "login.phraseHidden": "FRÁZE SKRYTA",
   "login.phraseVisible": "FRÁZE VIDITELNÁ",
   "login.enter": "POTVRDIT",

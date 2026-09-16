@@ -89,6 +89,7 @@ export const ja: Partial<Catalogue> = {
   "login.youWillBe": "あなたのアドレス",
   "login.account": "アカウント番号",
   "login.accountRaw": "アカウント番号 — 秘密鍵には無関係",
+  "login.username": "名前",
   "login.phraseHidden": "フレーズ非表示",
   "login.phraseVisible": "フレーズ表示中",
   "login.enter": "決定",

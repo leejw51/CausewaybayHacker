@@ -90,6 +90,7 @@ export const ko: Partial<Catalogue> = {
   "login.youWillBe": "당신의 주소",
   "login.account": "계정 번호",
   "login.accountRaw": "계정 번호 — 개인키에는 해당 없음",
+  "login.username": "이름",
   "login.phraseHidden": "구문 숨김",
   "login.phraseVisible": "구문 보임",
   "login.enter": "확인",

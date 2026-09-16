@@ -100,6 +100,7 @@ export const en = {
   "login.youWillBe": "YOU WILL BE",
   "login.account": "ACCOUNT",
   "login.accountRaw": "ACCOUNT — A RAW KEY IS ITS OWN",
+  "login.username": "NAME",
   "login.phraseHidden": "PHRASE HIDDEN",
   "login.phraseVisible": "PHRASE VISIBLE",
   "login.enter": "ENTER",

@@ -122,6 +122,13 @@ body {
   padding: 0 8px;
   line-height: 1;
 }
+/* The chosen name. Same one-line treatment as the index box beside it, left
+   aligned because it is a word people read along rather than a number they
+   take in at a glance. */
+.cwb-name {
+  padding: 0 8px;
+  line-height: 1;
+}
 .cwb-editor {
   overflow: hidden;
   background: rgba(10, 8, 26, 0.96);

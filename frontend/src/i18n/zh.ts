@@ -89,6 +89,7 @@ export const zh: Partial<Catalogue> = {
   "login.youWillBe": "你的地址",
   "login.account": "账户序号",
   "login.accountRaw": "账户序号 — 私钥不适用",
+  "login.username": "名称",
   "login.phraseHidden": "助记词已隐藏",
   "login.phraseVisible": "助记词可见",
   "login.enter": "确认",

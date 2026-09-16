@@ -51,7 +51,7 @@
  * sent.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, wrap, type Font } from "../engine/text";
+import { ensureFonts, printf, width, wrap, type Font } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { clipped, fill, neonPrint, well, type Ctx, type Rect } from "../engine/ui";
 import { btnBox } from "../engine/ui";
@@ -59,6 +59,7 @@ import { Buttons, footer, header, RUST, titledPanel } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { Overlay } from "../ui/overlay";
 import { readNumberPref, writePref } from "../ui/prefs";
+import { deterministicUsername } from "../wallet/username";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import {
@@ -108,6 +109,8 @@ function localeInfoLabel(): string {
  * derivation, not because anybody will reach it.
  */
 const MAX_INDEX = 2147483647;
+/** What `users.name` takes before it truncates (`backend/core/src/users.rs`). */
+const NAME_MAX = 48;
 const INDEX_PREF = "cwbhacker.wallet.index";
 
 export class LoginScene implements Scene {
@@ -131,6 +134,23 @@ export class LoginScene implements Scene {
   private readonly indexField: HTMLInputElement;
   private readonly indexOverlay: Overlay;
   private indexRect: Rect = [0, 0, 0, 0];
+  /**
+   * The name this account will be known by.
+   *
+   * The wallet is the account (SPEC §3) and this is not a second credential —
+   * it is the thing you read to check you arrived as the right one of your
+   * wallets. Forty-two characters of hex cannot do that job, and
+   * `AdjectiveNoun####` can.
+   *
+   * Filled in from the address, so there is never an empty box asking somebody
+   * to invent a name before they have seen their wallet — and refilled every
+   * time the address underneath changes, right up until somebody types in it.
+   * After that it is theirs and nothing rewrites it.
+   */
+  private readonly nameField: HTMLInputElement;
+  private readonly nameOverlay: Overlay;
+  private nameRect: Rect = [0, 0, 0, 0];
+  private nameTouched = false;
   private readonly buttons = new Buttons();
   private fieldRect: Rect = [0, 0, 0, 0];
   private preview = "";
@@ -224,6 +244,41 @@ export class LoginScene implements Scene {
     });
     this.indexField = idx;
     this.indexOverlay = new Overlay(app.overlay, app.layout, idx);
+
+    const nm = document.createElement("input");
+    nm.className = "cwb-field cwb-name";
+    nm.type = "text";
+    nm.autocomplete = "off";
+    nm.spellcheck = false;
+    // The server takes 48 characters and truncates past that, so the box
+    // refuses the 49th rather than letting somebody type a name the row will
+    // quietly cut in half.
+    nm.maxLength = NAME_MAX;
+    nm.addEventListener("input", () => {
+      // Typed in once and it is theirs: no later address change overwrites it.
+      this.nameTouched = true;
+    });
+    this.nameField = nm;
+    this.nameOverlay = new Overlay(app.overlay, app.layout, nm);
+  }
+
+  /**
+   * Put the derived name in the box, unless somebody has made it their own.
+   *
+   * Called from `derivePreview`, so the name tracks the address rather than
+   * the phrase: changing the account index is exactly the case where the box
+   * must follow, because that is a different wallet and therefore a different
+   * player.
+   */
+  private refreshName(): void {
+    if (this.nameTouched) return;
+    this.nameField.value = this.preview ? deterministicUsername(this.preview) : "";
+  }
+
+  /** What to seed the account with, or nothing to let the server decide. */
+  private chosenName(): string | undefined {
+    const name = this.nameField.value.trim().slice(0, NAME_MAX);
+    return name ? name : undefined;
   }
 
   /**
@@ -265,6 +320,10 @@ export class LoginScene implements Scene {
     this.offLocale = undefined;
     this.overlay.destroy();
     this.indexOverlay.destroy();
+    this.nameOverlay.destroy();
+    // A name typed for one wallet is not the name for the next one somebody
+    // signs in with, and this screen is where they would arrive.
+    this.nameTouched = false;
   }
 
   /** Twelve new words, shown once. Nothing is sent and nothing is stored. */
@@ -339,6 +398,7 @@ export class LoginScene implements Scene {
     this.status = "";
     if (!text) {
       this.preview = "";
+      this.refreshName();
       return;
     }
     try {
@@ -348,10 +408,12 @@ export class LoginScene implements Scene {
       this.preview = /^0x[0-9a-fA-F]{64}$/.test(text)
         ? addressFromPrivateKeyHex(text).eip55
         : addressFromMnemonic(text, this.walletIndex()).eip55;
+      this.refreshName();
     } catch {
       // Half a phrase is not an error worth shouting about; it is just not an
       // address yet.
       this.preview = "";
+      this.refreshName();
     }
   }
 
@@ -416,7 +478,11 @@ export class LoginScene implements Scene {
     const signature = signMessage(challenge.message);
 
     this.status = t("login.loggingIn");
-    const user = await this.app.client.login(address.eip55, signature);
+    // §4.3 takes an optional name and only ever uses it as a **default**: an
+    // account that already exists keeps the name it has, so typing here is
+    // how a new wallet is named and not a way to rename an old one. Renaming
+    // is `profile.update`, from inside the game.
+    const user = await this.app.client.login(address.eip55, signature, this.chosenName());
     this.app.addressLabel = user.address;
     // §1.3: the client keeps nothing durable of its own. Where this player is
     // comes back with the login, from whichever client they used last — the
@@ -665,6 +731,8 @@ export class LoginScene implements Scene {
       pad +
       idxH +
       pad +
+      idxH +
+      pad +
       fonts.stationSm.height +
       Math.round(4 * s) +
       fonts.small.height +
@@ -701,6 +769,32 @@ export class LoginScene implements Scene {
     this.indexRect = [card[0] + card[2] - idxW + 4, cy + 3, idxW - 8, idxH - 6];
     if (this.rightIn.finished && !raw) this.indexOverlay.place(this.indexRect, fonts.small.size);
     else this.indexOverlay.hide();
+    cy += idxH + pad;
+
+    // **The name, under the number that decides it.** Read top to bottom the
+    // card is now phrase, account, name, address — the order in which one
+    // thing produces the next.
+    g.fillStyle = css(Theme.cyan);
+    // Measured against its own label rather than sharing the index box's
+    // width. The two boxes hold different things: an account index is one or
+    // two digits and a name is `MythicOrca1234`, and a name in a box sized for
+    // a number is a name you cannot read the end of — which on this screen is
+    // the end that tells two of your wallets apart.
+    const nameLabel = t("login.username");
+    const nameW = Math.max(idxW, card[2] - width(fonts.stationSm, nameLabel) - Math.round(16 * s));
+    printf(
+      g,
+      fonts.stationSm,
+      nameLabel,
+      card[0],
+      cy + Math.round((idxH - fonts.stationSm.height) / 2),
+      card[2] - nameW - Math.round(8 * s),
+      "left",
+    );
+    well(g, card[0] + card[2] - nameW, cy, nameW, idxH, [0.06, 0.05, 0.14, 0.98]);
+    this.nameRect = [card[0] + card[2] - nameW + 4, cy + 3, nameW - 8, idxH - 6];
+    if (this.rightIn.finished) this.nameOverlay.place(this.nameRect, fonts.small.size);
+    else this.nameOverlay.hide();
     cy += idxH + pad;
 
     g.fillStyle = css(Theme.cyan);
@@ -861,6 +955,7 @@ export class LoginScene implements Scene {
     );
     this.overlay.hide();
     this.indexOverlay.hide();
+    this.nameOverlay.hide();
     return y + cardH;
   }
 

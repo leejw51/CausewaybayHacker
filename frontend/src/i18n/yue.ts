@@ -102,6 +102,7 @@ export const yue: Partial<Catalogue> = {
   "login.youWillBe": "你嘅地址",
   "login.account": "戶口編號",
   "login.accountRaw": "戶口編號 — 私鑰唔適用",
+  "login.username": "名",
   "login.phraseHidden": "助記詞收埋咗",
   "login.phraseVisible": "助記詞睇得到",
   "login.enter": "確認",
