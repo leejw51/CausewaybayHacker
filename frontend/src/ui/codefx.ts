@@ -19,6 +19,8 @@
  *
  * What happens when:
  *
+ *   * the pointer moves — a thin thread of light behind it, the caret's
+ *     colour, whiter the faster it goes;
  *   * the caret moves — its rectangle smears from where it was to where it
  *     is and shrinks back, a white thread down its middle, an L across
  *     lines; and a *jump* (PageDown, a far click) drops grains on the way;
@@ -43,6 +45,7 @@ import {
   keyPlan,
   linkPlan,
   loopPlan,
+  pointerPlan,
   rubblePlan,
   smearFor,
   type Cell,
@@ -76,6 +79,10 @@ const TONE_COLOUR: Record<Tone, RGBA> = {
  * a minute's thought is a fast move to where it clicked, not a slow one.
  */
 const MOVE_GAP = 0.25;
+/** Virtual pixels of pointer travel between one ember and the next. */
+const TRAIL_STEP = 5;
+/** The most embers one pointer event may leave: a flick is a flick, not a wall. */
+const TRAIL_MAX = 10;
 /** Seconds the editor holds its kick class: matches the CSS animation. */
 const KICK_SECS = 0.6;
 
@@ -89,7 +96,12 @@ export class CodeFx {
   private editor: Editor | null = null;
   /** When the caret last moved, for how fast it moved this time. */
   private movedAt = -1;
+  /** The pointer's last virtual position and when it was there. */
+  private last: Pt | null = null;
+  private lastAt = 0;
+  private carry = 0;
   private kick: ReturnType<typeof setTimeout> | null = null;
+  private readonly onPointer = (ev: PointerEvent): void => this.pointed(ev);
 
   constructor(
     host: HTMLElement,
@@ -121,6 +133,7 @@ export class CodeFx {
     // Faded in by the stylesheet once the class lands, a frame after it is
     // in the document, so the first paint is a fade and not a pop.
     requestAnimationFrame(() => this.canvas.classList.add("cwb-on"));
+    addEventListener("pointermove", this.onPointer, { passive: true });
   }
 
   /** Listen to this editor. One at a time; the screen has one. */
@@ -149,6 +162,7 @@ export class CodeFx {
   }
 
   destroy(): void {
+    removeEventListener("pointermove", this.onPointer);
     if (this.editor) {
       this.editor.events = null;
       this.editor.dom.classList.remove("cwb-kick");
@@ -267,6 +281,49 @@ export class CodeFx {
       dom.classList.remove("cwb-kick");
       this.kick = null;
     }, KICK_SECS * 1000);
+  }
+
+  // -- the pointer ---------------------------------------------------------
+
+  /**
+   * Embers along the pointer's path.
+   *
+   * Distance-paced rather than event-paced: a pointer moving slowly across a
+   * 240 Hz screen fires far more events per pixel than a flick does, and a
+   * trail that was one ember per event would be dense when still and thin
+   * when moving — the opposite of a tail. So travel is banked and an ember is
+   * spent every `TRAIL_STEP` virtual pixels, placed along the segment.
+   */
+  private pointed(ev: PointerEvent): void {
+    if (reducedMotion()) return;
+    const v = this.layout.toVirtual(ev.clientX, ev.clientY);
+    if (!v) return;
+    const t = this.now;
+    const last = this.last;
+    this.last = v;
+    // A pointer that has been still for a while has no path to trail: this
+    // is its first point again, not a jump from where it was.
+    if (!last || t - this.lastAt > 0.25) {
+      this.lastAt = t;
+      this.carry = 0;
+      return;
+    }
+    const dt = Math.max(1 / 240, t - this.lastAt);
+    this.lastAt = t;
+    const dx = v[0] - last[0];
+    const dy = v[1] - last[1];
+    const dist = Math.hypot(dx, dy);
+    if (dist < 0.5) return;
+    this.carry += dist;
+    const n = Math.min(TRAIL_MAX, Math.floor(this.carry / TRAIL_STEP));
+    if (n === 0) return;
+    this.carry -= n * TRAIL_STEP;
+    const vx = dx / dt;
+    const vy = dy / dt;
+    for (let i = 1; i <= n; i++) {
+      const u = i / n;
+      this.play(pointerPlan(last[0] + dx * u, last[1] + dy * u, vx, vy));
+    }
   }
 
   // -- coordinates ---------------------------------------------------------

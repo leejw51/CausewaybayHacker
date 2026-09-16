@@ -25,6 +25,7 @@ import {
   linkPlan,
   loopPlan,
   pathPoint,
+  pointerPlan,
   rubblePlan,
   smearFor,
   type Plan,
@@ -200,6 +201,26 @@ describe("the plans", () => {
       expect(p.delay).toBeGreaterThanOrEqual(lastDelay - 0.03);
       lastDelay = p.delay;
     }
+  });
+
+  it("the pointer's thread is one ember on the path, the caret's colour, whiter with speed", () => {
+    const plan = pointerPlan(100, 100, 800, 0, seeded());
+    finite(plan);
+    expect(plan.particles).toHaveLength(1);
+    const p = plan.particles[0];
+    expect(p.x).toBe(100);
+    expect(p.y).toBe(100);
+    expect(p.dx).toBeLessThan(0);
+    expect(p.dy).toBeCloseTo(0, 9);
+    expect(p.gravity).toBe(0);
+    expect(p.shape).toBe(6);
+    expect(p.life).toBeLessThanOrEqual(0.3);
+    const slow = pointerPlan(100, 100, 0, 0, seeded()).particles[0];
+    expect(slow.dx).toBeCloseTo(0, 9);
+    expect(slow.color).toEqual([...Theme.cyan.slice(0, 3), 1]);
+    expect(slow.size).toBeLessThan(p.size);
+    // Faster is whiter: the red channel, which cyan has least of, climbs.
+    expect(p.color[0]).toBeGreaterThan(slow.color[0]);
   });
 
   it("a point along a bent path walks the first leg, then the second", () => {

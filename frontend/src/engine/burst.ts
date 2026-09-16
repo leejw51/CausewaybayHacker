@@ -318,6 +318,45 @@ function shade(col: RGBA, k: number): RGBA {
 }
 
 /**
+ * What the pointer leaves behind as it crosses the code page: one ember on
+ * the path, in the caret's colour, with the shader's ghost trail for a body.
+ *
+ * Thin and short on purpose. The first version cycled through colours and
+ * was a website's mouse trail pasted over an editor; this is a thread of
+ * the same light the caret smears, and it says only "the pointer went this
+ * way". The ember drifts a little *against* the motion (`vx, vy`, virtual
+ * pixels a second) so the thread lengthens with speed, and its core goes
+ * whiter the faster the pointer went.
+ */
+export function pointerPlan(
+  x: number,
+  y: number,
+  vx: number,
+  vy: number,
+  rng: Rng = Math.random,
+): Plan {
+  const speed = Math.hypot(vx, vy);
+  const nx = speed > 1 ? -vx / speed : 0;
+  const ny = speed > 1 ? -vy / speed : 0;
+  const heat = Math.min(1, speed / SMEAR_HOT);
+  const drift = between(rng, 4, 9) * (0.6 + heat);
+  const c = Theme.cyan;
+  const particles: Particle[] = [
+    thrown(x, y, nx * drift, ny * drift, {
+      life: between(rng, 0.22, 0.3),
+      delay: 0,
+      size: 4 + 3 * heat,
+      color: [c[0] + (1 - c[0]) * heat * 0.6, c[1] + (1 - c[1]) * heat * 0.6, c[2], 1],
+      shape: 6,
+      trail: true,
+      gravity: 0,
+      seed: rng(),
+    }),
+  ];
+  return { particles, rings: [] };
+}
+
+/**
  * The caret moved: a smear.
  *
  * The first version of the code page's light trail followed the *pointer*,
