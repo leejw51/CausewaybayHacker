@@ -113,6 +113,13 @@ pub fn list(conn: &Connection, address: &str) -> Result<Vec<SnippetBrief>> {
 /// timer, so saving byte-identical content returns the row untouched — the
 /// same `updated_at` — rather than writing a new timestamp every few seconds
 /// and making a list sorted by it jump around while nobody is typing.
+///
+/// Eight arguments, which is one past what clippy will sit still for. Three
+/// are the context every call in this module takes and five are the pad
+/// itself; grouping the five into a struct for the one call site there is
+/// would move the same fields behind a name that says nothing the parameter
+/// list does not already say.
+#[allow(clippy::too_many_arguments)]
 pub fn save(
     conn: &Connection,
     home: &Home,

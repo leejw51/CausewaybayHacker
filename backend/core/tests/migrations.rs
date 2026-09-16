@@ -207,7 +207,9 @@ fn the_newest_migration_is_the_one_that_gave_a_scratchpad_its_input() {
     // Every pad that already existed keeps its code and gains an empty input,
     // which is the only honest value: nobody could have saved one yet.
     let empty: String = conn
-        .query_row("SELECT coalesce(max(stdin), '') FROM snippets", [], |r| r.get(0))
+        .query_row("SELECT coalesce(max(stdin), '') FROM snippets", [], |r| {
+            r.get(0)
+        })
         .unwrap();
     assert_eq!(empty, "", "an existing pad's input is empty, not null");
 }
