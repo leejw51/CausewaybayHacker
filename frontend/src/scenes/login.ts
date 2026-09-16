@@ -270,6 +270,21 @@ export class LoginScene implements Scene {
     this.nameField.value = this.preview ? deterministicUsername(this.preview) : "";
   }
 
+  /**
+   * Show an address, and let the name follow it.
+   *
+   * Every path that changes the address goes through here. It was six
+   * assignments to `this.preview` scattered across the scene, three of which
+   * forgot the name — NEW WALLET showed a fresh wallet with an empty name box,
+   * and CLEAR and DISCARD left the previous wallet's name sitting under an
+   * address that was gone. Two things that must move together are one method,
+   * or they are a bug waiting for whichever caller is written next.
+   */
+  private setPreview(address: string): void {
+    this.preview = address;
+    this.refreshName();
+  }
+
   /** What to seed the account with, or nothing to let the server decide. */
   private chosenName(): string | undefined {
     const name = this.nameField.value.trim().slice(0, NAME_MAX);
@@ -290,16 +305,18 @@ export class LoginScene implements Scene {
     // After a logout there is nothing held, which is the point — the field is
     // empty, the preview is empty, and the previous wallet is not on screen.
     const held = current();
-    if (held) this.preview = held.eip55;
+    if (held) this.setPreview(held.eip55);
     if (this.app.loggedOutNotice) {
       this.status = this.app.loggedOutNotice;
       this.app.loggedOutNotice = "";
     }
     queueMicrotask(() => this.field.focus());
     // The account box survives a logout — it is a preference, not key
-    // material — so the address under it has to be re-derived on arrival or
-    // the number and the address disagree until the first keystroke.
-    this.derivePreview();
+    // material — so the address under it is worked out on arrival rather than
+    // at the first keystroke. Only when nothing is held: `derivePreview` reads
+    // the *field*, which is empty here, and calling it unconditionally wiped
+    // the held wallet's address off the card the moment the screen opened.
+    if (!held) this.derivePreview();
   }
 
   leave(): void {
@@ -323,7 +340,11 @@ export class LoginScene implements Scene {
   private mint(): void {
     if (this.busy) return;
     this.minted = newMnemonic().split(" ");
-    this.preview = addressFromMnemonic(this.minted.join(" ")).eip55;
+    // The name for the wallet it just made. `derivePreview` bails while a
+    // minted phrase is up — the preview belongs to *it*, not to the field —
+    // so without this the one screen that hands somebody a brand-new account
+    // was the one screen that did not name it.
+    this.setPreview(addressFromMnemonic(this.minted.join(" ")).eip55);
     this.status = "";
     this.field.value = "";
   }
@@ -390,23 +411,22 @@ export class LoginScene implements Scene {
     const text = this.field.value.trim();
     this.status = "";
     if (!text) {
-      this.preview = "";
-      this.refreshName();
+      this.setPreview("");
       return;
     }
     try {
       // A raw private key **is** the account: there is no path to walk and
       // the box does not apply to it. Said on the label rather than by
       // silently deriving something the number had no part in.
-      this.preview = /^0x[0-9a-fA-F]{64}$/.test(text)
-        ? addressFromPrivateKeyHex(text).eip55
-        : addressFromMnemonic(text, this.walletIndex()).eip55;
-      this.refreshName();
+      this.setPreview(
+        /^0x[0-9a-fA-F]{64}$/.test(text)
+          ? addressFromPrivateKeyHex(text).eip55
+          : addressFromMnemonic(text, this.walletIndex()).eip55,
+      );
     } catch {
       // Half a phrase is not an error worth shouting about; it is just not an
       // address yet.
-      this.preview = "";
-      this.refreshName();
+      this.setPreview("");
     }
   }
 
@@ -462,7 +482,10 @@ export class LoginScene implements Scene {
     const address = unlock(text, this.walletIndex());
     // The textarea is emptied before a single byte goes near the socket.
     this.field.value = "";
-    this.preview = address.eip55;
+    // Through `setPreview` like every other path, even though the name box is
+    // about to be read and the screen is about to leave: the rule is only a
+    // rule if it has no exceptions, and the test below enforces exactly that.
+    this.setPreview(address.eip55);
 
     this.status = t("login.challenging");
     const challenge = await this.app.client.challenge(address.eip55);
@@ -546,13 +569,13 @@ export class LoginScene implements Scene {
       // The one place the phrase is allowed to disappear: because they said so.
       this.stopWait?.(false);
       this.minted = null;
-      this.preview = "";
+      this.setPreview("");
       this.field.value = "";
       this.field.placeholder = FIELD_HINT();
     }
     if (hit.id === "clear") {
       this.field.value = "";
-      this.preview = "";
+      this.setPreview("");
       this.field.focus();
     }
     if (hit.id === "reveal") this.toggleReveal();
