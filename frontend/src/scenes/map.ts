@@ -47,7 +47,7 @@ import { LandsScene } from "./lands";
 import { PlaygroundScene } from "./playground";
 import { QuestScene } from "./quest";
 import { AUX_BAR, openAux } from "../ui/auxnav";
-import { locale, t } from "../i18n";
+import { LOCALES, locale, nextLocale, setLocale, t } from "../i18n";
 import { NeonRail } from "../gfx/neon";
 
 /**
@@ -420,6 +420,16 @@ export class MapScene implements Scene {
         lit: false,
         group: phone ? 2 : 3,
       })),
+      // The language, named in itself, the way the login card has it. F7
+      // did this from anywhere and nothing on this screen said so; the map
+      // is where a player spends the game, and a Korean player who signed
+      // in through an English card should not have to find a function key.
+      {
+        id: "lang",
+        label: LOCALES.find((l) => l.id === locale())?.label ?? "ENGLISH",
+        lit: false,
+        group: phone ? 2 : 3,
+      },
     ];
   }
 
@@ -629,6 +639,7 @@ export class MapScene implements Scene {
         // into `["aux", "search"]`, and a fall-through would have sent
         // `switchTo(this.land, "search")` to `world.map` as a category.
         else if (kind === "aux") void openAux(this.app, onBar.id);
+        else if (onBar.id === "lang") void setLocale(nextLocale());
         else if (kind === "land") this.switchTo(value as Land, this.category);
         else this.switchTo(this.land, value as Category);
       }

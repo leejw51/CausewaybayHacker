@@ -31,7 +31,7 @@ import {
 } from "../net/protocol";
 import { MapScene } from "./map";
 import { PlaygroundScene } from "./playground";
-import { t } from "../i18n";
+import { LOCALES, locale, nextLocale, setLocale, t } from "../i18n";
 
 type Lands = Responses["world.lands"]["lands"];
 
@@ -509,6 +509,10 @@ export class LandsScene implements Scene {
       void this.app.go(new PlaygroundScene(this.app), "forward");
       return;
     }
+    if (hit.id === "lang") {
+      void setLocale(nextLocale());
+      return;
+    }
     if (hit.id.startsWith("cat:")) {
       const category = hit.id.slice(4) as Category;
       void this.app.go(new MapScene(this.app, this.land, category), "forward");
@@ -694,7 +698,11 @@ export class LandsScene implements Scene {
         const top = Math.max(py, ly);
         const bottom = Math.min(py + h, ly + lh);
         if (bottom > top) {
-          this.landBtns.add({ id: `land:${land}`, rect: [px, top, grid.pw, bottom - top], label: "" });
+          this.landBtns.add({
+            id: `land:${land}`,
+            rect: [px, top, grid.pw, bottom - top],
+            label: "",
+          });
         }
       });
       g.restore();
@@ -940,8 +948,7 @@ export class LandsScene implements Scene {
         // still says how far along it is.
         const oneLine =
           width(fonts.button, catName) + width(fonts.stationSm, count) + Math.round(16 * s) <= tw;
-        const twoLines =
-          rowH >= fonts.button.height + fonts.stationSm.height + Math.round(20 * s);
+        const twoLines = rowH >= fonts.button.height + fonts.stationSm.height + Math.round(20 * s);
         const countBelow = !oneLine && twoLines;
         const showCount = oneLine || twoLines;
         g.fillStyle = css(empty ? Theme.dim : Theme.cream);
@@ -949,7 +956,10 @@ export class LandsScene implements Scene {
         // What the road is, from the bible. Only when the row is tall enough
         // to hold it — in a short portrait window the count is what matters.
         const lineY =
-          titleY + fonts.button.height + Math.round(6 * s) + (countBelow ? fonts.stationSm.height : 0);
+          titleY +
+          fonts.button.height +
+          Math.round(6 * s) +
+          (countBelow ? fonts.stationSm.height : 0);
         // Only the lines that fit inside the row. In portrait the text column
         // is narrow and this wraps to four; a row that let the fourth spill
         // over its own bottom edge was the first thing the eye found.
@@ -1026,7 +1036,22 @@ export class LandsScene implements Scene {
         fonts.button.size * 2,
         layout.minTouchH(),
       );
-      const abw = pair ? Math.floor((right[2] - gap) / 2) : Math.max(aw, Math.round(right[2] * 0.4));
+      // The language, named in itself, at the right end of the PLAYGROUND
+      // row — the login card's button, on the screen a player comes back to
+      // between every map. Sized to the widest language name so it does not
+      // change width as it cycles, and capped so the two verbs keep theirs.
+      const langLabel = LOCALES.find((l) => l.id === locale())?.label ?? "ENGLISH";
+      const [lwRaw] = btnBox(
+        fonts.button,
+        LOCALES.map((l) => l.label),
+        0,
+        fonts.button.size * 2,
+        layout.minTouchH(),
+      );
+      const lw = Math.min(lwRaw, Math.round(right[2] * 0.3));
+      const abw = pair
+        ? Math.floor((right[2] - lw - gap * 2) / 2)
+        : Math.max(aw, Math.round(right[2] * 0.4));
       const aby = pair ? right[1] + right[3] - playH : right[1] + right[3] - playH * 2 - gap;
       const ahov = this.landBtns.hovered === "auto";
       pixBtn(g, fonts.button, right[0], aby, abw, playH, t("lands.autoSelect"), {
@@ -1034,8 +1059,15 @@ export class LandsScene implements Scene {
         quiet: !ahov,
       });
       if (!pair) {
-        noteBeside(g, fonts.small, this.autoNote ?? t("lands.autoNote"),
-          right[0] + abw + Math.round(12 * s), aby, right[2] - abw - Math.round(12 * s), playH);
+        noteBeside(
+          g,
+          fonts.small,
+          this.autoNote ?? t("lands.autoNote"),
+          right[0] + abw + Math.round(12 * s),
+          aby,
+          right[2] - abw - Math.round(12 * s),
+          playH,
+        );
       }
       this.landBtns.add({
         id: "auto",
@@ -1052,7 +1084,7 @@ export class LandsScene implements Scene {
       );
       // Painted here rather than through `Buttons.draw`: the land plates use
       // that list for hit boxes only, and nothing on this screen paints it.
-      const pbw = pair ? right[2] - abw - gap : Math.max(pw, Math.round(right[2] * 0.4));
+      const pbw = pair ? right[2] - abw - lw - gap * 2 : Math.max(pw, Math.round(right[2] * 0.4));
       const pby = right[1] + right[3] - playH;
       const pbx = pair ? right[0] + abw + gap : right[0];
       const phov = this.landBtns.hovered === "playground";
@@ -1060,15 +1092,31 @@ export class LandsScene implements Scene {
         hover: phov,
         quiet: !phov,
       });
-      if (!pair) {
-        noteBeside(g, fonts.small, t("lands.playgroundNote"),
-          right[0] + pbw + Math.round(12 * s), pby, right[2] - pbw - Math.round(12 * s), playH);
+      // The caption, only while the language button leaves it a real
+      // line's worth of room: squeezed to a third of the column it wrapped
+      // to two elided lines, and the playground says this sentence itself.
+      const noteW = right[2] - pbw - lw - gap - Math.round(24 * s);
+      if (!pair && noteW >= right[2] * 0.38) {
+        noteBeside(
+          g,
+          fonts.small,
+          t("lands.playgroundNote"),
+          right[0] + pbw + Math.round(12 * s),
+          pby,
+          noteW,
+          playH,
+        );
       }
       this.landBtns.add({
         id: "playground",
         rect: [pbx, pby, pbw, playH],
         label: t("lands.playground"),
       });
+
+      const lbx = right[0] + right[2] - lw;
+      const lhov = this.landBtns.hovered === "lang";
+      pixBtn(g, fonts.button, lbx, pby, lw, playH, langLabel, { hover: lhov, quiet: !lhov });
+      this.landBtns.add({ id: "lang", rect: [lbx, pby, lw, playH], label: langLabel });
 
       if (this.error) {
         g.fillStyle = css(Theme.red);
