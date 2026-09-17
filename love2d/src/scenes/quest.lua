@@ -90,6 +90,7 @@ local UI = require("src.ui")
 local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local CodeFx = require("src.codefx")
+local CoderM = require("src.agent.coder")
 local Land = require("src.land")
 local Editor = require("src.editor")
 local CodePane = require("src.codepane")
@@ -225,6 +226,13 @@ function Quest:enter(params)
   self.pane = CodePane.new(self.editor)
   self.fx:clear()
   self.fx:attach(self.editor, self.pane)
+  -- The Rust coder, with the short list of powers a graded screen may give
+  -- it: it reads, edits and writes the file, and it does **not** run it and
+  -- has no room to talk in. A quest's RUN is an attempt against a server that
+  -- is keeping score (PROTOCOL §4.8), and an agent that could spend one is an
+  -- agent that could fail a quest on your behalf.
+  self.coder = CoderM.new(self.app, self:agent_host())
+  self.coder:mount(self.editor)
   -- Brackets close themselves — except under the ANSWER drill, where a `}`
   -- the editor typed for you is a divergence you did not make.
   self.editor.auto_close = not self.answer_on
@@ -254,8 +262,30 @@ function Quest:enter(params)
 end
 
 function Quest:leave()
+  if self.coder then self.coder:leave() end
   self.app.session:off_all(self.subscriptions)
   self.subscriptions = nil
+end
+
+--- What the coder may do on a graded screen. Compare the playground's, which
+--- is the generous one.
+function Quest:agent_host()
+  local scene = self
+  return {
+    lang = function() return (scene.quest and scene.quest.land) or scene.app.land or "rust" end,
+    caret = function()
+      if not scene.pane then return nil end
+      return scene.pane:cell(scene.editor.line, scene.editor.col)
+    end,
+    room_id = function() return nil end,
+    room_name = function() return "" end,
+    ensure_room = function() return false end,
+    touched = function() end,
+    fx = function() return scene.fx end,
+    request = nil,
+    run = nil,
+    format = nil,
+  }
 end
 
 function Quest:refresh()
@@ -1322,6 +1352,10 @@ function Quest:update(dt)
   end
   self.t = self.t + dt
   self.fx:update(dt)
+  if self.coder then
+    self.coder:fly({ 0, 0, Layout.vw, Layout.vh }, self.agent_rect)
+    self.coder:update(dt)
+  end
   -- The land's loop keywords, for the effect a closed loop gets.
   self.editor.lang = self.quest and self.quest.land or self.app.land
   self:answer_tick()
@@ -1427,6 +1461,8 @@ function Quest:draw_code()
       state = (usable and not self.run_unsupported) and "hot" or "disabled" },
     { id = "format", label = I18n.t("FORMAT"),
       state = (usable and not self.format_unsupported) and "normal" or "disabled" },
+    { id = "agent", label = I18n.t("AGENT"),
+      state = (self.coder and self.coder.panel.open) and "hot" or "normal" },
     { id = "undo", label = I18n.t("UNDO"),
       state = (live and Edits.can_undo(self.edit)) and "normal" or "disabled" },
     { id = "redo", label = I18n.t("REDO"),
@@ -1511,9 +1547,33 @@ function Quest:draw_code()
   UI.text(status, pad + 4, rowsb + 4, UI.fitSize(status, vw - pad * 2 - 8, 7, 4), colour)
 
   local top = strip + 6
-  self:draw_editor({ x = pad, y = top, w = vw - pad * 2, h = vh - top - pad },
-    Theme.land[land] or Theme.coin, true)
+  local body = { x = pad, y = top, w = vw - pad * 2, h = vh - top - pad }
+  self:draw_editor(body, Theme.land[land] or Theme.coin, true)
+  -- The room keeps clear of the footer. The editor may run under it — it is
+  -- text, and the chips sit over their own plate — but the panel's buttons
+  -- may not: the footer is drawn after the scene *and* takes its clicks
+  -- first, so a SEND under it is a SEND that cannot be pressed.
+  local room = { x = body.x, y = body.y, w = body.w,
+    h = math.max(120, body.h - UI.footerHeight() - 4) }
   self.fx:draw()
+  -- After the editor and after the effects: the coder is on top of the screen
+  -- by being painted last, which is all "on top" can mean here.
+  self.agent_rect = nil
+  if self.coder then
+    if self.coder.panel.open then
+      local rect
+      if not Layout.isPortrait() then
+        local w = math.max(320, math.floor(room.w * 0.46))
+        rect = { x = room.x + room.w - w, y = room.y, w = w, h = room.h }
+      else
+        local h = math.max(240, math.floor(room.h * 0.52))
+        rect = { x = room.x, y = room.y + room.h - h, w = room.w, h = h }
+      end
+      self.agent_rect = rect
+      self.coder:draw_panel(rect)
+    end
+    self.coder:draw()
+  end
 end
 
 function Quest:draw()
@@ -2687,6 +2747,7 @@ end
 -- -------------------------------------------------------------------- input
 
 function Quest:textinput(text)
+  if self.coder and self.coder:textinput(text) then return end
   if self.focus == "editor" then
     self.editor:textinput(text)
     SFX.play("type")
@@ -2694,6 +2755,14 @@ function Quest:textinput(text)
 end
 
 function Quest:keypressed(key, mods)
+  mods = mods or {}
+  -- Ctrl/Cmd-Shift-A opens and closes the coder, the browser's accelerator,
+  -- and then the panel takes what it is holding a field for.
+  if key == "a" and (mods.ctrl or mods.gui) and mods.shift then
+    if self.coder then self.coder:toggle() end
+    return true
+  end
+  if self.coder and self.coder:keypressed(key, mods) then return true end
   -- ESC ends the writing session before it ends the quest: a player in CODE
   -- pressing it means "put the furniture back", and taking them to the map
   -- would throw away the thing they were doing.
@@ -2780,6 +2849,10 @@ function Quest:keypressed(key, mods)
 end
 
 function Quest:wheelmoved(_, dy)
+  if self.coder then
+    local vx, vy = Layout.toVirtual(love.mouse.getPosition())
+    if self.coder:wheelmoved(dy, vx, vy) then return end
+  end
   if self.show_log and self.log then
     self.log_follow = false
     self.log_scroll = math.max(1, (self.log_scroll >= 1e8 and 1e8 or self.log_scroll) - dy * 3)
@@ -2798,6 +2871,9 @@ function Quest:mousepressed(x, y, button)
   local function inside(r)
     return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
   end
+  -- The coder first: its panel owns what is under it, and a press on the
+  -- sprite holds it still.
+  if self.coder and self.coder:mousepressed(x, y, button) then return end
   if self.code_mode then
     if inside(self.code_done_rect) then
       self.code_mode = false
@@ -2805,6 +2881,7 @@ function Quest:mousepressed(x, y, button)
       return
     end
     local r = self.code_rects or {}
+    if inside(r.agent) then self.coder:toggle(); return end
     if inside(r.run) then self:run(); return end
     if inside(r.format) then self:format(); return end
     if inside(r.undo) then self:stack_undo(); return end
@@ -2855,6 +2932,7 @@ function Quest:mousepressed(x, y, button)
 end
 
 function Quest:mousemoved(x, y)
+  if self.coder then self.coder:mousemoved(x, y) end
   if self.pane then self.pane:mousemoved(x, y) end
   self.fx:pointer(x, y)
 end

@@ -236,9 +236,12 @@ function Coder:bench()
     search = coder.host.request and function(q)
       return coder:await_search(q)
     end or nil,
-    image = (Prefs.IMAGE_MODEL[Prefs.provider()] and coder.host.room_id) and function(prompt)
-      return coder:make_image(prompt)
-    end or nil,
+    -- A picture needs somewhere to go as well as somebody to draw it: the
+    -- room is the pad's, and a graded screen has none. Asked here, not at
+    -- mount, because both halves change while the screen is open.
+    image = (Prefs.IMAGE_MODEL[Prefs.provider()] ~= nil
+      and coder.host.room_id ~= nil and coder.host.room_id() ~= nil)
+      and function(prompt) return coder:make_image(prompt) end or nil,
   }
 end
 
