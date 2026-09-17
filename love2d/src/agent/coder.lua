@@ -345,6 +345,13 @@ function Coder:sync_room()
   self.room_id = id
   self.room = Sync.empty_room()
   self.panel:clear_items()
+  -- **Lines held for the pad we are leaving do not follow us.** They were
+  -- said in that room, and flushing them when the *next* pad gets an id
+  -- would put somebody's words in a conversation they were not part of.
+  self.pending = nil
+  self.saving = false
+  self.save_tries = nil
+  self.said_unsaved = nil
   self:list_room()
 end
 

@@ -235,7 +235,14 @@ end
 --- the moment somebody says something in a pad that has never had one.
 function Playground:save()
   if not self.editor then return end
-  if self.save_inflight then return end
+  if self.save_inflight then
+    -- One in flight already: remember that the text has moved on since, so
+    -- the reply starts another. Without this, `leave`'s save — the one that
+    -- exists so the last few seconds of typing are not lost — would be the
+    -- one dropped when it landed during an autosave's round trip.
+    self.save_again = true
+    return
+  end
   self.save_inflight = true
   local payload = {
     lang = self.lang,
@@ -248,8 +255,10 @@ function Playground:save()
   if self.snippet_id then payload.id = self.snippet_id end
   if self.name then payload.name = self.name end
 
-  self.app.session:request("playground.save", payload, function(ok, reply, why)
+  local sent = self.app.session:request("playground.save", payload, function(ok, reply, why)
     self.save_inflight = false
+    local again = self.save_again
+    self.save_again = false
     if not ok then
       -- The next attempt is one autosave interval away, not one frame.
       self.dirty_at = Anim.now()
@@ -267,7 +276,11 @@ function Playground:save()
     self.editor.dirty = false
     self.dirty_at = nil
     self:list()
+    if again then self:save() end
   end)
+  -- A request that could not even be framed answers nobody, and a flag left
+  -- true would mean this pad is never saved again.
+  if not sent then self.save_inflight = false end
 end
 
 function Playground:load(index)
