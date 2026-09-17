@@ -1589,21 +1589,47 @@ check(null, "beyond: two users never see each other's progress or attempts", asy
 });
 
 check(null, "beyond: what is not built says so, and what is built is judged", async () => {
-  // `search.query` and `ai.*` are SPEC §8 and §7.3, and PLAN.md puts both in
-  // milestone 2. They answer `unavailable` with `detail: {"milestone": 2}`,
-  // which is the right shape: a closed-set code plus a machine-readable
-  // reason, so a client can grey the button out instead of showing an error.
-  // `unavailable` rather than `not_found` because the endpoint is real and
-  // specified — it is not built yet, which is a different sentence to say to
-  // a player than "no such thing".
+  // `search.query` is SPEC §8 and it ships: BM25, the hashed embedder and
+  // the fusion of the two, with the shape §5.5 fixes. `ai.*` is SPEC §7.3
+  // and PLAN.md still puts it in milestone 2; it answers `unavailable` with
+  // `detail: {"milestone": 2}`, which is the right shape — a closed-set code
+  // plus a machine-readable reason, so a client can grey the button out.
   //
-  // This is a PENDING check, not a failing one. What it asserts is that the
-  // gap is *declared* — the day either ships, this check starts failing and
-  // that is the signal to write the real one.
+  // The `ai.*` half is a PENDING check, not a failing one. What it asserts is
+  // that the gap is *declared* — the day the drills ship, this check starts
+  // failing and that is the signal to write the real one.
   const cl = await session(freshAccount("m2"), "m2");
   try {
+    for (const mode of ["bm25", "semantic", "unified"]) {
+      const r = await cl.send("search.query", { q: "borrow", mode, limit: 5 });
+      assertEq(r.type, "search.query.ok", `search.query in ${mode} mode`);
+      assertEq(r.payload.mode, mode, "the mode it ran in");
+      assert(Number.isInteger(r.payload.took_ms), "took_ms is an integer");
+      assert(Array.isArray(r.payload.hits) && r.payload.hits.length > 0, `${mode}: "borrow" finds a quest`);
+      assert(r.payload.hits.length <= 5, "limit is a limit");
+      for (const h of r.payload.hits) {
+        for (const key of ["quest_id", "title", "land", "category", "snippet", "score", "state"])
+          assert(key in h, `SearchHit.${key} (§5.5)`);
+        assert(typeof h.score === "number" && h.score > 0, "the fused score is positive");
+        assert(["open", "cleared"].includes(h.state), `state is open|cleared, got ${h.state}`);
+        if (mode === "bm25") assert(h.cosine === null && typeof h.bm25 === "number", "bm25 alone");
+        if (mode === "semantic") assert(h.bm25 === null && typeof h.cosine === "number", "cosine alone");
+      }
+      const scores = r.payload.hits.map((h) => h.score);
+      assert(scores.every((v, i) => i === 0 || v <= scores[i - 1]), "hits come best first");
+    }
+    const filtered = await cl.send("search.query", { q: "borrow", filters: { land: "go" } });
+    assertEq(filtered.type, "search.query.ok");
+    assert(filtered.payload.hits.every((h) => h.land === "go"), "a land filter is honoured");
+    const nothing = await cl.send("search.query", { q: "   " });
+    assertEq(nothing.type, "search.query.ok");
+    assertEq(nothing.payload.hits.length, 0, "an empty box returns nothing, not everything");
+    const punct = await cl.send("search.query", { q: "Box<dyn Error>" });
+    assertEq(punct.type, "search.query.ok", "punctuation is a search, not a syntax error");
+    const badMode = await cl.send("search.query", { q: "borrow", mode: "psychic" });
+    assertEq(badMode.payload.code, "bad_request", "an unknown mode is refused");
+
     const pending = [
-      ["search.query", { q: "borrow", mode: "unified" }],
       ["ai.plan", { mode: "repeat" }],
       ["ai.next", { drill_id: "drl_0000000000000000" }],
       ["ai.finish", { drill_id: "drl_0000000000000000" }],
@@ -1631,8 +1657,7 @@ check(null, "beyond: what is not built says so, and what is built is judged", as
     if (landed.length)
       throw new Error(
         `${landed.join(", ")} now answer for real. This pending check has done ` +
-          `its job — replace it with the real assertions (tests/PLAN.md §9.3.d, ` +
-          `and the search rows of SPEC §8).`,
+          `its job — replace it with the real assertions (tests/PLAN.md §9.3.d).`,
       );
 
     // Go used to be the other declared gap. It is not any more — BE built

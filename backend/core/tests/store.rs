@@ -744,6 +744,28 @@ fn a_reader_never_sees_a_half_reconciled_map() {
                 break;
             }
         }
+        // One more, after the writer said it was done: the loop above can
+        // have taken its last look before the import landed — its two
+        // observations in hand, or its cap of four thousand reached while
+        // the import was still writing — and then "the reader never saw the
+        // import land" was a fact about scheduling, not about the store.
+        // Wait for the writer, so this read is after the commit by
+        // construction.
+        while !reader_stop.load(Ordering::Relaxed) {
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, node FROM quests
+                  WHERE land='rust' AND category='basic' ORDER BY node",
+            )
+            .unwrap();
+        let rows: Vec<(String, i64)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .unwrap();
+        seen.push(rows);
         seen
     });
 
