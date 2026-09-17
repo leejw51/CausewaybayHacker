@@ -38,7 +38,6 @@ local Editor = require("src.editor")
 local CodePane = require("src.codepane")
 local CodeFx = require("src.codefx")
 local CoderM = require("src.agent.coder")
-local AgentPrefs = require("src.agent.prefs")
 local Anim = require("src.anim")
 local runlog = require("src.net.runlog")
 

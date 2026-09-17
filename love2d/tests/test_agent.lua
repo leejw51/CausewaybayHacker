@@ -577,6 +577,118 @@ return function()
     T.eq(moods[#moods], "idle", "and went back to idle")
   end)
 
+  T.case("speaks Anthropic's own dialect, not only OpenAI's", function()
+    -- The default provider, and the one wire in this client with no SDK
+    -- behind it and a shape all of its own: content blocks that arrive
+    -- open-then-filled, tool arguments in fragments, and the reason it
+    -- stopped in a `message_delta` rather than on the choice. Untested, it is
+    -- a guess; so this is the same loopback server with Anthropic's events in
+    -- it, and the JSON is deliberately split down the middle of a fragment.
+    local Wallet = require("src.wallet")
+    local lib = Wallet.load()
+    if not lib then
+      T.skip("the key library is not built — run `make -C love2d ffi`")
+      return
+    end
+    local socket_ok, socket = pcall(require, "socket")
+    if not socket_ok then
+      T.skip("LuaSocket is missing")
+      return
+    end
+    local server = assert(socket.bind("127.0.0.1", 0))
+    local _, port = server:getsockname()
+    server:settimeout(0)
+
+    local function event(name, value)
+      return ("event: %s\ndata: %s\n\n"):format(name, json.encode(value))
+    end
+    local args = json.encode({ source = "fn main() {}\n", note = "a hello" })
+    local reply = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n"
+      .. event("message_start", { type = "message_start", message = { id = "msg_1" } })
+      .. event("content_block_start", { type = "content_block_start", index = 0,
+           content_block = { type = "text", text = "" } })
+      .. event("content_block_delta", { type = "content_block_delta", index = 0,
+           delta = { type = "text_delta", text = "Writing it." } })
+      .. event("content_block_start", { type = "content_block_start", index = 1,
+           content_block = { type = "tool_use", id = "toolu_1", name = "write_code" } })
+      .. event("content_block_delta", { type = "content_block_delta", index = 1,
+           delta = { type = "input_json_delta", partial_json = args:sub(1, 17) } })
+      .. event("content_block_delta", { type = "content_block_delta", index = 1,
+           delta = { type = "input_json_delta", partial_json = args:sub(18) } })
+      .. event("message_delta", { type = "message_delta",
+           delta = { stop_reason = "tool_use" } })
+      .. event("message_stop", { type = "message_stop" })
+
+    local seen_head = nil
+    local function serve()
+      local client = server:accept()
+      if not client then return end
+      client:settimeout(0.5)
+      local head, length = {}, 0
+      while true do
+        local line = client:receive("*l")
+        if not line or line == "" then break end
+        head[#head + 1] = line
+        local n = line:lower():match("^content%-length:%s*(%d+)")
+        if n then length = tonumber(n) end
+      end
+      if length > 0 then client:receive(length) end
+      seen_head = table.concat(head, "\n")
+      client:send(reply)
+      client:close()
+    end
+
+    -- The provider's URL is Anthropic's own, so the call is pointed at the
+    -- loopback server by name: everything else about the request is the real
+    -- one, headers included.
+    local was = Providers.ANTHROPIC_URL
+    Providers.ANTHROPIC_URL = "http://127.0.0.1:" .. port .. "/v1"
+    local text, turn, err = {}, nil, nil
+    local co = coroutine.create(function()
+      turn, err = Providers.anthropic_chat({
+        wallet = Wallet, lib = lib, provider = "anthropic",
+        key = "sk-ant-test", model = "claude-opus-5",
+        system = "you are the Rust coder",
+        messages = { { role = "user", content = { { type = "text", text = "write it" } } } },
+        tools = { { name = "write_code", description = "write the whole program",
+          properties = { source = { type = "string", description = "the program" } },
+          required = { "source" } } },
+        on_text = function(delta) text[#text + 1] = delta end,
+      })
+    end)
+    for _ = 1, 2000 do
+      if coroutine.status(co) == "dead" then break end
+      serve()
+      local ok, e = coroutine.resume(co)
+      if not ok then
+        Providers.ANTHROPIC_URL = was
+        error(e, 0)
+      end
+      socket.sleep(0.005)
+    end
+    server:close()
+    Providers.ANTHROPIC_URL = was
+
+    T.eq(err, nil, "the turn failed: " .. tostring(err))
+    T.ok(turn ~= nil, "no turn came back")
+    if not turn then return end
+    T.eq(table.concat(text), "Writing it.", "the prose streamed as it arrived")
+    T.eq(turn.text, "Writing it.")
+    T.eq(turn.stop, "tool", "a tool_use stop, read off the message_delta")
+    T.eq(#turn.tool_uses, 1)
+    T.eq(turn.tool_uses[1].name, "write_code")
+    T.eq(turn.tool_uses[1].id, "toolu_1")
+    T.eq(turn.tool_uses[1].input.source, "fn main() {}\n",
+      "the argument fragments were joined back into one object")
+    T.eq(turn.tool_uses[1].input.note, "a hello")
+    -- The headers are the contract: the key goes in `x-api-key`, never in an
+    -- `authorization`, and the version is the one this client was written to.
+    T.ok(seen_head:lower():find("x%-api%-key: sk%-ant%-test"), "the key went in its own header")
+    T.ok(seen_head:lower():find("anthropic%-version: " .. Providers.ANTHROPIC_VERSION),
+      "the API version was stated")
+    T.ok(not seen_head:lower():find("authorization:"), "and not as a bearer token")
+  end)
+
   T.section("the coder — what it says for free")
 
   T.case("has a catalogue for every land, and never repeats a tip", function()

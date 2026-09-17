@@ -168,6 +168,30 @@ add({ until_ = function(app)
     end, timeout = 10 })
 add({ shot = "A6-agent-done.png" })
 
+-- **The room is the server's, not the screen's.** A pad that had never been
+-- saved when the first word was said has an id by now, and everything said
+-- before it had one must have reached the server anyway — so this throws the
+-- local copy away and reads it back.
+add({ until_ = function(app)
+      local c = coder(app)
+      check(c.room_id ~= nil, "the pad was never saved, so there is no room")
+      app.probe_room = { id = c.room_id, count = 0, done = false }
+      c.host.request("playground.chat.list", { id = c.room_id, limit = 200 },
+        function(ok, payload)
+          app.probe_room.done = true
+          app.probe_room.count = ok and #(payload.messages or {}) or -1
+        end)
+      return true
+    end, timeout = 5 })
+add({ until_ = function(app) return app.probe_room.done end,
+      note = "the room came back from the server", timeout = 15 })
+add({ until_ = function(app)
+      print(("server room %s: %d messages"):format(app.probe_room.id, app.probe_room.count))
+      check(app.probe_room.count >= 2,
+        "the server kept " .. app.probe_room.count .. " messages; the ask and its answer are two")
+      return true
+    end, timeout = 5 })
+
 -- CODE, which is where the editor gets the window and the room gets a column
 -- the whole height of it. This is the mode the coder is actually worked in.
 add({ click = function(app) local r = pg(app).code_button_rect

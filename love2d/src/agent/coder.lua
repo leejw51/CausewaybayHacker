@@ -135,6 +135,16 @@ end
 
 function Coder:leave()
   self:stop()
+  -- A stop is noticed at the coroutine's next wait, so the ask has to be
+  -- given the frames to notice it in. Without them the request is left
+  -- streaming into a buffer nobody will ever read, and its handle is never
+  -- closed — the thread is the key library's, and it outlives this screen.
+  if self.session then
+    for _ = 1, 4 do
+      if not self.session:busy() then break end
+      self.session:update()
+    end
+  end
   self.editor = nil
   self.session = nil
 end
@@ -328,18 +338,41 @@ end
 
 -- ------------------------------------------------------------------ the room
 
+--- A different pad is a different room: forget this one and read that one.
 function Coder:sync_room()
   local id = self.host.room_id and self.host.room_id() or nil
   if id == self.room_id then return end
   self.room_id = id
   self.room = Sync.empty_room()
   self.panel:clear_items()
-  if not id then return end
+  self:list_room()
+end
+
+--- Read the room from the server, keeping whatever is on the screen already:
+--- `Panel:apply` merges rather than replaces, so a line still in flight does
+--- not blink out when the list lands.
+function Coder:list_room()
+  local id = self.room_id
+  if not id or not self.host.request then return end
   self.host.request("playground.chat.list", { id = id, limit = 200 }, function(ok, payload)
     if not ok then return end
     self.room = Sync.fold(self.room, payload.messages or {})
     self:show_room()
   end)
+end
+
+--- A pad that had no id has one: the save has landed. Keep what is on the
+--- screen, post what was said before there was anywhere to post it, and read
+--- whatever the server already had.
+function Coder:room_arrived(id)
+  self.room_id = id
+  self.saving = false
+  local held = self.pending or {}
+  self.pending = nil
+  for _, line in ipairs(held) do
+    self:post(id, line.role, line.text)
+  end
+  self:list_room()
 end
 
 function Coder:fold_one(message)
@@ -361,18 +394,32 @@ function Coder:show_room()
   self.panel:apply(items)
 end
 
---- Keep one line. A pad that has never been saved is saved first, so a room
---- has something to belong to.
+--- Keep one line.
+---
+--- A pad that has never been saved has no id, and a room belongs to an id. So
+--- the first thing said in a fresh pad asks the screen to save it and **holds
+--- the line** until the save comes back — saving is a round trip, and reading
+--- the id on the next line got nil and dropped the message on the floor while
+--- the panel went on showing it.
 function Coder:keep(role, text)
-  if not self.room_id and self.host.ensure_room then
-    local made = self.host.ensure_room()
-    self.room_id = self.host.room_id and self.host.room_id() or nil
-    if made and self.host.room_name then
-      self.panel.status = I18n.t("saved as %s"):format(self.host.room_name())
-    end
-  end
   local id = self.room_id
-  if not id then return end
+  if not id then
+    self.pending = self.pending or {}
+    self.pending[#self.pending + 1] = { role = role, text = text }
+    if self.host.ensure_room and not self.saving then
+      self.saving = true
+      local made = self.host.ensure_room()
+      if made and self.host.room_name then
+        self.panel.status = I18n.t("saved as %s"):format(self.host.room_name())
+      end
+    end
+    return
+  end
+  self:post(id, role, text)
+end
+
+function Coder:post(id, role, text)
+  if not self.host.request then return end
   local provider = Prefs.provider()
   self.host.request("playground.chat.post", {
     id = id,
@@ -389,8 +436,9 @@ function Coder:clear_room()
   local id = self.room_id
   self.panel:clear_items()
   self.room = Sync.empty_room()
+  self.pending = nil
   if self.session then self.session:clear() end
-  if not id then return end
+  if not id or not self.host.request then return end
   self.host.request("playground.chat.clear", { id = id }, function() end)
 end
 
@@ -453,6 +501,10 @@ end
 function Coder:ask(text, opts)
   opts = opts or {}
   if not self.session then return end
+  -- The bench as it is *now*. A pad that has since been saved has a room to
+  -- put a picture in, and TAB changes both the language the prompt names and
+  -- the file it says it is editing.
+  self.session.bench = self:bench()
   if self.session:busy() then
     self.panel.status = I18n.t("still working — press STOP first")
     return
@@ -497,7 +549,6 @@ function Coder:stop()
   if self.session then self.session:stop() end
   self.typist:stop()
   self.sprite:typing(false)
-  self.say_stopped = true
   self:say(I18n.t("stopped"), "busy")
 end
 
@@ -562,6 +613,18 @@ function Coder:update(dt)
   -- Only in agent mode. Put away, or the panel closed: no flying, no tips, no
   -- advice, no effects — and the AUTO review is silenced with it, because a
   -- character that is off should not spend.
+  -- The pad under this screen can change while it is open — another pad
+  -- opened from the list, a new one made, or this one saved for the first
+  -- time — and the room has to follow it.
+  local id = self.host.room_id and self.host.room_id() or nil
+  if id ~= self.room_id then
+    if id and self.room_id == nil then
+      self:room_arrived(id)
+    else
+      self:sync_room()
+    end
+  end
+
   local active = self:active()
   if active and not self.was_active then self.sprite:enter() end
   self.was_active = active

@@ -27,6 +27,7 @@ local I18n = require("src.i18n")
 local Anim = require("src.anim")
 local Clock = require("src.clock")
 local Wallet = require("src.wallet")
+local AgentPrefs = require("src.agent.prefs")
 local Session = require("src.session")
 local netclient = require("src.net.client")
 local socket_transport = require("src.net.socket")
@@ -171,12 +172,15 @@ function App:load()
   -- Opening the store is also what brings an older one across: if
   -- `~/.causewaybayhackerlove2d` holds a store and the new home does not,
   -- `Store.open` copies it, once, and leaves the old directory alone.
-  Store.open({
-    home = self.home,
-    secure = lib and function(target, is_directory)
-      return Wallet.secure(lib, target, is_directory)
-    end or nil,
-  })
+  local secure = lib and function(target, is_directory)
+    return Wallet.secure(lib, target, is_directory)
+  end or nil
+  Store.open({ home = self.home, secure = secure })
+  -- The Rust coder's own file, in the same directory and `0600` for the same
+  -- reason (`src/agent/prefs.lua`). It is opened here because a preference
+  -- that is never opened is never written, and a provider key the player has
+  -- to paste at every launch is a key they will paste somewhere worse.
+  AgentPrefs.open({ secure = secure })
   -- And the migration before that one: LÖVE's own save directory, which is
   -- where this client kept its session for exactly one release.
   --
