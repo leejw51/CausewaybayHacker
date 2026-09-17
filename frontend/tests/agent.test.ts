@@ -28,7 +28,7 @@ import { systemPrompt, MAX_ROUNDS } from "../src/ai/session";
 
 describe("the typing schedule", () => {
   it("never types faster than the floor", () => {
-    for (const ms of schedule("fn main() {\n    println!(\"hi\");\n}\n")) {
+    for (const ms of schedule('fn main() {\n    println!("hi");\n}\n')) {
       expect(ms).toBeGreaterThanOrEqual(FLOOR_MS);
     }
   });
@@ -64,7 +64,7 @@ describe("the advice", () => {
   it("says nothing about a clean program", () => {
     expect(advise("rust", 'fn main() {\n    println!("hello");\n}\n')).toEqual([]);
     expect(advise("python", 'print("hi")\n')).toEqual([]);
-    expect(advise("go", 'package main\nfunc main() {}\n')).toEqual([]);
+    expect(advise("go", "package main\nfunc main() {}\n")).toEqual([]);
     expect(advise("cpp", "#include <iostream>\nint main() { std::cout << 1; }\n")).toEqual([]);
   });
 
@@ -91,8 +91,12 @@ describe("the advice", () => {
 
   it("knows the C++ and Python classics", () => {
     expect(advise("cpp", "using namespace std;\n").map((a) => a.id)).toContain("cpp.using-std");
-    expect(advise("python", "def f(xs=[]):\n    pass\n").map((a) => a.id)).toContain("py.mutable-default");
-    expect(advise("python", "try:\n    x()\nexcept:\n    pass\n").map((a) => a.id)).toContain("py.bare-except");
+    expect(advise("python", "def f(xs=[]):\n    pass\n").map((a) => a.id)).toContain(
+      "py.mutable-default",
+    );
+    expect(advise("python", "try:\n    x()\nexcept:\n    pass\n").map((a) => a.id)).toContain(
+      "py.bare-except",
+    );
     expect(advise("python", "if x == None:\n    pass\n").map((a) => a.id)).toContain("py.eq-none");
   });
 
@@ -239,9 +243,20 @@ describe("the tools", () => {
   it("offers only what the bench can honour", () => {
     const names = (b: Bench) => toolsFor(b).map((t) => t.name);
     expect(names(bench())).toEqual(["read_code", "edit_code", "write_code", "insert_code"]);
-    expect(names(bench({ run: async () => ({ outcome: "ok", stdout: "", stderr: "", compile_ms: 0, run_ms: 0, exit_code: 0 }) }))).toContain(
-      "run_code",
-    );
+    expect(
+      names(
+        bench({
+          run: async () => ({
+            outcome: "ok",
+            stdout: "",
+            stderr: "",
+            compile_ms: 0,
+            run_ms: 0,
+            exit_code: 0,
+          }),
+        }),
+      ),
+    ).toContain("run_code");
     expect(names(bench({ image: async () => "ok" }))).toContain("make_image");
   });
 

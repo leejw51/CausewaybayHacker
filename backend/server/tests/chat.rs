@@ -429,3 +429,206 @@ async fn one_player_cannot_reach_anothers_room() {
     );
     server.handle.abort();
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_wire_validates_clamps_and_searches_by_mode() {
+    let server = start().await;
+    let mut alice = Client::connect(server.port).await;
+    alice.login(ALICE_KEY).await;
+    let id = alice.new_pad().await;
+
+    // A role the room does not know, a picture with no type, a picture that
+    // is not base64, and a message with nothing in it: all `bad_request`,
+    // all with the socket left open.
+    assert_eq!(
+        alice
+            .err(
+                "playground.chat.post",
+                json!({ "id": id, "role": "system", "text": "x" })
+            )
+            .await,
+        "bad_request"
+    );
+    assert_eq!(
+        alice
+            .err(
+                "playground.chat.post",
+                json!({ "id": id, "role": "agent", "text": "x", "image_b64": b64(PNG) })
+            )
+            .await,
+        "bad_request"
+    );
+    assert_eq!(
+        alice
+            .err(
+                "playground.chat.post",
+                json!({ "id": id, "role": "agent", "text": "x", "image_b64": "not base64 at all!!", "image_type": "image/png" })
+            )
+            .await,
+        "bad_request"
+    );
+    assert_eq!(
+        alice
+            .err("playground.chat.post", json!({ "id": id, "role": "user" }))
+            .await,
+        "bad_request"
+    );
+    // A data: URL is what a canvas hands a browser, and it is tolerated.
+    let posted = alice
+        .ok(
+            "playground.chat.post",
+            json!({
+                "id": id, "role": "agent", "text": "a crab in a data url",
+                "image_b64": format!("data:image/png;base64,{}", b64(PNG)), "image_type": "image/png"
+            }),
+        )
+        .await;
+    assert_eq!(posted["message"]["kind"], "image");
+    assert!(posted["message"]["photo_url"]
+        .as_str()
+        .unwrap()
+        .ends_with(".png"));
+
+    for n in 0..8 {
+        alice
+            .ok(
+                "playground.chat.post",
+                json!({ "id": id, "role": "user", "text": format!("closures capture {n}") }),
+            )
+            .await;
+    }
+    // `limit` keeps the newest, in order; out-of-range limits are clamped
+    // rather than refused.
+    let three = alice
+        .ok("playground.chat.list", json!({ "id": id, "limit": 3 }))
+        .await;
+    let texts: Vec<&str> = three["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        texts,
+        [
+            "closures capture 5",
+            "closures capture 6",
+            "closures capture 7"
+        ]
+    );
+    let clamped = alice
+        .ok("playground.chat.list", json!({ "id": id, "limit": 0 }))
+        .await;
+    assert_eq!(clamped["messages"].as_array().unwrap().len(), 1);
+    let all = alice
+        .ok(
+            "playground.chat.list",
+            json!({ "id": id, "limit": 999_999 }),
+        )
+        .await;
+    assert_eq!(all["messages"].as_array().unwrap().len(), 9);
+
+    // Search: the three modes answer, say which mode they ran in, and a mode
+    // nobody named is refused.
+    for mode in ["bm25", "semantic", "unified"] {
+        let res = alice
+            .ok(
+                "playground.chat.search",
+                json!({ "q": "closures", "id": id, "mode": mode, "limit": 2 }),
+            )
+            .await;
+        assert_eq!(res["mode"], mode);
+        assert!(res["took_ms"].is_i64());
+        let hits = res["hits"].as_array().unwrap();
+        assert_eq!(hits.len(), 2, "{mode}");
+        assert_eq!(hits[0]["snippet_name"], "chatty");
+        assert!(hits[0]["message"]["text"]
+            .as_str()
+            .unwrap()
+            .contains("closures"));
+    }
+    assert_eq!(
+        alice
+            .err(
+                "playground.chat.search",
+                json!({ "q": "closures", "mode": "psychic" })
+            )
+            .await,
+        "bad_request"
+    );
+    assert!(
+        alice.ok("playground.chat.search", json!({ "q": "" })).await["hits"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+
+    // Clear says how many went, and the room is empty after.
+    let cleared = alice.ok("playground.chat.clear", json!({ "id": id })).await;
+    assert_eq!(cleared["cleared"], 9);
+    assert!(
+        alice.ok("playground.chat.list", json!({ "id": id })).await["messages"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    // And the photo that was in it is gone from the web too.
+    let (status, _, _) = http_get(
+        server.port,
+        posted["message"]["photo_url"].as_str().unwrap(),
+    )
+    .await;
+    assert_eq!(status, 404);
+    server.handle.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_room_needs_a_login_and_dies_with_its_pad() {
+    let server = start().await;
+    let mut nobody = Client::connect(server.port).await;
+    for (kind, payload) in [
+        (
+            "playground.chat.list",
+            json!({ "id": "pg_0000000000000000" }),
+        ),
+        (
+            "playground.chat.post",
+            json!({ "id": "pg_0000000000000000", "role": "user", "text": "?" }),
+        ),
+        ("playground.chat.search", json!({ "q": "anything" })),
+        (
+            "playground.chat.clear",
+            json!({ "id": "pg_0000000000000000" }),
+        ),
+    ] {
+        assert_eq!(nobody.err(kind, payload).await, "unauthorized", "{kind}");
+    }
+
+    let mut alice = Client::connect(server.port).await;
+    alice.login(ALICE_KEY).await;
+    let id = alice.new_pad().await;
+    let posted = alice
+        .ok(
+            "playground.chat.post",
+            json!({ "id": id, "role": "agent", "text": "a crab", "image_b64": b64(PNG), "image_type": "image/png" }),
+        )
+        .await;
+    let url = posted["message"]["photo_url"].as_str().unwrap().to_string();
+    let (status, _, body) = http_get(server.port, &url).await;
+    assert_eq!(status, 200);
+    assert_eq!(body, PNG);
+
+    alice.ok("playground.delete", json!({ "id": id })).await;
+    assert_eq!(
+        alice.err("playground.chat.list", json!({ "id": id })).await,
+        "not_found"
+    );
+    let (status, _, _) = http_get(server.port, &url).await;
+    assert_eq!(status, 404);
+    let rows: i64 = server.store.with_conn(|conn| {
+        conn.query_row("SELECT count(*) FROM snippet_messages", [], |r| r.get(0))
+            .unwrap()
+    });
+    assert_eq!(rows, 0);
+    server.handle.abort();
+}

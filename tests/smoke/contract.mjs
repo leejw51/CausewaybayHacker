@@ -1906,6 +1906,83 @@ check(null, "beyond: an address in a payload is ignored, never trusted", async (
   }
 });
 
+check(null, "beyond: a scratchpad's chatroom keeps, serves and searches (§4.9f)", async () => {
+  // The chatroom under a pad: the four messages and the photo route, driven
+  // the way the Rust coder drives them. A server without §4.9f answers
+  // `not_found` to the first call, and that is reported as one line rather
+  // than four failures.
+  const cl = await session(freshAccount("room"), "room");
+  try {
+    const pad = await cl.send("playground.save", {
+      lang: "rust",
+      source: "fn main() {}\n",
+      name: "smoke room",
+    });
+    assertEq(pad.type, "playground.save.ok", "a pad to hang the room on");
+    const id = pad.payload.snippet.id;
+    const first = await cl.send("playground.chat.post", { id, role: "user", text: "hello room" });
+    if (first.type.endsWith(".err") && first.payload.code === "not_found") {
+      throw new Error("playground.chat.* is not on this server (PROTOCOL §4.9f)");
+    }
+    assertEq(first.type, "playground.chat.post.ok", "a text post");
+    const m = first.payload.message;
+    assertEq(m.snippet_id, id, "a message names its pad");
+    assertEq(m.role, "user");
+    assertEq(m.kind, "text");
+    assertEq(m.photo_url, null, "a text row has no photo");
+    for (const key of ["id", "text", "created_at", "provider", "model"])
+      assert(key in m, `ChatMessage.${key} (§5.14)`);
+
+    // A 1x1 PNG, as base64: a real picture, posted as the agent would.
+    const png =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==";
+    const photo = await cl.send("playground.chat.post", {
+      id,
+      role: "agent",
+      text: "a crab",
+      image_b64: png,
+      image_type: "image/png",
+      provider: "openai",
+      model: "gpt-image-1",
+    });
+    assertEq(photo.type, "playground.chat.post.ok", "an image post");
+    const url = photo.payload.message.photo_url;
+    assert(
+      typeof url === "string" && /^\/photos\/msg_[0-9a-f]{16}\/[0-9a-f]{32}\.png$/.test(url),
+      `a photo is fetched by capability path, got ${url}`,
+    );
+    const http = new URL(URL_WS.replace(/^ws/, "http"));
+    const res = await fetch(new URL(url, http));
+    assertEq(res.status, 200, "the photo route serves the owner's token");
+    assertEq(res.headers.get("content-type"), "image/png");
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    assertEq(bytes.length, Buffer.from(png, "base64").length, "the bytes as posted");
+    const wrong = await fetch(new URL(url.replace(/[0-9a-f]{32}\.png$/, "0".repeat(32) + ".png"), http));
+    assertEq(wrong.status, 404, "a wrong token is nothing");
+
+    const list = await cl.send("playground.chat.list", { id });
+    assertEq(list.type, "playground.chat.list.ok");
+    assertEq(list.payload.messages.length, 2, "oldest first, both there");
+    assertEq(list.payload.messages[0].text, "hello room");
+
+    const hits = await cl.send("playground.chat.search", { q: "hello", id });
+    assertEq(hits.type, "playground.chat.search.ok");
+    assertEq(hits.payload.mode, "unified", "the default mode");
+    assert(hits.payload.hits.length >= 1, "the word is found");
+    assertEq(hits.payload.hits[0].message.text, "hello room");
+    assertEq(hits.payload.hits[0].snippet_name, "smoke room");
+
+    const cleared = await cl.send("playground.chat.clear", { id });
+    assertEq(cleared.type, "playground.chat.clear.ok");
+    assertEq(cleared.payload.cleared, 2, "clear says how many went");
+    const gone = await fetch(new URL(url, http));
+    assertEq(gone.status, 404, "a cleared photo is gone from the web too");
+    await cl.send("playground.delete", { id });
+  } finally {
+    cl.close();
+  }
+});
+
 check(null, "beyond: no frame the server sent broke the envelope rules", async () => {
   // Every Client validates as it goes; this rolls the whole run up, so a
   // violation in the middle of an otherwise-passing check is still reported.

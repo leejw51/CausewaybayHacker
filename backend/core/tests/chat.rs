@@ -481,3 +481,368 @@ fn clear_and_delete_leave_nothing_behind() {
     );
     assert!(!store.home().snippet_dir(ALICE, &id).exists());
 }
+
+// ---------------------------------------------------------------------------
+// The edges: what a post may not be, what a list window keeps, and where a
+// search is allowed to look.
+// ---------------------------------------------------------------------------
+
+fn refusal(
+    store: &Store,
+    embedder: &HashedEmbedder,
+    id: &str,
+    role: &str,
+    text: &str,
+    image: Option<(&[u8], &str)>,
+) -> cwbhacker_core::Error {
+    store.with_conn(|conn| {
+        chat::post(
+            conn,
+            store.home(),
+            embedder,
+            ALICE,
+            id,
+            role,
+            text,
+            image,
+            None,
+            None,
+        )
+        .unwrap_err()
+    })
+}
+
+#[test]
+fn a_post_is_refused_for_a_bad_role_a_bad_image_or_too_much_text() {
+    let (_tmp, store, embedder, id) = room();
+    let bad = cwbhacker_core::Code::BadRequest;
+    assert_eq!(
+        refusal(&store, &embedder, &id, "system", "hi", None).code,
+        bad
+    );
+    assert_eq!(refusal(&store, &embedder, &id, "", "hi", None).code, bad);
+    // An image has to be a picture the room knows how to name.
+    assert_eq!(
+        refusal(
+            &store,
+            &embedder,
+            &id,
+            "agent",
+            "a crab",
+            Some((PNG, "image/gif"))
+        )
+        .code,
+        bad
+    );
+    assert_eq!(
+        refusal(
+            &store,
+            &embedder,
+            &id,
+            "agent",
+            "a crab",
+            Some((&[], "image/png"))
+        )
+        .code,
+        bad
+    );
+    let huge = vec![0u8; chat::MAX_PHOTO_BYTES + 1];
+    let e = refusal(
+        &store,
+        &embedder,
+        &id,
+        "agent",
+        "a crab",
+        Some((&huge, "image/png")),
+    );
+    assert_eq!(e.code, bad);
+    assert!(
+        e.message.contains(&chat::MAX_PHOTO_BYTES.to_string()),
+        "{}",
+        e.message
+    );
+    let wall = "x".repeat(chat::MAX_TEXT_BYTES + 1);
+    let e = refusal(&store, &embedder, &id, "user", &wall, None);
+    assert_eq!(e.code, bad);
+    assert!(
+        e.message.contains(&chat::MAX_TEXT_BYTES.to_string()),
+        "{}",
+        e.message
+    );
+    // And nothing of any of that was kept.
+    assert_eq!(count(&store, "SELECT count(*) FROM snippet_messages"), 0);
+    assert_eq!(count(&store, "SELECT count(*) FROM snippet_message_vec"), 0);
+    assert!(
+        !store.home().snippet_photo_dir(ALICE, &id).exists()
+            || std::fs::read_dir(store.home().snippet_photo_dir(ALICE, &id))
+                .unwrap()
+                .next()
+                .is_none()
+    );
+}
+
+#[test]
+fn every_role_is_kept_with_its_provider_and_model() {
+    let (_tmp, store, embedder, id) = room();
+    for role in ["user", "agent", "tool"] {
+        let m = say(&store, &embedder, &id, role, &format!("from {role}"));
+        assert_eq!(m.role, role);
+        assert_eq!(m.kind, "text");
+        assert_eq!(m.snippet_id, id);
+        assert_eq!(m.provider.as_deref(), Some("openai"));
+        assert_eq!(m.model.as_deref(), Some("gpt-4.1"));
+        assert!(m.photo_url.is_none());
+        assert!(m.id.starts_with("msg_"));
+    }
+    // Absent is absent, not an empty string.
+    let bare = store.with_conn(|conn| {
+        chat::post(
+            conn,
+            store.home(),
+            &embedder,
+            ALICE,
+            &id,
+            "user",
+            "plain",
+            None,
+            None,
+            None,
+        )
+        .unwrap()
+    });
+    assert!(bare.provider.is_none());
+    assert!(bare.model.is_none());
+}
+
+#[test]
+fn the_list_window_keeps_the_newest_in_the_order_they_were_said() {
+    let (_tmp, store, embedder, id) = room();
+    for n in 0..12 {
+        say(&store, &embedder, &id, "user", &format!("line {n}"));
+    }
+    let all = store.with_conn(|conn| chat::list(conn, ALICE, &id, 500).unwrap());
+    assert_eq!(all.len(), 12);
+    assert_eq!(all.first().unwrap().text, "line 0");
+    assert_eq!(all.last().unwrap().text, "line 11");
+    let tail = store.with_conn(|conn| chat::list(conn, ALICE, &id, 5).unwrap());
+    assert_eq!(
+        tail.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(),
+        ["line 7", "line 8", "line 9", "line 10", "line 11"]
+    );
+}
+
+#[test]
+fn search_is_scoped_to_a_room_when_asked_and_to_the_owner_always() {
+    let (_tmp, store, embedder, id) = room();
+    let other = store.with_conn(|conn| {
+        snippets::save(
+            conn,
+            store.home(),
+            ALICE,
+            None,
+            Some("other pad"),
+            "go",
+            "package main\n",
+            None,
+        )
+        .unwrap()
+        .id
+    });
+    say(&store, &embedder, &id, "user", "the borrow checker again");
+    store.with_conn(|conn| {
+        chat::post(
+            conn,
+            store.home(),
+            &embedder,
+            ALICE,
+            &other,
+            "user",
+            "borrow me a goroutine",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        // Bob's own pad and room, which Alice must never see in a search.
+        let bobs = snippets::save(
+            conn,
+            store.home(),
+            BOB,
+            None,
+            Some("bob pad"),
+            "rust",
+            "fn main() {}\n",
+            None,
+        )
+        .unwrap()
+        .id;
+        chat::post(
+            conn,
+            store.home(),
+            &embedder,
+            BOB,
+            &bobs,
+            "user",
+            "borrow borrow borrow",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    });
+    let everywhere = store.with_conn(|conn| {
+        chat::search(conn, &embedder, ALICE, "borrow", None, Mode::Unified, 20).unwrap()
+    });
+    let names: Vec<&str> = everywhere.iter().map(|h| h.snippet_name.as_str()).collect();
+    assert_eq!(everywhere.len(), 2, "{names:?}");
+    assert!(names.contains(&"iter ideas") && names.contains(&"other pad"));
+    let here = store.with_conn(|conn| {
+        chat::search(
+            conn,
+            &embedder,
+            ALICE,
+            "borrow",
+            Some(&id),
+            Mode::Unified,
+            20,
+        )
+        .unwrap()
+    });
+    assert_eq!(here.len(), 1);
+    assert_eq!(here[0].message.text, "the borrow checker again");
+    assert_eq!(here[0].snippet_name, "iter ideas");
+    // Bob, from his side, sees only his own.
+    let bobs = store.with_conn(|conn| {
+        chat::search(conn, &embedder, BOB, "borrow", None, Mode::Unified, 20).unwrap()
+    });
+    assert_eq!(bobs.len(), 1);
+    assert_eq!(bobs[0].snippet_name, "bob pad");
+}
+
+#[test]
+fn search_modes_say_where_a_hit_came_from() {
+    let (_tmp, store, embedder, id) = room();
+    say(
+        &store,
+        &embedder,
+        &id,
+        "agent",
+        "closures capture their environment",
+    );
+    say(&store, &embedder, &id, "user", "something else entirely");
+    let bm25 = store.with_conn(|conn| {
+        chat::search(
+            conn,
+            &embedder,
+            ALICE,
+            "closures",
+            Some(&id),
+            Mode::Bm25,
+            20,
+        )
+        .unwrap()
+    });
+    assert_eq!(bm25.len(), 1);
+    assert!(bm25[0].bm25.is_some() && bm25[0].cosine.is_none());
+    assert!(
+        bm25[0].snippet.contains("<b>closures</b>"),
+        "{}",
+        bm25[0].snippet
+    );
+    let semantic = store.with_conn(|conn| {
+        chat::search(
+            conn,
+            &embedder,
+            ALICE,
+            "closures",
+            Some(&id),
+            Mode::Semantic,
+            20,
+        )
+        .unwrap()
+    });
+    assert!(!semantic.is_empty());
+    assert!(semantic[0].bm25.is_none() && semantic[0].cosine.is_some());
+    assert_eq!(
+        semantic[0].message.text,
+        "closures capture their environment"
+    );
+    let unified = store.with_conn(|conn| {
+        chat::search(
+            conn,
+            &embedder,
+            ALICE,
+            "closures",
+            Some(&id),
+            Mode::Unified,
+            20,
+        )
+        .unwrap()
+    });
+    assert_eq!(
+        unified[0].message.text,
+        "closures capture their environment"
+    );
+    assert!(unified[0].bm25.is_some() && unified[0].cosine.is_some());
+    assert!(unified[0].score > 0.0);
+    // An empty question is an empty answer, and a limit is a limit.
+    assert!(store
+        .with_conn(
+            |conn| chat::search(conn, &embedder, ALICE, "   ", None, Mode::Unified, 20).unwrap()
+        )
+        .is_empty());
+    for n in 0..5 {
+        say(&store, &embedder, &id, "user", &format!("closures {n}"));
+    }
+    assert_eq!(
+        store
+            .with_conn(|conn| chat::search(
+                conn,
+                &embedder,
+                ALICE,
+                "closures",
+                None,
+                Mode::Unified,
+                3
+            )
+            .unwrap())
+            .len(),
+        3
+    );
+}
+
+#[test]
+fn a_photo_lookup_needs_the_right_token() {
+    let (_tmp, store, embedder, id) = room();
+    let m = store.with_conn(|conn| {
+        chat::post(
+            conn,
+            store.home(),
+            &embedder,
+            ALICE,
+            &id,
+            "agent",
+            "a crab",
+            Some((PNG, "image/png")),
+            None,
+            None,
+        )
+        .unwrap()
+    });
+    let url = m.photo_url.clone().unwrap();
+    // "/photos/<id>/<token>.png"
+    let tail = url.strip_prefix(&format!("/photos/{}/", m.id)).unwrap();
+    let token = tail.strip_suffix(".png").unwrap();
+    assert_eq!(token.len(), 32);
+    let found = store.with_conn(|conn| chat::photo(conn, store.home(), &m.id, token).unwrap());
+    let (path, mime) = found.expect("the right token finds the file");
+    assert_eq!(mime, "image/png");
+    assert_eq!(std::fs::read(path).unwrap(), PNG);
+    let wrong = "0".repeat(32);
+    assert!(store
+        .with_conn(|conn| chat::photo(conn, store.home(), &m.id, &wrong).unwrap())
+        .is_none());
+    assert!(store
+        .with_conn(|conn| chat::photo(conn, store.home(), "msg_nope", token).unwrap())
+        .is_none());
+}
