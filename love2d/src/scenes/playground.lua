@@ -224,8 +224,19 @@ function Playground:list()
 end
 
 --- §4.9c: idempotent by contract, so this can sit on a timer.
+--- Keep the pad.
+---
+--- **One at a time, and a failure waits.** The autosave fires from `update`
+--- whenever the text has been dirty for four seconds, and `dirty_at` was only
+--- cleared by a *successful* reply — so a save the server refused left the
+--- condition true and sent another on the very next frame, and the next, until
+--- the server said "too fast" to all of them. That was invisible while saves
+--- always worked; the coder's room hangs off this id, and it asks for a save
+--- the moment somebody says something in a pad that has never had one.
 function Playground:save()
   if not self.editor then return end
+  if self.save_inflight then return end
+  self.save_inflight = true
   local payload = {
     lang = self.lang,
     source = self.editor:text(),
@@ -238,8 +249,14 @@ function Playground:save()
   if self.name then payload.name = self.name end
 
   self.app.session:request("playground.save", payload, function(ok, reply, why)
+    self.save_inflight = false
     if not ok then
-      self.note = why.player
+      -- The next attempt is one autosave interval away, not one frame.
+      self.dirty_at = Anim.now()
+      -- Never silently: `why.player` is nil for codes this client has no
+      -- sentence for, and a save that failed with an empty note is a save
+      -- that looks like it worked. The coder's room hangs off this id.
+      self.note = (why and why.player) or ("save refused: " .. tostring(reply and reply.code))
       return
     end
     local snippet = reply.snippet

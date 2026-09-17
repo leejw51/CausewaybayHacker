@@ -367,6 +367,8 @@ end
 function Coder:room_arrived(id)
   self.room_id = id
   self.saving = false
+  self.save_tries = nil
+  self.said_unsaved = nil
   local held = self.pending or {}
   self.pending = nil
   for _, line in ipairs(held) do
@@ -622,6 +624,25 @@ function Coder:update(dt)
       self:room_arrived(id)
     else
       self:sync_room()
+    end
+  elseif self.pending and not id then
+    -- Lines held for a pad that is still being saved. A save can be refused —
+    -- the server rate-limits them, and a player at the snippet limit cannot
+    -- make another pad at all — so this asks again now and then, and then
+    -- **stops asking and says so**. A queue that grew forever behind a
+    -- refusal nobody could see is how this was found.
+    self.since_save = (self.since_save or 0) + dt
+    if self.since_save >= 4 and (self.save_tries or 0) < 3 then
+      self.since_save = 0
+      self.save_tries = (self.save_tries or 0) + 1
+      self.saving = false
+      if self.host.ensure_room then
+        self.saving = true
+        self.host.ensure_room()
+      end
+    elseif (self.save_tries or 0) >= 3 and not self.said_unsaved then
+      self.said_unsaved = true
+      self.panel.status = I18n.t("this pad could not be saved, so the room is this screen only")
     end
   end
 

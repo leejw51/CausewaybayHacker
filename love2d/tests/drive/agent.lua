@@ -174,6 +174,12 @@ add({ shot = "A6-agent-done.png" })
 -- local copy away and reads it back.
 add({ until_ = function(app)
       local c = coder(app)
+      if c.room_id == nil then
+        -- Worth printing rather than only failing: the reason is almost
+        -- always the server's, and the note carries it.
+        print(("no room: snippet_id=%s tries=%s note=%s"):format(
+          tostring(pg(app).snippet_id), tostring(c.save_tries), tostring(pg(app).note)))
+      end
       check(c.room_id ~= nil, "the pad was never saved, so there is no room")
       app.probe_room = { id = c.room_id, count = 0, done = false }
       c.host.request("playground.chat.list", { id = c.room_id, limit = 200 },
@@ -191,6 +197,48 @@ add({ until_ = function(app)
         "the server kept " .. app.probe_room.count .. " messages; the ask and its answer are two")
       return true
     end, timeout = 5 })
+
+-- STOP, mid-word. The one promise the character makes about the editor is
+-- that it is yours: whatever it is typing, it stops between two characters
+-- and leaves what it had already written where it is.
+add({ click = function(app) local r = coder(app).panel.rects["input"]
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ text = "rewrite it as a while loop with a counter and a comment on every line" })
+add({ click = function(app) local r = coder(app).panel.rects["write"]
+      return { r.x + r.w / 2, r.y + r.h / 2 } end })
+add({ until_ = function(app) return coder(app).typist:busy() end,
+      note = "typing again", timeout = 180 })
+-- A beat, so the stop lands mid-word rather than on the first frame: what is
+-- being checked is that it stops *between two characters* with some of the
+-- program already in.
+-- Enough of it in to be a stop rather than a cancel. Counted in characters
+-- rather than in seconds, because a drive runs as fast as the machine will
+-- let it and a wall-clock wait is a different number of frames every time.
+add({ until_ = function(app)
+      local c = coder(app)
+      return not c.typist:busy() or c.typist.typed >= 12
+    end, note = "a dozen characters in", timeout = 30 })
+local stopped_at, stopped_total = nil, nil
+add({ until_ = function(app)
+      local c = coder(app)
+      stopped_at, stopped_total = c.typist.typed, c.typist.total
+      c.panel:pressed("stop")
+      return true
+    end, timeout = 5 })
+add({ wait = 0.6 })
+add({ until_ = function(app)
+      local c = coder(app)
+      check(not c.typist:busy(), "the typist kept going after STOP")
+      check(stopped_at > 0 and stopped_at < stopped_total,
+        ("STOP did not land mid-program: %d of %d"):format(stopped_at, stopped_total))
+      local text = pg(app).editor:text()
+      check(#text > 0, "the editor was left empty by a stop")
+      print(("stopped at %d of %d characters"):format(stopped_at, stopped_total))
+      return true
+    end, timeout = 5 })
+add({ until_ = function(app) return not coder(app).session:busy() end,
+      note = "the ask gave up", timeout = 60 })
+add({ shot = "A9-agent-stopped.png" })
 
 -- CODE, which is where the editor gets the window and the room gets a column
 -- the whole height of it. This is the mode the coder is actually worked in.
@@ -211,6 +259,7 @@ add({ until_ = function(app) return pg(app).big == false end, note = "out of COD
 
 -- Portrait, where the panel is a band under the editor rather than a column
 -- beside it. The same room, re-laid.
+-- (The pad this run made is deleted at the end; see below.)
 add({ orient = "portrait" })
 add({ wait = 1.5 })
 add({ shot = "A7-agent-portrait.png" })
@@ -222,6 +271,22 @@ add({ until_ = function(app)
       end
       return true
     end, timeout = 5 })
+
+-- **Put the pad back.** This script makes one scratchpad every time it runs,
+-- and a player is allowed sixty-four; a drive that ran on every change would
+-- fill the test account and then start failing for a reason that has nothing
+-- to do with the coder. Which is exactly what happened.
+add({ orient = "landscape" })
+add({ until_ = function(app)
+      local s = pg(app)
+      if not s.snippet_id then return true end
+      app.probe_deleted = false
+      s.app.session:request("playground.delete", { id = s.snippet_id },
+        function(ok) app.probe_deleted = ok end)
+      return true
+    end, timeout = 5 })
+add({ until_ = function(app) return app.probe_deleted ~= false end,
+      note = "the pad was put back", timeout = 10 })
 
 add({ until_ = function() print(fail and "DRIVE FAILED" or "drive ok") return true end,
       timeout = 2 })

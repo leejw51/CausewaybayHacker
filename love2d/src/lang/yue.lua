@@ -109,6 +109,7 @@ return {
   ["the key library is not built"] = "個 key library 未 build",
   ["the key library returned %d words, not 12"] = "個 key library 俾咗 %d 個字返嚟，唔係 12 個",
   ["thinking… %ds"] = "諗緊… %d 秒",
+  ["this pad could not be saved, so the room is this screen only"] = "呢個 pad 存唔到，所以對話淨係留喺呢個畫面",
   ["this wallet:  "] = "呢個銀包:  ",
   ["twelve words, or 0x + 64 hex"] = "十二個字，或者 0x 加 64 個 hex",
   ["typing %d / %d"] = "打緊 %d / %d",

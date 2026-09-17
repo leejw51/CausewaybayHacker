@@ -107,6 +107,7 @@ return {
   ["the key library is not built"] = "鍵ライブラリがビルドされていません",
   ["the key library returned %d words, not 12"] = "鍵ライブラリが 12 語ではなく %d 語を返しました",
   ["thinking… %ds"] = "考え中… %d秒",
+  ["this pad could not be saved, so the room is this screen only"] = "このパッドを保存できないので、会話はこの画面だけに残ります",
   ["this wallet:  "] = "このウォレット:  ",
   ["twelve words, or 0x + 64 hex"] = "12 語、または 0x + 16 進 64 桁",
   ["typing %d / %d"] = "入力中 %d / %d",

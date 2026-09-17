@@ -108,6 +108,7 @@ return {
   ["the key library is not built"] = "密钥库还没有构建",
   ["the key library returned %d words, not 12"] = "密钥库返回了 %d 个词，不是 12 个",
   ["thinking… %ds"] = "思考中… %d 秒",
+  ["this pad could not be saved, so the room is this screen only"] = "这个代码本保存不了，所以对话只留在这个屏幕上",
   ["this wallet:  "] = "这个钱包:  ",
   ["twelve words, or 0x + 64 hex"] = "十二个词，或者 0x 加 64 位十六进制",
   ["typing %d / %d"] = "输入中 %d / %d",

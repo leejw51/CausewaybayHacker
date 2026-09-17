@@ -118,6 +118,7 @@ return {
   ["the key library is not built"] = "knihovna klíčů není sestavená",
   ["the key library returned %d words, not 12"] = "knihovna klíčů vrátila %d slov, ne 12",
   ["thinking… %ds"] = "přemýšlím… %d s",
+  ["this pad could not be saved, so the room is this screen only"] = "tento sešit se nepodařilo uložit, takže místnost zůstane jen na této obrazovce",
   ["this wallet:  "] = "tato peněženka:  ",
   ["twelve words, or 0x + 64 hex"] = "dvanáct slov, nebo 0x + 64 hex",
   ["typing %d / %d"] = "píšu %d / %d",

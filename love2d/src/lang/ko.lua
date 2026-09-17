@@ -105,6 +105,7 @@ return {
   ["the key library is not built"] = "키 라이브러리가 빌드되지 않았습니다",
   ["the key library returned %d words, not 12"] = "키 라이브러리가 12 개가 아니라 %d 개의 단어를 돌려줬습니다",
   ["thinking… %ds"] = "생각 중… %d초",
+  ["this pad could not be saved, so the room is this screen only"] = "이 패드를 저장할 수 없어서, 대화는 이 화면에만 남습니다",
   ["this wallet:  "] = "이 지갑:  ",
   ["twelve words, or 0x + 64 hex"] = "단어 12 개, 또는 0x + 16진수 64 자",
   ["typing %d / %d"] = "입력 중 %d / %d",
