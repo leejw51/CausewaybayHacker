@@ -2098,6 +2098,11 @@ function Quest:draw_editor(rect, tint, bare)
   local gutter = font:getWidth("0000 ")
   local rows = math.max(1, math.floor(room / line_h))
   self.editor:ensure_visible(rows)
+  -- And across: a line wider than the pane used to take the caret off the
+  -- right edge with it, which is most visible when the coder is writing.
+  self.editor:ensure_visible_across(function(t) return font:getWidth(t) end,
+    rect.w - gutter - 20)
+  local shift = self.editor.scroll_x or 0
   self.visible_rows = rows
   self.editor_rect = rect
   self.console_rect_drawn = console.open and console or nil
@@ -2140,7 +2145,7 @@ function Quest:draw_editor(rect, tint, bare)
     if sel_l1 and index >= sel_l1 and index <= sel_l2 then
       local from = (index == sel_l1) and sel_c1 or 1
       local to = (index == sel_l2) and sel_c2 or (#line + 1)
-      local sx = x0 + gutter + font:getWidth(line:sub(1, from - 1))
+      local sx = x0 + gutter - shift + font:getWidth(line:sub(1, from - 1))
       local sw = font:getWidth(line:sub(from, to - 1))
       if to > #line and index < sel_l2 then sw = sw + font:getWidth(" ") end
       UI.setColor(Theme.coin, 0.28)
@@ -2150,12 +2155,15 @@ function Quest:draw_editor(rect, tint, bare)
     -- A line number in `brick` means that line holds a bracket that never
     -- closed — said in the gutter as well as on the bracket, because the
     -- bracket itself may have scrolled off to the right.
+    -- The ruler stays put while the text slides under it.
+    UI.setColor(Theme.void, 0.92)
+    love.graphics.rectangle("fill", rect.x + 3, y, gutter + 5, line_h)
     UI.setColor(self.pane:gutter_color(index))
     love.graphics.print(("%4d"):format(index), x0, y)
 
     local spans
     spans, state = Editor.highlight(line, state)
-    local cx = x0 + gutter
+    local cx = x0 + gutter - shift
     for _, span in ipairs(spans) do
       UI.setColor(Theme.code[span.kind] or Theme.cream)
       love.graphics.print(span.text, cx, y)
@@ -2173,25 +2181,25 @@ function Quest:draw_editor(rect, tint, bare)
         local k, n = 0, math.min(#line, #want)
         while k < n and line:byte(k + 1) == want:byte(k + 1) do k = k + 1 end
         if k < #line then
-          local wx = x0 + gutter + font:getWidth(line:sub(1, k))
+          local wx = x0 + gutter - shift + font:getWidth(line:sub(1, k))
           UI.setColor(Theme.red, 0.3)
           love.graphics.rectangle("fill", wx, y,
             math.max(2, font:getWidth(line:sub(k + 1))), line_h)
         end
         if k < #want then
           UI.setColor(Theme.withAlpha(Theme.cream, 0.3))
-          love.graphics.print(want:sub(k + 1), x0 + gutter + typed_w, y)
+          love.graphics.print(want:sub(k + 1), x0 + gutter - shift + typed_w, y)
         end
       elseif #line > 0 then
         -- Typed past the end of the answer: all of this line is divergence.
         UI.setColor(Theme.red, 0.3)
-        love.graphics.rectangle("fill", x0 + gutter, y, math.max(2, typed_w), line_h)
+        love.graphics.rectangle("fill", x0 + gutter - shift, y, math.max(2, typed_w), line_h)
       end
       love.graphics.setColor(1, 1, 1, 1)
     end
 
     if index == self.editor.line and self.focus == "editor" then
-      local caret = x0 + gutter + font:getWidth(line:sub(1, self.editor.col - 1))
+      local caret = x0 + gutter - shift + font:getWidth(line:sub(1, self.editor.col - 1))
       if (love.timer.getTime() * 2) % 2 < 1.2 then
         UI.setColor(Theme.coin)
         love.graphics.rectangle("fill", caret, y, 2, line_h)
@@ -2206,7 +2214,7 @@ function Quest:draw_editor(rect, tint, bare)
     UI.setColor(Theme.withAlpha(Theme.cream, 0.3))
     for i = after + 1, #self.answer_lines do
       if row > rows then break end
-      love.graphics.print(self.answer_lines[i], x0 + gutter, y0 + (row - 1) * line_h)
+      love.graphics.print(self.answer_lines[i], x0 + gutter - shift, y0 + (row - 1) * line_h)
       row = row + 1
     end
     love.graphics.setColor(1, 1, 1, 1)

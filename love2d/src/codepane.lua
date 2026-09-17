@@ -80,7 +80,7 @@ function Pane:position(x, y)
   index = math.max(1, math.min(#self.editor.lines, index))
   local line = self.editor.lines[index] or ""
   local font = g.font
-  local col = Editor.column_at(line, x - g.x0 - g.gutter,
+  local col = Editor.column_at(line, x - g.x0 - g.gutter + (self.editor.scroll_x or 0),
     function(s) return font:getWidth(s) end)
   return index, col
 end
@@ -152,7 +152,7 @@ function Pane:cell(index, col)
   local line = self.editor.lines[index]
   if not line then return nil end
   local to = Editor.next_boundary(line, col)
-  local x = g.x0 + g.gutter + g.font:getWidth(line:sub(1, col - 1))
+  local x = g.x0 + g.gutter + g.font:getWidth(line:sub(1, col - 1)) - (self.editor.scroll_x or 0)
   local w = math.max(3, g.font:getWidth(line:sub(col, to - 1)))
   return x, g.y0 + (row - 1) * g.line_h, w, g.line_h
 end

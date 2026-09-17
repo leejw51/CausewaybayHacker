@@ -1036,6 +1036,10 @@ function Playground:draw_code(rect, bare)
   local gutter = font:getWidth("0000 ")
   local rows = math.max(1, math.floor((rect.h - strip - 12) / line_h))
   self.editor:ensure_visible(rows)
+  -- And across. The gutter and the two margins are not the text's room.
+  self.editor:ensure_visible_across(function(s) return font:getWidth(s) end,
+    rect.w - gutter - 20)
+  local shift = self.editor.scroll_x or 0
   self.visible_rows = rows
   self.code_rect = rect
   self.line_h = line_h
@@ -1064,16 +1068,20 @@ function Playground:draw_code(rect, bare)
     if sel_l1 and index >= sel_l1 and index <= sel_l2 then
       local from = (index == sel_l1) and sel_c1 or 1
       local to = (index == sel_l2) and sel_c2 or (#line + 1)
-      local sx = x0 + gutter + font:getWidth(line:sub(1, from - 1))
+      local sx = x0 + gutter - shift + font:getWidth(line:sub(1, from - 1))
       UI.setColor(Theme.coin, 0.28)
       love.graphics.rectangle("fill", sx, y,
         math.max(2, font:getWidth(line:sub(from, to - 1))), line_h)
     end
+    -- The line numbers do not move with the text: they are a ruler, and a
+    -- ruler that slides is not one. Painted over whatever scrolled under it.
+    UI.setColor(Theme.void, 0.92)
+    love.graphics.rectangle("fill", rect.x + 3, y, gutter + 5, line_h)
     UI.setColor(self.pane:gutter_color(index))
     love.graphics.print(("%4d"):format(index), x0, y)
     local spans
     spans, state = Editor.highlight(line, state)
-    local cx = x0 + gutter
+    local cx = x0 + gutter - shift
     for _, span in ipairs(spans) do
       UI.setColor(Theme.code[span.kind] or Theme.cream)
       love.graphics.print(span.text, cx, y)
@@ -1083,7 +1091,7 @@ function Playground:draw_code(rect, bare)
       and (love.timer.getTime() * 2) % 2 < 1.2 then
       UI.setColor(Theme.coin)
       love.graphics.rectangle("fill",
-        x0 + gutter + font:getWidth(line:sub(1, self.editor.col - 1)), y, 2, line_h)
+        x0 + gutter - shift + font:getWidth(line:sub(1, self.editor.col - 1)), y, 2, line_h)
     end
   end
   self.pane:draw_brackets()

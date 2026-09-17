@@ -812,6 +812,44 @@ function Editor:ensure_visible(rows)
   self.scroll = math.max(0, math.min(max_scroll, self.scroll))
 end
 
+--- Keep the caret inside a viewport `width` pixels wide, across.
+---
+--- The long-missing other half of `ensure_visible`. `scroll_x` has been a
+--- field on this object since the beginning and nothing ever wrote to it, so
+--- a line wider than the pane simply ran off the right edge, taking the caret
+--- with it — invisible to a person typing, who stops at the edge, and very
+--- visible when the Rust coder writes a long line and the text stops
+--- appearing while the sound of typing goes on.
+---
+--- `measure(s)` is the pane's font, handed in rather than reached for: this
+--- file has no `love` in it and cannot know how wide a character is.
+--- `width` is the room the text has, gutter already taken off.
+---
+--- Kept in whole characters' worth of slack on each side, so the caret is
+--- never flush against an edge it is about to cross.
+function Editor:ensure_visible_across(measure, width)
+  if not measure or not width or width <= 0 then return end
+  local line = self.lines[self.line] or ""
+  local caret = measure(line:sub(1, self.col - 1))
+  -- A margin of two characters, so the next few keystrokes are already on
+  -- the screen when they land rather than being chased one at a time.
+  local slack = math.min(width / 3, measure("MM"))
+  if caret - self.scroll_x > width - slack then
+    self.scroll_x = caret - width + slack
+  elseif caret - self.scroll_x < slack then
+    self.scroll_x = caret - slack
+  end
+  -- Never past the longest line on the screen: scrolling into empty space to
+  -- the right of everything is a view of nothing.
+  local widest = 0
+  local last = math.min(#self.lines, self.scroll + 200)
+  for i = self.scroll + 1, last do
+    local w = measure(self.lines[i] or "")
+    if w > widest then widest = w end
+  end
+  self.scroll_x = math.max(0, math.min(math.max(0, widest - width + slack), self.scroll_x))
+end
+
 function Editor:scroll_by(lines, rows)
   self.scroll = self.scroll + lines
   local max_scroll = math.max(0, #self.lines - math.max(1, rows or 20))
