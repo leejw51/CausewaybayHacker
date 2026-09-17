@@ -1089,7 +1089,18 @@ function Playground:draw_code(rect, bare)
 
   love.graphics.setScissor(rect.x + 3, rect.y + 3, rect.w - 6, rect.h - strip - 6)
   love.graphics.setFont(font)
-  local x0, y0 = rect.x + 8, rect.y + 6
+  -- **The leftover goes above the text, not below it.** A pane is a whole
+  -- number of lines and a rectangle is not, so up to a line's worth of height
+  -- is left over. Left at the bottom it is an empty row under the last line —
+  -- while a line is hidden off the top, because the scroll counts only whole
+  -- rows. What a person sees is a page that moved one line before it had to.
+  -- Given to the top instead, a scrolled pane fills to its bottom border and
+  -- the slack reads as the margin it is. A file that fits the pane is not
+  -- scrolled and keeps its slack at the foot, where an unstarted page wants
+  -- it.
+  local slack = math.max(0, (rect.h - strip - 12) - rows * line_h)
+  local x0 = rect.x + 8
+  local y0 = rect.y + 6 + (self.editor.scroll > 0 and slack or 0)
   self.pane:frame(rect, font, gutter, x0, y0, line_h, rows)
   local state = "code"
   for i = 1, self.editor.scroll do

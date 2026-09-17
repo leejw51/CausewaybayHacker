@@ -6,7 +6,7 @@ local function pg(app) return app.scene_name == "playground" and app.scene or ni
 local function coder(app) local s = pg(app); return s and s.coder or nil end
 local key = os.getenv("GROK_API_KEY")
 
-add({ orient = "landscape" })
+add({ orient = "portrait" })
 add({ until_ = function(app) return app.scene_name == "login" or app.session.authed end, timeout = 20 })
 add({ text = "legal winner thank year wave sausage worth useful legal winner thank yellow",
       when = function(app) return app.scene_name == "login" end })
@@ -25,7 +25,7 @@ add({ until_ = function()
     end, timeout = 3 })
 add({ click = function(app) local r = coder(app).panel.rects["input"]
       return { r.x + r.w / 2, r.y + r.h / 2 } end })
-add({ text = "write forty lines: a separate fn that prints its own number, f1 to f20, then main calling them all in order" })
+add({ text = "write fifty short lines: a separate fn per number that prints it, f1 to f24, then main calling them all in order" })
 add({ click = function(app) local r = coder(app).panel.rects["write"]
       return { r.x + r.w / 2, r.y + r.h / 2 } end })
 add({ until_ = function(app) return coder(app).typist:busy() end, note = "typing", timeout = 180 })
