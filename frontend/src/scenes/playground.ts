@@ -874,6 +874,7 @@ export class PlaygroundScene implements Scene {
       },
       touched: () => this.touched(),
       chip: this.app.chip,
+      fx: () => this.fx,
     });
     this.coder.mount(this.editor);
     this.stdinOverlay = new Overlay(this.app.overlay, this.app.layout, this.stdinEl);

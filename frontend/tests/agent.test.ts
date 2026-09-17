@@ -171,6 +171,83 @@ describe("the flight", () => {
     expect(s.state).toBe("wander");
   });
 
+  it("zooms in and rocks while typing, and settles back after", () => {
+    const s = new Sprite(48, () => false);
+    s.caret = [150, 200];
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
+    expect(Math.abs(s.scale - 1)).toBeLessThan(0.08);
+    s.typing(true);
+    for (let i = 0; i < 60; i++) s.update(1 / 60, box, 8);
+    expect(s.scale).toBeGreaterThan(1.1);
+    let rocked = false;
+    for (let i = 0; i < 30; i++) {
+      s.update(1 / 60, box, 8);
+      if (Math.abs(s.angle) > 0.03) rocked = true;
+    }
+    expect(rocked).toBe(true);
+    s.typing(false);
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
+    expect(Math.abs(s.scale - 1)).toBeLessThan(0.08);
+  });
+
+  it("pulses on a keystroke and the pulse dies away exponentially", () => {
+    const s = new Sprite(48, () => false);
+    s.typing(true);
+    s.kick();
+    expect(s.pulse).toBe(1);
+    const [sx, sy] = s.squash();
+    expect(sx).toBeGreaterThan(1);
+    expect(sy).toBeLessThan(1);
+    s.update(1 / 60, box, 8);
+    const a = s.pulse;
+    s.update(1 / 60, box, 8);
+    const b = s.pulse;
+    expect(a).toBeLessThan(1);
+    expect(b).toBeLessThan(a);
+    // The same ratio each frame: that is what exponential means.
+    expect(a).toBeCloseTo(b / a, 2);
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
+    expect(s.pulse).toBe(0);
+    expect(s.squash()).toEqual([1, 1]);
+  });
+
+  it("barrel-rolls exactly once round and comes back level", () => {
+    const s = new Sprite(48, () => false);
+    for (let i = 0; i < 60; i++) s.update(1 / 60, box, 8);
+    s.roll();
+    expect(s.rollingNow).toBe(true);
+    let turned = 0;
+    let last = s.angle;
+    for (let i = 0; i < 120 && s.rollingNow; i++) {
+      s.update(1 / 60, box, 8);
+      const d = Math.abs(s.angle - last);
+      if (d < Math.PI) turned += d;
+      last = s.angle;
+    }
+    expect(s.rollingNow).toBe(false);
+    expect(turned).toBeGreaterThan(Math.PI * 1.5);
+    for (let i = 0; i < 90; i++) s.update(1 / 60, box, 8);
+    expect(Math.abs(s.angle)).toBeLessThan(0.4);
+  });
+
+  it("leaves afterimages only while moving fast, and never more than a few", () => {
+    const s = new Sprite(48, () => false);
+    s.caret = [box[0] + 40, box[1] + 40];
+    for (let i = 0; i < 90; i++) s.update(1 / 60, box, 8);
+    expect(s.trail.length).toBe(0);
+    s.caret = [box[0] + box[2] - 40, box[1] + box[3] - 40];
+    s.typing(true);
+    let most = 0;
+    for (let i = 0; i < 20; i++) {
+      s.update(1 / 60, box, 8);
+      most = Math.max(most, s.trail.length);
+    }
+    expect(most).toBeGreaterThan(0);
+    expect(most).toBeLessThanOrEqual(7);
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
+    expect(s.trail.length).toBe(0);
+  });
+
   it("sits still in the corner under reduced motion", () => {
     const s = new Sprite(48, () => true);
     for (let i = 0; i < 300; i++) s.update(1 / 60, box, 8);
@@ -178,6 +255,14 @@ describe("the flight", () => {
     expect(Math.abs(s.x - rx)).toBeLessThan(1);
     expect(Math.abs(s.y - ry)).toBeLessThan(1);
     expect(s.bob()).toBe(0);
+    s.typing(true);
+    s.kick();
+    s.roll();
+    for (let i = 0; i < 30; i++) s.update(1 / 60, box, 8);
+    expect(s.scale).toBe(1);
+    expect(s.angle).toBe(0);
+    expect(s.squash()).toEqual([1, 1]);
+    expect(s.trail).toEqual([]);
   });
 });
 

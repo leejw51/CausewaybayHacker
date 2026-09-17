@@ -37,6 +37,8 @@ import { Typist } from "../../ai/typist";
 import { advise, nextTip, TIPS } from "../../ai/tips";
 import type { Bench, RunReport } from "../../ai/tools";
 import { image as makeImage } from "../../ai/providers";
+import { burstPlan, coinPlan, pointerPlan } from "../../engine/burst";
+import type { CodeFx } from "../codefx";
 import { Sprite, type Pt } from "./sprite";
 import { AgentLayer } from "./layer";
 import { Panel, type Item } from "./panel";
@@ -60,6 +62,12 @@ export interface Host {
   touched(): void;
   /** A small sound. */
   chip: { blip(): void; fail(): void; coin(): void; select(): void };
+  /**
+   * The screen's particle layer (`ui/codefx.ts`, three.js under WebGL), for
+   * the coder's own effects: its exhaust, and a burst when it starts or
+   * lands a program. Null when the screen has none yet.
+   */
+  fx(): CodeFx | null;
 }
 
 /** Seconds between the coder's own remarks while nobody is typing. */
@@ -103,6 +111,10 @@ export class Coder {
   private sinceCall = AUTO_EVERY;
   private mood: Mood = "idle";
   private moodSince = 0;
+  /** Time banked towards the next exhaust ember, in seconds. */
+  private exhaust = 0;
+  /** Shockwave rings, born at a moment and a place, for a landed program. */
+  private rings: Array<{ x: number; y: number; at: number }> = [];
   /** The bubble: what, and until when. */
   private bubble: { text: string; until: number; tone: "say" | "tip" | "busy" } | null = null;
   private room: string | null = null;
@@ -329,9 +341,22 @@ export class Coder {
       const ed = this.editor;
       if (!ed) return { typed: 0, total: text.length, stopped: true };
       this.sprite.typing(true);
-      const ok = await this.typist.run(text, { type: (ch) => ed.typeAt(ch) }, () => host.touched());
+      this.sprite.roll();
+      this.host.fx()?.play(burstPlan(this.sprite.x, this.sprite.y, 40));
+      const ok = await this.typist.run(text, { type: (ch) => ed.typeAt(ch) }, () => {
+        host.touched();
+        this.sprite.kick();
+      });
       this.sprite.typing(false);
-      if (ok) this.host.chip.coin();
+      if (ok) {
+        this.host.chip.coin();
+        this.sprite.roll();
+        this.rings.push({ x: this.sprite.x, y: this.sprite.y, at: this.t });
+        // A shower of coins from the coder to the caret: the program landed.
+        const c = this.sprite.caret ?? [this.sprite.x, this.sprite.y + 40];
+        this.host.fx()?.play(coinPlan(this.sprite.x, this.sprite.y, c[0], c[1], 18).plan);
+        this.host.fx()?.play(burstPlan(this.sprite.x, this.sprite.y, 60));
+      }
       return { typed: this.typist.typed, total: text.length, stopped: !ok };
     };
     return {
@@ -671,6 +696,39 @@ export class Coder {
     if (cell) this.cellV = Math.max(4, cell[0] / (this.app.layout.cssScale || 1));
     this.sprite.size = this.spriteSize();
     this.sprite.update(dt, this.box, this.cellV);
+    this.breathe(dt);
+  }
+
+  /**
+   * The exhaust: embers from the engines into the particle layer, paced by
+   * time, thrown downward in the ship's own frame and back the way it came,
+   * more of them the harder it burns. Off under reduced motion, like the
+   * smear it borrows.
+   */
+  private breathe(dt: number): void {
+    const fx = this.host.fx();
+    if (!fx || reducedMotion()) return;
+    const burn = this.sprite.thrust();
+    const every = 0.09 / burn;
+    this.exhaust += dt;
+    while (this.exhaust >= every) {
+      this.exhaust -= every;
+      const size = this.sprite.size * this.sprite.scale;
+      const a = this.sprite.angle;
+      const nozzles: Array<[number, number]> = [
+        [-0.28, 0.42],
+        [0, 0.42],
+        [0.28, 0.42],
+      ];
+      for (const [nx, ny] of nozzles) {
+        const lx = nx * size;
+        const ly = ny * size;
+        const x = this.sprite.x + lx * Math.cos(a) - ly * Math.sin(a);
+        const y = this.sprite.y + this.sprite.bob() + lx * Math.sin(a) + ly * Math.cos(a);
+        const vy = 140 * burn;
+        fx.play(pointerPlan(x, y, -Math.sin(a) * vy - this.sprite.speed() * 0.3, Math.cos(a) * vy));
+      }
+    }
   }
 
   private spriteSize(): number {
@@ -699,10 +757,49 @@ export class Coder {
     const ship = assets?.picture("agent_coder");
     const provider = readProvider();
     const bot = assets?.picture(PROVIDER_BOT[provider]);
+    const zoom = this.sprite.scale;
+    const [sqx, sqy] = this.sprite.squash();
+
+    // The shockwaves: a ring per landed program, growing and fading over a
+    // second, drawn under everything.
+    this.rings = this.rings.filter((r) => this.t - r.at < 1);
+    for (const r of this.rings) {
+      const k = (this.t - r.at) / 1;
+      const radius = size * (0.4 + 2.2 * (1 - Math.exp(-4 * k)));
+      g.save();
+      g.globalAlpha = (1 - k) * 0.8;
+      g.strokeStyle = css(Theme.coin);
+      g.lineWidth = Math.max(2, size * 0.06 * (1 - k));
+      g.beginPath();
+      g.arc(r.x, r.y, radius, 0, Math.PI * 2);
+      g.stroke();
+      g.restore();
+    }
+
+    // The afterimages: where it has just been, fading back along the trail.
+    if (ship) {
+      const trail = this.sprite.trail;
+      for (let i = 0; i < trail.length; i++) {
+        const k = (i + 1) / (trail.length + 1);
+        g.save();
+        g.globalAlpha = 0.28 * k;
+        g.translate(trail[i][0], trail[i][1]);
+        g.rotate(this.sprite.angle * k);
+        g.scale(this.sprite.facing * zoom * k, zoom * k);
+        g.drawImage(ship, -size / 2, -size / 2, size, size);
+        g.restore();
+      }
+    }
 
     // The engine, under the ship: three flames, the middle one longest,
-    // flickering with the clock. Drawn first so the ship sits on them.
+    // flickering with the clock. Drawn first so the ship sits on them, and
+    // in the ship's own frame so they tilt and zoom with it.
     {
+      g.save();
+      g.translate(x, y);
+      g.rotate(this.sprite.angle);
+      g.scale(zoom * sqx, zoom * sqy);
+      g.translate(-x, -y);
       const burn = this.sprite.thrust();
       const flick = 0.75 + 0.25 * Math.sin(this.t * 37) * Math.cos(this.t * 23);
       const fw = Math.max(2, Math.round(size * 0.06));
@@ -717,11 +814,13 @@ export class Coder {
         fill(g, Theme.cyan, fx, fy, fw, fh, 0.85);
         fill(g, Theme.cream, fx + fw * 0.25, fy, fw * 0.5, fh * 0.55, 0.9);
       }
+      g.restore();
     }
 
     g.save();
     g.translate(x, y);
-    if (this.sprite.facing < 0) g.scale(-1, 1);
+    g.rotate(this.sprite.angle);
+    g.scale(this.sprite.facing * zoom * sqx, zoom * sqy);
     if (ship) g.drawImage(ship, -size / 2, -size / 2, size, size);
     else {
       fill(g, Theme.coin, -size / 2, -size / 2, size, size, 0.9);
