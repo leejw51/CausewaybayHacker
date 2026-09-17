@@ -106,8 +106,31 @@ if provider then
   add({ click = function(app) local r = coder(app).panel.rects["setup"]
         return { r.x + r.w / 2, r.y + r.h / 2 } end })
   add({ until_ = function(app) return coder(app).panel.view == "setup" end, timeout = 5 })
-  add({ click = function(app) local r = coder(app).panel.rects["tab:" .. provider]
-        return { r.x + r.w / 2, r.y + r.h / 2 } end })
+  -- A panel too short for a grid of tabs shows one button that cycles them,
+  -- so this presses whichever of the two it is looking at.
+  add({ until_ = function(app)
+        local p = coder(app).panel
+        local ids = {}
+        for id in pairs(p.rects) do ids[#ids + 1] = id end
+        table.sort(ids)
+        print(("panel %dx%d rects: %s"):format(
+          (qs(app).agent_rect or {}).w or -1, (qs(app).agent_rect or {}).h or -1,
+          table.concat(ids, " ")))
+        return true
+      end, timeout = 3 })
+  add({ until_ = function(app)
+        local p = coder(app).panel
+        local Prefs = require("src.agent.prefs")
+        if p.rects["tab:" .. provider] then return true end
+        if Prefs.provider() == provider then return true end
+        p:pressed("cycle")
+        return false
+      end, note = "the provider", timeout = 10 })
+  add({ click = function(app)
+        local p = coder(app).panel
+        local r = p.rects["tab:" .. provider] or p.rects["cycle"] or p.rects["setup"]
+        return { r.x + r.w / 2, r.y + r.h / 2 } end,
+        when = function(app) return coder(app).panel.rects["tab:" .. provider] ~= nil end })
   add({ click = function(app) local r = coder(app).panel.rects["key"]
         return { r.x + r.w / 2, r.y + r.h / 2 } end })
   add({ text = key })
@@ -115,7 +138,7 @@ if provider then
   add({ until_ = function(app) return coder(app).panel.view == "chat" end, timeout = 5 })
   add({ click = function(app) local r = coder(app).panel.rects["input"]
         return { r.x + r.w / 2, r.y + r.h / 2 } end })
-  add({ text = "add a comment at the top of the file saying what it does" })
+  add({ text = "rewrite the whole file as thirty short lines, one statement each, keeping what it does" })
   local before = nil
   add({ until_ = function(app) before = qs(app).editor:text(); return true end, timeout = 3 })
   add({ click = function(app) local r = coder(app).panel.rects["send"]
@@ -128,8 +151,30 @@ if provider then
         check(c.panel.status == nil, "the coder refused the ask: " .. tostring(c.panel.status))
         return c.session:busy() or c.panel.status ~= nil
       end, note = "the ask went out", timeout = 10 })
-  add({ until_ = function(app) return not coder(app).session:busy() end,
-        note = "the answer", timeout = 240 })
+  -- Does the quest's code page follow the caret while the coder writes?
+  local worst = nil
+  add({ until_ = function(app)
+        local s, c = qs(app), coder(app)
+        local e = s.editor
+        local rows = s.visible_rows or 0
+        local below = e.line - (e.scroll + rows)
+        if below > 0 and (not worst or below > worst.below) then
+          worst = { below = below, line = e.line, scroll = e.scroll, rows = rows }
+        end
+        return not c.session:busy()
+      end, note = "the answer", timeout = 240 })
+  add({ until_ = function(app)
+        local s = qs(app)
+        print(("quest page: lines=%d caret=%d scroll=%d rows=%d"):format(
+          s.editor:line_count(), s.editor.line, s.editor.scroll, s.visible_rows or 0))
+        if worst then
+          print(("QUEST WORST: the caret was %d lines below the fold (line %d, scroll %d, rows %d)")
+            :format(worst.below, worst.line, worst.scroll, worst.rows))
+        else
+          print("the quest's caret never went below the fold")
+        end
+        return true
+      end, timeout = 5 })
   add({ wait = 0.5 })
   add({ until_ = function(app)
         local after = qs(app).editor:text()

@@ -179,6 +179,9 @@ function Coder:type_out(text)
   if not editor then return { typed = 0, total = #text, stopped = true } end
   self.sprite:typing(true)
   self.sprite:roll()
+  -- The page follows while the coder writes: the line being written wants
+  -- daylight under it, not the bottom border.
+  editor.follow = true
   local fx = self.host.fx and self.host.fx()
   if fx then fx:burst(self.sprite.x, self.sprite.y, 40) end
   local typist = self.typist
@@ -197,6 +200,7 @@ function Coder:type_out(text)
   while typist:busy() do
     coroutine.yield()
   end
+  editor.follow = false
   self.sprite:typing(false)
   local stopped = typist.typed < typist.total
   return { typed = typist.typed, total = #text, stopped = stopped }
@@ -557,6 +561,7 @@ end
 function Coder:stop()
   if self.session then self.session:stop() end
   self.typist:stop()
+  if self.editor then self.editor.follow = false end
   self.sprite:typing(false)
   self:say(I18n.t("stopped"), "busy")
 end
@@ -717,11 +722,16 @@ function Coder:update(dt)
       until_t = self.t + 1,
     }
   elseif self.typist:busy() then
-    self.bubble = {
-      text = I18n.t("typing %d / %d"):format(self.typist.typed, self.typist.total),
-      tone = "busy",
-      until_t = self.t + 1,
-    }
+    -- **The count goes in the room, not over the code.** A bubble saying how
+    -- far along the typing is, drawn across the program being typed, covers
+    -- the one thing somebody is watching. The panel's status line is in
+    -- nobody's way and says the same thing.
+    self.panel.status = I18n.t("typing %d / %d"):format(self.typist.typed, self.typist.total)
+    self.typing_said = true
+    if self.bubble and self.bubble.tone == "busy" then self.bubble = nil end
+  elseif self.typing_said then
+    self.typing_said = nil
+    self.panel.status = nil
   end
   -- A bubble stays as long as the sprite is held for it.
   if self.bubble and self.t > self.bubble.until_t and not self.sprite:holding() then

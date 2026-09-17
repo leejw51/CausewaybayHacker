@@ -121,6 +121,9 @@ function M.new(opts)
     goal_char = nil,
     scroll = 0,
     scroll_x = 0,
+    --- Set while somebody else is writing into this editor, so the view keeps
+    --- room under the caret rather than pinning it to the last row.
+    follow = false,
     -- Bumped by every edit. The bracket analysis is a whole-buffer walk, so
     -- it is computed once per change and not once per frame.
     rev = 0,
@@ -801,14 +804,27 @@ function Editor:goto_position(line, col, extend)
 end
 
 --- Keep the cursor inside a viewport `rows` lines tall.
+---
+--- **`follow` is for watching somebody else write.** Left alone, the view
+--- moves only when the caret would leave it, which is right for a person
+--- typing: they know what they are about to write and they want the screen
+--- still. It is wrong for watching the Rust coder, because the line being
+--- written is then always the last row of the pane, hard against the border
+--- and half-clipped, with nothing under it — the page technically scrolls and
+--- reads as though it never does. Following keeps a few lines of daylight
+--- under the caret, which means scrolling a little past the end of the file
+--- while the end of the file is where the writing is.
 function Editor:ensure_visible(rows)
   rows = math.max(1, rows or 20)
-  if self.line - 1 < self.scroll then
-    self.scroll = self.line - 1
-  elseif self.line > self.scroll + rows then
-    self.scroll = self.line - rows
+  local margin = 0
+  if self.follow then margin = math.max(2, math.floor(rows / 4)) end
+  margin = math.min(margin, math.floor((rows - 1) / 2))
+  if self.line - 1 < self.scroll + margin then
+    self.scroll = self.line - 1 - margin
+  elseif self.line > self.scroll + rows - margin then
+    self.scroll = self.line - rows + margin
   end
-  local max_scroll = math.max(0, #self.lines - rows)
+  local max_scroll = math.max(0, #self.lines - rows + margin)
   self.scroll = math.max(0, math.min(max_scroll, self.scroll))
 end
 

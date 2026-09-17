@@ -406,6 +406,47 @@ return function()
     T.eq(#s.trail, 0, "and nothing smears")
   end)
 
+  T.section("the coder — the page follows what it writes")
+
+  T.case("the line being written keeps room under it, and a person's does not", function()
+    local Editor = require("src.editor")
+    local rows = 12
+    local function type_lines(follow, n)
+      local e = Editor.new({})
+      e:set_text("")
+      e.follow = follow
+      local worst = 0
+      for i = 1, n do
+        for _, ch in ipairs({ ("fn f%d() {}"):format(i), "\n" }) do
+          for k = 1, #ch do e:insert(ch:sub(k, k), true) end
+        end
+        e:ensure_visible(rows)
+        -- How many lines of daylight there are under the line just written.
+        local under = (e.scroll + rows) - e.line
+        if i > rows then worst = math.max(worst, under) end
+      end
+      return e, worst
+    end
+
+    -- A person typing: the view moves only when the caret would leave it, so
+    -- the line being typed is the last row and there is nothing under it.
+    local typed, under_typed = type_lines(false, 30)
+    T.eq(under_typed, 0, "a person's own typing pins the caret to the last row")
+    T.eq(typed.line, 31)
+
+    -- The coder writing: daylight under it, all the way down a long file.
+    local written, under_written = type_lines(true, 30)
+    T.ok(under_written >= 2,
+      "the coder's writing kept only " .. under_written .. " lines under the caret")
+    T.ok(written.scroll > 0, "and the page did move")
+    -- The caret is inside the pane, not under it: the bug this is written
+    -- against is a page that technically scrolled and read as though it
+    -- never did, because what was being written was always half-clipped by
+    -- the bottom border.
+    T.ok(written.line > written.scroll and written.line <= written.scroll + rows,
+      "the line being written is on the screen")
+  end)
+
   T.section("the coder — the room")
 
   T.case("folds a page by id, oldest first", function()
