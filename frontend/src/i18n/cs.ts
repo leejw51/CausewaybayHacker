@@ -429,6 +429,7 @@ export const cs: Partial<Catalogue> = {
   "agent.coderOff": "KODÉR: VYPNUT",
   "agent.coderShown": "kodér je zpět na obrazovce",
   "agent.coderHidden": "kodér je schovaný — panel funguje dál",
+  "agent.roomMade": "uloženo jako {name} — místnost zůstává u sešitu",
   "agent.hello":
     "Ahoj, jsem rustový kodér. Zeptej se na cokoli o tomto souboru, nebo mi řekni, co napsat.",
   "pg.diskVerified": "deska přečtena · napsal a podepsal {address} · ověřeno",

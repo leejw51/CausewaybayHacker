@@ -18,7 +18,7 @@ function make() {
   const app = {
     overlay,
     layout: new Layout(canvas),
-    chip: { blip: vi.fn(), fail: vi.fn(), coin: vi.fn(), select: vi.fn() },
+    chip: { blip: vi.fn(), fail: vi.fn(), coin: vi.fn(), select: vi.fn(), type: vi.fn() },
   };
   const verbs: Verbs = {
     send: vi.fn(),

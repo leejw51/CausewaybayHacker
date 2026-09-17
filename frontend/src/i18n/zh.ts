@@ -402,6 +402,7 @@ export const zh: Partial<Catalogue> = {
   "agent.coderOff": "程序员：关",
   "agent.coderShown": "程序员回到了屏幕上",
   "agent.coderHidden": "程序员已收起 — 面板照常可用",
+  "agent.roomMade": "已保存为 {name} — 房间随代码本一起保存",
   "agent.hello": "嗨，我是 Rust 程序员。关于这个文件随便问，或者告诉我要写什么。",
   "pg.diskVerified": "已读碟 · 由 {address} 编写并签署 · 已验证",
   "pg.diskForged": "已读碟 · 签名与 {address} 不符",

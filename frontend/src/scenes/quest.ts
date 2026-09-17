@@ -506,6 +506,7 @@ export class QuestScene implements Scene {
         lang: () => this.land,
         roomId: () => null,
         ensureRoom: async () => null,
+        roomName: () => "",
         run: null,
         format: async () => {
           if (!this.editor) return { changed: false, problem: "no editor" };

@@ -56,13 +56,15 @@ export interface Host {
    * or null on a screen that has no rooms.
    */
   ensureRoom(): Promise<string | null>;
+  /** The pad's name, for the line that says it now exists. */
+  roomName(): string;
   /** RUN as the button does, or null where a run would count against the player. */
   run: ((source: string, stdin?: string) => Promise<RunReport>) | null;
   format: (() => Promise<{ changed: boolean; problem?: string }>) | null;
   /** The editor's text changed under the agent's hands: autosave, mirror. */
   touched(): void;
   /** A small sound. */
-  chip: { blip(): void; fail(): void; coin(): void; select(): void };
+  chip: { blip(): void; fail(): void; coin(): void; select(): void; type(): void };
   /**
    * The screen's particle layer (`ui/codefx.ts`, three.js under WebGL), for
    * the coder's own effects: its exhaust, and a burst when it starts or
@@ -350,6 +352,9 @@ export class Coder {
       const ok = await this.typist.run(text, { type: (ch) => ed.typeAt(ch) }, () => {
         host.touched();
         this.sprite.kick();
+        // A key tick every few characters: heard as typing, not as a
+        // machine gun. The editor's own sparks carry the rest.
+        if (this.typist.typed % 4 === 1) host.chip.type();
       });
       this.sprite.typing(false);
       if (ok) {
@@ -451,6 +456,10 @@ export class Coder {
         }
         this.live.text += delta;
         this.panel.scroll = 0;
+        // Spoken as it arrives, not once it is finished: the wait for a
+        // model is the weakest moment on the screen, and words landing one
+        // by one are the sign of life. The bubble keeps the tail.
+        this.say(this.live.text, "say", true);
       },
       tool: (name, input) => {
         const note = typeof input.note === "string" ? input.note : "";
@@ -518,8 +527,9 @@ export class Coder {
     this.panel.status = "";
     // The room first, so the message has somewhere to be kept.
     if (!this.room) {
-      await this.host.ensureRoom();
+      const made = await this.host.ensureRoom();
       this.syncRoom();
+      if (made) this.panel.status = t("agent.roomMade", { name: this.host.roomName() });
     }
     if (shown) {
       const mine: Item = { role: "user", text: shown };
@@ -622,13 +632,16 @@ export class Coder {
 
   // -- idle life ---------------------------------------------------------------
 
-  say(text: string, tone: "say" | "tip" | "busy"): void {
+  say(text: string, tone: "say" | "tip" | "busy", streaming = false): void {
     const clean = text.replace(/\s+/g, " ").trim();
     if (!clean) return;
+    // A reply still arriving shows its newest words; the whole of it is in
+    // the room, and a bubble that grows past four lines only hides code.
+    const shown = streaming && clean.length > 160 ? `…${clean.slice(-158)}` : clean;
     this.bubble = {
-      text: clean,
+      text: shown,
       tone,
-      until: this.t + BUBBLE_BASE + Math.min(9, clean.length * BUBBLE_PER_CHAR),
+      until: this.t + BUBBLE_BASE + Math.min(9, shown.length * BUBBLE_PER_CHAR),
     };
   }
 
@@ -787,8 +800,24 @@ export class Coder {
    * in when there is work to watch.
    */
   fly(box: Rect): void {
-    this.box = box;
+    const p = this.panelRect;
+    if (!p || !this.panel.open) {
+      this.box = box;
+      return;
+    }
+    // Out of the panel's way: the screen minus the column or band it
+    // takes, so idle roaming never drifts over the room's text. The caret
+    // still pulls the sprite wherever the code is.
+    const [x, y, w, h] = box;
+    if (p[2] >= w * 0.9) this.box = [x, y, w, Math.max(120, p[1] - y)];
+    else if (p[0] > x + w / 2) this.box = [x, y, Math.max(160, p[0] - x), h];
+    else if (p[0] + p[2] < x + w / 2)
+      this.box = [p[0] + p[2], y, Math.max(160, x + w - p[0] - p[2]), h];
+    else this.box = [x, y, w, Math.max(120, p[1] - y)];
   }
+
+  /** Where the panel was drawn this frame, for `fly` to keep clear of. */
+  private panelRect: Rect | null = null;
 
   /** Paint the sprite and its bubble on the agent's own layer. Every frame. */
   draw(): void {
@@ -926,8 +955,21 @@ export class Coder {
     const w = tw + pad * 2;
     const h = lines.length * f.height + pad * 2;
     // Above the sprite when there is room, else below; kept inside the box.
-    const above = at[1] - size * 0.6 - h - 4 >= this.box[1];
-    const y = above ? at[1] - size * 0.6 - h - 4 : at[1] + size * 0.6 + 4;
+    // And off the line the caret is on: a bubble over the line being read
+    // or written is the one place it must not be, so of the two places it
+    // could go, the one that clears the caret's row wins.
+    const aboveY = at[1] - size * 0.6 - h - 4;
+    const belowY = at[1] + size * 0.6 + 4;
+    const caret = this.sprite.caret;
+    const row = this.cellV * 1.6;
+    const clears = (top: number) => !caret || top + h < caret[1] - row || top > caret[1] + row;
+    const fitsAbove = aboveY >= this.box[1];
+    const fitsBelow = belowY + h <= this.box[1] + this.box[3];
+    let above = fitsAbove;
+    if (fitsAbove && fitsBelow) {
+      if (!clears(aboveY) && clears(belowY)) above = false;
+    } else if (!fitsAbove && fitsBelow) above = false;
+    const y = above ? aboveY : belowY;
     let x = at[0] - w / 2;
     x = Math.min(this.box[0] + this.box[2] - w - 2, Math.max(this.box[0] + 2, x));
     const face = b.tone === "tip" ? Theme.panel : b.tone === "busy" ? Theme.navy : Theme.cream;
@@ -973,6 +1015,7 @@ export class Coder {
   }
 
   drawPanel(g: Ctx, rect: Rect, s: number): void {
+    this.panelRect = rect;
     this.panel.draw(g, rect, s, {
       provider: readProvider(),
       busy: this.mood !== "idle" || this.typist.busy,

@@ -434,6 +434,7 @@ export const en = {
   "agent.coderOff": "CODER: OFF",
   "agent.coderShown": "the coder is back on the screen",
   "agent.coderHidden": "the coder is put away — the panel still works",
+  "agent.roomMade": "saved as {name} — the room is kept with the pad",
   "agent.hello":
     "Hi. I'm the Rust coder. Ask me anything about this file, or tell me what to write.",
   "pg.diskVerified": "disk read · written and signed by {address} · verified",

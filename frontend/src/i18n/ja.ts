@@ -409,6 +409,7 @@ export const ja: Partial<Catalogue> = {
   "agent.coderOff": "コーダー: オフ",
   "agent.coderShown": "コーダーが画面に戻りました",
   "agent.coderHidden": "コーダーをしまいました — パネルはそのまま使えます",
+  "agent.roomMade": "{name} として保存 — 部屋はパッドと一緒に保管されます",
   "agent.hello":
     "やあ、Rustコーダーです。このファイルについて何でも聞くか、何を書くか教えてください。",
   "pg.diskVerified": "ディスク読込 · {address} が作成・署名 · 検証済み",
