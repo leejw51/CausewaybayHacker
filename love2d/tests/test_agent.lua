@@ -408,60 +408,41 @@ return function()
 
   T.section("the coder — the page follows what it writes")
 
-  T.case("the line being written keeps room under it, and a person's does not", function()
+  T.case("the page follows the writing without ever leaving empty rows", function()
     local Editor = require("src.editor")
     local rows = 12
-    local function type_lines(follow, n)
+    local function write(n)
       local e = Editor.new({})
       e:set_text("")
-      e.follow = follow
-      local worst = 0
+      local worst_blank, worst_below = 0, 0
       for i = 1, n do
         for _, ch in ipairs({ ("fn f%d() {}"):format(i), "\n" }) do
           for k = 1, #ch do e:insert(ch:sub(k, k), true) end
         end
         e:ensure_visible(rows)
-        -- How many lines of daylight there are under the line just written.
-        local under = (e.scroll + rows) - e.line
-        if i > rows then worst = math.max(worst, under) end
+        -- Rows of the pane with no line in them, while lines are hidden above.
+        if e.scroll > 0 then
+          worst_blank = math.max(worst_blank, (e.scroll + rows) - e:line_count())
+        end
+        worst_below = math.max(worst_below, e.line - (e.scroll + rows))
       end
-      return e, worst
+      return e, worst_blank, worst_below
     end
 
-    -- A person typing: the view moves only when the caret would leave it, so
-    -- the line being typed is the last row and there is nothing under it.
-    local typed, under_typed = type_lines(false, 30)
-    T.eq(under_typed, 0, "a person's own typing pins the caret to the last row")
-    T.eq(typed.line, 31)
-
-    -- The coder writing: daylight under it, all the way down a long file.
-    local written, under_written = type_lines(true, 30)
-    T.ok(under_written >= 2,
-      "the coder's writing kept only " .. under_written .. " lines under the caret")
-    T.ok(written.scroll > 0, "and the page did move")
-    -- The caret is inside the pane, not under it: the bug this is written
-    -- against is a page that technically scrolled and read as though it
-    -- never did, because what was being written was always half-clipped by
-    -- the bottom border.
-    T.ok(written.line > written.scroll and written.line <= written.scroll + rows,
-      "the line being written is on the screen")
-
-    -- **And a file that fits does not move at all.** The daylight comes out
-    -- of a file that has room to give; taking it from one that fits scrolls
-    -- the first line off the top to make space the empty half of the pane was
-    -- already providing, which is a page scrolling for no reason.
-    local short = type_lines(true, 8)
+    -- A program that fits the pane does not move the pane at all.
+    local short = write(8)
     T.eq(short.scroll, 0, "a program shorter than the pane scrolled anyway")
-    T.eq(short:line_count(), 9)
-    -- A file barely longer than the pane gives what it has and no more: the
-    -- blank space under the last line never exceeds the file hidden above it.
-    local just_over = type_lines(true, rows + 2)
-    local hidden = just_over.scroll
-    local blank = (just_over.scroll + rows) - just_over:line_count()
-    T.ok(just_over.scroll > 0, "it did follow past the fold")
-    T.ok(blank <= hidden,
-      ("%d blank rows under a file with %d hidden above"):format(blank, hidden))
-    T.ok(blank < rows / 2, "and the pane is not mostly empty")
+
+    -- A long one follows to the end, and never shows an empty row while it
+    -- is hiding a line: a page that scrolls while there is still room on it
+    -- reads as a page that scrolls for no reason, which is what a margin of
+    -- daylight under the caret looked like when it was tried.
+    local long, blank, below = write(40)
+    T.eq(blank, 0, ("left %d empty rows while lines were hidden above"):format(blank))
+    T.ok(below <= 1, ("the caret was %d lines under the pane"):format(below))
+    T.eq(long.scroll, long:line_count() - rows, "the last line is the last row")
+    T.ok(long.line > long.scroll and long.line <= long.scroll + rows,
+      "the line being written is on the screen")
   end)
 
   T.section("the coder — the room")

@@ -179,9 +179,6 @@ function Coder:type_out(text)
   if not editor then return { typed = 0, total = #text, stopped = true } end
   self.sprite:typing(true)
   self.sprite:roll()
-  -- The page follows while the coder writes: the line being written wants
-  -- daylight under it, not the bottom border.
-  editor.follow = true
   local fx = self.host.fx and self.host.fx()
   if fx then fx:burst(self.sprite.x, self.sprite.y, 40) end
   local typist = self.typist
@@ -200,7 +197,6 @@ function Coder:type_out(text)
   while typist:busy() do
     coroutine.yield()
   end
-  editor.follow = false
   self.sprite:typing(false)
   local stopped = typist.typed < typist.total
   return { typed = typist.typed, total = #text, stopped = stopped }
@@ -561,7 +557,6 @@ end
 function Coder:stop()
   if self.session then self.session:stop() end
   self.typist:stop()
-  if self.editor then self.editor.follow = false end
   self.sprite:typing(false)
   self:say(I18n.t("stopped"), "busy")
 end

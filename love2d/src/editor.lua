@@ -121,9 +121,6 @@ function M.new(opts)
     goal_char = nil,
     scroll = 0,
     scroll_x = 0,
-    --- Set while somebody else is writing into this editor, so the view keeps
-    --- room under the caret rather than pinning it to the last row.
-    follow = false,
     -- Bumped by every edit. The bracket analysis is a whole-buffer walk, so
     -- it is computed once per change and not once per frame.
     rev = 0,
@@ -805,36 +802,23 @@ end
 
 --- Keep the cursor inside a viewport `rows` lines tall.
 ---
---- **`follow` is for watching somebody else write.** Left alone, the view
---- moves only when the caret would leave it, which is right for a person
---- typing: they know what they are about to write and they want the screen
---- still. It is wrong for watching the Rust coder, because the line being
---- written is then always the last row of the pane, hard against the border
---- and half-clipped, with nothing under it — the page technically scrolls and
---- reads as though it never does. Following keeps a few lines of daylight
---- under the caret, which means scrolling a little past the end of the file
---- while the end of the file is where the writing is.
+--- **It moves when the caret would otherwise leave, and not before.** That
+--- is the rule for a person typing, and it turns out to be the rule for
+--- watching the Rust coder write as well. The obvious-looking improvement —
+--- keeping a few lines of daylight under the caret, the way a terminal
+--- tailing a log does — was tried and taken out again: it hides lines off the
+--- top to show empty rows at the bottom, and a page that scrolls while there
+--- is still room on it reads as a page that scrolls for no reason. What the
+--- pane shows is as much of the program as it holds, ending at the line being
+--- written.
 function Editor:ensure_visible(rows)
   rows = math.max(1, rows or 20)
-  local margin = 0
-  if self.follow then margin = math.max(2, math.floor(rows / 4)) end
-  margin = math.min(margin, math.floor((rows - 1) / 2))
-  if self.line - 1 < self.scroll + margin then
-    self.scroll = self.line - 1 - margin
-  elseif self.line > self.scroll + rows - margin then
-    self.scroll = self.line - rows + margin
+  if self.line - 1 < self.scroll then
+    self.scroll = self.line - 1
+  elseif self.line > self.scroll + rows then
+    self.scroll = self.line - rows
   end
-  -- **The daylight is only ever taken out of a file that has some.** A file
-  -- that fits the pane whole must not move at all: taking the margin from it
-  -- scrolls the first line off the top to make room under the caret that the
-  -- empty half of the pane was already providing, which looks like a page
-  -- that scrolls for no reason — and is one.
-  local room = #self.lines - rows
-  -- Never more blank space under the last line than there is file hidden
-  -- above it, either: a file two lines longer than the pane that scrolled by
-  -- five to keep its margin hid four lines to show three empty rows.
-  local extra = (room > 0 and self.follow) and math.min(margin, room) or 0
-  local max_scroll = math.max(0, room + extra)
+  local max_scroll = math.max(0, #self.lines - rows)
   self.scroll = math.max(0, math.min(max_scroll, self.scroll))
 end
 
