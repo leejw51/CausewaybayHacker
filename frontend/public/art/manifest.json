@@ -208,6 +208,126 @@
       }
     },
     {
+      "name": "agent_coder",
+      "file": "agent_coder.png",
+      "w": 96,
+      "h": 96,
+      "box": {
+        "cx": 47.0,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 7,
+        "miny": 5,
+        "maxx": 87,
+        "maxy": 89
+      }
+    },
+    {
+      "name": "agent_bot_anthropic",
+      "file": "agent_bot_anthropic.png",
+      "w": 48,
+      "h": 48,
+      "box": {
+        "cx": 23.0,
+        "feet": 45.0,
+        "h": 42.0,
+        "minx": 2,
+        "miny": 3,
+        "maxx": 44,
+        "maxy": 44
+      }
+    },
+    {
+      "name": "agent_bot_openai",
+      "file": "agent_bot_openai.png",
+      "w": 48,
+      "h": 48,
+      "box": {
+        "cx": 23.5,
+        "feet": 45.0,
+        "h": 43.0,
+        "minx": 7,
+        "miny": 2,
+        "maxx": 40,
+        "maxy": 44
+      }
+    },
+    {
+      "name": "agent_bot_grok",
+      "file": "agent_bot_grok.png",
+      "w": 48,
+      "h": 48,
+      "box": {
+        "cx": 23.0,
+        "feet": 45.0,
+        "h": 43.0,
+        "minx": 5,
+        "miny": 2,
+        "maxx": 41,
+        "maxy": 44
+      }
+    },
+    {
+      "name": "fx_star",
+      "file": "fx_star.png",
+      "w": 48,
+      "h": 48,
+      "box": {
+        "cx": 24.0,
+        "feet": 41.0,
+        "h": 33.0,
+        "minx": 8,
+        "miny": 8,
+        "maxx": 40,
+        "maxy": 40
+      }
+    },
+    {
+      "name": "ui_coin",
+      "file": "ui_coin.png",
+      "w": 48,
+      "h": 48,
+      "box": {
+        "cx": 23.5,
+        "feet": 39.0,
+        "h": 29.0,
+        "minx": 12,
+        "miny": 10,
+        "maxx": 35,
+        "maxy": 38
+      }
+    },
+    {
+      "name": "fx_confetti",
+      "file": "fx_confetti.png",
+      "w": 24,
+      "h": 24,
+      "box": {
+        "cx": 12.0,
+        "feet": 19.0,
+        "h": 13.0,
+        "minx": 3,
+        "miny": 6,
+        "maxx": 21,
+        "maxy": 18
+      }
+    },
+    {
+      "name": "emblem_playground",
+      "file": "emblem_playground.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 67,
+        "miny": 7,
+        "maxx": 315,
+        "maxy": 120
+      }
+    },
+    {
       "name": "boss_autocomplete",
       "file": "boss_autocomplete.png",
       "w": 128,

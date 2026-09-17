@@ -15,6 +15,7 @@
     "fmt": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"*.ts\" \"*.json\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.126.0",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.9.0",
     "@codemirror/lang-cpp": "^6.0.3",
@@ -30,6 +31,7 @@
     "@scure/bip32": "^2.4.0",
     "@scure/bip39": "^2.4.0",
     "jsqr": "^1.4.0",
+    "openai": "^7.17.0",
     "qrcode-generator": "^1.5.2",
     "three": "^0.185.1"
   },

@@ -55,6 +55,7 @@ import {
 import { burstPlan } from "../engine/burst";
 import { Overlay } from "../ui/overlay";
 import { CodeFx } from "../ui/codefx";
+import { Coder } from "../ui/agent/coder";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import type { Attempt, Category, EditState, Land, Quest, RunStage } from "../net/protocol";
@@ -426,6 +427,14 @@ export class QuestScene implements Scene {
    * editor itself: the typing effects are its, not this screen's.
    */
   private fx: CodeFx | null = null;
+  /**
+   * The Rust coder (`ui/agent/coder.ts`). On this screen it reads, edits and
+   * explains, and does not run: a quest RUN is an attempt and counts
+   * (PROTOCOL §4.9b), and an agent that spends the player's record is not a
+   * helper. It has no room either — a quest has no folder — so the chat
+   * lasts the visit.
+   */
+  private coder: Coder | null = null;
 
   constructor(
     private readonly app: App,
@@ -492,6 +501,28 @@ export class QuestScene implements Scene {
       // After the editor, so it is painted over it.
       this.fx = new CodeFx(this.app.overlay, this.app.layout, this.app.assets, this.app.chip);
       this.fx.attach(this.editor);
+      this.coder?.leave();
+      this.coder = new Coder(this.app, {
+        lang: () => this.land,
+        roomId: () => null,
+        run: null,
+        format: async () => {
+          if (!this.editor) return { changed: false, problem: "no editor" };
+          const res = await this.app.client.request("code.format", {
+            lang: this.land,
+            source: this.editor.source,
+          });
+          if (res.problem) return { changed: false, problem: res.problem };
+          if (res.changed) {
+            this.editor.replaceAll(res.source);
+            this.touched();
+          }
+          return { changed: res.changed };
+        },
+        touched: () => this.touched(),
+        chip: this.app.chip,
+      });
+      this.coder.mount(this.editor);
       queueMicrotask(() => this.editor?.focus());
       // Deliberately *not* inside this try. The stack is an addition to the
       // bench and a server without it must not make the quest itself look
@@ -514,6 +545,8 @@ export class QuestScene implements Scene {
     this.cancelPush();
     this.overlay?.destroy();
     this.fx?.destroy();
+    this.coder?.leave();
+    this.coder = null;
     this.editor?.destroy();
     this.editor = null;
     this.overlay = null;
@@ -1469,6 +1502,13 @@ export class QuestScene implements Scene {
   // -- input ---------------------------------------------------------------
 
   key(name: string, ev: KeyboardEvent): void {
+    if (name === "a" && (ev.ctrlKey || ev.metaKey) && ev.shiftKey && this.coder) {
+      this.focus = true;
+      this.coder.panel.open = true;
+      this.coder.key(name, ev);
+      return;
+    }
+    if (this.coder?.key(name, ev)) return;
     // The console is where a compiler error lives, and a compiler error is
     // routinely taller than the drawer. Wheel-only scrollback means anyone on
     // a keyboard cannot read the top of their own error.
@@ -1480,6 +1520,11 @@ export class QuestScene implements Scene {
       if (name === "end") return void (this.logScroll = 0);
     }
     if (name === "escape") {
+      if (this.focus && this.coder?.open) {
+        this.coder.panel.open = false;
+        this.coder.panel.hideFields();
+        return;
+      }
       if (this.focus) {
         this.focus = false;
         return;
@@ -1526,10 +1571,11 @@ export class QuestScene implements Scene {
   }
 
   controls(): Buttons[] {
-    return [this.buttons, this.bar];
+    return this.coder ? [this.buttons, this.bar, this.coder.controls()] : [this.buttons, this.bar];
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
+    if (this.focus && this.coder?.pointer(x, y, phase)) return;
     if (phase === "move") {
       this.buttons.hovered = this.buttons.hit(x, y)?.id ?? null;
       this.bar.hovered = this.bar.hit(x, y)?.id ?? null;
@@ -1540,6 +1586,9 @@ export class QuestScene implements Scene {
     if (!hit) return;
     this.app.chip.select();
     switch (hit.id) {
+      case "agent":
+        this.coder?.toggle();
+        break;
       case "focus":
         this.focus = true;
         // **Effects only on the code page.** Nothing on the way here starts
@@ -1631,6 +1680,7 @@ export class QuestScene implements Scene {
   update(dt: number): void {
     this.t += dt;
     this.fx?.frame(dt);
+    this.coder?.update(dt);
     if (this.quest && this.askedLocale !== null && this.askedLocale !== locale()) {
       // F7 changed the language under an open quest. The interface re-reads
       // its own strings for free; the prose came from the server in the old
@@ -1665,6 +1715,7 @@ export class QuestScene implements Scene {
   }
 
   wheel(dy: number, x: number, y: number): void {
+    if (this.focus && this.coder?.wheel(dy, x, y)) return;
     if (inRect(x, y, this.briefRect)) {
       this.briefScroll = Math.max(0, Math.min(this.briefOverflow, this.briefScroll + dy));
     } else if (this.consoleOpen) {
@@ -1702,8 +1753,10 @@ export class QuestScene implements Scene {
     this.bar.reset();
     if (this.focus) {
       this.drawFocus(g, s);
+      this.coder?.draw();
       return;
     }
+    this.coder?.panel.hideFields();
 
     header(
       g,
@@ -1799,6 +1852,7 @@ export class QuestScene implements Scene {
     // The keys that are *only* keys. `ESC MAP` used to sit under a button that
     // already said MAP, which is the footer explaining the screen to itself.
     footer(g, layout, t("quest.footer"));
+    this.coder?.draw();
   }
 
   /**
@@ -1875,6 +1929,7 @@ export class QuestScene implements Scene {
     label: string;
     dim?: boolean;
     primary?: boolean;
+    strong?: boolean;
   }> {
     // `hints_used` comes back on `quest.get` (§5.3) and on every `quest.hint`,
     // so leaving a quest and coming back does not offer a hint already paid for.
@@ -1889,8 +1944,10 @@ export class QuestScene implements Scene {
         label: this.stage === "idle" ? t("quest.run") : "…",
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
+        strong: false,
       },
       { id: "format", label: t("quest.format"), dim: this.formatting },
+      { id: "agent", label: t("agent.button"), strong: this.coder?.open ?? false },
       { id: "undo", label: t("quest.undo"), dim: !steps.undo },
       { id: "redo", label: t("quest.redo"), dim: !steps.redo },
       { id: "hint", label: hintLabel, dim: hintsLeft <= 0 },
@@ -2023,10 +2080,17 @@ export class QuestScene implements Scene {
     printf(g, f, status, pad + Math.round(8 * s), statusY, layout.vw - pad * 2, "left");
 
     const top = strip + Math.round(6 * s);
-    well(g, pad, top, layout.vw - pad * 2, layout.vh - top - pad);
-    const editorRect: Rect = [pad + 4, top + 4, layout.vw - pad * 2 - 8, layout.vh - top - pad - 8];
+    const body: Rect = [pad, top, layout.vw - pad * 2, layout.vh - top - pad];
+    // The agent's panel takes its share when it is open (docs/agent.md §7).
+    const carve = this.coder?.split(body, layout.isPortrait(), s) ?? { editor: body, panel: null };
+    const [ex, ey, ew, eh] = carve.editor;
+    well(g, ex, ey, ew, eh);
+    const editorRect: Rect = [ex + 4, ey + 4, ew - 8, eh - 8];
     if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     else this.overlay?.hide();
+    this.coder?.fly(editorRect);
+    if (carve.panel) this.coder?.drawPanel(g, carve.panel, s);
+    else this.coder?.panel.hideFields();
   }
 
   /**
@@ -2313,6 +2377,7 @@ export class QuestScene implements Scene {
     if (this.editor && this.benchIn.finished) {
       this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     } else this.overlay?.hide();
+    this.coder?.fly(editorRect);
 
     const rowY = inner[1] + editorH + Math.round(8 * s);
     this.buttons.row(bench, [inner[0], rowY, rowW, bandH], rowItems, benchBtnH);

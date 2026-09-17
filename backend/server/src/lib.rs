@@ -1,7 +1,8 @@
 //! The HTTP and websocket server (SPEC §6).
 //!
-//! One port: the websocket at `/ws`, the art at `/art/…` and the built
-//! frontend at `/`. One port means no CORS and nothing to configure.
+//! One port: the websocket at `/ws`, the art at `/art/…`, the chatroom's
+//! photos at `/photos/…` and the built frontend at `/`. One port means no
+//! CORS and nothing to configure.
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -45,10 +46,11 @@ pub fn build_state(store: Arc<Store>, config: &Config) -> Shared {
 pub fn router(state: Shared) -> Router {
     let mut router = Router::new()
         .route("/ws", get(ws::upgrade))
-        .route("/healthz", get(healthz));
+        .route("/healthz", get(healthz))
+        .route("/photos/{message_id}/{file}", get(photo));
 
-    // /ws and /art before the static fallback, so a frontend build that
-    // happens to contain a `ws` file cannot shadow the protocol.
+    // /ws, /photos and /art before the static fallback, so a frontend build
+    // that happens to contain a `ws` file cannot shadow the protocol.
     if let Some(art) = state.art_dir.clone() {
         router = router.nest_service("/art", ServeDir::new(art));
     }
@@ -74,6 +76,56 @@ async fn healthz(
         "started_at": state.started_at,
         "protocol": proto::PROTOCOL_VERSION,
     }))
+}
+
+/// `GET /photos/{message_id}/{token}.{ext}` (PROTOCOL §4.9f). The token is
+/// the whole of the authorisation: it is minted at post time, handed only to
+/// the owner over the socket, and the row is looked up by id *and* token, so
+/// a wrong token and a missing message are the same 404. Cached privately for
+/// a year because the bytes under a given id never change — a cleared room
+/// changes the URL by deleting it.
+async fn photo(
+    axum::extract::State(state): axum::extract::State<Shared>,
+    axum::extract::Path((message_id, file)): axum::extract::Path<(String, String)>,
+) -> axum::response::Response {
+    use axum::http::{header, StatusCode};
+    use axum::response::IntoResponse;
+
+    let not_found = || StatusCode::NOT_FOUND.into_response();
+    let Some((token, ext)) = file.rsplit_once('.') else {
+        return not_found();
+    };
+    let ext = ext.to_string();
+    let token = token.to_string();
+    let lookup = {
+        let state = state.clone();
+        tokio::task::spawn_blocking(move || {
+            state.store.with_conn(|conn| {
+                cwbhacker_core::chat::photo(conn, state.store.home(), &message_id, &token)
+            })
+        })
+        .await
+    };
+    let Ok(Ok(Some((path, mime)))) = lookup else {
+        return not_found();
+    };
+    // The extension in the URL has to be the file's own: the type served is
+    // decided by the row, never by what the request called it.
+    if path.extension().and_then(|e| e.to_str()) != Some(ext.as_str()) {
+        return not_found();
+    }
+    let Ok(bytes) = tokio::fs::read(&path).await else {
+        return not_found();
+    };
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, mime),
+            (header::CACHE_CONTROL, "private, max-age=31536000"),
+        ],
+        bytes,
+    )
+        .into_response()
 }
 
 async fn no_frontend() -> axum::response::Response {

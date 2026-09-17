@@ -442,6 +442,36 @@ export interface Snippet {
 export type SnippetBrief = Omit<Snippet, "source" | "stdin"> & { bytes: number };
 
 /**
+ * §5.14 — one message in a scratchpad's chatroom (PROTOCOL §4.9f).
+ *
+ * A photo is fetched, not pushed: `photo_url` is a capability path the
+ * server serves over HTTP to whoever holds it, because a picture is most of
+ * a 4 MiB frame and the room lists two hundred of them. Null on text rows.
+ */
+export interface ChatMessage {
+  id: string;
+  snippet_id: string;
+  role: "user" | "agent" | "tool";
+  kind: "text" | "image";
+  /** The message, or the picture's prompt on an image row. */
+  text: string;
+  photo_url: string | null;
+  provider: string | null;
+  model: string | null;
+  created_at: string;
+}
+
+/** §5.14 — a hit from `playground.chat.search`, fused like `SearchHit`. */
+export interface ChatHit {
+  message: ChatMessage;
+  snippet_name: string;
+  score: number;
+  bm25: number | null;
+  cosine: number | null;
+  snippet: string;
+}
+
+/**
  * The edit stack for one quest: a stack with a cursor, which is what makes
  * redo possible at all.
  *
@@ -509,6 +539,21 @@ export interface Requests {
   "playground.list": Record<string, never>;
   "playground.load": { id: string };
   "playground.delete": { id: string };
+  // §4.9f. The chatroom of one pad: the agent's and the person's messages
+  // and photos, kept per entry, searched across every entry of one user.
+  "playground.chat.list": { id: string; limit?: number };
+  "playground.chat.post": {
+    id: string;
+    role: ChatMessage["role"];
+    text?: string;
+    /** Base64 bytes; present means an image row and `text` is the prompt. */
+    image_b64?: string;
+    image_type?: "image/png" | "image/jpeg" | "image/webp";
+    provider?: string;
+    model?: string;
+  };
+  "playground.chat.clear": { id: string };
+  "playground.chat.search": { q: string; id?: string; mode?: SearchMode; limit?: number };
   "stats.summary": Record<string, never>;
   "stats.mistakes": { limit?: number; include_learned?: boolean };
   /** §4.14c */
@@ -571,6 +616,10 @@ export interface Responses {
   "playground.list": { snippets: SnippetBrief[] };
   "playground.load": { snippet: Snippet };
   "playground.delete": Record<string, never>;
+  "playground.chat.list": { messages: ChatMessage[] };
+  "playground.chat.post": { message: ChatMessage };
+  "playground.chat.clear": { id: string; cleared: number };
+  "playground.chat.search": { hits: ChatHit[]; mode: SearchMode; took_ms: number };
   "search.query": { hits: SearchHit[]; mode: SearchMode; took_ms: number };
   "stats.summary": {
     cleared: number;

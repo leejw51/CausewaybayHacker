@@ -5,13 +5,14 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use base64::Engine;
 use cwbhacker_core::error::{bad_request, internal, unavailable, Result};
-use cwbhacker_core::{attempts, ids, mistakes, snippets};
+use cwbhacker_core::{attempts, chat, ids, mistakes, search, snippets};
 use cwbhacker_runner::{Event, Submission, TestSpec, Verdict};
 use serde_json::json;
 
 use crate::handlers::Session;
-use crate::proto::{opt_str_field, str_field, Out};
+use crate::proto::{opt_i64_field, opt_str_field, str_field, Out};
 use crate::state::Shared;
 use crate::submit::{Streamer, MAX_SOURCE_BYTES};
 
@@ -196,4 +197,117 @@ pub fn delete(
     let conn = state.store.conn();
     snippets::delete(&conn, state.store.home(), address, &id)?;
     Ok(json!({ "id": id, "deleted": true }))
+}
+
+// ---------------------------------------------------------------------------
+// The chatroom (PROTOCOL §4.9f)
+// ---------------------------------------------------------------------------
+
+pub fn chat_list(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let id = str_field(payload, "id")?;
+    let limit = opt_i64_field(payload, "limit")
+        .unwrap_or(200)
+        .clamp(1, chat::MAX_MESSAGES_PER_SNIPPET) as usize;
+    let conn = state.store.conn();
+    Ok(json!({ "messages": chat::list(&conn, address, &id, limit)? }))
+}
+
+/// `image_b64` decoded here, at the edge, so core takes bytes and a mime and
+/// never learns how a websocket spells a picture. A `data:` URL prefix is
+/// tolerated because that is what a canvas hands a browser.
+fn decode_image(b64: &str) -> Result<Vec<u8>> {
+    let raw = match b64.split_once(";base64,") {
+        Some((prefix, rest)) if prefix.starts_with("data:") => rest,
+        _ => b64,
+    };
+    base64::engine::general_purpose::STANDARD
+        .decode(raw.trim())
+        .map_err(|e| bad_request(format!("image_b64 is not base64: {e}")))
+}
+
+pub fn chat_post(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let id = str_field(payload, "id")?;
+    let role = str_field(payload, "role")?;
+    let text = opt_str_field(payload, "text").unwrap_or_default();
+    let provider = opt_str_field(payload, "provider");
+    let model = opt_str_field(payload, "model");
+    let image = match opt_str_field(payload, "image_b64") {
+        Some(b64) => {
+            let mime = opt_str_field(payload, "image_type")
+                .ok_or_else(|| bad_request("image_type must come with image_b64"))?;
+            Some((decode_image(&b64)?, mime))
+        }
+        None => None,
+    };
+    let conn = state.store.conn();
+    let message = chat::post(
+        &conn,
+        state.store.home(),
+        state.embedder.as_ref(),
+        address,
+        &id,
+        &role,
+        &text,
+        image
+            .as_ref()
+            .map(|(bytes, mime)| (bytes.as_slice(), mime.as_str())),
+        provider.as_deref(),
+        model.as_deref(),
+    )?;
+    Ok(json!({ "message": message }))
+}
+
+pub fn chat_clear(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let id = str_field(payload, "id")?;
+    let conn = state.store.conn();
+    let cleared = chat::clear(&conn, state.store.home(), address, &id)?;
+    Ok(json!({ "id": id, "cleared": cleared }))
+}
+
+pub fn chat_search(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let q = opt_str_field(payload, "q").unwrap_or_default();
+    let id = opt_str_field(payload, "id");
+    let mode = search::Mode::parse(
+        payload
+            .get("mode")
+            .and_then(|m| m.as_str())
+            .unwrap_or("unified"),
+    )?;
+    let limit = opt_i64_field(payload, "limit").unwrap_or(20).clamp(1, 100) as usize;
+    let started = Instant::now();
+    let conn = state.store.conn();
+    let hits = chat::search(
+        &conn,
+        state.embedder.as_ref(),
+        address,
+        &q,
+        id.as_deref(),
+        mode,
+        limit,
+    )?;
+    Ok(json!({
+        "hits": hits,
+        "mode": mode.as_str(),
+        "took_ms": started.elapsed().as_millis() as i64,
+    }))
 }

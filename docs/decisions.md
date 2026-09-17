@@ -4320,7 +4320,10 @@ reason it is the default. `onnx` is untouched and stays off.
 
 The hash is FNV-1a **because it will never change**: a stored vector is only
 valid while the function that made it is, and `quest_vec.model` carries
-`hashed-v1-512` so a change of either forces a recompute at startup. An import
+`hashed-v2-512` so a change of either forces a recompute at startup (v2 is
+the term-frequency curve: `ln(1 + tf)` in place of `1 + ln(tf)`, which went
+below zero for a lone 3-gram and made a text that repeats a word rank *against*
+a query that says it once — the chatroom's search was the first to notice). An import
 also drops the vectors for the quests it touched, so an edited brief never
 leaves a vector describing the old text.
 

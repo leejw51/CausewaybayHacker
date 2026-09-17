@@ -78,7 +78,7 @@ impl HashedEmbedder {
         HashedEmbedder {
             dim,
             idf: vec![1.0; dim],
-            id: format!("hashed-v1-{dim}"),
+            id: format!("hashed-v2-{dim}"),
         }
     }
 
@@ -104,7 +104,7 @@ impl HashedEmbedder {
         HashedEmbedder {
             dim,
             idf,
-            id: format!("hashed-v1-{dim}"),
+            id: format!("hashed-v2-{dim}"),
         }
     }
 }
@@ -126,8 +126,12 @@ impl Embedder for HashedEmbedder {
         let mut vector = vec![0f32; self.dim];
         for (bucket, tf) in counts {
             // Sub-linear term frequency: the tenth mention of a word says much
-            // less than the second.
-            vector[bucket] = (1.0 + tf.ln()) * self.idf[bucket];
+            // less than the second. `ln(1 + tf)` rather than `1 + ln(tf)`,
+            // because a lone 3-gram weighs 0.35 and `1 + ln(0.35)` is below
+            // zero — which made a text that repeats a word *anti*-correlate
+            // with a query that says it once, the opposite of what the grams
+            // are for. The id says v2 so every stored vector is recomputed.
+            vector[bucket] = tf.ln_1p() * self.idf[bucket];
         }
         let norm: f32 = vector.iter().map(|v| v * v).sum::<f32>().sqrt();
         if norm > 0.0 {
@@ -180,11 +184,13 @@ pub fn cosine(a: &[f32], b: &[f32]) -> f32 {
 // The index
 // ---------------------------------------------------------------------------
 
-fn to_blob(vector: &[f32]) -> Vec<u8> {
+/// `dim * f32`, little-endian — the `vec` column of `quest_vec` and
+/// `snippet_message_vec` alike (SPEC §2.1).
+pub fn to_blob(vector: &[f32]) -> Vec<u8> {
     vector.iter().flat_map(|v| v.to_le_bytes()).collect()
 }
 
-fn from_blob(blob: &[u8]) -> Vec<f32> {
+pub fn from_blob(blob: &[u8]) -> Vec<f32> {
     blob.chunks_exact(4)
         .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
         .collect()
@@ -279,7 +285,7 @@ pub struct SearchHit {
 /// FTS5's query language is a language, and a search box is not. Everything
 /// but letters and digits is dropped and each word is quoted, so a player
 /// typing `Box<dyn Error>` gets a search rather than a syntax error.
-fn match_query(q: &str, all_words: bool) -> Option<String> {
+pub(crate) fn match_query(q: &str, all_words: bool) -> Option<String> {
     let words: Vec<String> = q
         .to_lowercase()
         .split(|c: char| !c.is_alphanumeric())
@@ -365,7 +371,7 @@ fn semantic_search(
 ///
 /// RRF rather than a weighted sum because BM25 scores and cosine similarities
 /// are not on the same scale, and adding them ranks by neither.
-const RRF_K: f64 = 60.0;
+pub(crate) const RRF_K: f64 = 60.0;
 
 /// One quest's standing in the fusion: the RRF total, and the component scores
 /// kept beside it so the screen can show *why* something matched.
@@ -463,7 +469,7 @@ pub fn query(
 
 /// A snippet for a hit that FTS5 never saw — a semantic-only match has no
 /// matching term to highlight.
-fn excerpt(brief: &str) -> String {
+pub(crate) fn excerpt(brief: &str) -> String {
     let flat = brief.split_whitespace().collect::<Vec<_>>().join(" ");
     if flat.chars().count() > 160 {
         flat.chars().take(157).collect::<String>() + "…"

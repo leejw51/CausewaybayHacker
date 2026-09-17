@@ -70,6 +70,11 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0012_snippet_stdin",
         include_str!("../migrations/0012_snippet_stdin.sql"),
     ),
+    (
+        13,
+        "0013_snippet_chat",
+        include_str!("../migrations/0013_snippet_chat.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {

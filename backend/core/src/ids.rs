@@ -30,6 +30,21 @@ pub fn snippet_id() -> String {
     format!("pg_{}", suffix())
 }
 
+/// One message in a snippet's chatroom (PROTOCOL §5.14).
+pub fn message_id() -> String {
+    format!("msg_{}", suffix())
+}
+
+/// The capability that fetches a photo over HTTP (PROTOCOL §4.9f): 32 hex,
+/// twice an id's entropy, because it is the *only* thing guarding the bytes.
+/// There is no other HTTP auth in this server, so the token has to be
+/// unguessable on its own rather than merely unique.
+pub fn photo_token() -> String {
+    let mut bytes = [0u8; 16];
+    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    hex::encode(bytes)
+}
+
 /// A quest id is `<land>.<category>.<node:02d>.<slug>` (SPEC §4.1). The
 /// importer refuses a pack whose ids disagree with its own land/category, so
 /// the check lives here rather than in a comment.

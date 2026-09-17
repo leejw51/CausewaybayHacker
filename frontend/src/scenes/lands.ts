@@ -8,7 +8,7 @@
  * later would otherwise read as the game growing a new limb.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, width, wrap } from "../engine/text";
+import { elide, ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { btnBox, clipped, fill, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import {
@@ -304,6 +304,112 @@ export class LandsScene implements Scene {
    * The caller picks: fit the grid at `VIABLE` if it can, and only scroll when
    * even that will not fit.
    */
+  /**
+   * CODE PLAYGROUND, as a plate: the desk emblem on the right at its own
+   * proportions, the Rust coder hovering over it, the name and the one
+   * sentence on the left. Lit on hover like the roads, and drawn in the
+   * playground's own warm colour rather than a land's.
+   */
+  private drawPlaygroundTile(g: Ctx, rect: Rect, s: number, tight: boolean): void {
+    const fonts = ensureFonts(s);
+    const [x, y, w, h] = rect;
+    const hover = this.landBtns.hovered === "playground";
+    const lit = hover ? 1 : 0;
+    fill(g, Theme.ink, x, y, w, h);
+    fill(g, Theme.coin, x + 2, y + 2, w - 4, h - 4, 0.35 + 0.65 * lit);
+    fill(g, Theme.navy, x + 4, y + 4, w - 8, h - 8, 0.97);
+    const inset = Math.round(6 * s);
+    const art = this.app.assets?.picture("emblem_playground");
+    const abox = this.app.assets?.box.get("emblem_playground");
+    // The words own the left three fifths; the desk and the coder the rest.
+    const gutter = Math.round(w * 0.66);
+    let textW = w - inset * 2;
+    if (art) {
+      const bandH = h - inset * 2;
+      const inkW = abox ? abox.maxx - abox.minx : art.naturalWidth;
+      const inkH = abox ? abox.maxy - abox.miny : art.naturalHeight;
+      const winX = x + gutter;
+      const winW = w - gutter - inset;
+      const k = Math.min(bandH / Math.max(1, inkH), (winW * EMBLEM_OVERHANG) / Math.max(1, inkW));
+      const bw = inkW * k;
+      const bh = inkH * k;
+      const bx = x + w - bw - inset;
+      const by = y + inset + (bandH - bh);
+      if (winW > Math.round(24 * s)) {
+        clipped(g, winX, y + inset, winW, bandH, () => {
+          g.save();
+          g.globalAlpha = 0.7 + 0.3 * lit;
+          if (abox) g.drawImage(art, abox.minx, abox.miny, inkW, inkH, bx, by, bw, bh);
+          else g.drawImage(art, bx, by, bw, bh);
+          g.restore();
+          const fx = Math.max(bx, winX);
+          const fw = Math.min(Math.round(52 * s), Math.max(1, Math.round(bw * 0.35)));
+          const grad = g.createLinearGradient(fx, 0, fx + fw, 0);
+          grad.addColorStop(0, css(Theme.navy, 0.95));
+          grad.addColorStop(1, css(Theme.navy, 0));
+          g.fillStyle = grad;
+          g.fillRect(fx, by, fw, bh);
+          // The coder, hovering over the desk, engine on. Only while the
+          // tile is tall enough for a figure to read as one.
+          const ship = this.app.assets?.picture("agent_coder");
+          if (ship && !tight) {
+            const size = Math.round(bandH * 0.62);
+            const bob = Math.sin(this.t * 2.4) * Math.max(1, size * 0.05);
+            const sx = Math.max(winX, bx) + Math.round(size * 0.35);
+            const sy = y + inset + bob;
+            g.drawImage(ship, sx, sy, size, size);
+          }
+        });
+      }
+      textW = gutter - inset * 2;
+    }
+    const tx = x + Math.round(14 * s);
+    const tw = Math.max(Math.round(100 * s), textW - Math.round(14 * s));
+    const title = t("lands.codePlayground");
+    // The name at the road's size when it fits, a step down when it does
+    // not: a title elided to "CODE PLAYGR…" is a tile that cannot say what
+    // it is, and the languages' names for it are longer than the English.
+    const titleFont =
+      width(fonts.button, title) <= tw
+        ? fonts.button
+        : width(fonts.station, title) <= tw
+          ? fonts.station
+          : fonts.small;
+    if (tight) {
+      g.fillStyle = css(Theme.coin, 0.85 + 0.15 * lit);
+      printf(
+        g,
+        titleFont,
+        elide(titleFont, title, tw),
+        tx,
+        y + Math.round((h - titleFont.height) / 2),
+        tw,
+        "left",
+      );
+      return;
+    }
+    const titleY = y + Math.round(10 * s);
+    g.fillStyle = css(Theme.coin, 0.85 + 0.15 * lit);
+    printf(g, titleFont, elide(titleFont, title, tw), tx, titleY, tw, "left");
+    const note = fonts.stationSm;
+    const lineY = titleY + titleFont.height + Math.round(6 * s);
+    const lineH = note.height;
+    const fits = Math.floor((y + h - Math.round(8 * s) - lineY) / lineH);
+    if (fits >= 1) {
+      const all = wrap(note, t("lands.codePlaygroundNote"), tw);
+      const use = all.slice(0, fits);
+      if (all.length > use.length && use.length > 0) {
+        use[use.length - 1] = use[use.length - 1].replace(/.{0,2}$/u, "…");
+      }
+      g.fillStyle = css(Theme.cream, 0.6 + 0.3 * lit);
+      let ly = lineY;
+      for (const line of use) {
+        printf(g, note, line, tx, ly, tw, "left");
+        ly += lineH;
+      }
+    }
+  }
+
   private plateHeight(s: number, colW: number, mascot = 76): number {
     const fonts = ensureFonts(s);
     const MASCOT_MIN = Math.round(mascot * s);
@@ -801,19 +907,21 @@ export class LandsScene implements Scene {
         fonts.button.height + 20,
         fonts.small.height * 2 + Math.round(4 * s),
       );
-      // Two buttons stack under the category rows now: AUTO SELECT above
-      // PLAYGROUND. Both are "somewhere other than a land plate to go", and
-      // they are the same size because neither is the primary action here.
-      // **Side by side when the column cannot afford two rows of them.**
-      // A phone held sideways gives this panel about four hundred pixels,
-      // and three roads plus two full-width buttons do not fit in it: the
-      // buttons were drawn over HACKER, which is a road the player could
-      // then neither read nor reach. One row for the pair costs their
-      // captions and keeps the roads.
+      // Under the three roads: one row of two small buttons — AUTO SELECT and
+      // the language — and under that **the CODE PLAYGROUND tile**, as tall as
+      // a road, with its own emblem and the Rust coder hovering over it. The
+      // playground is one of the main things this game is (docs/agent.md),
+      // and a small button in the corner said otherwise.
+      //
+      // The tile gives way first: when the column cannot afford its full
+      // height it drops to a button's, keeps its emblem, and the roads keep
+      // theirs. A road behind a tile is a road nobody can reach.
+      const tileFull = Math.max(playH, Math.round(Math.min(96 * s, right[3] * 0.2)));
       const floorH = fonts.button.height + Math.round(14 * s);
-      const needed = cats.length * (floorH + gap) + playH * 2 + gap * 3;
-      const pair = needed > right[3] - (rowsTop - right[1]);
-      const buttonBand = pair ? playH + gap * 2 : playH * 2 + gap * 3;
+      const needed = cats.length * (floorH + gap) + playH + tileFull + gap * 3;
+      const tight = needed > right[3] - (rowsTop - right[1]);
+      const tileH = tight ? playH : tileFull;
+      const buttonBand = playH + tileH + gap * 3;
       const rowsBottom = right[1] + right[3] - buttonBand;
       // The rows share what the column has. Both heights above are
       // preferences, not floors — including the finger floor: in a phone's
@@ -1029,17 +1137,10 @@ export class LandsScene implements Scene {
       // The one button on this screen that answers "I do not know what to
       // practise". It asks the server rather than guessing, because the
       // ranking is SPEC §1.2's and both clients must agree on it.
-      const [aw] = btnBox(
-        fonts.button,
-        [t("lands.autoSelect")],
-        0,
-        fonts.button.size * 2,
-        layout.minTouchH(),
-      );
-      // The language, named in itself, at the right end of the PLAYGROUND
-      // row — the login card's button, on the screen a player comes back to
+      // The language, named in itself, at the right end of the same row —
+      // the login card's button, on the screen a player comes back to
       // between every map. Sized to the widest language name so it does not
-      // change width as it cycles, and capped so the two verbs keep theirs.
+      // change width as it cycles, and capped so AUTO SELECT keeps its own.
       const langLabel = LOCALES.find((l) => l.id === locale())?.label ?? "ENGLISH";
       const [lwRaw] = btnBox(
         fonts.button,
@@ -1048,75 +1149,48 @@ export class LandsScene implements Scene {
         fonts.button.size * 2,
         layout.minTouchH(),
       );
-      const lw = Math.min(lwRaw, Math.round(right[2] * 0.3));
-      const abw = pair
-        ? Math.floor((right[2] - lw - gap * 2) / 2)
-        : Math.max(aw, Math.round(right[2] * 0.4));
-      const aby = pair ? right[1] + right[3] - playH : right[1] + right[3] - playH * 2 - gap;
+      const lw = Math.min(lwRaw, Math.round(right[2] * 0.36));
+      const [aw] = btnBox(
+        fonts.button,
+        [t("lands.autoSelect")],
+        0,
+        fonts.button.size * 2,
+        layout.minTouchH(),
+      );
+      const abw = Math.max(aw, Math.round(right[2] * 0.4));
+      const aby = right[1] + right[3] - tileH - gap - playH;
       const ahov = this.landBtns.hovered === "auto";
       pixBtn(g, fonts.button, right[0], aby, abw, playH, t("lands.autoSelect"), {
         hover: ahov,
         quiet: !ahov,
       });
-      if (!pair) {
-        noteBeside(
-          g,
-          fonts.small,
-          this.autoNote ?? t("lands.autoNote"),
-          right[0] + abw + Math.round(12 * s),
-          aby,
-          right[2] - abw - Math.round(12 * s),
-          playH,
-        );
-      }
+      noteBeside(
+        g,
+        fonts.small,
+        this.autoNote ?? t("lands.autoNote"),
+        right[0] + abw + Math.round(12 * s),
+        aby,
+        right[2] - abw - lw - gap - Math.round(24 * s),
+        playH,
+      );
       this.landBtns.add({
         id: "auto",
         rect: [right[0], aby, abw, playH],
         label: t("lands.autoSelect"),
       });
-
-      const [pw] = btnBox(
-        fonts.button,
-        [t("lands.playground")],
-        0,
-        fonts.button.size * 2,
-        layout.minTouchH(),
-      );
-      // Painted here rather than through `Buttons.draw`: the land plates use
-      // that list for hit boxes only, and nothing on this screen paints it.
-      const pbw = pair ? right[2] - abw - lw - gap * 2 : Math.max(pw, Math.round(right[2] * 0.4));
-      const pby = right[1] + right[3] - playH;
-      const pbx = pair ? right[0] + abw + gap : right[0];
-      const phov = this.landBtns.hovered === "playground";
-      pixBtn(g, fonts.button, pbx, pby, pbw, playH, t("lands.playground"), {
-        hover: phov,
-        quiet: !phov,
-      });
-      // The caption, only while the language button leaves it a real
-      // line's worth of room: squeezed to a third of the column it wrapped
-      // to two elided lines, and the playground says this sentence itself.
-      const noteW = right[2] - pbw - lw - gap - Math.round(24 * s);
-      if (!pair && noteW >= right[2] * 0.38) {
-        noteBeside(
-          g,
-          fonts.small,
-          t("lands.playgroundNote"),
-          right[0] + pbw + Math.round(12 * s),
-          pby,
-          noteW,
-          playH,
-        );
-      }
-      this.landBtns.add({
-        id: "playground",
-        rect: [pbx, pby, pbw, playH],
-        label: t("lands.playground"),
-      });
-
       const lbx = right[0] + right[2] - lw;
       const lhov = this.landBtns.hovered === "lang";
-      pixBtn(g, fonts.button, lbx, pby, lw, playH, langLabel, { hover: lhov, quiet: !lhov });
-      this.landBtns.add({ id: "lang", rect: [lbx, pby, lw, playH], label: langLabel });
+      pixBtn(g, fonts.button, lbx, aby, lw, playH, langLabel, { hover: lhov, quiet: !lhov });
+      this.landBtns.add({ id: "lang", rect: [lbx, aby, lw, playH], label: langLabel });
+
+      // The tile.
+      const pby = right[1] + right[3] - tileH;
+      this.drawPlaygroundTile(g, [right[0], pby, right[2], tileH], s, tight);
+      this.landBtns.add({
+        id: "playground",
+        rect: [right[0], pby, right[2], tileH],
+        label: t("lands.codePlayground"),
+      });
 
       if (this.error) {
         g.fillStyle = css(Theme.red);

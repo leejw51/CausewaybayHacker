@@ -149,6 +149,12 @@ impl Home {
     pub fn snippet_dir(&self, address: &str, snippet_id: &str) -> PathBuf {
         self.user_dir(address).join("snippets").join(snippet_id)
     }
+    /// `users/<address>/snippets/<id>/photos/` — the pictures posted in the
+    /// pad's chatroom, one file per image message (docs/agent.md §6). Inside
+    /// the snippet's own folder so deleting the pad takes the room with it.
+    pub fn snippet_photo_dir(&self, address: &str, snippet_id: &str) -> PathBuf {
+        self.snippet_dir(address, snippet_id).join("photos")
+    }
 
     /// Scratch for one attempt (SPEC §5.1). Under `build/`, never `/tmp`.
     pub fn attempt_build_dir(&self, lang: &str, attempt_id: &str) -> PathBuf {

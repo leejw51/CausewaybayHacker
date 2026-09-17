@@ -1025,6 +1025,61 @@ export class Editor {
     return c ? [c.left, (c.top + c.bottom) / 2] : null;
   }
 
+  /** One character's cell on the page, for anything that sits beside the caret. */
+  cellClient(): [number, number] {
+    return [this.view.defaultCharacterWidth, this.view.defaultLineHeight];
+  }
+
+  // -- the agent's hands --------------------------------------------------
+  //
+  // The Rust coder (`ui/agent/coder.ts`) types into the editor one character
+  // at a time. Its edits carry a user event of their own, `input.agent`:
+  // *defined*, so `harvest` throws the sparks a keystroke gets and the
+  // typing reads as typing; *not* `input.type`, so `indentOnInput` does not
+  // re-indent a `}` the agent has already indented itself, which would put
+  // its braces in the wrong column twice over.
+
+  /** Type `text` at the caret and leave the caret after it. */
+  typeAt(text: string): void {
+    const head = this.view.state.selection.main.head;
+    this.view.dispatch({
+      changes: { from: head, insert: text },
+      selection: { anchor: head + text.length },
+      scrollIntoView: true,
+      userEvent: "input.agent",
+    });
+  }
+
+  /** Empty the document, silently: what follows is the typing, not this. */
+  clearAll(): void {
+    const len = this.view.state.doc.length;
+    if (len === 0) return;
+    this.view.dispatch({ changes: { from: 0, to: len }, selection: { anchor: 0 } });
+  }
+
+  /**
+   * Put the caret at `from` with `to - from` characters selected and
+   * removed, for an edit that is then typed in over the gap. Answers false
+   * when the span is not in the document.
+   */
+  cut(from: number, to: number): boolean {
+    const len = this.view.state.doc.length;
+    if (from < 0 || to > len || from > to) return false;
+    this.view.dispatch({
+      changes: { from, to },
+      selection: { anchor: from },
+      scrollIntoView: true,
+      userEvent: "delete.agent",
+    });
+    return true;
+  }
+
+  /** Put the caret at `pos`, scrolled into view. */
+  seek(pos: number): void {
+    const p = Math.max(0, Math.min(this.view.state.doc.length, pos));
+    this.view.dispatch({ selection: { anchor: p }, scrollIntoView: true });
+  }
+
   focus(): void {
     this.view.focus();
   }

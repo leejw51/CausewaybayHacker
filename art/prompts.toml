@@ -1149,3 +1149,72 @@ rerolls = 0
 note = "The wax seal over the poster's credits, greyed out when no key was unlocked to sign with. Deep red on purpose — a crimson with more blue in it would sit inside process.py's magenta predicate and be knocked out with the backdrop. The tram in the relief is the game's own mark; no lettering, as ever. First roll accepted."
 prompt = """\
 16-bit SNES pixel art game icon, ONE object, centred, filling most of the frame, seen flat-on from directly above. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a round wax seal: a thick blob of deep dark red wax with an irregular scalloped rim and a raised circular embossed centre, and embossed in the centre a small side view of a Hong Kong double-decker tram in gold relief. Deep dark red and brick red wax only, warm gold relief, dark brown outline. Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object)."""
+
+[[asset]]
+name = "emblem_playground"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-17"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art, chunky hard-edged pixels, heavy dithering, bold dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no writing on any sign, screen, board or panel — every sign and screen is completely blank. Painted 16-bit console game sprite art, not 3D rendered, not photographic. A WIDE SHORT HORIZONTAL BAND. The objects form ONE LOW SPREAD-OUT GROUP running left to right across the MIDDLE and RIGHT of the frame, wider than it is tall, nothing stacked up high. The far LEFT QUARTER of the frame is left completely empty plain magenta with no object in it at all. The objects sit on a common ground line with no ground, no floor, no sky and no background drawn behind them — only flat magenta between and behind them. A coder's playground desk in a Hong Kong flat at night: a big beige retro home computer with a blank dark CRT monitor, a chunky mechanical keyboard, a small orange cartoon crab sitting on top of the monitor, a stack of floppy disks, a takeaway cup of milk tea, a little tin robot toy, a soldering iron on a stand, and a tangle of cables. Warm lamp light, saturated orange, cream, teal and a strong blue; a cosy night-desk palette. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not an object). Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose — those hues belong to the background only."""
+
+# ---------------------------------------------------------------------------
+# Borrowed, not generated: the four sprites below are CausewaybayRaiden's
+# (love2d/assets/player.png, agent_claude.png, agent_codex.png,
+# agent_grok.png — same author, same MIT licence, same magenta studio field),
+# put through art/tools/process.py exactly as a fresh render would be:
+#
+#   process.py sprite <raiden>/love2d/assets/player.png       art/agent_coder.png         96 96 centre
+#   process.py sprite <raiden>/love2d/assets/agent_claude.png art/agent_bot_anthropic.png 48 48 centre
+#   process.py sprite <raiden>/love2d/assets/agent_codex.png  art/agent_bot_openai.png    48 48 centre
+#   process.py sprite <raiden>/love2d/assets/agent_grok.png   art/agent_bot_grok.png      48 48 centre
+#
+# `agent_coder` is the Rust coder on the flying keyboard (docs/agent.md);
+# the three bots fly beside it and say which provider is wired up.
+# ---------------------------------------------------------------------------
+
+[[asset]]
+name = "agent_coder"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-09-17"
+rerolls = 0
+note = "Borrowed from CausewaybayRaiden love2d/assets/player.png; see the block above."
+prompt = ""
+
+[[asset]]
+name = "agent_bot_anthropic"
+kind = "sprite"
+aspect = "1:1"
+size = [48, 48]
+generated = "2026-09-17"
+rerolls = 0
+note = "Borrowed from CausewaybayRaiden love2d/assets/agent_claude.png."
+prompt = ""
+
+[[asset]]
+name = "agent_bot_openai"
+kind = "sprite"
+aspect = "1:1"
+size = [48, 48]
+generated = "2026-09-17"
+rerolls = 0
+note = "Borrowed from CausewaybayRaiden love2d/assets/agent_codex.png."
+prompt = ""
+
+[[asset]]
+name = "agent_bot_grok"
+kind = "sprite"
+aspect = "1:1"
+size = [48, 48]
+generated = "2026-09-17"
+rerolls = 0
+note = "Borrowed from CausewaybayRaiden love2d/assets/agent_grok.png."
+prompt = ""
+
+# fx_star, ui_coin and fx_confetti are CausewaybayGolang's
+# (typescript/public/art/, same author, same licence), copied as they are:
+# already keyed and already at game size.

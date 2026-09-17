@@ -187,12 +187,8 @@ fn the_players_place_arrives_with_its_own_migration() {
 }
 
 #[test]
-fn the_newest_migration_is_the_one_that_gave_a_scratchpad_its_input() {
-    // A specific check on top of the generic ones, so this file also documents
-    // what the last field actually was — and fails loudly if a future
-    // migration is added without extending the tests above.
-    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
-    let conn = database_at_version(previous);
+fn a_scratchpad_got_its_input_with_0012() {
+    let conn = database_at_version(11);
     let has_stdin = |c: &Connection| -> i64 {
         c.query_row(
             "SELECT count(*) FROM pragma_table_info('snippets') WHERE name='stdin'",
@@ -212,4 +208,25 @@ fn the_newest_migration_is_the_one_that_gave_a_scratchpad_its_input() {
         })
         .unwrap();
     assert_eq!(empty, "", "an existing pad's input is empty, not null");
+}
+
+#[test]
+fn the_newest_migration_is_the_one_that_gave_a_scratchpad_its_chatroom() {
+    // A specific check on top of the generic ones, so this file also documents
+    // what the last change actually was — and fails loudly if a future
+    // migration is added without extending the tests above.
+    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
+    let conn = database_at_version(previous);
+    let tables = |c: &Connection| -> i64 {
+        c.query_row(
+            "SELECT count(*) FROM sqlite_master
+              WHERE name IN ('snippet_messages', 'snippet_message_fts', 'snippet_message_vec')",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap()
+    };
+    assert_eq!(tables(&conn), 0, "not there before 0013");
+    db::prepare(&conn).unwrap();
+    assert_eq!(tables(&conn), 3, "and there afterwards, unprompted");
 }

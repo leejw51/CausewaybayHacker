@@ -241,6 +241,21 @@ body {
 .cwb-codefx.cwb-on {
   opacity: 1;
 }
+/* The Rust coder's layer: a 2D canvas over the editor and the effects, on
+   the same fade. `.cwb-sparks` already makes it untouchable. */
+.cwb-agent {
+  opacity: 0;
+  transition: opacity 0.6s cubic-bezier(0.87, 0, 0.13, 1);
+}
+.cwb-agent.cwb-on {
+  opacity: 1;
+}
+/* The agent panel's fields: the message you type and the key you paste.
+   One line each, vertically centred like the name field. */
+.cwb-agent-field {
+  padding: 0 8px;
+  line-height: 1;
+}
 @media (prefers-reduced-motion: reduce) {
   .cwb-editor .cm-matchingBracket,
   .cwb-editor.cwb-kick {

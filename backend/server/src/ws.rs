@@ -390,6 +390,13 @@ async fn dispatch(
         "playground.load" => playground::load(state, session, payload),
         "playground.save" => playground::save(state, session, payload),
         "playground.delete" => playground::delete(state, session, payload),
+        // The chatroom under a pad (§4.9f). A post carries at most a 3 MiB
+        // photo, decoded and written in one short block; nothing here
+        // compiles, so it stays beside the other snippet messages.
+        "playground.chat.list" => playground::chat_list(state, session, payload),
+        "playground.chat.post" => playground::chat_post(state, session, payload),
+        "playground.chat.clear" => playground::chat_clear(state, session, payload),
+        "playground.chat.search" => playground::chat_search(state, session, payload),
         "search.query" => handlers::search_query(state, session, payload),
         "ai.plan" | "ai.next" | "ai.finish" => {
             Err(handlers::unimplemented("AI drills (SPEC §7.3)"))

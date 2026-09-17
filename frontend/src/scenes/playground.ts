@@ -44,6 +44,7 @@ import {
   MAIN_FILE,
 } from "../ui/editor";
 import { CodeFx } from "../ui/codefx";
+import { Coder } from "../ui/agent/coder";
 import { CODE_FACE_NAME, CODE_FACES, getCodeFace, setCodeFace } from "../engine/text";
 import { readNumberPref, writePref } from "../ui/prefs";
 import { Overlay } from "../ui/overlay";
@@ -265,6 +266,8 @@ export class PlaygroundScene implements Scene {
   private t = 0;
   /** The typing effects, over the editor. See `ui/codefx.ts`. */
   private fx: CodeFx | null = null;
+  /** The Rust coder: the AI agent that flies over the code (`ui/agent/coder.ts`). */
+  private coder: Coder | null = null;
   private readonly benchIn = new Tween(seconds("panel"));
   private readonly listIn = new Tween(seconds("panel"), seconds("stagger"));
   private readonly buttons = new Buttons();
@@ -814,6 +817,8 @@ export class PlaygroundScene implements Scene {
     this.overlay?.destroy();
     this.fx?.destroy();
     this.fx = null;
+    this.coder?.leave();
+    this.coder = null;
     this.stdinOverlay?.destroy();
     this.nameOverlay?.destroy();
     this.searchOverlay?.destroy();
@@ -832,6 +837,38 @@ export class PlaygroundScene implements Scene {
     this.fx?.destroy();
     this.fx = new CodeFx(this.app.overlay, this.app.layout, this.app.assets, this.app.chip);
     this.fx.attach(this.editor);
+    // The agent's layer goes over the effects, and its fields over that;
+    // the bench's own fields come after and stay on top of everything.
+    this.coder?.leave();
+    this.coder = new Coder(this.app, {
+      lang: () => this.held.lang,
+      roomId: () => this.held.id,
+      run: async (_source, stdin) => {
+        if (stdin !== undefined) {
+          this.stdinEl.value = stdin;
+          this.held.stdin = stdin;
+        }
+        const r = await this.run();
+        if (!r) throw new Error(this.status || "the run did not come back");
+        return r;
+      },
+      format: async () => {
+        if (!this.editor) return { changed: false, problem: "no editor" };
+        const res = await this.app.client.request("code.format", {
+          lang: this.held.lang,
+          source: this.editor.source,
+        });
+        if (res.problem) return { changed: false, problem: res.problem };
+        if (res.changed) {
+          this.editor.replaceAll(res.source);
+          this.touched();
+        }
+        return { changed: res.changed };
+      },
+      touched: () => this.touched(),
+      chip: this.app.chip,
+    });
+    this.coder.mount(this.editor);
     this.stdinOverlay = new Overlay(this.app.overlay, this.app.layout, this.stdinEl);
     this.nameOverlay = new Overlay(this.app.overlay, this.app.layout, this.nameEl);
     this.nameOverlay.hide();
@@ -1003,8 +1040,8 @@ export class PlaygroundScene implements Scene {
     }
   }
 
-  private async run(): Promise<void> {
-    if (this.stage !== "idle") return;
+  private async run(): Promise<PlaygroundRun | null> {
+    if (this.stage !== "idle") return null;
     const source = this.editor?.source ?? this.held.source;
     this.held.source = source;
     this.status = "";
@@ -1037,6 +1074,7 @@ export class PlaygroundScene implements Scene {
     } finally {
       this.stage = "idle";
     }
+    return this.result;
   }
 
   /**
@@ -1134,7 +1172,23 @@ export class PlaygroundScene implements Scene {
   // -- input ---------------------------------------------------------------
 
   key(name: string, ev: KeyboardEvent): void {
-    if (name === "escape") return void this.app.go(new LandsScene(this.app), "back");
+    // Ctrl/Cmd+Shift+A: the agent, from anywhere on the screen — CODE mode
+    // with the panel up and the caret in its field.
+    if (name === "a" && (ev.ctrlKey || ev.metaKey) && ev.shiftKey && this.coder) {
+      this.focus = true;
+      this.coder.panel.open = true;
+      this.coder.key(name, ev);
+      return;
+    }
+    if (this.coder?.key(name, ev)) return;
+    if (name === "escape") {
+      if (this.focus && this.coder?.open) {
+        this.coder.panel.open = false;
+        this.coder.panel.hideFields();
+        return;
+      }
+      return void this.app.go(new LandsScene(this.app), "back");
+    }
     if ((name === "return" || name === "kpenter") && (ev.ctrlKey || ev.metaKey)) {
       ev.preventDefault();
       void this.run();
@@ -1150,10 +1204,15 @@ export class PlaygroundScene implements Scene {
   }
 
   controls(): Buttons[] {
-    return [this.buttons, this.rows];
+    return this.coder
+      ? [this.buttons, this.rows, this.coder.controls()]
+      : [this.buttons, this.rows];
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
+    // The agent's panel first: it is drawn over the bench and its buttons
+    // are its own.
+    if (this.focus && this.coder?.pointer(x, y, phase)) return;
     if (phase === "move") {
       this.buttons.hovered = this.buttons.hit(x, y)?.id ?? null;
       this.rows.hovered = this.rows.hit(x, y)?.id ?? null;
@@ -1163,6 +1222,15 @@ export class PlaygroundScene implements Scene {
     const hit = this.buttons.hit(x, y) ?? this.rows.hit(x, y);
     if (!hit) return;
     if (this.display(hit.id)) return;
+    if (hit.id === "agent") {
+      // From the bench: into CODE with the panel up. In CODE: a toggle.
+      if (!this.focus) {
+        this.focus = true;
+        if (this.coder) this.coder.panel.open = true;
+        this.app.chip.select();
+      } else this.coder?.toggle();
+      return;
+    }
     if (hit.id === "code") {
       this.focus = true;
       this.app.chip.select();
@@ -1208,6 +1276,8 @@ export class PlaygroundScene implements Scene {
   update(dt: number): void {
     this.t += dt;
     this.fx?.frame(dt);
+    this.coder?.syncRoom();
+    this.coder?.update(dt);
     this.benchIn.update(dt);
     this.listIn.update(dt);
     // Clamped here rather than in the wheel handler, for the same reason
@@ -1224,6 +1294,7 @@ export class PlaygroundScene implements Scene {
   }
 
   wheel(dy: number, x: number, y: number): void {
+    if (this.focus && this.coder?.wheel(dy, x, y)) return;
     if (inRect(x, y, this.outputRect)) {
       // Same convention as the quest console: positive dy is "further into
       // the past", so it *increases* how far back from the live tail we are.
@@ -1249,8 +1320,11 @@ export class PlaygroundScene implements Scene {
       this.rows.reset();
       this.drawFocus(g, layout.uiScale());
       this.buttons.draw(g, ensureFonts(layout.uiScale()).stationSm);
+      this.coder?.draw();
       return;
     }
+    // The panel is CODE mode's; its fields must not linger over the bench.
+    this.coder?.panel.hideFields();
     header(g, this.app, t("pg.title", { name: this.heldName().toUpperCase() }));
     // Full-bleed, like the map and the quest screen and for their reason:
     // this is a screen somebody works on, and room to read beats room to
@@ -1264,6 +1338,7 @@ export class PlaygroundScene implements Scene {
     this.drawBench(g, f.right, s);
     this.buttons.draw(g, ensureFonts(s).button);
     footer(g, layout, t("pg.footer"));
+    this.coder?.draw();
   }
 
   /**
@@ -1580,6 +1655,7 @@ export class PlaygroundScene implements Scene {
         primary: this.stage === "idle",
       },
       { id: "format", label: t("pg.format"), dim: this.formatting },
+      { id: "agent", label: t("agent.button"), strong: this.coder?.open ?? false },
       { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
       { id: "rename", label: t("pg.rename") },
       // In and out of the screen. Nothing on a canvas can be selected with a
@@ -1741,10 +1817,20 @@ export class PlaygroundScene implements Scene {
     } else {
       this.outputRect = [0, 0, 0, 0];
     }
-    well(g, pad, top, editorW, editorH);
-    const editorRect: Rect = [pad + 4, top + 4, editorW - 8, editorH - 8];
+    // The agent's panel takes its share of the editor's room when it is
+    // open: beside the code when wide, under it when tall (docs/agent.md §7).
+    const carve = this.coder?.split([pad, top, editorW, editorH], !wide, s) ?? {
+      editor: [pad, top, editorW, editorH] as Rect,
+      panel: null,
+    };
+    const [ex, ey, ew, eh] = carve.editor;
+    well(g, ex, ey, ew, eh);
+    const editorRect: Rect = [ex + 4, ey + 4, ew - 8, eh - 8];
     if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     else this.overlay?.hide();
+    this.coder?.fly(editorRect);
+    if (carve.panel) this.coder?.drawPanel(g, carve.panel, s);
+    else this.coder?.panel.hideFields();
   }
 
   /** The editor, the stdin box, the buttons and whatever the program said. */
@@ -1850,6 +1936,7 @@ export class PlaygroundScene implements Scene {
       ...this.fontItems(),
     ];
     const optional = [
+      { id: "agent", label: t("agent.button") },
       { id: "poster", label: t("pg.poster"), dim: this.postering },
       { id: "reader", label: t("pg.reader") },
       ...this.displayItems(),
@@ -1916,6 +2003,7 @@ export class PlaygroundScene implements Scene {
     if (this.editor && this.benchIn.finished) {
       this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     } else this.overlay?.hide();
+    this.coder?.fly(editorRect);
 
     // The stdin box. It matters here in a way it never does on a quest screen:
     // there is no test case to supply the input, so without this there is no

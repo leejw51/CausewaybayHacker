@@ -23,6 +23,15 @@ ORDER = [
     "sprite_mei", "sprite_alex", "sprite_ferris", "sprite_gogo",
     "sprite_cpp", "sprite_python",
     "agent_skynet",
+    # The Rust coder — the AI agent on the code screens — and the three
+    # provider bots that fly beside it. Borrowed from CausewaybayRaiden
+    # (docs/agent.md §4).
+    "agent_coder", "agent_bot_anthropic", "agent_bot_openai", "agent_bot_grok",
+    # The agent's flourishes, from CausewaybayGolang: a star when it lands a
+    # program, a coin, confetti.
+    "fx_star", "ui_coin", "fx_confetti",
+    # CODE PLAYGROUND's own emblem band on the land select (docs/agent.md).
+    "emblem_playground",
     "boss_autocomplete", "boss_deadlock", "boss_nullptr",
     "boss_race", "boss_whiteboard", "boss_clock",
     "boss_segfault", "boss_dangling", "boss_linker",

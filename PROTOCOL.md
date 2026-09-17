@@ -630,6 +630,65 @@ player then has two problems.
 The runner's limits apply: a formatter gets a short timeout of its own, and a
 source over the submit cap is refused the same way.
 
+### 4.9f The chatroom
+
+Every playground snippet has a chatroom: the transcript of the AI coder's
+conversation about that pad (docs/agent.md). **The model is called from the
+browser, with the player's own key; the server never sees a key and never
+makes a model call.** What the server keeps is the room — the messages, the
+photos and a search index over them — per entry, per user, scoped by the
+session's address exactly as the snippet is. Another player's snippet id
+answers `not_found` on every one of the four, never `unauthorized`.
+
+```json
+→ playground.chat.list    { "id": "pg_…", "limit": 200 }          limit default 200, max 500
+← { "messages": [ ChatMessage, … ] }                                oldest first
+
+→ playground.chat.post    { "id": "pg_…", "role": "user", "text": "…",
+                            "image_b64": "…", "image_type": "image/png",
+                            "provider": "openai", "model": "gpt-4.1" }
+← { "message": ChatMessage }
+
+→ playground.chat.clear   { "id": "pg_…" }
+← { "id": "pg_…", "cleared": 2 }
+
+→ playground.chat.search  { "q": "borrow", "id": "pg_…", "mode": "unified", "limit": 20 }
+← { "hits": [ ChatHit, … ], "mode": "unified", "took_ms": 3 }
+```
+
+`role` is `user`, `agent` or `tool`. `text`, `provider` and `model` are
+optional; a post needs text or an image. `image_b64` present makes the row
+`kind: "image"` and `text` is then the prompt that made it; `image_type` must
+come with it and is one of `image/png`, `image/jpeg`, `image/webp`. The
+decoded image is at most **3 MiB** (the websocket frame is 4 MiB), a message
+at most 64 KiB, and a room holds at most **500 messages** — past that a post
+is `bad_request` naming the limit, and CLEAR is the remedy. `list` with a
+`limit` keeps the *newest* that many, still oldest first.
+
+`search` is BM25 over the messages' text and cosine over their vectors with
+the live embedder, fused by RRF exactly as §4.12 does for quests; `mode`
+takes the same three values and defaults to `unified`. `id` narrows to one
+room; without it, every room of this user. An empty `q` returns no hits.
+
+**Photos are fetched, not pushed.** A picture can be most of a frame, so an
+image row carries a `photo_url`:
+
+```
+GET /photos/{message_id}/{token}.{ext}
+```
+
+served with its own content-type and `Cache-Control: private, max-age=31536000`.
+The token is 32 random hex minted at post time and handed only to the owner
+over the socket; the file is looked up by message id *and* token, so a wrong
+token, a wrong extension and an unknown id are the same `404`. There is no
+other HTTP auth in this server (SPEC §3.5 describes a single-trusted-user
+trainer), and an unguessable capability URL is the honest fit. Clearing the
+room, or deleting the pad, retires every URL under it.
+
+On disk the room is the snippet folder's `chat.jsonl` (one JSON object per
+message, appended on post, removed on clear) and `photos/<message_id>.<ext>`
+(SPEC §1). Deleting the snippet removes the folder as it always has.
+
 ### 4.10 `quest.hint`
 
 ```json
@@ -1392,3 +1451,28 @@ open.
 The server keeps it from the navigation it already receives (SPEC §1.3); there
 is no message for setting it, and a client that wants to be somewhere goes
 there in the ordinary way.
+
+### 5.14 `ChatMessage` and `ChatHit`
+
+```ts
+type ChatMessage = {
+  id: string;                            // "msg_" + 16 hex
+  snippet_id: string;
+  role: "user" | "agent" | "tool";
+  kind: "text" | "image";
+  text: string;                          // the message, or an image's prompt
+  photo_url: string | null;              // "/photos/<message_id>/<token>.<ext>", image rows
+  provider: string | null;               // "openai" | "anthropic" | "grok" | null
+  model: string | null;
+  created_at: string;
+};
+type ChatHit = {
+  message: ChatMessage;
+  snippet_name: string;                  // the pad it was said in
+  score: number;                         // the fused RRF score, higher is better
+  bm25: number | null;                   // as SearchHit's, §5.5
+  cosine: number | null;
+  snippet: string;                       // FTS5 snippet() with <b>…</b>, or an excerpt
+};
+```
+

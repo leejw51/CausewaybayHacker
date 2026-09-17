@@ -351,6 +351,42 @@ CREATE TABLE snippets (
 );
 CREATE INDEX snippets_by_user ON snippets(address, updated_at DESC);
 
+-- ---------- the chatroom under a snippet (PROTOCOL §4.9f) ----------
+-- The AI coder's transcript about one pad, scoped by owner exactly as the
+-- snippet is. The model runs in the browser with the player's own key; the
+-- server keeps the messages, the photos and an index over them. A photo is a
+-- file under the snippet's folder, not a column: the websocket frame is 4 MiB
+-- and a picture can be most of it, so the row keeps the file name and a
+-- 32-hex capability token that `GET /photos/{id}/{token}.{ext}` checks.
+CREATE TABLE snippet_messages (
+  id            TEXT PRIMARY KEY,          -- 'msg_' + 16 hex
+  snippet_id    TEXT NOT NULL REFERENCES snippets(id) ON DELETE CASCADE,
+  address       TEXT NOT NULL,
+  role          TEXT NOT NULL CHECK (role IN ('user','agent','tool')),
+  kind          TEXT NOT NULL CHECK (kind IN ('text','image')),
+  text          TEXT NOT NULL DEFAULT '',  -- the message, or the image's prompt
+  photo         TEXT,                      -- file name under photos/, image rows only
+  photo_token   TEXT,                      -- 32 hex; the capability that fetches it
+  provider      TEXT,                      -- 'openai' | 'anthropic' | 'grok' | NULL
+  model         TEXT,
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX snippet_messages_by_snippet ON snippet_messages(snippet_id, created_at);
+
+CREATE VIRTUAL TABLE snippet_message_fts USING fts5(
+  text,
+  content='snippet_messages', content_rowid='rowid',
+  tokenize='porter unicode61'
+);
+-- kept in sync by the same three triggers quest_fts has.
+
+CREATE TABLE snippet_message_vec (
+  message_id    TEXT PRIMARY KEY REFERENCES snippet_messages(id) ON DELETE CASCADE,
+  dim           INTEGER NOT NULL,
+  model         TEXT NOT NULL,             -- embedder id, §8.2
+  vec           BLOB NOT NULL              -- dim * f32, little-endian
+);
+
 -- ---------- the edit stack (PROTOCOL §4.11c) ----------
 -- The order of the undo/redo entries lives here; the source itself lives on
 -- disk, content-addressed under `edits/` (§1). A row is tens of bytes and a
@@ -723,8 +759,9 @@ spinner. The final verdict arrives as the response to the original request.
 > its §8 conformance checklist is what "the client works" means.
 
 WebSocket at `ws://127.0.0.1:5390/ws`. Text frames. One JSON object per frame.
-The HTTP server also serves the built frontend from `/` and the art from
-`/art/…`, so there is one port and no CORS.
+The HTTP server also serves the built frontend from `/`, the art from
+`/art/…` and the chatroom's photos from `/photos/…` (PROTOCOL §4.9f), so
+there is one port and no CORS.
 
 ### 6.1 The envelope
 
@@ -774,6 +811,10 @@ Client → server, and the reply payload:
 | `edit.push` | `{quest_id, source}` | `EditState` |
 | `edit.undo` / `edit.redo` / `edit.clear` | `{quest_id}` | `EditState` |
 | `search.query` | `{q, mode, filters?, limit?}` | `{hits:[SearchHit]}` |
+| `playground.chat.list` | `{id, limit?}` | `{messages:[ChatMessage]}` — PROTOCOL §4.9f |
+| `playground.chat.post` | `{id, role, text?, image_b64?, image_type?, provider?, model?}` | `{message}` |
+| `playground.chat.clear` | `{id}` | `{id, cleared}` |
+| `playground.chat.search` | `{q, id?, mode?, limit?}` | `{hits:[ChatHit], mode, took_ms}` |
 | `stats.summary` | `{}` | `{cleared, attempts, accuracy, streak, by_land}` |
 | `stats.mistakes` | `{limit?}` | `{mistakes:[MistakeStat]}` |
 | `stats.history` | `{quest_id?, limit?}` | `{attempts:[AttemptBrief]}` |

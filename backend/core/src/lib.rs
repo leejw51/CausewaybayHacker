@@ -8,6 +8,7 @@
 pub mod attempts;
 pub mod auth;
 pub mod awards;
+pub mod chat;
 pub mod content;
 pub mod db;
 pub mod drills;
