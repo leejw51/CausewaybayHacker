@@ -32,7 +32,7 @@ import { expInOut } from "../../engine/ease";
 export type Rect = readonly [number, number, number, number];
 export type Pt = readonly [number, number];
 
-export type State = "wander" | "peek" | "typing" | "thinking";
+export type State = "wander" | "peek" | "typing" | "thinking" | "hold";
 
 /** How fast the sprite eases towards its target, per second (Raiden's `follow`). */
 const FOLLOW = 5.5;
@@ -45,6 +45,16 @@ const BOB_HZ = 1.6;
 const MARGIN = 0.55;
 /** The peek: how long it hovers at the caret. */
 const PEEK_HOLD = 1.6;
+/**
+ * The hold: pressed, the sprite stops so its bubble can be read. It does not
+ * stop dead — it coasts this many seconds' worth of its speed further and
+ * settles there on the exponential follow, an ease-out from wherever it
+ * was — and it lets itself go after this long, in case nobody presses again.
+ */
+const HOLD_COAST = 0.22;
+const HOLD_SECS = 20;
+/** The zoom while held: a touch closer, attentive. */
+const HOLD_ZOOM = 1.06;
 /** The orbit while thinking. */
 const THINK_R = 18;
 const THINK_HZ = 0.9;
@@ -89,6 +99,8 @@ export class Sprite {
   private held = 0;
   /** Where the caret was last seen, for peek and typing. */
   caret: Pt | null = null;
+  /** Where it settles while held. */
+  private holdAt: Pt = [0, 0];
   private placed = false;
   /** The zoom, chasing a target by state; 1 at rest. */
   scale = 1;
@@ -169,6 +181,38 @@ export class Sprite {
     else if (this.state === "typing") this.go("wander");
   }
 
+  /**
+   * Pressed: stop, so the bubble can be read. Only an idle sprite holds —
+   * one at work keeps working — and the stop is a braking curve, not a
+   * freeze: the target is a little ahead along its motion and the follow
+   * eases it there. Released, it flies off again. Returns whether it held.
+   */
+  hold(on: boolean, box?: Rect): boolean {
+    if (on) {
+      if (this.state === "typing" || this.state === "thinking") return false;
+      const m = this.size * MARGIN;
+      let hx = this.x + this.vx * HOLD_COAST;
+      let hy = this.y + this.vy * HOLD_COAST;
+      if (box) {
+        hx = Math.min(box[0] + box[2] - m, Math.max(box[0] + m, hx));
+        hy = Math.min(box[1] + box[3] - m, Math.max(box[1] + m, hy));
+      }
+      this.holdAt = [hx, hy];
+      this.state = "hold";
+      this.held = 0;
+      this.flight = null;
+      this.depart = false;
+      return true;
+    }
+    if (this.state === "hold") this.go("wander");
+    return false;
+  }
+
+  /** Whether it is holding still for a reader. */
+  get holding(): boolean {
+    return this.state === "hold";
+  }
+
   thinking(on: boolean): void {
     if (on) this.go("thinking");
     else if (this.state === "thinking") this.go("wander");
@@ -223,6 +267,8 @@ export class Sprite {
     switch (this.state) {
       case "wander":
         return this.wanderPoint(box);
+      case "hold":
+        return this.holdAt;
       case "peek":
       case "typing":
         return this.seat(box, cell);
@@ -240,6 +286,9 @@ export class Sprite {
     if (this.state === "peek") {
       this.held += dt;
       if (this.held >= PEEK_HOLD) this.state = "wander";
+    } else if (this.state === "hold") {
+      this.held += dt;
+      if (this.held >= HOLD_SECS) this.go("wander");
     }
     const [tx, ty] = this.target(box, cell);
     if (!this.placed) {
@@ -320,7 +369,9 @@ export class Sprite {
         ? TYPING_ZOOM + PULSE_ZOOM * this.pulse
         : this.state === "thinking"
           ? 0.92
-          : 1 + 0.035 * Math.sin(this.t * 1.1);
+          : this.state === "hold"
+            ? HOLD_ZOOM
+            : 1 + 0.035 * Math.sin(this.t * 1.1);
     this.scale += (targetScale - this.scale) * ease;
     // The tilt, in three parts. The bank into a turn is eased. The rock
     // while typing is a wave already and is applied straight, fading in
@@ -370,13 +421,17 @@ export class Sprite {
   /** The hover bob, in virtual pixels, at this moment. */
   bob(): number {
     if (this.reduced()) return 0;
-    const amp = this.state === "typing" ? 1.5 : 3.5;
+    const amp = this.state === "typing" || this.state === "hold" ? 1.5 : 3.5;
     return Math.sin(this.t * BOB_HZ * Math.PI * 2) * amp;
   }
 
   /** How hard the engine burns: 0..1, for the flame's length. */
   thrust(): number {
     if (this.reduced()) return 0.3;
-    return this.state === "thinking" ? 1 : this.state === "typing" ? 0.35 : 0.6;
+    return this.state === "thinking"
+      ? 1
+      : this.state === "typing" || this.state === "hold"
+        ? 0.35
+        : 0.6;
   }
 }

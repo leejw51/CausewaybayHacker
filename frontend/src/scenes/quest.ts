@@ -1573,6 +1573,10 @@ export class QuestScene implements Scene {
     }
   }
 
+  agent() {
+    return this.coder?.probe() ?? null;
+  }
+
   controls(): Buttons[] {
     return this.coder ? [this.buttons, this.bar, this.coder.controls()] : [this.buttons, this.bar];
   }

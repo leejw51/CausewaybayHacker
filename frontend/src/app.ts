@@ -64,6 +64,17 @@ export interface Scene {
    * hits cannot drift apart.
    */
   controls?(): Buttons[];
+  /** The Rust coder's sprite, if this screen has one, for the capture hook. */
+  agent?(): AgentProbe | null;
+}
+
+/** Where the coder is and what it is doing, in virtual pixels. */
+export interface AgentProbe {
+  x: number;
+  y: number;
+  state: string;
+  holding: boolean;
+  bubble: string | null;
 }
 
 /** Where the player's chosen orientation is kept. A preference, not a secret. */
@@ -167,7 +178,9 @@ export class App {
   questId: string | null = null;
 
   /** Adopt the place the server just handed us, if it sent one. */
-  restorePlace(at: { land: Land; category: Category | null; quest_id: string | null } | null): void {
+  restorePlace(
+    at: { land: Land; category: Category | null; quest_id: string | null } | null,
+  ): void {
     if (!at) return;
     this.land = at.land;
     this.category = at.category;

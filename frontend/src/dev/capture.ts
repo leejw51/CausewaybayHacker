@@ -18,7 +18,7 @@
  * It is deliberately not a test harness. It exposes the loop, the layout and
  * a compositor, and nothing that could reach the wallet module.
  */
-import type { App } from "../app";
+import type { AgentProbe, App } from "../app";
 import { cjkFloor, ensureFonts } from "../engine/text";
 import { footerFontPx } from "../ui/chrome";
 
@@ -54,6 +54,8 @@ export interface CaptureApi {
   fps(): number;
   /** Turn the tube on or off from a script, for a shot of each. */
   crt(on?: boolean): boolean;
+  /** The Rust coder's sprite on this screen, with its centre in client pixels. */
+  agent(): (AgentProbe & { cx: number; cy: number }) | null;
   /**
    * Every button the current screen is hit-testing, by id.
    *
@@ -282,6 +284,12 @@ export function install(app: App): void {
       const hit = api.buttons().find((b) => b.id === id);
       if (!hit) return null;
       return [hit.client[0] + hit.client[2] / 2, hit.client[1] + hit.client[3] / 2];
+    },
+    agent: () => {
+      const p = app.currentScene?.agent?.() ?? null;
+      if (!p) return null;
+      const [cx, cy] = app.layout.toClient(p.x, p.y);
+      return { ...p, cx, cy };
     },
     crt: (on?: boolean) => {
       if (on !== undefined && on !== app.crt.enabled) app.toggleCrt();

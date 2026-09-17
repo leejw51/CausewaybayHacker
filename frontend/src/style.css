@@ -244,6 +244,9 @@ body {
 /* The Rust coder's layer: a 2D canvas over the editor and the effects, on
    the same fade. `.cwb-sparks` already makes it untouchable. */
 .cwb-agent {
+  /* Over every other overlay element — the editor, the fields, the effects
+     — whatever order they were added in: the coder flies above the UI. */
+  z-index: 10;
   opacity: 0;
   transition: opacity 0.6s cubic-bezier(0.87, 0, 0.13, 1);
 }

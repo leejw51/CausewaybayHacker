@@ -302,6 +302,53 @@ describe("the flight", () => {
     expect(s.trail.length).toBe(0);
   });
 
+  it("holds still when pressed, braking on a curve, and roams again when let go", () => {
+    const s = new Sprite(48, () => false);
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
+    const [px, py] = [s.x, s.y];
+    expect(s.hold(true, box)).toBe(true);
+    expect(s.state).toBe("hold");
+    expect(s.holding).toBe(true);
+    // Not a freeze: it coasts a little, slower each frame, and settles.
+    let last = Infinity;
+    let eased = true;
+    for (let i = 0; i < 60; i++) {
+      s.update(1 / 60, box, 8);
+      const v = s.speed();
+      if (v > last + 1) eased = false;
+      last = v;
+    }
+    expect(eased).toBe(true);
+    expect(s.speed()).toBeLessThan(2);
+    expect(Math.hypot(s.x - px, s.y - py)).toBeLessThan(40);
+    const [hx, hy] = [s.x, s.y];
+    for (let i = 0; i < 90; i++) s.update(1 / 60, box, 8);
+    expect(Math.hypot(s.x - hx, s.y - hy)).toBeLessThan(0.5);
+    expect(Math.abs(s.scale - 1.06)).toBeLessThan(0.02);
+    expect(s.hold(false)).toBe(false);
+    expect(s.state).toBe("wander");
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
+    expect(Math.hypot(s.x - hx, s.y - hy)).toBeGreaterThan(10);
+  });
+
+  it("will not hold while working, and lets itself go after a while", () => {
+    const s = new Sprite(48, () => false);
+    s.caret = [150, 200];
+    s.typing(true);
+    expect(s.hold(true, box)).toBe(false);
+    expect(s.state).toBe("typing");
+    s.typing(false);
+    expect(s.hold(true, box)).toBe(true);
+    // Work interrupts a hold.
+    s.thinking(true);
+    expect(s.state).toBe("thinking");
+    expect(s.holding).toBe(false);
+    s.thinking(false);
+    s.hold(true, box);
+    for (let i = 0; i < 60 * 21; i++) s.update(1 / 60, box, 8);
+    expect(s.state).toBe("wander");
+  });
+
   it("sits still in the corner under reduced motion", () => {
     const s = new Sprite(48, () => true);
     for (let i = 0; i < 300; i++) s.update(1 / 60, box, 8);

@@ -41,6 +41,7 @@ import type { Bench, RunReport } from "../../ai/tools";
 import { image as makeImage } from "../../ai/providers";
 import { burstPlan, coinPlan, pointerPlan } from "../../engine/burst";
 import type { CodeFx } from "../codefx";
+import type { AgentProbe } from "../../app";
 import { Sprite, type Pt } from "./sprite";
 import { AgentLayer } from "./layer";
 import { Panel, type Item } from "./panel";
@@ -124,6 +125,8 @@ export class Coder {
   private rings: Array<{ x: number; y: number; at: number }> = [];
   /** The bubble: what, and until when. */
   private bubble: { text: string; until: number; tone: "say" | "tip" | "busy" } | null = null;
+  /** The last thing said, for a press that comes after the bubble has gone. */
+  private lastSaid: { text: string; tone: "say" | "tip" } | null = null;
   private room: string | null = null;
   /** The room as the server has it, folded by id, with the sync cursor. */
   private held: Room = emptyRoom();
@@ -159,6 +162,47 @@ export class Coder {
     this.lastSource = editor.source;
     this.session = new Session(this.bench(), this.listener());
     this.syncRoom();
+    // A press on the sprite, wherever it is. Its canvas takes no pointer
+    // events — it flies over the editor, which does — so the press is
+    // caught on the way down, before whatever is under the sprite sees it.
+    const down = (ev: PointerEvent) => {
+      if (ev.button !== 0 || !readShown()) return;
+      const v = this.app.layout.toVirtual(ev.clientX, ev.clientY);
+      if (!v || !this.hits(v[0], v[1])) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.press();
+    };
+    addEventListener("pointerdown", down, true);
+    this.offs.push(() => removeEventListener("pointerdown", down, true));
+  }
+
+  /** Whether a virtual point is on the sprite. */
+  hits(x: number, y: number): boolean {
+    const half = this.sprite.size * this.sprite.scale * 0.55;
+    return (
+      Math.abs(x - this.sprite.x) <= half && Math.abs(y - this.sprite.y - this.sprite.bob()) <= half
+    );
+  }
+
+  /**
+   * Pressed: an idle sprite stops where it is so its bubble can be read,
+   * and shows the last thing it said if the bubble has already gone.
+   * Pressed again, it roams. One at work is not interrupted.
+   */
+  press(): void {
+    if (this.sprite.holding) {
+      this.sprite.hold(false);
+      if (this.bubble) this.bubble.until = Math.max(this.bubble.until, this.t + 2.5);
+      this.host.chip.select();
+      return;
+    }
+    if (!this.sprite.hold(true, this.box)) return;
+    this.host.chip.select();
+    if (!this.bubble) {
+      if (this.lastSaid) this.say(this.lastSaid.text, this.lastSaid.tone);
+      else this.say(t("agent.held"), "say");
+    }
   }
 
   leave(): void {
@@ -639,6 +683,7 @@ export class Coder {
     // A reply still arriving shows its newest words; the whole of it is in
     // the room, and a bubble that grows past four lines only hides code.
     const shown = streaming && clean.length > 160 ? `…${clean.slice(-158)}` : clean;
+    if (tone !== "busy") this.lastSaid = { text: shown, tone };
     this.bubble = {
       text: shown,
       tone,
@@ -664,7 +709,8 @@ export class Coder {
     } else this.sinceChange += dt;
 
     const busy = this.mood !== "idle" || this.typist.busy;
-    if (!busy) {
+    // Held for a reader: no tips or advice over the words being read.
+    if (!busy && !this.sprite.holding) {
       // Advice: read the text once it has sat still.
       if (!this.advised && this.sinceChange >= ADVISE_AFTER && src.trim()) {
         this.advised = true;
@@ -710,7 +756,8 @@ export class Coder {
         until: this.t + 1,
       };
     }
-    if (this.bubble && this.t > this.bubble.until) this.bubble = null;
+    // A bubble stays as long as the sprite is held for it.
+    if (this.bubble && this.t > this.bubble.until && !this.sprite.holding) this.bubble = null;
 
     // The caret, for peek and typing.
     const c = this.editor?.caretClient();
@@ -1026,6 +1073,17 @@ export class Coder {
 
   controls(): Buttons {
     return this.panel.buttons;
+  }
+
+  /** For the capture hook: where the sprite is and what it is doing. */
+  probe(): AgentProbe {
+    return {
+      x: this.sprite.x,
+      y: this.sprite.y + this.sprite.bob(),
+      state: this.sprite.state,
+      holding: this.sprite.holding,
+      bubble: this.bubble?.text ?? null,
+    };
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): boolean {
