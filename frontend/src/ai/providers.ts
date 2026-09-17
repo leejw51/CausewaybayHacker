@@ -16,7 +16,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type OpenAI from "openai";
 import type { Provider } from "./prefs";
-import { IMAGE_MODEL } from "./prefs";
+import { IMAGE_MODEL, needsKey, ollamaHost } from "./prefs";
 import type { ToolDef } from "./tools";
 
 export type Part =
@@ -59,7 +59,7 @@ export interface ChatOpts {
 const MAX_TOKENS = 16000;
 
 export async function chat(o: ChatOpts): Promise<Turn> {
-  if (!o.key) throw new Error("no api key");
+  if (!o.key && needsKey(o.provider)) throw new Error("no api key");
   return o.provider === "anthropic" ? anthropicChat(o) : openaiChat(o);
 }
 
@@ -104,16 +104,25 @@ export async function listModels(provider: Provider, key: string): Promise<strin
   const out: string[] = [];
   for await (const m of client.models.list()) out.push(m.id);
   // OpenAI's list is everything they have ever shipped; only the chat
-  // models are any use here. xAI's is short enough to show whole.
-  return (
-    provider === "openai"
-      ? out.filter(
-          (id) =>
-            /^(gpt-|o\d)/.test(id) &&
-            !/(audio|realtime|tts|transcribe|image|embedding|moderation|search|instruct)/.test(id),
-        )
-      : out
-  ).sort();
+  // models are any use here. OpenRouter's is every model on the internet;
+  // the ones from the houses this game already knows come first and the
+  // rest follow, so the list has a top worth reading. xAI's and Ollama's
+  // are short enough to show whole.
+  if (provider === "openai") {
+    return out
+      .filter(
+        (id) =>
+          /^(gpt-|o\d)/.test(id) &&
+          !/(audio|realtime|tts|transcribe|image|embedding|moderation|search|instruct)/.test(id),
+      )
+      .sort();
+  }
+  if (provider === "openrouter") {
+    const known = /^(openai|anthropic|x-ai|google|meta-llama|qwen|deepseek|mistralai)\//;
+    const chat = out.filter((id) => !/(embedding|tts|whisper|image|vision-only)/.test(id));
+    return [...chat.filter((id) => known.test(id)).sort(), ...chat.filter((id) => !known.test(id)).sort()];
+  }
+  return out.sort();
 }
 
 // -- anthropic ---------------------------------------------------------------
@@ -176,13 +185,31 @@ async function anthropicChat(o: ChatOpts): Promise<Turn> {
 // -- openai and xai ----------------------------------------------------------
 
 const XAI_URL = "https://api.x.ai/v1";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1";
 
+/**
+ * One client for everything that speaks OpenAI's dialect: OpenAI itself,
+ * xAI, OpenRouter, and Ollama on the person's own machine. Ollama wants no
+ * key — the SDK insists on a string, so it gets a word — and its base URL is
+ * the host from SETUP. OpenRouter is told who is calling, which is what it
+ * asks of browser clients.
+ */
 async function openaiClient(provider: Provider, key: string) {
   const { default: OpenAI } = await import("openai");
   return new OpenAI({
-    apiKey: key,
+    apiKey: provider === "ollama" ? "ollama" : key,
     dangerouslyAllowBrowser: true,
     ...(provider === "grok" ? { baseURL: XAI_URL } : {}),
+    ...(provider === "openrouter"
+      ? {
+          baseURL: OPENROUTER_URL,
+          defaultHeaders: {
+            "HTTP-Referer": "https://github.com/leejw51/CausewaybayHacker",
+            "X-Title": "Causewaybay Hacker",
+          },
+        }
+      : {}),
+    ...(provider === "ollama" ? { baseURL: `${ollamaHost()}/v1` } : {}),
   });
 }
 

@@ -139,7 +139,10 @@ const transcript: Msg[] = [
 
 const tools = TOOLS.filter((t) => t.name === "read_code" || t.name === "write_code");
 
-function opts(provider: "openai" | "grok" | "anthropic", onText = (_: string) => {}) {
+function opts(
+  provider: "openai" | "grok" | "anthropic" | "openrouter" | "ollama",
+  onText = (_: string) => {},
+) {
   return {
     provider,
     key: "k-test",
@@ -277,6 +280,48 @@ describe("openai", () => {
     });
   });
 
+  it("reaches OpenRouter and Ollama on the same client, each at its own door", async () => {
+    openaiState.chunks = [{ choices: [{ delta: { content: "hi" }, finish_reason: "stop" }] }];
+    await chat(opts("openrouter"));
+    expect(openaiState.ctor[0]).toMatchObject({
+      apiKey: "k-test",
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: { "X-Title": "Causewaybay Hacker" },
+    });
+    // Ollama: no key needed, a word for the SDK, the host's /v1.
+    await chat({ ...opts("ollama"), key: "" });
+    expect(openaiState.ctor[1]).toMatchObject({
+      apiKey: "ollama",
+      baseURL: "http://localhost:11434/v1",
+    });
+    expect(openaiState.ctor[1]).not.toHaveProperty("defaultHeaders");
+  });
+
+  it("puts the known houses first in OpenRouter's long list", async () => {
+    openaiState.models = [
+      "zeta/thing",
+      "openai/gpt-4.1",
+      "anthropic/claude-sonnet-4",
+      "acme/embedding-1",
+      "meta-llama/llama-3",
+    ];
+    const list = await listModels("openrouter", "k");
+    expect(list).toEqual([
+      "anthropic/claude-sonnet-4",
+      "meta-llama/llama-3",
+      "openai/gpt-4.1",
+      "zeta/thing",
+    ]);
+    openaiState.models = [
+      "gpt-4.1",
+      "gpt-4o-audio-preview",
+      "o3",
+      "text-embedding-3-small",
+      "gpt-image-1",
+      "dall-e-3",
+    ];
+  });
+
   it("makes a picture, asking each provider in its own words", async () => {
     const ctl = new AbortController();
     const a = await image("openai", "k", "a crab", ctl.signal);
@@ -292,6 +337,10 @@ describe("openai", () => {
     expect(openaiState.images[1]).toMatchObject({ response_format: "b64_json" });
     expect(openaiState.images[1]).not.toHaveProperty("size");
     await expect(image("anthropic", "k", "a crab", ctl.signal)).rejects.toThrow(
+      /cannot make pictures/,
+    );
+    await expect(image("ollama", "", "a crab", ctl.signal)).rejects.toThrow(/cannot make pictures/);
+    await expect(image("openrouter", "k", "a crab", ctl.signal)).rejects.toThrow(
       /cannot make pictures/,
     );
     // xAI says what it drew; the room keeps that, not a guess.

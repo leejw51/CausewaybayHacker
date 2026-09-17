@@ -12,7 +12,7 @@
  * the server for keeps (`playground.chat.post`); this holds the shape the
  * model needs, tool ids and all, for the length of the visit.
  */
-import { readKey, readModel, type Provider } from "./prefs";
+import { needsKey, readKey, readModel, type Provider } from "./prefs";
 import { chat, type Msg, type Part, type Turn } from "./providers";
 import { numbered, runTool, toolsFor, type Bench } from "./tools";
 
@@ -100,7 +100,7 @@ export class Session {
     if (this.busy) throw new Error("busy");
     const key = readKey(provider);
     const model = readModel(provider);
-    if (!key) throw new Error("no api key");
+    if (!key && needsKey(provider)) throw new Error("no api key");
     const abort = new AbortController();
     this.abort = abort;
     this.messages.push({ role: "user", content: [{ type: "text", text }] });

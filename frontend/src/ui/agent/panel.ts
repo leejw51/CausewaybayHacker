@@ -17,6 +17,8 @@ import { Overlay } from "../overlay";
 import { t } from "../../i18n";
 import {
   maskKey,
+  needsKey,
+  OLLAMA_DEFAULT_HOST,
   PROVIDER_NAME,
   PROVIDERS,
   readAuto,
@@ -217,7 +219,7 @@ export class Panel {
     if (this.fetching) return;
     const provider = this.provider;
     const key = this.keyEl.value.trim() || readKey(provider);
-    if (!key) {
+    if (!key && needsKey(provider)) {
       this.status = t("agent.noKey", { provider: PROVIDER_NAME[provider] });
       this.app.chip.fail();
       return;
@@ -318,7 +320,11 @@ export class Panel {
       this.keyEl.dataset.for = provider;
       this.keyEl.value = readKey(provider);
       this.modelEl.value = readModel(provider);
-      this.keyEl.placeholder = t("agent.keyHint", { provider: PROVIDER_NAME[provider] });
+      this.keyEl.placeholder = needsKey(provider)
+        ? t("agent.keyHint", { provider: PROVIDER_NAME[provider] })
+        : t("agent.hostHint", { host: OLLAMA_DEFAULT_HOST });
+      // A host is not a secret; a key is.
+      this.keyEl.type = needsKey(provider) ? "password" : "text";
     }
 
     g.fillStyle = css(Theme.cream, 0.8);
@@ -328,9 +334,11 @@ export class Panel {
       body,
       elide(
         body,
-        stored
-          ? `${PROVIDER_NAME[provider]} · ${maskKey(stored)}`
-          : t("agent.noKey", { provider: PROVIDER_NAME[provider] }),
+        !needsKey(provider)
+          ? `${PROVIDER_NAME[provider]} · ${stored || OLLAMA_DEFAULT_HOST}`
+          : stored
+            ? `${PROVIDER_NAME[provider]} · ${maskKey(stored)}`
+            : t("agent.noKey", { provider: PROVIDER_NAME[provider] }),
         rect[2],
       ),
       rect[0],

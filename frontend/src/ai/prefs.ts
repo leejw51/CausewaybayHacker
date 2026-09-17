@@ -13,28 +13,54 @@
  */
 import { readEnumPref, readPref, writePref } from "../ui/prefs";
 
-export const PROVIDERS = ["anthropic", "openai", "grok"] as const;
+export const PROVIDERS = ["anthropic", "openai", "grok", "openrouter", "ollama"] as const;
 export type Provider = (typeof PROVIDERS)[number];
+
+/** Where Ollama listens unless told otherwise. */
+export const OLLAMA_DEFAULT_HOST = "http://localhost:11434";
+
+/**
+ * Whether the provider wants a key at all. Ollama is a program on your own
+ * machine: what goes in its field is the host it listens on, and empty
+ * means the default.
+ */
+export function needsKey(p: Provider): boolean {
+  return p !== "ollama";
+}
+
+/** Ollama's host: what was typed, or the default. */
+export function ollamaHost(): string {
+  const raw = readKey("ollama").replace(/\/+$/, "");
+  return raw || OLLAMA_DEFAULT_HOST;
+}
 
 /** The model each provider starts on. Editable; FETCH MODELS lists the rest. */
 export const DEFAULT_MODEL: Record<Provider, string> = {
   anthropic: "claude-opus-5",
   openai: "gpt-4.1",
   grok: "grok-4",
+  // OpenRouter names models as vendor/model; this one is on every plan.
+  openrouter: "openai/gpt-4.1",
+  // A coding model small enough to run on a laptop. `ollama pull` it first.
+  ollama: "qwen2.5-coder:7b",
 };
 
-/** The image model, where there is one. Anthropic has none. */
+/** The image model, where there is one. Anthropic, OpenRouter and Ollama have none. */
 export const IMAGE_MODEL: Record<Provider, string | null> = {
   anthropic: null,
   openai: "gpt-image-1",
   // The model `art/tools/grok_image.sh` draws this game's own art with.
   grok: "grok-imagine-image",
+  openrouter: null,
+  ollama: null,
 };
 
 export const PROVIDER_NAME: Record<Provider, string> = {
   anthropic: "ANTHROPIC",
   openai: "OPENAI",
   grok: "GROK",
+  openrouter: "OPENROUTER",
+  ollama: "OLLAMA",
 };
 
 /** The companion sprite that flies beside the coder for each provider. */
@@ -42,6 +68,9 @@ export const PROVIDER_BOT: Record<Provider, string> = {
   anthropic: "agent_bot_anthropic",
   openai: "agent_bot_openai",
   grok: "agent_bot_grok",
+  // Both speak OpenAI's dialect; both fly the green bot.
+  openrouter: "agent_bot_openai",
+  ollama: "agent_bot_openai",
 };
 
 const PROVIDER_KEY = "ai.provider";

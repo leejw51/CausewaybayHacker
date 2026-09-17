@@ -24,6 +24,8 @@ import {
   maskKey,
   readShown,
   writeShown,
+  needsKey,
+  ollamaHost,
 } from "../src/ai/prefs";
 import { numbered, runTool, toolsFor, type Bench } from "../src/ai/tools";
 import { systemPrompt, MAX_ROUNDS } from "../src/ai/session";
@@ -347,6 +349,19 @@ describe("the keys", () => {
     expect(readShown()).toBe(false);
     writeShown(true);
     expect(readShown()).toBe(true);
+  });
+
+  it("know which providers need a key, and where Ollama lives", () => {
+    expect(needsKey("openai")).toBe(true);
+    expect(needsKey("openrouter")).toBe(true);
+    expect(needsKey("ollama")).toBe(false);
+    writeKey("ollama", "");
+    expect(ollamaHost()).toBe("http://localhost:11434");
+    writeKey("ollama", "http://gpu-box:11434/");
+    expect(ollamaHost()).toBe("http://gpu-box:11434");
+    writeKey("ollama", "");
+    expect(DEFAULT_MODEL.ollama).toMatch(/coder/);
+    expect(DEFAULT_MODEL.openrouter).toContain("/");
   });
 
   it("mask a key for the screen", () => {

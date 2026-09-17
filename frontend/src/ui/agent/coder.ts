@@ -29,6 +29,7 @@ import {
   PROVIDER_NAME,
   readAuto,
   readKey,
+  needsKey,
   readModel,
   readProvider,
   readShown,
@@ -517,7 +518,7 @@ export class Coder {
       return;
     }
     const provider = readProvider();
-    if (!readKey(provider)) {
+    if (!readKey(provider) && needsKey(provider)) {
       this.panel.status = t("agent.noKey", { provider: PROVIDER_NAME[provider] });
       this.panel.mode = "setup";
       this.panel.open = true;

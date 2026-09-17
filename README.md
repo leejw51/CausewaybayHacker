@@ -42,8 +42,9 @@ borrowed from CausewaybayRaiden — that watches what you type, drops a tip now
 and then, and, when you press AGENT, chats about the file, reviews it, or
 writes the program itself: typed into the editor one character at a time at a
 person's speed, then run, then fixed until the compiler is quiet. It speaks
-OpenAI, Anthropic or Grok with **your own API key, kept in your browser and
-sent to nobody but the provider**; the server never calls a model. Every
+OpenAI, Anthropic, Grok or OpenRouter with **your own API key, kept in your
+browser and sent to nobody but the provider**, or Ollama on your own machine
+with no key at all; the server never calls a model. Every
 scratchpad has its own chatroom — messages and generated pictures — kept in
 the pad's folder and searchable by keyword and by meaning. It calls a model
 only when you press something. See `docs/agent.md`.

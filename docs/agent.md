@@ -39,8 +39,10 @@ the wire and the schema once they land.
 | `anthropic` | Messages API, streamed | yes | no | `@anthropic-ai/sdk`, `dangerouslyAllowBrowser` |
 | `openai` | Chat Completions, streamed | yes | `gpt-image-1` | `openai` SDK, `dangerouslyAllowBrowser` |
 | `grok` | Chat Completions (xAI, OpenAI-compatible), streamed | yes | `grok-imagine-image` | `openai` SDK with `baseURL: https://api.x.ai/v1` |
+| `openrouter` | Chat Completions (OpenAI-compatible), streamed | yes | no | `openai` SDK with `baseURL: https://openrouter.ai/api/v1`, `HTTP-Referer` and `X-Title` headers |
+| `ollama` | Chat Completions (OpenAI-compatible), streamed | model-dependent | no | `openai` SDK with `baseURL: <host>/v1`; no key — the field holds the host, empty means `http://localhost:11434` |
 
-Defaults: `claude-opus-5`, `gpt-4.1`, `grok-4`. The model field is editable and
+Defaults: `claude-opus-5`, `gpt-4.1`, `grok-4`, `openai/gpt-4.1`, `qwen2.5-coder:7b`. The model field is editable and
 SETUP has a FETCH MODELS button that lists what the key can reach (`/v1/models`
 on all three), because a hard-coded model name is the first thing to rot.
 
