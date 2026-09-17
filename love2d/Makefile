@@ -90,9 +90,12 @@ test-all: ffi-test test-headless test ## Everything: Rust, headless Lua, LÖVE
 # of, a name that is in every existing player's log and cannot be renamed to
 # please a grep. A quoted word is data, not a call.
 LAYERED := src/json.lua src/editor.lua src/fxplan.lua src/wallet.lua src/store.lua \
-           src/anim.lua src/clock.lua src/i18n.lua src/lang/*.lua src/net/*.lua
+           src/anim.lua src/clock.lua src/i18n.lua src/lang/*.lua src/net/*.lua \
+           src/agent/prefs.lua src/agent/typist.lua src/agent/tools.lua \
+           src/agent/http.lua src/agent/sse.lua src/agent/providers.lua \
+           src/agent/session.lua src/agent/sprite.lua src/agent/sync.lua src/agent/tips.lua
 
-check-layering: ## Assert net, json, editor, wallet, store, anim, clock and i18n never touch love
+check-layering: ## Assert net, json, editor, wallet, store, anim, clock, i18n and the agent's pure half never touch love
 	@bad=""; \
 	for f in $(LAYERED); do \
 		hit=$$(sed -e 's/--.*$$//' -e 's/"[^"]*"/""/g' -e "s/'[^']*'/''/g" "$$f" \
@@ -102,7 +105,7 @@ check-layering: ## Assert net, json, editor, wallet, store, anim, clock and i18n
 	if [ -n "$$bad" ]; then \
 		printf "these files must not reference love:%b\n" "$$bad"; exit 1; \
 	fi; \
-	echo "  layering ok: net, json, editor, wallet, store, anim, clock and i18n are LÖVE-free"
+	echo "  layering ok: net, json, editor, wallet, store, anim, clock, i18n and the agent's pure half are LÖVE-free"
 
 # -------------------------------------------------------------------- drive
 
