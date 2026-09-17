@@ -3,6 +3,10 @@
  * Kept byte-identical to the ffi.cdef block in love2d/src/wallet.lua.
  * Every char* returned here is owned by the caller and must be released with
  * cwbh_string_free, which is the only allocator that matches.
+ *
+ * The surface has not grown since ABI 1: every operation, including the
+ * coder's streaming http_start/http_poll/http_cancel/http_close, is a JSON
+ * request through cwbh_execute. Ask cwbh_describe for the list.
  */
 #ifndef CWBH_H
 #define CWBH_H

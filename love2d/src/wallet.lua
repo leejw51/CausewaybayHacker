@@ -35,11 +35,12 @@ local M = {}
 ---
 --- 3 is the contract with `generate` and `secure` in it; 4 added the poster's
 --- ops (`qr`, `recover`, `png_text`, `jpeg`, `disk_read`), none of which
---- touch a key. The login screen's
---- NEW WALLET button depends on the first and `src/store.lua`'s `0600` on the
---- second; a binding that loaded an older library would offer both and fail
---- on use.
-M.ABI_VERSION = 4
+--- touch a key. 5 adds the Rust coder's `http_*` ops — the TLS LÖVE has not
+--- got, and the only way `src/agent/` can reach a model provider. The login
+--- screen's NEW WALLET button depends on the first, `src/store.lua`'s `0600`
+--- on the second and the agent panel on the last; a binding that loaded an
+--- older library would offer all three and fail on use.
+M.ABI_VERSION = 5
 
 -- Kept byte-identical to love2d/ffi/include/cwbh.h.
 M.CDEF = [[

@@ -48,6 +48,12 @@ qrcode = { version = "0.14", default-features = false }
 rqrr = "0.9"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 crc32fast = "1"
+# The Rust coder's HTTPS. LÖVE bundles LuaSocket, which is plain TCP; every
+# model provider is TLS, so the client cannot reach one from Lua at all.
+# `ureq` is blocking by design, which is what a thread-per-request wants, and
+# its default `rustls` feature brings `ring` rather than a toolchain that
+# needs cmake on somebody's laptop.
+ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
 
 [profile.release]
 opt-level = 2

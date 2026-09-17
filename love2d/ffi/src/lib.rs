@@ -47,6 +47,7 @@ use serde_json::json;
 use zeroize::Zeroizing;
 
 pub mod disk;
+pub mod http;
 
 pub mod bip32;
 pub mod bip39;
@@ -64,7 +65,11 @@ pub mod evm;
 /// 4 added the poster's four ops — `qr`, `recover`, `png_text`, `disk_read`
 /// — none of which touch a key. A binding at 3 would offer POSTER and fail
 /// on the label.
-pub const ABI_VERSION: i32 = 4;
+/// 5 adds the Rust coder's door to the network: `http_start`, `http_poll`,
+/// `http_cancel`, `http_close` (`http.rs`). LÖVE ships LuaSocket and no TLS,
+/// so without these the client cannot reach a model provider at all — a
+/// binding at 4 would draw the agent panel and fail on the first ask.
+pub const ABI_VERSION: i32 = 5;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -113,6 +118,18 @@ struct Request {
     /// pre-save proof wants both halves of the same file.
     #[serde(default)]
     label: Option<bool>,
+    /// `http_start` only: where to, how, with what.
+    #[serde(default)]
+    url: Option<String>,
+    #[serde(default)]
+    method: Option<String>,
+    #[serde(default)]
+    headers: Option<std::collections::HashMap<String, String>>,
+    #[serde(default)]
+    body: Option<String>,
+    /// `http_poll`, `http_cancel`, `http_close`: which call.
+    #[serde(default)]
+    handle: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -214,7 +231,16 @@ pub fn describe() -> serde_json::Value {
             { "op": "jpeg", "in": ["path", "out", "quality?"], "out": ["out"],
               "note": "re-encodes a PNG as a JPEG; no key material involved" },
             { "op": "disk_read", "in": ["path", "label?"], "out": ["chunks","label"],
-              "note": "a poster's text chunks and/or its QR label; no key material involved" }
+              "note": "a poster's text chunks and/or its QR label; no key material involved" },
+            { "op": "http_start", "in": ["url", "method?", "headers?", "body?"], "out": ["handle"],
+              "note": "the coder's door to a model provider: TLS LÖVE has not got; no key material involved" },
+            { "op": "http_poll", "in": ["handle"],
+              "out": ["status","chunks","bytes","done","cancelled","error"],
+              "note": "whatever has arrived since the last poll, base64; never blocks" },
+            { "op": "http_cancel", "in": ["handle"], "out": ["cancelled"],
+              "note": "stop at the next read; the handle stays pollable" },
+            { "op": "http_close", "in": ["handle"], "out": ["closed"],
+              "note": "cancel and forget; the only way a handle is released" }
         ],
         "never_returns": ["private_key", "seed"],
         "returns_key_material_once": ["generate.mnemonic"]
@@ -285,6 +311,35 @@ fn run(request_json: &str) -> Result<serde_json::Value, String> {
         // calling `secure` immediately after the first `io.open`, and it is
         // the same window `umask 077` would close for good. A caller that
         // wants no window at all should create the file here instead.
+        // The Rust coder's network. Generic on purpose: this library knows
+        // about URLs and bytes, and `love2d/src/agent/providers.lua` knows
+        // about providers — the same split the web client has between
+        // `ai/providers.ts` and `fetch`.
+        "http_start" => {
+            let handle = http::start(&http::HttpRequest {
+                url: req.url.clone(),
+                method: req.method.clone(),
+                headers: req.headers.clone(),
+                body: req.body.clone(),
+            })?;
+            Ok(json!({ "ok": true, "handle": handle }))
+        }
+
+        "http_poll" => {
+            let handle = req.handle.ok_or_else(|| "no `handle` given".to_string())?;
+            http::poll(handle)
+        }
+
+        "http_cancel" => {
+            let handle = req.handle.ok_or_else(|| "no `handle` given".to_string())?;
+            http::cancel(handle)
+        }
+
+        "http_close" => {
+            let handle = req.handle.ok_or_else(|| "no `handle` given".to_string())?;
+            http::close(handle)
+        }
+
         "secure" => {
             let path = req
                 .path

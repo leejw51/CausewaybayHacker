@@ -105,7 +105,7 @@ return function()
     local d = wallet.describe(lib)
     T.ok(d ~= nil)
     T.eq(d.abi, wallet.ABI_VERSION)
-    T.eq(d.abi, 4, "4 is the contract with the poster's ops in it")
+    T.eq(d.abi, 5, "5 is the contract with the coder's http ops in it")
     T.eq(d.path_template, "m/44'/60'/0'/0/{index}")
     -- A private key and a seed never come back. A generated mnemonic does,
     -- exactly once, and the library says so rather than leaving it implicit.
