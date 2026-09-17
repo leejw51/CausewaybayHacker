@@ -27,6 +27,7 @@ local PURE = {
   "tests.test_anim",
   "tests.test_clock",
   "tests.test_playground",
+  "tests.test_agent",
   "tests.test_poster",
   "tests.test_screens",
   "tests.test_walk",

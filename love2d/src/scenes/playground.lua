@@ -37,6 +37,8 @@ local SFX = require("src.sfx")
 local Editor = require("src.editor")
 local CodePane = require("src.codepane")
 local CodeFx = require("src.codefx")
+local CoderM = require("src.agent.coder")
+local AgentPrefs = require("src.agent.prefs")
 local Anim = require("src.anim")
 local runlog = require("src.net.runlog")
 
@@ -126,6 +128,9 @@ function Playground.new(app)
     stamp_edit = nil,   -- what is in the key field; nil when it is closed
     disk_edit = nil,    -- what is in the path field; nil when it is closed
     postering = false,
+    -- The Rust coder: the AI agent that flies over the code
+    -- (`src/agent/coder.lua`). Made in `enter`, because it wants the editor.
+    coder = nil,
   }, Playground)
 end
 
@@ -153,10 +158,53 @@ function Playground:enter()
     self.app.session:on("run.stage", function(payload) self:on_stage(payload) end),
     self.app.session:on("run.log", function(payload) self:on_log(payload) end),
   }
+  self.coder = CoderM.new(self.app, self:agent_host())
+  self.coder:mount(self.editor)
   self:list()
 end
 
+--- What the coder is allowed to do on this screen. The playground is the
+--- generous one: it runs code, formats it, has a room per pad and can put a
+--- picture in it. The quest screen hands over a much shorter list.
+function Playground:agent_host()
+  local scene = self
+  return {
+    lang = function() return scene.lang end,
+    caret = function()
+      if not scene.pane then return nil end
+      return scene.pane:cell(scene.editor.line, scene.editor.col)
+    end,
+    room_id = function() return scene.snippet_id end,
+    room_name = function() return scene.name or "" end,
+    ensure_room = function()
+      -- A pad nobody has saved has no id, and a room belongs to an id. So the
+      -- first thing said in an unsaved pad saves it.
+      if scene.snippet_id then return false end
+      scene:save()
+      return true
+    end,
+    touched = function()
+      scene.dirty_at = Anim.now()
+    end,
+    fx = function() return scene.fx end,
+    request = function(type_name, payload, cb)
+      scene.app.session:request(type_name, payload, cb)
+    end,
+    run = function(stdin, done)
+      if scene.running then return done(nil) end
+      if stdin then scene.stdin = stdin end
+      scene.agent_run_done = done
+      scene:run()
+    end,
+    format = function(done)
+      scene.agent_format_done = done
+      scene:format()
+    end,
+  }
+end
+
 function Playground:leave()
+  if self.coder then self.coder:leave() end
   -- The stamp's key does not outlive the screen.
   Wallet.forget(self, "secret")
   self.stamp_edit, self.disk_edit = nil, nil
@@ -308,12 +356,29 @@ function Playground:run()
       -- Still not the failure register: a refusal is about the request, not
       -- about the program.
       self.note = why.player
+      self:tell_agent_run(nil)
       return
     end
     self.result = payload.run
     -- No accepted/rejected chime either way. Nothing was judged.
     SFX.play("move")
+    self:tell_agent_run(payload.run)
   end)
+end
+
+--- The coder asked for the RUN it is watching; hand it the report exactly
+--- once. The button's own run answers nobody, which is why this is a
+--- separate call rather than something the callback always does.
+function Playground:tell_agent_run(report)
+  local done = self.agent_run_done
+  self.agent_run_done = nil
+  if done then done(report) end
+end
+
+function Playground:tell_agent_format(report)
+  local done = self.agent_format_done
+  self.agent_format_done = nil
+  if done then done(report) end
 end
 
 function Playground:format()
@@ -333,24 +398,33 @@ function Playground:format()
       else
         self.note = why.player
       end
+      self:tell_agent_format({ changed = false, problem = self.note })
       return
     end
     if payload.problem and payload.problem ~= "" then
       self.problem = payload.problem
+      self:tell_agent_format({ changed = false, problem = payload.problem })
       return
     end
     if payload.changed == false then
       self.note = I18n.t("already tidy")
+      self:tell_agent_format({ changed = false })
       return
     end
     self.editor:replace_all(payload.source or self.editor:text())
     self.note = "formatted"
+    self:tell_agent_format({ changed = true })
   end)
 end
 
 function Playground:update(dt)
   self.t = self.t + dt
   if self.fx then self.fx:update(dt) end
+  if self.coder then
+    -- The whole screen is the coder's sky, minus whatever the panel took.
+    self.coder:fly({ 0, 0, Layout.vw, Layout.vh }, self.agent_rect)
+    self.coder:update(dt)
+  end
   if self.editor then self.editor.lang = self.lang end
   if self.running then self.elapsed_ms = self.elapsed_ms + dt * 1000 end
 
@@ -451,8 +525,10 @@ function Playground:draw()
   -- language are what this strip is for.
   local rx = lx - 8
   self.code_button_rect, self.rename_rect, self.poster_rect, self.reader_rect = nil, nil, nil, nil
+  self.agent_button_rect = nil
   for _, item in ipairs({
     { id = "code", label = I18n.t("CODE") },
+    { id = "agent", label = I18n.t("AGENT") },
     { id = "rename", label = I18n.t("RENAME") },
     -- Out as a picture, and back in: dropped first when the header is short.
     { id = "poster", label = I18n.t("POSTER") },
@@ -464,6 +540,7 @@ function Playground:draw()
     UI.button(rx, ly, w, lh, item.label, "normal", UI.CHIP_SIZE)
     local rect = { x = rx, y = ly, w = w, h = lh }
     if item.id == "code" then self.code_button_rect = rect
+    elseif item.id == "agent" then self.agent_button_rect = rect
     elseif item.id == "rename" then self.rename_rect = rect
     elseif item.id == "poster" then self.poster_rect = rect
     else self.reader_rect = rect end
@@ -486,6 +563,9 @@ function Playground:draw()
   self:draw_output(out)
 
   if self.fx then self.fx:draw() end
+  -- The panel goes where the output is: the same column or band, so the
+  -- screen keeps one shape whether the room is open or shut.
+  self:draw_agent(out, not Layout.isPortrait())
   self.app:footer(I18n.t("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"))
 end
 
@@ -523,6 +603,10 @@ function Playground:draw_big()
     { id = "format", label = self.formatting and "…" or "FORMAT F2",
       every = { "FORMAT F2" },
       state = self.format_unsupported and "disabled" or "normal" },
+    -- The Rust coder. Next to RUN because it is the other thing that acts
+    -- on the program rather than on the file.
+    { id = "agent", label = I18n.t("AGENT"), every = { I18n.t("AGENT") },
+      state = (self.coder and self.coder.panel.open) and "hot" or "normal" },
     { id = "save", label = I18n.t("SAVE"), every = { I18n.t("SAVE") }, state = "normal" },
     { id = "rename", label = I18n.t("RENAME"), every = { I18n.t("RENAME") }, state = "normal" },
     -- In and out of the screen. Nothing on a canvas can be selected with a
@@ -729,7 +813,35 @@ function Playground:draw_big()
   end
 
   if self.fx then self.fx:draw() end
+  self:draw_agent({ x = pad, y = top, w = body_w, h = body_h }, wide)
   self.app:footer(I18n.t("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"))
+end
+
+--- The coder's panel, and then the coder itself.
+---
+--- **The sprite is drawn last, after every pane and after the panel.** LÖVE
+--- has no z-index; a thing is on top of the interface by being painted after
+--- it, and the whole point of this character is that it flies over the code.
+---
+--- The panel takes the short axis the way the browser's does: a column on the
+--- right of a wide window, a band across the foot of a tall one, so the
+--- editor gives up one dimension and not two.
+function Playground:draw_agent(body, wide)
+  self.agent_rect = nil
+  if not self.coder then return end
+  if self.coder.panel.open then
+    local rect
+    if wide then
+      local w = math.max(280, math.floor(body.w * 0.42))
+      rect = { x = body.x + body.w - w, y = body.y, w = w, h = body.h }
+    else
+      local h = math.max(240, math.floor(body.h * 0.52))
+      rect = { x = body.x, y = body.y + body.h - h, w = body.w, h = h }
+    end
+    self.agent_rect = rect
+    self.coder:draw_panel(rect)
+  end
+  self.coder:draw()
 end
 
 function Playground:draw_snippets(rect)
@@ -1106,6 +1218,9 @@ end
 -- -------------------------------------------------------------------- input
 
 function Playground:textinput(text)
+  -- The room's field first while it is open: whatever is being typed into
+  -- the panel is not being typed into the program.
+  if self.coder and self.coder:textinput(text) then return end
   if self.focus == "name" then
     if self.name_fresh then self.name_edit, self.name_fresh = "", false end
     if #(self.name_edit or "") < 48 then self.name_edit = (self.name_edit or "") .. text end
@@ -1482,6 +1597,15 @@ function Playground:keypressed(key, mods)
   mods = mods or {}
   local cmd = mods.ctrl or mods.gui
 
+  -- Ctrl/Cmd-Shift-A opens and closes the coder from anywhere on the screen,
+  -- the browser's accelerator.
+  if key == "a" and cmd and mods.shift then
+    if self.coder then self.coder:toggle() end
+    return true
+  end
+  -- Then the panel, while it is open and holding a field.
+  if self.coder and self.coder:keypressed(key, mods) then return true end
+
   -- The name field owns every key while it is open: a rename that ran F5
   -- because the name has an "f5" in it would be a field nobody trusts.
   if self.focus == "find" then
@@ -1575,6 +1699,11 @@ function Playground:keypressed(key, mods)
 end
 
 function Playground:wheelmoved(_, dy)
+  if self.coder then
+    local mx, my = love.mouse.getPosition()
+    local vx, vy = Layout.toVirtual(mx, my)
+    if self.coder:wheelmoved(dy, vx, vy) then return end
+  end
   if self.focus == "editor" then
     self.editor:scroll_by(-dy * 3, self.visible_rows or 20)
   end
@@ -1584,8 +1713,14 @@ function Playground:mousepressed(x, y, button)
   local function inside(r)
     return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
   end
+  -- The coder first: its panel is drawn over the screen and owns what is
+  -- under it, and a press on the sprite holds it still. A press anywhere else
+  -- lets a held sprite go and then **carries on** to whatever it was aimed
+  -- at, which is why this is not a plain "handled" gate.
+  if self.coder and self.coder:mousepressed(x, y, button) then return end
   if self.big then
     if inside(self.done_rect) then self.big = false; SFX.play("select"); return end
+    if inside((self.big_rects or {}).agent) then self.coder:toggle(); return end
     local r = self.big_rects or {}
     if inside(r.run) then self:run(); return end
     if inside(r.format) then self:format(); return end
@@ -1618,6 +1753,7 @@ function Playground:mousepressed(x, y, button)
     return
   end
   if inside(self.code_button_rect) then self.big = true; SFX.play("select"); return end
+  if inside(self.agent_button_rect) then self.coder:toggle(); return end
   if inside(self.rename_rect) then self:start_rename(); return end
   if inside(self.poster_rect) then self:poster(); return end
   if inside(self.reader_rect) then self:start_disk(); return end
@@ -1642,6 +1778,8 @@ function Playground:mousepressed(x, y, button)
 end
 
 function Playground:mousemoved(x, y)
+  -- A moving mouse slows the coder's wander, so it can be caught.
+  if self.coder then self.coder:mousemoved(x, y) end
   if self.pane then self.pane:mousemoved(x, y) end
   self.hover = nil
   for id, r in pairs(self.list_rects or {}) do
