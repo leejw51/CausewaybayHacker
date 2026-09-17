@@ -415,7 +415,7 @@ export const ko: Partial<Catalogue> = {
   "agent.coderHidden": "코더를 치웠습니다 — 패널은 그대로 씁니다",
   "agent.roomMade": "{name}(으)로 저장됨 — 대화방은 패드와 함께 보관됩니다",
   "agent.hostHint": "Ollama 호스트 — 비우면 {host}",
-  "agent.held": "잠시 멈출게요. 다시 누르면 돌아다닐게요.",
+  "agent.held": "잠시 멈출게요. 다른 곳을 누르면 돌아다닐게요.",
   "agent.hello":
     "안녕하세요. 러스트 코더입니다. 이 파일에 대해 무엇이든 묻거나, 무엇을 쓸지 말해 주세요.",
   "pg.diskVerified": "디스크 읽음 · {address} 작성·서명 · 검증됨",

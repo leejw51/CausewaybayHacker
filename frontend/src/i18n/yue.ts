@@ -418,7 +418,7 @@ export const yue: Partial<Catalogue> = {
   "agent.coderHidden": "程式員收埋咗 — 面板照用",
   "agent.roomMade": "儲存做 {name} — 房間同個 pad 一齊保存",
   "agent.hostHint": "Ollama 主機 — 留空即係 {host}",
-  "agent.held": "我停一停先。再按一次我就繼續飛。",
+  "agent.held": "我停一停先。撳其他地方我就繼續飛。",
   "agent.hello": "喂，我係 Rust 程式員。關於呢個檔案隨便問，或者話我知想寫乜。",
   "pg.diskVerified": "已讀碟 · 由 {address} 編寫及簽署 · 已驗證",
   "pg.diskForged": "已讀碟 · 簽名同 {address} 唔符",

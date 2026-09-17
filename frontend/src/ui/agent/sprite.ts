@@ -59,10 +59,9 @@ const PEEK_HOLD = 1.6;
  * The hold: pressed, the sprite stops so its bubble can be read. It does not
  * stop dead — it coasts this many seconds' worth of its speed further and
  * settles there on the exponential follow, an ease-out from wherever it
- * was — and it lets itself go after this long, in case nobody presses again.
+ * was. It stays until a press somewhere else lets it go.
  */
 const HOLD_COAST = 0.22;
-const HOLD_SECS = 20;
 /** The zoom while held: a touch closer, attentive. */
 const HOLD_ZOOM = 1.06;
 /** The orbit while thinking. */
@@ -203,11 +202,13 @@ export class Sprite {
    * Pressed: stop, so the bubble can be read. Only an idle sprite holds —
    * one at work keeps working — and the stop is a braking curve, not a
    * freeze: the target is a little ahead along its motion and the follow
-   * eases it there. Released, it flies off again. Returns whether it held.
+   * eases it there. Released, it flies off again — the in-out curve of any
+   * flight. Returns whether it is held.
    */
   hold(on: boolean, box?: Rect): boolean {
     if (on) {
       if (this.state === "typing" || this.state === "thinking") return false;
+      if (this.state === "hold") return true;
       const m = this.size * MARGIN;
       let hx = this.x + this.vx * HOLD_COAST;
       let hy = this.y + this.vy * HOLD_COAST;
@@ -323,9 +324,6 @@ export class Sprite {
     if (this.state === "peek") {
       this.held += dt;
       if (this.held >= PEEK_HOLD) this.state = "wander";
-    } else if (this.state === "hold") {
-      this.held += dt;
-      if (this.held >= HOLD_SECS) this.go("wander");
     }
     const [tx, ty] = this.target(box, cell);
     if (!this.placed) {

@@ -173,10 +173,14 @@ export class Coder {
     const down = (ev: PointerEvent) => {
       if (ev.button !== 0 || !readShown()) return;
       const v = this.app.layout.toVirtual(ev.clientX, ev.clientY);
-      if (!v || !this.hits(v[0], v[1])) return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      this.press();
+      if (v && this.hits(v[0], v[1])) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.press();
+      } else if (this.sprite.holding) {
+        // A touch anywhere else lets it go; that touch is still whoever's it was.
+        this.release();
+      }
     };
     addEventListener("pointerdown", down, true);
     this.offs.push(() => removeEventListener("pointerdown", down, true));
@@ -207,23 +211,25 @@ export class Coder {
   }
 
   /**
-   * Pressed: an idle sprite stops where it is so its bubble can be read,
-   * and shows the last thing it said if the bubble has already gone.
-   * Pressed again, it roams. One at work is not interrupted.
+   * Touched: an idle sprite stops where it is so its bubble can be read,
+   * and shows the last thing it said if the bubble has already gone. It
+   * stays until a touch somewhere else. One at work is not interrupted.
    */
   press(): void {
-    if (this.sprite.holding) {
-      this.sprite.hold(false);
-      if (this.bubble) this.bubble.until = Math.max(this.bubble.until, this.t + 2.5);
-      this.host.chip.select();
-      return;
-    }
+    if (this.sprite.holding) return;
     if (!this.sprite.hold(true, this.box)) return;
     this.host.chip.select();
     if (!this.bubble) {
       if (this.lastSaid) this.say(this.lastSaid.text, this.lastSaid.tone);
       else this.say(t("agent.held"), "say");
     }
+  }
+
+  /** Touched elsewhere: off it flies, the bubble given a moment more. */
+  release(): void {
+    if (!this.sprite.holding) return;
+    this.sprite.hold(false);
+    if (this.bubble) this.bubble.until = Math.max(this.bubble.until, this.t + 2.5);
   }
 
   leave(): void {

@@ -436,7 +436,7 @@ export const en = {
   "agent.coderHidden": "the coder is put away — the panel still works",
   "agent.roomMade": "saved as {name} — the room is kept with the pad",
   "agent.hostHint": "Ollama host — empty means {host}",
-  "agent.held": "Holding still. Press me again and I'll roam.",
+  "agent.held": "Holding still. Touch anywhere else and I'll roam.",
   "agent.hello":
     "Hi. I'm the Rust coder. Ask me anything about this file, or tell me what to write.",
   "pg.diskVerified": "disk read · written and signed by {address} · verified",

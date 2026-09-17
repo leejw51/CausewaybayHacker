@@ -335,7 +335,7 @@ describe("the flight", () => {
     expect(Math.hypot(s.x - hx, s.y - hy)).toBeGreaterThan(10);
   });
 
-  it("will not hold while working, and lets itself go after a while", () => {
+  it("will not hold while working, and stays held until let go", () => {
     const s = new Sprite(48, () => false);
     s.caret = [150, 200];
     s.typing(true);
@@ -349,8 +349,34 @@ describe("the flight", () => {
     expect(s.holding).toBe(false);
     s.thinking(false);
     s.hold(true, box);
-    for (let i = 0; i < 60 * 21; i++) s.update(1 / 60, box, 8);
+    for (let i = 0; i < 60 * 30; i++) s.update(1 / 60, box, 8);
+    expect(s.state).toBe("hold");
+    // A second touch on it changes nothing; only a release does.
+    expect(s.hold(true, box)).toBe(true);
+    expect(s.state).toBe("hold");
+    s.hold(false);
     expect(s.state).toBe("wander");
+  });
+
+  it("flies off from a hold on the in-out curve, not at one speed", () => {
+    const s = new Sprite(48, () => false);
+    // Caught early, on its way in from the corner, so the way back is a real flight.
+    for (let i = 0; i < 4; i++) s.update(1 / 60, box, 8);
+    s.hold(true, box);
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
+    s.hold(false);
+    const speeds: number[] = [];
+    for (let i = 0; i < 90; i++) {
+      s.update(1 / 60, box, 8);
+      speeds.push(s.speed());
+    }
+    const peak = Math.max(...speeds);
+    const at = speeds.indexOf(peak);
+    // Slow at the start, fastest in the middle, slow again at the end.
+    expect(speeds[0]).toBeLessThan(peak * 0.5);
+    expect(at).toBeGreaterThan(3);
+    expect(at).toBeLessThan(80);
+    expect(speeds[89]).toBeLessThan(peak * 0.5);
   });
 
   it("wanders slowly enough to be caught", () => {

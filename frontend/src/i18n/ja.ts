@@ -411,7 +411,7 @@ export const ja: Partial<Catalogue> = {
   "agent.coderHidden": "コーダーをしまいました — パネルはそのまま使えます",
   "agent.roomMade": "{name} として保存 — 部屋はパッドと一緒に保管されます",
   "agent.hostHint": "Ollama のホスト — 空なら {host}",
-  "agent.held": "止まっています。もう一度押すとまた飛び回ります。",
+  "agent.held": "止まっています。ほかの場所を押すとまた飛び回ります。",
   "agent.hello":
     "やあ、Rustコーダーです。このファイルについて何でも聞くか、何を書くか教えてください。",
   "pg.diskVerified": "ディスク読込 · {address} が作成・署名 · 検証済み",

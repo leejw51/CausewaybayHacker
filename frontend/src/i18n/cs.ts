@@ -431,7 +431,7 @@ export const cs: Partial<Catalogue> = {
   "agent.coderHidden": "kodér je schovaný — panel funguje dál",
   "agent.roomMade": "uloženo jako {name} — místnost zůstává u sešitu",
   "agent.hostHint": "adresa Ollamy — prázdné znamená {host}",
-  "agent.held": "Držím se na místě. Stiskni mě znovu a zase poletím.",
+  "agent.held": "Držím se na místě. Klepni jinam a zase poletím.",
   "agent.hello":
     "Ahoj, jsem rustový kodér. Zeptej se na cokoli o tomto souboru, nebo mi řekni, co napsat.",
   "pg.diskVerified": "deska přečtena · napsal a podepsal {address} · ověřeno",
