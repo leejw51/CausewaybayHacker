@@ -389,7 +389,7 @@ export const ja: Partial<Catalogue> = {
   "agent.writeAsk": "プログラムを書いて: {brief}。その後実行し、コンパイラの指摘を直して。",
   "agent.writeAskBlank":
     "この言語で学ぶ価値のあることを示す、小さく完全な例のプログラムを書いて実行して。",
-  "agent.imageAsk": "画像を作って: {brief}",
+  "agent.imageAsk": "make_image ツールを呼んで画像を作って: {brief}。コードは書かないで。",
   "agent.noImage": "{provider} は画像を作れません — OPENAI か GROK を選んでください",
   "agent.cleared": "部屋を空にしました",
   "agent.tip": "ヒント",
@@ -398,6 +398,13 @@ export const ja: Partial<Catalogue> = {
   "agent.busy": "コーダーは作業中です — 先に停止してください",
   "agent.provider": "{name} · {model}",
   "agent.failed": "コーダーが答えられませんでした: {why}",
+  "agent.edit": "編集",
+  "agent.delete": "削除",
+  "agent.edited": "編集済み",
+  "agent.deleted": "メッセージを削除しました",
+  "agent.editing": "編集中 — ENTER で保存、ESC で元のまま",
+  "agent.editFailed": "変更できませんでした: {why}",
+  "agent.deleteFailed": "削除できませんでした: {why}",
   "agent.hello":
     "やあ、Rustコーダーです。このファイルについて何でも聞くか、何を書くか教えてください。",
   "pg.diskVerified": "ディスク読込 · {address} が作成・署名 · 検証済み",

@@ -394,6 +394,9 @@ async fn dispatch(
         // photo, decoded and written in one short block; nothing here
         // compiles, so it stays beside the other snippet messages.
         "playground.chat.list" => playground::chat_list(state, session, payload),
+        "playground.chat.sync" => playground::chat_sync(state, session, payload),
+        "playground.chat.edit" => playground::chat_edit(state, session, payload),
+        "playground.chat.delete" => playground::chat_delete(state, session, payload),
         "playground.chat.post" => playground::chat_post(state, session, payload),
         "playground.chat.clear" => playground::chat_clear(state, session, payload),
         "playground.chat.search" => playground::chat_search(state, session, payload),

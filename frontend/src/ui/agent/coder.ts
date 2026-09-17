@@ -40,12 +40,19 @@ import { image as makeImage } from "../../ai/providers";
 import { Sprite, type Pt } from "./sprite";
 import { AgentLayer } from "./layer";
 import { Panel, type Item } from "./panel";
+import { emptyRoom, fold, type Room } from "./sync";
 
 /** What the screen lends the agent. */
 export interface Host {
   lang(): Land;
   /** The pad the room belongs to; null on a screen with no room (a quest). */
   roomId(): string | null;
+  /**
+   * Make the room exist: a fresh pad has no id until its first save, and the
+   * first thing said on it must not be lost for that. Resolves to the id,
+   * or null on a screen that has no rooms.
+   */
+  ensureRoom(): Promise<string | null>;
   /** RUN as the button does, or null where a run would count against the player. */
   run: ((source: string, stdin?: string) => Promise<RunReport>) | null;
   format: (() => Promise<{ changed: boolean; problem?: string }>) | null;
@@ -99,6 +106,8 @@ export class Coder {
   /** The bubble: what, and until when. */
   private bubble: { text: string; until: number; tone: "say" | "tip" | "busy" } | null = null;
   private room: string | null = null;
+  /** The room as the server has it, folded by id, with the sync cursor. */
+  private held: Room = emptyRoom();
   /** The reply being streamed, as one growing item. */
   private live: Item | null = null;
   private offs: Array<() => void> = [];
@@ -114,6 +123,8 @@ export class Coder {
       image: (brief) => void this.picture(brief),
       stop: () => this.stop(),
       clear: () => void this.clearRoom(),
+      edit: (id, text) => void this.editMessage(id, text),
+      delete: (id) => void this.deleteMessage(id),
       note: (text) => this.say(text, "say"),
     });
   }
@@ -148,7 +159,12 @@ export class Coder {
 
   toggle(): void {
     this.panel.open = !this.panel.open;
-    if (this.panel.open) this.syncRoom();
+    if (this.panel.open) {
+      this.syncRoom();
+      // Opening a room already held: ask for what came after the cursor —
+      // another tab, the other client — and nothing that is already here.
+      if (this.room && this.held.cursor > 0) void this.refreshRoom(this.room);
+    }
     this.host.chip.select();
   }
 
@@ -156,7 +172,25 @@ export class Coder {
   syncRoom(): void {
     const id = this.host.roomId();
     if (id === this.room) return;
+    const was = this.room;
     this.room = id;
+    this.held = emptyRoom();
+    // A fresh pad has no room until its first save, and the first thing
+    // said on it is usually said before that. The pad getting its id is not
+    // a different room, it is this room arriving: keep the conversation and
+    // post what was said so far, in order, so the room starts complete.
+    if (was === null && id && this.panel.items.length > 0) {
+      const pending = this.panel.items.filter(
+        (i) => i.id === undefined && (i.role === "user" || i.role === "agent") && !i.live,
+      );
+      void (async () => {
+        for (const item of pending) {
+          const m = await this.post(item.role as "user" | "agent", item.text);
+          if (m) Object.assign(item, itemOf(m));
+        }
+      })();
+      return;
+    }
     this.session?.clear();
     this.panel.items = [];
     this.said.clear();
@@ -168,7 +202,10 @@ export class Coder {
     try {
       const res = await this.app.client.request("playground.chat.list", { id, limit: 200 });
       if (this.room !== id) return;
-      this.panel.items = res.messages.map((m) => itemOf(m));
+      // Merged, not replaced: a message sent while this was in flight is
+      // already on the screen, and it must keep its place.
+      this.held = emptyRoom();
+      this.apply(res.messages);
       this.panel.scroll = 0;
     } catch (e) {
       if (e instanceof WireError && e.payload.code === "not_found") {
@@ -176,6 +213,84 @@ export class Coder {
         // messages stay in the tab, and the panel says so once.
         this.panel.status = t("agent.roomFailed");
       }
+    }
+  }
+
+  /**
+   * What came after the cursor, folded in. Only messages this tab has not
+   * seen are shown; the ones it posted itself came back with their ids.
+   */
+  private async refreshRoom(id: string): Promise<void> {
+    try {
+      const res = await this.app.client.request("playground.chat.list", {
+        id,
+        limit: 200,
+        after: this.held.cursor,
+      });
+      if (this.room !== id) return;
+      this.apply(res.messages);
+    } catch {
+      /* the room as held is still right; the next open asks again */
+    }
+  }
+
+  /**
+   * Fold a page into the room and show the difference: a message this tab
+   * has not seen is appended, an edit replaces the text in place, a
+   * tombstone takes the line away. The tab's own lines — tool notes, tips,
+   * a reply still streaming — have no id and are left where they are.
+   */
+  private apply(page: readonly ChatMessage[]): void {
+    const before = new Map(this.held.messages.map((m) => [m.id, m]));
+    this.held = fold(this.held, page).room;
+    const after = new Map(this.held.messages.map((m) => [m.id, m]));
+    for (const m of page) {
+      const at = this.panel.items.findIndex((i) => i.id === m.id);
+      const now = after.get(m.id);
+      if (!now) {
+        if (at >= 0) this.panel.items.splice(at, 1);
+        continue;
+      }
+      if (at >= 0) {
+        this.panel.items[at] = { ...this.panel.items[at], ...itemOf(now) };
+      } else if (!before.has(m.id)) {
+        // The server's copy of something this tab said and has not yet
+        // heard back about: the same words under the same name, still
+        // without an id. Give it the id rather than showing it twice.
+        const twin = this.panel.items.find(
+          (i) => i.id === undefined && !i.live && i.role === now.role && i.text === now.text,
+        );
+        if (twin) Object.assign(twin, itemOf(now));
+        else this.panel.push(itemOf(now));
+      }
+    }
+  }
+
+  private async editMessage(id: number, text: string): Promise<void> {
+    const clean = text.trim();
+    if (!clean) return;
+    try {
+      const res = await this.app.client.request("playground.chat.edit", {
+        message_id: id,
+        text: clean,
+      });
+      this.apply([res.message]);
+      this.host.chip.blip();
+    } catch (e) {
+      this.panel.status = t("agent.editFailed", { why: reason(e) });
+      this.host.chip.fail();
+    }
+  }
+
+  private async deleteMessage(id: number): Promise<void> {
+    try {
+      const res = await this.app.client.request("playground.chat.delete", { message_id: id });
+      this.apply([res.message]);
+      this.panel.status = t("agent.deleted");
+      this.host.chip.blip();
+    } catch (e) {
+      this.panel.status = t("agent.deleteFailed", { why: reason(e) });
+      this.host.chip.fail();
     }
   }
 
@@ -196,6 +311,7 @@ export class Coder {
         ...(role === "agent" ? { provider, model: readModel(provider) } : {}),
         ...extra,
       });
+      if (this.room === id) this.held = fold(this.held, [res.message]).room;
       return res.message;
     } catch {
       return null;
@@ -206,6 +322,9 @@ export class Coder {
 
   private bench(): Bench {
     const host = this.host;
+    const app = this.app;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
     const typeIn = async (text: string) => {
       const ed = this.editor;
       if (!ed) return { typed: 0, total: text.length, stopped: true };
@@ -252,41 +371,45 @@ export class Coder {
           }
         : null,
       format: host.format,
-      search: this.host.roomId()
-        ? async (q) => {
-            const res = await this.app.client.request("playground.chat.search", { q, limit: 8 });
-            if (res.hits.length === 0) return "No notes match.";
-            return res.hits
-              .map(
-                (h) =>
-                  `[${h.snippet_name}] ${h.message.role} ${h.message.created_at.slice(0, 10)}: ${h.message.text.slice(0, 300)}`,
-              )
-              .join("\n");
-          }
-        : null,
-      image: this.host.roomId()
-        ? async (prompt) => {
-            const provider = readProvider();
-            if (!readKey(provider)) throw new Error("no api key");
-            const ctl = new AbortController();
-            const { b64, mime } = await makeImage(provider, readKey(provider), prompt, ctl.signal);
-            const shrunk = await shrink(b64, mime);
-            const msg = await this.post("agent", prompt, {
-              image_b64: shrunk.b64,
-              image_type: shrunk.mime,
-            });
-            const item: Item = msg
-              ? itemOf(msg)
-              : {
-                  role: "agent",
-                  text: prompt,
-                  photoUrl: `data:${shrunk.mime};base64,${shrunk.b64}`,
-                };
-            this.panel.push(item);
-            this.host.chip.coin();
-            return t("agent.photoPosted");
-          }
-        : null,
+      // Decided when asked, not when mounted: a fresh pad has no room until
+      // its first save, and the room arrives while this bench is in use.
+      get search() {
+        if (!host.roomId()) return null;
+        return async (q: string) => {
+          const res = await app.client.request("playground.chat.search", { q, limit: 8 });
+          if (res.hits.length === 0) return "No notes match.";
+          return res.hits
+            .map(
+              (h) =>
+                `[${h.snippet_name}] ${h.message.role} ${h.message.created_at.slice(0, 10)}: ${h.message.text.slice(0, 300)}`,
+            )
+            .join("\n");
+        };
+      },
+      get image() {
+        if (!host.roomId()) return null;
+        return async (prompt: string) => {
+          const provider = readProvider();
+          if (!readKey(provider)) throw new Error("no api key");
+          const ctl = new AbortController();
+          const { b64, mime } = await makeImage(provider, readKey(provider), prompt, ctl.signal);
+          const shrunk = await shrink(b64, mime);
+          const msg = await self.post("agent", prompt, {
+            image_b64: shrunk.b64,
+            image_type: shrunk.mime,
+          });
+          const item: Item = msg
+            ? itemOf(msg)
+            : {
+                role: "agent",
+                text: prompt,
+                photoUrl: `data:${shrunk.mime};base64,${shrunk.b64}`,
+              };
+          self.panel.push(item);
+          host.chip.coin();
+          return t("agent.photoPosted");
+        };
+      },
     };
   }
 
@@ -364,9 +487,17 @@ export class Coder {
       return;
     }
     this.panel.status = "";
+    // The room first, so the message has somewhere to be kept.
+    if (!this.room) {
+      await this.host.ensureRoom();
+      this.syncRoom();
+    }
     if (shown) {
-      this.panel.push({ role: "user", text: shown });
-      void this.post("user", shown);
+      const mine: Item = { role: "user", text: shown };
+      this.panel.push(mine);
+      void this.post("user", shown).then((m) => {
+        if (m) Object.assign(mine, itemOf(m));
+      });
     }
     this.sinceCall = 0;
     this.reviewedSource = this.editor.source;
@@ -374,7 +505,12 @@ export class Coder {
       const reply = await session.ask(provider, text);
       if (reply.trim()) {
         this.say(reply, "say");
-        void this.post("agent", reply);
+        const said = [...this.panel.items]
+          .reverse()
+          .find((i) => i.role === "agent" && i.id === undefined);
+        void this.post("agent", reply).then((m) => {
+          if (m && said && said.text === reply) Object.assign(said, itemOf(m));
+        });
       }
     } catch (e) {
       const why = e instanceof Error ? e.message : String(e);
@@ -694,11 +830,19 @@ export class Coder {
 
 function itemOf(m: ChatMessage): Item {
   return {
+    id: m.id,
     role: m.role,
     text: m.text,
     photoUrl: m.photo_url,
     at: m.created_at,
+    edited: m.edited,
   };
+}
+
+/** A failure's one line for the status row. */
+function reason(e: unknown): string {
+  if (e instanceof WireError) return e.payload.message?.slice(0, 80) ?? e.payload.code;
+  return (e instanceof Error ? e.message : String(e)).slice(0, 80);
 }
 
 /**

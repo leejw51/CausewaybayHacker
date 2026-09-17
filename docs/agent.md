@@ -38,7 +38,7 @@ the wire and the schema once they land.
 | --- | --- | --- | --- | --- |
 | `anthropic` | Messages API, streamed | yes | no | `@anthropic-ai/sdk`, `dangerouslyAllowBrowser` |
 | `openai` | Chat Completions, streamed | yes | `gpt-image-1` | `openai` SDK, `dangerouslyAllowBrowser` |
-| `grok` | Chat Completions (xAI, OpenAI-compatible), streamed | yes | `grok-2-image` | `openai` SDK with `baseURL: https://api.x.ai/v1` |
+| `grok` | Chat Completions (xAI, OpenAI-compatible), streamed | yes | `grok-imagine-image` | `openai` SDK with `baseURL: https://api.x.ai/v1` |
 
 Defaults: `claude-opus-5`, `gpt-4.1`, `grok-4`. The model field is editable and
 SETUP has a FETCH MODELS button that lists what the key can reach (`/v1/models`
@@ -109,27 +109,32 @@ Per entry, per user. Every message row and every photo belongs to one snippet
 and is scoped by the session's address exactly as snippets are — another
 player's id answers `not_found`.
 
-### Schema (migration `0013_snippet_chat.sql`)
+### Schema (migrations `0013_snippet_chat.sql`, `0014_chat_seq.sql`)
 
 ```sql
 CREATE TABLE snippet_messages (
-  id          TEXT PRIMARY KEY,               -- 'msg_' + 16 hex
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,  -- the identity, never reused
+  timeid      INTEGER NOT NULL UNIQUE,   -- ms since the epoch, strictly increasing; the sync cursor
   snippet_id  TEXT NOT NULL REFERENCES snippets(id) ON DELETE CASCADE,
   address     TEXT NOT NULL,
   role        TEXT NOT NULL CHECK (role IN ('user','agent','tool')),
   kind        TEXT NOT NULL CHECK (kind IN ('text','image')),
   text        TEXT NOT NULL DEFAULT '',        -- the message, or the image's prompt
-  photo       TEXT,                            -- file name under photos/, image rows only
+  photo       TEXT,                            -- '<id>.<ext>' under photos/, image rows only
   photo_token TEXT,                            -- 32 hex; the capability that fetches it
   provider    TEXT,                            -- 'openai' | 'anthropic' | 'grok' | null
   model       TEXT,
-  created_at  TEXT NOT NULL
+  created_at  TEXT NOT NULL,
+  edited      INTEGER NOT NULL DEFAULT 0,
+  deleted     INTEGER NOT NULL DEFAULT 0       -- a tombstone, delivered to a cursor
 );
-CREATE INDEX snippet_messages_by_snippet ON snippet_messages(snippet_id, created_at);
-CREATE VIRTUAL TABLE snippet_message_fts USING fts5(text, content='snippet_messages', content_rowid='rowid');
+CREATE INDEX snippet_messages_by_snippet ON snippet_messages(snippet_id, timeid);
+CREATE INDEX snippet_messages_by_address ON snippet_messages(address, timeid);
+CREATE TABLE chat_clock (one INTEGER PRIMARY KEY CHECK (one = 1), last_timeid INTEGER NOT NULL);
+CREATE VIRTUAL TABLE snippet_message_fts USING fts5(text, content='snippet_messages', content_rowid='id');
 -- plus the three external-content triggers, as quest_fts has
 CREATE TABLE snippet_message_vec (
-  message_id TEXT PRIMARY KEY REFERENCES snippet_messages(id) ON DELETE CASCADE,
+  message_id INTEGER PRIMARY KEY REFERENCES snippet_messages(id) ON DELETE CASCADE,
   dim INTEGER NOT NULL, model TEXT NOT NULL, vec BLOB NOT NULL
 );
 ```
@@ -137,13 +142,19 @@ CREATE TABLE snippet_message_vec (
 ### Messages (PROTOCOL §4.9f)
 
 ```
-→ playground.chat.list    { id, limit?=200 }
-← { messages: [ChatMessage, …] }                   oldest first
+→ playground.chat.list    { id, limit?=200, after?=0 }
+← { messages: [ChatMessage, …] }                   oldest first, timeid > after
+
+→ playground.chat.sync    { after?=0, limit?=200 }
+← { messages: [ChatMessage, …], head, more }       every room, timeid > after, paged
 
 → playground.chat.post    { id, role, text?, image_b64?, image_type?, provider?, model? }
 ← { message: ChatMessage }
    image_b64 present ⇒ kind 'image'; text is then the prompt. ≤ 3 MiB decoded,
    image/png | image/jpeg | image/webp. Refused past 500 messages per entry.
+
+→ playground.chat.edit    { message_id, text }     same id, new timeid, edited
+→ playground.chat.delete  { message_id }           a tombstone: same id, new timeid, deleted
 
 → playground.chat.clear   { id }                   every message and photo of one entry
 ← { id, cleared: N }
@@ -157,7 +168,10 @@ CREATE TABLE snippet_message_vec (
 
 ```ts
 type ChatMessage = {
-  id: string; snippet_id: string;
+  id: number;                      // int64: the identity, SQLite's, never reused
+  timeid: number;                  // int64: ms since the epoch, strictly increasing
+                                   // across every room — the sync cursor
+  snippet_id: string;
   role: "user" | "agent" | "tool"; kind: "text" | "image";
   text: string;
   photo_url: string | null;        // "/photos/<message_id>/<token>.<ext>", image rows
@@ -167,6 +181,18 @@ type ChatMessage = {
 type ChatHit = { message: ChatMessage; snippet_name: string; score: number;
                  bm25: number | null; cosine: number | null; snippet: string };
 ```
+
+### Sync
+
+Two int64s per message, as PocketSkynet does it. `id` names the row, the
+photo file and the photo URL. `timeid` orders it: `max(last handed out,
+now_ms) + 1`, bumped in the same transaction as the row that takes it and
+kept in its own `chat_clock` row, so two posts in one millisecond, a clock
+that stepped back and a cleared room all still land past everything any
+client has seen. 0 is never handed out; both stay under 2^53. A client
+folds pages by `id`, takes `max(cursor, timeid)` over every message it
+received, and asks again while `more` is true and the cursor moved
+(`ui/agent/sync.ts`, pure and tested).
 
 ### Photos over HTTP
 

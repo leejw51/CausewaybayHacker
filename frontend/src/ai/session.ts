@@ -58,6 +58,7 @@ export function systemPrompt(bench: Bench, canRun: boolean): string {
     "- If asked to review, be concrete: name the line and the habit, and offer the fix. Do not rewrite a working program nobody asked you to rewrite.",
     "- Keep the person's style, names and formatting unless asked. Keep the program's existing behaviour unless asked.",
     "- Never invent an API. If unsure, prefer the plain standard-library way.",
+    "- A picture is not a program. When the person asks for a picture, image, drawing or photo, call make_image with a prompt; do not write code that prints one, and do not describe it instead.",
     "",
     `The file is ${bench.file}. Its current text, with line numbers (do not include the numbers in edits):`,
     "```",

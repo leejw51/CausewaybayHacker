@@ -505,6 +505,7 @@ export class QuestScene implements Scene {
       this.coder = new Coder(this.app, {
         lang: () => this.land,
         roomId: () => null,
+        ensureRoom: async () => null,
         run: null,
         format: async () => {
           if (!this.editor) return { changed: false, problem: "no editor" };

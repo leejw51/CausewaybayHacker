@@ -30,11 +30,6 @@ pub fn snippet_id() -> String {
     format!("pg_{}", suffix())
 }
 
-/// One message in a snippet's chatroom (PROTOCOL §5.14).
-pub fn message_id() -> String {
-    format!("msg_{}", suffix())
-}
-
 /// The capability that fetches a photo over HTTP (PROTOCOL §4.9f): 32 hex,
 /// twice an id's entropy, because it is the *only* thing guarding the bytes.
 /// There is no other HTTP auth in this server, so the token has to be

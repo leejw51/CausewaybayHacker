@@ -253,7 +253,16 @@ async fn a_room_takes_text_and_a_photo_and_serves_the_photo_to_its_token() {
         )
         .await["message"]
         .clone();
-    assert!(said["id"].as_str().unwrap().starts_with("msg_"));
+    assert!(
+        said["id"].as_i64().unwrap() > 0,
+        "id is an int64: {}",
+        said["id"]
+    );
+    assert!(
+        said["timeid"].as_i64().unwrap() > 1_600_000_000_000,
+        "timeid is milliseconds since the epoch: {}",
+        said["timeid"]
+    );
     assert_eq!(said["kind"].as_str(), Some("text"));
     assert!(said["photo_url"].is_null());
     assert_eq!(said["provider"].as_str(), Some("openai"));
@@ -269,7 +278,8 @@ async fn a_room_takes_text_and_a_photo_and_serves_the_photo_to_its_token() {
         .clone();
     assert_eq!(photo["kind"].as_str(), Some("image"));
     let url = photo["photo_url"].as_str().unwrap().to_string();
-    let message_id = photo["id"].as_str().unwrap();
+    let message_id = photo["id"].as_i64().unwrap().to_string();
+    let message_id = message_id.as_str();
     assert!(
         url.starts_with(&format!("/photos/{message_id}/")) && url.ends_with(".png"),
         "{url}"
@@ -298,12 +308,7 @@ async fn a_room_takes_text_and_a_photo_and_serves_the_photo_to_its_token() {
     let bad_ext = url.replace(".png", ".jpg");
     assert_eq!(http_get(server.port, &bad_ext).await.0, 404);
     assert_eq!(
-        http_get(
-            server.port,
-            &url.replace(message_id, "msg_0000000000000000")
-        )
-        .await
-        .0,
+        http_get(server.port, &url.replace(message_id, "0")).await.0,
         404
     );
     assert_eq!(http_get(server.port, "/photos/x/notadot").await.0, 404);
@@ -341,7 +346,8 @@ async fn a_room_takes_text_and_a_photo_and_serves_the_photo_to_its_token() {
     let hits = found["hits"].as_array().unwrap();
     assert!(!hits.is_empty(), "{found}");
     assert_eq!(hits[0]["snippet_name"].as_str(), Some("chatty"));
-    assert!(hits[0]["message"]["id"].is_string());
+    assert!(hits[0]["message"]["id"].is_i64());
+    assert!(hits[0]["message"]["timeid"].is_i64());
 
     // Clear says how many went, and the url dies with the rows.
     let cleared = alice.ok("playground.chat.clear", json!({ "id": id })).await;
@@ -630,5 +636,245 @@ async fn the_room_needs_a_login_and_dies_with_its_pad() {
             .unwrap()
     });
     assert_eq!(rows, 0);
+    server.handle.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sync_walks_every_room_from_a_cursor() {
+    let server = start().await;
+    let mut alice = Client::connect(server.port).await;
+    alice.login(ALICE_KEY).await;
+    let a = alice.new_pad().await;
+    let b = alice
+        .ok(
+            "playground.save",
+            json!({ "lang": "go", "source": "package main\n", "name": "second pad" }),
+        )
+        .await["snippet"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    // Nothing yet: head 0, no more.
+    let empty = alice.ok("playground.chat.sync", json!({})).await;
+    assert_eq!(empty["messages"].as_array().unwrap().len(), 0);
+    assert_eq!(empty["head"], 0);
+    assert_eq!(empty["more"], false);
+
+    let mut timeids = Vec::new();
+    for (n, pad) in [(0, &a), (1, &b), (2, &a), (3, &b), (4, &a)] {
+        let m = alice
+            .ok(
+                "playground.chat.post",
+                json!({ "id": pad, "role": "user", "text": format!("m{n}") }),
+            )
+            .await;
+        timeids.push(m["message"]["timeid"].as_i64().unwrap());
+    }
+    assert!(timeids.windows(2).all(|w| w[0] < w[1]), "{timeids:?}");
+
+    // From 0, two at a time: three pages, the last one short and final.
+    let mut cursor = 0i64;
+    let mut seen = Vec::new();
+    let mut pages = 0;
+    loop {
+        let res = alice
+            .ok(
+                "playground.chat.sync",
+                json!({ "after": cursor, "limit": 2 }),
+            )
+            .await;
+        pages += 1;
+        let page = res["messages"].as_array().unwrap();
+        assert_eq!(res["head"].as_i64().unwrap(), *timeids.last().unwrap());
+        for m in page {
+            let t = m["timeid"].as_i64().unwrap();
+            assert!(t > cursor, "exclusive: {t} after {cursor}");
+            cursor = t;
+            seen.push(m["text"].as_str().unwrap().to_string());
+        }
+        if !res["more"].as_bool().unwrap() {
+            break;
+        }
+        assert!(pages < 10, "the loop did not end");
+    }
+    assert_eq!(pages, 3);
+    assert_eq!(seen, ["m0", "m1", "m2", "m3", "m4"]);
+    assert_eq!(cursor, *timeids.last().unwrap());
+    // Both rooms were in it, each message naming its own pad.
+    let all = alice
+        .ok("playground.chat.sync", json!({ "after": 0 }))
+        .await;
+    let pads: Vec<&str> = all["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["snippet_id"].as_str().unwrap())
+        .collect();
+    assert_eq!(pads, [&a, &b, &a, &b, &a]);
+
+    // `list` takes the same cursor for one room.
+    let tail = alice
+        .ok(
+            "playground.chat.list",
+            json!({ "id": a, "after": timeids[2] }),
+        )
+        .await;
+    let texts: Vec<&str> = tail["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(texts, ["m4"]);
+
+    // A clear takes its rows; the clock does not go back with them.
+    alice.ok("playground.chat.clear", json!({ "id": a })).await;
+    let late = alice
+        .ok(
+            "playground.chat.post",
+            json!({ "id": a, "role": "user", "text": "after the clear" }),
+        )
+        .await;
+    assert!(late["message"]["timeid"].as_i64().unwrap() > cursor);
+    let fresh = alice
+        .ok("playground.chat.sync", json!({ "after": cursor }))
+        .await;
+    let texts: Vec<&str> = fresh["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(texts, ["after the clear"]);
+
+    // Somebody else's cursor sees only their own rooms — nothing, here.
+    let mut bob = Client::connect(server.port).await;
+    bob.login(BOB_KEY).await;
+    let bobs = bob.ok("playground.chat.sync", json!({ "after": 0 })).await;
+    assert!(bobs["messages"].as_array().unwrap().is_empty());
+    assert_eq!(bobs["head"], 0);
+    server.handle.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn edits_and_deletes_reach_a_syncing_client_as_changes_to_the_same_id() {
+    let server = start().await;
+    let mut alice = Client::connect(server.port).await;
+    alice.login(ALICE_KEY).await;
+    let id = alice.new_pad().await;
+    let first = alice
+        .ok(
+            "playground.chat.post",
+            json!({ "id": id, "role": "user", "text": "typo hear" }),
+        )
+        .await["message"]
+        .clone();
+    let photo = alice
+        .ok(
+            "playground.chat.post",
+            json!({ "id": id, "role": "agent", "text": "a crab", "image_b64": b64(PNG), "image_type": "image/png" }),
+        )
+        .await["message"]
+        .clone();
+    let cursor = photo["timeid"].as_i64().unwrap();
+    let url = photo["photo_url"].as_str().unwrap().to_string();
+
+    // Edit: same id, later timeid, new words, flagged.
+    let edited = alice
+        .ok(
+            "playground.chat.edit",
+            json!({ "message_id": first["id"], "text": "typo here" }),
+        )
+        .await["message"]
+        .clone();
+    assert_eq!(edited["id"], first["id"]);
+    assert!(edited["timeid"].as_i64().unwrap() > cursor);
+    assert_eq!(edited["text"], "typo here");
+    assert_eq!(edited["edited"], true);
+    assert_eq!(edited["deleted"], false);
+
+    // Delete: same id, later still, scrubbed, flagged, photo gone from the web.
+    let gone = alice
+        .ok(
+            "playground.chat.delete",
+            json!({ "message_id": photo["id"] }),
+        )
+        .await["message"]
+        .clone();
+    assert_eq!(gone["id"], photo["id"]);
+    assert!(gone["timeid"].as_i64().unwrap() > edited["timeid"].as_i64().unwrap());
+    assert_eq!(gone["deleted"], true);
+    assert_eq!(gone["text"], "");
+    assert!(gone["photo_url"].is_null());
+    let (status, _, _) = http_get(server.port, &url).await;
+    assert_eq!(status, 404);
+
+    // A client at the old cursor receives both changes, in order, by id.
+    let sync = alice
+        .ok("playground.chat.sync", json!({ "after": cursor }))
+        .await;
+    let page = sync["messages"].as_array().unwrap();
+    assert_eq!(page.len(), 2);
+    assert_eq!(page[0]["id"], first["id"]);
+    assert_eq!(page[0]["edited"], true);
+    assert_eq!(page[1]["id"], photo["id"]);
+    assert_eq!(page[1]["deleted"], true);
+    assert_eq!(sync["head"], gone["timeid"]);
+    // A room read from the start shows the edit and not the tombstone.
+    let list = alice.ok("playground.chat.list", json!({ "id": id })).await;
+    let texts: Vec<&str> = list["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(texts, ["typo here"]);
+
+    // The refusals: no such message, a bad id, an empty edit, Bob's hands.
+    assert_eq!(
+        alice
+            .err(
+                "playground.chat.edit",
+                json!({ "message_id": 999_999, "text": "x" })
+            )
+            .await,
+        "not_found"
+    );
+    assert_eq!(
+        alice
+            .err(
+                "playground.chat.edit",
+                json!({ "message_id": "abc", "text": "x" })
+            )
+            .await,
+        "bad_request"
+    );
+    assert_eq!(
+        alice
+            .err(
+                "playground.chat.edit",
+                json!({ "message_id": first["id"], "text": " " })
+            )
+            .await,
+        "bad_request"
+    );
+    let mut bob = Client::connect(server.port).await;
+    bob.login(BOB_KEY).await;
+    assert_eq!(
+        bob.err(
+            "playground.chat.delete",
+            json!({ "message_id": first["id"] })
+        )
+        .await,
+        "not_found"
+    );
+    assert_eq!(
+        bob.err(
+            "playground.chat.edit",
+            json!({ "message_id": first["id"], "text": "mine" })
+        )
+        .await,
+        "not_found"
+    );
     server.handle.abort();
 }

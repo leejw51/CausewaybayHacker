@@ -35,6 +35,9 @@ export interface Item {
   text: string;
   photoUrl?: string | null;
   at?: string;
+  /** The server's id, once it has one; a tab-only line has none. */
+  id?: number;
+  edited?: boolean;
   /** Still streaming. */
   live?: boolean;
   error?: boolean;
@@ -47,6 +50,9 @@ export interface Verbs {
   image(brief: string): void;
   stop(): void;
   clear(): void;
+  /** A message's text, changed; and one taken back. By the server's id. */
+  edit(id: number, text: string): void;
+  delete(id: number): void;
   /** Something for the bubble. */
   note(text: string): void;
 }
@@ -72,6 +78,12 @@ export class Panel {
   private keyField: Overlay | null = null;
   private modelField: Overlay | null = null;
   private listRect: Rect = [0, 0, 0, 0];
+  /** Where each message was drawn this frame, for a tap to pick one. */
+  private rows: Array<{ id: number; top: number; bottom: number; text: boolean }> = [];
+  /** The message a tap picked, by id, or null. */
+  selected: number | null = null;
+  /** The message the field is editing, or null when it is a new one. */
+  editing: number | null = null;
   private models: string[] = [];
   private modelsFor: Provider | null = null;
   private fetching = false;
@@ -94,7 +106,8 @@ export class Panel {
         this.submit();
       } else if (ev.key === "Escape") {
         ev.preventDefault();
-        field.blur();
+        if (this.editing !== null) this.stopEditing();
+        else field.blur();
       }
     });
     this.fieldEl = field;
@@ -161,7 +174,29 @@ export class Panel {
     const text = this.fieldEl.value;
     if (!text.trim()) return;
     this.fieldEl.value = "";
+    if (this.editing !== null) {
+      const id = this.editing;
+      this.stopEditing();
+      this.verbs.edit(id, text);
+      return;
+    }
     this.verbs.send(text);
+  }
+
+  /** Put a message's text in the field, to be sent back as its new text. */
+  startEditing(id: number): void {
+    const item = this.items.find((i) => i.id === id);
+    if (!item) return;
+    this.editing = id;
+    this.fieldEl.value = item.text;
+    this.status = t("agent.editing");
+    setTimeout(() => this.fieldEl.focus(), 0);
+  }
+
+  stopEditing(): void {
+    this.editing = null;
+    this.fieldEl.value = "";
+    if (this.status === t("agent.editing")) this.status = "";
   }
 
   private saveSetup(): void {
@@ -388,8 +423,28 @@ export class Panel {
     const fieldH = Math.max(layout.minTouchH(), body.height + Math.round(12 * s));
 
     // The verbs, at the foot, measured first.
+    const picked = this.selected === null ? null : this.rows.find((r) => r.id === this.selected);
+    const pickedItem =
+      this.selected === null ? null : this.items.find((i) => i.id === this.selected);
     const items = [
       { id: "send", label: t("agent.send"), primary: !ctx.busy, dim: ctx.busy },
+      // A picked message can be changed or taken back — a messenger's two
+      // verbs. EDIT only on text, and only while nothing else is in the field.
+      ...(pickedItem && picked
+        ? [
+            ...(pickedItem.photoUrl
+              ? []
+              : [
+                  {
+                    id: "editmsg",
+                    label: t("agent.edit"),
+                    dim: ctx.busy,
+                    strong: this.editing !== null,
+                  },
+                ]),
+            { id: "deletemsg", label: t("agent.delete"), dim: ctx.busy },
+          ]
+        : []),
       { id: "write", label: t("agent.write"), dim: ctx.busy },
       { id: "review", label: t("agent.review"), dim: ctx.busy },
       ...(ctx.canImage ? [{ id: "image", label: t("agent.image"), dim: ctx.busy }] : []),
@@ -442,8 +497,8 @@ export class Panel {
     // Laid out bottom-up from the tail, so the newest is always in view and
     // `scroll` walks back into the past — the console's own convention.
     type Line =
-      | { kind: "text"; text: string; color: RGBA; font: typeof body }
-      | { kind: "photo"; url: string; h: number }
+      | { kind: "text"; text: string; color: RGBA; font: typeof body; id?: number }
+      | { kind: "photo"; url: string; h: number; id?: number }
       | { kind: "gap"; h: number };
     const lines: Line[] = [];
     const shown = this.items.slice(-SHOW_MAX);
@@ -469,25 +524,40 @@ export class Panel {
               : Theme.dim
             : Theme.coin;
       lines.push({ kind: "gap", h: Math.round(4 * s) });
-      lines.push({ kind: "text", text: tag, color: tagColor, font: f });
+      const label = item.edited ? `${tag} · ${t("agent.edited")}` : tag;
+      lines.push({ kind: "text", text: label, color: tagColor, font: f, id: item.id });
       const color = item.role === "tool" ? (item.error ? Theme.red : Theme.dim) : Theme.cream;
       const text = item.live ? `${item.text}▌` : item.text;
       for (const l of wrap(body, text || " ", innerW))
-        lines.push({ kind: "text", text: l, color, font: body });
+        lines.push({ kind: "text", text: l, color, font: body, id: item.id });
       if (item.photoUrl)
-        lines.push({ kind: "photo", url: item.photoUrl, h: Math.round(innerW * PHOTO_SHARE) });
+        lines.push({
+          kind: "photo",
+          url: item.photoUrl,
+          h: Math.round(innerW * PHOTO_SHARE),
+          id: item.id,
+        });
     }
     const heightOf = (l: Line) => (l.kind === "text" ? l.font.height : l.h);
     const total = lines.reduce((n, l) => n + heightOf(l), 0);
     const room = Math.max(0, listH - pad * 2);
     this.overflow = Math.max(0, total - room);
     this.scroll = Math.max(0, Math.min(this.scroll, this.overflow));
+    this.rows = [];
     clipped(g, rect[0] + 4, rect[1] + 4, rect[2] - 8, Math.max(0, listH - 8), () => {
       // The bottom of the last line sits at the bottom of the well, moved
       // down by `scroll` so earlier lines come into view.
       let y = rect[1] + pad + room - total + this.scroll;
       for (const l of lines) {
         const h = heightOf(l);
+        // The span each server-backed message covers, for a tap; and the
+        // picked one lit behind its lines.
+        if (l.kind !== "gap" && l.id !== undefined) {
+          const last = this.rows[this.rows.length - 1];
+          if (last && last.id === l.id) last.bottom = y + h;
+          else this.rows.push({ id: l.id, top: y, bottom: y + h, text: l.kind === "text" });
+          if (l.id === this.selected) fill(g, Theme.coin, rect[0] + 4, y, rect[2] - 8, h, 0.14);
+        }
         if (y + h >= rect[1] && y <= rect[1] + listH) {
           if (l.kind === "text") {
             g.fillStyle = css(l.color);
@@ -510,6 +580,28 @@ export class Panel {
         y += h;
       }
     });
+    this.registerRows(rect, listH);
+  }
+
+  /**
+   * Every message's span as a painted button, `msg:<id>`, cut to the well.
+   * A tap on one picks it, and — the reason it is a button and not a private
+   * hit test — an automated run can find and press it like any control.
+   */
+  private registerRows(rect: Rect, listH: number): void {
+    const top = rect[1] + 4;
+    const bottom = rect[1] + Math.max(0, listH) - 4;
+    for (const r of this.rows) {
+      const y0 = Math.max(top, r.top);
+      const y1 = Math.min(bottom, r.bottom);
+      if (y1 <= y0) continue;
+      this.buttons.add({
+        id: `msg:${r.id}`,
+        rect: [rect[0] + 4, y0, rect[2] - 8, y1 - y0],
+        label: "",
+        painted: true,
+      });
+    }
   }
 
   private photo(url: string): HTMLImageElement | null {
@@ -534,8 +626,25 @@ export class Panel {
     }
     if (phase !== "down") return false;
     const hit = this.buttons.hit(x, y);
-    if (!hit) return inRect(x, y, this.listRect);
+    if (!hit) {
+      if (!inRect(x, y, this.listRect)) return false;
+      // A tap on nothing lets go of whatever was picked.
+      if (this.selected !== null) {
+        this.selected = null;
+        if (this.editing !== null) this.stopEditing();
+      }
+      return true;
+    }
     const id = hit.id;
+    if (id.startsWith("msg:")) {
+      // A tap on a message picks it; on the picked one, lets go.
+      const picked = Number(id.slice(4));
+      const next = picked === this.selected ? null : picked;
+      this.selected = next;
+      if (this.editing !== null && this.editing !== next) this.stopEditing();
+      this.app.chip.blip();
+      return true;
+    }
     if (id.startsWith("prov:")) {
       const p = id.slice(5) as Provider;
       writeProvider(p);
@@ -586,7 +695,23 @@ export class Panel {
         this.verbs.stop();
         break;
       case "clearroom":
+        this.selected = null;
+        this.stopEditing();
         this.verbs.clear();
+        break;
+      case "editmsg":
+        if (this.selected !== null) {
+          if (this.editing === this.selected) this.stopEditing();
+          else this.startEditing(this.selected);
+        }
+        break;
+      case "deletemsg":
+        if (this.selected !== null) {
+          const id = this.selected;
+          this.selected = null;
+          if (this.editing === id) this.stopEditing();
+          this.verbs.delete(id);
+        }
         break;
       case "savekey":
         this.saveSetup();

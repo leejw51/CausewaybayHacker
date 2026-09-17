@@ -84,9 +84,13 @@ export async function image(
     },
     { signal },
   );
-  const b64 = res.data?.[0]?.b64_json;
+  const first = res.data?.[0] as { b64_json?: string; mime_type?: string } | undefined;
+  const b64 = first?.b64_json;
   if (!b64) throw new Error("the provider sent no picture");
-  return { b64, mime: "image/png" };
+  // xAI says what it drew (`mime_type`, usually a JPEG); OpenAI's gpt-image-1
+  // is a PNG and says nothing.
+  const mime = first?.mime_type && /^image\//.test(first.mime_type) ? first.mime_type : "image/png";
+  return { b64, mime };
 }
 
 export async function listModels(provider: Provider, key: string): Promise<string[]> {

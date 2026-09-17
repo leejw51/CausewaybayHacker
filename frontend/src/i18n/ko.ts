@@ -393,7 +393,7 @@ export const ko: Partial<Catalogue> = {
     "프로그램을 작성하세요: {brief}. 그 다음 실행하고 컴파일러가 말하는 것을 고치세요.",
   "agent.writeAskBlank":
     "이 언어에서 배울 만한 것을 보여주는 작고 완전한 예제 프로그램을 쓰고 실행하세요.",
-  "agent.imageAsk": "그림을 만들어 주세요: {brief}",
+  "agent.imageAsk": "make_image 도구를 호출해 그림을 만들어 주세요: {brief}. 코드는 쓰지 마세요.",
   "agent.noImage": "{provider}는 그림을 만들 수 없습니다 — OPENAI나 GROK을 고르세요",
   "agent.cleared": "방을 비웠습니다",
   "agent.tip": "팁",
@@ -402,6 +402,13 @@ export const ko: Partial<Catalogue> = {
   "agent.busy": "코더가 바쁩니다 — 먼저 중지하세요",
   "agent.provider": "{name} · {model}",
   "agent.failed": "코더가 답하지 못했습니다: {why}",
+  "agent.edit": "수정",
+  "agent.delete": "삭제",
+  "agent.edited": "수정됨",
+  "agent.deleted": "메시지를 삭제했습니다",
+  "agent.editing": "수정 중 — ENTER로 저장, ESC로 원래 글 유지",
+  "agent.editFailed": "바꾸지 못했습니다: {why}",
+  "agent.deleteFailed": "삭제하지 못했습니다: {why}",
   "agent.hello":
     "안녕하세요. 러스트 코더입니다. 이 파일에 대해 무엇이든 묻거나, 무엇을 쓸지 말해 주세요.",
   "pg.diskVerified": "디스크 읽음 · {address} 작성·서명 · 검증됨",

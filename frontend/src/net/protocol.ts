@@ -449,7 +449,14 @@ export type SnippetBrief = Omit<Snippet, "source" | "stdin"> & { bytes: number }
  * a 4 MiB frame and the room lists two hundred of them. Null on text rows.
  */
 export interface ChatMessage {
-  id: string;
+  /** An int64 (under 2^53): the identity, never reused. */
+  id: number;
+  /**
+   * An int64: milliseconds since the epoch at post time, strictly increasing
+   * across every room of this server. The sync cursor — "after N" is what
+   * `list` and `sync` take, and `max(timeid)` over a page is the next N.
+   */
+  timeid: number;
   snippet_id: string;
   role: "user" | "agent" | "tool";
   kind: "text" | "image";
@@ -459,6 +466,13 @@ export interface ChatMessage {
   provider: string | null;
   model: string | null;
   created_at: string;
+  /** The text was changed after it was said; `timeid` moved with it. */
+  edited: boolean;
+  /**
+   * A tombstone: the text and the photo are gone and `timeid` moved, so a
+   * client holding a copy drops it. Never in a room read from the start.
+   */
+  deleted: boolean;
 }
 
 /** §5.14 — a hit from `playground.chat.search`, fused like `SearchHit`. */
@@ -541,7 +555,9 @@ export interface Requests {
   "playground.delete": { id: string };
   // §4.9f. The chatroom of one pad: the agent's and the person's messages
   // and photos, kept per entry, searched across every entry of one user.
-  "playground.chat.list": { id: string; limit?: number };
+  "playground.chat.list": { id: string; limit?: number; after?: number };
+  /** §4.9f: every room of this player past a cursor, oldest first, paged. */
+  "playground.chat.sync": { after?: number; limit?: number };
   "playground.chat.post": {
     id: string;
     role: ChatMessage["role"];
@@ -552,6 +568,10 @@ export interface Requests {
     provider?: string;
     model?: string;
   };
+  /** §4.9f: the row keeps its id and takes a new `timeid`. Text rows only. */
+  "playground.chat.edit": { message_id: number; text: string };
+  /** §4.9f: a tombstone, with a new `timeid`. Deleting one twice is the same tombstone. */
+  "playground.chat.delete": { message_id: number };
   "playground.chat.clear": { id: string };
   "playground.chat.search": { q: string; id?: string; mode?: SearchMode; limit?: number };
   "stats.summary": Record<string, never>;
@@ -617,7 +637,10 @@ export interface Responses {
   "playground.load": { snippet: Snippet };
   "playground.delete": Record<string, never>;
   "playground.chat.list": { messages: ChatMessage[] };
+  "playground.chat.sync": { messages: ChatMessage[]; head: number; more: boolean };
   "playground.chat.post": { message: ChatMessage };
+  "playground.chat.edit": { message: ChatMessage };
+  "playground.chat.delete": { message: ChatMessage };
   "playground.chat.clear": { id: string; cleared: number };
   "playground.chat.search": { hits: ChatHit[]; mode: SearchMode; took_ms: number };
   "search.query": { hits: SearchHit[]; mode: SearchMode; took_ms: number };

@@ -414,7 +414,7 @@ export const en = {
   "agent.writeAsk": "Write the program: {brief}. Then run it and fix what the compiler says.",
   "agent.writeAskBlank":
     "Write a small, complete example program that shows something worth learning in this language, then run it.",
-  "agent.imageAsk": "Make a picture: {brief}",
+  "agent.imageAsk": "Call the make_image tool to make a picture of: {brief}. Do not write code.",
   "agent.noImage": "{provider} cannot make pictures — pick OPENAI or GROK",
   "agent.cleared": "room cleared",
   "agent.tip": "TIP",
@@ -423,6 +423,13 @@ export const en = {
   "agent.busy": "the coder is busy — STOP first",
   "agent.provider": "{name} · {model}",
   "agent.failed": "the coder could not answer: {why}",
+  "agent.edit": "EDIT",
+  "agent.delete": "DELETE",
+  "agent.edited": "edited",
+  "agent.deleted": "message deleted",
+  "agent.editing": "editing — ENTER saves, ESC keeps the old text",
+  "agent.editFailed": "could not change it: {why}",
+  "agent.deleteFailed": "could not delete it: {why}",
   "agent.hello":
     "Hi. I'm the Rust coder. Ask me anything about this file, or tell me what to write.",
   "pg.diskVerified": "disk read · written and signed by {address} · verified",

@@ -27,6 +27,8 @@ function make() {
     image: vi.fn(),
     stop: vi.fn(),
     clear: vi.fn(),
+    edit: vi.fn(),
+    delete: vi.fn(),
     note: vi.fn(),
   };
   // The panel only reads `overlay`, `layout` and `chip` off the app.
@@ -114,6 +116,34 @@ describe("the panel", () => {
     expect(panel.key("escape", new KeyboardEvent("keydown", { key: "Escape" }))).toBe(false);
     expect(panel.key("a", new KeyboardEvent("keydown", { key: "a", ctrlKey: true }))).toBe(false);
     void overlay;
+  });
+
+  it("edits a picked message through the field, and lets go on Escape", () => {
+    const { panel, verbs, overlay } = make();
+    panel.mount();
+    panel.push({ id: 7, role: "user", text: "typo hear" });
+    panel.push({ id: 8, role: "agent", text: "sure" });
+    const [field] = fields(overlay);
+    panel.startEditing(7);
+    expect(panel.editing).toBe(7);
+    expect(field.value).toBe("typo hear");
+    expect(panel.status).toMatch(/ENTER/);
+    field.value = "typo here";
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+    expect(verbs.edit).toHaveBeenCalledWith(7, "typo here");
+    expect(verbs.send).not.toHaveBeenCalled();
+    expect(panel.editing).toBeNull();
+    expect(field.value).toBe("");
+    // Escape while editing keeps the old text and sends nothing.
+    panel.startEditing(8);
+    field.value = "changed my mind";
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+    expect(panel.editing).toBeNull();
+    expect(field.value).toBe("");
+    expect(verbs.edit).toHaveBeenCalledTimes(1);
+    // A message the panel does not hold cannot be edited.
+    panel.startEditing(99);
+    expect(panel.editing).toBeNull();
   });
 
   it("knows when the caret is in one of its fields", () => {

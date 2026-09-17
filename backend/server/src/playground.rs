@@ -12,7 +12,7 @@ use cwbhacker_runner::{Event, Submission, TestSpec, Verdict};
 use serde_json::json;
 
 use crate::handlers::Session;
-use crate::proto::{opt_i64_field, opt_str_field, str_field, Out};
+use crate::proto::{i64_field, opt_i64_field, opt_str_field, str_field, Out};
 use crate::state::Shared;
 use crate::submit::{Streamer, MAX_SOURCE_BYTES};
 
@@ -213,8 +213,30 @@ pub fn chat_list(
     let limit = opt_i64_field(payload, "limit")
         .unwrap_or(200)
         .clamp(1, chat::MAX_MESSAGES_PER_SNIPPET) as usize;
+    // The sync cursor: only what came after it. Absent or 0 is the whole room.
+    let after = opt_i64_field(payload, "after").unwrap_or(0).max(0);
     let conn = state.store.conn();
-    Ok(json!({ "messages": chat::list(&conn, address, &id, limit)? }))
+    Ok(json!({ "messages": chat::list(&conn, address, &id, limit, after)? }))
+}
+
+/// `playground.chat.sync` — every room at once, from a cursor: what this
+/// player said or was told after `after`, oldest first, capped. `head` is
+/// the newest `seq` they have, so a client that only wants the future can
+/// start there, and `more` says whether another page is waiting.
+pub fn chat_sync(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let after = opt_i64_field(payload, "after").unwrap_or(0).max(0);
+    let limit = opt_i64_field(payload, "limit").unwrap_or(200).clamp(1, 500) as usize;
+    let conn = state.store.conn();
+    let mut messages = chat::since(&conn, address, after, limit + 1)?;
+    let more = messages.len() > limit;
+    messages.truncate(limit);
+    let head = chat::head(&conn, address)?;
+    Ok(json!({ "messages": messages, "head": head, "more": more }))
 }
 
 /// `image_b64` decoded here, at the edge, so core takes bytes and a mime and
@@ -264,6 +286,42 @@ pub fn chat_post(
         provider.as_deref(),
         model.as_deref(),
     )?;
+    Ok(json!({ "message": message }))
+}
+
+/// `playground.chat.edit` — a message's text, changed. The row keeps its id
+/// and takes a new `timeid`; a syncing client folds it by id.
+pub fn chat_edit(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let message_id = i64_field(payload, "message_id")?;
+    let text = str_field(payload, "text")?;
+    let conn = state.store.conn();
+    let message = chat::edit(
+        &conn,
+        state.store.home(),
+        state.embedder.as_ref(),
+        address,
+        message_id,
+        &text,
+    )?;
+    Ok(json!({ "message": message }))
+}
+
+/// `playground.chat.delete` — one message taken back: a tombstone, with a
+/// new `timeid`, so every copy hears about it.
+pub fn chat_delete(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let message_id = i64_field(payload, "message_id")?;
+    let conn = state.store.conn();
+    let message = chat::delete(&conn, state.store.home(), address, message_id)?;
     Ok(json!({ "message": message }))
 }
 

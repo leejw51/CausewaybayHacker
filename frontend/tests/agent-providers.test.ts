@@ -294,6 +294,14 @@ describe("openai", () => {
     await expect(image("anthropic", "k", "a crab", ctl.signal)).rejects.toThrow(
       /cannot make pictures/,
     );
+    // xAI says what it drew; the room keeps that, not a guess.
+    openaiState.imageResult = { data: [{ b64_json: "BBBB", mime_type: "image/jpeg" }] };
+    expect(await image("grok", "k", "a crab", ctl.signal)).toEqual({
+      b64: "BBBB",
+      mime: "image/jpeg",
+    });
+    openaiState.imageResult = { data: [{ b64_json: "CCCC", mime_type: "nonsense" }] };
+    expect((await image("grok", "k", "a crab", ctl.signal)).mime).toBe("image/png");
     openaiState.imageResult = { data: [] };
     await expect(image("openai", "k", "a crab", ctl.signal)).rejects.toThrow(/no picture/);
   });

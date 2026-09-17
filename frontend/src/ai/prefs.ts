@@ -27,7 +27,8 @@ export const DEFAULT_MODEL: Record<Provider, string> = {
 export const IMAGE_MODEL: Record<Provider, string | null> = {
   anthropic: null,
   openai: "gpt-image-1",
-  grok: "grok-2-image",
+  // The model `art/tools/grok_image.sh` draws this game's own art with.
+  grok: "grok-imagine-image",
 };
 
 export const PROVIDER_NAME: Record<Provider, string> = {

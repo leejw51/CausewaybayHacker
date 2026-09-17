@@ -211,12 +211,8 @@ fn a_scratchpad_got_its_input_with_0012() {
 }
 
 #[test]
-fn the_newest_migration_is_the_one_that_gave_a_scratchpad_its_chatroom() {
-    // A specific check on top of the generic ones, so this file also documents
-    // what the last change actually was — and fails loudly if a future
-    // migration is added without extending the tests above.
-    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
-    let conn = database_at_version(previous);
+fn a_scratchpads_chatroom_arrived_with_0013() {
+    let conn = database_at_version(12);
     let tables = |c: &Connection| -> i64 {
         c.query_row(
             "SELECT count(*) FROM sqlite_master
@@ -229,4 +225,101 @@ fn the_newest_migration_is_the_one_that_gave_a_scratchpad_its_chatroom() {
     assert_eq!(tables(&conn), 0, "not there before 0013");
     db::prepare(&conn).unwrap();
     assert_eq!(tables(&conn), 3, "and there afterwards, unprompted");
+}
+
+#[test]
+fn every_message_got_an_id_and_a_timeid_with_0014() {
+    let conn = database_at_version(13);
+    // A room from before: text ids, three messages, one pair said in the
+    // same second, one said earlier but inserted later, one with a photo
+    // and a vector.
+    conn.execute_batch(
+        "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
+           VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}');
+         INSERT INTO snippets (id, address, name, lang, source, created_at, updated_at)
+           VALUES ('pg_0000000000000001', '0xaa', 'old', 'rust', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+         INSERT INTO snippet_messages (id, snippet_id, address, role, kind, text, photo, photo_token, created_at) VALUES
+           ('msg_000000000000000b', 'pg_0000000000000001', '0xaa', 'user', 'text', 'second', NULL, NULL, '2026-01-02T00:00:00Z'),
+           ('msg_000000000000000c', 'pg_0000000000000001', '0xaa', 'agent', 'image', 'third', 'msg_000000000000000c.png', 'ab', '2026-01-02T00:00:00Z'),
+           ('msg_000000000000000a', 'pg_0000000000000001', '0xaa', 'user', 'text', 'first', NULL, NULL, '2026-01-01T00:00:00Z');
+         INSERT INTO snippet_message_vec (message_id, dim, model, vec)
+           VALUES ('msg_000000000000000c', 1, 'hashed-v2-512', x'00000000');",
+    )
+    .unwrap();
+    assert!(
+        conn.prepare("SELECT timeid FROM snippet_messages").is_err(),
+        "no timeid before 0014"
+    );
+    db::prepare(&conn).unwrap();
+    let mut stmt = conn
+        .prepare("SELECT id, timeid, text, photo FROM snippet_messages ORDER BY timeid")
+        .unwrap();
+    let rows: Vec<(i64, i64, String, Option<String>)> = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+        .unwrap()
+        .map(|r| r.unwrap())
+        .collect();
+    // In the order they were said, ties broken by insertion; ids are ints
+    // and the photo keeps the file it always had.
+    assert_eq!(
+        rows.iter().map(|r| r.2.as_str()).collect::<Vec<_>>(),
+        ["first", "second", "third"]
+    );
+    assert!(rows[0].1 < rows[1].1 && rows[1].1 < rows[2].1, "{rows:?}");
+    assert_eq!(rows[1].1 + 1, rows[2].1, "a tie is one millisecond apart");
+    assert_eq!(rows[0].1, 1_767_225_600_000, "2026-01-01T00:00:00Z in ms");
+    assert!(rows.iter().all(|r| r.0 > 0));
+    assert_eq!(rows[2].3.as_deref(), Some("msg_000000000000000c.png"));
+    // The vector followed its message to the new id, and the FTS index was
+    // rebuilt over the new rowids.
+    let vec_for: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM snippet_message_vec v JOIN snippet_messages m ON m.id = v.message_id WHERE m.text = 'third'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(vec_for, 1);
+    let found: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM snippet_message_fts WHERE snippet_message_fts MATCH 'second'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(found, 1);
+    // And the clock stands past every row that exists.
+    let clock: i64 = conn
+        .query_row("SELECT last_timeid FROM chat_clock", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(clock, rows[2].1);
+}
+
+#[test]
+fn the_newest_migration_let_a_message_be_edited_or_deleted() {
+    // A specific check on top of the generic ones, so this file also documents
+    // what the last change actually was — and fails loudly if a future
+    // migration is added without extending the tests above.
+    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
+    assert_eq!(previous, 14);
+    let conn = database_at_version(previous);
+    conn.execute_batch(
+        "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
+           VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}');
+         INSERT INTO snippets (id, address, name, lang, source, created_at, updated_at)
+           VALUES ('pg_0000000000000001', '0xaa', 'old', 'rust', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+         INSERT INTO snippet_messages (timeid, snippet_id, address, role, kind, text, created_at)
+           VALUES (1767225600000, 'pg_0000000000000001', '0xaa', 'user', 'text', 'said', '2026-01-01T00:00:00Z');",
+    )
+    .unwrap();
+    assert!(conn
+        .prepare("SELECT edited, deleted FROM snippet_messages")
+        .is_err());
+    db::prepare(&conn).unwrap();
+    let (edited, deleted): (i64, i64) = conn
+        .query_row("SELECT edited, deleted FROM snippet_messages", [], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
+        .unwrap();
+    assert_eq!((edited, deleted), (0, 0), "what exists is as it was said");
 }

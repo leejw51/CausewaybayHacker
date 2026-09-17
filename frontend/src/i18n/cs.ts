@@ -409,7 +409,7 @@ export const cs: Partial<Catalogue> = {
   "agent.writeAsk": "Napiš program: {brief}. Pak ho spusť a oprav, co říká překladač.",
   "agent.writeAskBlank":
     "Napiš malý, úplný ukázkový program, který ukáže něco, co stojí za to se v tomto jazyce naučit, a spusť ho.",
-  "agent.imageAsk": "Udělej obrázek: {brief}",
+  "agent.imageAsk": "Zavolej nástroj make_image a udělej obrázek: {brief}. Nepiš kód.",
   "agent.noImage": "{provider} neumí obrázky — vyber OPENAI nebo GROK",
   "agent.cleared": "místnost vymazána",
   "agent.tip": "TIP",
@@ -418,6 +418,13 @@ export const cs: Partial<Catalogue> = {
   "agent.busy": "kodér má práci — nejdřív STOP",
   "agent.provider": "{name} · {model}",
   "agent.failed": "kodér nemohl odpovědět: {why}",
+  "agent.edit": "UPRAVIT",
+  "agent.delete": "SMAZAT",
+  "agent.edited": "upraveno",
+  "agent.deleted": "zpráva smazána",
+  "agent.editing": "úprava — ENTER uloží, ESC nechá původní text",
+  "agent.editFailed": "nepodařilo se změnit: {why}",
+  "agent.deleteFailed": "nepodařilo se smazat: {why}",
   "agent.hello":
     "Ahoj, jsem rustový kodér. Zeptej se na cokoli o tomto souboru, nebo mi řekni, co napsat.",
   "pg.diskVerified": "deska přečtena · napsal a podepsal {address} · ověřeno",

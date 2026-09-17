@@ -81,7 +81,16 @@ fn post_list_and_clear_are_the_owners_alone() {
         "user",
         "how does an iterator adapter work?",
     );
-    assert!(first.id.starts_with("msg_"));
+    assert!(
+        first.id > 0,
+        "an id is SQLite's int64, never 0: {}",
+        first.id
+    );
+    assert!(
+        first.timeid > 1_600_000_000_000,
+        "a timeid is milliseconds since the epoch: {}",
+        first.timeid
+    );
     assert_eq!(first.kind, "text");
     assert_eq!(first.photo_url, None);
     assert_eq!(first.provider.as_deref(), Some("openai"));
@@ -93,14 +102,14 @@ fn post_list_and_clear_are_the_owners_alone() {
         "map is lazy; collect drives it",
     );
 
-    let listed = store.with_conn(|conn| chat::list(conn, ALICE, &id, 200).unwrap());
+    let listed = store.with_conn(|conn| chat::list(conn, ALICE, &id, 200, 0).unwrap());
     assert_eq!(
-        listed.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
-        vec![first.id.as_str(), second.id.as_str()],
+        listed.iter().map(|m| m.id).collect::<Vec<_>>(),
+        vec![first.id, second.id],
         "oldest first"
     );
     // A limit keeps the newest, still in order.
-    let tail = store.with_conn(|conn| chat::list(conn, ALICE, &id, 1).unwrap());
+    let tail = store.with_conn(|conn| chat::list(conn, ALICE, &id, 1, 0).unwrap());
     assert_eq!(tail.len(), 1);
     assert_eq!(tail[0].id, second.id);
 
@@ -108,7 +117,7 @@ fn post_list_and_clear_are_the_owners_alone() {
     // it does not exist rather than that it is hers.
     store.with_conn(|conn| {
         assert_eq!(
-            chat::list(conn, BOB, &id, 200).unwrap_err().code,
+            chat::list(conn, BOB, &id, 200, 0).unwrap_err().code,
             cwbhacker_core::Code::NotFound
         );
         assert_eq!(
@@ -271,19 +280,17 @@ fn an_image_post_writes_the_file_and_the_transcript_grows_by_a_line() {
 
     // The route's lookup: the right token finds it, a wrong one does not.
     store.with_conn(|conn| {
-        let (path, mime) = chat::photo(conn, store.home(), &photo.id, &token)
+        let (path, mime) = chat::photo(conn, store.home(), photo.id, &token)
             .unwrap()
             .expect("the token minted at post time fetches it");
         assert_eq!(path, file);
         assert_eq!(mime, "image/png");
-        assert!(chat::photo(conn, store.home(), &photo.id, &"0".repeat(32))
+        assert!(chat::photo(conn, store.home(), photo.id, &"0".repeat(32))
             .unwrap()
             .is_none());
-        assert!(
-            chat::photo(conn, store.home(), "msg_0000000000000000", &token)
-                .unwrap()
-                .is_none()
-        );
+        assert!(chat::photo(conn, store.home(), photo.id + 1, &token)
+            .unwrap()
+            .is_none());
     });
 
     // The limits: a wrong type and a photo over the cap are both refused.
@@ -383,11 +390,7 @@ fn search_finds_a_word_and_a_near_word() {
     let hits = store.with_conn(|conn| {
         chat::search(conn, &embedder, ALICE, "iterators", None, Mode::Unified, 10).unwrap()
     });
-    assert_eq!(
-        hits.first().map(|h| h.message.id.as_str()),
-        Some(hit.id.as_str()),
-        "{hits:?}"
-    );
+    assert_eq!(hits.first().map(|h| h.message.id), Some(hit.id), "{hits:?}");
     assert!(hits[0].cosine.is_some());
 
     // Narrowed to the other pad, the iterator line is out of scope.
@@ -592,7 +595,7 @@ fn every_role_is_kept_with_its_provider_and_model() {
         assert_eq!(m.provider.as_deref(), Some("openai"));
         assert_eq!(m.model.as_deref(), Some("gpt-4.1"));
         assert!(m.photo_url.is_none());
-        assert!(m.id.starts_with("msg_"));
+        assert!(m.id > 0);
     }
     // Absent is absent, not an empty string.
     let bare = store.with_conn(|conn| {
@@ -620,11 +623,11 @@ fn the_list_window_keeps_the_newest_in_the_order_they_were_said() {
     for n in 0..12 {
         say(&store, &embedder, &id, "user", &format!("line {n}"));
     }
-    let all = store.with_conn(|conn| chat::list(conn, ALICE, &id, 500).unwrap());
+    let all = store.with_conn(|conn| chat::list(conn, ALICE, &id, 500, 0).unwrap());
     assert_eq!(all.len(), 12);
     assert_eq!(all.first().unwrap().text, "line 0");
     assert_eq!(all.last().unwrap().text, "line 11");
-    let tail = store.with_conn(|conn| chat::list(conn, ALICE, &id, 5).unwrap());
+    let tail = store.with_conn(|conn| chat::list(conn, ALICE, &id, 5, 0).unwrap());
     assert_eq!(
         tail.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(),
         ["line 7", "line 8", "line 9", "line 10", "line 11"]
@@ -834,15 +837,363 @@ fn a_photo_lookup_needs_the_right_token() {
     let tail = url.strip_prefix(&format!("/photos/{}/", m.id)).unwrap();
     let token = tail.strip_suffix(".png").unwrap();
     assert_eq!(token.len(), 32);
-    let found = store.with_conn(|conn| chat::photo(conn, store.home(), &m.id, token).unwrap());
+    let found = store.with_conn(|conn| chat::photo(conn, store.home(), m.id, token).unwrap());
     let (path, mime) = found.expect("the right token finds the file");
     assert_eq!(mime, "image/png");
     assert_eq!(std::fs::read(path).unwrap(), PNG);
     let wrong = "0".repeat(32);
     assert!(store
-        .with_conn(|conn| chat::photo(conn, store.home(), &m.id, &wrong).unwrap())
+        .with_conn(|conn| chat::photo(conn, store.home(), m.id, &wrong).unwrap())
         .is_none());
     assert!(store
-        .with_conn(|conn| chat::photo(conn, store.home(), "msg_nope", token).unwrap())
+        .with_conn(|conn| chat::photo(conn, store.home(), m.id + 1, token).unwrap())
         .is_none());
+}
+
+// ---------------------------------------------------------------------------
+// Sync: the two int64s, and the cursor over them (PROTOCOL §4.9f).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ids_and_timeids_are_two_different_numbers_both_only_going_up() {
+    let (_tmp, store, embedder, id) = room();
+    let other = store.with_conn(|conn| {
+        snippets::save(
+            conn,
+            store.home(),
+            ALICE,
+            None,
+            Some("other pad"),
+            "go",
+            "package main\n",
+            None,
+        )
+        .unwrap()
+        .id
+    });
+    let a = say(&store, &embedder, &id, "user", "one");
+    let b = say(&store, &embedder, &other, "user", "two");
+    let c = say(&store, &embedder, &id, "agent", "three");
+    // The identity is SQLite's, small and sequential; the cursor is the
+    // clock's, milliseconds since the epoch. They are not the same number.
+    assert!(a.id < b.id && b.id < c.id, "{} {} {}", a.id, b.id, c.id);
+    assert!(a.timeid < b.timeid && b.timeid < c.timeid);
+    assert!(a.timeid > 1_600_000_000_000 && a.timeid < chat::MAX_SAFE_TIMEID);
+    assert_ne!(a.id, a.timeid);
+    // Across rooms: one cursor orders everything a player has.
+    let all = store.with_conn(|conn| chat::since(conn, ALICE, 0, 100).unwrap());
+    assert_eq!(
+        all.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(),
+        ["one", "two", "three"]
+    );
+    assert_eq!(
+        store.with_conn(|conn| chat::head(conn, ALICE).unwrap()),
+        c.timeid
+    );
+    assert_eq!(store.with_conn(|conn| chat::head(conn, BOB).unwrap()), 0);
+}
+
+#[test]
+fn two_posts_in_one_millisecond_still_get_two_timeids() {
+    let (_tmp, store, embedder, id) = room();
+    // Faster than the clock ticks: every timeid is strictly greater than
+    // the last, by exactly one when the clock has not moved.
+    let mut last = 0;
+    for n in 0..50 {
+        let m = say(&store, &embedder, &id, "user", &format!("burst {n}"));
+        assert!(m.timeid > last, "{} after {last}", m.timeid);
+        last = m.timeid;
+    }
+    let listed = store.with_conn(|conn| chat::list(conn, ALICE, &id, 500, 0).unwrap());
+    let mut sorted = listed.iter().map(|m| m.timeid).collect::<Vec<_>>();
+    sorted.dedup();
+    assert_eq!(sorted.len(), 50, "no two share a timeid");
+}
+
+#[test]
+fn the_cursor_is_exclusive_and_pages_with_more() {
+    let (_tmp, store, embedder, id) = room();
+    let posted: Vec<chat::Message> = (0..7)
+        .map(|n| say(&store, &embedder, &id, "user", &format!("m{n}")))
+        .collect();
+    // After the third: exactly the four that followed, oldest first.
+    let after =
+        store.with_conn(|conn| chat::list(conn, ALICE, &id, 500, posted[2].timeid).unwrap());
+    assert_eq!(
+        after.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(),
+        ["m3", "m4", "m5", "m6"]
+    );
+    // After the head: nothing. After 0: everything.
+    assert!(store
+        .with_conn(|conn| chat::list(conn, ALICE, &id, 500, posted[6].timeid).unwrap())
+        .is_empty());
+    assert_eq!(
+        store
+            .with_conn(|conn| chat::list(conn, ALICE, &id, 500, 0).unwrap())
+            .len(),
+        7
+    );
+    // `since` walks forward a page at a time and reaches the head.
+    let mut cursor = 0;
+    let mut seen = Vec::new();
+    loop {
+        let page = store.with_conn(|conn| chat::since(conn, ALICE, cursor, 3).unwrap());
+        if page.is_empty() {
+            break;
+        }
+        cursor = page.last().unwrap().timeid;
+        seen.extend(page.into_iter().map(|m| m.text));
+    }
+    assert_eq!(seen, ["m0", "m1", "m2", "m3", "m4", "m5", "m6"]);
+    assert_eq!(cursor, posted[6].timeid);
+}
+
+#[test]
+fn a_cleared_room_cannot_land_a_post_under_what_a_client_saw() {
+    let (_tmp, store, embedder, id) = room();
+    let before = say(&store, &embedder, &id, "user", "before the clear");
+    store.with_conn(|conn| chat::clear(conn, store.home(), ALICE, &id).unwrap());
+    assert_eq!(store.with_conn(|conn| chat::head(conn, ALICE).unwrap()), 0);
+    // The clock is its own row: the next post is newer than everything any
+    // client was ever handed, even though no row remembers it.
+    let after = say(&store, &embedder, &id, "user", "after the clear");
+    assert!(after.timeid > before.timeid);
+    // And a client sitting at the old cursor sees only the new one.
+    let fresh = store.with_conn(|conn| chat::since(conn, ALICE, before.timeid, 100).unwrap());
+    assert_eq!(fresh.len(), 1);
+    assert_eq!(fresh[0].text, "after the clear");
+}
+
+#[test]
+fn the_photo_url_is_named_by_the_id() {
+    let (_tmp, store, embedder, id) = room();
+    let m = store.with_conn(|conn| {
+        chat::post(
+            conn,
+            store.home(),
+            &embedder,
+            ALICE,
+            &id,
+            "agent",
+            "a crab",
+            Some((PNG, "image/png")),
+            None,
+            None,
+        )
+        .unwrap()
+    });
+    let url = m.photo_url.clone().unwrap();
+    assert!(url.starts_with(&format!("/photos/{}/", m.id)), "{url}");
+    assert!(
+        store
+            .home()
+            .snippet_photo_dir(ALICE, &id)
+            .join(format!("{}.png", m.id))
+            .exists(),
+        "the file is named by the id"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Edit and delete: the row stays, the timeid moves, sync says what happened.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn an_edit_keeps_the_id_moves_the_timeid_and_is_found_by_its_new_words() {
+    let (_tmp, store, embedder, id) = room();
+    let m = say(&store, &embedder, &id, "user", "the borrow checkr");
+    let later = say(&store, &embedder, &id, "agent", "sure");
+    let edited = store.with_conn(|conn| {
+        chat::edit(
+            conn,
+            store.home(),
+            &embedder,
+            ALICE,
+            m.id,
+            "the borrow checker",
+        )
+        .unwrap()
+    });
+    assert_eq!(edited.id, m.id);
+    assert!(edited.edited);
+    assert!(!edited.deleted);
+    assert_eq!(edited.text, "the borrow checker");
+    assert!(
+        edited.timeid > later.timeid,
+        "an edit lands after everything said since"
+    );
+    assert_eq!(
+        edited.created_at, m.created_at,
+        "when it was said does not change"
+    );
+    // A cursor past the original receives the edit; a read from the start
+    // shows it in its old place with its new words.
+    let past = store.with_conn(|conn| chat::since(conn, ALICE, later.timeid, 10).unwrap());
+    assert_eq!(past.iter().map(|x| x.id).collect::<Vec<_>>(), vec![m.id]);
+    let listed = store.with_conn(|conn| chat::list(conn, ALICE, &id, 100, 0).unwrap());
+    assert_eq!(
+        listed.iter().map(|x| x.text.as_str()).collect::<Vec<_>>(),
+        ["sure", "the borrow checker"],
+        "listed in timeid order, so the edit comes last"
+    );
+    // Search follows the new words, not the old.
+    let hits = store.with_conn(|conn| {
+        chat::search(conn, &embedder, ALICE, "checker", None, Mode::Bm25, 10).unwrap()
+    });
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].message.id, m.id);
+    let old = store.with_conn(|conn| {
+        chat::search(conn, &embedder, ALICE, "checkr", None, Mode::Bm25, 10).unwrap()
+    });
+    assert!(old.is_empty());
+    // The mirror on disk has both versions, in order.
+    let lines =
+        std::fs::read_to_string(store.home().snippet_dir(ALICE, &id).join("chat.jsonl")).unwrap();
+    assert_eq!(lines.lines().count(), 3);
+    assert!(lines.lines().last().unwrap().contains("the borrow checker"));
+}
+
+#[test]
+fn an_edit_is_refused_where_it_makes_no_sense() {
+    let (_tmp, store, embedder, id) = room();
+    let bad = cwbhacker_core::Code::BadRequest;
+    let m = say(&store, &embedder, &id, "user", "hello");
+    let photo = store.with_conn(|conn| {
+        chat::post(
+            conn,
+            store.home(),
+            &embedder,
+            ALICE,
+            &id,
+            "agent",
+            "a crab",
+            Some((PNG, "image/png")),
+            None,
+            None,
+        )
+        .unwrap()
+    });
+    store.with_conn(|conn| {
+        assert_eq!(
+            chat::edit(conn, store.home(), &embedder, ALICE, m.id, "   ")
+                .unwrap_err()
+                .code,
+            bad
+        );
+        assert_eq!(
+            chat::edit(conn, store.home(), &embedder, ALICE, photo.id, "x")
+                .unwrap_err()
+                .code,
+            bad
+        );
+        let wall = "x".repeat(chat::MAX_TEXT_BYTES + 1);
+        assert_eq!(
+            chat::edit(conn, store.home(), &embedder, ALICE, m.id, &wall)
+                .unwrap_err()
+                .code,
+            bad
+        );
+        // Somebody else's message is not found, and an id nobody has either.
+        assert_eq!(
+            chat::edit(conn, store.home(), &embedder, BOB, m.id, "mine now")
+                .unwrap_err()
+                .code,
+            cwbhacker_core::Code::NotFound
+        );
+        assert_eq!(
+            chat::edit(conn, store.home(), &embedder, ALICE, m.id + 100, "x")
+                .unwrap_err()
+                .code,
+            cwbhacker_core::Code::NotFound
+        );
+        // A tombstone is not edited.
+        chat::delete(conn, store.home(), ALICE, m.id).unwrap();
+        assert_eq!(
+            chat::edit(conn, store.home(), &embedder, ALICE, m.id, "back")
+                .unwrap_err()
+                .code,
+            bad
+        );
+    });
+}
+
+#[test]
+fn a_delete_leaves_a_tombstone_that_a_cursor_hears_and_a_room_does_not_show() {
+    let (_tmp, store, embedder, id) = room();
+    let kept = say(&store, &embedder, &id, "user", "keep this");
+    let photo = store.with_conn(|conn| {
+        chat::post(
+            conn,
+            store.home(),
+            &embedder,
+            ALICE,
+            &id,
+            "agent",
+            "a crab",
+            Some((PNG, "image/png")),
+            None,
+            None,
+        )
+        .unwrap()
+    });
+    let file = store
+        .home()
+        .snippet_photo_dir(ALICE, &id)
+        .join(format!("{}.png", photo.id));
+    assert!(file.exists());
+    let head = store.with_conn(|conn| chat::head(conn, ALICE).unwrap());
+
+    let gone = store.with_conn(|conn| chat::delete(conn, store.home(), ALICE, photo.id).unwrap());
+    assert_eq!(gone.id, photo.id);
+    assert!(gone.deleted);
+    assert_eq!(gone.text, "");
+    assert!(gone.photo_url.is_none());
+    assert!(
+        gone.timeid > head,
+        "a tombstone lands after everything said before it"
+    );
+    assert!(!file.exists(), "the picture is gone from the disk");
+    assert_eq!(
+        count(&store, "SELECT count(*) FROM snippet_message_vec"),
+        1,
+        "only the kept message has a vector"
+    );
+    // The room read from the start does not show it; a cursor past the
+    // original receives exactly the tombstone; everything after 0 has it.
+    let listed = store.with_conn(|conn| chat::list(conn, ALICE, &id, 100, 0).unwrap());
+    assert_eq!(
+        listed.iter().map(|m| m.id).collect::<Vec<_>>(),
+        vec![kept.id]
+    );
+    let past = store.with_conn(|conn| chat::list(conn, ALICE, &id, 100, head).unwrap());
+    assert_eq!(past.len(), 1);
+    assert!(past[0].deleted && past[0].id == photo.id);
+    let all = store.with_conn(|conn| chat::since(conn, ALICE, 0, 100).unwrap());
+    assert_eq!(all.len(), 2);
+    assert!(all[1].deleted);
+    // Search no longer finds it, by word or by meaning.
+    let hits = store.with_conn(|conn| {
+        chat::search(conn, &embedder, ALICE, "crab", None, Mode::Unified, 10).unwrap()
+    });
+    assert!(hits.is_empty());
+    // Deleting it again is the same tombstone, and the clock does not move.
+    let again = store.with_conn(|conn| chat::delete(conn, store.home(), ALICE, photo.id).unwrap());
+    assert_eq!(again.timeid, gone.timeid);
+    // The photo route has nothing to serve.
+    assert!(store
+        .with_conn(|conn| chat::photo(
+            conn,
+            store.home(),
+            photo.id,
+            "0000000000000000000000000000000000"
+        )
+        .unwrap())
+        .is_none());
+    // Bob cannot delete Alice's.
+    assert_eq!(
+        store.with_conn(|conn| chat::delete(conn, store.home(), BOB, kept.id)
+            .unwrap_err()
+            .code),
+        cwbhacker_core::Code::NotFound
+    );
 }

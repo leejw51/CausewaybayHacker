@@ -843,6 +843,13 @@ export class PlaygroundScene implements Scene {
     this.coder = new Coder(this.app, {
       lang: () => this.held.lang,
       roomId: () => this.held.id,
+      ensureRoom: async () => {
+        if (this.held.id) return this.held.id;
+        // An untouched starter has nothing to autosave; the room is a reason.
+        this.dirty = true;
+        await this.save();
+        return this.held.id;
+      },
       run: async (_source, stdin) => {
         if (stdin !== undefined) {
           this.stdinEl.value = stdin;

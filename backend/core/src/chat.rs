@@ -40,7 +40,14 @@ pub const MAX_TEXT_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Message {
-    pub id: String,
+    /// The identity: an int64 SQLite hands out and never reuses. It names the
+    /// row, the photo file and the photo URL.
+    pub id: i64,
+    /// The sync cursor (PROTOCOL §4.9f): milliseconds since the epoch at post
+    /// time, or one past the last `timeid` handed out when the clock has not
+    /// moved on. Strictly increasing across every room this server has, so
+    /// "everything after N" is one query whatever room it is in. Never 0.
+    pub timeid: i64,
     pub snippet_id: String,
     pub role: String,
     pub kind: String,
@@ -52,6 +59,12 @@ pub struct Message {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub created_at: String,
+    /// The text was changed after it was said; `timeid` moved with it.
+    pub edited: bool,
+    /// A tombstone: the text is gone, the photo is gone, `timeid` moved so a
+    /// client past the original hears about it. Hidden from a room read from
+    /// the start; delivered to a cursor.
+    pub deleted: bool,
 }
 
 /// One search result (PROTOCOL §5.14): the message, the pad it was said in,
@@ -98,10 +111,10 @@ fn check_role(role: &str) -> Result<()> {
 }
 
 const COLUMNS: &str =
-    "id, snippet_id, role, kind, text, photo, photo_token, provider, model, created_at";
+    "id, snippet_id, role, kind, text, photo, photo_token, provider, model, created_at, timeid, edited, deleted";
 
 fn read_message(r: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
-    let id: String = r.get(0)?;
+    let id: i64 = r.get(0)?;
     let photo: Option<String> = r.get(5)?;
     let token: Option<String> = r.get(6)?;
     let photo_url = match (photo, token) {
@@ -121,10 +134,40 @@ fn read_message(r: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
         provider: r.get(7)?,
         model: r.get(8)?,
         created_at: r.get(9)?,
+        timeid: r.get(10)?,
+        edited: r.get::<_, i64>(11)? != 0,
+        deleted: r.get::<_, i64>(12)? != 0,
     })
 }
 
-fn get(conn: &Connection, address: &str, id: &str) -> Result<Option<Message>> {
+/// The largest `timeid` a JavaScript client can hold exactly (2^53 - 1). An
+/// int64 goes further, but a browser reading past this would round, and a
+/// rounded cursor skips messages. PocketSkynet draws the same line.
+pub const MAX_SAFE_TIMEID: i64 = 9_007_199_254_740_991;
+
+/// The next `timeid`: `max(last handed out, now in ms) + 1`, read and bumped
+/// in one statement on the one connection this server writes through
+/// (`store.rs`), so two posts cannot draw the same number, a clock that
+/// stepped back cannot hand out an old one, and a cleared room — whose rows
+/// are gone — cannot let the next post land under what a client already saw.
+fn next_timeid(conn: &Connection) -> Result<i64> {
+    let now = crate::time::now().timestamp_millis();
+    let timeid: i64 = conn.query_row(
+        "INSERT INTO chat_clock (one, last_timeid) VALUES (1, max(?1, 0) + 1)
+         ON CONFLICT (one) DO UPDATE SET last_timeid = max(chat_clock.last_timeid, ?1) + 1
+         RETURNING last_timeid",
+        params![now],
+        |r| r.get(0),
+    )?;
+    if timeid > MAX_SAFE_TIMEID {
+        return Err(bad_request(
+            "the chat clock has run past what a client can count",
+        ));
+    }
+    Ok(timeid)
+}
+
+fn get(conn: &Connection, address: &str, id: i64) -> Result<Option<Message>> {
     Ok(conn
         .query_row(
             &format!("SELECT {COLUMNS} FROM snippet_messages WHERE id = ?1 AND address = ?2"),
@@ -136,25 +179,59 @@ fn get(conn: &Connection, address: &str, id: &str) -> Result<Option<Message>> {
 
 /// The room, oldest first, so a client appends as it reads. `limit` keeps
 /// the **newest** that many — a room past the limit shows its recent end,
-/// not its first day — and they still come back in the order they were said.
+/// not its first day — and they still come back in the order they were
+/// said. `after` is the sync cursor: only messages with a `timeid` past it,
+/// which is how a client that already holds the room asks for the rest.
+/// A read from the start (`after == 0`) leaves the tombstones out — nobody
+/// holds a copy to retire — while a cursor gets them, because somebody does.
 pub fn list(
     conn: &Connection,
     address: &str,
     snippet_id: &str,
     limit: usize,
+    after: i64,
 ) -> Result<Vec<Message>> {
     // Somebody else's snippet is `not_found`, before a single row is read.
     let _ = snippets::get(conn, address, snippet_id)?;
     let mut stmt = conn.prepare(&format!(
         "SELECT {COLUMNS} FROM (
-            SELECT {COLUMNS}, rowid AS seq FROM snippet_messages
-             WHERE snippet_id = ?1 AND address = ?2
-             ORDER BY created_at DESC, rowid DESC
+            SELECT {COLUMNS} FROM snippet_messages
+             WHERE snippet_id = ?1 AND address = ?2 AND timeid > ?4
+               AND (?4 > 0 OR deleted = 0)
+             ORDER BY timeid DESC
              LIMIT ?3)
-          ORDER BY created_at ASC, seq ASC"
+          ORDER BY timeid ASC"
     ))?;
-    let rows = stmt.query_map(params![snippet_id, address, limit as i64], read_message)?;
+    let rows = stmt.query_map(
+        params![snippet_id, address, limit as i64, after],
+        read_message,
+    )?;
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// Every message of this player past `after`, whichever room it is in, in
+/// `timeid` order and at most `limit` of them — the other half of sync, for a
+/// client keeping every room. The oldest first this time: a client walks
+/// forward from its cursor and takes the last `timeid` it saw as the next one.
+pub fn since(conn: &Connection, address: &str, after: i64, limit: usize) -> Result<Vec<Message>> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {COLUMNS} FROM snippet_messages
+          WHERE address = ?1 AND timeid > ?2
+          ORDER BY timeid ASC
+          LIMIT ?3"
+    ))?;
+    let rows = stmt.query_map(params![address, after, limit as i64], read_message)?;
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// The newest `timeid` this player has, or 0: where a fresh client's cursor
+/// starts if it only wants what comes next.
+pub fn head(conn: &Connection, address: &str) -> Result<i64> {
+    Ok(conn.query_row(
+        "SELECT coalesce(max(timeid), 0) FROM snippet_messages WHERE address = ?1",
+        params![address],
+        |r| r.get(0),
+    )?)
 }
 
 /// Post one message. `image` is `(bytes, mime)`; when it is present the row
@@ -217,23 +294,27 @@ pub fn post(
         )));
     }
 
-    let id = ids::message_id();
+    let timeid = next_timeid(conn)?;
     let now = now_stamp();
-    let (kind, file, token) = match photo {
-        Some((_, ext)) => (
-            "image",
-            Some(format!("{id}.{ext}")),
-            Some(ids::photo_token()),
-        ),
-        None => ("text", None, None),
-    };
+    let kind = if photo.is_some() { "image" } else { "text" };
+    let token = photo.map(|_| ids::photo_token());
     conn.execute(
         "INSERT INTO snippet_messages
-             (id, snippet_id, address, role, kind, text, photo, photo_token,
+             (timeid, snippet_id, address, role, kind, text, photo_token,
               provider, model, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-        params![id, snippet_id, address, role, kind, text, file, token, provider, model, now],
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        params![timeid, snippet_id, address, role, kind, text, token, provider, model, now],
     )?;
+    // The id is SQLite's to give; the photo's file name is built from it
+    // once it is known, and the row told where its picture went.
+    let id = conn.last_insert_rowid();
+    let file = photo.map(|(_, ext)| format!("{id}.{ext}"));
+    if let Some(file) = &file {
+        conn.execute(
+            "UPDATE snippet_messages SET photo = ?2 WHERE id = ?1",
+            params![id, file],
+        )?;
+    }
     // The index the agent's `search_notes` reads. An image's prompt is text
     // worth finding too; an empty text has nothing to embed.
     if !text.trim().is_empty() {
@@ -248,7 +329,7 @@ pub fn post(
             ],
         )?;
     }
-    let message = get(conn, address, &id)?.ok_or_else(|| not_found("no such message"))?;
+    let message = get(conn, address, id)?.ok_or_else(|| not_found("no such message"))?;
 
     // The folder mirror (SPEC §1): the bytes as posted, and one line in the
     // transcript. After the row, so a disk that refuses leaves nothing half
@@ -279,13 +360,107 @@ pub fn clear(conn: &Connection, home: &Home, address: &str, snippet_id: &str) ->
     Ok(cleared)
 }
 
+/// Change what a message says. The row keeps its id, takes a new `timeid`
+/// so every cursor past the original receives the change, and says it was
+/// edited. Only text rows, only the owner's, never a tombstone.
+pub fn edit(
+    conn: &Connection,
+    home: &Home,
+    embedder: &dyn Embedder,
+    address: &str,
+    message_id: i64,
+    text: &str,
+) -> Result<Message> {
+    let held = get(conn, address, message_id)?.ok_or_else(|| not_found("no such message"))?;
+    if held.deleted {
+        return Err(bad_request("that message was deleted"));
+    }
+    if held.kind != "text" {
+        return Err(bad_request(
+            "a photo's prompt is not edited; delete it and post again",
+        ));
+    }
+    if text.trim().is_empty() {
+        return Err(bad_request(
+            "an edit needs text; delete the message instead",
+        ));
+    }
+    if text.len() > MAX_TEXT_BYTES {
+        return Err(bad_request(format!(
+            "a message is at most {MAX_TEXT_BYTES} bytes; this one is {}",
+            text.len()
+        )));
+    }
+    let timeid = next_timeid(conn)?;
+    conn.execute(
+        "UPDATE snippet_messages SET text = ?2, edited = 1, timeid = ?3 WHERE id = ?1",
+        params![message_id, text, timeid],
+    )?;
+    conn.execute(
+        "INSERT INTO snippet_message_vec (message_id, dim, model, vec) VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(message_id) DO UPDATE SET dim = ?2, model = ?3, vec = ?4",
+        params![
+            message_id,
+            embedder.dim() as i64,
+            embedder.id(),
+            search::to_blob(&embedder.embed(text))
+        ],
+    )?;
+    let message = get(conn, address, message_id)?.ok_or_else(|| not_found("no such message"))?;
+    append_line(
+        &home
+            .snippet_dir(address, &held.snippet_id)
+            .join("chat.jsonl"),
+        &serde_json::to_string(&message)?,
+    )?;
+    Ok(message)
+}
+
+/// Take a message back. A tombstone rather than a missing row: the text is
+/// scrubbed, the photo and the vector are gone, and the row takes a new
+/// `timeid` so every client holding a copy is told to drop it. Deleting a
+/// tombstone again is the same tombstone.
+pub fn delete(conn: &Connection, home: &Home, address: &str, message_id: i64) -> Result<Message> {
+    let held = get(conn, address, message_id)?.ok_or_else(|| not_found("no such message"))?;
+    if held.deleted {
+        return Ok(held);
+    }
+    let timeid = next_timeid(conn)?;
+    let photo: Option<String> = conn.query_row(
+        "SELECT photo FROM snippet_messages WHERE id = ?1",
+        params![message_id],
+        |r| r.get(0),
+    )?;
+    conn.execute(
+        "UPDATE snippet_messages
+            SET text = '', photo = NULL, photo_token = NULL, deleted = 1, timeid = ?2
+          WHERE id = ?1",
+        params![message_id, timeid],
+    )?;
+    conn.execute(
+        "DELETE FROM snippet_message_vec WHERE message_id = ?1",
+        params![message_id],
+    )?;
+    if let Some(file) = photo {
+        let _ = std::fs::remove_file(home.snippet_photo_dir(address, &held.snippet_id).join(file));
+    }
+    let message = get(conn, address, message_id)?.ok_or_else(|| not_found("no such message"))?;
+    append_line(
+        &home
+            .snippet_dir(address, &held.snippet_id)
+            .join("chat.jsonl"),
+        &serde_json::to_string(&message)?,
+    )?;
+    Ok(message)
+}
+
 /// The file the HTTP route serves, if `token` is the one minted for this
 /// message. The row is looked up by id **and** token in one query, so a
 /// right id with a wrong token is indistinguishable from no row at all.
 pub fn photo(
     conn: &Connection,
     home: &Home,
-    message_id: &str,
+    message_id: i64,
     token: &str,
 ) -> Result<Option<(PathBuf, &'static str)>> {
     let row: Option<(String, String, String)> = conn
@@ -314,7 +489,7 @@ pub fn photo(
 // ---------------------------------------------------------------------------
 
 struct Bm25Hit {
-    id: String,
+    id: i64,
     score: f64,
     snippet: String,
 }
@@ -322,7 +497,7 @@ struct Bm25Hit {
 /// The `WHERE` tail shared by both halves: this user, and one pad if asked.
 /// Bound as parameters ?2/?3 either way, with ?3 ignored when it is NULL, so
 /// the two shapes are one statement.
-const SCOPE: &str = "m.address = ?2 AND (?3 IS NULL OR m.snippet_id = ?3)";
+const SCOPE: &str = "m.address = ?2 AND (?3 IS NULL OR m.snippet_id = ?3) AND m.deleted = 0";
 
 fn bm25_search(
     conn: &Connection,
@@ -372,7 +547,7 @@ fn semantic_search(
     snippet_id: Option<&str>,
     q: &str,
     limit: usize,
-) -> Result<Vec<(String, f64)>> {
+) -> Result<Vec<(i64, f64)>> {
     let query = embedder.embed(q);
     // Brute force over this user's rows: a few hundred messages per pad and
     // the scope is one SQL filter away, so an index would cost more than it
@@ -385,9 +560,9 @@ fn semantic_search(
     ))?;
     let rows = stmt.query_map(params![embedder.id(), address, snippet_id], |r| {
         let blob: Vec<u8> = r.get(1)?;
-        Ok((r.get::<_, String>(0)?, blob))
+        Ok((r.get::<_, i64>(0)?, blob))
     })?;
-    let mut scored: Vec<(String, f64)> = rows
+    let mut scored: Vec<(i64, f64)> = rows
         .collect::<rusqlite::Result<Vec<_>>>()?
         .into_iter()
         .map(|(id, blob)| (id, search::cosine(&query, &search::from_blob(&blob)) as f64))
@@ -437,15 +612,15 @@ pub fn search(
         semantic_search(conn, embedder, address, snippet_id, q, pool)?
     };
 
-    let mut fused: HashMap<String, Fused> = HashMap::new();
+    let mut fused: HashMap<i64, Fused> = HashMap::new();
     for (rank, hit) in bm25.iter().enumerate() {
-        let entry = fused.entry(hit.id.clone()).or_default();
+        let entry = fused.entry(hit.id).or_default();
         entry.score += 1.0 / (search::RRF_K + rank as f64 + 1.0);
         entry.bm25 = Some(hit.score);
         entry.snippet = Some(hit.snippet.clone());
     }
     for (rank, (id, score)) in semantic.iter().enumerate() {
-        let entry = fused.entry(id.clone()).or_default();
+        let entry = fused.entry(*id).or_default();
         entry.score += 1.0 / (search::RRF_K + rank as f64 + 1.0);
         entry.cosine = Some(*score);
     }
@@ -454,7 +629,7 @@ pub fn search(
     for (id, entry) in fused {
         // Scoped by address once more on the read: a hit is only ever built
         // from a row this user owns.
-        let Some(message) = get(conn, address, &id)? else {
+        let Some(message) = get(conn, address, id)? else {
             continue;
         };
         let snippet_name: String = conn.query_row(

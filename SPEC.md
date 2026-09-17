@@ -359,29 +359,42 @@ CREATE INDEX snippets_by_user ON snippets(address, updated_at DESC);
 -- and a picture can be most of it, so the row keeps the file name and a
 -- 32-hex capability token that `GET /photos/{id}/{token}.{ext}` checks.
 CREATE TABLE snippet_messages (
-  id            TEXT PRIMARY KEY,          -- 'msg_' + 16 hex
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,  -- the identity, never reused
+  timeid        INTEGER NOT NULL UNIQUE,   -- ms since the epoch, strictly increasing; the sync cursor
   snippet_id    TEXT NOT NULL REFERENCES snippets(id) ON DELETE CASCADE,
   address       TEXT NOT NULL,
   role          TEXT NOT NULL CHECK (role IN ('user','agent','tool')),
   kind          TEXT NOT NULL CHECK (kind IN ('text','image')),
   text          TEXT NOT NULL DEFAULT '',  -- the message, or the image's prompt
-  photo         TEXT,                      -- file name under photos/, image rows only
+  photo         TEXT,                      -- file name under photos/ ('<id>.<ext>'), image rows only
   photo_token   TEXT,                      -- 32 hex; the capability that fetches it
   provider      TEXT,                      -- 'openai' | 'anthropic' | 'grok' | NULL
   model         TEXT,
-  created_at    TEXT NOT NULL
+  created_at    TEXT NOT NULL,
+  edited        INTEGER NOT NULL DEFAULT 0,  -- the text changed after it was said
+  deleted       INTEGER NOT NULL DEFAULT 0   -- a tombstone: text '' and photo NULL, timeid moved
 );
-CREATE INDEX snippet_messages_by_snippet ON snippet_messages(snippet_id, created_at);
+CREATE INDEX snippet_messages_by_snippet ON snippet_messages(snippet_id, timeid);
+CREATE INDEX snippet_messages_by_address ON snippet_messages(address, timeid);
+
+-- The last timeid handed out, bumped in the same transaction as the row
+-- that takes it (max(last, now_ms) + 1). Its own row rather than max() over
+-- the messages, so a cleared room cannot let the next post land under what
+-- a client already saw.
+CREATE TABLE chat_clock (
+  one           INTEGER PRIMARY KEY CHECK (one = 1),
+  last_timeid   INTEGER NOT NULL
+);
 
 CREATE VIRTUAL TABLE snippet_message_fts USING fts5(
   text,
-  content='snippet_messages', content_rowid='rowid',
+  content='snippet_messages', content_rowid='id',
   tokenize='porter unicode61'
 );
 -- kept in sync by the same three triggers quest_fts has.
 
 CREATE TABLE snippet_message_vec (
-  message_id    TEXT PRIMARY KEY REFERENCES snippet_messages(id) ON DELETE CASCADE,
+  message_id    INTEGER PRIMARY KEY REFERENCES snippet_messages(id) ON DELETE CASCADE,
   dim           INTEGER NOT NULL,
   model         TEXT NOT NULL,             -- embedder id, §8.2
   vec           BLOB NOT NULL              -- dim * f32, little-endian

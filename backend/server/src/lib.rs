@@ -92,6 +92,11 @@ async fn photo(
     use axum::response::IntoResponse;
 
     let not_found = || StatusCode::NOT_FOUND.into_response();
+    // The id is an int64 on the wire (PROTOCOL §5.14); anything else is
+    // nothing, the same nothing a wrong token is.
+    let Ok(message_id) = message_id.parse::<i64>() else {
+        return axum::http::StatusCode::NOT_FOUND.into_response();
+    };
     let Some((token, ext)) = file.rsplit_once('.') else {
         return not_found();
     };
@@ -101,7 +106,7 @@ async fn photo(
         let state = state.clone();
         tokio::task::spawn_blocking(move || {
             state.store.with_conn(|conn| {
-                cwbhacker_core::chat::photo(conn, state.store.home(), &message_id, &token)
+                cwbhacker_core::chat::photo(conn, state.store.home(), message_id, &token)
             })
         })
         .await

@@ -1930,8 +1930,10 @@ check(null, "beyond: a scratchpad's chatroom keeps, serves and searches (§4.9f)
     assertEq(m.role, "user");
     assertEq(m.kind, "text");
     assertEq(m.photo_url, null, "a text row has no photo");
-    for (const key of ["id", "text", "created_at", "provider", "model"])
+    for (const key of ["id", "timeid", "text", "created_at", "provider", "model"])
       assert(key in m, `ChatMessage.${key} (§5.14)`);
+    assert(Number.isInteger(m.id) && m.id > 0, "id is an int64");
+    assert(Number.isInteger(m.timeid) && m.timeid > 1_600_000_000_000, "timeid is ms since the epoch");
 
     // A 1x1 PNG, as base64: a real picture, posted as the agent would.
     const png =
@@ -1948,7 +1950,7 @@ check(null, "beyond: a scratchpad's chatroom keeps, serves and searches (§4.9f)
     assertEq(photo.type, "playground.chat.post.ok", "an image post");
     const url = photo.payload.message.photo_url;
     assert(
-      typeof url === "string" && /^\/photos\/msg_[0-9a-f]{16}\/[0-9a-f]{32}\.png$/.test(url),
+      typeof url === "string" && /^\/photos\/[0-9]+\/[0-9a-f]{32}\.png$/.test(url),
       `a photo is fetched by capability path, got ${url}`,
     );
     const http = new URL(URL_WS.replace(/^ws/, "http"));
@@ -1972,11 +1974,35 @@ check(null, "beyond: a scratchpad's chatroom keeps, serves and searches (§4.9f)
     assertEq(hits.payload.hits[0].message.text, "hello room");
     assertEq(hits.payload.hits[0].snippet_name, "smoke room");
 
+    // A messenger's two verbs, delivered through the same cursor as changes
+    // to the same id: the edit keeps the row, the delete leaves a tombstone.
+    const cursor = list.payload.messages[1].timeid;
+    const edited = await cl.send("playground.chat.edit", { message_id: m.id, text: "hello room, edited" });
+    assertEq(edited.type, "playground.chat.edit.ok");
+    assertEq(edited.payload.message.id, m.id, "an edit keeps the id");
+    assert(edited.payload.message.timeid > cursor, "and takes a later timeid");
+    assertEq(edited.payload.message.edited, true);
+    const gone = await cl.send("playground.chat.delete", { message_id: photo.payload.message.id });
+    assertEq(gone.type, "playground.chat.delete.ok");
+    assertEq(gone.payload.message.deleted, true, "a delete is a tombstone");
+    assertEq(gone.payload.message.photo_url, null, "with no photo");
+    const sync = await cl.send("playground.chat.sync", { after: cursor });
+    assertEq(sync.type, "playground.chat.sync.ok");
+    assertEq(
+      sync.payload.messages.map((x) => [x.id, x.edited, x.deleted]),
+      [[m.id, true, false], [photo.payload.message.id, false, true]],
+      "a cursor past the originals receives both changes, in order",
+    );
+    assertEq(sync.payload.head, gone.payload.message.timeid, "head is the newest timeid");
+    assertEq(sync.payload.more, false);
+    const fresh = await cl.send("playground.chat.list", { id });
+    assertEq(fresh.payload.messages.length, 1, "a room read from the start hides the tombstone");
+    assertEq(fresh.payload.messages[0].text, "hello room, edited");
     const cleared = await cl.send("playground.chat.clear", { id });
     assertEq(cleared.type, "playground.chat.clear.ok");
-    assertEq(cleared.payload.cleared, 2, "clear says how many went");
-    const gone = await fetch(new URL(url, http));
-    assertEq(gone.status, 404, "a cleared photo is gone from the web too");
+    assertEq(cleared.payload.cleared, 2, "clear says how many went — the tombstone counts");
+    const afterClear = await fetch(new URL(url, http));
+    assertEq(afterClear.status, 404, "a cleared photo is gone from the web too");
     await cl.send("playground.delete", { id });
   } finally {
     cl.close();

@@ -641,13 +641,22 @@ session's address exactly as the snippet is. Another player's snippet id
 answers `not_found` on every one of the four, never `unauthorized`.
 
 ```json
-→ playground.chat.list    { "id": "pg_…", "limit": 200 }          limit default 200, max 500
+→ playground.chat.list    { "id": "pg_…", "limit": 200, "after": 0 }   limit default 200, max 500
 ← { "messages": [ ChatMessage, … ] }                                oldest first
+
+→ playground.chat.sync    { "after": 1758100000000, "limit": 200 }   limit default 200, max 500
+← { "messages": [ ChatMessage, … ], "head": 1758100123456, "more": false }
 
 → playground.chat.post    { "id": "pg_…", "role": "user", "text": "…",
                             "image_b64": "…", "image_type": "image/png",
                             "provider": "openai", "model": "gpt-4.1" }
 ← { "message": ChatMessage }
+
+→ playground.chat.edit    { "message_id": 42, "text": "…" }
+← { "message": ChatMessage }                                        same id, new timeid, edited: true
+
+→ playground.chat.delete  { "message_id": 42 }
+← { "message": ChatMessage }                                        same id, new timeid, deleted: true
 
 → playground.chat.clear   { "id": "pg_…" }
 ← { "id": "pg_…", "cleared": 2 }
@@ -664,6 +673,40 @@ decoded image is at most **3 MiB** (the websocket frame is 4 MiB), a message
 at most 64 KiB, and a room holds at most **500 messages** — past that a post
 is `bad_request` naming the limit, and CLEAR is the remedy. `list` with a
 `limit` keeps the *newest* that many, still oldest first.
+
+**Two int64s on every message.** `id` is the identity — SQLite's own, never
+reused; it names the row, the photo file and the photo URL. `timeid` is the
+sync cursor: milliseconds since the epoch at post time, or one past the last
+`timeid` handed out when the clock has not moved on, so it is **strictly
+increasing across every room this server has** (two posts in one
+millisecond, a clock that stepped back, and a cleared room all still land
+past everything any client has seen — the last value lives in its own
+`chat_clock` row, not in the messages). 0 is never handed out: it is the "I
+have received nothing" cursor. Both stay under 2^53, so a JavaScript client
+holds them exactly.
+
+**Sync** is one question: "what came after the last `timeid` I saw?"
+`list` takes `after` for one room. `sync` takes it for *every* room of this
+player at once — oldest first, at most `limit`, `more` says whether another
+page is waiting, `head` is the newest `timeid` they have (0 with none) so a
+client that only wants the future can start there. The cursor is exclusive:
+a client folds each page, takes `max(cursor, timeid)` over what it received,
+and asks again until `more` is false. Messages are folded by `id` (an id
+seen twice replaces the copy held), so a page replayed is harmless. A
+cleared room sends nothing on its own; a client that was told
+`playground.chat.clear` succeeded drops its copy of that room.
+
+**Edit and delete are changes to the same id**, the way a messenger does
+them. `edit` keeps the row, replaces its text, sets `edited` and gives it a
+new `timeid`, so a client past the original receives it and folds it over
+the copy it holds; text rows only, never a tombstone, `bad_request`
+otherwise. `delete` keeps the row as a tombstone — `deleted: true`, the
+text scrubbed, the photo gone from disk and from the web, the vector gone
+— with a new `timeid`, so a client past the original hears about it and
+drops its copy. A room read from the start (`after` absent or 0) never
+shows a tombstone; a cursor always receives one. Deleting a tombstone again
+answers the same tombstone. A message that is not the caller's answers
+`not_found`, on both, as everything in the room does.
 
 `search` is BM25 over the messages' text and cosine over their vectors with
 the live embedder, fused by RRF exactly as §4.12 does for quests; `mode`
@@ -1456,7 +1499,9 @@ there in the ordinary way.
 
 ```ts
 type ChatMessage = {
-  id: string;                            // "msg_" + 16 hex
+  id: number;                            // int64: the identity, never reused
+  timeid: number;                        // int64: ms since the epoch, strictly increasing
+                                         // across every room — the sync cursor
   snippet_id: string;
   role: "user" | "agent" | "tool";
   kind: "text" | "image";
@@ -1464,7 +1509,9 @@ type ChatMessage = {
   photo_url: string | null;              // "/photos/<message_id>/<token>.<ext>", image rows
   provider: string | null;               // "openai" | "anthropic" | "grok" | null
   model: string | null;
-  created_at: string;
+  created_at: string;                    // when it was said; an edit does not move it
+  edited: boolean;                       // the text changed after it was said
+  deleted: boolean;                      // a tombstone: text and photo gone, timeid moved
 };
 type ChatHit = {
   message: ChatMessage;
