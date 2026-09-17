@@ -27,7 +27,7 @@
  *
  * `reducedMotion` pins it in the top-right corner and only the bubble moves.
  */
-import { expInOut } from "../../engine/ease";
+import { expInOut, expOut } from "../../engine/ease";
 
 export type Rect = readonly [number, number, number, number];
 export type Pt = readonly [number, number];
@@ -37,8 +37,18 @@ export type State = "wander" | "peek" | "typing" | "thinking" | "hold";
 /** How fast the sprite eases towards its target, per second (Raiden's `follow`). */
 const FOLLOW = 5.5;
 /** The wander's period in seconds along each axis; unequal so it never repeats. */
-const WANDER_X = 11.0;
-const WANDER_Y = 7.3;
+const WANDER_X = 26.0;
+const WANDER_Y = 18.5;
+/**
+ * The tempo of the wander: 1 left alone, and this much while the pointer is
+ * moving — someone reaching for the sprite should find it slowing to meet
+ * them. The change is eased, per second.
+ */
+const CALM_TEMPO = 0.18;
+const CALM_EASE = 3.2;
+/** The entrance: from this zoom down to size, easing out, over this long. */
+const ENTRY_ZOOM = 3.2;
+const ENTRY_SECS = 1.5;
 /** The bob under everything: a hover, not a stand. */
 const BOB_HZ = 1.6;
 /** How far the sprite keeps from the box's edge, as a share of its size. */
@@ -81,8 +91,11 @@ const FLIGHT_PER_PX = 1 / 520;
 const FLIGHT_MAX = 1.3;
 /** A destination that moved further than this mid-flight is a new flight. */
 const REPLAN_PX = 120;
-/** How many frames of a flight the light ribbon remembers. */
-const WAKE_MAX = 16;
+/** The light ribbon: how long each point of it lives, and how many at most. */
+const WAKE_SECS = 1.1;
+const WAKE_MAX = 64;
+/** How fast the sprite must move to leave ribbon behind it. */
+const WAKE_SPEED = 24;
 /** The afterimages: how many, and how fast the sprite must move to leave one. */
 const TRAIL_MAX = 7;
 const TRAIL_SPEED = 180;
@@ -95,6 +108,11 @@ export class Sprite {
   state: State = "wander";
   /** The wander's own clock; advanced only while wandering so it resumes where it left off. */
   private phase = 0;
+  /** How fast the wander's clock runs: 1, or towards `CALM_TEMPO` for a reaching pointer. */
+  private tempo = 1;
+  private calmed = false;
+  /** The entrance under way: 0..1, or -1 once it is in. */
+  private entry = -1;
   private t = 0;
   private held = 0;
   /** Where the caret was last seen, for peek and typing. */
@@ -123,8 +141,8 @@ export class Sprite {
   }
   /** Where it has just been, newest last, for the afterimages. */
   trail: Pt[] = [];
-  /** Every frame of a flight, newest last, for the light ribbon behind it. */
-  wake: Pt[] = [];
+  /** Where it has been lately, oldest first, each with its age, for the light ribbon. */
+  wake: Array<{ x: number; y: number; age: number }> = [];
   /** Set for one frame when a flight begins, and when one ends. */
   tookOff = false;
   landed = false;
@@ -213,6 +231,23 @@ export class Sprite {
     return this.state === "hold";
   }
 
+  /** The pointer is moving: slow the wander so it can be caught. */
+  calm(on: boolean): void {
+    this.calmed = on;
+  }
+
+  /** Just switched on: arrive huge and shrink to size. */
+  enter(): void {
+    if (this.reduced()) return;
+    this.entry = 0;
+    this.scale = ENTRY_ZOOM;
+  }
+
+  /** Whether the entrance is still playing. */
+  get entering(): boolean {
+    return this.entry >= 0;
+  }
+
   thinking(on: boolean): void {
     if (on) this.go("thinking");
     else if (this.state === "thinking") this.go("wander");
@@ -282,7 +317,9 @@ export class Sprite {
 
   update(dt: number, box: Rect, cell: number): void {
     this.t += dt;
-    if (this.state === "wander") this.phase += dt;
+    const tempoTarget = this.calmed ? CALM_TEMPO : 1;
+    this.tempo += (tempoTarget - this.tempo) * (1 - Math.exp(-CALM_EASE * dt));
+    if (this.state === "wander") this.phase += dt * this.tempo;
     if (this.state === "peek") {
       this.held += dt;
       if (this.held >= PEEK_HOLD) this.state = "wander";
@@ -356,6 +393,7 @@ export class Sprite {
       this.pulse = 0;
       this.rolling = -1;
       this.flight = null;
+      this.entry = -1;
       this.trail.length = 0;
       this.wake.length = 0;
       return;
@@ -372,7 +410,13 @@ export class Sprite {
           : this.state === "hold"
             ? HOLD_ZOOM
             : 1 + 0.035 * Math.sin(this.t * 1.1);
-    this.scale += (targetScale - this.scale) * ease;
+    if (this.entry >= 0) {
+      // The entrance owns the zoom: an ease-out from huge, so the first
+      // frames are the fastest shrinking and the last are barely moving.
+      this.entry = Math.min(1, this.entry + dt / ENTRY_SECS);
+      this.scale = ENTRY_ZOOM + (targetScale - ENTRY_ZOOM) * expOut(this.entry);
+      if (this.entry >= 1) this.entry = -1;
+    } else this.scale += (targetScale - this.scale) * ease;
     // The tilt, in three parts. The bank into a turn is eased. The rock
     // while typing is a wave already and is applied straight, fading in
     // and out with the state. The roll is spent at a fixed rate until it
@@ -400,11 +444,15 @@ export class Sprite {
       this.trail.push([this.x, this.y]);
       if (this.trail.length > TRAIL_MAX) this.trail.shift();
     } else if (this.trail.length) this.trail.shift();
-    // The wake: the whole flight, fading once it has landed.
-    if (this.flight) {
-      this.wake.push([this.x, this.y]);
+    // The wake: wherever it has flown lately, each point ageing out. Left
+    // whenever it is really moving — a wander leaves ribbon too, not only a
+    // flight — and gone a second after it stops.
+    for (const p of this.wake) p.age += dt;
+    while (this.wake.length && this.wake[0].age > WAKE_SECS) this.wake.shift();
+    if (this.speed() > WAKE_SPEED) {
+      this.wake.push({ x: this.x, y: this.y, age: 0 });
       if (this.wake.length > WAKE_MAX) this.wake.shift();
-    } else if (this.wake.length) this.wake.shift();
+    }
   }
 
   /** The squash and stretch of the moment: [x, y] factors on top of `scale`. */

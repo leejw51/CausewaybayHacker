@@ -22,7 +22,14 @@ export class AgentLayer {
     this.canvas.className = "cwb-sparks cwb-agent";
     this.g = this.canvas.getContext("2d");
     host.appendChild(this.canvas);
-    requestAnimationFrame(() => this.canvas.classList.add("cwb-on"));
+    this.canvas.classList.add("cwb-on");
+  }
+
+  /** How present the layer is, 0..1, on top of its own fade-in. */
+  setAlpha(a: number): void {
+    const v = a >= 1 ? "" : String(Math.max(0, a).toFixed(3));
+    if (this.canvas.style.getPropertyValue("--cwb-presence") !== v)
+      this.canvas.style.setProperty("--cwb-presence", v);
   }
 
   /** Clear and set the virtual transform; the caller draws, then nothing else is needed. */

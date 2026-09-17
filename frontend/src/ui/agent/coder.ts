@@ -18,7 +18,7 @@ import type { Land } from "../../net/protocol";
 import type { ChatMessage } from "../../net/protocol";
 import { WireError } from "../../net/client";
 import { ensureFonts, printf, wrap, width } from "../../engine/text";
-import { css, Theme } from "../../engine/theme";
+import { css, Theme, type RGBA } from "../../engine/theme";
 import { fill, type Ctx, type Rect } from "../../engine/ui";
 import { reducedMotion } from "../../engine/motion";
 import { t } from "../../i18n";
@@ -125,6 +125,11 @@ export class Coder {
   private rings: Array<{ x: number; y: number; at: number }> = [];
   /** The bubble: what, and until when. */
   private bubble: { text: string; until: number; tone: "say" | "tip" | "busy" } | null = null;
+  /** How present the sprite is, 0..1: eased in when agent mode opens, out when it closes. */
+  private presence = 0;
+  private wasActive = false;
+  /** When the pointer last moved, on the coder's clock, for the calm. */
+  private pointerAt = -Infinity;
   /** The last thing said, for a press that comes after the bubble has gone. */
   private lastSaid: { text: string; tone: "say" | "tip" } | null = null;
   private room: string | null = null;
@@ -175,10 +180,26 @@ export class Coder {
     };
     addEventListener("pointerdown", down, true);
     this.offs.push(() => removeEventListener("pointerdown", down, true));
+    // A moving mouse slows the wander, so the sprite can be caught. A finger
+    // does not move between taps, so touch is left out.
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerType === "mouse") this.pointerAt = this.t;
+    };
+    addEventListener("pointermove", move, { capture: true, passive: true });
+    this.offs.push(() => removeEventListener("pointermove", move, true));
+  }
+
+  /**
+   * Agent mode: the sprite lives only while the panel is open. Off, it
+   * fades out and stops; on, it arrives huge and shrinks to size.
+   */
+  get active(): boolean {
+    return readShown() && this.panel.open;
   }
 
   /** Whether a virtual point is on the sprite. */
   hits(x: number, y: number): boolean {
+    if (this.presence < 0.5) return false;
     const half = this.sprite.size * this.sprite.scale * 0.55;
     return (
       Math.abs(x - this.sprite.x) <= half && Math.abs(y - this.sprite.y - this.sprite.bob()) <= half
@@ -695,12 +716,22 @@ export class Coder {
     this.t += dt;
     this.sinceTip += dt;
     this.sinceCall += dt;
-    // Put away: no flying, no tips, no advice, no effects. The AUTO review
-    // is silenced with it — a character that is off should not spend.
-    if (!readShown()) {
+    // Only in agent mode. Put away, or the panel closed: no flying, no
+    // tips, no advice, no effects. The AUTO review is silenced with it — a
+    // character that is off should not spend. The sprite fades rather than
+    // pops, and arrives with a zoom.
+    const active = this.active;
+    if (active && !this.wasActive) this.sprite.enter();
+    this.wasActive = active;
+    this.presence += ((active ? 1 : 0) - this.presence) * (1 - Math.exp(-(active ? 7 : 4) * dt));
+    if (this.presence < 0.002) this.presence = 0;
+    this.layer?.setAlpha(this.presence);
+    if (!active) {
       this.bubble = null;
+      if (this.sprite.holding) this.sprite.hold(false);
       return;
     }
+    this.sprite.calm(this.t - this.pointerAt < 1.4);
     const src = this.editor?.source ?? "";
     if (src !== this.lastSource) {
       this.lastSource = src;
@@ -778,7 +809,7 @@ export class Coder {
    */
   private breathe(dt: number): void {
     const fx = this.host.fx();
-    if (!fx || reducedMotion()) return;
+    if (!fx || reducedMotion() || !this.active) return;
     const sp = this.sprite;
     // Takeoff and landing: a puff of sparks at each end of a flight.
     if (sp.tookOff) fx.play(burstPlan(sp.x, sp.y, 22));
@@ -871,7 +902,7 @@ export class Coder {
   draw(): void {
     const g = this.layer?.begin();
     if (!g) return;
-    if (!readShown()) return;
+    if (this.presence <= 0) return;
     const s = this.app.layout.uiScale();
     const size = this.sprite.size;
     const x = this.sprite.x;
@@ -899,29 +930,7 @@ export class Coder {
       g.restore();
     }
 
-    // The light ribbon: the flight's wake as one glowing stroke, cyan with
-    // a white core, wide and bright at the ship and thinning to nothing.
-    const wake = this.sprite.wake;
-    if (wake.length >= 2) {
-      const pts = [...wake, [x, this.sprite.y] as Pt];
-      for (let i = 1; i < pts.length; i++) {
-        const k = i / (pts.length - 1);
-        g.save();
-        g.lineCap = "round";
-        g.globalAlpha = 0.55 * k;
-        g.strokeStyle = css(Theme.cyan);
-        g.lineWidth = Math.max(1.5, size * 0.22 * k);
-        g.beginPath();
-        g.moveTo(pts[i - 1][0], pts[i - 1][1]);
-        g.lineTo(pts[i][0], pts[i][1]);
-        g.stroke();
-        g.globalAlpha = 0.8 * k;
-        g.strokeStyle = css(Theme.cream);
-        g.lineWidth = Math.max(1, size * 0.06 * k);
-        g.stroke();
-        g.restore();
-      }
-    }
+    this.drawRibbon(g, size, x);
 
     // The afterimages: where it has just been, fading back along the trail.
     if (ship) {
@@ -983,6 +992,64 @@ export class Coder {
     }
 
     if (this.bubble) this.drawBubble(g, s, [x, y], size);
+  }
+
+  /**
+   * The light ribbon: where it has flown in the last second, as one stroke
+   * in three layers — a wide additive glow, a cyan body, a white core —
+   * shifting from pink at the tail to cyan at the head, tapering and fading
+   * with age, with sparks winking along it. Wide at the ship, gone at the
+   * tail.
+   */
+  private drawRibbon(g: Ctx, size: number, headX: number): void {
+    const wake = this.sprite.wake;
+    if (wake.length < 2) return;
+    const head = { x: headX, y: this.sprite.y, age: 0 };
+    const pts = [...wake, head];
+    const n = pts.length - 1;
+    g.save();
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    const pass = (width: number, alpha: number, tone: (k: number) => string, add: boolean) => {
+      g.globalCompositeOperation = add ? "lighter" : "source-over";
+      for (let i = 1; i <= n; i++) {
+        const p = pts[i];
+        const k = i / n;
+        const life = 1 - Math.min(1, p.age / 1.1);
+        const a = alpha * k * life;
+        if (a <= 0.01) continue;
+        g.globalAlpha = a;
+        g.strokeStyle = tone(k);
+        g.lineWidth = Math.max(1, width * (0.25 + 0.75 * k) * life);
+        g.beginPath();
+        g.moveTo(pts[i - 1].x, pts[i - 1].y);
+        g.lineTo(p.x, p.y);
+        g.stroke();
+      }
+    };
+    const blend = (k: number): string => css(mix(Theme.pink, Theme.cyan, k));
+    pass(size * 1.1, 0.16, blend, true);
+    pass(size * 0.42, 0.55, blend, false);
+    pass(size * 0.12, 0.9, () => css(Theme.cream), false);
+    // Sparks: a diamond every few points, each winking on its own clock.
+    g.globalCompositeOperation = "lighter";
+    for (let i = 2; i < n; i += 3) {
+      const p = pts[i];
+      const k = i / n;
+      const life = 1 - Math.min(1, p.age / 1.1);
+      const wink = 0.5 + 0.5 * Math.sin(this.t * 14 + i * 1.7);
+      const r = Math.max(1.5, size * 0.11 * k * life) * (0.6 + 0.4 * wink);
+      g.globalAlpha = 0.9 * life * wink;
+      g.fillStyle = i % 2 ? css(Theme.cream) : blend(k);
+      g.beginPath();
+      g.moveTo(p.x, p.y - r);
+      g.lineTo(p.x + r, p.y);
+      g.lineTo(p.x, p.y + r);
+      g.lineTo(p.x - r, p.y);
+      g.closePath();
+      g.fill();
+    }
+    g.restore();
   }
 
   private drawBubble(g: Ctx, s: number, at: Pt, size: number): void {
@@ -1097,6 +1164,11 @@ export class Coder {
   key(name: string, ev: KeyboardEvent): boolean {
     return this.panel.key(name, ev);
   }
+}
+
+/** A colour between two, by k. */
+function mix(a: RGBA, b: RGBA, k: number): RGBA {
+  return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k, 1];
 }
 
 function itemOf(m: ChatMessage): Item {

@@ -147,9 +147,13 @@ describe("the flight", () => {
   it("actually moves while wandering", () => {
     const s = new Sprite(48, () => false);
     s.update(1 / 60, box, 8);
-    const x0 = s.x;
-    for (let i = 0; i < 300; i++) s.update(1 / 60, box, 8);
-    expect(Math.abs(s.x - x0)).toBeGreaterThan(5);
+    let path = 0;
+    for (let i = 0; i < 300; i++) {
+      const [x0, y0] = [s.x, s.y];
+      s.update(1 / 60, box, 8);
+      path += Math.hypot(s.x - x0, s.y - y0);
+    }
+    expect(path).toBeGreaterThan(40);
   });
 
   it("goes to the caret on a peek and comes back", () => {
@@ -349,6 +353,76 @@ describe("the flight", () => {
     expect(s.state).toBe("wander");
   });
 
+  it("wanders slowly enough to be caught", () => {
+    const s = new Sprite(48, () => false);
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
+    let top = 0;
+    for (let i = 0; i < 60 * 12; i++) {
+      s.update(1 / 60, box, 8);
+      top = Math.max(top, s.speed());
+    }
+    expect(top).toBeGreaterThan(10);
+    expect(top).toBeLessThan(120);
+  });
+
+  it("slows right down while the pointer is moving, and picks up again after", () => {
+    const wander = (calm: boolean) => {
+      const s = new Sprite(48, () => false);
+      s.calm(calm);
+      for (let i = 0; i < 60 * 3; i++) s.update(1 / 60, box, 8);
+      let sum = 0;
+      for (let i = 0; i < 60 * 8; i++) {
+        s.update(1 / 60, box, 8);
+        sum += s.speed();
+      }
+      return sum / (60 * 8);
+    };
+    const free = wander(false);
+    const calm = wander(true);
+    expect(calm).toBeLessThan(free * 0.4);
+    const s = new Sprite(48, () => false);
+    s.calm(true);
+    for (let i = 0; i < 60 * 4; i++) s.update(1 / 60, box, 8);
+    s.calm(false);
+    let sum = 0;
+    for (let i = 0; i < 60 * 8; i++) {
+      s.update(1 / 60, box, 8);
+      sum += s.speed();
+    }
+    expect(sum / (60 * 8)).toBeGreaterThan(calm * 1.8);
+  });
+
+  it("arrives huge and shrinks to size on an ease-out", () => {
+    const s = new Sprite(48, () => false);
+    s.enter();
+    expect(s.entering).toBe(true);
+    expect(s.scale).toBeGreaterThan(2.5);
+    const drops: number[] = [];
+    let last = s.scale;
+    for (let i = 0; i < 120; i++) {
+      s.update(1 / 60, box, 8);
+      drops.push(last - s.scale);
+      last = s.scale;
+    }
+    expect(s.entering).toBe(false);
+    expect(Math.abs(s.scale - 1)).toBeLessThan(0.08);
+    // Ease-out: the first frame shrinks more than the tenth, which shrinks more than the fortieth.
+    expect(drops[0]).toBeGreaterThan(drops[10]);
+    expect(drops[10]).toBeGreaterThan(drops[40]);
+    expect(Math.min(...drops.slice(0, 60))).toBeGreaterThanOrEqual(-0.001);
+  });
+
+  it("leaves a ribbon behind a wander as well as a flight, and it ages away", () => {
+    const s = new Sprite(48, () => false);
+    for (let i = 0; i < 60 * 4; i++) s.update(1 / 60, box, 8);
+    expect(s.wake.length).toBeGreaterThan(10);
+    expect(s.wake.length).toBeLessThanOrEqual(64);
+    expect(s.wake[0].age).toBeGreaterThan(s.wake[s.wake.length - 1].age);
+    s.hold(true, box);
+    for (let i = 0; i < 60 * 3; i++) s.update(1 / 60, box, 8);
+    expect(s.wake.length).toBe(0);
+  });
+
   it("sits still in the corner under reduced motion", () => {
     const s = new Sprite(48, () => true);
     for (let i = 0; i < 300; i++) s.update(1 / 60, box, 8);
@@ -364,6 +438,9 @@ describe("the flight", () => {
     expect(s.angle).toBe(0);
     expect(s.squash()).toEqual([1, 1]);
     expect(s.trail).toEqual([]);
+    s.enter();
+    expect(s.entering).toBe(false);
+    expect(s.scale).toBe(1);
   });
 });
 

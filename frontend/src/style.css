@@ -247,11 +247,10 @@ body {
   /* Over every other overlay element — the editor, the fields, the effects
      — whatever order they were added in: the coder flies above the UI. */
   z-index: 10;
-  opacity: 0;
-  transition: opacity 0.6s cubic-bezier(0.87, 0, 0.13, 1);
-}
-.cwb-agent.cwb-on {
-  opacity: 1;
+  /* How present the coder is: 1 in agent mode, eased to 0 outside it, set
+     every frame by the coder itself. No CSS transition on top — one would
+     restart at every frame's new value and never get anywhere. */
+  opacity: var(--cwb-presence, 0);
 }
 /* The agent panel's fields: the message you type and the key you paste.
    One line each, vertically centred like the name field. */
