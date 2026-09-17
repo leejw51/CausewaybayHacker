@@ -473,6 +473,41 @@ end
 --- the same rule as `Quest:header_h`, for the same reason: it was a hard
 --- 46 px, which fitted a 14 px title over a 7 px name, and at the doubled
 --- ladder the name was printed through the title.
+--- What the TAB caption needs at the right end of the header strip.
+--- How much of the foot of the screen is spoken for, so a banner does not
+--- land on the coder's room. The room is only at the bottom when the window
+--- is upright; beside the editor it is in nobody's way.
+function Playground:toast_lift()
+  local r = self.agent_rect
+  if not r then return 0 end
+  -- Where the banner would land, against where the room is. Beside the
+  -- editor on a wide window the two never meet; upright the room is the foot
+  -- of the screen and the banner would sit on its buttons.
+  local band = Layout.vh - UI.footerHeight() - 60
+  if r.y + r.h < band then return 0 end
+  return math.max(0, (Layout.vh - UI.footerHeight()) - r.y + 8)
+end
+
+function Playground:header_tab_reserve()
+  return UI.textWidth(I18n.t("TAB"), 7) + 16
+end
+
+--- How wide the header's strip of buttons wants to be, so the title can be
+--- fitted into what is left of the line rather than under it.
+function Playground:header_strip_w()
+  local total = math.max(64, UI.textWidth(self.lang:upper(), UI.CHIP_SIZE) + 28)
+    + 12 + self:header_tab_reserve()
+  for _, label in ipairs({ I18n.t("CODE"), I18n.t("AGENT"), I18n.t("RENAME"),
+    I18n.t("POSTER"), I18n.t("DISK READER") }) do
+    local w = math.max(64, UI.textWidth(label, UI.CHIP_SIZE) + 24)
+    -- The same floor the strip itself stops at: a button that would not be
+    -- drawn is not room the title has to give up.
+    if total + w > (Layout.vw - 200) then break end
+    total = total + w + 8
+  end
+  return total
+end
+
 function Playground:header_h()
   return math.max(46, 8 + UI.lineHeight(14) + 2 + UI.lineHeight(7) + 8)
 end
@@ -532,7 +567,13 @@ function Playground:draw()
   UI.setColor(Theme.ink, 0.9)
   love.graphics.rectangle("fill", 0, 0, vw, head)
   love.graphics.setColor(1, 1, 1, 1)
-  local ty = 8 + UI.text(I18n.t("PLAYGROUND"), 12, 8, 14, Theme.cyan) + 2
+  -- **The title is what gives way.** Upright, the strip of buttons reaches
+  -- back across this line and the two were drawn through each other; the
+  -- name of the screen you are already on is the least of what is on it, so
+  -- it is fitted to whatever the buttons left.
+  local title = I18n.t("PLAYGROUND")
+  local title_room = math.max(120, vw - 24 - self:header_strip_w())
+  local ty = 8 + UI.text(title, 12, 8, UI.fitSize(title, title_room, 14, 7), Theme.cyan) + 2
   local shown = self.name and tostring(self.name) or I18n.t("unsaved")
   if self.focus == "name" then shown = (self.name_edit or "") .. "_" end
   UI.text(shown, 12, ty, 7,
@@ -556,7 +597,7 @@ function Playground:draw()
   -- share this line, and laying the buttons from the language's left edge put
   -- the first of them straight through `TAB` and the `saved` notice on a
   -- window with no room to spare.
-  local tab_reserve = UI.textWidth(I18n.t("TAB"), 7) + 16
+  local tab_reserve = self:header_tab_reserve()
   local rx = lx - 8 - tab_reserve
   self.code_button_rect, self.rename_rect, self.poster_rect, self.reader_rect = nil, nil, nil, nil
   self.agent_button_rect = nil

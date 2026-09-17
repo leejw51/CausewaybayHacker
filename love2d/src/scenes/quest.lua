@@ -269,6 +269,20 @@ end
 
 --- What the coder may do on a graded screen. Compare the playground's, which
 --- is the generous one.
+--- How much of the foot of the screen is spoken for, so a banner does not
+--- land on the coder's room. The room is only at the bottom when the window
+--- is upright; beside the editor it is in nobody's way.
+function Quest:toast_lift()
+  local r = self.agent_rect
+  if not r then return 0 end
+  -- Where the banner would land, against where the room is. Beside the
+  -- editor on a wide window the two never meet; upright the room is the foot
+  -- of the screen and the banner would sit on its buttons.
+  local band = Layout.vh - UI.footerHeight() - 60
+  if r.y + r.h < band then return 0 end
+  return math.max(0, (Layout.vh - UI.footerHeight()) - r.y + 8)
+end
+
 function Quest:agent_host()
   local scene = self
   return {

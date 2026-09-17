@@ -162,6 +162,14 @@ function Panel:draw(rect, opts)
   -- came out as two stacked syllables.
   local columns = math.max(2, math.min(6, math.floor(w / 96)))
   local tab_w = math.floor((w - (columns - 1) * 4) / columns)
+  -- **One size for the row, from its widest name.** `UI.button` fits each
+  -- label to its own box, so a row of five came out at five different sizes —
+  -- `ANTHROPIC` small, `GROK` large — which reads as a ransom note rather
+  -- than a set of tabs.
+  local tab_size = 7
+  for _, name in ipairs(Prefs.PROVIDERS) do
+    tab_size = math.min(tab_size, UI.fitSize(Prefs.PROVIDER_NAME[name], tab_w - 8, 7, 4))
+  end
   local tab_rows = math.ceil((#Prefs.PROVIDERS + 2) / columns)
   if header_room < tab_rows * trow then
     -- No room for a grid of them: one button that says who is being spoken
@@ -193,7 +201,7 @@ function Panel:draw(rect, opts)
     -- `hot` is this client's word for the one that is chosen.
     local state = provider == name and "hot" or "normal"
     local r = { x = tx, y = y, w = tab_w, h = trow - 6 }
-    UI.button(r.x, r.y, r.w, r.h, Prefs.PROVIDER_NAME[name], state, 7)
+    UI.button(r.x, r.y, r.w, r.h, Prefs.PROVIDER_NAME[name], state, tab_size)
     self.rects["tab:" .. name] = r
     tx = tx + tab_w + 4
   end
@@ -212,7 +220,7 @@ function Panel:draw(rect, opts)
     local r = { x = tx, y = y, w = tab_w, h = trow - 6 }
     local hot = verb == "setup" and self.view == "setup"
     UI.button(r.x, r.y, r.w, r.h, I18n.t(verb == "setup" and "SETUP" or "CLOSE"),
-      hot and "hot" or "normal", 7)
+      hot and "hot" or "normal", tab_size)
     self.rects[verb] = r
     tx = tx + tab_w + 4
   end
@@ -325,10 +333,14 @@ function Panel:draw_chat(rect, x, y, w, row)
     }
   end
   local vw = math.floor((w - (#verbs - 1) * 4) / #verbs)
+  local verb_size = 7
+  for _, verb in ipairs(verbs) do
+    verb_size = math.min(verb_size, UI.fitSize(verb.label, vw - 8, 7, 4))
+  end
   local vx = x
   for _, verb in ipairs(verbs) do
     local r = { x = vx, y = verbs_y, w = vw, h = row - 6 }
-    UI.button(r.x, r.y, r.w, r.h, verb.label, verb.dim and "disabled" or "normal", 7)
+    UI.button(r.x, r.y, r.w, r.h, verb.label, verb.dim and "disabled" or "normal", verb_size)
     if not verb.dim then self.rects[verb.id] = r end
     vx = vx + vw + 4
   end

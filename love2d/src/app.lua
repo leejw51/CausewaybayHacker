@@ -416,7 +416,8 @@ function App:draw()
     love.graphics.clear(Theme.void)
   end
   CRT.draw(self.scene_name == "quest" and 0.35 or 1)
-  UI.toast(self.toast_text, math.min(1, self.toast_left / 0.5))
+  UI.toast(self.toast_text, math.min(1, self.toast_left / 0.5),
+    self.scene and self.scene.toast_lift and self.scene:toast_lift() or 0)
 end
 
 --- The modifier keys held right now.

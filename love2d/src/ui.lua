@@ -773,7 +773,11 @@ function UI.footer(lines, connection)
 end
 
 --- A one-line notice that fades. Owned by the app, drawn here.
-function UI.toast(text, alpha)
+--- `lift` is how much of the bottom of the screen is already spoken for —
+--- the coder's room, say. A banner is transient and the things under it are
+--- not: covering SEND for three seconds is worse than being read a line
+--- higher up.
+function UI.toast(text, alpha, lift)
   if not text or alpha <= 0 then return end
   local size = 10
   local font = Assets.font(Layout.ui(size))
@@ -787,7 +791,8 @@ function UI.toast(text, alpha)
   local lines = UI.wrap(text, w - 24, size)
   local h = #lines * font:getHeight() + 12
   local x = (Layout.vw - w) / 2
-  local y = Layout.vh - UI.footerHeight() - h - 20
+  local y = Layout.vh - UI.footerHeight() - h - 20 - math.max(0, lift or 0)
+  y = math.max(4, y)
   UI.setColor(Theme.ink, 0.85 * alpha)
   love.graphics.rectangle("fill", x, y, w, h)
   UI.setColor(Theme.coin, alpha)

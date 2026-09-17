@@ -59,12 +59,16 @@ local MONO_FILE = "assets/fonts/VT323-Regular.ttf"
 
 --- The faces a code pane can be set in, in the order the button cycles them.
 ---
---- `game` is the one the rest of the screen is drawn in and stays the
---- default: changing what somebody already knows is not an improvement. The
---- other two are code faces proper — VT323's `0` and `O` are the same shape
---- and `1`, `l` and `I` nearly so, where both of these separate all five and
---- fit half again as much on a line. Subset to what a code pane can hold, so
---- the pair costs 125 KB rather than a megabyte. Both SIL OFL 1.1.
+--- `game` is the face the rest of the screen is drawn in, and it was the
+--- default because changing what somebody already knows is not an
+--- improvement. It is not the default any more, and the argument that was
+--- written here against it is the reason: VT323's `0` and `O` are the same
+--- shape and `1`, `l` and `I` nearly so, and this is a game about reading
+--- code. Iosevka separates all five, fits half again as much on a line, and
+--- is what a programmer's editor looks like. The cycle button is unchanged
+--- and the choice is remembered, so anyone who prefers the terminal face
+--- sets it once. Subset to what a code pane can hold, so the pair costs
+--- 125 KB rather than a megabyte. Both SIL OFL 1.1.
 A.CODE_FACES = { "game", "iosevka", "jetbrains" }
 A.CODE_FACE_NAME = { game = "VT323", iosevka = "IOSEVKA", jetbrains = "JETBRAINS" }
 local CODE_FILE = {
@@ -81,7 +85,7 @@ local CODE_FILE = {
 --- Each face is drawn at the size that matches VT323's apparent size, and
 --- then the comparison is the one worth making.
 local CODE_SCALE = { game = 1, iosevka = 0.68, jetbrains = 0.68 }
-local code_face = "game"
+local code_face = "iosevka"
 
 --- Which face `A.mono` hands back. Clears the cache: the sizes already made
 --- are the old face at those sizes.
