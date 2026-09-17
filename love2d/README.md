@@ -54,6 +54,7 @@ official release from GitHub instead, and `make run` will use a `love` on
 | `CWBH_LANG` | — | `en` `ko` `yue` `zh` `ja` `cs` — a launch-time override |
 | `CWBH_FULLSCREEN` | `desktop` | `exclusive` for a real display-mode change |
 | `CWBH_FFI_LIB` | — | an explicit path to `libcwbh_ffi.dylib` |
+| `GROK_API_KEY` etc. | — | only read by `tests/drive/agent.lua`; the game itself asks in SETUP |
 | `CWBH_TEST` | — | `1` runs the suite and quits |
 | `CWBH_DRIVE` | — | a scripted session (`tests/drive/*.lua`) |
 
@@ -183,6 +184,33 @@ judging it. That is not decoration. PROTOCOL §4.9c makes a playground run
 deliberately unrecorded *because* this is where somebody writes something
 broken on purpose to see what the compiler says; a screen that scolded them
 for it would be arguing with its own contract.
+
+### The Rust coder
+
+**AGENT**, on the playground's header or in CODE's strip (or Ctrl-Shift-A). A
+small pixel-art character on a flying keyboard that lives on the code screen:
+ask it about the program, or say what to write and watch it type the answer
+into the editor one character at a time. It reads the file, edits or rewrites
+it, runs it, reads what the compiler said, fixes it and runs again — up to ten
+rounds — and then says in a sentence what it did. Every one of those steps
+happens on this machine.
+
+Five providers: Anthropic, OpenAI, xAI (Grok), OpenRouter, and Ollama on your
+own computer. Press SETUP, choose one, paste its key — for Ollama, the host it
+listens on — and press MODELS to see what that key can reach. The key is kept
+in `agent.json` in this client's own store, `0600`, and is sent to the provider
+that issued it and to nobody else. **It never goes to the game server**, which
+is storage: the conversation is kept there, one room per scratchpad, so the
+same room opens in the browser (PROTOCOL §4.9f).
+
+LÖVE ships LuaSocket and no TLS, so the call itself goes through the key
+library — `ffi/src/http.rs`, ABI 5 — which streams the reply back in pieces
+that `love.update` collects without ever blocking a frame. `docs/agent.md` is
+the contract, and it is one contract for both clients.
+
+The character can be put away (SETUP → CODER: OFF) without losing the room,
+and AUTO — off unless you turn it on — lets it review your code by itself now
+and then, which is the only thing here that spends a call nobody pressed for.
 
 ### The clock
 

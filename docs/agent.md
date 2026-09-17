@@ -240,6 +240,40 @@ folder, so the room lives for the visit. It gets `read_code`, `write_code`,
 
 ## 8. Files
 
+The LÖVE client (`love2d/`) carries the same agent, module for module. Where
+the browser has an SDK it has the wire; where the browser has `await` it has a
+coroutine; where the browser has `localStorage` it has a file of its own. The
+system prompt, the tool schemas, the typing constants and the sprite's
+constants are shared by being **copied and pinned in both suites**, which is
+the only arrangement that survives either client changing.
+
+* `ffi/src/http.rs` — ABI 5's `http_start`/`http_poll`/`http_cancel`/
+  `http_close`: a thread per request, bytes taken by polling, base64 across
+  the boundary. LÖVE bundles LuaSocket and no TLS, so without this the desktop
+  client cannot reach a provider at all.
+* `src/agent/prefs.lua` — provider, keys, models, AUTO, in `agent.json` beside
+  the event log, `0600`. Not *in* the log: `Store.check_no_secrets` refuses any
+  field named `key` or `secret`, and that guard is the wallet's.
+* `src/agent/http.lua` — the Lua side of the streaming call; `sse.lua`
+  reassembles events from whatever the network gave.
+* `src/agent/providers.lua` — both dialects on the wire: Anthropic's
+  `/v1/messages`, and OpenAI's `/chat/completions` for OpenAI, xAI, OpenRouter
+  and Ollama.
+* `src/agent/tools.lua`, `session.lua` — the same catalogue and the same loop;
+  a slow tool yields a frame instead of awaiting.
+* `src/agent/typist.lua` — the same schedule, driven by `dt` rather than by a
+  timer.
+* `src/agent/tips.lua` — the same catalogue and `advise()`, checked line for
+  line against the TypeScript's output.
+* `src/agent/sprite.lua`, `sync.lua` — the flight and the fold, constant for
+  constant.
+* `src/agent/panel.lua`, `coder.lua` — the panel in this client's widgets, and
+  the character: drawn **after** everything else, because LÖVE has no z-index.
+* `src/scenes/playground.lua` — the AGENT button, the bench (run, format,
+  search, picture), and the panel's share of the screen.
+* `tests/test_agent.lua` — the suite; `tests/drive/agent.lua` — the whole
+  feature against a live provider, with screenshots.
+
 Frontend (`frontend/src/`):
 
 * `ai/prefs.ts` — provider, keys, models, AUTO, in `localStorage`.

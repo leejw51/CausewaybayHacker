@@ -42,12 +42,14 @@ borrowed from CausewaybayRaiden — that watches what you type, drops a tip now
 and then, and, when you press AGENT, chats about the file, reviews it, or
 writes the program itself: typed into the editor one character at a time at a
 person's speed, then run, then fixed until the compiler is quiet. It speaks
-OpenAI, Anthropic, Grok or OpenRouter with **your own API key, kept in your
-browser and sent to nobody but the provider**, or Ollama on your own machine
+OpenAI, Anthropic, Grok or OpenRouter with **your own API key, kept on your own
+machine and sent to nobody but the provider**, or Ollama on your own computer
 with no key at all; the server never calls a model. Every
 scratchpad has its own chatroom — messages and generated pictures — kept in
 the pad's folder and searchable by keyword and by meaning. It calls a model
-only when you press something. See `docs/agent.md`.
+only when you press something. **The desktop client has the same coder**, the
+same five providers and the same room, over a streaming HTTP client in the key
+library (LÖVE brings no TLS of its own). See `docs/agent.md`.
 
 Everything lives in `~/.causewaybayhacker`: your code, your attempts, the
 database, the build caches.

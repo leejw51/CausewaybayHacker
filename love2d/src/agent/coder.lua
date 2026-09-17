@@ -653,11 +653,19 @@ function Coder:fly(box, panel_rect)
   end
   local x, y, w, h = box[1], box[2], box[3], box[4]
   local p = panel_rect
-  if p.w >= w * 0.9 then
-    self.box = { x, y, w, math.max(120, p.y - y) }
-  elseif p.x > x + w / 2 then
+  -- Which side the panel is on, by the **edge it is flush with** rather than
+  -- by where its left edge happens to fall. A room that takes a little over
+  -- half the window is still a column on the right, and asking whether its
+  -- left edge is past the middle said it was a band across the foot — which
+  -- left the coder flying in the strip above it with its bubble hanging down
+  -- over the conversation it had just had.
+  local margin = 8
+  local full_width = p.w >= w * 0.9
+  local at_right = not full_width and (x + w) - (p.x + p.w) <= margin
+  local at_left = not full_width and p.x - x <= margin
+  if at_right then
     self.box = { x, y, math.max(160, p.x - x), h }
-  elseif p.x + p.w < x + w / 2 then
+  elseif at_left then
     self.box = { p.x + p.w, y, math.max(160, x + w - p.x - p.w), h }
   else
     self.box = { x, y, w, math.max(120, p.y - y) }

@@ -130,25 +130,40 @@ function Panel:draw(rect, opts)
 
   -- The title: who is being spoken to, and on what.
   local provider = Prefs.provider()
-  local title = ("%s · %s · %s"):format(
-    I18n.t("RUST CODER"),
-    Prefs.PROVIDER_NAME[provider] or provider,
-    Prefs.model(provider)
-  )
-  UI.text(title, x, y, 8, Theme.coin)
-  y = y + row
+  -- **A short panel spends its height on the conversation.** In CODE the room
+  -- is a column beside the editor and in the framed view it is a quarter of
+  -- the window; either can be too short for chrome that assumed a page. Under
+  -- this, the model's name goes back to SETUP where it is edited anyway and
+  -- the tabs take the smaller row.
+  local compact = rect.h < 420
+  local title = ("%s · %s"):format(I18n.t("RUST CODER"),
+    Prefs.PROVIDER_NAME[provider] or provider)
+  UI.text(title, x, y, UI.fitSize(title, w, 8, 5), Theme.coin)
+  y = y + UI.lineHeight(8) + 2
+  if not compact then
+    -- Which model, under the name: it is the thing most worth knowing after
+    -- who is being spoken to, and it is too long to sit on the same line.
+    local model = Prefs.model(provider)
+    UI.text(model, x, y, UI.fitSize(model, w, 7, 5), Theme.withAlpha(Theme.cream, 0.55))
+    y = y + UI.lineHeight(7) + 2
+  end
+  y = y + 4
+  local trow = compact and (UI.lineHeight(7) + 10) or row
 
-  -- The provider tabs, wrapping when the panel is narrow.
-  local tab_w = math.max(54, math.floor((w - 5 * 4) / 6))
+  -- The provider tabs, in as many columns as the panel can hold a name in.
+  -- Six across a narrow room gave each of them forty pixels, and `ANTHROPIC`
+  -- came out as two stacked syllables.
+  local columns = math.max(2, math.min(6, math.floor(w / 96)))
+  local tab_w = math.floor((w - (columns - 1) * 4) / columns)
   local tx = x
   for _, name in ipairs(Prefs.PROVIDERS) do
     if tx + tab_w > x + w then
       tx = x
-      y = y + row
+      y = y + trow
     end
     -- `hot` is this client's word for the one that is chosen.
     local state = provider == name and "hot" or "normal"
-    local r = { x = tx, y = y, w = tab_w, h = row - 6 }
+    local r = { x = tx, y = y, w = tab_w, h = trow - 6 }
     UI.button(r.x, r.y, r.w, r.h, Prefs.PROVIDER_NAME[name], state, 7)
     self.rects["tab:" .. name] = r
     tx = tx + tab_w + 4
@@ -157,16 +172,22 @@ function Panel:draw(rect, opts)
     tx = x
     y = y + row
   end
-  local setup_r = { x = tx, y = y, w = tab_w, h = row - 6 }
-  UI.button(setup_r.x, setup_r.y, setup_r.w, setup_r.h, I18n.t("SETUP"),
-    self.view == "setup" and "hot" or "normal", 7)
-  self.rects["setup"] = setup_r
-  y = y + row
-
-  local close_r = { x = x, y = y, w = 64, h = row - 6 }
-  UI.button(close_r.x, close_r.y, close_r.w, close_r.h, I18n.t("CLOSE"), "normal", 7)
-  self.rects["close"] = close_r
-  y = y + row
+  -- SETUP and CLOSE are two more cells of the same grid: a row of their own
+  -- is a row the conversation does not get, and on a short window the
+  -- conversation was three lines tall.
+  for _, verb in ipairs({ "setup", "close" }) do
+    if tx + tab_w > x + w then
+      tx = x
+      y = y + trow
+    end
+    local r = { x = tx, y = y, w = tab_w, h = trow - 6 }
+    local hot = verb == "setup" and self.view == "setup"
+    UI.button(r.x, r.y, r.w, r.h, I18n.t(verb == "setup" and "SETUP" or "CLOSE"),
+      hot and "hot" or "normal", 7)
+    self.rects[verb] = r
+    tx = tx + tab_w + 4
+  end
+  y = y + trow + 2
 
   if self.view == "setup" then
     self:draw_setup(rect, x, y, w, row)
@@ -186,7 +207,23 @@ function Panel:draw_chat(rect, x, y, w, row)
 
   UI.well(x, y, w, well_h, Theme.navy)
   love.graphics.setScissor(x + 2, y + 2, w - 4, well_h - 4)
-  local iy = y + 6 - self.scroll
+  -- Measured before it is drawn, so the **newest line is the one on screen**.
+  -- A room that drew from the top showed the first thing ever said and hid
+  -- the answer that just arrived, which is the wrong end of a conversation.
+  local line_h = UI.lineHeight(7) + 1
+  local wrapped, total = {}, 0
+  for index, item in ipairs(self.items) do
+    local head = label_of(item)
+    local body = item.text or ""
+    if item.photo_url then body = body .. "  " .. I18n.t("[picture]") end
+    if item.edited then body = body .. "  " .. I18n.t("(edited)") end
+    local lines = UI.wrap(head .. ": " .. body, w - 20, 7)
+    wrapped[index] = lines
+    total = total + #lines * line_h + 6
+  end
+  -- `scroll` is how far *back* the reader has gone, 0 at the newest.
+  local iy = y + 6
+  if total > well_h - 12 then iy = y + well_h - 6 - total + self.scroll end
   local shown = 0
   if #self.items == 0 then
     UI.paragraph(
@@ -194,12 +231,8 @@ function Panel:draw_chat(rect, x, y, w, row)
       x + 8, iy, w - 16, 7, Theme.withAlpha(Theme.cream, 0.45))
   end
   for index, item in ipairs(self.items) do
-    local head = label_of(item)
-    local text = item.text or ""
-    if item.photo_url then text = text .. "  " .. I18n.t("[picture]") end
-    if item.edited then text = text .. "  " .. I18n.t("(edited)") end
-    local lines = UI.wrap(head .. ": " .. text, w - 20, 7)
-    local h = #lines * (UI.lineHeight(7) + 1) + 4
+    local lines = wrapped[index]
+    local h = #lines * line_h + 4
     if iy + h > y and iy < y + well_h then
       if self.selected == index then
         UI.setColor(Theme.cyan, 0.15)
@@ -209,7 +242,7 @@ function Panel:draw_chat(rect, x, y, w, row)
       local ly = iy
       for _, line in ipairs(lines) do
         UI.text(line, x + 8, ly, 7, tone_of(item))
-        ly = ly + UI.lineHeight(7) + 1
+        ly = ly + line_h
       end
       self.rects["msg:" .. index] = { x = x + 4, y = iy - 2, w = w - 8, h = h }
       shown = shown + 1
@@ -217,8 +250,8 @@ function Panel:draw_chat(rect, x, y, w, row)
     iy = iy + h + 2
   end
   love.graphics.setScissor()
-  -- How far the room can be scrolled back, kept for the wheel.
-  self.extent = math.max(0, (iy + self.scroll) - (y + well_h))
+  -- How far back the wheel may go: everything that is above the fold.
+  self.extent = math.max(0, total - (well_h - 12))
 
   if self.status then
     UI.text(self.status, x, y + well_h + 2, 7, Theme.withAlpha(Theme.coin, 0.9))
@@ -565,7 +598,9 @@ end
 
 function Panel:wheelmoved(dy)
   if not self.open then return false end
-  self.scroll = math.max(0, math.min(self.extent or 0, self.scroll - dy * 24))
+  -- Up goes back into the conversation; 0 is the newest line, which is where
+  -- a new message puts it again.
+  self.scroll = math.max(0, math.min(self.extent or 0, self.scroll + dy * 24))
   return true
 end
 

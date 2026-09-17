@@ -523,7 +523,12 @@ function Playground:draw()
   -- against it however wide their own labels measure, and dropped rather
   -- than overlapped when the header has no room for them — the name and the
   -- language are what this strip is for.
-  local rx = lx - 8
+  -- **Right of the TAB caption, not over it.** The strip and the captions
+  -- share this line, and laying the buttons from the language's left edge put
+  -- the first of them straight through `TAB` and the `saved` notice on a
+  -- window with no room to spare.
+  local tab_reserve = UI.textWidth(I18n.t("TAB"), 7) + 16
+  local rx = lx - 8 - tab_reserve
   self.code_button_rect, self.rename_rect, self.poster_rect, self.reader_rect = nil, nil, nil, nil
   self.agent_button_rect = nil
   for _, item in ipairs({
@@ -563,9 +568,17 @@ function Playground:draw()
   self:draw_output(out)
 
   if self.fx then self.fx:draw() end
-  -- The panel goes where the output is: the same column or band, so the
-  -- screen keeps one shape whether the room is open or shut.
-  self:draw_agent(out, not Layout.isPortrait())
+  -- **The room is not a sliver.** In the framed view the output column is a
+  -- fifth of the window, which is a fine width for a compiler message and far
+  -- too narrow for a conversation, so the panel takes the code and output
+  -- panes together and the list stays where it is.
+  local body = {
+    x = code.x,
+    y = math.min(code.y, out.y),
+    w = out.x + out.w - code.x,
+    h = math.max(code.y + code.h, out.y + out.h) - math.min(code.y, out.y),
+  }
+  self:draw_agent(body, not Layout.isPortrait())
   self.app:footer(I18n.t("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"))
 end
 
@@ -832,7 +845,11 @@ function Playground:draw_agent(body, wide)
   if self.coder.panel.open then
     local rect
     if wide then
-      local w = math.max(280, math.floor(body.w * 0.42))
+      -- **Half, not a third.** The room is a conversation and the editor is
+      -- the program; on a wide window both want a column a sentence can turn
+      -- a corner in, and the pads' list on the left is already paying for
+      -- itself.
+      local w = math.max(320, math.floor(body.w * 0.52))
       rect = { x = body.x + body.w - w, y = body.y, w = w, h = body.h }
     else
       local h = math.max(240, math.floor(body.h * 0.52))
