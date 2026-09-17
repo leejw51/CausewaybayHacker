@@ -16,8 +16,19 @@
  * starts fast and settles soft, and none of them read the wall clock. A
  * short `trail` of where it has just been is kept for the afterimages.
  *
+ * **A journey is a flight, not a slide.** Changing state — going to peek at
+ * the caret, sitting down to type, orbiting to think, drifting off again —
+ * starts a flight from where it is to where it is going, on the house
+ * exponential in-out curve: slow away, fast through the middle, slow to
+ * arrive. The destination is re-read every frame, so a caret that moves
+ * mid-flight is still where it lands. Once there, small movements are the
+ * exponential follow, which is what tracking a caret wants. The barrel roll
+ * turns on the same curve.
+ *
  * `reducedMotion` pins it in the top-right corner and only the bubble moves.
  */
+import { expInOut } from "../../engine/ease";
+
 export type Rect = readonly [number, number, number, number];
 export type Pt = readonly [number, number];
 
@@ -52,8 +63,16 @@ const ROCK_HZ = 4.5;
 /** How far it banks into a turn, per virtual pixel per second of travel. */
 const BANK = 0.0022;
 const BANK_MAX = 0.35;
-/** A barrel roll: one full turn at this rate, radians per second. */
-const ROLL_RATE = 11;
+/** A barrel roll: one full turn, eased in and out, over this many seconds. */
+const ROLL_SECS = 0.7;
+/** A flight's length: a floor, plus this much per virtual pixel, to a ceiling. */
+const FLIGHT_MIN = 0.4;
+const FLIGHT_PER_PX = 1 / 520;
+const FLIGHT_MAX = 1.3;
+/** A destination that moved further than this mid-flight is a new flight. */
+const REPLAN_PX = 120;
+/** How many frames of a flight the light ribbon remembers. */
+const WAKE_MAX = 16;
 /** The afterimages: how many, and how fast the sprite must move to leave one. */
 const TRAIL_MAX = 7;
 const TRAIL_SPEED = 180;
@@ -81,8 +100,10 @@ export class Sprite {
   private spin = 0;
   /** A keystroke's kick, 1 on the key and dying away. */
   pulse = 0;
-  /** Radians of barrel roll still to turn. */
-  private rolling = 0;
+  /** The roll's progress, 0..1, or -1 when level. */
+  private rolling = -1;
+  /** The flight under way, if any: where from, and how far along. */
+  private flight: { from: Pt; to: Pt; t: number; secs: number } | null = null;
 
   /** The tilt in radians: bank, rock and roll together. 0 at rest. */
   get angle(): number {
@@ -90,6 +111,11 @@ export class Sprite {
   }
   /** Where it has just been, newest last, for the afterimages. */
   trail: Pt[] = [];
+  /** Every frame of a flight, newest last, for the light ribbon behind it. */
+  wake: Pt[] = [];
+  /** Set for one frame when a flight begins, and when one ends. */
+  tookOff = false;
+  landed = false;
   private vx = 0;
   private vy = 0;
 
@@ -133,19 +159,46 @@ export class Sprite {
   /** Go and look at the caret; nothing happens if there is none. */
   peek(): boolean {
     if (!this.caret || this.state !== "wander") return false;
-    this.state = "peek";
+    this.go("peek");
     this.held = 0;
     return true;
   }
 
   typing(on: boolean): void {
-    if (on) this.state = "typing";
-    else if (this.state === "typing") this.state = "wander";
+    if (on) this.go("typing");
+    else if (this.state === "typing") this.go("wander");
   }
 
   thinking(on: boolean): void {
-    if (on) this.state = "thinking";
-    else if (this.state === "thinking") this.state = "wander";
+    if (on) this.go("thinking");
+    else if (this.state === "thinking") this.go("wander");
+  }
+
+  /** Change state, and set off: every change of mind is a flight. */
+  private go(state: State): void {
+    if (this.state === state) return;
+    this.state = state;
+    this.flight = null;
+    this.depart = true;
+  }
+
+  /** Set on a state change; the next update plans the flight from there. */
+  private depart = false;
+
+  private plan(to: Pt): void {
+    const dist = Math.hypot(to[0] - this.x, to[1] - this.y);
+    if (dist < 2) {
+      this.flight = null;
+      return;
+    }
+    const secs = Math.min(FLIGHT_MAX, FLIGHT_MIN + dist * FLIGHT_PER_PX);
+    this.flight = { from: [this.x, this.y], to, t: 0, secs };
+    this.tookOff = true;
+  }
+
+  /** Whether a flight is under way. */
+  get flying(): boolean {
+    return this.flight !== null;
   }
 
   /** A keystroke: the sprite squashes, stretches and zooms for a beat. */
@@ -153,10 +206,10 @@ export class Sprite {
     this.pulse = 1;
   }
 
-  /** One full barrel roll, on top of whatever else the angle is doing. */
+  /** One full barrel roll, eased in and out, on top of whatever else the angle is doing. */
   roll(): void {
     if (this.reduced()) return;
-    this.rolling += Math.PI * 2;
+    if (this.rolling < 0) this.rolling = 0;
   }
 
   /** How fast it is going, in virtual pixels per second. */
@@ -195,12 +248,39 @@ export class Sprite {
       this.y = ry;
       this.placed = true;
     }
-    const k = 1 - Math.exp(-FOLLOW * dt);
-    const dx = tx - this.x;
     const x0 = this.x;
     const y0 = this.y;
-    this.x += dx * k;
-    this.y += (ty - this.y) * k;
+    this.tookOff = false;
+    this.landed = false;
+    if (this.depart && !this.reduced()) {
+      this.depart = false;
+      this.plan([tx, ty]);
+    }
+    const dx = tx - this.x;
+    if (this.flight) {
+      // A flight: the in-out curve from where it set off to where it is
+      // going, the destination re-read every frame. A destination that
+      // jumped is a new flight from here.
+      const f = this.flight;
+      if (Math.hypot(tx - f.to[0], ty - f.to[1]) > REPLAN_PX) {
+        this.plan([tx, ty]);
+      } else {
+        f.to = [tx, ty];
+        f.t = Math.min(1, f.t + dt / f.secs);
+        const k = expInOut(f.t);
+        this.x = f.from[0] + (f.to[0] - f.from[0]) * k;
+        this.y = f.from[1] + (f.to[1] - f.from[1]) * k;
+        if (f.t >= 1) {
+          this.flight = null;
+          this.landed = true;
+        }
+      }
+    } else {
+      // At rest, or tracking: the exponential follow.
+      const k = 1 - Math.exp(-FOLLOW * dt);
+      this.x += dx * k;
+      this.y += (ty - this.y) * k;
+    }
     if (Math.abs(dx) > 0.6 && !this.reduced()) this.facing = dx < 0 ? -1 : 1;
     // Clamp to the box, whatever the target asked for.
     const m = this.size * MARGIN;
@@ -225,8 +305,10 @@ export class Sprite {
       this.rock = 0;
       this.spin = 0;
       this.pulse = 0;
-      this.rolling = 0;
+      this.rolling = -1;
+      this.flight = null;
       this.trail.length = 0;
+      this.wake.length = 0;
       return;
     }
     this.pulse *= Math.exp(-PULSE_DECAY * dt);
@@ -254,12 +336,11 @@ export class Sprite {
         ? Math.sin(this.t * ROCK_HZ * Math.PI * 2) * ROCK * (0.6 + 0.4 * this.pulse)
         : 0;
     this.rock = this.state === "typing" ? rockTarget : this.rock * (1 - ease);
-    if (this.rolling > 0) {
-      const step = Math.min(this.rolling, ROLL_RATE * dt);
-      this.spin += step * this.facing;
-      this.rolling -= step;
-      if (this.rolling <= 0) {
-        this.rolling = 0;
+    if (this.rolling >= 0) {
+      this.rolling = Math.min(1, this.rolling + dt / ROLL_SECS);
+      this.spin = Math.PI * 2 * expInOut(this.rolling) * this.facing;
+      if (this.rolling >= 1) {
+        this.rolling = -1;
         this.spin = 0;
       }
     }
@@ -268,6 +349,11 @@ export class Sprite {
       this.trail.push([this.x, this.y]);
       if (this.trail.length > TRAIL_MAX) this.trail.shift();
     } else if (this.trail.length) this.trail.shift();
+    // The wake: the whole flight, fading once it has landed.
+    if (this.flight) {
+      this.wake.push([this.x, this.y]);
+      if (this.wake.length > WAKE_MAX) this.wake.shift();
+    } else if (this.wake.length) this.wake.shift();
   }
 
   /** The squash and stretch of the moment: [x, y] factors on top of `scale`. */
@@ -278,7 +364,7 @@ export class Sprite {
 
   /** Whether a roll is still turning. */
   get rollingNow(): boolean {
-    return this.rolling > 0;
+    return this.rolling >= 0;
   }
 
   /** The hover bob, in virtual pixels, at this moment. */

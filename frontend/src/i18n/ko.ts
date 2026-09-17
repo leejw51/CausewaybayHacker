@@ -409,6 +409,10 @@ export const ko: Partial<Catalogue> = {
   "agent.editing": "수정 중 — ENTER로 저장, ESC로 원래 글 유지",
   "agent.editFailed": "바꾸지 못했습니다: {why}",
   "agent.deleteFailed": "삭제하지 못했습니다: {why}",
+  "agent.coderOn": "코더: 켬",
+  "agent.coderOff": "코더: 끔",
+  "agent.coderShown": "코더가 다시 화면에 나왔습니다",
+  "agent.coderHidden": "코더를 치웠습니다 — 패널은 그대로 씁니다",
   "agent.hello":
     "안녕하세요. 러스트 코더입니다. 이 파일에 대해 무엇이든 묻거나, 무엇을 쓸지 말해 주세요.",
   "pg.diskVerified": "디스크 읽음 · {address} 작성·서명 · 검증됨",

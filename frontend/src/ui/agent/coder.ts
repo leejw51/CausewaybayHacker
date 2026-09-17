@@ -31,6 +31,7 @@ import {
   readKey,
   readModel,
   readProvider,
+  readShown,
 } from "../../ai/prefs";
 import { Session, type Listener, type Mood } from "../../ai/session";
 import { Typist } from "../../ai/typist";
@@ -113,6 +114,9 @@ export class Coder {
   private moodSince = 0;
   /** Time banked towards the next exhaust ember, in seconds. */
   private exhaust = 0;
+  /** Distance banked towards the next light along a flight, in virtual px. */
+  private wakeCarry = 0;
+  private wakeLast: Pt | null = null;
   /** Shockwave rings, born at a moment and a place, for a landed program. */
   private rings: Array<{ x: number; y: number; at: number }> = [];
   /** The bubble: what, and until when. */
@@ -632,6 +636,12 @@ export class Coder {
     this.t += dt;
     this.sinceTip += dt;
     this.sinceCall += dt;
+    // Put away: no flying, no tips, no advice, no effects. The AUTO review
+    // is silenced with it — a character that is off should not spend.
+    if (!readShown()) {
+      this.bubble = null;
+      return;
+    }
     const src = this.editor?.source ?? "";
     if (src !== this.lastSource) {
       this.lastSource = src;
@@ -708,7 +718,37 @@ export class Coder {
   private breathe(dt: number): void {
     const fx = this.host.fx();
     if (!fx || reducedMotion()) return;
-    const burn = this.sprite.thrust();
+    const sp = this.sprite;
+    // Takeoff and landing: a puff of sparks at each end of a flight.
+    if (sp.tookOff) fx.play(burstPlan(sp.x, sp.y, 22));
+    if (sp.landed) fx.play(burstPlan(sp.x, sp.y, 30));
+    // The light along the way: embers left every few pixels of a flight,
+    // paced by distance the way the pointer's own trail is, thrown back
+    // along the direction of travel so they read as a wake.
+    if (sp.flying) {
+      const here: Pt = [sp.x, sp.y];
+      if (this.wakeLast) {
+        const dx = here[0] - this.wakeLast[0];
+        const dy = here[1] - this.wakeLast[1];
+        const dist = Math.hypot(dx, dy);
+        this.wakeCarry += dist;
+        const n = Math.min(8, Math.floor(this.wakeCarry / 6));
+        if (n > 0) {
+          this.wakeCarry -= n * 6;
+          const vx = (dx / Math.max(dt, 1 / 240)) * -0.35;
+          const vy = (dy / Math.max(dt, 1 / 240)) * -0.35;
+          for (let i = 1; i <= n; i++) {
+            const u = i / n;
+            fx.play(pointerPlan(this.wakeLast[0] + dx * u, this.wakeLast[1] + dy * u, vx, vy));
+          }
+        }
+      }
+      this.wakeLast = here;
+    } else {
+      this.wakeLast = null;
+      this.wakeCarry = 0;
+    }
+    const burn = sp.thrust();
     const every = 0.09 / burn;
     this.exhaust += dt;
     while (this.exhaust >= every) {
@@ -740,7 +780,12 @@ export class Coder {
 
   // -- drawing -----------------------------------------------------------------
 
-  /** Where the sprite flies this frame: the editor's rectangle. */
+  /**
+   * Where the sprite flies this frame. The whole screen: it is a character
+   * of the room, not a widget of the editor, and a coder who only ever
+   * hovers over the code is a cursor with a face. The caret still pulls it
+   * in when there is work to watch.
+   */
   fly(box: Rect): void {
     this.box = box;
   }
@@ -749,6 +794,7 @@ export class Coder {
   draw(): void {
     const g = this.layer?.begin();
     if (!g) return;
+    if (!readShown()) return;
     const s = this.app.layout.uiScale();
     const size = this.sprite.size;
     const x = this.sprite.x;
@@ -774,6 +820,30 @@ export class Coder {
       g.arc(r.x, r.y, radius, 0, Math.PI * 2);
       g.stroke();
       g.restore();
+    }
+
+    // The light ribbon: the flight's wake as one glowing stroke, cyan with
+    // a white core, wide and bright at the ship and thinning to nothing.
+    const wake = this.sprite.wake;
+    if (wake.length >= 2) {
+      const pts = [...wake, [x, this.sprite.y] as Pt];
+      for (let i = 1; i < pts.length; i++) {
+        const k = i / (pts.length - 1);
+        g.save();
+        g.lineCap = "round";
+        g.globalAlpha = 0.55 * k;
+        g.strokeStyle = css(Theme.cyan);
+        g.lineWidth = Math.max(1.5, size * 0.22 * k);
+        g.beginPath();
+        g.moveTo(pts[i - 1][0], pts[i - 1][1]);
+        g.lineTo(pts[i][0], pts[i][1]);
+        g.stroke();
+        g.globalAlpha = 0.8 * k;
+        g.strokeStyle = css(Theme.cream);
+        g.lineWidth = Math.max(1, size * 0.06 * k);
+        g.stroke();
+        g.restore();
+      }
     }
 
     // The afterimages: where it has just been, fading back along the trail.

@@ -22,6 +22,8 @@ import {
   writeModel,
   writeProvider,
   maskKey,
+  readShown,
+  writeShown,
 } from "../src/ai/prefs";
 import { numbered, runTool, toolsFor, type Bench } from "../src/ai/tools";
 import { systemPrompt, MAX_ROUNDS } from "../src/ai/session";
@@ -161,6 +163,47 @@ describe("the flight", () => {
     expect(s.state).toBe("wander");
   });
 
+  it("flies to the caret slow-fast-slow, not at one speed", () => {
+    const s = new Sprite(48, () => false);
+    // Settle in the corner first, then set off across the box.
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
+    s.caret = [box[0] + 60, box[1] + box[3] - 60];
+    s.typing(true);
+    const steps: number[] = [];
+    let lx = s.x;
+    let ly = s.y;
+    for (let i = 0; i < 90 && (s.flying || i === 0); i++) {
+      s.update(1 / 60, box, 8);
+      steps.push(Math.hypot(s.x - lx, s.y - ly));
+      lx = s.x;
+      ly = s.y;
+    }
+    expect(steps.length).toBeGreaterThan(20);
+    const n = steps.length;
+    const early = steps[1];
+    const mid = steps[Math.floor(n / 2)];
+    const late = steps[n - 2];
+    expect(mid).toBeGreaterThan(early * 3);
+    expect(mid).toBeGreaterThan(late * 3);
+    // And it arrived where it was going.
+    const [sx, sy] = s.seat(box, 8);
+    expect(Math.hypot(s.x - sx, s.y - sy)).toBeLessThan(3);
+  });
+
+  it("re-plans the flight when the destination jumps mid-air, and lands there", () => {
+    const s = new Sprite(48, () => false);
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
+    s.caret = [box[0] + 60, box[1] + 60];
+    s.typing(true);
+    for (let i = 0; i < 10; i++) s.update(1 / 60, box, 8);
+    expect(s.flying).toBe(true);
+    s.caret = [box[0] + box[2] - 60, box[1] + box[3] - 60];
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
+    const [sx, sy] = s.seat(box, 8);
+    expect(Math.hypot(s.x - sx, s.y - sy)).toBeLessThan(3);
+    expect(s.flying).toBe(false);
+  });
+
   it("will not peek with no caret, or while typing", () => {
     const s = new Sprite(48, () => false);
     expect(s.peek()).toBe(false);
@@ -211,21 +254,30 @@ describe("the flight", () => {
     expect(s.squash()).toEqual([1, 1]);
   });
 
-  it("barrel-rolls exactly once round and comes back level", () => {
+  it("barrel-rolls exactly once round, eased in and out, and comes back level", () => {
     const s = new Sprite(48, () => false);
-    for (let i = 0; i < 60; i++) s.update(1 / 60, box, 8);
+    for (let i = 0; i < 120; i++) s.update(1 / 60, box, 8);
     s.roll();
     expect(s.rollingNow).toBe(true);
     let turned = 0;
     let last = s.angle;
+    const steps: number[] = [];
     for (let i = 0; i < 120 && s.rollingNow; i++) {
       s.update(1 / 60, box, 8);
       const d = Math.abs(s.angle - last);
-      if (d < Math.PI) turned += d;
+      if (d < Math.PI) {
+        turned += d;
+        steps.push(d);
+      }
       last = s.angle;
     }
     expect(s.rollingNow).toBe(false);
     expect(turned).toBeGreaterThan(Math.PI * 1.5);
+    // Slow into the turn and slow out of it: the middle frames turn far
+    // more than the first and last.
+    const n = steps.length;
+    expect(steps[Math.floor(n / 2)]).toBeGreaterThan(steps[0] * 3);
+    expect(steps[Math.floor(n / 2)]).toBeGreaterThan(steps[n - 1] * 3);
     for (let i = 0; i < 90; i++) s.update(1 / 60, box, 8);
     expect(Math.abs(s.angle)).toBeLessThan(0.4);
   });
@@ -287,6 +339,14 @@ describe("the keys", () => {
     writeProvider("grok");
     expect(readProvider()).toBe("grok");
     writeProvider("anthropic");
+  });
+
+  it("show the coder unless told otherwise, and remember being told", () => {
+    expect(readShown()).toBe(true);
+    writeShown(false);
+    expect(readShown()).toBe(false);
+    writeShown(true);
+    expect(readShown()).toBe(true);
   });
 
   it("mask a key for the screen", () => {

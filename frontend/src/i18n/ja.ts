@@ -405,6 +405,10 @@ export const ja: Partial<Catalogue> = {
   "agent.editing": "編集中 — ENTER で保存、ESC で元のまま",
   "agent.editFailed": "変更できませんでした: {why}",
   "agent.deleteFailed": "削除できませんでした: {why}",
+  "agent.coderOn": "コーダー: オン",
+  "agent.coderOff": "コーダー: オフ",
+  "agent.coderShown": "コーダーが画面に戻りました",
+  "agent.coderHidden": "コーダーをしまいました — パネルはそのまま使えます",
   "agent.hello":
     "やあ、Rustコーダーです。このファイルについて何でも聞くか、何を書くか教えてください。",
   "pg.diskVerified": "ディスク読込 · {address} が作成・署名 · 検証済み",

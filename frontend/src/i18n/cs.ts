@@ -425,6 +425,10 @@ export const cs: Partial<Catalogue> = {
   "agent.editing": "úprava — ENTER uloží, ESC nechá původní text",
   "agent.editFailed": "nepodařilo se změnit: {why}",
   "agent.deleteFailed": "nepodařilo se smazat: {why}",
+  "agent.coderOn": "KODÉR: ZAPNUT",
+  "agent.coderOff": "KODÉR: VYPNUT",
+  "agent.coderShown": "kodér je zpět na obrazovce",
+  "agent.coderHidden": "kodér je schovaný — panel funguje dál",
   "agent.hello":
     "Ahoj, jsem rustový kodér. Zeptej se na cokoli o tomto souboru, nebo mi řekni, co napsat.",
   "pg.diskVerified": "deska přečtena · napsal a podepsal {address} · ověřeno",

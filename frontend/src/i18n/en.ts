@@ -430,6 +430,10 @@ export const en = {
   "agent.editing": "editing — ENTER saves, ESC keeps the old text",
   "agent.editFailed": "could not change it: {why}",
   "agent.deleteFailed": "could not delete it: {why}",
+  "agent.coderOn": "CODER: ON",
+  "agent.coderOff": "CODER: OFF",
+  "agent.coderShown": "the coder is back on the screen",
+  "agent.coderHidden": "the coder is put away — the panel still works",
   "agent.hello":
     "Hi. I'm the Rust coder. Ask me anything about this file, or tell me what to write.",
   "pg.diskVerified": "disk read · written and signed by {address} · verified",

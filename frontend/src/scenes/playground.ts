@@ -1798,14 +1798,57 @@ export class PlaygroundScene implements Scene {
     };
 
     let top = strip + Math.round(6 * s);
-    if (!hasOut) {
+    const agentOpen = this.coder?.open ?? false;
+    if (!hasOut && !agentOpen) {
       fed(pad, top, bodyW);
       top += fedH + gap;
     }
     const bodyH = layout.vh - top - pad;
     let editorW = bodyW;
     let editorH = bodyH;
-    if (hasOut && wide) {
+    let panel: Rect | null = null;
+    // **The editor keeps the larger part, whatever else is up.** Three
+    // things can share the window with it: the agent's panel, the input, and
+    // the output. Wide, the editor is the left column and the other three
+    // share the right one, the panel above the run. Tall, the editor is the
+    // top and the others share the band under it, the panel to the left
+    // of the run. Either way the editor gives up one dimension, once, and
+    // the input travels with the output rather than taking a row of its own.
+    if (agentOpen && wide) {
+      const colW = Math.max(Math.round(260 * s), Math.round(bodyW * 0.42));
+      editorW = bodyW - colW - pad;
+      const x = pad + editorW + pad;
+      if (hasOut) {
+        const runH = Math.max(fedH * 2 + gap, Math.round(bodyH * 0.38));
+        panel = [x, top, colW, bodyH - runH - gap];
+        const y = top + bodyH - runH;
+        const inH = Math.max(fedH, Math.round(runH * 0.3));
+        fed(x, y, colW, inH);
+        this.drawOutput(g, [x, y + inH + gap, colW, runH - inH - gap], s);
+      } else {
+        const inH = fedH;
+        fed(x, top, colW, inH);
+        panel = [x, top + inH + gap, colW, bodyH - inH - gap];
+        this.outputRect = [0, 0, 0, 0];
+      }
+    } else if (agentOpen) {
+      const bandH = Math.round(bodyH * (hasOut ? 0.5 : 0.44));
+      editorH = bodyH - bandH - pad;
+      const y = top + editorH + pad;
+      if (hasOut) {
+        const panelW = Math.round(bodyW * 0.55);
+        panel = [pad, y, panelW, bandH];
+        const rx = pad + panelW + pad;
+        const rw = bodyW - panelW - pad;
+        const inH = Math.max(fedH, Math.round(bandH * 0.3));
+        fed(rx, y, rw, inH);
+        this.drawOutput(g, [rx, y + inH + gap, rw, bandH - inH - gap], s);
+      } else {
+        fed(pad, y, bodyW);
+        panel = [pad, y + fedH + gap, bodyW, bandH - fedH - gap];
+        this.outputRect = [0, 0, 0, 0];
+      }
+    } else if (hasOut && wide) {
       const outW = Math.round(bodyW * 0.38);
       editorW = bodyW - outW - pad;
       const x = pad + editorW + pad;
@@ -1825,19 +1868,12 @@ export class PlaygroundScene implements Scene {
     } else {
       this.outputRect = [0, 0, 0, 0];
     }
-    // The agent's panel takes its share of the editor's room when it is
-    // open: beside the code when wide, under it when tall (docs/agent.md §7).
-    const carve = this.coder?.split([pad, top, editorW, editorH], !wide, s) ?? {
-      editor: [pad, top, editorW, editorH] as Rect,
-      panel: null,
-    };
-    const [ex, ey, ew, eh] = carve.editor;
-    well(g, ex, ey, ew, eh);
-    const editorRect: Rect = [ex + 4, ey + 4, ew - 8, eh - 8];
+    well(g, pad, top, editorW, editorH);
+    const editorRect: Rect = [pad + 4, top + 4, editorW - 8, editorH - 8];
     if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     else this.overlay?.hide();
-    this.coder?.fly(editorRect);
-    if (carve.panel) this.coder?.drawPanel(g, carve.panel, s);
+    this.coder?.fly([0, 0, layout.vw, layout.vh]);
+    if (panel) this.coder?.drawPanel(g, panel, s);
     else this.coder?.panel.hideFields();
   }
 
@@ -2011,7 +2047,7 @@ export class PlaygroundScene implements Scene {
     if (this.editor && this.benchIn.finished) {
       this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     } else this.overlay?.hide();
-    this.coder?.fly(editorRect);
+    this.coder?.fly([0, 0, layout.vw, layout.vh]);
 
     // The stdin box. It matters here in a way it never does on a quest screen:
     // there is no test case to supply the input, so without this there is no

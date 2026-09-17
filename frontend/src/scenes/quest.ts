@@ -2090,7 +2090,7 @@ export class QuestScene implements Scene {
     const editorRect: Rect = [ex + 4, ey + 4, ew - 8, eh - 8];
     if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     else this.overlay?.hide();
-    this.coder?.fly(editorRect);
+    this.coder?.fly([0, 0, layout.vw, layout.vh]);
     if (carve.panel) this.coder?.drawPanel(g, carve.panel, s);
     else this.coder?.panel.hideFields();
   }
@@ -2379,7 +2379,7 @@ export class QuestScene implements Scene {
     if (this.editor && this.benchIn.finished) {
       this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     } else this.overlay?.hide();
-    this.coder?.fly(editorRect);
+    this.coder?.fly([0, 0, layout.vw, layout.vh]);
 
     const rowY = inner[1] + editorH + Math.round(8 * s);
     this.buttons.row(bench, [inner[0], rowY, rowW, bandH], rowItems, benchBtnH);

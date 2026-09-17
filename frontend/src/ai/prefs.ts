@@ -46,6 +46,7 @@ export const PROVIDER_BOT: Record<Provider, string> = {
 
 const PROVIDER_KEY = "ai.provider";
 const AUTO_KEY = "ai.auto";
+const SHOWN_KEY = "ai.shown";
 const keyKey = (p: Provider) => `ai.key.${p}`;
 const modelKey = (p: Provider) => `ai.model.${p}`;
 
@@ -80,6 +81,19 @@ export function readAuto(): boolean {
 
 export function writeAuto(on: boolean): void {
   writePref(AUTO_KEY, on ? "1" : "0");
+}
+
+/**
+ * Whether the coder is on the screen at all: the sprite, its tips, its
+ * effects. Off, the panel still opens and the verbs still work — it is the
+ * character that is put away, not the help. On by default.
+ */
+export function readShown(): boolean {
+  return readPref(SHOWN_KEY) !== "0";
+}
+
+export function writeShown(on: boolean): void {
+  writePref(SHOWN_KEY, on ? "1" : "0");
 }
 
 /** A key's shape for the setup line: the first and last few characters. */

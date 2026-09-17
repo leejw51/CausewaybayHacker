@@ -22,7 +22,9 @@ import {
   readAuto,
   readKey,
   readModel,
+  readShown,
   writeAuto,
+  writeShown,
   writeKey,
   writeModel,
   writeProvider,
@@ -349,6 +351,8 @@ export class Panel {
       { id: "savekey", label: t("agent.save"), primary: true },
       { id: "fetch", label: t("agent.fetchModels"), dim: this.fetching },
       { id: "auto", label: t("agent.auto"), strong: auto },
+      // The character itself, on or off. The verbs do not depend on it.
+      { id: "coder", label: readShown() ? t("agent.coderOn") : t("agent.coderOff") },
     ];
     const [, bh] = btnBox(
       f,
@@ -719,6 +723,12 @@ export class Panel {
       case "fetch":
         void this.fetchModels();
         break;
+      case "coder": {
+        writeShown(!readShown());
+        this.status = readShown() ? t("agent.coderShown") : t("agent.coderHidden");
+        this.app.chip.blip();
+        break;
+      }
       case "auto": {
         const on = !readAuto();
         writeAuto(on);
