@@ -150,11 +150,40 @@ function Panel:draw(rect, opts)
   y = y + 4
   local trow = compact and (UI.lineHeight(7) + 10) or row
 
+  -- **The room comes first.** What the panel is for is the conversation and
+  -- the line you type in, so the height those need is taken out here and the
+  -- tabs get what is left. A panel too short for both drew its field through
+  -- the CLOSE button.
+  local need_below = (row - 6) + row + 3 * (UI.lineHeight(7) + 1) + 20
+  local header_room = (rect.y + rect.h - 8) - y - need_below
+
   -- The provider tabs, in as many columns as the panel can hold a name in.
   -- Six across a narrow room gave each of them forty pixels, and `ANTHROPIC`
   -- came out as two stacked syllables.
   local columns = math.max(2, math.min(6, math.floor(w / 96)))
   local tab_w = math.floor((w - (columns - 1) * 4) / columns)
+  local tab_rows = math.ceil((#Prefs.PROVIDERS + 2) / columns)
+  if header_room < tab_rows * trow then
+    -- No room for a grid of them: one button that says who is being spoken
+    -- to and moves to the next one when pressed, and SETUP and CLOSE beside
+    -- it. Every provider is still reachable, in one row instead of three.
+    local third = math.floor((w - 8) / 3)
+    for index, id in ipairs({ "cycle", "setup", "close" }) do
+      local r = { x = x + (index - 1) * (third + 4), y = y, w = third, h = trow - 6 }
+      local label = id == "cycle" and (Prefs.PROVIDER_NAME[provider] or provider)
+        or I18n.t(id == "setup" and "SETUP" or "CLOSE")
+      UI.button(r.x, r.y, r.w, r.h, label,
+        (id == "setup" and self.view == "setup") and "hot" or "normal", 7)
+      self.rects[id] = r
+    end
+    y = y + trow + 2
+    if self.view == "setup" then
+      self:draw_setup(rect, x, y, w, row)
+    else
+      self:draw_chat(rect, x, y, w, row)
+    end
+    return
+  end
   local tx = x
   for _, name in ipairs(Prefs.PROVIDERS) do
     if tx + tab_w > x + w then
@@ -244,7 +273,14 @@ function Panel:draw_chat(rect, x, y, w, row)
         UI.text(line, x + 8, ly, 7, tone_of(item))
         ly = ly + line_h
       end
-      self.rects["msg:" .. index] = { x = x + 4, y = iy - 2, w = w - 8, h = h }
+      -- Clipped to the well, because this rect is what a press is tested
+      -- against: a row half-scrolled out of the top used to take clicks from
+      -- above the panel, where it was not drawn and could not be seen.
+      local top = math.max(iy - 2, y + 2)
+      local bottom = math.min(iy - 2 + h, y + well_h - 2)
+      if bottom - top > 8 then
+        self.rects["msg:" .. index] = { x = x + 4, y = top, w = w - 8, h = bottom - top }
+      end
       shown = shown + 1
     end
     iy = iy + h + 2
@@ -301,11 +337,44 @@ end
 function Panel:draw_setup(rect, x, y, w, row)
   local provider = Prefs.provider()
   local needs = Prefs.needs_key(provider)
-  UI.text(needs and I18n.t("API KEY") or I18n.t("HOST"), x, y, 7,
-    Theme.withAlpha(Theme.cream, 0.6))
-  y = y + UI.lineHeight(7) + 4
+  local label_h = UI.lineHeight(7) + 4
 
-  local key_r = { x = x, y = y, w = w, h = row - 6 }
+  -- **Three rows, measured from the floor.** The key, the model and the two
+  -- switches are what somebody came to SETUP to press, so the height is
+  -- divided between them before anything is drawn and every position below
+  -- comes out of that one division. Laid out downwards from the top instead,
+  -- a short panel drew the key field straight through the model row and put
+  -- the switches off the bottom edge, where they could be seen and not
+  -- pressed.
+  local bottom = rect.y + rect.h - 8
+  local gaps = 12
+  local room = bottom - y
+  local labels = true
+  local field_h = math.floor((room - gaps - 2 * label_h) / 3)
+  if field_h < UI.lineHeight(7) + 8 then
+    -- No room for the captions: the key field says what it wants when it is
+    -- empty, and MODEL sits next to a button that says MODELS.
+    labels = false
+    field_h = math.floor((room - gaps) / 3)
+  end
+  field_h = math.max(14, math.min(row - 6, field_h))
+
+  local switches_y = bottom - field_h
+  local model_y = switches_y - 6 - field_h
+  local model_label_y = labels and (model_y - label_h) or model_y
+  local key_y = labels and (y + label_h) or y
+  -- Whatever the arithmetic above left, the key row sits above the model row
+  -- and not through it.
+  key_y = math.min(key_y, model_label_y - 6 - field_h)
+  key_y = math.max(key_y, y)
+
+  -- The key, at the top, with its label when there is room for one.
+  if labels then
+    UI.text(needs and I18n.t("API KEY") or I18n.t("HOST"), x, key_y - label_h, 7,
+      Theme.withAlpha(Theme.cream, 0.6))
+  end
+
+  local key_r = { x = x, y = key_y, w = w, h = field_h }
   UI.well(key_r.x, key_r.y, key_r.w, key_r.h,
     self.focus == "key" and Theme.cyan or Theme.navy)
   local shown
@@ -322,64 +391,66 @@ function Panel:draw_setup(rect, x, y, w, row)
     Prefs.key(provider) == "" and self.focus ~= "key"
       and Theme.withAlpha(Theme.cream, 0.4) or Theme.cream)
   self.rects["key"] = key_r
-  y = y + row
+  y = key_y + field_h + 6
 
-  -- Where it goes, said plainly. A provider key on a game's screen deserves
-  -- one sentence about where it is kept.
-  y = y + UI.paragraph(
-    I18n.t("Kept on this machine only, and sent to the provider that issued it. Never to the game server."),
-    x, y, w, 7, Theme.withAlpha(Theme.cream, 0.45)) + 6
+  -- Where it goes, said plainly — but only when saying it does not cost the
+  -- list its last line. A provider key on a game's screen deserves one
+  -- sentence about where it is kept, and a panel too short to hold the
+  -- sentence is a panel that needs its buttons more.
+  local note = I18n.t("Kept on this machine only, and sent to the provider that issued it. Never to the game server.")
+  local note_h = UI.lineHeight(7) * #UI.wrap(note, w, 7)
+  if model_label_y - y > note_h + 40 then
+    y = y + UI.paragraph(note, x, y, w, 7, Theme.withAlpha(Theme.cream, 0.45)) + 6
+  end
 
-  UI.text(I18n.t("MODEL"), x, y, 7, Theme.withAlpha(Theme.cream, 0.6))
-  y = y + UI.lineHeight(7) + 4
-  local model_r = { x = x, y = y, w = w - 96, h = row - 6 }
-  UI.well(model_r.x, model_r.y, model_r.w, model_r.h,
-    self.focus == "model" and Theme.cyan or Theme.navy)
-  local model_text = self.focus == "model" and (self.model_field .. "_") or Prefs.model(provider)
-  UI.text(self:tail(model_text, model_r.w - 12), model_r.x + 6, model_r.y + 5, 7, Theme.cream)
-  self.rects["model"] = model_r
-  local fetch_r = { x = x + w - 92, y = y, w = 92, h = row - 6 }
-  UI.button(fetch_r.x, fetch_r.y, fetch_r.w, fetch_r.h, I18n.t("MODELS"), "normal", 7)
-  self.rects["fetch"] = fetch_r
-  y = y + row
-
-  -- What the provider answered, as a list to pick from.
-  if self.models and #self.models > 0 then
-    local list_h = math.max(40, rect.y + rect.h - y - row * 2 - 16)
+  -- What the provider answered, in whatever room is left between the key and
+  -- the model row. Dropped entirely when there is none.
+  local list_h = model_label_y - y - 6
+  if self.models and #self.models > 0 and list_h >= 40 then
     UI.well(x, y, w, list_h, Theme.navy)
     love.graphics.setScissor(x + 2, y + 2, w - 4, list_h - 4)
     local my = y + 4 - self.scroll
     for index, id in ipairs(self.models) do
       local h = UI.lineHeight(7) + 4
       if my + h > y and my < y + list_h then
-        UI.text(id, x + 8, my, 7,
-          id == Prefs.model(provider) and Theme.coin or Theme.cream)
+        UI.text(id, x + 8, my, 7, id == Prefs.model(provider) and Theme.coin or Theme.cream)
         self.rects["model:" .. index] = { x = x + 4, y = my - 2, w = w - 8, h = h }
       end
       my = my + h
     end
     love.graphics.setScissor()
     self.extent = math.max(0, (my + self.scroll) - (y + list_h))
-    y = y + list_h + 6
-  elseif self.status then
-    y = y + UI.paragraph(self.status, x, y, w, 7, Theme.withAlpha(Theme.coin, 0.9)) + 6
+  elseif self.status and list_h >= UI.lineHeight(7) then
+    UI.paragraph(self.status, x, y, w, 7, Theme.withAlpha(Theme.coin, 0.9), 2)
   end
 
-  -- The two switches, and CLOSE is above.
+  -- The model, named and chosen.
+  if labels then
+    UI.text(I18n.t("MODEL"), x, model_label_y, 7, Theme.withAlpha(Theme.cream, 0.6))
+  end
+  local fetch_w = math.min(math.floor(w * 0.4), math.max(72, UI.textWidth(I18n.t("MODELS"), 7) + 24))
+  local model_r = { x = x, y = model_y, w = w - fetch_w - 4, h = field_h }
+  UI.well(model_r.x, model_r.y, model_r.w, model_r.h,
+    self.focus == "model" and Theme.cyan or Theme.navy)
+  local model_text = self.focus == "model" and (self.model_field .. "_") or Prefs.model(provider)
+  UI.text(self:tail(model_text, model_r.w - 12), model_r.x + 6, model_r.y + 5, 7, Theme.cream)
+  self.rects["model"] = model_r
+  local fetch_r = { x = x + w - fetch_w, y = model_y, w = fetch_w, h = field_h }
+  UI.button(fetch_r.x, fetch_r.y, fetch_r.w, fetch_r.h, I18n.t("MODELS"), "normal", 7)
+  self.rects["fetch"] = fetch_r
+
+  -- And the two switches, on the floor.
   local half = math.floor((w - 4) / 2)
-  local auto_r = { x = x, y = y, w = half, h = row - 6 }
+  local auto_r = { x = x, y = switches_y, w = half, h = field_h }
   UI.button(auto_r.x, auto_r.y, auto_r.w, auto_r.h,
     I18n.t("AUTO") .. ": " .. (Prefs.auto() and I18n.t("ON") or I18n.t("OFF")),
     Prefs.auto() and "hot" or "normal", 7)
   self.rects["auto"] = auto_r
-  local shown_r = { x = x + half + 4, y = y, w = half, h = row - 6 }
+  local shown_r = { x = x + half + 4, y = switches_y, w = half, h = field_h }
   UI.button(shown_r.x, shown_r.y, shown_r.w, shown_r.h,
     I18n.t("CODER") .. ": " .. (Prefs.shown() and I18n.t("ON") or I18n.t("OFF")),
     Prefs.shown() and "hot" or "normal", 7)
   self.rects["shown"] = shown_r
-  y = y + row
-  UI.paragraph(I18n.t("AUTO lets the coder review your code by itself, now and then. It spends a call when it does."),
-    x, y, w, 7, Theme.withAlpha(Theme.cream, 0.45))
 end
 
 --- The end of a long line, which is the part being typed.
@@ -427,6 +498,17 @@ function Panel:pressed(id)
       Prefs.set_model(Prefs.provider(), picked)
       self.model_field = picked
     end
+    return
+  end
+  if id == "cycle" then
+    -- Round the list and back to the start: the tab row's job in one button.
+    local at = 1
+    for index, name in ipairs(Prefs.PROVIDERS) do
+      if name == Prefs.provider() then at = index end
+    end
+    Prefs.set_provider(Prefs.PROVIDERS[(at % #Prefs.PROVIDERS) + 1])
+    self.models = nil
+    self.status = nil
     return
   end
   if id == "setup" then

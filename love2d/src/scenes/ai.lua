@@ -402,6 +402,16 @@ end
 
 -- -------------------------------------------------------------------- input
 
+--- The wheel moves the cursor, because on a desktop that is what a wheel is
+--- for. Every screen in this client that has a list has one of these now: a
+--- mouse that scrolled on four screens and did nothing on five reads as five
+--- screens that are broken, not as four that are special.
+function Ai:wheelmoved(_, dy)
+  if self.drill then return end
+  self.cursor = ((self.cursor - 1 + (dy > 0 and -1 or 1)) % #MODES) + 1
+  SFX.play("move")
+end
+
 function Ai:keypressed(key)
   if key == "left" or key == "up" then
     self.cursor = ((self.cursor - 2) % #MODES) + 1; SFX.play("move"); return true

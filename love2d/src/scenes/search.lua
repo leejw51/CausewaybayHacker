@@ -371,6 +371,14 @@ function Search:keypressed(key, mods)
   return false
 end
 
+--- The wheel moves the cursor, because on a desktop that is what a wheel is
+--- for. Every screen in this client that has a list has one of these now.
+function Search:wheelmoved(_, dy)
+  if not self.hits or #self.hits == 0 then return end
+  self.cursor = math.max(1, math.min(#self.hits, self.cursor + (dy > 0 and -1 or 1)))
+  SFX.play("move")
+end
+
 function Search:mousepressed(x, y)
   for mode, rect in pairs(self.mode_rects or {}) do
     if x >= rect.x and x <= rect.x + rect.w and y >= rect.y and y <= rect.y + rect.h then

@@ -986,6 +986,15 @@ function Map:step(dx, dy)
   end
 end
 
+--- The wheel moves the cursor, because on a desktop that is what a wheel is
+--- for. Every screen in this client that has a list has one of these now.
+--- On the map the list is a path, so the wheel walks it: down goes on, up
+--- goes back, and `step` is the same move the arrow keys make.
+function Map:wheelmoved(_, dy)
+  if self.iris or self.walk then return end
+  self:step(0, dy > 0 and -1 or 1)
+end
+
 function Map:keypressed(key)
   -- **Any key lands her immediately.** Not just the one that started it: a
   -- player reaching for the next thing has already decided, and an animation

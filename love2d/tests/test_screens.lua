@@ -197,6 +197,113 @@ return function()
     Layout.font, Layout.mode, Layout.vw, Layout.vh = was_font, was_mode, was_vw, was_vh
   end)
 
+  T.section("screens — the coder's panel, laid out at every step and shape")
+
+  --- Two rectangles that share any area at all.
+  local function overlap(a, b)
+    return a.x < b.x + b.w and b.x < a.x + a.w and a.y < b.y + b.h and b.y < a.y + a.h
+  end
+
+  T.case("every control is inside the panel and none is under another", function()
+    if not (love and love.graphics) then
+      T.skip("agent panel metrics", "needs fonts, so needs LÖVE")
+      return
+    end
+    -- The bug this is written against: six provider tabs across a narrow
+    -- column drew `ANTHROPIC` as two stacked syllables, and before that the
+    -- verbs were laid under the footer where they could be seen and not
+    -- pressed. Neither is visible to a test that only asks whether the code
+    -- runs, and both are obvious in a picture — so this asks the layout the
+    -- questions a picture would answer.
+    local Layout = require("src.layout")
+    local PanelM = require("src.agent.panel")
+    local Prefs = require("src.agent.prefs")
+    Prefs.reset()
+    Prefs.open({ dir = false })
+    local panel = PanelM.new({
+      send = function() end, write = function() end, review = function() end,
+      image = function() end, stop = function() end, clear = function() end,
+      erase = function() end, amend = function() end, fetch_models = function() end,
+      note = function() end,
+    })
+    panel.open = true
+    -- A room with something in it: an empty one lays out the easy way.
+    for i = 1, 6 do
+      panel:push({ role = i % 2 == 0 and "agent" or "you",
+        text = ("a line of conversation number %d, long enough to wrap in a narrow column"):format(i) })
+    end
+
+    local was_font, was_mode = Layout.font, Layout.mode
+    local shapes = {
+      -- The column the playground gives it on a wide window, the band it
+      -- gives it upright, and the smallest either goes down to.
+      { "landscape", { x = 500, y = 60, w = 480, h = 440 } },
+      { "landscape", { x = 660, y = 180, w = 320, h = 260 } },
+      { "portrait", { x = 10, y = 700, w = 700, h = 520 } },
+      { "portrait", { x = 10, y = 900, w = 380, h = 240 } },
+    }
+    for _, step in ipairs({ 1, 2, 3, 4 }) do
+      Layout.font = step
+      for _, shape in ipairs(shapes) do
+        Layout.mode = shape[1]
+        local rect = shape[2]
+        for _, view in ipairs({ "chat", "setup" }) do
+          panel.view = view
+          panel:draw(rect, { busy = false, can_image = true })
+          local tag = ("step %d %s %dx%d %s"):format(step, shape[1], rect.w, rect.h, view)
+
+          local named = {}
+          for id, r in pairs(panel.rects) do
+            named[#named + 1] = { id = id, r = r }
+            T.ok(r.x >= rect.x - 1 and r.x + r.w <= rect.x + rect.w + 1,
+              ("%s: %s runs outside the panel across (%d..%d of %d..%d)")
+                :format(tag, id, r.x, r.x + r.w, rect.x, rect.x + rect.w))
+            T.ok(r.y >= rect.y - 1 and r.y + r.h <= rect.y + rect.h + 1,
+              ("%s: %s runs outside the panel down (%d..%d of %d..%d)")
+                :format(tag, id, r.y, r.y + r.h, rect.y, rect.y + rect.h))
+            T.ok(r.w > 8 and r.h > 8, ("%s: %s is %dx%d, too small to press"):format(tag, id, r.w, r.h))
+          end
+          -- Nothing under anything else. A message row is allowed to sit
+          -- inside the well and nothing else is, so rows are compared only
+          -- with each other's neighbours by being excluded here.
+          for i = 1, #named do
+            for k = i + 1, #named do
+              local a, b = named[i], named[k]
+              local rows = a.id:match("^msg:") or b.id:match("^msg:")
+                or a.id:match("^model:") or b.id:match("^model:")
+              if not rows then
+                T.ok(not overlap(a.r, b.r),
+                  ("%s: %s and %s are drawn on top of each other"):format(tag, a.id, b.id))
+              end
+            end
+          end
+
+          if view == "chat" then
+            T.ok(panel.rects.input ~= nil, tag .. ": there is nowhere to type")
+            T.ok(panel.rects.send ~= nil, tag .. ": SEND is not on the panel")
+            T.ok(panel.rects.close ~= nil, tag .. ": CLOSE is not on the panel")
+            -- The line you type in is above the verbs, and the room above
+            -- that: the order is the browser's and it is what makes the two
+            -- clients recognisably the same screen.
+            T.ok(panel.rects.input.y < panel.rects.send.y,
+              tag .. ": the field is under the verbs")
+            T.ok(panel.rects.send.y + panel.rects.send.h <= rect.y + rect.h + 1,
+              tag .. ": the verbs are off the bottom")
+          else
+            T.ok(panel.rects.key ~= nil, tag .. ": there is nowhere to paste a key")
+            T.ok(panel.rects.model ~= nil and panel.rects.fetch ~= nil,
+              tag .. ": the model cannot be chosen")
+            T.ok(panel.rects.auto ~= nil and panel.rects.shown ~= nil,
+              tag .. ": the two switches are missing")
+          end
+        end
+      end
+    end
+    Layout.font, Layout.mode = was_font, was_mode
+    Prefs.reset()
+    Prefs.open({ dir = false })
+  end)
+
   T.section("screens — stats gives `cleared_since` its weight")
 
   T.case("five is the threshold, and it comes from SPEC §7.3", function()

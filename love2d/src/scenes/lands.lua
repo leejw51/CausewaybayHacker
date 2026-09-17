@@ -418,6 +418,18 @@ function Lands:auto_select()
   end)
 end
 
+--- The wheel moves the cursor, because on a desktop that is what a wheel is
+--- for. Every screen in this client that has a list has one of these now: a
+--- mouse that scrolled on four screens and did nothing on five reads as five
+--- screens that are broken, not as four that are special.
+function Lands:wheelmoved(_, dy)
+  if not self.lands or #self.lands == 0 then return end
+  local n = #self.lands
+  self.cursor = ((self.cursor - 1 + (dy > 0 and -1 or 1)) % n) + 1
+  self.picked_at = Anim.now()
+  SFX.play("move")
+end
+
 function Lands:keypressed(key)
   local n = math.max(1, self.lands and #self.lands or #LAND_ORDER)
   if key == "left" or key == "up" then
