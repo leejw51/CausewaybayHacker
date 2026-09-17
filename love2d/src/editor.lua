@@ -824,7 +824,17 @@ function Editor:ensure_visible(rows)
   elseif self.line > self.scroll + rows - margin then
     self.scroll = self.line - rows + margin
   end
-  local max_scroll = math.max(0, #self.lines - rows + margin)
+  -- **The daylight is only ever taken out of a file that has some.** A file
+  -- that fits the pane whole must not move at all: taking the margin from it
+  -- scrolls the first line off the top to make room under the caret that the
+  -- empty half of the pane was already providing, which looks like a page
+  -- that scrolls for no reason — and is one.
+  local room = #self.lines - rows
+  -- Never more blank space under the last line than there is file hidden
+  -- above it, either: a file two lines longer than the pane that scrolled by
+  -- five to keep its margin hid four lines to show three empty rows.
+  local extra = (room > 0 and self.follow) and math.min(margin, room) or 0
+  local max_scroll = math.max(0, room + extra)
   self.scroll = math.max(0, math.min(max_scroll, self.scroll))
 end
 

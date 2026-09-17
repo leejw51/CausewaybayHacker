@@ -445,6 +445,23 @@ return function()
     -- the bottom border.
     T.ok(written.line > written.scroll and written.line <= written.scroll + rows,
       "the line being written is on the screen")
+
+    -- **And a file that fits does not move at all.** The daylight comes out
+    -- of a file that has room to give; taking it from one that fits scrolls
+    -- the first line off the top to make space the empty half of the pane was
+    -- already providing, which is a page scrolling for no reason.
+    local short = type_lines(true, 8)
+    T.eq(short.scroll, 0, "a program shorter than the pane scrolled anyway")
+    T.eq(short:line_count(), 9)
+    -- A file barely longer than the pane gives what it has and no more: the
+    -- blank space under the last line never exceeds the file hidden above it.
+    local just_over = type_lines(true, rows + 2)
+    local hidden = just_over.scroll
+    local blank = (just_over.scroll + rows) - just_over:line_count()
+    T.ok(just_over.scroll > 0, "it did follow past the fold")
+    T.ok(blank <= hidden,
+      ("%d blank rows under a file with %d hidden above"):format(blank, hidden))
+    T.ok(blank < rows / 2, "and the pane is not mostly empty")
   end)
 
   T.section("the coder — the room")
