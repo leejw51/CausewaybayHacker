@@ -37,3 +37,4 @@ art/raw/
 # Python bytecode, from tests/content/verify_pack.py and the art tools.
 __pycache__/
 *.pyc
+.env
