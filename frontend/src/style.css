@@ -272,6 +272,13 @@ body {
   color: rgba(252, 236, 200, 0.32);
   white-space: pre-wrap;
 }
+/* The coder's suggestion. The drill's ghost is the page's own ink faded;
+   this one is the agent's cyan, because it is the agent talking and the two
+   must not be mistaken for each other. */
+.cwb-editor .cwb-hint {
+  color: rgba(80, 216, 248, 0.42);
+  white-space: pre-wrap;
+}
 .cwb-editor .cwb-wrong-empty {
   display: inline-block;
   width: 0.6em;

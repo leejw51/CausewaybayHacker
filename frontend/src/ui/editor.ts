@@ -11,6 +11,14 @@
  * indentation are what a person needs to write forty lines of Rust; a linter or
  * an autocomplete engine would be a second, wrong, opinion about code the
  * server is the judge of.
+ *
+ * Which leaves one hole, and `suggest` is it. The editor still has no opinion
+ * of its own — it renders a suggestion somebody else computed and takes TAB
+ * for it, and the only somebody is the coder (`ui/agent/coder.ts`), which is
+ * off until the player turns it on. An opinion you asked for is not a second
+ * opinion; and `contextAt` is the same deal in the other direction — the
+ * parse tree is already here for the colours, so anything that wants to know
+ * what the caret is standing in can ask, and decide elsewhere.
  */
 import {
   Compartment,
@@ -66,6 +74,7 @@ import { python } from "@codemirror/lang-python";
 import { RUBBLE_MAX } from "../engine/burst";
 import { Theme } from "../engine/theme";
 import type { Land } from "../net/protocol";
+import type { CodeContext } from "../ai/help";
 
 /** The syntax mode per land: highlighting and indentation, nothing cleverer. */
 const MODE: Record<Land, () => Extension> = { rust, go, cpp, python };
@@ -495,6 +504,117 @@ const answerEnter: Extension = Prec.highest(
       run: (view) => {
         if ((view.state.field(answerField, false) ?? null) === null) return false;
         return insertNewline(view);
+      },
+    },
+  ]),
+);
+
+/**
+ * The coder's suggestion: grey text at the caret that TAB turns real.
+ *
+ * Computed nowhere near here (`ai/complete.ts`, from the grammar and from
+ * the words already in the file) and pushed in by whoever is offering it.
+ * The editor's part is three rules and no cleverness:
+ *
+ *   * **it dies on contact.** Any edit, any selection move, anything that is
+ *     not the accept itself clears the field. A ghost that survived the next
+ *     keystroke would be a suggestion about a line that no longer exists.
+ *   * **TAB only takes it when there is one.** `indentWithTab` is in the
+ *     keymap and TAB has to keep indenting; the handler returns false when
+ *     there is nothing to accept, and the ordinary binding runs. ESC the
+ *     same way, so ESC still reaches the scene.
+ *   * **never over a drill.** ANSWER and BLANKS already draw ghost text —
+ *     that is the exercise. Two ghosts on one line is nobody's idea of help,
+ *     so a suggestion is refused outright while a target is set.
+ */
+export interface Suggest {
+  text: string;
+  /** Where the caret lands inside `text` once it is in. */
+  caret: number;
+}
+
+class HintText extends WidgetType {
+  constructor(readonly text: string) {
+    super();
+  }
+  eq(other: HintText): boolean {
+    return other.text === this.text;
+  }
+  toDOM(): HTMLElement {
+    const el = document.createElement("span");
+    el.className = "cwb-hint";
+    el.textContent = this.text;
+    return el;
+  }
+  ignoreEvent(): boolean {
+    return false;
+  }
+}
+
+const setSuggest = StateEffect.define<Suggest | null>();
+
+const suggestField = StateField.define<Suggest | null>({
+  create: () => null,
+  update(value, tr) {
+    let next = value;
+    // The document moved or the caret did: whatever was offered was about
+    // the old one. Effects in the same transaction win, which is what lets
+    // the accept clear the field in the transaction that inserts the text.
+    if (tr.docChanged || tr.selection) next = null;
+    for (const e of tr.effects) if (e.is(setSuggest)) next = e.value;
+    return next;
+  },
+});
+
+/** Draws it, at the caret, and only when the field has something in it. */
+const hint = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = hintFor(view.state);
+    }
+    update(u: ViewUpdate): void {
+      const touched = u.transactions.some((tr) => tr.effects.some((e) => e.is(setSuggest)));
+      if (u.docChanged || u.selectionSet || touched) this.decorations = hintFor(u.state);
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
+
+function hintFor(state: EditorState): DecorationSet {
+  const s = state.field(suggestField, false) ?? null;
+  if (s === null || s.text === "") return Decoration.none;
+  const at = state.selection.main.head;
+  return Decoration.set([Decoration.widget({ widget: new HintText(s.text), side: 1 }).range(at)]);
+}
+
+/** Put the suggestion in. Answers false when there was nothing to put in. */
+function acceptSuggest(view: EditorView): boolean {
+  const s = view.state.field(suggestField, false) ?? null;
+  if (s === null || s.text === "") return false;
+  const at = view.state.selection.main.head;
+  view.dispatch({
+    changes: { from: at, insert: s.text },
+    selection: { anchor: at + Math.min(s.caret, s.text.length) },
+    scrollIntoView: true,
+    effects: setSuggest.of(null),
+    // The same event the coder's own typing carries, for the same reason
+    // (see "the agent's hands" below): `indentOnInput` must not re-indent
+    // the `}` a multi-line template already indented itself.
+    userEvent: "input.agent",
+  });
+  return true;
+}
+
+const suggestKeys: Extension = Prec.highest(
+  keymap.of([
+    { key: "Tab", run: acceptSuggest },
+    {
+      key: "Escape",
+      run: (view) => {
+        if ((view.state.field(suggestField, false) ?? null) === null) return false;
+        view.dispatch({ effects: setSuggest.of(null) });
+        return true;
       },
     },
   ]),
@@ -930,6 +1050,9 @@ export class Editor {
         answerField,
         answerEnter,
         ghost,
+        suggestField,
+        hint,
+        suggestKeys,
         // A phone's keyboard, told this is code. Without these iOS
         // capitalises the first letter of `fn main`, turns `"hello"` into
         // “hello” and autocorrects `println` — and every one of those is a
@@ -1048,6 +1171,58 @@ export class Editor {
       selection: { anchor: at + text.length },
       scrollIntoView: true,
     });
+  }
+
+  /** Where the caret is in the document, for anything watching it rest. */
+  get caretPos(): number {
+    return this.view.state.selection.main.head;
+  }
+
+  /**
+   * What the caret is standing in, for anybody who wants to say something
+   * about it (`ai/help.ts`, `ai/complete.ts`).
+   *
+   * The parse tree is already here — the syntax colours are made of it — so
+   * this costs a `resolveInner` and a walk up the parents. `ensureSyntaxTree`
+   * with the same small budget `loopClosedBy` uses: a tree that cannot be
+   * finished in time means no help this tick, not a stall while typing.
+   */
+  contextAt(): CodeContext | null {
+    const state = this.view.state;
+    const sel = state.selection.main;
+    if (!sel.empty) return null;
+    const pos = sel.head;
+    const line = state.doc.lineAt(pos);
+    const before = line.text.slice(0, pos - line.from);
+    const word = /[A-Za-z_][A-Za-z0-9_]*$/.exec(before)?.[0] ?? "";
+    const path: string[] = [];
+    const tree = ensureSyntaxTree(state, pos, 30);
+    if (tree) {
+      let node: import("@lezer/common").SyntaxNode | null = tree.resolveInner(pos, -1);
+      while (node) {
+        path.push(node.name);
+        node = node.parent;
+      }
+    }
+    return { pos, path, word, before, source: state.doc.toString() };
+  }
+
+  /**
+   * Offer (or withdraw) the grey text at the caret. Refused while a drill's
+   * answer is on screen, which is its own ghost and has the floor.
+   */
+  suggest(s: Suggest | null): void {
+    const now = this.view.state.field(suggestField, false) ?? null;
+    const want =
+      s !== null && (this.view.state.field(answerField, false) ?? null) === null ? s : null;
+    if (now === want) return;
+    if (now && want && now.text === want.text && now.caret === want.caret) return;
+    this.view.dispatch({ effects: setSuggest.of(want) });
+  }
+
+  /** What is being offered at the caret, if anything. */
+  get suggestion(): Suggest | null {
+    return this.view.state.field(suggestField, false) ?? null;
   }
 
   /** Where the caret is on the page, for an effect thrown at it. */

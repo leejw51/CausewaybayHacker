@@ -37,6 +37,8 @@ import {
 import { Session, type Listener, type Mood } from "../../ai/session";
 import { Typist } from "../../ai/typist";
 import { advise, nextTip, TIPS } from "../../ai/tips";
+import { helpAt, type CodeContext } from "../../ai/help";
+import { completeAt } from "../../ai/complete";
 import type { Bench, RunReport } from "../../ai/tools";
 import { image as makeImage } from "../../ai/providers";
 import { burstPlan, coinPlan, pointerPlan } from "../../engine/burst";
@@ -90,6 +92,19 @@ const AUTO_IDLE = 25;
 const AUTO_EVERY = 180;
 /** AUTO: how much the text must have changed since the last review, in characters. */
 const AUTO_DELTA = 40;
+/**
+ * The caret's own clock, in seconds.
+ *
+ * Two different waits on the same signal. A suggestion is a typing aid, so
+ * it has to arrive inside the pause between two keystrokes or it arrives
+ * after the person has typed the thing themselves. Help is a remark, so it
+ * waits until the caret has actually settled — offered at typing speed it
+ * would be a bubble flickering through every construct on the way down the
+ * line.
+ */
+const HINT_AFTER = 0.28;
+const HELP_AFTER = 1.1;
+
 /** How long a bubble stays, plus a share per character. */
 const BUBBLE_BASE = 4.5;
 const BUBBLE_PER_CHAR = 0.045;
@@ -119,6 +134,12 @@ export class Coder {
   private readonly said = new Set<string>();
   private lastSource = "";
   private reviewedSource = "";
+  /** The caret, and how long it has been there: the context help's clock. */
+  private lastPos = -1;
+  private sinceCaret = 0;
+  /** Which of the two caret jobs have run for this resting place. */
+  private hinted = false;
+  private helped = false;
   private sinceCall = AUTO_EVERY;
   private mood: Mood = "idle";
   private moodSince = 0;
@@ -735,6 +756,65 @@ export class Coder {
 
   // -- idle life ---------------------------------------------------------------
 
+  /**
+   * The offline half of "copilot": what the caret is standing in, and what
+   * the rest of the line probably is. No key, no network, no model — the
+   * grammar is the one CodeMirror is already parsing for the colours
+   * (docs/agent.md §1, §5).
+   *
+   * Only in agent mode, because `update` has already returned otherwise:
+   * the plain editor stays plain, and the opinion arrives with the coder
+   * the player switched on.
+   *
+   * The caret resting is the signal for both, at two different distances —
+   * a suggestion inside the gap between keystrokes, a remark once the
+   * caret has genuinely stopped. Both are computed once per resting place
+   * and not again, so holding still costs nothing after the first tick.
+   */
+  private caretWork(dt: number): void {
+    const ed = this.editor;
+    if (!ed) return;
+    const pos = ed.caretPos;
+    if (pos !== this.lastPos) {
+      this.lastPos = pos;
+      this.sinceCaret = 0;
+      this.hinted = false;
+      this.helped = false;
+      // The old suggestion was about the old caret. It goes now rather than
+      // in HINT_AFTER seconds, so there is never grey text in the wrong place.
+      ed.suggest(null);
+      return;
+    }
+    this.sinceCaret += dt;
+    let ctx: CodeContext | null = null;
+    const lang = this.host.lang();
+    if (!this.hinted && this.sinceCaret >= HINT_AFTER) {
+      this.hinted = true;
+      ctx = ed.contextAt();
+      const s = ctx ? completeAt(lang, ctx) : null;
+      ed.suggest(s ? { text: s.text, caret: s.caret } : null);
+    }
+    if (!this.helped && this.sinceCaret >= HELP_AFTER && !this.sprite.holding) {
+      this.helped = true;
+      // One at a time: grey text at the caret and a bubble beside it are
+      // both the coder talking, and two of it at once is noise.
+      if (!ed.suggestion && !this.bubble) {
+        ctx ??= ed.contextAt();
+        const h = ctx ? helpAt(lang, ctx) : null;
+        // Once per pad, out of the same set the advice uses: a caret that
+        // goes back and forth between a loop and a match arm would
+        // otherwise re-say both, with a flight each, for as long as it kept
+        // moving. `said` is cleared when the room changes.
+        if (h && !this.said.has(h.id)) {
+          this.said.add(h.id);
+          this.sprite.peek();
+          this.say(h.text, "tip");
+          this.sinceTip = 0;
+        }
+      }
+    }
+  }
+
   say(text: string, tone: "say" | "tip" | "busy", streaming = false): void {
     const clean = text.replace(/\s+/g, " ").trim();
     if (!clean) return;
@@ -765,6 +845,10 @@ export class Coder {
     this.layer?.setAlpha(this.presence);
     if (!active) {
       this.bubble = null;
+      // Put away: the grey text goes with it. Agent mode off means the
+      // editor is the plain editor again, with nothing in it but the code.
+      this.editor?.suggest(null);
+      this.lastPos = -1;
       if (this.sprite.holding) this.sprite.hold(false);
       return;
     }
@@ -777,6 +861,12 @@ export class Coder {
     } else this.sinceChange += dt;
 
     const busy = this.mood !== "idle" || this.typist.busy;
+    if (busy) {
+      // The typist is writing: its own text is not something to suggest
+      // completions for, and a ghost beside it would be typed straight over.
+      this.editor?.suggest(null);
+      this.lastPos = -1;
+    } else this.caretWork(dt);
     // Held for a reader: no tips or advice over the words being read.
     if (!busy && !this.sprite.holding) {
       // Advice: read the text once it has sat still.

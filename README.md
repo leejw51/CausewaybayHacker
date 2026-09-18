@@ -39,7 +39,10 @@ is decoration. Many players, one server.
 **The Rust coder flies beside you.** On the playground and on every quest's
 CODE page there is an AI agent — a small pixel coder on a flying keyboard,
 borrowed from CausewaybayRaiden — that watches what you type, drops a tip now
-and then, and, when you press AGENT, chats about the file, reviews it, or
+and then, says what the construct under your caret is, finishes the line in
+grey for TAB to take — **all of that with no key and no network**, off the
+same grammar the editor colours your code with — and, when you press AGENT,
+chats about the file, reviews it, or
 writes the program itself: typed into the editor one character at a time at a
 person's speed, then run, then fixed until the compiler is quiet. It speaks
 OpenAI, Anthropic, Grok or OpenRouter with **your own API key, kept on your own

@@ -14,7 +14,10 @@ the wire and the schema once they land.
 1. **The model is called only when a person presses something.** ASK, WRITE,
    REVIEW and IMAGE each cost one round trip. Everything the agent does on its
    own — flying, peeking at the caret, the tips, "you have four `unwrap()`s in
-   here" — is local logic with no network in it. An optional AUTO toggle lets
+   here", the sentence about the construct the caret is standing in, and the
+   grey text finishing the line — is local logic with no network in it. The
+   last two read the parse tree the editor already has (§5); on a plane, with
+   no key in the box, they work exactly as well. An optional AUTO toggle lets
    the agent review on its own; it is off by default and, when on, fires at
    most once per three minutes, only after 25 s of idle, and only if the text
    changed materially since the last review.
@@ -92,7 +95,13 @@ after the effects layer, so it is painted over both; `pointer-events: none`,
 like `.cwb-sparks`. Reduced motion: no wander, the sprite sits in a corner and
 only the bubble moves.
 
-## 5. Tips and advice with no model in them
+## 5. Tips, advice and help with no model in them
+
+Four things the coder does with no key, no network and no model in them. The
+first two read the file; the last two read the **caret**, through the parse
+tree CodeMirror already keeps for the syntax colours — Rust, Go, C++ and
+Python all come with a Lezer grammar, and a tree good enough to colour a
+`match` arm is good enough to name it.
 
 `ai/tips.ts`:
 
@@ -104,6 +113,56 @@ only the bubble moves.
   `using namespace std`, a bare `new`; Python: bare `except:`, a mutable
   default argument. Each yields one sentence. Checked on a 4 s idle after a
   change, and said at most once per finding per pad.
+
+`ui/editor.ts#contextAt()` is what both of the caret ones read: the offset,
+the word the caret is at the end of, the line so far, and the chain of Lezer
+node names from the innermost node outward. `ensureSyntaxTree` with the same
+small budget `loopClosedBy` uses — a tree that cannot be finished in time is
+a missed remark, not a stall while typing.
+
+`ai/help.ts` — **context help**. `helpAt(lang, ctx)` answers one sentence
+about where the caret is, or nothing. Two layers, most specific first: the
+**word** (`unwrap`, `defer`, `enumerate`, `std::move` — about 25 per land),
+then the **construct**, walking the node chain outward past the anonymous
+nodes (`Block`, `Body`, a bare `{`) and past the `⚠` a half-typed line leaves
+behind, to the first name the catalogue knows (`MatchArm`, `RangeClause`,
+`ForRangeLoop`, `WithStatement` — about 30 per land). Stable ids, like
+`advise` and out of the same per-pad set, so each is said once and the caret
+going back and forth does not re-say them. Fires when the caret has rested
+1.1 s, and only when there is no suggestion and no bubble already up. Silent
+inside a comment or a string.
+
+`ai/complete.ts` — **the completion**, the offline half of what people mean
+by copilot. `completeAt(lang, ctx)` answers grey text to put at the caret, or
+nothing, from two sources:
+
+* **templates** — the shapes each language is made of, keyed by the word
+  being typed and, where it matters, the construct around it. `for` in Go is
+  `for i, v := range xs {}`, `for` in Python is `for x in xs:`, `try` in C++
+  brings its `catch`. Indented to the caret's own line in the land's own unit
+  (`INDENT`), with `$` marking where the caret lands. A multi-line one is
+  offered only at the start of a line.
+* **the buffer** — identifiers already written in this file, by prefix,
+  the most-used one winning. The name you wrote forty lines up is the one no
+  dictionary could have had.
+
+It knows nothing about your types, your crates or your intent: it is a good
+typist with a copy of the grammar. It is offered after a 0.28 s pause — inside
+the gap between two keystrokes, or it arrives after you have typed the thing
+yourself — and TAB takes it, ESC dismisses it, anything else makes it go away.
+
+Both are English, for the reason `tips.ts` gives: the catalogue is the
+agent's own voice.
+
+The rendering is `ui/editor.ts`: a `suggestField`, a `HintText` widget in
+`.cwb-hint` (the agent's cyan, so it is never mistaken for the drill's own
+ghost) and a `Prec.highest` keymap whose TAB handler returns false when there
+is nothing to accept, so `indentWithTab` still indents. Refused outright
+while an ANSWER or BLANKS target is set — that ghost is the exercise. The
+editor computes none of it and has no opinion of its own; the coder pushes
+the suggestion in, and the coder is off until the player opens it.
+
+Web client only. The LÖVE client shares the agent but has no Lezer in it.
 
 ## 6. The chatroom (backend)
 
