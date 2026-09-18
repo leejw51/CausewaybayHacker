@@ -145,15 +145,13 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
     )
 }
 
-/// The interpreter keeps the ambient environment for the compile phase (a
-/// conda or pyenv `python3` is a shim that needs it) with the scratch pointed
+/// The toolchain allowlist (`harness::toolchain_base`: `PATH`, plus what a
+/// pyenv shim or a relocated libpython needs) with the scratch pointed
 /// inside the home (§1). `py_compile` writes `__pycache__/main.cpython-*.pyc`
 /// beside the file — that is what it is for — and the directory it lands in
 /// is the attempt's own, pruned with it.
 pub(crate) fn toolchain_env(command: &mut Command, sub: &Submission) {
-    command
-        .env("TMPDIR", &sub.workdir)
-        .env("HOME", &sub.workdir);
+    crate::harness::toolchain_base(command, &sub.workdir);
 }
 
 /// The first executable `program` on the ambient `PATH`, as an absolute path.

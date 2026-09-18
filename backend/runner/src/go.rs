@@ -122,12 +122,11 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
 /// SPEC §5.1: every cache Go keeps lives under `build/go/`, and `GOPROXY=off`
 /// — a quest does not fetch the internet.
 ///
-/// The compiler keeps the ambient environment (it has to find `go` on `PATH`,
-/// the way `rustc` has to find its toolchain) and everything Go would
-/// otherwise put in the user's own home is pointed inside ours. §5.3's
-/// stripped environment applies one step down, to the program the player
-/// wrote.
+/// The toolchain allowlist (`harness::toolchain_base`: `PATH` and `GOROOT`,
+/// nothing of the server's own) with everything Go would otherwise put in
+/// the user's own home pointed inside ours.
 pub(crate) fn toolchain_env(command: &mut Command, sub: &Submission) {
+    crate::harness::toolchain_base(command, &sub.workdir);
     command
         .env("GOCACHE", sub.cache_root.join("gocache"))
         .env("GOMODCACHE", sub.cache_root.join("gomodcache"))
@@ -139,7 +138,5 @@ pub(crate) fn toolchain_env(command: &mut Command, sub: &Submission) {
         // broken quest rather than as a refused download.
         .env("GOTOOLCHAIN", "local")
         .env("GO111MODULE", "auto")
-        .env("CGO_ENABLED", "0")
-        .env("TMPDIR", &sub.workdir)
-        .env("HOME", &sub.workdir);
+        .env("CGO_ENABLED", "0");
 }

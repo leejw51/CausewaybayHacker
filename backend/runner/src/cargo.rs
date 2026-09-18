@@ -191,18 +191,19 @@ fn slug(attempt_id: &str) -> String {
     }
 }
 
-/// The compiler keeps a working environment (`rustc` is usually a rustup shim
-/// that needs `HOME` to pick a toolchain at all); what is redirected is every
-/// path it writes, so the promise in SPEC §1 holds — nothing outside the home.
+/// The toolchain allowlist (`harness::toolchain_base`: enough for the rustup
+/// shim to pick a toolchain, nothing of the server's own) with every path
+/// cargo writes redirected, so the promise in SPEC §1 holds — nothing
+/// outside the home.
 fn toolchain_env(command: &mut Command, sub: &Submission) {
+    crate::harness::toolchain_base(command, &sub.workdir);
     command
         .env("CARGO_HOME", sub.cache_root.join("cargo-home"))
         .env("CARGO_TARGET_DIR", sub.cache_root.join("target"))
         .env("CARGO_TERM_COLOR", "never")
         // Offline is already on the command line; this makes it true for any
         // child cargo spawns as well.
-        .env("CARGO_NET_OFFLINE", "true")
-        .env("TMPDIR", &sub.workdir);
+        .env("CARGO_NET_OFFLINE", "true");
 }
 
 #[derive(Debug, Default)]
@@ -415,9 +416,26 @@ fn compile_failure(
         Verdict::InternalError,
         compile_ms,
         compiler_stderr,
-        format!("cargo could not build this quest:\n{}", cargo_stderr.trim()),
+        format!(
+            "cargo could not build this quest:\n{}",
+            without_home_paths(cargo_stderr.trim(), sub)
+        ),
         exit_code,
     )
+}
+
+/// Cargo names files by absolute path, and every path it could name here is
+/// under the home — the attempt's workdir or the shared cache. The player is
+/// owed the message, not the location of the home on this disk.
+fn without_home_paths(text: &str, sub: &Submission) -> String {
+    let mut out = text.to_string();
+    for (root, label) in [(&sub.workdir, "<attempt>"), (&sub.cache_root, "<cache>")] {
+        let root = root.to_string_lossy();
+        if !root.is_empty() {
+            out = out.replace(root.as_ref(), label);
+        }
+    }
+    out
 }
 
 fn has_error(json_lines: &[String]) -> bool {

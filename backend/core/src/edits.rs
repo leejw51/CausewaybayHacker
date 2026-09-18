@@ -142,9 +142,11 @@ fn read_blob(home: &Home, address: &str, quest_id: &str, sha: &str, ext: &str) -
         // is gone is a broken home rather than an empty stack. Say which file,
         // because the remedy — clear the stack — is one button away and the
         // player can only press it if they are told what went wrong.
+        // The name and not the path: the path is inside the home, and the
+        // home's location on this disk is nobody's business over the wire.
         internal(format!(
-            "the edit history names {} and it cannot be read: {e}",
-            path.display()
+            "the edit history of {quest_id} names {} and it cannot be read: {e}",
+            path.file_name().unwrap_or_default().to_string_lossy()
         ))
     })
 }

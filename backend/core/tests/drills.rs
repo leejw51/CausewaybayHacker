@@ -248,7 +248,10 @@ fn a_plan_is_fixed_and_a_reconnect_resumes_it() {
         let drill = drills::create(&conn, ALICE, drills::Mode::Repeat, None, 5).unwrap();
         let plan = drill.plan.clone();
         let step = drills::next(&conn, ALICE, &drill.id).unwrap();
-        assert_eq!(step.position, 1);
+        assert_eq!(
+            step.position, 0,
+            "PROTOCOL §4.16: the first step is position 0"
+        );
         assert_eq!(step.quest_id, plan[0]);
         assert!(step.why.contains("2 times"), "{}", step.why);
         (drill, plan)

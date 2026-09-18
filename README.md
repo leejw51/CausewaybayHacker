@@ -85,6 +85,12 @@ up. `make remote` prints them again.
 > back to loopback, and `make start` and `make remote` both print exactly which
 > addresses are live so you never have to guess. And do not paste in code you
 > would not run in your own shell — the trainer will run it.
+>
+> What loopback does *not* protect against on its own is your browser: a
+> page from any site can open a websocket to `127.0.0.1`. So the server checks
+> the `Origin` of every socket (PROTOCOL §1.3) and only its own page, at
+> whatever address you reached it on, gets in. The desktop and terminal clients
+> send no `Origin` and are unaffected.
 
 ## Release
 

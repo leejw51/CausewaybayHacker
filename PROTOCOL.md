@@ -58,6 +58,22 @@ that never comes back.
 
 ---
 
+The server holds at most **64** open sockets across every address. The next
+open is accepted and closed at once with **1013** (try again later); a client
+should back off as it does for `rate_limited`.
+
+### 1.3 Origin
+
+A browser does not apply the same-origin rule to opening a websocket, so the
+server applies one at the upgrade. With no `Origin` header (the LÖVE client,
+`cwbh`) the socket opens. With one, its authority has to equal the `Host` the
+request came in on — the page the server itself served, at whatever address
+it was reached on — or its host has to be loopback (`127.0.0.1`, `localhost`,
+`::1`) on any port, which is the vite dev server. Anything else, `null`
+included, is answered **403** before the upgrade. Without this any page the
+player had open could reach `ws://127.0.0.1:5390` and, login being open
+registration (§3), run code on the machine.
+
 ## 2. The envelope
 
 **Every frame in both directions is an object with exactly these four keys:**
@@ -968,7 +984,9 @@ nothing here compiles anything.
 
 Hits are ordered best-first. `SearchHit` (§5.5) carries the component scores as
 well as the fused one, so a search screen can show *why* something matched.
-An empty `q` returns no hits rather than everything.
+An empty `q` returns no hits rather than everything. `q` is at most **1024
+bytes**; longer is `bad_request` (§3.3). The same cap applies to
+`playground.chat.search`.
 
 ### 4.13 `stats.summary`
 

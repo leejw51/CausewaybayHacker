@@ -1629,36 +1629,30 @@ check(null, "beyond: what is not built says so, and what is built is judged", as
     const badMode = await cl.send("search.query", { q: "borrow", mode: "psychic" });
     assertEq(badMode.payload.code, "bad_request", "an unknown mode is refused");
 
-    const pending = [
-      ["ai.plan", { mode: "repeat" }],
-      ["ai.next", { drill_id: "drl_0000000000000000" }],
-      ["ai.finish", { drill_id: "drl_0000000000000000" }],
-    ];
-    const landed = [];
-    for (const [type, payload] of pending) {
-      const r = await cl.send(type, payload);
-      if (!r.type.endsWith(".err")) {
-        landed.push(type);
-        continue;
-      }
-      assert(
-        ERROR_CODES.has(r.payload.code),
-        `${type} answered ${r.payload.code}, outside §3.3`,
-      );
-      assertEq(r.payload.code, "unavailable", `${type} while unimplemented`);
-      assertEq(
-        r.payload.detail?.milestone,
-        2,
-        `${type}: an unimplemented endpoint must say so in detail.milestone, ` +
-          `or a client cannot tell "not built yet" from "you asked for something ` +
-          `that does not exist"`,
-      );
+    // §4.16: the drills answer for real. A fresh account has no mistakes, so
+    // every plan is legitimately empty — `.ok` with `plan: []`, never an
+    // error — and the ids and codes around it are what the section says.
+    for (const mode of ["repeat", "weakness", "spaced"]) {
+      const r = await cl.send("ai.plan", { mode });
+      assertEq(r.type, "ai.plan.ok", `ai.plan ${mode}`);
+      assert(r.payload.drill?.id?.startsWith("drl_"), `ai.plan ${mode}: a drl_ id`);
+      assertEq(r.payload.drill.mode, mode);
+      assertEq(r.payload.drill.cursor, 0, "§4.16: cursor is 0-based");
+      assert(Array.isArray(r.payload.drill.plan), `ai.plan ${mode}: plan is an array`);
     }
-    if (landed.length)
-      throw new Error(
-        `${landed.join(", ")} now answer for real. This pending check has done ` +
-          `its job — replace it with the real assertions (tests/PLAN.md §9.3.d).`,
-      );
+    const empty = await cl.send("ai.plan", { mode: "repeat" });
+    const drillId = empty.payload.drill.id;
+    if (empty.payload.drill.plan.length === 0) {
+      const past = await cl.send("ai.next", { drill_id: drillId });
+      assertEq(past.payload.code, "not_found", "§4.16: ai.next past the end is not_found");
+    }
+    const fin = await cl.send("ai.finish", { drill_id: drillId });
+    assertEq(fin.type, "ai.finish.ok");
+    assert(typeof fin.payload.summary?.attempted === "number", "summary.attempted");
+    const badMode2 = await cl.send("ai.plan", { mode: "psychic" });
+    assertEq(badMode2.payload.code, "bad_request", "an unknown drill mode is refused");
+    const noDrill = await cl.send("ai.next", { drill_id: "drl_0000000000000000" });
+    assertEq(noDrill.payload.code, "not_found", "a drill that does not exist is not_found");
 
     // Go used to be the other declared gap. It is not any more — BE built
     // the runner — so the assertion that used to live here ("a Go submission

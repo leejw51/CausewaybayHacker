@@ -542,16 +542,48 @@ async fn the_whole_slice_end_to_end() {
         "punctuation in the box became an error: {punctuation}"
     );
 
-    // AI drills are still milestone 2: it refuses cleanly rather than
-    // panicking the connection, and says *not yet* rather than *no such
-    // thing*.
-    let ai = alice.call("ai.plan", json!({ "mode": "weakness" })).await;
-    assert_eq!(ai["payload"]["code"].as_str(), Some("unavailable"));
+    // AI drills (§4.16). Alice has failed `02` above and cleared `01`, so
+    // `repeat` has one quest to offer; the plan is walked to its end, which
+    // is `not_found`, and finished. The plan's *contents* are the core's
+    // business (core/tests/drills.rs); this is the wire.
+    let ai = alice.ok("ai.plan", json!({ "mode": "repeat" })).await;
+    let drill_id = ai["drill"]["id"].as_str().expect("a drill id").to_string();
+    assert!(drill_id.starts_with("drl_"), "{drill_id}");
+    assert_eq!(ai["drill"]["mode"].as_str(), Some("repeat"));
     assert_eq!(
-        ai["payload"]["detail"]["milestone"].as_i64(),
-        Some(2),
-        "a client should be able to say *when*, not only *no*"
+        ai["drill"]["cursor"].as_i64(),
+        Some(0),
+        "§4.16: cursor is 0-based"
     );
+    let total = ai["drill"]["plan"].as_array().expect("a plan").len();
+    assert!(total >= 1, "a failed quest is what `repeat` is for: {ai}");
+    for position in 0..total {
+        let step = alice
+            .ok("ai.next", json!({ "drill_id": drill_id, "locale": "ko" }))
+            .await;
+        assert_eq!(step["position"].as_u64(), Some(position as u64));
+        assert_eq!(step["total"].as_u64(), Some(total as u64));
+        assert!(step["quest"]["id"].is_string(), "{step}");
+        assert!(
+            step["why"].as_str().is_some_and(|w| !w.is_empty()),
+            "{step}"
+        );
+    }
+    let past = alice.call("ai.next", json!({ "drill_id": drill_id })).await;
+    assert_eq!(
+        past["payload"]["code"].as_str(),
+        Some("not_found"),
+        "§4.16: past the end is not_found, not a crash: {past}"
+    );
+    let done = alice.ok("ai.finish", json!({ "drill_id": drill_id })).await;
+    assert!(done["summary"]["attempted"].is_number(), "{done}");
+    let weak = alice.ok("ai.plan", json!({ "mode": "weakness" })).await;
+    assert!(
+        weak["drill"]["plan"].is_array(),
+        "an empty plan is .ok, not an error: {weak}"
+    );
+    let bad = alice.call("ai.plan", json!({ "mode": "psychic" })).await;
+    assert_eq!(bad["payload"]["code"].as_str(), Some("bad_request"));
     assert!(alice.ok("ping", json!({})).await["t"].is_string());
 
     // §6.4: one in-flight submit per connection. Both frames go out before
@@ -841,5 +873,52 @@ async fn a_stale_nonce_and_a_forged_signature_are_both_refused() {
             .as_str(),
         Some("auth_nonce_used")
     );
+    server.handle.abort();
+}
+
+/// PROTOCOL §1.3: a page from somewhere else cannot open the socket; the
+/// server's own page, a native client, and the dev server can.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_foreign_origin_cannot_open_the_socket() {
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let src = content_src(tmp.path());
+    let server = start(&home, &src).await;
+    let url = format!("ws://127.0.0.1:{}/ws", server.port);
+
+    let with_origin = |origin: &str| {
+        let mut request = url.as_str().into_client_request().unwrap();
+        request
+            .headers_mut()
+            .insert("Origin", origin.parse().unwrap());
+        request
+    };
+
+    let err = tokio_tungstenite::connect_async(with_origin("http://evil.example"))
+        .await
+        .expect_err("a foreign origin is refused");
+    match err {
+        tokio_tungstenite::tungstenite::Error::Http(response) => {
+            assert_eq!(response.status(), 403, "refused with 403, not {response:?}");
+        }
+        other => panic!("expected an HTTP 403, got {other:?}"),
+    }
+    tokio_tungstenite::connect_async(with_origin("null"))
+        .await
+        .expect_err("an opaque origin is refused");
+
+    let own = format!("http://127.0.0.1:{}", server.port);
+    tokio_tungstenite::connect_async(with_origin(&own))
+        .await
+        .expect("the server's own page opens the socket");
+    tokio_tungstenite::connect_async(with_origin("http://localhost:5291"))
+        .await
+        .expect("the dev server on loopback opens the socket");
+    tokio_tungstenite::connect_async(url.as_str())
+        .await
+        .expect("a native client with no Origin opens the socket");
+
     server.handle.abort();
 }

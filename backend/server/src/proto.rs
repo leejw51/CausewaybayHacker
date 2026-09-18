@@ -309,6 +309,24 @@ pub fn str_field(payload: &serde_json::Value, name: &str) -> Result<String> {
         .ok_or_else(|| bad_request(format!("payload.{name} must be a string")))
 }
 
+/// The longest search string either search takes (PROTOCOL §4.12, §4.19).
+/// Source is capped at 256 KiB and chat text at 64 KiB; a query was the one
+/// string with no cap, and every byte of it becomes tokens, a padded copy per
+/// word and an FTS5 `MATCH` term, all under the one database lock.
+pub const MAX_QUERY_BYTES: usize = 1024;
+
+/// `q`, or `bad_request` when it is longer than a search box could hold.
+pub fn query_field(payload: &serde_json::Value) -> cwbhacker_core::error::Result<String> {
+    let q = opt_str_field(payload, "q").unwrap_or_default();
+    if q.len() > MAX_QUERY_BYTES {
+        return Err(cwbhacker_core::error::bad_request(format!(
+            "q is {} bytes; the limit is {MAX_QUERY_BYTES}",
+            q.len()
+        )));
+    }
+    Ok(q)
+}
+
 pub fn opt_str_field(payload: &serde_json::Value, name: &str) -> Option<String> {
     payload
         .get(name)

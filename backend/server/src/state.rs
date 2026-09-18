@@ -74,6 +74,8 @@ pub struct AppState {
     /// And on formatters. `code.format` skips the execution slot on purpose,
     /// which is what let a tight loop of it spawn `rustfmt` without bound.
     pub formatters: Arc<Gate>,
+    /// Sockets open right now, against `limits::MAX_CONNECTIONS`.
+    pub connections: AtomicUsize,
     next_connection: AtomicU64,
 }
 
@@ -114,6 +116,7 @@ impl AppState {
             running: AtomicUsize::new(0),
             executions: Gate::new(limits::MAX_CONCURRENT_EXECUTIONS),
             formatters: Gate::new(limits::MAX_CONCURRENT_FORMATS),
+            connections: AtomicUsize::new(0),
             next_connection: AtomicU64::new(1),
         }
     }

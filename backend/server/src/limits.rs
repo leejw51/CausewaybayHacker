@@ -43,6 +43,14 @@ pub const EXECUTION_RETRY_MS: u64 = 2_000;
 pub const MAX_CONCURRENT_FORMATS: usize = 4;
 pub const FORMAT_RETRY_MS: u64 = 1_000;
 
+/// Open sockets, across every address. Every other limit here is per
+/// connection or per compile, so without this one the way round all of them
+/// was to open more sockets — each with its own request bucket and its own
+/// unbounded outgoing channel. Sized for a household of devices and a few
+/// tabs each, not for a public server; the (MAX_CONNECTIONS + 1)th open is
+/// closed at once with 1013 (try again later).
+pub const MAX_CONNECTIONS: usize = 64;
+
 /// A token bucket. Refills continuously, so a client that has been idle gets
 /// its whole burst back and a client that never stops gets the steady rate.
 #[derive(Debug)]

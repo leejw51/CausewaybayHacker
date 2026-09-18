@@ -343,7 +343,7 @@ pub fn chat_search(
     payload: &serde_json::Value,
 ) -> Result<serde_json::Value> {
     let address = session.address()?;
-    let q = opt_str_field(payload, "q").unwrap_or_default();
+    let q = crate::proto::query_field(payload)?;
     let id = opt_str_field(payload, "id");
     let mode = search::Mode::parse(
         payload

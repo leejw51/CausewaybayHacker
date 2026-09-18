@@ -492,7 +492,11 @@ pub fn next(conn: &Connection, address: &str, drill_id: &str) -> Result<Step> {
     Ok(Step {
         why: why(conn, address, drill.mode, &quest_id)?,
         quest_id,
-        position: drill.cursor + 1,
+        // PROTOCOL §4.16: 0-based, "how many quests of the plan are already
+        // behind you" — the cursor *before* this step. A client prints
+        // `position + 1`. It was `cursor + 1` once, and the web client, which
+        // follows the contract, showed "2 of 5" on the first quest.
+        position: drill.cursor,
         total: drill.plan.len() as i64,
     })
 }

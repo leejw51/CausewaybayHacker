@@ -191,6 +191,15 @@ pub fn world_map(
     let locale = opt_str_field(payload, "locale");
     let conn = state.store.conn();
     let map = world::map_localized(&conn, address, &land, &category, locale.as_deref())?;
+    // A land or category no pack defines has no nodes. It is `not_found`
+    // rather than an empty map, because the next line would otherwise write
+    // whatever string the client sent — any length, any bytes — into the
+    // player's position as the place to come back to.
+    if map.nodes.is_empty() {
+        return Err(not_found(format!(
+            "no quests in land {land:?}, category {category:?}"
+        )));
+    }
     // The bookmark is written from the traffic that is already here (SPEC
     // §1.3): asking for this map *is* choosing this land and category, so no
     // client has to remember to say so separately, and two clients cannot
@@ -531,7 +540,7 @@ pub fn search_query(
     payload: &serde_json::Value,
 ) -> Result<serde_json::Value> {
     let address = session.address()?;
-    let q = opt_str_field(payload, "q").unwrap_or_default();
+    let q = crate::proto::query_field(payload)?;
     let mode = search::Mode::parse(
         payload
             .get("mode")

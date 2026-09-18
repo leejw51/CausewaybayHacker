@@ -95,9 +95,11 @@ pub fn format(lang: &str, source: &str) -> std::io::Result<Formatted> {
     };
     // All three tools read stdin and write stdout, so none of the per-attempt
     // directory machinery is needed. They are trusted tools rather than the
-    // player's code, so they keep their environment and get no rlimits — what
-    // they do get is the timeout and the output cap.
-    command.env("TERM", "dumb");
+    // player's code, so they get no rlimits — what they do get is the
+    // timeout, the output cap, and the same allowlisted environment the
+    // compilers get, with the scratch in the system temp dir since there is
+    // no attempt directory to point it at.
+    crate::harness::toolchain_base(&mut command, &std::env::temp_dir());
     let outcome = proc::run(
         command,
         source.as_bytes(),

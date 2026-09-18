@@ -406,7 +406,7 @@ pub async fn search(ctx: &Ctx, query: &str, limit: i64) -> Result<()> {
     Ok(())
 }
 
-/// `ai.plan` — the drill. Also not built on this server yet.
+/// `ai.plan` — the drill (PROTOCOL §4.16).
 pub async fn drill(ctx: &Ctx, mode: &str, land: Option<&str>, size: i64) -> Result<()> {
     let mut session = ctx.session().await?;
     let mut payload = serde_json::json!({ "mode": mode, "size": size });

@@ -187,6 +187,64 @@ pub fn not_run(sub: &Submission) -> Vec<CaseResult> {
         .collect()
 }
 
+/// The environment a *toolchain* (compiler, formatter, `go test`) runs in:
+/// cleared, then exactly what it needs to find itself handed back.
+///
+/// The compilers used to inherit the server's whole environment, on the
+/// reasoning that §5.3's stripped environment is for the player's program
+/// one step down. But a compiler is a program the player steers: Rust's
+/// `option_env!("ANTHROPIC_API_KEY")` bakes the server's variable into the
+/// binary at compile time and prints it at run time, past `strip_env`
+/// entirely. So the compile phase gets an allowlist instead of everything:
+///
+///   * `PATH`, so `cargo`, `go`, `c++`, `python3`, `clang-format` are found;
+///   * what the rustup proxies need to pick a toolchain: `RUSTUP_HOME`
+///     (defaulted to `~/.rustup` from the server's own `HOME` when unset,
+///     since the proxy derives it from `HOME` and `HOME` is about to be
+///     redirected) and `RUSTUP_TOOLCHAIN`;
+///   * `GOROOT`, which `actions/setup-go` sets and a relocated Go wants;
+///   * `SDKROOT` and `DEVELOPER_DIR`, which point Apple's `c++` shim at an
+///     SDK when the machine has more than one;
+///   * `PYENV_ROOT` and `PYENV_VERSION` for a pyenv `python3` shim, and
+///     `LD_LIBRARY_PATH` for a `python3` built against a libpython that is
+///     not on the loader's default path (`actions/setup-python` does this);
+///   * `HOME` and `TMPDIR` pointed at `workdir`, so nothing the tool writes
+///     on its own initiative lands outside the home (§1).
+///
+/// The per-language `toolchain_env` functions layer their cache paths on
+/// top of this.
+pub(crate) fn toolchain_base(command: &mut Command, workdir: &Path) {
+    const KEEP: &[&str] = &[
+        "PATH",
+        "RUSTUP_HOME",
+        "RUSTUP_TOOLCHAIN",
+        "GOROOT",
+        "SDKROOT",
+        "DEVELOPER_DIR",
+        "PYENV_ROOT",
+        "PYENV_VERSION",
+        "LD_LIBRARY_PATH",
+    ];
+    let ambient_home = std::env::var_os("HOME");
+    command.env_clear();
+    for name in KEEP {
+        if let Some(value) = std::env::var_os(name) {
+            command.env(name, value);
+        }
+    }
+    if std::env::var_os("RUSTUP_HOME").is_none() {
+        if let Some(home) = &ambient_home {
+            command.env("RUSTUP_HOME", Path::new(home).join(".rustup"));
+        }
+    }
+    command
+        .env("HOME", workdir)
+        .env("TMPDIR", workdir)
+        .env("LANG", "C")
+        .env("LC_ALL", "C")
+        .env("TERM", "dumb");
+}
+
 /// SPEC §5.3: `PATH`, `HOME` pointed at the build dir, and nothing else.
 ///
 /// Shared with the `cargo` and `gotest` harnesses (`suite.rs`): a test binary

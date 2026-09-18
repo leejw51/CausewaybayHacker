@@ -13,7 +13,8 @@ use std::time::Duration;
 
 use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
-use axum::response::Response;
+use axum::http::{header, HeaderMap, StatusCode};
+use axum::response::{IntoResponse, Response};
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc::unbounded_channel;
 
@@ -35,14 +36,111 @@ const MISSED_PONGS_ALLOWED: usize = 2;
 const CLOSE_GOING_AWAY: u16 = 1001;
 const CLOSE_UNSUPPORTED: u16 = 1003;
 const CLOSE_TOO_LARGE: u16 = 1009;
+const CLOSE_TRY_AGAIN_LATER: u16 = 1013;
 
-pub async fn upgrade(ws: WebSocketUpgrade, State(state): State<Shared>) -> Response {
+/// One open socket, counted against `limits::MAX_CONNECTIONS` for exactly as
+/// long as `connection` runs — a guard rather than a decrement at the end,
+/// so a panic or an early return cannot leave the count high.
+struct Seat(Shared);
+
+impl Seat {
+    fn take(state: &Shared) -> Option<Seat> {
+        let before = state.connections.fetch_add(1, Ordering::AcqRel);
+        if before >= limits::MAX_CONNECTIONS {
+            state.connections.fetch_sub(1, Ordering::AcqRel);
+            return None;
+        }
+        Some(Seat(state.clone()))
+    }
+}
+
+impl Drop for Seat {
+    fn drop(&mut self) {
+        self.0.connections.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+/// Whether a browser at `origin` may open the socket on a server addressed
+/// as `host` (PROTOCOL §1.3).
+///
+/// A browser does not apply the same-origin rule to a websocket open, so
+/// without this any page the player visits could reach `ws://127.0.0.1:5390`
+/// and, since login is open registration, run code on this machine. The rule
+/// is the one the frontend's own derivation implies (`endpoint.ts`: the
+/// socket is `location.host`):
+///
+///   * no `Origin` at all: allowed. The LÖVE client and `cwbh` are not
+///     browsers and send none; a browser always sends one, so this is not a
+///     way round the check.
+///   * `Origin`'s authority equals the `Host` the request came in on:
+///     allowed. That is the page the server itself served, at whatever
+///     address it was reached on — loopback, a LAN IP, a tailnet IP.
+///   * `Origin`'s host is loopback, on any port: allowed. That is the vite
+///     dev server on 5291 talking to the game server on 5390.
+///   * anything else, including `Origin: null`: refused.
+pub fn origin_allowed(origin: Option<&str>, host: Option<&str>) -> bool {
+    let Some(origin) = origin else { return true };
+    let Some(authority) = origin
+        .strip_prefix("http://")
+        .or_else(|| origin.strip_prefix("https://"))
+    else {
+        return false;
+    };
+    let authority = authority
+        .split('/')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if authority.is_empty() {
+        return false;
+    }
+    if let Some(host) = host {
+        if authority == host.to_ascii_lowercase() {
+            return true;
+        }
+    }
+    let hostname = if let Some(rest) = authority.strip_prefix('[') {
+        rest.split(']').next().unwrap_or("")
+    } else {
+        authority.split(':').next().unwrap_or("")
+    };
+    matches!(hostname, "127.0.0.1" | "localhost" | "::1")
+}
+
+pub async fn upgrade(
+    ws: WebSocketUpgrade,
+    headers: HeaderMap,
+    State(state): State<Shared>,
+) -> Response {
+    let origin = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok());
+    let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
+    if !origin_allowed(origin, host) {
+        tracing::warn!(
+            origin = origin.unwrap_or("-"),
+            host = host.unwrap_or("-"),
+            "websocket refused: foreign origin"
+        );
+        return (StatusCode::FORBIDDEN, "foreign origin").into_response();
+    }
     ws.max_message_size(MAX_FRAME_BYTES)
         .max_frame_size(MAX_FRAME_BYTES)
         .on_upgrade(move |socket| connection(socket, state))
 }
 
-async fn connection(socket: WebSocket, state: Shared) {
+async fn connection(mut socket: WebSocket, state: Shared) {
+    let Some(_seat) = Seat::take(&state) else {
+        tracing::warn!(
+            limit = limits::MAX_CONNECTIONS,
+            "websocket refused: too many open connections"
+        );
+        let _ = socket
+            .send(Message::Close(Some(CloseFrame {
+                code: CLOSE_TRY_AGAIN_LATER,
+                reason: "too many connections".into(),
+            })))
+            .await;
+        return;
+    };
     let connection_id = state.next_connection_id();
     let (mut sink, mut stream) = socket.split();
     let (tx, mut rx) = unbounded_channel::<Outgoing>();
@@ -401,9 +499,9 @@ async fn dispatch(
         "playground.chat.clear" => playground::chat_clear(state, session, payload),
         "playground.chat.search" => playground::chat_search(state, session, payload),
         "search.query" => handlers::search_query(state, session, payload),
-        "ai.plan" | "ai.next" | "ai.finish" => {
-            Err(handlers::unimplemented("AI drills (SPEC §7.3)"))
-        }
+        "ai.plan" => handlers::ai_plan(state, session, payload),
+        "ai.next" => handlers::ai_next(state, session, payload),
+        "ai.finish" => handlers::ai_finish(state, session, payload),
         other => Err(Error::new(
             Code::NotFound,
             format!("no message type '{other}'"),
@@ -587,4 +685,79 @@ fn execute_async(
         };
         send(&tx, frame);
     });
+}
+
+#[cfg(test)]
+mod origin_tests {
+    use super::origin_allowed;
+
+    #[test]
+    fn no_origin_is_a_native_client() {
+        assert!(origin_allowed(None, Some("127.0.0.1:5390")));
+        assert!(origin_allowed(None, None));
+    }
+
+    #[test]
+    fn the_page_the_server_served_is_allowed_at_any_address() {
+        assert!(origin_allowed(
+            Some("http://127.0.0.1:5390"),
+            Some("127.0.0.1:5390")
+        ));
+        assert!(origin_allowed(
+            Some("http://100.93.166.76:5390"),
+            Some("100.93.166.76:5390")
+        ));
+        assert!(origin_allowed(
+            Some("http://172.30.1.59:5390"),
+            Some("172.30.1.59:5390")
+        ));
+        assert!(origin_allowed(
+            Some("https://Dojo.Example:443"),
+            Some("dojo.example:443")
+        ));
+        assert!(origin_allowed(
+            Some("http://[fd7a::1]:5390"),
+            Some("[fd7a::1]:5390")
+        ));
+    }
+
+    #[test]
+    fn the_dev_server_on_loopback_is_allowed_on_any_port() {
+        assert!(origin_allowed(
+            Some("http://127.0.0.1:5291"),
+            Some("127.0.0.1:5390")
+        ));
+        assert!(origin_allowed(
+            Some("http://localhost:5291"),
+            Some("127.0.0.1:5390")
+        ));
+        assert!(origin_allowed(
+            Some("http://[::1]:5291"),
+            Some("127.0.0.1:5390")
+        ));
+    }
+
+    #[test]
+    fn a_foreign_page_is_refused() {
+        assert!(!origin_allowed(
+            Some("http://evil.example"),
+            Some("127.0.0.1:5390")
+        ));
+        assert!(!origin_allowed(
+            Some("https://evil.example"),
+            Some("100.93.166.76:5390")
+        ));
+        assert!(!origin_allowed(
+            Some("http://127.0.0.1.evil.example:5390"),
+            Some("127.0.0.1:5390")
+        ));
+        assert!(!origin_allowed(
+            Some("http://100.93.166.76:5390"),
+            Some("172.30.1.59:5390")
+        ));
+        assert!(!origin_allowed(Some("null"), Some("127.0.0.1:5390")));
+        assert!(!origin_allowed(Some(""), Some("127.0.0.1:5390")));
+        assert!(!origin_allowed(Some("file://"), Some("127.0.0.1:5390")));
+        assert!(!origin_allowed(Some("http://"), Some("127.0.0.1:5390")));
+    }
 }

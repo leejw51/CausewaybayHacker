@@ -127,12 +127,9 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
     judge(sub, &binary, compile_ms, compiler_stderr)
 }
 
-/// The compiler keeps the ambient environment — it has to find its own SDK
-/// and linker, and on macOS that is a path only Xcode knows — while the
-/// scratch is pointed inside the home (§1). §5.3's stripped environment
-/// applies one step down, to the program the player wrote.
+/// The toolchain allowlist (`harness::toolchain_base`: `PATH`, and on macOS
+/// `SDKROOT`/`DEVELOPER_DIR` so the shim finds its SDK and linker) with the
+/// scratch pointed inside the home (§1).
 pub(crate) fn toolchain_env(command: &mut Command, sub: &Submission) {
-    command
-        .env("TMPDIR", &sub.workdir)
-        .env("HOME", &sub.workdir);
+    crate::harness::toolchain_base(command, &sub.workdir);
 }

@@ -354,6 +354,40 @@ fn main() {
 }
 
 #[test]
+fn the_compiler_does_not_see_the_servers_environment_either() {
+    // The runtime environment is stripped (above), but a compiler is a
+    // program the player steers too: `option_env!` bakes a variable of the
+    // *compiler's* environment into the binary at compile time, and the
+    // stripped runtime environment never gets a say. This is what made an
+    // API key in the shell that started the server printable by one line of
+    // Rust. The compile phase runs in `harness::toolchain_base`'s allowlist.
+    //
+    // The variable is set in this test process, which is the "server" the
+    // runner is spawned from. Tests in this file run in one process, so the
+    // name is unique to this test and is cleared again afterwards.
+    const NAME: &str = "CWBH_TEST_CANARY_FOR_OPTION_ENV";
+    std::env::set_var(NAME, "the-server-secret");
+    let h = harness();
+    let source = r#"
+fn main() {
+    match option_env!("CWBH_TEST_CANARY_FOR_OPTION_ENV") {
+        Some(v) => println!("leaked {v}"),
+        None => println!("clean"),
+    }
+}
+"#;
+    let report = run_in(&h, "att_option_env", source, &spec(30_000, "clean\n"));
+    std::env::remove_var(NAME);
+    assert_eq!(
+        report.verdict,
+        Verdict::Accepted,
+        "the compiler saw the server's environment: {:?} / {:?}",
+        report.compiler_stderr,
+        report.cases
+    );
+}
+
+#[test]
 fn it_is_not_a_sandbox_and_this_test_says_so_out_loud() {
     // Deliberately asserts the *weak* thing, because the strong thing is not
     // true and a test claiming otherwise would be the most dangerous file in

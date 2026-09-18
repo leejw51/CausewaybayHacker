@@ -60,15 +60,14 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
         .arg("main.rs")
         .arg("-o")
         .arg(&binary);
-    // The compiler runs with a working environment. `rustc` is very often a
-    // rustup shim that needs HOME and RUSTUP_HOME to pick a toolchain at all,
-    // and §5.3's stripped environment is aimed at the code the player wrote,
-    // which is the next step down. What does get redirected is the scratch:
-    // nothing outside the home is written (§1).
+    // The compiler runs in the toolchain allowlist (`harness::toolchain_base`:
+    // enough for the rustup shim to pick a toolchain, and nothing of the
+    // server's own) with the scratch redirected so nothing outside the home
+    // is written (§1).
+    crate::harness::toolchain_base(&mut rustc, &sub.workdir);
     rustc
         .env("CARGO_HOME", sub.cache_root.join("cargo-home"))
-        .env("CARGO_TARGET_DIR", sub.cache_root.join("target"))
-        .env("TMPDIR", &sub.workdir);
+        .env("CARGO_TARGET_DIR", sub.cache_root.join("target"));
 
     let compile = proc::run(
         rustc,
