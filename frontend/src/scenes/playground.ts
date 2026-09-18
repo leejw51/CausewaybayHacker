@@ -2279,19 +2279,47 @@ export class PlaygroundScene implements Scene {
     this.outputRect = [x, ty, w, y + h - ty];
     const lineH = fonts.codeSm.height;
     const room = Math.max(1, Math.floor((y + h - ty - pad * 2) / lineH));
+    const textW = w - pad * 4;
+    // **Visual lines, not source lines.** Everything below is wrapped to the
+    // panel's width *before* it is counted, so `room`, the scroll and the
+    // overflow all speak of the lines that are drawn. `printf` wraps on its
+    // own, but a loop that advanced one line height per entry then printed
+    // the second visual line of a long diagnostic through the entry under
+    // it — `ok` through `variable: \`rx\`` — which is what this used to do.
     const out: Array<[string, readonly [number, number, number, number]]> = [];
+    const push = (text: string, col: readonly [number, number, number, number]) => {
+      for (const line of wrap(fonts.codeSm, text, textW)) out.push([line, col]);
+    };
+    // A heading over each block, as the LÖVE client has always drawn them:
+    // what the program wrote, what it wrote to stderr, and what the compiler
+    // said, in that order — the program's own output is what RUN was pressed
+    // for, and a page of warnings above it buried a one-line answer.
+    const block = (
+      label: string,
+      lines: string[],
+      col: readonly [number, number, number, number],
+    ) => {
+      if (lines.length === 0) return;
+      if (out.length > 0) out.push(["", Theme.dim]);
+      out.push([label, Theme.dim]);
+      for (const line of lines) push(line, col);
+    };
     if (r) {
-      for (const d of r.diagnostics) {
-        const where = d.line === null ? "" : ` (${d.line}${d.col === null ? "" : ":" + d.col})`;
-        out.push([`${d.kind}${d.code ? " " + d.code : ""}${where}  ${d.message}`, Theme.pink]);
-      }
-      for (const line of r.stdout.split("\n")) if (line) out.push([line, Theme.cream]);
-      for (const line of r.stderr.split("\n")) if (line) out.push([line, Theme.red]);
+      const nonEmpty = (s: string) => s.split("\n").filter((l) => l !== "");
+      block(t("pg.outStdout"), nonEmpty(r.stdout), Theme.cream);
+      block(t("pg.outStderr"), nonEmpty(r.stderr), Theme.red);
+      block(
+        t("pg.outCompiler"),
+        r.diagnostics.map((d) => {
+          const where = d.line === null ? "" : ` (${d.line}${d.col === null ? "" : ":" + d.col})`;
+          return `${d.kind}${d.code ? " " + d.code : ""}${where}  ${d.message}`;
+        }),
+        Theme.pink,
+      );
     }
     // While it is still running, the compiler's own chatter is the progress bar.
     if (!r)
-      for (const l of this.log.lines)
-        out.push([l.text, l.stream === "stderr" ? Theme.red : Theme.dim]);
+      for (const l of this.log.lines) push(l.text, l.stream === "stderr" ? Theme.red : Theme.dim);
     if (out.length === 0) {
       this.outputOverflow = 0;
       g.fillStyle = css(Theme.dim);
@@ -2311,7 +2339,9 @@ export class PlaygroundScene implements Scene {
       let ly = ty + pad;
       for (const [text, col] of shown) {
         g.fillStyle = css(col);
-        printf(g, fonts.codeSm, text, x + pad * 2, ly, w - pad * 4, "left");
+        // Already one visual line each (see `push`), so the limit here is a
+        // guard and never wraps.
+        printf(g, fonts.codeSm, text, x + pad * 2, ly, textW, "left");
         ly += lineH;
       }
     });
