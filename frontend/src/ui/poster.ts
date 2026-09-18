@@ -23,10 +23,12 @@
  * label: the QR carries the source, the address and the signature, in
  * that order, so a phone pointed at the picture — the picture Instagram
  * re-encoded, stripped and shrank — can recover the program and check who
- * signed it. When a program would make the label too dense to scan off a
- * phone (`QR_MAX_MODULES`; about 650 bytes of source), the label carries
- * its keccak-256 instead and says so; the source is then on the disc and in
- * the file's own text chunks, and the hash ties the two.
+ * signed it. When the source as written would make the label too dense to
+ * scan off a phone (`QR_MAX_MODULES`; about 650 bytes), it goes on the label
+ * **deflated** — code compresses two- to threefold, which carries a program
+ * of 1.5–2 KB — and only past that does the label carry its keccak-256
+ * instead and say so; the source is then on the disc and in the file's own
+ * text chunks, and the hash ties the two.
  *
  * **The signature is EIP-191 `personal_sign` over the source, and only the
  * source.** Not over a JSON envelope, not over the output, not over the name.
@@ -125,6 +127,12 @@ export interface PosterWords {
 
 export interface PosterInput {
   lang: Land;
+  /**
+   * `source`, deflated (`packSource`), for the label when the plain text is
+   * too dense; null when the browser cannot deflate. `makePoster` fills it,
+   * once, because the drawing is synchronous and the deflate is not.
+   */
+  packed?: Uint8Array | null;
   /** The pad's name, as shown on screen. */
   name: string;
   /** `main.rs`, `main.go`, … */
@@ -438,8 +446,9 @@ const TONE_COL: Record<Tone, RGBA> = {
  * The densest label allowed: 105 modules a side (version 23). Denser than
  * that and the label — a quarter of the picture's width — is under 2.5px a
  * module once Instagram has shown the poster at 1080, and phones stop
- * reading it. A program whose payload would need more is hashed instead;
- * about 650 bytes of source is the line.
+ * reading it. A program whose payload would need more goes on deflated;
+ * one that is still too dense deflated is hashed instead. About 650 bytes
+ * of source is the first line, and 1.5–2 KB the second.
  */
 export const QR_MAX_MODULES = 105;
 
@@ -454,27 +463,89 @@ export const QR_MAGIC = "CWBH1";
  *     <0x signature, or ->
  *     <lang>
  *     <source>            — or, when the source is too long:
+ *     deflate:<base64>    — the source, raw-deflated; or, when even that is:
  *     keccak256:<hex>
  *
  * Five lines, split on the first four newlines; the source keeps its own.
- * A verifier recovers the signer from EIP-191 over the fifth field (or, for
- * a hash, over the source it hashed) and compares it to the second line.
+ * A verifier recovers the signer from EIP-191 over the source — the fifth
+ * field as it is, or inflated, or the program the hash was taken of — and
+ * compares it to the second line. The signature is over the plain source in
+ * every case: the deflate is the label's business, not the wallet's.
+ *
+ * `packed` is the deflated source, made by `packSource` beforehand (the
+ * deflate is asynchronous, this is not); null or absent means the label may
+ * only be plain or a hash.
  */
 export function qrPayload(
   address: string,
   signature: string | null,
   lang: Land,
   source: string,
+  packed: Uint8Array | null = null,
 ): { text: string; hashed: boolean } {
   const wrap = (body: string) => `${QR_MAGIC}\n${address}\n${signature ?? "-"}\n${lang}\n${body}`;
   const whole = wrap(source);
   // Sized by encoding it: the module count is what a scanner sees, and a
   // byte count would have to guess at it.
   if (qrModulesCount(whole) <= QR_MAX_MODULES) return { text: whole, hashed: false };
+  if (packed) {
+    const deflated = wrap(`${QR_DEFLATE}${toBase64(packed)}`);
+    if (qrModulesCount(deflated) <= QR_MAX_MODULES) return { text: deflated, hashed: false };
+  }
   return {
-    text: wrap(`keccak256:${toHex(keccak_256(new TextEncoder().encode(source)))}`),
+    text: wrap(`${QR_HASH}${toHex(keccak_256(new TextEncoder().encode(source)))}`),
     hashed: true,
   };
+}
+
+/** The two body prefixes that mean "not the source as written". */
+export const QR_DEFLATE = "deflate:";
+export const QR_HASH = "keccak256:";
+
+/**
+ * The source, raw-deflated, for the label. Null where the browser has no
+ * `CompressionStream` (Safari before 16.4), in which case the label is
+ * plain or hashed as it always was. Raw deflate, no zlib header: the
+ * two bytes are two modules, and there is nothing in them a reader needs.
+ */
+export async function packSource(source: string): Promise<Uint8Array | null> {
+  if (typeof CompressionStream !== "function") return null;
+  const bytes = new TextEncoder().encode(source);
+  const packed = await new Response(
+    new Blob([bytes as BlobPart]).stream().pipeThrough(new CompressionStream("deflate-raw")),
+  ).arrayBuffer();
+  return new Uint8Array(packed);
+}
+
+/** `packSource` undone. Null for bytes that are not a deflate stream, or where the browser cannot inflate. */
+export async function unpackSource(packed: Uint8Array): Promise<string | null> {
+  if (typeof DecompressionStream !== "function") return null;
+  try {
+    const bytes = await new Response(
+      new Blob([packed as BlobPart]).stream().pipeThrough(new DecompressionStream("deflate-raw")),
+    ).arrayBuffer();
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+export function toBase64(bytes: Uint8Array): string {
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+/** Base64 back to bytes, or null when the text is not base64. */
+export function fromBase64(text: string): Uint8Array | null {
+  try {
+    const bin = atob(text);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch {
+    return null;
+  }
 }
 
 /** How many modules a side the QR for `text` needs, or Infinity when no QR can hold it. */
@@ -1019,7 +1090,7 @@ export async function renderPoster(p: PosterInput, S = POSTER_SIZE): Promise<Ren
       runStart = i;
     }
   }
-  const payload = qrPayload(p.user.address, p.signature, p.lang, p.source);
+  const payload = qrPayload(p.user.address, p.signature, p.lang, p.source, p.packed ?? null);
   const qrCell = label(
     g,
     faces,
@@ -1169,6 +1240,8 @@ export async function renderPoster(p: PosterInput, S = POSTER_SIZE): Promise<Ren
  * the right answer for nearly every pad and a quarter of the bytes.
  */
 export async function makePoster(p: PosterInput): Promise<Rendered & { size: number }> {
+  // Deflated once, here, for both sizes: the label is the same on either.
+  if (p.packed === undefined) p = { ...p, packed: await packSource(p.source) };
   const small = await renderPoster(p, POSTER_SIZE);
   if (small.hidden === 0 && small.qrCell >= QR_MIN_CELL) return { ...small, size: POSTER_SIZE };
   const large = await renderPoster(p, POSTER_SIZE_LARGE);
@@ -1207,17 +1280,25 @@ export async function posterJpeg(canvas: HTMLCanvasElement, quality = 0.92): Pro
 }
 
 /**
- * Put the files where the person is: on a phone, into the share sheet (which
- * is where Instagram is); anywhere else, into the downloads folder, one
- * after the other. Says which it did, because the two are different
- * sentences on screen.
+ * Put the files where the person is: on anything touched — a phone, and an
+ * iPad just as much — into the share sheet (which is where Instagram is,
+ * and where "Save Image" is; iPadOS has no downloads folder anybody looks
+ * in, and two `a.download` clicks in a row is one download at best there);
+ * anywhere else, into the downloads folder, one after the other. Says which
+ * it did, because the two are different sentences on screen.
+ *
+ * Both need the browser's user activation, and the caller has to have kept
+ * it: a poster is drawn, encoded and proved between the tap and this call,
+ * and the activation a tap grants lasts about five seconds. The scene fires
+ * POSTER on the `pointerup`, which is the event a finger's activation comes
+ * from.
  */
 export async function savePoster(
   files: readonly PosterFile[],
-  phone: boolean,
+  touch: boolean,
 ): Promise<"shared" | "saved"> {
   const blobs = files.map((f) => new File([f.bytes as BlobPart], f.name, { type: f.type }));
-  if (phone && typeof navigator.share === "function") {
+  if (touch && typeof navigator.share === "function") {
     try {
       if (navigator.canShare?.({ files: blobs })) {
         await navigator.share({ files: blobs });

@@ -215,6 +215,8 @@ export class PlaygroundScene implements Scene {
   private formatting = false;
   /** POSTER is a render and a file write; a second press mid-way is ignored. */
   private postering = false;
+  /** A POSTER or READER press waiting for its `pointerup`; see `pointer`. */
+  private armed: "poster" | "reader" | null = null;
   /** DISK READER's file picker. Made once; the browser owns the dialogue. */
   private readonly diskEl: HTMLInputElement;
   /**
@@ -626,10 +628,12 @@ export class PlaygroundScene implements Scene {
           }
         : null;
       const at = new Date();
-      const { makePoster, posterBytes, posterJpeg, posterFileName, savePoster } =
+      const { makePoster, packSource, posterBytes, posterJpeg, posterFileName, savePoster } =
         await import("../ui/poster");
+      const packed = await packSource(source);
       const { canvas } = await makePoster({
         lang: this.held.lang,
+        packed,
         name: this.heldName(),
         file: MAIN_FILE[this.held.lang],
         source,
@@ -669,7 +673,7 @@ export class PlaygroundScene implements Scene {
       // that will be saved. A failure is said and nothing is saved.
       const png = await posterBytes(canvas, meta);
       const { proveDisk, decodeLabelFrom } = await import("../ui/diskreader");
-      const failed = proveDisk(png, decodeLabelFrom(canvas), source, address, signature);
+      const failed = proveDisk(png, decodeLabelFrom(canvas), source, address, signature, packed);
       if (failed) {
         this.saveNote = t("pg.posterCheckFailed", { what: failed });
         this.app.chip.fail();
@@ -686,7 +690,7 @@ export class PlaygroundScene implements Scene {
             type: "image/jpeg",
           },
         ],
-        this.app.layout.isPhone(),
+        this.app.layout.touch,
       );
       this.saveNote =
         how === "shared" ? t("pg.posterShared") : t("pg.posterSaved", { file: `${file} + .jpg` });
@@ -1318,6 +1322,18 @@ export class PlaygroundScene implements Scene {
     }
     if (phase === "up") {
       this.outputDrag = null;
+      // The two buttons that open something of the browser's fire here, on
+      // the way *up*, not on the way down like the rest. A finger's
+      // `pointerdown` grants no user activation — only its `pointerup` does
+      // (a mouse's does both, which is why this was never seen on a desk) —
+      // and the file picker, the share sheet and a download are all refused
+      // without one. On an iPad the tap was landing and nothing was opening.
+      const armed = this.armed;
+      this.armed = null;
+      if (armed && (this.buttons.hit(x, y) ?? this.rows.hit(x, y))?.id === armed) {
+        if (armed === "poster") void this.poster();
+        else this.diskEl.click();
+      }
       return;
     }
     if (phase === "move") {
@@ -1355,8 +1371,11 @@ export class PlaygroundScene implements Scene {
       this.app.chip.select();
       return;
     }
-    if (hit.id === "poster") return void this.poster();
-    if (hit.id === "reader") return void this.diskEl.click();
+    if (hit.id === "poster" || hit.id === "reader") {
+      // Fired on the up, above, where the browser will let it open anything.
+      this.armed = hit.id;
+      return;
+    }
     if (hit.id === "undo" || hit.id === "redo") {
       // A button press takes the focus off the editor; give it back so the
       // next keystroke goes on typing where the step left the caret.

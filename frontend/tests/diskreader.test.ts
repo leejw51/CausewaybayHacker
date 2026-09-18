@@ -10,12 +10,52 @@
 import { describe, expect, it } from "vitest";
 import { fromHex, toHex } from "../src/wallet/address";
 import { eip191Hash, recoverSigner, signHash } from "../src/wallet/wallet";
-import { crc32, qrPayload, withPngText } from "../src/ui/poster";
-import { fromChunks, fromLabel, isPng, judge, proveDisk, readDisk } from "../src/ui/diskreader";
+import { crc32, packSource, qrPayload, withPngText } from "../src/ui/poster";
+import {
+  fromChunks,
+  fromLabel,
+  isPng,
+  judge,
+  parseLabel,
+  proveDisk,
+  readDisk,
+} from "../src/ui/diskreader";
 
 const KEY = fromHex("0x4646464646464646464646464646464646464646464646464646464646464646");
 const ADDR = "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F";
 const SRC = 'fn main() {\n    println!("héllo 🌏");\n}\n';
+
+/**
+ * The program off the poster this was built for: 628 bytes, four modules
+ * over the cap as plain text, and the reason a JPEG of it had nothing to
+ * open. Deflated it is well under.
+ */
+const LONG_SRC = [
+  "use std::sync::mpsc::channel;",
+  "use std::sync::Arc;",
+  "use std::sync::Mutex;",
+  "use std::thread;",
+  "fn main() {",
+  '    println!("hello, causewaybay");',
+  "    let result = Arc::new(Mutex::new(Vec::<i32>::new()));",
+  "    let result2 = result.clone();",
+  "    let (tx, rx) = channel::<i32>();",
+  "    let producer = thread::spawn(move || {",
+  "        for i in 1..11 {",
+  "            tx.send(i).unwrap();",
+  "        }",
+  "    });",
+  "    let consumer = thread::spawn(move || {",
+  "        for r in rx {",
+  "            result2.lock().unwrap().push(r);",
+  "        }",
+  "    });",
+  "    producer.join().unwrap();",
+  "    consumer.join().unwrap();",
+  '    println!("result {:?}", result.lock().unwrap());',
+  "}",
+  "",
+].join("\n");
 const SIG = "0x" + toHex(signHash(eip191Hash(SRC), KEY));
 
 function chunk(type: string, data: Uint8Array): Uint8Array {
@@ -102,26 +142,48 @@ describe("reading the file's chunks", () => {
 });
 
 describe("reading the label", () => {
-  it("takes the program and the verdict off the QR's text", () => {
+  it("takes the program and the verdict off the QR's text", async () => {
     const { text } = qrPayload(ADDR, SIG, "rust", SRC);
-    expect(fromLabel(text)).toMatchObject({
+    expect(await fromLabel(text)).toMatchObject({
       source: SRC,
       address: ADDR,
       via: "label",
       verdict: "verified",
     });
   });
-  it("calls a doctored program forged", () => {
+  it("calls a doctored program forged", async () => {
     const { text } = qrPayload(ADDR, SIG, "rust", SRC.replace("héllo", "hello"));
-    expect(fromLabel(text)?.verdict).toBe("forged");
+    expect((await fromLabel(text))?.verdict).toBe("forged");
   });
-  it("knows when the label holds only a hash", () => {
+  it("knows when the label holds only a hash", async () => {
     const { text, hashed } = qrPayload(ADDR, SIG, "python", "x".repeat(3000));
     expect(hashed).toBe(true);
-    expect(fromLabel(text)).toMatchObject({ verdict: "hashed", source: "", lang: "python" });
+    expect(await fromLabel(text)).toMatchObject({ verdict: "hashed", source: "", lang: "python" });
   });
-  it("refuses text that is not a label", () => {
-    expect(fromLabel("https://example.com")).toBeNull();
+  it("inflates a deflated label back to the program, and judges that", async () => {
+    // Long enough that the plain text is over the cap, real enough to
+    // compress: this is the shape of program the label used to hash.
+    const long = LONG_SRC;
+    const lsig = "0x" + toHex(signHash(eip191Hash(long), KEY));
+    const { text, hashed } = qrPayload(ADDR, lsig, "rust", long, await packSource(long));
+    expect(hashed).toBe(false);
+    expect(parseLabel(text)?.kind).toBe("deflate");
+    expect(await fromLabel(text)).toMatchObject({
+      source: long,
+      verdict: "verified",
+      lang: "rust",
+    });
+    // The same label with another address named on it: the signature does
+    // not recover to it, and inflating did nothing to hide that.
+    const other = text.replace(ADDR, "0x0000000000000000000000000000000000000000");
+    expect((await fromLabel(other))?.verdict).toBe("forged");
+  });
+  it("is no disk at all when the deflated body will not inflate", async () => {
+    expect(await fromLabel(`CWBH1\n${ADDR}\n${SIG}\nrust\ndeflate:not base64!`)).toBeNull();
+    expect(await fromLabel(`CWBH1\n${ADDR}\n${SIG}\nrust\ndeflate:AAAA`)).toBeNull();
+  });
+  it("refuses text that is not a label", async () => {
+    expect(await fromLabel("https://example.com")).toBeNull();
   });
 });
 
@@ -168,6 +230,17 @@ describe("proving a poster before it is saved", () => {
       "label",
     );
     expect(proveDisk(png, "https://example.com", SRC, ADDR, SIG)).toBe("label");
+  });
+  it("accepts a deflated label only for the program it deflates", async () => {
+    const long = LONG_SRC;
+    const lsig = "0x" + toHex(signHash(eip191Hash(long), KEY));
+    const lpng = withPngText(tinyPng(), { Source: long, Signer: ADDR, Signature: lsig });
+    const packed = await packSource(long);
+    const llabel = qrPayload(ADDR, lsig, "rust", long, packed).text;
+    expect(parseLabel(llabel)?.kind).toBe("deflate");
+    expect(proveDisk(lpng, llabel, long, ADDR, lsig, packed)).toBeNull();
+    const otherLabel = qrPayload(ADDR, lsig, "rust", long + "z", await packSource(long + "z")).text;
+    expect(proveDisk(lpng, otherLabel, long, ADDR, lsig, packed)).toBe("label");
   });
   it("accepts a hashed label only for the program it hashes", () => {
     const long = "y".repeat(3000);

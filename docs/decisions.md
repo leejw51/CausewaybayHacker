@@ -6404,8 +6404,13 @@ needs is in the picture, and the QR is what survives Instagram, which
 strips metadata and re-encodes. The label is capped at 105 modules a side —
 denser than that and, at a quarter of the picture's width shown at 1080, a
 phone stops reading it (measured with `jsQR` at 1080 and at 640 as JPEG) —
-so past about 650 bytes of source the fifth field is `keccak256:<hex>` of it
-and the label says `LABEL HOLDS THE HASH · CODE IS ON THE DISC`. The same fields go into the PNG as `iTXt` chunks
+so past about 650 bytes of source the fifth field is `deflate:<base64>` — the
+source raw-deflated, which carries a program of 1.5–2 KB, since code compresses
+two- to threefold — and only past *that* is it `keccak256:<hex>` of it and the
+label says `LABEL HOLDS THE HASH · CODE IS ON THE DISC`. (The deflate came
+after a 628-byte program, four modules over the cap, came back off an iPad's
+camera roll as a JPEG with no chunks and nothing to open; the signature is over
+the plain source either way.) The same fields go into the PNG as `iTXt` chunks
 (`Source`, `Signer`, `Signature`, and `Title`/`Author`/`Software`) for a
 reader with the file rather than a photo. `qrcode-generator` (MIT, no
 dependencies, byte mode as UTF-8) is the one new package.

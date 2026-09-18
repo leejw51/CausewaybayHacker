@@ -14,22 +14,25 @@ import { keccak_256 } from "@noble/hashes/sha3.js";
 import { fromHex, toEip55, toHex } from "../src/wallet/address";
 import { eip191Hash, signHash } from "../src/wallet/wallet";
 import {
+  QR_MAX_MODULES,
   crc32,
   discSlots,
   expandTabs,
   fitDisc,
   fitMono,
+  fromBase64,
   itxtChunk,
   mascotFor,
+  packSource,
   parseQrPayload,
   posterFileName,
   pour,
   qrModules,
-  qrPayload,
-  QR_MAX_MODULES,
   qrModulesCount,
+  qrPayload,
   readPngText,
   tones,
+  unpackSource,
   withPngText,
 } from "../src/ui/poster";
 
@@ -256,6 +259,33 @@ describe("the label", () => {
     // these is three bytes.
     expect(qrPayload(addr, sig, "rust", "가".repeat(300)).hashed).toBe(true);
     expect(qrPayload(addr, sig, "rust", "a".repeat(300)).hashed).toBe(false);
+  });
+
+  it("deflates a program the plain label cannot hold, before it hashes it", async () => {
+    // Real code, not a run of one letter: a run compresses to nothing and
+    // would prove the wrong thing. 30 lines of Rust — past the plain cap.
+    const src = "fn f(x: i32) -> i32 {\n    let y = x * 2 + 1;\n    y\n}\n".repeat(16);
+    expect(qrPayload(addr, sig, "rust", src).hashed).toBe(true);
+    const packed = await packSource(src);
+    expect(packed).not.toBeNull();
+    const { text, hashed } = qrPayload(addr, sig, "rust", src, packed);
+    expect(hashed).toBe(false);
+    expect(text).toContain("\ndeflate:");
+    expect(qrModulesCount(text)).toBeLessThanOrEqual(QR_MAX_MODULES);
+    // And back: the base64 is the deflate, and the deflate is the source.
+    const body = parseQrPayload(text)!.body.slice("deflate:".length);
+    expect(await unpackSource(fromBase64(body)!)).toBe(src);
+  });
+
+  it("still hashes what will not fit even deflated", async () => {
+    const src = Array.from({ length: 400 }, (_, i) => `let v${i} = ${i * 7919};`).join("\n");
+    const { hashed } = qrPayload(addr, sig, "rust", src, await packSource(src));
+    expect(hashed).toBe(true);
+  });
+
+  it("goes plain when plain fits, deflated or not", async () => {
+    const src = "fn main() {}\n";
+    expect(qrPayload(addr, sig, "rust", src, await packSource(src)).text).toContain("\n" + src);
   });
 
   it("refuses a payload that is not one of ours", () => {

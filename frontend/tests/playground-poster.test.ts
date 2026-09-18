@@ -15,10 +15,11 @@ const SOURCE = readFileSync(resolve(process.cwd(), "src/scenes/playground.ts"), 
 
 /** The body of one method, from its signature to the first `\n  }`. */
 function method(name: string): string {
-  const at = SOURCE.indexOf(`  private ${name}(`);
-  const at2 = at >= 0 ? at : SOURCE.indexOf(`  private async ${name}(`);
+  const at2 = [`  private ${name}(`, `  private async ${name}(`, `\n  ${name}(`]
+    .map((sig) => SOURCE.indexOf(sig))
+    .find((i) => i >= 0);
   expect(at2, `${name} exists`).toBeGreaterThan(0);
-  const body = SOURCE.slice(at2);
+  const body = SOURCE.slice(at2!);
   return body.slice(0, body.indexOf("\n  }\n") + 4);
 }
 
@@ -73,6 +74,33 @@ describe("POSTER", () => {
     }
     expect(poster).toContain('type: "image/png"');
     expect(poster).toContain('type: "image/jpeg"');
+  });
+});
+
+describe("a finger can open them", () => {
+  it("fires POSTER and READER on the pointerup, where a touch has its activation", () => {
+    // A finger's `pointerdown` grants no user activation; only its `pointerup`
+    // does. The picker, the share sheet and a download are all refused
+    // without one — the whole of "does not work on an iPad".
+    const pointer = method("pointer");
+    const up = pointer.indexOf('if (phase === "up")');
+    const down = pointer.indexOf('if (phase !== "down") return;');
+    expect(up).toBeGreaterThan(0);
+    expect(down).toBeGreaterThan(up);
+    const onUp = pointer.slice(up, down);
+    expect(onUp).toContain("this.poster()");
+    expect(onUp).toContain("this.diskEl.click()");
+    const onDown = pointer.slice(down);
+    expect(onDown).not.toContain("this.poster()");
+    expect(onDown).not.toContain("this.diskEl.click()");
+    // And only if the finger came up on the same button it went down on.
+    expect(onUp).toMatch(/\.id === armed/);
+  });
+
+  it("hands the poster to the share sheet on anything touched, not only a phone", () => {
+    const poster = method("poster");
+    expect(poster).toContain("this.app.layout.touch,");
+    expect(poster).not.toContain("isPhone()");
   });
 });
 

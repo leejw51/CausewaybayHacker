@@ -10,7 +10,8 @@
  *      (`poster.ts`, `withPngText`). Lossless and exact, so it is read first.
  *   2. **The label**, otherwise. The record's centre is a QR code with the
  *      same five fields (`qrPayload`); it survives every re-encoding the
- *      chunks do not. Decoded from the pixels with `jsQR`.
+ *      chunks do not. Decoded from the pixels with `jsQR`, and inflated
+ *      when the poster deflated the program to fit it on.
  *
  * Then the signature is checked: recover the signer from (signature, source)
  * with `recoverSigner` and compare it to the address the picture names. The
@@ -28,7 +29,15 @@
 import jsQR from "jsqr";
 import { isLand, type Land } from "../net/protocol";
 import { recoverSigner } from "../wallet/wallet";
-import { parseQrPayload, qrPayload, readPngText } from "./poster";
+import {
+  fromBase64,
+  parseQrPayload,
+  QR_DEFLATE,
+  QR_HASH,
+  qrPayload,
+  readPngText,
+  unpackSource,
+} from "./poster";
 
 export type Verdict = "verified" | "forged" | "unsigned" | "hashed";
 
@@ -82,31 +91,57 @@ export function fromChunks(bytes: Uint8Array): Disk | null {
 }
 
 /** The disk in a decoded label, or null when the text is not one of ours. */
-export function fromLabel(text: string): Disk | null {
+/** A label's parts, and which of the three things its fifth field is. */
+export interface Label {
+  address: string;
+  signature: string | null;
+  lang: Land;
+  body: string;
+  kind: "source" | "deflate" | "hash";
+}
+
+/** The label's text apart, with no inflating: the synchronous half of `fromLabel`. */
+export function parseLabel(text: string): Label | null {
   const p = parseQrPayload(text);
   if (!p) return null;
   const lang = isLand(p.lang) ? p.lang : "rust";
-  if (p.body.startsWith("keccak256:")) {
+  const kind = p.body.startsWith(QR_HASH)
+    ? "hash"
+    : p.body.startsWith(QR_DEFLATE)
+      ? "deflate"
+      : "source";
+  return { address: p.address, signature: p.signature, lang, body: p.body, kind };
+}
+
+/**
+ * A label into a disk. Asynchronous for one reason: a deflated program has
+ * to be inflated, and the browser's inflater is a stream. A deflated label
+ * that will not inflate is not a disk at all — nothing on it can be checked.
+ */
+export async function fromLabel(text: string): Promise<Disk | null> {
+  const l = parseLabel(text);
+  if (!l) return null;
+  const { address, signature, lang } = l;
+  if (l.kind === "hash") {
     // The program is on the disc, not on the label. Nothing to load, but the
     // reader can still say whose it claims to be.
-    return {
-      source: "",
-      lang,
-      address: p.address,
-      signature: p.signature,
-      title: null,
-      via: "label",
-      verdict: "hashed",
-    };
+    return { source: "", lang, address, signature, title: null, via: "label", verdict: "hashed" };
+  }
+  let source = l.body;
+  if (l.kind === "deflate") {
+    const packed = fromBase64(l.body.slice(QR_DEFLATE.length));
+    const inflated = packed ? await unpackSource(packed) : null;
+    if (inflated === null) return null;
+    source = inflated;
   }
   return {
-    source: p.body,
+    source,
     lang,
-    address: p.address,
-    signature: p.signature,
+    address,
+    signature,
     title: null,
     via: "label",
-    verdict: judge(p.body, p.address, p.signature),
+    verdict: judge(source, address, signature),
   };
 }
 
@@ -132,7 +167,10 @@ export function decodeLabel(img: ImageData): string | null {
  * proof and cannot deliver it is worse than none.
  *
  * `labelText` is what the decoder found in the pixels, or null when it
- * found nothing — injected so the check itself needs no canvas.
+ * found nothing — injected so the check itself needs no canvas. `packed` is
+ * the deflated source the poster was drawn with (`PosterInput.packed`), so
+ * a deflated label can be checked the way a hashed one is: by making the
+ * label this program would have and comparing, rather than inflating.
  */
 export function proveDisk(
   png: Uint8Array,
@@ -140,6 +178,7 @@ export function proveDisk(
   source: string,
   address: string,
   signature: string | null,
+  packed: Uint8Array | null = null,
 ): "signature" | "chunks" | "label" | null {
   if (signature !== null && judge(source, address, signature) !== "verified") return "signature";
   const c = fromChunks(png);
@@ -147,12 +186,12 @@ export function proveDisk(
     return "chunks";
   if (c.signature !== signature) return "chunks";
   if (labelText === null) return "label";
-  const l = fromLabel(labelText);
+  const l = parseLabel(labelText);
   if (!l || l.address.toLowerCase() !== address.toLowerCase() || l.signature !== signature)
     return "label";
-  if (l.verdict === "hashed") {
-    if (qrPayload(address, signature, l.lang, source).text !== labelText) return "label";
-  } else if (l.source !== source) {
+  if (l.kind === "source") {
+    if (l.body !== source) return "label";
+  } else if (qrPayload(address, signature, l.lang, source, packed).text !== labelText) {
     return "label";
   }
   return null;
@@ -216,7 +255,7 @@ export async function readDisk(
   const chunked = fromChunks(bytes);
   if (chunked) return chunked;
   const text = await label();
-  return text ? fromLabel(text) : null;
+  return text ? await fromLabel(text) : null;
 }
 
 /** The label's text out of an image file, or null when the browser cannot decode the picture or finds no code. */
