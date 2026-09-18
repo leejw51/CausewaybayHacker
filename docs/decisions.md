@@ -6563,3 +6563,49 @@ against a live server, which signs in, presses POSTER, types the phrase
 into the field, finds the PNG and JPEG in `<home>/posters/`, and reads the
 PNG back through DISK READER to the same program, verified.
 
+## 2026-09-18 — the audit: an Origin check, a compiler in an allowlist, and the drills switched on
+
+A read-through of all three clients and the server, with what it found fixed
+in one pass. The two that mattered:
+
+* **The socket checks `Origin`** (PROTOCOL §1.3, `server/src/ws.rs`). A
+  browser applies no same-origin rule to opening a websocket, and login is
+  open registration, so any page the player had open could reach
+  `ws://127.0.0.1:5390/ws`, mint a key, log in and `playground.run` — with
+  `LOCAL=1` too. Now: no `Origin` (LÖVE, `cwbh`) passes; an `Origin` whose
+  authority equals `Host` passes (the page the server served, at loopback, a
+  LAN IP or a tailnet IP alike); a loopback `Origin` on any port passes (vite
+  on 5291); anything else, `null` included, is 403 before the upgrade.
+* **The compile phase runs in an allowlist** (`runner/src/harness.rs`
+  `toolchain_base`). `env_clear` covered the player's binary and not the
+  compiler, and `option_env!("ANTHROPIC_API_KEY")` is a compile-time read —
+  one line of Rust printed whatever the shell that started the server was
+  carrying. Compilers and formatters now get `PATH`, what rustup/Go/Xcode/
+  pyenv need to find themselves, and `HOME`/`TMPDIR` inside the attempt.
+  `limits.rs` has the test that sets a canary and compiles against it.
+
+The rest, briefly: `ai.plan`/`ai.next`/`ai.finish` were fully built in core
+and in both clients and still answered `unavailable` from three match arms,
+so they are wired (and `Step.position` made 0-based as §4.16 says; the LÖVE
+screen was printing it as if 1-based); `q` in both searches is capped at 1 KiB;
+at most 64 sockets, the next closed 1013; an unknown land is `not_found`
+rather than a saved position; two error messages no longer carry the home's
+absolute path; STOP mid-tool on both agents closes every `tool_use` with a
+result so the next ask is not refused; vite is pinned to loopback as the
+README always said it was; `make dev` exists; the LÖVE JSON decoder refuses
+lone surrogates and malformed UTF-8 (one such title from a server put it on
+the error screen every frame); the login scene drops its preview copy of the
+phrase; `agent.json` gets `0600` without the key library too; the key
+library is no longer looked for under `/opt/homebrew/lib`; the FFI HTTP
+client follows no redirects and bounds a dropped image's decode; a listener
+that raises mid-stream closes the call. CI: `love2d/ffi` fmt and clippy were
+red (and root `make lint` now runs the ffi clippy); the `pgcode` drive
+asserted the old default code face; `codesign --timestamp` retries when
+Apple's timestamp service is out, which is what sank the v0.1.0 release.
+
+Deferred, on purpose, each a design change and not a fix: hidden test
+`stdin` visible through `run.log` on SUBMIT; the shared cargo/go caches
+under `build/` being writable by the player's own program; logout and token
+revocation (a protocol change across three clients); the LÖVE client holding
+the signing key for poster signing (documented as a choice in
+`playground.lua`, contradicted by the comment in `ffi/src/lib.rs`).
