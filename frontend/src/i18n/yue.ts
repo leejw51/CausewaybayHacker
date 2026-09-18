@@ -345,6 +345,7 @@ export const yue: Partial<Catalogue> = {
   "pg.outStdout": "STDOUT",
   "pg.outStderr": "STDERR",
   "pg.outCompiler": "compiler 講咗咩",
+  "pg.noOutput": "程式冇輸出任何嘢",
   "pg.nothingRun": "仲未行過嘢",
   "pg.timings": "編譯 {compile} ms · 執行 {run} ms{exit}",
   "pg.exit": " · 結束碼 {code}",

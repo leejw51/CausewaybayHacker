@@ -78,6 +78,9 @@ pub struct Outcome {
     pub timed_out: bool,
     pub stdout_overflow: bool,
     pub elapsed_ms: u64,
+    /// How long the system held the child before it ran a first instruction
+    /// (`EXEC_HOLD_MAX`); 0 everywhere but a Mac meeting a new binary.
+    pub held_ms: u64,
     /// Bytes the child actually produced, before the cap threw the rest away.
     pub stdout_produced: usize,
     /// Descendants that were still alive when the attempt ended and had to be
@@ -92,6 +95,21 @@ impl Outcome {
         !self.timed_out && !self.stdout_overflow && self.exit_code == Some(0)
     }
 }
+
+/// How long a child may exist without having run a single instruction
+/// before that, too, is called a timeout.
+///
+/// On macOS the first launch of a freshly built binary is held by the system
+/// — Gatekeeper's assessment of an executable it has not seen, in
+/// `syspolicyd` — for as long as it takes, which on one Mac in 2026 was 8 to
+/// 20 seconds, per new binary, before `main` ran. The child exists (it has a
+/// pid), it is asleep in `execve`, and its CPU time is exactly zero. Counting
+/// that against a five-second run limit made every new program a timeout with
+/// no output at all. So the run clock (`Limits::timeout`) starts when the
+/// child first has CPU time, and this is the separate, generous bound on the
+/// hold itself — a program that never starts is still not allowed to keep the
+/// slot forever.
+const EXEC_HOLD_MAX: Duration = Duration::from_secs(120);
 
 const RLIMIT_AS_BYTES: u64 = 1024 * 1024 * 1024;
 const RLIMIT_FSIZE_BYTES: u64 = 64 * 1024 * 1024;
@@ -187,12 +205,23 @@ pub fn run(
     let mut tracker = Tracker::new(pid);
 
     let mut timed_out = false;
+    // When the program first ran, as against when it was spawned: see
+    // `EXEC_HOLD_MAX`. `None` until the child has consumed any CPU at all.
+    let mut running_since: Option<Instant> = None;
     let status = loop {
         // Before `try_wait`, always: once the child is reaped its pid is free
         // to be handed to somebody else, and a sample taken after that could
         // record a stranger.
         tracker.sample_if_due();
+        if running_since.is_none() && has_run(pid) {
+            running_since = Some(Instant::now());
+        }
         if let Some(status) = child.try_wait()? {
+            // A program that finished inside one poll interval, before it was
+            // ever seen running, ran all the same.
+            if running_since.is_none() {
+                running_since = Some(Instant::now());
+            }
             break Some(status);
         }
         if overflow.load(Ordering::Relaxed) {
@@ -201,13 +230,30 @@ pub fn run(
             stop_and_kill(&mut tracker, pid);
             break child.wait().ok();
         }
-        if started.elapsed() >= limits.timeout {
+        let over = match running_since {
+            Some(since) => since.elapsed() >= limits.timeout,
+            None => started.elapsed() >= EXEC_HOLD_MAX,
+        };
+        if over {
             timed_out = true;
             stop_and_kill(&mut tracker, pid);
             break child.wait().ok();
         }
         std::thread::sleep(Duration::from_millis(5));
     };
+    let running_since = running_since.unwrap_or(started);
+    let held = running_since.duration_since(started);
+    if held >= Duration::from_secs(1) {
+        // Worth a line: it is the whole explanation of a slow RUN on a Mac,
+        // and the remedy is a system setting, not anything in here.
+        tracing::warn!(
+            pid,
+            held_ms = held.as_millis() as u64,
+            "the system held the binary before it ran (on macOS: Gatekeeper's first-launch check; \
+             System Settings > Privacy & Security > Developer Tools, for the terminal the server \
+             runs from, skips it)"
+        );
+    }
 
     // On every path, including a clean exit: a submission that returned 0
     // having left `sleep 120` behind has still left it behind, and it is
@@ -251,7 +297,11 @@ pub fn run(
         signal,
         timed_out,
         stdout_overflow: overflow.load(Ordering::Relaxed),
-        elapsed_ms: started.elapsed().as_millis() as u64,
+        // From when the program ran, not from when it was spawned: the hold
+        // is the system's time, not the program's, and `run 5031 ms` on a
+        // program that printed one line and exited was a lie about the program.
+        elapsed_ms: running_since.elapsed().as_millis() as u64,
+        held_ms: held.as_millis() as u64,
         stdout_produced: produced.load(Ordering::Relaxed),
         strays_killed,
     })
@@ -394,4 +444,36 @@ unsafe fn set_rlimit(resource: RlimitResource, value: u64) {
         rlim_max: hard,
     };
     libc::setrlimit(resource, &limit);
+}
+
+/// Whether the child has run at all: any CPU time, user or system.
+///
+/// macOS: `proc_pidinfo(PROC_PIDTASKINFO)`, nanosecond totals. A child that
+/// the system is still assessing is asleep in `execve` and reports zero for
+/// both; the moment it is allowed to run, the dynamic linker alone costs it
+/// more than that. Elsewhere `exec` does not wait on anything, so the answer
+/// is yes from the first poll.
+#[cfg(target_os = "macos")]
+fn has_run(pid: i32) -> bool {
+    let size = std::mem::size_of::<libc::proc_taskinfo>() as libc::c_int;
+    // SAFETY: the call is given a zeroed buffer it owns and the length of it.
+    unsafe {
+        let mut info: libc::proc_taskinfo = std::mem::zeroed();
+        let n = libc::proc_pidinfo(
+            pid,
+            libc::PROC_PIDTASKINFO,
+            0,
+            &mut info as *mut _ as *mut libc::c_void,
+            size,
+        );
+        // A pid that cannot be asked (gone already) counts as having run:
+        // `try_wait` is about to say so, and holding the clock back for it
+        // would be wrong in the other direction.
+        n != size || info.pti_total_user + info.pti_total_system > 0
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn has_run(_pid: i32) -> bool {
+    true
 }

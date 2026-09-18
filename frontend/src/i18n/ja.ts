@@ -338,6 +338,7 @@ export const ja: Partial<Catalogue> = {
   "pg.outStdout": "STDOUT",
   "pg.outStderr": "STDERR",
   "pg.outCompiler": "コンパイラが言ったこと",
+  "pg.noOutput": "プログラムは何も出力しませんでした",
   "pg.nothingRun": "まだ何も実行していません",
   "pg.timings": "コンパイル {compile} ms · 実行 {run} ms{exit}",
   "pg.exit": " · 終了コード {code}",

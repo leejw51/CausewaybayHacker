@@ -332,6 +332,7 @@ export const zh: Partial<Catalogue> = {
   "pg.outStdout": "STDOUT",
   "pg.outStderr": "STDERR",
   "pg.outCompiler": "编译器说了什么",
+  "pg.noOutput": "程序没有输出任何内容",
   "pg.nothingRun": "还没有跑过什么",
   "pg.timings": "编译 {compile} ms · 运行 {run} ms{exit}",
   "pg.exit": " · 退出码 {code}",

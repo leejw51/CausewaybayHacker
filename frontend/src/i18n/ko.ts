@@ -339,6 +339,7 @@ export const ko: Partial<Catalogue> = {
   "pg.outStdout": "STDOUT",
   "pg.outStderr": "STDERR",
   "pg.outCompiler": "컴파일러가 한 말",
+  "pg.noOutput": "프로그램이 아무것도 출력하지 않았습니다",
   "pg.nothingRun": "아직 아무것도 실행하지 않았습니다",
   "pg.timings": "컴파일 {compile} ms · 실행 {run} ms{exit}",
   "pg.exit": " · 종료 코드 {code}",

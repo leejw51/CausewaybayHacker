@@ -360,6 +360,7 @@ export const en = {
   "pg.outStdout": "STDOUT",
   "pg.outStderr": "STDERR",
   "pg.outCompiler": "WHAT THE COMPILER SAID",
+  "pg.noOutput": "the program wrote nothing",
   "pg.nothingRun": "nothing has been run yet",
   "pg.timings": "{compile} ms compile · {run} ms run{exit}",
   "pg.exit": " · exit {code}",

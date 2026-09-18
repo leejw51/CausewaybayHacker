@@ -723,6 +723,17 @@ that pipe to close is waiting for a process the runner may not be able to kill
 — a submission that spawned `sleep 30` used to choose its own wall clock that
 way, and returned at 6.4 s against a 5 s timeout.
 
+**And it starts when the program does.** On macOS the first launch of a
+binary the system has not seen is held in `execve` while Gatekeeper assesses
+it — 8 to 20 s on one Mac, per new binary, with the child asleep at zero CPU
+— and counting that against `timeout_ms` made every new program a timeout
+with no output. The runner polls the child's CPU time and starts the clock at
+the first nanosecond of it; the hold has its own bound of 120 s. `run_ms`
+counts from the same moment, and a hold over a second is logged with the
+remedy (the terminal the server runs from, under System Settings → Privacy &
+Security → Developer Tools, skips the assessment). Elsewhere `exec` waits on
+nothing and the clock starts at spawn as before.
+
 **What the kill reaches.** The child is put in its own process group and the
 group is killed — SIGTERM, 500 ms, SIGKILL — which takes every child that
 stayed in the group, the ordinary fork bomb included. But a process can *leave*

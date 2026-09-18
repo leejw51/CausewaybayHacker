@@ -265,6 +265,8 @@ export class PlaygroundScene implements Scene {
   private outputScroll = 0;
   private outputOverflow = 0;
   private outputRect: Rect = [0, 0, 0, 0];
+  /** A finger down on the output: where, and how far back it was then. */
+  private outputDrag: { y: number; scroll: number } | null = null;
   /** Where the editor was last drawn, for an effect over it. */
   private editorRect: Rect = [0, 0, 0, 0];
   /**
@@ -1300,12 +1302,34 @@ export class PlaygroundScene implements Scene {
     // The agent's panel first: it is drawn over the bench and its buttons
     // are its own.
     if (this.focus && this.coder?.pointer(x, y, phase)) return;
+    // A finger on the output: drag to scroll it. There is no wheel on a
+    // tablet, and a panel that can scroll and cannot be scrolled shows the
+    // first screen of a compiler's answer and nothing after it.
+    if (phase === "move" && this.outputDrag !== null) {
+      const lineH = ensureFonts(this.app.layout.scale).codeSm.height;
+      const moved = Math.round((y - this.outputDrag.y) / lineH);
+      if (moved !== 0) {
+        this.outputScroll = Math.max(
+          0,
+          Math.min(this.outputOverflow, this.outputDrag.scroll + moved),
+        );
+      }
+      return;
+    }
+    if (phase === "up") {
+      this.outputDrag = null;
+      return;
+    }
     if (phase === "move") {
       this.buttons.hovered = this.buttons.hit(x, y)?.id ?? null;
       this.rows.hovered = this.rows.hit(x, y)?.id ?? null;
       return;
     }
     if (phase !== "down") return;
+    if (this.outputOverflow > 0 && inRect(x, y, this.outputRect)) {
+      this.outputDrag = { y, scroll: this.outputScroll };
+      return;
+    }
     const hit = this.buttons.hit(x, y) ?? this.rows.hit(x, y);
     if (!hit) return;
     if (this.display(hit.id)) return;
@@ -2323,7 +2347,11 @@ export class PlaygroundScene implements Scene {
     if (out.length === 0) {
       this.outputOverflow = 0;
       g.fillStyle = css(Theme.dim);
-      printf(g, fonts.codeSm, t("pg.nothingRun"), x + pad * 2, ty + pad, w - pad * 4, "left");
+      // Two different silences: nothing has run, or something ran and wrote
+      // nothing (or was stopped before it could) — "nothing has been run
+      // yet" under a red "it timed out" contradicted the line above it.
+      const line = r ? t("pg.noOutput") : t("pg.nothingRun");
+      printf(g, fonts.codeSm, line, x + pad * 2, ty + pad, w - pad * 4, "left");
       return;
     }
     // `outputScroll` counts lines back from the tail (0 = live), so the same

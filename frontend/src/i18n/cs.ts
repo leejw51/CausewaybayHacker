@@ -356,6 +356,7 @@ export const cs: Partial<Catalogue> = {
   "pg.outStdout": "STDOUT",
   "pg.outStderr": "STDERR",
   "pg.outCompiler": "CO ŘEKL PŘEKLADAČ",
+  "pg.noOutput": "program nic nevypsal",
   "pg.nothingRun": "zatím nic neběželo",
   "pg.timings": "{compile} ms kompilace · {run} ms běh{exit}",
   "pg.exit": " · návratový kód {code}",
