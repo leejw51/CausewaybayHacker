@@ -215,7 +215,9 @@ add({ until_ = function(app)
       local s = pg(app)
       local Assets = require("src.assets")
       check(s.big_rects.face ~= nil, "no face button in CODE")
-      check(Assets.codeFace() == "game", "the default face is not the game's")
+      -- Iosevka is the default (src/assets.lua): the face a fresh install
+      -- opens on, and the one the cycle below starts from.
+      check(Assets.codeFace() == "iosevka", "the default face is not iosevka")
       s.probe_face = { Assets.codeFace() }
       s.probe_w = { s.mono_font:getWidth("MMMMMMMMMM") }
       return true
@@ -250,10 +252,17 @@ add({ until_ = function(app)
       return true
     end, note = "the face changed the glyphs", timeout = 5 })
 add({ shot = "PA-code-face.png" })
--- Back to the game's own face, so the shots below are the usual screen.
+-- Back to the default face, so the shots below are the usual screen: the
+-- third click closes the three-face cycle, and that it did is asserted
+-- rather than assumed.
 add({ click = function(app) local r = pg(app).big_rects.face
       return { r.x + r.w / 2, r.y + r.h / 2 } end })
 add({ wait = 0.4 })
+add({ until_ = function(app)
+      check(require("src.assets").codeFace() == "iosevka",
+        "three clicks did not bring the face back round to iosevka")
+      return true
+    end, timeout = 5 })
 
 -- Run something, so there is output to place — and in a landscape window it
 -- goes **beside** the code rather than under it. Stacked there it costs a

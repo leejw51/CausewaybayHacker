@@ -54,8 +54,21 @@ fi
 # `--options runtime` is the hardened runtime, without which Apple will not
 # notarize; `--timestamp` gets a secure timestamp, without which the signature
 # expires along with the certificate.
+# Apple's timestamp service is occasionally unreachable from a runner
+# ("The timestamp service is not available"), and one such minute has cost a
+# whole release. Tried a few times before it is called a failure; there is no
+# fallback to an untimestamped signature, because notarization refuses one.
 echo "  signing $(basename "$BIN") as $IDENTITY"
-codesign --force --options runtime --timestamp --sign "$IDENTITY" "$BIN"
+signed=""
+for attempt in 1 2 3 4 5; do
+    if codesign --force --options runtime --timestamp --sign "$IDENTITY" "$BIN"; then
+        signed=1
+        break
+    fi
+    echo "  codesign attempt $attempt failed (timestamp service?), retrying in $((attempt * 10))s"
+    sleep $((attempt * 10))
+done
+[[ -n "$signed" ]] || { echo "  codesign failed after 5 attempts" >&2; exit 1; }
 codesign --verify --strict "$BIN"
 
 if [[ -z "${APPLE_ID:-}" || -z "${APPLE_PASSWORD:-}" || -z "${APPLE_TEAM_ID:-}" ]]; then

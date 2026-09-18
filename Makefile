@@ -96,7 +96,7 @@ DIST_SRC := frontend/src frontend/public frontend/index.html \
 dist_stale = [ ! -f frontend/dist/index.html ] || \
              [ -n "$$(find $(DIST_SRC) -newer frontend/dist/index.html 2>/dev/null | head -1)" ]
 
-.PHONY: help start stop restart status logs remote art rebuild _deps _bundle gui serve web build test test-all test-all-list test-be test-fe \
+.PHONY: help dev start stop restart status logs remote art rebuild _deps _bundle gui serve web build test test-all test-all-list test-be test-fe \
         fmt-check check version package release package-server package-server-verify package-gui package-love \
         test-love test-e2e smoke fmt lint doctor clean clean-home
 
@@ -112,6 +112,8 @@ help: ## what you can do
 	@echo "  hot reload      http://127.0.0.1:$(WEB_PORT)   (this machine only)"
 	@echo "  your progress   $(HOME_DIR)"
 	@echo ""
+
+dev: start ## alias for start (the README's and PLAN.md's name for it)
 
 start: ## start both servers in the background
 	@mkdir -p $(RUN)
@@ -136,7 +138,7 @@ start: ## start both servers in the background
 	@if $(call held,$(WEB_PORT),node|vite); then \
 	  echo "  frontend already up on $(WEB_PORT)"; \
 	else \
-	  ( cd frontend && exec ../$(VITE) --host --port $(WEB_PORT) ) \
+	  ( cd frontend && exec ../$(VITE) --port $(WEB_PORT) ) \
 	    < /dev/null > $(RUN)/web.log 2>&1 & echo $$! > $(RUN)/web.pid; \
 	  $(MAKE) -s _wait PORT=$(WEB_PORT) WHAT=frontend LOG=$(RUN)/web.log; \
 	fi
@@ -261,15 +263,21 @@ test-love: ## the LÖVE client, headless
 test-e2e: ## playwright, both orientations (needs `make start`)
 	cd e2e && npx playwright test
 smoke: ## drive the live server against PROTOCOL.md §8 (needs `make start`)
-	@test -d tests/smoke && $(MAKE) -C tests/smoke run || echo "tests/smoke is not built yet"
+	@# `tests/smoke` has no Makefile; the checker is one node script with one
+	@# dependency, and it used to be asked for a `run` target that never
+	@# existed — so `make smoke` printed "not built yet" on a checkout that
+	@# had it and nobody ran the contract.
+	@test -d tests/smoke/node_modules/ws || ( cd tests/smoke && npm ci --silent )
+	node tests/smoke/contract.mjs
 
 fmt: ## format everything
 	cd backend && cargo fmt
 	cd frontend && npm run fmt
 	$(MAKE) -C love2d fmt
 
-lint: ## clippy, tsc, and the LÖVE layering check
+lint: ## clippy (backend, cli, key library), tsc, and the LÖVE layering check
 	cd backend && cargo clippy --all-targets --workspace -- -D warnings
+	cd love2d/ffi && cargo clippy --all-targets -- -D warnings
 	cd frontend && npm run lint
 	$(MAKE) -C love2d lint
 
