@@ -106,7 +106,8 @@ export const ko: Partial<Catalogue> = {
   "login.clear": "지우기",
   "login.fullscreen": "전체 화면",
   "login.windowed": "창 모드",
-  "login.custody": "구문은 이 탭을 벗어나지 않습니다. 서버는 서명만 봅니다.",
+  "login.custody":
+    "구문은 이 브라우저를 벗어나지 않습니다. 이 계정용으로 여기에 보관되고, 서버는 서명만 봅니다.",
   "login.footer": "ENTER  로그인      REVEAL  구문 보기      F7  언어      F1  화면 방향",
   "login.footerMinted": "ENTER  적어 뒀습니다, 들어갑니다      F1  화면 방향",
   "login.mintTitle": "이 열두 단어를 적어 두세요",
@@ -355,7 +356,8 @@ export const ko: Partial<Catalogue> = {
   "pg.posterSaved": "포스터 저장됨 · {file}",
   "pg.posterShared": "포스터를 공유 창으로 보냈습니다",
   "pg.posterFailed": "포스터를 만들 수 없습니다",
-  "pg.stampAsk": "도장을 찍으려면 문구나 개인 키를 붙여넣으세요 — 이 탭에만 남습니다",
+  "pg.stampAsk":
+    "도장을 찍으려면 문구나 개인 키를 붙여넣으세요 — 이 브라우저에 보관되며 전송되지 않습니다",
   "pg.stampKey": "문구 또는 0x 개인 키 · ENTER 도장 · ESC 취소",
   "pg.stampBadKey": "문구도 개인 키도 아닙니다",
   "pg.stampWrongKey": "그 키는 여기 로그인한 {address}의 키가 아닙니다",

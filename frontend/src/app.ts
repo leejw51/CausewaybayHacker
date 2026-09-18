@@ -32,7 +32,7 @@ import { Client } from "./net/client";
 import type { Category, Land } from "./net/protocol";
 import type { Buttons } from "./ui/chrome";
 import { Chip } from "./audio/sfx";
-import { wipe as wipeKey } from "./wallet/wallet";
+import { forget as forgetKey, lastAddress, recall, signMessage } from "./wallet/wallet";
 import { localeInfo, nextLocale, setLocale, t } from "./i18n";
 
 export interface Scene {
@@ -265,6 +265,10 @@ export class App {
       // for, so the deliberate case is swallowed here.
       if (s === "offline" && !this.closingOnPurpose) this.say(t("app.connLost"));
       if (s === "authed") this.toast = null;
+      // The token was retired under this tab — another tab's resume rotated
+      // it first, or the server forgot it. The key is kept, so this is a
+      // fresh login nobody has to watch, not a trip to the login screen.
+      if (s === "open" && client.needsLogin && !this.closingOnPurpose) void this.signInAgain();
     });
     client.on("server.bye", (p) => this.say(p.reason));
   }
@@ -744,6 +748,28 @@ export class App {
   // -- the session ---------------------------------------------------------
 
   /**
+   * Sign in with the kept key, with nobody typing: challenge, sign, login,
+   * the same three steps the login screen takes (§3.2), for the address
+   * `keep` last noted or the one given. False when there is nothing kept,
+   * the key is not the account's, or the server said no — in which case the
+   * login screen is the right next thing and the caller shows it.
+   */
+  async signInAgain(address = lastAddress()): Promise<boolean> {
+    if (!address || !recall(address)) return false;
+    if (this.client.state === "authed") return true;
+    try {
+      const challenge = await this.client.challenge(address);
+      const user = await this.client.login(address, signMessage(challenge.message));
+      this.addressLabel = user.address;
+      this.restorePlace(this.client.position);
+      return true;
+    } catch (e) {
+      console.warn("sign-in with the kept key failed:", e);
+      return false;
+    }
+  }
+
+  /**
    * Log out, from any screen.
    *
    * The order matters. The key is wiped first, because that is the part that
@@ -765,7 +791,7 @@ export class App {
       });
       if (!ok) return false;
     }
-    wipeKey();
+    forgetKey();
     this.client.forgetToken();
     this.closingOnPurpose = true;
     this.client.close();

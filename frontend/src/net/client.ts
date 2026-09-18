@@ -120,10 +120,10 @@ export class Client {
   // -- session -------------------------------------------------------------
 
   /**
-   * The *only* thing persisted. The mnemonic and the private key are never
-   * written anywhere (SPEC §3.1, PROTOCOL §4.3); the token is what makes that
-   * survivable, because `auth.resume` trades it for a live connection without
-   * the key being touched again.
+   * Read from the store on every use rather than cached: the store is shared
+   * by every tab and `auth.resume` rotates the token, so the freshest copy is
+   * the only one the server still knows. The key is kept beside it by
+   * `wallet.ts`, not by this class, which never sees it (SPEC §3.1).
    */
   get token(): string | null {
     try {

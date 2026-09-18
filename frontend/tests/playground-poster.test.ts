@@ -24,9 +24,9 @@ function method(name: string): string {
 }
 
 describe("POSTER", () => {
-  it("asks for the key instead of making an unsigned poster", () => {
+  it("recalls the kept key first, and asks only when nothing is kept", () => {
     const poster = method("poster");
-    expect(poster).toContain("if (!isUnlocked())");
+    expect(poster).toContain("if (!isUnlocked() && !recall(this.app.addressLabel))");
     expect(poster).toContain("this.startStamp();");
     // Once past that gate the signature is never null.
     expect(poster).toContain("signMessage(source)");
@@ -114,6 +114,12 @@ describe("the key field", () => {
     const mismatch = stamp.slice(stamp.indexOf("who.lower !== me.toLowerCase()"));
     expect(mismatch.indexOf("wipe();")).toBeGreaterThan(0);
     expect(mismatch.indexOf("wipe();")).toBeLessThan(mismatch.indexOf("return;"));
+    // The right key is kept, after the match and before the poster; a
+    // stranger's never is.
+    const matched = mismatch.slice(mismatch.indexOf("return;"));
+    expect(matched.indexOf("keep();")).toBeGreaterThan(0);
+    expect(matched.indexOf("keep();")).toBeLessThan(matched.indexOf("this.poster()"));
+    expect(stamp.indexOf("keep();")).toBeGreaterThan(stamp.indexOf("wipe();"));
   });
 
   it("is masked, never autocompleted, and emptied on every exit", () => {

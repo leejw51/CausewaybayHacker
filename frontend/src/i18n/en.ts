@@ -116,7 +116,8 @@ export const en = {
   "login.clear": "CLEAR",
   "login.fullscreen": "FULLSCREEN",
   "login.windowed": "WINDOWED",
-  "login.custody": "The phrase never leaves this tab. The server only ever sees a signature.",
+  "login.custody":
+    "The phrase never leaves this browser. It is kept here, for this account, and the server only ever sees a signature.",
   "login.footer":
     "ENTER  LOG IN      REVEAL  SHOW THE PHRASE      F7  LANGUAGE      F1  ORIENTATION",
   "login.footerMinted": "ENTER  I HAVE WRITTEN IT DOWN AND I AM GOING IN      F1  ORIENTATION",
@@ -377,7 +378,7 @@ export const en = {
   "pg.posterSaved": "poster saved · {file}",
   "pg.posterShared": "poster handed to the share sheet",
   "pg.posterFailed": "could not make the poster",
-  "pg.stampAsk": "paste your phrase or private key to stamp — it stays in this tab",
+  "pg.stampAsk": "paste your phrase or private key to stamp — kept in this browser, never sent",
   "pg.stampKey": "phrase or 0x private key · ENTER stamps · ESC cancels",
   "pg.stampBadKey": "that is not a phrase or a private key",
   "pg.stampWrongKey": "that key is not {address}, who is signed in here",

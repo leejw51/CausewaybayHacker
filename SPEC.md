@@ -570,8 +570,17 @@ A raw private key (`0x` + 64 hex) is accepted as an alternative to a mnemonic
 and skips straight to the last arrow.
 
 > **The mnemonic and the private key never leave the browser.** Not over the
-> websocket, not in a log, not in `localStorage` unencrypted, not "just on
-> localhost". The only thing that crosses the wire is a signature.
+> websocket, not in a log, not "just on localhost". The only thing that crosses
+> the wire is a signature.
+>
+> Inside the browser, the web client **keeps the derived private key in
+> `localStorage`**, under `cwbhacker.key.<address>`, from the moment a login is
+> accepted until logout (`frontend/src/wallet/wallet.ts` `keep`/`recall`/
+> `forget`). That is what lets a reload, a new tab or a poster sign without the
+> phrase being pasted again. The mnemonic itself is never written; the key is
+> written only by the wallet module, read only by it, and never returned by
+> any export. The cost is stated plainly: any script running on the origin can
+> read that slot, so the web client's custody is the browser profile's.
 
 ### 3.2 Challenge–response
 

@@ -6648,3 +6648,39 @@ one device stays open on the other until its next save meets `not_found`;
 and an event sent while a socket was down is not replayed on reconnect
 (§6), so a pad open through a disconnect is re-read by its client rather
 than by the server.
+
+## 2026-09-18 — WEB: the key is kept in the browser, and the token is one per browser
+
+The poster asked for the phrase again on every reload. Login resumed from
+its token, so the header showed the address, but the key had only ever
+lived in a module variable for the life of the tab (SPEC §3.1 as it was), and
+a stamp after a reload had nothing to sign with. Asked three times over,
+the answer was the same: keep it.
+
+* **The derived private key, not the mnemonic**, in `localStorage` under
+  `cwbhacker.key.<address>`, written by `wallet.ts#keep` only once the server
+  has accepted a login (or a stamp's key has matched the signed-in account),
+  read by `recall` on resume and before a stamp, removed by `forget` on
+  logout. The key covers both login inputs and, leaked, exposes one account
+  where the phrase exposes every index. The wallet module does the writing
+  and the reading itself, so still no export returns the bytes, and the
+  test that pins this reads the source. A slot that does not derive to its
+  own address is dropped, not trusted.
+* **The session token moves back to `localStorage`**, one per browser, and
+  `net/tabsession.ts` is gone with its test. The rotation collision that
+  sent it to `sessionStorage` on 09-11 (two tabs, one token, the first
+  reload retires the other's copy) is real and is now survivable rather than
+  avoided: the client already reads the store fresh on every use, and a tab
+  whose resume still comes back `unauthorized` signs in again with the kept
+  key (`App#signInAgain`: challenge, sign, login, nobody typing). The same
+  path is what a new tab, or a boot with no token, takes before it would
+  show the login screen — so the login screen is now for a browser this
+  account has never typed its phrase into. Two accounts in two tabs of one
+  browser is no longer a thing; the account index is for two browsers.
+* **The promises changed with the code.** `login.custody` and `pg.stampAsk`
+  in all six languages say "kept in this browser", not "stays in this tab";
+  SPEC §3.1 says where the key is and that any script on the origin can read
+  it. Deliberately not "encrypted": there is no secret to encrypt it with
+  that would not sit beside it.
+
+Web only. The LÖVE client has its own custody and was not touched.

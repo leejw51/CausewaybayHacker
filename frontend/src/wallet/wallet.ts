@@ -2,11 +2,17 @@
  * The key, and the only two things anyone is allowed to ask it for.
  *
  * SPEC §3.1: the mnemonic and the private key never leave the browser — not
- * over the websocket, not into a log, not into `localStorage`. The way that is
- * enforced here is structural rather than by discipline: the secret lives in a
- * module-local variable, no export returns it, and nothing a scene can reach
- * holds a reference to it. A scene gets an `Address` and can ask for a
- * signature; that is the whole surface.
+ * over the websocket, not into a log. The way that is enforced here is
+ * structural rather than by discipline: the secret lives in a module-local
+ * variable, no export returns it, and nothing a scene can reach holds a
+ * reference to it. A scene gets an `Address` and can ask for a signature; that
+ * is the whole surface.
+ *
+ * The one place the key does go is this browser's `localStorage`, under the
+ * address it belongs to (`keep`/`recall`/`forget`, below), so a reload, a new
+ * tab or a poster does not ask for the phrase again. This module does the
+ * writing and the reading itself, so the rule above still holds: nothing
+ * outside it ever has the bytes.
  *
  * The derivation is `CausewaybayWallet`'s EVM account 0, verbatim
  * (`rustcli/core/src/bip32.rs` + `bip39.rs`): BIP-39 seed, BIP-32 over
@@ -187,6 +193,102 @@ export function wipe(): void {
   if (secret) secret.fill(0);
   secret = null;
   held = null;
+}
+
+// ---------------------------------------------------------------------------
+// The kept key: this browser's localStorage, one slot per address.
+// ---------------------------------------------------------------------------
+
+export type KeyStore = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+/** `cwbhacker.key.<address, lowercase>` holds the private key, hex, no `0x`. */
+export const KEY_SLOT = (address: string) => `cwbhacker.key.${address.toLowerCase()}`;
+/** Whose key was kept last: the account a tab with no session signs in as. */
+export const LAST_ADDRESS = "cwbhacker.wallet.address";
+
+/** This browser's localStorage, or null where touching it throws (private browsing, site data blocked). */
+function browserStore(): KeyStore | null {
+  try {
+    const store = globalThis.localStorage;
+    if (!store) return null;
+    store.setItem("cwbhacker.probe", "1");
+    store.removeItem("cwbhacker.probe");
+    return store;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write the held key to the store, under its address, and note the address
+ * as the last one used. Silent when nothing is held or the store is
+ * unusable — a browser that cannot keep the key simply asks for it again,
+ * which is what every browser did before this existed.
+ *
+ * Called only once a login has *succeeded* (or a stamp's key has matched
+ * the signed-in account), never for a phrase the server rejected.
+ */
+export function keep(store: KeyStore | null = browserStore()): void {
+  if (!secret || !held || !store) return;
+  try {
+    store.setItem(KEY_SLOT(held.lower), toHex(secret));
+    store.setItem(LAST_ADDRESS, held.lower);
+  } catch {
+    /* kept for this tab only */
+  }
+}
+
+/**
+ * Unlock from the store, for `address`, or say there is nothing kept for it.
+ * A slot that does not derive to its own address (a hand-edited value, a
+ * truncated write) is dropped and treated as absent rather than trusted.
+ */
+export function recall(address: string, store: KeyStore | null = browserStore()): boolean {
+  if (!store) return false;
+  let hex: string | null;
+  try {
+    hex = store.getItem(KEY_SLOT(address));
+  } catch {
+    return false;
+  }
+  if (!hex) return false;
+  try {
+    const who = unlock("0x" + hex);
+    if (who.lower === address.toLowerCase()) return true;
+    wipe();
+  } catch {
+    /* not a key */
+  }
+  try {
+    store.removeItem(KEY_SLOT(address));
+  } catch {
+    /* nothing to do */
+  }
+  return false;
+}
+
+/** The address `keep` last noted, or null. What a fresh tab tries `recall` with. */
+export function lastAddress(store: KeyStore | null = browserStore()): string | null {
+  try {
+    return store?.getItem(LAST_ADDRESS) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Logout: the kept key goes with the held one. A logout that left the key
+ * on disk would not be one.
+ */
+export function forget(store: KeyStore | null = browserStore()): void {
+  const who = held?.lower ?? lastAddress(store);
+  try {
+    if (who) store?.removeItem(KEY_SLOT(who));
+    store?.removeItem(LAST_ADDRESS);
+  } catch {
+    /* as above */
+  }
+  wipe();
 }
 
 /**

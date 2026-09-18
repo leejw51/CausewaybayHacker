@@ -2,9 +2,11 @@
  * Boot: fonts, art, socket, and the one question worth asking at startup —
  * is there a session already?
  *
- * SPEC §3.3: `auth.resume` trades a stored token for a live connection without
- * the key material being touched again. That is the whole reason the browser
- * can forget the mnemonic on reload and still put the player back on their map.
+ * SPEC §3.3: `auth.resume` trades a stored token for a live connection, and
+ * the key kept beside it (`wallet.ts#recall`) is unlocked again for the
+ * signatures the session will want. No token, or a dead one, and the kept key
+ * signs in on its own (`App#signInAgain`); only a browser with nothing kept
+ * sees the login screen.
  */
 import type { App, Scene } from "../app";
 import { Assets } from "../engine/assets";
@@ -15,6 +17,7 @@ import { LandsScene } from "./lands";
 import { LoginScene } from "./login";
 import { TitleScene } from "./title";
 import { localeReady, t } from "../i18n";
+import { recall } from "../wallet/wallet";
 
 export class BootScene implements Scene {
   readonly name = "boot";
@@ -69,12 +72,19 @@ export class BootScene implements Scene {
       try {
         const user = await this.app.client.resume(token);
         this.app.addressLabel = user.address;
+        // The key, back in memory for the poster and whatever else signs.
+        // Nothing kept is not an error: the stamp asks, as it always did.
+        recall(user.address);
         return void this.app.go(new LandsScene(this.app), "forward");
       } catch {
-        // A dead token is not an error worth a banner: the login screen is
-        // exactly what the player would do about it anyway.
+        // A dead token is not an error worth a banner: the kept key, if
+        // there is one, signs in again below, and the login screen is what
+        // the player would do about it otherwise.
         this.app.client.forgetToken();
       }
+    }
+    if (await this.app.signInAgain()) {
+      return void this.app.go(new LandsScene(this.app), "forward");
     }
     // Nobody is logged in and nobody is being resumed: this is a cold start at
     // the front of the game, which is where the cabinet's title card goes. It

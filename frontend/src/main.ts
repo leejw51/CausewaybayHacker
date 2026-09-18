@@ -9,7 +9,6 @@
  */
 import { App } from "./app";
 import { Client } from "./net/client";
-import { browserTabSession } from "./net/tabsession";
 import { chooseTransport } from "./net/endpoint";
 import { BootScene } from "./scenes/boot";
 import { preferredLocale, setLocale, t } from "./i18n";
@@ -19,6 +18,18 @@ import { preferredLocale, setLocale, t } from "./i18n";
  * a *built* bundle, which is why this is not `import.meta.env.DEV` alone.
  */
 const CAPTURE = import.meta.env.DEV || import.meta.env.VITE_E2E === "1";
+
+/** This browser's localStorage, or nothing where touching it throws (private browsing, site data blocked). */
+function localStore(): Storage | undefined {
+  try {
+    const store = globalThis.localStorage;
+    store.setItem("cwbhacker.probe", "1");
+    store.removeItem("cwbhacker.probe");
+    return store;
+  } catch {
+    return undefined;
+  }
+}
 
 async function main(): Promise<void> {
   const canvas = document.getElementById("game") as HTMLCanvasElement | null;
@@ -32,10 +43,11 @@ async function main(): Promise<void> {
   void setLocale(preferredLocale(), false);
 
   const { factory, label } = await chooseTransport();
-  // One session per tab. `localStorage` alone meant two tabs shared one token
-  // and the newest login overwrote the rest, so signing in as two accounts at
-  // once — the thing the account index exists for — could not work.
-  const client = new Client({ transport: factory, storage: browserTabSession() });
+  // One session per browser, in `localStorage`, shared by every tab. The
+  // server rotates the token on each resume, so two tabs resuming at once can
+  // retire each other's copy; the client reads the store fresh each time, and
+  // a tab that still loses signs in again with the kept key (`App#signInAgain`).
+  const client = new Client({ transport: factory, storage: localStore() });
   const app = new App(canvas, fx, overlay, client);
   // Scene transitions are `void this.app.go(...)` in twenty places, and a
   // scene's `enter` that throws used to vanish: no console line the player

@@ -8,8 +8,8 @@
  * still run — the choice simply lasts for the session instead of for ever —
  * so every read and every write is guarded and a failure is silent by design.
  *
- * Nothing secret is ever put in here. Key material lives in `wallet/wallet.ts`
- * and is deliberately not persisted at all (SPEC §3.1).
+ * Nothing secret goes through here. Key material is `wallet/wallet.ts`'s
+ * business, which keeps its own slot and does its own reading (SPEC §3.1).
  */
 
 /** One namespace, so a stray key in devtools is obviously ours. */

@@ -106,7 +106,8 @@ export const ja: Partial<Catalogue> = {
   "login.clear": "消去",
   "login.fullscreen": "全画面",
   "login.windowed": "ウィンドウ",
-  "login.custody": "フレーズはこのタブから出ません。サーバーが見るのは署名だけです。",
+  "login.custody":
+    "フレーズはこのブラウザから出ません。このアカウント用にここに保管され、サーバーが見るのは署名だけです。",
   "login.footer": "ENTER  ログイン      REVEAL  フレーズを表示      F7  言語      F1  画面の向き",
   "login.footerMinted": "ENTER  書き留めました、入ります      F1  画面の向き",
   "login.mintTitle": "この 12 の単語を書き留めてください",
@@ -354,7 +355,8 @@ export const ja: Partial<Catalogue> = {
   "pg.posterSaved": "ポスターを保存しました · {file}",
   "pg.posterShared": "ポスターを共有シートに渡しました",
   "pg.posterFailed": "ポスターを作れませんでした",
-  "pg.stampAsk": "スタンプにはフレーズか秘密鍵を貼り付けてください — このタブにだけ残ります",
+  "pg.stampAsk":
+    "スタンプにはフレーズか秘密鍵を貼り付けてください — このブラウザに保管され、送信はされません",
   "pg.stampKey": "フレーズまたは 0x 秘密鍵 · ENTER でスタンプ · ESC で取消",
   "pg.stampBadKey": "フレーズでも秘密鍵でもありません",
   "pg.stampWrongKey": "その鍵はここでログイン中の {address} のものではありません",

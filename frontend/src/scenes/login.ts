@@ -67,6 +67,7 @@ import {
   addressFromMnemonic,
   addressFromPrivateKeyHex,
   current,
+  keep,
   newMnemonic,
   parseAccountIndex,
   phraseProblem,
@@ -515,6 +516,10 @@ export class LoginScene implements Scene {
     // is `profile.update`, from inside the game.
     const user = await this.app.client.login(address.eip55, signature, this.chosenName());
     this.app.addressLabel = user.address;
+    // Kept in this browser's localStorage, under this address, now that the
+    // server has accepted it: the next tab, reload or poster signs with it
+    // and nobody pastes the phrase twice. Never for a phrase that failed.
+    keep();
     // §1.3: the client keeps nothing durable of its own. Where this player is
     // comes back with the login, from whichever client they used last — the
     // browser and the LÖVE desktop client share one server and therefore one

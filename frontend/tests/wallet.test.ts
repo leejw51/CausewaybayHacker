@@ -18,12 +18,20 @@ import {
   addressFromMnemonic,
   addressFromPrivateKeyHex,
   eip191Hash,
+  forget,
+  isUnlocked,
+  keep,
+  KEY_SLOT,
+  LAST_ADDRESS,
+  lastAddress,
   newMnemonic,
   normalizeMnemonic,
+  recall,
   signHash,
   signMessage,
   unlock,
   wipe,
+  type KeyStore,
 } from "../src/wallet/wallet";
 
 const BIP39_CANONICAL =
@@ -177,5 +185,132 @@ describe("a phrase the game hands out", () => {
     const words = new Set<string>();
     for (let i = 0; i < 20; i++) for (const w of newMnemonic().split(" ")) words.add(w);
     expect(words.size).toBeGreaterThan(60);
+  });
+});
+
+describe("the kept key", () => {
+  const ANVIL0 = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+  const ANVIL0_KEY = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+
+  function store(): KeyStore & { map: Map<string, string> } {
+    const map = new Map<string, string>();
+    return {
+      map,
+      getItem: (k) => map.get(k) ?? null,
+      setItem: (k, v) => void map.set(k, v),
+      removeItem: (k) => void map.delete(k),
+    };
+  }
+  const hostile: KeyStore = {
+    getItem() {
+      throw new Error("site data is blocked");
+    },
+    setItem() {
+      throw new Error("site data is blocked");
+    },
+    removeItem() {
+      throw new Error("site data is blocked");
+    },
+  };
+
+  it("keep writes the private key under the address, and notes the address", () => {
+    const st = store();
+    unlock(ANVIL);
+    keep(st);
+    wipe();
+    expect(st.map.get(KEY_SLOT(ANVIL0))).toBe(ANVIL0_KEY);
+    expect(st.map.get(LAST_ADDRESS)).toBe(ANVIL0.toLowerCase());
+    expect(lastAddress(st)).toBe(ANVIL0.toLowerCase());
+    // The slot is the lowercase address, whatever case was asked with.
+    expect(st.map.has(KEY_SLOT(ANVIL0.toUpperCase()))).toBe(true);
+  });
+
+  it("keep with nothing unlocked writes nothing", () => {
+    const st = store();
+    wipe();
+    keep(st);
+    expect(st.map.size).toBe(0);
+  });
+
+  it("recall unlocks from the slot, and the signature is the account's", () => {
+    const st = store();
+    unlock(ANVIL);
+    keep(st);
+    wipe();
+    expect(isUnlocked()).toBe(false);
+    expect(recall(ANVIL0, st)).toBe(true);
+    expect(isUnlocked()).toBe(true);
+    const sig = signMessage("hello");
+    // The same key the phrase derives to, byte for byte (RFC 6979 is deterministic).
+    unlock(ANVIL);
+    expect(signMessage("hello")).toBe(sig);
+    wipe();
+  });
+
+  it("recall is false, and unlocks nothing, when there is no slot for the address", () => {
+    const st = store();
+    wipe();
+    expect(recall(ANVIL0, st)).toBe(false);
+    expect(isUnlocked()).toBe(false);
+  });
+
+  it("recall drops a slot that is not the address's own key", () => {
+    const st = store();
+    // Account 1's key filed under account 0's address: a hand-edited store.
+    unlock(ANVIL, 1);
+    const one = addressFromMnemonic(ANVIL, 1).lower;
+    keep(st);
+    wipe();
+    st.map.set(KEY_SLOT(ANVIL0), st.map.get(KEY_SLOT(one))!);
+    expect(recall(ANVIL0, st)).toBe(false);
+    expect(isUnlocked()).toBe(false);
+    expect(st.map.has(KEY_SLOT(ANVIL0))).toBe(false);
+    // Garbage in the slot goes the same way.
+    st.map.set(KEY_SLOT(ANVIL0), "not hex");
+    expect(recall(ANVIL0, st)).toBe(false);
+    expect(st.map.has(KEY_SLOT(ANVIL0))).toBe(false);
+  });
+
+  it("forget removes the kept key and the note, and wipes memory", () => {
+    const st = store();
+    unlock(ANVIL);
+    keep(st);
+    forget(st);
+    expect(st.map.size).toBe(0);
+    expect(isUnlocked()).toBe(false);
+    expect(() => signMessage("x")).toThrow();
+    // With nothing unlocked, the last address noted is what is forgotten.
+    unlock(ANVIL);
+    keep(st);
+    wipe();
+    forget(st);
+    expect(st.map.size).toBe(0);
+  });
+
+  it("a store that throws leaves keep silent, recall false, forget still wiping", () => {
+    unlock(ANVIL);
+    expect(() => keep(hostile)).not.toThrow();
+    expect(() => forget(hostile)).not.toThrow();
+    expect(isUnlocked()).toBe(false);
+    expect(recall(ANVIL0, hostile)).toBe(false);
+    expect(lastAddress(hostile)).toBeNull();
+    expect(recall(ANVIL0, null)).toBe(false);
+    expect(() => keep(null)).not.toThrow();
+  });
+
+  it("two accounts keep two slots, and each recalls its own", () => {
+    const st = store();
+    unlock(ANVIL, 0);
+    keep(st);
+    unlock(ANVIL, 1);
+    keep(st);
+    wipe();
+    const one = addressFromMnemonic(ANVIL, 1);
+    expect(recall(ANVIL0, st)).toBe(true);
+    expect(addressFromPrivateKeyHex("0x" + st.map.get(KEY_SLOT(ANVIL0))!).eip55).toBe(ANVIL0);
+    expect(recall(one.eip55, st)).toBe(true);
+    expect(addressFromPrivateKeyHex("0x" + st.map.get(KEY_SLOT(one.lower))!).eip55).toBe(one.eip55);
+    expect(lastAddress(st)).toBe(one.lower);
+    wipe();
   });
 });

@@ -117,7 +117,8 @@ export const cs: Partial<Catalogue> = {
   "login.clear": "VYMAZAT",
   "login.fullscreen": "CELÁ OBRAZOVKA",
   "login.windowed": "OKNO",
-  "login.custody": "Fráze nikdy neopustí tuto záložku. Server vidí jen podpis.",
+  "login.custody":
+    "Fráze nikdy neopustí tento prohlížeč. Zůstává zde, pro tento účet, a server vidí jen podpis.",
   "login.footer": "ENTER  PŘIHLÁSIT      ODKRÝT  UKÁZAT FRÁZI      F7  JAZYK      F1  ORIENTACE",
   "login.footerMinted": "ENTER  MÁM TO ZAPSANÉ A JDU DOVNITŘ      F1  ORIENTACE",
   "login.mintTitle": "ZAPIŠ SI TĚCHTO DVANÁCT SLOV",
@@ -373,7 +374,8 @@ export const cs: Partial<Catalogue> = {
   "pg.posterSaved": "plakát uložen · {file}",
   "pg.posterShared": "plakát předán do sdílení",
   "pg.posterFailed": "plakát se nepodařilo vytvořit",
-  "pg.stampAsk": "pro razítko vložte frázi nebo privátní klíč — zůstane jen v tomto panelu",
+  "pg.stampAsk":
+    "pro razítko vložte frázi nebo privátní klíč — zůstane v tomto prohlížeči, nikam se neposílá",
   "pg.stampKey": "fráze nebo 0x privátní klíč · ENTER razítkuje · ESC ruší",
   "pg.stampBadKey": "to není fráze ani privátní klíč",
   "pg.stampWrongKey": "ten klíč nepatří {address}, kdo je tu přihlášen",

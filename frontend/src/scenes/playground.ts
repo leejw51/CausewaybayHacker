@@ -57,7 +57,15 @@ import { isLand, LANDS, playerText } from "../net/protocol";
 import { onLocale, t, tEn } from "../i18n";
 import type { Land, PlaygroundRun, RunStage, SnippetBrief, Snippet } from "../net/protocol";
 import { LandsScene } from "./lands";
-import { isUnlocked, MAX_ACCOUNT_INDEX, signMessage, unlock, wipe } from "../wallet/wallet";
+import {
+  isUnlocked,
+  keep,
+  MAX_ACCOUNT_INDEX,
+  recall,
+  signMessage,
+  unlock,
+  wipe,
+} from "../wallet/wallet";
 import { INDEX_PREF } from "./login";
 import { deterministicUsername } from "../wallet/username";
 
@@ -76,7 +84,7 @@ import { deterministicUsername } from "../wallet/username";
  * then fail.
  *
  * Two changes, and both are needed. `sessionStorage` puts the draft in the tab,
- * beside the session that owns it (`net/tabsession.ts`) — it still survives the
+ * beside the tab that owns it — it still survives the
  * reload this exists for, and stops being visible to a tab practising as
  * somebody else. The address stays in the key because one tab can sign out and
  * back in as another account, and the draft must not follow it across.
@@ -446,6 +454,8 @@ export class PlaygroundScene implements Scene {
       this.app.chip.fail();
       return;
     }
+    // The right key, kept: the next poster, tab or reload signs without asking.
+    keep();
     this.app.chip.select();
     void this.poster();
   }
@@ -588,12 +598,10 @@ export class PlaygroundScene implements Scene {
    *
    * The signature is EIP-191 over **the source and only the source**, made
    * here because the key is here — `wallet.ts` hands out signatures and
-   * nothing else, and the server is never asked. After a reload the session
-   * is resumed from its token and the key is *not* in memory, so there is
-   * nothing to sign with: the poster is still made, with the seal greyed out
-   * and a note saying how to get a real one. Refusing to make it at all
-   * would punish the person for the thing the login screen told them was
-   * safe (the key never leaving the tab).
+   * nothing else, and the server is never asked. After a reload the key is
+   * recalled from this browser's localStorage; only when nothing is kept
+   * there (storage blocked, or a browser this account never typed its
+   * phrase into) is the person asked for it, once, and it is kept from then.
    *
    * The rest is in `ui/poster.ts`, loaded on the press: it pulls in the four
    * grammars' parsers for the colouring and nobody pays for that on the way
@@ -601,8 +609,9 @@ export class PlaygroundScene implements Scene {
    */
   private async poster(): Promise<void> {
     if (this.postering) return;
-    if (!isUnlocked()) {
-      // No key in this tab: ask for it, and come back here from `stampWith`.
+    if (!isUnlocked() && !recall(this.app.addressLabel)) {
+      // Nothing kept for this account: ask for it, and come back here from
+      // `stampWith`, which keeps it.
       this.startStamp();
       return;
     }
