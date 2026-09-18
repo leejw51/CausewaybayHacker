@@ -307,6 +307,10 @@ export const ja: Partial<Catalogue> = {
   "pg.run": "実行",
   "pg.format": "整形",
   "pg.save": "保存",
+  "pg.updatedElsewhere": "別の端末で更新されました",
+  "pg.updatedElsewhereUnsaved":
+    "別の端末で保存されました — ここでの未保存の入力は残り、次の保存が優先されます",
+  "agent.roomUpdated": "別の端末で会話が変わりました",
   "pg.saveDirty": "保存 *",
   "pg.full": "全画面",
   "pg.window": "ウィンドウ",

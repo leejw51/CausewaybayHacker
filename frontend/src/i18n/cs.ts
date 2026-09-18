@@ -325,6 +325,10 @@ export const cs: Partial<Catalogue> = {
   "pg.run": "SPUSTIT",
   "pg.format": "FORMÁT",
   "pg.save": "ULOŽIT",
+  "pg.updatedElsewhere": "aktualizováno na jiném zařízení",
+  "pg.updatedElsewhereUnsaved":
+    "uloženo na jiném zařízení — neuložené psaní zde zůstává; příští uložení odsud vyhrává",
+  "agent.roomUpdated": "místnost se změnila na jiném zařízení",
   "pg.saveDirty": "ULOŽIT *",
   "pg.full": "CELÁ",
   "pg.window": "OKNO",

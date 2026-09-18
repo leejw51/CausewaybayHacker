@@ -516,6 +516,15 @@ async fn dispatch(
         }
     }
 
+    // §4.22, §4.23: a pad saved or its room changed on this connection is
+    // told to the same user's other connections — the tablet and the laptop
+    // with the same pad open — and not to this one, which has the reply.
+    if let (Ok(payload), Some(address)) = (&result, session.address.as_deref()) {
+        if let Some(event) = playground::fanout(&kind, payload) {
+            state.hub.broadcast(address, connection_id, &event);
+        }
+    }
+
     release(live_ids, &id);
     send(
         tx,

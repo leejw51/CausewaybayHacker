@@ -298,6 +298,9 @@ return {
   -- The edit stack: UNDO, REDO and CLEAR, and the caption that says how
   -- deep it goes. `stack` is the data structure programmers already name
   -- in their own language, so the word is translated rather than kept.
+  ["updated on another device"] = "aktualizováno na jiném zařízení",
+  ["saved on another device: unsaved typing here is kept, and the next save from here wins"] = "uloženo na jiném zařízení -- neuložené psaní zde zůstává; příští uložení odsud vyhrává",
+  ["the room changed on another device"] = "místnost se změnila na jiném zařízení",
   ["UNDO"] = "ZPĚT",
   ["REDO"] = "ZNOVU",
   ["CLEAR  SHIFT-F6"] = "VYČISTIT  SHIFT-F6",

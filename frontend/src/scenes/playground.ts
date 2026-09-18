@@ -20,6 +20,8 @@
 import type { App, Scene } from "../app";
 import { elide, ensureFonts, inkBox, inkCentreY, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
+import { burstPlan } from "../engine/burst";
+import { remoteSaveAction } from "../net/remote";
 import {
   BTN_FRAME,
   btnBox,
@@ -53,7 +55,7 @@ import { LogBuffer } from "../net/logbuf";
 import { WireError } from "../net/client";
 import { isLand, LANDS, playerText } from "../net/protocol";
 import { onLocale, t, tEn } from "../i18n";
-import type { Land, PlaygroundRun, RunStage, SnippetBrief } from "../net/protocol";
+import type { Land, PlaygroundRun, RunStage, SnippetBrief, Snippet } from "../net/protocol";
 import { LandsScene } from "./lands";
 import { isUnlocked, MAX_ACCOUNT_INDEX, signMessage, unlock, wipe } from "../wallet/wallet";
 import { INDEX_PREF } from "./login";
@@ -263,6 +265,8 @@ export class PlaygroundScene implements Scene {
   private outputScroll = 0;
   private outputOverflow = 0;
   private outputRect: Rect = [0, 0, 0, 0];
+  /** Where the editor was last drawn, for an effect over it. */
+  private editorRect: Rect = [0, 0, 0, 0];
   /**
    * What *saving* said, kept apart from `status` on purpose: an autosave that
    * fires two seconds after a keystroke must never overwrite the reason a run
@@ -784,6 +788,12 @@ export class PlaygroundScene implements Scene {
 
   async enter(): Promise<void> {
     this.offs.push(
+      // §4.22, §4.23: the same pad open on the tablet and the laptop. A save
+      // or a room change on the other one arrives here.
+      this.app.client.on("playground.updated", (p) => this.remoteSaved(p.snippet)),
+      this.app.client.on("playground.chat.updated", (p) =>
+        this.coder?.roomUpdated(p.id, p.message ?? null, p.cleared === true),
+      ),
       this.app.client.on("run.stage", (p) => {
         if (this.attemptId && p.attempt_id !== this.attemptId) return;
         this.attemptId = p.attempt_id;
@@ -1128,6 +1138,57 @@ export class PlaygroundScene implements Scene {
     } finally {
       this.formatting = false;
     }
+  }
+
+  /**
+   * This pad was saved on another of this user's devices (§4.22).
+   *
+   * Taken when nothing here is unsaved: the text, the input, the name and
+   * the language, exactly as a `playground.load` would set them, with the
+   * caret kept where it was (`replaceAll` narrows the change). When there
+   * is unsaved typing here it is only said, and the next save from here is
+   * the one that wins — see `remoteSaveAction`.
+   */
+  private remoteSaved(snippet: Snippet): void {
+    const action = remoteSaveAction(this.held.id, snippet.id, this.dirty);
+    if (action === "ignore") {
+      void this.refreshList();
+      return;
+    }
+    const changed =
+      snippet.source !== (this.editor?.source ?? this.held.source) ||
+      (snippet.stdin ?? "") !== this.stdinEl.value ||
+      snippet.name !== this.held.name ||
+      snippet.lang !== this.held.lang;
+    if (!changed) return;
+    if (action === "apply") {
+      if (snippet.lang !== this.held.lang) {
+        this.held.lang = snippet.lang;
+        this.land = snippet.lang;
+        this.editor?.load(snippet.lang, snippet.source);
+      } else {
+        this.editor?.replaceAll(snippet.source);
+      }
+      this.held.source = snippet.source;
+      this.held.name = snippet.name;
+      this.held.stdin = snippet.stdin ?? "";
+      this.stdinEl.value = this.held.stdin;
+      this.savedSource = snippet.source;
+      this.savedLang = snippet.lang;
+      this.savedName = snippet.name;
+      this.savedStdin = this.held.stdin;
+      this.dirty = false;
+      this.writeLocal();
+      this.saveNote = t("pg.updatedElsewhere");
+    } else {
+      this.saveNote = t("pg.updatedElsewhereUnsaved");
+    }
+    void this.refreshList();
+    // The effect: a burst over the editor and a chime, so a change that
+    // arrived from nowhere visible is seen to arrive.
+    const [x, y, w, h] = this.editorRect;
+    if (w > 0) this.fx?.play(burstPlan(x + w / 2, y + Math.min(h / 2, 80), 36));
+    this.app.chip.coin();
   }
 
   private fresh(): void {
@@ -1900,6 +1961,7 @@ export class PlaygroundScene implements Scene {
     }
     well(g, pad, top, editorW, editorH);
     const editorRect: Rect = [pad + 4, top + 4, editorW - 8, editorH - 8];
+    this.editorRect = editorRect;
     if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     else this.overlay?.hide();
     this.coder?.fly([0, 0, layout.vw, layout.vh]);
@@ -2074,6 +2136,7 @@ export class PlaygroundScene implements Scene {
 
     well(g, inner[0], inner[1], inner[2], editorH);
     const editorRect: Rect = [inner[0] + 4, inner[1] + 4, inner[2] - 8, editorH - 8];
+    this.editorRect = editorRect;
     if (this.editor && this.benchIn.finished) {
       this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
     } else this.overlay?.hide();

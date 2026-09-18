@@ -301,6 +301,10 @@ export const zh: Partial<Catalogue> = {
   "pg.run": "运行",
   "pg.format": "格式化",
   "pg.save": "保存",
+  "pg.updatedElsewhere": "已在另一台设备上更新",
+  "pg.updatedElsewhereUnsaved":
+    "已在另一台设备上保存 — 这里未保存的输入会保留，下一次保存以这里为准",
+  "agent.roomUpdated": "对话在另一台设备上有了变化",
   "pg.saveDirty": "保存 *",
   "pg.full": "全屏",
   "pg.window": "窗口",

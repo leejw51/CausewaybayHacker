@@ -280,6 +280,9 @@ return {
   -- The edit stack: UNDO, REDO and CLEAR, and the caption that says how
   -- deep it goes. `stack` is the data structure programmers already name
   -- in their own language, so the word is translated rather than kept.
+  ["updated on another device"] = "已在另一台设备上更新",
+  ["saved on another device: unsaved typing here is kept, and the next save from here wins"] = "已在另一台设备上保存 -- 这里未保存的输入会保留，下一次保存以这里为准",
+  ["the room changed on another device"] = "对话在另一台设备上有了变化",
   ["UNDO"] = "撤销",
   ["REDO"] = "重做",
   ["CLEAR  SHIFT-F6"] = "清空记录  SHIFT-F6",

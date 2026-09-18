@@ -984,3 +984,111 @@ async fn the_page_is_revalidated_and_the_hashed_assets_are_kept() {
     );
     handle.abort();
 }
+
+/// PROTOCOL §4.22, §4.23: a pad saved, or its room changed, on one of the
+/// user's connections reaches the same user's other connections — and not
+/// the one that made the change, nor another user.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_saved_pad_and_its_room_reach_the_users_other_window() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let src = content_src(tmp.path());
+    let server = start(&home, &src).await;
+
+    let mut a = Client::connect(server.port).await;
+    let mut b = Client::connect(server.port).await;
+    let mut bob = Client::connect(server.port).await;
+    a.login(ALICE_KEY).await;
+    b.login(ALICE_KEY).await;
+    bob.login(BOB_KEY).await;
+
+    // A save on a: b hears the pad in full, a does not hear itself.
+    let saved = a
+        .ok(
+            "playground.save",
+            json!({ "lang": "rust", "source": "fn main() { println!(\"one\"); }\n", "stdin": "7\n" }),
+        )
+        .await;
+    let pad = saved["snippet"]["id"].as_str().unwrap().to_string();
+    assert!(b.ok("ping", json!({})).await["t"].is_string());
+    let heard: Vec<&Value> = b
+        .events
+        .iter()
+        .filter(|e| e["type"] == "playground.updated")
+        .collect();
+    assert_eq!(
+        heard.len(),
+        1,
+        "one playground.updated on the other window: {:?}",
+        b.events
+    );
+    let snippet = &heard[0]["payload"]["snippet"];
+    assert_eq!(snippet["id"].as_str(), Some(pad.as_str()));
+    assert_eq!(
+        snippet["source"].as_str(),
+        Some("fn main() { println!(\"one\"); }\n")
+    );
+    assert_eq!(snippet["stdin"].as_str(), Some("7\n"));
+    assert!(snippet["name"].is_string() && snippet["lang"] == "rust");
+    assert!(heard[0]["id"].is_null(), "§2.2: an event carries id: null");
+    assert!(a.ok("ping", json!({})).await["t"].is_string());
+    assert!(
+        !a.events.iter().any(|e| e["type"] == "playground.updated"),
+        "the window that saved must not be told about its own save: {:?}",
+        a.events
+    );
+
+    // The room: a post, an edit, a delete, a clear — each reaches b as the
+    // row the server recorded, foldable by id.
+    let posted = a
+        .ok(
+            "playground.chat.post",
+            json!({ "id": pad, "role": "user", "text": "hello room" }),
+        )
+        .await;
+    let message_id = posted["message"]["id"].as_i64().unwrap();
+    a.ok(
+        "playground.chat.edit",
+        json!({ "message_id": message_id, "text": "hello, room" }),
+    )
+    .await;
+    a.ok(
+        "playground.chat.delete",
+        json!({ "message_id": message_id }),
+    )
+    .await;
+    a.ok("playground.chat.clear", json!({ "id": pad })).await;
+    assert!(b.ok("ping", json!({})).await["t"].is_string());
+    let room: Vec<&Value> = b
+        .events
+        .iter()
+        .filter(|e| e["type"] == "playground.chat.updated")
+        .map(|e| &e["payload"])
+        .collect();
+    assert_eq!(room.len(), 4, "post, edit, delete, clear: {room:?}");
+    for p in &room {
+        assert_eq!(p["id"].as_str(), Some(pad.as_str()));
+    }
+    assert_eq!(room[0]["message"]["text"], "hello room");
+    assert_eq!(room[1]["message"]["text"], "hello, room");
+    assert_eq!(room[1]["message"]["edited"], true);
+    assert_eq!(room[2]["message"]["deleted"], true);
+    assert_eq!(room[2]["message"]["id"].as_i64(), Some(message_id));
+    assert!(
+        room[1]["message"]["timeid"].as_i64() > room[0]["message"]["timeid"].as_i64(),
+        "an edit moves timeid, so a cursor past the original hears it"
+    );
+    assert_eq!(room[3]["cleared"], true);
+
+    // Another user hears none of it.
+    assert!(bob.ok("ping", json!({})).await["t"].is_string());
+    assert!(
+        !bob.events.iter().any(|e| {
+            e["type"] == "playground.updated" || e["type"] == "playground.chat.updated"
+        }),
+        "another user's window heard about alice's pad: {:?}",
+        bob.events
+    );
+
+    server.handle.abort();
+}

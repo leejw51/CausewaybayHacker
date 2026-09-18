@@ -308,6 +308,10 @@ export const ko: Partial<Catalogue> = {
   "pg.run": "실행",
   "pg.format": "정렬",
   "pg.save": "저장",
+  "pg.updatedElsewhere": "다른 기기에서 업데이트됨",
+  "pg.updatedElsewhereUnsaved":
+    "다른 기기에서 저장됨 — 여기서 저장하지 않은 입력은 유지되고, 다음 저장이 우선합니다",
+  "agent.roomUpdated": "다른 기기에서 대화가 바뀌었습니다",
   "pg.saveDirty": "저장 *",
   "pg.full": "전체화면",
   "pg.window": "창",

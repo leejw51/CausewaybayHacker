@@ -298,6 +298,27 @@ export class Coder {
     if (id) void this.loadRoom(id);
   }
 
+  /**
+   * The room changed on another of this user's connections (§4.23): one row
+   * as the server recorded it — a post, an edit, a tombstone — or the room
+   * cleared. Folded by id like a page of the list; nothing is asked back.
+   */
+  roomUpdated(id: string, message: ChatMessage | null, cleared: boolean): void {
+    if (id !== this.room) return;
+    if (cleared) {
+      this.held = emptyRoom();
+      this.panel.items = [];
+      this.said.clear();
+      this.session?.clear();
+    } else if (message) {
+      this.apply([message]);
+    } else {
+      return;
+    }
+    this.panel.status = t("agent.roomUpdated");
+    this.host.chip.blip();
+  }
+
   private async loadRoom(id: string): Promise<void> {
     try {
       const res = await this.app.client.request("playground.chat.list", { id, limit: 200 });

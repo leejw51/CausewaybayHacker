@@ -329,6 +329,10 @@ export const en = {
   "pg.run": "RUN",
   "pg.format": "FORMAT",
   "pg.save": "SAVE",
+  "pg.updatedElsewhere": "updated on another device",
+  "pg.updatedElsewhereUnsaved":
+    "saved on another device — your unsaved typing here is kept; the next save from here wins",
+  "agent.roomUpdated": "the room changed on another device",
   "pg.saveDirty": "SAVE *",
   "pg.full": "FULL",
   "pg.window": "WINDOW",

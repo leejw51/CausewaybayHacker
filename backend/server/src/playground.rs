@@ -187,6 +187,36 @@ pub fn save(
     Ok(json!({ "snippet": snippet }))
 }
 
+/// The event the same user's other connections get when `kind` succeeded
+/// with `reply` (PROTOCOL §4.22, §4.23), or `None` for a message that changes
+/// nothing another window would show.
+///
+/// Built from the reply rather than from the request so what is broadcast is
+/// what the server recorded — the pad with its server-side id and name, the
+/// message with its `id` and `timeid` — and a receiver folds it exactly as it
+/// folds a page of `playground.chat.list`.
+pub fn fanout(kind: &str, reply: &serde_json::Value) -> Option<crate::proto::ServerFrame> {
+    use crate::proto::ServerFrame;
+    match kind {
+        "playground.save" => Some(ServerFrame::event(
+            "playground.updated",
+            json!({ "snippet": reply.get("snippet")? }),
+        )),
+        "playground.chat.post" | "playground.chat.edit" | "playground.chat.delete" => {
+            let message = reply.get("message")?;
+            Some(ServerFrame::event(
+                "playground.chat.updated",
+                json!({ "id": message.get("snippet_id")?, "message": message }),
+            ))
+        }
+        "playground.chat.clear" => Some(ServerFrame::event(
+            "playground.chat.updated",
+            json!({ "id": reply.get("id")?, "cleared": true }),
+        )),
+        _ => None,
+    }
+}
+
 pub fn delete(
     state: &Shared,
     session: &Session,

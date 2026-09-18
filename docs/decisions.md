@@ -6609,3 +6609,37 @@ under `build/` being writable by the player's own program; logout and token
 revocation (a protocol change across three clients); the LÖVE client holding
 the signing key for poster signing (documented as a choice in
 `playground.lua`, contradicted by the comment in `ffi/src/lib.rs`).
+
+## 2026-09-18 — two devices, one pad: a save or a room change on one is told to the other
+
+The same wallet on an iPad and a Mac, the same scratchpad open on both. Until
+now the second device found out about a save when it reopened the pad, and
+about the room when it reopened the panel. Now the server tells the same
+user's other connections at once (PROTOCOL §4.22 `playground.updated`, §4.23
+`playground.chat.updated`), the way `progress.update` already reached the
+other window for a clear.
+
+* **From the reply, not the request.** `playground::fanout` builds the event
+  from what the server recorded and just answered with — the pad with its
+  server-side id and name, the message with its `id` and `timeid`, a
+  tombstone for a delete, `cleared: true` for a clear — so a receiver folds
+  it exactly as it folds a page of `playground.chat.list`. One place in
+  `dispatch`, no handler signature changed, never to the connection that
+  made the change (it has the reply), never to another user.
+* **The receiver takes it only when it has nothing unsaved.** Both clients
+  put the decision in one pure function (`net/remote.ts` `remoteSaveAction`,
+  `Playground.remote_save_action`): another pad → ignore, refresh the list;
+  this pad and clean → apply as `open` would (text with the caret kept, input,
+  name, language); this pad and dirty → say so and keep the buffer, because
+  the one thing this must never do is replace text under fingers that are
+  typing. The next save from that device wins. So this is last-write-wins:
+  edit the same pad on both at the same moment and one side's change is
+  lost, which is the honest limit of a design with no merge.
+* **Seen to arrive.** A burst over the code and a chime, and the pad's note
+  says "updated on another device". The room says it under the panel.
+
+Not done, and known: `playground.delete` has no event, so a pad deleted on
+one device stays open on the other until its next save meets `not_found`;
+and an event sent while a socket was down is not replayed on reconnect
+(§6), so a pad open through a disconnect is re-read by its client rather
+than by the server.

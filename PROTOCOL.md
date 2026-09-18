@@ -1171,6 +1171,37 @@ Sent immediately before the server closes the connection. `reason` ∈
 
 ---
 
+### 4.22 `playground.updated`
+
+```json
+{ "v":1, "id":null, "type":"playground.updated",
+  "payload": { "snippet": Snippet } }
+```
+
+A pad was saved (§4.9) on one of the user's connections; this goes to **the
+same user's other open connections** and not to the one that saved. `Snippet`
+is §5.9 in full — id, name, lang, source, stdin — so a window with that pad
+open can take it without a `playground.load`. A window with a different pad
+open ignores it (the list, if shown, is worth refreshing). Whether to replace
+what is on screen is the client's call: the reference clients apply it when
+their editor has nothing unsaved, and only say so when it has.
+
+### 4.23 `playground.chat.updated`
+
+```json
+{ "v":1, "id":null, "type":"playground.chat.updated",
+  "payload": { "id":"pg_…", "message": ChatMessage } }
+{ "v":1, "id":null, "type":"playground.chat.updated",
+  "payload": { "id":"pg_…", "cleared": true } }
+```
+
+A room changed (§4.9f: a post, an edit, a delete) on one of the user's
+connections. The other connections get the row as recorded — with its `id`
+and new `timeid`, a tombstone for a delete — and fold it exactly as a page of
+`playground.chat.list`. `cleared: true` is `playground.chat.clear`: the room
+is empty. Neither is sent to the connection that made the change; it has
+the reply.
+
 ## 5. Shared shapes
 
 Given as TypeScript for precision. A Lua or Rust client implements the same
@@ -1428,6 +1459,10 @@ The rule for every client:
 4. On `unauthorized`, drop to the login screen and ask for the key again.
 5. Refetch `world.map` for the screen the player is on. Do not trust a map
    cached across a disconnect — a `progress.update` may have been missed.
+   The same goes for a pad: a `playground.updated` or
+   `playground.chat.updated` (§4.22, §4.23) sent while the socket was down
+   is not replayed, so a client with a pad open re-reads it, or its room
+   from its cursor, on reconnect.
 6. A `quest.submit` that was in flight when the connection dropped **is still
    running on the server**, and its result is durable. After resuming, call
    `stats.history` with the quest id and look at the newest attempt rather than

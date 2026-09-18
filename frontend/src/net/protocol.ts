@@ -697,6 +697,10 @@ export interface Events {
     /** The nodes this clear opened, so the map updates without refetching. */
     unlocked: string[];
   };
+  /** §4.22: the same user saved this pad on another connection. */
+  "playground.updated": { snippet: Snippet };
+  /** §4.23: the same user changed this pad's room on another connection. */
+  "playground.chat.updated": { id: string; message?: ChatMessage; cleared?: boolean };
   award: {
     kind: "badge" | "stamp" | "level" | "streak" | string;
     id: string;

@@ -1520,6 +1520,49 @@ check(null, "beyond: progress.update reaches the same user's other connection", 
   }
 });
 
+check(null, "beyond: a saved pad and its room reach the same user's other connection", async () => {
+  // PROTOCOL.md §4.22, §4.23: the same pad open on the tablet and the laptop.
+  // A save or a post on one arrives on the other, and not on the one that
+  // made the change.
+  const acct = freshAccount("two-pads");
+  const a = await session(acct, "pad-a");
+  const b = await session(acct, "pad-b");
+  try {
+    const saved = await a.send("playground.save", {
+      lang: "python",
+      source: 'print("from a")\n',
+      stdin: "3\n",
+    });
+    assertEq(saved.type, "playground.save.ok", "the save");
+    const pad = saved.payload.snippet.id;
+    await sleep(300);
+    const onB = b.events.filter((e) => e.type === "playground.updated");
+    assert(onB.length === 1, `§4.22: expected one playground.updated on the other window, got ${onB.length}`);
+    assertEq(onB[0].id, null, "§2.2: an event carries id: null");
+    assertEq(onB[0].payload.snippet.id, pad, "§4.22: the pad that was saved");
+    assertEq(onB[0].payload.snippet.source, 'print("from a")\n', "§4.22: the snippet in full");
+    assertEq(onB[0].payload.snippet.stdin, "3\n", "§4.22: stdin travels with it");
+    assert(
+      !a.events.some((e) => e.type === "playground.updated"),
+      "§4.22: the window that saved must not be told about its own save",
+    );
+
+    const posted = await a.send("playground.chat.post", { id: pad, role: "user", text: "hi" });
+    assertEq(posted.type, "playground.chat.post.ok", "the post");
+    await a.send("playground.chat.clear", { id: pad });
+    await sleep(300);
+    const room = b.events.filter((e) => e.type === "playground.chat.updated").map((e) => e.payload);
+    assert(room.length === 2, `§4.23: expected a post and a clear on the other window, got ${room.length}`);
+    assertEq(room[0].id, pad);
+    assertEq(room[0].message.id, posted.payload.message.id, "§4.23: the row as recorded, by id");
+    assertEq(room[0].message.text, "hi");
+    assertEq(room[1].cleared, true, "§4.23: clear");
+  } finally {
+    a.close();
+    b.close();
+  }
+});
+
 check(null, "beyond: two users never see each other's progress or attempts", async () => {
   // SPEC §9.8 and §3.5. Two addresses, two sessions, submissions that overlap
   // in time.

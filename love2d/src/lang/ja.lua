@@ -279,6 +279,9 @@ return {
   -- The edit stack: UNDO, REDO and CLEAR, and the caption that says how
   -- deep it goes. `stack` is the data structure programmers already name
   -- in their own language, so the word is translated rather than kept.
+  ["updated on another device"] = "別の端末で更新されました",
+  ["saved on another device: unsaved typing here is kept, and the next save from here wins"] = "別の端末で保存されました -- ここでの未保存の入力は残り、次の保存が優先されます",
+  ["the room changed on another device"] = "別の端末で会話が変わりました",
   ["UNDO"] = "元に戻す",
   ["REDO"] = "やり直す",
   ["CLEAR  SHIFT-F6"] = "履歴を消す  SHIFT-F6",

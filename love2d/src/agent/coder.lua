@@ -385,6 +385,25 @@ function Coder:room_arrived(id)
   self:list_room()
 end
 
+--- The room changed on another of this user's connections (§4.23): one row
+--- as the server recorded it — a post, an edit, a tombstone — or the room
+--- cleared. Folded by id like a page of the list; nothing is asked back.
+function Coder:room_updated(id, message, cleared)
+  if id == nil or id ~= self.room_id then return end
+  if cleared then
+    self.panel:clear_items()
+    self.room = Sync.empty_room()
+    self.pending = nil
+    if self.session then self.session:clear() end
+  elseif message then
+    self:fold_one(message)
+  else
+    return
+  end
+  self.panel.status = I18n.t("the room changed on another device")
+  SFX.play("select")
+end
+
 function Coder:fold_one(message)
   self.room = Sync.fold(self.room, { message })
   self:show_room()

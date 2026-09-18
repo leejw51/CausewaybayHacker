@@ -277,6 +277,9 @@ return {
   -- The edit stack: UNDO, REDO and CLEAR, and the caption that says how
   -- deep it goes. `stack` is the data structure programmers already name
   -- in their own language, so the word is translated rather than kept.
+  ["updated on another device"] = "다른 기기에서 업데이트됨",
+  ["saved on another device: unsaved typing here is kept, and the next save from here wins"] = "다른 기기에서 저장됨 -- 여기서 저장하지 않은 입력은 유지되고, 다음 저장이 우선합니다",
+  ["the room changed on another device"] = "다른 기기에서 대화가 바뀌었습니다",
   ["UNDO"] = "되돌리기",
   ["REDO"] = "다시 실행",
   ["CLEAR  SHIFT-F6"] = "기록 비우기  SHIFT-F6",

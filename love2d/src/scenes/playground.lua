@@ -157,6 +157,16 @@ function Playground:enter()
   self.subscriptions = {
     self.app.session:on("run.stage", function(payload) self:on_stage(payload) end),
     self.app.session:on("run.log", function(payload) self:on_log(payload) end),
+    -- §4.22, §4.23: the same pad open here and on another device. A save or
+    -- a room change there arrives here.
+    self.app.session:on("playground.updated", function(payload)
+      self:remote_saved(payload and payload.snippet)
+    end),
+    self.app.session:on("playground.chat.updated", function(payload)
+      if self.coder and payload then
+        self.coder:room_updated(payload.id, payload.message, payload.cleared == true)
+      end
+    end),
   }
   self.coder = CoderM.new(self.app, self:agent_host())
   self.coder:mount(self.editor)
@@ -324,6 +334,58 @@ function Playground:delete(index)
     self.note = "deleted"
     self:list()
   end)
+end
+
+--- What a `playground.updated` from another connection of the same user
+--- means for the pad on this screen (PROTOCOL §4.22). Pure, so the suite can
+--- ask without a screen.
+---
+---   * "ignore": a different pad, or none held.
+---   * "apply": this pad, and nothing unsaved here — take the saved text.
+---   * "notify": this pad, but unsaved typing here. Say so, leave the buffer
+---     alone; the next save from here wins. Replacing text under fingers that
+---     are typing is the one thing this must never do.
+function Playground.remote_save_action(held_id, snippet_id, dirty)
+  if held_id == nil or held_id ~= snippet_id then return "ignore" end
+  return dirty and "notify" or "apply"
+end
+
+--- This pad was saved on another device (§4.22): taken as `open` would take
+--- it when nothing here is unsaved, only said when there is.
+function Playground:remote_saved(snippet)
+  if not snippet or not self.editor then return end
+  local action = Playground.remote_save_action(self.snippet_id, snippet.id, self.editor.dirty)
+  if action == "ignore" then
+    self:list()
+    return
+  end
+  local source = snippet.source or ""
+  local changed = source ~= self.editor:text()
+    or (snippet.stdin or "") ~= (self.stdin or "")
+    or snippet.name ~= self.name
+    or snippet.lang ~= self.lang
+  if not changed then return end
+  if action == "apply" then
+    self.lang = snippet.lang or self.lang
+    self.editor.lang = self.lang
+    self.name = snippet.name
+    self.stdin = snippet.stdin or ""
+    if source ~= self.editor:text() then self.editor:set_text(source) end
+    self.editor.dirty = false
+    self.dirty_at = nil
+    self.saved_at = Anim.now()
+    self.note = I18n.t("updated on another device")
+  else
+    self.note = I18n.t("saved on another device: unsaved typing here is kept, and the next save from here wins")
+  end
+  self:list()
+  -- The effect: a burst over the code and a chime, so a change that arrived
+  -- from nowhere visible is seen to arrive.
+  local r = self.code_rect
+  if self.fx and r then
+    self.fx:burst(r.x + r.w / 2, r.y + math.min(r.h / 2, 80), 36, Theme.coin)
+  end
+  SFX.play("coin")
 end
 
 function Playground:new_snippet()
