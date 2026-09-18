@@ -254,7 +254,7 @@ return {
   ["COPY INPUT"] = "入力をコピー",
   ["POSTER"] = "ポスター",
   ["DISK READER"] = "ディスクリーダー",
-  ["paste your phrase or private key to stamp — it stays in this screen"] = "スタンプにはフレーズか秘密鍵を貼り付けてください — この画面にだけ残ります",
+  ["paste your phrase or private key to stamp — kept on this machine, never sent"] = "スタンプにはフレーズか秘密鍵を貼り付けてください — この端末に保管され、送信はされません",
   ["that key is not the account signed in here"] = "その鍵はここでログイン中のアカウントのものではありません",
   ["that is not a phrase or a private key"] = "フレーズでも秘密鍵でもありません",
   ["poster saved"] = "ポスターを保存しました",

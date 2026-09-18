@@ -50,12 +50,27 @@ function Reader.from_chunks(chunks, recover)
 end
 
 --- The disk in a decoded label, or nil when the text is not one of ours.
-function Reader.from_label(text, recover)
+---
+--- The fifth field is one of three things: the source as written; the source
+--- raw-deflated and base64 behind `deflate:` (the web poster, once the plain
+--- text is too dense to scan — code compresses two- to threefold); or its
+--- keccak behind `keccak256:`. `inflate(b64) -> text|nil` is the library's
+--- inflater; a deflated label with no inflater, or one that will not
+--- inflate, is not a disk — nothing on it can be checked, and taking the
+--- base64 for the program would call a good poster forged.
+function Reader.from_label(text, recover, inflate)
   local p = Poster.parse_payload(text)
   if not p then
     return nil
   end
   local lang = LANDS[p.lang] and p.lang or "rust"
+  local source = p.body
+  if p.body:sub(1, 8) == "deflate:" then
+    source = inflate and inflate(p.body:sub(9)) or nil
+    if type(source) ~= "string" then
+      return nil
+    end
+  end
   if p.body:sub(1, 10) == "keccak256:" then
     return {
       source = "",
@@ -68,18 +83,18 @@ function Reader.from_label(text, recover)
     }
   end
   return {
-    source = p.body,
+    source = source,
     lang = lang,
     address = p.address,
     signature = p.signature,
     title = nil,
     via = "label",
-    verdict = Reader.judge(p.body, p.address, p.signature, recover),
+    verdict = Reader.judge(source, p.address, p.signature, recover),
   }
 end
 
 --- What the library read (`{ chunks, label }`) as a disk, or nil.
-function Reader.from_read(read, recover)
+function Reader.from_read(read, recover, inflate)
   if not read then
     return nil
   end
@@ -88,7 +103,7 @@ function Reader.from_read(read, recover)
     return disk
   end
   if type(read.label) == "string" then
-    return Reader.from_label(read.label, recover)
+    return Reader.from_label(read.label, recover, inflate)
   end
   return nil
 end

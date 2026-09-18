@@ -199,6 +199,27 @@ pub fn decode_label(bytes: &[u8]) -> Option<String> {
 /// The address behind an EIP-191 signature over `message`: `r||s||v` with
 /// `v` in {27, 28} (or the raw 0/1), as `sign` produces it. Err for bytes
 /// that are not a signature.
+/// A label's `deflate:` body — the source, raw-deflated and base64 — back to
+/// the source. The web poster writes it (`frontend/src/ui/poster.ts`
+/// `packSource`, `CompressionStream("deflate-raw")`) once the plain text is
+/// too dense for the label; a reader that met it without this would take the
+/// base64 for the program and call a good poster forged.
+pub fn inflate_label(b64: &str) -> Result<String, String> {
+    use base64::Engine;
+    use std::io::Read;
+    let packed = base64::engine::general_purpose::STANDARD
+        .decode(b64.trim())
+        .map_err(|e| format!("the label's body is not base64: {e}"))?;
+    let mut out = Vec::new();
+    // A cap, so a hostile label cannot ask for a gigabyte: no source this
+    // client accepts is anywhere near it (PROTOCOL: 64 KiB per program).
+    flate2::read::DeflateDecoder::new(&packed[..])
+        .take(1 << 20)
+        .read_to_end(&mut out)
+        .map_err(|e| format!("the label's body is not a deflate stream: {e}"))?;
+    String::from_utf8(out).map_err(|_| "the label's program is not UTF-8".to_string())
+}
+
 pub fn recover(message: &[u8], signature_hex: &str) -> Result<[u8; 20], String> {
     let body = signature_hex.strip_prefix("0x").unwrap_or(signature_hex);
     let sig = hex::decode(body).map_err(|_| "signature is not hex".to_string())?;
@@ -284,6 +305,21 @@ mod tests {
         let mut out = std::io::Cursor::new(Vec::new());
         img.write_to(&mut out, image::ImageFormat::Png).unwrap();
         assert_eq!(decode_label(&out.into_inner()).as_deref(), Some(text));
+    }
+
+    #[test]
+    fn a_deflated_label_inflates_and_junk_does_not() {
+        use base64::Engine;
+        use std::io::Write;
+        let src = "fn main() {\n    println!(\"héllo\");\n}\n".repeat(20);
+        let mut enc = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::best());
+        enc.write_all(src.as_bytes()).unwrap();
+        let packed = enc.finish().unwrap();
+        assert!(packed.len() < src.len() / 2, "code compresses");
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&packed);
+        assert_eq!(inflate_label(&b64).unwrap(), src);
+        assert!(inflate_label("not base64!").is_err());
+        assert!(inflate_label(&base64::engine::general_purpose::STANDARD.encode(b"\xff\xfe\x00")).is_err());
     }
 
     #[test]

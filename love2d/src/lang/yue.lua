@@ -258,7 +258,7 @@ return {
   ["COPY INPUT"] = "複製輸入",
   ["POSTER"] = "海報",
   ["DISK READER"] = "讀碟",
-  ["paste your phrase or private key to stamp — it stays in this screen"] = "要蓋章就貼上助記詞或私鑰 — 只會留喺呢個畫面",
+  ["paste your phrase or private key to stamp — kept on this machine, never sent"] = "要蓋章就貼上助記詞或私鑰 — 保存喺呢部機，唔會送出",
   ["that key is not the account signed in here"] = "呢條鑰匙唔係登入中嘅帳戶",
   ["that is not a phrase or a private key"] = "呢個唔係助記詞亦唔係私鑰",
   ["poster saved"] = "海報已儲存",

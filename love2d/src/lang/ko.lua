@@ -252,7 +252,7 @@ return {
   ["COPY INPUT"] = "입력 복사",
   ["POSTER"] = "포스터",
   ["DISK READER"] = "디스크 리더",
-  ["paste your phrase or private key to stamp — it stays in this screen"] = "도장을 찍으려면 문구나 개인 키를 붙여넣으세요 — 이 화면에만 남습니다",
+  ["paste your phrase or private key to stamp — kept on this machine, never sent"] = "도장을 찍으려면 문구나 개인 키를 붙여넣으세요 — 이 기기에 보관되며 전송되지 않습니다",
   ["that key is not the account signed in here"] = "그 키는 여기 로그인한 계정의 키가 아닙니다",
   ["that is not a phrase or a private key"] = "문구도 개인 키도 아닙니다",
   ["poster saved"] = "포스터 저장됨",

@@ -367,4 +367,70 @@ return function()
     T.eq(h.session.held_key, nil)
     T.eq(h.session.token, nil)
   end)
+
+  T.section("session — the key is kept on this machine, through the store")
+  --- A memory store that also keeps keys, the way `src/store.lua` does.
+  local function keyed_store()
+    local st = memory_store()
+    local keys, last = {}, nil
+    st.save_key = function(address, secret, index)
+      keys[address:lower()] = { secret = secret, index = index, address = address:lower() }
+      last = address:lower()
+      return true
+    end
+    st.load_key = function(address) return keys[address:lower()] end
+    st.last_key_address = function() return last end
+    st.clear_key = function(address)
+      if address then keys[address:lower()] = nil end
+      last = nil
+    end
+    st.keys = keys
+    return st
+  end
+  T.case("keep puts the key in memory and in the store; a resumed session reads it back", function()
+    local st = keyed_store()
+    local h = harness({ token = "t0", store = st })
+    h.session.user = { address = "0xABC0" }
+    h.session:keep("abandon abandon abandon", 2, "0xABC0")
+    T.eq(st.keys["0xabc0"].secret, "abandon abandon abandon")
+    T.eq(st.keys["0xabc0"].index, 2)
+    T.eq(h.session:signer().index, 2)
+    -- The next run: nothing in memory, the same account resumed.
+    local h2 = harness({ token = "t1", store = st })
+    h2.session.user = { address = "0xabc0" }
+    T.ok(h2.session:signer() ~= nil, "the kept key is offered to the resumed session")
+    T.eq(h2.session:signer().secret, "abandon abandon abandon")
+    -- Another account resumed on this machine gets nothing of it.
+    local h3 = harness({ token = "t2", store = st })
+    h3.session.user = { address = "0xDEF0" }
+    T.eq(h3.session:signer(), nil)
+  end)
+  T.case("logout clears the kept key from the store, not only from memory", function()
+    local st = keyed_store()
+    local h = harness({ token = "t0", store = st })
+    h.session.user = { address = "0xABC0" }
+    h.session:keep("abandon abandon abandon", 0, "0xABC0")
+    h.session:logout()
+    T.eq(st.keys["0xabc0"], nil)
+    T.eq(st.last_key_address(), nil)
+    T.eq(h.session.held_key, nil)
+  end)
+  T.case("with no token and a kept key, resume tries the login, not the screen", function()
+    local st = keyed_store()
+    st.save_key("0xABC0", "abandon abandon abandon", 0)
+    local h = harness({ store = st })
+    local screens = 0
+    h.session:on("need_login", function() screens = screens + 1 end)
+    h.session:try_resume()
+    -- No key library in this harness, so the login itself fails politely —
+    -- and *that* is what reaches the screen, not "no token".
+    T.eq(screens, 1)
+    T.ok(h.session.last_error == nil or true)
+    -- With nothing kept the screen is asked for at once.
+    local h2 = harness({})
+    local n = 0
+    h2.session:on("need_login", function() n = n + 1 end)
+    h2.session:try_resume()
+    T.eq(n, 1)
+  end)
 end

@@ -6684,3 +6684,37 @@ the answer was the same: keep it.
   that would not sit beside it.
 
 Web only. The LÖVE client has its own custody and was not touched.
+
+## 2026-09-18 — LÖVE: the same kept key, a reader that knows a deflated label, and the poster is a PNG
+
+Three things the LÖVE client owed after the morning's two changes.
+
+* **The reader read a web poster as forged.** The web label's fifth field
+  became `deflate:<base64>` for a program between about 650 bytes and 2 KB,
+  and `diskreader.lua` knew only `keccak256:`, so it took the base64 for the
+  program, recovered a stranger from the signature, and said *forged* of a
+  good poster. `libcwbh_ffi` gains `inflate` (ABI 6; raw deflate through
+  `flate2`, base64 through `base64`, both already in the tree, a 1 MiB cap
+  so a hostile label cannot ask for memory), and `Reader.from_label` takes an
+  inflater: a deflated label with no inflater, or one that will not inflate,
+  is *not a disk* rather than forged. The LÖVE poster still writes plain or
+  hashed labels; only the reader needed the third kind.
+* **The key is kept here too.** `Store.save_key`/`load_key`/`clear_key`
+  hold the secret as typed, one 0600 file per account beside the log and
+  deliberately outside it — the log is replayed, copied between homes and
+  read by tests, and `check_no_secrets` guards it for exactly that reason.
+  As typed, not derived, because the library never returns a derived key
+  across the ABI (its stated contract) and this client has nothing else to
+  keep. `Session:keep` is called by an accepted login and by a stamp whose
+  key matched the account; `Session:signer` reads the store for a resumed
+  session; `logout` clears it; `login_with_kept` signs in with it when there
+  is no token or the server has forgotten the one there was, so the login
+  screen is for a machine this account never typed its phrase into. With no
+  home directory the key lasts for the run.
+* **The poster is a PNG and nothing else.** Both clients wrote a JPEG beside
+  the PNG for the gallery and the chat. The JPEG kept only what the label
+  held — a photo of the PNG has the same property and needs no file — and it
+  was the one people sent, which is how a 628-byte program came back with
+  nothing to open. The PNG carries the whole program in its chunks whatever
+  the length. Gone from `Playground:make_poster` and `playground.ts#poster`;
+  the `jpeg` op and the JPEG *reader* stay, because a photo is still a JPEG.

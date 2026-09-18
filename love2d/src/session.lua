@@ -138,7 +138,13 @@ end
 
 function Session:try_resume()
   if self.authed or self.resuming or not self.token then
-    if not self.token then self:fire("need_login", {}) end
+    -- No token: the kept key, if there is one, signs in on its own; only
+    -- a machine this account never typed its phrase into sees the screen.
+    if not self.token and not self:login_with_kept(function(ok)
+      if not ok then self:fire("need_login", {}) end
+    end) then
+      self:fire("need_login", {})
+    end
     return
   end
   self.resuming = true
@@ -157,8 +163,17 @@ function Session:try_resume()
     local why = errors.classify(payload.code)
     self.log("warn", "auth.resume failed: " .. tostring(payload.code))
     if payload.code == "unauthorized" then
-      -- §6 rule 4: drop to the login screen and ask for the key again.
-      self:forget_token("the stored session is no longer valid")
+      -- §6 rule 4: the session is gone. The kept key signs in again with
+      -- nobody typing; without one, the login screen asks for it.
+      self.token = nil
+      self.user = nil
+      self.authed = false
+      pcall(self.store.clear_session, self.server or self.client.url)
+      if not self:login_with_kept(function(ok)
+        if not ok then self:forget_token("the stored session is no longer valid") end
+      end) then
+        self:forget_token("the stored session is no longer valid")
+      end
     else
       self.last_error = why.player
       self:fire("need_login", { message = why.player })
@@ -282,8 +297,10 @@ function Session:login(secret, index, name, cb)
         return
       end
       self:adopt(payload2.token, payload2.user, payload2.position)
-      -- Signed in with a key in hand: keep it, for this account only.
-      self.held_key = { secret = holder.secret, index = index or 0, address = account.address }
+      -- Signed in with a key in hand: keep it, for this account only — in
+      -- memory for the run and on this machine for the next one
+      -- (`Store.save_key`), now that the server has accepted it.
+      self:keep(holder.secret, index or 0, account.address)
       Wallet.forget(holder, "secret")
       self:fire("auth", { user = self.user, position = self.position, resumed = false })
       cb(true, nil)
@@ -313,13 +330,48 @@ end
 --- Sign out: forget the token here and on disk. The server keeps the session
 --- alive until it expires, which is fine — nothing on this machine can use it.
 function Session:logout()
+  if self.store.clear_key then
+    pcall(self.store.clear_key, self.user and self.user.address or nil)
+  end
   self:forget_signer()
   self:forget_token(nil)
 end
 
---- The key this run signed in with — `{ secret, index, address }` — or nil
---- when the session was resumed from a token and never had one.
+--- Sign in with the kept key, nobody typing: for a launch with no token, or
+--- a token the server no longer knows. `cb(ok, message)`; false at once,
+--- with no callback, when nothing is kept.
+function Session:login_with_kept(cb)
+  if not (self.store.last_key_address and self.store.load_key) then return false end
+  local ok, address = pcall(self.store.last_key_address)
+  if not ok or not address then return false end
+  local ok2, found = pcall(self.store.load_key, address)
+  if not ok2 or not found then return false end
+  self:login(found.secret, found.index, nil, cb)
+  return true
+end
+
+--- Hold a key for `address` (the one signed in, or about to be) and keep it
+--- on this machine. `Playground:stamp_with` comes here once a typed key has
+--- matched the account, so the next poster, and the next launch, do not ask.
+function Session:keep(secret, index, address)
+  self:forget_signer()
+  self.held_key = { secret = secret, index = index or 0, address = address }
+  if self.store.save_key then
+    local ok, why = pcall(self.store.save_key, address, secret, index or 0)
+    if not ok then self.log("error", "could not keep the key: " .. tostring(why)) end
+  end
+end
+
+--- The key this machine signs with — `{ secret, index, address }` — or nil.
+--- Held from the login this run, or read back from the store for the account
+--- a resumed session belongs to; nil only when neither has one.
 function Session:signer()
+  if not self.held_key and self.user and self.user.address and self.store.load_key then
+    local ok, found = pcall(self.store.load_key, self.user.address)
+    if ok and found then
+      self.held_key = found
+    end
+  end
   local s = self.held_key
   if s and self.user and self.user.address
     and s.address:lower() ~= tostring(self.user.address):lower() then

@@ -40,7 +40,7 @@ local M = {}
 --- screen's NEW WALLET button depends on the first, `src/store.lua`'s `0600`
 --- on the second and the agent panel on the last; a binding that loaded an
 --- older library would offer all three and fail on use.
-M.ABI_VERSION = 5
+M.ABI_VERSION = 6
 
 -- Kept byte-identical to love2d/ffi/include/cwbh.h.
 M.CDEF = [[
@@ -320,6 +320,14 @@ end
 --- decodes the QR even when the chunks answer — the pre-save proof wants both.
 function M.disk_read(lib, path, always_label)
   return M.execute(lib, { op = "disk_read", path = path, label = always_label or nil })
+end
+
+--- A label's `deflate:` body (base64 of the raw-deflated source) back to the
+--- source, or nil and why. The web poster writes such labels once the plain
+--- text is too dense to scan (ABI 6).
+function M.inflate(lib, b64)
+  local r, err = M.execute(lib, { op = "inflate", base64 = b64 })
+  return r and r.text or nil, err
 end
 
 --- SPEC §3.1: "A raw private key (`0x` + 64 hex) is accepted as an

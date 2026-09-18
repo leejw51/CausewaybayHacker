@@ -273,7 +273,7 @@ return {
   ["COPY INPUT"] = "KOPÍROVAT VSTUP",
   ["POSTER"] = "PLAKÁT",
   ["DISK READER"] = "ČTEČKA DESEK",
-  ["paste your phrase or private key to stamp — it stays in this screen"] = "pro razítko vložte frázi nebo privátní klíč — zůstane jen na této obrazovce",
+  ["paste your phrase or private key to stamp — kept on this machine, never sent"] = "pro razítko vložte frázi nebo privátní klíč — zůstane na tomto stroji, nikam se neposílá",
   ["that key is not the account signed in here"] = "ten klíč nepatří účtu, který je tu přihlášen",
   ["that is not a phrase or a private key"] = "to není fráze ani privátní klíč",
   ["poster saved"] = "plakát uložen",

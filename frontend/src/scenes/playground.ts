@@ -637,7 +637,7 @@ export class PlaygroundScene implements Scene {
           }
         : null;
       const at = new Date();
-      const { makePoster, packSource, posterBytes, posterJpeg, posterFileName, savePoster } =
+      const { makePoster, packSource, posterBytes, posterFileName, savePoster } =
         await import("../ui/poster");
       const packed = await packSource(source);
       const { canvas } = await makePoster({
@@ -688,21 +688,14 @@ export class PlaygroundScene implements Scene {
         this.app.chip.fail();
         return;
       }
-      // Both: the PNG is the one with the proof in the file, the JPEG is the
-      // one a gallery or a chat wants. Same picture, same label.
+      // The PNG only: it is the one with the proof in the file and the whole
+      // program in its chunks whatever the length. A JPEG beside it kept
+      // only what the label held, and was the one people sent.
       const how = await savePoster(
-        [
-          { bytes: png, name: file, type: "image/png" },
-          {
-            bytes: await posterJpeg(canvas),
-            name: file.replace(/\.png$/, ".jpg"),
-            type: "image/jpeg",
-          },
-        ],
+        [{ bytes: png, name: file, type: "image/png" }],
         this.app.layout.touch,
       );
-      this.saveNote =
-        how === "shared" ? t("pg.posterShared") : t("pg.posterSaved", { file: `${file} + .jpg` });
+      this.saveNote = how === "shared" ? t("pg.posterShared") : t("pg.posterSaved", { file });
       this.app.chip.blip();
     } catch (e) {
       console.warn("poster:", e);

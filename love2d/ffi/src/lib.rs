@@ -69,7 +69,7 @@ pub mod evm;
 /// `http_cancel`, `http_close` (`http.rs`). LÖVE ships LuaSocket and no TLS,
 /// so without these the client cannot reach a model provider at all — a
 /// binding at 4 would draw the agent panel and fail on the first ask.
-pub const ABI_VERSION: i32 = 5;
+pub const ABI_VERSION: i32 = 6;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -118,6 +118,9 @@ struct Request {
     /// pre-save proof wants both halves of the same file.
     #[serde(default)]
     label: Option<bool>,
+    /// `inflate` only: a raw-deflate stream, base64.
+    #[serde(default)]
+    base64: Option<String>,
     /// `http_start` only: where to, how, with what.
     #[serde(default)]
     url: Option<String>,
@@ -232,6 +235,8 @@ pub fn describe() -> serde_json::Value {
               "note": "re-encodes a PNG as a JPEG; no key material involved" },
             { "op": "disk_read", "in": ["path", "label?"], "out": ["chunks","label"],
               "note": "a poster's text chunks and/or its QR label; no key material involved" },
+            { "op": "inflate", "in": ["base64"], "out": ["text"],
+              "note": "a label's `deflate:` body back to the source: raw deflate, UTF-8; no key material involved" },
             { "op": "http_start", "in": ["url", "method?", "headers?", "body?"], "out": ["handle"],
               "note": "the coder's door to a model provider: TLS LÖVE has not got; no key material involved" },
             { "op": "http_poll", "in": ["handle"],
@@ -511,6 +516,19 @@ fn run(request_json: &str) -> Result<serde_json::Value, String> {
                 .ok_or_else(|| "no `path` given".to_string())?;
             let d = disk::read_disk(path, req.label.unwrap_or(false))?;
             Ok(json!({ "ok": true, "chunks": d.chunks, "label": d.label }))
+        }
+
+        // A `deflate:` label back into the program it carries. Raw deflate
+        // (no zlib header), the way the web poster's `CompressionStream`
+        // wrote it, and UTF-8 or nothing: a stream that is not one of ours
+        // is an error, not a source.
+        "inflate" => {
+            let b64 = req
+                .base64
+                .as_deref()
+                .ok_or_else(|| "no `base64` given".to_string())?;
+            let text = disk::inflate_label(b64)?;
+            Ok(json!({ "ok": true, "text": text }))
         }
 
         other => Err(format!("unknown op `{other}`")),

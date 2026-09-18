@@ -225,6 +225,26 @@ return function()
     T.eq(Reader.from_read({ chunks = {}, label = nil }, recover), nil)
   end)
 
+  T.case("knows a deflated label, through the inflater, and refuses one it cannot inflate", function()
+    -- What the web poster writes once the plain text is too dense: the
+    -- source raw-deflated, base64, behind `deflate:`. The inflater is the
+    -- library's; here it is a table lookup, so the rule is what is tested.
+    local packed = "eJxLTEoGAAJNASc="
+    local inflate = function(b64) return b64 == packed and SRC or nil end
+    local text = ("CWBH1\n%s\n%s\nrust\ndeflate:%s"):format(ADDR, SIG, packed)
+    local d = Reader.from_label(text, recover, inflate)
+    T.ok(d, "a deflated label is a disk")
+    T.eq(d.source, SRC)
+    T.eq(d.verdict, "verified")
+    T.eq(d.via, "label")
+    -- Through `from_read`, the way the playground takes it.
+    T.eq(Reader.from_read({ chunks = {}, label = text }, recover, inflate).verdict, "verified")
+    -- No inflater, or a body that will not inflate: not a disk — never
+    -- "forged", which is what taking the base64 for the program would say.
+    T.eq(Reader.from_label(text, recover, nil), nil)
+    T.eq(Reader.from_label(text:gsub(packed, "AAAA"), recover, inflate), nil)
+  end)
+
   T.case("names a pad from a file the way the poster named the file", function()
     T.eq(Reader.name_from_file("/x/y/cwbhacker-scratch-2026-09-16-20260916-1055.jpg"), "scratch-2026-09-16")
     T.eq(Reader.name_from_file("photo.png"), "photo")

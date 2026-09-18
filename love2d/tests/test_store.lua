@@ -565,6 +565,50 @@ return function()
     T.no_love("src/store.lua")
   end)
 
+  T.section("store — the kept key, outside the log")
+  T.case("save_key writes one 0600 file per account, load_key reads it back, clear_key removes it", function()
+    local dir = scratch()
+    Store.reset()
+    Store.open({ dir = dir })
+    T.eq(Store.load_key("0xAbC0"), nil)
+    T.eq(Store.save_key("0xAbC0", "abandon abandon abandon", 3), true)
+    local k = Store.load_key("0xabc0")
+    T.eq(k.secret, "abandon abandon abandon")
+    T.eq(k.index, 3)
+    T.eq(Store.last_key_address(), "0xabc0")
+    -- Not in the log: the log is replayed, copied and read by tests.
+    for _, line in ipairs(lines_of(dir)) do
+      T.ok(not line:find("abandon", 1, true), "the log never holds the key")
+    end
+    -- On disk, owner-only, and readable by a fresh store.
+    local mode = io.popen(("stat -f %%Lp %q 2>/dev/null || stat -c %%a %q"):format(dir .. "/key-0xabc0", dir .. "/key-0xabc0")):read("*l")
+    T.eq(mode, "600")
+    Store.reset()
+    Store.open({ dir = dir })
+    T.eq(Store.load_key("0xABC0").index, 3)
+    T.eq(Store.last_key_address(), "0xabc0")
+    -- A second account is its own file; clearing one leaves the other.
+    Store.save_key("0xDEF0", "0x" .. ("11"):rep(32), 0)
+    Store.clear_key("0xabc0")
+    T.eq(Store.load_key("0xabc0"), nil)
+    T.eq(Store.load_key("0xdef0").index, 0)
+    Store.clear_key("0xdef0")
+    T.eq(io.open(dir .. "/key-0xdef0", "r"), nil)
+    T.eq(Store.last_key_address(), nil)
+    Store.reset()
+    wipe(dir)
+  end)
+
+  T.case("with no home the key lasts for the run", function()
+    Store.reset()
+    Store.open({ dir = false })
+    T.eq(Store.save_key("0xABC0", "abandon abandon abandon", 1), true)
+    T.eq(Store.load_key("0xabc0").index, 1)
+    Store.clear_key("0xabc0")
+    T.eq(Store.load_key("0xabc0"), nil)
+    Store.reset()
+  end)
+
   T.case("with no home the store runs in memory rather than failing", function()
     -- `dir = false` is the explicit "there is nowhere to write" case. The
     -- game still runs; nothing survives the process, and it says so once.

@@ -255,7 +255,7 @@ return {
   ["COPY INPUT"] = "复制输入",
   ["POSTER"] = "海报",
   ["DISK READER"] = "读碟",
-  ["paste your phrase or private key to stamp — it stays in this screen"] = "要盖章请粘贴助记词或私钥 — 只留在此界面",
+  ["paste your phrase or private key to stamp — kept on this machine, never sent"] = "要盖章请粘贴助记词或私钥 — 保存在这台机器，绝不发送",
   ["that key is not the account signed in here"] = "这把钥匙不属于当前登录的账户",
   ["that is not a phrase or a private key"] = "这不是助记词也不是私钥",
   ["poster saved"] = "海报已保存",

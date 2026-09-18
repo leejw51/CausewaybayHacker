@@ -629,6 +629,94 @@ function Store.clear_session(server)
   return Store.append({ kind = "session.clear", server = server or Store.DEFAULT_SERVER })
 end
 
+-- ---------------------------------------------------------------- kept keys
+
+--- The key this machine signs with, kept **outside the log** and outside
+--- `check_no_secrets`' reach, on purpose: the log is replayed, copied between
+--- homes and read by tests, and a secret in it would be in every one of
+--- those. Each account gets its own file, `key-<address>` (0600, in the 0700
+--- home), holding the account index and the secret the player typed — the
+--- phrase or the `0x` key — because the library never hands the derived key
+--- back across the ABI and this client has nothing else to keep. `key-last`
+--- names the account kept most recently, for a launch with no session.
+---
+--- SPEC §3.1 as amended 2026-09-18: the key stays on this machine, is never
+--- sent, and is what lets a resumed session stamp a poster and a lost one
+--- sign in again without the phrase being typed twice. With no home
+--- directory the key lasts for the run, in `kept`, and no longer.
+local kept = {}
+local KEY_LAST = "key-last"
+
+local function key_file(address)
+  return dir and (dir .. "/key-" .. tostring(address):lower()) or nil
+end
+
+function Store.save_key(address, secret, index)
+  if type(address) ~= "string" or type(secret) ~= "string" or secret == "" then
+    return false, "nothing to keep"
+  end
+  local lower = address:lower()
+  kept[lower] = { secret = secret, index = tonumber(index) or 0 }
+  kept.last = lower
+  local file = key_file(lower)
+  if not file then return true end
+  -- Create empty and lock it down *before* the secret is written into it.
+  local fh, err = io.open(file, "w")
+  if not fh then return false, tostring(err) end
+  fh:close()
+  make_private(file, false)
+  fh, err = io.open(file, "w")
+  if not fh then return false, tostring(err) end
+  fh:write(("%d\n%s\n"):format(tonumber(index) or 0, secret))
+  fh:close()
+  local last = io.open(dir .. "/" .. KEY_LAST, "w")
+  if last then
+    last:write(lower .. "\n")
+    last:close()
+    make_private(dir .. "/" .. KEY_LAST, false)
+  end
+  return true
+end
+
+--- `{ secret, index, address }` for the account, or nil when nothing is kept.
+function Store.load_key(address)
+  if type(address) ~= "string" then return nil end
+  local lower = address:lower()
+  local held = kept[lower]
+  if held then return { secret = held.secret, index = held.index, address = lower } end
+  local file = key_file(lower)
+  if not file then return nil end
+  local fh = io.open(file, "r")
+  if not fh then return nil end
+  local index = fh:read("*l")
+  local secret = fh:read("*l")
+  fh:close()
+  if type(secret) ~= "string" or secret == "" then return nil end
+  return { secret = secret, index = tonumber(index) or 0, address = lower }
+end
+
+--- The address `save_key` last kept, or nil.
+function Store.last_key_address()
+  if kept.last then return kept.last end
+  if not dir then return nil end
+  local fh = io.open(dir .. "/" .. KEY_LAST, "r")
+  if not fh then return nil end
+  local line = fh:read("*l")
+  fh:close()
+  return line and line ~= "" and line or nil
+end
+
+--- Logout: the kept key goes with it.
+function Store.clear_key(address)
+  local lower = type(address) == "string" and address:lower() or kept.last
+  if lower then kept[lower] = nil end
+  if kept.last == lower then kept.last = nil end
+  if not dir then return true end
+  if lower then os.remove(key_file(lower)) end
+  os.remove(dir .. "/" .. KEY_LAST)
+  return true
+end
+
 --- Every server this client holds a token for, for a "signed in to" list.
 function Store.known_servers()
   local out = {}

@@ -581,6 +581,13 @@ and skips straight to the last arrow.
 > written only by the wallet module, read only by it, and never returned by
 > any export. The cost is stated plainly: any script running on the origin can
 > read that slot, so the web client's custody is the browser profile's.
+>
+> The LÖVE client does the same on its own terms: the secret as typed (the
+> library never hands a derived key back across the ABI) goes into one
+> `key-<address>` file, 0600 in the 0700 home, outside the append-only log
+> (`love2d/src/store.lua` `save_key`/`load_key`/`clear_key`), from an accepted
+> login until logout. A launch with no session, or a token the server has
+> forgotten, signs in again with it (`Session:login_with_kept`).
 
 ### 3.2 Challenge–response
 

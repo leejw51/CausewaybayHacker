@@ -62,7 +62,7 @@ describe("POSTER", () => {
     expect(between).toMatch(/if \(failed\) \{[\s\S]*return;/);
   });
 
-  it("writes the PNG with its proof and a JPEG beside it", () => {
+  it("writes the PNG with its proof, and only the PNG", () => {
     const poster = method("poster");
     for (const k of [
       "Source: source",
@@ -73,7 +73,9 @@ describe("POSTER", () => {
       expect(poster).toContain(k);
     }
     expect(poster).toContain('type: "image/png"');
-    expect(poster).toContain('type: "image/jpeg"');
+    // No JPEG: it carried only what the label held, and it was the one sent.
+    expect(poster).not.toContain("image/jpeg");
+    expect(poster).not.toContain("posterJpeg");
   });
 });
 

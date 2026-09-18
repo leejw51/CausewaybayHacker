@@ -48,6 +48,11 @@ qrcode = { version = "0.14", default-features = false }
 rqrr = "0.9"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 crc32fast = "1"
+# The label's fifth field may be the source raw-deflated (the web poster does
+# this once the plain text is too dense to scan); DISK READER inflates it.
+# Both crates are already in the tree through `ureq` and `image`.
+flate2 = "1"
+base64 = "0.23"
 # The Rust coder's HTTPS. LÖVE bundles LuaSocket, which is plain TCP; every
 # model provider is TLS, so the client cannot reach one from Lua at all.
 # `ureq` is blocking by design, which is what a thread-per-request wants, and

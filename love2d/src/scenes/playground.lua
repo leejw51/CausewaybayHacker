@@ -118,11 +118,10 @@ function Playground.new(app)
     query = "",
     finding = false,
     -- POSTER and DISK READER (`src/poster.lua`, `src/diskreader.lua`).
-    -- The key for the stamp. The session keeps the phrase it signed in
-    -- with for the run (`Session:signer`), the browser's rule for its tab;
-    -- a session resumed from its token has none, so then the poster asks
-    -- for it, in place, and holds it **for this screen only** — `leave`
-    -- drops it.
+    -- The key for the stamp. The session keeps the key it signed in with,
+    -- and the store keeps it for the next launch (`Session:signer`); only
+    -- an account with nothing kept on this machine is asked, once, in
+    -- place, and `stamp_with` keeps what it typed.
     secret = nil,
     secret_index = 0,
     stamp_edit = nil,   -- what is in the key field; nil when it is closed
@@ -1571,7 +1570,15 @@ function Playground:recoverer()
   end
 end
 
---- POSTER: the pad as one square PNG (and a JPEG), signed, saved to disk.
+--- A `deflate:` label's body back to its source, through the library.
+function Playground:inflater()
+  local lib = self.app.wallet_lib
+  return function(b64)
+    return (Wallet.inflate(lib, b64))
+  end
+end
+
+--- POSTER: the pad as one square PNG, signed, saved to disk.
 ---
 --- The signature is EIP-191 over the source and only the source — the same
 --- scheme as the login challenge and as the browser client's poster, so one
@@ -1680,8 +1687,9 @@ function Playground:make_poster(lib)
     SFX.play("locked")
     return
   end
-  Wallet.jpeg(lib, path, (path:gsub("%.png$", ".jpg")), 92)
-  self.note = ("%s · %s + .jpg"):format(I18n.t("poster saved"), path)
+  -- The PNG only: it is the one with the proof in the file, and the whole
+  -- program in it whatever the length. A JPEG kept only what the label held.
+  self.note = ("%s · %s"):format(I18n.t("poster saved"), path)
   SFX.play("select")
 end
 
@@ -1689,7 +1697,7 @@ end
 function Playground:start_stamp()
   self.focus = "stamp"
   self.stamp_edit = ""
-  self.note = I18n.t("paste your phrase or private key to stamp — it stays in this screen")
+  self.note = I18n.t("paste your phrase or private key to stamp — kept on this machine, never sent")
 end
 
 --- Take what was typed as the key: derived at the index the login used,
@@ -1712,6 +1720,9 @@ function Playground:stamp_with(text)
     return
   end
   self.secret, self.secret_index = typed, index
+  -- The right key, kept: the session holds it for the run and the store for
+  -- the next launch, so this field does not open again for this account.
+  self.app.session:keep(typed, index, who.address)
   SFX.play("select")
   self:poster()
 end
@@ -1747,7 +1758,7 @@ function Playground:read_disk_path(path)
     SFX.play("locked")
     return
   end
-  local disk = Reader.from_read(read, self:recoverer())
+  local disk = Reader.from_read(read, self:recoverer(), self:inflater())
   if not disk then
     self.note = I18n.t("no disk on that picture")
     SFX.play("locked")
