@@ -84,6 +84,7 @@ function Playground.new(app)
     lang = "rust",
     snippets = nil,
     snippet_id = nil,
+    pad_serial = 0,
     name = nil,
     focus = "editor",       -- "editor" | "stdin" | "snippets"
     stdin = "",
@@ -174,6 +175,10 @@ function Playground:agent_host()
       return scene.pane:cell(scene.editor.line, scene.editor.col)
     end,
     room_id = function() return scene.snippet_id end,
+    -- Changes with every pad the screen moves to, saved or not: what tells
+    -- NEW from the unsaved pad before it, which `room_id` (nil for both)
+    -- cannot. See `Sync.room_move`.
+    room_key = function() return scene.pad_serial end,
     room_name = function() return scene.name or "" end,
     ensure_room = function()
       -- A pad nobody has saved has no id, and a room belongs to an id. So the
@@ -289,6 +294,7 @@ function Playground:load(index)
   self.app.session:request("playground.load", { id = brief.id }, function(ok, payload, why)
     if not ok then self.note = why.player; return end
     local snippet = payload.snippet
+    self.pad_serial = self.pad_serial + 1
     self.snippet_id = snippet.id
     self.name = snippet.name
     self.lang = snippet.lang
@@ -310,6 +316,8 @@ function Playground:delete(index)
   self.app.session:request("playground.delete", { id = brief.id }, function(ok, _, why)
     if not ok then self.note = why.player; return end
     if self.snippet_id == brief.id then
+      -- The room went with the pad; what is held is a new unsaved pad now.
+      self.pad_serial = self.pad_serial + 1
       self.snippet_id = nil
       self.name = nil
     end
@@ -319,6 +327,7 @@ function Playground:delete(index)
 end
 
 function Playground:new_snippet()
+  self.pad_serial = self.pad_serial + 1
   self.snippet_id = nil
   self.name = nil
   self.editor:set_text(STARTER[self.lang])

@@ -515,6 +515,7 @@ export class QuestScene implements Scene {
       this.coder = new Coder(this.app, {
         lang: () => this.land,
         roomId: () => null,
+        roomKey: () => "quest",
         ensureRoom: async () => null,
         roomName: () => "",
         run: null,

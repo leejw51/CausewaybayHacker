@@ -75,6 +75,39 @@ export function nextCursor(room: Room, page: readonly ChatMessage[]): number {
  * cursor actually moved — a page that moved nothing would be asked for again
  * for ever.
  */
+/**
+ * Which pad the screen is on, as the coder sees it: `key` changes with every
+ * pad the screen moves to, saved or not; `id` is the server's, and null until
+ * the pad's first save.
+ */
+export interface PadRef {
+  key: string;
+  id: string | null;
+}
+
+/**
+ * What a change of pad means for the room.
+ *
+ *   * `same`: nothing moved.
+ *   * `arriving`: the same pad, which had no id, now has one — the first
+ *     save landed. The conversation stays and is posted, in order.
+ *   * `switch`: a different pad. The panel is cleared and that pad's room is
+ *     read.
+ *
+ * The `key` is what tells two unsaved pads apart. Keyed on the id alone, NEW
+ * from an unsaved pad looked like no change (null to null) and the old
+ * conversation stayed on the new pad; and opening a saved pad from an unsaved
+ * one looked like the unsaved pad's room *arriving*, which posted the unsaved
+ * pad's conversation into the other pad's room.
+ */
+export function roomMove(from: PadRef | null, to: PadRef): "same" | "arriving" | "switch" {
+  if (from === null) return "switch";
+  if (from.key !== to.key) return "switch";
+  if (from.id === to.id) return "same";
+  if (from.id === null && to.id !== null) return "arriving";
+  return "switch";
+}
+
 export function shouldContinue(before: number, after: number, more: boolean): boolean {
   return more && after > before;
 }

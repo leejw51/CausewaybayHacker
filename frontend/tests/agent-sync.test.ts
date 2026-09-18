@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../src/net/protocol";
-import { emptyRoom, fold, nextCursor, shouldContinue } from "../src/ui/agent/sync";
+import { emptyRoom, fold, nextCursor, roomMove, shouldContinue } from "../src/ui/agent/sync";
 
 function msg(id: number, timeid: number, text = `m${id}`): ChatMessage {
   return {
@@ -164,5 +164,23 @@ describe("the drain loop", () => {
     expect(pages).toBe(3);
     expect(room.messages).toHaveLength(9);
     expect(room.cursor).toBe(900);
+  });
+});
+
+describe("which pad the room follows", () => {
+  it("tells the first save from a different pad, and two unsaved pads apart", () => {
+    const unsaved = { key: "1", id: null };
+    expect(roomMove(null, unsaved)).toBe("switch");
+    expect(roomMove(unsaved, { key: "1", id: null })).toBe("same");
+    // The first save landing: the same pad, now with an id.
+    expect(roomMove(unsaved, { key: "1", id: "pg_a" })).toBe("arriving");
+    expect(roomMove({ key: "1", id: "pg_a" }, { key: "1", id: "pg_a" })).toBe("same");
+    // NEW from an unsaved pad: null to null, and it must NOT read as no change.
+    expect(roomMove(unsaved, { key: "2", id: null })).toBe("switch");
+    // A saved pad opened from an unsaved one: not this room arriving.
+    expect(roomMove(unsaved, { key: "2", id: "pg_b" })).toBe("switch");
+    // Another pad from the list; the held pad deleted.
+    expect(roomMove({ key: "1", id: "pg_a" }, { key: "2", id: "pg_b" })).toBe("switch");
+    expect(roomMove({ key: "1", id: "pg_a" }, { key: "2", id: null })).toBe("switch");
   });
 });

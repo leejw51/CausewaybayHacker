@@ -45,13 +45,19 @@ import type { AgentProbe } from "../../app";
 import { Sprite, type Pt } from "./sprite";
 import { AgentLayer } from "./layer";
 import { Panel, type Item } from "./panel";
-import { emptyRoom, fold, type Room } from "./sync";
+import { emptyRoom, fold, type Room, roomMove, type PadRef } from "./sync";
 
 /** What the screen lends the agent. */
 export interface Host {
   lang(): Land;
   /** The pad the room belongs to; null on a screen with no room (a quest). */
   roomId(): string | null;
+  /**
+   * Changes with every pad the screen moves to, saved or not — what tells a
+   * NEW pad from the unsaved one before it, which `roomId` (null for both)
+   * cannot. See `sync.roomMove`.
+   */
+  roomKey(): string;
   /**
    * Make the room exist: a fresh pad has no id until its first save, and the
    * first thing said on it must not be lost for that. Resolves to the id,
@@ -133,6 +139,8 @@ export class Coder {
   /** The last thing said, for a press that comes after the bubble has gone. */
   private lastSaid: { text: string; tone: "say" | "tip" } | null = null;
   private room: string | null = null;
+  /** The pad as last seen, for `roomMove`. */
+  private pad: PadRef | null = null;
   /** The room as the server has it, folded by id, with the sync cursor. */
   private held: Room = emptyRoom();
   /** The reply being streamed, as one growing item. */
@@ -260,16 +268,18 @@ export class Coder {
 
   /** The pad changed, or a new one was opened: a different room. */
   syncRoom(): void {
-    const id = this.host.roomId();
-    if (id === this.room) return;
-    const was = this.room;
+    const to: PadRef = { key: this.host.roomKey(), id: this.host.roomId() };
+    const move = roomMove(this.pad, to);
+    if (move === "same") return;
+    this.pad = to;
+    const id = to.id;
     this.room = id;
     this.held = emptyRoom();
     // A fresh pad has no room until its first save, and the first thing
     // said on it is usually said before that. The pad getting its id is not
     // a different room, it is this room arriving: keep the conversation and
     // post what was said so far, in order, so the room starts complete.
-    if (was === null && id && this.panel.items.length > 0) {
+    if (move === "arriving" && id && this.panel.items.length > 0) {
       const pending = this.panel.items.filter(
         (i) => i.id === undefined && (i.role === "user" || i.role === "agent") && !i.live,
       );

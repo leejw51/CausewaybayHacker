@@ -104,6 +104,8 @@ function M.new(app, host)
     reviewed_source = "",
     room = Sync.empty_room(),
     room_id = nil,
+    -- The pad as last seen, `{ key, id }`, for `Sync.room_move`.
+    pad = nil,
     rings = {},
     live = nil,
     pending_run = nil,
@@ -341,7 +343,6 @@ end
 --- A different pad is a different room: forget this one and read that one.
 function Coder:sync_room()
   local id = self.host.room_id and self.host.room_id() or nil
-  if id == self.room_id then return end
   self.room_id = id
   self.room = Sync.empty_room()
   self.panel:clear_items()
@@ -626,8 +627,11 @@ function Coder:update(dt)
   -- opened from the list, a new one made, or this one saved for the first
   -- time — and the room has to follow it.
   local id = self.host.room_id and self.host.room_id() or nil
-  if id ~= self.room_id then
-    if id and self.room_id == nil then
+  local key = self.host.room_key and self.host.room_key() or nil
+  local move = Sync.room_move(self.pad, { key = key, id = id })
+  if move ~= "same" then
+    self.pad = { key = key, id = id }
+    if move == "arriving" then
       self:room_arrived(id)
     else
       self:sync_room()

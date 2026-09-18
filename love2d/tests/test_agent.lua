@@ -461,6 +461,20 @@ return function()
     T.eq(#again.messages, 2)
   end)
 
+  T.case("the room tells the first save from a different pad, and two unsaved pads apart", function()
+    local unsaved = { key = 1, id = nil }
+    T.eq(Sync.room_move(nil, unsaved), "switch")
+    T.eq(Sync.room_move(unsaved, { key = 1, id = nil }), "same")
+    T.eq(Sync.room_move(unsaved, { key = 1, id = "pg_a" }), "arriving", "the first save landing")
+    T.eq(Sync.room_move({ key = 1, id = "pg_a" }, { key = 1, id = "pg_a" }), "same")
+    -- NEW from an unsaved pad: nil to nil, and it must NOT read as no change.
+    T.eq(Sync.room_move(unsaved, { key = 2, id = nil }), "switch")
+    -- A saved pad opened from an unsaved one is not this room arriving.
+    T.eq(Sync.room_move(unsaved, { key = 2, id = "pg_b" }), "switch")
+    T.eq(Sync.room_move({ key = 1, id = "pg_a" }, { key = 2, id = "pg_b" }), "switch")
+    T.eq(Sync.room_move({ key = 1, id = "pg_a" }, { key = 2, id = nil }), "switch", "the held pad deleted")
+  end)
+
   T.case("an edit replaces in place and a tombstone does not come back", function()
     local room = Sync.fold(Sync.empty_room(), {
       { id = 1, timeid = 100, text = "before", role = "user" },

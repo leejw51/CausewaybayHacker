@@ -133,6 +133,25 @@ end
 --- for ever.
 --- Always a true boolean, never the nil a bare `and` would pass on when the
 --- server left `more` out of its reply.
+--- What a change of pad means for the room. `from` and `to` are
+--- `{ key = <changes with every pad>, id = <server id or nil> }`.
+---
+---   * "same": nothing moved.
+---   * "arriving": the same pad, which had no id, has one — the first save
+---     landed. The conversation stays and is posted, in order.
+---   * "switch": a different pad. Clear, and read that pad's room.
+---
+--- The key is what tells two unsaved pads apart: on the id alone NEW from an
+--- unsaved pad was nil to nil, no change, and the old conversation stayed on
+--- the new pad.
+function M.room_move(from, to)
+  if from == nil then return "switch" end
+  if from.key ~= to.key then return "switch" end
+  if from.id == to.id then return "same" end
+  if from.id == nil and to.id ~= nil then return "arriving" end
+  return "switch"
+end
+
 function M.should_continue(before, after, more)
   if not more then return false end
   return after > before

@@ -188,6 +188,13 @@ export class PlaygroundScene implements Scene {
     return this.held.name;
   }
   /** What the server last confirmed, so an identical save is not sent at all. */
+  /**
+   * Bumped whenever `held` becomes a different pad — NEW, a pad opened from
+   * the list, the tab's mirror restored, the held pad deleted. A save is the
+   * same pad and does not bump it. The coder's room follows this, since two
+   * unsaved pads both have `id: null` and are otherwise indistinguishable.
+   */
+  private padSerial = 0;
   private savedSource = "";
   private savedLang: Land = "rust";
   /**
@@ -843,6 +850,7 @@ export class PlaygroundScene implements Scene {
     this.coder = new Coder(this.app, {
       lang: () => this.held.lang,
       roomId: () => this.held.id,
+      roomKey: () => String(this.padSerial),
       roomName: () => this.heldName(),
       ensureRoom: async () => {
         if (this.held.id) return this.held.id;
@@ -925,6 +933,7 @@ export class PlaygroundScene implements Scene {
       if (!raw) return;
       const v = JSON.parse(raw) as Partial<Held>;
       if (typeof v.source !== "string") return;
+      this.padSerial++;
       this.held = {
         id: typeof v.id === "string" ? v.id : null,
         name: typeof v.name === "string" ? v.name : SCRATCH,
@@ -960,6 +969,7 @@ export class PlaygroundScene implements Scene {
   private async load(id: string, quiet = false): Promise<void> {
     try {
       const res = await this.app.client.request("playground.load", { id });
+      this.padSerial++;
       this.held = {
         id: res.snippet.id,
         name: res.snippet.name,
@@ -1122,6 +1132,7 @@ export class PlaygroundScene implements Scene {
 
   private fresh(): void {
     void this.save();
+    this.padSerial++;
     this.held = {
       id: null,
       name: SCRATCH,
@@ -1170,6 +1181,8 @@ export class PlaygroundScene implements Scene {
     if (!id) return;
     try {
       await this.app.client.request("playground.delete", { id });
+      // The room went with the pad; what is held is a new unsaved pad now.
+      this.padSerial++;
       this.held.id = null;
       this.saveNote = "deleted";
       void this.refreshList();

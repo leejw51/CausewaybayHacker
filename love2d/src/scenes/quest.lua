@@ -292,6 +292,7 @@ function Quest:agent_host()
       return scene.pane:cell(scene.editor.line, scene.editor.col)
     end,
     room_id = function() return nil end,
+    room_key = function() return "quest" end,
     room_name = function() return "" end,
     ensure_room = function() return false end,
     touched = function() end,
