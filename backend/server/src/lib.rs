@@ -65,7 +65,43 @@ pub fn router(state: Shared) -> Router {
         _ => router.fallback(no_frontend),
     };
 
-    router.with_state(state)
+    router
+        .layer(axum::middleware::from_fn(cache_policy))
+        .with_state(state)
+}
+
+/// How long a browser may keep what it was served.
+///
+/// The bundle's assets carry a content hash in their name, so a file at a
+/// given path never changes and may be kept for a year. The page itself and
+/// the art are the opposite: `index.html` is what names the current bundle,
+/// and without a header Safari kept it on its own judgement — a rebuild was
+/// served, the tablet reloaded, and the old bundle came up from the cache with
+/// the new button nowhere on it. `no-cache` still lets the browser keep a
+/// copy; it just has to ask whether it is current, and `ServeDir` answers
+/// that with `Last-Modified` and a 304 when nothing moved.
+///
+/// Only where nothing was said: `/photos` sets its own policy, and the
+/// websocket's 101 is left alone.
+async fn cache_policy(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::http::{header, HeaderValue};
+    let immutable = request.uri().path().starts_with("/assets/");
+    let mut response = next.run(request).await;
+    let headers = response.headers_mut();
+    if !headers.contains_key(header::CACHE_CONTROL) && !headers.contains_key(header::UPGRADE) {
+        headers.insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static(if immutable {
+                "public, max-age=31536000, immutable"
+            } else {
+                "no-cache"
+            }),
+        );
+    }
+    response
 }
 
 async fn healthz(

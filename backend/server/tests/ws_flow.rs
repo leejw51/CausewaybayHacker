@@ -922,3 +922,65 @@ async fn a_foreign_origin_cannot_open_the_socket() {
 
     server.handle.abort();
 }
+
+/// A rebuild has to reach a browser on a plain reload: the page names the
+/// bundle and is `no-cache`; the hashed assets under `/assets/` never change
+/// at a given path and are kept for a year.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_page_is_revalidated_and_the_hashed_assets_are_kept() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let src = content_src(tmp.path());
+    let dist = tmp.path().join("dist");
+    std::fs::create_dir_all(dist.join("assets")).unwrap();
+    std::fs::write(
+        dist.join("index.html"),
+        "<script src=/assets/index-abc.js></script>",
+    )
+    .unwrap();
+    std::fs::write(dist.join("assets/index-abc.js"), "// bundle").unwrap();
+
+    let store = Arc::new(Store::open(&home).expect("store"));
+    {
+        let conn = store.conn();
+        content::import_dir(&conn, store.home(), &src).expect("import");
+    }
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let config = cwbhacker_server::Config {
+        bind: listener.local_addr().unwrap(),
+        static_dir: Some(dist),
+        art_dir: None,
+    };
+    let app = cwbhacker_server::router(cwbhacker_server::build_state(store, &config));
+    let handle = tokio::spawn(async move {
+        let _ = axum::serve(listener, app).await;
+    });
+
+    let head = |path: &'static str| async move {
+        let mut stream = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        stream
+            .write_all(
+                format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+                    .as_bytes(),
+            )
+            .await
+            .unwrap();
+        let mut text = String::new();
+        stream.read_to_string(&mut text).await.unwrap();
+        text.lines()
+            .find_map(|l| l.strip_prefix("cache-control: "))
+            .map(str::to_string)
+            .unwrap_or_else(|| panic!("no cache-control on {path}: {text}"))
+    };
+    assert_eq!(head("/").await, "no-cache");
+    assert_eq!(head("/index.html").await, "no-cache");
+    assert_eq!(
+        head("/assets/index-abc.js").await,
+        "public, max-age=31536000, immutable"
+    );
+    handle.abort();
+}
