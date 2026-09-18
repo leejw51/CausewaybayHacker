@@ -6718,3 +6718,16 @@ Three things the LÖVE client owed after the morning's two changes.
   nothing to open. The PNG carries the whole program in its chunks whatever
   the length. Gone from `Playground:make_poster` and `playground.ts#poster`;
   the `jpeg` op and the JPEG *reader* stay, because a photo is still a JPEG.
+
+The review caught one thing the browser check had not: on the web, a session
+refused *mid-run* never reached `signInAgain`. `Client#reconnect` fires
+`onState("open")` before the resume is answered and set `needsLogin` only
+after, so a hook on the state saw the flag down and the tab sat open and
+anonymous — which is also what it did before today. The client now has its
+own `onNeedLogin(why)` signal, fired after the flag, and a test that shows
+the race (`tests/client-needlogin.test.ts`). `why` matters: `unauthorized`
+(the token rotated under this tab, or expired) is a fresh login with the kept
+key; `revoked` is the server signing this session out on purpose (PROTOCOL
+§4.21), so both clients drop the kept key with the token and go to the login
+screen rather than quietly signing back in. The LÖVE session does the same
+in `Session:revoked`, from the 4001 close and from `server.bye`.

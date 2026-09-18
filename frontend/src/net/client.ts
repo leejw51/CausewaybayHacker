@@ -82,6 +82,7 @@ export class Client {
   private readonly pending = new Map<string, Pending>();
   private readonly nextId = makeIdSource("c");
   private readonly listeners = new Map<string, Set<(p: unknown) => void>>();
+  private readonly needLoginWatchers = new Set<(why: "unauthorized" | "revoked") => void>();
   private readonly stateWatchers = new Set<(s: ConnState) => void>();
   private submitInFlight = false;
   private closing = false;
@@ -279,7 +280,7 @@ export class Client {
       // the player has to produce the key again.
       if (e instanceof WireError && e.payload.code === "unauthorized") {
         this.forgetToken();
-        this.needsLogin = true;
+        this.needLogin("unauthorized");
         return;
       }
       // Anything else is transient — but the socket is open and anonymous,
@@ -306,6 +307,24 @@ export class Client {
   onState(fn: (s: ConnState) => void): () => void {
     this.stateWatchers.add(fn);
     return () => this.stateWatchers.delete(fn);
+  }
+
+  /**
+   * The session this client had is gone and the socket is open, anonymous.
+   * `unauthorized`: a resume the server refused (the token was rotated under
+   * this tab, or expired). `revoked`: the server signed this session out on
+   * purpose (§4.21), which the app must not quietly undo. Fired *after*
+   * `needsLogin` is set, which `onState("open")` is not — the open came
+   * before the resume was answered.
+   */
+  onNeedLogin(fn: (why: "unauthorized" | "revoked") => void): () => void {
+    this.needLoginWatchers.add(fn);
+    return () => this.needLoginWatchers.delete(fn);
+  }
+
+  private needLogin(why: "unauthorized" | "revoked"): void {
+    this.needsLogin = true;
+    for (const w of this.needLoginWatchers) w(why);
   }
 
   /** Resolve once the connection reaches a state at least as far along as `s`. */
@@ -506,7 +525,7 @@ export class Client {
       // pointless, so it is dropped here rather than after one wasted round.
       if (reason === "revoked") {
         this.forgetToken();
-        this.needsLogin = true;
+        this.needLogin("revoked");
       }
     }
     this.emit(type, payload);

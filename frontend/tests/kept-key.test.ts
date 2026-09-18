@@ -73,8 +73,13 @@ describe("the app", () => {
     expect(again).toContain("this.client.challenge(address)");
     expect(again).toContain("signMessage(challenge.message)");
     expect(again).toContain("this.restorePlace(this.client.position)");
-    // Wired to the client: an anonymous socket that needs a login gets one.
-    expect(APP).toMatch(/s === "open" && client\.needsLogin[^\n]*signInAgain\(\)/);
+    // Wired to the client's own signal, which fires after the flag is set —
+    // `onState("open")` fires before the resume is answered and would miss it.
+    expect(APP).toContain("client.onNeedLogin((why) => void this.sessionLost(why))");
+    const lost = method(APP, "private async sessionLost(");
+    expect(lost).toContain('if (why === "revoked") forgetKey();');
+    expect(lost).toContain("await this.signInAgain()");
+    expect(lost).toContain("await this.logout(");
     // And it never hands the phrase or the key anywhere: only a signature crosses.
     expect(again).not.toContain("localStorage");
     expect(again).not.toMatch(/login\([^)]*key/);

@@ -265,11 +265,13 @@ export class App {
       // for, so the deliberate case is swallowed here.
       if (s === "offline" && !this.closingOnPurpose) this.say(t("app.connLost"));
       if (s === "authed") this.toast = null;
-      // The token was retired under this tab — another tab's resume rotated
-      // it first, or the server forgot it. The key is kept, so this is a
-      // fresh login nobody has to watch, not a trip to the login screen.
-      if (s === "open" && client.needsLogin && !this.closingOnPurpose) void this.signInAgain();
     });
+    // The session went away under a live tab. `unauthorized` — another tab's
+    // resume rotated the token first, or it expired — is a fresh login with
+    // the kept key that nobody has to watch. `revoked` is the server signing
+    // this session out on purpose (§4.21): the kept key goes too, and the
+    // login screen is the honest next thing, not a quiet way back in.
+    client.onNeedLogin((why) => void this.sessionLost(why));
     client.on("server.bye", (p) => this.say(p.reason));
   }
 
@@ -746,6 +748,14 @@ export class App {
   }
 
   // -- the session ---------------------------------------------------------
+
+  /** See `Client#onNeedLogin`. */
+  private async sessionLost(why: "unauthorized" | "revoked"): Promise<void> {
+    if (why === "revoked") forgetKey();
+    else if (await this.signInAgain()) return;
+    if (this.client.state === "authed") return;
+    await this.logout(t("err.unauthorized"));
+  }
 
   /**
    * Sign in with the kept key, with nobody typing: challenge, sign, login,

@@ -68,7 +68,7 @@ function M.new(opts)
       -- §1.2: 4001 means the session was revoked; the token is dead and
       -- reconnecting with it would only loop.
       if detail == "close:4001" then
-        self:forget_token("the server revoked this session")
+        self:revoked()
       end
     end
     self:fire("state", { state = state, detail = detail })
@@ -77,7 +77,7 @@ function M.new(opts)
   self.client:on("server.bye", function(payload)
     self.log("info", "server.bye: " .. tostring(payload.reason))
     if payload.reason == "revoked" then
-      self:forget_token("the server revoked this session")
+      self:revoked()
     end
     self:fire("bye", payload)
   end)
@@ -335,6 +335,17 @@ function Session:logout()
   end
   self:forget_signer()
   self:forget_token(nil)
+end
+
+--- §4.21 / §1.2: the server signed this session out on purpose. The kept
+--- key goes with the token, so `try_resume` does not quietly sign back in
+--- with it — that would undo the revocation — and the login screen asks.
+function Session:revoked()
+  if self.store.clear_key then
+    pcall(self.store.clear_key, self.user and self.user.address or nil)
+  end
+  self:forget_signer()
+  self:forget_token("the server revoked this session")
 end
 
 --- Sign in with the kept key, nobody typing: for a launch with no token, or

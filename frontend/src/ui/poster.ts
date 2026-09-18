@@ -1280,12 +1280,12 @@ export async function posterJpeg(canvas: HTMLCanvasElement, quality = 0.92): Pro
 }
 
 /**
- * Put the files where the person is: on anything touched — a phone, and an
+ * Put the file where the person is: on anything touched — a phone, and an
  * iPad just as much — into the share sheet (which is where Instagram is,
  * and where "Save Image" is; iPadOS has no downloads folder anybody looks
- * in, and two `a.download` clicks in a row is one download at best there);
- * anywhere else, into the downloads folder, one after the other. Says which
- * it did, because the two are different sentences on screen.
+ * in); anywhere else, into the downloads folder. Says which it did, because
+ * the two are different sentences on screen. Since 2026-09-18 the list is
+ * one PNG; the shape stays a list because the share sheet takes one.
  *
  * Both need the browser's user activation, and the caller has to have kept
  * it: a poster is drawn, encoded and proved between the tap and this call,

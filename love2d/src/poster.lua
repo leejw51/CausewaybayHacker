@@ -11,7 +11,7 @@
 -- What differs:
 --
 --   * The arithmetic that cannot honestly be Lua — the QR, recovering a
---     signer, the PNG's text chunks, the JPEG — is in `libcwbh_ffi` (ABI 4,
+--     signer, the PNG's text chunks, the JPEG — is in `libcwbh_ffi` (ABI 6,
 --     `ffi/src/disk.rs`), reached through `src/wallet.lua`. Nothing in it
 --     touches a key.
 --   * LÖVE cannot write outside its save directory, so the PNG goes through
