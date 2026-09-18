@@ -19,6 +19,7 @@
 import type { Catalogue } from "./index";
 
 export const zh: Partial<Catalogue> = {
+  "app.crashed": "这个画面出错了 — 请查看控制台；如果一直卡住，请刷新页面",
   "app.connLost": "连接断开 — 正在重新连接",
   "app.logoutTitle": "要退出登录吗？",
   "app.logoutBody": "编辑器里的代码还没保存。退出登录会丢掉它。",

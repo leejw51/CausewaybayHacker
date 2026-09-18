@@ -16,9 +16,10 @@
  * the panel, at the size a headline is set in, above the quest it explains —
  * because the sentence is the product and the quest is the exercise.
  *
- * All three `ai.*` calls are milestone 2 and today answer `unavailable`, so
- * this screen probes and renders whatever comes back. What it must never do is
- * render zero rows in silence: a new player has no mistakes, so every plan can
+ * All three `ai.*` calls are live (§4.16); the screen still probes and
+ * renders whatever comes back, so a server built without them (`unavailable`)
+ * gets a sentence and not a broken panel. What it must never do is render
+ * zero rows in silence: a new player has no mistakes, so every plan can
  * legitimately be empty, and `ui/coach.ts` gives each of the three its own
  * answer for why and what would fill it.
  */

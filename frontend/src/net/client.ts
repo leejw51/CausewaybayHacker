@@ -89,6 +89,8 @@ export class Client {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   /** Bumped on every connect and close, so a stale socket cannot speak. */
   private generation = 0;
+  /** Said once per socket: a version mismatch is on every frame, and one toast is the message. */
+  private versionWarned = false;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
 
   state: ConnState = "offline";
@@ -177,6 +179,7 @@ export class Client {
     this.transport = this.opts.transport({
       onOpen: () => {
         if (gen !== this.generation) return;
+        this.versionWarned = false;
         this.setState("open");
         this.startKeepalive();
       },
@@ -456,8 +459,13 @@ export class Client {
     const frame: Envelope = d.frame;
     if (frame.v !== PROTOCOL_VERSION) {
       // §2.1: the connection stays open, so the player can be told they are too
-      // old rather than watching a socket die for no visible reason.
-      this.emit("server.bye", { reason: `server speaks protocol v${frame.v}` });
+      // old rather than watching a socket die for no visible reason. Told
+      // once: every frame carries the version, and every ping reply is a
+      // frame, so without this the toast came back every twenty seconds.
+      if (!this.versionWarned) {
+        this.versionWarned = true;
+        this.emit("server.bye", { reason: `server speaks protocol v${frame.v}` });
+      }
       return;
     }
     if (frame.id === null) {

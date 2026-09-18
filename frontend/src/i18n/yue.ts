@@ -32,6 +32,7 @@
 import type { Catalogue } from "./index";
 
 export const yue: Partial<Catalogue> = {
+  "app.crashed": "呢個畫面出咗錯 — 睇吓 console；如果一直卡住，重新載入頁面",
   "app.connLost": "斷咗線 — 而家重新連接緊",
   "app.logoutTitle": "要登出？",
   "app.logoutBody": "編輯器入面嘅碼未儲。登出就會冇咗。",

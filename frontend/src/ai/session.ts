@@ -164,7 +164,24 @@ export class Session {
             is_error: r.error,
           });
         }
-        if (abort.signal.aborted) break;
+        // STOP during a tool: every `tool_use` in the assistant turn still
+        // has to be answered, or the next ask goes out with a call and no
+        // result and every provider refuses the whole transcript until the
+        // room is cleared. The tools that ran keep their real result; the
+        // ones that did not get told so.
+        if (abort.signal.aborted) {
+          for (const u of turn.toolUses.slice(results.length)) {
+            results.push({
+              type: "tool_result",
+              tool_use_id: u.id,
+              name: u.name,
+              content: "Stopped by the player before this tool ran.",
+              is_error: true,
+            });
+          }
+          this.messages.push({ role: "user", content: results });
+          break;
+        }
         this.messages.push({ role: "user", content: results });
       }
     } finally {

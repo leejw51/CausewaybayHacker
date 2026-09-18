@@ -12,7 +12,7 @@ import { Client } from "./net/client";
 import { browserTabSession } from "./net/tabsession";
 import { chooseTransport } from "./net/endpoint";
 import { BootScene } from "./scenes/boot";
-import { preferredLocale, setLocale } from "./i18n";
+import { preferredLocale, setLocale, t } from "./i18n";
 
 /**
  * Dev, or a build made for the end-to-end suite. QA needs the capture hook in
@@ -37,6 +37,16 @@ async function main(): Promise<void> {
   // once — the thing the account index exists for — could not work.
   const client = new Client({ transport: factory, storage: browserTabSession() });
   const app = new App(canvas, fx, overlay, client);
+  // Scene transitions are `void this.app.go(...)` in twenty places, and a
+  // scene's `enter` that throws used to vanish: no console line the player
+  // would see, no banner, a screen that simply did not change. Both kinds of
+  // uncaught error land here and are said out loud, once each.
+  const crashed = (what: unknown) => {
+    console.error("[causewaybay hacker]", what);
+    app.say(t("app.crashed"), 6);
+  };
+  window.addEventListener("unhandledrejection", (e) => crashed(e.reason));
+  window.addEventListener("error", (e) => crashed(e.error ?? e.message));
   // Useful once, on the first frame, and never again: which server this is.
   console.info(`[causewaybay hacker] talking to ${label}`);
   app.start(new BootScene(app));

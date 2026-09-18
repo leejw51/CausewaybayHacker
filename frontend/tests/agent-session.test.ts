@@ -251,6 +251,60 @@ describe("the session", () => {
     expect(calls).toBe(1);
   });
 
+  it("stops during a tool and still answers every tool_use, so the next ask is valid", async () => {
+    // Round 1: the model asks for two tools. The first one is slow, and the
+    // player presses STOP while it runs. The transcript must still pair the
+    // second tool_use with a tool_result, or every later ask is refused.
+    const b = bench();
+    let release: () => void = () => {};
+    b.write = () =>
+      new Promise((resolve) => {
+        release = () => resolve({ typed: 0, total: 0, stopped: true });
+      });
+    let calls = 0;
+    mocked.mockImplementation(async (o) => {
+      calls++;
+      if (calls === 1) {
+        return {
+          text: "",
+          toolUses: [
+            { id: "w1", name: "write_code", input: { source: "fn main() {}" } },
+            { id: "r1", name: "run_code", input: {} },
+          ],
+          stop: "tool",
+        };
+      }
+      // The follow-up ask: check what it was handed.
+      for (let i = 0; i < o.messages.length; i++) {
+        const m = o.messages[i];
+        for (const p of m.content) {
+          if (p.type !== "tool_use") continue;
+          const next = o.messages[i + 1];
+          expect(next?.role).toBe("user");
+          expect(
+            next?.content.some((q) => q.type === "tool_result" && q.tool_use_id === p.id),
+          ).toBe(true);
+        }
+      }
+      return { text: "fine", toolUses: [], stop: "end" };
+    });
+    const { api } = listener();
+    const s = new Session(b, api);
+    const first = s.ask("anthropic", "write it");
+    await new Promise((r) => setTimeout(r, 5));
+    s.stop();
+    release();
+    await first;
+    expect(s.busy).toBe(false);
+    await expect(s.ask("anthropic", "and now?")).resolves.toBe("fine");
+    expect(calls).toBe(2);
+    const results = s.messages
+      .flatMap((m) => m.content)
+      .filter((p) => p.type === "tool_result")
+      .map((p) => (p as { tool_use_id: string }).tool_use_id);
+    expect(results).toEqual(["w1", "r1"]);
+  });
+
   it("refuses without a key, and while busy", async () => {
     writeKey("anthropic", "");
     const { api } = listener();

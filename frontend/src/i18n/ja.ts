@@ -17,6 +17,8 @@
 import type { Catalogue } from "./index";
 
 export const ja: Partial<Catalogue> = {
+  "app.crashed":
+    "この画面でエラーが起きました — コンソールを確認し、止まったままなら再読み込みしてください",
   "app.connLost": "接続が切れました — 再接続しています",
   "app.logoutTitle": "ログアウトしますか？",
   "app.logoutBody": "エディタのコードは保存されていません。ログアウトすると失われます。",

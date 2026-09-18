@@ -17,10 +17,10 @@
  *
  * Nothing is locked (§4.7), so a hit is a door: clicking one opens the quest.
  *
- * `search.query` is milestone 2 and today answers `unavailable` (§3.3). The
- * screen therefore probes and renders what comes back rather than being written
- * against a shape nobody has sent yet — it says the index is still being built,
- * in the story's voice, and turns real the day the endpoint does.
+ * `search.query` is live (§4.12). The screen still probes and renders what
+ * comes back rather than assuming a shape, so a server built without the
+ * index — `unavailable` (§3.3) — gets the "still being built" line in the
+ * story's voice instead of a broken list.
  */
 import type { App, Scene } from "../app";
 import { ensureFonts, print, printf, width, wrap, type Font } from "../engine/text";

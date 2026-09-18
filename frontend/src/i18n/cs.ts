@@ -28,6 +28,8 @@
 import type { Catalogue } from "./index";
 
 export const cs: Partial<Catalogue> = {
+  "app.crashed":
+    "na této obrazovce se něco rozbilo — podívejte se do konzole; pokud to zůstane zaseknuté, obnovte stránku",
   "app.connLost": "spojení přerušeno — připojuji se znovu",
   "app.logoutTitle": "ODHLÁSIT SE?",
   "app.logoutBody": "Kód v editoru není uložený. Odhlášením o něj přijdeš.",

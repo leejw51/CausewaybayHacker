@@ -450,7 +450,16 @@ export class QuestScene implements Scene {
     private readonly draft?: string,
   ) {}
 
+  /**
+   * Set by `leave`. `enter` awaits the server in the middle of building the
+   * screen, and a player who backs out during that wait has already had
+   * `leave` run; anything built after the await would then have no `leave`
+   * of its own and would stay in the DOM.
+   */
+  private gone = false;
+
   async enter(): Promise<void> {
+    this.gone = false;
     // §1.3. `quest.get` below tells the server the same thing; this keeps the
     // lobby and the map in step for the rest of this window.
     this.app.land = this.land;
@@ -486,6 +495,7 @@ export class QuestScene implements Scene {
         quest_id: this.questId,
         locale: this.askedLocale,
       });
+      if (this.gone) return;
       this.quest = res.quest;
       // §4.8. The editor opens on the player's own most recent run or submit,
       // fetched from the server with the quest itself — no local storage, no
@@ -543,6 +553,7 @@ export class QuestScene implements Scene {
   }
 
   leave(): void {
+    this.gone = true;
     for (const off of this.offs) off();
     this.offs.length = 0;
     this.cancelPush();

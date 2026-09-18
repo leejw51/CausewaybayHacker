@@ -24,6 +24,7 @@
 export const en = {
   // -- the shell -----------------------------------------------------------
   "app.connLost": "connection lost — reconnecting",
+  "app.crashed": "something broke on this screen — see the console; reload if it stays stuck",
   "app.logoutTitle": "LOG OUT?",
   "app.logoutBody": "The code in the editor is not saved. Logging out throws it away.",
   "app.logout": "LOG OUT",

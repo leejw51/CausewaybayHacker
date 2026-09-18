@@ -18,6 +18,7 @@
 import type { Catalogue } from "./index";
 
 export const ko: Partial<Catalogue> = {
+  "app.crashed": "이 화면에서 오류가 났습니다 — 콘솔을 확인하고, 계속 멈춰 있으면 새로고침하세요",
   "app.connLost": "연결이 끊겼습니다 — 다시 연결하는 중",
   "app.logoutTitle": "로그아웃할까요?",
   "app.logoutBody": "편집기의 코드가 저장되지 않았습니다. 로그아웃하면 사라집니다.",
