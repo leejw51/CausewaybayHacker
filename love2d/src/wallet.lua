@@ -78,11 +78,6 @@ function M.normalize(path)
   return (absolute and "/" or "") .. table.concat(parts, "/")
 end
 
-local function system_library_dirs(os_name)
-  if os_name == "Windows" then return {} end
-  if os_name == "OSX" then return { "/usr/local/lib", "/opt/homebrew/lib" } end
-  return { "/usr/local/lib", "/usr/lib" }
-end
 
 --- Where to look, in order. A pure function, so a test can ask what the order
 --- *is* without the environment it happens to run in changing the answer.
@@ -114,9 +109,10 @@ function M.search_paths(root, override, os_name)
   -- Beside the archive, which is the shape a `.love` handed to somebody with
   -- their own LÖVE takes.
   paths[#paths + 1] = M.normalize(root .. "/../" .. name)
-  for _, dir in ipairs(system_library_dirs(os_name)) do
-    paths[#paths + 1] = dir .. "/" .. name
-  end
+  -- And nowhere else. `/usr/local/lib` and `/opt/homebrew/lib` used to be
+  -- last resorts; both are writable by whoever owns Homebrew on that
+  -- machine, and this library is handed every phrase typed on the login
+  -- screen. Nothing installs it there, so a hit there was never ours.
   return paths
 end
 
@@ -158,7 +154,14 @@ function M.load(root, explicit)
   for _, path in ipairs(paths) do
     local ok, lib = pcall(ffi.load, path)
     if ok then
-      local reported = lib.cwbh_abi_version()
+      -- A library of that name that is not this one has no such symbol, and
+      -- an uncaught error here is a crash before the first frame.
+      local has_symbol, reported = pcall(function() return lib.cwbh_abi_version() end)
+      if not has_symbol then
+        load_error = ("%s is not the key library (no cwbh_abi_version): %s")
+          :format(path, tostring(reported))
+        return nil, load_error
+      end
       if reported ~= M.ABI_VERSION then
         load_error = ("%s speaks ABI %d, this binding expects %d — rebuild both with `%s`")
           :format(path, tonumber(reported), M.ABI_VERSION, M.BUILD_HINT)

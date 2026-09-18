@@ -129,6 +129,13 @@ fn agent() -> ureq::Agent {
             // deadline that is not the whole call's.
             .timeout_recv_body(None)
             .http_status_as_error(false)
+            // Every URL this client is given is a provider's fixed endpoint
+            // (`agent/providers.lua`) or the player's own Ollama. None of them
+            // redirects, and following one would carry the `x-api-key`
+            // header (which ureq's redirect policy does not strip, unlike
+            // `authorization`) to wherever it pointed. A redirect is an
+            // error to show, not a place to go.
+            .max_redirects(0)
             .build(),
     )
 }
@@ -178,7 +185,9 @@ fn run_call(
     headers: HashMap<String, String>,
     body: String,
 ) {
-    let mut builder = ureq::http::Request::builder().method(method.as_str()).uri(&url);
+    let mut builder = ureq::http::Request::builder()
+        .method(method.as_str())
+        .uri(&url);
     for (name, value) in &headers {
         builder = builder.header(name.as_str(), value.as_str());
     }
@@ -191,7 +200,8 @@ fn run_call(
         Ok(r) => r,
         Err(e) => return call.fail(describe_error(&e)),
     };
-    call.status.store(response.status().as_u16() as i64, Ordering::SeqCst);
+    call.status
+        .store(response.status().as_u16() as i64, Ordering::SeqCst);
 
     let mut reader = response.into_body().into_reader();
     let mut buf = vec![0u8; READ_CHUNK];
@@ -250,11 +260,7 @@ pub fn poll(handle: u64) -> Result<serde_json::Value, String> {
         .collect();
     call.buffered.fetch_sub(bytes as u64, Ordering::SeqCst);
     let status = call.status.load(Ordering::SeqCst);
-    let error = call
-        .error
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .clone();
+    let error = call.error.lock().unwrap_or_else(|e| e.into_inner()).clone();
     Ok(json!({
         "ok": true,
         "handle": handle,
@@ -310,14 +316,26 @@ const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx
 /// Standard base64 with padding. Written out rather than pulled in: this is
 /// the only place in the crate that needs it, and it is fifteen lines.
 fn b64(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for group in bytes.chunks(3) {
-        let b = [group[0], *group.get(1).unwrap_or(&0), *group.get(2).unwrap_or(&0)];
+        let b = [
+            group[0],
+            *group.get(1).unwrap_or(&0),
+            *group.get(2).unwrap_or(&0),
+        ];
         let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
         out.push(ALPHABET[(n >> 18) as usize & 63] as char);
         out.push(ALPHABET[(n >> 12) as usize & 63] as char);
-        out.push(if group.len() > 1 { ALPHABET[(n >> 6) as usize & 63] as char } else { '=' });
-        out.push(if group.len() > 2 { ALPHABET[n as usize & 63] as char } else { '=' });
+        out.push(if group.len() > 1 {
+            ALPHABET[(n >> 6) as usize & 63] as char
+        } else {
+            '='
+        });
+        out.push(if group.len() > 2 {
+            ALPHABET[n as usize & 63] as char
+        } else {
+            '='
+        });
     }
     out
 }
@@ -447,7 +465,10 @@ mod tests {
         assert!(text.contains("[DONE]"), "got {text}");
         let request = server.join().expect("server");
         assert!(request.starts_with("POST /v1/chat"), "got {request}");
-        assert!(request.contains("content-type: application/json"), "got {request}");
+        assert!(
+            request.contains("content-type: application/json"),
+            "got {request}"
+        );
         assert!(request.contains(r#"{"model":"test"}"#), "got {request}");
         close(handle).expect("close");
     }

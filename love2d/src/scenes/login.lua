@@ -127,6 +127,10 @@ function Login:discard()
   Wallet.forget(self, "words")
   self.words = nil
   self.new_address = nil
+  -- `refresh_preview` keeps the phrase (with the index) as its change key;
+  -- it is a copy like any other and goes with them.
+  Wallet.forget(self, "preview_key")
+  self.preview_key = nil
 end
 
 function Login:field()

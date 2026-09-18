@@ -64,6 +64,31 @@ return function()
     T.eq(json.decode('"\\u9280"'), "銀")
   end)
 
+  T.case("a string the renderer would raise on is an error, not a value", function()
+    -- `love.graphics.print` raises "Invalid UTF-8" / "Invalid code point" on
+    -- these, and a title is printed every frame — so a decode that let them
+    -- through was one bad server string away from the error screen.
+    local bad = {
+      '"\\udc00"',            -- a low surrogate alone
+      '"\\ud83e"',            -- a high surrogate with nothing after it
+      '"\\ud83e\\u0041"',     -- a high surrogate followed by a non-surrogate
+      '"\237\176\128"',       -- the same lone surrogate as raw bytes
+      '"\255\254"',           -- bytes that are not UTF-8 at all
+      '"\192\128"',           -- an overlong NUL
+      '"\244\144\128\128"',   -- above U+10FFFF
+      '"\226\130"',           -- a sequence cut short
+    }
+    for _, text in ipairs(bad) do
+      local value, err = json.try_decode(text)
+      T.eq(value, nil, text .. " must not decode")
+      T.ok(err ~= nil and err:find("invalid JSON", 1, true) ~= nil, text .. ": " .. tostring(err))
+    end
+    -- And the well-formed neighbours still do.
+    T.eq(json.decode('"\\u0041\\ud83e\\udd80"'), "A🦀")
+    T.eq(json.decode('"\244\143\191\191"'), "\244\143\191\191")
+    T.eq(json.decode('"caf\195\169"'), "café")
+  end)
+
   T.case("nested objects keep their shape", function()
     local text = '{"attempt":{"cases":[{"name":"greets","passed":true,"visible":true}],'
       .. '"mistakes":[],"exit_code":null,"stars":2}}'

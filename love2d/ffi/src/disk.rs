@@ -152,7 +152,21 @@ pub fn read_disk(path: &str, always_label: bool) -> Result<Disk, String> {
 /// The first QR in the picture, tried at the picture's own size and at a few
 /// smaller ones: a 2048px poster's finder patterns are large, and a decoder
 /// that locates once does better on a version it can hold in one look.
+/// The largest picture a dropped file may decode to. A poster is 1080 by
+/// 1920 or thereabouts; a PNG header can promise 30000 by 30000 in a few
+/// hundred bytes, and without a limit the decoder allocates for it, which is
+/// an out-of-memory abort that `catch_unwind` does not catch.
+const MAX_LABEL_PIXELS: u64 = 4096 * 4096;
+
 pub fn decode_label(bytes: &[u8]) -> Option<String> {
+    use std::io::Cursor;
+    let reader = image::ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?;
+    let (w, h) = reader.into_dimensions().ok()?;
+    if u64::from(w) * u64::from(h) > MAX_LABEL_PIXELS {
+        return None;
+    }
     let img = image::load_from_memory(bytes).ok()?;
     let (w, h) = img.dimensions();
     let mut sizes = vec![w];

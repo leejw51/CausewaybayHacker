@@ -16,7 +16,7 @@
 --
 -- ## While it does not exist
 --
--- The server answers `unavailable` with `detail.milestone`. §3.3: that is
+-- A server built without the drills answers `unavailable` with `detail.milestone`. §3.3: that is
 -- **not** `internal` — the screen says which chapter and offers no retry. The
 -- three modes are still drawn and still describe themselves, because "what
 -- will this do" is a question somebody can usefully have answered before the
@@ -353,11 +353,14 @@ function Ai:draw_step(x, y, w, h)
   UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = Theme.coin })
   local cy = y + 14
 
-  local position = ("%d of %d"):format(self.position or 1, self.total or 1)
+  -- §4.16: `position` is 0-based (quests already behind you), so the label
+  -- and the bar are `position + 1`.
+  local at = (self.position or 0) + 1
+  local position = ("%d of %d"):format(at, self.total or 1)
   UI.text(position, x + w - 16 - UI.textWidth(position, 8), cy, 8,
     Theme.withAlpha(Theme.cream, 0.6))
   UI.bar(x + 16, y + h - 22, w - 32, 7,
-    (self.total or 1) > 0 and (self.position or 1) / self.total or 0, Theme.coin)
+    (self.total or 1) > 0 and at / self.total or 0, Theme.coin)
 
   -- The line that makes this a coach rather than a shuffle (§4.16). Largest
   -- thing on the screen, on purpose.

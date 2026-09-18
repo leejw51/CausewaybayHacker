@@ -137,8 +137,13 @@ local function save()
   fh:write(json.encode(state) .. "\n")
   fh:close()
   -- A file holding somebody's provider key is nobody else's business, and
-  -- `io.open` has no mode argument. The key library does the chmod.
-  if not existed and secure then pcall(secure, path, false) end
+  -- `io.open` has no mode argument. The key library does the chmod, and
+  -- without the library the store's `os.execute` fallback does — the same
+  -- one the session token's file gets, for the same reason.
+  if not existed then
+    local ok = secure and pcall(secure, path, false)
+    if not ok then pcall(Store.make_private, path, false) end
+  end
   return true
 end
 

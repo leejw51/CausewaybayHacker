@@ -241,6 +241,11 @@ local function make_private(target, is_directory)
   return false
 end
 
+--- `make_private`, for the other file that holds a secret (`agent/prefs.lua`).
+function Store.make_private(target, is_directory)
+  return make_private(target, is_directory)
+end
+
 --- Read every well-formed record from the log, skipping junk.
 ---
 --- Junk is: an empty line, a line that is not JSON, a line that is not an

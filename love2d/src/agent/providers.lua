@@ -144,7 +144,14 @@ local function run_stream(o, url, body, on_event)
       -- whole so `refusal` can read it.
       if call.status and call.status < 400 then
         for _, event in ipairs(stream:feed(piece)) do
-          on_event(event)
+          -- `on_event` is screen code. If it raises, the call is closed
+          -- first: otherwise the reading thread runs on to the 8 MiB cap or
+          -- the deadline and the handle stays in the registry for good.
+          local ok, err = pcall(on_event, event)
+          if not ok then
+            call:close()
+            error(err, 0)
+          end
         end
       end
     end

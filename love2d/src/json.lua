@@ -169,6 +169,13 @@ function Parser:unicode_escape()
 
   -- A code point above the BMP arrives as a surrogate pair; joining them is
   -- the only way to get an emoji in a label back out intact.
+  if code >= 0xDC00 and code <= 0xDFFF then
+    -- A low surrogate on its own has no code point. Let through, it became
+    -- three bytes no UTF-8 decoder accepts, and `love.graphics.print` raises
+    -- on those — so one such string in a quest title took the whole client
+    -- to the error screen, and again on every reconnect.
+    fail(self, "low surrogate without a high surrogate")
+  end
   if code >= 0xD800 and code <= 0xDBFF then
     if self.text:sub(self.pos, self.pos + 1) ~= "\\u" then
       fail(self, "high surrogate without a low surrogate")
@@ -301,10 +308,53 @@ function Parser:parse_value()
   fail(self, "unexpected character " .. string.format("%q", c))
 end
 
+--- Whether `text` is well-formed UTF-8: no overlong forms, no surrogate
+--- code points, nothing above U+10FFFF. Pure Lua, because the headless suite
+--- runs under LuaJIT without LÖVE's `utf8` module. One pass over the frame,
+--- before parsing, so every string that comes out of the parser is one the
+--- renderer will take.
+local function well_formed_utf8(text)
+  local i, n = 1, #text
+  while i <= n do
+    local c = text:byte(i)
+    if c < 0x80 then
+      i = i + 1
+    else
+      local len, min
+      if c >= 0xC2 and c <= 0xDF then
+        len, min = 2, 0x80
+      elseif c >= 0xE0 and c <= 0xEF then
+        len, min = 3, 0x800
+      elseif c >= 0xF0 and c <= 0xF4 then
+        len, min = 4, 0x10000
+      else
+        return false, i
+      end
+      if i + len - 1 > n then return false, i end
+      local code = c % (2 ^ (8 - len))
+      for k = 1, len - 1 do
+        local b = text:byte(i + k)
+        if b < 0x80 or b > 0xBF then return false, i end
+        code = code * 0x40 + (b - 0x80)
+      end
+      if code < min or code > 0x10FFFF or (code >= 0xD800 and code <= 0xDFFF) then
+        return false, i
+      end
+      i = i + len
+    end
+  end
+  return true
+end
+json.well_formed_utf8 = well_formed_utf8
+
 --- Decode JSON text. Raises on malformed input; use `json.try_decode` to catch.
 function json.decode(text)
   if type(text) ~= "string" then
     error("json.decode expects a string, got " .. type(text), 0)
+  end
+  local utf8_ok, at = well_formed_utf8(text)
+  if not utf8_ok then
+    error(("invalid JSON at byte %d: not well-formed UTF-8"):format(at), 0)
   end
   local parser = setmetatable({ text = text, pos = 1 }, Parser)
   local value = parser:parse_value()

@@ -224,7 +224,24 @@ function Session:ask(provider, text, done)
           is_error = failed,
         }
       end
-      if session.stopping then return session.last end
+      -- STOP during a tool: every tool_use in the assistant turn still has
+      -- to be answered, or the next ask goes out with a call and no result
+      -- and the provider refuses the whole transcript until the room is
+      -- cleared. The tools that ran keep their result; the rest are told so.
+      if session.stopping then
+        for i = #results + 1, #turn.tool_uses do
+          local use = turn.tool_uses[i]
+          results[#results + 1] = {
+            type = "tool_result",
+            tool_use_id = use.id,
+            name = use.name,
+            content = "Stopped by the player before this tool ran.",
+            is_error = true,
+          }
+        end
+        session.messages[#session.messages + 1] = { role = "user", content = results }
+        return session.last
+      end
       session.messages[#session.messages + 1] = { role = "user", content = results }
     end
     return session.last
