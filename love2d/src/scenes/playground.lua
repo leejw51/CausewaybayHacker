@@ -690,6 +690,14 @@ function Playground:draw_big()
     -- on the program rather than on the file.
     { id = "agent", label = I18n.t("AGENT"), every = { I18n.t("AGENT") },
       state = (self.coder and self.coder.panel.open) and "hot" or "normal" },
+    -- The editor's own undo stack (`src/editor.lua`), as buttons -- the
+    -- steps ctrl-Z takes, for a touch screen that has no ctrl. Not the
+    -- quest screen's UNDO/REDO, which walk the server's per-quest stack:
+    -- a scratchpad has no server stack and wants none; the pad is saved.
+    { id = "undo", label = I18n.t("UNDO"), every = { I18n.t("UNDO") },
+      state = #self.editor.undo_stack > 0 and "normal" or "disabled" },
+    { id = "redo", label = I18n.t("REDO"), every = { I18n.t("REDO") },
+      state = #self.editor.redo_stack > 0 and "normal" or "disabled" },
     { id = "save", label = I18n.t("SAVE"), every = { I18n.t("SAVE") }, state = "normal" },
     { id = "rename", label = I18n.t("RENAME"), every = { I18n.t("RENAME") }, state = "normal" },
     -- In and out of the screen. Nothing on a canvas can be selected with a
@@ -1385,6 +1393,18 @@ end
 ---
 --- One preference for both code panes, because how somebody likes to read
 --- code is a fact about them and not about which screen they are on.
+--- UNDO / REDO on the CODE strip: one step along the editor's own stack.
+--- The editor marks itself dirty on a step, which is what the autosave
+--- watches, so the pad on the server follows the step like any edit.
+function Playground:step_history(which)
+  local stepped = which == "undo" and self.editor:undo() or self.editor:redo()
+  if stepped then
+    self.focus = "editor"
+    self.dirty_at = Anim.now()
+    SFX.play("select")
+  end
+end
+
 function Playground:cycle_face()
   local faces = Assets.CODE_FACES
   local at = 1
@@ -1832,6 +1852,8 @@ function Playground:mousepressed(x, y, button)
     if inside(r.format) then self:format(); return end
     if inside(r.save) then self:save(); SFX.play("select"); return end
     if inside(r.rename) then self:start_rename(); return end
+    if inside(r.undo) then self:step_history("undo"); return end
+    if inside(r.redo) then self:step_history("redo"); return end
     if inside(r.copycode) then self:clip("code"); return end
     if inside(r.pastecode) then self:clip("paste"); return end
     if inside(r.copyout) then self:clip("out"); return end

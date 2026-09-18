@@ -86,7 +86,7 @@ describe("narrowEdit", () => {
  * holding still.
  */
 describe("answerProgress", () => {
-  const answer = "fn main() {\n    println!(\"hi\");\n}\n";
+  const answer = 'fn main() {\n    println!("hi");\n}\n';
 
   it("an empty buffer has typed none of it and got none of it wrong", () => {
     const p = answerProgress("", answer);
@@ -250,7 +250,7 @@ describe("answerCompletion", () => {
  */
 describe("answerIndent", () => {
   const tabs = "func main() {\n\tswitch {\n\tcase 1:\n\t}\n}\n";
-  const spaces = "fn main() {\n    println!(\"hi\");\n}\n";
+  const spaces = 'fn main() {\n    println!("hi");\n}\n';
 
   it("gives the answer's own indentation, whatever it is made of", () => {
     expect(answerIndent("func main() {\n", tabs)).toBe("\t");
@@ -264,7 +264,7 @@ describe("answerIndent", () => {
 
   it("nothing when the line does not start with any", () => {
     expect(answerIndent("", spaces)).toBeNull();
-    expect(answerIndent("fn main() {\n    println!(\"hi\");\n", spaces)).toBeNull();
+    expect(answerIndent('fn main() {\n    println!("hi");\n', spaces)).toBeNull();
   });
 
   it("refuses past a divergence, like everything else in the mode", () => {
@@ -362,5 +362,33 @@ describe("solutionBlanks", () => {
     expect(holes.length).toBe(4);
     expect(answer.slice(holes[0].from, holes[0].to)).toBe("package main");
     expect(answer.slice(holes[2].from, holes[2].to)).toBe("good()");
+  });
+});
+
+describe("the editor's own history as buttons", () => {
+  it("undoes and redoes what was typed, and says when there is nothing to step", async () => {
+    const { Editor } = await import("../src/ui/editor");
+    const ed = new Editor("rust", "fn main() {}\n");
+    try {
+      expect(ed.canUndo).toBe(false);
+      expect(ed.canRedo).toBe(false);
+      expect(ed.undo()).toBe(false);
+      ed.appendAtEnd("// one\n");
+      expect(ed.source).toContain("// one");
+      expect(ed.canUndo).toBe(true);
+      expect(ed.undo()).toBe(true);
+      expect(ed.source).toBe("fn main() {}\n");
+      expect(ed.canUndo).toBe(false);
+      expect(ed.canRedo).toBe(true);
+      expect(ed.redo()).toBe(true);
+      expect(ed.source).toContain("// one");
+      expect(ed.canRedo).toBe(false);
+      // A new edit after an undo drops the redo tail, as every editor does.
+      ed.undo();
+      ed.appendAtEnd("// two\n");
+      expect(ed.canRedo).toBe(false);
+    } finally {
+      ed.destroy();
+    }
   });
 });

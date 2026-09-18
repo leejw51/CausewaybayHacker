@@ -1259,6 +1259,14 @@ export class PlaygroundScene implements Scene {
     }
     if (hit.id === "poster") return void this.poster();
     if (hit.id === "reader") return void this.diskEl.click();
+    if (hit.id === "undo" || hit.id === "redo") {
+      // A button press takes the focus off the editor; give it back so the
+      // next keystroke goes on typing where the step left the caret.
+      const stepped = hit.id === "undo" ? this.editor?.undo() : this.editor?.redo();
+      if (stepped) this.app.chip.blip();
+      this.editor?.focus();
+      return;
+    }
     if (hit.id === "copycode") return void this.clip("code");
     if (hit.id === "pastecode") return void this.clip("paste");
     if (hit.id === "copyout") return void this.clip("out");
@@ -1669,6 +1677,10 @@ export class PlaygroundScene implements Scene {
       },
       { id: "format", label: t("pg.format"), dim: this.formatting },
       { id: "agent", label: t("agent.button"), strong: this.coder?.open ?? false },
+      // The editor's own history, as buttons — for a phone, where there is
+      // no Ctrl+Z. Client-side only (see `Editor.canUndo`).
+      { id: "undo", label: t("quest.undo"), dim: !this.editor?.canUndo },
+      { id: "redo", label: t("quest.redo"), dim: !this.editor?.canRedo },
       { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
       { id: "rename", label: t("pg.rename") },
       // In and out of the screen. Nothing on a canvas can be selected with a

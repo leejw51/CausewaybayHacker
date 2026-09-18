@@ -43,6 +43,10 @@ import {
   historyKeymap,
   indentWithTab,
   insertNewline,
+  redo,
+  redoDepth,
+  undo,
+  undoDepth,
 } from "@codemirror/commands";
 import {
   HighlightStyle,
@@ -975,6 +979,33 @@ export class Editor {
 
   get source(): string {
     return this.view.state.doc.toString();
+  }
+
+  /**
+   * CodeMirror's own history, per keystroke, as buttons.
+   *
+   * This is the fine-grained one — the same steps Ctrl+Z takes — and it lives
+   * in the tab and nowhere else. The quest screen's UNDO/REDO are a different
+   * thing: the server's stack, one entry per pause in typing, kept across
+   * devices. The playground has no server stack and wants none; the pad
+   * itself is saved, and what is undone here is the last few keystrokes.
+   */
+  get canUndo(): boolean {
+    return undoDepth(this.view.state) > 0;
+  }
+
+  get canRedo(): boolean {
+    return redoDepth(this.view.state) > 0;
+  }
+
+  /** One step back. Returns whether there was one. */
+  undo(): boolean {
+    return undo(this.view);
+  }
+
+  /** One step forward. Returns whether there was one. */
+  redo(): boolean {
+    return redo(this.view);
   }
 
   /**
