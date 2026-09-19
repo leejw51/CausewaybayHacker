@@ -6731,3 +6731,96 @@ key; `revoked` is the server signing this session out on purpose (PROTOCOL
 §4.21), so both clients drop the kept key with the token and go to the login
 screen rather than quietly signing back in. The LÖVE session does the same
 in `Session:revoked`, from the 4001 close and from `server.bye`.
+
+## 2026-09-20 — the second audit: a resume that spent the wrong token, a STOP that never came back, and a key wiped by a blip
+
+A second read-through of the server and the web client, a day after the
+first, with the web client driven live against the real server in both
+orientations. Everything found that was a *fix* is fixed in this pass;
+what is a design change is listed at the end, as before.
+
+* **`auth.resume` asked whose token it was only after spending it**
+  (`handlers.rs`). Rotate first, refuse second meant a connection logged in
+  as A could present B's token: B's row deleted, the fresh one handed to
+  nobody. Now `auth::session_address` answers the question read-only, the
+  user check runs, and only then does `rotate_session` — itself one
+  `BEGIN IMMEDIATE` transaction now — spend anything. A server test resumes
+  as another user and checks the other user can still resume afterwards.
+* **An expired session said `auth_expired`; §4.4 says `unauthorized`.** The
+  web client re-signs with the kept key only on `unauthorized`, so the first
+  resume after thirty days idle cost a backoff cycle before it got the
+  answer it acts on. Both codes are one answer now, as the spec said.
+  `auth_expired` stays what it was: the *challenge* running out.
+* **The nonce was checked outside the lock it was spent under**, so two
+  logins carrying the same signature could both pass. `Challenges::login`
+  holds the mutex from lookup through burn.
+* **The RUN log showed rustc's JSON.** `rust.rs` streamed `--error-format=json`
+  lines raw on `stream: "compile"` (the SUBMIT path had always rendered
+  them for the attempt record). The runner now buffers the stream by line
+  and emits each diagnostic's `rendered` text; cargo's
+  `compiler-message` wrapper gets the same treatment. `compiler_stderr`
+  is untouched — classification reads the JSON.
+* **STOP during a typing tool hung the coder** (`typist.ts`). `stop()`
+  cleared the timer but nothing resolved the `run()` promise, so the tool
+  never returned, `busy` never cleared, and the next ask went out with a
+  `tool_use` nobody had answered — the 09-18 STOP fix, defeated for
+  `write_code`/`edit_code`. The resolver is kept and `stop()` settles it.
+  `Session#busy` is now a flag that holds until the aborted loop's tool has
+  actually come back; a `max_tokens` turn that still carried a tool call is
+  answered with an error result instead of left dangling; and the editor is
+  locked (`EditorView.editable` plus a transaction filter) while the coder
+  types, so a click mid-write no longer scatters the program.
+* **A network blip during the kept-key sign-in wiped the key** (`app.ts`).
+  `sessionLost` fell through to `logout()` on *any* failure, and `logout`
+  always forgot the key. `signInAgain` now says `ok` / `none` / `refused` /
+  `transient`; only the server's own refusal forgets the key, a transient
+  failure is retried over a short backoff and then shown the login screen
+  with the key kept. The same rule in `boot.ts`: a resume that did not
+  reach a verdict keeps the (shared) token rather than logging every tab
+  out. And a background resume that lands while the title or login screen
+  is up now moves the tab on to the lands.
+* **A reconnect with no token in the store said nothing** (`client.ts`) —
+  another tab's logout had removed it; this tab kept its address in the
+  header and refused every request locally. A tab that *had* a session now
+  treats the missing token as the session being gone.
+* **Enter chose the destructive side of every modal.** It takes the lit
+  button now, which is the safe one unless the pointer is on the other.
+* **The rest, briefly.** `playground.save` and `playground.run` cap `stdin`
+  (64 KiB) as `source` always was; a frame that is not a JSON object ends the
+  read loop as well as the writer; `attempts::latest_source` breaks
+  same-second ties by rowid; `drills::next` no longer consumes a step whose
+  `why` fails; profile `settings` are capped at 16 KiB; the new-wallet
+  panel signs in at the index it previewed (0); raw wallet error strings no
+  longer reach the login status line in English; the Go-land "opens in the
+  next chapter" branches are gone (the Go runner shipped on 09-11); a
+  `not_found` on RUN is a missing quest, not "this server cannot run"; a
+  compile error shows no expected/got pair on either the run report or the
+  result screen; "saved"/"deleted" are translated; the playground re-reads
+  its pad and room on reconnect (§6.5); the phrase panel's button fits its
+  panel; the land cards keep a line more of their blurb in landscape (portrait has no room to give); the category
+  counts sit in one column; the result panels reach the button band; the
+  STDIN label sits above its field beside the coder; the settings toasts
+  are blue, red is for the connection going. The mock answers an unknown
+  type with `not_found`, locks nothing, refuses a second login, and names a
+  new player the way the server does. `tools/shots.mjs` no longer composites
+  the two full-screen effect canvases as text fields (which is what made the
+  quest and playground captures black), and clears the kept key before the
+  groups that want the cold path.
+* **The test harness on Node 26.** Node 26 ships a `localStorage` getter
+  that returns `undefined` without `--localstorage-file`; happy-dom did not
+  replace it and `prefs.ts` swallowed the `TypeError`, so sixteen agent
+  tests failed on a machine that was not CI (which pins Node 24).
+  `tests/setup.ts` installs an in-memory `Storage` only when the global is
+  missing.
+
+Deferred, on purpose, each a design change: **token revocation** — the
+server still cannot emit `server.bye revoked` or close 4001 because there
+is no logout message in the protocol; §1.2 and §4.21 now say so instead of
+promising it; hidden-test `stdin` reaching the player through `run.log` and
+`Attempt.stderr` on SUBMIT; the shared cargo/go caches being writable by the
+player's own program (the recorded test-binary path in `cargo.rs` is a
+TOCTOU against the next attempt); the mock's ~25 unimplemented message types
+(run, edit stack, format, playground, chat, awards, ai.*); automatic pruning
+of attempt build directories; and migration 0014's join, which can duplicate
+a message id on identical `(created_at, text, role, photo)` — an applied
+migration is not edited, and a dedupe would be a 0016.

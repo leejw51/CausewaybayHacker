@@ -23,5 +23,8 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     include: ["tests/**/*.test.ts"],
+    // Web Storage for a Node whose own `localStorage` getter returns
+    // `undefined` (25+ without `--localstorage-file`); see the file.
+    setupFiles: ["tests/setup.ts"],
   },
 });

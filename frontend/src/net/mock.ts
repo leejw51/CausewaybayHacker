@@ -28,6 +28,7 @@ import { keccak_256 } from "@noble/hashes/sha3.js";
 import { decode, encode } from "./codec";
 import type { Attempt, Category, Land, MapNode, Position, Quest, User } from "./protocol";
 import type { Transport, TransportFactory, TransportHandlers } from "./transport";
+import { deterministicUsername } from "../wallet/username";
 
 interface MockQuest extends Quest {
   hints: string[];
@@ -137,7 +138,9 @@ function quests(): MockQuest[] {
 const QUESTS = quests();
 
 type Row = {
-  state: "locked" | "open" | "cleared";
+  // Never `locked`: PROTOCOL §4.7 says every node is playable and the code
+  // is no longer emitted, so the mock does not emit it either.
+  state: "open" | "cleared";
   stars: 0 | 1 | 2 | 3;
   fails: number;
   hints: number;
@@ -223,7 +226,19 @@ function loadWorld(): void {
     const s = JSON.parse(raw) as Saved;
     world.tokens = new Map(s.tokens);
     world.users = new Map(s.users);
-    world.progress = new Map(s.progress.map(([a, rows]) => [a, new Map(rows)]));
+    // A blob written while the mock still locked nodes is read as open ones:
+    // `locked` is not a state a row can be in any more (§4.7).
+    world.progress = new Map(
+      s.progress.map(([a, rows]) => [
+        a,
+        new Map(
+          rows.map(([id, row]) => [
+            id,
+            { ...row, state: row.state === "cleared" ? "cleared" : "open" } as Row,
+          ]),
+        ),
+      ]),
+    );
     // Optional: a blob written before §1.3 existed is still a good world.
     world.positions = new Map(s.positions ?? []);
   } catch {
@@ -253,7 +268,7 @@ function progressFor(address: string): Map<string, Row> {
     p = new Map();
     for (const q of QUESTS) {
       p.set(q.id, {
-        state: q.requires.length === 0 ? "open" : "locked",
+        state: "open",
         stars: 0,
         fails: 0,
         hints: 0,
@@ -265,17 +280,17 @@ function progressFor(address: string): Map<string, Row> {
   return p;
 }
 
-/** Recompute which nodes are open, and report the ones that just became so. */
-function relock(rows: Map<string, Row>): string[] {
-  const opened: string[] = [];
-  for (const q of QUESTS) {
-    const row = rows.get(q.id)!;
-    if (row.state === "cleared") continue;
-    const next = q.requires.every((r) => rows.get(r)?.state === "cleared") ? "open" : "locked";
-    if (next === "open" && row.state === "locked") opened.push(q.id);
-    row.state = next;
-  }
-  return opened;
+/**
+ * What clearing `questId` just finished the prerequisites for — §4.19's
+ * `unlocked`. Nothing is gated (§4.7), so this is not "these became playable"
+ * but "the suggested route says these come next and you have now done
+ * everything they asked for": the same set the server's `unlocked_by` sends.
+ */
+function unlockedBy(rows: Map<string, Row>, questId: string): string[] {
+  const cleared = (id: string) => rows.get(id)?.state === "cleared";
+  return QUESTS.filter(
+    (q) => q.requires.includes(questId) && !cleared(q.id) && q.requires.every(cleared),
+  ).map((q) => q.id);
 }
 
 function mapNodes(address: string): MapNode[] {
@@ -405,8 +420,22 @@ export function mockTransport(): TransportFactory {
         }
 
         case "auth.login": {
+          // §3.1: a connection never goes back to anonymous; to change user
+          // you open a new one (`handlers.rs`, `must_be_anonymous`).
+          if (address !== null) {
+            return err(
+              id,
+              type,
+              "bad_request",
+              "this connection is already authenticated; open a new one to change user",
+            );
+          }
           const claimed = String(p.address ?? "").toLowerCase();
-          const entry = [...world.nonces.entries()].find(([, n]) => n.address === claimed);
+          // Newest first, as the server does: the challenge a client just
+          // asked for is the one it is most likely to have signed.
+          const entry = [...world.nonces.entries()]
+            .reverse()
+            .find(([, n]) => n.address === claimed);
           if (!entry) return err(id, type, "auth_nonce_used", "no live challenge for that address");
           const [nonce, n] = entry;
           if (Date.now() > n.expires) {
@@ -427,7 +456,9 @@ export function mockTransport(): TransportFactory {
           const checksummed = eip55(claimed);
           const user: User = world.users.get(claimed) ?? {
             address: checksummed,
-            name: typeof p.name === "string" && p.name ? p.name : `hacker-${claimed.slice(2, 8)}`,
+            // The same deterministic name the server gives a row nobody seeded
+            // (`username::deterministic`), so the login preview and the mock agree.
+            name: typeof p.name === "string" && p.name ? p.name : deterministicUsername(claimed),
             created_at: now(),
             last_seen_at: now(),
             settings: {},
@@ -530,9 +561,6 @@ export function mockTransport(): TransportFactory {
           const q = QUESTS.find((x) => x.id === p.quest_id);
           if (!q) return err(id, type, "not_found", "no such quest");
           const row = progressFor(address!).get(q.id)!;
-          if (row.state === "locked") {
-            return err(id, type, "locked", `${q.id} is locked`, { requires: q.requires });
-          }
           world.positions.set(address!, {
             land: q.land as Land,
             category: q.category as Category,
@@ -651,7 +679,7 @@ export function mockTransport(): TransportFactory {
             if (passed) {
               row.state = "cleared";
               row.stars = Math.max(row.stars, stars) as 0 | 1 | 2 | 3;
-              unlocked = relock(rows);
+              unlocked = unlockedBy(rows, q.id);
             }
             saveWorld();
 
@@ -747,10 +775,10 @@ export function mockTransport(): TransportFactory {
           return ok(id, type, { hits: [], mode: p.mode ?? "unified", took_ms: 1 });
 
         default:
-          // Not in the catalogue. A real server would answer bad_request; the
-          // mock does the same rather than staying silent, so a typo in a
-          // scene surfaces here instead of as a hang.
-          return err(id, type, "bad_request", `the mock does not answer ${type}`);
+          // Not in the catalogue. The real server answers `not_found` with
+          // this message (`ws.rs`); the mock does the same rather than staying
+          // silent, so a typo in a scene surfaces here instead of as a hang.
+          return err(id, type, "not_found", `no message type '${type}'`);
       }
     };
 

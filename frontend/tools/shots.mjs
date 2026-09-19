@@ -56,6 +56,66 @@ async function playwright() {
 const taken = [];
 const skipped = [];
 
+/**
+ * One frame, frozen: both canvases and the overlay, as a PNG data URL.
+ *
+ * Runs in the page, and in one evaluate — `freeze(); step(1); png()` with
+ * nothing between them, because the WebGL layer is not `preserveDrawingBuffer`
+ * (see the top of the file).
+ *
+ * The one thing done around `png()`: `src/dev/capture.ts` paints the overlay
+ * by re-drawing every direct child of `#overlay` as a text field — a dark
+ * fill the size of the element, then its text. Two of those children are the
+ * full-viewport 2D canvases the code-fx sparks and the coder's sprite live on,
+ * and a "text field" the size of the viewport painted last is a black frame —
+ * which is what every quest and playground shot was. So the canvas layers are
+ * hidden for the `png()` call (the class is what the painter checks, and it
+ * is put back in the same task, so no frame ever shows the gap) and drawn back
+ * on top afterwards, in their own order and at their own opacity. They are 2D
+ * canvases, so they still hold their pixels after an await.
+ */
+const GRAB = async () => {
+  const api = window.__cwbCapture;
+  api.freeze();
+  api.step(1);
+  const overlay = document.getElementById("overlay");
+  const layers = overlay
+    ? Array.from(overlay.children).filter(
+        (el) => el instanceof HTMLCanvasElement && !el.classList.contains("cwb-hidden"),
+      )
+    : [];
+  for (const el of layers) el.classList.add("cwb-hidden");
+  let url;
+  try {
+    url = api.png();
+  } finally {
+    for (const el of layers) el.classList.remove("cwb-hidden");
+  }
+  if (!url || layers.length === 0) return url;
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  const out = document.createElement("canvas");
+  out.width = img.width;
+  out.height = img.height;
+  const g = out.getContext("2d");
+  if (!g) return url;
+  g.drawImage(img, 0, 0);
+  for (const el of layers) {
+    const alpha = parseFloat(getComputedStyle(el).opacity);
+    if (!(alpha > 0)) continue;
+    g.globalAlpha = Math.min(1, alpha);
+    g.drawImage(el, 0, 0, out.width, out.height);
+  }
+  return out.toDataURL("image/png");
+};
+
+const write = (name, url) => {
+  writeFileSync(resolve(OUT, `${name}.png`), Buffer.from(url.split(",")[1], "base64"));
+  taken.push(`${name}.png`);
+  process.stdout.write(`  ${name}.png\n`);
+};
+
 function wanted(name) {
   return !only || only.has(name.slice(0, 1)) || only.has(name.slice(0, 2));
 }
@@ -69,21 +129,18 @@ async function main() {
     if (m.type() === "error" && !m.text().includes("favicon")) console.log("  ! " + m.text());
   });
 
+  /** One frame, frozen, as a data URL; the loop is handed back afterwards. */
+  const grab = async (name) => {
+    await ready();
+    const url = await page.evaluate(GRAB);
+    if (!url) throw new Error(`no picture for ${name}`);
+    await page.evaluate(() => window.__cwbCapture.resume());
+    return url;
+  };
   /** One frame, frozen, both canvases and the overlay, written to disk. */
   const shot = async (name) => {
     if (!wanted(name)) return;
-    await ready();
-    const url = await page.evaluate(() => {
-      const api = window.__cwbCapture;
-      api.freeze();
-      api.step(1);
-      return api.png();
-    });
-    if (!url) throw new Error(`no picture for ${name}`);
-    writeFileSync(resolve(OUT, `${name}.png`), Buffer.from(url.split(",")[1], "base64"));
-    taken.push(`${name}.png`);
-    process.stdout.write(`  ${name}.png\n`);
-    await page.evaluate(() => window.__cwbCapture.resume());
+    write(name, await grab(name));
   };
 
   /**
@@ -167,14 +224,23 @@ async function main() {
    *
    * `boot.ts` resumes a stored token straight past the title card and the
    * login screen, which is correct and is exactly what makes a group that
-   * wants either of them report "still on lands". Only the token is removed —
-   * the orientation and the language are preferences and a shot run has no
-   * business editing somebody's.
+   * wants either of them report "still on lands". And since the key is kept
+   * in the browser (`wallet.ts`, `cwbhacker.key.<address>` and
+   * `cwbhacker.wallet.address`), a tab with no token signs itself back in
+   * with the kept key — so that goes too, or the language groups report the
+   * same thing. Only the session and the key are removed — the orientation
+   * and the language are preferences and a shot run has no business editing
+   * somebody's.
    */
   const forgetSession = async () => {
     await page.evaluate(() => {
       try {
-        localStorage.removeItem("cwbhacker.token");
+        const gone = ["cwbhacker.token", "cwbhacker.wallet.address"];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith("cwbhacker.key.")) gone.push(k);
+        }
+        for (const k of gone) localStorage.removeItem(k);
       } catch {
         /* nothing to forget */
       }
@@ -272,12 +338,14 @@ async function main() {
     }
     // The logo is the end of the sequence and the screen hands over by itself
     // a few seconds later, so it is taken by holding the last story frame:
-    // each pass overwrites the one before, and the file that survives is the
-    // last frame before the hand-over.
+    // each pass replaces the one before, and the frame that is written is the
+    // last one before the hand-over.
+    let last = null;
     for (let i = 0; i < 20 && (await scene()) === "story"; i++) {
-      await shot("07-story-title");
+      if (wanted("07-story-title")) last = await grab("07-story-title");
       await page.waitForTimeout(450);
     }
+    if (last) write("07-story-title", last);
   });
 
   await group("story-portrait", async () => {
@@ -355,18 +423,9 @@ async function main() {
         await dead.waitForTimeout(2500);
       }
       await dead.evaluate(() => window.__cwbCapture.settle(2.5));
-      const url = await dead.evaluate(() => {
-        const api = window.__cwbCapture;
-        api.freeze();
-        api.step(1);
-        return api.png();
-      });
+      const url = await dead.evaluate(GRAB);
       const name = "12-login-phrase-held-offline";
-      if (wanted(name) && url) {
-        writeFileSync(resolve(OUT, `${name}.png`), Buffer.from(url.split(",")[1], "base64"));
-        taken.push(`${name}.png`);
-        process.stdout.write(`  ${name}.png\n`);
-      }
+      if (wanted(name) && url) write(name, url);
     } finally {
       await dead.close();
     }
