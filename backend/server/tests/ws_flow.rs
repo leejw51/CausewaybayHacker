@@ -878,6 +878,48 @@ async fn a_stale_nonce_and_a_forged_signature_are_both_refused() {
 
 /// PROTOCOL §1.3: a page from somewhere else cannot open the socket; the
 /// server's own page, a native client, and the dev server can.
+/// PROTOCOL §3.1 meets §4.4: a connection that is already Alice may refresh
+/// *her* token with `auth.resume`, and may not become Bob. The refusal has to
+/// come before anything is spent — it used to rotate first and refuse
+/// second, so Alice's window deleted Bob's session and the fresh token went
+/// to nobody.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn resuming_as_another_user_is_refused_without_spending_their_token() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = content_src(tmp.path());
+    let server = start(&tmp.path().join("home"), &src).await;
+    let mut alice = Client::connect(server.port).await;
+    let (alice_address, _) = alice.login(ALICE_KEY).await;
+    let mut bob = Client::connect(server.port).await;
+    let (bob_address, bob_token) = bob.login(BOB_KEY).await;
+    assert_ne!(alice_address, bob_address);
+
+    assert_eq!(
+        alice
+            .err("auth.resume", json!({ "token": bob_token }))
+            .await,
+        "bad_request",
+        "a connection does not change user"
+    );
+    // Alice's window is still Alice's.
+    let me = alice.ok("profile.update", json!({})).await;
+    assert_eq!(
+        me["user"]["address"].as_str(),
+        Some(eth::to_eip55(&alice_address).as_str())
+    );
+
+    // And Bob's token was not burned by the refusal: a fresh window of his
+    // still resumes with it.
+    let mut later = Client::connect(server.port).await;
+    let resumed = later.ok("auth.resume", json!({ "token": bob_token })).await;
+    assert_eq!(
+        resumed["user"]["address"].as_str(),
+        Some(eth::to_eip55(&bob_address).as_str()),
+        "the refused resume must leave the token alive"
+    );
+    server.handle.abort();
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_foreign_origin_cannot_open_the_socket() {
     use tokio_tungstenite::tungstenite::client::IntoClientRequest;

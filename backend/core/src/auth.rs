@@ -194,7 +194,7 @@ impl Challenges {
     }
 
     /// The whole of PROTOCOL §4.3's step 4: find the challenge this signature
-    /// is over, check it, and spend it — in that order.
+    /// is over, check it, and spend it — in that order, **under one lock**.
     ///
     /// `auth.login` carries `{address, signature}` and **not** the nonce, so
     /// the server has to work out which of its outstanding challenges the
@@ -206,31 +206,45 @@ impl Challenges {
     ///
     /// A signature that verifies against nothing leaves every challenge live.
     /// A mistyped mnemonic should cost a retry, not a round trip.
+    ///
+    /// The mutex is held from the lookup through the burn. Checking unlocked
+    /// and burning afterwards let two logins carrying the same signature both
+    /// see the challenge unused and both pass; single-use (SPEC §3.2) means
+    /// the check and the spend are one step.
     pub fn login(&self, claimed: &str, signature_hex: &str, nonce: Option<&str>) -> Result<String> {
         let address = normalize_address(claimed)?;
+        let mut entries = self.entries.lock().unwrap();
+        sweep(&mut entries);
+
         if let Some(nonce) = nonce {
             // A client that named a nonce gets exactly that one's verdict.
-            let message = self.peek(&address, nonce)?;
-            let who = verify_login(&address, &message, signature_hex)?;
-            self.burn(nonce);
+            let entry = entries
+                .get(nonce)
+                .ok_or_else(|| Error::new(Code::AuthExpired, "the challenge expired"))?;
+            if entry.used {
+                return Err(Error::new(Code::AuthNonceUsed, "the challenge was used"));
+            }
+            if entry.address != address {
+                return Err(Error::new(
+                    Code::AuthBadSignature,
+                    "the challenge was issued for another address",
+                ));
+            }
+            let who = verify_login(&address, &entry.message, signature_hex)?;
+            if let Some(entry) = entries.get_mut(nonce) {
+                entry.used = true;
+            }
             return Ok(who);
         }
 
-        let mut candidates: Vec<(String, String, bool)> = {
-            let mut entries = self.entries.lock().unwrap();
-            sweep(&mut entries);
-            let mut live: Vec<_> = entries
-                .iter()
-                .filter(|(_, e)| e.address == address)
-                .map(|(nonce, e)| (nonce.clone(), e.message.clone(), e.used, e.expires_at))
-                .collect();
-            // Newest first: the challenge a client just asked for is the one
-            // it is most likely to have signed.
-            live.sort_by_key(|entry| std::cmp::Reverse(entry.3));
-            live.into_iter()
-                .map(|(nonce, message, used, _)| (nonce, message, used))
-                .collect()
-        };
+        let mut candidates: Vec<(String, String, bool, chrono::DateTime<chrono::Utc>)> = entries
+            .iter()
+            .filter(|(_, e)| e.address == address)
+            .map(|(nonce, e)| (nonce.clone(), e.message.clone(), e.used, e.expires_at))
+            .collect();
+        // Newest first: the challenge a client just asked for is the one it
+        // is most likely to have signed.
+        candidates.sort_by_key(|entry| std::cmp::Reverse(entry.3));
         if candidates.is_empty() {
             return Err(Error::new(
                 Code::AuthExpired,
@@ -239,7 +253,7 @@ impl Challenges {
         }
 
         let mut any_unused = false;
-        for (nonce, message, used) in candidates.drain(..) {
+        for (nonce, message, used, _) in candidates {
             if !used {
                 any_unused = true;
             }
@@ -248,7 +262,12 @@ impl Challenges {
                     if used {
                         return Err(Error::new(Code::AuthNonceUsed, "the challenge was used"));
                     }
-                    self.burn(&nonce);
+                    // Spent through the guard this check was made under: no
+                    // window between "unused" and "used" for a second copy
+                    // of the same signature to slip through.
+                    if let Some(entry) = entries.get_mut(&nonce) {
+                        entry.used = true;
+                    }
                     return Ok(address);
                 }
                 // A malformed signature is malformed whichever challenge it is
@@ -303,8 +322,9 @@ fn signature_is_wellformed(signature_hex: &str) -> bool {
 }
 
 /// Step 4 of §3.2: recover, compare case-insensitively, and hand back the
-/// lowercase canonical address. The nonce is burned by the caller first, so a
-/// bad signature does not let the same nonce be tried again.
+/// lowercase canonical address. Pure: the caller ([`Challenges::login`])
+/// spends the nonce only once this has verified, under the lock it looked
+/// the challenge up with.
 pub fn verify_login(claimed: &str, message: &str, signature_hex: &str) -> Result<String> {
     let claimed = normalize_address(claimed)?;
     let recovered = recover_address(message, signature_hex)?;
@@ -360,7 +380,12 @@ pub fn resume_session(conn: &Connection, token: &str) -> Result<String> {
     let expired = parse(&expires_at).map(|t| t <= now()).unwrap_or(true);
     if expired {
         conn.execute("DELETE FROM sessions WHERE token_hash = ?1", params![hash])?;
-        return Err(Error::new(Code::AuthExpired, "the session expired"));
+        // PROTOCOL §4.4: "an expired or unknown token is `unauthorized`". The
+        // two are one answer on purpose — a client holding either has nothing
+        // to wait for and goes to the login screen. `auth_expired` is the
+        // *challenge* running out, which is a different instruction ("ask
+        // again").
+        return Err(Error::new(Code::Unauthorized, "the session expired"));
     }
     let fresh = stamp(now() + chrono::Duration::days(SESSION_TTL_DAYS));
     conn.execute(
@@ -370,16 +395,46 @@ pub fn resume_session(conn: &Connection, token: &str) -> Result<String> {
     Ok(address)
 }
 
+/// Whose token this is, and nothing else: no refresh, no rotation, no row
+/// touched. The same verdicts as [`resume_session`] — unknown and expired are
+/// both `unauthorized` — so a caller can decide whether it is *allowed* to
+/// resume before anything is spent. An expired row is left where it is
+/// rather than deleted, because a read-only question should not have a
+/// side effect; `purge_expired_sessions` and the next real resume clear it.
+pub fn session_address(conn: &Connection, token: &str) -> Result<String> {
+    let row: Option<(String, String)> = conn
+        .query_row(
+            "SELECT address, expires_at FROM sessions WHERE token_hash = ?1",
+            params![token_hash(token)],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?;
+    let (address, expires_at) =
+        row.ok_or_else(|| Error::new(Code::Unauthorized, "unknown session token"))?;
+    let expired = parse(&expires_at).map(|t| t <= now()).unwrap_or(true);
+    if expired {
+        return Err(Error::new(Code::Unauthorized, "the session expired"));
+    }
+    Ok(address)
+}
+
 /// PROTOCOL §4.4: `auth.resume` **rotates** the token. The old one stops
 /// working the moment the new one is handed over, so a token read off a disk
 /// backup is good for exactly one resume rather than thirty days.
+///
+/// One transaction: the old row goes and the new one comes in the same
+/// step, or neither does. Without it a failure between the INSERT and the
+/// DELETE — or a caller that gives up between them — leaves either two live
+/// tokens for one resume or none at all.
 pub fn rotate_session(conn: &Connection, token: &str) -> Result<(String, String)> {
-    let address = resume_session(conn, token)?;
-    let fresh = mint_session(conn, &address)?;
-    conn.execute(
+    let tx = rusqlite::Transaction::new_unchecked(conn, rusqlite::TransactionBehavior::Immediate)?;
+    let address = resume_session(&tx, token)?;
+    let fresh = mint_session(&tx, &address)?;
+    tx.execute(
         "DELETE FROM sessions WHERE token_hash = ?1",
         params![token_hash(token)],
     )?;
+    tx.commit()?;
     Ok((address, fresh))
 }
 

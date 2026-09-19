@@ -21,6 +21,11 @@ pub const MAX_SNIPPETS_PER_USER: i64 = 64;
 /// The same 256 KiB `quest.submit` accepts. One number for "a source file this
 /// server will take" is easier to hold in your head than two.
 pub const MAX_SNIPPET_BYTES: usize = 256 * 1024;
+/// A pad's saved input, and the input a playground run feeds its program.
+/// One number for both, for the same reason as the source cap: the input a
+/// player types into a scratchpad is a few lines, and 64 KiB is well past
+/// anything a hand produces while still being nothing to a disk.
+pub const MAX_STDIN_BYTES: usize = 64 * 1024;
 pub const MAX_NAME_CHARS: usize = 80;
 
 #[derive(Debug, Clone, Serialize)]
@@ -136,6 +141,14 @@ pub fn save(
             "a snippet is at most {MAX_SNIPPET_BYTES} bytes; this one is {}",
             source.len()
         )));
+    }
+    if let Some(stdin) = stdin {
+        if stdin.len() > MAX_STDIN_BYTES {
+            return Err(bad_request(format!(
+                "a snippet's stdin is at most {MAX_STDIN_BYTES} bytes; this one is {}",
+                stdin.len()
+            )));
+        }
     }
     let now = now_stamp();
     let name = clean_name(name);

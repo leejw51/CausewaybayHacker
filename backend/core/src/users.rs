@@ -3,10 +3,15 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
-use crate::error::{not_found, Result};
+use crate::error::{bad_request, not_found, Result};
 use crate::eth::to_eip55;
 use crate::paths::{write_private, Home};
 use crate::time::now_stamp;
+
+/// `settings` serialized. A client's preferences are a handful of keys; this
+/// is the ceiling that keeps a stuck client from growing the row without
+/// bound.
+pub const MAX_SETTINGS_BYTES: usize = 16 * 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
@@ -100,9 +105,18 @@ pub fn update_profile(
         }
     }
     if let Some(settings) = settings {
+        // Opaque to the server (PROTOCOL §4.5), but not unbounded: it is a
+        // column copied into `profile.json` and sent back with every login.
+        let serialized = settings.to_string();
+        if serialized.len() > MAX_SETTINGS_BYTES {
+            return Err(bad_request(format!(
+                "settings are at most {MAX_SETTINGS_BYTES} bytes; this object is {}",
+                serialized.len()
+            )));
+        }
         conn.execute(
             "UPDATE users SET settings = ?2 WHERE address = ?1",
-            params![address, settings.to_string()],
+            params![address, serialized],
         )?;
     }
     get(conn, &address)

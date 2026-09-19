@@ -140,7 +140,7 @@ pub fn write_to_disk(
 pub fn latest_source(conn: &Connection, address: &str, quest_id: &str) -> Result<Option<String>> {
     conn.query_row(
         "SELECT source FROM attempts WHERE address = ?1 AND quest_id = ?2
-          ORDER BY created_at DESC LIMIT 1",
+          ORDER BY created_at DESC, rowid DESC LIMIT 1",
         params![address, quest_id],
         |row| row.get(0),
     )

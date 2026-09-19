@@ -241,7 +241,7 @@ async fn connection(mut socket: WebSocket, state: Shared) {
         missed.store(0, Ordering::Relaxed);
         match message {
             Message::Text(text) => {
-                dispatch(
+                let next = dispatch(
                     &state,
                     connection_id,
                     &mut session,
@@ -252,6 +252,11 @@ async fn connection(mut socket: WebSocket, state: Shared) {
                     text.as_str(),
                 )
                 .await;
+                if next == Next::Hangup {
+                    // The writer is closing the socket; anything read after
+                    // this would be dispatched into a dead channel.
+                    break;
+                }
             }
             Message::Pong(_) => {}
             Message::Close(_) => break,
@@ -293,6 +298,16 @@ async fn connection(mut socket: WebSocket, state: Shared) {
     let _ = writer.await;
 }
 
+/// What the read loop does after a frame: carry on, or stop reading because
+/// the writer has been told to close. Once a `Close` is queued the writer
+/// task hangs up and drops the channel, so every frame dispatched after it
+/// would be answered into nothing — the loop has to stop at the same moment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Next {
+    Continue,
+    Hangup,
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn dispatch(
     state: &Shared,
@@ -303,7 +318,7 @@ async fn dispatch(
     allowance: &Arc<ConnectionLimits>,
     tx: &Out,
     text: &str,
-) {
+) -> Next {
     let frame = match proto::parse(text) {
         Incoming::Frame(frame) => frame,
         Incoming::NotAnObject => {
@@ -311,7 +326,7 @@ async fn dispatch(
                 code: CLOSE_UNSUPPORTED,
                 reason: "every frame is one JSON object",
             });
-            return;
+            return Next::Hangup;
         }
         Incoming::Malformed { id, kind, error } => {
             // Charged too. A frame the server could not understand is still a
@@ -322,7 +337,7 @@ async fn dispatch(
             if charge(allowance, tx, &id, &kind) {
                 send(tx, ServerFrame::err(id, &kind, &error));
             }
-            return;
+            return Next::Continue;
         }
     };
     let id = frame.id.clone();
@@ -333,7 +348,7 @@ async fn dispatch(
     // nothing to release; and before the ANONYMOUS gate, because an anonymous
     // socket asking for a hundred nonces is the case that needed a limit most.
     if !charge(allowance, tx, &id, &kind) {
-        return;
+        return Next::Continue;
     }
 
     if frame.v != proto::PROTOCOL_VERSION {
@@ -351,7 +366,7 @@ async fn dispatch(
                 .with_detail(serde_json::json!({ "supported": [proto::PROTOCOL_VERSION] })),
             ),
         );
-        return;
+        return Next::Continue;
     }
 
     if kind == "auth.challenge" {
@@ -365,7 +380,7 @@ async fn dispatch(
                     &rate_limited("too many login challenges", retry_after_ms),
                 ),
             );
-            return;
+            return Next::Continue;
         }
     }
 
@@ -379,7 +394,7 @@ async fn dispatch(
                     &bad_request("that id is already in flight"),
                 ),
             );
-            return;
+            return Next::Continue;
         }
     }
 
@@ -391,7 +406,7 @@ async fn dispatch(
             tx,
             ServerFrame::err(id, &kind, &Error::new(Code::Unauthorized, "log in first")),
         );
-        return;
+        return Next::Continue;
     }
 
     // RUN and SUBMIT are the same path with a flag (PROTOCOL §4.9b), and they
@@ -413,7 +428,7 @@ async fn dispatch(
                     &rate_limited("too many formatters running", limits::FORMAT_RETRY_MS),
                 ),
             );
-            return;
+            return Next::Continue;
         };
         let tx = tx.clone();
         let live_ids = live_ids.clone();
@@ -435,7 +450,7 @@ async fn dispatch(
                 },
             );
         });
-        return;
+        return Next::Continue;
     }
 
     if let Some(execution) = Execution::for_kind(&kind) {
@@ -450,7 +465,7 @@ async fn dispatch(
             execution,
             frame.payload,
         );
-        return;
+        return Next::Continue;
     }
 
     let payload = &frame.payload;
@@ -533,6 +548,7 @@ async fn dispatch(
             Err(e) => ServerFrame::err(id, &kind, &e),
         },
     );
+    Next::Continue
 }
 
 /// Spend one of this connection's request tokens. `false` means the token was

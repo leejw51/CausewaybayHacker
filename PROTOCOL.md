@@ -49,6 +49,9 @@ laptop sleep** — see reconnection, §6.
 A close is never the answer to an application error. Application errors are
 `*.err` messages (§3.3) and the connection stays open.
 
+`4001` is defined for clients to handle but not yet emitted by this server,
+which has no message that revokes a session out from under a connection.
+
 `1003` means what it says. A frame that is a JSON object but nests deeper than
 §1's limit is **not** one of these: it is an object, so closing it 1003 would
 be telling the client something untrue. It is answered `bad_request`, and it is
@@ -1167,7 +1170,9 @@ client plays the fanfare. A client that does not know a `kind` ignores it.
 
 Sent immediately before the server closes the connection. `reason` ∈
 `shutdown` | `revoked` | `replaced`. A client should reconnect (§6) on
-`shutdown`, and go to the login screen on `revoked`.
+`shutdown`, and go to the login screen on `revoked`. `revoked` and `replaced`
+are defined for clients to handle but not yet emitted by this server, which has
+no message that ends another connection's session.
 
 ---
 

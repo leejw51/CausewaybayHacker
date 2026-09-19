@@ -140,7 +140,7 @@ fn sessions_resume_and_expire() {
     )
     .unwrap();
     let expired = auth::resume_session(&conn, &token).unwrap_err();
-    assert_eq!(expired.code, Code::AuthExpired);
+    assert_eq!(expired.code, Code::Unauthorized);
     let left: i64 = conn
         .query_row("SELECT count(*) FROM sessions", [], |r| r.get(0))
         .unwrap();
@@ -362,4 +362,33 @@ fn the_older_of_two_live_challenges_still_works() {
         challenges.peek(&address, &older.nonce).unwrap_err().code,
         Code::AuthNonceUsed
     );
+}
+
+/// SPEC §3.2's single-use rule against the login path itself: two logins
+/// carrying the same signature over the same challenge, and exactly one of
+/// them gets in. The check and the burn happen under one lock, so the second
+/// copy sees the challenge spent — `auth_nonce_used`, "ask for a new one" —
+/// rather than a second welcome.
+#[test]
+fn the_same_signature_logs_in_exactly_once() {
+    let challenges = Challenges::new();
+    let address = address_of(KEY);
+
+    // Without a nonce: the server finds the challenge the signature is over.
+    let challenge = challenges.issue(&address).unwrap();
+    let signature = sign_with(KEY, &challenge.message);
+    assert!(challenges.login(&address, &signature, None).is_ok());
+    let replay = challenges.login(&address, &signature, None).unwrap_err();
+    assert_eq!(replay.code, Code::AuthNonceUsed);
+
+    // With the nonce named: the same rule on the other branch.
+    let named = challenges.issue(&address).unwrap();
+    let signature = sign_with(KEY, &named.message);
+    assert!(challenges
+        .login(&address, &signature, Some(&named.nonce))
+        .is_ok());
+    let replay = challenges
+        .login(&address, &signature, Some(&named.nonce))
+        .unwrap_err();
+    assert_eq!(replay.code, Code::AuthNonceUsed);
 }

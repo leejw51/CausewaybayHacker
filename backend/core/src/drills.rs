@@ -485,12 +485,15 @@ pub fn next(conn: &Connection, address: &str, drill_id: &str) -> Result<Step> {
         .get(index)
         .cloned()
         .ok_or_else(|| not_found("the drill is finished"))?;
+    // The sentence first, the advance second: a `why` that fails must not
+    // have consumed the step, or the plan skips a quest the player never saw.
+    let why = why(conn, address, drill.mode, &quest_id)?;
     conn.execute(
         "UPDATE drills SET cursor = ?3 WHERE id = ?1 AND address = ?2",
         params![drill_id, address, drill.cursor + 1],
     )?;
     Ok(Step {
-        why: why(conn, address, drill.mode, &quest_id)?,
+        why,
         quest_id,
         // PROTOCOL §4.16: 0-based, "how many quests of the plan are already
         // behind you" — the cursor *before* this step. A client prints

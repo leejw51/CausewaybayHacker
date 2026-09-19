@@ -41,6 +41,15 @@ pub fn run(
             source.len()
         )));
     }
+    // The same ceiling a saved pad's input has (`snippets::save`): what a
+    // player can keep is what a player can run.
+    if stdin.len() > snippets::MAX_STDIN_BYTES {
+        return Err(bad_request(format!(
+            "stdin is {} bytes; the limit is {}",
+            stdin.len(),
+            snippets::MAX_STDIN_BYTES
+        )));
+    }
 
     // SPEC §5.3's limits apply unchanged. This is the one place a player runs
     // genuinely arbitrary code, so it is the last place to relax any of them:

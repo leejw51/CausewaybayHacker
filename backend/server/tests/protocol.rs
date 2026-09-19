@@ -216,9 +216,24 @@ async fn a_frame_that_is_not_an_object_closes_1003() {
     let server = start().await;
     let mut socket = connect(server.port).await;
     socket.send(Message::text("\"hello\"")).await.unwrap();
+    // A well-formed request right behind it, before the close is read. The
+    // read loop used to keep dispatching after queueing the close, so this
+    // was answered into a writer that had already hung up. Now the loop
+    // stops with the close: the socket is closed and nothing else comes.
+    let _ = socket
+        .send(Message::text(
+            json!({ "v":1, "id":"c-after", "type":"ping", "payload": {} }).to_string(),
+        ))
+        .await;
     match next(&mut socket).await {
         Message::Close(Some(frame)) => assert_eq!(u16::from(frame.code), 1003),
         other => panic!("expected a 1003 close, got {other:?}"),
+    }
+    // The socket is closed, or the read fails, or nothing comes — any of
+    // those is the end. A text frame is the one thing that must not arrive.
+    let after = tokio::time::timeout(std::time::Duration::from_secs(2), socket.next()).await;
+    if let Ok(Some(Ok(Message::Text(text)))) = after {
+        panic!("a frame after the close was answered: {text}");
     }
     server.handle.abort();
 }

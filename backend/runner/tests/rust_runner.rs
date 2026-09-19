@@ -297,6 +297,53 @@ fn the_compiler_streams_while_it_works() {
     assert!(logs > 0, "no run.log chunks were emitted while compiling");
 }
 
+/// What is streamed on `compile` is what the player would see in a terminal
+/// — the `rendered` text of each diagnostic, with its `^^^` under the span —
+/// and not the JSON object rustc wrapped it in. The report's
+/// `compiler_stderr` is a different thing and stays the raw JSON, because
+/// classification (SPEC §7.1) reads that.
+#[test]
+fn the_compile_stream_is_rendered_text_and_not_rustc_json() {
+    let h = harness();
+    let compile = Arc::new(std::sync::Mutex::new(String::new()));
+    let sink = compile.clone();
+    let spec = stdio(serde_json::json!([
+        { "name": "any", "stdin": "", "expect": "", "visible": true }
+    ]));
+    let submission = Submission {
+        attempt_id: "att_test",
+        lang: "rust",
+        source: "fn main() { let x: i32 = \"nope\"; }",
+        spec: &spec,
+        workdir: h.workdir.clone(),
+        cache_root: h.cache.clone(),
+        events: Arc::new(move |event| {
+            if let Event::Log { stream, chunk } = event {
+                if stream == "compile" {
+                    sink.lock().unwrap().push_str(&chunk);
+                }
+            }
+        }),
+    };
+    let report = cwbhacker_runner::run(&submission);
+    assert_eq!(report.verdict, Verdict::CompileError);
+
+    let streamed = compile.lock().unwrap().clone();
+    assert!(
+        streamed.contains("error") && streamed.contains("^"),
+        "the stream should read like rustc's terminal output: {streamed:?}"
+    );
+    assert!(
+        !streamed.contains("$message_type") && !streamed.contains("\"rendered\""),
+        "raw rustc JSON leaked into the compile stream: {streamed:?}"
+    );
+    assert!(
+        report.compiler_stderr.trim_start().starts_with('{'),
+        "compiler_stderr must stay the raw JSON for classification: {}",
+        report.compiler_stderr
+    );
+}
+
 /// Both test harnesses are built now (`cargo_harness.rs`, `gotest_harness.rs`).
 /// What is still refused is a harness asked of the wrong land, and it refuses
 /// cleanly rather than compiling the wrong thing and calling the answer wrong.

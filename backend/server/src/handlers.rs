@@ -96,8 +96,11 @@ pub fn auth_challenge(state: &Shared, payload: &serde_json::Value) -> Result<ser
     }))
 }
 
-/// §4.3, in order: burn the nonce first, then check the signature. A bad
-/// signature must not leave the nonce available for another try.
+/// §4.3, in order: find the challenge, check the signature against it, and
+/// spend the nonce only when the signature verifies — all under one lock, so
+/// the same signature cannot be presented twice. A signature that verifies
+/// against nothing leaves every challenge live: a mistyped mnemonic costs a
+/// retry, not a round trip (`auth::Challenges::login`).
 pub fn auth_login(
     state: &Shared,
     session: &mut Session,
@@ -144,8 +147,12 @@ pub fn auth_resume(
 ) -> Result<serde_json::Value> {
     let token = str_field(payload, "token")?;
     let conn = state.store.conn();
-    let (address, fresh) = auth::rotate_session(&conn, &token)?;
+    // Whose token is this — asked *before* anything is spent. Rotating first
+    // and refusing afterwards would let a connection logged in as A burn B's
+    // token: B's row deleted, the fresh one never handed to anybody.
+    let address = auth::session_address(&conn, &token)?;
     session.must_not_change_user(&address)?;
+    let (address, fresh) = auth::rotate_session(&conn, &token)?;
     let user = users::upsert(&conn, &address)?;
     let user = user_json(&conn, &user)?;
     let position = position::get(&conn, &address)?;

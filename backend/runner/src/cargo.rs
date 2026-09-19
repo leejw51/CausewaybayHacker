@@ -25,6 +25,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::proc::{self, Limits};
+use crate::rust::{rendered_of, CompileLines};
 use crate::suite::{self, Status, SuiteRun, TestOutcome};
 use crate::{Event, Report, Submission, Verdict};
 
@@ -57,19 +58,14 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
     }
 
     (sub.events)(Event::Stage("compiling"));
-    let events = sub.events.clone();
-    let compile_logs: proc::LogSink = Arc::new(move |stream, chunk| {
-        // cargo's stdout is the JSON stream; the player wants the prose it
-        // writes to stderr ("Compiling quest v0.0.0", "error: …"), not a wall
-        // of serialized spans. The JSON is kept — it is the report's
-        // `compiler_stderr` — it is simply not what gets streamed.
-        if stream == "compile" {
-            events(Event::Log {
-                stream: "compile".into(),
-                chunk: chunk.to_string(),
-            });
-        }
-    });
+    // cargo's stdout is the JSON stream and its stderr is prose ("Compiling
+    // quest v0.0.0", "error: could not compile …"). The player gets the prose
+    // as it comes and, out of the JSON, each diagnostic's `rendered` text —
+    // never the object around it, and nothing at all for the artifact and
+    // build-finished records. The JSON itself is kept: it is the report's
+    // `compiler_stderr`, which is what classification reads.
+    let lines = CompileLines::new(sub.events.clone(), cargo_line);
+    let compile_logs = lines.sink();
 
     let mut cargo = Command::new("cargo");
     cargo
@@ -90,11 +86,14 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
             apply_rlimits: false,
             address_space: false,
         },
-        // The label the sink filters on: stdout is the JSON, stderr is prose.
+        // The labels the sink tells the pipes apart by: stdout is the JSON,
+        // stderr is prose.
         "cargo-json",
-        "compile",
+        "cargo-stderr",
         compile_logs,
-    )?;
+    );
+    lines.flush();
+    let compile = compile?;
     let compile_ms = compile.elapsed_ms as i64;
     let cargo_stdout = String::from_utf8_lossy(&compile.stdout).to_string();
     let cargo_stderr = String::from_utf8_lossy(&compile.stderr).to_string();
@@ -697,6 +696,24 @@ fn status_note(rest: &str) -> String {
 
 /// Whether this build can reach `cargo` at all. Used by the tests, and by
 /// nothing else: the server asks [`crate::unsupported`].
+/// One line of `cargo --message-format=json`, as the player should read it.
+/// A `compiler-message` record is unwrapped to its diagnostic's `rendered`
+/// text; every other `reason` (`compiler-artifact`, `build-script-executed`,
+/// `build-finished`) is bookkeeping and is not streamed. cargo's own prose
+/// arrives on the other pipe and is not JSON, so it goes through as it came.
+fn cargo_line(line: &str) -> Option<String> {
+    match serde_json::from_str::<serde_json::Value>(line) {
+        Ok(value) if value.is_object() => {
+            if value.get("reason").and_then(|r| r.as_str()) == Some("compiler-message") {
+                value.get("message").and_then(rendered_of)
+            } else {
+                None
+            }
+        }
+        _ => Some(line.to_string()),
+    }
+}
+
 pub fn is_installed() -> bool {
     Command::new("cargo")
         .arg("--version")
