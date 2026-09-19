@@ -80,6 +80,8 @@ export interface Sink {
 export class Typist {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
+  /** The `run` in flight, so `stop` can settle it rather than leave it hanging. */
+  private pending: ((ok: boolean) => void) | null = null;
   /** How many characters of the current text have gone in. */
   typed = 0;
   total = 0;
@@ -94,14 +96,18 @@ export class Typist {
     this.total = text.length;
     const delays = schedule(text);
     return new Promise((resolve) => {
+      const settle = (ok: boolean) => {
+        if (this.pending !== resolve) return;
+        this.pending = null;
+        this.timer = null;
+        resolve(ok);
+      };
+      this.pending = resolve;
       const step = (i: number) => {
-        if (this.stopped) return resolve(false);
-        if (i >= text.length) {
-          this.timer = null;
-          return resolve(true);
-        }
+        if (this.stopped) return settle(false);
+        if (i >= text.length) return settle(true);
         this.timer = setTimeout(() => {
-          if (this.stopped) return resolve(false);
+          if (this.stopped) return settle(false);
           sink.type(text[i]);
           this.typed = i + 1;
           onEach?.();
@@ -112,9 +118,17 @@ export class Typist {
     });
   }
 
+  /**
+   * Stop between two characters. The pending `run` resolves `false` at
+   * once — nothing else would resolve it, its timer being cleared here —
+   * so whoever awaited it can carry on.
+   */
   stop(): void {
     this.stopped = true;
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
+    const pending = this.pending;
+    this.pending = null;
+    pending?.(false);
   }
 }

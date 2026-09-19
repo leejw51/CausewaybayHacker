@@ -365,6 +365,44 @@ describe("solutionBlanks", () => {
   });
 });
 
+describe("the editor's lock", () => {
+  it("drops what the person does while the coder types, and takes it all back after", async () => {
+    const { Editor } = await import("../src/ui/editor");
+    const { EditorView } = await import("@codemirror/view");
+    const ed = new Editor("rust", "fn main() {}\n");
+    try {
+      const view = EditorView.findFromDOM(ed.dom)!;
+      const content = ed.dom.querySelector(".cm-content")!;
+      expect(ed.locked).toBe(false);
+      expect(content.getAttribute("contenteditable")).toBe("true");
+
+      ed.setLocked(true);
+      expect(ed.locked).toBe(true);
+      expect(view.state.facet(EditorView.editable)).toBe(false);
+      expect(content.getAttribute("contenteditable")).toBe("false");
+      // A keystroke, a click: transactions the person started go nowhere.
+      view.dispatch({ changes: { from: 0, insert: "x" }, userEvent: "input.type" });
+      view.dispatch({ selection: { anchor: 3 }, userEvent: "select.pointer" });
+      expect(ed.source).toBe("fn main() {}\n");
+      expect(ed.caretPos).toBe(0);
+      // The coder's own typing, and the screen's programmatic edits, land.
+      ed.typeAt("// hi\n");
+      expect(ed.source).toBe("// hi\nfn main() {}\n");
+      ed.appendAtEnd("// end\n");
+      expect(ed.source).toBe("// hi\nfn main() {}\n// end\n");
+      ed.setLocked(true); // idempotent
+
+      ed.setLocked(false);
+      expect(ed.locked).toBe(false);
+      expect(content.getAttribute("contenteditable")).toBe("true");
+      view.dispatch({ changes: { from: 0, insert: "x" }, userEvent: "input.type" });
+      expect(ed.source).toBe("x// hi\nfn main() {}\n// end\n");
+    } finally {
+      ed.destroy();
+    }
+  });
+});
+
 describe("the editor's own history as buttons", () => {
   it("undoes and redoes what was typed, and says when there is nothing to step", async () => {
     const { Editor } = await import("../src/ui/editor");

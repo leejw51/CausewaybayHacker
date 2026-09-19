@@ -71,8 +71,17 @@ export class Session {
   /** The transcript as the model sees it. */
   messages: Msg[] = [];
   private abort: AbortController | null = null;
+  /**
+   * True from the top of `ask` to its `finally`. Not derived from `abort`:
+   * STOP aborts the loop, but the loop is still awaiting whatever tool it
+   * was in (a run on the server, a picture), and until that returns and
+   * its `tool_result` is on the transcript, a new ask would push its text
+   * into the middle of the exchange and every provider would refuse the
+   * lot.
+   */
+  private running = false;
   get busy(): boolean {
-    return this.abort !== null;
+    return this.running;
   }
 
   constructor(
@@ -86,9 +95,9 @@ export class Session {
     this.messages = [];
   }
 
+  /** Abort the ask in flight. `busy` stays true until its loop has unwound. */
   stop(): void {
     this.abort?.abort();
-    this.abort = null;
   }
 
   /**
@@ -105,8 +114,13 @@ export class Session {
     this.abort = abort;
     this.messages.push({ role: "user", content: [{ type: "text", text }] });
     this.trim();
+    // The transcript this ask is part of. CLEAR mid-tool swaps `this.messages`
+    // for an empty one; the results still coming back belong to the old
+    // exchange and must not land at the front of the new.
+    const messages = this.messages;
     const tools = toolsFor(this.bench);
     let last = "";
+    this.running = true;
     try {
       for (let round = 0; round <= MAX_ROUNDS; round++) {
         this.listener.mood("thinking");
@@ -122,7 +136,7 @@ export class Session {
           system: systemPrompt(this.bench, this.bench.run !== null),
           messages: final
             ? [
-                ...this.messages,
+                ...messages,
                 {
                   role: "user",
                   content: [
@@ -133,7 +147,7 @@ export class Session {
                   ],
                 },
               ]
-            : this.messages,
+            : messages,
           tools: final ? [] : tools,
           signal: abort.signal,
           onText: (d) => this.listener.text(d),
@@ -141,9 +155,25 @@ export class Session {
         const parts: Part[] = [];
         if (turn.text) parts.push({ type: "text", text: turn.text });
         for (const u of turn.toolUses) parts.push({ type: "tool_use", ...u });
-        if (parts.length) this.messages.push({ role: "assistant", content: parts });
+        if (parts.length) messages.push({ role: "assistant", content: parts });
         last = turn.text;
-        if (turn.stop !== "tool" || turn.toolUses.length === 0) break;
+        if (turn.toolUses.length === 0) break;
+        // A turn cut short (the token cap, a refusal) can still carry a
+        // tool call the model never got to finish. It does not run, but it
+        // has to be answered all the same, or the transcript is invalid.
+        if (turn.stop !== "tool") {
+          messages.push({
+            role: "user",
+            content: turn.toolUses.map((u): Part => ({
+              type: "tool_result",
+              tool_use_id: u.id,
+              name: u.name,
+              content: "The reply was cut off before this tool could run.",
+              is_error: true,
+            })),
+          });
+          break;
+        }
         const results: Part[] = [];
         for (const u of turn.toolUses) {
           if (abort.signal.aborted) break;
@@ -179,13 +209,14 @@ export class Session {
               is_error: true,
             });
           }
-          this.messages.push({ role: "user", content: results });
+          messages.push({ role: "user", content: results });
           break;
         }
-        this.messages.push({ role: "user", content: results });
+        messages.push({ role: "user", content: results });
       }
     } finally {
       if (this.abort === abort) this.abort = null;
+      this.running = false;
       this.listener.mood("idle");
     }
     return last;

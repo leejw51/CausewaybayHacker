@@ -202,6 +202,26 @@ const setAnswer = StateEffect.define<Target | null>();
  */
 const autoClose = new Compartment();
 
+/**
+ * The lock the Rust coder holds while it types (`ui/agent/coder.ts`). Its
+ * text goes in at the live caret, one character at a time, so a click or a
+ * keystroke in the middle of a write would move the caret and scatter the
+ * rest of the program. Locked, the content DOM stops being editable —
+ * which is `EditorView.editable`, not `EditorState.readOnly`, because the
+ * coder's own dispatches must keep landing — and, since a mouse click
+ * moves the caret whether or not the DOM is editable, every transaction a
+ * person started is dropped on the floor. The coder's are tagged `*.agent`
+ * and go through; the screen's own programmatic ones carry no event.
+ */
+const lock = new Compartment();
+const LOCKED: Extension = [
+  EditorView.editable.of(false),
+  EditorState.transactionFilter.of((tr) => {
+    const ev = tr.annotation(Transaction.userEvent);
+    return ev !== undefined && !/\.agent$/.test(ev) ? [] : tr;
+  }),
+];
+
 const answerField = StateField.define<Target | null>({
   create: () => null,
   update(value, tr) {
@@ -889,6 +909,8 @@ export class Editor {
   private lastPair: string | null = null;
   /** Where the caret was last measured, for the smear from there to here. */
   private lastCaret: Pt | null = null;
+  /** Whether the editor had focus when it was locked, to hand back after. */
+  private refocus = false;
 
   constructor(lang: Land, doc: string, onChange?: () => void) {
     this.dom.className = "cwb-editor";
@@ -1047,6 +1069,7 @@ export class Editor {
         base,
         indentUnit.of(INDENT[lang]),
         autoClose.of(closeBrackets()),
+        lock.of([]),
         answerField,
         answerEnter,
         ghost,
@@ -1244,6 +1267,28 @@ export class Editor {
   // typing reads as typing; *not* `input.type`, so `indentOnInput` does not
   // re-indent a `}` the agent has already indented itself, which would put
   // its braces in the wrong column twice over.
+
+  /** Whether the coder holds the editor: see `lock`. */
+  get locked(): boolean {
+    return !this.view.state.facet(EditorView.editable);
+  }
+
+  /**
+   * Hold the editor against the person while the coder types, or give it
+   * back. Programmatic dispatches — the coder's typing, a FORMAT — still
+   * land; what the person does with the keyboard or the mouse does not.
+   */
+  setLocked(on: boolean): void {
+    if (on === this.locked) return;
+    // A content DOM that stops being editable loses the focus it had; give
+    // it back with the lock, so the person is where they were.
+    if (on) this.refocus = this.view.hasFocus;
+    this.view.dispatch({ effects: lock.reconfigure(on ? LOCKED : []) });
+    if (!on && this.refocus) {
+      this.refocus = false;
+      this.view.focus();
+    }
+  }
 
   /** Type `text` at the caret and leave the caret after it. */
   typeAt(text: string): void {

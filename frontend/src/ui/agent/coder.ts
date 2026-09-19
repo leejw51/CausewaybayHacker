@@ -25,6 +25,7 @@ import { t } from "../../i18n";
 import { Editor, MAIN_FILE } from "../editor";
 import { Buttons } from "../chrome";
 import {
+  IMAGE_MODEL,
   PROVIDER_BOT,
   PROVIDER_NAME,
   readAuto,
@@ -33,6 +34,7 @@ import {
   readModel,
   readProvider,
   readShown,
+  type Provider,
 } from "../../ai/prefs";
 import { Session, type Listener, type Mood } from "../../ai/session";
 import { Typist } from "../../ai/typist";
@@ -122,6 +124,15 @@ export class Coder {
   readonly panel: Panel;
   private session: Session | null = null;
   private readonly typist = new Typist();
+  /**
+   * The ask in flight, from before its room is made until its reply is in:
+   * a second press meanwhile is dropped, and the tools that need a provider
+   * and a key (`make_image`) use the ones the ask went out with, not
+   * whatever the setup fields say by the time the model gets round to it.
+   */
+  private asking: { provider: Provider; key: string } | null = null;
+  /** The picture being made, so STOP can abort it. */
+  private imageAbort: AbortController | null = null;
   /** Where the sprite may fly, set by the screen each frame. */
   private box: Rect = [0, 0, 100, 100];
   private cellV = 8;
@@ -467,19 +478,30 @@ export class Coder {
     const app = this.app;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
-    const typeIn = async (text: string) => {
+    // `prep` is whatever has to happen to the document just before the
+    // typing — clearing it, cutting the span an edit replaces — and it runs
+    // under the same lock, so nothing of the person's lands between the
+    // cut and the first character.
+    const typeIn = async (text: string, prep?: (ed: Editor) => void) => {
       const ed = this.editor;
       if (!ed) return { typed: 0, total: text.length, stopped: true };
-      this.sprite.typing(true);
-      this.sprite.roll();
-      this.host.fx()?.play(burstPlan(this.sprite.x, this.sprite.y, 40));
-      const ok = await this.typist.run(text, { type: (ch) => ed.typeAt(ch) }, () => {
-        host.touched();
-        this.sprite.kick();
-        // A key tick every few characters: heard as typing, not as a
-        // machine gun. The editor's own sparks carry the rest.
-        if (this.typist.typed % 4 === 1) host.chip.type();
-      });
+      ed.setLocked(true);
+      let ok = false;
+      try {
+        prep?.(ed);
+        this.sprite.typing(true);
+        this.sprite.roll();
+        this.host.fx()?.play(burstPlan(this.sprite.x, this.sprite.y, 40));
+        ok = await this.typist.run(text, { type: (ch) => ed.typeAt(ch) }, () => {
+          host.touched();
+          this.sprite.kick();
+          // A key tick every few characters: heard as typing, not as a
+          // machine gun. The editor's own sparks carry the rest.
+          if (this.typist.typed % 4 === 1) host.chip.type();
+        });
+      } finally {
+        ed.setLocked(false);
+      }
       this.sprite.typing(false);
       if (ok) {
         this.host.chip.coin();
@@ -500,10 +522,7 @@ export class Coder {
         return MAIN_FILE[host.lang()];
       },
       read: () => this.editor?.source ?? "",
-      write: async (source) => {
-        this.editor?.clearAll();
-        return typeIn(source);
-      },
+      write: (source) => typeIn(source, (ed) => ed.clearAll()),
       insert: (text) => typeIn(text),
       edit: async (find, replace) => {
         const ed = this.editor;
@@ -517,9 +536,10 @@ export class Coder {
           };
         if (src.indexOf(find, at + 1) >= 0)
           return { ok: false, why: "`find` occurs more than once; include more surrounding text." };
-        ed.cut(at, at + find.length);
-        host.touched();
-        const r = await typeIn(replace);
+        const r = await typeIn(replace, () => {
+          ed.cut(at, at + find.length);
+          host.touched();
+        });
         return r.stopped ? { ok: false, why: "stopped by the person" } : { ok: true };
       },
       run: host.run
@@ -547,10 +567,19 @@ export class Coder {
       get image() {
         if (!host.roomId()) return null;
         return async (prompt: string) => {
-          const provider = readProvider();
-          if (!readKey(provider)) throw new Error("no api key");
+          const provider = self.asking?.provider ?? readProvider();
+          const key = self.asking?.key ?? readKey(provider);
+          if (!key) throw new Error("no api key");
           const ctl = new AbortController();
-          const { b64, mime } = await makeImage(provider, readKey(provider), prompt, ctl.signal);
+          self.imageAbort?.abort();
+          self.imageAbort = ctl;
+          let b64: string;
+          let mime: string;
+          try {
+            ({ b64, mime } = await makeImage(provider, key, prompt, ctl.signal));
+          } finally {
+            if (self.imageAbort === ctl) self.imageAbort = null;
+          }
           const shrunk = await shrink(b64, mime);
           const msg = await self.post("agent", prompt, {
             image_b64: shrunk.b64,
@@ -640,8 +669,12 @@ export class Coder {
       this.host.chip.fail();
       return;
     }
+    // A second press while the first is still making its room: not an
+    // error, just the same press twice.
+    if (this.asking) return;
     const provider = readProvider();
-    if (!readKey(provider) && needsKey(provider)) {
+    const key = readKey(provider);
+    if (!key && needsKey(provider)) {
       this.panel.status = t("agent.noKey", { provider: PROVIDER_NAME[provider] });
       this.panel.mode = "setup";
       this.panel.open = true;
@@ -649,22 +682,23 @@ export class Coder {
       return;
     }
     this.panel.status = "";
-    // The room first, so the message has somewhere to be kept.
-    if (!this.room) {
-      const made = await this.host.ensureRoom();
-      this.syncRoom();
-      if (made) this.panel.status = t("agent.roomMade", { name: this.host.roomName() });
-    }
-    if (shown) {
-      const mine: Item = { role: "user", text: shown };
-      this.panel.push(mine);
-      void this.post("user", shown).then((m) => {
-        if (m) Object.assign(mine, itemOf(m));
-      });
-    }
-    this.sinceCall = 0;
-    this.reviewedSource = this.editor.source;
+    this.asking = { provider, key };
     try {
+      // The room first, so the message has somewhere to be kept.
+      if (!this.room) {
+        const made = await this.host.ensureRoom();
+        this.syncRoom();
+        if (made) this.panel.status = t("agent.roomMade", { name: this.host.roomName() });
+      }
+      if (shown) {
+        const mine: Item = { role: "user", text: shown };
+        this.panel.push(mine);
+        void this.post("user", shown).then((m) => {
+          if (m) Object.assign(mine, itemOf(m));
+        });
+      }
+      this.sinceCall = 0;
+      this.reviewedSource = this.editor.source;
       const reply = await session.ask(provider, text);
       if (reply.trim()) {
         this.say(reply, "say");
@@ -683,6 +717,7 @@ export class Coder {
         this.host.chip.fail();
       }
     } finally {
+      this.asking = null;
       if (this.live) {
         this.live.live = false;
         this.live = null;
@@ -709,12 +744,9 @@ export class Coder {
   picture(brief: string): Promise<void> {
     const provider = readProvider();
     const b = brief.trim();
-    if (!this.host.roomId() || !this.bench().image) {
-      this.panel.status = t("agent.noImage", { provider: PROVIDER_NAME[provider] });
-      this.host.chip.fail();
-      return Promise.resolve();
-    }
-    if (provider === "anthropic") {
+    // No room to keep the picture in, or a provider with no image model:
+    // said here, before a model is asked to call a tool it does not have.
+    if (!this.host.roomId() || !this.bench().image || IMAGE_MODEL[provider] === null) {
       this.panel.status = t("agent.noImage", { provider: PROVIDER_NAME[provider] });
       this.host.chip.fail();
       return Promise.resolve();
@@ -728,6 +760,9 @@ export class Coder {
   stop(): void {
     this.session?.stop();
     this.typist.stop();
+    this.imageAbort?.abort();
+    this.imageAbort = null;
+    this.editor?.setLocked(false);
     this.sprite.typing(false);
     this.sprite.thinking(false);
     if (this.live) {

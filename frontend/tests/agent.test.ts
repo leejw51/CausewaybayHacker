@@ -10,7 +10,7 @@
  * tool catalogue (only what the bench can honour is offered).
  */
 import { describe, expect, it } from "vitest";
-import { BASE_MS, FLOOR_MS, MAX_TOTAL_MS, NEWLINE_MS, schedule } from "../src/ai/typist";
+import { BASE_MS, FLOOR_MS, MAX_TOTAL_MS, NEWLINE_MS, Typist, schedule } from "../src/ai/typist";
 import { advise, nextTip, TIPS } from "../src/ai/tips";
 import { Sprite } from "../src/ui/agent/sprite";
 import {
@@ -61,6 +61,34 @@ describe("the typing schedule", () => {
 
   it("is deterministic", () => {
     expect(schedule("hello world")).toEqual(schedule("hello world"));
+  });
+});
+
+describe("the typist", () => {
+  it("settles its run promise the moment it is stopped, not never", async () => {
+    // STOP mid-write: the coder awaits `run`, and a promise nobody resolves
+    // would leave the tool hanging, the session busy and the panel dimmed.
+    const typed: string[] = [];
+    const ty = new Typist();
+    const text = 'fn main() {\n    println!("hello");\n}\n'.repeat(8);
+    const run = ty.run(text, { type: (ch) => typed.push(ch) });
+    expect(ty.busy).toBe(true);
+    await new Promise((r) => setTimeout(r, BASE_MS * 2));
+    ty.stop();
+    const hang = new Promise<"hang">((r) => setTimeout(() => r("hang"), 200));
+    expect(await Promise.race([run, hang])).toBe(false);
+    expect(ty.busy).toBe(false);
+    expect(typed.length).toBeGreaterThan(0);
+    expect(typed.length).toBeLessThan(text.length);
+    // Nothing more goes in after the stop.
+    const n = typed.length;
+    await new Promise((r) => setTimeout(r, BASE_MS * 2));
+    expect(typed.length).toBe(n);
+    // A second run settles the first, too.
+    const one = ty.run("abc", { type: () => {} });
+    const two = ty.run("d", { type: () => {} });
+    expect(await Promise.race([one, hang])).toBe(false);
+    expect(await two).toBe(true);
   });
 });
 

@@ -305,6 +305,110 @@ describe("the session", () => {
     expect(results).toEqual(["w1", "r1"]);
   });
 
+  it("answers a tool call the model never finished, so the next ask is valid", async () => {
+    // The token cap (or a refusal) can cut a turn off with a tool_use in
+    // it. The tool must not run, but the transcript still needs a result
+    // under that id or the next ask is refused wholesale.
+    const seen = script([
+      {
+        text: "Let me read",
+        toolUses: [{ id: "t1", name: "read_code", input: {} }],
+        stop: "max",
+      },
+      { text: "ok", toolUses: [], stop: "end" },
+    ]);
+    const b = bench();
+    const { l, api } = listener();
+    const s = new Session(b, api);
+    await expect(s.ask("anthropic", "go")).resolves.toBe("Let me read");
+    expect(l.tools).toEqual([]);
+    expect(s.busy).toBe(false);
+    await expect(s.ask("anthropic", "and?")).resolves.toBe("ok");
+    const sent = seen[1].messages;
+    const at = sent.findIndex((m) => m.content.some((p) => p.type === "tool_use"));
+    expect(at).toBeGreaterThan(0);
+    expect(sent[at + 1].role).toBe("user");
+    expect(sent[at + 1].content[0]).toMatchObject({
+      type: "tool_result",
+      tool_use_id: "t1",
+      is_error: true,
+      content: expect.stringMatching(/cut off/),
+    });
+  });
+
+  it("stays busy after STOP until the tool it was in comes back", async () => {
+    // STOP aborts the loop, but the loop is still awaiting a tool (a run on
+    // the server, say). A new ask before that returns would push its text
+    // ahead of the old tool_result and corrupt the transcript, so `busy`
+    // holds until the ask has unwound.
+    const b = bench();
+    let release: () => void = () => {};
+    b.run = () =>
+      new Promise((resolve) => {
+        release = () =>
+          resolve({
+            outcome: "ok",
+            stdout: "",
+            stderr: "",
+            compile_ms: 1,
+            run_ms: 1,
+            exit_code: 0,
+          });
+      });
+    script([
+      { text: "", toolUses: [{ id: "r1", name: "run_code", input: {} }], stop: "tool" },
+      { text: "fine", toolUses: [], stop: "end" },
+    ]);
+    const { api } = listener();
+    const s = new Session(b, api);
+    const first = s.ask("anthropic", "run it");
+    await new Promise((r) => setTimeout(r, 5));
+    s.stop();
+    expect(s.busy).toBe(true);
+    await expect(s.ask("anthropic", "again")).rejects.toThrow(/busy/);
+    release();
+    await first;
+    expect(s.busy).toBe(false);
+    await expect(s.ask("anthropic", "again")).resolves.toBe("fine");
+    const ids = s.messages
+      .flatMap((m) => m.content)
+      .filter((p) => p.type === "tool_result")
+      .map((p) => (p as { tool_use_id: string }).tool_use_id);
+    expect(ids).toEqual(["r1"]);
+  });
+
+  it("a CLEAR mid-tool leaves the new transcript empty, not headed by a stray result", async () => {
+    const b = bench();
+    let release: () => void = () => {};
+    b.run = () =>
+      new Promise((resolve) => {
+        release = () =>
+          resolve({
+            outcome: "ok",
+            stdout: "",
+            stderr: "",
+            compile_ms: 1,
+            run_ms: 1,
+            exit_code: 0,
+          });
+      });
+    script([
+      { text: "", toolUses: [{ id: "r1", name: "run_code", input: {} }], stop: "tool" },
+      { text: "fresh", toolUses: [], stop: "end" },
+    ]);
+    const { api } = listener();
+    const s = new Session(b, api);
+    const first = s.ask("anthropic", "run it");
+    await new Promise((r) => setTimeout(r, 5));
+    s.clear();
+    release();
+    await first;
+    expect(s.messages).toEqual([]);
+    await expect(s.ask("anthropic", "hello")).resolves.toBe("fresh");
+    expect(s.messages[0]).toEqual({ role: "user", content: [{ type: "text", text: "hello" }] });
+    expect(s.messages.flatMap((m) => m.content).some((p) => p.type === "tool_result")).toBe(false);
+  });
+
   it("refuses without a key, and while busy", async () => {
     writeKey("anthropic", "");
     const { api } = listener();
