@@ -128,6 +128,7 @@ export const ko: Partial<Catalogue> = {
   "login.unreachable": "서버에 닿지 않습니다 — 기다리는 중",
   "login.pressEnter": " — ENTER를 누르세요",
   "login.failed": "되지 않았습니다",
+  "login.badInput": "시드 구문도 개인 키도 아닙니다",
 
   "lands.title": "지역을 고르세요",
   "lands.rustBlurb": "소유권, 빌림, 수명. 기계가 대신 쓰기 전에 당신이 갖고 있던 기술.",
@@ -351,6 +352,8 @@ export const ko: Partial<Catalogue> = {
   "pg.noPlayground": "이 서버에는 아직 연습장이 없습니다",
   "pg.runSilent": "실행 결과가 돌아오지 않았습니다",
   "pg.deleteFailed": "삭제하지 못했습니다",
+  "pg.saved": "저장했습니다",
+  "pg.deleted": "삭제했습니다",
   "pg.footer": "CTRL+ENTER  실행   CTRL+SHIFT+F  정렬   CTRL+S  저장   ESC  뒤로   F1  화면 방향",
   "pg.poster": "포스터",
   "pg.posterSaved": "포스터 저장됨 · {file}",

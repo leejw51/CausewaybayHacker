@@ -79,6 +79,25 @@ const EMBLEM_OVERHANG = 1.3;
 const BLURB_LINES = 2;
 
 /**
+ * Up to this many rows more than `BLURB_LINES`, when the plate is taller than
+ * the budget: in a roomy window the plates take their fair share of the
+ * column and the sentence was still cut at two lines — "The craft you…" —
+ * with room to spare. Where the rows come from is decided in `drawLandPlate`:
+ * first from height the mascot cannot use, then one row from the mascot
+ * himself, never more.
+ */
+const BLURB_EXTRA = 2;
+
+/**
+ * The mascot's comfortable height in design pixels: what `plateHeight`
+ * budgets for by default, and the least a longer sentence may leave him.
+ */
+const MASCOT_COMFY = 76;
+
+/** The most of the plate's width the mascot is drawn at. */
+const MASCOT_WIDE = 0.62;
+
+/**
  * Cut already-wrapped lines to at most `max`, marking the cut.
  *
  * The ellipsis goes on the **last line kept**, not on a line of its own, so a
@@ -410,7 +429,7 @@ export class LandsScene implements Scene {
     }
   }
 
-  private plateHeight(s: number, colW: number, mascot = 76): number {
+  private plateHeight(s: number, colW: number, mascot = MASCOT_COMFY): number {
     const fonts = ensureFonts(s);
     const MASCOT_MIN = Math.round(mascot * s);
     // The same font object `titledPanel` measures its bar with — `font()` and
@@ -459,10 +478,23 @@ export class LandsScene implements Scene {
     // past the plate's bottom edge and printed through the record. The
     // record is the information and the sentence is flavour, so the sentence
     // is what gives way.
-    const fits = Math.max(0, Math.floor((inner[3] - recH) / fonts.small.height));
+    const lineH = fonts.small.height;
+    const fits = Math.max(0, Math.floor((inner[3] - recH) / lineH));
+    // **And more than budgeted, when the plate has more than budgeted.** The
+    // rows past `BLURB_LINES` come first out of height the mascot cannot use
+    // — he is drawn no taller than `MASCOT_WIDE` of the plate's width, and in
+    // a wide window the plate is taller than that — and then, once, out of
+    // the mascot himself, as long as he keeps his comfortable height. One
+    // row of the sentence for a tenth of him is a fair trade; two is not.
+    const mascotCap = Math.round(inner[2] * MASCOT_WIDE);
+    const roomAtBudget = inner[3] - recH - Math.round(8 * s) - BLURB_LINES * lineH;
+    const fromFree = Math.floor(Math.max(0, roomAtBudget - mascotCap) / lineH);
+    const fromMascot =
+      roomAtBudget - fromFree * lineH - lineH >= Math.round(MASCOT_COMFY * s) ? 1 : 0;
+    const extra = Math.min(BLURB_EXTRA, fromFree + fromMascot);
     const blurb = capLines(
       wrap(fonts.small, BLURB[land](), inner[2]),
-      Math.min(BLURB_LINES, fits),
+      Math.min(BLURB_LINES + extra, fits),
       (l) => width(fonts.small, l) <= inner[2],
     );
     const blurbH = blurb.length * fonts.small.height;
@@ -486,7 +518,7 @@ export class LandsScene implements Scene {
       // The `box` metadata from the art manifest is what lets a sprite stand on
       // its feet instead of on the bottom of its transparent margin.
       const box = this.app.assets?.box.get(name);
-      const hh = Math.min(room, inner[2] * 0.62);
+      const hh = Math.min(room, mascotCap);
       const scale = hh / sprite.naturalHeight;
       const ww = sprite.naturalWidth * scale;
       const feet = box ? box.feet * scale : hh;
@@ -932,6 +964,37 @@ export class LandsScene implements Scene {
       const share = Math.floor((rowsBottom - rowsTop) / cats.length) - gap;
       const rowH = Math.max(floorH, Math.min(minRowH, share));
 
+      // **One column for the counts, decided once for every row.** Each row
+      // used to decide alone whether its count fitted beside its name, and
+      // ADVANCED — the widest name — dropped its count under itself while
+      // BASIC and HACKER kept theirs inline, so the three numbers sat at
+      // three different places. The column is measured against the text
+      // width a row with an emblem has, which is the narrowest, and the
+      // count's right edge is the same for every row that keeps it inline.
+      const countText = (c: CategorySummary) => {
+        const missing = c.total > 0 && !c.open;
+        return missing
+          ? t("lands.notInstalled")
+          : c.total === 0
+            ? t("lands.empty")
+            : `${c.cleared}/${c.total}  ★${c.stars}`;
+      };
+      const countW = Math.max(0, ...cats.map((c) => width(fonts.stationSm, countText(c))));
+      const nameW = Math.max(
+        0,
+        ...cats.map((c) => width(fonts.button, t(`map.${c.category}` as "map.basic"))),
+      );
+      // A little wider than the words' column: the emblem's window starts at
+      // the gutter and fades in over its first fifty pixels, so the count
+      // may end a few pixels short of it where a sentence may not. At the
+      // design size "ADVANCED" plus "0/17  ★0" missed the words' column by
+      // nine pixels, which is the whole reason the rows disagreed.
+      const colTw = Math.max(
+        Math.round(120 * s),
+        Math.round(right[2] * 0.58) - Math.round(8 * s) - Math.round(16 * s),
+      );
+      const inlineAll = nameW + countW + Math.round(8 * s) <= colTw;
+
       let y = rowsTop;
       for (const c of cats) {
         // Nothing is *locked* (PROTOCOL §4.7): a road with streets in it is a
@@ -1043,22 +1106,16 @@ export class LandsScene implements Scene {
         // ran into its "0/17" in Czech, so the count drops under the name
         // when the two would touch.
         const catName = t(`map.${c.category}` as "map.basic");
-        const count = missing
-          ? t("lands.notInstalled")
-          : empty
-            ? t("lands.empty")
-            : `${c.cleared}/${c.total}  ★${c.stars}`;
+        const count = countText(c);
         // The count goes under the name when the two would touch — but only
         // when the row is tall enough to hold a second line. In a short row
         // (a phone held sideways, three roads and two buttons in four hundred
         // pixels) there is no second line, and a count drawn into one is a
         // count cut in half by the road underneath. The bar along the row
         // still says how far along it is.
-        const oneLine =
-          width(fonts.button, catName) + width(fonts.stationSm, count) + Math.round(16 * s) <= tw;
         const twoLines = rowH >= fonts.button.height + fonts.stationSm.height + Math.round(20 * s);
-        const countBelow = !oneLine && twoLines;
-        const showCount = oneLine || twoLines;
+        const countBelow = !inlineAll && twoLines;
+        const showCount = inlineAll || twoLines;
         g.fillStyle = css(empty ? Theme.dim : Theme.cream);
         printf(g, fonts.button, catName, tx, titleY, tw, "left");
         // What the road is, from the bible. Only when the row is tall enough
@@ -1096,7 +1153,9 @@ export class LandsScene implements Scene {
             count,
             tx + Math.round(4 * s),
             titleY + Math.round(2 * s) + (countBelow ? fonts.button.height + Math.round(2 * s) : 0),
-            tw,
+            // Inline, right-aligned in the shared column — the same right
+            // edge for every row, whether or not this one has an emblem.
+            countBelow ? tw : colTw,
             countBelow ? "left" : "right",
           );
         }

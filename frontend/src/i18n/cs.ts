@@ -139,6 +139,7 @@ export const cs: Partial<Catalogue> = {
   "login.unreachable": "server je nedostupný — čekám na něj",
   "login.pressEnter": " — stiskni ENTER",
   "login.failed": "tohle nevyšlo",
+  "login.badInput": "tohle není seed fráze ani privátní klíč",
 
   "lands.title": "VYBER SI KRAJ",
   "lands.rustBlurb":
@@ -368,6 +369,8 @@ export const cs: Partial<Catalogue> = {
   "pg.noPlayground": "tento server zatím nemá hřiště",
   "pg.runSilent": "výsledek se nevrátil",
   "pg.deleteFailed": "nepodařilo se to smazat",
+  "pg.saved": "uloženo",
+  "pg.deleted": "smazáno",
   "pg.footer":
     "CTRL+ENTER  SPUSTIT   CTRL+SHIFT+F  FORMÁT   CTRL+S  ULOŽIT   ESC  ZPĚT   F1  ORIENTACE",
   "pg.poster": "PLAKÁT",

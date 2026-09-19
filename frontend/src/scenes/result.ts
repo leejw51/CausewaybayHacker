@@ -31,7 +31,7 @@ import {
 } from "../ui/chrome";
 import type { Attempt, Category, Land } from "../net/protocol";
 import { MapScene } from "./map";
-import { QuestScene } from "./quest";
+import { QuestScene, ranCases } from "./quest";
 import { t } from "../i18n";
 
 function verdictText(v: Attempt["verdict"]): string {
@@ -45,17 +45,11 @@ export class ResultScene implements Scene {
   private readonly buttons = new Buttons();
 
   /**
-   * The headline for this attempt.
-   *
-   * Go has no runner until the next milestone, and the server reports that as
-   * an internal error because from its side it *is* one. Repeating that word
-   * to the player would teach them to distrust a server that is working
-   * exactly as built, so the one case we know about is named honestly.
+   * The headline for this attempt. The verdict's own word in every land: the
+   * Go runner has shipped (decisions.md 2026-09-11), so an internal error
+   * there is a server fault like anywhere else and is named as one.
    */
   private verdictWord(): string {
-    if (this.attempt.verdict === "internal_error" && this.land === "go") {
-      return t("result.unavailable");
-    }
     return verdictText(this.attempt.verdict);
   }
   private confetti: Plan | null = null;
@@ -103,9 +97,7 @@ export class ResultScene implements Scene {
       case "wrong_answer":
         return 0.42;
       default:
-        // `internal_error` in the Go land is this milestone being honest about
-        // itself, not the player failing at anything. It gets no impact.
-        return this.land === "go" ? 0 : 0.35;
+        return 0.35;
     }
   }
 
@@ -231,10 +223,20 @@ export class ResultScene implements Scene {
    * sharing it, because the drawing walks the same list in the same order —
    * the pair is checked by eye on the two screens it produces.
    */
+  /**
+   * The cases worth a row. A program that never compiled ran no case, so a
+   * `FAIL greets — expected "hello\n", got ""` line would be describing a
+   * comparison that never happened; the compiler's own words below are the
+   * whole story then.
+   */
+  private shownCases(): Attempt["cases"] {
+    return ranCases(this.attempt) ? this.attempt.cases : [];
+  }
+
   private rightHeight(s: number, fonts: ReturnType<typeof ensureFonts>, w: number): number {
     let h = Math.round(52 * s);
     const rowH = Math.max(fonts.small.height, fonts.stationSm.height);
-    for (const c of this.attempt.cases) {
+    for (const c of this.shownCases()) {
       h += fonts.small.height;
       if (c.visible && !c.passed) h += rowH * 2 + Math.round(32 * s);
     }
@@ -249,7 +251,14 @@ export class ResultScene implements Scene {
       }
       h += Math.round(12 * s);
     }
-    if (this.attempt.stderr) h += fonts.codeSm.height * 2 + Math.round(8 * s);
+    // Measured, like the mistakes above it. Counted as two lines, a compiler
+    // that had six things to say was clipped at the panel's bottom edge while
+    // the lower half of a landscape window was empty skyline: with the
+    // number right the panels grow to just above the button row.
+    if (this.attempt.stderr) {
+      h += wrap(fonts.codeSm, this.attempt.stderr, w).length * fonts.codeSm.height;
+      h += Math.round(8 * s);
+    }
     return h;
   }
 
@@ -414,7 +423,7 @@ export class ResultScene implements Scene {
       let ry = right[1];
       const lineH = fonts.small.height;
 
-      for (const c of this.attempt.cases) {
+      for (const c of this.shownCases()) {
         g.fillStyle = css(c.passed ? Theme.admit : Theme.red);
         printf(
           g,

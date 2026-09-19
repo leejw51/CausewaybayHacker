@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { resyncSteps, snippetDiffers } from "../src/scenes/playground";
 
 /**
  * The playground keeps a local mirror of the pad you have open, so text that
@@ -64,5 +65,74 @@ describe("the playground's local mirror", () => {
     expect(body.slice(0, body.indexOf("\n  }"))).toContain(
       "localStorage.removeItem(LEGACY_LOCAL_KEY)",
     );
+  });
+});
+
+/**
+ * PROTOCOL §6.5: a `playground.updated` or `chat.updated` sent while the
+ * socket was down is not replayed. The screen has to ask again on reconnect —
+ * and it did not: there was no `onState` watcher in the file at all, so a pad
+ * saved on the tablet during a laptop's outage stayed stale until a reload.
+ */
+describe("what a reconnect asks for again", () => {
+  it("re-lists the pads for a pad that was never saved, and nothing else", () => {
+    // Nothing on the server could have changed under an unsaved pad, and a
+    // room only exists once the pad does.
+    expect(resyncSteps(null)).toEqual(["list"]);
+  });
+
+  it("re-reads the list, the open pad and its room for a saved one", () => {
+    expect(resyncSteps("snip_1")).toEqual(["list", "pad", "room"]);
+  });
+
+  it("watches the connection from enter, in the list leave drains", () => {
+    const enter = SOURCE.slice(SOURCE.indexOf("async enter(): Promise<void> {"));
+    const regs = enter.slice(0, enter.indexOf('addEventListener("blur"'));
+    expect(regs).toContain("this.offs.push(");
+    expect(regs).toContain("this.app.client.onState(");
+    expect([...SOURCE.matchAll(/onState\(/g)]).toHaveLength(1);
+  });
+
+  it("only asks after the socket has actually been away", () => {
+    // The first `authed` after arriving has missed nothing; re-listing the
+    // room on it would throw away what was said before the pad was saved.
+    const enter = SOURCE.slice(SOURCE.indexOf("async enter(): Promise<void> {"));
+    const handler = enter.slice(
+      enter.indexOf("onState("),
+      enter.indexOf('addEventListener("blur"'),
+    );
+    expect(handler).toContain("this.dropped = true");
+    expect(handler).toContain("if (!this.dropped) return;");
+  });
+
+  it("hands the re-read pad to the same path a live update takes", () => {
+    // `remoteSaved` is what decides apply-or-notify from `dirty`; a second
+    // copy of that decision here would be the one that drifts.
+    const body = SOURCE.slice(SOURCE.indexOf("private async resync("));
+    const fn = body.slice(0, body.indexOf("\n  }"));
+    expect(fn).toContain("this.remoteSaved(res.snippet)");
+    expect(fn).not.toContain("this.load(");
+  });
+});
+
+/**
+ * The one decision in the resync that a source assertion cannot catch: what
+ * "changed elsewhere" is measured against. Against the editor, a reconnect
+ * with unsaved typing chimed and said "updated on another device" about the
+ * player's own edits; against the saved baseline it says nothing.
+ */
+describe("whether the server's copy of the pad changed elsewhere", () => {
+  const saved = { source: "fn main() {}", lang: "rust" as const, name: "SCRATCH", stdin: "" };
+
+  it("is quiet when the server holds exactly what was last saved", () => {
+    expect(snippetDiffers({ ...saved, stdin: undefined }, saved)).toBe(false);
+    expect(snippetDiffers({ ...saved }, saved)).toBe(false);
+  });
+
+  it("notices a change to any of the four things a save carries", () => {
+    expect(snippetDiffers({ ...saved, source: "fn main() { }" }, saved)).toBe(true);
+    expect(snippetDiffers({ ...saved, lang: "go" }, saved)).toBe(true);
+    expect(snippetDiffers({ ...saved, name: "SIEVE" }, saved)).toBe(true);
+    expect(snippetDiffers({ ...saved, stdin: "3\n" }, saved)).toBe(true);
   });
 });

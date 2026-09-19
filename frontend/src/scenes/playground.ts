@@ -131,6 +131,39 @@ const OUTCOME: Record<PlaygroundRun["outcome"], () => string> = {
 };
 
 /**
+ * What a reconnect has to ask for again (PROTOCOL §6.5), in order.
+ *
+ * The list always; the pad and its room only when the pad has a server id —
+ * an unsaved pad has nothing on the server that could have changed, and a
+ * room only exists once the pad does.
+ */
+export function resyncSteps(heldId: string | null): Array<"list" | "pad" | "room"> {
+  return heldId === null ? ["list"] : ["list", "pad", "room"];
+}
+
+/**
+ * Whether the server's copy of the open pad is not the one this screen last
+ * saved or loaded — that is, whether something happened to it elsewhere.
+ *
+ * Against the saved baseline, deliberately, and not against the editor: a
+ * live `playground.updated` only ever arrives because somebody saved, but a
+ * reconnect fetches the pad whether or not anybody did, and comparing that
+ * with a buffer full of unsaved typing says "changed" about one's own edits
+ * — a chime, a burst and "updated on another device" for nothing.
+ */
+export function snippetDiffers(
+  snippet: { source: string; lang: Land; name: string; stdin?: string },
+  saved: { source: string; lang: Land; name: string; stdin: string },
+): boolean {
+  return (
+    snippet.source !== saved.source ||
+    snippet.lang !== saved.lang ||
+    snippet.name !== saved.name ||
+    (snippet.stdin ?? "") !== saved.stdin
+  );
+}
+
+/**
  * The open scratchpad. `dirty` is mirrored with it: text that never reached the
  * server must be able to say so after a reload, or the next visit would fetch
  * the older server copy over the top of it and the loss would be silent.
@@ -286,6 +319,12 @@ export class PlaygroundScene implements Scene {
    * line.
    */
   private saveNote = "";
+  /**
+   * Whether the socket has been anything but `authed` since this screen was
+   * entered: the difference between a connection and a *re*connection. §6.5
+   * is about the second; the first has missed nothing.
+   */
+  private dropped = false;
   private t = 0;
   /** The typing effects, over the editor. See `ui/codefx.ts`. */
   private fx: CodeFx | null = null;
@@ -815,7 +854,25 @@ export class PlaygroundScene implements Scene {
         }
         this.log.push(p.stream, p.chunk, p.seq);
       }),
+      // PROTOCOL §6.5: a `playground.updated` or `chat.updated` sent while
+      // the socket was down is not replayed, so a reconnect re-reads what the
+      // events would have carried. Only a *re*connect: the first `authed`
+      // after arriving has missed nothing, and re-listing the room on it
+      // would throw away what was said before the pad was saved. Registered
+      // here, with the events, because `leave` drains this list and a watcher
+      // that outlived the screen would load a pad into an editor that no
+      // longer exists.
+      this.app.client.onState((state) => {
+        if (state !== "authed") {
+          this.dropped = true;
+          return;
+        }
+        if (!this.dropped) return;
+        this.dropped = false;
+        void this.resync();
+      }),
     );
+    this.dropped = false;
     addEventListener("blur", this.onBlur);
 
     // The local mirror first, because it is instant and it is the copy that
@@ -984,6 +1041,44 @@ export class PlaygroundScene implements Scene {
     }
   }
 
+  /**
+   * After a reconnect: what the missed events would have said, asked for.
+   *
+   * The list first, because a pad saved or deleted elsewhere changes it. Then
+   * the open pad, if it has a server id: fetched and, when it is not the copy
+   * this screen last saved (`snippetDiffers`), handed to the same path a live
+   * `playground.updated` takes, so a clean buffer takes the saved text and a
+   * dirty one is told and left alone — `remoteSaved` already knows both.
+   * Last the room: a new pad key makes `syncRoom` (called every frame)
+   * treat it as a switch and list the conversation again from the start,
+   * which is the only way to learn what was said while the socket was down.
+   * `load` is not used for this: it replaces the editor and moves the caret.
+   */
+  private async resync(): Promise<void> {
+    for (const step of resyncSteps(this.held.id)) {
+      if (step === "list") await this.refreshList();
+      if (step === "pad" && this.held.id) {
+        try {
+          const res = await this.app.client.request("playground.load", { id: this.held.id });
+          const saved = {
+            source: this.savedSource,
+            lang: this.savedLang,
+            name: this.savedName,
+            stdin: this.savedStdin,
+          };
+          if (snippetDiffers(res.snippet, saved)) this.remoteSaved(res.snippet);
+        } catch (e) {
+          // Deleted on another device during the outage, or a server that
+          // has not got §4.9c: the pad on screen is still the pad on screen.
+          if (e instanceof WireError) {
+            console.warn("playground resync:", e.payload.code, e.payload.message);
+          }
+        }
+      }
+      if (step === "room" && this.held.id) this.padSerial++;
+    }
+  }
+
   private async load(id: string, quiet = false): Promise<void> {
     try {
       const res = await this.app.client.request("playground.load", { id });
@@ -1061,7 +1156,7 @@ export class PlaygroundScene implements Scene {
       this.savedName = res.snippet.name;
       this.savedStdin = res.snippet.stdin ?? this.held.stdin;
       this.dirty = false;
-      this.saveNote = "saved";
+      this.saveNote = t("pg.saved");
       this.writeLocal();
       void this.refreshList();
     } catch (e) {
@@ -1253,7 +1348,7 @@ export class PlaygroundScene implements Scene {
       // The room went with the pad; what is held is a new unsaved pad now.
       this.padSerial++;
       this.held.id = null;
-      this.saveNote = "deleted";
+      this.saveNote = t("pg.deleted");
       void this.refreshList();
     } catch (e) {
       this.saveNote = e instanceof WireError ? playerText(e.payload.code) : t("pg.deleteFailed");
@@ -1920,18 +2015,25 @@ export class PlaygroundScene implements Scene {
         const lh = f.height + Math.round(5 * s);
         this.stdinOverlay?.place([x + 4, y + lh, w - 8, h - lh - 4], fonts.codeSm.size);
       } else {
+        // Two rects that do not touch: the label's, then a gap, then the
+        // field's. The field used to start where the label's box ended, so
+        // the two shared an edge and the label read as printed on the field.
+        const fieldX = x + labelW + Math.round(4 * s);
         printf(
           g,
           f,
           fedLabel,
           x + Math.round(6 * s),
           inkCentreY(f, fedLabel, y, fedH),
-          labelW,
+          labelW - Math.round(8 * s),
           "left",
         );
-        this.stdinOverlay?.place([x + labelW, y + 3, w - labelW - 6, h - 6], fonts.codeSm.size);
+        this.stdinOverlay?.place([fieldX, y + 3, x + w - fieldX - 6, h - 6], fonts.codeSm.size);
       }
     };
+    // Tall enough for the label to sit above the field, as it does on the
+    // framed bench: the stacked form `fed` switches to at 1.6x a line.
+    const fedStacked = Math.max(Math.ceil(fedH * 1.6), fedH + f.height + Math.round(9 * s));
 
     let top = strip + Math.round(6 * s);
     const agentOpen = this.coder?.open ?? false;
@@ -1962,7 +2064,10 @@ export class PlaygroundScene implements Scene {
         fed(x, y, colW, inH);
         this.drawOutput(g, [x, y + inH + gap, colW, runH - inH - gap], s);
       } else {
-        const inH = fedH;
+        // Stacked, not a single line: on one line the label and the field
+        // sat edge to edge over the coder's title bar and read as one box
+        // printed over another. The panel gives up one row of type for it.
+        const inH = fedStacked;
         fed(x, top, colW, inH);
         panel = [x, top + inH + gap, colW, bodyH - inH - gap];
         this.outputRect = [0, 0, 0, 0];

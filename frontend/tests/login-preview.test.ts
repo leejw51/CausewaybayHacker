@@ -67,3 +67,54 @@ describe("the login card's address and name", () => {
     );
   });
 });
+
+/**
+ * NEW WALLET previews the address at index 0 (`addressFromMnemonic` with no
+ * index) and used to sign in at whatever the account box held — a preference
+ * left over from some other wallet. The card promised one address and the
+ * server was handed another, so the phrase somebody had just written down was
+ * for an account they were never shown.
+ */
+describe("a wallet this screen minted", () => {
+  const fn = (name: string) => {
+    const body = SOURCE.slice(SOURCE.indexOf(name));
+    return body.slice(0, body.indexOf("\n  }"));
+  };
+
+  it("signs in at index 0, whatever the account box says", () => {
+    expect(fn("private async attempt(")).toContain("minted ? 0 : this.walletIndex()");
+  });
+
+  it("is told apart from a typed phrase all the way down", () => {
+    expect(fn("private async signIn(")).toContain("this.attempt(text, minted)");
+  });
+
+  it("still previews at index 0, which is what it signs in as", () => {
+    expect(fn("private mint(")).toContain('addressFromMnemonic(this.minted.join(" "))');
+  });
+});
+
+/**
+ * The wallet module's refusals are English sentences for a developer. On the
+ * one screen a player who cannot read English is guaranteed to see, they have
+ * to be ours: a bad phrase is turned away before `unlock` sees it, and what
+ * `unlock` still refuses is named with a key, never with `e.message`.
+ */
+describe("what the player is told when the text is wrong", () => {
+  it("checks the phrase before signing in", () => {
+    const body = SOURCE.slice(SOURCE.indexOf("private async submit("));
+    const submit = body.slice(0, body.indexOf("\n  }"));
+    expect(submit.indexOf("LoginScene.inputProblem(text)")).toBeGreaterThan(-1);
+    expect(submit.indexOf("LoginScene.inputProblem(text)")).toBeLessThan(
+      submit.indexOf("this.signIn(text)"),
+    );
+  });
+
+  it("never puts a raw Error message on the screen", () => {
+    expect(SOURCE).not.toMatch(/this\.status = e(\.message| instanceof Error \? e\.message)/);
+    const body = SOURCE.slice(SOURCE.indexOf("private report("));
+    const report = body.slice(0, body.indexOf("\n  }"));
+    expect(report).toContain('t("login.badInput")');
+    expect(report).toContain('t("login.failed")');
+  });
+});

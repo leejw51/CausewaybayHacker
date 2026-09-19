@@ -51,10 +51,10 @@
  * sent.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, width, wrap, type Font } from "../engine/text";
+import { cjkFloor, ensureFonts, fontAt, printf, width, wrap, type Font } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { clipped, fill, neonPrint, well, type Ctx, type Rect } from "../engine/ui";
-import { btnBox } from "../engine/ui";
+import { btnBox, pixBtn } from "../engine/ui";
 import { Buttons, footer, header, RUST, titledPanel } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { Overlay } from "../ui/overlay";
@@ -79,8 +79,36 @@ import { LandsScene } from "./lands";
 import { LOCALES, locale, nextLocale, onLocale, setLocale, t } from "../i18n";
 import { StoryScene } from "./story";
 
+/**
+ * The wallet module refused the text. Its own message is an English sentence
+ * for a developer ("that is not a valid seed phrase", "a private key is 32
+ * bytes"); this class is how `report` tells that failure apart from a socket
+ * that dropped, so the player gets our wording for it.
+ */
+class BadInputError extends Error {}
+
 /** The empty field's own instructions, restored whenever it is handed back. */
 const FIELD_HINT = (): string => t("login.fieldHint");
+
+/**
+ * The button face, stepped down until `label` fits a box `limit` wide.
+ *
+ * Press Start 2P has no narrow cut, so the only way a long label fits a
+ * narrow card is smaller type. Down in steps of two pixels and never below
+ * two thirds of the size it started at, nor below `floor` (the CJK floor
+ * `ensureFonts` applies, which `fontAt` does not) — past that it is small
+ * print on the one button that signs somebody up, and the width clamp takes
+ * over.
+ */
+function fitButtonFont(f: Font, label: string, limit: number, floor: number): Font {
+  let out = f;
+  const least = Math.max(Math.round(f.size * 0.66), floor);
+  for (let px = f.size; px >= least; px -= 2) {
+    out = px === f.size ? f : fontAt(px, "pixel");
+    if (btnBox(out, [label], 0, out.size * 2, 0)[0] <= limit) break;
+  }
+  return out;
+}
 
 /**
  * How many rows a set of labels wraps to inside `width`, at the same gap
@@ -453,7 +481,35 @@ export class LoginScene implements Scene {
       this.status = t("login.needPhrase");
       return;
     }
+    // Checked here, before anything is derived. `unlock` refuses a bad phrase
+    // with an English sentence meant for a developer, and this is the one
+    // localized screen a person who cannot read English is guaranteed to see.
+    const problem = LoginScene.inputProblem(text);
+    if (problem) {
+      this.status = problem;
+      this.app.chip.fail();
+      return;
+    }
     await this.signIn(text);
+  }
+
+  /**
+   * Why the text in the field cannot be signed in with, in the player's
+   * language — or `null` when it can. The same three complaints the preview
+   * makes as somebody types, plus the one it cannot: hex that is not a key.
+   */
+  private static inputProblem(text: string): string | null {
+    const flat = text.replace(/\s/gu, "");
+    // Anything that reads as hex is on the key path: a `0x` prefix, or a run
+    // of hex digits too long to be a seed word. A malformed key must not fall
+    // through to the phrase check and be told "0x12ab is not a seed word".
+    const hexish = /^0x/iu.test(flat) || (/^[0-9a-f]+$/iu.test(flat) && flat.length >= 40);
+    if (hexish) return privateKeyHexOf(text) ? null : t("login.badInput");
+    const problem = phraseProblem(text);
+    if (!problem) return null;
+    if (problem.kind === "word") return t("login.notAWord", { word: problem.word });
+    if (problem.kind === "count") return t("login.wordCount", { n: problem.count });
+    return t("login.badChecksum");
   }
 
   /**
@@ -471,7 +527,7 @@ export class LoginScene implements Scene {
       for (let attempt = 0; attempt < (minted ? 5 : 1); attempt++) {
         if (minted && !(await this.reachable())) return;
         try {
-          await this.attempt(text);
+          await this.attempt(text, minted);
           return;
         } catch (e) {
           this.report(e);
@@ -484,8 +540,15 @@ export class LoginScene implements Scene {
     }
   }
 
-  /** One go: derive, sign the challenge, log in, leave. */
-  private async attempt(text: string): Promise<void> {
+  /**
+   * One go: derive, sign the challenge, log in, leave.
+   *
+   * A phrase this screen minted a moment ago signs in at index 0, whatever the
+   * account box says: the address on the panel was derived at 0, and the box
+   * is a preference kept from some *other* wallet. Signing in at index 3 with
+   * a card that promised the index-0 address is a wallet nobody wrote down.
+   */
+  private async attempt(text: string, minted = false): Promise<void> {
     // A live session on this socket cannot become a different one (§3.1), and
     // the server says so in a code the player should never have to read. Trade
     // it for a fresh anonymous connection first — that is what "log in as
@@ -495,7 +558,7 @@ export class LoginScene implements Scene {
       await this.app.client.restart();
     }
     this.status = t("login.deriving");
-    const address = unlock(text, this.walletIndex());
+    const address = LoginScene.derive(text, minted ? 0 : this.walletIndex());
     // The textarea is emptied before a single byte goes near the socket.
     this.field.value = "";
     // Through `setPreview` like every other path, even though the name box is
@@ -531,10 +594,20 @@ export class LoginScene implements Scene {
     await this.app.go(new LandsScene(this.app), "forward");
   }
 
+  /** `unlock`, with its refusal marked as the player's input rather than ours. */
+  private static derive(text: string, index: number): ReturnType<typeof unlock> {
+    try {
+      return unlock(text, index);
+    } catch (e) {
+      throw new BadInputError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   /**
    * §3.3: the server's `message` is for a developer. The player gets our
    * wording, keyed off the code; the server's line goes to the console where a
-   * developer can actually find it.
+   * developer can actually find it. The same rule for our own modules: the
+   * wallet's and the client's sentences are English and go to the console too.
    */
   private report(e: unknown): void {
     if (e instanceof WireError) {
@@ -543,8 +616,12 @@ export class LoginScene implements Scene {
       // §3.3's table: a spent or expired nonce is retryable as-is, and saying
       // "log in again" about it would be a lie.
       if (e.action === "rechallenge") this.status += t("login.pressEnter");
+    } else if (e instanceof BadInputError) {
+      console.warn("auth failed:", e.message);
+      this.status = t("login.badInput");
     } else {
-      this.status = e instanceof Error ? e.message : t("login.failed");
+      console.warn("auth failed:", e);
+      this.status = t("login.failed");
     }
     this.app.chip.fail();
   }
@@ -912,13 +989,23 @@ export class LoginScene implements Scene {
     const warn = t("login.mintWarning");
     const warnLines = wrap(fonts.small, warn, w - Math.round(24 * s)).length;
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
+    // The panel's inner width, `titledPanel`'s 6 + 8 each side.
+    const innerW = w - 28;
+    const keepLabel = this.waiting ? t("login.mintWaiting") : this.busy ? "…" : t("login.mintKeep");
+    const cancelLabel = t("login.mintCancel");
+    // I HAVE WRITTEN IT DOWN is wider than the card at the button size, in
+    // both orientations, and a button wider than its panel ran out over the
+    // right border. The type steps down until the box fits — this one label,
+    // painted by hand below, because `Buttons.draw` sets every button in one
+    // face — and the width is clamped to the panel whatever the label does.
+    const keepFont = fitButtonFont(fonts.button, keepLabel, innerW, Math.round(cjkFloor() * s));
+    const keepW = Math.min(innerW, btnBox(keepFont, [keepLabel], 0, keepFont.size * 2, 0)[0]);
+    const [cancelW] = btnBox(fonts.button, [cancelLabel], 0, fonts.button.size * 2, 0);
+    const btnGap = Math.round(fonts.button.size * 0.5);
     // Measured, not "one in landscape, two in portrait": I HAVE WRITTEN IT
     // DOWN and CANCEL wrap in a landscape card too, and the assumed single
     // row put CANCEL on the rim.
-    const btnRows = rowsFor(fonts.button, w - 28, [
-      this.waiting ? t("login.mintWaiting") : this.busy ? "…" : t("login.mintKeep"),
-      t("login.mintCancel"),
-    ]);
+    const btnRows = keepW + btnGap + cancelW <= innerW ? 1 : 2;
     const frameH = 8 + fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9) + 8 + 14;
     const cardH =
       frameH +
@@ -973,22 +1060,32 @@ export class LoginScene implements Scene {
     printf(g, fonts.small, this.preview || "—", card[0], cy, card[2], "left");
     cy += fonts.small.height + pad;
 
-    this.buttons.row(
-      fonts.button,
-      [card[0], cy, card[2], btnH * btnRows],
-      [
-        {
-          id: "keep",
-          label: this.waiting ? t("login.mintWaiting") : this.busy ? "…" : t("login.mintKeep"),
-          dim: this.busy,
-          primary: !this.busy,
-        },
-        // Live while we wait, and only while we wait: giving up has to be
-        // possible, and it is the only thing that throws the words away.
-        { id: "discard", label: t("login.mintCancel"), dim: this.busy && !this.waiting },
-      ],
-      layout.minTouchH(),
-    );
+    // The same geometry `Buttons.row` would lay out, done by hand because the
+    // first button is set in its own face.
+    const keep = this.buttons.add({
+      id: "keep",
+      rect: [card[0], cy, keepW, btnH],
+      label: keepLabel,
+      dim: this.busy,
+      primary: !this.busy,
+      painted: true,
+    });
+    pixBtn(g, keepFont, keep.rect[0], keep.rect[1], keep.rect[2], keep.rect[3], keepLabel, {
+      hover: this.buttons.hovered === "keep",
+      dim: this.busy,
+      lit: !this.busy,
+    });
+    // Live while we wait, and only while we wait: giving up has to be
+    // possible, and it is the only thing that throws the words away.
+    this.buttons.add({
+      id: "discard",
+      rect:
+        btnRows === 1
+          ? [card[0] + keepW + btnGap, cy, cancelW, btnH]
+          : [card[0], cy + btnH + btnGap, cancelW, btnH],
+      label: cancelLabel,
+      dim: this.busy && !this.waiting,
+    });
     this.overlay.hide();
     this.indexOverlay.hide();
     this.nameOverlay.hide();

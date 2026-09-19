@@ -115,6 +115,19 @@ function show(text: string): string {
 }
 
 /**
+ * Whether the cases on a run report describe something that actually ran.
+ *
+ * After a compile error the server still lists the sample case, failed, with
+ * `got: ""` — and `expected "3\n" got ""` under IT DID NOT COMPILE reads as
+ * a program that printed nothing, which is a different mistake from the one
+ * the player made. The same for a runner that broke before it started. The
+ * verdict line is the whole report then; the case line is left out.
+ */
+export function ranCases(a: Pick<Attempt, "verdict">): boolean {
+  return a.verdict !== "compile_error" && a.verdict !== "internal_error";
+}
+
+/**
  * What the editor opens with, in the order that respects the player's work.
  *
  * `local` is the buffer handed back by the verdict screen's TRY AGAIN — the
@@ -654,26 +667,17 @@ export class QuestScene implements Scene {
       if (e instanceof WireError) {
         console.warn("submit failed:", e.payload.code, e.payload.message, e.payload.detail);
       }
-      // §3.3 again: our words on screen, the server's in the console.
-      const goGap = this.land === "go" && e instanceof WireError && e.payload.code === "internal";
-      this.notice = goGap;
-      // A server that has not caught up with §4.9b answers an unknown request
-      // type with `not_found`, and "that is not there any more" sends the
-      // player looking for a missing quest. Name the actual situation.
-      const noRun =
-        kind === "quest.run" && e instanceof WireError && e.payload.code === "not_found";
-      this.notice = this.notice || noRun;
-      this.error = noRun
-        ? t("quest.noRun")
-        : dropped
-          ? t("quest.dropped")
-          : goGap
-            ? // The Go runner arrives in the next milestone. Reporting that as a
-              // server fault teaches the player to distrust a working server.
-              t("quest.goGap")
-            : e instanceof WireError
-              ? playerText(e.payload.code)
-              : t("quest.runFailed");
+      // §3.3 again: our words on screen, the server's in the console. Every
+      // land gets the same words for the same code: the Go runner has shipped
+      // (decisions.md 2026-09-11), so a Go `internal` is a server fault like
+      // any other, and a `not_found` is the quest gone from the content pack
+      // — which is what `err.not_found` says — not a server without RUN.
+      this.notice = false;
+      this.error = dropped
+        ? t("quest.dropped")
+        : e instanceof WireError
+          ? playerText(e.payload.code)
+          : t("quest.runFailed");
     }
   }
 
@@ -1402,7 +1406,7 @@ export class QuestScene implements Scene {
         }),
         t("run.counts", { passed: a.tests_passed, total: a.tests_total, notRun: "" }),
       );
-      for (const c of a.cases) {
+      for (const c of ranCases(a) ? a.cases : []) {
         if (c.visible && !c.passed) {
           out.push(`${c.name}: expected ${show(c.expect ?? "")} got ${show(c.got ?? "")}`);
         }
@@ -2457,7 +2461,8 @@ export class QuestScene implements Scene {
     const pad = Math.round(8 * s);
     const hidden = this.quest?.tests.hidden_count ?? 0;
     const ok = this.samplePassed(a);
-    const failed = a.cases.find((c) => c.visible && !c.passed);
+    // Only a case that ran has an "expected / got" worth printing.
+    const failed = ranCases(a) ? a.cases.find((c) => c.visible && !c.passed) : undefined;
 
     const head = ok
       ? t("verdict.accepted")

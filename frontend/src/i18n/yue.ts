@@ -136,6 +136,7 @@ export const yue: Partial<Catalogue> = {
   "login.unreachable": "駁唔到伺服器 — 等緊佢",
   "login.pressEnter": " — 撳 ENTER",
   "login.failed": "唔得",
+  "login.badInput": "呢個唔係助記詞亦唔係私鑰",
 
   "lands.title": "揀塊領地",
   "lands.rustBlurb": "所有權、借用、生命週期。部機幫你寫之前，你本來有嘅嗰門手藝。",
@@ -356,6 +357,8 @@ export const yue: Partial<Catalogue> = {
   "pg.noPlayground": "呢部伺服器仲未有練習場",
   "pg.runSilent": "執行結果冇返嚟",
   "pg.deleteFailed": "刪唔到",
+  "pg.saved": "已儲存",
+  "pg.deleted": "已刪除",
   "pg.footer": "CTRL+ENTER  執行   CTRL+SHIFT+F  格式化   CTRL+S  儲存   ESC  返   F1  畫面方向",
   "pg.poster": "海報",
   "pg.posterSaved": "海報已儲存 · {file}",

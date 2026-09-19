@@ -123,6 +123,7 @@ export const zh: Partial<Catalogue> = {
   "login.unreachable": "连不上服务器 — 正在等它",
   "login.pressEnter": " — 请按 ENTER",
   "login.failed": "没有成功",
+  "login.badInput": "这不是助记词也不是私钥",
 
   "lands.title": "选一块领地",
   "lands.rustBlurb": "所有权、借用、生命周期。在机器替你写之前，你手上有的那门手艺。",
@@ -343,6 +344,8 @@ export const zh: Partial<Catalogue> = {
   "pg.noPlayground": "这台服务器还没有练习场",
   "pg.runSilent": "运行结果没有回来",
   "pg.deleteFailed": "删不掉它",
+  "pg.saved": "已保存",
+  "pg.deleted": "已删除",
   "pg.footer": "CTRL+ENTER  运行   CTRL+SHIFT+F  格式化   CTRL+S  保存   ESC  返回   F1  屏幕方向",
   "pg.poster": "海报",
   "pg.posterSaved": "海报已保存 · {file}",

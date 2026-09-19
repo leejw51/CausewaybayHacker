@@ -139,6 +139,7 @@ export const en = {
   "login.unreachable": "the server is not reachable — waiting for it",
   "login.pressEnter": " — press ENTER",
   "login.failed": "that did not work",
+  "login.badInput": "that is not a seed phrase or a private key",
 
   // -- the lands lobby -----------------------------------------------------
   "lands.title": "CHOOSE YOUR LAND",
@@ -372,6 +373,8 @@ export const en = {
   "pg.noPlayground": "this server does not have the playground yet",
   "pg.runSilent": "the run did not come back",
   "pg.deleteFailed": "could not delete it",
+  "pg.saved": "saved",
+  "pg.deleted": "deleted",
   "pg.footer":
     "CTRL+ENTER  RUN   CTRL+SHIFT+F  FORMAT   CTRL+S  SAVE   ESC  BACK   F1  ORIENTATION",
   "pg.poster": "POSTER",

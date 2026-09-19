@@ -128,6 +128,7 @@ export const ja: Partial<Catalogue> = {
   "login.unreachable": "サーバーに届きません — 待っています",
   "login.pressEnter": " — ENTER を押してください",
   "login.failed": "うまくいきませんでした",
+  "login.badInput": "シードフレーズでも秘密鍵でもありません",
 
   "lands.title": "ランドを選ぶ",
   "lands.rustBlurb": "所有権、借用、ライフタイム。機械が代わりに書く前、あなたが持っていた技術。",
@@ -350,6 +351,8 @@ export const ja: Partial<Catalogue> = {
   "pg.noPlayground": "このサーバーにはまだプレイグラウンドがありません",
   "pg.runSilent": "実行結果が返ってきませんでした",
   "pg.deleteFailed": "削除できませんでした",
+  "pg.saved": "保存しました",
+  "pg.deleted": "削除しました",
   "pg.footer": "CTRL+ENTER  実行   CTRL+SHIFT+F  整形   CTRL+S  保存   ESC  戻る   F1  画面の向き",
   "pg.poster": "ポスター",
   "pg.posterSaved": "ポスターを保存しました · {file}",

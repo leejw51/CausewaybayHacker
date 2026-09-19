@@ -158,11 +158,7 @@ describe("lookup", () => {
  * still read 열두 단어. These are the keys that reach the DOM that way.
  */
 describe("a language change reaches strings held in the DOM", () => {
-  const HELD_IN_DOM = [
-    "login.fieldHint",
-    "search.placeholder",
-    "pg.stdinHint",
-  ] as const;
+  const HELD_IN_DOM = ["login.fieldHint", "search.placeholder", "pg.stdinHint"] as const;
 
   // Presence only, deliberately. `search.placeholder` is "borrow checker" in
   // Czech too, because that is what a Czech Rust programmer calls it — a value

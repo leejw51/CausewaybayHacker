@@ -14,6 +14,7 @@ import {
   editorTextFor,
   hintsRemaining,
   openingSource,
+  ranCases,
   solveOutcome,
 } from "../src/scenes/quest";
 import type { EditState } from "../src/net/protocol";
@@ -223,5 +224,33 @@ describe("clearsForAnswer", () => {
   it("does nothing when the quest shipped no starter at all", () => {
     expect(clearsForAnswer("", "")).toBe(false);
     expect(clearsForAnswer("   ", "  \n ")).toBe(false);
+  });
+});
+
+/**
+ * The run report's case line. After a compile error the server still lists
+ * the sample, failed, with `got: ""`, and `expected "3\\n" got ""` under IT
+ * DID NOT COMPILE reads as a program that printed nothing — a different
+ * mistake from the one that was made.
+ */
+describe("whether a run's cases describe something that ran", () => {
+  it("says no after a compile error, so no expected/got line is printed", () => {
+    expect(ranCases({ verdict: "compile_error" })).toBe(false);
+  });
+
+  it("says no when the runner itself broke", () => {
+    expect(ranCases({ verdict: "internal_error" })).toBe(false);
+  });
+
+  it("says yes for every verdict a program produced", () => {
+    for (const verdict of [
+      "accepted",
+      "wrong_answer",
+      "runtime_error",
+      "timeout",
+      "output_limit",
+    ] as const) {
+      expect(ranCases({ verdict })).toBe(true);
+    }
   });
 });
