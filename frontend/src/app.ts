@@ -28,8 +28,11 @@ import { seconds, reducedMotion, Tween } from "./engine/motion";
 import { expInOut } from "./engine/ease";
 import { Backdrop, type Mood } from "./gfx/backdrop";
 import { Crt } from "./gfx/crt";
-import { Client } from "./net/client";
+import { Client, WireError } from "./net/client";
 import type { Category, Land } from "./net/protocol";
+
+/** What `App#signInAgain` came back with. See its doc for what each means. */
+export type SignInAgain = "ok" | "none" | "refused" | "transient";
 import type { Buttons } from "./ui/chrome";
 import { Chip } from "./audio/sfx";
 import { forget as forgetKey, lastAddress, recall, signMessage } from "./wallet/wallet";
@@ -219,7 +222,7 @@ export class App {
   private frozenAt = Date.now();
   private modal: Modal | null = null;
   /** A one-line banner for anything the player needs told: errors, reconnects. */
-  private toast: { text: string; left: number; tween: Tween } | null = null;
+  private toast: { text: string; left: number; tween: Tween; alarm: boolean } | null = null;
 
   /** Set by `logout()` so the login screen can say why it is being shown. */
   loggedOutNotice = "";
@@ -263,8 +266,26 @@ export class App {
       // A logout closes the socket on purpose. Announcing that as a failure
       // would put a red alarm across the login screen the player just asked
       // for, so the deliberate case is swallowed here.
-      if (s === "offline" && !this.closingOnPurpose) this.say(t("app.connLost"));
-      if (s === "authed") this.toast = null;
+      if (s === "offline" && !this.closingOnPurpose) this.say(t("app.connLost"), 4, "alarm");
+      if (s === "authed") {
+        this.toast = null;
+        // A resume that landed in the background — the server came back
+        // after a boot that found it down, or a reconnect caught up while
+        // the player was looking at the login card — has signed the tab in
+        // behind a screen that is still asking for a phrase. Move on. A
+        // `login` is left alone: the scene that asked for it goes on itself.
+        const name = this.scene?.name;
+        if (this.client.lastAuth === "resume" && (name === "login" || name === "title")) {
+          const user = this.client.user;
+          if (user) {
+            this.addressLabel = user.address;
+            recall(user.address);
+          }
+          void import("./scenes/lands").then(({ LandsScene }) =>
+            this.go(new LandsScene(this), "forward"),
+          );
+        }
+      }
     });
     // The session went away under a live tab. `unauthorized` — another tab's
     // resume rotated the token first, or it expired — is a fresh login with
@@ -272,7 +293,13 @@ export class App {
     // this session out on purpose (§4.21): the kept key goes too, and the
     // login screen is the honest next thing, not a quiet way back in.
     client.onNeedLogin((why) => void this.sessionLost(why));
-    client.on("server.bye", (p) => this.say(p.reason));
+    // §4.21: our words on the banner, the server's in the console. `revoked`
+    // is handled by `sessionLost`; `shutdown` (and anything unknown) is a
+    // connection about to drop, which the reconnect banner already covers.
+    client.on("server.bye", (p) => {
+      console.info("server.bye:", p.reason);
+      if (p.reason !== "revoked") this.say(t("app.connLost"), 4, "alarm");
+    });
   }
 
   // -- the loop ------------------------------------------------------------
@@ -751,31 +778,65 @@ export class App {
 
   /** See `Client#onNeedLogin`. */
   private async sessionLost(why: "unauthorized" | "revoked"): Promise<void> {
-    if (why === "revoked") forgetKey();
-    else if (await this.signInAgain()) return;
-    if (this.client.state === "authed") return;
-    await this.logout(t("err.unauthorized"));
+    // One at a time: a second `needLogin` while the first is still signing
+    // in again (the socket dropped mid-challenge, say) would race it to the
+    // logout below and throw away the session the first one just won.
+    if (this.sessionLostBusy) return;
+    this.sessionLostBusy = true;
+    try {
+      if (why === "revoked") {
+        forgetKey();
+        await this.logout(t("err.unauthorized"));
+        return;
+      }
+      // A refused sign-in is the server's word and the key goes with it. A
+      // transient one — the socket was down, a challenge timed out, the
+      // server was rate-limiting — is retried a few times over the reconnect
+      // backoff, and if it still will not go the login screen is shown with
+      // the key *kept*: the phrase was typed once and nothing has said it is
+      // wrong.
+      let outcome = await this.signInAgain();
+      for (const wait of [1000, 2000, 4000]) {
+        if (outcome !== "transient") break;
+        await new Promise((r) => setTimeout(r, wait));
+        if (this.client.state === "authed") return;
+        outcome = await this.signInAgain();
+      }
+      if (outcome === "ok" || this.client.state === "authed") return;
+      await this.logout(t("err.unauthorized"), { keepKey: outcome === "transient" });
+    } finally {
+      this.sessionLostBusy = false;
+    }
   }
+
+  private sessionLostBusy = false;
 
   /**
    * Sign in with the kept key, with nobody typing: challenge, sign, login,
    * the same three steps the login screen takes (§3.2), for the address
-   * `keep` last noted or the one given. False when there is nothing kept,
-   * the key is not the account's, or the server said no — in which case the
-   * login screen is the right next thing and the caller shows it.
+   * `keep` last noted or the one given. `none` when there is nothing kept or
+   * the key is not the account's; `refused` when the server said no, which is
+   * the one answer that means the key is worthless; `transient` when the
+   * attempt did not reach a verdict (no socket, a timeout, a rate limit) —
+   * the caller decides whether to try again, and must not throw the key away
+   * on it.
    */
-  async signInAgain(address = lastAddress()): Promise<boolean> {
-    if (!address || !recall(address)) return false;
-    if (this.client.state === "authed") return true;
+  async signInAgain(address = lastAddress()): Promise<SignInAgain> {
+    if (!address || !recall(address)) return "none";
+    if (this.client.state === "authed") return "ok";
     try {
       const challenge = await this.client.challenge(address);
       const user = await this.client.login(address, signMessage(challenge.message));
       this.addressLabel = user.address;
       this.restorePlace(this.client.position);
-      return true;
+      return "ok";
     } catch (e) {
       console.warn("sign-in with the kept key failed:", e);
-      return false;
+      const refused =
+        e instanceof WireError &&
+        !e.payload.detail?.disconnected &&
+        (e.payload.code === "unauthorized" || e.payload.code === "auth_bad_signature");
+      return refused ? "refused" : "transient";
     }
   }
 
@@ -791,8 +852,13 @@ export class App {
    * Nothing else needs clearing, and that is by design: no scene holds
    * progress, so the second wallet cannot see the first one's map.
    */
-  async logout(reason = ""): Promise<boolean> {
-    if (this.scene?.unsaved?.()) {
+  async logout(reason = "", opts: { keepKey?: boolean } = {}): Promise<boolean> {
+    // The question is for a player choosing to leave. A session that went
+    // away under them is not a choice — the server has already stopped
+    // answering — so the dialogue would only offer "keep writing" into a
+    // dead socket. The editor's buffer is on the edit stack (§4.11c) and
+    // comes back with the next login.
+    if (!reason && this.scene?.unsaved?.()) {
       const ok = await this.ask({
         title: t("app.logoutTitle"),
         body: t("app.logoutBody"),
@@ -801,7 +867,7 @@ export class App {
       });
       if (!ok) return false;
     }
-    forgetKey();
+    if (!opts.keepKey) forgetKey();
     this.client.forgetToken();
     this.closingOnPurpose = true;
     this.client.close();
@@ -982,7 +1048,11 @@ export class App {
 
       if (this.modal) {
         if (name === "escape") this.answer(false);
-        if (name === "return" || name === "kpenter") this.answer(true);
+        // Enter takes the lit button, which is the safe one unless the
+        // pointer is resting on the other (see `drawModal`). Every `ask()`
+        // guards something destructive, and a player who hit F3 by accident
+        // and presses Enter to make the box go away must not lose the buffer.
+        if (name === "return" || name === "kpenter") this.answer(this.modal.hover === "confirm");
         ev.preventDefault();
         return;
       }
@@ -1070,8 +1140,14 @@ export class App {
 
   // -- the banner ----------------------------------------------------------
 
-  say(text: string, secs = 4): void {
-    this.toast = { text, left: secs, tween: new Tween(seconds("panel")) };
+  /**
+   * A line under the header for a few seconds. `note` is the default and is
+   * drawn in the game's own blue — "language: 한국어", "crt: on" — because red
+   * means failure everywhere else on screen and a settings change is not one.
+   * `alarm` is for the connection going, or something breaking.
+   */
+  say(text: string, secs = 4, tone: "note" | "alarm" = "note"): void {
+    this.toast = { text, left: secs, tween: new Tween(seconds("panel")), alarm: tone === "alarm" };
   }
 
   /**
@@ -1121,7 +1197,7 @@ export class App {
     // slides down out of the header rather than appearing, so the eye is
     // brought to it instead of having to notice it.
     const top = Math.round(38 * s) - Math.round((1 - toast.tween.out) * h);
-    g.fillStyle = "rgba(216,40,0,0.92)";
+    g.fillStyle = toast.alarm ? "rgba(216,40,0,0.92)" : "rgba(28,36,92,0.94)";
     g.fillRect(0, top, vw, h);
     g.fillStyle = "rgba(40,24,16,1)";
     g.fillRect(0, top + h - 2, vw, 2);

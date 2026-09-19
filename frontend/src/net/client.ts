@@ -109,6 +109,22 @@ export class Client {
    * and "ask for the key again".
    */
   needsLogin = false;
+  /**
+   * How the current session was authenticated: `login` is the player (or the
+   * kept key) signing in on this connection, `resume` is a token the store
+   * already had. `App` uses it to tell a background resume — which nobody is
+   * waiting on, and which may land while the login screen is up — from a login
+   * the scene that asked for it is about to act on itself.
+   */
+  lastAuth: "login" | "resume" | null = null;
+  /**
+   * True once this tab has held a session. A reconnect that finds no token in
+   * the store then means the session was taken away under a live tab (another
+   * tab logged out, or a resume elsewhere failed and forgot it), which is a
+   * `needLogin` and not a quiet return to anonymous. A tab that never had one
+   * is on the login screen already and is left alone.
+   */
+  private hadSession = false;
 
   private readonly storage: ClientOptions["storage"];
   private readonly storageKey: string;
@@ -163,6 +179,7 @@ export class Client {
   forgetToken(): void {
     this.token = null;
     this.user = null;
+    this.hadSession = false;
   }
 
   // -- connection ----------------------------------------------------------
@@ -271,7 +288,17 @@ export class Client {
   private async reconnect(): Promise<void> {
     this.connect();
     const token = this.token;
-    if (!token) return;
+    if (!token) {
+      // The store had a token when this tab was authed and has none now: the
+      // header still shows an address, every request would be refused with
+      // "needs a session", and nothing else would ever say so. Treat it as the
+      // session being gone (§6.4) so the kept key can sign in again.
+      if (this.hadSession) {
+        this.hadSession = false;
+        this.needLogin("unauthorized");
+      }
+      return;
+    }
     try {
       await this.waitFor("open");
       await this.resume(token);
@@ -419,6 +446,7 @@ export class Client {
       "auth.login",
       name ? { address, signature, name } : { address, signature },
     );
+    this.lastAuth = "login";
     this.adopt(res.token, res.user);
     this.position = res.position;
     return res.user;
@@ -431,6 +459,7 @@ export class Client {
     this.position = res.position;
     // §4.4 / §8.7: the server rotates on use. Storing the one we sent would
     // work until it didn't, on whichever reconnect happened to be the second.
+    this.lastAuth = "resume";
     this.adopt(res.token, res.user);
     return res.user;
   }
@@ -443,6 +472,7 @@ export class Client {
     this.token = token;
     this.user = user;
     this.needsLogin = false;
+    this.hadSession = true;
     this.setState("authed");
   }
 

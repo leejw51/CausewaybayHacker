@@ -18,6 +18,7 @@ import { LoginScene } from "./login";
 import { TitleScene } from "./title";
 import { localeReady, t } from "../i18n";
 import { recall } from "../wallet/wallet";
+import { WireError } from "../net/client";
 
 export class BootScene implements Scene {
   readonly name = "boot";
@@ -51,7 +52,7 @@ export class BootScene implements Scene {
       // the login screen first tries to draw it.
       this.app.assets.prefetch("title_bg", this.app.layout.isPortrait());
     } catch {
-      this.app.say(t("boot.artFailed"));
+      this.app.say(t("boot.artFailed"), 4, "alarm");
     }
 
     this.step = t("boot.server");
@@ -62,7 +63,7 @@ export class BootScene implements Scene {
       // Straight to login, not to the story. Somebody whose server is not
       // running has a problem to see, and a two-minute attract sequence in
       // front of the message telling them about it is the wrong order.
-      this.app.say(t("boot.noServer"));
+      this.app.say(t("boot.noServer"), 4, "alarm");
       return void this.app.go(new LoginScene(this.app), "none");
     }
 
@@ -76,14 +77,21 @@ export class BootScene implements Scene {
         // Nothing kept is not an error: the stamp asks, as it always did.
         recall(user.address);
         return void this.app.go(new LandsScene(this.app), "forward");
-      } catch {
+      } catch (e) {
         // A dead token is not an error worth a banner: the kept key, if
         // there is one, signs in again below, and the login screen is what
-        // the player would do about it otherwise.
-        this.app.client.forgetToken();
+        // the player would do about it otherwise. Only the server's own
+        // `unauthorized` is a dead token, though. A drop or a timeout before
+        // the reply is a token the server still honours — and the store is
+        // shared by every tab, so forgetting it here would log the others
+        // out too. Kept, it is what the client resumes with when the socket
+        // comes back, and `App` then moves this tab off the login screen.
+        if (e instanceof WireError && e.payload.code === "unauthorized") {
+          this.app.client.forgetToken();
+        }
       }
     }
-    if (await this.app.signInAgain()) {
+    if ((await this.app.signInAgain()) === "ok") {
       return void this.app.go(new LandsScene(this.app), "forward");
     }
     // Nobody is logged in and nobody is being resumed: this is a cold start at

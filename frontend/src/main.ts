@@ -55,7 +55,7 @@ async function main(): Promise<void> {
   // uncaught error land here and are said out loud, once each.
   const crashed = (what: unknown) => {
     console.error("[causewaybay hacker]", what);
-    app.say(t("app.crashed"), 6);
+    app.say(t("app.crashed"), 6, "alarm");
   };
   window.addEventListener("unhandledrejection", (e) => crashed(e.reason));
   window.addEventListener("error", (e) => crashed(e.error ?? e.message));

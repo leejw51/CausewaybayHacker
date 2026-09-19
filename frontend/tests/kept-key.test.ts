@@ -77,9 +77,18 @@ describe("the app", () => {
     // `onState("open")` fires before the resume is answered and would miss it.
     expect(APP).toContain("client.onNeedLogin((why) => void this.sessionLost(why))");
     const lost = method(APP, "private async sessionLost(");
-    expect(lost).toContain('if (why === "revoked") forgetKey();');
+    // `revoked` is the server signing the session out on purpose: the key goes.
+    expect(lost).toMatch(/if \(why === "revoked"\) \{\s*forgetKey\(\);/);
     expect(lost).toContain("await this.signInAgain()");
-    expect(lost).toContain("await this.logout(");
+    // A sign-in that did not reach a verdict keeps the key: only the server's
+    // own refusal is grounds to throw it away.
+    expect(lost).toContain(
+      'await this.logout(t("err.unauthorized"), { keepKey: outcome === "transient" })',
+    );
+    // And the retry loop is bounded.
+    expect(lost).toContain("for (const wait of [1000, 2000, 4000])");
+    // `logout` itself only forgets the key when not told to keep it.
+    expect(method(APP, "async logout(")).toContain("if (!opts.keepKey) forgetKey();");
     // And it never hands the phrase or the key anywhere: only a signature crosses.
     expect(again).not.toContain("localStorage");
     expect(again).not.toMatch(/login\([^)]*key/);
