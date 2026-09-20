@@ -136,8 +136,11 @@ export const ko: Partial<Catalogue> = {
   "lands.cppBlurb": "포인터, RAII, 미정의 동작. 모든 것이 주소이고 아무도 당신을 검사하지 않는다.",
   "lands.pythonBlurb":
     "딕셔너리, 제너레이터, 덕 타이핑. 실행되기 전까지는 아무것도 타입이 없고, 여섯 시에 실행된다.",
-  "lands.basicBlurb": "아침 산책. 가게, 노점, 계산대 — 기계가 쓴 것을 읽는다.",
-  "lands.advancedBlurb": "점심 러시. 계산대 하나에 손님 둘, 그리고 둘 다 동시에 일어났다.",
+  "lands.verybasicBlurb": "퀴즈. 어느 줄이 맞는 문법인가? 넷 중 하나를 고르고, 그 줄을 친다.",
+  "lands.basicBlurb":
+    "아침 산책. 문법 하나씩 설명을 읽고 한두 줄만 채운다 — 타입, 반복문, 구조체, 정렬, 클로저, 스레드, 트리.",
+  "lands.advancedBlurb":
+    "문법을 쓰는 작은 코딩 퀴즈, 그다음 점심 러시. 계산대 하나에 손님 둘, 동시에.",
   "lands.hackerBlurb": "면접. 방 하나, 시계 하나, 당신의 줄을 대신 끝내 주는 것은 없다.",
   "lands.category": "{land} — 분류",
   "lands.clearedOf": "{total} 중 {cleared} 클리어",
@@ -154,10 +157,14 @@ export const ko: Partial<Catalogue> = {
   "lands.noWorld": "서버가 세계 정보를 보내지 않았습니다",
   "lands.footer": "←→  지역   클릭  분류   F7  언어   F1  화면 방향   F3  로그아웃",
 
+  "map.menu": "메뉴",
+  "map.close": "닫기",
+  "map.goIn": "들어가기",
   "map.allMaps": "전체 지도",
   "map.playground": "연습장",
   "map.allMapsShort": "지도",
   "map.playgroundShort": "연습",
+  "map.verybasic": "입문",
   "map.basic": "기초",
   "map.advanced": "심화",
   "map.hacker": "해커",
@@ -178,6 +185,8 @@ export const ko: Partial<Catalogue> = {
   "map.footer": "←→  거리   ENTER  들어가기   TAB  지역   Q/E  분류   F1  화면 방향",
 
   "quest.loading": "여는 중",
+  "quest.quizPick": "맞는 줄을 고르고, 그 줄을 치세요  (1–4)",
+  "quest.quizRight": "정답 — 이제 그 줄을 치세요",
   "quest.job": "오늘의 과제",
   "quest.sample": "예시 · {name}",
   "quest.in": "입력",
@@ -294,6 +303,10 @@ export const ko: Partial<Catalogue> = {
   "result.runnerSaw": "실행기가 본 것",
   "result.again": "한 번 더",
   "result.tryAgain": "다시 시도",
+  "result.xpGained": "+{xp} XP",
+  "result.levelUp": "레벨 {level}",
+  "result.xpTotal": "{xp} XP · 레벨 {level}",
+  "result.next": "다음",
   "result.backToMap": "지도로 돌아가기",
   "result.footer": "ENTER  지도   R  다시 시도   F1  화면 방향   F3  로그아웃",
 

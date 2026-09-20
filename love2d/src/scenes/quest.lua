@@ -156,6 +156,14 @@ function Quest.new(app)
     solve_note = nil,
     solve_unsupported = false,
     solving = false,
+    -- VERY BASIC (PROTOCOL §5.3 `quiz`): the question is the brief, the four
+    -- choices are drawn under it, and the editor is locked until the right
+    -- one is picked — select one, then type it. Nothing goes to the server;
+    -- the record is the typed line passing the tests.
+    quiz_right = true,
+    quiz_wrong = nil,
+    quiz_wrong_at = nil,
+    choice_hits = {},
     -- CODE: the editor with the screen to itself. The brief, the band and
     -- the console are one press away and the code is what the screen is for.
     code_mode = false,
@@ -320,6 +328,9 @@ function Quest:refresh()
       return
     end
     self.quest = payload.quest
+    -- The quiz comes first on VERY BASIC; a cleared quest is past it.
+    self.quiz_right = not (self.quest.quiz and self.quest.state ~= "cleared")
+    self.quiz_wrong = nil
     -- §4.8b: the clock arrives with the quest. `opened_at` and `deadline_at`
     -- are the server's and are the *same pair* on every later `quest.get`, so
     -- a reconnect shows one clock rather than starting a new one — which is
@@ -451,6 +462,8 @@ function Quest:execute(mode)
     self.app.last_attempt = attempt
     self.app:go("result", {
       attempt = attempt,
+      -- §4.9: what this submit was worth and where it left the player.
+      xp = payload.xp,
       quest = self.quest,
       log = self.log,
       source = self.editor:text(),
@@ -1729,6 +1742,100 @@ function Quest:draw_clock(vw)
   end
 end
 
+--- Whether the quiz still stands between the player and the editor.
+function Quest:quiz_locked()
+  return self.quest ~= nil and self.quest.quiz ~= nil and not self.quiz_right
+end
+
+--- What picking choice `i` (1-based) means against `quiz` (`answer` is the
+--- wire's 0-based index): "right", "wrong", or nil for no such choice.
+function Quest.pick_result(quiz, i)
+  if not quiz or not quiz.choices or i < 1 or i > #quiz.choices then return nil end
+  return (i - 1) == (quiz.answer or -1) and "right" or "wrong"
+end
+
+--- The four wells, stacked from `y` in a column `w` wide: one rectangle per
+--- choice, each as tall as its wrapped text needs and never shorter than a
+--- fingertip. Pure — read by the draw and by the click.
+function Quest.choice_boxes(x, y, w, heights, gap)
+  local out = {}
+  for i, h in ipairs(heights) do
+    out[i] = { x = x, y = y, w = w, h = h }
+    y = y + h + (gap or 6)
+  end
+  return out
+end
+
+--- One of the four, chosen.
+function Quest:pick(i)
+  local result = self.quest and Quest.pick_result(self.quest.quiz, i)
+  if not result or self.quiz_right then return end
+  if result == "right" then
+    self.quiz_right = true
+    self.quiz_wrong = nil
+    SFX.play("select")
+    self.focus = "editor"
+    return
+  end
+  self.quiz_wrong = i
+  self.quiz_wrong_at = Anim.now()
+  SFX.play("locked")
+end
+
+--- The choices under the question. Returns the y after them and records
+--- the hit boxes, cut to the panel, for `mousepressed`.
+function Quest:draw_choices(x, y, column, clip)
+  local quiz = self.quest and self.quest.quiz
+  self.choice_hits = {}
+  if not quiz or not quiz.choices then return y end
+  local head = self.quiz_right and I18n.t("RIGHT — NOW TYPE IT")
+    or I18n.t("PICK THE LINE, THEN TYPE IT  (1–4)")
+  for _, line in ipairs(UI.wrap(head, column, 8)) do
+    y = y + UI.text(line, x, y, 8, self.quiz_right and Theme.admit or Theme.coin) + 3
+  end
+  y = y + 6
+  local size = 8
+  local wraps, heights = {}, {}
+  for i, text in ipairs(quiz.choices) do
+    wraps[i] = UI.wrap(tostring(text), column - 30, size)
+    heights[i] = math.max(36, #wraps[i] * (UI.lineHeight(size) + 2) + 14)
+  end
+  local boxes = Quest.choice_boxes(x, y, column, heights, 6)
+  local shake_x, shake_y = 0, 0
+  if self.quiz_wrong and self.quiz_wrong_at then
+    shake_x, shake_y = Anim.shake(Anim.now() - self.quiz_wrong_at, { duration = 0.34, amount = 4 })
+  end
+  for i, box in ipairs(boxes) do
+    local right = self.quiz_right and (i - 1) == quiz.answer
+    local wrong = self.quiz_wrong == i and self.quiz_wrong_at
+      and (Anim.now() - self.quiz_wrong_at) < 0.9
+    local dx, dy = 0, 0
+    if wrong then dx, dy = shake_x, shake_y end
+    UI.panel(box.x + dx, box.y + dy, box.w, box.h, {
+      fill = Theme.withAlpha(right and Theme.admit or wrong and Theme.red or Theme.ink,
+        (right or wrong) and 0.45 or 0.6),
+      tint = right and Theme.admit or wrong and Theme.red or Theme.withAlpha(Theme.coin, 0.6),
+    })
+    UI.text(tostring(i), box.x + dx + 8, box.y + dy + 7, size,
+      right and Theme.admit or wrong and Theme.red or Theme.coin)
+    local ty = box.y + dy + 7
+    for _, line in ipairs(wraps[i]) do
+      UI.text(line, box.x + dx + 26, ty, size,
+        (self.quiz_right and not right) and Theme.dim or Theme.cream)
+      ty = ty + UI.lineHeight(size) + 2
+    end
+    -- The hit box is the visible part: the brief scrolls, and a choice
+    -- scrolled out of the panel must not take a tap meant for the well.
+    local top = math.max(box.y, clip.y)
+    local bottom = math.min(box.y + box.h, clip.y + clip.h)
+    if bottom > top and not self.quiz_right then
+      self.choice_hits[i] = { x = box.x, y = top, w = box.w, h = bottom - top }
+    end
+    y = box.y + box.h + 6
+  end
+  return y + 4
+end
+
 function Quest:draw_brief(rect, tint)
   UI.panel(rect.x, rect.y, rect.w, rect.h, {
     fill = Theme.withAlpha(Theme.navy, 0.95),
@@ -1768,6 +1875,8 @@ function Quest:draw_brief(rect, tint)
       y = y + UI.text(line, x, y, prose, Theme.cream) + 3
     end
     y = y + 10
+    -- VERY BASIC: the question was the brief; here are the answers.
+    y = self:draw_choices(x, y, column, rect)
 
     if self.quest.concepts and #self.quest.concepts > 0 then
       y = y + UI.text(I18n.t("CONCEPTS"), x, y, 8, Theme.withAlpha(Theme.cream, 0.6)) + 4
@@ -2781,6 +2890,12 @@ end
 
 function Quest:textinput(text)
   if self.coder and self.coder:textinput(text) then return end
+  -- The quiz first: a digit picks, anything else is refused until it is right.
+  if self:quiz_locked() then
+    local n = tonumber(text)
+    if n and n >= 1 and n <= 4 then self:pick(n) else SFX.play("locked") end
+    return
+  end
   if self.focus == "editor" then
     self.editor:textinput(text)
     SFX.play("type")
@@ -2871,6 +2986,18 @@ function Quest:keypressed(key, mods)
     return true
   end
 
+  if self:quiz_locked() then
+    -- Digits arrive through `textinput`; the editing keys are refused while
+    -- the editor is locked, and the rest (scroll, panes) still work.
+    if key == "return" or key == "kpenter" or key == "backspace" or key == "delete"
+      or key == "tab" then
+      SFX.play("locked")
+      return true
+    end
+    if key == "up" then self.brief_scroll = math.max(0, self.brief_scroll - 24); return true end
+    if key == "down" then self.brief_scroll = self.brief_scroll + 24; return true end
+    return false
+  end
   if self.focus == "editor" then
     if self.editor:keypressed(key, mods) then return true end
   else
@@ -2949,6 +3076,9 @@ function Quest:mousepressed(x, y, button)
   if inside(self.clear_rect) then self:stack_clear(); return end
   if inside(self.run_rect) then self:run(); return end
   if inside(self.submit_rect) then self:submit(); return end
+  for i, r in pairs(self.choice_hits or {}) do
+    if inside(r) then self:pick(i); return end
+  end
   if x >= brief.x and x <= brief.x + brief.w and y >= brief.y and y <= brief.y + brief.h then
     self.focus = "brief"
     return

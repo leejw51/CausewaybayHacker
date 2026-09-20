@@ -11,6 +11,511 @@ locale = "yue"
 
 # ---------------------------------------------------------------- 01
 [[quest]]
+id    = "go.advanced.01.control-flow"
+title = "電車定港鐵"
+story = "銅鑼灣站大堂個板本來係話邊班車到緊。而家佢每一分鐘都只係顯示嗰分鐘嘅數字。"
+brief = '''
+讀一個整數 `n`。對每個由 `1` 到 `n` 嘅 `i`，印一行：
+
+* `i` 同時被 3 同 5 整除就印 `TRAMMTR`
+* `i` 被 3 整除就印 `TRAM`
+* `i` 被 5 整除就印 `MTR`
+* 否則印 `i` 本身
+
+```
+input:  5
+output: 1
+        2
+        TRAM
+        4
+        MTR
+```
+
+Go 嘅 `switch` 可以冇 subject，每個 arm 收一個布林條件，而且唔會 fall through。
+用佢。
+'''
+hints = [
+  "先 check 兩樣都中嘅情況，唔係佢永遠都唔會觸發。",
+  "switch { case cond: } 唔使 subject，亦都唔使 break。",
+  "被 3 同 5 整除，即係被 15 整除。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.advanced.02.slices"
+title = "車廂中間"
+story = "2 號月台數到邊個最先上車、邊個最後上車，中間嘅人全部唔見晒。"
+brief = '''
+標準輸入第一行係個數量 `n`，第二行係 `n` 個整數，用空格分開。`n` 至少係 `1`。
+
+印三行：第一個值、最後一個值，同埋嚴格喺佢哋兩個之間所有值嘅總和。少過三個值嘅話，
+嗰個總和係 `0`。
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+'''
+hints = [
+  "nums[1:len(nums)-1] 同原本嗰個共用同一個 backing array — 佢係一個 view，唔係 copy。",
+  "得一個或者兩個值嘅時候，嗰個 slice 表達式會係空或者無效；用 if 守住佢。",
+  "range 一個 slice 會畀你 index 同 value；唔要 index 就用 _ 頂住。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.advanced.03.maps"
+title = "大堂嗌緊乜"
+story = "九點鐘嘅銅鑼灣轉車站。廣播板想要個排名，但係 map 係冇次序嘅。"
+brief = '''
+讀晒成個標準輸入，按空白字元切開。
+
+每個唔同嘅字印一次，格式係 `<word> <count>`，按次數由多到少排，次數一樣就按字由細到大排。
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+喺 Go 入面 range 一個 map，次序係刻意隨機嘅。印之前先收集好。
+'''
+hints = [
+  "counts[word]++ 對唔存在嘅 key 都得：int 嘅零值係 0。",
+  "sort.Slice 收一個 less function — i 要排喺 j 前面嘅時候就 return true。",
+  "打和嘅處理就係同一個 function 入面嘅第二個比較。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.advanced.04.strings"
+title = "byte 唔係字"
+story = "B 出口個指示牌將「銅鑼灣」截到三個 byte，出嚟係一個半字加一個問號。"
+brief = '''
+讀一行。印三行：
+
+1. 佢有幾多個 **byte**
+2. 佢有幾多個 **rune**
+3. 呢一行嘅 rune 倒轉排
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+呢一行可能有 ASCII 以外嘅字元，嗰陣頭兩個數字就唔會一樣。`len(s)` 係 byte 數，
+一直都係。
+'''
+hints = [
+  "len(line) 係 byte 數；[]rune(line) 係解碼之後嗰個。",
+  "倒轉個 byte slice 會將一個多 byte 嘅字元切開兩半。",
+  "兩個 index 由兩邊行埋嚟，一邊行一邊交換，成個倒轉就係咁。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.advanced.05.structs"
+title = "收銀機"
+story = "Lucky Mac 個櫃檯加咗一行落張單，到下一行嗰陣佢已經唔見咗。個 method 攞咗個 copy。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行 `<ITEM> <CENTS>`。
+
+將啲項目收集喺一個 `Till` 度，然後按到達次序將每個項目印返出嚟，格式係
+`<ITEM> <CENTS>`，最後印 `TOTAL <sum>`。
+
+```
+input:  2
+        HASHBROWN 600
+        SET 2800
+output: HASHBROWN 600
+        SET 2800
+        TOTAL 3400
+```
+
+`n` 可以係 `0`，嗰陣唯一嗰行就係 `TOTAL 0`。
+
+value receiver 嘅 method 攞到嘅係個 till 嘅 copy。`Add` 一定要改到真嗰個。
+'''
+hints = [
+  "func (t *Till) Add — pointer receiver 改嘅係 caller 手上嗰個 till。",
+  "till.Add(...) 照樣寫都得；因為 till 係 addressable，Go 會自動幫你攞地址。",
+  "Total 只係讀，但係同一個 type 上面嘅 receiver 要保持一致。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.advanced.06.interfaces"
+title = "一張清單，兩樣嘢"
+story = "希慎廣場個指示牌同出面個電車站係兩個唔同嘅程式印嘅，邊個都放唔入對方嘅清單。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行，每行係以下其中一種
+
+* `SHOP <NAME> <FLOOR>` — 顯示成 `<NAME> / F<FLOOR>`
+* `STOP <ROUTE>` — 顯示成 `TRAM <ROUTE>`
+
+按次序印出每個 sign 顯示嘅樣，然後印 `SIGNS <n>`，再印 `SHOPS <k>`，`k` 係入面
+有幾多個係舖頭 — 要用 **type switch** 數，唔係用你 parse 嗰陣留低嘅 flag。
+
+```
+input:  3
+        SHOP HYSAN 4
+        STOP 2
+        SHOP SOGO 1
+output: HYSAN / F4
+        TRAM 2
+        SOGO / F1
+        SIGNS 3
+        SHOPS 2
+```
+'''
+hints = [
+  "冇 `implements` 呢個 keyword。畀每個 struct 一個 Render() string method，佢就滿足 Sign。",
+  "直接將個具體值 append 入 []Sign — Go 會幫你包住佢。",
+  "switch sign.(type) { case Shop: } 就係 type switch；要攞個值嘅寫法係 switch v := sign.(type)。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.advanced.07.errors"
+title = "唔係數字嗰一行"
+story = "騎手記錄由車廠送返嚟，個欄中間夾住咗唔知邊個嘅午餐單。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行。每行應該係一個整數。
+
+每一行，印個值嘅兩倍，或者 parse 唔到就印 `BAD <line>`。最後印 `SUM <total>`，
+即係你印過嗰啲值嘅總和。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+定義一個 sentinel `var ErrNotANumber = errors.New(...)`，用
+`fmt.Errorf("...: %w", ErrNotANumber)` 包住佢，再喺 `main` 入面用 `errors.Is`
+認返佢出嚟。error 係一個值；呢樣嘢就係咁樣換返嚟嘅。
+'''
+hints = [
+  "strconv.ParseInt(s, 10, 64) 回傳 (int64, error) — 第二個值唔係話唔睇就得。",
+  "fmt.Errorf 入面嘅 %w 令被包住嘅 error 仲搵得返；%v 就會將佢壓成純文字。",
+  "errors.Is 會沿住成條 wrap chain 行，所以個訊息加咗嘢之後佢照樣認得。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.advanced.08.closures"
+title = "門口人數"
+story = "Lucky Mac 數住邊個入嚟邊個出去，經理想要收舖嗰陣個數，中間發生咩事都好。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行，每行係 `IN` 或者 `OUT`。
+
+維持一個永遠唔會跌到零以下嘅計數。每個指令之後印一次個數。`main` return 嗰陣，
+印 `CLOSED <final>` — 要由 `defer` 印，唔係喺 function 尾印。
+
+```
+input:  4
+        IN
+        IN
+        OUT
+        IN
+output: 1
+        2
+        1
+        2
+        CLOSED 2
+```
+
+個計數器本身係一個 closure：一個回傳 function 嘅 function，個總數就夾喺佢哋兩個
+之間。答案入面冇 package 層級嘅變數。
+'''
+hints = [
+  "total 住喺 makeCounter 個 frame 入面，回傳嗰個 function 令佢一直生存。呢個就係 closure。",
+  "defer func(){ ... }() 喺 return 嗰陣先行，而個 closure 係嗰陣先讀 `last` — 唔係寫 defer 嗰陣。",
+  "如果個 defer 係收 argument 嘅，佢就會喺 defer 嗰一刻攞住個值。兩樣都試下，睇下佢點變。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.advanced.09.generics"
+title = "一個 function，任何 list"
+story = "Alex 已經寫咗四次 Sum — 訂單一次、騎手一次、分鐘一次、仙一次 — 第五次就嚟到期。"
+brief = '''
+標準輸入係一行整數，用空格分開。
+
+印三行：
+
+1. 每個值嘅兩倍，用單個空格連埋
+2. 原本啲值嘅總和
+3. 有幾多個大過 `10`
+
+```
+input:  1 2 3 4 12
+output: 2 4 6 8 24
+        22
+        1
+```
+
+寫三個泛型 helper 而且要用佢哋：`MapSlice[T, U any]`、用 `~int64 | ~float64`
+constraint 嘅 `Sum[T Number]`，同埋收一個 predicate 嘅 `Count[T any]`。
+'''
+hints = [
+  "MapSlice 會改變元素嘅 type，所以佢要兩個 type parameter，唔係一個。",
+  "call site 會由個 slice 同個 function 推斷出 T 同 U — 你唔使寫 MapSlice[int64, string]。",
+  "~int64 嘅意思係 int64 加埋任何 underlying type 係 int64 嘅嘢，named type 就係咁樣過到關。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.advanced.10.defer-panic-recover"
+title = "跌低咗又企返起身"
+story = "以前一張壞單就可以令成部收銀機死機，成個更嘅記錄一齊冇埋。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行。每行係一個整數、`BOOM` 呢個字，或者其他嘢。
+
+寫 `run(text string) (out string)`，回傳個值嘅兩倍，parse 唔到就回傳 `BAD <text>`
+— 遇到 `BOOM` 就 **panic**，然後喺一個 deferred function 入面 recover，等 caller
+攞到 `RECOVERED boom`，而唔係一個死咗嘅程式。每個輸入印一行，最後由 `main` 入面
+嘅 `defer` 印 `CLOSED <n>`。
+
+```
+input:  4
+        21
+        BOOM
+        xx
+        -4
+output: 42
+        RECOVERED boom
+        BAD xx
+        -8
+        CLOSED 4
+```
+
+三件事，三件都係考點：`recover` 只係喺 deferred function 入面先有作用；
+**named** return value 係令 deferred function 可以喺 panic 之後改變回傳值嘅關鍵；
+`main` 入面嘅 `defer` 喺 return 嗰陣先行，所以個 loop 點行都好，`CLOSED` 一定係
+最後一行。
+'''
+hints = [
+  "回傳值一定要有名 — out string — 唔係嘅話個 deferred function 冇嘢可以 assign。",
+  "冇 panic 嘅時候 recover() 回傳 nil，所以個 if 就係分辨兩條路嘅方法。",
+  "main 入面嗰個 deferred closure 係行嗰陣先讀 `done`，唔係寫嗰陣，所以佢見到嘅係最終嘅數。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.advanced.11.zero-values"
+title = "冇嘢唔等於冇嘢"
+story = "更表個 map 從來冇整過出嚟，段碼成個朝早讀住佢，一次都冇投訴過。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個字。
+
+按次序印四行：
+
+1. `READ <v>` — 一個 **nil** map 對一個佢冇嘅 key 會畀你乜
+2. `LEN <k>` — 將全部 `n` 個字 append 入一個 **nil** slice 之後嘅長度
+3. `WRITE <ok|panic>` — 向嗰個 nil map assign 有冇 panic
+   （要 recover 佢；唔好畀個程式死）
+4. `FOUND <k>` — 有幾多個字係一個*已初始化*、預先放咗 `a` 同 `b` 嘅 map 嘅 key
+
+```
+input:  3
+        a b c
+output: READ 0
+        LEN 3
+        WRITE panic
+        FOUND 2
+```
+
+nil map 同 nil slice 唔係同一種「冇」。讀一個 nil map 係合法嘅，會畀你值嘅 type
+嘅零值；寫入去就會 panic，因為根本冇個表可以寫。`append` 入一個 nil slice 係合法
+嘅，佢會自己分配 — 所以 `var s []T` 係慣用嘅空 slice，而 `var m map[K]V` 就唔係
+慣用嘅空 map。
+'''
+hints = [
+  "喺 nil map 上面 empty[\"missing\"] 唔係 error — 佢係 int 嘅零值，即係 0。",
+  "append 應付得到 nil slice：佢會幫你分配第一個 backing array，所以你從來唔使為咗起頭而 make()。",
+  "個寫入一定要喺一個有 deferred recover 嘅 function 入面發生，唔係個 panic 會喺第四行之前就搞死個程式。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.advanced.12.embedding"
+title = "佢乜都冇繼承到"
+story = "總站就係一個站加多啲嘢。Alex 寫咗兩次，多咗一次。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行，每行係 `STOP <NAME>` 或者 `TERM <NAME> <LINES>`。
+
+畀 `Stop` 一個回傳佢個名嘅 `Describe() string`。令 `Terminus` **embed** `Stop`
+再加一個 `Lines int`，同埋畀佢自己一個 `Describe`，呼叫 embed 嗰個之後加上
+`(<lines> lines)`。
+
+印每個嘅 `Describe()`，然後印 `TERMINI <k>`，個數要用 type switch 行一個
+`[]Describer` 數出嚟。
+
+```
+input:  3
+        STOP CAUSEWAY
+        TERM KENNEDY 2
+        STOP TINHAU
+output: CAUSEWAY
+        KENNEDY (2 lines)
+        TINHAU
+        TERMINI 1
+```
+
+embedding 唔係繼承。`Terminus` 唔會*變成*一個 `Stop`；佢係入面裝住一個，而入面
+嗰個值嘅 method 會被 **promote** 到外面嘅 type，除非外面嘅 type 自己聲明咗一個。
+`t.Stop.Describe()` 就係你搵返被遮住嗰個嘅方法，而且冇 `super`。
+'''
+hints = [
+  "embed 咗嘅 field 冇自己嘅名 — 喺 literal 入面同 t.Stop.Describe() 入面都係寫做 `Stop`。",
+  "Terminus 滿足 Describer 係因為佢自己嗰個 Describe；冇嘅話佢會透過 promote 上嚟嘅 Stop method 去滿足。",
+  "d.(Terminus) 用 comma-ok 寫法就係 type assertion；多過兩種嘅時候，type switch 做嘅係同一件事。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.advanced.13.variadics"
+title = "有幾多就幾多"
+story = "有時係兩張單，有時係成個架嘅單，個 function 唔應該理呢樣嘢。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個整數。
+
+寫 `total(values ...int64) (sum int64, count int)` — variadic，有 named return
+value — 然後用三種方式呼叫佢。印：
+
+1. `ALL <sum> <count>` — 成個 slice，用 `...` 展開
+2. `NONE <sum> <count>` — 完全冇 argument 咁呼叫
+3. `TWO <sum> <count>` — 頭兩個值逐個傳入，唔夠兩個就有幾多傳幾多
+
+```
+input:  4
+        1 2 3 4
+output: ALL 10 4
+        NONE 0 0
+        TWO 3 2
+```
+
+喺 function 入面 `values` 就係一個普通嘅 `[]int64`，冇 argument 嘅時候佢係 `nil`
+— `range` 同 `len` 都應付得到，唔使特別處理。`total(list...)` 係將現有嘅 slice
+直接傳過去，唔係 copy 一份新嘅；`total(list)` 就 compile 唔到，知道點解先係考點。
+'''
+hints = [
+  "有 named result 嘅時候，淨係寫 `return` 就會回傳 sum 同 count 當時嘅值。",
+  "total(list...) 會展開；total(list) 就係想將一個 []int64 當成單一個 int64 傳入去，compile 唔到。",
+  "冇 argument 嘅時候 values 係 nil，而 len(nil slice) 係 0 — 唔使守住。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.advanced.14.json"
+title = "tag 就係合約"
+story = "車廠個 API 送嚟嘅 key 係細楷，Go export 出去嘅 field 係大楷，成個星期冇人睇得出點解每張單都係空嘅。"
+brief = '''
+標準輸入係一行：一個 JSON array 嘅訂單，每張單有一個 `item` 字串同一個 `cents`
+數字。
+
+Unmarshal 佢，每張單印一行 `<ITEM> <CENTS>`，然後 marshal 並印出一個摘要
+object，key 一定要係 `count` 同 `total`，而且要係呢個次序。如果輸入唔係有效嘅
+JSON，就印 `BAD JSON`，其他嘢一律唔印。
+
+```
+input:  [{"item":"SET","cents":2800},{"item":"PIE","cents":900}]
+output: SET 2800
+        PIE 900
+        {"count":2,"total":3700}
+```
+
+一個 field 一定要 **export** 咗，`encoding/json` 先會見到佢 — 細楷嘅 field 對
+marshaller 嚟講係隱形嘅，一聲都唔會出。之後個 struct tag 先話畀佢知喺 wire 上面
+叫咩名。`Marshal` 係按聲明次序寫 field 嘅，所以摘要嘅 key 次序係由你決定，唔係
+由 map 決定。
+'''
+hints = [
+  "tag 放喺 type 後面嘅 backtick 入面：Item string `json:\"item\"`。",
+  "Unmarshal 收嘅係目標嘅 pointer — &orders，唔係 orders — 唔係嘅話佢冇嘢可以填。",
+  "睇下 Unmarshal 個 error。輸入壞咗嘅時候 orders 會留空，一個唔理 error 嘅程式會開開心心印一個零嘅摘要。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.advanced.15.testing"
+title = "自己證明"
+story = "06:40 冇人會幫你 check 呢樣嘢。個表就喺度；令佢變綠。"
+brief = '''
+個程式有一個表，入面係四個已知正確嘅 `(km, fare)` 案例，佢會逐個用嚟 check
+`fare`，印 `<name> ok` 或者 `<name> FAIL got <g> want <w>`，然後印
+`PASSED <k>/4`。最後佢由標準輸入讀一個距離，印 `FARE <x>`。
+
+`fare(km)` 應該係 `500 + 100 * km`。starter 嗰個係錯嘅，而個表捉到佢 — 呢個
+正正就係重點。
+
+```
+input:  4
+output: zero ok
+        one ok
+        four ok
+        ten ok
+        PASSED 4/4
+        FARE 900
+```
+
+唔好掂個表；佢就係規格。呢個**就係** Go 嘅 table-driven test，只係冇咗個
+harness：喺真正嘅 package 入面佢係 `func TestFare(t *testing.T)`，配
+`for _, c := range cases` 同 `t.Run(c.name, ...)`，由 `go test` 行。個表兩邊
+都係一樣嘅。
+'''
+hints = [
+  "個表就係規格。錯嘅係個 function。",
+  "四個案例有三個失敗，過到嗰個係 km = 0，呢個正正就係點解一個測試案例證明唔到任何嘢。",
+  "喺 package 入面呢個係 func TestFare(t *testing.T) 配 t.Run(c.name, func(t *testing.T){ ... })，咁失敗嘅時候佢會自己報名。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.advanced.16.nil-and-order"
+title = "前面個收銀機"
+story = "11:55，Lucky Mac 前枱收銀機。每張單都過到，有啲根本唔存在，部收銀機照樣讀佢哋。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行。每行係 `<NAME> <CENTS>`，或者單一個 `-`，
+意思係張單從來冇到過：slice 入面一個 nil 嘅 `*Order`。
+
+將真正嘅訂單按 cents **由大到小**排，一樣就按名由細到大排，印成 `<NAME> <CENTS>`。
+然後印 `NIL <count>` — 有幾多張係唔見咗嘅。
+
+```
+input:  4
+        SET 2800
+        -
+        PIE 900
+        TEA 1200
+output: SET 2800
+        TEA 1200
+        PIE 900
+        NIL 1
+```
+
+每一個 nil 都要喺任何嘢 dereference 佢之前搵出嚟，包括你交畀 `sort.Slice` 嗰個
+比較 function。成個 boss 就係咁。
+'''
+hints = [
+  "slice 入面一個 nil *Order 本身冇問題，直到有嘢讀佢個 field 為止。先篩，後排。",
+  "strings.Fields 對 \"-\" 會畀一個 field，所以 len(fields) < 2 就係你嘅「單唔見咗」測試。",
+  "由大到小就係 less function 入面嘅 >；打和嘅處理係佢後面嘅第二個比較。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
 id    = "go.advanced.01.goroutines"
 title = "四十個騎手"
 story = "12:30。八架單車，四十張單，個調度員仲係一張一張咁嗌。"
@@ -45,7 +550,7 @@ hints = [
   "用 sort.Slice 按 index 排，就可以攞返 scheduler 攞走咗嘅次序。",
 ]
 
-# ---------------------------------------------------------------- 02
+# ---------------------------------------------------------------- 18
 [[quest]]
 id    = "go.advanced.02.waitgroup"
 title = "冇人可以早走"
@@ -75,7 +580,7 @@ hints = [
   "wg.Add(1) 放喺 loop 入面、go 語句之前 — 唔係 goroutine 入面。",
 ]
 
-# ---------------------------------------------------------------- 03
+# ---------------------------------------------------------------- 19
 [[quest]]
 id    = "go.advanced.03.close"
 title = "邊個閂出餐口"
@@ -108,7 +613,7 @@ hints = [
   "由收嘢嗰邊 close 會令 sender 送嘢嗰陣 panic — 所以條規矩先係 sender close。",
 ]
 
-# ---------------------------------------------------------------- 04
+# ---------------------------------------------------------------- 20
 [[quest]]
 id    = "go.advanced.04.select"
 title = "兩個月台"
@@ -140,7 +645,7 @@ hints = [
   "loop 條件係 `tramCh != nil || mtrCh != nil`，所以兩個 arm 都閂咗佢先會完。",
 ]
 
-# ---------------------------------------------------------------- 05
+# ---------------------------------------------------------------- 21
 [[quest]]
 id    = "go.advanced.05.mutex"
 title = "一個錢櫃，八隻手"
@@ -169,7 +674,7 @@ hints = [
   "兩個 method 都要用 pointer receiver，唔係每次呼叫都係 lock 住個 mutex 嘅 copy，乜都守唔到。",
 ]
 
-# ---------------------------------------------------------------- 06
+# ---------------------------------------------------------------- 22
 [[quest]]
 id    = "go.advanced.06.atomic"
 title = "一次，得一次"
@@ -201,7 +706,7 @@ hints = [
   "INIT 一定喺 TOTAL 之前出現，因為印 INIT 係喺 goroutine 入面發生，而 TOTAL 係 Wait 之後先印。",
 ]
 
-# ---------------------------------------------------------------- 07
+# ---------------------------------------------------------------- 23
 [[quest]]
 id    = "go.advanced.07.context"
 title = "唔好再送"
@@ -234,7 +739,7 @@ hints = [
   "就算你自己會呼叫 cancel，main 入面嘅 defer cancel() 都唔係可有可無 — 佢係釋放個 context 嘅嘢。",
 ]
 
-# ---------------------------------------------------------------- 08
+# ---------------------------------------------------------------- 24
 [[quest]]
 id    = "go.advanced.08.worker-pool"
 title = "八架單車"
@@ -266,7 +771,7 @@ hints = [
   "多出嚟嗰個 goroutine 就係為咗呢樣嘢：wg.Wait() 然後 close(results)，而 main 仲喺度抽緊嘢。",
 ]
 
-# ---------------------------------------------------------------- 09
+# ---------------------------------------------------------------- 25
 [[quest]]
 id    = "go.advanced.09.errors-in-flight"
 title = "唔知邊個嘅午餐單"
@@ -299,7 +804,7 @@ hints = [
   "印之前先按 index 排序，唔係個輸出就係 scheduler 想點就點。",
 ]
 
-# ---------------------------------------------------------------- 10
+# ---------------------------------------------------------------- 26
 [[quest]]
 id    = "go.advanced.10.context-tree"
 title = "佢係向下取消嘅"
@@ -338,7 +843,7 @@ hints = [
   "ctx.Err() 係 context.Canceled 或者 context.DeadlineExceeded，分辨佢哋要用 errors.Is，唔係比較啲字串。",
 ]
 
-# ---------------------------------------------------------------- 11
+# ---------------------------------------------------------------- 27
 [[quest]]
 id    = "go.advanced.11.rwmutex"
 title = "三百個讀者"
@@ -372,7 +877,7 @@ hints = [
   "讀 map 嘅 comma-ok 寫法先分得開「唔存在」同「存在但係零」。",
 ]
 
-# ---------------------------------------------------------------- 12
+# ---------------------------------------------------------------- 28
 [[quest]]
 id    = "go.advanced.12.chan-directions"
 title = "佢係行邊個方向"
@@ -405,7 +910,7 @@ hints = [
   "range 一條 close 咗而且抽乾咗嘅 channel 會完 — 所以 produce close 佢，consume 先可以 return。",
 ]
 
-# ---------------------------------------------------------------- 13
+# ---------------------------------------------------------------- 29
 [[quest]]
 id    = "go.advanced.13.select-default"
 title = "試下，但係唔等"
@@ -437,7 +942,7 @@ hints = [
   "唔好用 close channel 嚟測試空唔空 — 喺 close 咗嘅 channel 上面 receive 永遠都 ready，會報 `no`。",
 ]
 
-# ---------------------------------------------------------------- 14
+# ---------------------------------------------------------------- 30
 [[quest]]
 id    = "go.advanced.14.happens-before"
 title = "點解呢個係安全嘅"
@@ -476,7 +981,7 @@ hints = [
   "每個 goroutine 擁有自己一格，所以永遠冇兩個會掂同一舊記憶；唯一需要嘅邊就係讀晒佢哋之前嗰個 Wait。",
 ]
 
-# ---------------------------------------------------------------- 15
+# ---------------------------------------------------------------- 31
 [[quest]]
 id    = "go.advanced.15.generic-constraints"
 title = "個 type 要應承啲乜"
@@ -516,7 +1021,7 @@ hints = [
   "map[T]struct{} 要 T 係 comparable，啱啱好就係嗰個 constraint，而 struct{} 係嗰個零闊度嘅值，講緊「係 set，唔係 map」。",
 ]
 
-# ---------------------------------------------------------------- 16
+# ---------------------------------------------------------------- 32
 [[quest]]
 id    = "go.advanced.16.gotchas"
 title = "三樣睇落唔係嗰回事嘅嘢"
@@ -566,7 +1071,7 @@ hints = [
   "boxed 揸住嘅係 (*Thing, nil)。同 nil 比較係比較成對嘢，而 type 嗰半唔係 nil。",
 ]
 
-# ---------------------------------------------------------------- 17
+# ---------------------------------------------------------------- 33
 [[quest]]
 id    = "go.advanced.17.race"
 title = "競賽"

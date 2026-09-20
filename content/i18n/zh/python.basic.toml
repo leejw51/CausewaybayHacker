@@ -36,11 +36,15 @@ id    = "python.basic.02.price-board"
 title = "价格牌"
 story = "豆腐档的牌子上只剩一个数字，后面两格空着，原来写的是两件的价钱和每平方的价钱。"
 brief = '''
-从标准输入读取一个整数 `n`。
+`input()` 从标准输入读一行，并把它作为**字符串**返回。看起来像数字的字符串仍然是
+字符串：`"12" * 2` 是 `"1212"`，而 `"12" * "12"` 是 `TypeError`。`int()` 把文本变成整数，
+顺便去掉两边的空白。
 
-输出三行：`n`，然后是 `n` 的两倍，然后是 `n` 乘以自己。
+```
+n = int(input())
+```
 
-`n` 可以是负数。它能放进 Python 想要的任何大小，因为 Python 的整数没有位宽。
+三个 `print` 已经写好。照样输入 `main` 的第一行，这样 `n` 就是整数而不是文本。
 
 ```
 input:  12
@@ -48,568 +52,770 @@ output: 12
         24
         144
 ```
-
-`input()` 给你的是一个**字符串**。`"12" * 2` 是 `"1212"`，而 `"12" * "12"`
-是一个 `TypeError`。先转换。
 '''
 hints = [
-  "起始代码在第三个 print 上崩溃：TypeError, can't multiply sequence by non-int of type 'str'。读一下这条消息；它在告诉你 n 是什么。",
-  "int(input()) 在读取的同时完成转换。int() 还会替你去掉前后的空白。",
+  "起始代码在第三个 print 崩溃：TypeError, can't multiply sequence by non-int of type 'str'。读一读这条消息；它在告诉你 n 是什么。",
+  "int(input()) 在读取时就转换。int() 还会替你去掉空白。",
   "负数 n 的平方是正数。测试知道这一点。",
 ]
 
 # ---------------------------------------------------------------- 03
 [[quest]]
-id    = "python.basic.03.conversions"
-title = "三种形态，一个名字"
-story = "鱼档的记事本里，价钱既是文字，又是数字，又是元，而三个都叫 price。"
+id    = "python.basic.03.types"
+title = "分账"
+story = "宝灵顿道的门口，两个摊主分一箱鸡蛋，本子上本该写份额、余数和单价的三个地方是同一个数字。"
 brief = '''
-读取一行：一个以分为单位的金额，全是数字。
-
-输出三行：
-
-1. 去掉首尾空白后的文本有多少个字符
-2. 这个金额作为数字
-3. 这个金额换算成元，精确到两位小数
+Python 有两种除法。`//` 是整数除法，向下取整；`%` 是余数；`/` 总是给出 `float`，
+即使是 `6 / 3`。要打印固定小数位的浮点数，在 f-string 里的冒号后面放一个格式说明：
+`.2f` 表示小数点后两位。
 
 ```
-input:  1234
-output: 4
-        1234
-        12.34
+print(a // b)
+print(a % b)
+print(f"{a / b:.2f}")
 ```
 
-金额非负。用**一个名字**来做，重新绑定三次——先是 `str`，然后是 `int`，然后又是
-`str`。Python 允许一个名字装任何东西、随时改主意；代价是，除了读上面的代码，没有任何东西告诉你
-`cents` 此刻是什么。
+`a` 和 `b` 已经读好，前两个 print 也已写好。照样输入第三个 `print` 行。
 
-算元的时候不要经过 `float`。`1234 / 100` 今天是 `12.34`，而 `0.1 + 0.2`
-每天都是 `0.30000000000000004`。整数除法和取模精确地给你两个部分，`f"{cents % 100:02d}"`
-给第二部分补零。
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
 '''
 hints = [
-  "在 cents 还是字符串的时候取 len(cents)，就是第一行。",
-  "cents = int(cents) 不是原地转换；它是把一个新值绑定到旧名字上。在那之后字符串就没了。",
-  "f-string 里的 :02d 是宽度二、补零、十进制。5 分是 0.05，不是 0.5。",
+  "print(f\"{a / b:.2f}\") ——引号前的 f 让它成为 f-string，:.2f 是格式说明。",
+  "格式说明写在花括号里、表达式之后：{value:.2f}。",
 ]
 
 # ---------------------------------------------------------------- 04
 [[quest]]
-id    = "python.basic.04.control-flow"
-title = "哪条过道"
-story = "街市的过道编号漆在地上，门口的指示牌本该写明每条过道卖什么。它每次都只写编号。"
+id    = "python.basic.04.strings"
+title = "摊位招牌"
+story = "鱼摊的招牌师傅要把名字量一量、喊出来，还要倒着写一份贴在鱼缸后面的镜子上，本子上只有一份，正着写的。"
 brief = '''
-读取一个整数 `n`。对从 `1` 到 `n` 的每个 `i`，输出一行：
-
-* 如果 `i` 能同时被 3 和 5 整除，输出 `FISHVEG`
-* 如果 `i` 能被 3 整除，输出 `FISH`
-* 如果 `i` 能被 5 整除，输出 `VEG`
-* 否则输出 `i` 本身
-
-然后继续读取整数，每行一个，直到读到 `0` 为止，再输出 `SKIPPED <k>`，其中 `k`
-是途中读到的非零行数。
+字符串通过 `len()` 知道自己的长度，用 `.upper()` 得到大写副本，步长为 `-1` 的切片
+倒着走过它。`s[::-1]` 的意思是：从头到尾，每次往回一步——也就是整个字符串反转。
 
 ```
-input:  5
-        7
-        8
-        0
-output: 1
-        2
-        FISH
-        4
-        VEG
-        SKIPPED 2
+print(len(s))
+print(s.upper())
+print(s[::-1])
 ```
 
-两个循环，两种写法。第一个在开始之前就知道要跑多少次：`for i in range(1, n + 1)`。第二个不知道：`while True`
-加 `break`，因为次数由你读到的内容决定。Python 的 `range` 在终点**之前**就停下，而 `range(1, n)`
-是每个人在这里都会写错一次的差一错误。
+`s` 已经读好，长度也已打印。照样输入第二和第三个 `print` 行。
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
 '''
 hints = [
-  "先检查两者都满足的情况，否则它永远不会触发。能被 3 和 5 整除就是能被 15 整除。",
-  "range(1, n) 停在 n - 1。起始代码就有这个 bug；样例输出会少最后一行。",
-  "while True 加 break 是 Python 表达“出口在中间的循环”的方式。没有 do-while。",
+  "print(s.upper()) 然后 print(s[::-1]) ——一个方法调用和一个切片。",
+  "切片是 s[start:stop:step]；start 和 stop 留空表示整个字符串，step 为 -1 表示倒着走。",
 ]
 
 # ---------------------------------------------------------------- 05
 [[quest]]
-id    = "python.basic.05.lists"
-title = "队伍中间"
-story = "四十个人在崇光地库排队买烧鹅。柜台看得见队头和队尾，中间的一个也看不见。"
+id    = "python.basic.05.loops"
+title = "数袋子"
+story = "袋子摊每天早上把塑料袋从 1 编到 n，出去了多少个、哪些是免费的第三个，这一栏在数字下面是一行空白。"
 brief = '''
-标准输入第一行是一个数量 `n`，第二行是 `n` 个整数，用空格分隔。
-
-输出三行：第一个值、最后一个值，以及严格位于它们之间所有值的和。少于三个值时，这个和为 `0`。
+`for` 循环走过一个序列，`range` 按需生成一个。`range(1, n + 1)` 从 `1` 数到 `n`
+（包含）——stop 值永远不包含在内，所以要写成比你想要的最后一个数大一。
 
 ```
-input:  5
-        4 8 15 16 23
-output: 4
-        23
-        39
+for i in range(1, n + 1):
+    total += i
+    if i % 3 == 0:
+        threes += 1
 ```
 
-`nums[1:-1]` 就是中间部分：一个切片，也就是一个**新列表**——Python 切片时会复制，这一点和 Rust
-的切片或 Go 的子切片不同。`nums[-1]` 是最后一个元素，负索引正是你在 Python 里从来不写
-`nums[len(nums) - 1]` 的全部原因。
+`n` 已经读好，`total` 和 `threes` 从 `0` 开始，循环体也已写好。在循环体上方
+照样输入 `for` 行。
 
-只有一个值时，`nums[1:-1]` 是空的，对它 `sum` 得到 `0`，所以其他语言需要的那道保护在这里是免费的。这值得知道，也值得去验证而不是想当然。
+```
+input:  10
+output: 55
+        3
+```
 '''
 hints = [
-  "nums[-1] 是最后一个元素；nums[-2] 是它前面那个。",
-  "nums[1:-1] 是除去首尾之后的全部，而空切片自己就会求和为 0。",
-  "sys.stdin.read().split() 一次读完全部内容并按任意空白切分，于是换行在哪里就不再重要。",
+  "for i in range(1, n + 1): ——range 在第二个参数之前停下，所以 n + 1 让 n 成为最后一个值。",
+  "range(n) 会从 0 数到 n - 1；总和会少 n。",
 ]
 
 # ---------------------------------------------------------------- 06
 [[quest]]
-id    = "python.basic.06.strings"
-title = "字节不是字"
-story = "崇光地库的楼层指示牌把 銅鑼灣 截到三个字节，打出一个字和一个问号。"
+id    = "python.basic.06.functions"
+title = "送货费率"
+story = "菜心摊按趟给送货的小伙子付钱，第十趟之后更便宜，本子上算这笔账的那一页只有一个名字，下面什么都没有。"
 brief = '''
-读取一行。输出三行：
-
-1. 它按 UTF-8 编码后的**字节**长度
-2. 它的**字符**长度
-3. 把这一行的字符倒过来
+`def` 创建函数：名字、括号里的参数、冒号，以及缩进的函数体。`return` 把一个值交还给
+调用者。函数体可以只是一个 `return`，把整个答案写成一个表达式。
 
 ```
-input:  causeway
-output: 8
-        8
-        yawesuac
+def fare(rides):
+    return min(rides, 10) * 5 + max(rides - 10, 0) * 3
 ```
 
-这一行可能含有 ASCII 之外的字符，那时前两个数字就不相同。Python 的 `str` 是码点的序列，所以 `len`
-是字符数；要得到字节，你得专门去要，用 `.encode("utf-8")`，然后对**那个结果**取 `len`，才是另一个数字。
+前十程每程 `5` 元，之后每程 `3` 元。`main` 读取 `n` 并打印 `fare(n)`。在 `fare` 里
+照样输入 `return` 行。
 
-`s[::-1]` 反转一个字符串。它是一个步长为 `-1` 的切片，对任何序列都有效。
+```
+input:  12
+output: 56
+```
 '''
 hints = [
-  "len(line) 是字符数。len(line.encode(\"utf-8\")) 是字节数。起始代码把错的那个先打了出来。",
-  "line[::-1] 就是整个反转。对 str 切片得到的还是 str。",
-  "把字节串倒过来会把一个多字节字符切成两半；把 str 倒过来不会，因为 str 里根本没有字节。",
+  "return min(rides, 10) * 5 + max(rides - 10, 0) * 3 ——min 把便宜的程数封顶在十，max 防止其余部分变成负数。",
+  "函数的工作到 return 为止；函数体里它后面的东西都不会运行。",
 ]
 
 # ---------------------------------------------------------------- 07
 [[quest]]
-id    = "python.basic.07.dicts"
-title = "街市在喊什么"
-story = "七点的宝灵顿道：每个档口都在喊些什么，坚拿道那头的指示牌想要一份排名。"
+id    = "python.basic.07.structs"
+title = "一个摊位，三个字段"
+story = "豆腐摊的卡片上有名字、价格和数量，收银机把卡片读成三个松散的词，什么也没加起来。"
 brief = '''
-读取标准输入的全部内容，按空白切分。
-
-每个不同的词输出一次，格式为 `<word> <count>`，按次数降序排列，次数相同时按词升序。
+`class` 把字段和作用于它们的函数捆在一起。`__init__` 在对象创建时运行，把字段存到 `self`
+上；其他方法第一个参数都是 `self`，通过它读字段。没有 `this`——对象就是参数列表里排第一的
+那个名字。
 
 ```
-input:  tram tram bus
-output: tram 2
-        bus 1
+class Stall:
+    def __init__(self, name, price, qty):
+        self.name = name
+        self.price = price
+        self.qty = qty
+
+    def total(self):
+        return self.price * self.qty
 ```
 
-dict 会记住插入顺序，但那不是你要的顺序。给 `sorted` 一个返回元组的 `key`，它会按第一个元素排序、用第二个元素决胜；把次数取负，就能在一个字段上降序而另一个字段保持升序。
+`Stall` 和它的 `__init__` 已经写好。照样输入 `total` 的 `return` 行。
+
+```
+input:  tofu 8 5
+output: tofu: 40
+```
 '''
 hints = [
-  "起始代码在第一个词上就死于 KeyError：counts[word] += 1 先读后写，而那里没有东西可读。counts.get(word, 0) 补上那个零。",
-  "sorted(counts.items(), key=...) 按你要求的顺序给出 (word, count) 对。dict 本身仍然保持插入顺序。",
-  "key=lambda item: (-item[1], item[0]) — 次数降序，然后词升序，一个元组搞定。",
+  "return self.price * self.qty ——字段住在 self 上，所以在方法里它们是 self.price 和 self.qty。",
+  "在 total() 里单独的 price 不是一个名字；传进来的只有 self。",
 ]
 
 # ---------------------------------------------------------------- 08
 [[quest]]
-id    = "python.basic.08.sets"
-title = "两个档口都有的"
-story = "两个菜档，一边一个，隔着过道；一位顾客想知道哪些东西两边随便哪家都能买到，免得在湿地板上来回走两趟。"
+id    = "python.basic.08.enums"
+title = "三条线，三种颜色"
+story = "钉在鱼摊上方的港铁图上有三条线，摊主的儿子得说出该坐哪种颜色，而下面的板子是空的。"
 brief = '''
-标准输入两行，每行是一个档口的货品，用空格分隔。一个档口可能把同一样东西列两次；那只算一次。
-
-输出三行：
-
-1. `BOTH` 后面跟着两份清单上都有的东西，排好序，用空格分隔——如果一样都没有，输出
-   `BOTH -`
-2. `ONLY_A <k>`：有多少东西在第一份清单上而不在第二份上
-3. `ALL <k>`：两份清单加起来一共有多少种不同的东西
+`Enum` 是一组封闭的具名成员。`Line.ISLAND` 是一个成员，`Line["ISLAND"]` 按名字查找一个成员，
+成员也可以像任何值一样作为 dict 的键。输入的单词大写后再查找，就变成了一个成员。
 
 ```
-input:  choisum tofu gailan tofu
-        gailan egg
-output: BOTH gailan
-        ONLY_A 2
-        ALL 4
+class Line(Enum):
+    ISLAND = 1
+
+line = Line[word.upper()]
 ```
 
-`set` 没有重复也没有顺序，`&`、`-` 和 `|` 就是那三种运算。对 set 用 `sorted` 得到一个列表，这是按固定顺序打印它的唯一办法。
+`Line`、从成员到颜色的 `COLOUR` 字典，以及 print 都已写好。照样输入 `line = ...` 行。
+
+```
+input:  tsuenwan
+output: red
+```
 '''
 hints = [
-  "set(input().split()) 直接从各个词构建集合；重复的 tofu 在进去的路上就消失了。",
-  "a & b 是交集，a - b 是差集，a | b 是并集。对每个取 len 就是数量。",
-  "\" \".join(sorted(both)) 需要字符串——这些本来就是——而 `if both else \"-\"` 用一个表达式就覆盖了空的情况。",
+  "line = Line[word.upper()] ——方括号按名字查找成员，而名字是大写的。",
+  "Line(2) 按值查找，Line.TSUENWAN 按属性查找；只有按名字的形式接受你读到的字符串。",
 ]
 
 # ---------------------------------------------------------------- 09
 [[quest]]
-id    = "python.basic.09.functions"
-title = "每斤"
-story = "宝灵顿道上的每张价签都是按斤算的，除非它另有说明；而标签打印机坚持每次都要人告诉它一遍。"
+id    = "python.basic.09.vector"
+title = "早市清单"
+story = "鸡蛋摊把早上的价格一个个喊出来，本子上没有清单，只有四个空格：多少个、第一个、最后一个、总数。"
 brief = '''
-标准输入是一个数量 `n`，然后是 `n` 行 `<NAME> <CENTS>` 或
-`<NAME> <CENTS> <UNIT>`。
-
-写一个 `tag(name, cents, unit="catty")`，返回 `<NAME> $<dollars>/<unit>`，保留两位小数，每行输出一张标签。
+列表是原地修改的。`.append(x)` 在末尾添加一个值，`del xs[i]` 删掉某个
+下标处的值（后面的前移），`xs[i] = x` 替换某个下标处的值，`.sort()` 把值
+原地升序排好。四个操作，四行，每一步之后列表都不一样了。
 
 ```
-input:  3
-        CHOISUM 1200
-        EGG 250 each
-        GARLIC 800
-output: CHOISUM $12.00/catty
-        EGG $2.50/each
-        GARLIC $8.00/catty
+xs.append(100)
+del xs[0]
+xs[0] = 7
+xs.sort()
 ```
 
-起始代码的 `tag` 没有默认值，所以只有两个词的行会让它崩溃：`TypeError: tag() missing 1 required positional argument`。默认参数是函数契约的一部分——它说明调用方可以省掉什么，以及省掉之后会得到什么。
+`xs` 装着这一行的整数，每一步之后都会打印。在四个 `# FILL` 占位符处，
+按这个顺序照样输入这四行。
 
-用 `.split()` 切开这一行，把分转换好之后用 `tag(*parts)` 把各部分交过去。`*`
-把一个列表展开成位置参数，于是两个元素的列表和三个元素的列表都能套进同一个签名。
+```
+input:  16 8 15 4
+output: 16 8 15 4 100
+        8 15 4 100
+        7 15 4 100
+        4 7 15 100
+```
 '''
 hints = [
-  "在 def 那一行写 unit=\"catty\"。这就是整个修复。",
-  "有默认值的参数放在没有默认值的参数之后——def tag(name, cents, unit=\"catty\")——而一个是列表或 dict 的默认值会在多次调用之间共享，那是接下来的问题。",
-  "tag(*parts) 把列表展开；只有两部分时，默认值填上第三个。",
+  "xs.append(100)，然后 del xs[0]，然后 xs[0] = 7，然后 xs.sort()——每个占位符一行，按这个顺序。",
+  "del 接受的是下标，不是值；xs.sort() 原地排序并返回 None，所以不要赋值。",
 ]
 
 # ---------------------------------------------------------------- 10
 [[quest]]
-id    = "python.basic.10.exceptions"
-title = "不是数字的那一行"
-story = "鱼档的秤打出一列重量，中间夹着某个人的电话号码。"
+id    = "python.basic.10.maps"
+title = "记账本"
+story = "菜摊每卖一样就在本子上记一个词，到 09:00 摊主要每种菜一行加上数量，而那一页只是按喊的顺序写下的词。"
 brief = '''
-标准输入是一个数量 `n`，然后是 `n` 行。每一行本该是一个整数。
-
-对每一行，要么输出它的值的两倍，要么在解析不了时输出 `BAD <line>`。最后输出 `SUM <total>`，其中 total
-是你输出过的那些值的和。
+字典按键修改。`counts[k] = v` 在键下存一个值——新键被添加，已有的键被
+覆盖——`del counts[k]` 删掉键和它的值，`counts[k] += n` 读出键下的值、
+改动、再写回。字典保持插入顺序；`sorted(counts)` 是它升序排列的键，给
+按这个顺序打印的循环用。统计已经替你建好；这四行先改动它，再排序。
 
 ```
-input:  3
-        21
-        xx
-        -4
-output: 42
-        BAD xx
-        -8
-        SUM 34
+counts["tofu"] = 1
+del counts[first]
+counts["tofu"] += 4
+for k in sorted(counts):
 ```
 
-`int("xx")` 会抛出 `ValueError`。这是 Python 告诉你转换失败的唯一方式——没有 `Result`，没有 `(value, ok)`；失败就是一个异常，而期望得到数字的那段代码必须用
-`try`/`except ValueError` 说清楚它打算怎么办。
+`counts` 每个词存一个计数，`first` 是这一行的第一个词，`show(counts)` 在
+每次修改后按插入顺序打印统计。在三个 `# FILL` 占位符处输入三处修改，
+然后把最后一个循环的头替换成排好序的那个。
 
-捕获 **`ValueError`**，而不是 `Exception`。光秃秃的 `except:` 还会把
-`KeyboardInterrupt` 和你自己代码里的拼写错误一起吞掉，程序就是这样学会悄无声息地失败的。
+```
+input:  siu mai har gau siu mai
+output: siu=2 mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=5
+        gau 1
+        har 1
+        mai 2
+        tofu 5
+```
 '''
 hints = [
-  "起始代码在 xx 上死于 ValueError: invalid literal for int() with base 10。这条消息就是你要捕获的那个异常。",
-  "把 try 块保持得很小：只有可能失败的那个调用放在里面，print 和累加放在后面。",
-  "except 里的 continue 会跳过这一行余下的循环体，于是坏行什么也不会加进去。",
+  "counts[\"tofu\"] = 1，然后 del counts[first]，然后 counts[\"tofu\"] += 4，然后把 for k in sorted(counts): 作为最后一个循环的头。",
+  "sorted(counts) 是升序的键；循环体 print(k, counts[k]) 已经在那里了。",
 ]
 
 # ---------------------------------------------------------------- 11
 [[quest]]
-id    = "python.basic.11.comprehensions"
-title = "宝灵顿道一趟走完"
-story = "亚历克斯说三个 for 循环就能做到。过道只容一个人，地板是湿的；你只能走一趟。"
+id    = "python.basic.11.sets"
+title = "不同的价格"
+story = "水果摊一早上喊的都是同样三个价格，而板子要知道的是有多少个不同的价格，不是喊了多少声。"
 brief = '''
-标准输入是一行整数，用空格分隔。
-
-输出三行：
-
-1. 所有偶数值的和（没有则为 `0`）
-2. 每个大于 `10` 的值，翻倍，按原顺序，用单个空格连接——没有则输出
-   `-`
-3. 一共有多少个不同的值
+`set` 里每个值只出现一次，并且按值修改：`.add(x)` 放入一个值，
+`.discard(x)` 取出一个值（不在时什么也不做），而没有"改这个值"——集合的
+修改是删掉一个值再添加另一个，`.remove(a); .add(b)`。集合自己不保持顺序，
+所以通过 `sorted(seen)` 展示，这就是第四行。
 
 ```
-input:  1 2 3 4 12 12 30
-output: 60
-        24 24 60
-        6
+seen.add(100)
+seen.discard(first)
+seen.remove(100); seen.add(101)
+print(*sorted(seen))
 ```
 
-用推导式，不要用索引循环：`sum` 里放一个生成器表达式，第二行用一个带 `if`
-的列表推导式，第三行用一个集合推导式。`if` 放在末尾负责过滤；放在前面的表达式负责变换。
+`seen` 装着这一行不重复的整数，`first` 是第一个，每次修改后打印 `len(seen)`。
+在四个 `# FILL` 占位符处，按这个顺序照样输入这四行。
 
-`" ".join(...)` 要的是字符串，所以第二个推导式必须产出
-`str(v * 2)`，而不是 `v * 2`。那条 `TypeError: sequence item 0: expected str
-instance, int found` 是每个人在这一行都会遇到的。
+```
+input:  8 3 8 5 3
+output: 4
+        3
+        3
+        3 5 101
+```
 '''
 hints = [
-  "sum(v for v in nums if v % 2 == 0) — 生成器表达式作为唯一参数时不需要额外的括号。",
-  "[str(v * 2) for v in nums if v > 10] — 前面变换，后面过滤。",
-  "{v for v in nums} 是集合推导式；set(nums) 是同一回事，这里两种都行。",
+  "seen.add(100)，然后 seen.discard(first)，然后 seen.remove(100); seen.add(101)，然后 print(*sorted(seen))——每个占位符一行，按这个顺序。",
+  "discard 忽略不存在的值；remove 遇到不存在的值会抛 KeyError。sorted(seen) 是列表；* 把它展开进 print。",
 ]
 
 # ---------------------------------------------------------------- 12
 [[quest]]
-id    = "python.basic.12.sorting"
-title = "排名榜"
-story = "街市办公室每天早上贴出最便宜的菜心，办事员靠两张清单和一支铅笔手工给各档口排名。"
+id    = "python.basic.12.stack-queue"
+title = "袋子堆"
+story = "袋子在收银台摞起来从顶上拿；顾客在旁边排队从前头走；收银机把两行都打成空的。"
 brief = '''
-标准输入两行：第一行是档口名字，第二行是它们的价格（以分计），顺序一致。
-
-按最便宜在前的顺序输出各档口，格式为 `<rank>. <NAME> <cents>`，名次从 `1`
-开始，价格相同时按名字升序。然后输出
-`CHEAPEST <NAME>`。
+列表就是栈，在它的顶部修改：`.append(x)` 压入一个值，`.pop()` 取走顶部，
+`stack[-1] = x` 原地替换顶部（`-1` 是最后一个下标）。`collections.deque`
+是队列，用 `.popleft()` 从前面取——那一边已经替你写好。
 
 ```
-input:  LAM WONG CHAN
-        1200 900 1200
-output: 1. WONG 900
-        2. CHAN 1200
-        3. LAM 1200
-        CHEAPEST WONG
+stack.append(100)
+stack.pop()
+stack[-1] = 9
 ```
 
-`zip` 把两个列表配成对；带 `key` 的 `sorted` 给这些对排序；`enumerate(..., start=1)`
-给它们编号。三个内置函数，任何地方都没有索引运算——用 `for i in range(len(names))`
-的那个版本，会在第三个档口把决胜规则弄错。
+`stack` 和 `queue` 装着这一行的整数；栈在每一步之后打印，然后取出并打印
+队列的队首。在三个 `# FILL` 占位符处，按这个顺序照样输入这三行。
+
+```
+input:  1 2 3 4
+output: 1 2 3 4 100
+        1 2 3 4
+        1 2 3 9
+        1
+```
 '''
 hints = [
-  "zip(names, prices) 逐个产出 (name, price) 元组，每个档口一个，到较短的列表结束时停止。",
-  "key=lambda pair: (pair[1], pair[0]) 先按价格再按名字排序；sorted 是稳定的，但键已经是完整的时候你用不着这一点。",
-  "enumerate(ranked, start=1) 给出 (rank, (name, price))，嵌套的元组可以在 for 那一行直接解包。",
+  "stack.append(100)，然后 stack.pop()，然后 stack[-1] = 9——每个占位符一行，按这个顺序。",
+  "不带参数的 pop() 取的是末尾，也就是栈顶；[-1] 指的是同一个位置，用来赋值。",
 ]
 
 # ---------------------------------------------------------------- 13
 [[quest]]
-id    = "python.basic.13.classes"
-title = "档口的记事本"
-story = "宝灵顿道上每个档口都有自己的一本当日销售记事本，而豆腐档那本的每一行都写在封面上，没写进里面。"
+id    = "python.basic.13.sorting"
+title = "价格阶梯"
+story = "市场办公室要当天的价格，给牌子的最便宜的排前面，给税表的最贵的排前面，而摊位是按喊的顺序记下来的。"
 brief = '''
-标准输入是一个数量 `n`，然后是 `n` 行 `<ITEM> <CENTS>`。
-
-建一个 `Notebook` 类来收集这些条目，然后把每个条目按到达的顺序原样输出为
-`<ITEM> <CENTS>`，接着输出 `TOTAL <sum>`，最后通过 `print(book)`
-输出记事本本身——它的 `__repr__` 必须产出 `Notebook(items=<n>, total=<sum>)`。
+`sorted()` 接收任何序列，返回一个新的升序列表，不动原来的。`reverse=True` 把它反过来。
+（列表也有 `.sort()`，它就地排序并返回 `None`。）
 
 ```
-input:  2
-        TOFU 600
-        SET 2800
-output: TOFU 600
-        SET 2800
-        TOTAL 3400
-        Notebook(items=2, total=3400)
+asc = sorted(xs)
+desc = sorted(xs, reverse=True)
 ```
 
-`n` 可以是 `0`，那时这两行是 `TOTAL 0` 和
-`Notebook(items=0, total=0)`。
+`xs` 已经读好，两个 print 也已写好。照样输入这两行，替换两个占位符。
 
-起始代码里的 bug 就是这道题名字的由来：`items = []` 写在**类体**里，于是它是一个被将来所有 `Notebook`
-共用的列表，而不是每本记事本一个。凡是在 `__init__` 里通过 `self` 创建的，属于实例；凡是写在类体里的，属于类。可变的类属性是最常逃过代码审查的
-Python bug，因为程序一直运行正常，直到出现第二个实例为止。
+```
+input:  5 3 9 1
+output: 1 3 5 9
+        9 5 3 1
+```
 '''
 hints = [
-  "运行起始代码，看输出的第一行：PENCIL 0，来自一本没人在里面写过字的记事本。那就是被共享的列表。",
-  "def __init__(self): self.items = [] — 在构造函数里、通过 self、每个实例各建一个。",
-  "没有 __str__ 时，print(book) 会调用 repr(book)，所以 __repr__ 是唯一要写的方法。让它看起来像一次能重建出它的构造调用；这是惯例。",
+  "asc = sorted(xs) 和 desc = sorted(xs, reverse=True) ——sorted 返回新列表，所以要赋值。",
+  "xs.sort() 会返回 None；sorted(xs) 才是给回值的那个。",
 ]
 
 # ---------------------------------------------------------------- 14
 [[quest]]
-id    = "python.basic.14.dataclasses"
-title = "谁在买"
-story = "崇光地库的米柜台对每张卡都收全价，包括那些不是成人的，还有那张根本不是卡的。"
+id    = "python.basic.14.sort-by-key"
+title = "排行榜"
+story = "崇光地库的美食广场按当天营业额把摊位钉在板上，最高的在前，营业额相同的两个摊位按字母顺序排；板上却是它们进门的顺序。"
 brief = '''
-标准输入是一个数量 `n`，然后是 `n` 行 `<TYPE> <KG>`。
+`sort` 和 `sorted` 接收一个 `key`：对每一项调用的函数，它的结果才是被比较的东西。元组
+逐个元素比较，所以返回元组的 key 先按第一个字段排，相同时再按第二个。把数字取负，
+就把那个字段的升序变成降序。
 
-基础价格是 `500 + 100 * KG` 分。对每一行输出下列之一：
+```
+rows.sort(key=lambda r: (-r[1], r[0]))
+```
 
-* `ADULT` — 基础价格
-* `STUDENT` — 基础价格的一半，整数除法
-* `SENIOR` — 永远是 `200`
-* 其他任何值 — `UNKNOWN <TYPE>`
+`rows` 是 `(name, score)` 元组的列表，print 已经写好。在 `FILL` 注释处照样输入 `sort` 行。
 
 ```
 input:  3
-        ADULT 4
-        STUDENT 4
-        SENIOR 4
-output: 900
-        450
-        200
+        mei 40
+        alex 55
+        ken 40
+output: alex 55
+        ken 40
+        mei 40
 ```
-
-把每一行建模成一个 frozen 的 `@dataclass`——`Order(kind: str, kg: int)`——并用对这个订单的**一个**
-`match` 来决定价格。`match` 可以按关键字解构一个 dataclass——`case Order(kind="ADULT", kg=kg):`——而它的最后一个分支
-`case Order(kind=other):` 会绑定所有没匹配上的情况。
-
-起始代码的 `match` 只有一个分支，然后是一个兜底的 `case _:`，对所有东西都打印
-`UNKNOWN`，包括它本该认识的那三种。分支按顺序尝试，第一个匹配的胜出，所以通配符必须放在最后，而且必须是唯一一个通配符。
 '''
 hints = [
-  "每种类型一个 case：case Order(kind=\"STUDENT\"): 以此类推。dataclass 按字段名匹配。",
-  "// 是整数除法；/ 会给你 450.0，而测试要的是 450。",
-  "case Order(kind=other): 是一个捕获模式——它总能匹配并绑定那个标签——所以要放在最后，正如 Rust 的 match 里的 `other =>` 分支。",
+  "rows.sort(key=lambda r: (-r[1], r[0])) ——r[1] 是分数，取负让大的排前面；r[0] 是名字。",
+  "reverse=True 会把名字也反过来；只对分数取负能让名字保持升序。",
 ]
 
 # ---------------------------------------------------------------- 15
 [[quest]]
-id    = "python.basic.15.generators"
-title = "你自己的 for 循环"
-story = "鱼档的报价器从开盘价起按固定步长往上列出每一个价格，却从不在任何地方保存它们的列表。"
+id    = "python.basic.15.closures"
+title = "加价"
+story = "水果摊给早上单子上的每个批发价加同样的加价，而本该记住加价的那个函数返回的是 None。"
 brief = '''
-标准输入是三个整数：`start`、`step`、`count`。
-
-写一个**生成器** `ticker(start, step, count)`，从 `start` 开始、每次前进 `step`，产出 `count`
-个值。每个值单独输出一行，然后输出 `SUM <total>`，这个总和要通过把第二个 ticker 交给 `sum` 来计算。
+定义在另一个函数里面的函数可以使用外层函数的名字，而且在外层函数返回之后仍然可以用。
+这就是闭包：内层函数把 `k` 带在身上。外层函数返回内层函数——函数本身，不是对它的调用。
 
 ```
-input:  5 2 4
-output: 5
-        7
-        9
-        11
-        SUM 32
-        generator
+def make_adder(k):
+    def add(x):
+        return x + k
+    return add
 ```
 
-最后一行是 `type(ticker(...)).__name__`，由起始代码现有的 `main` 打印。眼下它打出来的是
-`list`。
+`make_adder` 和它内部的 `def add(x):` 已经写好，`main` 把结果应用到每个数字。照样输入
+两个 `return` 行，替换两个占位符。
 
-含有 `yield` 的函数在你调用它时并不运行。它返回一个生成器，函数体一次走一步，每当有人要下一个值时才走一步。这就是为什么
-`for` 对它有效、`sum` 对它有效，以及为什么它可以产出一百万个值，而一个一百万元素的列表从来不曾存在。
-
-起始代码构建列表并返回它，这是正确的，但不是题目问的。列表是一次性给出所有值；生成器是被问到时给出一个值。把
-`append` 改成 `yield`，删掉列表。
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
 '''
 hints = [
-  "输出的最后一行是类型的名字，测试要的是 `generator`。这正是一个带 yield 的 def 返回的东西。",
-  "先 yield value，再前进。函数在 yield 处暂停，下一次请求时从它之后恢复。",
-  "生成器只能消费一次。这就是为什么 main 为求和另建了一个新的 ticker，而不是复用被循环耗尽的那个。",
+  "add 里面 return x + k，然后 return add（不带括号）作为 make_adder 的最后一行。",
+  "return add() 会不带参数地调用它然后失败；光秃秃的名字才是函数本身。",
 ]
 
 # ---------------------------------------------------------------- 16
 [[quest]]
-id    = "python.basic.16.decorators"
-title = "包起来"
-story = "街市办公室想知道今天价格函数被调用了多少次，而那个函数不想知道自己正被盯着。"
+id    = "python.basic.16.lambdas"
+title = "偶数的平方"
+story = "市场办公室按编号的平方向偶数号摊位收费，而办事员的表上该是总额的地方是一个零。"
 brief = '''
-标准输入是一个数量 `n`，然后是 `n` 个以千克计的重量。
-
-`price(kg)` 是 `500 + 100 * kg`。用 `@counted` 装饰它，让每一次调用都被计数，而 `price`
-自己毫不知情。每个重量输出一个价格，然后输出
-`CALLS <n>`，然后输出 `NAME <price.__name__>`——它必须仍然说 `price`。
+`lambda` 写一个没有名字的小函数：参数、冒号、一个表达式。`filter(f, xs)` 保留 `f` 说“是”的
+项；`map(f, xs)` 把每一项换成 `f(item)`；`sum()` 把剩下的加起来。从里往外读。
 
 ```
-input:  3
-        1 2 3
-output: 600
-        700
-        800
-        CALLS 3
-        NAME price
+total = sum(map(lambda x: x * x, filter(lambda x: x % 2 == 0, xs)))
 ```
 
-装饰器是一个接收函数、返回函数的函数。它返回的通常是一个叫 `wrapper`
-的闭包，先做点什么，然后调用原函数——而除非你另作声明，`wrapper` 就是名字 `price`
-现在所指的东西，连 `__name__` 也是。`functools.wraps` 把原函数的名字和 docstring
-复制到 wrapper 上。起始代码忘了它，于是最后一行说的是 `NAME wrapper`。
+`xs` 已经读好，print 也已写好。照样输入 `total = ...` 行。
 
-计数放在哪里？不放在全局变量里。把它挂在 wrapper 上——`wrapper.calls = 0`——事后读
-`price.calls`。函数是一个对象，和其他对象一样可以带属性。
+```
+input:  1 2 3 4 5 6
+output: 56
+```
 '''
 hints = [
-  "在 def wrapper 上面一行写 @functools.wraps(func)。你的装饰器里面再套一个装饰器。",
-  "def price 上面的 @counted 等同于在它后面写 price = counted(price)。这个名字被重新绑定到 counted 返回的任何东西上。",
-  "*args, **kwargs 是 wrapper 在不知道签名的情况下转发任意签名的方式，正是它让装饰器可以复用。",
+  "total = sum(map(lambda x: x * x, filter(lambda x: x % 2 == 0, xs))) ——先 filter，再 map，再 sum。",
+  "lambda 的主体是一个表达式，没有 return 关键字：lambda x: x * x。",
 ]
 
 # ---------------------------------------------------------------- 17
 [[quest]]
-id    = "python.basic.17.duck-typing"
-title = "会叫就是鸭子"
-story = "蛋档的一个塑料袋。没人问它是什么；他们问的是里面有几个、鸭蛋在不在里面，还有能不能一个一个地翻。"
+id    = "python.basic.17.threads"
+title = "十二个摊位同时"
+story = "06:30，崇光地库的每个摊位同时把自己的库存数平方了填订货单，而单子回来全是零，因为没有人等任何人。"
 brief = '''
-标准输入是一行货品，用空格分隔，然后是一行，只有一个要找的词。
-
-把货品放进一个 `Bag`，然后输出：
-
-1. `LEN <k>` — 来自 `len(bag)`
-2. 货品，每行一个 — 来自 `for item in bag`
-3. `HAS <WORD> YES` 或 `HAS <WORD> NO` — 来自 `word in bag`
-4. `LONGEST <item>` — 来自 `max(bag, key=len)`，长度相同时取第一个
+`threading.Thread(target=f, args=(i,))` 创建一个将调用 `f(i)` 的线程；在 `.start()` 之前
+什么都不会运行。`.join()` 等待那个线程结束。先启动所有线程，再 join 所有线程——
+在启动循环里 join 会让它们一个接一个地跑。
 
 ```
-input:  egg duckegg tofu
-        duckegg
-output: LEN 3
-        egg
-        duckegg
-        tofu
-        HAS duckegg YES
-        LONGEST duckegg
+threads = [threading.Thread(target=square, args=(i,)) for i in range(len(nums))]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
 ```
 
-`Bag` 不继承 `list`，也不需要继承。`len` 调用
-`__len__`，`for` 调用 `__iter__`，`in` 调用 `__contains__`，而 `max`
-只需要 `__iter__`。Python 从不问一个东西*是*什么；它只在需要的那一刻问它有没有那个方法。起始代码一个都没有，第一个错误是
-`TypeError: object of type 'Bag' has no len()`。
+`square(i)` 填 `results[i]`，线程列表已经建好，两个 print 在 join 之后运行。照样输入
+`t.start()` 作为第一个循环体、`t.join()` 作为第二个循环体。
 
-`__contains__` 是可选的：没有它，`in` 会退回到逐个迭代比较，正确但更慢。还是把它写上，因为面试官说“把它做成一个容器”时，指的就是这个。
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
 '''
 hints = [
-  "def __len__(self): return len(self._goods) — 三个方法，每个一行。",
-  "__iter__ 可以直接返回 iter(self._goods)；它不必是生成器，不过 `yield from self._goods` 也行。",
-  "max(bag, key=len) 在长度相同的项中保留第一个，所以样例说的是 duckegg 而不是后面的某个。",
+  "第一个循环里 t.start()，第二个循环里 t.join() ——两者都是不带参数的方法调用。",
+  "从不 start 的 Thread 永远不会运行；从不 join 的 Thread 在你 print 时可能还在跑。",
 ]
 
 # ---------------------------------------------------------------- 18
 [[quest]]
-id    = "python.basic.18.none"
-title = "空"
-story = "05:59，宝灵顿道。价格牌向记事本查一个还没开档的档口，记事本回答了一个“没有”，价格牌就把这个“没有”的价钱打了出来。"
+id    = "python.basic.18.binary-tree"
+title = "None"
+story = "05:59，市场的价格牌：价格树只有一个根，下面什么都没有，第一次查找就死在 'NoneType' object has no attribute 'left' 上。"
 brief = '''
-标准输入是一个数量 `n`，然后是 `n` 行 `<STALL> <CENTS>`——已经开档的档口——然后是一个数量 `q` 和
-`q` 个要查询的档口名。
-
-对每个查询输出 `<STALL> <cents>`，如果该档口没开则输出 `<STALL> NONE`。然后输出 `MISSING <k>` 和
-`CHEAPEST <STALL>`——已开档口中价格最低的那个，价格相同时按名字——如果一家都没开，输出 `CHEAPEST NONE`。
+二叉搜索树把较小的值放在节点的左子树，较大的放在右子树。插入是递归的：空子树（`None`）
+变成一个新的 `Node`；否则值往一侧走下去，回来的东西再存为那个子节点，因为那个子节点
+刚才可能还是 `None`。对 `None` 访问 `.left` 就是这整条路以之命名的崩溃——`None` 检查
+在最前面，而且已经写好了。
 
 ```
-input:  2
-        LAM 1200
-        WONG 900
+if v < n.val:
+    n.left = insert(n.left, v)
+else:
+    n.right = insert(n.right, v)
+```
+
+`Node`、`insert` 的 `None` 情况和它的 `if v < n.val:` / `else:` 骨架、`inorder`、`height`
+和 `main` 都已写好。照样输入两行递归行，替换两个 `pass` 占位符。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
         3
-        WONG
-        CHAN
-        LAM
-output: WONG 900
-        CHAN NONE
-        LAM 1200
-        MISSING 1
-        CHEAPEST WONG
 ```
-
-起始代码在 `CHAN` 上崩溃：
-
-```
-AttributeError: 'NoneType' object has no attribute 'cents'
-```
-
-这一行就是 boss。它从不指向 bug 本身。它指向一个 `None` 最终被*使用*的地方，而那里离它被*制造出来*的地方可以有任意远——起始代码里，它是在两个不同的地方被制造出来的。`lookup`
-对不存在的档口按设计返回 `None`，而调用方不问一声就从它上面读 `.cents`。`cheapest`
-有一条路径上没有 `return`，于是它**隐式地**返回 `None`，调用方又对它做了同样的事。
-
-Python 里每个函数都会返回点什么。一个走到末尾的函数返回 `None`。不带默认值的 `dict.get` 返回 `None`。两者在当时都不是错误；两者稍后都会变成错误。修法两次都一样：可能收到
-`None` 的代码在碰属性之前先用 `is None` 检查。不是 `== None`，也不是 `if not stall`——价格为 `0`
-的档口是真实存在的档口，`not` 会把它扔掉。
-
-让 `lookup` 和 `cheapest` **有意地**返回 `Optional[Stall]`，在注解里说明，并在 `None`
-落地的地方处理它。
 '''
 hints = [
-  "从下往上读回溯：AttributeError 在 print 那一行，但 None 是前一行从 lookup 出来的，再往前是从 board.get 出来的。",
-  "if stall is None: 就是那个检查。用 `is`，因为 None 是单个对象，身份比较才是诚实的比较；`==` 可以被重载，而 `not stall` 对一个为假但真实存在的值是错的。",
-  "cheapest 有两条路径，只有一条有 return。Python 不会为此警告；它把 None 交给调用方，让调用方自己去发现。给空的情况一个显式的 `return None`，读者才能看出这是有意为之。",
-  "注解里的 Optional[Stall] 不会被解释器强制执行。它是写给读者和类型检查器的一条说明，而读者才是那个赶时间的人。",
+  "if 下面 n.left = insert(n.left, v)，else 下面 n.right = insert(n.right, v)。",
+  "赋值才是关键：insert 返回子树的根，子节点原来是 None 时它就是一个全新的 Node。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.basic.04.int-types"
+title = "四字节宽"
+story = "鱼档的秤把重量存在四个字节里，在侧面印着它能装下的最大数字，而记事本上两样都没有。"
+brief = '''
+Python 的 `int` 没有宽度：数字需要多大它就长多大。宽度仍然存在于边缘、
+有字节的地方——`n.to_bytes(4, "big", signed=True)` 把 `n` 写成一个有符号的 32 位整数，
+四个字节，最高位在前，`.hex()` 把它们显示出来。有符号 32 位整数能装下的最大值是
+`(1 << 31) - 1`，无符号 64 位的是 `(1 << 64) - 1`。
+
+```
+print(n.to_bytes(4, "big", signed=True).hex())
+print((1 << 31) - 1)
+```
+
+`n` 已读入，64 位最大值在最后打印。在两个 `# FILL` 标记处输入上面这两行。
+
+```
+input:  7
+output: 00000007
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "print(n.to_bytes(4, \"big\", signed=True).hex()) ——四个字节，大端序，有符号，再显示为十六进制。",
+  "(1 << 31) - 1 是 2147483647：把 1 左移 31 位再减一。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.basic.05.big-int"
+title = "三十二字节"
+story = "市场里的每张收据都盖着一个没人读得懂的三十二字节的数，而收银机把它打印成一串跑出纸外的十进制。"
+brief = '''
+哈希、密钥、地址：这个游戏赖以运转的数字有 256 位宽——三十二字节。Python 的 `int`
+毫无怨言地装下它，`n.to_bytes(32, "big")` 把它铺成恰好三十二个字节，最高位在前，
+左侧补零。`.hex()` 把这些字节变成你在每个钱包上见过的那六十四个十六进制字符。
+
+```
+print(n.to_bytes(32, "big").hex())
+```
+
+`n` 以十进制读入。在 `# FILL` 标记处输入上面这一行。
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "print(n.to_bytes(32, \"big\").hex()) ——三十二字节，大端序，然后十六进制。",
+  "n 装不下时 to_bytes 会抛出 OverflowError；2**256 - 1 是能装下的最大值。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.basic.06.floats"
+title = "小数点后三位"
+story = "电子秤读到小数点后三位，旁边那台便宜的只保留单精度，而记事本上把同一个数写了两遍，两遍都错。"
+brief = '''
+Python 的 `float` 是 64 位双精度——在别的地方叫 `f64`。没有 32 位的浮点类型，
+但你可以看到一个：`struct.pack("f", x)` 把 `x` 写成四个字节的单精度，
+`struct.unpack("f", ...)` 把它们读回来，回来的就是 `x` 舍入到最近的 `f32`。
+f 字符串里的 `:.3f` 打印三位小数；`:.10f` 打印得足够多，能看见舍入。
+
+```
+x = float(s)
+y = struct.unpack("f", struct.pack("f", x))[0]
+```
+
+`s` 已读入，两个 print 都已写好。在两个占位处输入上面这两行。
+
+```
+input:  0.1
+output: 0.100
+        0.1000000015
+```
+'''
+hints = [
+  "x = float(s)，然后 y = struct.unpack(\"f\", struct.pack(\"f\", x))[0] ——unpack 返回元组，所以取 [0]。",
+  "\"f\" 是单精度格式；\"d\" 是双精度，什么也不会改变。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.basic.08.string-slices"
+title = "开头几个字母"
+story = "标签打印机取档口名字的前几个字母做短标签，加上一个记号，而招牌上的全名必须一字不动。"
+brief = '''
+`s[:n]` 是一个切片：`s` 的前 `n` 个字符，作为一个新字符串。字符串不能被修改，
+所以切片总是复制——无论对那一段做什么，`s` 都不受影响。字符串上的 `+=` 造一个新的
+并把名字重新绑定上去，追加就是这么做的。
+
+```
+head = s[:n]
+head += "!"
+```
+
+`s` 和 `n` 已读入，两个 print 都已写好。在两个占位处输入上面这两行。
+
+```
+input:  causeway bay
+        8
+output: causeway!
+        causeway bay
+```
+'''
+hints = [
+  "head = s[:n]，然后 head += \"!\" ——切片是一份副本，+= 再造一份。",
+  "s[:n] 和 s[0:n] 一样；省略起点就是从头开始。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.basic.09.int-slices"
+title = "从头上取两个"
+story = "点单本要把第二、第三个价格抄出来，把最后两个接在后面，而原来的单子要照写的样子留着。"
+brief = '''
+`v[1:3]` 是列表的一个切片：下标 1 和 2 处的元素，放在一个**新列表**里——改它永远
+不会改 `v`。`.extend(other)` 把 `other` 的每一项追加到末尾。切片从 0 数起，在第二个
+数字之前停下；负下标从末尾数起，所以 `v[-2:]` 是最后两个。
+
+```
+part = v[1:3]
+part.extend(v[-2:])
+```
+
+`v` 已读入，两个 print 都已写好。在两个占位处输入上面这两行。
+
+```
+input:  1 2 3 4 5
+output: 2 3 4 5
+        1 2 3 4 5
+```
+'''
+hints = [
+  "part = v[1:3]，然后 part.extend(v[-2:]) ——切片复制，extend 就地追加。",
+  "对列表来说 part += v[-2:] 和 extend 做的是同一件事。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.basic.10.byte-slices"
+title = "前三个字节"
+story = "条码打印机要档口名字的前三个字节和后面的一个记号，而且在打印成字母之前先以十六进制显示这些字节。"
+brief = '''
+`s.encode()` 把文本变成 `bytes`——每个字节一个数字，UTF-8。字节的切片和字符串的
+切片一样是副本，和另一个 `bytes` 值 `+=` 就是追加。`.hex()` 把每个字节显示为两位
+十六进制，`.decode()` 把它们变回文本。
+
+```
+head = s.encode()[:3]
+head += b"!"
+```
+
+`s` 已读入，两个 print 都已写好。在两个占位处输入上面这两行。
+
+```
+input:  kwan lee
+output: 6b776121
+        kwa!
+```
+'''
+hints = [
+  "head = s.encode()[:3]，然后 head += b\"!\" ——b 前缀构成一个 bytes 字面量。",
+  "str 和 bytes 不能相加；b\"!\" 是字节，\"!\" 是文本。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.basic.16.list"
+title = "点单链"
+story = "美食广场的跑腿把每张订单夹到链子的末尾，再把票号夹到最前面，而链子空空地挂在那里。"
+brief = '''
+`collections.deque` 是双端的链，两端都能改：`.appendleft(x)` 把值夹到
+最前面，`.pop()` 取走最后一个，`chain[i] = x` 替换某个位置的值——deque
+可以像列表一样用下标。deque 没有 `.sort()`；要排序就用 `sorted(chain)`
+建一个新的 deque，这就是第四行。
+
+```
+chain.appendleft(0)
+chain.pop()
+chain[0] = 9
+chain = deque(sorted(chain))
+```
+
+`chain` 装着这一行的整数，每一步之后都会打印。在四个 `# FILL` 占位符处，
+按这个顺序照样输入这四行。
+
+```
+input:  3 1 2
+output: 0 3 1 2
+        0 3 1
+        9 3 1
+        1 3 9
+```
+'''
+hints = [
+  "chain.appendleft(0)，然后 chain.pop()，然后 chain[0] = 9，然后 chain = deque(sorted(chain))——每个占位符一行，按这个顺序。",
+  "sorted() 返回列表；用 deque() 包一下就又是 deque 了。没有 chain.sort()。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "python.basic.18.hashtable"
+title = "档口编号"
+story = "市场办公室保存着一张从档口名到档口编号的表，而柜台上的每次查询都是空手而归。"
+brief = '''
+`dict` 就是哈希表：键被哈希到一个槽位，所以存、删、查的开销不管有多少键
+都一样。`table[k] = v` 存入（新键被添加），`table.pop(k)` 删掉一个键并交回
+它的值，`table[k] += n` 原地修改键下的值。`table.get(k, -1)` 查找而不抛出
+异常，`sorted(table)` 是升序排列的键——哈希表有它自己的顺序，但不是这一个。
+
+```
+table["bread"] = 99
+table.pop(first)
+table[last] += 10
+keys = sorted(table)
+```
+
+`table` 把第一行的每个摊位名映射到它的位置；`first` 和 `last` 是第一个和
+最后一个名字。第二行的名字在修改之后被查找并打印，缺失时打印 `-1`；
+然后整张表按 `keys` 打印。在四个 `# FILL` 占位符处，按这个顺序照样输入这四行。
+
+```
+input:  tofu fish gau
+        gau bread tofu fish
+output: 12
+        99
+        -1
+        1
+        bread=99 fish=1 gau=12
+```
+'''
+hints = [
+  "table[\"bread\"] = 99，然后 table.pop(first)，然后 table[last] += 10，然后 keys = sorted(table)——每个占位符一行，按这个顺序。",
+  "pop(k) 删除并返回；+= 要求键存在，而 last 是存在的。sorted(table) 排的是键，不是值。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "python.basic.22.reverse"
+title = "从后往前"
+story = "晚间的价目表要把价格梯从上往下倒着读，档口的名字在玻璃上是镜像画的，而记事本上两样都是正的。"
+brief = '''
+`v.reverse()` 把列表**就地**翻转——不返回任何东西，`v` 本身现在是倒的。字符串不能
+修改，所以通过切片来反转：`s[::-1]` 是一个从末尾以步长 `-1` 走出来的新字符串。
+想要一份反转的副本并保留原件时，同样的切片对列表也管用。
+
+```
+v.reverse()
+r = s[::-1]
+```
+
+`v` 和 `s` 已读入，两个 print 都已写好。在两个占位处输入上面这两行。
+
+```
+input:  1 2 3
+        gau
+output: 3 2 1
+        uag
+```
+'''
+hints = [
+  "v.reverse() 单独一行，然后 r = s[::-1]。",
+  "v = v.reverse() 会把 v 设成 None：reverse 什么也不返回。",
 ]

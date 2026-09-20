@@ -1,6 +1,16 @@
-# GO LAND — BASIC. Tin Hau down the Island Line to the Lucky Mac front till.
-# Grammar only: packages, vars, control flow, slices, maps, strings, structs,
-# interfaces, errors, closures, generics, sorting. Nothing here is timed.
+# GO LAND — BASIC. The grammar road: Tin Hau down the Island Line to the
+# Lucky Mac front till, one construct per node. Grammar practice, not a quiz:
+# each brief says what the construct is and shows how it is written, the
+# starter is the whole program, and the player fills a hole of one or two
+# lines — variables, conversion, integer widths, a thirty-two-byte number,
+# float32 and float64, strings, string, int and byte slices with copy and
+# append, a for loop, a function, a struct, iota constants, append, a linked
+# list, a map, a map as a hash table, a map as a set, a slice as a stack and
+# a queue, sort, reverse, sort.Slice, a closure, function literals as
+# arguments, a goroutine with a WaitGroup, and a binary search tree at the
+# boss. Nothing
+# here is timed, and verify_pack refuses a basic solution that adds more than
+# two lines over its starter.
 #
 # Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
 # Format: SPEC §12. Every solution and starter in this file is run by
@@ -9,7 +19,7 @@
 pack = "go.basic"
 land = "go"
 category = "basic"
-version = 1
+version = 2
 
 # ---------------------------------------------------------------- 01
 [[quest]]
@@ -20,7 +30,7 @@ difficulty  = 1
 story       = "Tin Hau exit A. Alex hands you a laptop with a file on it that has a package line and nothing under it."
 concepts    = ["io", "imports"]
 requires    = []
-map          = { x = 0.046, y = 0.135, kind = "quest" }
+map          = { x = 0.044, y = 0.146, kind = "quest" }
 brief       = '''
 Print exactly:
 
@@ -37,6 +47,8 @@ package main
 
 func main() {
 	// your code here
+	// ANSWER: import "fmt"
+	// ANSWER: fmt.Println("hello, causewaybay")
 }
 '''
 solution    = '''
@@ -73,13 +85,19 @@ difficulty  = 1
 story       = "The reader at Tin Hau shows the balance and then two blanks where the day cap and the deposit used to be."
 concepts    = ["bindings", "types", "io"]
 requires    = ["go.basic.01.package-main"]
-map          = { x = 0.282, y = 0.050, kind = "quest" }
+map          = { x = 0.247, y = 0.058, kind = "quest" }
 brief       = '''
-Read one integer `n` from standard input.
+A variable is declared with `var`, or made on the spot with `:=`, which
+takes its type from the right-hand side. `fmt.Println` prints its arguments
+with a space between them and a newline after. Arithmetic on an `int64`
+stays an `int64`: `n * n` is another integer.
 
-Print three lines: `n`, then `n` doubled, then `n` multiplied by itself.
+```
+fmt.Println(n * n)
+```
 
-`n` fits in an `int64` and may be negative.
+The balance `n` is read and printed, and so is `n * 2`. Write the third
+print: `n` multiplied by itself.
 
 ```
 input:  12
@@ -102,7 +120,11 @@ func main() {
 	var n int64
 	fmt.Fscan(reader, &n)
 
-	// print n, then n * 2, then n * n — one per line
+	fmt.Println(n)
+	fmt.Println(n * 2)
+	// FILL: print n multiplied by itself
+	// ANSWER: fmt.Println(n * n)
+	fmt.Println(0)
 }
 '''
 solution    = '''
@@ -125,9 +147,8 @@ func main() {
 }
 '''
 hints = [
-  "The reading is done for you; n already holds the value.",
-  "fmt.Println takes any value, so you do not need a format string here.",
-  "A negative n squared is positive. The test knows.",
+  "fmt.Println(n * n)",
+  "The same shape as the line above it: n * 2 becomes n * n.",
 ]
 
 [quest.tests]
@@ -137,93 +158,78 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "twelve",   stdin = "12\n", expect = "12\n24\n144\n", visible = true },
-  { name = "negative", stdin = "-3\n", expect = "-3\n-6\n9\n",   visible = false },
-  { name = "zero",     stdin = "0\n",  expect = "0\n0\n0\n",     visible = false },
+  { name = "twelve", stdin = "12\n", expect = "12\n24\n144\n", visible = true },
+  { name = "negative", stdin = "-3\n", expect = "-3\n-6\n9\n", visible = false },
+  { name = "zero", stdin = "0\n", expect = "0\n0\n0\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 03
 [[quest]]
-id          = "go.basic.03.control-flow"
+id          = "go.basic.03.types"
 node        = 3
-title       = "TRAM OR MTR"
-difficulty  = 2
-story       = "The Causeway Bay concourse board is supposed to say which service is due. It says the number of the minute instead, every minute."
-concepts    = ["control-flow", "functions", "io"]
+title       = "THE FARE SPLIT"
+difficulty  = 1
+story       = "Two riders split one Lucky Mac bill at the Tin Hau counter and the receipt prints the share as a whole number, a remainder, and then the real figure."
+concepts    = ["types", "io"]
 requires    = ["go.basic.02.vars"]
-map          = { x = 0.387, y = 0.141, kind = "quest" }
+map          = { x = 0.333, y = 0.132, kind = "quest" }
 brief       = '''
-Read one integer `n`. For every `i` from `1` to `n`, print one line:
-
-* `TRAMMTR` if `i` divides by both 3 and 5
-* `TRAM` if `i` divides by 3
-* `MTR` if `i` divides by 5
-* otherwise `i` itself
+Go never converts a number for you. `a / b` on two integers is integer
+division (it rounds toward zero) and `a % b` is the remainder. To get a real
+quotient you convert both sides with `float64(...)` first, and `fmt.Printf`
+with `%.2f` prints a float with exactly two digits after the point.
 
 ```
-input:  5
-output: 1
-        2
-        TRAM
-        4
-        MTR
+fmt.Printf("%.2f\n", float64(a)/float64(b))
 ```
 
-Go's `switch` with no subject takes a boolean case per arm and does not fall
-through. Use it.
+The whole-number share and the remainder are printed. Write the third line:
+the real share, two decimals.
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
+	var a, b int64
+	fmt.Scan(&a, &b)
 
-	for i := 1; i <= n; i++ {
-		// TRAMMTR / TRAM / MTR / i
-		_ = i
-	}
+	fmt.Println(a / b)
+	fmt.Println(a % b)
+	// FILL: the real quotient with two decimals
+	// ANSWER: fmt.Printf("%.2f\n", float64(a)/float64(b))
+	fmt.Printf("%.2f\n", 0.0)
 }
 '''
 solution    = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
+	var a, b int64
+	fmt.Scan(&a, &b)
 
-	for i := 1; i <= n; i++ {
-		switch {
-		case i%15 == 0:
-			fmt.Println("TRAMMTR")
-		case i%3 == 0:
-			fmt.Println("TRAM")
-		case i%5 == 0:
-			fmt.Println("MTR")
-		default:
-			fmt.Println(i)
-		}
-	}
+	fmt.Println(a / b)
+	fmt.Println(a % b)
+	fmt.Printf("%.2f\n", float64(a)/float64(b))
 }
 '''
 hints = [
-  "Check the both-case first, or it never fires.",
-  "switch { case cond: } needs no subject, and no break.",
-  "Divisible by 3 and 5 is the same as divisible by 15.",
+  "fmt.Printf(\"%.2f\\n\", float64(a)/float64(b))",
+  "Convert both sides: float64(a) / b does not compile, because a float64 and an int64 cannot be divided.",
 ]
 
 [quest.tests]
@@ -233,92 +239,87 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "five",  stdin = "5\n",  expect = "1\n2\nTRAM\n4\nMTR\n", visible = true },
-  { name = "fifteen", stdin = "15\n", expect = "1\n2\nTRAM\n4\nMTR\nTRAM\n7\n8\nTRAM\nMTR\n11\nTRAM\n13\n14\nTRAMMTR\n", visible = false },
-  { name = "one",   stdin = "1\n",  expect = "1\n", visible = false },
+  { name = "seven-two", stdin = "7 2\n", expect = "3\n1\n3.50\n", visible = true },
+  { name = "ten-four", stdin = "10 4\n", expect = "2\n2\n2.50\n", visible = false },
+  { name = "exact", stdin = "9 3\n", expect = "3\n0\n3.00\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 04
 [[quest]]
-id          = "go.basic.04.slices"
+id          = "go.basic.04.int-types"
 node        = 4
-title       = "THE MIDDLE OF THE CARRIAGE"
-difficulty  = 2
-story       = "Platform 2 counts who boards first and who boards last and loses everybody in between."
-concepts    = ["slices", "iteration", "control-flow"]
-requires    = ["go.basic.03.control-flow"]
-map          = { x = 0.603, y = 0.055, kind = "quest" }
+title       = "THE WIDTH OF A NUMBER"
+difficulty  = 1
+story       = "The Octopus reader at Tin Hau stores the fare in a 32-bit cell and the day's total in a 64-bit one, and today it prints the same zero for both."
+concepts    = ["types", "bindings"]
+requires    = ["go.basic.03.types"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
 brief       = '''
-Standard input is a count `n` on the first line and then `n` integers on the
-second, separated by spaces. `n` is at least `1`.
-
-Print three lines: the first value, the last value, and the sum of everything
-strictly between them. With fewer than three values that sum is `0`.
+Go's integers come in widths: `int32` and `int64` are signed, `uint32`
+and `uint64` cannot go below zero. Nothing converts on its own — you write
+the target type like a function, `uint64(a)`, and the value is copied into
+the wider cell. The `math` package names the edges: `math.MaxInt32` is the
+largest `int32`, `math.MaxUint64` the largest `uint64`.
 
 ```
-input:  5
-        4 8 15 16 23
-output: 4
-        23
-        39
+b := uint64(a)
+fmt.Println(math.MaxInt32)
+```
+
+`a` is read as an `int32`. Type the conversion into `b` and the
+`math.MaxInt32` print, in place of the two placeholders; the other two
+lines are printed for you.
+
+```
+input:  7
+output: 7
+        2147483647
+        18446744073709551615
 ```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
+	"math"
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
-	nums := make([]int64, n)
-	for i := range nums {
-		fmt.Fscan(reader, &nums[i])
-	}
+	var a int32
+	fmt.Scan(&a)
 
-	// print nums[0], the last element, then the sum of nums[1:len(nums)-1]
-	_ = nums
+	// FILL: copy a into a uint64 named b
+	// ANSWER: b := uint64(a)
+	b := uint64(0)
+	fmt.Println(b)
+	// FILL: print the largest int32
+	// ANSWER: fmt.Println(math.MaxInt32)
+	fmt.Println(0)
+	fmt.Println(uint64(math.MaxUint64))
 }
 '''
 solution    = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
+	"math"
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
-	nums := make([]int64, n)
-	for i := range nums {
-		fmt.Fscan(reader, &nums[i])
-	}
+	var a int32
+	fmt.Scan(&a)
 
-	fmt.Println(nums[0])
-	fmt.Println(nums[len(nums)-1])
-
-	var middle int64
-	if len(nums) > 2 {
-		for _, v := range nums[1 : len(nums)-1] {
-			middle += v
-		}
-	}
-	fmt.Println(middle)
+	b := uint64(a)
+	fmt.Println(b)
+	fmt.Println(math.MaxInt32)
+	fmt.Println(uint64(math.MaxUint64))
 }
 '''
 hints = [
-  "nums[1:len(nums)-1] shares the same backing array — it is a view, not a copy.",
-  "With one or two values that slice expression is empty or invalid; guard it with an if.",
-  "range over a slice gives you index and value; blank the index with _.",
+  "b := uint64(a) — the type name is the conversion; then fmt.Println(math.MaxInt32).",
+  "A width is part of the type: an int32 and an int64 never mix without a conversion written out.",
 ]
 
 [quest.tests]
@@ -328,103 +329,89 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "five",   stdin = "5\n4 8 15 16 23\n", expect = "4\n23\n39\n", visible = true },
-  { name = "single", stdin = "1\n7\n",            expect = "7\n7\n0\n",   visible = false },
-  { name = "pair",   stdin = "2\n3 9\n",          expect = "3\n9\n0\n",   visible = false },
+  { name = "seven", stdin = "7\n", expect = "7\n2147483647\n18446744073709551615\n", visible = true },
+  { name = "big", stdin = "300000\n", expect = "300000\n2147483647\n18446744073709551615\n", visible = false },
+  { name = "edge", stdin = "2147483647\n", expect = "2147483647\n2147483647\n18446744073709551615\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 05
 [[quest]]
-id          = "go.basic.05.maps"
+id          = "go.basic.05.big-int"
 node        = 5
-title       = "WHAT THE CONCOURSE SHOUTS"
-difficulty  = 3
-story       = "Causeway Bay interchange at nine. The announcement board wants the ranking and a map has no order."
-concepts    = ["collections", "sorting", "iteration"]
-requires    = ["go.basic.04.slices"]
-map          = { x = 0.711, y = 0.143, kind = "quest" }
+title       = "THIRTY-TWO BYTES"
+difficulty  = 2
+story       = "A wallet address on the rider's phone is thirty-two bytes wide, and the app that shows it has thirty-two bytes of zero."
+concepts    = ["types", "slices", "strings"]
+requires    = ["go.basic.04.int-types"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
 brief       = '''
-Read the whole of standard input and split it on whitespace.
-
-Print each distinct word once, as `<word> <count>`, ordered by count
-descending, ties broken by the word ascending.
+No built-in integer is 256 bits wide, and a hash or a key is exactly
+that: thirty-two bytes. `math/big` holds a number of any size, and
+`FillBytes` writes it big-endian into a byte array you hand it, padding
+with zeros on the left. `hex.EncodeToString` turns those bytes into the
+sixty-four hex characters you see printed on a chain.
 
 ```
-input:  tram tram bus
-output: tram 2
-        bus 1
+n.FillBytes(buf[:])
 ```
 
-Ranging over a Go map is deliberately in random order. Collect before you
-print.
+`n` is already parsed from the decimal on stdin and `buf` is a `[32]byte`.
+Type the one line that fills `buf` from `n`; the length and the hex are
+printed for you.
+
+```
+input:  255
+output: 32
+        00000000000000000000000000000000000000000000000000000000000000ff
+```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
+	"encoding/hex"
 	"fmt"
-	"os"
+	"math/big"
 )
 
 func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Split(bufio.ScanWords)
+	var s string
+	fmt.Scan(&s)
+	n := new(big.Int)
+	n.SetString(s, 10)
+	var buf [32]byte
+	// FILL: write n into buf, big-endian, zero-padded on the left
+	// ANSWER: n.FillBytes(buf[:])
+	_ = n
 
-	counts := map[string]int{}
-	for sc.Scan() {
-		_ = sc.Text()
-	}
-
-	// rank the counts and print them
-	_ = counts
-	_ = fmt.Sprint
+	fmt.Println(len(buf))
+	fmt.Println(hex.EncodeToString(buf[:]))
 }
 '''
 solution    = '''
 package main
 
 import (
-	"bufio"
+	"encoding/hex"
 	"fmt"
-	"os"
-	"sort"
+	"math/big"
 )
 
-type row struct {
-	word  string
-	count int
-}
-
 func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Split(bufio.ScanWords)
+	var s string
+	fmt.Scan(&s)
+	n := new(big.Int)
+	n.SetString(s, 10)
+	var buf [32]byte
+	n.FillBytes(buf[:])
 
-	counts := map[string]int{}
-	for sc.Scan() {
-		counts[sc.Text()]++
-	}
-
-	rows := make([]row, 0, len(counts))
-	for word, count := range counts {
-		rows = append(rows, row{word: word, count: count})
-	}
-	sort.Slice(rows, func(i, j int) bool {
-		if rows[i].count != rows[j].count {
-			return rows[i].count > rows[j].count
-		}
-		return rows[i].word < rows[j].word
-	})
-
-	for _, r := range rows {
-		fmt.Printf("%s %d\n", r.word, r.count)
-	}
+	fmt.Println(len(buf))
+	fmt.Println(hex.EncodeToString(buf[:]))
 }
 '''
 hints = [
-  "counts[word]++ works on a missing key: the zero value of int is 0.",
-  "sort.Slice takes a less function — return true when i must come before j.",
-  "The tie-break is a second comparison inside that same function.",
+  "n.FillBytes(buf[:]) — the array becomes a slice with [:], and FillBytes writes the number into it.",
+  "Big-endian means the last byte is the least significant: 255 lands in buf[31] as ff.",
 ]
 
 [quest.tests]
@@ -434,90 +421,89 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "tram",   stdin = "tram tram bus\n", expect = "tram 2\nbus 1\n", visible = true },
-  { name = "ties",   stdin = "a b a c b a\n",   expect = "a 3\nb 2\nc 1\n", visible = false },
-  { name = "single", stdin = "one\n",           expect = "one 1\n",         visible = false },
+  { name = "ff", stdin = "255\n", expect = "32\n00000000000000000000000000000000000000000000000000000000000000ff\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "32\n0000000000000000000000000000000000000000000000000000000000000001\n", visible = false },
+  { name = "all-ones", stdin = "115792089237316195423570985008687907853269984665640564039457584007913129639935\n", expect = "32\nffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 06
 [[quest]]
-id          = "go.basic.06.strings"
+id          = "go.basic.06.floats"
 node        = 6
-title       = "BYTES ARE NOT LETTERS"
-difficulty  = 2
-story       = "The exit-B directory truncates 銅鑼灣 at three and gets one and a half characters and a question mark."
-concepts    = ["strings", "iteration", "types"]
-requires    = ["go.basic.05.maps"]
-map          = { x = 0.940, y = 0.050, kind = "quest" }
+title       = "TWO KINDS OF DECIMAL"
+difficulty  = 1
+story       = "The interchange clock at Admiralty keeps the seconds as a float64 and the departure board rounds them into a float32, and the two boards disagree in the tenth place."
+concepts    = ["types", "io"]
+requires    = ["go.basic.05.big-int"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
 brief       = '''
-Read one line. Print three lines:
-
-1. its length in **bytes**
-2. its length in **runes**
-3. the line with its runes reversed
+A decimal number is a `float64` unless you say otherwise; `float32` is
+half the width and keeps about seven digits. `strconv.ParseFloat` reads
+one from text (the `64` is the width to parse into), and `float32(x)`
+copies it into the narrower type, rounding as it goes. `%.10f` prints ten
+places, which is where the two start to differ.
 
 ```
-input:  causeway
-output: 8
-        8
-        yawesuac
+x, _ := strconv.ParseFloat(s, 64)
+y := float32(x)
 ```
 
-The line may contain characters outside ASCII, and then the first two numbers
-are not the same. `len(s)` is bytes. It always was.
+`s` is the text from stdin. Type the parse into `x` and the conversion
+into `y`, in place of the two placeholders; both are printed for you.
+
+```
+input:  3.14159265358979
+output: 3.1415926536
+        3.1415927410
+```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strings"
+	"strconv"
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	line, _ := reader.ReadString('\n')
-	line = strings.TrimRight(line, "\r\n")
+	var s string
+	fmt.Scan(&s)
 
-	// 1. bytes
-	// 2. runes
-	// 3. the runes, reversed, back as a string
-	_ = line
-	_ = fmt.Sprint
+	// FILL: parse s into a float64 named x
+	// ANSWER: x, _ := strconv.ParseFloat(s, 64)
+	x, _ := strconv.ParseFloat("0", 64)
+	// FILL: copy x into a float32 named y
+	// ANSWER: y := float32(x)
+	y := float32(0)
+	_ = s
+
+	fmt.Printf("%.10f\n", x)
+	fmt.Printf("%.10f\n", y)
 }
 '''
 solution    = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strings"
+	"strconv"
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	line, _ := reader.ReadString('\n')
-	line = strings.TrimRight(line, "\r\n")
+	var s string
+	fmt.Scan(&s)
 
-	fmt.Println(len(line))
+	x, _ := strconv.ParseFloat(s, 64)
+	y := float32(x)
+	_ = s
 
-	runes := []rune(line)
-	fmt.Println(len(runes))
-
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-	fmt.Println(string(runes))
+	fmt.Printf("%.10f\n", x)
+	fmt.Printf("%.10f\n", y)
 }
 '''
 hints = [
-  "len(line) is the byte count; []rune(line) is the decoded one.",
-  "Reversing the byte slice would cut a multi-byte character in half.",
-  "Two indices walking towards each other, swapping as they go, is the whole reversal.",
+  "x, _ := strconv.ParseFloat(s, 64) then y := float32(x).",
+  "ParseFloat returns two values; the _ throws the error away here because the input is known good.",
 ]
 
 [quest.tests]
@@ -527,40 +513,41 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "ascii",     stdin = "causeway\n",  expect = "8\n8\nyawesuac\n",  visible = true },
-  { name = "cantonese", stdin = "銅鑼灣\n",    expect = "9\n3\n灣鑼銅\n",    visible = false },
-  { name = "spaced",    stdin = "Lucky Mac\n", expect = "9\n9\ncaM ykcuL\n", visible = false },
+  { name = "pi", stdin = "3.14159265358979\n", expect = "3.1415926536\n3.1415927410\n", visible = true },
+  { name = "exact", stdin = "2.5\n", expect = "2.5000000000\n2.5000000000\n", visible = false },
+  { name = "tenth", stdin = "0.1\n", expect = "0.1000000000\n0.1000000015\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 07
 [[quest]]
-id          = "go.basic.07.structs"
+id          = "go.basic.04.strings"
 node        = 7
-title       = "THE TILL"
-difficulty  = 3
-story       = "Lucky Mac's counter adds a line to the order and the line is gone by the next one. The method took a copy."
-concepts    = ["structs", "functions", "mutability"]
-requires    = ["go.basic.06.strings"]
-map          = { x = 0.888, y = 0.537, kind = "quest" }
+title       = "THE STATION NAME"
+difficulty  = 1
+story       = "The platform sign at Causeway Bay shows the station name once, then a blank where the capitals go, then a blank where it runs backwards for the mirror side."
+concepts    = ["strings", "iteration"]
+requires    = ["go.basic.06.floats"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` lines of `<ITEM> <CENTS>`.
-
-Collect the items on a `Till`, then print each item back as `<ITEM> <CENTS>`,
-in the order it arrived, and finally `TOTAL <sum>`.
+A `string` is a read-only slice of bytes. `len(s)` is its length in bytes,
+the `strings` package holds the everyday transformations, and to walk it
+character by character you convert it to `[]rune`. The `reverse` helper
+below does that walk; you only have to call it.
 
 ```
-input:  2
-        HASHBROWN 600
-        SET 2800
-output: HASHBROWN 600
-        SET 2800
-        TOTAL 3400
+fmt.Println(strings.ToUpper(line))
+fmt.Println(reverse(line))
 ```
 
-`n` may be `0`, and then the only line is `TOTAL 0`.
+The length is printed. Write the next two lines: the name in capitals, then
+the name reversed.
 
-A method on a value receiver gets a copy of the till. `Add` must change the
-real one.
+```
+input:  causeway bay
+output: 12
+        CAUSEWAY BAY
+        yab yawesuac
+```
 '''
 starter     = '''
 package main
@@ -569,41 +556,27 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strings"
 )
 
-type Item struct {
-	Name  string
-	Cents int64
-}
-
-type Till struct {
-	Items []Item
-}
-
-func (t Till) Add(name string, cents int64) {
-	// this receiver is a copy. That is the bug.
-	t.Items = append(t.Items, Item{Name: name, Cents: cents})
-}
-
-func (t Till) Total() int64 {
-	return 0
+func reverse(s string) string {
+	r := []rune(s)
+	for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
+		r[i], r[j] = r[j], r[i]
+	}
+	return string(r)
 }
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Scan()
+	line := sc.Text()
 
-	var till Till
-	for i := 0; i < n; i++ {
-		var name string
-		var cents int64
-		fmt.Fscan(reader, &name, &cents)
-		till.Add(name, cents)
-	}
-
-	// print each item, then TOTAL
-	fmt.Printf("TOTAL %d\n", till.Total())
+	fmt.Println(len(line))
+	// FILL: print line in capitals, then line reversed
+	// ANSWER: fmt.Println(strings.ToUpper(line))
+	// ANSWER: fmt.Println(reverse(line))
+	_ = strings.ToUpper
 }
 '''
 solution    = '''
@@ -613,52 +586,30 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strings"
 )
 
-type Item struct {
-	Name  string
-	Cents int64
-}
-
-type Till struct {
-	Items []Item
-}
-
-func (t *Till) Add(name string, cents int64) {
-	t.Items = append(t.Items, Item{Name: name, Cents: cents})
-}
-
-func (t *Till) Total() int64 {
-	var total int64
-	for _, item := range t.Items {
-		total += item.Cents
+func reverse(s string) string {
+	r := []rune(s)
+	for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
+		r[i], r[j] = r[j], r[i]
 	}
-	return total
+	return string(r)
 }
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Scan()
+	line := sc.Text()
 
-	var till Till
-	for i := 0; i < n; i++ {
-		var name string
-		var cents int64
-		fmt.Fscan(reader, &name, &cents)
-		till.Add(name, cents)
-	}
-
-	for _, item := range till.Items {
-		fmt.Printf("%s %d\n", item.Name, item.Cents)
-	}
-	fmt.Printf("TOTAL %d\n", till.Total())
+	fmt.Println(len(line))
+	fmt.Println(strings.ToUpper(line))
+	fmt.Println(reverse(line))
 }
 '''
 hints = [
-  "func (t *Till) Add — a pointer receiver mutates the till the caller holds.",
-  "till.Add(...) still works unchanged; Go takes the address for you because till is addressable.",
-  "Total only reads, but keep the receivers consistent on one type.",
+  "fmt.Println(strings.ToUpper(line)) and then fmt.Println(reverse(line)).",
+  "The _ = strings.ToUpper line only kept the import used; delete it once you call strings.ToUpper for real.",
 ]
 
 [quest.tests]
@@ -668,159 +619,84 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "two-items", stdin = "2\nHASHBROWN 600\nSET 2800\n", expect = "HASHBROWN 600\nSET 2800\nTOTAL 3400\n", visible = true },
-  { name = "empty",     stdin = "0\n", expect = "TOTAL 0\n", visible = false },
-  { name = "repeats",   stdin = "3\nTEA 1200\nTEA 1200\nPIE 900\n", expect = "TEA 1200\nTEA 1200\nPIE 900\nTOTAL 3300\n", visible = false },
+  { name = "station", stdin = "causeway bay\n", expect = "12\nCAUSEWAY BAY\nyab yawesuac\n", visible = true },
+  { name = "short", stdin = "mtr\n", expect = "3\nMTR\nrtm\n", visible = false },
+  { name = "mixed", stdin = "Tin Hau 1\n", expect = "9\nTIN HAU 1\n1 uaH niT\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 08
 [[quest]]
-id          = "go.basic.08.interfaces"
+id          = "go.basic.08.string-slices"
 node        = 8
-title       = "ONE LIST, TWO THINGS"
-difficulty  = 3
-story       = "The Hysan Place directory and the tram stop outside it are printed by two different programs, and neither of them fits in the other's list."
-concepts    = ["interfaces", "structs", "pattern-matching"]
-requires    = ["go.basic.07.structs"]
-map          = { x = 0.773, y = 0.465, kind = "quest" }
+title       = "THE FIRST FOUR LETTERS"
+difficulty  = 1
+story       = "The station sign at Causeway Bay shows the first four letters of the name and the line's suffix after them, and the sign is showing the suffix alone."
+concepts    = ["strings", "slices"]
+requires    = ["go.basic.04.strings"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` lines, each either
-
-* `SHOP <NAME> <FLOOR>` — renders as `<NAME> / F<FLOOR>`
-* `STOP <ROUTE>` — renders as `TRAM <ROUTE>`
-
-Print every sign rendered, in order, then `SIGNS <n>`, then `SHOPS <k>` where
-`k` is how many of them were shops — counted with a **type switch**, not a
-flag you kept while parsing.
+A string can be sliced like anything else: `s[0:4]` is its first four
+bytes. A string never changes, so slicing copies nothing and breaks
+nothing — the new value `t` is its own string, and `s` stays whole.
+Appending is `+=`: it builds a new string from the old one and the piece.
 
 ```
-input:  3
-        SHOP HYSAN 4
-        STOP 2
-        SHOP SOGO 1
-output: HYSAN / F4
-        TRAM 2
-        SOGO / F1
-        SIGNS 3
-        SHOPS 2
+t := s[0:4]
+t += "_bay"
+```
+
+`s` is the word from stdin. Type the slice into `t` and the append, in
+place of the two placeholders; `t` and then the untouched `s` are printed.
+
+```
+input:  causeway
+output: caus_bay
+        causeway
 ```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 )
 
-type Sign interface {
-	Render() string
-}
-
-type Shop struct {
-	Name  string
-	Floor int
-}
-
-type Stop struct {
-	Route string
-}
-
-// Shop and Stop do not implement Sign yet.
-
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
+	var s string
+	fmt.Scan(&s)
 
-	var signs []Sign
-	for i := 0; i < n; i++ {
-		var kind string
-		fmt.Fscan(reader, &kind)
-		if kind == "SHOP" {
-			var name string
-			var floor int
-			fmt.Fscan(reader, &name, &floor)
-			_ = Shop{Name: name, Floor: floor}
-		} else {
-			var route string
-			fmt.Fscan(reader, &route)
-			_ = Stop{Route: route}
-		}
-	}
+	// FILL: the first four bytes of s, as a new string t
+	// ANSWER: t := s[0:4]
+	t := s[0:0]
+	// FILL: append _bay to t
+	// ANSWER: t += "_bay"
+	t += ""
 
-	// render each sign, then SIGNS, then SHOPS
-	_ = signs
+	fmt.Println(t)
+	fmt.Println(s)
 }
 '''
 solution    = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 )
 
-type Sign interface {
-	Render() string
-}
-
-type Shop struct {
-	Name  string
-	Floor int
-}
-
-type Stop struct {
-	Route string
-}
-
-func (s Shop) Render() string {
-	return fmt.Sprintf("%s / F%d", s.Name, s.Floor)
-}
-
-func (s Stop) Render() string {
-	return "TRAM " + s.Route
-}
-
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
+	var s string
+	fmt.Scan(&s)
 
-	var signs []Sign
-	for i := 0; i < n; i++ {
-		var kind string
-		fmt.Fscan(reader, &kind)
-		if kind == "SHOP" {
-			var name string
-			var floor int
-			fmt.Fscan(reader, &name, &floor)
-			signs = append(signs, Shop{Name: name, Floor: floor})
-		} else {
-			var route string
-			fmt.Fscan(reader, &route)
-			signs = append(signs, Stop{Route: route})
-		}
-	}
+	t := s[0:4]
+	t += "_bay"
 
-	shops := 0
-	for _, sign := range signs {
-		fmt.Println(sign.Render())
-		switch sign.(type) {
-		case Shop:
-			shops++
-		}
-	}
-	fmt.Printf("SIGNS %d\n", len(signs))
-	fmt.Printf("SHOPS %d\n", shops)
+	fmt.Println(t)
+	fmt.Println(s)
 }
 '''
 hints = [
-  "There is no `implements` keyword. Give each struct a Render() string method and it satisfies Sign.",
-  "Append the concrete value into []Sign — Go wraps it for you.",
-  "switch sign.(type) { case Shop: } is the type switch; the value form is switch v := sign.(type).",
+  "t := s[0:4] then t += \"_bay\".",
+  "s[a:b] runs from index a up to but not including b — 0:4 is four bytes.",
 ]
 
 [quest.tests]
@@ -830,124 +706,99 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "three-signs", stdin = "3\nSHOP HYSAN 4\nSTOP 2\nSHOP SOGO 1\n", expect = "HYSAN / F4\nTRAM 2\nSOGO / F1\nSIGNS 3\nSHOPS 2\n", visible = true },
-  { name = "one-stop",    stdin = "1\nSTOP 116\n", expect = "TRAM 116\nSIGNS 1\nSHOPS 0\n", visible = false },
-  { name = "two-shops",   stdin = "2\nSHOP LUCKYMAC 0\nSHOP TIMES 9\n", expect = "LUCKYMAC / F0\nTIMES / F9\nSIGNS 2\nSHOPS 2\n", visible = false },
+  { name = "causeway", stdin = "causeway\n", expect = "caus_bay\ncauseway\n", visible = true },
+  { name = "hysan", stdin = "hysan\n", expect = "hysa_bay\nhysan\n", visible = false },
+  { name = "percival", stdin = "percival\n", expect = "perc_bay\npercival\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 09
 [[quest]]
-id          = "go.basic.09.errors"
+id          = "go.basic.09.int-slices"
 node        = 9
-title       = "THE LINE THAT IS NOT A NUMBER"
-difficulty  = 3
-story       = "The rider log comes back from the depot with somebody's lunch order in the middle of the column."
-concepts    = ["error-handling", "functions", "types"]
-requires    = ["go.basic.08.interfaces"]
-map          = { x = 0.557, y = 0.540, kind = "quest" }
+title       = "A PIECE OF THE TIMETABLE"
+difficulty  = 1
+story       = "The rider takes the second and third stops off the day's timetable to work from, and the copy on the phone is two zeros."
+concepts    = ["slices", "collections"]
+requires    = ["go.basic.08.string-slices"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` lines. Each line is supposed to be an
-integer.
-
-For each line print either the value doubled, or `BAD <line>` if it does not
-parse. Finally print `SUM <total>`, the sum of the values you printed.
+`xs[1:3]` is a window onto the second and third elements — the same
+memory, not a copy. `copy(dst, src)` moves the values into a slice you
+made with `make`, so `dst` is its own; and `append` grows it. Change
+`dst` afterwards and `xs` does not move.
 
 ```
-input:  3
-        21
-        xx
-        -4
-output: 42
-        BAD xx
-        -8
-        SUM 34
+copy(dst, xs[1:3])
+dst = append(dst, 99)
 ```
 
-Define a sentinel `var ErrNotANumber = errors.New(...)`, wrap it with
-`fmt.Errorf("...: %w", ErrNotANumber)`, and recognise it in `main` with
-`errors.Is`. An error is a value; this is what that buys you.
+`xs` is read from stdin and `dst` is a `make([]int, 2)`. Type the copy
+and the append, in place of the two placeholders; `dst` and the untouched
+`xs` are printed.
+
+```
+input:  1 2 3 4 5
+output: [2 3 99]
+        [1 2 3 4 5]
+```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
-	"os"
-	"strings"
 )
 
-var ErrNotANumber = errors.New("not a number")
-
-func double(text string) (int64, error) {
-	_ = strings.TrimSpace(text)
-	return 0, ErrNotANumber
-}
-
 func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Scan()
-	var n int
-	fmt.Sscan(sc.Text(), &n)
-
-	var sum int64
-	for i := 0; i < n; i++ {
-		sc.Scan()
-		line := sc.Text()
-		_ = line
-		// print the doubled value or BAD <line>, and keep a running total
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
 	}
-	fmt.Printf("SUM %d\n", sum)
+	dst := make([]int, 2)
+
+	// FILL: copy the second and third elements of xs into dst
+	// ANSWER: copy(dst, xs[1:3])
+	copy(dst, xs[:0])
+	// FILL: append 99 to dst
+	// ANSWER: dst = append(dst, 99)
+	dst = append(dst)
+
+	fmt.Println(dst)
+	fmt.Println(xs)
 }
 '''
 solution    = '''
 package main
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 )
 
-var ErrNotANumber = errors.New("not a number")
-
-func double(text string) (int64, error) {
-	value, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("double %q: %w", text, ErrNotANumber)
-	}
-	return value * 2, nil
-}
-
 func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Scan()
-	var n int
-	fmt.Sscan(sc.Text(), &n)
-
-	var sum int64
-	for i := 0; i < n; i++ {
-		sc.Scan()
-		line := sc.Text()
-		value, err := double(line)
-		if errors.Is(err, ErrNotANumber) {
-			fmt.Printf("BAD %s\n", strings.TrimSpace(line))
-			continue
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
 		}
-		fmt.Println(value)
-		sum += value
+		xs = append(xs, v)
 	}
-	fmt.Printf("SUM %d\n", sum)
+	dst := make([]int, 2)
+
+	copy(dst, xs[1:3])
+	dst = append(dst, 99)
+
+	fmt.Println(dst)
+	fmt.Println(xs)
 }
 '''
 hints = [
-  "strconv.ParseInt(s, 10, 64) returns (int64, error) — the second value is not optional to look at.",
-  "%w in fmt.Errorf keeps the wrapped error findable; %v would flatten it to text.",
-  "errors.Is walks the wrap chain, so it still matches after the message was decorated.",
+  "copy(dst, xs[1:3]) then dst = append(dst, 99).",
+  "copy fills as many elements as the shorter side has; dst was made with room for two.",
 ]
 
 [quest.tests]
@@ -957,123 +808,89 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "mixed",   stdin = "3\n21\nxx\n-4\n",     expect = "42\nBAD xx\n-8\nSUM 34\n", visible = true },
-  { name = "zero",    stdin = "1\n0\n",              expect = "0\nSUM 0\n",               visible = false },
-  { name = "all-bad", stdin = "2\nhello\nworld\n",   expect = "BAD hello\nBAD world\nSUM 0\n", visible = false },
+  { name = "five", stdin = "1 2 3 4 5\n", expect = "[2 3 99]\n[1 2 3 4 5]\n", visible = true },
+  { name = "three", stdin = "9 8 7\n", expect = "[8 7 99]\n[9 8 7]\n", visible = false },
+  { name = "negatives", stdin = "0 -1 -2 4\n", expect = "[-1 -2 99]\n[0 -1 -2 4]\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 10
 [[quest]]
-id          = "go.basic.10.closures"
+id          = "go.basic.10.byte-slices"
 node        = 10
-title       = "THE DOOR COUNT"
-difficulty  = 3
-story       = "Lucky Mac counts who walks in and who walks out, and the manager wants the number at closing whatever happens in between."
-concepts    = ["closures", "functions", "control-flow"]
-requires    = ["go.basic.09.errors"]
-map          = { x = 0.448, y = 0.470, kind = "quest" }
+title       = "THE BYTES OF A WORD"
+difficulty  = 1
+story       = "The Lucky Mac ticket printer works in bytes, not letters: three bytes for the code on the top, the name with two bangs after it, and it printed three spaces."
+concepts    = ["slices", "strings", "types"]
+requires    = ["go.basic.09.int-slices"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` lines, each `IN` or `OUT`.
-
-Keep a running count that never drops below zero. Print it after every
-command. When `main` returns, print `CLOSED <final>` — from a `defer`, not
-from the end of the function.
+`[]byte(s)` copies a string into a byte slice you can change. Slice it
+like any slice — `b[:3]` is the first three bytes — and grow it with
+`append`, spreading another slice in with `...`. `hex.EncodeToString`
+shows bytes as hex pairs; `string(b)` turns them back into text.
 
 ```
-input:  4
-        IN
-        IN
-        OUT
-        IN
-output: 1
-        2
-        1
-        2
-        CLOSED 2
+b := []byte(s)
+b = append(b, []byte("!!")...)
 ```
 
-The counter itself is a closure: a function that returns a function, with the
-total captured between them. There is no package-level variable in the answer.
+`s` is the word from stdin. Type the conversion into `b` and the append,
+in place of the two placeholders; the hex of the first three bytes and the
+whole of `b` as text are printed.
+
+```
+input:  gopher
+output: 676f70
+        gopher!!
+```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
+	"encoding/hex"
 	"fmt"
-	"os"
 )
 
-func makeCounter() func(int) int {
-	// return a function that keeps a total between calls,
-	// clamped at zero
-	return nil
-}
-
 func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Scan()
-	var n int
-	fmt.Sscan(sc.Text(), &n)
+	var s string
+	fmt.Scan(&s)
 
-	count := makeCounter()
-	last := 0
-	_ = count
-	_ = last
+	// FILL: the bytes of s, as a slice named b
+	// ANSWER: b := []byte(s)
+	b := []byte("   ")
+	// FILL: append the two bytes of "!!" to b
+	// ANSWER: b = append(b, []byte("!!")...)
+	b = append(b)
+	_ = s
 
-	for i := 0; i < n; i++ {
-		sc.Scan()
-		_ = sc.Text()
-	}
+	fmt.Println(hex.EncodeToString(b[:3]))
+	fmt.Println(string(b))
 }
 '''
 solution    = '''
 package main
 
 import (
-	"bufio"
+	"encoding/hex"
 	"fmt"
-	"os"
 )
 
-func makeCounter() func(int) int {
-	total := 0
-	return func(delta int) int {
-		total += delta
-		if total < 0 {
-			total = 0
-		}
-		return total
-	}
-}
-
 func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Scan()
-	var n int
-	fmt.Sscan(sc.Text(), &n)
+	var s string
+	fmt.Scan(&s)
 
-	count := makeCounter()
-	last := 0
-	defer func() {
-		fmt.Printf("CLOSED %d\n", last)
-	}()
+	b := []byte(s)
+	b = append(b, []byte("!!")...)
+	_ = s
 
-	for i := 0; i < n; i++ {
-		sc.Scan()
-		if sc.Text() == "IN" {
-			last = count(1)
-		} else {
-			last = count(-1)
-		}
-		fmt.Println(last)
-	}
+	fmt.Println(hex.EncodeToString(b[:3]))
+	fmt.Println(string(b))
 }
 '''
 hints = [
-  "total lives in makeCounter's frame and the returned function keeps it alive. That is the closure.",
-  "defer func(){ ... }() runs at return, and the closure reads `last` then — not when the defer was written.",
-  "A defer that took an argument would capture the value at defer time instead. Try both and watch it change.",
+  "b := []byte(s) then b = append(b, []byte(\"!!\")...).",
+  "The ... after a slice spreads its elements as separate arguments; without it append wants single bytes.",
 ]
 
 [quest.tests]
@@ -1083,152 +900,90 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "in-out", stdin = "4\nIN\nIN\nOUT\nIN\n", expect = "1\n2\n1\n2\nCLOSED 2\n", visible = true },
-  { name = "floor",  stdin = "2\nOUT\nOUT\n",        expect = "0\n0\nCLOSED 0\n",       visible = false },
-  { name = "one",    stdin = "1\nIN\n",              expect = "1\nCLOSED 1\n",          visible = false },
+  { name = "gopher", stdin = "gopher\n", expect = "676f70\ngopher!!\n", visible = true },
+  { name = "mtr", stdin = "mtr\n", expect = "6d7472\nmtr!!\n", visible = false },
+  { name = "admiralty", stdin = "admiralty\n", expect = "61646d\nadmiralty!!\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 11
 [[quest]]
-id          = "go.basic.11.generics"
+id          = "go.basic.05.loops"
 node        = 11
-title       = "ONE FUNCTION, ANY LIST"
-difficulty  = 4
-story       = "Alex has written Sum four times — for orders, for riders, for minutes and for cents — and the fifth one is due."
-concepts    = ["generics", "functions", "closures", "slices"]
-requires    = ["go.basic.10.closures"]
-map          = { x = 0.229, y = 0.513, kind = "quest" }
+title       = "EVERY THIRD TRAIN"
+difficulty  = 1
+story       = "The Admiralty departure board is supposed to add up the morning's trains and say how many of them were the every-third express. It shows two zeros."
+concepts    = ["control-flow", "io"]
+requires    = ["go.basic.10.byte-slices"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
 brief       = '''
-Standard input is one line of integers separated by spaces.
-
-Print three lines:
-
-1. every value doubled, joined by single spaces
-2. the sum of the original values
-3. how many of them are greater than `10`
+Go has one loop keyword. `for init; condition; step { }` counts, and an
+`if` inside it needs no parentheses, only the braces. `sum += i` adds to a
+variable in place, and `i%3 == 0` is how you ask whether `i` is a multiple
+of three.
 
 ```
-input:  1 2 3 4 12
-output: 2 4 6 8 24
-        22
-        1
+for i := 1; i <= n; i++ {
+	sum += i
+	if i%3 == 0 { threes++ }
+}
 ```
 
-Write three generic helpers and use them: `MapSlice[T, U any]`,
-`Sum[T Number]` over a `~int64 | ~float64` constraint, and
-`Count[T any]` taking a predicate.
+The loop header is written. Fill its body: add `i` to `sum`, and count it
+in `threes` when it is a multiple of three (one `if` on one line is fine).
+
+```
+input:  10
+output: 55
+        3
+```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 )
 
-type Number interface {
-	~int64 | ~float64
-}
-
-func MapSlice[T any, U any](xs []T, f func(T) U) []U {
-	return nil
-}
-
-func Sum[T Number](xs []T) T {
-	var zero T
-	return zero
-}
-
-func Count[T any](xs []T, pred func(T) bool) int {
-	return 0
-}
-
 func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Split(bufio.ScanWords)
-	var nums []int64
-	for sc.Scan() {
-		v, err := strconv.ParseInt(sc.Text(), 10, 64)
-		if err != nil {
-			continue
-		}
-		nums = append(nums, v)
+	var n int
+	fmt.Scan(&n)
+
+	sum, threes := 0, 0
+	for i := 1; i <= n; i++ {
+		// FILL: add i to sum; if i%3 == 0, add one to threes
+		// ANSWER: sum += i
+		// ANSWER: if i%3 == 0 { threes++ }
+		_ = i
 	}
 
-	// 1. doubled, joined by spaces   2. the sum   3. how many over 10
-	_ = nums
-	_ = strings.Join
-	_ = fmt.Sprint
+	fmt.Println(sum)
+	fmt.Println(threes)
 }
 '''
 solution    = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 )
 
-type Number interface {
-	~int64 | ~float64
-}
-
-func MapSlice[T any, U any](xs []T, f func(T) U) []U {
-	out := make([]U, 0, len(xs))
-	for _, x := range xs {
-		out = append(out, f(x))
-	}
-	return out
-}
-
-func Sum[T Number](xs []T) T {
-	var total T
-	for _, x := range xs {
-		total += x
-	}
-	return total
-}
-
-func Count[T any](xs []T, pred func(T) bool) int {
-	n := 0
-	for _, x := range xs {
-		if pred(x) {
-			n++
-		}
-	}
-	return n
-}
-
 func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Split(bufio.ScanWords)
-	var nums []int64
-	for sc.Scan() {
-		v, err := strconv.ParseInt(sc.Text(), 10, 64)
-		if err != nil {
-			continue
-		}
-		nums = append(nums, v)
+	var n int
+	fmt.Scan(&n)
+
+	sum, threes := 0, 0
+	for i := 1; i <= n; i++ {
+		sum += i
+		if i%3 == 0 { threes++ }
 	}
 
-	doubled := MapSlice(nums, func(n int64) string {
-		return strconv.FormatInt(n*2, 10)
-	})
-	fmt.Println(strings.Join(doubled, " "))
-	fmt.Println(Sum(nums))
-	fmt.Println(Count(nums, func(n int64) bool { return n > 10 }))
+	fmt.Println(sum)
+	fmt.Println(threes)
 }
 '''
 hints = [
-  "MapSlice changes the element type, so it needs two type parameters, not one.",
-  "The call sites infer T and U from the slice and the function — you do not write MapSlice[int64, string].",
-  "~int64 means int64 and anything whose underlying type is int64, which is what lets a named type through.",
+  "sum += i on one line, then if i%3 == 0 { threes++ } on the next.",
+  "An if needs braces even for one statement; it does not need parentheses.",
 ]
 
 [quest.tests]
@@ -1238,131 +993,84 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "five",      stdin = "1 2 3 4 12\n", expect = "2 4 6 8 24\n22\n1\n", visible = true },
-  { name = "one",       stdin = "5\n",          expect = "10\n5\n0\n",          visible = false },
-  { name = "negatives", stdin = "-3 20 20\n",   expect = "-6 40 40\n37\n2\n",   visible = false },
+  { name = "ten", stdin = "10\n", expect = "55\n3\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "1\n0\n", visible = false },
+  { name = "nine", stdin = "9\n", expect = "45\n3\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 12
 [[quest]]
-id          = "go.basic.12.defer-panic-recover"
+id          = "go.basic.06.functions"
 node        = 12
-title       = "IT FELL OVER AND GOT BACK UP"
-difficulty  = 3
-story       = "One bad docket used to take the whole till down and lose the shift with it."
-concepts    = ["panics", "functions", "control-flow"]
-requires    = ["go.basic.11.generics"]
-map          = { x = 0.119, y = 0.467, kind = "quest" }
+title       = "THE RIDER'S RATE"
+difficulty  = 1
+story       = "Alex's delivery app pays the first ten rides of a shift at one rate and the rest at another, and the payout function on the kitchen tablet returns zero for everybody."
+concepts    = ["functions", "control-flow"]
+requires    = ["go.basic.05.loops"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` lines. Each is an integer, the word
-`BOOM`, or something else.
-
-Write `run(text string) (out string)` that returns the value doubled, or
-`BAD <text>` if it does not parse — and **panics** on `BOOM`, recovering in a
-deferred function so the caller gets `RECOVERED boom` instead of a dead
-program. Print one line per input, and at the end, from a `defer` in `main`,
-print `CLOSED <n>`.
+A function names its parameters with their types after them, and its
+result type after the parentheses. `return` ends it with a value; a `return`
+inside an `if` ends it early, so the line after the `if` only runs when the
+condition was false.
 
 ```
-input:  4
-        21
-        BOOM
-        xx
-        -4
-output: 42
-        RECOVERED boom
-        BAD xx
-        -8
-        CLOSED 4
+func fare(rides int) int {
+	if rides <= 10 { return rides * 5 }
+	return 50 + (rides-10)*3
+}
 ```
 
-Three facts, and all three are the question: `recover` only does anything
-inside a deferred function; a **named** return value is what lets the deferred
-function change what gets returned after the panic; and `defer` in `main` runs
-at return, so `CLOSED` is last however the loop went.
+The first ten rides pay 5 each and every ride after that pays 3. `fare` is
+declared and called; write its body: the early `return` for ten rides or
+fewer, and the `return` for the rest.
+
+```
+input:  12
+output: 56
+```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 )
 
-func run(text string) (out string) {
-	// recover in a deferred func, panic on BOOM, otherwise double or BAD
-	_ = strings.TrimSpace(text)
-	_ = strconv.Atoi
-	return "?"
+func fare(rides int) int {
+	// FILL: rides <= 10 pay 5 each; beyond ten, 50 plus 3 per extra ride
+	// ANSWER: if rides <= 10 { return rides * 5 }
+	// ANSWER: return 50 + (rides-10)*3
+	return 0
 }
 
 func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Scan()
-	n, _ := strconv.Atoi(strings.TrimSpace(sc.Text()))
-
-	done := 0
-	for i := 0; i < n; i++ {
-		sc.Scan()
-		fmt.Println(run(sc.Text()))
-		done++
-	}
-	fmt.Printf("CLOSED %d\n", done)
+	var n int
+	fmt.Scan(&n)
+	fmt.Println(fare(n))
 }
 '''
 solution    = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 )
 
-func run(text string) (out string) {
-	defer func() {
-		if r := recover(); r != nil {
-			out = fmt.Sprintf("RECOVERED %v", r)
-		}
-	}()
-
-	text = strings.TrimSpace(text)
-	if text == "BOOM" {
-		panic("boom")
-	}
-	value, err := strconv.ParseInt(text, 10, 64)
-	if err != nil {
-		return "BAD " + text
-	}
-	return strconv.FormatInt(value*2, 10)
+func fare(rides int) int {
+	if rides <= 10 { return rides * 5 }
+	return 50 + (rides-10)*3
 }
 
 func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Scan()
-	n, _ := strconv.Atoi(strings.TrimSpace(sc.Text()))
-
-	done := 0
-	defer func() {
-		fmt.Printf("CLOSED %d\n", done)
-	}()
-
-	for i := 0; i < n; i++ {
-		sc.Scan()
-		fmt.Println(run(sc.Text()))
-		done++
-	}
+	var n int
+	fmt.Scan(&n)
+	fmt.Println(fare(n))
 }
 '''
 hints = [
-  "The return value has to be named — out string — or the deferred function has nothing to assign to.",
-  "recover() returns nil when there was no panic, so the if is how you tell the two paths apart.",
-  "The deferred closure in main reads `done` when it runs, not when it was written, so it sees the final count.",
+  "if rides <= 10 { return rides * 5 } and then return 50 + (rides-10)*3.",
+  "Ten rides at 5 is 50; that is where the second formula starts counting from.",
 ]
 
 [quest.tests]
@@ -1372,140 +1080,103 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "mixed", stdin = "4\n21\nBOOM\nxx\n-4\n", expect = "42\nRECOVERED boom\nBAD xx\n-8\nCLOSED 4\n", visible = true },
-  { name = "boom",  stdin = "1\nBOOM\n",             expect = "RECOVERED boom\nCLOSED 1\n",                 visible = false },
-  { name = "clean", stdin = "2\n0\n5\n",             expect = "0\n10\nCLOSED 2\n",                          visible = false },
-  { name = "junk",  stdin = "1\nzz\n",               expect = "BAD zz\nCLOSED 1\n",                         visible = false },
+  { name = "twelve", stdin = "12\n", expect = "56\n", visible = true },
+  { name = "ten", stdin = "10\n", expect = "50\n", visible = false },
+  { name = "three", stdin = "3\n", expect = "15\n", visible = false },
+  { name = "zero", stdin = "0\n", expect = "0\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 13
 [[quest]]
-id          = "go.basic.13.zero-values"
+id          = "go.basic.07.structs"
 node        = 13
-title       = "NOTHING IS NOT NOTHING"
-difficulty  = 3
-story       = "The rota map was never made and the code read from it all morning without complaining once."
-concepts    = ["zero-values", "collections", "slices"]
-requires    = ["go.basic.12.defer-panic-recover"]
-map          = { x = 0.041, y = 0.934, kind = "quest" }
+title       = "ONE LINE OF THE ORDER"
+difficulty  = 2
+story       = "The Lucky Mac order screen has a row for each item — name, price, how many — and the total column reads zero on every row."
+concepts    = ["structs", "functions"]
+requires    = ["go.basic.06.functions"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` words.
-
-Print four lines, in order:
-
-1. `READ <v>` — what a **nil** map gives you for a key it does not have
-2. `LEN <k>` — the length after appending all `n` words to a **nil** slice
-3. `WRITE <ok|panic>` — whether assigning into that nil map panicked
-   (recover it; do not let the program die)
-4. `FOUND <k>` — how many of the words are keys of an *initialised* map seeded
-   with `a` and `b`
+A `struct` groups named fields. A value of it is built with a literal that
+names the fields, and a method is a function with a receiver in front of
+its name: `func (it Item) Total() int` is called as `it.Total()` and reads
+the fields through `it`.
 
 ```
-input:  3
-        a b c
-output: READ 0
-        LEN 3
-        WRITE panic
-        FOUND 2
+it := Item{Name: name, Price: price, Qty: qty}
+return it.Price * it.Qty
 ```
 
-A nil map and a nil slice are not the same kind of nothing. Reading a nil map
-is legal and gives the value type's zero; writing to one panics, because there
-is no table to write into. `append` to a nil slice is legal and allocates —
-which is why `var s []T` is the idiomatic empty slice and `var m map[K]V` is
-not the idiomatic empty map.
+`Item` and its `Total` method are declared. Write the literal that builds
+`it` from the three values read, and the one-line body of `Total`.
+
+```
+input:  tea 12 3
+output: tea: 36
+```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 )
 
-func writeToNil(m map[string]int) (result string) {
-	// assign into m and report "ok", or recover and report "panic"
-	_ = m
-	return "?"
+type Item struct {
+	Name  string
+	Price int
+	Qty   int
+}
+
+func (it Item) Total() int {
+	// FILL: price times quantity
+	// ANSWER: return it.Price * it.Qty
+	return 0
 }
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
-	words := make([]string, n)
-	for i := range words {
-		fmt.Fscan(reader, &words[i])
-	}
+	var name string
+	var price, qty int
+	fmt.Scan(&name, &price, &qty)
 
-	var empty map[string]int
-	var list []string
-	seeded := map[string]int{"a": 1, "b": 2}
+	// FILL: build the Item from name, price and qty
+	// ANSWER: it := Item{Name: name, Price: price, Qty: qty}
+	it := Item{}
+	_, _, _ = name, price, qty
 
-	_ = empty
-	_ = list
-	_ = seeded
-	_ = writeToNil(nil)
-	fmt.Println("READ 0")
-	fmt.Println("LEN 0")
-	fmt.Println("WRITE ok")
-	fmt.Println("FOUND 0")
+	fmt.Printf("%s: %d\n", it.Name, it.Total())
 }
 '''
 solution    = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 )
 
-func writeToNil(m map[string]int) (result string) {
-	defer func() {
-		if r := recover(); r != nil {
-			result = "panic"
-		}
-	}()
-	m["anything"] = 1
-	return "ok"
+type Item struct {
+	Name  string
+	Price int
+	Qty   int
+}
+
+func (it Item) Total() int {
+	return it.Price * it.Qty
 }
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
-	words := make([]string, n)
-	for i := range words {
-		fmt.Fscan(reader, &words[i])
-	}
+	var name string
+	var price, qty int
+	fmt.Scan(&name, &price, &qty)
 
-	var empty map[string]int
-	fmt.Printf("READ %d\n", empty["missing"])
+	it := Item{Name: name, Price: price, Qty: qty}
 
-	var list []string
-	for _, word := range words {
-		list = append(list, word)
-	}
-	fmt.Printf("LEN %d\n", len(list))
-
-	fmt.Printf("WRITE %s\n", writeToNil(empty))
-
-	seeded := map[string]int{"a": 1, "b": 2}
-	found := 0
-	for _, word := range words {
-		if _, ok := seeded[word]; ok {
-			found++
-		}
-	}
-	fmt.Printf("FOUND %d\n", found)
+	fmt.Printf("%s: %d\n", it.Name, it.Total())
 }
 '''
 hints = [
-  "empty[\"missing\"] on a nil map is not an error — it is the zero value of int, which is 0.",
-  "append handles a nil slice: it allocates the first backing array for you, which is why you never need make() just to start.",
-  "The write has to happen inside a function with a deferred recover, or the panic ends the program before line four.",
+  "it := Item{Name: name, Price: price, Qty: qty} — and in Total, return it.Price * it.Qty.",
+  "Delete the _, _, _ = line once the literal uses the three names; Go refuses an unused variable.",
 ]
 
 [quest.tests]
@@ -1515,157 +1186,136 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "three",  stdin = "3\na b c\n",   expect = "READ 0\nLEN 3\nWRITE panic\nFOUND 2\n", visible = true },
-  { name = "miss",   stdin = "1\nz\n",       expect = "READ 0\nLEN 1\nWRITE panic\nFOUND 0\n", visible = false },
-  { name = "none",   stdin = "0\n",          expect = "READ 0\nLEN 0\nWRITE panic\nFOUND 0\n", visible = false },
-  { name = "repeat", stdin = "4\na a b q\n", expect = "READ 0\nLEN 4\nWRITE panic\nFOUND 3\n", visible = false },
+  { name = "tea", stdin = "tea 12 3\n", expect = "tea: 36\n", visible = true },
+  { name = "noodles", stdin = "noodles 48 2\n", expect = "noodles: 96\n", visible = false },
+  { name = "one", stdin = "bun 7 1\n", expect = "bun: 7\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 14
 [[quest]]
-id          = "go.basic.14.embedding"
+id          = "go.basic.08.enums"
 node        = 14
-title       = "IT INHERITED NOTHING"
-difficulty  = 3
-story       = "A terminus is a stop with extra. Alex wrote it twice, which is once too many."
-concepts    = ["structs", "interfaces", "dispatch"]
-requires    = ["go.basic.13.zero-values"]
-map          = { x = 0.273, y = 0.864, kind = "quest" }
+title       = "THE LINE COLOUR"
+difficulty  = 2
+story       = "The interchange map at Admiralty knows three lines by name and paints every one of them grey."
+concepts    = ["enums", "pattern-matching"]
+requires    = ["go.basic.07.structs"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` lines, each `STOP <NAME>` or
-`TERM <NAME> <LINES>`.
-
-Give `Stop` a `Describe() string` returning its name. Make `Terminus`
-**embed** `Stop` and add `Lines int`, and give it its own `Describe` that
-calls the embedded one and adds `(<lines> lines)`.
-
-Print each one's `Describe()`, then `TERMINI <k>` counted with a type switch
-over a `[]Describer`.
+Go has no `enum` keyword. The idiom is a named integer type and a `const`
+block with `iota`, which numbers the constants 0, 1, 2 as it goes down. A
+`switch` over such a value lists one `case` per constant, and a `case` may
+sit on one line with its `return`.
 
 ```
-input:  3
-        STOP CAUSEWAY
-        TERM KENNEDY 2
-        STOP TINHAU
-output: CAUSEWAY
-        KENNEDY (2 lines)
-        TINHAU
-        TERMINI 1
+type Line int
+
+const (
+	Island Line = iota
+	TsuenWan
+	KwunTong
+)
+
+switch l {
+case Island: return "blue"
+case TsuenWan: return "red"
+case KwunTong: return "green"
+}
 ```
 
-Embedding is not inheritance. `Terminus` does not *become* a `Stop`; it
-contains one, and the contained value's methods are **promoted** to the outer
-type unless the outer type declares its own. `t.Stop.Describe()` is how you
-reach the one you shadowed, and there is no `super`.
+`Line`, its three constants and `parse` are written, and `colour` already
+answers `blue` for `Island`. Add the two missing cases: `TsuenWan` is
+`red`, `KwunTong` is `green`.
+
+```
+input:  tsuenwan
+output: red
+```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 )
 
-type Describer interface {
-	Describe() string
+type Line int
+
+const (
+	Island Line = iota
+	TsuenWan
+	KwunTong
+)
+
+func parse(word string) Line {
+	switch word {
+	case "tsuenwan":
+		return TsuenWan
+	case "kwuntong":
+		return KwunTong
+	}
+	return Island
 }
 
-type Stop struct {
-	Name string
+func colour(l Line) string {
+	switch l {
+	case Island: return "blue"
+	// FILL: case TsuenWan is red, case KwunTong is green
+	// ANSWER: case TsuenWan: return "red"
+	// ANSWER: case KwunTong: return "green"
+	}
+	return ""
 }
-
-type Terminus struct {
-	Stop
-	Lines int
-}
-
-// Stop needs Describe; Terminus needs its own that calls the embedded one.
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
-
-	var all []Describer
-	for i := 0; i < n; i++ {
-		var kind, name string
-		fmt.Fscan(reader, &kind, &name)
-		if kind == "TERM" {
-			var lines int
-			fmt.Fscan(reader, &lines)
-			_ = Terminus{Stop: Stop{Name: name}, Lines: lines}
-			continue
-		}
-		_ = Stop{Name: name}
-	}
-
-	_ = all
-	fmt.Println("TERMINI 0")
+	var word string
+	fmt.Scan(&word)
+	fmt.Println(colour(parse(word)))
 }
 '''
 solution    = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 )
 
-type Describer interface {
-	Describe() string
+type Line int
+
+const (
+	Island Line = iota
+	TsuenWan
+	KwunTong
+)
+
+func parse(word string) Line {
+	switch word {
+	case "tsuenwan":
+		return TsuenWan
+	case "kwuntong":
+		return KwunTong
+	}
+	return Island
 }
 
-type Stop struct {
-	Name string
-}
-
-func (s Stop) Describe() string {
-	return s.Name
-}
-
-type Terminus struct {
-	Stop
-	Lines int
-}
-
-func (t Terminus) Describe() string {
-	return fmt.Sprintf("%s (%d lines)", t.Stop.Describe(), t.Lines)
+func colour(l Line) string {
+	switch l {
+	case Island: return "blue"
+	case TsuenWan: return "red"
+	case KwunTong: return "green"
+	}
+	return ""
 }
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
-
-	all := make([]Describer, 0, n)
-	for i := 0; i < n; i++ {
-		var kind, name string
-		fmt.Fscan(reader, &kind, &name)
-		if kind == "TERM" {
-			var lines int
-			fmt.Fscan(reader, &lines)
-			all = append(all, Terminus{Stop: Stop{Name: name}, Lines: lines})
-			continue
-		}
-		all = append(all, Stop{Name: name})
-	}
-
-	termini := 0
-	for _, d := range all {
-		fmt.Println(d.Describe())
-		if _, ok := d.(Terminus); ok {
-			termini++
-		}
-	}
-	fmt.Printf("TERMINI %d\n", termini)
+	var word string
+	fmt.Scan(&word)
+	fmt.Println(colour(parse(word)))
 }
 '''
 hints = [
-  "The embedded field has no name of its own — it is spelled `Stop` inside the literal and inside t.Stop.Describe().",
-  "Terminus satisfies Describer because of its own Describe; without one it would satisfy it through the promoted Stop method instead.",
-  "d.(Terminus) with the comma-ok form is the type assertion; a type switch does the same job when there are more than two.",
+  "case TsuenWan: return \"red\" and case KwunTong: return \"green\", each on its own line under the Island case.",
+  "A Go switch does not fall through: each case ends by itself, no break needed.",
 ]
 
 [quest.tests]
@@ -1675,544 +1325,118 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "mixed", stdin = "3\nSTOP CAUSEWAY\nTERM KENNEDY 2\nSTOP TINHAU\n", expect = "CAUSEWAY\nKENNEDY (2 lines)\nTINHAU\nTERMINI 1\n", visible = true },
-  { name = "one",   stdin = "1\nTERM SHEUNGWAN 1\n",                           expect = "SHEUNGWAN (1 lines)\nTERMINI 1\n",                  visible = false },
-  { name = "stops", stdin = "2\nSTOP A\nSTOP B\n",                             expect = "A\nB\nTERMINI 0\n",                                 visible = false },
-  { name = "terms", stdin = "2\nTERM X 0\nTERM Y 9\n",                         expect = "X (0 lines)\nY (9 lines)\nTERMINI 2\n",             visible = false },
+  { name = "tsuenwan", stdin = "tsuenwan\n", expect = "red\n", visible = true },
+  { name = "island", stdin = "island\n", expect = "blue\n", visible = false },
+  { name = "kwuntong", stdin = "kwuntong\n", expect = "green\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 15
 [[quest]]
-id          = "go.basic.15.variadics"
+id          = "go.basic.09.vector"
 node        = 15
-title       = "HOWEVER MANY YOU HAVE"
+title       = "THE CARRIAGE COUNT"
 difficulty  = 2
-story       = "Sometimes it is two orders and sometimes it is the whole rack, and the function should not care."
-concepts    = ["functions", "slices", "types"]
-requires    = ["go.basic.14.embedding"]
-map          = { x = 0.378, y = 0.947, kind = "quest" }
+story       = "Platform 2 at Causeway Bay reads the boarding count off every door and keeps none of them: no total, no first door, no last."
+concepts    = ["slices", "iteration"]
+requires    = ["go.basic.08.enums"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` integers.
-
-Write `total(values ...int64) (sum int64, count int)` — variadic, with named
-return values — and call it three ways. Print:
-
-1. `ALL <sum> <count>` — the whole slice, spread with `...`
-2. `NONE <sum> <count>` — called with no arguments at all
-3. `TWO <sum> <count>` — the first two values passed individually, or as many
-   as there are
+A slice is Go's growable list, and the three things you do to one are
+the three lines below. `append` adds on the end and hands back the slice,
+so you always assign it back. Removing index 1 is `append` again: the part
+before it joined to the part after it. Editing is plain indexing —
+`xs[0] = 99` overwrites the first element in place. And `sort.Ints`
+puts the whole slice in ascending order, in place.
 
 ```
-input:  4
-        1 2 3 4
-output: ALL 10 4
-        NONE 0 0
-        TWO 3 2
+xs = append(xs, v)
+xs = append(xs[:1], xs[2:]...)
+xs[0] = 99
+sort.Ints(xs)
 ```
 
-Inside the function `values` is an ordinary `[]int64`, and with no arguments
-it is `nil` — which `range` and `len` both handle without a special case.
-`total(list...)` passes the existing slice rather than copying it into a new
-one; `total(list)` would not compile, and knowing why is the question.
+Every door count `v` is read in a loop (at least two of them). Type the
+`append` inside the loop, then the remove, the edit and the sort after
+it, in place of the four placeholders; the length and the slice are
+printed.
+
+```
+input:  3 7 2 5
+output: 3
+        2 5 99
+```
 '''
 starter     = '''
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-)
-
-func total(values ...int64) (sum int64, count int) {
-	// named returns: assign to sum and count, then a bare return
-	_ = values
-	return
-}
-
-func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
-	list := make([]int64, n)
-	for i := range list {
-		fmt.Fscan(reader, &list[i])
-	}
-
-	// ALL (spread the slice), NONE (no arguments), TWO (the first two)
-	_ = total
-	_ = list
-	fmt.Println("ALL 0 0")
-	fmt.Println("NONE 0 0")
-	fmt.Println("TWO 0 0")
-}
-'''
-solution    = '''
-package main
-
-import (
-	"bufio"
-	"fmt"
-	"os"
-)
-
-func total(values ...int64) (sum int64, count int) {
-	for _, v := range values {
-		sum += v
-	}
-	count = len(values)
-	return
-}
-
-func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var n int
-	fmt.Fscan(reader, &n)
-	list := make([]int64, n)
-	for i := range list {
-		fmt.Fscan(reader, &list[i])
-	}
-
-	sum, count := total(list...)
-	fmt.Printf("ALL %d %d\n", sum, count)
-
-	sum, count = total()
-	fmt.Printf("NONE %d %d\n", sum, count)
-
-	// passed individually — the form the spread exists to contrast with
-	switch len(list) {
-	case 0:
-		sum, count = total()
-	case 1:
-		sum, count = total(list[0])
-	default:
-		sum, count = total(list[0], list[1])
-	}
-	fmt.Printf("TWO %d %d\n", sum, count)
-}
-'''
-hints = [
-  "A bare `return` with named results returns whatever sum and count currently hold.",
-  "total(list...) spreads; total(list) tries to pass a []int64 as a single int64 and does not compile.",
-  "With no arguments values is nil, and len(nil slice) is 0 — no guard needed.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "four",  stdin = "4\n1 2 3 4\n",       expect = "ALL 10 4\nNONE 0 0\nTWO 3 2\n",   visible = true },
-  { name = "one",   stdin = "1\n7\n",             expect = "ALL 7 1\nNONE 0 0\nTWO 7 1\n",    visible = false },
-  { name = "empty", stdin = "0\n",                expect = "ALL 0 0\nNONE 0 0\nTWO 0 0\n",    visible = false },
-  { name = "mixed", stdin = "5\n-1 -2 10 0 3\n",  expect = "ALL 10 5\nNONE 0 0\nTWO -3 2\n",  visible = false },
-]
-
-# ---------------------------------------------------------------- 16
-[[quest]]
-id          = "go.basic.16.json"
-node        = 16
-title       = "THE TAG IS THE CONTRACT"
-difficulty  = 3
-story       = "The depot's API sends lowercase keys and Go exports uppercase fields, and for a week nobody could see why every order was empty."
-concepts    = ["serialization", "structs", "error-handling"]
-requires    = ["go.basic.15.variadics"]
-map          = { x = 0.617, y = 0.851, kind = "quest" }
-brief       = '''
-Standard input is one line: a JSON array of orders, each with an `item` string
-and a `cents` number.
-
-Unmarshal it, print one line per order as `<ITEM> <CENTS>`, then marshal and
-print a summary object with exactly the keys `count` and `total`, in that
-order. If the input is not valid JSON, print `BAD JSON` and nothing else.
-
-```
-input:  [{"item":"SET","cents":2800},{"item":"PIE","cents":900}]
-output: SET 2800
-        PIE 900
-        {"count":2,"total":3700}
-```
-
-A field has to be **exported** for `encoding/json` to see it at all — a
-lowercase field is invisible to the marshaller, silently. The struct tag then
-says what it is called on the wire. `Marshal` writes the fields in declaration
-order, so the summary's key order is yours to decide, not the map's.
-'''
-starter     = '''
-package main
-
-import (
-	"bufio"
-	"fmt"
-	"os"
-	"strings"
-)
-
-type Order struct {
-	Item  string
-	Cents int64
-}
-
-type Summary struct {
-	Count int
-	Total int64
-}
-
-func main() {
-	reader := bufio.NewReader(os.Stdin)
-	line, _ := reader.ReadString('\n')
-	line = strings.TrimRight(line, "\r\n")
-
-	// unmarshal into []Order, print each, then marshal a Summary
-	var orders []Order
-	_ = orders
-	_ = line
-	_ = Summary{}
-	fmt.Println("BAD JSON")
-}
-'''
-solution    = '''
-package main
-
-import (
-	"bufio"
-	"encoding/json"
-	"fmt"
-	"os"
-	"strings"
-)
-
-type Order struct {
-	Item  string `json:"item"`
-	Cents int64  `json:"cents"`
-}
-
-type Summary struct {
-	Count int   `json:"count"`
-	Total int64 `json:"total"`
-}
-
-func main() {
-	reader := bufio.NewReader(os.Stdin)
-	line, _ := reader.ReadString('\n')
-	line = strings.TrimRight(line, "\r\n")
-
-	var orders []Order
-	if err := json.Unmarshal([]byte(line), &orders); err != nil {
-		fmt.Println("BAD JSON")
-		return
-	}
-
-	summary := Summary{Count: len(orders)}
-	for _, order := range orders {
-		fmt.Printf("%s %d\n", order.Item, order.Cents)
-		summary.Total += order.Cents
-	}
-
-	encoded, err := json.Marshal(summary)
-	if err != nil {
-		fmt.Println("BAD JSON")
-		return
-	}
-	fmt.Println(string(encoded))
-}
-'''
-hints = [
-  "The tag goes in backticks after the type: Item string `json:\"item\"`.",
-  "Unmarshal takes a pointer to the destination — &orders, not orders — or it has nothing to fill in.",
-  "Check the error from Unmarshal. On bad input orders is left empty and a program that ignores the error prints a cheerful zero summary.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "two",   stdin = "[{\"item\":\"SET\",\"cents\":2800},{\"item\":\"PIE\",\"cents\":900}]\n", expect = "SET 2800\nPIE 900\n{\"count\":2,\"total\":3700}\n", visible = true },
-  { name = "empty", stdin = "[]\n",                                       expect = "{\"count\":0,\"total\":0}\n",            visible = false },
-  { name = "one",   stdin = "[{\"item\":\"TEA\",\"cents\":1200}]\n",      expect = "TEA 1200\n{\"count\":1,\"total\":1200}\n", visible = false },
-  { name = "junk",  stdin = "not json\n",                                 expect = "BAD JSON\n",                            visible = false },
-]
-
-# ---------------------------------------------------------------- 17
-[[quest]]
-id          = "go.basic.17.testing"
-node        = 17
-title       = "PROVE IT YOURSELF"
-difficulty  = 3
-story       = "Nobody is going to check this for you at 06:40. The table is right there; make it green."
-concepts    = ["testing", "functions", "slices"]
-requires    = ["go.basic.16.json"]
-map          = { x = 0.723, y = 0.932, kind = "quest" }
-brief       = '''
-The program holds a table of four known-good `(km, fare)` cases and checks
-`fare` against every one, printing `<name> ok` or
-`<name> FAIL got <g> want <w>`, then `PASSED <k>/4`. Finally it reads one
-distance from standard input and prints `FARE <x>`.
-
-`fare(km)` should be `500 + 100 * km`. The starter's is wrong, and the table
-catches it — which is the whole point.
-
-```
-input:  4
-output: zero ok
-        one ok
-        four ok
-        ten ok
-        PASSED 4/4
-        FARE 900
-```
-
-Do not touch the table; it is the specification. This **is** the Go
-table-driven test, minus the harness: in a real package it is
-`func TestFare(t *testing.T)` with `for _, c := range cases` and
-`t.Run(c.name, ...)`, and `go test` runs it. The table is the same either way.
-'''
-starter     = '''
-package main
-
-import (
-	"bufio"
-	"fmt"
-	"os"
-)
-
-func fare(km int64) int64 {
-	return 500 + 10*km
-}
-
-type testCase struct {
-	name string
-	km   int64
-	want int64
-}
-
-var cases = []testCase{
-	{"zero", 0, 500},
-	{"one", 1, 600},
-	{"four", 4, 900},
-	{"ten", 10, 1500},
-}
-
-func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var km int64
-	fmt.Fscan(reader, &km)
-
-	passed := 0
-	for _, c := range cases {
-		got := fare(c.km)
-		if got == c.want {
-			passed++
-			fmt.Printf("%s ok\n", c.name)
-			continue
-		}
-		fmt.Printf("%s FAIL got %d want %d\n", c.name, got, c.want)
-	}
-	fmt.Printf("PASSED %d/%d\n", passed, len(cases))
-	fmt.Printf("FARE %d\n", fare(km))
-}
-'''
-solution    = '''
-package main
-
-import (
-	"bufio"
-	"fmt"
-	"os"
-)
-
-func fare(km int64) int64 {
-	return 500 + 100*km
-}
-
-type testCase struct {
-	name string
-	km   int64
-	want int64
-}
-
-var cases = []testCase{
-	{"zero", 0, 500},
-	{"one", 1, 600},
-	{"four", 4, 900},
-	{"ten", 10, 1500},
-}
-
-func main() {
-	reader := bufio.NewReader(os.Stdin)
-	var km int64
-	fmt.Fscan(reader, &km)
-
-	passed := 0
-	for _, c := range cases {
-		got := fare(c.km)
-		if got == c.want {
-			passed++
-			fmt.Printf("%s ok\n", c.name)
-			continue
-		}
-		fmt.Printf("%s FAIL got %d want %d\n", c.name, got, c.want)
-	}
-	fmt.Printf("PASSED %d/%d\n", passed, len(cases))
-	fmt.Printf("FARE %d\n", fare(km))
-}
-'''
-hints = [
-  "The table is the specification. The function is the thing that is wrong.",
-  "Three of the four cases fail and the one that passes is km = 0, which is exactly why one test case proves nothing.",
-  "In a package this is func TestFare(t *testing.T) with t.Run(c.name, func(t *testing.T){ ... }) so a failure names itself.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "four", stdin = "4\n",  expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 900\n",  visible = true },
-  { name = "zero", stdin = "0\n",  expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 500\n",  visible = false },
-  { name = "long", stdin = "20\n", expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 2500\n", visible = false },
-  { name = "back", stdin = "-2\n", expect = "zero ok\none ok\nfour ok\nten ok\nPASSED 4/4\nFARE 300\n",  visible = false },
-]
-
-# ---------------------------------------------------------------- 18  BOSS
-[[quest]]
-id          = "go.basic.18.nil-and-order"
-node        = 18
-title       = "NULLPTR"
-difficulty  = 4
-story       = "11:55 at the Lucky Mac front till. Every order goes through and some of them do not exist, and the till reads them anyway."
-concepts    = ["sorting", "structs", "slices", "control-flow"]
-requires    = ["go.basic.17.testing", "go.basic.13.zero-values"]
-map          = { x = 0.939, y = 0.846, kind = "boss" }
-brief       = '''
-Standard input is a count `n`, then `n` lines. Each is either
-`<NAME> <CENTS>` or a single `-`, which means the order never arrived: a nil
-`*Order` in the slice.
-
-Print the real orders sorted by cents **descending**, ties by name ascending,
-as `<NAME> <CENTS>`. Then print `NIL <count>` — how many were missing.
-
-```
-input:  4
-        SET 2800
-        -
-        PIE 900
-        TEA 1200
-output: SET 2800
-        TEA 1200
-        PIE 900
-        NIL 1
-```
-
-Every nil has to be found before anything dereferences it, including the
-comparison function you hand to `sort.Slice`. That is the whole boss.
-'''
-starter     = '''
-package main
-
-import (
-	"bufio"
-	"fmt"
-	"os"
-	"strconv"
-	"strings"
-)
-
-type Order struct {
-	Name  string
-	Cents int64
-}
-
-func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Scan()
-	n, _ := strconv.Atoi(strings.TrimSpace(sc.Text()))
-
-	orders := make([]*Order, 0, n)
-	for i := 0; i < n; i++ {
-		sc.Scan()
-		fields := strings.Fields(sc.Text())
-		_ = fields
-		orders = append(orders, nil)
-	}
-
-	// drop the nils (counting them), sort what is left, print
-	_ = orders
-	_ = fmt.Sprint
-}
-'''
-solution    = '''
-package main
-
-import (
-	"bufio"
-	"fmt"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-type Order struct {
-	Name  string
-	Cents int64
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		// FILL: add v on the end of xs
+		// ANSWER: xs = append(xs, v)
+		_ = v
+	}
+	// FILL: remove the element at index 1
+	// ANSWER: xs = append(xs[:1], xs[2:]...)
+	// FILL: edit the first element to 99
+	// ANSWER: xs[0] = 99
+	// FILL: sort xs ascending
+	// ANSWER: sort.Ints(xs)
+	_ = sort.Ints
+
+	var out []string
+	for _, x := range xs {
+		out = append(out, strconv.Itoa(x))
+	}
+	fmt.Println(len(xs))
+	fmt.Println(strings.Join(out, " "))
 }
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+)
 
 func main() {
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Scan()
-	n, _ := strconv.Atoi(strings.TrimSpace(sc.Text()))
-
-	orders := make([]*Order, 0, n)
-	for i := 0; i < n; i++ {
-		sc.Scan()
-		fields := strings.Fields(sc.Text())
-		if len(fields) < 2 {
-			orders = append(orders, nil)
-			continue
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
 		}
-		cents, err := strconv.ParseInt(fields[1], 10, 64)
-		if err != nil {
-			orders = append(orders, nil)
-			continue
-		}
-		orders = append(orders, &Order{Name: fields[0], Cents: cents})
+		xs = append(xs, v)
 	}
+	xs = append(xs[:1], xs[2:]...)
+	xs[0] = 99
+	sort.Ints(xs)
 
-	present := make([]*Order, 0, len(orders))
-	missing := 0
-	for _, order := range orders {
-		if order == nil {
-			missing++
-			continue
-		}
-		present = append(present, order)
+	var out []string
+	for _, x := range xs {
+		out = append(out, strconv.Itoa(x))
 	}
-
-	sort.Slice(present, func(i, j int) bool {
-		if present[i].Cents != present[j].Cents {
-			return present[i].Cents > present[j].Cents
-		}
-		return present[i].Name < present[j].Name
-	})
-
-	for _, order := range present {
-		fmt.Printf("%s %d\n", order.Name, order.Cents)
-	}
-	fmt.Printf("NIL %d\n", missing)
+	fmt.Println(len(xs))
+	fmt.Println(strings.Join(out, " "))
 }
 '''
 hints = [
-  "A nil *Order in a slice is fine until something reads a field off it. Filter first, sort second.",
-  "strings.Fields on \"-\" gives one field, so len(fields) < 2 is your missing-order test.",
-  "Descending is the > in the less function; the tie-break is a second comparison after it.",
+  "xs = append(xs, v) in the loop; then xs = append(xs[:1], xs[2:]...), xs[0] = 99 and sort.Ints(xs) after it.",
+  "xs[:1] is everything before index 1 and xs[2:] everything after it; append joins the two, and the ... spreads the second slice into arguments.",
 ]
 
 [quest.tests]
@@ -2222,7 +1446,1584 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "one-missing", stdin = "4\nSET 2800\n-\nPIE 900\nTEA 1200\n", expect = "SET 2800\nTEA 1200\nPIE 900\nNIL 1\n", visible = true },
-  { name = "all-missing", stdin = "2\n-\n-\n", expect = "NIL 2\n", visible = false },
-  { name = "ties",        stdin = "3\nA 500\nB 500\n-\n", expect = "A 500\nB 500\nNIL 1\n", visible = false },
+  { name = "four", stdin = "3 7 2 5\n", expect = "3\n2 5 99\n", visible = true },
+  { name = "two", stdin = "9 4\n", expect = "1\n99\n", visible = false },
+  { name = "negatives", stdin = "-1 4 -6\n", expect = "2\n-6 99\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "go.basic.16.list"
+node        = 16
+title       = "THE ORDER LINE"
+difficulty  = 1
+story       = "Orders at the Lucky Mac pass hang on a chain, newest at the back, a marker at the front, and the chain hangs empty."
+concepts    = ["collections", "iteration"]
+requires    = ["go.basic.09.vector"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+`container/list` is a doubly linked list. `PushBack` hangs a value on the
+end. `Remove` takes an element off wherever it is — `l.Front()` is the
+first one. Editing goes through the element: `e.Value` is a field you can
+assign to, so `l.Front().Value = 99` rewrites the first order in place.
+A list has no sort of its own: the walk from `l.Front()` by `e.Next()`
+copies the values into a slice `vals` (written for you), and `sort.Ints`
+sorts that.
+
+```
+l.PushBack(v)
+l.Remove(l.Front())
+l.Front().Value = 99
+sort.Ints(vals)
+```
+
+Every number `v` is read in a loop (at least two of them). Type the
+`PushBack` inside the loop, then the remove and the edit after it, and
+the sort after the walk, in place of the four placeholders; the length
+and the sorted values are printed.
+
+```
+input:  3 1 2
+output: 2
+        2 99
+```
+'''
+starter     = '''
+package main
+
+import (
+	"container/list"
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+)
+
+func main() {
+	l := list.New()
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		// FILL: hang v on the back of l
+		// ANSWER: l.PushBack(v)
+		_ = v
+	}
+	// FILL: remove the front element
+	// ANSWER: l.Remove(l.Front())
+	// FILL: edit the front element's Value to 99
+	// ANSWER: l.Front().Value = 99
+	_ = l
+
+	var vals []int
+	for e := l.Front(); e != nil; e = e.Next() {
+		vals = append(vals, e.Value.(int))
+	}
+	// FILL: sort vals ascending
+	// ANSWER: sort.Ints(vals)
+	_ = sort.Ints
+	var out []string
+	for _, x := range vals {
+		out = append(out, strconv.Itoa(x))
+	}
+	fmt.Println(l.Len())
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"container/list"
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+)
+
+func main() {
+	l := list.New()
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		l.PushBack(v)
+	}
+	l.Remove(l.Front())
+	l.Front().Value = 99
+
+	var vals []int
+	for e := l.Front(); e != nil; e = e.Next() {
+		vals = append(vals, e.Value.(int))
+	}
+	sort.Ints(vals)
+	var out []string
+	for _, x := range vals {
+		out = append(out, strconv.Itoa(x))
+	}
+	fmt.Println(l.Len())
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+hints = [
+  "l.PushBack(v) in the loop; l.Remove(l.Front()) and l.Front().Value = 99 after it; sort.Ints(vals) after the walk.",
+  "Remove takes the *Element, not the value, so it is handed l.Front(); after that the old second element is the new front, and that is the one edited. e.Value is an interface{}, which is why the walk writes e.Value.(int).",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3 1 2\n", expect = "2\n2 99\n", visible = true },
+  { name = "two", stdin = "7 4\n", expect = "1\n99\n", visible = false },
+  { name = "four", stdin = "5 5 9 0\n", expect = "3\n0 9 99\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "go.basic.10.maps"
+node        = 17
+title       = "THE ORDER TALLY"
+difficulty  = 2
+story       = "The Lucky Mac kitchen printer spits out every item as it is shouted and never says how many of each the rush actually ordered."
+concepts    = ["collections", "strings"]
+requires    = ["go.basic.16.list"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+A `map[string]int` keys a count by a word. Adding is `counts[w]++` — a
+missing key reads as zero, so the first sighting makes 1. Removing is
+`delete(counts, k)`, which is silent when the key is not there. Editing is
+assignment: `counts["bun"] = 10` overwrites the count under that key (and
+would insert it if it were missing). A map has no order — ranging over it
+comes out shuffled — so the keys are collected into a slice (written for
+you) and `sort.Strings` puts them in order before printing.
+
+```
+counts[w]++
+delete(counts, "tea")
+counts["bun"] = 10
+sort.Strings(keys)
+```
+
+Every word `w` is read in a loop. Type the count inside the loop, the
+`delete` of `tea` and the edit of `bun` after it, and the sort once
+`keys` is built, in place of the four placeholders; the sorted
+`word count` lines are printed.
+
+```
+input:  tea bun tea rice tea bun
+output: bun 10
+        rice 1
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+)
+
+func main() {
+	counts := map[string]int{}
+	var w string
+	for {
+		if _, err := fmt.Scan(&w); err != nil {
+			break
+		}
+		// FILL: add one to the count for w
+		// ANSWER: counts[w]++
+		_ = w
+	}
+	// FILL: remove the key "tea"
+	// ANSWER: delete(counts, "tea")
+	// FILL: edit the count under "bun" to 10
+	// ANSWER: counts["bun"] = 10
+	_ = counts
+
+	var keys []string
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	// FILL: sort keys
+	// ANSWER: sort.Strings(keys)
+	_ = sort.Strings
+	for _, k := range keys {
+		fmt.Println(k, counts[k])
+	}
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+)
+
+func main() {
+	counts := map[string]int{}
+	var w string
+	for {
+		if _, err := fmt.Scan(&w); err != nil {
+			break
+		}
+		counts[w]++
+	}
+	delete(counts, "tea")
+	counts["bun"] = 10
+
+	var keys []string
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Println(k, counts[k])
+	}
+}
+'''
+hints = [
+  "counts[w]++ in the loop; delete(counts, \"tea\") and counts[\"bun\"] = 10 after it; sort.Strings(keys) once keys is built.",
+  "Assigning to a key is the same line whether the key exists or not: it overwrites when it does and inserts when it does not.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six", stdin = "tea bun tea rice tea bun\n", expect = "bun 10\nrice 1\n", visible = true },
+  { name = "no-tea", stdin = "rice bun\n", expect = "bun 10\nrice 1\n", visible = false },
+  { name = "only-tea", stdin = "tea tea\n", expect = "bun 10\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "go.basic.18.hashtable"
+node        = 18
+title       = "THE TALLY, MINUS ONE"
+difficulty  = 2
+story       = "The kitchen tallies every word shouted at the pass, strikes out the word the, and reads the tally back in a different order every evening."
+concepts    = ["collections", "hashing", "sorting"]
+requires    = ["go.basic.10.maps"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''
+A Go map is a hash table: a key is hashed to a slot, so adding, removing
+and looking up all cost the same whether there are ten keys or ten million
+— and the price is that walking it comes out in no fixed order. Adding is
+`counts[w]++`; removing is `delete`; editing an entry safely is the
+comma-ok form, `n, ok := counts[k]`, which says whether the key was there
+before you write it back. The keys are collected into a slice (written
+for you) and `sort.Strings` puts them in order, or the tally would read
+differently every evening.
+
+```
+counts[w]++
+delete(counts, "the")
+if n, ok := counts["tram"]; ok { counts["tram"] = n * 100 }
+sort.Strings(keys)
+```
+
+Every word `w` is read in a loop. Type the count inside the loop, the
+`delete` and the comma-ok edit after it, and the sort once `keys` is
+built, in place of the four placeholders; the size and the sorted tally
+are printed.
+
+```
+input:  the tram the wire the
+output: 2
+        tram 100
+        wire 1
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+)
+
+func main() {
+	counts := map[string]int{}
+	var w string
+	for {
+		if _, err := fmt.Scan(&w); err != nil {
+			break
+		}
+		// FILL: add one to the count for w
+		// ANSWER: counts[w]++
+		_ = w
+	}
+	// FILL: remove the key "the"
+	// ANSWER: delete(counts, "the")
+	// FILL: if "tram" is there, edit its count to a hundred times itself
+	// ANSWER: if n, ok := counts["tram"]; ok { counts["tram"] = n * 100 }
+	_ = counts
+
+	keys := make([]string, 0, len(counts))
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	// FILL: sort keys
+	// ANSWER: sort.Strings(keys)
+	_ = sort.Strings
+	fmt.Println(len(counts))
+	for _, k := range keys {
+		fmt.Println(k, counts[k])
+	}
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+)
+
+func main() {
+	counts := map[string]int{}
+	var w string
+	for {
+		if _, err := fmt.Scan(&w); err != nil {
+			break
+		}
+		counts[w]++
+	}
+	delete(counts, "the")
+	if n, ok := counts["tram"]; ok { counts["tram"] = n * 100 }
+
+	keys := make([]string, 0, len(counts))
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	fmt.Println(len(counts))
+	for _, k := range keys {
+		fmt.Println(k, counts[k])
+	}
+}
+'''
+hints = [
+  "counts[w]++ in the loop; delete(counts, \"the\") and if n, ok := counts[\"tram\"]; ok { counts[\"tram\"] = n * 100 } after it; sort.Strings(keys) once keys is built.",
+  "The comma-ok read never inserts: when \"tram\" is absent, ok is false and nothing is written — a plain counts[\"tram\"] read would have handed back 0 and an assignment would have created the key.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tram", stdin = "the tram the wire the\n", expect = "2\ntram 100\nwire 1\n", visible = true },
+  { name = "tin-hau", stdin = "tin hau tin\n", expect = "2\nhau 1\ntin 2\n", visible = false },
+  { name = "only-the", stdin = "the the a\n", expect = "1\na 1\n", visible = false },
+  { name = "two-trams", stdin = "tram tram the\n", expect = "1\ntram 200\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "go.basic.11.sets"
+node        = 19
+title       = "DISTINCT RIDERS"
+difficulty  = 2
+story       = "Forty rider numbers come through the Lucky Mac door in a morning, most of them the same eight people, and the shift board counts every arrival as a new rider."
+concepts    = ["collections", "sorting"]
+requires    = ["go.basic.18.hashtable"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''
+Go has no set type; a map whose value type is the empty struct is the
+idiom. Adding is `seen[v] = struct{}{}`; removing is `delete`. A set has
+no edit — a member is only there or not — so changing `3` into `4` is a
+remove and an add, written here on one line. `len(seen)` is the distinct
+count; the keys come out in no order, so they are collected into a slice
+(written for you) and `sort.Ints` puts them in order.
+
+```
+seen[v] = struct{}{}
+delete(seen, 8)
+delete(seen, 3); seen[4] = struct{}{}
+sort.Ints(keys)
+```
+
+Every rider number `v` is read in a loop. Type the add inside the loop,
+the remove of `8` and the `3`-to-`4` edit after it, and the sort once
+`keys` is built, in place of the four placeholders; the distinct count
+and the sorted numbers are printed.
+
+```
+input:  8 3 8 5 3 8
+output: 2
+        4 5
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
+func main() {
+	seen := map[int]struct{}{}
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		// FILL: record v in seen
+		// ANSWER: seen[v] = struct{}{}
+		_ = v
+	}
+	// FILL: remove 8
+	// ANSWER: delete(seen, 8)
+	// FILL: edit 3 into 4 (remove one, add the other)
+	// ANSWER: delete(seen, 3); seen[4] = struct{}{}
+	_ = seen
+
+	var keys []int
+	for k := range seen {
+		keys = append(keys, k)
+	}
+	// FILL: sort keys
+	// ANSWER: sort.Ints(keys)
+	_ = sort.Ints
+	var out []string
+	for _, k := range keys {
+		out = append(out, fmt.Sprint(k))
+	}
+	fmt.Println(len(seen))
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
+func main() {
+	seen := map[int]struct{}{}
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		seen[v] = struct{}{}
+	}
+	delete(seen, 8)
+	delete(seen, 3); seen[4] = struct{}{}
+
+	var keys []int
+	for k := range seen {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	var out []string
+	for _, k := range keys {
+		out = append(out, fmt.Sprint(k))
+	}
+	fmt.Println(len(seen))
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+hints = [
+  "seen[v] = struct{}{} in the loop; delete(seen, 8) and delete(seen, 3); seen[4] = struct{}{} after it; sort.Ints(keys) once keys is built.",
+  "delete on a value that is not there does nothing, and adding one that is already there changes nothing: both halves of the edit are safe to run whatever the input held.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six", stdin = "8 3 8 5 3 8\n", expect = "2\n4 5\n", visible = true },
+  { name = "all-same", stdin = "4 4 4\n", expect = "1\n4\n", visible = false },
+  { name = "three-and-eight", stdin = "3 8 3\n", expect = "1\n4\n", visible = false },
+  { name = "distinct", stdin = "9 1 5\n", expect = "4\n1 4 5 9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "go.basic.12.stack-queue"
+node        = 20
+title       = "PLATES AND THE QUEUE"
+difficulty  = 2
+story       = "Clean plates stack up at the Lucky Mac pass and come off the top; customers line up at the till and come off the front. The screen does both the same way."
+concepts    = ["stacks-queues", "collections"]
+requires    = ["go.basic.11.sets"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief       = '''
+A slice is a stack. Pushing is `append`; popping is reslicing away the
+last element; and the top is `stack[len(stack)-1]`, which you can assign
+to — editing the top plate without taking it off. The queue side, which
+takes from the front with `queue = queue[1:]`, is written for you. A stack
+is never sorted — the order *is* the point of it — so this drill has three
+lines, not four.
+
+```
+stack = append(stack, v)
+stack = stack[:len(stack)-1]
+stack[len(stack)-1] = 99
+```
+
+The numbers are read into `xs` (at least two). Type the push inside the
+loop over `xs`, then the pop and the edit of the top after it, in place of
+the three placeholders; the stack and the first two of the queue are
+printed.
+
+```
+input:  1 2 3 4
+output: 1 2 99
+        1 2
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+
+	var stack []int
+	for _, v := range xs {
+		// FILL: push v onto stack
+		// ANSWER: stack = append(stack, v)
+		_ = v
+	}
+	// FILL: pop the top
+	// ANSWER: stack = stack[:len(stack)-1]
+	// FILL: edit the new top to 99
+	// ANSWER: stack[len(stack)-1] = 99
+	_ = stack
+
+	var plates []string
+	for _, x := range stack {
+		plates = append(plates, strconv.Itoa(x))
+	}
+	fmt.Println(strings.Join(plates, " "))
+
+	queue := append([]int(nil), xs...)
+	var front []string
+	for i := 0; i < 2; i++ {
+		head := queue[0]
+		queue = queue[1:]
+		front = append(front, strconv.Itoa(head))
+	}
+	fmt.Println(strings.Join(front, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+
+	var stack []int
+	for _, v := range xs {
+		stack = append(stack, v)
+	}
+	stack = stack[:len(stack)-1]
+	stack[len(stack)-1] = 99
+
+	var plates []string
+	for _, x := range stack {
+		plates = append(plates, strconv.Itoa(x))
+	}
+	fmt.Println(strings.Join(plates, " "))
+
+	queue := append([]int(nil), xs...)
+	var front []string
+	for i := 0; i < 2; i++ {
+		head := queue[0]
+		queue = queue[1:]
+		front = append(front, strconv.Itoa(head))
+	}
+	fmt.Println(strings.Join(front, " "))
+}
+'''
+hints = [
+  "stack = append(stack, v) in the loop; then stack = stack[:len(stack)-1] and stack[len(stack)-1] = 99 after it.",
+  "Popping narrows the slice; nothing is copied and nothing is freed. After the pop, len(stack)-1 names the element that used to be second from the top.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "1 2 99\n1 2\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "99\n9 7\n", visible = false },
+  { name = "five", stdin = "5 1 4 1 3\n", expect = "5 1 4 99\n5 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "go.basic.13.sorting"
+node        = 21
+title       = "THE ARRIVALS BOARD"
+difficulty  = 2
+story       = "The Tin Hau arrivals board lists the next trains in the order the data came in, which is no order at all."
+concepts    = ["sorting", "slices"]
+requires    = ["go.basic.12.stack-queue"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief       = '''
+The `sort` package sorts a slice in place. `sort.Ints(xs)` puts integers
+in ascending order. For descending there is no `sort.IntsDesc`; instead you
+wrap the slice as a `sort.IntSlice`, reverse its ordering with
+`sort.Reverse`, and hand that to `sort.Sort`.
+
+```
+sort.Ints(xs)
+sort.Sort(sort.Reverse(sort.IntSlice(xs)))
+```
+
+Write the ascending sort before the first print and the descending sort
+before the second. The printing is written.
+
+```
+input:  5 2 9 1
+output: 1 2 5 9
+        9 5 2 1
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
+func show(xs []int) {
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(x))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+
+	// FILL: sort xs ascending
+	// ANSWER: sort.Ints(xs)
+	_ = sort.Ints
+	show(xs)
+
+	// FILL: sort xs descending
+	// ANSWER: sort.Sort(sort.Reverse(sort.IntSlice(xs)))
+	show(xs)
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
+func show(xs []int) {
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(x))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+
+	sort.Ints(xs)
+	show(xs)
+
+	sort.Sort(sort.Reverse(sort.IntSlice(xs)))
+	show(xs)
+}
+'''
+hints = [
+  "sort.Ints(xs) first; sort.Sort(sort.Reverse(sort.IntSlice(xs))) second.",
+  "sort.IntSlice(xs) is a conversion, not a copy — the sort still happens inside xs.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "5 2 9 1\n", expect = "1 2 5 9\n9 5 2 1\n", visible = true },
+  { name = "one", stdin = "3\n", expect = "3\n3\n", visible = false },
+  { name = "dupes", stdin = "2 2 1\n", expect = "1 2 2\n2 2 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "go.basic.22.reverse"
+node        = 22
+title       = "BACK DOWN THE LINE"
+difficulty  = 1
+story       = "The last train runs the Island Line back to front, and the departure board still lists the stops and the destination the morning way round."
+concepts    = ["slices", "strings", "iteration"]
+requires    = ["go.basic.13.sorting"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''
+`slices.Reverse` turns a slice round in place, whatever it holds. A
+string cannot be reversed in place — it never changes — so you copy it
+into a `[]rune` first (one rune per character, so accents and CJK stay
+whole), reverse that, and turn it back with `string(r)`.
+
+```
+slices.Reverse(xs)
+slices.Reverse(r)
+```
+
+`xs` holds the first line's numbers and `r` is already the second line's
+word as runes. Type the two reversals in place of the placeholders; both
+are printed for you.
+
+```
+input:  1 2 3
+        tram
+output: 3 2 1
+        mart
+```
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"slices"
+	"strconv"
+	"strings"
+)
+
+func main() {
+	in := bufio.NewScanner(os.Stdin)
+	in.Scan()
+	var xs []int
+	for _, f := range strings.Fields(in.Text()) {
+		v, _ := strconv.Atoi(f)
+		xs = append(xs, v)
+	}
+	in.Scan()
+	word := strings.TrimSpace(in.Text())
+	r := []rune(word)
+
+	// FILL: reverse xs in place
+	// ANSWER: slices.Reverse(xs)
+	_ = xs
+	// FILL: reverse r in place
+	// ANSWER: slices.Reverse(r)
+	_ = r
+
+	fmt.Println(strings.Trim(fmt.Sprint(xs), "[]"))
+	fmt.Println(string(r))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"slices"
+	"strconv"
+	"strings"
+)
+
+func main() {
+	in := bufio.NewScanner(os.Stdin)
+	in.Scan()
+	var xs []int
+	for _, f := range strings.Fields(in.Text()) {
+		v, _ := strconv.Atoi(f)
+		xs = append(xs, v)
+	}
+	in.Scan()
+	word := strings.TrimSpace(in.Text())
+	r := []rune(word)
+
+	slices.Reverse(xs)
+	slices.Reverse(r)
+
+	fmt.Println(strings.Trim(fmt.Sprint(xs), "[]"))
+	fmt.Println(string(r))
+}
+'''
+hints = [
+  "slices.Reverse(xs) then slices.Reverse(r) — in place, nothing to assign.",
+  "[]rune(word) copies the string into characters you may reorder; string(r) joins them back.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tram", stdin = "1 2 3\ntram\n", expect = "3 2 1\nmart\n", visible = true },
+  { name = "one", stdin = "9\ngo\n", expect = "9\nog\n", visible = false },
+  { name = "hysan", stdin = "4 8 15 16\nhysan\n", expect = "16 15 8 4\nnasyh\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "go.basic.14.sort-by-key"
+node        = 23
+title       = "THE RIDER LEADERBOARD"
+difficulty  = 3
+story       = "The Lucky Mac shift board is meant to rank the riders by deliveries, best first, ties by name, and it lists them in the order they clocked in."
+concepts    = ["sorting", "structs"]
+requires    = ["go.basic.22.reverse"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief       = '''
+`sort.Slice` sorts any slice given a `less(i, j)` function that says
+whether element `i` should come before element `j`. For a two-level order
+you compare the first key, and only when it ties fall through to the
+second. Descending is just the comparison the other way round.
+
+```
+sort.Slice(entries, func(i, j int) bool {
+	a, b := entries[i], entries[j]
+	if a.Score != b.Score { return a.Score > b.Score }
+	return a.Name < b.Name
+})
+```
+
+The `sort.Slice` call and the function's opening are written. Write its
+two lines: score descending when the scores differ, name ascending when
+they tie.
+
+```
+input:  4
+        alex 12
+        mei 15
+        bo 12
+        sam 9
+output: mei 15
+        alex 12
+        bo 12
+        sam 9
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+)
+
+type Entry struct {
+	Name  string
+	Score int
+}
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	entries := make([]Entry, n)
+	for i := range entries {
+		fmt.Scan(&entries[i].Name, &entries[i].Score)
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		a, b := entries[i], entries[j]
+		// FILL: score descending, then name ascending
+		// ANSWER: if a.Score != b.Score { return a.Score > b.Score }
+		// ANSWER: return a.Name < b.Name
+		_, _ = a, b
+		return false
+	})
+
+	for _, e := range entries {
+		fmt.Println(e.Name, e.Score)
+	}
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+)
+
+type Entry struct {
+	Name  string
+	Score int
+}
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	entries := make([]Entry, n)
+	for i := range entries {
+		fmt.Scan(&entries[i].Name, &entries[i].Score)
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		a, b := entries[i], entries[j]
+		if a.Score != b.Score { return a.Score > b.Score }
+		return a.Name < b.Name
+	})
+
+	for _, e := range entries {
+		fmt.Println(e.Name, e.Score)
+	}
+}
+'''
+hints = [
+  "if a.Score != b.Score { return a.Score > b.Score } and then return a.Name < b.Name.",
+  "less answers \"does i go first?\": a higher score goes first, and among equal scores the smaller name does.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4\nalex 12\nmei 15\nbo 12\nsam 9\n", expect = "mei 15\nalex 12\nbo 12\nsam 9\n", visible = true },
+  { name = "ties", stdin = "3\nzed 5\namy 5\nkim 5\n", expect = "amy 5\nkim 5\nzed 5\n", visible = false },
+  { name = "one", stdin = "1\nsolo 42\n", expect = "solo 42\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "go.basic.15.closures"
+node        = 24
+title       = "THE SURCHARGE"
+difficulty  = 2
+story       = "Every fare through the Causeway Bay gates tonight carries the same surcharge, and the gate's adder was written before anyone told it the number."
+concepts    = ["closures", "functions"]
+requires    = ["go.basic.14.sort-by-key"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief       = '''
+A function literal is a function with no name, made where it is needed
+and stored in a variable like any value. It can use the variables around
+it — here `k` — and keeps using them after: that is a closure. Calling it
+is `add(x)`, the same as any function.
+
+```
+add := func(x int) int { return x + k }
+```
+
+Write the one line that makes `add`: a function literal taking an `int`
+and returning it plus `k`. It is applied to every fare and printed for you.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	var k int
+	fmt.Scan(&k)
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+
+	// FILL: add is a function literal that returns its argument plus k
+	// ANSWER: add := func(x int) int { return x + k }
+	add := func(x int) int { return x }
+	_ = k
+
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(add(x)))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	var k int
+	fmt.Scan(&k)
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+
+	add := func(x int) int { return x + k }
+
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(add(x)))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+hints = [
+  "add := func(x int) int { return x + k }",
+  "k is not a parameter; the literal simply reaches out and reads it. Delete the _ = k line once it does.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5\n1 2 3\n", expect = "6 7 8\n", visible = true },
+  { name = "zero", stdin = "0\n4 4\n", expect = "4 4\n", visible = false },
+  { name = "negative", stdin = "-3\n10 0 3\n", expect = "7 -3 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "go.basic.16.lambdas"
+node        = 25
+title       = "EVEN DOORS ONLY"
+difficulty  = 2
+story       = "The platform sensors at Admiralty report every door, the model only wants the even-numbered ones squared and summed, and the tablet has a filter and a map with nothing plugged into them."
+concepts    = ["closures", "iteration"]
+requires    = ["go.basic.15.closures"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''
+A function literal can be passed straight into another function as an
+argument, with no name at all. `filter` keeps the elements a `func(int)
+bool` says yes to; `mapInts` replaces each element with what a `func(int)
+int` returns. Both are written above `main`; you only supply the two
+literals.
+
+```
+evens := filter(xs, func(x int) bool { return x%2 == 0 })
+squares := mapInts(evens, func(x int) int { return x * x })
+```
+
+Write the two calls: keep the even numbers, then square them. Their sum is
+added up and printed for you.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+)
+
+func filter(xs []int, keep func(int) bool) []int {
+	var out []int
+	for _, x := range xs {
+		if keep(x) {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+func mapInts(xs []int, f func(int) int) []int {
+	out := make([]int, len(xs))
+	for i, x := range xs {
+		out[i] = f(x)
+	}
+	return out
+}
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+
+	// FILL: evens keeps the even numbers; squares squares each of them
+	// ANSWER: evens := filter(xs, func(x int) bool { return x%2 == 0 })
+	// ANSWER: squares := mapInts(evens, func(x int) int { return x * x })
+	evens := filter(xs, func(x int) bool { return false })
+	squares := mapInts(evens, func(x int) int { return x })
+
+	sum := 0
+	for _, s := range squares {
+		sum += s
+	}
+	fmt.Println(sum)
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+)
+
+func filter(xs []int, keep func(int) bool) []int {
+	var out []int
+	for _, x := range xs {
+		if keep(x) {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+func mapInts(xs []int, f func(int) int) []int {
+	out := make([]int, len(xs))
+	for i, x := range xs {
+		out[i] = f(x)
+	}
+	return out
+}
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+
+	evens := filter(xs, func(x int) bool { return x%2 == 0 })
+	squares := mapInts(evens, func(x int) int { return x * x })
+
+	sum := 0
+	for _, s := range squares {
+		sum += s
+	}
+	fmt.Println(sum)
+}
+'''
+hints = [
+  "filter(xs, func(x int) bool { return x%2 == 0 }) and mapInts(evens, func(x int) int { return x * x }).",
+  "The literal's signature must match the parameter exactly: func(int) bool for keep, func(int) int for f.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six", stdin = "1 2 3 4 5 6\n", expect = "56\n", visible = true },
+  { name = "noeven", stdin = "1 3 5\n", expect = "0\n", visible = false },
+  { name = "neg", stdin = "-4 3 -2\n", expect = "20\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "go.basic.17.threads"
+node        = 26
+title       = "ONE RIDER PER ORDER"
+difficulty  = 3
+story       = "Eight orders go out of the Lucky Mac door on eight bikes at once, and the board waits for none of them before it adds up the evening."
+concepts    = ["concurrency", "closures"]
+requires    = ["go.basic.16.lambdas"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''
+`go f()` starts `f` on its own goroutine and does not wait. A
+`sync.WaitGroup` is how `main` waits for all of them: `Add(1)` before each
+start, `Done()` inside each one when it finishes — deferred, so it runs
+however the function exits — and `Wait()` blocks until the count is back
+to zero. Each goroutine here writes only its own `results[i]`, so nothing
+is shared.
+
+```
+var wg sync.WaitGroup
+for i, x := range xs {
+	wg.Add(1)
+	go func(i, x int) {
+		defer wg.Done()
+		results[i] = x * x
+	}(i, x)
+}
+wg.Wait()
+```
+
+The loop, the `Add` and the goroutine's shape are written. Fill its body:
+`defer wg.Done()`, then store `x * x` in `results[i]`.
+
+```
+input:  1 2 3 4
+output: 1 4 9 16
+        30
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+	"sync"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+
+	results := make([]int, len(xs))
+	var wg sync.WaitGroup
+	for i, x := range xs {
+		wg.Add(1)
+		go func(i, x int) {
+			// FILL: defer wg.Done(), then store x * x in results[i]
+			// ANSWER: defer wg.Done()
+			// ANSWER: results[i] = x * x
+			wg.Done()
+			_, _ = i, x
+		}(i, x)
+	}
+	wg.Wait()
+
+	total := 0
+	var out []string
+	for _, r := range results {
+		total += r
+		out = append(out, fmt.Sprint(r))
+	}
+	fmt.Println(strings.Join(out, " "))
+	fmt.Println(total)
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+	"sync"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+
+	results := make([]int, len(xs))
+	var wg sync.WaitGroup
+	for i, x := range xs {
+		wg.Add(1)
+		go func(i, x int) {
+			defer wg.Done()
+			results[i] = x * x
+		}(i, x)
+	}
+	wg.Wait()
+
+	total := 0
+	var out []string
+	for _, r := range results {
+		total += r
+		out = append(out, fmt.Sprint(r))
+	}
+	fmt.Println(strings.Join(out, " "))
+	fmt.Println(total)
+}
+'''
+hints = [
+  "defer wg.Done() as the first line, results[i] = x * x as the second.",
+  "defer runs Done when the goroutine returns, whatever happens in between; a plain wg.Done() first would say \"finished\" before the work.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "1 4 9 16\n30\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "49\n49\n", visible = false },
+  { name = "eight", stdin = "3 1 4 1 5 9 2 6\n", expect = "9 1 16 1 25 81 4 36\n173\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "go.basic.18.binary-tree"
+node        = 27
+title       = "NULLPTR"
+difficulty  = 4
+story       = "Lucky Mac's front till at 11:55 files every order into a tree by number, and the root of the tree is nil, and it follows the nil anyway. Every order goes through and none of them exist."
+concepts    = ["trees", "recursion", "structs"]
+requires    = ["go.basic.17.threads"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief       = '''
+A binary search tree is a `struct` whose two children are pointers to the
+same struct, and an empty tree is `nil`. Inserting is recursive: a `nil`
+subtree becomes a new node, otherwise the value goes into the left or the
+right subtree — and because the recursion returns the subtree's new root,
+you assign that back into the child field. Follow `n.Left` when `n` is
+`nil` and the program dies; the `nil` check comes first, always.
+
+```
+type Node struct {
+	Val         int
+	Left, Right *Node
+}
+if v < n.Val {
+	n.Left = insert(n.Left, v)
+} else {
+	n.Right = insert(n.Right, v)
+}
+```
+
+`Node`, `insert`'s `nil` check, its `if v < n.Val` / `else`, `inorder`,
+`height` and `main` are written. Fill the two branches: the left assignment
+and the right one.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+type Node struct {
+	Val         int
+	Left, Right *Node
+}
+
+// insert puts v into the tree rooted at n and returns that tree's root.
+func insert(n *Node, v int) *Node {
+	if n == nil {
+		return &Node{Val: v}
+	}
+	if v < n.Val {
+		// FILL: insert into the left subtree and store the result in n.Left
+		// ANSWER: n.Left = insert(n.Left, v)
+	} else {
+		// FILL: the same on the right
+		// ANSWER: n.Right = insert(n.Right, v)
+	}
+	return n
+}
+
+func inorder(n *Node, out *[]string) {
+	if n == nil {
+		return
+	}
+	inorder(n.Left, out)
+	*out = append(*out, fmt.Sprint(n.Val))
+	inorder(n.Right, out)
+}
+
+func height(n *Node) int {
+	if n == nil {
+		return 0
+	}
+	l, r := height(n.Left), height(n.Right)
+	if r > l {
+		return 1 + r
+	}
+	return 1 + l
+}
+
+func main() {
+	var root *Node
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		root = insert(root, v)
+	}
+
+	var out []string
+	inorder(root, &out)
+	fmt.Println(strings.Join(out, " "))
+	fmt.Println(height(root))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+type Node struct {
+	Val         int
+	Left, Right *Node
+}
+
+// insert puts v into the tree rooted at n and returns that tree's root.
+func insert(n *Node, v int) *Node {
+	if n == nil {
+		return &Node{Val: v}
+	}
+	if v < n.Val {
+		n.Left = insert(n.Left, v)
+	} else {
+		n.Right = insert(n.Right, v)
+	}
+	return n
+}
+
+func inorder(n *Node, out *[]string) {
+	if n == nil {
+		return
+	}
+	inorder(n.Left, out)
+	*out = append(*out, fmt.Sprint(n.Val))
+	inorder(n.Right, out)
+}
+
+func height(n *Node) int {
+	if n == nil {
+		return 0
+	}
+	l, r := height(n.Left), height(n.Right)
+	if r > l {
+		return 1 + r
+	}
+	return 1 + l
+}
+
+func main() {
+	var root *Node
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		root = insert(root, v)
+	}
+
+	var out []string
+	inorder(root, &out)
+	fmt.Println(strings.Join(out, " "))
+	fmt.Println(height(root))
+}
+'''
+hints = [
+  "n.Left = insert(n.Left, v) in the first branch, n.Right = insert(n.Right, v) in the second.",
+  "insert returns the subtree's root — a brand-new node when the child was nil — so the result has to be stored back into the child field, or the tree never grows.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5 3 8 1 4\n", expect = "1 3 4 5 8\n3\n", visible = true },
+  { name = "chain", stdin = "1 2 3 4\n", expect = "1 2 3 4\n4\n", visible = false },
+  { name = "single", stdin = "42\n", expect = "42\n1\n", visible = false },
+  { name = "wide", stdin = "50 30 70 20 40 60 80\n", expect = "20 30 40 50 60 70 80\n3\n", visible = false },
 ]

@@ -1,0 +1,570 @@
+# GO LAND — VERY BASIC, in Cantonese (colloquial written Cantonese,
+# traditional characters). A translation pack (SPEC §12.1): the prose of
+# `content/go/verybasic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, the quiz choices, sample input and output and the exact strings
+# a program must print are the English pack's and are copied verbatim, never
+# translated.
+
+
+pack   = "go.verybasic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "go.verybasic.01.print"
+title = "第一行"
+story = "天后，06:00，閘門升起一半。售票機個螢幕本應打招呼，但印咗一行空白。"
+brief = '''
+一個講一句嘢嘅程式需要 `fmt` 嘅一個呼叫：印出參數並結束嗰行嘅嗰個。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  
+output: hello, causewaybay
+```
+'''
+hints = [
+  "fmt.Println(\"hello, causewaybay\") — 字串用雙引號，細楷，一個逗號。",
+  "冇 fmt 嘅 print 寫去 stderr，而冇 ln 嘅 Print 唔會結束嗰行。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.verybasic.02.int-types"
+title = "闊數"
+story = "天后個八達通讀卡機用 int32 數拍卡，全日總數塞唔落。"
+brief = '''
+`n` 係 `int32`。乘以四十億之前要先轉去更闊嘅型別：將 `n` 轉做 `int64`，然後先乘。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  7
+output: 28000000000
+```
+'''
+hints = [
+  "wide := int64(n) * 4000000000 — 先轉型，再喺闊型別入面乘。",
+  "n * 4000000000 係喺 int32 入面計，個常數塞唔落，所以編譯唔到。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.verybasic.03.floats"
+title = "小數車費"
+story = "牌上嘅車費係文字。讀卡機要先變做 float64 先可以雙倍佢。"
+brief = '''
+`s` 係字串形式嘅車費。`strconv` 用一個呼叫將佢變做 `float64`，回傳個數字同一個 error；留低個數字，掉咗個 error。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  0.1
+output: 0.100000000
+        0.20
+```
+'''
+hints = [
+  "x, _ := strconv.ParseFloat(s, 64) — 兩個結果，64 係你想要嘅闊度。",
+  "用 32 嘅話個值會先四捨五入做 float32；第九個小數位睇得出。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.verybasic.04.strings"
+title = "大楷車站"
+story = "天后月台個指示牌要大楷站名，但讀卡機只有細楷嗰份。"
+brief = '''
+`line` 係一行文字。`strings` 套件有個函數會用大楷回傳佢。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  tin hau
+output: TIN HAU
+        7
+```
+'''
+hints = [
+  "up := strings.ToUpper(line) — 套件函數，攞個字串做參數，唔係字串上嘅方法。",
+  "Go 嘅字串冇大小楷方法；strings.Title 係逐個字大楷開頭，唔係同一樣嘢。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.verybasic.05.bool-if"
+title = "雙數車卡"
+story = "雙數車卡停闊月台；個顯示器隔一班車就揀錯。"
+brief = '''
+`n` 係車卡號碼。`n` 除二冇餘數就印 `even`，否則印 `odd`。`if` 嗰行需要餘數測試。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  4
+output: even
+```
+'''
+hints = [
+  "if n%2 == 0 { — % 係餘數，== 係比較。",
+  "單一個 = 係指定，n/2 係商，唔係餘數。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.verybasic.06.loops"
+title = "數車站"
+story = "條線有 n 個站，點算板由 1 加到 n；佢個迴圈少行一個。"
+brief = '''
+`n` 已經讀咗。個迴圈要由 1 行到 `n`（包括 `n`），將每個 `i` 加落 `sum`。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5
+output: 15
+```
+'''
+hints = [
+  "for i := 1; i <= n; i++ { — 三個子句，<= 包埋 n。",
+  "冇 := 嘅 i = 1 乜都冇宣告，而 < n 早一步停。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.verybasic.07.functions"
+title = "車手薪率"
+story = "每單送遞五蚊，加每晚一次三蚊花紅。個薪率函數而家乜都唔回傳。"
+brief = '''
+`fare` 攞送遞次數，要回傳每單五蚊加三蚊。寫佢嘅 `return` 行。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  4
+output: 23
+```
+'''
+hints = [
+  "return rides*5 + 3 — 先乘，再加花紅。",
+  "rides * (5 + 3) 係每單八蚊；rides + 5*3 係將次數加十五。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.verybasic.08.structs"
+title = "一個檔口，兩個欄位"
+story = "Lucky Mac 張檔口卡有名同價錢，但落單螢幕砌出嚟兩個欄位都係空。"
+brief = '''
+`Stall` 有欄位 `Name` 同 `Price`。用帶欄位名嘅 struct 字面量，由 `name` 同 `price` 砌一個出嚟。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  noodles 12
+output: noodles 24
+```
+'''
+hints = [
+  "s := Stall{Name: name, Price: price} — 欄位名，冒號，逗號。",
+  "三個值多咗一個，而且欄位有型別，啲值一定要夾。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.verybasic.09.struct-method"
+title = "檔口總數"
+story = "個檔口知道價錢同數量；佢個 Total 方法每張單都回傳零。"
+brief = '''
+`Total` 係 `Stall` 上嘅方法。佢嘅 `return` 行要透過接收者 `s` 讀出價錢乘數量。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 4
+output: 12
+```
+'''
+hints = [
+  "return s.Price * s.Qty — 欄位透過接收者接觸。",
+  "淨係 Price 唔喺作用域入面；接收者 s 係方法睇到自己 struct 嘅方法。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.verybasic.10.enums"
+title = "第三條線"
+story = "轉車站個指示牌將啲線編做 0、1、2，然後要將個數變返一條線先可以叫名。"
+brief = '''
+`Line` 係一個 `iota` 型別，有 `Island`、`TsuenWan`、`KwunTong`。將整數 `n` 變做 `Line`，令下面個 `switch` 可以比較佢。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  2
+output: kwuntong
+```
+'''
+hints = [
+  "line := Line(n) — 一個轉換，寫法好似喺型別上做函數呼叫。",
+  "line := n 係 int，而 switch 拿佢同 Line 常數比較，編譯唔到。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.verybasic.11.vector"
+title = "車卡清單"
+story = "每個由線路傳落嚟嘅車卡號碼都應該放喺清單尾；清單一直係空。"
+brief = '''
+`xs` 係一個 int 切片。喺迴圈入面，用令切片增長嘅內建函數將每個 `v` 放喺佢尾。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 4
+        3 1 4 1
+```
+'''
+hints = [
+  "xs = append(xs, v) — append 回傳增長後嘅切片，所以要指定返去。",
+  "切片冇方法；append 係內建函數，第一個參數係切片。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.verybasic.12.vector-edit"
+title = "第二個車卡出"
+story = "二號車卡由列車除落。個清單刪錯咗，或者乜都冇刪。"
+brief = '''
+`xs` 裝住嗰行嘅整數，至少四個。將索引 1 嘅元素移走：將佢前面嘅切片同後面嘅切片接埋。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 3 4 1
+```
+'''
+hints = [
+  "xs = append(xs[:1], xs[2:]...) — ... 將尾巴展開落 append。",
+  "冇 ... 嘅話 append 收到一個切片但佢想要 int，編譯唔到。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.verybasic.13.list"
+title = "車手隊，鏈表版"
+story = "車手一個接一個打卡，但門口個鏈表一個都冇留住。"
+brief = '''
+`l` 係一個 `container/list`。將每個 `v` 放喺佢後面；由 `Front` 行嘅遍歷會按次序印出嚟。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  4 5 6
+output: 4 5 6
+```
+'''
+hints = [
+  "l.PushBack(v) — container/list 追加嘅方法。",
+  "PushFront 都有，但會倒轉印。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.verybasic.14.maps"
+title = "落單點算"
+story = "Lucky Mac 每叫一款餸都應該將佢個計數加一；個點算一直冇郁過。"
+brief = '''
+`counts` 係一個 `map[string]int`。喺迴圈入面，將 `w` 嘅計數加一 — 唔存在嘅 key 讀出嚟係零，所以一個表達式就得。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  rice tea rice bun
+output: bun 1
+        rice 2
+        tea 1
+```
+'''
+hints = [
+  "counts[w]++ — 索引個 map，++ 將入面嘅嘢加一（冇嘢就係零）。",
+  "counts[w] = 1 會忘記每次重複。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.verybasic.15.hashtable"
+title = "名對號碼"
+story = "車手登記冊將名對應去號碼，常數時間查到，但個查詢對每個人都答 -1。"
+brief = '''
+`table` 係一個 `map[string]int` — Go 嘅 hash table。喺第一個迴圈入面，將每個 `name` 連同佢嘅索引 `i` 存起；下面嘅查詢用 comma-ok 寫法。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  alex mei kit
+        mei kit bo
+output: 1
+        2
+        -1
+```
+'''
+hints = [
+  "table[name] = i — key 喺左邊方括號入面，值喺右邊。",
+  "key 一定要係字串；table[i] 用 int 做索引，唔係個 map 嘅 key 型別。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.verybasic.16.sets"
+title = "唔同嘅車手"
+story = "四十單，八個車手。本應數唔同車手嘅集合乜都冇數。"
+brief = '''
+`seen` 係一個 `map[int]struct{}` — 一個集合。將每個 `v` 記入去；空 struct 係唔使成本嘅值。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  8 3 8 5 3 8
+output: 3
+```
+'''
+hints = [
+  "seen[v] = struct{}{} — 個型別，然後一對大括號整一個出嚟。",
+  "true 係 bool，而 map 嘅值型別係 struct{}。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "go.verybasic.17.stack"
+title = "頂部攞兩個"
+story = "碟喺出餐位疊起，由頂部攞走；個收銀機讀咗頂碟兩次，從來冇攞走。"
+brief = '''
+`stack` 係一個當做棧用嘅切片。`top` 由佢尾讀出；之後嗰行要用重新切片掉走最後嗰個元素。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 1
+        4
+        2
+```
+'''
+hints = [
+  "stack = stack[:len(stack)-1] — 除咗最後一個元素之外嘅全部。",
+  "stack[1:] 掉走前面，係隊列嘅動作，唔係棧嘅。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "go.verybasic.18.queue"
+title = "前面攞兩個"
+story = "客人喺收銀機排隊，由前面出；個螢幕服務咗同一個客兩次。"
+brief = '''
+`queue` 係一個當做隊列用嘅切片。`front` 係佢第一個元素；之後嗰行要由索引 1 重新切片，掉走嗰個元素。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 3
+        1
+        2
+```
+'''
+hints = [
+  "queue = queue[1:] — 由第二個元素開始嘅全部。",
+  "queue[:1] 只留低隊頭，queue[0:] 全部留低。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "go.verybasic.19.heap"
+title = "最細先"
+story = "落單按最細號碼先服務。本應裝住佢哋嘅堆係手動 push 嘅，出嚟次序隨機。"
+brief = '''
+`h` 係一個 `*IntHeap`，實作咗 `heap.Interface`。透過 `heap` 套件 push 每個 `v`，令次序保持；下面嘅 pop 會由最細開始出。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5 1 4 2
+output: 1 2 4 5
+```
+'''
+hints = [
+  "heap.Push(h, v) — 套件函數，畀佢個堆同個值。",
+  "push &v 係將一個指標交畀個堆；佢個 Push 斷言係 int，會 panic。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "go.verybasic.20.sorting"
+title = "到站板"
+story = "個板按輸入次序列出到站。佢想要升序。"
+brief = '''
+`xs` 係一個 int 切片。`sort` 套件一個呼叫就會就地將佢升序排好。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 1 1 3 4
+```
+'''
+hints = [
+  "sort.Ints(xs) — 眾數，畀 []int 用，就地排序。",
+  "sort.Sort 想要有 Len、Less 同 Swap 嘅型別；淨係 []int 唔係。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "go.verybasic.21.sort-by-key"
+title = "車手排行榜"
+story = "排行榜有名同分數，但按打卡次序列出。"
+brief = '''
+`rows` 係一個 `Row{Name, Score}` 切片。用 `sort.Slice` 同一個索引上嘅 less 函數，按 `Score` 由高到低排序。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3
+        alex 40
+        mei 75
+        kit 12
+output: mei 75
+        alex 40
+        kit 12
+```
+'''
+hints = [
+  "sort.Slice(rows, func(i, j int) bool { return rows[i].Score > rows[j].Score }) — > 係降序。",
+  "less 函數嘅參數要寫型別 int，否則編譯唔到。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "go.verybasic.22.reverse"
+title = "倒轉嘅線"
+story = "尾班車倒轉行各個站，但個板仲係正向列出。"
+brief = '''
+`xs` 係一個 int 切片。`slices` 套件一個呼叫就會就地倒轉佢。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 1 4 1 3
+```
+'''
+hints = [
+  "slices.Reverse(xs) — 就地，冇回傳值。",
+  "佢攞個切片本身，唔係指標；指定佢嘅結果會編譯唔到。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "go.verybasic.23.closures"
+title = "附加費"
+story = "夜間板上每程車費都加同一個附加費；加費嘅函數忘記咗個金額。"
+brief = '''
+`k` 先讀入。`add` 要係一個函數字面量：攞一個 int，回傳佢加 `k` — 一個捕獲 `k` 嘅閉包。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "add := func(x int) int { return x + k } — 參數型別，結果型別，k 由外面嚟。",
+  "冇結果型別嘅字面量乜都唔回傳，而 x * k 係另一個函數。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "go.verybasic.24.lambdas"
+title = "每道門，平方"
+story = "月台模型想要每個門號嘅平方，但將函數映射落啲門嘅輔助函數乜都冇收到。"
+brief = '''
+`apply` 攞一個切片同一個函數，回傳映射後嘅切片。用一個將參數平方嘅函數字面量喺 `xs` 上呼叫佢。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3
+output: 1 4 9
+```
+'''
+hints = [
+  "ys := apply(xs, func(x int) int { return x * x }) — 成個字面量就係參數。",
+  "淨係 x * x 唔係函數，冇結果型別嘅字面量乜都唔回傳。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "go.verybasic.25.threads"
+title = "一單一個車手"
+story = "八張單同時由廚房出，八架單車，個板一個都唔等。"
+brief = '''
+每個數一條 goroutine：每條將自己個 `x` 平方寫入 `results[i]`，完成後通知 `WaitGroup`。用 `go` 關鍵字開始，將 `i` 同 `x` 傳入去。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 1 4 9 16
+        30
+```
+'''
+hints = [
+  "go func(i, x int) { defer wg.Done(); results[i] = x * x }(i, x) — 個字面量，然後用迴圈值呼叫。",
+  "冇 Done 嘅話 WaitGroup 永遠唔返；冇 (i, x) 嘅話個字面量從來冇被呼叫。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "go.verybasic.26.mutex"
+title = "一個總數，好多隻手"
+story = "每個車手同時將車費加落同一個總數，而個總數錯咗一個冇人重現到嘅數。"
+brief = '''
+`total` 由每條 goroutine 共用。將 `x` 加落佢嗰行一定要夾喺 `mu.Lock()` 同 `mu.Unlock()` 之間 — 呢度三樣嘢寫喺同一行。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 10
+```
+'''
+hints = [
+  "mu.Lock(); total += x; mu.Unlock() — 鎖，掂個共用值，解鎖。",
+  "有 Lock 冇 Unlock 會令其他所有 goroutine 永遠等落去，WaitGroup 都一齊等。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "go.verybasic.27.binary-tree"
+title = "NULLPTR"
+story = "Lucky Mac 前面個收銀機 11:55 將每張單按號碼入一棵樹，左邊嗰枝入咗之後就掉咗。"
+brief = '''
+`insert` 將 `v` 放入以 `n` 為根嘅子樹，並回傳嗰棵子樹嘅根。`if` 分支處理較細嘅 `v`：遞迴入左子節點，並將回傳嘅嘢存返去。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "n.Left = insert(n.Left, v) — 遞迴呼叫回傳子樹嘅根，所以要指定返去。",
+  "淨係 insert(n.Left, v) 會將新節點掉咗；冇嘢存住佢。",
+]

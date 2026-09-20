@@ -73,6 +73,20 @@
       "why": "English is the source and lives on `quests`; a translation file claiming `en` (or any locale no client asks for) would either shadow the source or serve nobody.",
       "detect": "locale is \"en\"",
       "note": "Recognised as a translation by its `locale` key wherever it is filed, so it is refused for this reason and never parsed as a pack missing `land`."
+    },
+    {
+      "file": "basic-too-long.toml",
+      "rule": "a `basic` solution adds at most BASIC_MAX_ADDED (4) non-blank, non-comment lines over its starter",
+      "why": "BASIC is grammar practice, not a coding quiz (README, docs/story.md §4): the brief explains one construct and shows its syntax, the starter is the whole program, and the player fills a hole of one or two lines (up to four on a container drill: add, remove, edit, sort). A basic quest whose answer is a program is an advanced quest filed on the wrong road.",
+      "detect": "the solution adds 11 lines (a struct, an impl, a loop) where one `println!` would do",
+      "note": "An authoring rule, not an import rule: enforced by `tests/content/verify_pack.py` (like the map-layout and worked-example gates), not by `cwbhacker import`."
+    },
+    {
+      "file": "verybasic-answer-given-away.toml",
+      "rule": "VERY BASIC: the answer line appears nowhere in the starter or the brief; four choices, one of which is exactly the typed line",
+      "why": "The quiz is the answer on that road. A brief that shows the line, or a starter that carries it, makes the choice a formality — and a wrong choice that also passes makes it a lie (verify_pack swaps each wrong choice into the solution and judges it).",
+      "detect": "the brief says `println!(\"hello, causewaybay\");` in prose",
+      "note": "An authoring rule enforced by `tests/content/verify_pack.py` (structural: 'given away'); `tests/content/test_verify_pack.py` pins it."
     }
   ],
   "also_worth_refusing_but_not_fixtured_here": {

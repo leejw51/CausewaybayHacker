@@ -1,22 +1,28 @@
 # C++ LAND — BASIC. Noon on the waterfront: the Noon Day Gun, the typhoon
-# shelter, the Yacht Club slipway. Grammar only: iostream, strings, vector,
-# map and set, pairs, <algorithm>, references, const, classes, enum class,
-# lambdas, templates, optional and variant, exceptions, iterators, RAII.
-# Nothing here is timed.
+# shelter, the Yacht Club slipway. The grammar road, and grammar practice
+# only: every node explains one construct, shows how it is written, and
+# hands over a whole program with a hole of one or two lines in it. The
+# player types the idiom; nothing here is a problem to solve, and nothing
+# here is timed.
 #
-# Everything in this land is an address. Nothing checks you. The basic road
-# stays on the side of the language that does not need checking, until the
-# boss, which is the first time a pointer points at nothing.
+# The topics, in order: printing, bindings, types and conversion, integer
+# widths, a 32-byte integer, double and float, strings, string slices,
+# vector slices, byte slices (each: slice, copy, append), loops, functions,
+# structs, enum class, vector, std::list, map, unordered_map, set, stack and
+# queue, sorting, reverse, sorting by a key, lambdas that capture, lambdas in
+# <algorithm>, threads, and a binary search tree for the boss — the first
+# time on this road that a pointer points at nothing.
 #
 # Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
 # Format: SPEC §12. Every solution and starter in this file is run by
 # tests/content/verify_pack.py and by CI (SPEC §9.4, §9.5), with the same
-# line the runner uses: c++ -std=c++20 -O2 -pthread.
+# line the runner uses: c++ -std=c++20 -O2 -pthread. verify_pack also
+# holds every basic solution to BASIC_MAX_ADDED lines over its starter.
 
 pack = "cpp.basic"
 land = "cpp"
 category = "basic"
-version = 1
+version = 2
 
 # ---------------------------------------------------------------- 01
 [[quest]]
@@ -45,6 +51,7 @@ starter     = '''
 
 int main() {
     // your code here
+    // ANSWER: std::cout << "hello, causewaybay\n";
 }
 '''
 solution    = '''
@@ -79,16 +86,19 @@ difficulty  = 1
 story       = "The plaque beside the gun shows one number and then two blanks where the day count and the year used to be."
 concepts    = ["io", "bindings", "types"]
 requires    = ["cpp.basic.01.first-light"]
-map          = { x = 0.275, y = 0.058, kind = "quest" }
+map          = { x = 0.247, y = 0.058, kind = "quest" }
 brief       = '''
-Read one integer `n` from standard input.
+A variable in C++ is declared with its type first: `long long n = 0;`
+makes a 64-bit integer called `n`. `std::cin >> n` reads the next number
+from standard input into it, and `std::cout << n << '\n'` prints it with
+a newline. Arithmetic on the name is just arithmetic: `n * 2`, `n * n`.
 
-Print three lines: `n`, then `n` doubled, then `n` multiplied by itself.
+```
+std::cout << n * n << '\n';
+```
 
-`n` fits in a `long long` and may be negative. It may also be large enough
-that `n * n` does not fit in an `int`, and one of the hidden cases is exactly
-that: an `int` is 32 bits on every platform this runs on, and `3000000000`
-squared is not.
+The program reads `n` and prints it and its double. Type that line at
+`// FILL`: the third print, `n * n`.
 
 ```
 input:  12
@@ -104,7 +114,10 @@ int main() {
     long long n = 0;
     std::cin >> n;
 
-    // print n, then n * 2, then n * n — one per line
+    std::cout << n << '\n';
+    std::cout << n * 2 << '\n';
+    // FILL: print n * n on its own line
+    // ANSWER: std::cout << n * n << '\n';
 }
 '''
 solution    = '''
@@ -120,9 +133,8 @@ int main() {
 }
 '''
 hints = [
-  "The reading is done for you; n already holds the value.",
-  "std::cout << n << '\\n' prints a number and a newline; no format string needed.",
-  "long long is the type to reach for whenever the statement says a number might be large. int is not.",
+  "std::cout << n * n << '\\\\n'; — the same shape as the line above it.",
+  "long long holds 3000000000 squared; an int would not, which is why the plaque says long long.",
 ]
 
 [quest.tests]
@@ -132,101 +144,75 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "twelve",   stdin = "12\n",         expect = "12\n24\n144\n",                                   visible = true },
-  { name = "negative", stdin = "-3\n",         expect = "-3\n-6\n9\n",                                     visible = false },
-  { name = "zero",     stdin = "0\n",          expect = "0\n0\n0\n",                                       visible = false },
-  { name = "wide",     stdin = "3000000000\n", expect = "3000000000\n6000000000\n9000000000000000000\n",   visible = false },
+  { name = "twelve", stdin = "12\n", expect = "12\n24\n144\n", visible = true },
+  { name = "negative", stdin = "-3\n", expect = "-3\n-6\n9\n", visible = false },
+  { name = "zero", stdin = "0\n", expect = "0\n0\n0\n", visible = false },
+  { name = "wide", stdin = "3000000000\n", expect = "3000000000\n6000000000\n9000000000000000000\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 03
 [[quest]]
-id          = "cpp.basic.03.getline"
+id          = "cpp.basic.03.types"
 node        = 3
-title       = "THE SAMPAN LOG"
-difficulty  = 2
-story       = "The typhoon shelter's harbour master logs every sampan as one line: its name, then whatever it landed, however many numbers that turns out to be."
-concepts    = ["io", "strings", "iteration"]
+title       = "THE TIDE TABLE"
+difficulty  = 1
+story       = "The harbour master's tide table divides the shelter's depth by the sampan count and the answer comes out as a whole number, always, even when it is not."
+concepts    = ["types", "io"]
 requires    = ["cpp.basic.02.bindings"]
-map          = { x = 0.389, y = 0.132, kind = "quest" }
+map          = { x = 0.333, y = 0.132, kind = "quest" }
 brief       = '''
-Line one is a count `n`. Each of the next `n` lines is a boat name followed by
-zero or more integers, separated by spaces.
-
-Print one line per boat as `<NAME> <how many numbers> <their sum>`, then
-`BOATS <n>`.
+Two integers divided give an integer: `7 / 2` is `3`, and `7 % 2` is the
+remainder, `1`. To get `3.5` one side has to be a floating-point number
+first, and `static_cast<double>(a)` is the explicit way to say so. To print
+it with a fixed number of decimals, `<iomanip>` has `std::fixed` and
+`std::setprecision(2)`.
 
 ```
-input:  2
-        KWAN 3 4 5
-        LEE
-output: KWAN 3 12
-        LEE 0 0
-        BOATS 2
+std::cout << a / b << '\n';
+std::cout << a % b << '\n';
+std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\n';
 ```
 
-The line is the unit here, not the token. `std::cin >> x` stops at whitespace
-and does not care about newlines, so it cannot tell you where one boat ends
-and the next begins. `std::getline` gives you the whole line; an
-`std::istringstream` over that line then gives you `>>` again, but only within
-it.
+The integer division and the remainder are printed. Write the third line
+at `// FILL`: the division as a `double` with two decimals.
 
-One thing bites everyone once: after `std::cin >> n` the newline at the end of
-that first line is still waiting in the stream, and the first `getline` reads
-it as an empty line.
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
 '''
 starter     = '''
+#include <iomanip>
 #include <iostream>
-#include <sstream>
-#include <string>
 
 int main() {
-    int n = 0;
-    std::cin >> n;
+    long long a = 0, b = 0;
+    std::cin >> a >> b;
 
-    for (int i = 0; i < n; ++i) {
-        std::string line;
-        // read one whole line, split it with an istringstream,
-        // print <NAME> <count> <sum>
-    }
-    std::cout << "BOATS " << n << '\n';
+    std::cout << a / b << '\n';
+    std::cout << a % b << '\n';
+    // FILL: a / b as a double, with exactly two decimals
+    // ANSWER: std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\n';
 }
 '''
 solution    = '''
+#include <iomanip>
 #include <iostream>
-#include <sstream>
-#include <string>
 
 int main() {
-    int n = 0;
-    std::cin >> n;
-    // consume the rest of the first line, or the first getline gets ""
-    std::string rest;
-    std::getline(std::cin, rest);
+    long long a = 0, b = 0;
+    std::cin >> a >> b;
 
-    for (int i = 0; i < n; ++i) {
-        std::string line;
-        std::getline(std::cin, line);
-
-        std::istringstream fields(line);
-        std::string name;
-        fields >> name;
-
-        long long value = 0;
-        long long count = 0;
-        long long sum = 0;
-        while (fields >> value) {
-            ++count;
-            sum += value;
-        }
-        std::cout << name << ' ' << count << ' ' << sum << '\n';
-    }
-    std::cout << "BOATS " << n << '\n';
+    std::cout << a / b << '\n';
+    std::cout << a % b << '\n';
+    std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\n';
 }
 '''
 hints = [
-  "One std::getline(std::cin, junk) after reading n throws away the newline that >> left behind.",
-  "std::istringstream fields(line); fields >> name; then while (fields >> value) walks the rest — the loop ends when there is nothing left to parse.",
-  "The name is the first token of the line, and a line with only a name gives 0 0, no special case needed.",
+  "std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\\\\n';",
+  "Only one operand needs the cast: double divided by long long is a double.",
 ]
 
 [quest.tests]
@@ -236,133 +222,78 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "two-boats", stdin = "2\nKWAN 3 4 5\nLEE\n",             expect = "KWAN 3 12\nLEE 0 0\nBOATS 2\n",        visible = true },
-  { name = "one",       stdin = "1\nHO 10\n",                       expect = "HO 1 10\nBOATS 1\n",                    visible = false },
-  { name = "ragged",    stdin = "3\nA 1 1\nB -2\nC 0 0 0 0\n",      expect = "A 2 2\nB 1 -2\nC 4 0\nBOATS 3\n",       visible = false },
-  { name = "none",      stdin = "0\n",                              expect = "BOATS 0\n",                             visible = false },
+  { name = "seven-two", stdin = "7 2\n", expect = "3\n1\n3.50\n", visible = true },
+  { name = "ten-four", stdin = "10 4\n", expect = "2\n2\n2.50\n", visible = false },
+  { name = "exact", stdin = "9 3\n", expect = "3\n0\n3.00\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 04
 [[quest]]
-id          = "cpp.basic.04.references"
+id          = "cpp.basic.04.int-types"
 node        = 4
-title       = "A COPY IS NOT THE THING"
-difficulty  = 2
-story       = "The winch operator on the Yacht Club slipway writes each load onto a copy of the sheet, and the sheet on the wall never changes."
-concepts    = ["pointers", "functions", "mutability"]
-requires    = ["cpp.basic.03.getline"]
-map          = { x = 0.602, y = 0.065, kind = "quest" }
+title       = "THE REGISTER WIDTHS"
+difficulty  = 1
+story       = "The gun's firing register is 32 bits wide and the harbour clock's is 64; a count copied from one to the other keeps its value only if somebody says so."
+concepts    = ["types", "bindings"]
+requires    = ["cpp.basic.03.types"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
 brief       = '''
-Standard input is a count `n` and then `n` integers.
-
-Push every value onto one `std::vector<long long>` through a function `load`,
-then print three lines: `LOADED <how many>`, `TOTAL <sum>` from a function
-`total` that only reads, and `FIRST <value>` — or `FIRST NONE` when there is
-nothing.
+`<cstdint>` names integers by their width: `int32_t` and `int64_t` are signed,
+`uint32_t` and `uint64_t` are unsigned. A value moves between widths with
+`static_cast<...>`, which says out loud that a conversion is happening.
+`std::numeric_limits<T>::max()` from `<limits>` is the largest value a
+width can hold.
 
 ```
-input:  3
-        4 8 15
-output: LOADED 3
-        TOTAL 27
-        FIRST 4
+uint64_t b = static_cast<uint64_t>(a);
+std::cout << std::numeric_limits<uint64_t>::max() << '\n';
 ```
 
-The starter compiles and prints `LOADED 0`. `load` takes the vector **by
-value**, so every call gets its own copy, pushes onto that, and throws it away
-on return. C++ copies unless you say otherwise.
+`a` is read as an `int32_t`. Type the cast line at the first `// FILL`, and
+the second print line at the second.
 
-Say otherwise with `&`: a parameter of type `std::vector<long long>&` is a
-reference to the caller's vector, not a copy of it. `total` should take a
-`const std::vector<long long>&` — it needs to look, it does not need to touch,
-and `const` is how you say that in the signature so the compiler holds you to
-it.
-
-`FIRST` is a pointer: `long long* first` is either the address of the first
-element or `nullptr`, and `nullptr` is the one value you must test for before
-you follow it. That is the whole of this land in one line.
+```
+input:  7
+output: 7
+        2147483647
+        18446744073709551615
+```
 '''
 starter     = '''
+#include <cstdint>
 #include <iostream>
-#include <vector>
-
-// takes a copy, pushes onto the copy, and the copy dies here
-void load(std::vector<long long> sheet, long long value) {
-    sheet.push_back(value);
-}
-
-long long total(std::vector<long long> sheet) {
-    long long sum = 0;
-    for (long long v : sheet) {
-        sum += v;
-    }
-    return sum;
-}
+#include <limits>
 
 int main() {
-    int n = 0;
-    std::cin >> n;
+    int32_t a = 0;
+    std::cin >> a;
 
-    std::vector<long long> sheet;
-    for (int i = 0; i < n; ++i) {
-        long long value = 0;
-        std::cin >> value;
-        load(sheet, value);
-    }
-
-    std::cout << "LOADED " << sheet.size() << '\n';
-    std::cout << "TOTAL " << total(sheet) << '\n';
-
-    long long* first = nullptr;
-    // point first at the first element if there is one, then print it
-    std::cout << "FIRST NONE\n";
-    (void)first;
+    uint64_t b = 0;  // FILL: b is a, widened with static_cast<uint64_t>
+    // ANSWER: uint64_t b = static_cast<uint64_t>(a);
+    std::cout << b << '\n';
+    std::cout << std::numeric_limits<int32_t>::max() << '\n';
+    std::cout << 0 << '\n';  // FILL: the largest uint64_t, from std::numeric_limits
+    // ANSWER: std::cout << std::numeric_limits<uint64_t>::max() << '\n';
 }
 '''
 solution    = '''
+#include <cstdint>
 #include <iostream>
-#include <vector>
-
-// a reference: this IS the caller's vector, not a copy of it
-void load(std::vector<long long>& sheet, long long value) {
-    sheet.push_back(value);
-}
-
-// const&: no copy, and the compiler refuses any line that would change it
-long long total(const std::vector<long long>& sheet) {
-    long long sum = 0;
-    for (long long v : sheet) {
-        sum += v;
-    }
-    return sum;
-}
+#include <limits>
 
 int main() {
-    int n = 0;
-    std::cin >> n;
+    int32_t a = 0;
+    std::cin >> a;
 
-    std::vector<long long> sheet;
-    for (int i = 0; i < n; ++i) {
-        long long value = 0;
-        std::cin >> value;
-        load(sheet, value);
-    }
-
-    std::cout << "LOADED " << sheet.size() << '\n';
-    std::cout << "TOTAL " << total(sheet) << '\n';
-
-    long long* first = sheet.empty() ? nullptr : &sheet.front();
-    if (first != nullptr) {
-        std::cout << "FIRST " << *first << '\n';
-    } else {
-        std::cout << "FIRST NONE\n";
-    }
+    uint64_t b = static_cast<uint64_t>(a);
+    std::cout << b << '\n';
+    std::cout << std::numeric_limits<int32_t>::max() << '\n';
+    std::cout << std::numeric_limits<uint64_t>::max() << '\n';
 }
 '''
 hints = [
-  "One character fixes load: std::vector<long long>& sheet. The call site does not change; a reference binds to the argument as written.",
-  "total should take const std::vector<long long>& — the const is a promise, and the compiler checks it.",
-  "&sheet.front() is the address of the first element and only makes sense when there is one; test for nullptr before you write *first.",
+  "uint64_t b = static_cast<uint64_t>(a); — the cast names the width it goes to.",
+  "std::numeric_limits<uint64_t>::max() is 18446744073709551615; the int32_t line above it is the same call with the other type.",
 ]
 
 [quest.tests]
@@ -372,88 +303,86 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "three",    stdin = "3\n4 8 15\n",      expect = "LOADED 3\nTOTAL 27\nFIRST 4\n",    visible = true },
-  { name = "none",     stdin = "0\n",              expect = "LOADED 0\nTOTAL 0\nFIRST NONE\n",  visible = false },
-  { name = "negative", stdin = "2\n-5 -6\n",       expect = "LOADED 2\nTOTAL -11\nFIRST -5\n",  visible = false },
-  { name = "single",   stdin = "1\n42\n",          expect = "LOADED 1\nTOTAL 42\nFIRST 42\n",   visible = false },
+  { name = "seven", stdin = "7\n", expect = "7\n2147483647\n18446744073709551615\n", visible = true },
+  { name = "max32", stdin = "2147483647\n", expect = "2147483647\n2147483647\n18446744073709551615\n", visible = false },
+  { name = "zero", stdin = "0\n", expect = "0\n2147483647\n18446744073709551615\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 05
 [[quest]]
-id          = "cpp.basic.05.vector"
+id          = "cpp.basic.05.big-int"
 node        = 5
-title       = "THE MIDDLE OF THE RAFT"
+title       = "THIRTY-TWO BYTES"
 difficulty  = 2
-story       = "Forty sampans rafted up in the typhoon shelter. The harbour master can see the outermost and the innermost and nothing in between."
-concepts    = ["slices", "iteration", "control-flow"]
-requires    = ["cpp.basic.04.references"]
-map          = { x = 0.716, y = 0.137, kind = "quest" }
+story       = "The Yacht Club's mooring keys are 32-byte numbers, and the winch reads them a byte at a time from the big end; the buffer is all zeros until the bytes are put in."
+concepts    = ["types", "slices", "strings"]
+requires    = ["cpp.basic.04.int-types"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
 brief       = '''
-Standard input is a count `n` on the first line and then `n` integers on the
-second, separated by spaces. `n` is at least `1`.
-
-Print three lines: the first value, the last value, and the sum of everything
-strictly between them. With fewer than three values that sum is `0`.
+A 32-byte integer — a hash, a key, an address — has no built-in type, so it
+lives in `std::array<uint8_t, 32>`: 32 bytes, big-endian, the most
+significant byte first. A `uint64_t` fills the last eight of them. Shifting
+right by `8 * i` bits brings byte `i` (counting from the small end) down
+to the bottom, and the cast keeps only that byte.
 
 ```
-input:  5
-        4 8 15 16 23
-output: 4
-        23
-        39
+buf[31 - i] = static_cast<uint8_t>(v >> (8 * i));
 ```
 
-`std::vector` is the sequence. `front()` and `back()` are the ends;
-`begin() + 1` to `end() - 1` is the middle, and `std::accumulate` over that
-range is the sum — as long as the starting value you hand it is a
-`long long`. `std::accumulate(first, last, 0)` sums in `int`, because `0` is
-an `int`, and one of the hidden cases has a middle that does not fit.
+The loop over `i` and the hex print are written. Type that line as the
+loop body at `// FILL`.
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
 '''
 starter     = '''
+#include <array>
+#include <cstdint>
+#include <iomanip>
 #include <iostream>
-#include <numeric>
-#include <vector>
 
 int main() {
-    int n = 0;
-    std::cin >> n;
-    std::vector<long long> nums(n);
-    for (long long& v : nums) {
-        std::cin >> v;
+    uint64_t v = 0;
+    std::cin >> v;
+    std::array<uint8_t, 32> buf{};
+
+    for (int i = 0; i < 8; ++i) {
+        buf[31 - i] = 0;  // FILL: byte i of v, counted from the small end
+        // ANSWER: buf[31 - i] = static_cast<uint8_t>(v >> (8 * i));
     }
 
-    // print nums.front(), nums.back(), then the sum of the middle
-    (void)nums;
+    for (uint8_t byte : buf) {
+        std::cout << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(byte);
+    }
+    std::cout << '\n';
 }
 '''
 solution    = '''
+#include <array>
+#include <cstdint>
+#include <iomanip>
 #include <iostream>
-#include <numeric>
-#include <vector>
 
 int main() {
-    int n = 0;
-    std::cin >> n;
-    std::vector<long long> nums(n);
-    for (long long& v : nums) {
-        std::cin >> v;
+    uint64_t v = 0;
+    std::cin >> v;
+    std::array<uint8_t, 32> buf{};
+
+    for (int i = 0; i < 8; ++i) {
+        buf[31 - i] = static_cast<uint8_t>(v >> (8 * i));
     }
 
-    std::cout << nums.front() << '\n';
-    std::cout << nums.back() << '\n';
-
-    long long middle = 0;
-    if (nums.size() > 2) {
-        // 0LL, not 0: the type of the initial value is the type of the sum
-        middle = std::accumulate(nums.begin() + 1, nums.end() - 1, 0LL);
+    for (uint8_t byte : buf) {
+        std::cout << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(byte);
     }
-    std::cout << middle << '\n';
+    std::cout << '\n';
 }
 '''
 hints = [
-  "nums.begin() + 1 and nums.end() - 1 are iterators, and an iterator pair is how <numeric> and <algorithm> name a range.",
-  "With one or two values that range is empty or backwards — guard it with an if on nums.size() before you build it.",
-  "The 0LL matters: accumulate deduces its result type from the initial value, and a plain 0 is an int.",
+  "buf[31 - i] = static_cast<uint8_t>(v >> (8 * i)); — the last index gets the lowest byte.",
+  "v >> (8 * i) slides byte i to the bottom; static_cast<uint8_t> throws the rest away.",
 ]
 
 [quest.tests]
@@ -463,104 +392,78 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "five",   stdin = "5\n4 8 15 16 23\n",                 expect = "4\n23\n39\n",                          visible = true },
-  { name = "single", stdin = "1\n7\n",                            expect = "7\n7\n0\n",                            visible = false },
-  { name = "pair",   stdin = "2\n3 9\n",                          expect = "3\n9\n0\n",                            visible = false },
-  { name = "wide",   stdin = "4\n1 3000000000 3000000000 1\n",    expect = "1\n1\n6000000000\n",                   visible = false },
+  { name = "ff", stdin = "255\n", expect = "00000000000000000000000000000000000000000000000000000000000000ff\n", visible = true },
+  { name = "0100", stdin = "256\n", expect = "0000000000000000000000000000000000000000000000000000000000000100\n", visible = false },
+  { name = "max64", stdin = "18446744073709551615\n", expect = "000000000000000000000000000000000000000000000000ffffffffffffffff\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 06
 [[quest]]
-id          = "cpp.basic.06.strings"
+id          = "cpp.basic.06.floats"
 node        = 6
-title       = "BYTES ARE NOT LETTERS"
-difficulty  = 2
-story       = "The typhoon shelter noticeboard truncates 銅鑼灣 at three bytes and gets one character."
-concepts    = ["strings", "iteration", "types"]
-requires    = ["cpp.basic.05.vector"]
-map          = { x = 0.962, y = 0.054, kind = "quest" }
+title       = "THE TIDE GAUGE"
+difficulty  = 1
+story       = "The tide gauge at the shelter logs in double and the display board is single precision, and the two disagree in the tenth decimal place."
+concepts    = ["types", "io"]
+requires    = ["cpp.basic.05.big-int"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
 brief       = '''
-Read one line. Print three lines:
-
-1. its length in **bytes**
-2. its length in **characters** — UTF-8 code points
-3. the line with its characters reversed
+`double` is the 64-bit float and `float` the 32-bit one. `std::stod` parses
+text into a `double`; narrowing it to a `float` is a `static_cast<float>`,
+and the cast is where precision is lost — `0.1` has no exact binary form,
+and the float keeps fewer of its digits than the double.
 
 ```
-input:  causeway
-output: 8
-        8
-        yawesuac
+double x = std::stod(s);
+float y = static_cast<float>(x);
 ```
 
-The line may contain characters outside ASCII, and then the first two numbers
-are not the same. `std::string::size()` is bytes. It always was. `std::string`
-knows nothing about encodings; it is a sequence of `char`, and a `char` is a
-byte.
+`s` is the line read in, and both prints use ten decimals. Type those two
+lines at `// FILL`.
 
-UTF-8 is easy to count without decoding it: every code point starts with a
-byte that is **not** of the form `10xxxxxx`, and every continuation byte is.
-So a byte `c` begins a character exactly when `(c & 0xC0) != 0x80`. Reverse
-the characters, not the bytes — `std::reverse` on the string itself would cut
-`銅` into three pieces and print them backwards.
+```
+input:  0.1
+output: 0.1000000000
+        0.1000000015
+```
 '''
 starter     = '''
-#include <algorithm>
+#include <iomanip>
 #include <iostream>
 #include <string>
 
 int main() {
-    std::string line;
-    std::getline(std::cin, line);
+    std::string s;
+    std::getline(std::cin, s);
 
-    std::cout << line.size() << '\n';
-    // this is the byte count again, not the character count
-    std::cout << line.size() << '\n';
-    // reverse the characters, not the bytes: std::reverse on the string
-    // itself would cut a three-byte character into three broken bytes
-    std::cout << line << '\n';
+    double x = 0.0;  // FILL: parse s with std::stod
+    // ANSWER: double x = std::stod(s);
+    float y = 0.0f;  // FILL: x narrowed with static_cast<float>
+    // ANSWER: float y = static_cast<float>(x);
+
+    std::cout << std::fixed << std::setprecision(10) << x << '\n';
+    std::cout << std::fixed << std::setprecision(10) << y << '\n';
 }
 '''
 solution    = '''
-#include <algorithm>
+#include <iomanip>
 #include <iostream>
 #include <string>
-#include <vector>
-
-// true for the first byte of a UTF-8 sequence, false for a continuation byte
-bool starts_char(unsigned char c) {
-    return (c & 0xC0) != 0x80;
-}
 
 int main() {
-    std::string line;
-    std::getline(std::cin, line);
+    std::string s;
+    std::getline(std::cin, s);
 
-    std::cout << line.size() << '\n';
+    double x = std::stod(s);
+    float y = static_cast<float>(x);
 
-    // cut the string into one std::string per character
-    std::vector<std::string> chars;
-    for (unsigned char c : line) {
-        if (starts_char(c)) {
-            chars.emplace_back(1, static_cast<char>(c));
-        } else {
-            chars.back().push_back(static_cast<char>(c));
-        }
-    }
-    std::cout << chars.size() << '\n';
-
-    std::reverse(chars.begin(), chars.end());
-    std::string reversed;
-    for (const std::string& ch : chars) {
-        reversed += ch;
-    }
-    std::cout << reversed << '\n';
+    std::cout << std::fixed << std::setprecision(10) << x << '\n';
+    std::cout << std::fixed << std::setprecision(10) << y << '\n';
 }
 '''
 hints = [
-  "Loop over the bytes as unsigned char; a plain char may be signed, and then the bit test on anything above 0x7F goes wrong.",
-  "Collect each character as its own small std::string, reverse the vector of them, and join.",
-  "Counting the bytes for which (c & 0xC0) != 0x80 is the character count without decoding anything.",
+  "double x = std::stod(s); — string to double, from <string>.",
+  "float y = static_cast<float>(x); — the narrowing is spelled out; y prints with fewer true digits.",
 ]
 
 [quest.tests]
@@ -570,147 +473,86 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "ascii",     stdin = "causeway\n",  expect = "8\n8\nyawesuac\n",  visible = true },
-  { name = "cantonese", stdin = "銅鑼灣\n",    expect = "9\n3\n灣鑼銅\n",    visible = false },
-  { name = "spaced",    stdin = "Lucky Mac\n", expect = "9\n9\ncaM ykcuL\n", visible = false },
+  { name = "tenth", stdin = "0.1\n", expect = "0.1000000000\n0.1000000015\n", visible = true },
+  { name = "exact", stdin = "3.5\n", expect = "3.5000000000\n3.5000000000\n", visible = false },
+  { name = "big", stdin = "123456.789\n", expect = "123456.7890000000\n123456.7890625000\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 07
 [[quest]]
-id          = "cpp.basic.07.classes"
+id          = "cpp.basic.04.strings"
 node        = 7
-title       = "THE SLIPWAY LEDGER"
-difficulty  = 3
-story       = "The Yacht Club slipway charges every haul-out and keeps the lines in one place, or it did before the suggestion replaced the class with a comment."
-concepts    = ["structs", "functions", "mutability"]
-requires    = ["cpp.basic.06.strings"]
-map          = { x = 0.898, y = 0.526, kind = "quest" }
+title       = "THE SAMPAN'S NAME"
+difficulty  = 1
+story       = "A sampan's name is painted on the bow in capitals and on the stern back to front, and the harbour master's log has it in neither."
+concepts    = ["strings", "iteration"]
+requires    = ["cpp.basic.06.floats"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
 brief       = '''
-Line one is `<BOAT> <n>`. The next `n` lines are `<ITEM> <CENTS>`.
-
-Build a `Ledger` for the boat that collects the items, then print each item
-back as `<ITEM> <CENTS>` in the order it arrived, then `TOTAL <sum>`, then
-`BOAT <name> <count>`.
+A `std::string` knows its own length (`size()`), can be walked with
+`<algorithm>`, and can be built from any pair of iterators. `std::transform`
+applies a function to every character and writes the result back;
+`::toupper` from `<cctype>` is the function. `rbegin()` and `rend()` walk
+the string backwards, so a string built from them is the reverse.
 
 ```
-input:  KWAN 2
-        HAUL 600
-        WASH 2800
-output: HAUL 600
-        WASH 2800
-        TOTAL 3400
-        BOAT KWAN 2
+std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+std::string rev(line.rbegin(), line.rend());
 ```
 
-`n` may be `0`, and then the output is the last two lines only.
+`upper` is a copy of the line and `rev` is a placeholder. Type those two
+lines at `// FILL`, replacing the placeholder `rev`.
 
-A `class` is a `struct` whose members are private unless you say `public:`.
-The constructor runs before the body has a chance to, so members are set in
-the **initialiser list** — `Ledger(std::string boat) : boat_(std::move(boat)) {}`
-— and not by assignment inside the braces. `total()` changes nothing, so it is
-declared `const`, which is the only reason it can be called on a
-`const Ledger&`.
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
 '''
 starter     = '''
+#include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <string>
-#include <utility>
-#include <vector>
-
-class Ledger {
-public:
-    explicit Ledger(std::string boat) {
-        (void)boat;
-        // what does a ledger have to remember?
-    }
-
-    void add(const std::string& item, long long cents) {
-        (void)item;
-        (void)cents;
-    }
-
-    long long total() const {
-        return 0;
-    }
-
-    // items() and boat() and count() are missing
-};
 
 int main() {
-    std::string boat;
-    int n = 0;
-    std::cin >> boat >> n;
+    std::string line;
+    std::getline(std::cin, line);
 
-    Ledger ledger(boat);
-    for (int i = 0; i < n; ++i) {
-        std::string item;
-        long long cents = 0;
-        std::cin >> item >> cents;
-        ledger.add(item, cents);
-    }
+    std::string upper = line;
+    // FILL: upper-case every character of upper, in place
+    // ANSWER: std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+    std::string rev = line;  // FILL: build rev from line's rbegin() and rend() instead
+    // ANSWER: std::string rev(line.rbegin(), line.rend());
 
-    // print each item, then TOTAL, then BOAT <name> <count>
-    std::cout << "TOTAL " << ledger.total() << '\n';
+    std::cout << line.size() << '\n';
+    std::cout << upper << '\n';
+    std::cout << rev << '\n';
 }
 '''
 solution    = '''
+#include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <string>
-#include <utility>
-#include <vector>
-
-class Ledger {
-public:
-    explicit Ledger(std::string boat) : boat_(std::move(boat)) {}
-
-    void add(const std::string& item, long long cents) {
-        items_.emplace_back(item, cents);
-    }
-
-    long long total() const {
-        long long sum = 0;
-        for (const auto& [item, cents] : items_) {
-            sum += cents;
-        }
-        return sum;
-    }
-
-    const std::vector<std::pair<std::string, long long>>& items() const {
-        return items_;
-    }
-
-    const std::string& boat() const { return boat_; }
-    std::size_t count() const { return items_.size(); }
-
-private:
-    std::string boat_;
-    std::vector<std::pair<std::string, long long>> items_;
-};
 
 int main() {
-    std::string boat;
-    int n = 0;
-    std::cin >> boat >> n;
+    std::string line;
+    std::getline(std::cin, line);
 
-    Ledger ledger(boat);
-    for (int i = 0; i < n; ++i) {
-        std::string item;
-        long long cents = 0;
-        std::cin >> item >> cents;
-        ledger.add(item, cents);
-    }
+    std::string upper = line;
+    std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+    std::string rev(line.rbegin(), line.rend());
 
-    for (const auto& [item, cents] : ledger.items()) {
-        std::cout << item << ' ' << cents << '\n';
-    }
-    std::cout << "TOTAL " << ledger.total() << '\n';
-    std::cout << "BOAT " << ledger.boat() << ' ' << ledger.count() << '\n';
+    std::cout << line.size() << '\n';
+    std::cout << upper << '\n';
+    std::cout << rev << '\n';
 }
 '''
 hints = [
-  "A std::vector<std::pair<std::string, long long>> is enough. The class is there so the ledger owns its own lines.",
-  "The initialiser list — : boat_(std::move(boat)) — sets the member as it is constructed; assigning inside the braces builds an empty string first and then overwrites it.",
-  "Return the items as a const reference so main can walk them without copying the vector, and mark every method that does not modify the ledger const.",
+  "std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper); — source, source end, destination, function.",
+  "std::string rev(line.rbegin(), line.rend()); — a string built from two reverse iterators is the reverse.",
 ]
 
 [quest.tests]
@@ -720,140 +562,72 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "two-items", stdin = "KWAN 2\nHAUL 600\nWASH 2800\n",         expect = "HAUL 600\nWASH 2800\nTOTAL 3400\nBOAT KWAN 2\n",         visible = true },
-  { name = "empty",     stdin = "LEE 0\n",                                expect = "TOTAL 0\nBOAT LEE 0\n",                                  visible = false },
-  { name = "repeats",   stdin = "HO 3\nTEA 1200\nTEA 1200\nPIE 900\n",    expect = "TEA 1200\nTEA 1200\nPIE 900\nTOTAL 3300\nBOAT HO 3\n",   visible = false },
+  { name = "kwan-lee", stdin = "kwan lee\n", expect = "8\nKWAN LEE\neel nawk\n", visible = true },
+  { name = "gun", stdin = "gun\n", expect = "3\nGUN\nnug\n", visible = false },
+  { name = "mixed", stdin = "Noon Day Gun 12\n", expect = "15\nNOON DAY GUN 12\n21 nuG yaD nooN\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 08
 [[quest]]
-id          = "cpp.basic.08.enum-class"
+id          = "cpp.basic.08.string-slices"
 node        = 8
-title       = "WHO IS AT THE HELM"
-difficulty  = 3
-story       = "The Yacht Club gate charges every card the member rate, including the ones that are not members and the one that is not a card."
-concepts    = ["enums", "pattern-matching", "functions"]
-requires    = ["cpp.basic.07.classes"]
-map          = { x = 0.785, y = 0.463, kind = "quest" }
+title       = "THE SHORT NAME"
+difficulty  = 1
+story       = "The harbour master's board has room for four letters of a sampan's name and a mark after them, and the clerk copies the whole name in."
+concepts    = ["strings", "slices"]
+requires    = ["cpp.basic.04.strings"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` lines of `<TYPE> <HOURS>`.
-
-The base rate is `500 + 100 * HOURS` cents. For each line print one of:
-
-* `MEMBER` — the base rate
-* `CREW` — half the base rate, integer division
-* `JUNIOR` — always `200`
-* anything else — `UNKNOWN <TYPE>`
+`s.substr(pos, n)` is a slice of a string: `n` characters starting at
+`pos`, and it is a **copy** — a new `std::string` that does not share
+memory with `s`. Appending to a string is `+=`, or `append(...)`, and it
+grows the string in place.
 
 ```
-input:  3
-        MEMBER 4
-        CREW 4
-        JUNIOR 4
-output: 900
-        450
-        200
+std::string t = s.substr(0, 4);
+t += "...";
 ```
 
-Model the card as an `enum class Card` with four values, one of them
-`Other`. An `enum class` value does not convert to an `int` behind your back
-and does not leak its names into the enclosing scope — both of which a plain
-`enum` does, and both of which are why it is the one to write.
+`s` is the line read in (at least four characters). Type those two lines
+at `// FILL`, replacing the placeholder `t`.
 
-A C++ enum cannot carry a payload, so the unrecognised tag travels beside it:
-a small `struct Tag { Card card; std::string raw; }`. Decide the fare with one
-`switch`. Cover every enumerator and the compiler has nothing to warn about;
-leave one out and `-Wall` will tell you which.
+```
+input:  causewaybay
+output: caus...
 '''
 starter     = '''
 #include <iostream>
 #include <string>
 
-enum class Card {
-    Member,
-    Crew,
-    Junior,
-    // one more value, for the tag it did not recognise
-};
-
-struct Tag {
-    Card card;
-    std::string raw;
-};
-
-Tag classify(const std::string& raw) {
-    // MEMBER / CREW / JUNIOR / anything else
-    return Tag{Card::Member, raw};
-}
-
-std::string fare(const Tag& tag, long long hours) {
-    long long base = 500 + 100 * hours;
-    (void)tag;
-    (void)base;
-    // one switch over tag.card
-    return "?";
-}
-
 int main() {
-    int n = 0;
-    std::cin >> n;
-    for (int i = 0; i < n; ++i) {
-        std::string raw;
-        long long hours = 0;
-        std::cin >> raw >> hours;
-        std::cout << fare(classify(raw), hours) << '\n';
-    }
+    std::string s;
+    std::getline(std::cin, s);
+
+    std::string t = s;  // FILL: t is the first four characters of s, a copy
+    // ANSWER: std::string t = s.substr(0, 4);
+    // FILL: append "..." to t
+    // ANSWER: t += "...";
+
+    std::cout << t << '\n';
 }
 '''
 solution    = '''
 #include <iostream>
 #include <string>
 
-enum class Card {
-    Member,
-    Crew,
-    Junior,
-    Other,
-};
-
-struct Tag {
-    Card card;
-    std::string raw;
-};
-
-Tag classify(const std::string& raw) {
-    if (raw == "MEMBER") return Tag{Card::Member, raw};
-    if (raw == "CREW") return Tag{Card::Crew, raw};
-    if (raw == "JUNIOR") return Tag{Card::Junior, raw};
-    return Tag{Card::Other, raw};
-}
-
-std::string fare(const Tag& tag, long long hours) {
-    long long base = 500 + 100 * hours;
-    switch (tag.card) {
-        case Card::Member: return std::to_string(base);
-        case Card::Crew: return std::to_string(base / 2);
-        case Card::Junior: return "200";
-        case Card::Other: return "UNKNOWN " + tag.raw;
-    }
-    return "?";  // unreachable once every enumerator is covered
-}
-
 int main() {
-    int n = 0;
-    std::cin >> n;
-    for (int i = 0; i < n; ++i) {
-        std::string raw;
-        long long hours = 0;
-        std::cin >> raw >> hours;
-        std::cout << fare(classify(raw), hours) << '\n';
-    }
+    std::string s;
+    std::getline(std::cin, s);
+
+    std::string t = s.substr(0, 4);
+    t += "...";
+
+    std::cout << t << '\n';
 }
 '''
 hints = [
-  "Card::Other is the fourth enumerator; the string it did not recognise lives in Tag::raw next to it.",
-  "switch (tag.card) with a case per enumerator, and return from inside each case — no break needed when every arm returns.",
-  "std::to_string turns the number into a std::string; the UNKNOWN line is a string concatenation with +.",
+  "std::string t = s.substr(0, 4); — start at 0, take 4; the result is its own string.",
+  "t += \"...\"; — append in place; t.append(\"...\") is the same.",
 ]
 
 [quest.tests]
@@ -863,90 +637,89 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "three-kinds", stdin = "3\nMEMBER 4\nCREW 4\nJUNIOR 4\n", expect = "900\n450\n200\n",         visible = true },
-  { name = "tourist",     stdin = "2\nCREW 0\nTOURIST 9\n",          expect = "250\nUNKNOWN TOURIST\n",   visible = false },
-  { name = "long-day",    stdin = "1\nMEMBER 12\n",                  expect = "1700\n",                   visible = false },
+  { name = "causewaybay", stdin = "causewaybay\n", expect = "caus...\n", visible = true },
+  { name = "noonday", stdin = "noonday\n", expect = "noon...\n", visible = false },
+  { name = "hong-kong", stdin = "hong kong\n", expect = "hong...\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 09
 [[quest]]
-id          = "cpp.basic.09.maps"
+id          = "cpp.basic.09.int-slices"
 node        = 9
-title       = "WHAT THE SHELTER SHOUTS"
-difficulty  = 3
-story       = "The typhoon shelter at noon: every sampan hailing something, and the harbour master wants the ranking."
-concepts    = ["collections", "sorting", "closures"]
-requires    = ["cpp.basic.08.enum-class"]
-map          = { x = 0.557, y = 0.538, kind = "quest" }
+title       = "TWO FROM THE MIDDLE"
+difficulty  = 1
+story       = "The slipway log wants the second and third readings copied out on their own, then the whole morning appended after them, and the copy is the whole morning twice."
+concepts    = ["slices", "collections"]
+requires    = ["cpp.basic.08.string-slices"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
 brief       = '''
-Read the whole of standard input and split it on whitespace.
-
-Print each distinct word once, as `<word> <count>`, ordered by count
-descending, and ties broken by the word ascending.
+A `std::vector` has no slice syntax; a slice is a new vector built from two
+iterators — `begin() + 1` up to but not including `begin() + 3` — and it
+is a **copy** (`std::span` from `<span>` is the view that does not copy).
+`insert(where, first, last)` appends a whole range when `where` is `end()`.
 
 ```
-input:  tram tram bus
-output: tram 2
-        bus 1
+std::vector<long long> part(v.begin() + 1, v.begin() + 3);
+part.insert(part.end(), v.begin(), v.end());
 ```
 
-`std::map<std::string, long long>` is ordered by key, `std::unordered_map` is
-ordered by nothing, and neither is ordered by count — so the ranking is a
-separate step: copy the entries into a `std::vector` of pairs and `std::sort`
-it with a comparator. `counts[word]++` on a key that is not there inserts it
-with a value of `0` first, which is exactly what a counting loop wants.
+`v` holds the line's integers (at least three). Type those two lines at
+`// FILL`, replacing the placeholder `part`.
+
+```
+input:  1 2 3 4
+output: 2 3 1 2 3 4
+```
 '''
 starter     = '''
-#include <algorithm>
 #include <iostream>
-#include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
 int main() {
-    std::map<std::string, long long> counts;
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
 
-    std::string word;
-    while (std::cin >> word) {
-        // count it
+    std::vector<long long> part = v;  // FILL: elements 1 and 2 of v, copied
+    // ANSWER: std::vector<long long> part(v.begin() + 1, v.begin() + 3);
+    // FILL: append all of v to the end of part
+    // ANSWER: part.insert(part.end(), v.begin(), v.end());
+
+    for (size_t i = 0; i < part.size(); ++i) {
+        std::cout << part[i] << (i + 1 < part.size() ? ' ' : '\n');
     }
-
-    // copy into a vector, sort by count desc then word asc, print
-    (void)counts;
 }
 '''
 solution    = '''
-#include <algorithm>
 #include <iostream>
-#include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
 int main() {
-    std::map<std::string, long long> counts;
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
 
-    std::string word;
-    while (std::cin >> word) {
-        counts[word]++;
-    }
+    std::vector<long long> part(v.begin() + 1, v.begin() + 3);
+    part.insert(part.end(), v.begin(), v.end());
 
-    std::vector<std::pair<std::string, long long>> rows(counts.begin(), counts.end());
-    std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
-        if (a.second != b.second) {
-            return a.second > b.second;
-        }
-        return a.first < b.first;
-    });
-
-    for (const auto& [w, count] : rows) {
-        std::cout << w << ' ' << count << '\n';
+    for (size_t i = 0; i < part.size(); ++i) {
+        std::cout << part[i] << (i + 1 < part.size() ? ' ' : '\n');
     }
 }
 '''
 hints = [
-  "while (std::cin >> word) reads every whitespace-separated token until the input ends; counts[word]++ is the whole counting loop.",
-  "A vector can be built straight from the map's begin() and end(); each element is a std::pair<const std::string, long long>.",
-  "The comparator is a lambda that returns true when a must come before b: count descending first, word ascending on a tie.",
+  "std::vector<long long> part(v.begin() + 1, v.begin() + 3); — a range constructor; the end is one past the last element taken.",
+  "part.insert(part.end(), v.begin(), v.end()); — insert a range at the end is append.",
 ]
 
 [quest.tests]
@@ -956,220 +729,988 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "tram",   stdin = "tram tram bus\n", expect = "tram 2\nbus 1\n", visible = true },
-  { name = "ties",   stdin = "a b a c b a\n",   expect = "a 3\nb 2\nc 1\n", visible = false },
-  { name = "single", stdin = "one\n",           expect = "one 1\n",         visible = false },
-]
-
-# ---------------------------------------------------------------- 19
-[[quest]]
-id          = "cpp.basic.19.hashtable"
-node        = 10
-title       = "NO ORDER AT ALL"
-difficulty  = 2
-story       = "The shelter's roll call comes back alphabetical and the harbour master wants it in the order the boats actually answered."
-concepts    = ["collections", "iteration", "slices"]
-requires    = ["cpp.basic.09.maps"]
-map          = { x = 0.502, y = 0.509, kind = "quest" }
-brief       = '''
-Standard input is a count `n`, then `n` lines, one boat name each. `n` is at
-least `1`, and a name is one run of non-space characters. A name may appear
-more than once.
-
-Print each distinct name once, as `<name> <count>`, **in the order the name
-first appeared**. Then print `DISTINCT <k>`.
-
-```
-input:  5
-        SAI-WAN
-        TAI-PO
-        SAI-WAN
-        LEI-YUE
-        SAI-WAN
-output: SAI-WAN 3
-        TAI-PO 1
-        LEI-YUE 1
-        DISTINCT 3
-```
-
-Neither container gives you this on its own, and that is the whole quest.
-
-`std::map` is a tree: iterating it hands the names back **sorted**, which is
-not the order they answered in. `std::unordered_map` is a hash table: lookup
-is O(1) on average instead of O(log n), but iterating it hands them back in
-**no specified order at all** — not sorted, not insertion, and not necessarily
-the same order twice. The standard does not promise one, so a program that
-prints an `unordered_map` by walking it is a program whose output depends on
-the library it was built against. The starter does exactly that, and it even
-passes the cases with only one distinct name — which is the tell: a test that
-cannot tell the orders apart is not evidence the order is right.
-
-Keep the two jobs in two containers: a `std::vector<std::string>` remembers
-the order a name was first seen, and a `std::unordered_map<std::string, long
-long>` counts. Walk the vector to print.
-'''
-starter     = '''
-#include <iostream>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
-int main() {
-    int n = 0;
-    std::cin >> n;
-    std::unordered_map<std::string, long long> count;
-    for (int i = 0; i < n; ++i) {
-        std::string name;
-        std::cin >> name;
-        ++count[name];
-    }
-
-    // Walking the hash table. The names come out in whatever order its
-    // buckets happen to be in, which is not the order they arrived.
-    for (const auto& [name, c] : count) {
-        std::cout << name << ' ' << c << '\n';
-    }
-    std::cout << "DISTINCT " << count.size() << '\n';
-}
-'''
-solution    = '''
-#include <iostream>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
-int main() {
-    int n = 0;
-    std::cin >> n;
-
-    std::vector<std::string> order;
-    std::unordered_map<std::string, long long> count;
-    for (int i = 0; i < n; ++i) {
-        std::string name;
-        std::cin >> name;
-        // The insert happens once per distinct name: `count[name]` default
-        // constructs to 0, so a fresh name is exactly the one whose count
-        // was 0 before the increment.
-        if (count[name]++ == 0) order.push_back(name);
-    }
-
-    for (const std::string& name : order) {
-        std::cout << name << ' ' << count[name] << '\n';
-    }
-    std::cout << "DISTINCT " << order.size() << '\n';
-}
-'''
-hints = [
-  "The hash table is for looking up fast. The vector is for remembering order. You need both.",
-  "`count[name]++ == 0` is true exactly once per name — on the insert — because operator[] default constructs the value to 0.",
-  "Print by walking the vector and asking the map for each count, never by walking the map.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "answers in the order they came", stdin = "5\nSAI-WAN\nTAI-PO\nSAI-WAN\nLEI-YUE\nSAI-WAN\n", expect = "SAI-WAN 3\nTAI-PO 1\nLEI-YUE 1\nDISTINCT 3\n", visible = true },
-  { name = "one boat, once", stdin = "1\nABERDEEN\n", expect = "ABERDEEN 1\nDISTINCT 1\n", visible = true },
-  { name = "already alphabetical stays as it came", stdin = "3\nAAA\nBBB\nCCC\n", expect = "AAA 1\nBBB 1\nCCC 1\nDISTINCT 3\n", visible = false },
-  { name = "reverse of alphabetical, which a map would sort", stdin = "6\nZED\nYAN\nXIU\nZED\nYAN\nZED\n", expect = "ZED 3\nYAN 2\nXIU 1\nDISTINCT 3\n", visible = false },
-  { name = "every name the same", stdin = "4\nONE\nONE\nONE\nONE\n", expect = "ONE 4\nDISTINCT 1\n", visible = false },
-  { name = "six boats, so no hash order agrees by luck", stdin = "9\nTAI-O\nCHEUNG-CHAU\nPENG-CHAU\nTAI-O\nMUI-WO\nSOK-KWU\nYUNG-SHUE\nMUI-WO\nTAI-O\n", expect = "TAI-O 3\nCHEUNG-CHAU 1\nPENG-CHAU 1\nMUI-WO 2\nSOK-KWU 1\nYUNG-SHUE 1\nDISTINCT 6\n", visible = false },
+  { name = "four", stdin = "1 2 3 4\n", expect = "2 3 1 2 3 4\n", visible = true },
+  { name = "three", stdin = "7 8 9\n", expect = "8 9 7 8 9\n", visible = false },
+  { name = "five", stdin = "5 1 4 1 3\n", expect = "1 4 5 1 4 1 3\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 10
 [[quest]]
-id          = "cpp.basic.10.set-and-pair"
-node        = 11
-title       = "WHO IS MOORED WHERE"
-difficulty  = 3
-story       = "The mooring board lists the same sampan at the same berth twice, and nobody can say which of the lines are the duplicates."
-concepts    = ["collections", "pattern-matching", "iteration"]
-requires    = ["cpp.basic.19.hashtable"]
-map          = { x = 0.447, y = 0.480, kind = "quest" }
+id          = "cpp.basic.10.byte-slices"
+node        = 10
+title       = "THE FIRST THREE BYTES"
+difficulty  = 1
+story       = "The gun's wire carries a name as bytes, the receiver keeps the first three and tacks the last two on the end, and the buffer it prints is the whole name."
+concepts    = ["slices", "strings", "types"]
+requires    = ["cpp.basic.09.int-slices"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` lines of `<BERTH> <NAME>`.
-
-Print every distinct `<BERTH> <NAME>` pairing once, ordered by berth and then
-by name, then `DISTINCT <k>` and `DUPES <n - k>`.
+Bytes are `uint8_t`, and a byte array is `std::vector<uint8_t>`. The same
+two idioms as an integer vector apply: a slice is a new vector built from
+two iterators (a copy), and `insert(end(), first, last)` appends a range.
+`bytes.end() - 2` is an iterator two from the end.
 
 ```
-input:  4
-        2 KWAN
-        1 LEE
-        2 KWAN
-        1 HO
-output: 1 HO
-        1 LEE
-        2 KWAN
-        DISTINCT 3
-        DUPES 1
+std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3);
+head.insert(head.end(), bytes.end() - 2, bytes.end());
 ```
 
-A `std::set<std::pair<int, std::string>>` does all three jobs at once: it
-refuses a second copy of anything already in it, it keeps itself sorted, and
-`std::pair` already compares the way the output wants — first element, then
-second. Walk it with a range-`for` and take each pair apart with a
-**structured binding**, `const auto& [berth, name]`, rather than `.first` and
-`.second`.
+`bytes` holds the line's characters (at least three). Type those two lines
+at `// FILL`, replacing the placeholder `head`. The hex line and the text
+line are printed for you.
+
+```
+input:  sampan
+output: 73616d616e
+        saman
+```
 '''
 starter     = '''
+#include <cstdint>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
 
 int main() {
-    int n = 0;
+    std::string s;
+    std::getline(std::cin, s);
+    std::vector<uint8_t> bytes(s.begin(), s.end());
+
+    std::vector<uint8_t> head = bytes;  // FILL: the first three bytes, copied
+    // ANSWER: std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3);
+    // FILL: append the last two bytes of bytes to head
+    // ANSWER: head.insert(head.end(), bytes.end() - 2, bytes.end());
+
+    for (uint8_t b : head) {
+        std::cout << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(b);
+    }
+    std::cout << '\n' << std::string(head.begin(), head.end()) << '\n';
+}
+'''
+solution    = '''
+#include <cstdint>
+#include <iomanip>
+#include <iostream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string s;
+    std::getline(std::cin, s);
+    std::vector<uint8_t> bytes(s.begin(), s.end());
+
+    std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3);
+    head.insert(head.end(), bytes.end() - 2, bytes.end());
+
+    for (uint8_t b : head) {
+        std::cout << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(b);
+    }
+    std::cout << '\n' << std::string(head.begin(), head.end()) << '\n';
+}
+'''
+hints = [
+  "std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3); — three bytes, a new vector.",
+  "head.insert(head.end(), bytes.end() - 2, bytes.end()); — the last two, appended.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sampan", stdin = "sampan\n", expect = "73616d616e\nsaman\n", visible = true },
+  { name = "gun", stdin = "gun\n", expect = "67756e756e\ngunun\n", visible = false },
+  { name = "winch", stdin = "winch\n", expect = "77696e6368\nwinch\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "cpp.basic.05.loops"
+node        = 11
+title       = "COUNTING THE SALUTE"
+difficulty  = 1
+story       = "The gun fires once for every day of the month and the plaque wants the running total, and which of the shots landed on a third day."
+concepts    = ["control-flow", "io"]
+requires    = ["cpp.basic.10.byte-slices"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''
+A counted loop in C++ is a `for` with three parts: where the counter
+starts, how long it keeps going, and how it moves. `for (long long i = 1;
+i <= n; ++i)` visits `1` through `n` inclusive. The body runs once per
+visit, and `%` is the remainder, so `i % 3 == 0` says "a multiple of 3".
+
+```
+for (long long i = 1; i <= n; ++i) {
+```
+
+The body is written: it adds `i` to `sum` and counts the multiples of 3.
+Type that `for` line at `// FILL`, replacing the placeholder one.
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+starter     = '''
+#include <iostream>
+
+int main() {
+    long long n = 0;
     std::cin >> n;
 
-    std::vector<std::pair<int, std::string>> moorings;
-    for (int i = 0; i < n; ++i) {
-        int berth = 0;
-        std::string name;
-        std::cin >> berth >> name;
-        moorings.emplace_back(berth, name);
+    long long sum = 0;
+    long long threes = 0;
+    for (long long i = 0; i < 0; ++i) {  // FILL: i from 1 to n, inclusive
+    // ANSWER: for (long long i = 1; i <= n; ++i) {
+        sum += i;
+        if (i % 3 == 0) ++threes;
     }
 
-    // a vector keeps duplicates and keeps arrival order — neither is wanted
-    for (const auto& m : moorings) {
-        std::cout << m.first << ' ' << m.second << '\n';
+    std::cout << sum << '\n';
+    std::cout << threes << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+
+int main() {
+    long long n = 0;
+    std::cin >> n;
+
+    long long sum = 0;
+    long long threes = 0;
+    for (long long i = 1; i <= n; ++i) {
+        sum += i;
+        if (i % 3 == 0) ++threes;
     }
-    std::cout << "DISTINCT " << moorings.size() << '\n';
-    std::cout << "DUPES 0\n";
+
+    std::cout << sum << '\n';
+    std::cout << threes << '\n';
+}
+'''
+hints = [
+  "for (long long i = 1; i <= n; ++i) { — start at 1, keep going while i <= n, step by one.",
+  "<= n, not < n: the salute counts n itself.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "ten", stdin = "10\n", expect = "55\n3\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "1\n0\n", visible = false },
+  { name = "nine", stdin = "9\n", expect = "45\n3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "cpp.basic.06.functions"
+node        = 12
+title       = "THE SLIPWAY TARIFF"
+difficulty  = 1
+story       = "The Yacht Club winch charges five a haul for the first ten hauls of the day and three after that, and the tariff board just says fare."
+concepts    = ["functions", "control-flow"]
+requires    = ["cpp.basic.05.loops"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''
+A function names a piece of work: its return type, its name, its
+parameters, and a body that ends in `return`. `long long fare(long long
+rides)` takes one number and gives one back. A function can `return` early
+from inside an `if`, and anything after that line is the other case.
+
+```
+if (rides <= 10) return rides * 5;
+return 50 + (rides - 10) * 3;
+```
+
+The tariff: the first 10 rides cost 5 each, every ride after that costs
+3. `main` reads `n` and prints `fare(n)`. Type those two lines as the body
+of `fare` at `// FILL`, replacing the `return 0;`.
+
+```
+input:  13
+output: 59
+```
+'''
+starter     = '''
+#include <iostream>
+
+long long fare(long long rides) {
+    // FILL: rides <= 10 cost 5 each; beyond that, 50 plus 3 per extra ride
+    // ANSWER: if (rides <= 10) return rides * 5;
+    // ANSWER: return 50 + (rides - 10) * 3;
+    return 0;
+}
+
+int main() {
+    long long n = 0;
+    std::cin >> n;
+    std::cout << fare(n) << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+
+long long fare(long long rides) {
+    if (rides <= 10) return rides * 5;
+    return 50 + (rides - 10) * 3;
+}
+
+int main() {
+    long long n = 0;
+    std::cin >> n;
+    std::cout << fare(n) << '\n';
+}
+'''
+hints = [
+  "if (rides <= 10) return rides * 5; — then, on the next line, return 50 + (rides - 10) * 3;",
+  "Ten rides at 5 is 50, and every ride past the tenth adds 3 on top of that.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "thirteen", stdin = "13\n", expect = "59\n", visible = true },
+  { name = "four", stdin = "4\n", expect = "20\n", visible = false },
+  { name = "ten", stdin = "10\n", expect = "50\n", visible = false },
+  { name = "zero", stdin = "0\n", expect = "0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "cpp.basic.07.structs"
+node        = 13
+title       = "ONE STALL, THREE FIELDS"
+difficulty  = 2
+story       = "The typhoon shelter's fish stall writes its name, its price and its count on three separate boards and nobody has put them on one."
+concepts    = ["structs", "functions"]
+requires    = ["cpp.basic.06.functions"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''
+A `struct` groups named fields into one value, and can carry member
+functions that work on those fields. Braces build one field by field, in
+the order the fields are declared: `Stall s{"fish", 12, 3};`. Inside a
+member function the fields are plain names.
+
+```
+return price * qty;
+Stall s{name, price, qty};
+```
+
+`Stall` has a name, a price and a quantity, and `main` prints
+`name: total`. Type those two lines at the two `// FILL` marks: the first
+is the body of `total()`, the second builds `s` in `main`.
+
+```
+input:  fish 12 3
+output: fish: 36
+```
+'''
+starter     = '''
+#include <iostream>
+#include <string>
+
+struct Stall {
+    std::string name;
+    long long price;
+    long long qty;
+    long long total() const {
+        return 0;  // FILL: price times qty
+        // ANSWER: return price * qty;
+    }
+};
+
+int main() {
+    std::string name;
+    long long price = 0, qty = 0;
+    std::cin >> name >> price >> qty;
+
+    Stall s{"", 0, 0};  // FILL: build s from name, price and qty
+    // ANSWER: Stall s{name, price, qty};
+
+    std::cout << s.name << ": " << s.total() << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <string>
+
+struct Stall {
+    std::string name;
+    long long price;
+    long long qty;
+    long long total() const {
+        return price * qty;
+    }
+};
+
+int main() {
+    std::string name;
+    long long price = 0, qty = 0;
+    std::cin >> name >> price >> qty;
+
+    Stall s{name, price, qty};
+
+    std::cout << s.name << ": " << s.total() << '\n';
+}
+'''
+hints = [
+  "return price * qty; inside total(), and Stall s{name, price, qty}; in main.",
+  "Brace initialisation fills the fields in declaration order: name, then price, then qty.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "fish", stdin = "fish 12 3\n", expect = "fish: 36\n", visible = true },
+  { name = "tofu", stdin = "tofu 5 20\n", expect = "tofu: 100\n", visible = false },
+  { name = "none", stdin = "ice 40 0\n", expect = "ice: 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "cpp.basic.08.enums"
+node        = 14
+title       = "THE LINE COLOURS"
+difficulty  = 2
+story       = "The interchange sign over the shelter's bus stop names three MTR lines and the strip of colour beside each one has been painted out."
+concepts    = ["enums", "pattern-matching"]
+requires    = ["cpp.basic.07.structs"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''
+An `enum class` is a closed set of named values: `Line::Island`,
+`Line::TsuenWan`, `Line::KwunTong`, and nothing else. A `switch` over one
+picks the branch for the value it holds, and each `case` names an
+enumerator with its type in front. The compiler warns when a case is
+missing, which is the point of a closed set.
+
+```
+case Line::TsuenWan: return "red";
+case Line::KwunTong: return "green";
+```
+
+`parse` turns the word into a `Line`, and the `Island` case is written.
+Type those two `case` lines at `// FILL`, under the `Island` one.
+
+```
+input:  island
+output: blue
+```
+'''
+starter     = '''
+#include <iostream>
+#include <string>
+
+enum class Line { Island, TsuenWan, KwunTong };
+
+Line parse(const std::string& w) {
+    if (w == "island") return Line::Island;
+    if (w == "tsuenwan") return Line::TsuenWan;
+    return Line::KwunTong;
+}
+
+const char* colour(Line l) {
+    switch (l) {
+        case Line::Island: return "blue";
+        // FILL: case Line::TsuenWan ... "red"
+        // ANSWER: case Line::TsuenWan: return "red";
+        // FILL: case Line::KwunTong ... "green"
+        // ANSWER: case Line::KwunTong: return "green";
+        default: return "";
+    }
+}
+
+int main() {
+    std::string word;
+    std::cin >> word;
+    std::cout << colour(parse(word)) << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <string>
+
+enum class Line { Island, TsuenWan, KwunTong };
+
+Line parse(const std::string& w) {
+    if (w == "island") return Line::Island;
+    if (w == "tsuenwan") return Line::TsuenWan;
+    return Line::KwunTong;
+}
+
+const char* colour(Line l) {
+    switch (l) {
+        case Line::Island: return "blue";
+        case Line::TsuenWan: return "red";
+        case Line::KwunTong: return "green";
+        default: return "";
+    }
+}
+
+int main() {
+    std::string word;
+    std::cin >> word;
+    std::cout << colour(parse(word)) << '\n';
+}
+'''
+hints = [
+  "case Line::TsuenWan: return \"red\"; and case Line::KwunTong: return \"green\"; — the same shape as the Island line.",
+  "An enum class enumerator is always written with its type in front: Line::TsuenWan, never TsuenWan alone.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "island", stdin = "island\n", expect = "blue\n", visible = true },
+  { name = "tsuenwan", stdin = "tsuenwan\n", expect = "red\n", visible = false },
+  { name = "kwuntong", stdin = "kwuntong\n", expect = "green\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "cpp.basic.09.vector"
+node        = 15
+title       = "THE CATCH, IN ORDER"
+difficulty  = 1
+story       = "Every sampan calls its catch across the water one number at a time and the harbour master has nowhere to put them until the last boat is in."
+concepts    = ["slices", "iteration"]
+requires    = ["cpp.basic.08.enums"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''
+`std::vector<long long>` is a growable array, and the four things you do
+to one are add, remove, edit and sort. `push_back(x)` appends at the end;
+`erase(v.begin() + i)` removes the element at index `i` and closes the
+gap; `v[i] = x` overwrites what is already there; `std::sort` from
+`<algorithm>` puts the whole thing in ascending order. Index `0` is the
+front.
+
+```
+xs.push_back(99);
+xs.erase(xs.begin());
+xs[0] = 700;
+std::sort(xs.begin(), xs.end());
+```
+
+`xs` holds the line's integers. Type those four lines at the four
+`// FILL` marks: add `99` at the end, remove the first element, set the
+new first element to `700`, then sort. The vector is printed, then its
+size.
+
+```
+input:  4 8 15 16
+output: 15 16 99 700
+        4
+```
+'''
+starter     = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <algorithm>
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) xs.push_back(x);
+
+    // FILL: add 99 at the end
+    // ANSWER: xs.push_back(99);
+    // FILL: remove the first element
+    // ANSWER: xs.erase(xs.begin());
+    // FILL: set the first element to 700
+    // ANSWER: xs[0] = 700;
+    // FILL: sort ascending
+    // ANSWER: std::sort(xs.begin(), xs.end());
+
+    for (size_t i = 0; i < xs.size(); ++i) {
+        std::cout << xs[i] << (i + 1 < xs.size() ? ' ' : '\n');
+    }
+    std::cout << xs.size() << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <algorithm>
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) xs.push_back(x);
+
+    xs.push_back(99);
+    xs.erase(xs.begin());
+    xs[0] = 700;
+    std::sort(xs.begin(), xs.end());
+
+    for (size_t i = 0; i < xs.size(); ++i) {
+        std::cout << xs[i] << (i + 1 < xs.size() ? ' ' : '\n');
+    }
+    std::cout << xs.size() << '\n';
+}
+'''
+hints = [
+  "xs.push_back(99); xs.erase(xs.begin()); xs[0] = 700; std::sort(xs.begin(), xs.end()); — add, remove, edit, sort.",
+  "erase and sort take iterators (xs.begin(), xs.end()); [] takes an index.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4 8 15 16\n", expect = "15 16 99 700\n4\n", visible = true },
+  { name = "one", stdin = "9\n", expect = "700\n1\n", visible = false },
+  { name = "negatives", stdin = "-2 5 -7\n", expect = "-7 99 700\n3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "cpp.basic.16.list"
+node        = 16
+title       = "FRONT OR BACK"
+difficulty  = 1
+story       = "Sampans with an even number tie up at the back of the shelter and odd ones at the front, and the mooring list just keeps adding to the back."
+concepts    = ["collections", "iteration"]
+requires    = ["cpp.basic.09.vector"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+`std::list` from `<list>` is a doubly linked list: adding or removing at
+either end is constant time, which a vector cannot do at the front.
+`push_front(x)` adds at the front, `pop_back()` removes the last element,
+`front()` is a reference — assign to it and the first element changes —
+and a list sorts itself with its own `sort()` member, because `std::sort`
+needs random access and a linked list has none.
+
+```
+l.push_front(0);
+l.pop_back();
+l.front() = 99;
+l.sort();
+```
+
+`l` already holds the line's integers in order. Type those four lines at
+the `// FILL` marks: add `0` at the front, remove the last element,
+overwrite the front with `99`, then sort. The list is printed.
+
+```
+input:  1 2 3 4 5
+output: 1 2 3 4 99
+```
+'''
+starter     = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <list>
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) xs.push_back(x);
+
+    std::list<long long> l;
+    for (long long v : xs) l.push_back(v);
+
+    // FILL: add 0 at the front
+    // ANSWER: l.push_front(0);
+    // FILL: remove the last element
+    // ANSWER: l.pop_back();
+    // FILL: overwrite the front with 99
+    // ANSWER: l.front() = 99;
+    // FILL: sort ascending
+    // ANSWER: l.sort();
+
+    bool first = true;
+    for (long long v : l) {
+        std::cout << (first ? "" : " ") << v;
+        first = false;
+    }
+    std::cout << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <list>
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) xs.push_back(x);
+
+    std::list<long long> l;
+    for (long long v : xs) l.push_back(v);
+
+    l.push_front(0);
+    l.pop_back();
+    l.front() = 99;
+    l.sort();
+
+    bool first = true;
+    for (long long v : l) {
+        std::cout << (first ? "" : " ") << v;
+        first = false;
+    }
+    std::cout << '\n';
+}
+'''
+hints = [
+  "l.push_front(0); l.pop_back(); l.front() = 99; l.sort(); — one line each, in that order.",
+  "std::sort cannot sort a std::list (no random access); the list's own l.sort() can.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "1 2 3 4 5\n", expect = "1 2 3 4 99\n", visible = true },
+  { name = "two", stdin = "2 4\n", expect = "2 99\n", visible = false },
+  { name = "three", stdin = "7 8 9\n", expect = "7 8 99\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "cpp.basic.10.maps"
+node        = 17
+title       = "THE TALLY BOARD"
+difficulty  = 2
+story       = "The shelter's tally board lists every fish the fleet landed, one word per fish, and the buyer wants one line per kind with a count."
+concepts    = ["collections", "strings"]
+requires    = ["cpp.basic.16.list"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+`std::map<std::string, int>` is a dictionary kept in key order. `m[k] = v`
+adds a key (or overwrites one that exists); `erase(k)` removes a key and
+does nothing when it is absent; `at(k)` is the entry for a key that must
+already exist — assign to it to edit, and it throws rather than inventing
+a key. Walking the map visits the keys sorted — a `std::map` is always in
+key order, so there is no sort line here.
+
+```
+counts["crab"] = 1;
+counts.erase("rice");
+counts.at("fish") = 9;
+```
+
+`counts` already tallies every word on the line, and every line has
+`fish` on it. Type those three lines at the `// FILL` marks: add `crab`
+at `1`, remove `rice`, then set `fish` to `9`. The sorted print is written.
+
+```
+input:  fish rice fish tea
+output: crab 1
+        fish 9
+        tea 1
+```
+'''
+starter     = '''
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::map<std::string, int> counts;
+    std::string w;
+    while (in >> w) ++counts[w];
+
+    // FILL: add the key "crab" with the value 1
+    // ANSWER: counts["crab"] = 1;
+    // FILL: remove the key "rice"
+    // ANSWER: counts.erase("rice");
+    // FILL: set the existing key "fish" to 9
+    // ANSWER: counts.at("fish") = 9;
+
+    for (const auto& [word, n] : counts) {
+        std::cout << word << ' ' << n << '\n';
+    }
+}
+'''
+solution    = '''
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::map<std::string, int> counts;
+    std::string w;
+    while (in >> w) ++counts[w];
+
+    counts["crab"] = 1;
+    counts.erase("rice");
+    counts.at("fish") = 9;
+
+    for (const auto& [word, n] : counts) {
+        std::cout << word << ' ' << n << '\n';
+    }
+}
+'''
+hints = [
+  "counts[\"crab\"] = 1; counts.erase(\"rice\"); counts.at(\"fish\") = 9; — add, remove, edit.",
+  "[] creates a missing key; at() refuses to. Use at() when the key must already be there.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "fish rice fish tea\n", expect = "crab 1\nfish 9\ntea 1\n", visible = true },
+  { name = "one", stdin = "fish\n", expect = "crab 1\nfish 9\n", visible = false },
+  { name = "rice", stdin = "rice fish rice\n", expect = "crab 1\nfish 9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "cpp.basic.18.hashtable"
+node        = 18
+title       = "THE UNORDERED TALLY"
+difficulty  = 1
+story       = "The pass counts every dish on a hash table and then reads it back in whatever order the buckets happen to be, and no two prints agree."
+concepts    = ["collections", "hashing", "sorting"]
+requires    = ["cpp.basic.10.maps"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''
+`std::unordered_map` is the hash table: the same `[]`, `erase` and `at` as
+`std::map`, faster on average, and in **no particular order** when walked
+— which is why the keys are sorted before printing. `count(k)` or `find(k)`
+asks whether a key is there without creating it.
+
+```
+counts["gun"] = 12;
+counts.erase("siu");
+counts.at("mai") = 0;
+std::sort(keys.begin(), keys.end());
+```
+
+`counts` already tallies every word on the line, and every line has `mai`
+on it; `keys` is a vector of its keys, copied out in whatever order the
+buckets gave. Type those four lines at the `// FILL` marks: add `gun` at
+`12`, remove `siu`, set `mai` to `0`, then sort the keys so the print is
+the same every time.
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        gun 12
+        har 1
+        mai 0
+```
+'''
+starter     = '''
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::unordered_map<std::string, int> counts;
+    std::string w;
+    while (in >> w) ++counts[w];
+
+    // FILL: add the key "gun" with the value 12
+    // ANSWER: counts["gun"] = 12;
+    // FILL: remove the key "siu"
+    // ANSWER: counts.erase("siu");
+    // FILL: set the existing key "mai" to 0
+    // ANSWER: counts.at("mai") = 0;
+
+    std::vector<std::string> keys;
+    for (const auto& kv : counts) keys.push_back(kv.first);
+    // FILL: sort keys, because a hash table has no order
+    // ANSWER: std::sort(keys.begin(), keys.end());
+    for (const std::string& k : keys) std::cout << k << ' ' << counts[k] << '\n';
+}
+'''
+solution    = '''
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::unordered_map<std::string, int> counts;
+    std::string w;
+    while (in >> w) ++counts[w];
+
+    counts["gun"] = 12;
+    counts.erase("siu");
+    counts.at("mai") = 0;
+
+    std::vector<std::string> keys;
+    for (const auto& kv : counts) keys.push_back(kv.first);
+    std::sort(keys.begin(), keys.end());
+    for (const std::string& k : keys) std::cout << k << ' ' << counts[k] << '\n';
+}
+'''
+hints = [
+  "counts[\"gun\"] = 12; counts.erase(\"siu\"); counts.at(\"mai\") = 0; then std::sort(keys.begin(), keys.end()); — add, remove, edit, sort.",
+  "The table has no order of its own: the keys are copied out for you; sorting them is the fourth line, before the print.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "dim-sum", stdin = "siu mai har gau siu mai\n", expect = "gau 1\ngun 12\nhar 1\nmai 0\n", visible = true },
+  { name = "one", stdin = "mai\n", expect = "gun 12\nmai 0\n", visible = false },
+  { name = "repeat", stdin = "a mai a\n", expect = "a 2\ngun 12\nmai 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "cpp.basic.11.sets"
+node        = 19
+title       = "THE MOORING NUMBERS"
+difficulty  = 2
+story       = "The mooring list has a sampan's number on it once for every time it came in, and the harbour master wants to know how many boats that actually is."
+concepts    = ["collections", "sorting"]
+requires    = ["cpp.basic.18.hashtable"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''
+`std::set<long long>` keeps each value once, in ascending order.
+`insert(x)` adds a value (a duplicate is ignored) and `erase(x)` removes
+one (a missing value is ignored). A set has no edit: a value is its own
+key, so changing `1` into `-1` is an erase followed by an insert. And it
+has no sort line: a `std::set` is always in ascending order.
+
+```
+seen.insert(100);
+seen.erase(3);
+seen.erase(1); seen.insert(-1);
+```
+
+`seen` already holds the line's distinct values. Type those three lines at
+the `// FILL` marks: add `100`, remove `3`, then turn `1` into `-1`. The
+size and the sorted walk are written.
+
+```
+input:  3 1 3 2 1
+output: 3
+        -1 2 100
+```
+'''
+starter     = '''
+#include <iostream>
+#include <set>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::set<long long> seen;
+    long long x = 0;
+    while (in >> x) seen.insert(x);
+
+    // FILL: add 100
+    // ANSWER: seen.insert(100);
+    // FILL: remove 3
+    // ANSWER: seen.erase(3);
+    // FILL: turn 1 into -1 (erase, then insert)
+    // ANSWER: seen.erase(1); seen.insert(-1);
+
+    std::cout << seen.size() << '\n';
+    bool first = true;
+    for (long long v : seen) {
+        std::cout << (first ? "" : " ") << v;
+        first = false;
+    }
+    std::cout << '\n';
 }
 '''
 solution    = '''
 #include <iostream>
 #include <set>
+#include <sstream>
 #include <string>
-#include <utility>
 
 int main() {
-    int n = 0;
-    std::cin >> n;
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::set<long long> seen;
+    long long x = 0;
+    while (in >> x) seen.insert(x);
 
-    std::set<std::pair<int, std::string>> moorings;
-    for (int i = 0; i < n; ++i) {
-        int berth = 0;
-        std::string name;
-        std::cin >> berth >> name;
-        moorings.emplace(berth, name);
-    }
+    seen.insert(100);
+    seen.erase(3);
+    seen.erase(1); seen.insert(-1);
 
-    for (const auto& [berth, name] : moorings) {
-        std::cout << berth << ' ' << name << '\n';
+    std::cout << seen.size() << '\n';
+    bool first = true;
+    for (long long v : seen) {
+        std::cout << (first ? "" : " ") << v;
+        first = false;
     }
-    std::cout << "DISTINCT " << moorings.size() << '\n';
-    std::cout << "DUPES " << n - static_cast<int>(moorings.size()) << '\n';
+    std::cout << '\n';
 }
 '''
 hints = [
-  "Change the container: std::set<std::pair<int, std::string>>. Inserting a duplicate is not an error, it is a no-op.",
-  "A set is sorted by its element type's operator<, and std::pair compares first then second — which is the berth-then-name order the output wants.",
-  "for (const auto& [berth, name] : moorings) unpacks each pair into two names; n minus the set's size is the duplicate count.",
+  "seen.insert(100); seen.erase(3); seen.erase(1); seen.insert(-1); — the last two calls share a line.",
+  "erase(3) on a set without a 3 does nothing, and insert(-1) when -1 is already there does nothing: both are safe.",
 ]
 
 [quest.tests]
@@ -1179,121 +1720,122 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "four",   stdin = "4\n2 KWAN\n1 LEE\n2 KWAN\n1 HO\n", expect = "1 HO\n1 LEE\n2 KWAN\nDISTINCT 3\nDUPES 1\n", visible = true },
-  { name = "same",   stdin = "3\n5 A\n5 A\n5 A\n",               expect = "5 A\nDISTINCT 1\nDUPES 2\n",                 visible = false },
-  { name = "none",   stdin = "0\n",                              expect = "DISTINCT 0\nDUPES 0\n",                      visible = false },
-  { name = "berths", stdin = "3\n9 Z\n1 Z\n9 A\n",               expect = "1 Z\n9 A\n9 Z\nDISTINCT 3\nDUPES 0\n",       visible = false },
+  { name = "five", stdin = "3 1 3 2 1\n", expect = "3\n-1 2 100\n", visible = true },
+  { name = "all-same", stdin = "7 7 7\n", expect = "3\n-1 7 100\n", visible = false },
+  { name = "spread", stdin = "10 -1 4 10\n", expect = "4\n-1 4 10 100\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 11
+# ---------------------------------------------------------------- 20
 [[quest]]
-id          = "cpp.basic.11.algorithms"
-node        = 12
-title       = "ONE PASS DOWN THE SLIPWAY"
-difficulty  = 4
-story       = "The winch log is a column of loads. Alex says three for loops. Mei says the standard library already wrote them."
-concepts    = ["iteration", "closures", "sorting"]
-requires    = ["cpp.basic.10.set-and-pair"]
-map          = { x = 0.222, y = 0.514, kind = "quest" }
+id          = "cpp.basic.12.stack-queue"
+node        = 20
+title       = "LAST IN, FIRST IN"
+difficulty  = 2
+story       = "Sampans raft up at the shelter wall in the order they arrive: the last one in is the first that can leave, and the first one in is the first the buyer serves."
+concepts    = ["stacks-queues", "collections"]
+requires    = ["cpp.basic.11.sets"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
 brief       = '''
-Standard input is one line of integers separated by spaces.
-
-Print four lines:
-
-1. the sum of the even values (`0` if there are none)
-2. every value greater than `10`, doubled, in order, joined by single spaces —
-   or `-` if there are none
-3. how many distinct values there are
-4. `FIRST_BIG <i>` — the 0-based index of the first value greater than `10`,
-   or `-1`
+`std::stack` is last in, first out: `push(x)` adds on top, `pop()` removes
+the top (and returns nothing), and `top()` is a reference to it — assign
+to it to edit the top in place. `std::queue` has the same shape at the
+other end: `push` at the back, `front()` and `pop()` at the front.
 
 ```
-input:  1 2 3 4 12 12 30
-output: 60
-        24 24 60
-        6
-        FIRST_BIG 4
+st.push(0);
+st.pop();
+st.top() = 99;
 ```
 
-Use `<algorithm>` and `<numeric>`, not index loops: `std::accumulate` with a
-lambda for line one, `std::copy_if` and `std::transform` for line two,
-`std::sort` then `std::unique` for line three, `std::find_if` for line four.
-Every one of them takes an iterator pair and, where it needs a decision, a
-lambda. The point is not that the loop is hard to write; it is that the name
-says what the loop is for.
+Every number is already pushed onto both `st` and `q`. Type those three
+lines at the `// FILL` marks: add `0` on top, pop it off again, then
+overwrite the top with `99`. The stack is then drained and printed, and
+the queue's first two are taken.
+
+```
+input:  1 2 3 4
+output: 99 3 2 1
+        1 2
+```
 '''
 starter     = '''
-#include <algorithm>
 #include <iostream>
-#include <numeric>
-#include <vector>
+#include <queue>
+#include <sstream>
+#include <stack>
+#include <string>
 
 int main() {
-    std::vector<long long> nums;
-    long long v = 0;
-    while (std::cin >> v) {
-        nums.push_back(v);
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::stack<long long> st;
+    std::queue<long long> q;
+    long long x = 0;
+    while (in >> x) {
+        st.push(x);
+        q.push(x);
     }
 
-    // 1. accumulate the even ones
-    // 2. copy_if the ones over 10, transform them doubled, print or "-"
-    // 3. sort + unique for the distinct count
-    // 4. find_if for the first over 10
-    (void)nums;
-    std::cout << "0\n-\n0\nFIRST_BIG -1\n";
+    // FILL: push 0 on top
+    // ANSWER: st.push(0);
+    // FILL: pop the top
+    // ANSWER: st.pop();
+    // FILL: overwrite the top with 99
+    // ANSWER: st.top() = 99;
+
+    bool first = true;
+    while (!st.empty()) {
+        std::cout << (first ? "" : " ") << st.top();
+        first = false;
+        st.pop();
+    }
+    std::cout << '\n';
+
+    std::cout << q.front() << ' ';
+    q.pop();
+    std::cout << q.front() << '\n';
 }
 '''
 solution    = '''
-#include <algorithm>
 #include <iostream>
-#include <iterator>
-#include <numeric>
-#include <vector>
+#include <queue>
+#include <sstream>
+#include <stack>
+#include <string>
 
 int main() {
-    std::vector<long long> nums;
-    long long v = 0;
-    while (std::cin >> v) {
-        nums.push_back(v);
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::stack<long long> st;
+    std::queue<long long> q;
+    long long x = 0;
+    while (in >> x) {
+        st.push(x);
+        q.push(x);
     }
 
-    // 1. the lambda is the "add this one only if" rule
-    long long even_sum = std::accumulate(nums.begin(), nums.end(), 0LL,
-        [](long long acc, long long x) { return x % 2 == 0 ? acc + x : acc; });
-    std::cout << even_sum << '\n';
+    st.push(0);
+    st.pop();
+    st.top() = 99;
 
-    // 2. select, then map
-    std::vector<long long> big;
-    std::copy_if(nums.begin(), nums.end(), std::back_inserter(big),
-        [](long long x) { return x > 10; });
-    std::transform(big.begin(), big.end(), big.begin(),
-        [](long long x) { return x * 2; });
-    if (big.empty()) {
-        std::cout << "-\n";
-    } else {
-        for (std::size_t i = 0; i < big.size(); ++i) {
-            std::cout << (i ? " " : "") << big[i];
-        }
-        std::cout << '\n';
+    bool first = true;
+    while (!st.empty()) {
+        std::cout << (first ? "" : " ") << st.top();
+        first = false;
+        st.pop();
     }
+    std::cout << '\n';
 
-    // 3. unique only removes adjacent duplicates, so sort first
-    std::vector<long long> sorted = nums;
-    std::sort(sorted.begin(), sorted.end());
-    auto last = std::unique(sorted.begin(), sorted.end());
-    std::cout << last - sorted.begin() << '\n';
-
-    // 4. find_if returns end() when nothing matches
-    auto hit = std::find_if(nums.begin(), nums.end(),
-        [](long long x) { return x > 10; });
-    std::cout << "FIRST_BIG " << (hit == nums.end() ? -1 : hit - nums.begin()) << '\n';
+    std::cout << q.front() << ' ';
+    q.pop();
+    std::cout << q.front() << '\n';
 }
 '''
 hints = [
-  "accumulate's fourth argument is a binary function (acc, x) -> acc; make it add x only when x is even.",
-  "copy_if needs somewhere to write — std::back_inserter(big) grows the vector as it goes. transform can write back over the same range.",
-  "std::unique moves the duplicates to the end and returns an iterator to where they start; the distance from begin() is the distinct count. It only sees adjacent duplicates, so sort a copy first.",
-  "find_if hands back end() on a miss, and iterator minus begin() is the index on a hit.",
+  "st.push(0); st.pop(); st.top() = 99; — add, remove, edit on the stack; the queue is untouched.",
+  "top() is a reference, so st.top() = 99 changes the element that pop() would remove next.",
 ]
 
 [quest.tests]
@@ -1303,151 +1845,200 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "mixed",     stdin = "1 2 3 4 12 12 30\n", expect = "60\n24 24 60\n6\nFIRST_BIG 4\n", visible = true },
-  { name = "no-big",    stdin = "1 3 5\n",            expect = "0\n-\n3\nFIRST_BIG -1\n",        visible = false },
-  { name = "negatives", stdin = "-4 -2 0 11\n",       expect = "-6\n22\n4\nFIRST_BIG 3\n",       visible = false },
+  { name = "four", stdin = "1 2 3 4\n", expect = "99 3 2 1\n1 2\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "99 9\n9 7\n", visible = false },
+  { name = "five", stdin = "5 1 4 1 3\n", expect = "99 1 4 1 5\n5 1\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 12
+# ---------------------------------------------------------------- 21
 [[quest]]
-id          = "cpp.basic.12.templates"
-node        = 13
-title       = "WRITE IT ONCE"
-difficulty  = 3
-story       = "The pump room's gauge board has largest written four times — for litres, for minutes, for pumps and for pump names — and the fifth is due before the tide turns."
-concepts    = ["generics", "types", "mutability"]
-requires    = ["cpp.basic.11.algorithms"]
-map          = { x = 0.116, y = 0.476, kind = "quest" }
+id          = "cpp.basic.13.sorting"
+node        = 21
+title       = "DEPTH ORDER"
+difficulty  = 1
+story       = "The soundings along the shelter wall were written down in the order the boat took them, and the chart wants them shallow to deep and then deep to shallow."
+concepts    = ["sorting", "slices"]
+requires    = ["cpp.basic.12.stack-queue"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
 brief       = '''
-Standard input is two lines: integers on the first, words on the second.
-
-Write **one** `largest` that works on both, and a class template `Pair<T>`
-with `larger()` and `smaller()`.
-
-Print the largest integer, the largest word, then
-`PAIR <larger> <smaller>` for a `Pair` of the first two integers. A tie counts
-as `a` being the larger.
+`std::sort` from `<algorithm>` orders a range in place. Given the two
+ends of a vector it sorts ascending; given a comparator as a third argument
+it sorts by that instead, and `std::greater<>{}` is "larger first".
 
 ```
-input:  4 8 15 16
-        tram bus mtr
-output: 16
-        tram
-        PAIR 8 4
+std::sort(v.begin(), v.end());
+std::sort(v.begin(), v.end(), std::greater<>{});
 ```
 
-The starter does not compile: `largest` is nailed to `long long`, so passing
-it the words is *no matching function*. A **function template**,
-`template <typename T> T largest(const std::vector<T>& xs)`, is stamped out
-once per type it is called with — `T` is deduced from the argument, and the
-only thing the body demands of `T` is that `>` works on it.
+The numbers are read into `v` and printed twice. Type the first line at
+the first `// FILL` and the second at the second.
 
-`Pair<T>` is the same idea for a class. Its methods are `const`, because they
-read and do not write, and they return `const T&` rather than a copy, because
-the caller only wants to look. Both signatures say what they promise, and the
-compiler holds them to it.
+```
+input:  3 1 2
+output: 1 2 3
+        3 2 1
+```
 '''
 starter     = '''
+#include <algorithm>
+#include <functional>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
 
-long long largest(const std::vector<long long>& xs) {
-    long long best = xs[0];
-    for (long long x : xs) {
-        if (x > best) {
-            best = x;
-        }
-    }
-    return best;
+void print(const std::vector<long long>& v) {
+    for (long long x : v) std::cout << x << ' ';
+    std::cout << '\n';
 }
-
-// Pair<T> goes here, with larger() and smaller()
 
 int main() {
     std::string line;
     std::getline(std::cin, line);
-    std::istringstream ints(line);
-    std::vector<long long> nums;
-    long long v = 0;
-    while (ints >> v) {
-        nums.push_back(v);
-    }
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
 
-    std::getline(std::cin, line);
-    std::istringstream text(line);
-    std::vector<std::string> words;
-    std::string w;
-    while (text >> w) {
-        words.push_back(w);
-    }
-
-    std::cout << largest(nums) << '\n';
-    std::cout << largest(words) << '\n';
-    std::cout << "PAIR " << nums[0] << ' ' << nums[1] << '\n';
+    // FILL: sort v ascending
+    // ANSWER: std::sort(v.begin(), v.end());
+    print(v);
+    // FILL: sort v descending
+    // ANSWER: std::sort(v.begin(), v.end(), std::greater<>{});
+    print(v);
 }
 '''
 solution    = '''
+#include <algorithm>
+#include <functional>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
 
-// one definition, instantiated once per T it is used with
-template <typename T>
-T largest(const std::vector<T>& xs) {
-    T best = xs[0];
-    for (const T& x : xs) {
-        if (x > best) {
-            best = x;
-        }
-    }
-    return best;
+void print(const std::vector<long long>& v) {
+    for (long long x : v) std::cout << x << ' ';
+    std::cout << '\n';
 }
-
-template <typename T>
-class Pair {
-public:
-    Pair(T a, T b) : a_(std::move(a)), b_(std::move(b)) {}
-
-    const T& larger() const { return a_ >= b_ ? a_ : b_; }
-    const T& smaller() const { return a_ >= b_ ? b_ : a_; }
-
-private:
-    T a_;
-    T b_;
-};
 
 int main() {
     std::string line;
     std::getline(std::cin, line);
-    std::istringstream ints(line);
-    std::vector<long long> nums;
-    long long v = 0;
-    while (ints >> v) {
-        nums.push_back(v);
-    }
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
 
+    std::sort(v.begin(), v.end());
+    print(v);
+    std::sort(v.begin(), v.end(), std::greater<>{});
+    print(v);
+}
+'''
+hints = [
+  "std::sort(v.begin(), v.end()); then std::sort(v.begin(), v.end(), std::greater<>{});",
+  "std::sort takes a range, not a container: begin() and end().",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3 1 2\n", expect = "1 2 3\n3 2 1\n", visible = true },
+  { name = "five", stdin = "5 -1 4 0 2\n", expect = "-1 0 2 4 5\n5 4 2 0 -1\n", visible = false },
+  { name = "ties", stdin = "2 2 1\n", expect = "1 2 2\n2 2 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "cpp.basic.22.reverse"
+node        = 22
+title       = "BACK TO FRONT"
+difficulty  = 1
+story       = "The last sampan in should be the first out and the slipway board reads the queue the way it was written, and the winch name on the stern is the wrong way round too."
+concepts    = ["slices", "strings", "iteration"]
+requires    = ["cpp.basic.13.sorting"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''
+`std::reverse(first, last)` from `<algorithm>` turns a range round in
+place, on any container. A string is turned round the other way this road
+has already used: build a new one from `rbegin()` to `rend()`.
+
+```
+std::reverse(v.begin(), v.end());
+std::string r(s.rbegin(), s.rend());
+```
+
+`v` holds the first line's integers and `s` the second line. Type those
+two lines at `// FILL`, replacing the placeholder `r`.
+
+```
+input:  1 2 3
+        gun
+output: 3 2 1
+        nug
+```
+'''
+starter     = '''
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
     std::getline(std::cin, line);
-    std::istringstream text(line);
-    std::vector<std::string> words;
-    std::string w;
-    while (text >> w) {
-        words.push_back(w);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+    std::string s;
+    std::getline(std::cin, s);
+
+    // FILL: reverse v in place
+    // ANSWER: std::reverse(v.begin(), v.end());
+    std::string r = s;  // FILL: build r from s's rbegin() and rend() instead
+    // ANSWER: std::string r(s.rbegin(), s.rend());
+
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << v[i] << (i + 1 < v.size() ? ' ' : '\n');
     }
+    std::cout << r << '\n';
+}
+'''
+solution    = '''
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
 
-    std::cout << largest(nums) << '\n';
-    std::cout << largest(words) << '\n';
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+    std::string s;
+    std::getline(std::cin, s);
 
-    Pair<long long> pair(nums[0], nums[1]);
-    std::cout << "PAIR " << pair.larger() << ' ' << pair.smaller() << '\n';
+    std::reverse(v.begin(), v.end());
+    std::string r(s.rbegin(), s.rend());
+
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << v[i] << (i + 1 < v.size() ? ' ' : '\n');
+    }
+    std::cout << r << '\n';
 }
 '''
 hints = [
-  "template <typename T> in front of largest, and T in place of long long everywhere inside it. The calls do not change; T is deduced.",
-  "std::string already has operator>, so the same template body compiles for the words with nothing added.",
-  "Pair<T> is a class template; you name the type at the point of use — Pair<long long> — and the methods are const because they only compare.",
+  "std::reverse(v.begin(), v.end()); — in place; nothing is returned.",
+  "std::string r(s.rbegin(), s.rend()); — reverse iterators build the reversed copy.",
 ]
 
 [quest.tests]
@@ -1457,51 +2048,45 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "mixed",     stdin = "4 8 15 16\ntram bus mtr\n", expect = "16\ntram\nPAIR 8 4\n",   visible = true },
-  { name = "negatives", stdin = "-3 -9\nz a\n",              expect = "-3\nz\nPAIR -3 -9\n",    visible = false },
-  { name = "tie",       stdin = "5 5 1\nhku hku\n",          expect = "5\nhku\nPAIR 5 5\n",     visible = false },
+  { name = "three-gun", stdin = "1 2 3\ngun\n", expect = "3 2 1\nnug\n", visible = true },
+  { name = "one-sampan", stdin = "5\nsampan\n", expect = "5\nnapmas\n", visible = false },
+  { name = "four-winch", stdin = "4 8 15 16\nwinch\n", expect = "16 15 8 4\nhcniw\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 13
+# ---------------------------------------------------------------- 23
 [[quest]]
-id          = "cpp.basic.13.lambdas"
-node        = 14
-title       = "THE DOOR COUNT"
+id          = "cpp.basic.14.sort-by-key"
+node        = 23
+title       = "THE LEADERBOARD"
 difficulty  = 3
-story       = "The Yacht Club turnstile counts who walks in and who walks out, and the manager wants the number at closing whatever happened in between."
-concepts    = ["closures", "functions", "control-flow"]
-requires    = ["cpp.basic.12.templates"]
-map          = { x = 0.045, y = 0.931, kind = "quest" }
+story       = "The Yacht Club's race board lists every boat with its points, in the order they signed on, and the commodore wants first place at the top."
+concepts    = ["sorting", "structs"]
+requires    = ["cpp.basic.22.reverse"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` lines, each `IN` or `OUT`.
-
-Keep a running count that never drops below zero and print it after every
-command. Then print `INS <k>` — how many commands were `IN`, counted with
-`std::count_if` and a lambda — and `CLOSED <final>`.
+`std::sort` takes a comparator: a function of two elements that says
+whether the first belongs before the second. A lambda written in place is
+the usual comparator, and "by score descending, then by name ascending" is
+one expression: when the scores differ, the higher goes first; when they
+tie, the smaller name goes first.
 
 ```
-input:  4
-        IN
-        IN
-        OUT
-        IN
-output: 1
-        2
-        1
-        2
-        INS 3
-        CLOSED 2
+std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) {
+    return a.score != b.score ? a.score > b.score : a.name < b.name;
+});
 ```
 
-The counter is a closure: `make_counter` returns a lambda that owns its own
-total. A lambda captures by copy by default, and a copy is `const` inside the
-body — `mutable` after the parameter list is what lets the captured total
-change between calls. An **init-capture**, `[total = 0LL]`, declares the
-captured variable right there in the brackets rather than in the enclosing
-scope, so there is nothing outside the lambda for anyone else to touch.
+The rows are read and printed. Type that `std::sort` at `// FILL`.
 
-The other capture, `[&]`, takes everything by reference. Both are written in
-this quest; knowing which one you meant is what an interviewer listens for.
+```
+input:  3
+        mei 40
+        alex 55
+        sam 40
+output: alex 55
+        mei 40
+        sam 40
+```
 '''
 starter     = '''
 #include <algorithm>
@@ -1509,32 +2094,21 @@ starter     = '''
 #include <string>
 #include <vector>
 
-auto make_counter() {
-    // return a lambda that keeps a total between calls, clamped at zero
-    return [](long long delta) {
-        (void)delta;
-        return 0LL;
-    };
-}
+struct Row {
+    std::string name;
+    long long score;
+};
 
 int main() {
     int n = 0;
     std::cin >> n;
-    std::vector<std::string> commands(n);
-    for (std::string& c : commands) {
-        std::cin >> c;
-    }
+    std::vector<Row> rs(n);
+    for (auto& r : rs) std::cin >> r.name >> r.score;
 
-    auto count = make_counter();
-    long long last = 0;
-    for (const std::string& c : commands) {
-        last = count(c == "IN" ? 1 : -1);
-        std::cout << last << '\n';
-    }
+    // FILL: sort rs by score descending, then name ascending
+    // ANSWER: std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) { return a.score != b.score ? a.score > b.score : a.name < b.name; });
 
-    // INS via std::count_if with a lambda
-    std::cout << "INS 0\n";
-    std::cout << "CLOSED " << last << '\n';
+    for (const auto& r : rs) std::cout << r.name << ' ' << r.score << '\n';
 }
 '''
 solution    = '''
@@ -1543,45 +2117,25 @@ solution    = '''
 #include <string>
 #include <vector>
 
-auto make_counter() {
-    // total lives inside the closure object; mutable lets each call change it
-    return [total = 0LL](long long delta) mutable {
-        total += delta;
-        if (total < 0) {
-            total = 0;
-        }
-        return total;
-    };
-}
+struct Row {
+    std::string name;
+    long long score;
+};
 
 int main() {
     int n = 0;
     std::cin >> n;
-    std::vector<std::string> commands(n);
-    for (std::string& c : commands) {
-        std::cin >> c;
-    }
+    std::vector<Row> rs(n);
+    for (auto& r : rs) std::cin >> r.name >> r.score;
 
-    auto count = make_counter();
-    long long last = 0;
-    for (const std::string& c : commands) {
-        last = count(c == "IN" ? 1 : -1);
-        std::cout << last << '\n';
-    }
+    std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) { return a.score != b.score ? a.score > b.score : a.name < b.name; });
 
-    const std::string in = "IN";
-    // [&] captures `in` by reference; the lambda reads it and owns nothing
-    long long ins = std::count_if(commands.begin(), commands.end(),
-        [&](const std::string& c) { return c == in; });
-
-    std::cout << "INS " << ins << '\n';
-    std::cout << "CLOSED " << last << '\n';
+    for (const auto& r : rs) std::cout << r.name << ' ' << r.score << '\n';
 }
 '''
 hints = [
-  "[total = 0LL](long long delta) mutable { ... } — the init-capture declares total, and mutable is what lets the body assign to it.",
-  "Without mutable the body is a const member function of the closure type, and total += delta is a compile error, not a silent no-op.",
-  "std::count_if(begin, end, predicate) returns how many elements the predicate accepted; the predicate is a lambda taking one command.",
+  "std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) { return a.score != b.score ? a.score > b.score : a.name < b.name; });",
+  "The comparator answers \"does a go before b\": higher score first, and on a tie the smaller name.",
 ]
 
 [quest.tests]
@@ -1591,533 +2145,90 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "in-out", stdin = "4\nIN\nIN\nOUT\nIN\n", expect = "1\n2\n1\n2\nINS 3\nCLOSED 2\n", visible = true },
-  { name = "floor",  stdin = "2\nOUT\nOUT\n",        expect = "0\n0\nINS 0\nCLOSED 0\n",       visible = false },
-  { name = "one",    stdin = "1\nIN\n",              expect = "1\nINS 1\nCLOSED 1\n",          visible = false },
+  { name = "three", stdin = "3\nmei 40\nalex 55\nsam 40\n", expect = "alex 55\nmei 40\nsam 40\n", visible = true },
+  { name = "one", stdin = "1\nyu 9\n", expect = "yu 9\n", visible = false },
+  { name = "ties", stdin = "4\nd 1\nb 2\nc 2\na 1\n", expect = "b 2\nc 2\na 1\nd 1\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 14
+# ---------------------------------------------------------------- 24
 [[quest]]
-id          = "cpp.basic.14.optional-variant"
-node        = 15
-title       = "THE LINE THAT IS NOT A NUMBER"
-difficulty  = 3
-story       = "The pump room's meter reader hands in a column of numbers with somebody's lunch order in the middle of it."
-concepts    = ["error-handling", "pattern-matching", "types"]
-requires    = ["cpp.basic.13.lambdas"]
-map          = { x = 0.287, y = 0.854, kind = "quest" }
+id          = "cpp.basic.15.closures"
+node        = 24
+title       = "THE TIDE OFFSET"
+difficulty  = 2
+story       = "Every sounding on the chart was taken at low water and the harbour master wants them all corrected by today's tide, which he read off the gauge once."
+concepts    = ["closures", "functions"]
+requires    = ["cpp.basic.14.sort-by-key"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
 brief       = '''
-Standard input is a count `n`, then `n` lines. Each line is supposed to be an
-integer.
-
-For each line print either the value doubled, or `BAD <line>` if it does not
-parse. Finally print `SUM <total>`, where the total is the sum of the values
-you printed.
+A lambda is a function written in place: `[capture](params) { body }`.
+The capture list is what it can see from the surrounding scope — `[k]`
+copies `k` in, and the lambda keeps that copy for as long as it lives.
+`auto` names it, and calling it is `add(x)`.
 
 ```
-input:  3
-        21
-        xx
-        -4
-output: 42
-        BAD xx
-        -8
-        SUM 34
+auto add = [k](long long v) { return v + k; };
 ```
 
-Two types carry the answer. `std::optional<long long> parse(const std::string&)`
-is *a number or nothing*, and `std::from_chars` fills it in: it returns an
-error code instead of throwing, and it tells you where it stopped, so `4x` can
-be rejected as well as `xx`.
-
-`std::variant<long long, std::string> doubled(const std::string&)` is *either
-the doubled value or the line that failed* — one of exactly two types, never
-both, never neither. `std::get_if<long long>(&result)` gives you a pointer to
-the number if that is what is in there and `nullptr` if it is not, which is
-the two-way branch `main` needs. No exceptions anywhere in this program; the
-failure is a value, and it goes where values go.
-'''
-starter     = '''
-#include <charconv>
-#include <iostream>
-#include <optional>
-#include <string>
-#include <variant>
-
-std::optional<long long> parse(const std::string& text) {
-    (void)text;
-    // std::from_chars over the whole string, or std::nullopt
-    return std::nullopt;
-}
-
-std::variant<long long, std::string> doubled(const std::string& text) {
-    // the value * 2, or the text that would not parse
-    return text;
-}
-
-int main() {
-    int n = 0;
-    std::cin >> n;
-    std::string rest;
-    std::getline(std::cin, rest);
-
-    long long sum = 0;
-    for (int i = 0; i < n; ++i) {
-        std::string line;
-        std::getline(std::cin, line);
-        auto result = doubled(line);
-        // std::get_if<long long>(&result): a pointer, or nullptr
-        std::cout << "BAD " << line << '\n';
-        (void)result;
-    }
-    std::cout << "SUM " << sum << '\n';
-}
-'''
-solution    = '''
-#include <charconv>
-#include <iostream>
-#include <optional>
-#include <string>
-#include <variant>
-
-std::optional<long long> parse(const std::string& text) {
-    long long value = 0;
-    const char* begin = text.data();
-    const char* end = begin + text.size();
-    auto [ptr, ec] = std::from_chars(begin, end, value);
-    // both halves matter: no error, and every character consumed
-    if (ec != std::errc() || ptr != end) {
-        return std::nullopt;
-    }
-    return value;
-}
-
-std::variant<long long, std::string> doubled(const std::string& text) {
-    if (auto value = parse(text)) {
-        return *value * 2;
-    }
-    return text;
-}
-
-int main() {
-    int n = 0;
-    std::cin >> n;
-    std::string rest;
-    std::getline(std::cin, rest);
-
-    long long sum = 0;
-    for (int i = 0; i < n; ++i) {
-        std::string line;
-        std::getline(std::cin, line);
-        auto result = doubled(line);
-        if (const long long* value = std::get_if<long long>(&result)) {
-            std::cout << *value << '\n';
-            sum += *value;
-        } else {
-            std::cout << "BAD " << std::get<std::string>(result) << '\n';
-        }
-    }
-    std::cout << "SUM " << sum << '\n';
-}
-'''
-hints = [
-  "std::from_chars(first, last, value) returns a struct with ptr and ec; success is ec == std::errc() AND ptr == last, or a line like 4x half-parses.",
-  "An optional is truthy when it holds a value, so if (auto v = parse(text)) is the whole branch, and *v is the number.",
-  "Returning a long long or a std::string from the same function is legal because the return type is a variant that can hold either; get_if picks the branch in main.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "mixed",   stdin = "3\n21\nxx\n-4\n",     expect = "42\nBAD xx\n-8\nSUM 34\n",          visible = true },
-  { name = "zero",    stdin = "1\n0\n",              expect = "0\nSUM 0\n",                         visible = false },
-  { name = "all-bad", stdin = "2\nhello\nworld\n",   expect = "BAD hello\nBAD world\nSUM 0\n",      visible = false },
-  { name = "partial", stdin = "2\n4x\n7\n",          expect = "BAD 4x\n14\nSUM 14\n",               visible = false },
-]
-
-# ---------------------------------------------------------------- 15
-[[quest]]
-id          = "cpp.basic.15.exceptions"
-node        = 16
-title       = "AN ERROR OF YOUR OWN"
-difficulty  = 3
-story       = "Four layers of the mooring fee service each throw something different and nothing above them catches any of it."
-concepts    = ["error-handling", "panics", "structs"]
-requires    = ["cpp.basic.14.optional-variant"]
-map          = { x = 0.391, y = 0.950, kind = "quest" }
-brief       = '''
-Standard input is a count `n`, then `n` lines, each meant to be a distance in
-km.
-
-`fare(text)` parses with `std::stoll` — which **throws**
-`std::invalid_argument` on `xx` — and rejects a negative distance by throwing
-your own `NegativeDistance`, a class derived from `std::runtime_error` whose
-`what()` reads `negative distance: <km>`. Otherwise it returns
-`500 + 100 * km`.
-
-Print one line per input line: the fare, or `not a number` when it does not
-parse, or the `NegativeDistance`'s `what()` when the distance is negative.
-Then print `ERRORS <k>`, how many lines failed.
-
-The parse failure prints your words and not the exception's, because
-`std::invalid_argument::what()` is whatever the library felt like saying —
-`stoll` on libstdc++, `stoll: no conversion` on libc++ — and an expected
-output cannot depend on that.
+`k` and the numbers are read, and the loop applies `add` to each. Type
+that line at `// FILL`, replacing the placeholder `add`.
 
 ```
-input:  3
-        4
-        xx
-        -2
-output: 900
-        not a number
-        negative distance: -2
-        ERRORS 2
-```
-
-The starter compiles and dies on `xx`: an exception nobody catches reaches the
-top of `main` and the runtime calls `std::terminate`, which is the abort you
-see. A `try` block with two `catch` arms fixes it — the more specific type
-first, because arms are tried in order and `std::runtime_error` would swallow
-`NegativeDistance` if it came first. Catch by `const&`, always: catching by
-value slices a derived exception down to its base and loses the message you
-threw.
-'''
-starter     = '''
-#include <iostream>
-#include <stdexcept>
-#include <string>
-
-struct NegativeDistance : std::runtime_error {
-    explicit NegativeDistance(long long km)
-        : std::runtime_error("negative distance: " + std::to_string(km)) {}
-};
-
-long long fare(const std::string& text) {
-    long long km = std::stoll(text);
-    if (km < 0) {
-        throw NegativeDistance(km);
-    }
-    return 500 + 100 * km;
-}
-
-int main() {
-    int n = 0;
-    std::cin >> n;
-
-    int errors = 0;
-    for (int i = 0; i < n; ++i) {
-        std::string text;
-        std::cin >> text;
-        // nothing catches what fare throws
-        std::cout << fare(text) << '\n';
-    }
-    std::cout << "ERRORS " << errors << '\n';
-}
-'''
-solution    = '''
-#include <iostream>
-#include <stdexcept>
-#include <string>
-
-struct NegativeDistance : std::runtime_error {
-    explicit NegativeDistance(long long km)
-        : std::runtime_error("negative distance: " + std::to_string(km)) {}
-};
-
-long long fare(const std::string& text) {
-    long long km = std::stoll(text);  // throws std::invalid_argument on junk
-    if (km < 0) {
-        throw NegativeDistance(km);
-    }
-    return 500 + 100 * km;
-}
-
-int main() {
-    int n = 0;
-    std::cin >> n;
-
-    int errors = 0;
-    for (int i = 0; i < n; ++i) {
-        std::string text;
-        std::cin >> text;
-        try {
-            std::cout << fare(text) << '\n';
-        } catch (const NegativeDistance& e) {
-            // the derived type first, or the arm below takes it
-            ++errors;
-            std::cout << e.what() << '\n';
-        } catch (const std::invalid_argument&) {
-            ++errors;
-            std::cout << "not a number\n";
-        }
-    }
-    std::cout << "ERRORS " << errors << '\n';
-}
-'''
-hints = [
-  "Wrap the call in try { ... } and add catch (const NegativeDistance& e) then catch (const std::invalid_argument&) — in that order.",
-  "e.what() is the message you built in the constructor; std::runtime_error stores it for you.",
-  "Uncaught exceptions call std::terminate, which aborts the process with no output flushed beyond what already went out. That is what the starter does on line two.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "mixed",    stdin = "3\n4\nxx\n-2\n",   expect = "900\nnot a number\nnegative distance: -2\nERRORS 2\n", visible = true },
-  { name = "clean",    stdin = "1\n0\n",           expect = "500\nERRORS 0\n",                                      visible = false },
-  { name = "all-junk", stdin = "2\nzz\nyy\n",      expect = "not a number\nnot a number\nERRORS 2\n",               visible = false },
-  { name = "negative", stdin = "1\n-1\n",          expect = "negative distance: -1\nERRORS 1\n",                    visible = false },
-]
-
-# ---------------------------------------------------------------- 16
-[[quest]]
-id          = "cpp.basic.16.iterators"
-node        = 17
-title       = "YOUR OWN FOR LOOP"
-difficulty  = 3
-story       = "The pump room's gauge ticks through every reading from the start to the end of the shift and stores none of them anywhere."
-concepts    = ["iteration", "structs", "functions"]
-requires    = ["cpp.basic.15.exceptions"]
-map          = { x = 0.619, y = 0.868, kind = "quest" }
-brief       = '''
-Standard input is three integers: `start`, `step`, `count`.
-
-Give `Stops` an iterator so that a range-`for` over it yields `count` values
-beginning at `start` and advancing by `step`. Print each on its own line, then
-`SUM <total>` computed by `std::accumulate` over the same `begin()`/`end()`.
-
-```
-input:  2 3 5
-output: 2
-        5
-        8
-        11
-        14
-        SUM 40
-```
-
-The starter does not compile: a range-`for` is rewritten by the compiler into
-a call to `begin()` and `end()`, and `Stops` has neither. There is no trait to
-inherit from and no interface to declare; the loop asks for three things by
-name — `operator*`, prefix `operator++`, `operator!=` — on whatever `begin()`
-returns, and if they are there, it works. That is the entire contract, and it
-is the same contract `std::accumulate` and every other algorithm use.
-'''
-starter     = '''
-#include <iostream>
-#include <numeric>
-
-struct Stops {
-    long long start;
-    long long step;
-    long long count;
-
-    // an iterator type, and begin() / end() that return it
-};
-
-int main() {
-    long long start = 0, step = 0, count = 0;
-    std::cin >> start >> step >> count;
-
-    Stops stops{start, step, count};
-    for (long long value : stops) {
-        std::cout << value << '\n';
-    }
-    std::cout << "SUM " << std::accumulate(stops.begin(), stops.end(), 0LL) << '\n';
-}
-'''
-solution    = '''
-#include <iostream>
-#include <numeric>
-
-struct Stops {
-    long long start;
-    long long step;
-    long long count;
-
-    struct iterator {
-        long long value;
-        long long step;
-        long long left;
-
-        long long operator*() const { return value; }
-
-        iterator& operator++() {
-            value += step;
-            --left;
-            return *this;
-        }
-
-        bool operator!=(const iterator& other) const { return left != other.left; }
-        bool operator==(const iterator& other) const { return left == other.left; }
-    };
-
-    iterator begin() const { return iterator{start, step, count}; }
-    iterator end() const { return iterator{start, step, 0}; }
-};
-
-int main() {
-    long long start = 0, step = 0, count = 0;
-    std::cin >> start >> step >> count;
-
-    Stops stops{start, step, count};
-    for (long long value : stops) {
-        std::cout << value << '\n';
-    }
-    std::cout << "SUM " << std::accumulate(stops.begin(), stops.end(), 0LL) << '\n';
-}
-'''
-hints = [
-  "The iterator is a small struct of its own: the current value, the step, and how many are left.",
-  "end() is the iterator with nothing left; operator!= compares only the countdown, so the value inside end() does not matter.",
-  "std::accumulate walks the same three operators the for loop does — once begin()/end() exist, both work without another line.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "five",     stdin = "2 3 5\n",   expect = "2\n5\n8\n11\n14\nSUM 40\n", visible = true },
-  { name = "flat",     stdin = "0 0 3\n",   expect = "0\n0\n0\nSUM 0\n",          visible = false },
-  { name = "backward", stdin = "10 -4 4\n", expect = "10\n6\n2\n-2\nSUM 16\n",    visible = false },
-  { name = "none",     stdin = "7 1 0\n",   expect = "SUM 0\n",                   visible = false },
-]
-
-# ---------------------------------------------------------------- 17
-[[quest]]
-id          = "cpp.basic.17.raii"
-node        = 18
-title       = "IT CLEANS UP AFTER ITSELF"
-difficulty  = 3
-story       = "The pump room logbook closes itself when the shift ends, in the right order, whether or not anyone remembered to."
-concepts    = ["raii", "structs", "functions"]
-requires    = ["cpp.basic.16.iterators"]
-map          = { x = 0.719, y = 0.950, kind = "quest" }
-brief       = '''
-Standard input is a count `n` and then `n` integers.
-
-Declare two `Guard` values at the **top** of `main`, named `first` and
-`second`, whose destructor prints `DROP <name>`. Inside a nested block, feed
-the values into a `Tally` whose destructor prints `TALLY <count> <sum>`. After
-the block print `DONE`. Nothing else is printed by `main` itself.
-
-```
-input:  3
+input:  5
         1 2 3
-output: TALLY 3 6
-        DONE
-        DROP second
-        DROP first
+output: 6 7 8
 ```
-
-Every line but `DONE` is printed by a destructor. `Tally` dies at the closing
-brace of its block, so `TALLY` comes before `DONE`; the two guards die when
-`main` returns, in **reverse** declaration order, so `second` goes before
-`first`. None of it is scheduled by you. It is scheduled by scope.
-
-That is RAII, and the name is worse than the idea: a resource is tied to an
-object's lifetime, and the destructor is the release. `std::lock_guard`
-unlocks this way, `std::unique_ptr` frees this way, `std::ofstream` closes
-this way, and an early `return` or a thrown exception runs every one of them
-exactly the same. You will meet all three in the next map.
 '''
 starter     = '''
 #include <iostream>
+#include <sstream>
 #include <string>
-
-struct Guard {
-    std::string name;
-    // needs a destructor that prints DROP <name>
-};
-
-struct Tally {
-    long long count = 0;
-    long long sum = 0;
-
-    void add(long long v) {
-        ++count;
-        sum += v;
-    }
-    // needs a destructor that prints TALLY <count> <sum>
-};
+#include <vector>
 
 int main() {
-    Guard first{"first"};
-    Guard second{"second"};
+    long long k = 0;
+    std::cin >> k;
+    std::string line;
+    std::getline(std::cin, line);
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) xs.push_back(x);
 
-    int n = 0;
-    std::cin >> n;
-    {
-        Tally tally;
-        for (int i = 0; i < n; ++i) {
-            long long v = 0;
-            std::cin >> v;
-            tally.add(v);
-        }
-    }
-    std::cout << "DONE\n";
+    auto add = [](long long v) { return v; };  // FILL: capture k and add it
+    // ANSWER: auto add = [k](long long v) { return v + k; };
+
+    for (long long v : xs) std::cout << add(v) << ' ';
+    std::cout << '\n';
 }
 '''
 solution    = '''
 #include <iostream>
+#include <sstream>
 #include <string>
-
-struct Guard {
-    std::string name;
-
-    ~Guard() {
-        std::cout << "DROP " << name << '\n';
-    }
-};
-
-struct Tally {
-    long long count = 0;
-    long long sum = 0;
-
-    void add(long long v) {
-        ++count;
-        sum += v;
-    }
-
-    // runs at the closing brace of whatever block owns the Tally
-    ~Tally() {
-        std::cout << "TALLY " << count << ' ' << sum << '\n';
-    }
-};
+#include <vector>
 
 int main() {
-    Guard first{"first"};
-    Guard second{"second"};
+    long long k = 0;
+    std::cin >> k;
+    std::string line;
+    std::getline(std::cin, line);
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) xs.push_back(x);
 
-    int n = 0;
-    std::cin >> n;
-    {
-        Tally tally;
-        for (int i = 0; i < n; ++i) {
-            long long v = 0;
-            std::cin >> v;
-            tally.add(v);
-        }
-    }
-    std::cout << "DONE\n";
+    auto add = [k](long long v) { return v + k; };
+
+    for (long long v : xs) std::cout << add(v) << ' ';
+    std::cout << '\n';
 }
 '''
 hints = [
-  "A destructor is ~Guard() { ... } — no return type, no parameters, and you never call it; the scope does.",
-  "The inner braces are the whole reason TALLY prints before DONE. Remove them and it prints after.",
-  "Destruction is reverse construction, always, which is why second goes first and why a lock taken second is released first.",
+  "auto add = [k](long long v) { return v + k; };",
+  "[k] copies k into the lambda; [] captures nothing and cannot see k at all.",
 ]
 
 [quest.tests]
@@ -2127,166 +2238,343 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "three", stdin = "3\n1 2 3\n",       expect = "TALLY 3 6\nDONE\nDROP second\nDROP first\n",   visible = true },
-  { name = "none",  stdin = "0\n",              expect = "TALLY 0 0\nDONE\nDROP second\nDROP first\n",   visible = false },
-  { name = "one",   stdin = "1\n-5\n",          expect = "TALLY 1 -5\nDONE\nDROP second\nDROP first\n",  visible = false },
-  { name = "four",  stdin = "4\n10 20 30 40\n", expect = "TALLY 4 100\nDONE\nDROP second\nDROP first\n", visible = false },
+  { name = "five", stdin = "5\n1 2 3\n", expect = "6 7 8\n", visible = true },
+  { name = "zero", stdin = "0\n4 4\n", expect = "4 4\n", visible = false },
+  { name = "negative", stdin = "-3\n10 0 3\n", expect = "7 -3 0\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 18  BOSS
+# ---------------------------------------------------------------- 25
 [[quest]]
-id          = "cpp.basic.18.segfault"
-node        = 19
+id          = "cpp.basic.16.lambdas"
+node        = 25
+title       = "EVEN BERTHS, SQUARED"
+difficulty  = 2
+story       = "The even-numbered berths along the wall pay by the square of their number and the odd ones pay nothing, and the ledger has one line for the total."
+concepts    = ["closures", "iteration"]
+requires    = ["cpp.basic.15.closures"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''
+The algorithms in `<numeric>` and `<algorithm>` take lambdas as their
+last argument. `std::accumulate` folds a range into one value: it starts
+from an initial value and calls the lambda with the total so far and each
+element, keeping what the lambda returns. Starting at `0LL` makes the
+total a `long long`.
+
+```
+long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });
+```
+
+The numbers are in `xs` and `total` is printed. Type that line at
+`// FILL`, replacing the placeholder `total`: the lambda adds the square of
+`v` when `v` is even and hands `acc` back unchanged otherwise.
+
+```
+input:  1 2 3 4 5
+output: 20
+```
+'''
+starter     = '''
+#include <iostream>
+#include <numeric>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) xs.push_back(x);
+
+    long long total = 0;  // FILL: std::accumulate with a lambda over xs
+    // ANSWER: long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });
+
+    std::cout << total << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <numeric>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) xs.push_back(x);
+
+    long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });
+
+    std::cout << total << '\n';
+}
+'''
+hints = [
+  "long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });",
+  "The lambda gets the running total and one element, and returns the new total.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "1 2 3 4 5\n", expect = "20\n", visible = true },
+  { name = "odd-only", stdin = "1 3 5\n", expect = "0\n", visible = false },
+  { name = "negatives", stdin = "-2 -3 6\n", expect = "40\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "cpp.basic.17.threads"
+node        = 26
+title       = "ONE WINCH EACH"
+difficulty  = 3
+story       = "Every sampan on the slipway gets its own winch, they all haul at once, and the tally is read only after the last one has stopped."
+concepts    = ["concurrency", "closures"]
+requires    = ["cpp.basic.16.lambdas"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''
+`std::thread` runs a function on its own thread the moment it is made;
+`join()` waits for it to finish. A vector of threads is built with
+`emplace_back` and a lambda. Capturing `[&, i]` borrows everything by
+reference except `i`, which is copied — the loop moves on, the copy does
+not. Every thread writes only its own slot, so nothing is shared, and
+nothing is printed until every `join()` has returned.
+
+```
+threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });
+for (auto& t : threads) t.join();
+```
+
+`results` has one slot per number and the printing is written. Type the
+first line at the `// FILL` inside the loop, replacing the placeholder,
+and the second at the `// FILL` after it.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+starter     = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) xs.push_back(x);
+
+    std::vector<long long> results(xs.size());
+    std::vector<std::thread> threads;
+    for (size_t i = 0; i < xs.size(); ++i) {
+        results[i] = 0;  // FILL: emplace_back a thread that squares xs[i] into results[i]
+        // ANSWER: threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });
+    }
+    // FILL: join every thread
+    // ANSWER: for (auto& t : threads) t.join();
+
+    long long total = 0;
+    for (long long r : results) {
+        std::cout << r << ' ';
+        total += r;
+    }
+    std::cout << '\n' << total << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) xs.push_back(x);
+
+    std::vector<long long> results(xs.size());
+    std::vector<std::thread> threads;
+    for (size_t i = 0; i < xs.size(); ++i) {
+        threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });
+    }
+    for (auto& t : threads) t.join();
+
+    long long total = 0;
+    for (long long r : results) {
+        std::cout << r << ' ';
+        total += r;
+    }
+    std::cout << '\n' << total << '\n';
+}
+'''
+hints = [
+  "threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; }); in the loop, then for (auto& t : threads) t.join(); after it.",
+  "A thread not joined by the end of main terminates the program; join them all before printing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "1 4 9\n14\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "49\n49\n", visible = false },
+  { name = "eight", stdin = "1 1 2 3 5 8 13 21\n", expect = "1 1 4 9 25 64 169 441\n714\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "cpp.basic.18.binary-tree"
+node        = 27
 title       = "SEGFAULT"
 difficulty  = 4
-story       = "12:00:00. The Noon Day Gun fires at an address nobody owns, and the whole waterfront goes quiet."
-concepts    = ["pointers", "undefined-behaviour", "slices", "error-handling"]
-requires    = ["cpp.basic.17.raii", "cpp.basic.04.references"]
-map          = { x = 0.949, y = 0.868, kind = "boss" }
+story       = "12:00 at the Noon Day Gun. The firing table is a tree of times and the gun followed a left branch that was never there — nullptr, dereferenced, at the one address in Causeway Bay that must not be wrong."
+concepts    = ["trees", "recursion", "structs"]
+requires    = ["cpp.basic.17.threads"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
 brief       = '''
-Line one is `n`. The next `n` lines are the firing table, `<NAME> <SECONDS>`.
-Then a line `q`, and `q` names to look up.
-
-For each name print `<NAME> FIRES AT <seconds>` or `<NAME> UNKNOWN`. Then
-print `LOADED <n> CHECKSUM <sum of every SECONDS in the table>`.
+A binary search tree is nodes with a value and two child pointers:
+smaller values live under `left`, larger under `right`. Inserting is
+recursive: an empty subtree (`nullptr`) becomes a new node, and otherwise
+the value goes down one side — and whatever that side becomes is stored
+back, because the side may have been `nullptr` a moment ago. That store is
+the whole trick, and the check for `nullptr` before it is the whole boss.
 
 ```
-input:  2
-        GUN 3
-        HORN 7
+if (!n) return new Node{v};
+if (v < n->val) n->left = insert(n->left, v);
+else n->right = insert(n->right, v);
+return n;
+```
+
+`Node`, the `nullptr` case, `inorder`, `height` and `main` are written.
+Type the two descent lines at the two `// FILL` marks: the left one in the
+`if`, the right one in the `else`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
         3
-        GUN
-        BELL
-        HORN
-output: GUN FIRES AT 3
-        BELL UNKNOWN
-        HORN FIRES AT 7
-        LOADED 2 CHECKSUM 10
 ```
-
-The starter compiles cleanly and crashes twice, for two different reasons, and
-you have to find both.
-
-The first is the checksum loop. It walks `1..n` and reads `table.at(i)`, and
-`at` **checks**: index `n` is one past the end, so it throws
-`std::out_of_range`, nothing catches it, and the process aborts. Fix the loop.
-Then understand what `at` bought you: the same loop written with `table[i]`
-would not have thrown. It would have read whatever happened to be at that
-address — the next object on the heap, or nothing — and printed a checksum
-that was wrong by an amount nobody could reproduce. `[]` on a vector does not
-check. That is the deal in this land: it is fast, and it is your job.
-
-The second is `lookup`. It returns a `Shell*`, and when the name is not in the
-table it returns `nullptr` — and the caller writes `->seconds` on it without
-looking. Reading through a null pointer is undefined behaviour; on every
-machine this runs on it is also a segmentation fault, which is the kindest
-form undefined behaviour takes, because at least it stops. Test the pointer.
-That is the whole boss, and it is the question every C++ interview is really
-asking: *what is at that address right now, and who said you could read it?*
 '''
 starter     = '''
+#include <algorithm>
 #include <iostream>
+#include <sstream>
 #include <string>
-#include <vector>
 
-struct Shell {
-    std::string name;
-    long long seconds;
+struct Node {
+    long long val;
+    Node* left = nullptr;
+    Node* right = nullptr;
 };
 
-// the address of the matching shell, or nullptr if there is none
-Shell* lookup(std::vector<Shell>& table, const std::string& name) {
-    for (Shell& shell : table) {
-        if (shell.name == name) {
-            return &shell;
-        }
+Node* insert(Node* n, long long v) {
+    if (!n) return new Node{v};
+    if (v < n->val) {
+        // FILL: descend left, storing the result back into n->left
+        // ANSWER: n->left = insert(n->left, v);
+    } else {
+        // FILL: descend right, storing the result back into n->right
+        // ANSWER: n->right = insert(n->right, v);
     }
-    return nullptr;
+    return n;
+}
+
+void inorder(const Node* n) {
+    if (!n) return;
+    inorder(n->left);
+    std::cout << n->val << ' ';
+    inorder(n->right);
+}
+
+int height(const Node* n) {
+    if (!n) return 0;
+    return 1 + std::max(height(n->left), height(n->right));
 }
 
 int main() {
-    int n = 0;
-    std::cin >> n;
-    std::vector<Shell> table;
-    for (int i = 0; i < n; ++i) {
-        Shell shell;
-        std::cin >> shell.name >> shell.seconds;
-        table.push_back(shell);
-    }
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    Node* root = nullptr;
+    long long x = 0;
+    while (in >> x) root = insert(root, x);
 
-    int q = 0;
-    std::cin >> q;
-    for (int i = 0; i < q; ++i) {
-        std::string name;
-        std::cin >> name;
-        // follows the pointer without asking whether there is anything there
-        std::cout << name << " FIRES AT " << lookup(table, name)->seconds << '\n';
-    }
-
-    // one past the end: at() throws, [] would have read garbage
-    long long checksum = 0;
-    for (std::size_t i = 1; i <= table.size(); ++i) {
-        checksum += table.at(i).seconds;
-    }
-    std::cout << "LOADED " << n << " CHECKSUM " << checksum << '\n';
+    inorder(root);
+    std::cout << '\n' << height(root) << '\n';
 }
 '''
 solution    = '''
+#include <algorithm>
 #include <iostream>
+#include <sstream>
 #include <string>
-#include <vector>
 
-struct Shell {
-    std::string name;
-    long long seconds;
+struct Node {
+    long long val;
+    Node* left = nullptr;
+    Node* right = nullptr;
 };
 
-// the address of the matching shell, or nullptr if there is none
-Shell* lookup(std::vector<Shell>& table, const std::string& name) {
-    for (Shell& shell : table) {
-        if (shell.name == name) {
-            return &shell;
-        }
+Node* insert(Node* n, long long v) {
+    if (!n) return new Node{v};
+    if (v < n->val) {
+        n->left = insert(n->left, v);
+    } else {
+        n->right = insert(n->right, v);
     }
-    return nullptr;
+    return n;
+}
+
+void inorder(const Node* n) {
+    if (!n) return;
+    inorder(n->left);
+    std::cout << n->val << ' ';
+    inorder(n->right);
+}
+
+int height(const Node* n) {
+    if (!n) return 0;
+    return 1 + std::max(height(n->left), height(n->right));
 }
 
 int main() {
-    int n = 0;
-    std::cin >> n;
-    std::vector<Shell> table;
-    for (int i = 0; i < n; ++i) {
-        Shell shell;
-        std::cin >> shell.name >> shell.seconds;
-        table.push_back(shell);
-    }
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    Node* root = nullptr;
+    long long x = 0;
+    while (in >> x) root = insert(root, x);
 
-    int q = 0;
-    std::cin >> q;
-    for (int i = 0; i < q; ++i) {
-        std::string name;
-        std::cin >> name;
-        // a pointer that may be null is tested before it is followed, every time
-        if (Shell* shell = lookup(table, name)) {
-            std::cout << name << " FIRES AT " << shell->seconds << '\n';
-        } else {
-            std::cout << name << " UNKNOWN\n";
-        }
-    }
-
-    // 0..size-1 is the whole vector; size is one past the end
-    long long checksum = 0;
-    for (std::size_t i = 0; i < table.size(); ++i) {
-        checksum += table[i].seconds;
-    }
-    std::cout << "LOADED " << n << " CHECKSUM " << checksum << '\n';
+    inorder(root);
+    std::cout << '\n' << height(root) << '\n';
 }
 '''
 hints = [
-  "Bind the lookup result to a name and test it: if (Shell* shell = lookup(...)) { ... } else { UNKNOWN }. The pointer is the answer and the question at once.",
-  "Valid indices run from 0 to size() - 1. The loop that starts at 1 and runs to size() is off by one at both ends, and only the top end crashes.",
-  "at() throws std::out_of_range and [] does not check at all; the crash you got is the good outcome. The one you did not get is the boss.",
-  "A segmentation fault is the OS refusing a read of an address the process does not own. Address 0 is always one of those, which is why nullptr crashes reliably and a stale pointer into freed memory does not.",
+  "n->left = insert(n->left, v); on the left, n->right = insert(n->right, v); on the right.",
+  "Store the result back: the child may have been nullptr, and the new node is what insert returns.",
 ]
 
 [quest.tests]
@@ -2296,8 +2584,8 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "sample",   stdin = "2\nGUN 3\nHORN 7\n3\nGUN\nBELL\nHORN\n", expect = "GUN FIRES AT 3\nBELL UNKNOWN\nHORN FIRES AT 7\nLOADED 2 CHECKSUM 10\n", visible = true },
-  { name = "empty",    stdin = "0\n1\nGUN\n",                            expect = "GUN UNKNOWN\nLOADED 0 CHECKSUM 0\n",                                   visible = false },
-  { name = "twice",    stdin = "1\nGUN 12\n2\nGUN\nGUN\n",               expect = "GUN FIRES AT 12\nGUN FIRES AT 12\nLOADED 1 CHECKSUM 12\n",             visible = false },
-  { name = "no-query", stdin = "3\nA 1\nB 2\nC 3\n0\n",                  expect = "LOADED 3 CHECKSUM 6\n",                                                visible = false },
+  { name = "balanced", stdin = "5 3 8 1 4\n", expect = "1 3 4 5 8\n3\n", visible = true },
+  { name = "single", stdin = "42\n", expect = "42\n1\n", visible = false },
+  { name = "chain", stdin = "1 2 3 4\n", expect = "1 2 3 4\n4\n", visible = false },
+  { name = "seven", stdin = "50 25 75 10 30 60 90\n", expect = "10 25 30 50 60 75 90\n3\n", visible = false },
 ]

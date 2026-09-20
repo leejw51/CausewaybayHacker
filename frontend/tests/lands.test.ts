@@ -15,7 +15,7 @@
  * already measured — so all of this is checkable without a canvas.
  */
 import { describe, expect, it } from "vitest";
-import { capLines, landGrid } from "../src/scenes/lands";
+import { capLines, landGrid, roadColumn } from "../src/scenes/lands";
 import { landRowAt, landRowLines } from "../src/scenes/stats";
 import { LANDS } from "../src/net/protocol";
 
@@ -258,5 +258,101 @@ describe("the record's land rows — the C++ line that was silently dropped", ()
       const { x } = landRowAt(i, 0, 0, cell, gap, 30);
       expect(x + cell).toBeLessThanOrEqual(w);
     }
+  });
+});
+
+/**
+ * The right-hand column: the CODE PLAYGROUND tile leads it.
+ *
+ * The tile used to be the last thing in the column, under the three roads and
+ * under a row of buttons, at a fifth of the height — the slot for the thing a
+ * screen expects nobody to want. `roadColumn` is the order and the fit, with
+ * every height handed in already measured, so this is checkable without a
+ * canvas.
+ */
+describe("roadColumn", () => {
+  type R = readonly [number, number, number, number];
+  const overlaps = (a: R, b: R) => a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
+  const within = (r: R, p: R) =>
+    r[0] >= p[0] && r[1] >= p[1] && r[0] + r[2] <= p[0] + p[2] && r[1] + r[3] <= p[1] + p[3];
+
+  /** A landscape panel at the design scale, and a portrait one. */
+  const LAND: [number, number, number, number] = [660, 100, 600, 560];
+  const PORT: [number, number, number, number] = [20, 420, 560, 520];
+  const GAP = 8;
+  const REC = 34;
+  const FLOOR = 38;
+  const MIN_ROW = 76;
+  const PLAY = 48;
+  const TILE = 168;
+
+  it("puts the playground tile at the very top of the column", () => {
+    for (const panel of [LAND, PORT]) {
+      const col = roadColumn(panel, 3, GAP, REC, FLOOR, MIN_ROW, PLAY, TILE);
+      expect(col.tile[1]).toBe(panel[1]);
+      expect(col.tile[0]).toBe(panel[0]);
+      expect(col.tile[2]).toBe(panel[2]);
+      for (const r of [col.record, ...col.rows, col.buttons]) {
+        expect(r[1]).toBeGreaterThan(col.tile[1] + col.tile[3]);
+      }
+    }
+  });
+
+  it("makes the tile the tallest single thing in the column when there is room", () => {
+    for (const panel of [LAND, PORT]) {
+      const col = roadColumn(panel, 3, GAP, REC, FLOOR, MIN_ROW, PLAY, TILE);
+      expect(col.tight).toBe(false);
+      expect(col.tile[3]).toBe(TILE);
+      for (const r of [col.record, ...col.rows, col.buttons]) {
+        expect(col.tile[3]).toBeGreaterThanOrEqual(r[3]);
+      }
+    }
+  });
+
+  it("keeps the roads in order under the record, and the buttons at the foot", () => {
+    const col = roadColumn(LAND, 3, GAP, REC, FLOOR, MIN_ROW, PLAY, TILE);
+    expect(col.rows).toHaveLength(3);
+    expect(col.record[1]).toBeGreaterThan(col.tile[1]);
+    expect(col.rows[0][1]).toBeGreaterThan(col.record[1] + col.record[3]);
+    for (let i = 1; i < col.rows.length; i++) {
+      expect(col.rows[i][1]).toBeGreaterThan(col.rows[i - 1][1] + col.rows[i - 1][3]);
+      expect(col.rows[i][3]).toBe(col.rows[0][3]);
+    }
+    expect(col.buttons[1] + col.buttons[3]).toBe(LAND[1] + LAND[3]);
+    expect(col.buttons[1]).toBeGreaterThan(col.rows[2][1] + col.rows[2][3]);
+  });
+
+  it("never overlaps anything and stays inside the panel", () => {
+    for (const panel of [LAND, PORT, [0, 0, 400, 300] as [number, number, number, number]]) {
+      const col = roadColumn(panel, 3, GAP, REC, FLOOR, MIN_ROW, PLAY, TILE);
+      const all = [col.tile, col.record, ...col.rows, col.buttons];
+      for (const r of all) expect(within(r, panel), `${r} in ${panel}`).toBe(true);
+      for (let i = 0; i < all.length; i++) {
+        for (let j = i + 1; j < all.length; j++) {
+          expect(overlaps(all[i], all[j]), `${all[i]} vs ${all[j]}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("gives the roads a finger's height before the tile takes more", () => {
+    const col = roadColumn(LAND, 3, GAP, REC, FLOOR, MIN_ROW, PLAY, TILE);
+    expect(col.rows[0][3]).toBe(MIN_ROW);
+  });
+
+  it("shrinks the tile to a button's height when the roads would not fit — and keeps it on top", () => {
+    // A phone held sideways: 300px for the whole column.
+    const short: [number, number, number, number] = [0, 0, 400, 300];
+    const col = roadColumn(short, 3, GAP, REC, FLOOR, MIN_ROW, PLAY, TILE);
+    expect(col.tight).toBe(true);
+    expect(col.tile[3]).toBe(PLAY);
+    expect(col.tile[1]).toBe(0);
+    for (const r of col.rows) expect(r[3]).toBeGreaterThanOrEqual(FLOOR);
+    expect(col.buttons[1] + col.buttons[3]).toBe(300);
+  });
+
+  it("never lets a tile ask for less than the button row", () => {
+    const col = roadColumn(LAND, 3, GAP, REC, FLOOR, MIN_ROW, PLAY, 10);
+    expect(col.tile[3]).toBe(PLAY);
   });
 });

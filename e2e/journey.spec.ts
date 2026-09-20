@@ -1,4 +1,5 @@
 import {
+  clickButton,
   atScreen,
   expect,
   fixtureAccount,
@@ -65,7 +66,9 @@ test("boots to the login screen and asks for a seed", async ({ page }) => {
   expect((test.info() as unknown as { _errors: string[] })._errors).toEqual([]);
 });
 
-test("a seed logs in, and the address is the one the wallet derives", async ({ page }) => {
+test("a seed logs in, and the address is the one the wallet derives", async ({
+  page,
+}) => {
   // SPEC §9.1, observed from outside: the address the game shows for this key
   // is the one `CausewaybayWallet` derives for it. The *fixture* account on
   // purpose — the whole point is that the value came from somewhere else and
@@ -104,7 +107,9 @@ test("the seed never crosses the wire", async ({ page }) => {
   expect(traffic).not.toContain(account.privateKey.replace(/^0x/, ""));
   expect(traffic).not.toContain("abandon");
   for (const frame of sent)
-    expect(frame).not.toMatch(/"(mnemonic|private_key|privkey|seed|passphrase)"/);
+    expect(frame).not.toMatch(
+      /"(mnemonic|private_key|privkey|seed|passphrase)"/,
+    );
 
   // §3.1 says not in localStorage unencrypted either. A session token is
   // fine and expected there; key material is not.
@@ -116,7 +121,9 @@ test("the seed never crosses the wire", async ({ page }) => {
   await expect(page.locator("textarea.cwb-field")).toHaveCount(0);
 });
 
-test("RUST × BASIC opens a map, and every node on it is playable", async ({ page }) => {
+test("RUST × BASIC opens a map, and every node on it is playable", async ({
+  page,
+}) => {
   // This test used to assert "node 1 is open, the rest are locked". §4.7
   // changed that — "**Every node is playable. Nothing is locked.** … This is
   // a trainer, not a platformer" — so the old assertion is wrong, and simply
@@ -136,11 +143,15 @@ test("RUST × BASIC opens a map, and every node on it is playable", async ({ pag
   const wire = await Wire.as(test.info().project.use.baseURL!, account);
   try {
     const nodes = await wire.map();
-    expect(nodes.length, "the rust/basic map has nodes").toBeGreaterThanOrEqual(3);
+    expect(nodes.length, "the rust/basic map has nodes").toBeGreaterThanOrEqual(
+      3,
+    );
     const byNode = [...nodes].sort((a, b) => a.node - b.node);
 
     expect(
-      byNode.filter((n) => (n.state as string) === "locked").map((n) => n.quest_id),
+      byNode
+        .filter((n) => (n.state as string) === "locked")
+        .map((n) => n.quest_id),
       "§5.2: `state` is `open` or `cleared`, never `locked`",
     ).toEqual([]);
     expect(
@@ -182,7 +193,9 @@ test("a wrong answer is rejected and the node stays open", async ({ page }) => {
   }
 });
 
-test("the right answer clears it, and the clear survives a reload", async ({ page }) => {
+test("the right answer clears it, and the clear survives a reload", async ({
+  page,
+}) => {
   const account = freshAccount();
   const wire = await Wire.as(test.info().project.use.baseURL!, account);
   try {
@@ -195,8 +208,11 @@ test("the right answer clears it, and the clear survives a reload", async ({ pag
     const opened = await toQuest(page, account, wire);
     const got = await wire.ok("quest.get", { quest_id: opened });
     const source = sourceThatPrints(
-      (got.quest as { tests?: { visible?: { stdin?: string; expect?: string }[] } }).tests
-        ?.visible?.[0],
+      (
+        got.quest as {
+          tests?: { visible?: { stdin?: string; expect?: string }[] };
+        }
+      ).tests?.visible?.[0],
     );
     expect(
       source,
@@ -214,7 +230,10 @@ test("the right answer clears it, and the clear survives a reload", async ({ pag
     // "expected cleared, got open" on a quest the UI never opened, which
     // reads as a server bug and is not one.
     const history = await wire.history();
-    expect(history.length, "the browser's submit never reached the server").toBe(1);
+    expect(
+      history.length,
+      "the browser's submit never reached the server",
+    ).toBe(1);
     expect(
       (history[0] as unknown as { quest_id: string }).quest_id,
       "the browser submitted to a different quest than the one the wire " +
@@ -222,23 +241,33 @@ test("the right answer clears it, and the clear survives a reload", async ({ pag
     ).toBe(node.quest_id);
 
     const cleared = await wire.node(node.quest_id);
-    expect(cleared?.state, "the server did not record the clear").toBe("cleared");
-    expect(cleared?.stars, "a clean first clear is three stars (SPEC §6.3)").toBe(3);
+    expect(cleared?.state, "the server did not record the clear").toBe(
+      "cleared",
+    );
+    expect(
+      cleared?.stars,
+      "a clean first clear is three stars (SPEC §6.3)",
+    ).toBe(3);
 
     // Back to the map, and the stamp is there.
-    await page.keyboard.press("Enter");
+    // ENTER takes the lit button, which after a clear is NEXT; the map is its own button.
+    await clickButton(page, "map");
     await atScreen(page, "map");
 
     // PLAN.md's definition of done: nothing in the game lives in the browser.
     await page.reload();
-    await page.waitForFunction(() => typeof window.__cwbCapture?.settle === "function");
+    await page.waitForFunction(
+      () => typeof window.__cwbCapture?.settle === "function",
+    );
     // §3.3 / §6: the token is kept, so a reload does not ask for the seed.
     await expect
       .poll(async () => scene(page), { timeout: 60_000 })
       .not.toBe("login");
 
     const afterReload = await wire.node(node.quest_id);
-    expect(afterReload?.state, "the clear did not survive the reload").toBe("cleared");
+    expect(afterReload?.state, "the clear did not survive the reload").toBe(
+      "cleared",
+    );
   } finally {
     wire.close();
   }
@@ -263,10 +292,16 @@ test("logout, then a second wallet sees its own map and none of the first's", as
     const opened = await toQuest(page, first, firstWire);
     const got = await firstWire.ok("quest.get", { quest_id: opened });
     const source = sourceThatPrints(
-      (got.quest as { tests?: { visible?: { stdin?: string; expect?: string }[] } }).tests
-        ?.visible?.[0],
+      (
+        got.quest as {
+          tests?: { visible?: { stdin?: string; expect?: string }[] };
+        }
+      ).tests?.visible?.[0],
     );
-    expect(source, `${opened} cannot be answered by printing a constant`).not.toBeNull();
+    expect(
+      source,
+      `${opened} cannot be answered by printing a constant`,
+    ).not.toBeNull();
     const node = { quest_id: opened };
 
     await setSource(page, source!);
@@ -285,7 +320,9 @@ test("logout, then a second wallet sees its own map and none of the first's", as
     // Nothing of the first wallet is left where a second player could reach
     // it. A session token for a wallet that logged out is the one that
     // matters: it would silently resume on the next reload.
-    const leftovers = await page.evaluate(() => JSON.stringify(window.localStorage));
+    const leftovers = await page.evaluate(() =>
+      JSON.stringify(window.localStorage),
+    );
     expect(
       leftovers,
       "the logged-out wallet's address is still in local storage",
@@ -316,8 +353,12 @@ test("logout, then a second wallet sees its own map and none of the first's", as
 
     // A reload as the second wallet must not resume as the first.
     await page.reload();
-    await page.waitForFunction(() => typeof window.__cwbCapture?.settle === "function");
-    await expect.poll(async () => scene(page), { timeout: 60_000 }).not.toBe("login");
+    await page.waitForFunction(
+      () => typeof window.__cwbCapture?.settle === "function",
+    );
+    await expect
+      .poll(async () => scene(page), { timeout: 60_000 })
+      .not.toBe("login");
     expect((await secondWire.history()).length).toBe(0);
   } finally {
     firstWire.close();
@@ -358,7 +399,10 @@ test("the screen fills this orientation, and the two canvases agree", async ({
     window.__cwbCapture!.settle();
     return window.__cwbCapture!.png();
   });
-  expect(shot.startsWith("data:image/png"), "the capture hook produced no PNG").toBe(true);
+  expect(
+    shot.startsWith("data:image/png"),
+    "the capture hook produced no PNG",
+  ).toBe(true);
   await info.attach(`map-${info.project.name}.png`, {
     body: Buffer.from(shot.split(",")[1], "base64"),
     contentType: "image/png",
@@ -381,8 +425,12 @@ test("both orientations reach the same screen", async ({ page }) => {
       window.__cwbCapture!.orient(m);
       window.__cwbCapture!.settle();
     }, mode);
-    expect(await page.evaluate(() => window.__cwbCapture!.orientation())).toBe(mode);
-    expect(await scene(page), `the ${mode} flip changed the screen`).toBe("map");
+    expect(await page.evaluate(() => window.__cwbCapture!.orientation())).toBe(
+      mode,
+    );
+    expect(await scene(page), `the ${mode} flip changed the screen`).toBe(
+      "map",
+    );
     const [vw, vh] = await page.evaluate(() => window.__cwbCapture!.virtual());
     if (mode === "portrait") expect(vh).toBeGreaterThan(vw);
     else expect(vw).toBeGreaterThan(vh);
@@ -392,7 +440,9 @@ test("both orientations reach the same screen", async ({ page }) => {
   await openSelectedNode(page);
 });
 
-test("the compiler's output paints while it is still compiling", async ({ page }, info) => {
+test("the compiler's output paints while it is still compiling", async ({
+  page,
+}, info) => {
   // **Nobody has ever seen this work.** FE unit-tested the console and could
   // not confirm it visually — headless RAF starvation defeated its timing
   // attempts — so `run.log` painting *while* rustc thinks has been believed

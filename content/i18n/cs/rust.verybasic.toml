@@ -1,0 +1,590 @@
+# RUST LAND — VERY BASIC, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/rust/verybasic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, the quiz's four choices, sample input and output and the exact
+# strings a program must print are the English pack's and are never translated.
+
+pack   = "rust.verybasic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.verybasic.01.print"
+title = "První světlo"
+story = "06:40 nad Jardine's Bazaar. Kiosek zná jméno zákazníka a nezdraví nikoho."
+brief = '''
+Přečti jeden řádek, jméno. Vypiš `hello, ` a za tím jméno, na jeden řádek.
+`println!` je makro, které vypíše řádek; `{}` je místo, kam přijde hodnota.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  mei
+output: hello, mei
+```
+'''
+hints = [
+  "println!(\"hello, {}\", name); — makro si nechává svůj !, a {} bere name.",
+  "Bez ! je to funkce, která neexistuje; bez argumentu nemá {} co vypsat.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.verybasic.02.int-types"
+title = "Širší pokladna"
+story = "Pokladna na Percival Street počítá v i32 a denní součet chce u64; řádek s přetypováním je prázdný."
+brief = '''
+Přečti jedno nezáporné celé číslo `a` jako `i32`. Vytvoř `b`, tutéž hodnotu jako `u64`, a program vypíše `b + 1`.
+`as` převádí mezi šířkami celých čísel.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  12
+output: 13
+```
+'''
+hints = [
+  "let b: u64 = a as u64; — as je přetypování a typ vlevo říká, čím se to stane.",
+  "i32 se sám od sebe u64 nestane; přetypování přes u8 ztratí všechno nad 255.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.verybasic.03.floats"
+title = "Desetinná váha"
+story = "Váha na Bowrington Road tiskne deset desetinných míst a číslo, které přečetla, se drží ve špatné šířce."
+brief = '''
+Přečti jedno desetinné číslo do `x` jako `f64` — široký float — a program ho vypíše na deset desetinných míst.
+`parse` vyčte z textu číslo; `trim` nejdřív odstraní konec řádku.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3.14159265
+output: 3.1415926500
+```
+'''
+hints = [
+  "let x: f64 = input.trim().parse().unwrap(); — f64 je ten široký; f32 změní číslice.",
+  "parse na neoříznutém textu selže na konci řádku; &str není číslo.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.verybasic.04.strings"
+title = "Vývěsní štít"
+story = "Malíř štítů na Yee Wo Street má název obchodu malými písmeny a štít musí křičet."
+brief = '''
+Přečti jeden řádek a vypiš ho velkými písmeny.
+`String` má metodu, která vrátí kopii velkými písmeny.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  jardines bazaar
+output: JARDINES BAZAAR
+```
+'''
+hints = [
+  "let upper = line.to_uppercase(); — v Rustu se jmenuje to_uppercase.",
+  "to_upper a toUpperCase jsou jiné jazyky; to_lowercase je opačný směr.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.verybasic.05.bool-if"
+title = "Sudé, nebo liché"
+story = "Dveře tramvaje počítají cestující a světlo, které říká sudé nebo liché, se nikdy nemění."
+brief = '''
+Přečti celé číslo `n`. Nastav `even` na `bool`, který je true, když je `n` sudé; program z něj vypíše `even` nebo `odd`.
+`%` je zbytek po dělení, `==` porovnání.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  4
+output: even
+```
+'''
+hints = [
+  "let even = n % 2 == 0; — nulový zbytek znamená sudé a == z toho udělá bool.",
+  "Samotný zbytek je celé číslo a if chce bool.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.verybasic.06.loops"
+title = "Počítání tramvají"
+story = "Zastávka u Hysan Place počítá jízdné od 1 až po poslední noční tramvaj a součet zůstává na nule."
+brief = '''
+Přečti `n`. Přičti do `total` každé celé číslo od 1 do `n` včetně; program ho vypíše.
+`for` přes rozsah to udělá; `..=` zahrnuje konec.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  4
+output: 10
+```
+'''
+hints = [
+  "for i in 1..=n { total += i; } — ..= dosáhne na n; .. se zastaví o jedno dřív.",
+  "Tři tečky nejsou Rust; = i místo += i si nechá jen to poslední.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.verybasic.07.functions"
+title = "Dvojnásobné jízdné"
+story = "Kiosek na Times Square po půlnoci účtuje dvojnásobek a funkce, která zdvojnásobuje, vrací jízdné nedotčené."
+brief = '''
+Napiš `double`: funkci, která vezme `i64` a vrátí jeho dvojnásobek. Program přečte `n` a vypíše `double(n)`.
+Poslední výraz funkce, bez středníku, je její návratová hodnota.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5
+output: 10
+```
+'''
+hints = [
+  "fn double(x: i64) -> i64 { x * 2 } — -> pojmenuje návratový typ a holé x * 2 je to, co se vrací.",
+  "Středník na konci promění hodnotu v nic; bez -> funkce nic nevrací.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.verybasic.08.structs"
+title = "Karta stánku"
+story = "Každý stánek na Bowrington Road má kartu se jménem a cenou a typ, který jednu drží, chybí."
+brief = '''
+Deklaruj `Stall`: strukturu s polem `name`, které je `String`, a polem `price`, které je `i64`. Program přečte obojí, jednu sestaví a vypíše ji.
+`struct` pojmenuje typ a vyjmenuje pole s jejich typy.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  fish 38
+output: fish: 38
+```
+'''
+hints = [
+  "struct Stall { name: String, price: i64 } — složené závorky, pole: Typ, čárky, žádný středník.",
+  "str nemá známou velikost a sám o sobě polem být nemůže; n-ticová struktura nemá jména polí, ze kterých by se stavělo.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.verybasic.09.struct-method"
+title = "Součet stánku"
+story = "Karta stánku zná svou cenu i množství a neumí říct, kolik řádek dělá."
+brief = '''
+Dej `Stall` metodu `total`, která vrátí `price * qty`. Program volá `stall.total()`.
+Metody žijí v bloku `impl` a berou `&self`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  38 3
+output: 114
+```
+'''
+hints = [
+  "impl Stall { fn total(&self) -> i64 { self.price * self.qty } } — &self je to, jak se metoda dostane ke svým polím.",
+  "Bez &self žádné self není; bez self. jména price a qty neexistují.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.verybasic.10.enums"
+title = "Barva linky"
+story = "Cedule MTR pod Times Square zná tři linky a linku Tsuen Wan maluje ničím."
+brief = '''
+`match` přes `Line` má větev pro `Island` a `KwunTong`. Přidej větev pro `TsuenWan`, jejíž barva je `red`.
+Větev je `Type::Variant => value,`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "Line::TsuenWan => \"red\", — varianta se svým enumem vpředu, tlustá šipka, hodnota, čárka.",
+  "Holé jméno je vazba, která chytí všechno, ne varianta; -> není větev.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.verybasic.11.vector"
+title = "Fronta u Hysan"
+story = "Počítadlo fronty u Hysan Place potřebuje seznam, který roste, jak se lidé přidávají, a seznam se nikdy nevytvoří."
+brief = '''
+Vytvoř `v`: prázdný, rostoucí vektor `i64`, do kterého může smyčka vkládat push. Program vypíše jeho délku a součet.
+Vektor se vytvoří pomocí `Vec::new()` a musí být `mut`, aby mohl růst.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3
+output: 3 6
+```
+'''
+hints = [
+  "let mut v: Vec<i64> = Vec::new(); — new() se závorkami a mut, aby byl push dovolen.",
+  "Vec::new bez () je funkce, ne volání; vec![0] začíná s nulou uvnitř.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.verybasic.12.vector-edit"
+title = "První odchází"
+story = "První člověk ve frontě u Hysan Place je obsloužen a seznam ho pořád ukazuje vpředu."
+brief = '''
+`v` drží celá čísla z řádku. Odstraň hodnotu na indexu 0; program vypíše, co zbylo.
+Vektor odstraňuje podle indexu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  4 5 6 7
+output: 5 6 7
+```
+'''
+hints = [
+  "v.remove(0); — remove bere index a zbytek posune dolů.",
+  "pop bere poslední; index 1 je druhý; delete není metoda Vec.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.verybasic.13.list"
+title = "Hromada talířů"
+story = "Pult s dim sum dává každý nový talíř na začátek kolejnice a kolejnice je ukazuje v pořadí, v jakém přišly."
+brief = '''
+`list` je `LinkedList<i64>`. Dej každé `x` na ZAČÁTEK, aby program vypsal hodnoty v opačném pořadí.
+Spojový seznam umí vkládat na oba konce.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+hints = [
+  "list.push_front(x); — přední konec; push_back je ten druhý.",
+  "LinkedList nemá push ani vkládání podle indexu.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.verybasic.14.maps"
+title = "Objednávkový blok"
+story = "Objednávkový blok v Lucky Macu musí spočítat, kolikrát bylo které jídlo vyvoláno, a u každého jídla ukazuje jedničku."
+brief = '''
+`count` je `BTreeMap<String, i64>`. Pro každé slovo `w` přičti jedničku k jeho počtu — nové slovo začíná na nule. Program vypíše `word count` na řádek, seřazeno.
+`entry` najde nebo vytvoří políčko, `or_insert` mu dá počáteční hodnotu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        har 1
+        mai 2
+        siu 2
+```
+'''
+hints = [
+  "*count.entry(w.to_string()).or_insert(0) += 1; — or_insert vrátí referenci a * je to, co += potřebuje.",
+  "insert pokaždé přepíše jedničkou; get vrátí sdílenou referenci, ke které nejde přičítat.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.verybasic.15.hashtable"
+title = "Náhodný součet"
+story = "Hashovaný součet v Lucky Macu vyjde pokaždé v jiném pořadí, když se tiskne."
+brief = '''
+`counts` je `HashMap`, který prochází své klíče v žádném pevném pořadí. `keys` drží tyto klíče ve `Vec`. Seřaď `keys`, aby se součet pokaždé vytiskl stejně.
+`Vec` se řadí na místě.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  f e d c b a f
+output: a 1
+        b 1
+        c 1
+        d 1
+        e 1
+        f 2
+```
+'''
+hints = [
+  "keys.sort(); — na místě, vzestupně.",
+  "sorted() na Vec neexistuje; reverse jen otočí to náhodné pořadí, které bylo; b.cmp(a) řadí sestupně.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.verybasic.16.sets"
+title = "Známková knížka"
+story = "Tramvajová známková knížka bere razítko jednou, ať stejná tramvaj projede kolikrát chce."
+brief = '''
+`seen` je `BTreeSet<i64>`. Přidej do ní každé `x`; hodnota, která už v množině je, se podruhé nepřidá. Program vypíše, kolik je různých hodnot, a hodnoty v pořadí.
+Množina vkládá pomocí insert.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 1 3 2 1
+output: 3
+        1 2 3
+```
+'''
+hints = [
+  "seen.insert(x); — množina vkládá a opakování nic nezmění.",
+  "push a add nejsou metody množiny; x * 2 je jiná hodnota.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.verybasic.17.stack"
+title = "Poslední dovnitř, první ven"
+story = "Čisté talíře u pultu s dim sum se berou z vrchu hromady a hromada se čte zespodu."
+brief = '''
+`stack` je `Vec<i64>` použitý jako zásobník. Odebírej z něj hodnoty pop, dokud není prázdný, a každou vkládej do `out`; program je vypíše — poslední dovnitř, první ven.
+`pop` dává `Option`, takže smyčka je `while let`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 4 3 2 1
+```
+'''
+hints = [
+  "while let Some(v) = stack.pop() { out.push(v.to_string()); } — pop bere vršek, dokud None smyčku neukončí.",
+  "Vec nemá pop_front; procházení od začátku nebo vkládání na 0 vrátí původní pořadí.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.verybasic.18.queue"
+title = "První dovnitř, první ven"
+story = "Čísla lístků u pultu v Sogu se vyvolávají z čela fronty a obrazovka vyvolává konec."
+brief = '''
+`queue` je `VecDeque<i64>`. Vezmi PRVNÍ hodnotu z čela do `first`; program pak vezme druhou a vypíše obě.
+Deque odebírá na obou koncích.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 1 2
+```
+'''
+hints = [
+  "let first = queue.pop_front().unwrap(); — přední konec, odebráno.",
+  "pop_back je druhý konec; front() se dívá bez odebrání, takže druhá je tatáž hodnota; pop na VecDeque neexistuje.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.verybasic.19.heap"
+title = "Nejmenší první"
+story = "Seznam u kohoutku ve Victoria Parku obsluhuje nejmenší lístek první a halda pořád vydává největší."
+brief = '''
+`heap` je `BinaryHeap<Reverse<i64>>` — max-halda proměněná v min-haldu tím, že je každá hodnota zabalená v `Reverse`. Vlož do ní každé `x`; program je vybírá od nejmenšího.
+Co jde dovnitř, musí být zabalené.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 1 4 2 3
+output: 1 2 3 4 5
+```
+'''
+hints = [
+  "heap.push(std::cmp::Reverse(x)); — halda drží Reverse<i64>, takže to se vkládá.",
+  "Holé x je špatný typ; -x vydá největší první, znegované; insert není metoda haldy.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.verybasic.20.sorting"
+title = "Cenový žebřík"
+story = "Cenová tabule v Sogu vypisuje ceny v pořadí, v jakém byly napsány, a zákazníci chtějí nejlevnější nahoře."
+brief = '''
+`v` drží celá čísla z řádku. Seřaď ho vzestupně, na místě; program ho vypíše.
+`Vec` na to má metodu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 1 4 2 3
+output: 1 2 3 4 5
+```
+'''
+hints = [
+  "v.sort(); — na místě, vzestupně, se závorkami.",
+  "b.cmp(a) řadí sestupně; sorted() není metoda Vec; bez () se nic nezavolá.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.verybasic.21.sort-by-key"
+title = "Žebříček"
+story = "Tabule v herně u Hysan Place chce nejvyšší skóre první a shody podle jména, a ukazuje je jen podle jména."
+brief = '''
+`rows` je `Vec<(String, i64)>` jmen a skóre. Seřaď ho podle skóre sestupně, pak podle jména vzestupně; program vypíše `name score` na řádek.
+`sort_by_key` řadí podle klíče; `Reverse` otočí jednu jeho část.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3
+        mei 90
+        alex 95
+        bo 90
+output: alex 95
+        bo 90
+        mei 90
+```
+'''
+hints = [
+  "rows.sort_by_key(|r| (std::cmp::Reverse(r.1), r.0.clone())); — n-ticový klíč: skóre obráceně, pak jméno.",
+  "r.1 samotné je vzestupně; r.0 bez clone přesune String z výpůjčky; prosté sort() řadí podle jména.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.verybasic.22.reverse"
+title = "Pozpátku"
+story = "Jméno sampanu je na zádi namalované pozpátku a malíř má jen kopii popředu."
+brief = '''
+Přečti jeden řádek. Vytvoř `rev`, tentýž text se znaky v opačném pořadí; program ho vypíše.
+Znaky dává `chars()`, iterátor umí běžet pozpátku a iterátor znaků se posbírá do `String`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  kwan lee
+output: eel nawk
+```
+'''
+hints = [
+  "let rev: String = s.chars().rev().collect(); — rev() na iterátoru, collect() do String.",
+  "reverse je metoda Vec, ne iterátoru ani str; to_string to zkopíruje popředu.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.verybasic.23.closures"
+title = "Servisní přirážka"
+story = "Tiskárna v jídelně přičítá ke každé položce stejnou přirážku a přirážku zapomněla ještě před první položkou."
+brief = '''
+Přečti `k`, pak řádek celých čísel. Vytvoř `add`: closure, která vezme `i64` a vrátí ho plus `k`. Program ji použije na každé číslo.
+Closure je `|args| body` a může použít `k` zvenčí.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "let add = |x: i64| x + k; — svislítka drží argument, tělo následuje, k je zachyceno.",
+  "Closure nemá před tělem -> a nepíše se fn; x - k je špatný součet.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "rust.verybasic.24.lambdas"
+title = "Sudé stoly"
+story = "Jídelna v Sogu účtuje sudým stolům druhou mocninu jejich čísla a pokladna má řetězec, ve kterém nic není."
+brief = '''
+`nums` drží celá čísla z řádku. Vytvoř `total`: součet druhých mocnin těch sudých, jako jeden řetězec iterátoru.
+`filter` nechává, `map` proměňuje, `sum` sčítá.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "let total: i64 = nums.iter().filter(|&&x| x % 2 == 0).map(|&x| x * x).sum(); — &&x rozbalí dvě reference, které filter podává.",
+  "x % 2 == 1 nechá lichá; bez vzorů & se zbytek bere z reference; bez filter se umocní každé číslo.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "rust.verybasic.25.threads"
+title = "Čtyři pokladny"
+story = "Jardine's Bazaar otevírá jednu pokladnu na účtenku a pokladny se nikdy nespustí."
+brief = '''
+Pro každé `x` spusť vlákno, které spočítá `x * x`, a vlož jeho handle do `handles`. Program je po řadě spojí a vypíše mocniny.
+`thread::spawn` bere closure; `move` dá vláknu vlastní kopii `x`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3
+output: 1 4 9
+```
+'''
+hints = [
+  "handles.push(thread::spawn(move || x * x)); — move, žádné argumenty, x * x jako hodnota.",
+  "Bez move si vlákno půjčuje proměnnou smyčky, kterou může přežít; closure pro spawn nebere argumenty; x + x je dvojnásobek.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "rust.verybasic.26.mutex"
+title = "Jedno počítadlo, mnoho rukou"
+story = "Každá pokladna v Jardine's Bazaar přičítá své tržby k jednomu počítadlu ve stejnou chvíli a počítadlo ukazuje nulu."
+brief = '''
+`c` je klon `Arc<Mutex<i64>>` uvnitř každého vlákna. Přičti `x` k číslu uvnitř mutexu. Program spojí každé vlákno a vypíše součet.
+`lock()` dá guard; `*` se dostane k číslu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3
+output: 6
+```
+'''
+hints = [
+  "*c.lock().unwrap() += x; — zamknout, rozbalit guard, * k i64, pak přičíst.",
+  "Ke guardu samotnému se přičítat nedá; lock() vrací Result, který se musí rozbalit; = x přepisuje místo přičítání.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "rust.verybasic.27.binary-tree"
+title = "Automatické doplňování"
+story = "Telefonní kiosek na Percival Street a přízračný text je zpátky se stromem, který už viděl. Nemá doplnění pro ten jeden řádek, který rozhoduje, na kterou stranu hodnota jde."
+brief = '''
+`insert` vloží `value` do stromu pod `n`: menší hodnoty jdou do levého podstromu, větší do pravého, a podstrom se přiřadí zpět. Napiš ten jeden řádek. Program vypíše průchod inorder a výšku.
+`take()` vyzvedne dítě, aby se mohlo předat rekurzivnímu volání.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "if value < n.value { n.left = insert(n.left.take(), value); } else { n.right = insert(n.right.take(), value); } — take, rekurze, přiřazení zpět, na straně, kterou vybere porovnání.",
+  "Nepřiřazení zpět ztratí podstrom; > posílá hodnoty na špatnou stranu; &n.right je reference tam, kde funkce chce samotný Option.",
+]

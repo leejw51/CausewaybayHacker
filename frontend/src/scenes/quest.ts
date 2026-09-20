@@ -58,9 +58,10 @@ import { CodeFx } from "../ui/codefx";
 import { Coder } from "../ui/agent/coder";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
-import type { Attempt, Category, EditState, Land, Quest, RunStage } from "../net/protocol";
+import type { Attempt, XpGain, Category, EditState, Land, Quest, RunStage } from "../net/protocol";
 import { LogBuffer } from "../net/logbuf";
 import { blocks } from "../ui/markdown";
+import { quizPick, startsLocked, visibleBox } from "../ui/quiz";
 import { clipMessage, copyText, readText } from "../ui/clip";
 import { readEnumPref, readNumberPref, writePref } from "../ui/prefs";
 import { LandsScene } from "./lands";
@@ -356,6 +357,17 @@ export class QuestScene implements Scene {
   /** True when `error` is news rather than a fault; it changes the colour. */
   private notice = false;
   private t = 0;
+  /**
+   * VERY BASIC: the quiz (PROTOCOL §5.3 `quiz`). The question is the brief;
+   * the four choices are drawn under it as buttons, and the editor stays
+   * locked until the right one is picked — "select one, then type it". A
+   * wrong pick flashes red and shakes the screen; the right one rings the
+   * coin, unlocks the editor and puts the caret in it. Nothing here is sent
+   * to the server: the record is the typed line passing the tests.
+   */
+  private quizRight = false;
+  private quizWrong: number | null = null;
+  private quizWrongAt = -1;
   private consoleOpen = false;
   private logScroll = 0;
   private queued = 0;
@@ -384,6 +396,13 @@ export class QuestScene implements Scene {
    * automated run see every control on the screen regardless.
    */
   private readonly bar = new Buttons();
+  /**
+   * The quiz's four choices. Their own set: `this.buttons` is painted as
+   * pixel plates by `Buttons.draw`, and a choice painted as a blank plate
+   * over its own text is exactly what the first build of this showed.
+   * These are drawn by `drawChoices` and only hit-tested here.
+   */
+  private readonly choiceBtns = new Buttons();
   private stack: Stack = readEnumPref(STACK_KEY, STACKS, "auto");
   private fontMul = readNumberPref(FONT_KEY, 1, FONT_MIN, FONT_MAX);
   /** Where the toolbar was this frame, so the panels start under it. */
@@ -520,6 +539,10 @@ export class QuestScene implements Scene {
       // but a change is the one moment the edit stack cares about, so it
       // starts the idle timer that eventually takes a copy.
       this.editor = new Editor(this.land, this.opened, () => this.touched());
+      // The quiz comes first on VERY BASIC: the editor opens locked and the
+      // right choice is the key. A cleared quest is past its quiz.
+      this.quizRight = !startsLocked(res.quest.quiz, res.quest.state);
+      if (!this.quizRight) this.editor.setLocked(true);
       this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
       // After the editor, so it is painted over it.
       this.fx = new CodeFx(this.app.overlay, this.app.layout, this.app.assets, this.app.chip);
@@ -655,7 +678,7 @@ export class QuestScene implements Scene {
         else this.app.chip.fail();
         return;
       }
-      this.showResult(res.attempt);
+      this.showResult(res.attempt, "xp" in res ? res.xp : undefined);
     } catch (e) {
       this.stage = "idle";
       this.log.end();
@@ -686,7 +709,7 @@ export class QuestScene implements Scene {
     return a.verdict === "accepted" && a.tests_passed === a.tests_total;
   }
 
-  private showResult(attempt: Attempt): void {
+  private showResult(attempt: Attempt, xp?: XpGain): void {
     // `cleared` is "did *this* submission clear it" (§5.4); a re-solve is
     // still accepted and still deserves the sound, just not the fanfare.
     if (attempt.verdict === "accepted") this.app.chip.clear();
@@ -699,6 +722,7 @@ export class QuestScene implements Scene {
         this.questId,
         attempt,
         this.editor?.source,
+        xp,
       ),
     );
   }
@@ -1538,6 +1562,11 @@ export class QuestScene implements Scene {
       if (name === "home") return void (this.logScroll = 9999);
       if (name === "end") return void (this.logScroll = 0);
     }
+    // 1–4 answer the quiz while the editor does not have the keyboard.
+    if (!this.focus && this.quest?.quiz && !this.quizRight && /^[1-4]$/.test(name)) {
+      this.pick(Number(name) - 1);
+      return;
+    }
     if (name === "escape") {
       if (this.focus && this.coder?.open) {
         this.coder.panel.open = false;
@@ -1594,7 +1623,9 @@ export class QuestScene implements Scene {
   }
 
   controls(): Buttons[] {
-    return this.coder ? [this.buttons, this.bar, this.coder.controls()] : [this.buttons, this.bar];
+    return this.coder
+      ? [this.buttons, this.bar, this.choiceBtns, this.coder.controls()]
+      : [this.buttons, this.bar, this.choiceBtns];
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
@@ -1602,11 +1633,16 @@ export class QuestScene implements Scene {
     if (phase === "move") {
       this.buttons.hovered = this.buttons.hit(x, y)?.id ?? null;
       this.bar.hovered = this.bar.hit(x, y)?.id ?? null;
+      this.choiceBtns.hovered = this.choiceBtns.hit(x, y)?.id ?? null;
       return;
     }
     if (phase !== "down") return;
-    const hit = this.buttons.hit(x, y) ?? this.bar.hit(x, y);
+    const hit = this.choiceBtns.hit(x, y) ?? this.buttons.hit(x, y) ?? this.bar.hit(x, y);
     if (!hit) return;
+    if (hit.id.startsWith("choice:")) {
+      this.pick(Number(hit.id.slice(7)));
+      return;
+    }
     this.app.chip.select();
     switch (hit.id) {
       case "agent":
@@ -1774,6 +1810,7 @@ export class QuestScene implements Scene {
     const fonts = ensureFonts(s);
     this.buttons.reset();
     this.bar.reset();
+    this.choiceBtns.reset();
     if (this.focus) {
       this.drawFocus(g, s);
       this.coder?.draw();
@@ -1820,9 +1857,14 @@ export class QuestScene implements Scene {
     // message bar at the bottom of this screen, which is part of the layout
     // rather than an overlay for exactly this reason.
     const toast = this.app.toastBand();
+    // While a quiz is unanswered the brief is the screen — the question and
+    // its four choices are the whole action — so it takes the larger share
+    // of the column; the moment the right line is picked the editor gets it
+    // back, because then typing is.
+    const quizUp = !!this.quest?.quiz && !this.quizRight;
     const f = frame(
       layout,
-      side ? 0.34 : 0.26,
+      side ? (quizUp ? 0.46 : 0.34) : quizUp ? 0.76 : 0.26,
       0,
       side ? "row" : "column",
       this.barH + Math.round(6 * s) + toast,
@@ -2133,6 +2175,101 @@ export class QuestScene implements Scene {
     this.bar.row(fonts.stationSm, [x, y, w, h], this.toolItems(), layout.minTouchH());
   }
 
+  /** One of the four, chosen. */
+  private pick(i: number): void {
+    const verdict = quizPick(this.quest?.quiz, i, this.quizRight);
+    if (verdict === "ignored") return;
+    if (verdict === "right") {
+      this.quizRight = true;
+      this.quizWrong = null;
+      this.app.chip.coin();
+      this.editor?.setLocked(false);
+      // The caret, not the screen's focus mode: that mode swaps the bar for
+      // the code-only one, and SUBMIT lives on the ordinary bar.
+      this.editor?.focus();
+      return;
+    }
+    this.quizWrong = i;
+    this.quizWrongAt = this.t;
+    this.app.chip.fail();
+    this.app.shake(0.3);
+  }
+
+  /**
+   * The four choices under the question, as buttons in the brief's column.
+   * Returns the height used. The picked-wrong one flashes red for a moment,
+   * the right one stays green once found, and the rest are plain wells with
+   * their number, so a keyboard player sees which key is which.
+   */
+  private drawChoices(
+    g: Ctx,
+    x: number,
+    y: number,
+    w: number,
+    clip: Rect,
+    fonts: ReturnType<typeof ensureFonts>,
+    s: number,
+  ): number {
+    const quiz = this.quest?.quiz;
+    if (!quiz) return 0;
+    const { layout } = this.app;
+    let yy = y;
+    g.fillStyle = css(this.quizRight ? Theme.admit : Theme.coin);
+    printf(
+      g,
+      fonts.stationSm,
+      this.quizRight ? t("quest.quizRight") : t("quest.quizPick"),
+      x,
+      yy,
+      w,
+      "left",
+    );
+    yy += fonts.stationSm.height + Math.round(6 * s);
+    const gap = Math.round(6 * s);
+    for (let i = 0; i < quiz.choices.length; i++) {
+      const text = quiz.choices[i];
+      const lines = wrap(fonts.code, text, w - Math.round(34 * s));
+      const h = Math.max(layout.minTouchH(), lines.length * fonts.code.height + Math.round(12 * s));
+      const right = this.quizRight && i === quiz.answer;
+      const wrong = this.quizWrong === i && this.t - this.quizWrongAt < 0.9;
+      const hover = this.choiceBtns.hovered === `choice:${i}` && !this.quizRight;
+      fill(g, Theme.ink, x, yy, w, h, 0.9);
+      fill(
+        g,
+        right ? Theme.admit : wrong ? Theme.red : hover ? Theme.coin : Theme.navy,
+        x + 2,
+        yy + 2,
+        w - 4,
+        h - 4,
+        right || wrong ? 0.45 : hover ? 0.35 : 0.9,
+      );
+      g.fillStyle = css(right ? Theme.admit : wrong ? Theme.red : Theme.coin);
+      printf(
+        g,
+        fonts.stationSm,
+        String(i + 1),
+        x + Math.round(8 * s),
+        yy + Math.round(6 * s),
+        20,
+        "left",
+      );
+      g.fillStyle = css(this.quizRight && !right ? Theme.dim : Theme.cream);
+      let cy = yy + Math.round(6 * s);
+      for (const line of lines) {
+        printf(g, fonts.code, line, x + Math.round(28 * s), cy, w - Math.round(34 * s), "left");
+        cy += fonts.code.height;
+      }
+      // The hit box is the visible part: the brief scrolls, and a choice
+      // scrolled out of the panel must not take a tap meant for the well.
+      const box = visibleBox([x, yy, w, h], clip);
+      if (box && !this.quizRight) {
+        this.choiceBtns.add({ id: `choice:${i}`, rect: box, label: "" });
+      }
+      yy += h + gap;
+    }
+    return yy - y + Math.round(4 * s);
+  }
+
   private drawBrief(g: Ctx, rect: Rect, accent: readonly [number, number, number, number]): void {
     const s = this.app.layout.uiScale();
     const fonts = ensureFonts(s);
@@ -2186,7 +2323,17 @@ export class QuestScene implements Scene {
         yy += Math.round(5 * s);
       }
       // `brief` is markdown (SPEC §2.1); the canvas draws the flattening.
+      //
+      // On VERY BASIC the four choices go in right after the question and
+      // before the worked example: on a phone the example pushed them under
+      // the fold, and a quiz whose answers need a scroll is a quiz nobody
+      // sees. The example still follows, for the output format.
+      let choicesDrawn = false;
       for (const b of blocks(this.quest!.brief)) {
+        if (b.kind === "code" && !choicesDrawn && this.quest!.quiz) {
+          yy += this.drawChoices(g, inner[0], yy, textW, inner, fonts, s);
+          choicesDrawn = true;
+        }
         if (b.kind === "code") {
           const lines = wrap(fonts.code, b.text, textW - Math.round(10 * s));
           const h = lines.length * fonts.code.height + Math.round(8 * s);
@@ -2204,6 +2351,9 @@ export class QuestScene implements Scene {
           yy += Math.round(6 * s);
         }
       }
+
+      // VERY BASIC with no example fence in the brief: the answers go last.
+      if (!choicesDrawn) yy += this.drawChoices(g, inner[0], yy, textW, inner, fonts, s);
 
       // SPEC §5.2 and §12: at least one case is `visible` precisely so "a
       // player is never guessing blind about the output format". It was the

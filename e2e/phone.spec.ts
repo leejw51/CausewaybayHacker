@@ -44,7 +44,7 @@ test("phone: the quest screen", async ({ page }) => {
   // under it — the road that used to be behind AUTO SELECT.
   const rows = await page.evaluate(() => {
     const api = window.__cwbCapture!;
-    const cat = ["basic", "advanced", "hacker"].map((c) => api.buttonAt(`cat:${c}`));
+    const cat = ["verybasic", "basic", "advanced", "hacker"].map((c) => api.buttonAt(`cat:${c}`));
     return { cat, auto: api.buttonAt("auto"), play: api.buttonAt("playground") };
   });
   for (const c of rows.cat) expect(c).not.toBeNull();

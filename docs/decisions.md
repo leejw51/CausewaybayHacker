@@ -2831,6 +2831,23 @@ directory.
 one SELECT and no write, and returns the same `updated_at`. Without that a list
 sorted by `updated_at` shuffles every few seconds while nobody is typing.
 
+## 2026-09-20 — BE: XP is a ledger, and a clear says what it was worth
+
+Until now `User.xp` was recomputed on every read from the progress table. It
+could never disagree with the record — and it could never be *shown*: a clear
+had no number of its own, the result screen had nothing to count up, and a
+quest that left the content pack took its XP with it. The first-clear grant
+is now a row in `xp_ledger` (`0016_xp.sql`), written by
+`progress::record_clear` in the same transaction as the clear, with the same
+formula as before; `awards::total_xp` sums the ledger, and `quest.submit.ok`
+and `progress.update` carry an `XpGain` (PROTOCOL §5.1b): the grant, the
+total, the level and whether it is new. No foreign key to `quests`: XP is
+history. The migration backfills every clear already on the record at the
+amount the old formula was reading, dated at the clear, so nobody's level
+moves on upgrade. The web result screen counts the grant up under a flash and
+light trails (`engine/celebrate.ts`), and slams the new level in when there
+is one; the LÖVE client ignores the field until it draws it.
+
 ## 2026-09-11 — BE: XP, levels and the badge set (for DESIGN)
 
 **XP** is `25 × stars × difficulty × category`, where `basic` = 1,

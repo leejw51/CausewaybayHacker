@@ -129,7 +129,17 @@ export const LANDS: readonly Land[] = ["rust", "go", "cpp", "python"];
 export function isLand(v: unknown): v is Land {
   return typeof v === "string" && (LANDS as readonly string[]).includes(v);
 }
-export type Category = "basic" | "advanced" | "hacker";
+export type Category = "verybasic" | "basic" | "advanced" | "hacker";
+
+/**
+ * §5.3. VERY BASIC only: the grammar asked as a question first. Four choices,
+ * `answer` the index of the one that is the line the quest wants typed. The
+ * question is the brief. Absent on every other road.
+ */
+export interface Quiz {
+  choices: string[];
+  answer: number;
+}
 /** The languages quest prose can arrive in (SPEC §12.1); `"en"` is the source. */
 export type TextLocale = "en" | "ko" | "yue" | "zh" | "ja" | "cs";
 export type NodeState = "locked" | "open" | "cleared";
@@ -188,6 +198,8 @@ export interface QuestTests {
 }
 
 export interface Quest {
+  /** §5.3: present on VERY BASIC quests only. */
+  quiz?: Quiz;
   id: string;
   land: Land;
   category: Category;
@@ -261,6 +273,20 @@ export interface AttemptMistake {
  * recorded, and its mistakes do feed the drills.
  */
 export type AttemptMode = "run" | "submit";
+
+/**
+ * §4.9 / §4.19. The XP a submit granted and where it leaves the player. The
+ * ledger on the server is the truth (`0016_xp.sql`); this is its reading at
+ * the moment of the reply, so the screen and the record cannot disagree.
+ */
+export interface XpGain {
+  gained: number;
+  total: number;
+  level: number;
+  into_level: number;
+  for_next: number;
+  level_up: boolean;
+}
 
 export interface Attempt {
   id: string;
@@ -602,7 +628,12 @@ export interface Responses {
     edges: Array<[string, string]>;
   };
   "quest.get": { quest: Quest };
-  "quest.submit": { attempt: Attempt };
+  /**
+   * §4.9. `xp` rides beside the attempt: what this submit was worth (zero on
+   * everything but a first clear), the total it leaves, and the level. It is
+   * optional only so an older server's reply still parses.
+   */
+  "quest.submit": { attempt: Attempt; xp?: XpGain };
   "quest.run": { attempt: Attempt };
   "quest.hint": { hint: string; index: number; total: number; hints_used: number };
   /**
@@ -690,6 +721,8 @@ export interface Events {
     seq: number;
   };
   "progress.update": {
+    /** §4.19: the same reading of the ledger the submit reply got. */
+    xp?: XpGain;
     quest_id: string;
     state: NodeState;
     stars: Stars;

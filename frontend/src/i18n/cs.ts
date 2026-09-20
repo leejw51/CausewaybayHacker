@@ -149,8 +149,12 @@ export const cs: Partial<Catalogue> = {
     "Ukazatele, RAII, nedefinované chování. Všechno je adresa a nikdo tě nekontroluje.",
   "lands.pythonBlurb":
     "Slovníky, generátory, kachní typování. Nic nemá typ, dokud to neběží, a běží to v šest.",
-  "lands.basicBlurb": "Ranní procházka. Výlohy, stánky a pokladny — přečti, co napsal stroj.",
-  "lands.advancedBlurb": "Polední špička. Dvě pokladny u jednoho pultu, a obě naráz.",
+  "lands.verybasicBlurb":
+    "Kvíz. Který řádek je správná gramatika? Vyber jeden ze čtyř a pak ho napiš.",
+  "lands.basicBlurb":
+    "Ranní procházka. Vždy jedna konstrukce, vysvětlená, a jeden dva řádky k doplnění — typy, smyčky, struktury, řazení, closures, vlákno, strom.",
+  "lands.advancedBlurb":
+    "Malé kódovací úlohy na gramatiku, pak polední špička: dvě pokladny u jednoho pultu, obě naráz.",
   "lands.hackerBlurb": "Pohovor. Jedna místnost, jedny hodiny a nikdo, kdo by dopsal tvůj řádek.",
   "lands.category": "{land} — KATEGORIE",
   "lands.clearedOf": "{cleared} Z {total} SPLNĚNO",
@@ -167,10 +171,14 @@ export const cs: Partial<Catalogue> = {
   "lands.noWorld": "server neposlal svět",
   "lands.footer": "←→  KRAJ   KLIK  KATEGORIE   F7  JAZYK   F1  ORIENTACE   F3  ODHLÁSIT",
 
+  "map.menu": "MENU",
+  "map.close": "ZAVŘÍT",
+  "map.goIn": "VSTOUPIT",
   "map.allMaps": "VŠECHNY MAPY",
   "map.playground": "HŘIŠTĚ",
   "map.allMapsShort": "MAPY",
   "map.playgroundShort": "HŘIŠTĚ",
+  "map.verybasic": "ÚPLNÝ ZÁKLAD",
   "map.basic": "ZÁKLAD",
   "map.advanced": "POKROČILÉ",
   "map.hacker": "HACKER",
@@ -191,6 +199,8 @@ export const cs: Partial<Catalogue> = {
   "map.footer": "←→  ULICE   ENTER  DOVNITŘ   TAB  KRAJ   Q/E  KATEGORIE   F1  ORIENTACE",
 
   "quest.loading": "NAČÍTÁM",
+  "quest.quizPick": "VYBER SPRÁVNÝ ŘÁDEK A NAPIŠ HO  (1–4)",
+  "quest.quizRight": "SPRÁVNĚ — TEĎ HO NAPIŠ",
   "quest.job": "ZADÁNÍ",
   "quest.sample": "UKÁZKA · {name}",
   "quest.in": "vstup",
@@ -311,6 +321,10 @@ export const cs: Partial<Catalogue> = {
   "result.runnerSaw": "CO VIDĚL RUNNER",
   "result.again": "ZNOVU",
   "result.tryAgain": "ZKUSIT ZNOVU",
+  "result.xpGained": "+{xp} XP",
+  "result.levelUp": "ÚROVEŇ {level}",
+  "result.xpTotal": "{xp} XP · ÚROVEŇ {level}",
+  "result.next": "DALŠÍ",
   "result.backToMap": "ZPĚT NA MAPU",
   "result.footer": "ENTER  MAPA   R  ZNOVU   F1  ORIENTACE   F3  ODHLÁSIT",
 

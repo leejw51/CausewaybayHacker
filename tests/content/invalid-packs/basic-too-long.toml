@@ -1,0 +1,73 @@
+# A `basic` quest whose answer is a program, not a drill. BASIC is the grammar
+# road: the brief explains a construct and the player fills a hole of one or
+# two lines. This solution adds eleven lines the starter does not have, so
+# `verify_pack.py` refuses it (BASIC_MAX_ADDED). The importer does not check
+# this — it is an authoring rule, like the map-layout rules — so this fixture
+# is for the content gate, not for `cwbhacker import`.
+pack = "rust.basic"
+land = "rust"
+category = "basic"
+version = 1
+
+[[quest]]
+id = "rust.basic.01.too-long"
+node = 1
+title = "TOO LONG"
+difficulty = 1
+story = "The till at Jardine's Bazaar wants a whole program where a line would do."
+concepts = ["io", "control-flow"]
+requires = []
+map = { x = 0.1, y = 0.1, kind = "quest" }
+brief = '''
+Read `n`. Print the sum 1..n.
+
+```
+input:  3
+output: 6
+```
+'''
+starter = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let n: i64 = input.trim().parse().unwrap();
+    // your code here
+    let _ = n;
+}
+'''
+solution = '''
+use std::io::Read;
+
+struct Counter {
+    total: i64,
+}
+
+impl Counter {
+    fn new() -> Self {
+        Counter { total: 0 }
+    }
+    fn add(&mut self, x: i64) {
+        self.total += x;
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let n: i64 = input.trim().parse().unwrap();
+    let mut c = Counter::new();
+    for i in 1..=n {
+        c.add(i);
+    }
+    println!("{}", c.total);
+}
+'''
+hints = ["It is one line.", "Really."]
+
+[quest.tests]
+harness = "stdio"
+timeout_ms = 5000
+match = "trim"
+cases = [ { name = "three", stdin = "3\n", expect = "6\n", visible = true } ]

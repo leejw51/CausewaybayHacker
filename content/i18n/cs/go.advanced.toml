@@ -8,6 +8,531 @@ locale = "cs"
 
 # ---------------------------------------------------------------- 01
 [[quest]]
+id    = "go.advanced.01.control-flow"
+title = "Tramvaj, nebo metro"
+story = "Tabule ve vestibulu Causeway Bay má hlásit, který spoj právě jede. Místo toho každou minutu hlásí číslo minuty."
+brief = '''
+Načti jedno celé číslo `n`. Pro každé `i` od `1` do `n` vypiš jeden řádek:
+
+* `TRAMMTR`, pokud je `i` dělitelné třemi i pěti
+* `TRAM`, pokud je `i` dělitelné třemi
+* `MTR`, pokud je `i` dělitelné pěti
+* jinak samotné `i`
+
+```
+input:  5
+output: 1
+        2
+        TRAM
+        4
+        MTR
+```
+
+`switch` bez výrazu bere v Go v každé větvi jednu booleovskou podmínku a
+nepropadává dál. Použij ho.
+'''
+hints = [
+  "Nejdřív otestuj případ „obojí“, jinak nikdy nenastane.",
+  "switch { case cond: } nepotřebuje výraz a nepotřebuje break.",
+  "Dělitelné třemi a pěti je totéž co dělitelné patnácti.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.advanced.02.slices"
+title = "Uprostřed vozu"
+story = "Nástupiště 2 počítá, kdo nastoupí první a kdo poslední, a všechny mezi nimi ztratí."
+brief = '''
+Na standardním vstupu je na prvním řádku počet `n` a na druhém `n` celých
+čísel oddělených mezerami. `n` je nejméně `1`.
+
+Vypiš tři řádky: první hodnotu, poslední hodnotu a součet všeho, co leží
+ostře mezi nimi. Při méně než třech hodnotách je ten součet `0`.
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+'''
+hints = [
+  "nums[1:len(nums)-1] sdílí totéž podkladové pole — je to pohled, ne kopie.",
+  "S jednou nebo dvěma hodnotami je ten výraz prázdný nebo neplatný; ohlídej ho pomocí if.",
+  "range přes slice dává index a hodnotu; index zahoď pomocí _.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.advanced.03.maps"
+title = "Co hlásí vestibul"
+story = "Přestup Causeway Bay v devět. Hlásicí tabule chce pořadí a mapa žádné pořadí nemá."
+brief = '''
+Načti celý standardní vstup a rozděl ho podle bílých znaků.
+
+Vypiš každé různé slovo jednou jako `<word> <count>`, seřazené podle počtu
+sestupně, při shodě podle slova vzestupně.
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+Procházení mapy v Go je záměrně v náhodném pořadí. Nejdřív posbírej, pak
+vypisuj.
+'''
+hints = [
+  "counts[word]++ funguje i na chybějícím klíči: nulová hodnota int je 0.",
+  "sort.Slice bere funkci less — vrať true, když i musí být před j.",
+  "Rozhodnutí při shodě je druhé porovnání uvnitř té samé funkce.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.advanced.04.strings"
+title = "Bajty nejsou písmena"
+story = "Ukazatel u východu B ořízne 銅鑼灣 na tři a dostane jeden a půl znaku a otazník."
+brief = '''
+Načti jeden řádek. Vypiš tři řádky:
+
+1. jeho délku v **bajtech**
+2. jeho délku v **runách**
+3. ten řádek s runami v obráceném pořadí
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+Řádek může obsahovat znaky mimo ASCII, a pak si první dvě čísla nejsou
+rovna. `len(s)` jsou bajty. Vždycky byly.
+'''
+hints = [
+  "len(line) je počet bajtů; []rune(line) je dekódovaná podoba.",
+  "Obrácení slice bajtů by rozseklo vícebajtový znak napůl.",
+  "Dva indexy jdoucí proti sobě a prohazující cestou hodnoty — to je celé obracení.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.advanced.05.structs"
+title = "Pokladna"
+story = "Pult v Lucky Mac přidá k objednávce položku a při další už je pryč. Metoda si vzala kopii."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků `<ITEM> <CENTS>`.
+
+Posbírej položky do `Till` a pak každou vypiš zpátky jako `<ITEM> <CENTS>`,
+v pořadí, v jakém přišly, a nakonec `TOTAL <sum>`.
+
+```
+input:  2
+        HASHBROWN 600
+        SET 2800
+output: HASHBROWN 600
+        SET 2800
+        TOTAL 3400
+```
+
+`n` může být `0`, a pak je jediný řádek `TOTAL 0`.
+
+Metoda s hodnotovým příjemcem dostane kopii pokladny. `Add` musí měnit tu
+skutečnou.
+'''
+hints = [
+  "func (t *Till) Add — ukazatelový příjemce mění pokladnu, kterou drží volající.",
+  "till.Add(...) funguje beze změny; Go vezme adresu za tebe, protože till je adresovatelný.",
+  "Total jen čte, ale příjemce na jednom typu drž konzistentní.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.advanced.06.interfaces"
+title = "Jeden seznam, dvě věci"
+story = "Rozcestník v Hysan Place a tramvajová zastávka před ním se tisknou dvěma různými programy a ani jeden se nevejde do seznamu toho druhého."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků, každý buď
+
+* `SHOP <NAME> <FLOOR>` — vykreslí se jako `<NAME> / F<FLOOR>`
+* `STOP <ROUTE>` — vykreslí se jako `TRAM <ROUTE>`
+
+Vypiš každou ceduli vykreslenou, v pořadí, pak `SIGNS <n>` a pak `SHOPS <k>`,
+kde `k` je počet obchodů mezi nimi — spočítaný **typovým switchem**, ne
+příznakem, který sis vedl při parsování.
+
+```
+input:  3
+        SHOP HYSAN 4
+        STOP 2
+        SHOP SOGO 1
+output: HYSAN / F4
+        TRAM 2
+        SOGO / F1
+        SIGNS 3
+        SHOPS 2
+```
+'''
+hints = [
+  "Žádné klíčové slovo `implements` neexistuje. Dej každé struktuře metodu Render() string a splňuje Sign.",
+  "Přidej konkrétní hodnotu do []Sign pomocí append — Go ji zabalí za tebe.",
+  "switch sign.(type) { case Shop: } je typový switch; tvar s hodnotou je switch v := sign.(type).",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.advanced.07.errors"
+title = "Řádek, který není číslo"
+story = "Výpis jezdců se vrací z depa a uprostřed sloupce má něčí objednávku oběda."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků. Každý řádek má být celé
+číslo.
+
+Pro každý řádek vypiš buď dvojnásobek hodnoty, nebo `BAD <line>`, pokud se
+nedá naparsovat. Nakonec vypiš `SUM <total>`, součet hodnot, které jsi
+vypsal.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+Definuj sentinelovou chybu `var ErrNotANumber = errors.New(...)`, obal ji
+pomocí `fmt.Errorf("...: %w", ErrNotANumber)` a v `main` ji rozpoznej pomocí
+`errors.Is`. Chyba je hodnota; tohle je to, co ti to přináší.
+'''
+hints = [
+  "strconv.ParseInt(s, 10, 64) vrací (int64, error) — na druhou hodnotu se podívat není nepovinné.",
+  "%w ve fmt.Errorf nechá obalenou chybu dohledatelnou; %v by ji zploštilo na text.",
+  "errors.Is prochází řetěz obalení, takže shoda platí i po tom, co byla zpráva doplněna.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.advanced.08.closures"
+title = "Počítadlo u dveří"
+story = "Lucky Mac počítá, kdo vejde a kdo odejde, a vedoucí chce při zavírání číslo, ať se mezitím stane cokoli."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků, každý `IN` nebo `OUT`.
+
+Veď průběžný počet, který nikdy neklesne pod nulu. Po každém příkazu ho vypiš.
+Když se `main` vrací, vypiš `CLOSED <final>` — z `defer`, ne z konce funkce.
+
+```
+input:  4
+        IN
+        IN
+        OUT
+        IN
+output: 1
+        2
+        1
+        2
+        CLOSED 2
+```
+
+Samotné počítadlo je uzávěr: funkce, která vrací funkci, se součtem zachyceným
+mezi nimi. V řešení není žádná proměnná na úrovni balíčku.
+'''
+hints = [
+  "total žije v rámci makeCounter a vrácená funkce ho drží naživu. To je ten uzávěr.",
+  "defer func(){ ... }() se spustí při návratu a uzávěr čte `last` až tehdy — ne ve chvíli, kdy byl defer zapsán.",
+  "defer, který by bral argument, by hodnotu zachytil ve chvíli deferu. Zkus obojí a sleduj, jak se to změní.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.advanced.09.generics"
+title = "Jedna funkce, jakýkoli seznam"
+story = "Alex napsal Sum čtyřikrát — pro objednávky, pro jezdce, pro minuty a pro centy — a pátá je na řadě."
+brief = '''
+Na standardním vstupu je jeden řádek celých čísel oddělených mezerami.
+
+Vypiš tři řádky:
+
+1. každou hodnotu zdvojenou, spojené jednotlivými mezerami
+2. součet původních hodnot
+3. kolik z nich je větších než `10`
+
+```
+input:  1 2 3 4 12
+output: 2 4 6 8 24
+        22
+        1
+```
+
+Napiš tři generické pomocné funkce a použij je: `MapSlice[T, U any]`,
+`Sum[T Number]` nad omezením `~int64 | ~float64` a `Count[T any]`, která bere
+predikát.
+'''
+hints = [
+  "MapSlice mění typ prvku, takže potřebuje dva typové parametry, ne jeden.",
+  "Místa volání odvodí T a U ze slice a z funkce — MapSlice[int64, string] nepíšeš.",
+  "~int64 znamená int64 a cokoli, jehož podkladový typ je int64, a právě to pustí dovnitř pojmenovaný typ.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.advanced.10.defer-panic-recover"
+title = "Spadlo to a zase vstalo"
+story = "Jeden špatný lístek dřív shodil celou pokladnu a s ní i celou směnu."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků. Každý je celé číslo, slovo
+`BOOM`, nebo něco jiného.
+
+Napiš `run(text string) (out string)`, která vrátí dvojnásobek hodnoty, nebo
+`BAD <text>`, pokud se nedá naparsovat — a při `BOOM` **zpanikaří**, přičemž
+se v odložené funkci zotaví, takže volající dostane `RECOVERED boom` místo
+mrtvého programu. Vypiš jeden řádek na každý vstup a na konci, z `defer`
+v `main`, vypiš `CLOSED <n>`.
+
+```
+input:  4
+        21
+        BOOM
+        xx
+        -4
+output: 42
+        RECOVERED boom
+        BAD xx
+        -8
+        CLOSED 4
+```
+
+Tři fakta, a všechna tři jsou ta otázka: `recover` dělá něco jen uvnitř
+odložené funkce; **pojmenovaná** návratová hodnota je to, co odložené funkci
+dovolí změnit, co se po panice vrátí; a `defer` v `main` se spustí při
+návratu, takže `CLOSED` je poslední, ať smyčka dopadla jakkoli.
+'''
+hints = [
+  "Návratová hodnota musí být pojmenovaná — out string — jinak odložená funkce nemá do čeho přiřadit.",
+  "recover() vrací nil, když žádná panika nebyla, takže if je způsob, jak ty dvě cesty rozlišit.",
+  "Odložený uzávěr v main čte `done` ve chvíli, kdy běží, ne kdy byl zapsán, takže vidí konečný počet.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.advanced.11.zero-values"
+title = "Nic není nic"
+story = "Mapa rozpisu směn nikdy nevznikla a kód z ní celé dopoledne četl, aniž si jednou postěžoval."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` slov.
+
+Vypiš čtyři řádky, v tomto pořadí:
+
+1. `READ <v>` — co ti **nil** mapa dá pro klíč, který nemá
+2. `LEN <k>` — délku po přidání všech `n` slov do **nil** slice
+3. `WRITE <ok|panic>` — jestli přiřazení do té nil mapy zpanikařilo
+   (zotav se z toho; nenech program umřít)
+4. `FOUND <k>` — kolik ze slov je klíčem *inicializované* mapy naplněné
+   hodnotami `a` a `b`
+
+```
+input:  3
+        a b c
+output: READ 0
+        LEN 3
+        WRITE panic
+        FOUND 2
+```
+
+Nil mapa a nil slice nejsou stejný druh ničeho. Číst z nil mapy je legální
+a dává nulovou hodnotu typu hodnoty; zápis do ní zpanikaří, protože není
+žádná tabulka, do které by se zapisovalo. `append` do nil slice je legální
+a alokuje — proto je `var s []T` idiomatický prázdný slice a `var m map[K]V`
+idiomatická prázdná mapa není.
+'''
+hints = [
+  "empty[\"missing\"] na nil mapě není chyba — je to nulová hodnota int, tedy 0.",
+  "append si s nil slicem poradí: první podkladové pole alokuje za tebe, a proto nikdy nepotřebuješ make() jen kvůli začátku.",
+  "Zápis se musí odehrát uvnitř funkce s odloženým recover, jinak panika ukončí program dřív než čtvrtý řádek.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.advanced.12.embedding"
+title = "Nezdědilo nic"
+story = "Konečná je zastávka s něčím navíc. Alex ji napsal dvakrát, což je jednou moc."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků, každý `STOP <NAME>` nebo
+`TERM <NAME> <LINES>`.
+
+Dej `Stop` metodu `Describe() string`, která vrací jeho jméno. Nech `Terminus`
+**vnořit** `Stop` a přidat `Lines int`, a dej mu vlastní `Describe`, která
+zavolá tu vnořenou a přidá `(<lines> lines)`.
+
+Vypiš `Describe()` každého z nich, pak `TERMINI <k>` spočítané typovým
+switchem nad `[]Describer`.
+
+```
+input:  3
+        STOP CAUSEWAY
+        TERM KENNEDY 2
+        STOP TINHAU
+output: CAUSEWAY
+        KENNEDY (2 lines)
+        TINHAU
+        TERMINI 1
+```
+
+Vnoření není dědičnost. `Terminus` se *nestane* `Stop`; obsahuje ho, a metody
+obsažené hodnoty jsou **povýšeny** na vnější typ, pokud si vnější typ
+nedeklaruje vlastní. `t.Stop.Describe()` je způsob, jak se dostat k té, kterou
+jsi zastínil, a žádné `super` neexistuje.
+'''
+hints = [
+  "Vnořené pole nemá vlastní jméno — píše se `Stop` uvnitř literálu i v t.Stop.Describe().",
+  "Terminus splňuje Describer díky vlastní Describe; bez ní by ho splňoval přes povýšenou metodu Stop.",
+  "d.(Terminus) s tvarem comma-ok je typová aserce; typový switch dělá tutéž práci, když jsou možnosti víc než dvě.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.advanced.13.variadics"
+title = "Kolik jich máš"
+story = "Někdy jsou to dvě objednávky a někdy celý stojan, a funkci to nemá zajímat."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Napiš `total(values ...int64) (sum int64, count int)` — variadickou,
+s pojmenovanými návratovými hodnotami — a zavolej ji třemi způsoby. Vypiš:
+
+1. `ALL <sum> <count>` — celý slice, rozbalený pomocí `...`
+2. `NONE <sum> <count>` — volání úplně bez argumentů
+3. `TWO <sum> <count>` — první dvě hodnoty předané jednotlivě, nebo tolik,
+   kolik jich je
+
+```
+input:  4
+        1 2 3 4
+output: ALL 10 4
+        NONE 0 0
+        TWO 3 2
+```
+
+Uvnitř funkce je `values` obyčejný `[]int64`, a bez argumentů je `nil` —
+s čímž si `range` i `len` poradí bez zvláštního případu. `total(list...)`
+předá existující slice, místo aby ho kopíroval do nového; `total(list)` by se
+nezkompilovalo, a vědět proč je ta otázka.
+'''
+hints = [
+  "Holý `return` s pojmenovanými výsledky vrátí to, co sum a count právě drží.",
+  "total(list...) rozbaluje; total(list) se pokusí předat []int64 jako jediný int64 a nezkompiluje se.",
+  "Bez argumentů je values nil a len(nil slice) je 0 — žádnou pojistku nepotřebuješ.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.advanced.14.json"
+title = "Tag je smlouva"
+story = "API depa posílá klíče malými písmeny a Go exportuje pole velkými, a týden nikdo neviděl, proč je každá objednávka prázdná."
+brief = '''
+Na standardním vstupu je jeden řádek: JSON pole objednávek, každá s řetězcem
+`item` a číslem `cents`.
+
+Rozbal ho pomocí Unmarshal, vypiš jeden řádek na objednávku jako
+`<ITEM> <CENTS>`, pak zabal pomocí Marshal a vypiš souhrnný objekt přesně
+s klíči `count` a `total`, v tomto pořadí. Pokud vstup není platný JSON,
+vypiš `BAD JSON` a nic jiného.
+
+```
+input:  [{"item":"SET","cents":2800},{"item":"PIE","cents":900}]
+output: SET 2800
+        PIE 900
+        {"count":2,"total":3700}
+```
+
+Aby `encoding/json` pole vůbec vidělo, musí být **exportované** — pole
+s malým písmenem je pro marshaller neviditelné, a to potichu. Tag struktury
+pak říká, jak se jmenuje na drátě. `Marshal` zapisuje pole v pořadí
+deklarace, takže pořadí klíčů souhrnu určuješ ty, ne mapa.
+'''
+hints = [
+  "Tag jde do zpětných apostrofů za typ: Item string `json:\"item\"`.",
+  "Unmarshal bere ukazatel na cíl — &orders, ne orders — jinak nemá co vyplnit.",
+  "Zkontroluj chybu z Unmarshal. Při špatném vstupu zůstane orders prázdné a program, který chybu ignoruje, vesele vypíše nulový souhrn.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.advanced.15.testing"
+title = "Dokaž si to sám"
+story = "V 06:40 ti tohle nikdo nezkontroluje. Tabulka je přímo tady; rozsviť ji zeleně."
+brief = '''
+Program drží tabulku čtyř známých správných dvojic `(km, fare)` a ověřuje
+`fare` proti každé z nich; vypisuje `<name> ok` nebo
+`<name> FAIL got <g> want <w>` a pak `PASSED <k>/4`. Nakonec načte ze
+standardního vstupu jednu vzdálenost a vypíše `FARE <x>`.
+
+`fare(km)` má být `500 + 100 * km`. Ta ve startovním kódu je špatně a tabulka
+to odhalí — což je celý smysl.
+
+```
+input:  4
+output: zero ok
+        one ok
+        four ok
+        ten ok
+        PASSED 4/4
+        FARE 900
+```
+
+Na tabulku nesahej; je to specifikace. Tohle **je** tabulkový test v Go, jen
+bez harnessu: ve skutečném balíčku je to `func TestFare(t *testing.T)`
+s `for _, c := range cases` a `t.Run(c.name, ...)` a spouští ho `go test`.
+Tabulka je v obou případech stejná.
+'''
+hints = [
+  "Tabulka je specifikace. Funkce je to, co je špatně.",
+  "Tři ze čtyř případů selžou a ten, který projde, je km = 0, což je přesně důvod, proč jeden testovací případ nic nedokazuje.",
+  "V balíčku je to func TestFare(t *testing.T) s t.Run(c.name, func(t *testing.T){ ... }), aby se selhání samo pojmenovalo.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.advanced.16.nil-and-order"
+title = "Přední pokladna"
+story = "11:55 u přední pokladny Lucky Mac. Každá objednávka projde, některé z nich neexistují, a pokladna je stejně čte."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků. Každý je buď
+`<NAME> <CENTS>`, nebo samotné `-`, což znamená, že objednávka nikdy
+nedorazila: nil `*Order` ve slice.
+
+Vypiš skutečné objednávky seřazené podle centů **sestupně**, při shodě podle
+jména vzestupně, jako `<NAME> <CENTS>`. Pak vypiš `NIL <count>` — kolik jich
+chybělo.
+
+```
+input:  4
+        SET 2800
+        -
+        PIE 900
+        TEA 1200
+output: SET 2800
+        TEA 1200
+        PIE 900
+        NIL 1
+```
+
+Každý nil se musí najít dřív, než ho cokoli dereferencuje, včetně porovnávací
+funkce, kterou předáš `sort.Slice`. To je celý boss.
+'''
+hints = [
+  "Nil *Order ve slice je v pořádku, dokud z něj něco nečte pole. Nejdřív filtruj, pak řaď.",
+  "strings.Fields na \"-\" dá jedno pole, takže len(fields) < 2 je tvůj test chybějící objednávky.",
+  "Sestupně je > ve funkci less; rozhodnutí při shodě je druhé porovnání za ním.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
 id    = "go.advanced.01.goroutines"
 title = "Čtyřicet jezdců"
 story = "12:30. Osm kol, čtyřicet objednávek a dispečer je pořád vyvolává jednu po druhé."
@@ -43,7 +568,7 @@ hints = [
   "sort.Slice podle indexu vrátí pořadí, které plánovač vzal.",
 ]
 
-# ---------------------------------------------------------------- 02
+# ---------------------------------------------------------------- 18
 [[quest]]
 id    = "go.advanced.02.waitgroup"
 title = "Nikdo neodchází dřív"
@@ -74,7 +599,7 @@ hints = [
   "wg.Add(1) patří do smyčky, před příkaz go — ne dovnitř gorutiny.",
 ]
 
-# ---------------------------------------------------------------- 03
+# ---------------------------------------------------------------- 19
 [[quest]]
 id    = "go.advanced.03.close"
 title = "Kdo zavírá okénko"
@@ -108,7 +633,7 @@ hints = [
   "Zavření z přijímací strany by způsobilo paniku odesílatele při odeslání — proto zní pravidlo: zavírá odesílatel.",
 ]
 
-# ---------------------------------------------------------------- 04
+# ---------------------------------------------------------------- 20
 [[quest]]
 id    = "go.advanced.04.select"
 title = "Dvě nástupiště"
@@ -141,7 +666,7 @@ hints = [
   "Podmínka smyčky je `tramCh != nil || mtrCh != nil`, takže skončí, až jsou obě větve vypnuté.",
 ]
 
-# ---------------------------------------------------------------- 05
+# ---------------------------------------------------------------- 21
 [[quest]]
 id    = "go.advanced.05.mutex"
 title = "Jedna zásuvka, osm rukou"
@@ -170,7 +695,7 @@ hints = [
   "Obě metody potřebují ukazatelový příjemce, jinak každé volání zamkne kopii mutexu a nehlídá nic.",
 ]
 
-# ---------------------------------------------------------------- 06
+# ---------------------------------------------------------------- 22
 [[quest]]
 id    = "go.advanced.06.atomic"
 title = "Jednou, a jen jednou"
@@ -203,7 +728,7 @@ hints = [
   "INIT přistane vždy před TOTAL, protože tisk probíhá uvnitř gorutin a TOTAL se děje až po Wait.",
 ]
 
-# ---------------------------------------------------------------- 07
+# ---------------------------------------------------------------- 23
 [[quest]]
 id    = "go.advanced.07.context"
 title = "Přestaň posílat"
@@ -238,7 +763,7 @@ hints = [
   "defer cancel() v main není nepovinné, ani když cancel voláš sám — právě to uvolní kontext.",
 ]
 
-# ---------------------------------------------------------------- 08
+# ---------------------------------------------------------------- 24
 [[quest]]
 id    = "go.advanced.08.worker-pool"
 title = "Osm kol"
@@ -271,7 +796,7 @@ hints = [
   "Na to je ta gorutina navíc: wg.Wait() a pak close(results), zatímco main pořád vyprazdňuje.",
 ]
 
-# ---------------------------------------------------------------- 09
+# ---------------------------------------------------------------- 25
 [[quest]]
 id    = "go.advanced.09.errors-in-flight"
 title = "Něčí objednávka oběda"
@@ -306,7 +831,7 @@ hints = [
   "Před tiskem seřaď podle indexu, jinak je výstup takový, jak se rozhodl plánovač.",
 ]
 
-# ---------------------------------------------------------------- 10
+# ---------------------------------------------------------------- 26
 [[quest]]
 id    = "go.advanced.10.context-tree"
 title = "Ruší se směrem dolů"
@@ -347,7 +872,7 @@ hints = [
   "ctx.Err() je context.Canceled nebo context.DeadlineExceeded a errors.Is je způsob, jak je rozlišit, místo porovnávání řetězců.",
 ]
 
-# ---------------------------------------------------------------- 11
+# ---------------------------------------------------------------- 27
 [[quest]]
 id    = "go.advanced.11.rwmutex"
 title = "Tři sta čtenářů"
@@ -385,7 +910,7 @@ hints = [
   "Tvar comma-ok při čtení z mapy je to, co odlišuje `chybí` od `je přítomné a nulové`.",
 ]
 
-# ---------------------------------------------------------------- 12
+# ---------------------------------------------------------------- 28
 [[quest]]
 id    = "go.advanced.12.chan-directions"
 title = "Kterým směrem to jde"
@@ -420,7 +945,7 @@ hints = [
   "range přes zavřený, vyprázdněný kanál skončí — proto právě to, že ho produce zavře, vůbec dovolí consume vrátit hodnotu.",
 ]
 
-# ---------------------------------------------------------------- 13
+# ---------------------------------------------------------------- 29
 [[quest]]
 id    = "go.advanced.13.select-default"
 title = "Zkus to a nečekej"
@@ -454,7 +979,7 @@ hints = [
   "Netestuj prázdnotu zavřením kanálu — příjem ze zavřeného kanálu je vždy připravený a hlásil by `no`.",
 ]
 
-# ---------------------------------------------------------------- 14
+# ---------------------------------------------------------------- 30
 [[quest]]
 id    = "go.advanced.14.happens-before"
 title = "Proč je tenhle bezpečný"
@@ -495,7 +1020,7 @@ hints = [
   "Každá gorutina vlastní jeden slot, takže žádné dvě nikdy nesáhnou na stejnou paměť; jediná potřebná hrana je Wait před čtením všech.",
 ]
 
-# ---------------------------------------------------------------- 15
+# ---------------------------------------------------------------- 31
 [[quest]]
 id    = "go.advanced.15.generic-constraints"
 title = "Co musí typ slíbit"
@@ -537,7 +1062,7 @@ hints = [
   "map[T]struct{} potřebuje, aby T bylo comparable, což je přesně to omezení, a struct{} je hodnota nulové šířky, která říká `množina, ne mapa`.",
 ]
 
-# ---------------------------------------------------------------- 16
+# ---------------------------------------------------------------- 32
 [[quest]]
 id    = "go.advanced.16.gotchas"
 title = "Tři věci, které nejsou, co vypadají"
@@ -592,7 +1117,7 @@ hints = [
   "boxed drží (*Thing, nil). Porovnání s nil porovnává dvojici a typová polovina nil není.",
 ]
 
-# ---------------------------------------------------------------- 17
+# ---------------------------------------------------------------- 33
 [[quest]]
 id    = "go.advanced.17.race"
 title = "Závod"

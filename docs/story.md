@@ -126,12 +126,13 @@ be sat in whichever language the player is taking back.
 
 ---
 
-## 4. What the three roads mean in-world
+## 4. What the four roads mean in-world
 
 | road | in-world | what the player is doing |
 | --- | --- | --- |
-| **BASIC** | the morning walk | Re-learning to read. Every node is a shopfront, a kiosk or a till whose code is a Skynet suggestion with nothing underneath it. Mei writes the underneath. |
-| **ADVANCED** | the lunch rush | 12:30. Two tills on one counter, riders on shared bikes, an MTR interchange. Nothing fails because it is hard; it fails because two of it happened at the same time. |
+| **VERY BASIC** | the first coffee | Before the walk: a question on a napkin. Four lines, one of them the real grammar — a type, a container, a thread, a mutex, a heap, a stack, a struct. Mei points at one, then writes it. The napkin is the road; nothing is timed. |
+| **BASIC** | the morning walk | Re-learning to read, one line at a time. Every node is a shopfront, a kiosk or a till whose code is whole but for one or two lines — a type, a loop, a struct, a sort, a closure, a thread, a tree. The node says what the construct is and shows the exact line; Mei types it and it compiles. Grammar activation, not a quiz, and untimed: the syntax, back in the fingers. |
+| **ADVANCED** | the walk into the lunch rush | Simple coding quizzes that use the grammar BASIC activated — ownership, slices, errors, traits and interfaces, pointers, iterators, generics: the road the game opened with, kept whole. Then 12:30. Two tills on one counter, riders on shared bikes, an MTR interchange. Nothing fails because it is hard; it fails because two of it happened at the same time. |
 | **HACKER** | the interview | HKU, Chow Yei Ching Building, a room with a clock on the wall. Twenty-eight questions a real interview draws from — hashing, windows, trees, heaps, backtracking, graphs, DP, bits — worked alone, under time. Skynet's last defence is the thing it convinced everyone they could no longer do without help: solve a stated problem, under time, alone. |
 
 `BASIC` is untimed on purpose — the point is reading, not speed. `HACKER`
@@ -145,18 +146,22 @@ One per map, always the last node, `map.kind = "boss"`.
 
 | map | node | boss | what it is |
 | --- | --- | --- | --- |
-| `rust.basic` | 18 | **THE AUTOCOMPLETE** | The ghost text itself, at the Percival Street phone kiosk. It finishes every line before Mei has one. Beaten by writing something it has no completion for: a trait she named herself. |
-| `rust.advanced` | 17 | **DEADLOCK** | Under Times Square, in the plant room. Two locks, two threads, and the escalators stopped. Beaten by ordering. |
+| `rust.basic` | 27 | **THE AUTOCOMPLETE** | The ghost text itself, at the Percival Street phone kiosk. It finishes every line before Mei has one. Beaten by writing something it has no completion for: a binary search tree, inserted by hand, node by node. (The trait she named herself is on the ADVANCED road now, as *A TRAIT OF HER OWN*.) |
+| `rust.advanced` | 33 | **DEADLOCK** | Under Times Square, in the plant room. Two locks, two threads, and the escalators stopped. Beaten by ordering. |
 | `rust.hacker` | 28 | **THE WHITEBOARD** | Room 7-32, HKU. No syntax highlighting, no completion, a clock — and a cache that has to evict the right thing. |
-| `go.basic` | 18 | **NULLPTR** | Lucky Mac's front till at 11:55. Every order goes through and none of them exist. |
-| `go.advanced` | 17 | **THE RACE** | Causeway Bay interchange, platform 2. Two counters, one number, and the number is wrong by an amount nobody can reproduce. |
+| `go.basic` | 27 | **NULLPTR** | A nil child pointer, followed. The tree of orders at Lucky Mac has a branch that is not there yet, and the insert has to look before it walks. (The front till at 11:55 is on the ADVANCED road now, as *THE FRONT TILL*.) |
+| `go.advanced` | 33 | **THE RACE** | Causeway Bay interchange, platform 2. Two counters, one number, and the number is wrong by an amount nobody can reproduce. |
 | `go.hacker` | 28 | **THE CLOCK** | The second interview. Same room, and this time the clock is shorter. |
-| `cpp.basic` | 18 | **SEGFAULT** | The Noon Day Gun fires at an address nobody owns. |
-| `cpp.advanced` | 17 | **THE DANGLING** | Victoria Park's pump room: a thread still holding a reference to a buffer that was freed. |
+| `cpp.basic` | 27 | **SEGFAULT** | A `nullptr` child, dereferenced. The tree the gun's firing table is kept in has a branch that does not exist yet, and the insert has to check before it follows. (The address nobody owns is on the ADVANCED road now, as *THE WRONG ADDRESS*.) |
+| `cpp.advanced` | 34 | **THE DANGLING** | Victoria Park's pump room: a thread still holding a reference to a buffer that was freed. |
 | `cpp.hacker` | 34 | **THE LINKER** | The third interview, Room 7-32, a language with no safety net and a shorter clock. |
-| `python.basic` | 18 | **NONE** | The market's price board at 05:59: `'NoneType' object has no attribute 'price'`. |
-| `python.advanced` | 17 | **THE GIL** | SOGO basement, twelve stalls, one lock; everything "concurrent" ran one at a time. |
+| `python.basic` | 27 | **NONE** | `'NoneType' object has no attribute 'left'`: a child that is `None`, followed. The tree of stall numbers has a branch that is not there yet. (The price board at 05:59 is on the ADVANCED road now, as *THE 05:59 BOARD*.) |
+| `python.advanced` | 34 | **THE GIL** | SOGO basement, twelve stalls, one lock; everything "concurrent" ran one at a time. |
 | `python.hacker` | 34 | **THE RECURSION LIMIT** | The fourth interview; depth 1000 and the clock. |
+
+On the merged ADVANCED road the four old BASIC bosses keep their stories but
+lose the `boss` mark and their titles, so the name and the art belong to one
+node per map: the last one.
 
 A boss node is a quest like any other — harder, `difficulty` 4–5, and the story
 line is the only thing that says it is a boss. There is no separate boss

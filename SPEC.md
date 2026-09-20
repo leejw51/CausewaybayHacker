@@ -27,8 +27,11 @@ Skynet's plan all along — and takes it back one street at a time.
 
 * Four **lands**: `rust`, `go`, `cpp`, `python`. The player picks one; the
   others are still there.
-* Three **categories** per land: `basic` (grammar), `advanced` (threads,
-  mutexes, lifetimes, channels), `hacker` (HackerRank-style timed quests).
+* Four **categories** per land: `verybasic` (the quiz: four lines, one right,
+  pick it then type it), `basic` (grammar activation: a construct
+  shown, one or two lines to type), `advanced` (simple coding quizzes on that grammar — ownership, errors,
+  traits, iterators — then threads, mutexes, lifetimes, channels), `hacker`
+  (HackerRank-style timed quests).
 * Each category is a **map** — a Super Mario World overworld of numbered nodes
   joined by paths. Clear a node and it is stamped `CLEARED`, for good.
 * A node holds one **quest**. A quest is code the player writes, that the server
@@ -246,7 +249,7 @@ CREATE TABLE quests (
   id            TEXT PRIMARY KEY,          -- 'rust.basic.03.shadowing' (§4.1)
   pack          TEXT NOT NULL,             -- content pack that supplied it
   land          TEXT NOT NULL CHECK (land IN ('rust','go')),
-  category      TEXT NOT NULL CHECK (category IN ('basic','advanced','hacker')),
+  category      TEXT NOT NULL CHECK (category IN ('verybasic','basic','advanced','hacker')),
   node          INTEGER NOT NULL,          -- position on the map, 1-based
   title         TEXT NOT NULL,
   brief         TEXT NOT NULL,             -- markdown shown in the quest panel

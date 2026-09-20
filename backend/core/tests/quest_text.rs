@@ -115,10 +115,10 @@ fn the_shipped_korean_sample_imports_and_reaches_the_wire() {
         wire["starter"].as_str().unwrap().contains("fn main()"),
         "code is never translated"
     );
-    assert_eq!(wire["hints_total"], 3);
+    assert_eq!(wire["hints_total"], 2);
     assert_eq!(
         quest.hints[1],
-        "println!은 서식 문자열을 받습니다: println!(\"{}\", n)."
+        "바로 위 두 줄과 같은 모양입니다. 두 번째 인자의 식만 달라집니다."
     );
 
     // The map: every node says for itself which language its title is in, and

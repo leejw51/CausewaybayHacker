@@ -158,6 +158,13 @@ const SUITES = [
       : "headless: the layout suite is skipped inside it, and LÖVE is not installed to run it",
   },
   {
+    name: "content-gate",
+    what: "the content gate's own structural rules, on fixtures (no compiler)",
+    cwd: ROOT,
+    cmd: ["python3", "-m", "unittest", "-q", "tests/content/test_verify_pack.py"],
+    needs: [[env.python, "python3 is not on PATH"]],
+  },
+  {
     name: "content",
     what: "every reference solution is accepted and no starter is (SPEC §9.4, §9.5)",
     cwd: ROOT,
@@ -171,15 +178,19 @@ const SUITES = [
       //   * `--complete` fails on a concept slug no §7.1 mistake kind can
       //     reach, so the AI drills cannot be pointed at a dead end.
       "--complete",
+      "content/rust/verybasic.toml",
       "content/rust/basic.toml",
       "content/rust/advanced.toml",
       "content/rust/hacker.toml",
+      "content/go/verybasic.toml",
       "content/go/basic.toml",
       "content/go/advanced.toml",
       "content/go/hacker.toml",
+      "content/cpp/verybasic.toml",
       "content/cpp/basic.toml",
       "content/cpp/advanced.toml",
       "content/cpp/hacker.toml",
+      "content/python/verybasic.toml",
       "content/python/basic.toml",
       "content/python/advanced.toml",
       "content/python/hacker.toml",

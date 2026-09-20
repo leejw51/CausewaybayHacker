@@ -56,6 +56,16 @@ pub struct QuestDef {
     pub tests: toml::Value,
     #[serde(default)]
     pub time_limit_s: Option<i64>,
+    /// VERY BASIC only: the four choices and the index of the right one.
+    #[serde(default)]
+    pub quiz: Option<QuizDef>,
+}
+
+/// `[quest.quiz]` — the question is the brief; these are the answers.
+#[derive(Debug, Clone, Deserialize, serde::Serialize)]
+pub struct QuizDef {
+    pub choices: Vec<String>,
+    pub answer: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -333,7 +343,10 @@ pub fn validate(pack: &Pack) -> Result<()> {
     if !matches!(pack.land.as_str(), "rust" | "go" | "cpp" | "python") {
         return Err(bad_request(format!("unknown land '{}'", pack.land)));
     }
-    if !matches!(pack.category.as_str(), "basic" | "advanced" | "hacker") {
+    if !matches!(
+        pack.category.as_str(),
+        "verybasic" | "basic" | "advanced" | "hacker"
+    ) {
         return Err(bad_request(format!("unknown category '{}'", pack.category)));
     }
     let mut nodes = BTreeSet::new();
@@ -525,6 +538,7 @@ pub fn checksum(quest: &QuestDef) -> Result<String> {
         "tests": tests_json(quest)?,
         "time_limit_s": quest.time_limit_s,
         "map": { "x": quest.map.x, "y": quest.map.y, "kind": quest.map.kind },
+        "quiz": quest.quiz,
     });
     let mut hasher = Sha256::new();
     hasher.update(serde_json::to_vec(&canonical)?);
@@ -615,12 +629,13 @@ fn reconcile(conn: &Connection, pack: &Pack, ids: &[String]) -> Result<PackCount
         let changed = conn.execute(
             "INSERT INTO quests (id, pack, land, category, node, title, brief, story,
                                  difficulty, time_limit_s, starter, solution, hints,
-                                 concepts, tests, checksum, map_x, map_y, map_kind)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)
+                                 concepts, tests, checksum, map_x, map_y, map_kind, quiz)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)
              ON CONFLICT(id) DO UPDATE SET
                pack=?2, land=?3, category=?4, node=?5, title=?6, brief=?7, story=?8,
                difficulty=?9, time_limit_s=?10, starter=?11, solution=?12, hints=?13,
-               concepts=?14, tests=?15, checksum=?16, map_x=?17, map_y=?18, map_kind=?19",
+               concepts=?14, tests=?15, checksum=?16, map_x=?17, map_y=?18, map_kind=?19,
+               quiz=?20",
             params![
                 quest.id,
                 pack.pack,
@@ -641,6 +656,7 @@ fn reconcile(conn: &Connection, pack: &Pack, ids: &[String]) -> Result<PackCount
                 quest.map.x,
                 quest.map.y,
                 quest.map.kind,
+                quest.quiz.as_ref().map(serde_json::to_string).transpose()?,
             ],
         );
         match changed {

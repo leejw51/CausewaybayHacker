@@ -296,13 +296,11 @@ fn every_message_got_an_id_and_a_timeid_with_0014() {
 }
 
 #[test]
-fn the_newest_migration_let_a_message_be_edited_or_deleted() {
+fn a_message_could_be_edited_or_deleted_from_0015() {
     // A specific check on top of the generic ones, so this file also documents
-    // what the last change actually was — and fails loudly if a future
-    // migration is added without extending the tests above.
-    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
-    assert_eq!(previous, 14);
-    let conn = database_at_version(previous);
+    // what that change actually was. (It used to pin itself as the newest
+    // migration; 0016 took that seat — see the ledger test below.)
+    let conn = database_at_version(14);
     conn.execute_batch(
         "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
            VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}');
@@ -322,4 +320,118 @@ fn the_newest_migration_let_a_message_be_edited_or_deleted() {
         })
         .unwrap();
     assert_eq!((edited, deleted), (0, 0), "what exists is as it was said");
+}
+
+#[test]
+fn the_xp_ledger_arrived_with_0016_and_was_backfilled() {
+    // A player who cleared things before the ledger existed keeps exactly the
+    // XP the old formula was reading for them, dated at the clear.
+    let conn = database_at_version(15);
+    conn.execute(
+        "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
+           VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}')",
+        [],
+    )
+    .unwrap();
+    for (id, cat, node, diff) in [
+        ("rust.basic.01.a", "basic", 1, 1),
+        ("rust.hacker.02.b", "hacker", 2, 5),
+        ("rust.basic.03.c", "basic", 3, 2),
+    ] {
+        conn.execute(
+            "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                                 starter, solution, tests, checksum)
+             VALUES (?1, 'p', 'rust', ?2, ?3, 't', 'b', 's', ?4, 's', 's', '{}', 'c')",
+            rusqlite::params![id, cat, node, diff],
+        )
+        .unwrap();
+    }
+    conn.execute(
+        "INSERT INTO progress (address, quest_id, state, stars, attempts, hints_used, first_clear_at, updated_at)
+           VALUES ('0xaa', 'rust.basic.01.a', 'cleared', 3, 1, 0, '2026-02-01T00:00:00Z', '2026-02-02T00:00:00Z'),
+                  ('0xaa', 'rust.hacker.02.b', 'cleared', 2, 4, 1, NULL, '2026-03-01T00:00:00Z'),
+                  ('0xaa', 'rust.basic.03.c', 'open', 0, 2, 0, NULL, '2026-03-02T00:00:00Z')",
+        [],
+    )
+    .unwrap();
+
+    db::prepare(&conn).unwrap();
+
+    let rows: Vec<(String, i64, i64, String)> = conn
+        .prepare("SELECT quest_id, amount, stars, created_at FROM xp_ledger WHERE address = '0xaa' ORDER BY quest_id")
+        .unwrap()
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+        .unwrap()
+        .map(|r| r.unwrap())
+        .collect();
+    assert_eq!(
+        rows,
+        vec![
+            (
+                "rust.basic.01.a".to_string(),
+                75,
+                3,
+                "2026-02-01T00:00:00Z".to_string()
+            ),
+            (
+                "rust.hacker.02.b".to_string(),
+                750,
+                2,
+                "2026-03-01T00:00:00Z".to_string()
+            ),
+        ],
+        "3×1×1 basic and 2×5×3 hacker; the open quest gets nothing"
+    );
+}
+
+#[test]
+fn the_newest_migration_widens_category_and_adds_the_quiz() {
+    // The "newest migration" pin: fails loudly if a 0018 is added without a
+    // test of its own here. 0017 rebuilds `quests`: a row survives with its
+    // rowid, a 'verybasic' quest is now insertable, and `quiz` is a column.
+    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
+    assert_eq!(previous, 16);
+    let conn = database_at_version(previous);
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum)
+         VALUES ('rust.basic.01.a', 'p', 'rust', 'basic', 1, 'A', 'b', 's', 1, 's', 's', '{}', 'c')",
+        [],
+    )
+    .unwrap();
+    let rowid_before: i64 = conn
+        .query_row(
+            "SELECT rowid FROM quests WHERE id = 'rust.basic.01.a'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+
+    db::prepare(&conn).unwrap();
+
+    let (rowid_after, quiz): (i64, Option<String>) = conn
+        .query_row(
+            "SELECT rowid, quiz FROM quests WHERE id = 'rust.basic.01.a'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(rowid_after, rowid_before, "the FTS index is keyed by rowid");
+    assert_eq!(quiz, None);
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum, quiz)
+         VALUES ('rust.verybasic.01.a', 'p', 'rust', 'verybasic', 1, 'Q', 'b', 's', 1, 's', 's', '{}', 'c',
+                 '{\"choices\":[\"a\",\"b\",\"c\",\"d\"],\"answer\":2}')",
+        [],
+    )
+    .expect("a verybasic quest with a quiz is insertable after 0017");
+    let hits: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quest_fts WHERE quest_fts MATCH 'Q'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(hits, 1, "the FTS triggers were put back");
 }

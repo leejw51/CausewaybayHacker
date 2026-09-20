@@ -37,7 +37,7 @@ Map.__index = Map
 -- The lands and the three categories, in SPEC §0's order. TAB walks the
 -- lands in this order and wraps.
 local LANDS = Land.ORDER
-local CATEGORIES = { "basic", "advanced", "hacker" }
+local CATEGORIES = Land.CATEGORIES
 
 --- Where the player was, per map, keyed `land.category`.
 ---
@@ -138,7 +138,7 @@ function Map:switch(land, category)
   self.switched_at = self.t
 
   SFX.play("select")
-  self.app:toast(("%s / %s"):format(Land.name(land), category:upper()))
+  self.app:toast(("%s / %s"):format(Land.name(land), I18n.t(Land.category_label(category))))
   self:refresh()
 end
 
@@ -193,7 +193,7 @@ function Map:refresh()
       end
       -- §4.7 says `nodes` arrives "ordered by node", and this sorts anyway.
       -- Observed on the live server: `world.map` for rust/basic returned
-      -- `rust.basic.12.traits` as the first element. Nothing here depends on
+      -- `rust.basic.12.stack-queue` as the first element. Nothing here depends on
       -- array order for correctness — positions come from `x`/`y`, paths from
       -- `edges`, labels from `node.node` — but "the first node the player can
       -- play" is a walk over this list, and out of order it starts the cursor
@@ -575,7 +575,7 @@ function Map:draw_header()
   end
   local cat_w = 0
   for _, category in ipairs(CATEGORIES) do
-    cat_w = math.max(cat_w, UI.textWidth(I18n.t(category:upper()), cat_size) + 16)
+    cat_w = math.max(cat_w, UI.textWidth(I18n.t(Land.category_label(category)), cat_size) + 16)
   end
   local tab_tag = UI.textWidth("TAB", tag_size) + 8
   local q_tag = UI.textWidth("Q", tag_size) + 8
@@ -602,7 +602,7 @@ function Map:draw_header()
     end
     cat_w = 0
     for _, category in ipairs(CATEGORIES) do
-      cat_w = math.max(cat_w, UI.textWidth(I18n.t(category:upper()), cat_size) + 16)
+      cat_w = math.max(cat_w, UI.textWidth(I18n.t(Land.category_label(category)), cat_size) + 16)
     end
     wanted = 10 + #LANDS * (land_w + 6) + tab_tag + #CATEGORIES * (cat_w + 4) + q_tag + 10
   end
@@ -653,7 +653,7 @@ function Map:draw_header()
     UI.setColor(on and Theme.coin or Theme.withAlpha(Theme.cream, 0.25))
     love.graphics.rectangle("line", x + 1, cy + 1, cat_w - 2, ch - 2)
     love.graphics.setColor(1, 1, 1, 1)
-    local label = I18n.t(category:upper())
+    local label = I18n.t(Land.category_label(category))
     local fit = UI.fitSize(label, cat_w - 8, cat_size, 3)
     love.graphics.setScissor(x, cy, cat_w, ch)
     UI.text(label, x + (cat_w - UI.textWidth(label, fit)) / 2,

@@ -36,6 +36,17 @@ function Land.name(land)
   return Land.NAME[land] or tostring(land or "?"):upper()
 end
 
+--- SPEC §0's four roads, in the order they are walked. `verybasic` is the
+--- quiz road (PROTOCOL §5.3): the grammar asked before it is typed.
+Land.CATEGORIES = { "verybasic", "basic", "advanced", "hacker" }
+
+--- The English label a category is translated from. `verybasic` is two
+--- words on screen; every other road is its id in capitals, as before.
+function Land.category_label(category)
+  if category == "verybasic" then return "VERY BASIC" end
+  return tostring(category or "?"):upper()
+end
+
 function Land.mascot(land)
   return Assets.pick(Land.MASCOT[land], STANDIN[land])
 end

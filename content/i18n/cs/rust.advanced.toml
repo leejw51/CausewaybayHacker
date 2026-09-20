@@ -8,6 +8,563 @@ locale = "cs"
 
 # ---------------------------------------------------------------- 01
 [[quest]]
+id    = "rust.advanced.01.shadowing"
+title = "Tři jména, jedno jméno"
+story = "Kiosek u přechodu před Sogo drží cenu jako text, jako číslo a jako peníze a všem třem říká price."
+brief = '''
+Přečti jeden řádek: částku v centech, zapsanou číslicemi.
+
+Vypiš tři řádky:
+
+1. kolik znaků má oříznutý text
+2. částku jako číslo
+3. částku v dolarech s přesně dvěma desetinnými místy
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+Částka je nezáporná a vejde se do `i64`. Udělej to s jedním jménem,
+dvakrát zastíněným — `&str`, potom `i64`, potom `String`.
+'''
+hints = [
+  "Druhé `let cents = ...` nepřiřazuje; vytvoří novou vazbu, která tu starou schová, a může mít jiný typ.",
+  "Proto zastínění není `mut`: `mut` typ zachovává, zastínění ne.",
+  "Dvě desetinná místa s úvodní nulou je šířkový příznak {:02}.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.advanced.02.the-move"
+title = "Jedna účtenka"
+story = "Pokladna v Lucky Mac vytiskne účtenku a pak nedokáže poděkovat, protože jméno odevzdala i s papírem."
+brief = '''
+Přečti jeden řádek: jméno zákazníka. Vypiš dva řádky:
+
+```
+input:  MEI
+output: RECEIPT: MEI
+        THANK YOU, MEI
+```
+
+Startovní kód se nezkompiluje. `receipt` bere jméno **hodnotou**, takže po
+volání ho `main` už nevlastní a nemůže ho vypsat znovu.
+
+Oprav to tak, že `receipt` se na jméno jen *podívá*, místo aby si ho bral.
+Neklonuj.
+'''
+hints = [
+  "Chyba je E0382: borrow of moved value. Přesun se stal při volání, ne při výpisu.",
+  "Parametr typu &str si půjčuje; parametr typu String si bere.",
+  "Nejdřív změň signaturu, pak bude místo volání potřebovat &.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.advanced.03.slices"
+title = "Prostředek fronty"
+story = "Čtyřicet lidí před Hysan Place. Pult vidí začátek a konec fronty a nic mezi tím."
+brief = '''
+Na standardním vstupu je na prvním řádku počet `n` a na druhém `n` celých
+čísel oddělených mezerami.
+
+Vypiš tři řádky: první hodnotu, poslední hodnotu a součet všeho, co leží
+ostře mezi nimi. Při méně než třech hodnotách je ten součet `0`.
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+'''
+hints = [
+  "nums[1..nums.len() - 1] je řez Vec, ne jeho kopie.",
+  "S jednou nebo dvěma hodnotami by ten rozsah byl prázdný nebo pozpátku — ohlídej to pomocí if, než začneš indexovat.",
+  "Iterátor přes &i64 se sečte rovnou do i64.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.advanced.04.strings"
+title = "Bajty nejsou písmena"
+story = "Rozcestník v Times Square zkrátí 銅鑼灣 na tři znaky a dostane jeden a půl."
+brief = '''
+Přečti jeden řádek. Vypiš tři řádky:
+
+1. jeho délku v **bajtech**
+2. jeho délku ve **znacích**
+3. řádek se znaky v obráceném pořadí
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+Řádek může obsahovat znaky mimo ASCII, a pak první dvě čísla nejsou stejná.
+O to tu jde.
+'''
+hints = [
+  "str::len je délka v bajtech. Vždycky byla.",
+  "chars() prochází skalární hodnoty, takže chars().count() je to druhé číslo.",
+  "chars().rev().collect::<String>() obrací bezpečně; obrácení bajtů by bezpečné nebylo.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.advanced.05.structs"
+title = "Pokladna"
+story = "Přední pult v Lucky Mac drží každou položku objednávky na jednom místě — tedy držel, než návrh nahradil strukturu komentářem."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` řádků ve tvaru `<ITEM> <CENTS>`.
+
+Postav `Till`, která položky sbírá, pak vypiš každou položku zpět jako
+`<ITEM> <CENTS>`, jednu na řádek, v pořadí, v jakém přišly, a nakonec
+`TOTAL <sum>`.
+
+```
+input:  2
+        HASHBROWN 600
+        SET 2800
+output: HASHBROWN 600
+        SET 2800
+        TOTAL 3400
+```
+
+`n` může být `0`, a pak je jediným řádkem `TOTAL 0`.
+'''
+hints = [
+  "Vec dvojic (String, i64) stačí. Struktura je tu proto, aby pokladna vlastnila své vlastní položky.",
+  "add pokladnu mění, takže bere &mut self; total jen čte, takže bere &self.",
+  "Iterace přes &till.items si půjčuje, což je přesně to, co chceš — výpis by pokladnu neměl vyprázdnit.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.advanced.06.enums"
+title = "Kdo jede"
+story = "Turniket v Causeway Bay účtuje každé kartě jízdné pro dospělé, včetně těch, které dospělým nepatří, a té jedné, která není karta."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` řádků ve tvaru `<TYPE> <KM>`.
+
+Základní jízdné je `500 + 100 * KM` centů. Pro každý řádek vypiš jedno z:
+
+* `ADULT` — základní jízdné
+* `STUDENT` — polovina základního jízdného, celočíselné dělení
+* `SENIOR` — vždy `200`
+* cokoli jiného — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+Namodeluj cestujícího jako `enum` se čtyřmi variantami, z nichž jedna nese
+nerozpoznanou značku, a o jízdném rozhodni jediným `match`.
+'''
+hints = [
+  "Varianta může nést data: Other(String) drží značku, která nic neodpovídala.",
+  "Poslední větev match nad &str naváže všechno, co zbylo: `other => ...`.",
+  "Match nad &Rider ti ve větvi Other dá &String — format! s tím nemá problém.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.advanced.07.maps"
+title = "Co vykřikuje bazar"
+story = "Jardine's Bazaar v devět: každý stánek něco volá a tabule chce pořadí."
+brief = '''
+Přečti celý standardní vstup a rozděl ho podle bílých znaků.
+
+Vypiš každé různé slovo jednou jako `<word> <count>`, seřazené podle počtu
+sestupně; při shodě rozhoduje slovo vzestupně.
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+'''
+hints = [
+  "*counts.entry(word).or_insert(0) += 1 je celá počítací smyčka.",
+  "HashMap nemá pořadí. Před výpisem ji sesbírej do Vec.",
+  "Ordering::then řetězí rozhodování při shodě: počet sestupně, pak slovo vzestupně.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.advanced.08.errors"
+title = "Řádek, který není číslo"
+story = "Odečítač měřičů z Victoria Parku odevzdá sloupec čísel a uprostřed něj něčí objednávku na oběd."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` řádků. Každý řádek má být celé
+číslo.
+
+Pro každý řádek vypiš buď dvojnásobek hodnoty, nebo `BAD <line>`, pokud se
+nedá naparsovat. Nakonec vypiš `SUM <total>`, kde total je součet hodnot,
+které jsi vypsal.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+Napiš `fn double(text: &str) -> Result<i64, ParseIntError>`, která používá `?`,
+a oba výsledky ošetři pomocí `match` v `main`.
+'''
+hints = [
+  "`?` na Result za tebe vrátí chybu z funkce ven, takže tělo double má dva řádky.",
+  "match double(line) má přesně dvě větve, Ok(value) a Err(_).",
+  "SUM je součet toho, co jsi vypsal — zdvojených hodnot, ne původních.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.advanced.09.iterators"
+title = "Jedním průchodem po Yee Wo Street"
+story = "Alex říká, že se to dá udělat třemi cykly for. Provoz na Yee Wo Street už znáš; máš jeden průchod."
+brief = '''
+Na standardním vstupu je jeden řádek celých čísel oddělených mezerami.
+
+Vypiš tři řádky:
+
+1. součet sudých hodnot (`0`, pokud žádné nejsou)
+2. každou hodnotu větší než `10`, zdvojenou, v pořadí, spojené jednou
+   mezerou — nebo `-`, pokud žádná není
+3. kolik je různých hodnot
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+Použij iterátorové adaptéry — `filter`, `map`, `sum`, `collect` — ne indexové
+smyčky.
+'''
+hints = [
+  "nums.iter() dává &i64 a filter předává své uzávěře referenci na to, takže argument je &&i64. Rozeber ho ve vzoru — |&&n| n % 2 == 0 — místo hádání, kolik hvězdiček tělo potřebuje.",
+  "join potřebuje řetězce, takže každé číslo nejdřív namapuj přes to_string(), než sesbíráš do Vec<String>.",
+  "HashSet postavený přímo z iterátoru ti dá počet různých hodnot přes len().",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.advanced.10.str-and-string"
+title = "První otázka"
+story = "Každý pohovor na Rust v Hongkongu jí začíná a Mei na ni už dvakrát odpověděla špatně."
+brief = '''
+Přečti jeden řádek. Vypiš tři řádky:
+
+1. jeho první slovo (oddělené bílými znaky) jako **vypůjčený** `&str` — žádná
+   alokace, žádné `to_string()`
+2. totéž slovo velkými písmeny, což musí být vlastněný `String`, protože verze
+   velkými písmeny není řezem ničeho, co už existuje
+3. `SAME YES`, pokud se ta dvě rovnají, jinak `SAME NO`
+
+```
+input:  lucky mac
+output: lucky
+        LUCKY
+        SAME NO
+```
+
+`&str` je pohled do textu, který vlastní někdo jiný. `String` vlastní buffer,
+který může růst. `first_word` vrací pohled, takže si jeho návratový typ půjčuje
+z argumentu a nic nealokuje — a to je celá odpověď na otázku, kterou ve
+skutečnosti kladou.
+'''
+hints = [
+  "split_whitespace().next() dává Option<&str> a unwrap_or na něm promění prázdný řádek v prázdné slovo.",
+  "to_uppercase vrací String, ne &str — musí alokovat, protože výsledek není kusem vstupu.",
+  "&str a String se porovnávají přímo; standardní knihovna mezi nimi rovnost implementuje, takže as_str() nepotřebuješ.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.advanced.11.combinators"
+title = "Bez jediného unwrapu"
+story = "Alex pořád tvrdí, že v Rustu je to samý unwrap. Napiš čtečku sloupce znovu, bez unwrapu v části, která může selhat."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` řádků, každý má být celé číslo.
+
+Pro každý řádek vypiš dvojnásobek hodnoty, nebo `-1`, pokud se nedá naparsovat.
+Potom vypiš `SOME <k>`, kolik se jich naparsovalo, a `FIRST <v>` — první
+hodnotu, která se naparsovala — nebo `FIRST NONE`.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        -1
+        -8
+        SOME 2
+        FIRST 21
+```
+
+Udělej to kombinátory: `.ok()` promění `Result` v `Option`,
+`.map(|v| v * 2)` působí jen na hodnotu, která tam je, a `.unwrap_or(-1)`
+dodá odpověď, když tam není. `find_map` ti dá poslední řádek jedním
+průchodem.
+
+`unwrap()` by na řádcích, které se naparsují, také „fungoval“ — a na `xx` by
+pak shodil celý program. `unwrap_or` panikařit nemůže. Vědět, co je co, je
+tahle ulice.
+'''
+hints = [
+  "parse::<i64>() tu potřebuje turbofish, protože nic dál po proudu typ pro kompilátor nefixuje.",
+  ".ok() chybu zahodí schválně — nehlásíš, proč to selhalo, jen že to selhalo.",
+  "find_map spouští uzávěru, dokud jedna nevrátí Some, takže se zastaví na prvním řádku, který se naparsuje.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.advanced.12.matching"
+title = "Tvar té věci"
+story = "Rozvážková aplikace bere čtyři příkazy a starý kód je kontroloval devíti vnořenými ify."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` řádků, každý `<COMMAND>` nebo
+`<COMMAND> <ARG>`.
+
+Pro každý řádek vypiš:
+
+* `FORWARD <n>` pro `GO <n>` s `n` větším než nula
+* `STAY` pro `GO <n>` s `n` rovným nule nebo menším
+* `HALT` pro `STOP`
+* `UNKNOWN <COMMAND>` pro cokoli jiného
+
+Potom vypiš `MOVED <total>`, součet všeho, o co jsi popojel dopředu.
+
+```
+input:  4
+        GO 3
+        GO -1
+        STOP
+        JUMP 9
+output: FORWARD 3
+        STAY
+        HALT
+        UNKNOWN JUMP
+        MOVED 3
+```
+
+Jeden `match` nad rozděleným řádkem, se **strážní podmínkou** na větvi `GO`,
+která oba případy oddělí bez druhého větvení. Vzor nad řezem —
+`["GO", arg]` — udělá z počtu prvků řádku součást vzoru, místo kontroly
+délky, kterou bys psal ručně.
+'''
+hints = [
+  "parts.as_slice() je to, co z Vec udělá něco, s čím se dá porovnat vzor nad řezem.",
+  "`if` za vzorem je strážní podmínka match — odděluje dvě větve, které mají stejný tvar.",
+  "`[command, ..]` naváže první prvek a zbytek ignoruje; `[]` je prázdný řádek, který musíš pokrýt taky.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.advanced.13.modules"
+title = "Kdo to smí vidět"
+story = "Tabulka jízdného prosákla do tří souborů a ve dvou z nich ji někdo změnil. Dej ji za dveře."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` vzdáleností v km.
+
+Uspořádej logiku jízdného do modulu:
+
+* `mod fares` s **veřejnou** `adult(km) -> i64` a **soukromou** `base(km)`,
+  kterou `adult` volá — `500 + 100 * km`
+* vnořený `mod fares::pass` s veřejnou `monthly() -> i64`, která vrací `50000`
+
+Vypiš jedno jízdné pro dospělého na každou vzdálenost, potom `MONTHLY <x>`.
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        MONTHLY 50000
+```
+
+Startovní kód se nezkompiluje: položky existují, ale nic není `pub`, a obsah
+modulu je ve výchozím stavu soukromý. Ten výchozí stav je ta funkce —
+`base` není součástí rozhraní a kompilátor je to, co to tak udrží. Vnořený
+modul potřebuje vlastní `pub` na řádku s `mod`, ne jen na funkci uvnitř.
+'''
+hints = [
+  "Chyba je E0603: položka existuje, jen je soukromá. Tři klíčová slova pub opraví celý soubor.",
+  "base zůstává soukromá schválně — je to jediná věc tady, do které nikomu jinému nic není.",
+  "Zveřejnění funkce nezveřejní dveře: `mod pass` potřebuje pub taky.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.advanced.14.smart-pointers"
+title = "Velikost, kterou kompilátor umí pojmenovat"
+story = "Napichovák na účtenky v Lucky Mac: každý lístek napíchnutý na ten pod ním, až dolů k pultu."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` částek v centech.
+
+Drž je v řetězu, jeden uzel na částku, v pořadí, v jakém přišly:
+
+```
+struct Entry {
+    cents: i64,
+    next: Option<Box<Entry>>,
+}
+```
+
+Vypiš tři řádky:
+
+1. částky v pořadí, oddělené mezerou, nebo `-`, pokud žádné nejsou
+2. `SUM <total>`, z **rekurzivní** funkce přes řetěz
+3. `LAST <cents>` — částku na posledním uzlu — nebo `LAST NONE`
+
+```
+input:  5
+        1 2 3 4 5
+output: 1 2 3 4 5
+        SUM 15
+        LAST 5
+```
+
+Startovní kód se nezkompiluje a ta chyba je důvod, proč `Box` existuje. Napiš
+`next: Option<Entry>` a kompilátor musí rozložit `Entry` v paměti: potřebuje
+`8` bajtů pro `cents` plus tolik, kolik je velký `Entry` — což je právě to,
+co se snaží spočítat. E0072, *recursive type has infinite size*.
+
+`Box<Entry>` je ukazatel na alokaci na haldě a ukazatel má velikost, kterou
+kompilátor už zná. Vlastní to, na co ukazuje: přesně jeden vlastník, uvolněno,
+když je `Box` zahozen, žádné počítání a nic sdíleného. `Option<Box<Entry>>`
+je konec řetězu i uzel v něm, v jedné hodnotě velikosti ukazatele — `None` se
+uloží jako nulová adresa, ne jako bajt navíc se značkou, takže oproti
+samotnému `Box` nestojí nic.
+'''
+hints = [
+  "Chybu kompilace opraví jedno slovo: z Option<Entry> se stane Option<Box<Entry>> a konstruktor dostane Box::new.",
+  "Stav to odzadu — projdi částky v obráceném pořadí a každému novému uzlu dej jako next řetěz, který už máš. Stavění odpředu potřebuje kurzor na konec, a to je boj s výpůjčkami, který zatím nepotřebuješ.",
+  "Pro průchod bez spotřebování drž Option<&Box<Entry>>: head.as_ref() na začátek a entry.next.as_ref() na krok. .as_ref() promění &Option<T> v Option<&T>, což je ten tah, který řetěz nechá celý.",
+  "Rekurzivní součet nepotřebuje žádné mut ani smyčku: Some(entry) => entry.cents + sum(&entry.next), None => 0.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.advanced.15.testing"
+title = "Dokaž si to sám"
+story = "V 06:40 ti to nikdo nezkontroluje. Tabulka je přímo tady; udělej ji zelenou."
+brief = '''
+Program drží tabulku čtyř ověřených dvojic `(km, fare)` a kontroluje `fare`
+proti každé z nich; vypisuje `<name> ok` nebo
+`<name> FAIL got <g> want <w>`, potom `PASSED <k>/4`. Nakonec přečte ze
+standardního vstupu jednu vzdálenost a vypíše `FARE <x>`.
+
+`fare(km)` má být `500 + 100 * km`. Ta ve startovním kódu je špatně a tabulka
+to chytí — což je celý smysl.
+
+```
+input:  4
+output: zero ok
+        one ok
+        four ok
+        ten ok
+        PASSED 4/4
+        FARE 900
+```
+
+Na tabulku nesahej; je to specifikace. V opravdové crate žije v
+`#[cfg(test)] mod tests` a spouští ji `cargo test`. Tabulka je tak i tak
+stejná — mění se jen harness, a tabulka, kterou si dokážeš přečíst, má větší
+cenu než harness, který nedokážeš.
+'''
+hints = [
+  "Tabulka je specifikace. Funkce je to, co je špatně.",
+  "Tři ze čtyř případů selžou a ten jediný, který projde, je km = 0 — a přesně proto jeden testovací případ nic nedokazuje.",
+  "V crate je to #[cfg(test)] mod tests s #[test] fn fares() a assert_eq!(fare(arg), want).",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.advanced.16.traits"
+title = "Trait, který je jen její"
+story = "Telefonní kiosek v Percival Street dopíše každý řádek dřív, než ho máš. Pro trait, který sis pojmenoval sám, žádné doplnění nemá."
+brief = '''
+Na standardním vstupu je počet `n` a potom `n` řádků, každý buď
+
+* `SHOP <NAME> <FLOOR>`
+* `STOP <ROUTE>` — `ROUTE` je číslo
+
+Vypiš jeden řádek na značku jako `<tag> <rendering>`, potom `SIGNS <n>`:
+
+* `Shop` se vykreslí jako `<NAME> / F<FLOOR>` a jeho tag je `SIGN`
+* `Stop` se vykreslí jako číslo své linky a jeho tag je `TRAM`
+
+```
+input:  3
+        SHOP HYSAN 4
+        STOP 2
+        SHOP SOGO 1
+output: SIGN HYSAN / F4
+        TRAM 2
+        SIGN SOGO / F1
+        SIGNS 3
+```
+
+Deklaruj jeden trait a implementuj ho pro dvě různé struktury:
+
+```
+trait Sign {
+    fn render(&self) -> String;      // required: no body, every implementor writes one
+    fn tag(&self) -> &'static str { "SIGN" }   // provided: an implementor gets this free
+}
+```
+
+`tag` je **výchozí metoda**. `Shop` o ní nic neříká a dostane `SIGN`;
+`Stop` si napíše vlastní a dostane `TRAM`. To je ta polovina traitů, na
+kterou lidé na pohovoru zapomínají: trait není jen seznam signatur, může nést
+chování, a přepsání je dobrovolné.
+
+Vypisuj přes **jednu** funkci, `fn show<T: Sign>(sign: &T)`. Ta mez je
+smlouva — `show` neví nic o `Shop` ani `Stop`, jen že cokoli dostala, má
+`render` a `tag`. Kompilátor vyrazí jednu kopii `show` na každý konkrétní typ
+a volání jsou přímá.
+
+Startovní kód se nezkompiluje. Trait je deklarovaný a struktury existují, a to
+samo o sobě nic nekupuje: `show(&Shop { .. })` je E0277, *the trait
+bound `Shop: Sign` is not satisfied*. Deklarovat trait a implementovat ho jsou
+dva oddělené úkony a v Rustu se ten druhý vždycky vypisuje.
+
+Obě značky v jednom `Vec` by byly jiný mechanismus — `Box<dyn Sign>`, ukazatel
+plus vtable, vyhledaná za běhu. Tady ho nepotřebuješ, protože na každém místě
+volání je konkrétní typ pořád vidět. To je otázka příští mapy, a vědět, který
+z těch dvou držíš, je to, na co se ptá.
+'''
+hints = [
+  "impl Sign for Shop patří mimo strukturu. Trait říká co; impl říká jak; a kompilátor to druhé z prvního neodvodí.",
+  "Nech tag v impl pro Shop úplně vynechaný a vezme si verzi z traitu. Napiš ho v impl pro Stop a vyhraje ta ze Stop. To je celé, co výchozí metoda znamená.",
+  "show<T: Sign>(sign: &T) je generická, takže typ musí být známý tam, kde se volá — což je uvnitř větve match, dokud ještě vidíš, co jsi právě postavil.",
+  "Jeden Vec držící obojí by potřeboval Box<dyn Sign>, a to je jiný mechanismus s vyhledáním za běhu. Nikdo to po tobě nechce a sáhnout po něm tady by byla špatná odpověď na otázku o traitech.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
 id    = "rust.advanced.01.threads"
 title = "Dvě pokladny, jeden pult"
 story = "Pobočka v Times Square v poledne otevře druhou pokladnu a fronta se konečně pohne. Nic jiného se v obchodě nezměnilo."
@@ -36,7 +593,7 @@ hints = [
   "Vezmi si počet před smyčkou; iterace hodnotou ten Vec spotřebuje.",
 ]
 
-# ---------------------------------------------------------------- 02
+# ---------------------------------------------------------------- 18
 [[quest]]
 id    = "rust.advanced.02.move"
 title = "Vezmi si to s sebou"
@@ -66,7 +623,7 @@ hints = [
   "line je už tak čerstvý String v každé iteraci, takže dát ho pryč nestojí nic.",
 ]
 
-# ---------------------------------------------------------------- 03
+# ---------------------------------------------------------------- 19
 [[quest]]
 id    = "rust.advanced.03.channels"
 title = "Jedno okénko, mnoho kurýrů"
@@ -96,7 +653,7 @@ hints = [
   "rx.iter() dává hodnoty, dokud se kanál nezavře, takže collect() je celá přijímací smyčka.",
 ]
 
-# ---------------------------------------------------------------- 04
+# ---------------------------------------------------------------- 20
 [[quest]]
 id    = "rust.advanced.04.mutex"
 title = "Jedna zásuvka, osm rukou"
@@ -124,7 +681,7 @@ hints = [
   "Strážce (guard) z lock() se dereferencuje na hodnotu; *guard += value, a strážce odemkne, když vypadne z rozsahu platnosti.",
 ]
 
-# ---------------------------------------------------------------- 05
+# ---------------------------------------------------------------- 21
 [[quest]]
 id    = "rust.advanced.05.rwlock"
 title = "Mnoho čtenářů, jeden písař"
@@ -156,7 +713,7 @@ hints = [
   "Drž strážce pro čtení ve vazbě, dokud přes něj iteruješ, jinak se dočasná hodnota zahodí dřív, než s ní skončíš.",
 ]
 
-# ---------------------------------------------------------------- 06
+# ---------------------------------------------------------------- 22
 [[quest]]
 id    = "rust.advanced.06.lifetimes"
 title = "Jak dlouho to platí"
@@ -191,7 +748,7 @@ hints = [
   "longest vrací &'a str, ne &str: odpověď přežije výpůjčku self, patří vstupu.",
 ]
 
-# ---------------------------------------------------------------- 07
+# ---------------------------------------------------------------- 23
 [[quest]]
 id    = "rust.advanced.07.generics"
 title = "Napiš to jednou"
@@ -223,7 +780,7 @@ hints = [
   "Mez patří na blok impl, ne na strukturu: impl<T: PartialOrd> Pair<T>.",
 ]
 
-# ---------------------------------------------------------------- 08
+# ---------------------------------------------------------------- 24
 [[quest]]
 id    = "rust.advanced.08.iterator"
 title = "Vlastní cyklus for"
@@ -254,7 +811,7 @@ hints = [
   "left je odpočet; sniž ho pokaždé, když vydáš hodnotu.",
 ]
 
-# ---------------------------------------------------------------- 09
+# ---------------------------------------------------------------- 25
 [[quest]]
 id    = "rust.advanced.09.pipeline"
 title = "Kuchař na lince"
@@ -288,7 +845,7 @@ hints = [
   "Smyčka v main přes rx2 skončí, když skončí druhé vlákno, a proto se join potom nezasekne.",
 ]
 
-# ---------------------------------------------------------------- 10
+# ---------------------------------------------------------------- 26
 [[quest]]
 id    = "rust.advanced.10.async"
 title = "Kde async doopravdy běží"
@@ -327,7 +884,7 @@ hints = [
   "Tento exekutor při Pending točí naprázdno. Skutečný by vlákno uspal, dokud se waker neozve, a to je jediný zajímavý rozdíl.",
 ]
 
-# ---------------------------------------------------------------- 11
+# ---------------------------------------------------------------- 27
 [[quest]]
 id    = "rust.advanced.11.send-sync"
 title = "Proč to nepřejde"
@@ -365,7 +922,7 @@ hints = [
   "assert_sync(&*total) se ptá na samotný Mutex, ne na Arc kolem něj — Mutex<T> je Sync, kdykoli T je Send.",
 ]
 
-# ---------------------------------------------------------------- 12
+# ---------------------------------------------------------------- 28
 [[quest]]
 id    = "rust.advanced.12.dispatch"
 title = "Teď, nebo později"
@@ -409,7 +966,7 @@ hints = [
   "Obě funkce mají stejné jednořádkové tělo. Rozdíl je celý v signatuře a celý v tom, kde se metoda vyhledává.",
 ]
 
-# ---------------------------------------------------------------- 13
+# ---------------------------------------------------------------- 29
 [[quest]]
 id    = "rust.advanced.13.interior-mutability"
 title = "Změna přes sdílenou referenci"
@@ -459,7 +1016,7 @@ hints = [
   "Rc::clone(&ledger) se píše takhle, a ne .clone(), aby čtenář viděl, že se kopíruje handle, a ne Vec. Rc::strong_count ukazuje 2, dokud jsou oba handly naživu, a ty dva borrow_mut() v testu paniky mohou přijít po jednom z každého handlu — je to stejný RefCell a počítá je dohromady.",
 ]
 
-# ---------------------------------------------------------------- 14
+# ---------------------------------------------------------------- 30
 [[quest]]
 id    = "rust.advanced.14.custom-error"
 title = "Vlastní chyba"
@@ -501,7 +1058,7 @@ hints = [
   "Display je to, co vypisuje {}; Debug je to, co vypisuje {:?}; trait Error je to, co ho pustí do Box<dyn Error>. Všechny tři stojí za to mít a jen jeden je tu potřeba.",
 ]
 
-# ---------------------------------------------------------------- 15
+# ---------------------------------------------------------------- 31
 [[quest]]
 id    = "rust.advanced.15.atomics"
 title = "Jedno slovo, žádný zámek"
@@ -542,7 +1099,7 @@ hints = [
   "Drop běží v obráceném pořadí deklarace, takže `second` jde první. Navázání jako _first a _second je udrží naživu do konce main; holé `_` by je zahodilo okamžitě.",
 ]
 
-# ---------------------------------------------------------------- 16
+# ---------------------------------------------------------------- 32
 [[quest]]
 id    = "rust.advanced.16.closure-kinds"
 title = "Tři druhy uzávěr"
@@ -587,7 +1144,7 @@ hints = [
   "apply_fn_mut bere `mut f: F` — parametr sám musí být měnitelný, aby uzávěra mohla měnit své vlastní zachycené hodnoty.",
 ]
 
-# ---------------------------------------------------------------- 17
+# ---------------------------------------------------------------- 33
 [[quest]]
 id    = "rust.advanced.17.deadlock"
 title = "Uváznutí"

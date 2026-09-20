@@ -62,10 +62,11 @@ impl Session {
 /// PROTOCOL §5.1. `address` is the EIP-55 spelling: checksummed on the wire in
 /// both directions, lowercase only inside the server (SPEC §3.4).
 pub fn user_json(conn: &Connection, user: &users::User) -> Result<serde_json::Value> {
-    // XP is stars weighted by difficulty and category, and the level curve is
-    // triangular (`awards.rs`). The protocol fixes the fields and not the
-    // curve; the curve is written down in docs/decisions.md so the two clients
-    // draw the same number.
+    // XP is the ledger's sum (`0016_xp.sql`): each first clear writes stars
+    // weighted by difficulty and category, and the level curve is triangular
+    // (`awards.rs`). The protocol fixes the fields and not the curve; the
+    // curve is written down in docs/decisions.md so the two clients draw the
+    // same number.
     let xp = awards::total_xp(conn, &user.address)?;
     let level = awards::level_for_xp(xp);
     Ok(json!({

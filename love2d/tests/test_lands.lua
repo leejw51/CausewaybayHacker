@@ -93,4 +93,76 @@ return function()
       T.ok(External.EXT[land] ~= nil, land .. " has an extension")
     end
   end)
+
+  T.section("lands — the CODE PLAYGROUND tile leads the screen")
+
+  T.case("the tile sits under the title, above every card, clear of the band, both ways up", function()
+    if not (love and love.graphics) then
+      T.skip("the playground tile", "needs fonts, so needs LÖVE")
+      return
+    end
+    local Layout = require("src.layout")
+    local UI = require("src.ui")
+    local Lands = require("src.scenes.lands")
+    local was_font, was_mode, was_vw, was_vh = Layout.font, Layout.mode, Layout.vw, Layout.vh
+    local app = { session = { authed = true }, land = "rust" }
+    for _, step in ipairs({ 1, 2, 4 }) do
+      Layout.font = step
+      for _, shape in ipairs({ { "landscape", 1280, 720 }, { "portrait", 720, 1280 } }) do
+        Layout.mode, Layout.vw, Layout.vh = shape[1], shape[2], shape[3]
+        local scene = Lands.new(app)
+        local tag = ("step %d %s"):format(step, shape[1])
+        local tile = scene:tile_rect()
+        local cards = scene:card_rects()
+        local band = scene:button_rects().weakest
+        local title_bottom = 24 + UI.lineHeight(Lands.title_size(Layout.vw))
+        T.ok(tile.y >= title_bottom, tag .. ": the tile is under the title")
+        T.ok(tile.x >= 0 and tile.x + tile.w <= Layout.vw, tag .. ": the tile is inside the canvas, across")
+        T.ok(tile.h >= Lands.band_height() * 1.8 - 1, tag .. ": the tile is taller than a button")
+        for i, c in ipairs(cards) do
+          T.ok(c.y >= tile.y + tile.h, tag .. (": card %d starts under the tile"):format(i))
+          T.ok(c.y + c.h <= band.y, tag .. (": card %d ends above the band"):format(i))
+          T.ok(c.h > 0, tag .. (": card %d has height"):format(i))
+        end
+        T.ok(tile.y + tile.h < band.y, tag .. ": the tile is clear of the band")
+        T.ok(band.y + band.h <= Layout.vh, tag .. ": the band is inside the canvas")
+      end
+    end
+    Layout.font, Layout.mode, Layout.vw, Layout.vh = was_font, was_mode, was_vw, was_vh
+  end)
+  T.section("lands — the fourth road, and the quiz's pure parts")
+
+  T.case("VERY BASIC walks first, and every road has a label", function()
+    T.same(Land.CATEGORIES, { "verybasic", "basic", "advanced", "hacker" })
+    T.eq(Land.category_label("verybasic"), "VERY BASIC", "two words on screen, not the id")
+    T.eq(Land.category_label("basic"), "BASIC")
+    T.eq(Land.category_label("hacker"), "HACKER")
+    T.eq(Land.category_label("zig"), "ZIG", "an unknown road keeps its id, upper-cased")
+  end)
+
+  T.case("a pick is right only at the wire's 0-based answer", function()
+    local Quest = require("src.scenes.quest")
+    local quiz = { choices = { "a", "b", "c", "d" }, answer = 2 }
+    T.eq(Quest.pick_result(quiz, 3), "right", "the third choice is index 2")
+    T.eq(Quest.pick_result(quiz, 1), "wrong")
+    T.eq(Quest.pick_result(quiz, 4), "wrong")
+    T.eq(Quest.pick_result(quiz, 5), nil, "no fifth choice")
+    T.eq(Quest.pick_result(quiz, 0), nil)
+    T.eq(Quest.pick_result(nil, 1), nil, "no quiz, no pick")
+  end)
+
+  T.case("the choice wells stack without overlapping and keep their column", function()
+    local Quest = require("src.scenes.quest")
+    local boxes = Quest.choice_boxes(12, 100, 300, { 36, 50, 36, 36 }, 6)
+    T.eq(#boxes, 4)
+    for i, b in ipairs(boxes) do
+      T.eq(b.x, 12); T.eq(b.w, 300)
+      if i > 1 then
+        local prev = boxes[i - 1]
+        T.ok(b.y >= prev.y + prev.h + 6, "well " .. i .. " sits under well " .. (i - 1))
+      end
+    end
+    T.eq(boxes[2].h, 50, "a wrapped choice gets a taller well")
+  end)
+
 end

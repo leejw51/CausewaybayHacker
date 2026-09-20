@@ -1403,7 +1403,7 @@ check(null, "beyond: world.lands, world.map and quest.get match §5", async () =
       assert(["rust", "go", "cpp", "python"].includes(l.land), `§4.6: land ${l.land}`);
       for (const cat of l.categories) {
         assert(
-          ["basic", "advanced", "hacker"].includes(cat.category),
+          ["verybasic", "basic", "advanced", "hacker"].includes(cat.category),
           `§4.6: category ${cat.category}`,
         );
         assert(cat.cleared <= cat.total, "§4.6: cleared exceeds total");
@@ -1418,7 +1418,7 @@ check(null, "beyond: world.lands, world.map and quest.get match §5", async () =
     assertEq(map.payload.category, "basic", "§4.7: the map echoes its category");
     for (const n of nodes) {
       assert(
-        /^(rust|go)\.(basic|advanced|hacker)\.\d{2}\..+$/.test(n.quest_id),
+        /^(rust|go|cpp|python)\.(verybasic|basic|advanced|hacker)\.\d{2}\..+$/.test(n.quest_id),
         `SPEC §4.1: quest_id ${n.quest_id}`,
       );
       // §5.2: `open` | `cleared`. Never `locked` — see §4.7.

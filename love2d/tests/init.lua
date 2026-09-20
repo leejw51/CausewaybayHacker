@@ -35,6 +35,7 @@ local PURE = {
   "tests.test_lands",
   "tests.test_editor",
   "tests.test_fxplan",
+  "tests.test_celebrate",
   "tests.test_wallet",
   "tests.test_username",
   "tests.test_edits",

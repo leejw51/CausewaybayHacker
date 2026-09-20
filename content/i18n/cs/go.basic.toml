@@ -34,11 +34,17 @@ id    = "go.basic.02.vars"
 title = "Čtečka Octopus"
 story = "Čtečka na Tin Hau ukáže zůstatek a pak dvě prázdná místa tam, kde býval denní strop a záloha."
 brief = '''
-Načti ze standardního vstupu jedno celé číslo `n`.
+Proměnná se deklaruje pomocí `var`, nebo se vytvoří na místě pomocí `:=`,
+které si vezme typ z pravé strany. `fmt.Println` vypíše své argumenty s
+mezerou mezi nimi a novým řádkem za nimi. Aritmetika na `int64` zůstává
+`int64`: `n * n` je další celé číslo.
 
-Vypiš tři řádky: `n`, potom dvojnásobek `n`, potom `n` vynásobené samo sebou.
+```
+fmt.Println(n * n)
+```
 
-`n` se vejde do `int64` a může být záporné.
+Zůstatek `n` je načten a vypsán, stejně jako `n * 2`. Napiš třetí výpis:
+`n` vynásobené samo sebou.
 
 ```
 input:  12
@@ -48,532 +54,833 @@ output: 12
 ```
 '''
 hints = [
-  "Načtení je hotové za tebe; n už tu hodnotu drží.",
-  "fmt.Println bere jakoukoli hodnotu, takže tu nepotřebuješ formátovací řetězec.",
-  "Záporné n na druhou je kladné. Test to ví.",
+  "fmt.Println(n * n)",
+  "Stejný tvar jako řádek nad ním: z n * 2 se stane n * n.",
 ]
 
 # ---------------------------------------------------------------- 03
 [[quest]]
-id    = "go.basic.03.control-flow"
-title = "Tramvaj, nebo metro"
-story = "Tabule ve vestibulu Causeway Bay má hlásit, který spoj právě jede. Místo toho každou minutu hlásí číslo minuty."
+id    = "go.basic.03.types"
+title = "Jízdné napůl"
+story = "Dva kurýři si dělí jeden účet z Lucky Macu u pultu v Tin Hau a účtenka tiskne podíl jako celé číslo, zbytek a potom skutečnou částku."
 brief = '''
-Načti jedno celé číslo `n`. Pro každé `i` od `1` do `n` vypiš jeden řádek:
-
-* `TRAMMTR`, pokud je `i` dělitelné třemi i pěti
-* `TRAM`, pokud je `i` dělitelné třemi
-* `MTR`, pokud je `i` dělitelné pěti
-* jinak samotné `i`
+Go za tebe číslo nikdy nepřevede. `a / b` na dvou celých číslech je
+celočíselné dělení (zaokrouhluje k nule) a `a % b` je zbytek. Aby vyšel
+skutečný podíl, převedeš nejdřív obě strany pomocí `float64(...)`, a
+`fmt.Printf` s `%.2f` vypíše float přesně se dvěma číslicemi za tečkou.
 
 ```
-input:  5
-output: 1
-        2
-        TRAM
-        4
-        MTR
+fmt.Printf("%.2f\n", float64(a)/float64(b))
 ```
 
-`switch` bez výrazu bere v Go v každé větvi jednu booleovskou podmínku a
-nepropadává dál. Použij ho.
+Celočíselný podíl a zbytek se vypisují. Napiš třetí řádek: skutečný podíl,
+dvě desetinná místa.
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
 '''
 hints = [
-  "Nejdřív otestuj případ „obojí“, jinak nikdy nenastane.",
-  "switch { case cond: } nepotřebuje výraz a nepotřebuje break.",
-  "Dělitelné třemi a pěti je totéž co dělitelné patnácti.",
+  "fmt.Printf(\"%.2f\\n\", float64(a)/float64(b))",
+  "Převeď obě strany: float64(a) / b se nepřeloží, protože float64 a int64 nelze dělit.",
 ]
 
 # ---------------------------------------------------------------- 04
 [[quest]]
-id    = "go.basic.04.slices"
-title = "Uprostřed vozu"
-story = "Nástupiště 2 počítá, kdo nastoupí první a kdo poslední, a všechny mezi nimi ztratí."
+id    = "go.basic.04.strings"
+title = "Název stanice"
+story = "Cedule na nástupišti v Causeway Bay ukazuje název stanice jednou, potom prázdné místo, kde mají být velká písmena, a prázdné místo, kde má běžet pozpátku pro zrcadlovou stranu."
 brief = '''
-Na standardním vstupu je na prvním řádku počet `n` a na druhém `n` celých
-čísel oddělených mezerami. `n` je nejméně `1`.
-
-Vypiš tři řádky: první hodnotu, poslední hodnotu a součet všeho, co leží
-ostře mezi nimi. Při méně než třech hodnotách je ten součet `0`.
+`string` je jen pro čtení, řez bajtů. `len(s)` je jeho délka v bajtech,
+balíček `strings` obsahuje běžné transformace a k průchodu znak po znaku
+ho převedeš na `[]rune`. Pomocná funkce `reverse` níže ten průchod dělá;
+ty ji jen zavoláš.
 
 ```
-input:  5
-        4 8 15 16 23
-output: 4
-        23
-        39
+fmt.Println(strings.ToUpper(line))
+fmt.Println(reverse(line))
+```
+
+Délka se vypisuje. Napiš další dva řádky: jméno velkými písmeny a pak jméno
+pozpátku.
+
+```
+input:  causeway bay
+output: 12
+        CAUSEWAY BAY
+        yab yawesuac
 ```
 '''
 hints = [
-  "nums[1:len(nums)-1] sdílí totéž podkladové pole — je to pohled, ne kopie.",
-  "S jednou nebo dvěma hodnotami je ten výraz prázdný nebo neplatný; ohlídej ho pomocí if.",
-  "range přes slice dává index a hodnotu; index zahoď pomocí _.",
+  "fmt.Println(strings.ToUpper(line)) a potom fmt.Println(reverse(line)).",
+  "Řádek _ = strings.ToUpper jen udržoval import použitý; smaž ho, jakmile strings.ToUpper zavoláš doopravdy.",
 ]
 
 # ---------------------------------------------------------------- 05
 [[quest]]
-id    = "go.basic.05.maps"
-title = "Co hlásí vestibul"
-story = "Přestup Causeway Bay v devět. Hlásicí tabule chce pořadí a mapa žádné pořadí nemá."
+id    = "go.basic.05.loops"
+title = "Každý třetí vlak"
+story = "Odjezdová tabule v Admiralty má sečíst ranní vlaky a říct, kolik z nich byl expres jedoucí jako každý třetí. Ukazuje dvě nuly."
 brief = '''
-Načti celý standardní vstup a rozděl ho podle bílých znaků.
-
-Vypiš každé různé slovo jednou jako `<word> <count>`, seřazené podle počtu
-sestupně, při shodě podle slova vzestupně.
+Go má jedno klíčové slovo pro smyčku. `for init; podminka; krok { }`
+počítá a `if` uvnitř nepotřebuje závorky, jen složené závorky. `sum += i`
+přičítá k proměnné na místě a `i%3 == 0` je způsob, jak se zeptat, zda je
+`i` násobkem tří.
 
 ```
-input:  tram tram bus
-output: tram 2
-        bus 1
+for i := 1; i <= n; i++ {
+	sum += i
+	if i%3 == 0 { threes++ }
+}
 ```
 
-Procházení mapy v Go je záměrně v náhodném pořadí. Nejdřív posbírej, pak
-vypisuj.
+Hlavička smyčky je napsaná. Doplň její tělo: přičti `i` k `sum` a započítej
+ho do `threes`, když je násobkem tří (jeden `if` na jednom řádku stačí).
+
+```
+input:  10
+output: 55
+        3
+```
 '''
 hints = [
-  "counts[word]++ funguje i na chybějícím klíči: nulová hodnota int je 0.",
-  "sort.Slice bere funkci less — vrať true, když i musí být před j.",
-  "Rozhodnutí při shodě je druhé porovnání uvnitř té samé funkce.",
+  "sum += i na jednom řádku, pak if i%3 == 0 { threes++ } na dalším.",
+  "if potřebuje složené závorky i pro jeden příkaz; kulaté závorky nepotřebuje.",
 ]
 
 # ---------------------------------------------------------------- 06
 [[quest]]
-id    = "go.basic.06.strings"
-title = "Bajty nejsou písmena"
-story = "Ukazatel u východu B ořízne 銅鑼灣 na tři a dostane jeden a půl znaku a otazník."
+id    = "go.basic.06.functions"
+title = "Sazba kurýra"
+story = "Alexova doručovací aplikace platí prvních deset jízd směny jednou sazbou a zbytek jinou, a funkce pro výplatu na kuchyňském tabletu vrací všem nulu."
 brief = '''
-Načti jeden řádek. Vypiš tři řádky:
-
-1. jeho délku v **bajtech**
-2. jeho délku v **runách**
-3. ten řádek s runami v obráceném pořadí
+Funkce pojmenuje své parametry s typy za nimi a typ výsledku za
+závorkami. `return` ji ukončí s hodnotou; `return` uvnitř `if` ji ukončí
+předčasně, takže řádek za `if` se provede jen tehdy, když podmínka
+neplatila.
 
 ```
-input:  causeway
-output: 8
-        8
-        yawesuac
+func fare(rides int) int {
+	if rides <= 10 { return rides * 5 }
+	return 50 + (rides-10)*3
+}
 ```
 
-Řádek může obsahovat znaky mimo ASCII, a pak si první dvě čísla nejsou
-rovna. `len(s)` jsou bajty. Vždycky byly.
+Prvních deset jízd stojí po 5 a každá další po 3. `fare` je deklarována a
+volána; napiš její tělo: předčasný `return` pro deset jízd a méně a
+`return` pro zbytek.
+
+```
+input:  12
+output: 56
+```
 '''
 hints = [
-  "len(line) je počet bajtů; []rune(line) je dekódovaná podoba.",
-  "Obrácení slice bajtů by rozseklo vícebajtový znak napůl.",
-  "Dva indexy jdoucí proti sobě a prohazující cestou hodnoty — to je celé obracení.",
+  "if rides <= 10 { return rides * 5 } a potom return 50 + (rides-10)*3.",
+  "Deset jízd po 5 je 50; odtud druhý vzorec začíná počítat.",
 ]
 
 # ---------------------------------------------------------------- 07
 [[quest]]
 id    = "go.basic.07.structs"
-title = "Pokladna"
-story = "Pult v Lucky Mac přidá k objednávce položku a při další už je pryč. Metoda si vzala kopii."
+title = "Jeden řádek objednávky"
+story = "Obrazovka objednávek v Lucky Macu má řádek pro každou položku — název, cenu, kolik — a sloupec s celkem hlásí na každém řádku nulu."
 brief = '''
-Na standardním vstupu je počet `n` a pak `n` řádků `<ITEM> <CENTS>`.
-
-Posbírej položky do `Till` a pak každou vypiš zpátky jako `<ITEM> <CENTS>`,
-v pořadí, v jakém přišly, a nakonec `TOTAL <sum>`.
+`struct` seskupuje pojmenovaná pole. Jeho hodnota se staví literálem,
+který pojmenuje pole, a metoda je funkce s příjemcem před svým jménem:
+`func (it Item) Total() int` se volá jako `it.Total()` a čte pole přes
+`it`.
 
 ```
-input:  2
-        HASHBROWN 600
-        SET 2800
-output: HASHBROWN 600
-        SET 2800
-        TOTAL 3400
+it := Item{Name: name, Price: price, Qty: qty}
+return it.Price * it.Qty
 ```
 
-`n` může být `0`, a pak je jediný řádek `TOTAL 0`.
+`Item` a jeho metoda `Total` jsou deklarovány. Napiš literál, který postaví
+`it` ze tří načtených hodnot, a jednořádkové tělo `Total`.
 
-Metoda s hodnotovým příjemcem dostane kopii pokladny. `Add` musí měnit tu
-skutečnou.
+```
+input:  tea 12 3
+output: tea: 36
+```
 '''
 hints = [
-  "func (t *Till) Add — ukazatelový příjemce mění pokladnu, kterou drží volající.",
-  "till.Add(...) funguje beze změny; Go vezme adresu za tebe, protože till je adresovatelný.",
-  "Total jen čte, ale příjemce na jednom typu drž konzistentní.",
+  "it := Item{Name: name, Price: price, Qty: qty} — a v Total return it.Price * it.Qty.",
+  "Smaž řádek _, _, _ =, jakmile literál ta tři jména použije; Go odmítá nepoužitou proměnnou.",
 ]
 
 # ---------------------------------------------------------------- 08
 [[quest]]
-id    = "go.basic.08.interfaces"
-title = "Jeden seznam, dvě věci"
-story = "Rozcestník v Hysan Place a tramvajová zastávka před ním se tisknou dvěma různými programy a ani jeden se nevejde do seznamu toho druhého."
+id    = "go.basic.08.enums"
+title = "Barva linky"
+story = "Mapa přestupů v Admiralty zná tři linky podle jména a každou z nich maluje šedě."
 brief = '''
-Na standardním vstupu je počet `n` a pak `n` řádků, každý buď
-
-* `SHOP <NAME> <FLOOR>` — vykreslí se jako `<NAME> / F<FLOOR>`
-* `STOP <ROUTE>` — vykreslí se jako `TRAM <ROUTE>`
-
-Vypiš každou ceduli vykreslenou, v pořadí, pak `SIGNS <n>` a pak `SHOPS <k>`,
-kde `k` je počet obchodů mezi nimi — spočítaný **typovým switchem**, ne
-příznakem, který sis vedl při parsování.
+Go nemá klíčové slovo `enum`. Idiom je pojmenovaný celočíselný typ a blok
+`const` s `iota`, které konstanty čísluje 0, 1, 2, jak jde dolů. `switch`
+nad takovou hodnotou vyjmenuje jeden `case` na konstantu a `case` může
+sedět na jednom řádku i se svým `return`.
 
 ```
-input:  3
-        SHOP HYSAN 4
-        STOP 2
-        SHOP SOGO 1
-output: HYSAN / F4
-        TRAM 2
-        SOGO / F1
-        SIGNS 3
-        SHOPS 2
+type Line int
+
+const (
+	Island Line = iota
+	TsuenWan
+	KwunTong
+)
+
+switch l {
+case Island: return "blue"
+case TsuenWan: return "red"
+case KwunTong: return "green"
+}
+```
+
+`Line`, jeho tři konstanty a `parse` jsou napsané a `colour` už odpovídá
+`blue` pro `Island`. Přidej dva chybějící případy: `TsuenWan` je `red`,
+`KwunTong` je `green`.
+
+```
+input:  tsuenwan
+output: red
 ```
 '''
 hints = [
-  "Žádné klíčové slovo `implements` neexistuje. Dej každé struktuře metodu Render() string a splňuje Sign.",
-  "Přidej konkrétní hodnotu do []Sign pomocí append — Go ji zabalí za tebe.",
-  "switch sign.(type) { case Shop: } je typový switch; tvar s hodnotou je switch v := sign.(type).",
+  "case TsuenWan: return \"red\" a case KwunTong: return \"green\", každý na vlastním řádku pod případem Island.",
+  "Switch v Go nepropadává: každý case končí sám od sebe, žádný break není potřeba.",
 ]
 
 # ---------------------------------------------------------------- 09
 [[quest]]
-id    = "go.basic.09.errors"
-title = "Řádek, který není číslo"
-story = "Výpis jezdců se vrací z depa a uprostřed sloupce má něčí objednávku oběda."
+id    = "go.basic.09.vector"
+title = "Počet ve vagonech"
+story = "Nástupiště 2 v Causeway Bay čte počet nastupujících z každých dveří a žádný si nenechá: ani celkem, ani první dveře, ani poslední."
 brief = '''
-Na standardním vstupu je počet `n` a pak `n` řádků. Každý řádek má být celé
-číslo.
-
-Pro každý řádek vypiš buď dvojnásobek hodnoty, nebo `BAD <line>`, pokud se
-nedá naparsovat. Nakonec vypiš `SUM <total>`, součet hodnot, které jsi
-vypsal.
+Slice je rostoucí seznam v Go a tři věci, které s ním děláte, jsou ty tři
+řádky níže. `append` přidá na konec a vrátí slice, takže ho vždy přiřadíte
+zpátky. Odebrání indexu 1 je zase `append`: část před ním spojená s částí
+za ním. Úprava je obyčejné indexování — `xs[0] = 99` přepíše první prvek
+na místě. A `sort.Ints` seřadí celý slice vzestupně, na místě.
 
 ```
-input:  3
-        21
-        xx
-        -4
-output: 42
-        BAD xx
-        -8
-        SUM 34
+xs = append(xs, v)
+xs = append(xs[:1], xs[2:]...)
+xs[0] = 99
+sort.Ints(xs)
 ```
 
-Definuj sentinelovou chybu `var ErrNotANumber = errors.New(...)`, obal ji
-pomocí `fmt.Errorf("...: %w", ErrNotANumber)` a v `main` ji rozpoznej pomocí
-`errors.Is`. Chyba je hodnota; tohle je to, co ti to přináší.
+Každý počet dveří `v` se čte ve smyčce (aspoň dva). Napište `append` do
+smyčky a odebrání, úpravu a řazení za ni, místo čtyř zástupných řádků;
+vypíše se délka a slice.
+
+```
+input:  3 7 2 5
+output: 3
+        2 5 99
+```
 '''
 hints = [
-  "strconv.ParseInt(s, 10, 64) vrací (int64, error) — na druhou hodnotu se podívat není nepovinné.",
-  "%w ve fmt.Errorf nechá obalenou chybu dohledatelnou; %v by ji zploštilo na text.",
-  "errors.Is prochází řetěz obalení, takže shoda platí i po tom, co byla zpráva doplněna.",
+  "xs = append(xs, v) ve smyčce; pak xs = append(xs[:1], xs[2:]...), xs[0] = 99 a sort.Ints(xs) za ní.",
+  "xs[:1] je všechno před indexem 1 a xs[2:] všechno za ním; append je spojí a ... rozprostře druhý slice do argumentů.",
 ]
 
 # ---------------------------------------------------------------- 10
 [[quest]]
-id    = "go.basic.10.closures"
-title = "Počítadlo u dveří"
-story = "Lucky Mac počítá, kdo vejde a kdo odejde, a vedoucí chce při zavírání číslo, ať se mezitím stane cokoli."
+id    = "go.basic.10.maps"
+title = "Součet objednávek"
+story = "Tiskárna v kuchyni Lucky Macu vyplivne každou položku, jak ji někdo vykřikne, a nikdy neřekne, kolik čeho nával vlastně objednal."
 brief = '''
-Na standardním vstupu je počet `n` a pak `n` řádků, každý `IN` nebo `OUT`.
-
-Veď průběžný počet, který nikdy neklesne pod nulu. Po každém příkazu ho vypiš.
-Když se `main` vrací, vypiš `CLOSED <final>` — z `defer`, ne z konce funkce.
+`map[string]int` drží počet pod slovem. Přidání je `counts[w]++` —
+chybějící klíč se čte jako nula, takže první výskyt udělá 1. Odebrání je
+`delete(counts, k)`, které mlčí, když klíč není. Úprava je přiřazení:
+`counts["bun"] = 10` přepíše počet pod tím klíčem (a vložil by ho, kdyby
+chyběl). Mapa nemá pořadí — range přes ni vychází zamíchaně — takže se
+klíče sesbírají do slice (napsáno za vás) a `sort.Strings` je před
+výpisem seřadí.
 
 ```
-input:  4
-        IN
-        IN
-        OUT
-        IN
-output: 1
-        2
-        1
-        2
-        CLOSED 2
+counts[w]++
+delete(counts, "tea")
+counts["bun"] = 10
+sort.Strings(keys)
 ```
 
-Samotné počítadlo je uzávěr: funkce, která vrací funkci, se součtem zachyceným
-mezi nimi. V řešení není žádná proměnná na úrovni balíčku.
+Každé slovo `w` se čte ve smyčce. Napište počítání do smyčky, `delete`
+slova `tea` a úpravu `bun` za ni a řazení, jakmile je `keys` postavené,
+místo čtyř zástupných řádků; vypíšou se seřazené řádky `slovo počet`.
+
+```
+input:  tea bun tea rice tea bun
+output: bun 10
+        rice 1
+```
 '''
 hints = [
-  "total žije v rámci makeCounter a vrácená funkce ho drží naživu. To je ten uzávěr.",
-  "defer func(){ ... }() se spustí při návratu a uzávěr čte `last` až tehdy — ne ve chvíli, kdy byl defer zapsán.",
-  "defer, který by bral argument, by hodnotu zachytil ve chvíli deferu. Zkus obojí a sleduj, jak se to změní.",
+  "counts[w]++ ve smyčce; delete(counts, \"tea\") a counts[\"bun\"] = 10 za ní; sort.Strings(keys), jakmile je keys postavené.",
+  "Přiřazení do klíče je stejný řádek, ať klíč existuje nebo ne: přepíše, když existuje, a vloží, když ne.",
 ]
 
 # ---------------------------------------------------------------- 11
 [[quest]]
-id    = "go.basic.11.generics"
-title = "Jedna funkce, jakýkoli seznam"
-story = "Alex napsal Sum čtyřikrát — pro objednávky, pro jezdce, pro minuty a pro centy — a pátá je na řadě."
+id    = "go.basic.11.sets"
+title = "Různí kurýři"
+story = "Za dopoledne projde dveřmi Lucky Macu čtyřicet čísel kurýrů, většinou těch samých osmi lidí, a tabule směny počítá každý příchod jako nového kurýra."
 brief = '''
-Na standardním vstupu je jeden řádek celých čísel oddělených mezerami.
-
-Vypiš tři řádky:
-
-1. každou hodnotu zdvojenou, spojené jednotlivými mezerami
-2. součet původních hodnot
-3. kolik z nich je větších než `10`
+Go nemá typ množina; idiomem je mapa, jejíž hodnotou je prázdná struktura.
+Přidání je `seen[v] = struct{}{}`; odebrání je `delete`. Množina nemá
+úpravu — člen buď je, nebo není — takže změna `3` na `4` je odebrání a
+přidání, tady napsané na jednom řádku. `len(seen)` je počet odlišných;
+klíče vycházejí bez pořadí, takže se sesbírají do slice (napsáno za vás)
+a `sort.Ints` je seřadí.
 
 ```
-input:  1 2 3 4 12
-output: 2 4 6 8 24
-        22
-        1
+seen[v] = struct{}{}
+delete(seen, 8)
+delete(seen, 3); seen[4] = struct{}{}
+sort.Ints(keys)
 ```
 
-Napiš tři generické pomocné funkce a použij je: `MapSlice[T, U any]`,
-`Sum[T Number]` nad omezením `~int64 | ~float64` a `Count[T any]`, která bere
-predikát.
+Každé číslo jezdce `v` se čte ve smyčce. Napište přidání do smyčky,
+odebrání `8` a úpravu `3` na `4` za ni a řazení, jakmile je `keys`
+postavené, místo čtyř zástupných řádků; vypíše se počet odlišných a
+seřazená čísla.
+
+```
+input:  8 3 8 5 3 8
+output: 2
+        4 5
+```
 '''
 hints = [
-  "MapSlice mění typ prvku, takže potřebuje dva typové parametry, ne jeden.",
-  "Místa volání odvodí T a U ze slice a z funkce — MapSlice[int64, string] nepíšeš.",
-  "~int64 znamená int64 a cokoli, jehož podkladový typ je int64, a právě to pustí dovnitř pojmenovaný typ.",
+  "seen[v] = struct{}{} ve smyčce; delete(seen, 8) a delete(seen, 3); seen[4] = struct{}{} za ní; sort.Ints(keys), jakmile je keys postavené.",
+  "delete hodnoty, která tam není, nic nedělá, a přidání té, která už tam je, nic nezmění: obě půlky úpravy lze bezpečně spustit, ať vstup obsahoval cokoli.",
 ]
 
 # ---------------------------------------------------------------- 12
 [[quest]]
-id    = "go.basic.12.defer-panic-recover"
-title = "Spadlo to a zase vstalo"
-story = "Jeden špatný lístek dřív shodil celou pokladnu a s ní i celou směnu."
+id    = "go.basic.12.stack-queue"
+title = "Talíře a fronta"
+story = "Čisté talíře se u výdejního pultu Lucky Macu vrší a berou se shora; zákazníci stojí u pokladny ve frontě a odcházejí zepředu. Obrazovka dělá obojí stejně."
 brief = '''
-Na standardním vstupu je počet `n` a pak `n` řádků. Každý je celé číslo, slovo
-`BOOM`, nebo něco jiného.
-
-Napiš `run(text string) (out string)`, která vrátí dvojnásobek hodnoty, nebo
-`BAD <text>`, pokud se nedá naparsovat — a při `BOOM` **zpanikaří**, přičemž
-se v odložené funkci zotaví, takže volající dostane `RECOVERED boom` místo
-mrtvého programu. Vypiš jeden řádek na každý vstup a na konci, z `defer`
-v `main`, vypiš `CLOSED <n>`.
+Slice je zásobník. Push je `append`; pop je odříznutí posledního prvku
+přeslicováním; a vršek je `stack[len(stack)-1]`, do kterého lze přiřadit —
+úprava horního talíře bez jeho sundání. Strana fronty, která bere zepředu
+pomocí `queue = queue[1:]`, je napsaná za vás. Zásobník se nikdy neřadí —
+pořadí *je* jeho smysl — takže tenhle drill má tři řádky, ne čtyři.
 
 ```
-input:  4
-        21
-        BOOM
-        xx
-        -4
-output: 42
-        RECOVERED boom
-        BAD xx
-        -8
-        CLOSED 4
+stack = append(stack, v)
+stack = stack[:len(stack)-1]
+stack[len(stack)-1] = 99
 ```
 
-Tři fakta, a všechna tři jsou ta otázka: `recover` dělá něco jen uvnitř
-odložené funkce; **pojmenovaná** návratová hodnota je to, co odložené funkci
-dovolí změnit, co se po panice vrátí; a `defer` v `main` se spustí při
-návratu, takže `CLOSED` je poslední, ať smyčka dopadla jakkoli.
+Čísla se načtou do `xs` (aspoň dvě). Napište push do smyčky přes `xs`,
+pak pop a úpravu vršku za ni, místo tří zástupných řádků; vypíše se
+zásobník a první dva z fronty.
+
+```
+input:  1 2 3 4
+output: 1 2 99
+        1 2
+```
 '''
 hints = [
-  "Návratová hodnota musí být pojmenovaná — out string — jinak odložená funkce nemá do čeho přiřadit.",
-  "recover() vrací nil, když žádná panika nebyla, takže if je způsob, jak ty dvě cesty rozlišit.",
-  "Odložený uzávěr v main čte `done` ve chvíli, kdy běží, ne kdy byl zapsán, takže vidí konečný počet.",
+  "stack = append(stack, v) ve smyčce; pak stack = stack[:len(stack)-1] a stack[len(stack)-1] = 99 za ní.",
+  "Pop slice zúží; nic se nekopíruje a nic neuvolňuje. Po popu len(stack)-1 pojmenovává prvek, který býval druhý shora.",
 ]
 
 # ---------------------------------------------------------------- 13
 [[quest]]
-id    = "go.basic.13.zero-values"
-title = "Nic není nic"
-story = "Mapa rozpisu směn nikdy nevznikla a kód z ní celé dopoledne četl, aniž si jednou postěžoval."
+id    = "go.basic.13.sorting"
+title = "Tabule příjezdů"
+story = "Tabule příjezdů v Tin Hau vypisuje další vlaky v pořadí, v jakém přišla data, což není žádné pořadí."
 brief = '''
-Na standardním vstupu je počet `n` a pak `n` slov.
-
-Vypiš čtyři řádky, v tomto pořadí:
-
-1. `READ <v>` — co ti **nil** mapa dá pro klíč, který nemá
-2. `LEN <k>` — délku po přidání všech `n` slov do **nil** slice
-3. `WRITE <ok|panic>` — jestli přiřazení do té nil mapy zpanikařilo
-   (zotav se z toho; nenech program umřít)
-4. `FOUND <k>` — kolik ze slov je klíčem *inicializované* mapy naplněné
-   hodnotami `a` a `b`
+Balíček `sort` řadí řez na místě. `sort.Ints(xs)` dá celá čísla do
+vzestupného pořadí. Pro sestupné žádné `sort.IntsDesc` není; místo toho
+zabalíš řez jako `sort.IntSlice`, obrátíš jeho uspořádání přes
+`sort.Reverse` a předáš to `sort.Sort`.
 
 ```
-input:  3
-        a b c
-output: READ 0
-        LEN 3
-        WRITE panic
-        FOUND 2
+sort.Ints(xs)
+sort.Sort(sort.Reverse(sort.IntSlice(xs)))
 ```
 
-Nil mapa a nil slice nejsou stejný druh ničeho. Číst z nil mapy je legální
-a dává nulovou hodnotu typu hodnoty; zápis do ní zpanikaří, protože není
-žádná tabulka, do které by se zapisovalo. `append` do nil slice je legální
-a alokuje — proto je `var s []T` idiomatický prázdný slice a `var m map[K]V`
-idiomatická prázdná mapa není.
+Napiš vzestupné řazení před první výpis a sestupné před druhý. Výpis je
+napsaný.
+
+```
+input:  5 2 9 1
+output: 1 2 5 9
+        9 5 2 1
+```
 '''
 hints = [
-  "empty[\"missing\"] na nil mapě není chyba — je to nulová hodnota int, tedy 0.",
-  "append si s nil slicem poradí: první podkladové pole alokuje za tebe, a proto nikdy nepotřebuješ make() jen kvůli začátku.",
-  "Zápis se musí odehrát uvnitř funkce s odloženým recover, jinak panika ukončí program dřív než čtvrtý řádek.",
+  "Nejdřív sort.Ints(xs); potom sort.Sort(sort.Reverse(sort.IntSlice(xs))).",
+  "sort.IntSlice(xs) je převod, ne kopie — řazení se pořád děje uvnitř xs.",
 ]
 
 # ---------------------------------------------------------------- 14
 [[quest]]
-id    = "go.basic.14.embedding"
-title = "Nezdědilo nic"
-story = "Konečná je zastávka s něčím navíc. Alex ji napsal dvakrát, což je jednou moc."
+id    = "go.basic.14.sort-by-key"
+title = "Žebříček kurýrů"
+story = "Tabule směny v Lucky Macu má řadit kurýry podle doručení, nejlepší první, remízy podle jména, a vypisuje je v pořadí, v jakém si píchli příchod."
 brief = '''
-Na standardním vstupu je počet `n` a pak `n` řádků, každý `STOP <NAME>` nebo
-`TERM <NAME> <LINES>`.
-
-Dej `Stop` metodu `Describe() string`, která vrací jeho jméno. Nech `Terminus`
-**vnořit** `Stop` a přidat `Lines int`, a dej mu vlastní `Describe`, která
-zavolá tu vnořenou a přidá `(<lines> lines)`.
-
-Vypiš `Describe()` každého z nich, pak `TERMINI <k>` spočítané typovým
-switchem nad `[]Describer`.
+`sort.Slice` seřadí libovolný řez, když dostane funkci `less(i, j)`, která
+říká, zda má prvek `i` být před prvkem `j`. Pro dvouúrovňové pořadí
+porovnáš první klíč a jen při shodě propadneš k druhému. Sestupně je prostě
+porovnání naopak.
 
 ```
-input:  3
-        STOP CAUSEWAY
-        TERM KENNEDY 2
-        STOP TINHAU
-output: CAUSEWAY
-        KENNEDY (2 lines)
-        TINHAU
-        TERMINI 1
+sort.Slice(entries, func(i, j int) bool {
+	a, b := entries[i], entries[j]
+	if a.Score != b.Score { return a.Score > b.Score }
+	return a.Name < b.Name
+})
 ```
 
-Vnoření není dědičnost. `Terminus` se *nestane* `Stop`; obsahuje ho, a metody
-obsažené hodnoty jsou **povýšeny** na vnější typ, pokud si vnější typ
-nedeklaruje vlastní. `t.Stop.Describe()` je způsob, jak se dostat k té, kterou
-jsi zastínil, a žádné `super` neexistuje.
+Volání `sort.Slice` a začátek funkce jsou napsané. Napiš její dva řádky:
+skóre sestupně, když se skóre liší, jméno vzestupně, když jsou stejná.
+
+```
+input:  4
+        alex 12
+        mei 15
+        bo 12
+        sam 9
+output: mei 15
+        alex 12
+        bo 12
+        sam 9
+```
 '''
 hints = [
-  "Vnořené pole nemá vlastní jméno — píše se `Stop` uvnitř literálu i v t.Stop.Describe().",
-  "Terminus splňuje Describer díky vlastní Describe; bez ní by ho splňoval přes povýšenou metodu Stop.",
-  "d.(Terminus) s tvarem comma-ok je typová aserce; typový switch dělá tutéž práci, když jsou možnosti víc než dvě.",
+  "if a.Score != b.Score { return a.Score > b.Score } a potom return a.Name < b.Name.",
+  "less odpovídá na otázku „jde i první?“: vyšší skóre jde první a mezi stejnými skóre jde menší jméno.",
 ]
 
 # ---------------------------------------------------------------- 15
 [[quest]]
-id    = "go.basic.15.variadics"
-title = "Kolik jich máš"
-story = "Někdy jsou to dvě objednávky a někdy celý stojan, a funkci to nemá zajímat."
+id    = "go.basic.15.closures"
+title = "Příplatek"
+story = "Každé jízdné přes turnikety v Causeway Bay má dnes večer stejný příplatek a sčítačka turniketu byla napsaná dřív, než jí někdo řekl číslo."
 brief = '''
-Na standardním vstupu je počet `n` a pak `n` celých čísel.
-
-Napiš `total(values ...int64) (sum int64, count int)` — variadickou,
-s pojmenovanými návratovými hodnotami — a zavolej ji třemi způsoby. Vypiš:
-
-1. `ALL <sum> <count>` — celý slice, rozbalený pomocí `...`
-2. `NONE <sum> <count>` — volání úplně bez argumentů
-3. `TWO <sum> <count>` — první dvě hodnoty předané jednotlivě, nebo tolik,
-   kolik jich je
+Funkční literál je funkce bez jména, vytvořená tam, kde je potřeba, a
+uložená do proměnné jako každá jiná hodnota. Může používat proměnné kolem
+sebe — tady `k` — a používá je i potom: to je closure. Volá se jako
+`add(x)`, stejně jako každá funkce.
 
 ```
-input:  4
-        1 2 3 4
-output: ALL 10 4
-        NONE 0 0
-        TWO 3 2
+add := func(x int) int { return x + k }
 ```
 
-Uvnitř funkce je `values` obyčejný `[]int64`, a bez argumentů je `nil` —
-s čímž si `range` i `len` poradí bez zvláštního případu. `total(list...)`
-předá existující slice, místo aby ho kopíroval do nového; `total(list)` by se
-nezkompilovalo, a vědět proč je ta otázka.
+Napiš jeden řádek, který vytvoří `add`: funkční literál beroucí `int` a
+vracející ho plus `k`. Použije se na každé jízdné a vypíše za tebe.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
 '''
 hints = [
-  "Holý `return` s pojmenovanými výsledky vrátí to, co sum a count právě drží.",
-  "total(list...) rozbaluje; total(list) se pokusí předat []int64 jako jediný int64 a nezkompiluje se.",
-  "Bez argumentů je values nil a len(nil slice) je 0 — žádnou pojistku nepotřebuješ.",
+  "add := func(x int) int { return x + k }",
+  "k není parametr; literál prostě sáhne ven a přečte ho. Smaž řádek _ = k, jakmile to udělá.",
 ]
 
 # ---------------------------------------------------------------- 16
 [[quest]]
-id    = "go.basic.16.json"
-title = "Tag je smlouva"
-story = "API depa posílá klíče malými písmeny a Go exportuje pole velkými, a týden nikdo neviděl, proč je každá objednávka prázdná."
+id    = "go.basic.16.lambdas"
+title = "Jen sudé dveře"
+story = "Senzory na nástupišti v Admiralty hlásí každé dveře, model chce jen ty se sudým číslem umocněné a sečtené, a tablet má filter a map, do kterých není nic zapojené."
 brief = '''
-Na standardním vstupu je jeden řádek: JSON pole objednávek, každá s řetězcem
-`item` a číslem `cents`.
-
-Rozbal ho pomocí Unmarshal, vypiš jeden řádek na objednávku jako
-`<ITEM> <CENTS>`, pak zabal pomocí Marshal a vypiš souhrnný objekt přesně
-s klíči `count` a `total`, v tomto pořadí. Pokud vstup není platný JSON,
-vypiš `BAD JSON` a nic jiného.
+Funkční literál se dá předat přímo do jiné funkce jako argument, úplně
+beze jména. `filter` ponechá prvky, kterým `func(int) bool` řekne ano;
+`mapInts` každý prvek nahradí tím, co `func(int) int` vrátí. Obě jsou
+napsané nad `main`; ty dodáš jen ty dva literály.
 
 ```
-input:  [{"item":"SET","cents":2800},{"item":"PIE","cents":900}]
-output: SET 2800
-        PIE 900
-        {"count":2,"total":3700}
+evens := filter(xs, func(x int) bool { return x%2 == 0 })
+squares := mapInts(evens, func(x int) int { return x * x })
 ```
 
-Aby `encoding/json` pole vůbec vidělo, musí být **exportované** — pole
-s malým písmenem je pro marshaller neviditelné, a to potichu. Tag struktury
-pak říká, jak se jmenuje na drátě. `Marshal` zapisuje pole v pořadí
-deklarace, takže pořadí klíčů souhrnu určuješ ty, ne mapa.
+Napiš dvě volání: ponech sudá čísla, pak je umocni na druhou. Jejich součet
+se sečte a vypíše za tebe.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
 '''
 hints = [
-  "Tag jde do zpětných apostrofů za typ: Item string `json:\"item\"`.",
-  "Unmarshal bere ukazatel na cíl — &orders, ne orders — jinak nemá co vyplnit.",
-  "Zkontroluj chybu z Unmarshal. Při špatném vstupu zůstane orders prázdné a program, který chybu ignoruje, vesele vypíše nulový souhrn.",
+  "filter(xs, func(x int) bool { return x%2 == 0 }) a mapInts(evens, func(x int) int { return x * x }).",
+  "Signatura literálu musí přesně odpovídat parametru: func(int) bool pro keep, func(int) int pro f.",
 ]
 
 # ---------------------------------------------------------------- 17
 [[quest]]
-id    = "go.basic.17.testing"
-title = "Dokaž si to sám"
-story = "V 06:40 ti tohle nikdo nezkontroluje. Tabulka je přímo tady; rozsviť ji zeleně."
+id    = "go.basic.17.threads"
+title = "Jeden kurýr na objednávku"
+story = "Osm objednávek vyjede ze dveří Lucky Macu na osmi kolech najednou a tabule nepočká na žádnou z nich, než sečte večer."
 brief = '''
-Program drží tabulku čtyř známých správných dvojic `(km, fare)` a ověřuje
-`fare` proti každé z nich; vypisuje `<name> ok` nebo
-`<name> FAIL got <g> want <w>` a pak `PASSED <k>/4`. Nakonec načte ze
-standardního vstupu jednu vzdálenost a vypíše `FARE <x>`.
-
-`fare(km)` má být `500 + 100 * km`. Ta ve startovním kódu je špatně a tabulka
-to odhalí — což je celý smysl.
+`go f()` spustí `f` ve vlastní gorutině a nečeká. `sync.WaitGroup` je
+způsob, jak `main` na všechny počká: `Add(1)` před každým spuštěním,
+`Done()` uvnitř každé, když skončí — přes `defer`, aby se provedlo, ať
+funkce skončí jakkoli — a `Wait()` blokuje, dokud počítadlo není zpět na
+nule. Každá gorutina tady zapisuje jen do svého `results[i]`, takže nic
+není sdílené.
 
 ```
-input:  4
-output: zero ok
-        one ok
-        four ok
-        ten ok
-        PASSED 4/4
-        FARE 900
+var wg sync.WaitGroup
+for i, x := range xs {
+	wg.Add(1)
+	go func(i, x int) {
+		defer wg.Done()
+		results[i] = x * x
+	}(i, x)
+}
+wg.Wait()
 ```
 
-Na tabulku nesahej; je to specifikace. Tohle **je** tabulkový test v Go, jen
-bez harnessu: ve skutečném balíčku je to `func TestFare(t *testing.T)`
-s `for _, c := range cases` a `t.Run(c.name, ...)` a spouští ho `go test`.
-Tabulka je v obou případech stejná.
+Smyčka, `Add` a tvar gorutiny jsou napsané. Doplň její tělo:
+`defer wg.Done()`, pak ulož `x * x` do `results[i]`.
+
+```
+input:  1 2 3 4
+output: 1 4 9 16
+        30
+```
 '''
 hints = [
-  "Tabulka je specifikace. Funkce je to, co je špatně.",
-  "Tři ze čtyř případů selžou a ten, který projde, je km = 0, což je přesně důvod, proč jeden testovací případ nic nedokazuje.",
-  "V balíčku je to func TestFare(t *testing.T) s t.Run(c.name, func(t *testing.T){ ... }), aby se selhání samo pojmenovalo.",
+  "defer wg.Done() jako první řádek, results[i] = x * x jako druhý.",
+  "defer spustí Done, když se gorutina vrátí, ať se mezitím stane cokoli; obyčejné wg.Done() na začátku by řeklo „hotovo“ ještě před prací.",
 ]
 
 # ---------------------------------------------------------------- 18
 [[quest]]
-id    = "go.basic.18.nil-and-order"
+id    = "go.basic.18.binary-tree"
 title = "Nullptr"
-story = "11:55 u přední pokladny Lucky Mac. Každá objednávka projde, některé z nich neexistují, a pokladna je stejně čte."
+story = "Přední pokladna Lucky Macu v 11:55 zakládá každou objednávku do stromu podle čísla, kořen stromu je nil a ona ten nil stejně následuje. Každá objednávka projde a žádná neexistuje."
 brief = '''
-Na standardním vstupu je počet `n` a pak `n` řádků. Každý je buď
-`<NAME> <CENTS>`, nebo samotné `-`, což znamená, že objednávka nikdy
-nedorazila: nil `*Order` ve slice.
-
-Vypiš skutečné objednávky seřazené podle centů **sestupně**, při shodě podle
-jména vzestupně, jako `<NAME> <CENTS>`. Pak vypiš `NIL <count>` — kolik jich
-chybělo.
+Binární vyhledávací strom je `struct`, jehož dva potomci jsou ukazatele na
+tu samou strukturu, a prázdný strom je `nil`. Vkládání je rekurzivní: z
+`nil` podstromu se stane nový uzel, jinak hodnota jde do levého nebo
+pravého podstromu — a protože rekurze vrací nový kořen podstromu, přiřadíš
+ho zpět do pole potomka. Sáhni na `n.Left`, když je `n` `nil`, a program
+umře; kontrola na `nil` jde vždycky první.
 
 ```
-input:  4
-        SET 2800
-        -
-        PIE 900
-        TEA 1200
-output: SET 2800
-        TEA 1200
-        PIE 900
-        NIL 1
+type Node struct {
+	Val         int
+	Left, Right *Node
+}
+if v < n.Val {
+	n.Left = insert(n.Left, v)
+} else {
+	n.Right = insert(n.Right, v)
+}
 ```
 
-Každý nil se musí najít dřív, než ho cokoli dereferencuje, včetně porovnávací
-funkce, kterou předáš `sort.Slice`. To je celý boss.
+`Node`, kontrola `nil` v `insert`, jeho `if v < n.Val` / `else`, `inorder`,
+`height` a `main` jsou napsané. Doplň obě větve: levé přiřazení a pravé.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
 '''
 hints = [
-  "Nil *Order ve slice je v pořádku, dokud z něj něco nečte pole. Nejdřív filtruj, pak řaď.",
-  "strings.Fields na \"-\" dá jedno pole, takže len(fields) < 2 je tvůj test chybějící objednávky.",
-  "Sestupně je > ve funkci less; rozhodnutí při shodě je druhé porovnání za ním.",
+  "n.Left = insert(n.Left, v) v první větvi, n.Right = insert(n.Right, v) ve druhé.",
+  "insert vrací kořen podstromu — zbrusu nový uzel, když byl potomek nil — takže se výsledek musí uložit zpět do pole potomka, jinak strom nikdy neroste.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.basic.04.int-types"
+title = "Šířka čísla"
+story = "Čtečka Octopus na Tin Hau ukládá jízdné do 32bitové buňky a denní součet do 64bitové, a dnes tiskne pro obě stejnou nulu."
+brief = '''
+Celá čísla v Go mají šířky: `int32` a `int64` mají znaménko, `uint32`
+a `uint64` nemohou klesnout pod nulu. Nic se nepřevádí samo — cílový typ
+napíšeš jako funkci, `uint64(a)`, a hodnota se zkopíruje do širší buňky.
+Balíček `math` pojmenovává okraje: `math.MaxInt32` je největší `int32`,
+`math.MaxUint64` největší `uint64`.
+
+```
+b := uint64(a)
+fmt.Println(math.MaxInt32)
+```
+
+`a` se načte jako `int32`. Napiš převod do `b` a tisk `math.MaxInt32`
+místo dvou zástupných řádků; zbylé dva řádky se tisknou za tebe.
+
+```
+input:  7
+output: 7
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "b := uint64(a) — jméno typu je převod; potom fmt.Println(math.MaxInt32).",
+  "Šířka je součást typu: int32 a int64 se bez vypsaného převodu nikdy nemíchají.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.basic.05.big-int"
+title = "Třicet dva bajtů"
+story = "Adresa peněženky v telefonu kurýra je široká třicet dva bajtů a aplikace, která ji ukazuje, má třicet dva bajtů nul."
+brief = '''
+Žádné vestavěné celé číslo není široké 256 bitů, a hash nebo klíč je
+přesně to: třicet dva bajtů. `math/big` drží číslo jakékoli velikosti a
+`FillBytes` ho zapíše big-endian do pole bajtů, které mu podáš, s nulami
+doplněnými zleva. `hex.EncodeToString` udělá z těch bajtů šedesát čtyři
+hexadecimálních znaků, jaké vidíš vytištěné na řetězci.
+
+```
+n.FillBytes(buf[:])
+```
+
+`n` je už rozparsované z desítkového čísla na stdin a `buf` je `[32]byte`.
+Napiš ten jeden řádek, který naplní `buf` z `n`; délka a hex se tisknou za
+tebe.
+
+```
+input:  255
+output: 32
+        00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "n.FillBytes(buf[:]) — pole se stane řezem pomocí [:] a FillBytes do něj zapíše číslo.",
+  "Big-endian znamená, že poslední bajt je nejméně významný: 255 přistane v buf[31] jako ff.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.basic.06.floats"
+title = "Dva druhy desetinných čísel"
+story = "Hodiny na přestupu v Admiralty drží sekundy jako float64 a odjezdová tabule je zaokrouhluje do float32, a obě tabule se rozcházejí na desátém místě."
+brief = '''
+Desetinné číslo je `float64`, pokud neřekneš jinak; `float32` má
+poloviční šířku a drží asi sedm číslic. `strconv.ParseFloat` ho přečte z
+textu (to `64` je šířka, do které se parsuje) a `float32(x)` ho zkopíruje
+do užšího typu a cestou zaokrouhlí. `%.10f` tiskne deset míst, což je tam,
+kde se ta dvě začínají lišit.
+
+```
+x, _ := strconv.ParseFloat(s, 64)
+y := float32(x)
+```
+
+`s` je text ze stdin. Napiš parsování do `x` a převod do `y` místo dvou
+zástupných řádků; oba se tisknou za tebe.
+
+```
+input:  3.14159265358979
+output: 3.1415926536
+        3.1415927410
+```
+'''
+hints = [
+  "x, _ := strconv.ParseFloat(s, 64) a potom y := float32(x).",
+  "ParseFloat vrací dvě hodnoty; _ tady chybu zahazuje, protože vstup je známý a správný.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.basic.08.string-slices"
+title = "První čtyři písmena"
+story = "Cedule stanice na Causeway Bay ukazuje první čtyři písmena jména a za nimi příponu linky, a cedule ukazuje příponu samotnou."
+brief = '''
+Řetězec se dá řezat jako cokoli jiného: `s[0:4]` jsou jeho první čtyři
+bajty. Řetězec se nikdy nemění, takže řez nic nekopíruje a nic nerozbíjí
+— nová hodnota `t` je vlastní řetězec a `s` zůstává celý. Připojení je
+`+=`: postaví nový řetězec ze starého a z kousku.
+
+```
+t := s[0:4]
+t += "_bay"
+```
+
+`s` je slovo ze stdin. Napiš řez do `t` a připojení místo dvou zástupných
+řádků; vytiskne se `t` a pak nedotčené `s`.
+
+```
+input:  causeway
+output: caus_bay
+        causeway
+```
+'''
+hints = [
+  "t := s[0:4] a potom t += \"_bay\".",
+  "s[a:b] běží od indexu a až po b, ale bez něj — 0:4 jsou čtyři bajty.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.basic.09.int-slices"
+title = "Kus jízdního řádu"
+story = "Kurýr si vezme z denního jízdního řádu druhou a třetí zastávku, se kterými bude pracovat, a kopie v telefonu jsou dvě nuly."
+brief = '''
+`xs[1:3]` je okno na druhý a třetí prvek — stejná paměť, ne kopie.
+`copy(dst, src)` přesune hodnoty do řezu, který jsi udělal pomocí `make`,
+takže `dst` je vlastní; a `append` ho zvětší. Změň potom `dst` a `xs` se
+nepohne.
+
+```
+copy(dst, xs[1:3])
+dst = append(dst, 99)
+```
+
+`xs` se načte ze stdin a `dst` je `make([]int, 2)`. Napiš copy a append
+místo dvou zástupných řádků; vytiskne se `dst` a nedotčené `xs`.
+
+```
+input:  1 2 3 4 5
+output: [2 3 99]
+        [1 2 3 4 5]
+```
+'''
+hints = [
+  "copy(dst, xs[1:3]) a potom dst = append(dst, 99).",
+  "copy naplní tolik prvků, kolik má kratší strana; dst byl vytvořen s místem pro dva.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.basic.10.byte-slices"
+title = "Bajty slova"
+story = "Tiskárna lístků u Lucky Mac pracuje v bajtech, ne v písmenech: tři bajty pro kód nahoře, jméno se dvěma vykřičníky za ním, a vytiskla tři mezery."
+brief = '''
+`[]byte(s)` zkopíruje řetězec do řezu bajtů, který můžeš měnit. Řež ho
+jako kterýkoli řez — `b[:3]` jsou první tři bajty — a zvětšuj ho pomocí
+`append`, další řez do něj rozprostři pomocí `...`. `hex.EncodeToString`
+ukáže bajty jako hexadecimální dvojice; `string(b)` z nich udělá zpět
+text.
+
+```
+b := []byte(s)
+b = append(b, []byte("!!")...)
+```
+
+`s` je slovo ze stdin. Napiš převod do `b` a append místo dvou zástupných
+řádků; vytiskne se hex prvních tří bajtů a celé `b` jako text.
+
+```
+input:  gopher
+output: 676f70
+        gopher!!
+```
+'''
+hints = [
+  "b := []byte(s) a potom b = append(b, []byte(\"!!\")...).",
+  "Ty ... za řezem rozprostřou jeho prvky jako samostatné argumenty; bez nich append chce jednotlivé bajty.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.basic.16.list"
+title = "Řada objednávek"
+story = "Objednávky u výdejního pultu Lucky Mac visí na řetězu, nejnovější vzadu, značka vpředu, a řetěz visí prázdný."
+brief = '''
+`container/list` je obousměrně zřetězený seznam. `PushBack` zavěsí
+hodnotu na konec. `Remove` sundá prvek, ať je kdekoli — `l.Front()` je ten
+první. Úprava jde přes prvek: `e.Value` je pole, do kterého lze přiřadit,
+takže `l.Front().Value = 99` přepíše první objednávku na místě. Seznam
+vlastní řazení nemá: průchod od `l.Front()` přes `e.Next()` zkopíruje
+hodnoty do slice `vals` (napsáno za vás) a `sort.Ints` ho seřadí.
+
+```
+l.PushBack(v)
+l.Remove(l.Front())
+l.Front().Value = 99
+sort.Ints(vals)
+```
+
+Každé číslo `v` se čte ve smyčce (aspoň dvě). Napište `PushBack` do
+smyčky, odebrání a úpravu za ni a řazení až za průchod, místo čtyř
+zástupných řádků; vypíše se délka a seřazené hodnoty.
+
+```
+input:  3 1 2
+output: 2
+        2 99
+```
+'''
+hints = [
+  "l.PushBack(v) ve smyčce; l.Remove(l.Front()) a l.Front().Value = 99 za ní; sort.Ints(vals) za průchodem.",
+  "Remove bere *Element, ne hodnotu, proto dostane l.Front(); potom je bývalý druhý prvek novou hlavou a právě ten se upraví. e.Value je interface{}, proto průchod píše e.Value.(int).",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "go.basic.18.hashtable"
+title = "Čárkovací tabulka minus jedna"
+story = "Kuchyně čárkuje každé slovo zavolané na výdej, škrtne slovo the a čte tabulku zpátky každý večer v jiném pořadí."
+brief = '''
+Mapa v Go je hashovací tabulka: klíč se zahashuje na slot, takže přidání,
+odebrání i vyhledání stojí stejně, ať je klíčů deset nebo deset milionů
+— a cenou je, že průchod vychází v žádném pevném pořadí. Přidání je
+`counts[w]++`; odebrání je `delete`; bezpečná úprava záznamu je tvar
+comma-ok, `n, ok := counts[k]`, který řekne, zda klíč existoval, než ho
+zapíšete zpátky. Klíče se sesbírají do slice (napsáno za vás) a
+`sort.Strings` je seřadí, jinak by se součet každý večer četl jinak.
+
+```
+counts[w]++
+delete(counts, "the")
+if n, ok := counts["tram"]; ok { counts["tram"] = n * 100 }
+sort.Strings(keys)
+```
+
+Každé slovo `w` se čte ve smyčce. Napište počítání do smyčky, `delete`
+a comma-ok úpravu za ni a řazení, jakmile je `keys` postavené, místo čtyř
+zástupných řádků; vypíše se velikost a seřazený součet.
+
+```
+input:  the tram the wire the
+output: 2
+        tram 100
+        wire 1
+```
+'''
+hints = [
+  "counts[w]++ ve smyčce; delete(counts, \"the\") a if n, ok := counts[\"tram\"]; ok { counts[\"tram\"] = n * 100 } za ní; sort.Strings(keys), jakmile je keys postavené.",
+  "Čtení comma-ok nikdy nevkládá: když \"tram\" chybí, ok je false a nic se nezapíše — obyčejné čtení counts[\"tram\"] by vrátilo 0 a přiřazení by klíč vytvořilo.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "go.basic.22.reverse"
+title = "Zpátky po lince"
+story = "Poslední vlak projíždí Island Line odzadu a odjezdová tabule pořád uvádí zastávky i cíl ranním směrem."
+brief = '''
+`slices.Reverse` otočí řez na místě, ať drží cokoli. Řetězec se na místě
+otočit nedá — nikdy se nemění — takže ho nejdřív zkopíruješ do `[]rune`
+(jedna runa na znak, takže diakritika a CJK zůstanou celé), otočíš to a
+pomocí `string(r)` to vrátíš zpět.
+
+```
+slices.Reverse(xs)
+slices.Reverse(r)
+```
+
+`xs` drží čísla z prvního řádku a `r` je už slovo z druhého řádku jako
+runy. Napiš obě otočení místo zástupných řádků; obojí se tiskne za tebe.
+
+```
+input:  1 2 3
+        tram
+output: 3 2 1
+        mart
+```
+'''
+hints = [
+  "slices.Reverse(xs) a potom slices.Reverse(r) — na místě, nic se nepřiřazuje.",
+  "[]rune(word) zkopíruje řetězec do znaků, které smíš přeskládat; string(r) je zase spojí.",
 ]

@@ -36,7 +36,7 @@ A terminal player wants **their** editor, not one written here. So:
   A second `edit` opens what you wrote. The file is yours.
 * `run` and `submit` send that same file. No hidden buffer, no copy.
 * `cwbh edit --path <id>` prints the path and exits, so
-  `vim "$(cwbh edit --path rust.basic.03.shadowing)"` works too.
+  `vim "$(cwbh edit --path rust.advanced.01.shadowing)"` works too.
 * getting the starter back is `cwbh reset <id>`, which asks first. `edit` never
   overwrites anything.
 * `$EDITOR="code -w"` works: the command is split on whitespace, so the wait

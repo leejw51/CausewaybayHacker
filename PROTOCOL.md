@@ -475,8 +475,16 @@ The main event.
     "lang":     "rust",                   must match the quest's land
     "source":   "fn main() { … }"
   }
-← payload: { "attempt": Attempt }         §5.4
+← payload: { "attempt": Attempt,          §5.4
+             "xp": XpGain }               §5.1b
 ```
+
+`xp` is what this submit was worth and where it leaves the player: `gained`
+is the clear's XP on a **first clear** and `0` on everything else — a run, a
+failure, a re-solve — and `total`, `level`, `into_level`, `for_next` and
+`level_up` are the ledger's reading after the grant, so the screen and the
+record cannot disagree. The grant is written to the server's XP ledger in the
+same transaction as the clear (SPEC §2; `0016_xp.sql`), once per quest.
 
 While it runs the server pushes `run.stage` and `run.log` events (§4.17,
 §4.18) carrying the same `attempt_id` that the final `Attempt` will have. The
@@ -1144,11 +1152,14 @@ the truncated-to-64-KiB copy is in the `Attempt`.
 ```json
 { "v":1, "id":null, "type":"progress.update",
   "payload": { "quest_id":"…", "state":"cleared", "stars":3,
-               "cleared_total":15, "unlocked":["rust.basic.04.slices"] } }
+               "cleared_total":15, "unlocked":["rust.basic.04.slices"],
+               "xp": XpGain } }
 ```
 
 Sent when a clear changes the map, including the nodes it unlocked, so a client
-updates the overworld without refetching it. Also sent to **the same user's
+updates the overworld without refetching it. `xp` is the same reading the
+`quest.submit.ok` carried (§4.9, §5.1b), so the other window's level moves
+with this one. Also sent to **the same user's
 other open connections**, which is how two windows stay in step.
 
 ### 4.20 `award`
@@ -1221,10 +1232,30 @@ type User = {
   created_at: string;
   last_seen_at: string;
   settings: object;         // opaque, client-owned
-  level: number;            // derived from stars
-  xp: number;
+  level: number;            // from `xp`, on the triangular curve
+  xp: number;               // the XP ledger's sum
+  xp_into_level: number;
+  xp_for_next: number;
 };
 ```
+
+### 5.1b `XpGain`
+
+```ts
+type XpGain = {
+  gained: number;           // this submit's grant; 0 unless it was a first clear
+  total: number;            // the ledger's sum after it
+  level: number;
+  into_level: number;       // XP past the level's start
+  for_next: number;         // XP the level spans
+  level_up: boolean;        // `level` is higher than before the grant
+};
+```
+
+XP is recorded, not recomputed: every first clear writes one row to the
+server's ledger — `25 × stars × difficulty × category weight` (`basic` 1,
+`advanced` 2, `hacker` 3) — and `User.xp` is what the rows add up to. A quest
+leaving the content pack does not take the XP it gave.
 
 ### 5.2 `MapNode`
 
@@ -1248,7 +1279,7 @@ type MapNode = {
 
 ```ts
 type Quest = {
-  id: string; land: "rust"|"go"|"cpp"|"python"; category: "basic"|"advanced"|"hacker";
+  id: string; land: "rust"|"go"|"cpp"|"python"; category: "verybasic"|"basic"|"advanced"|"hacker";
   node: number; title: string; brief: string; story: string;
   /** §4.8 — the language of title, story, brief and the hints. "en" unless a
    *  translation (SPEC §12.1) was substituted for the `locale` the client
@@ -1275,6 +1306,8 @@ type Quest = {
     hidden_count: number;                    // count only, never the data
   };
   solution?: string;                     // present only once cleared
+  quiz?: { choices: string[]; answer: number };  // VERY BASIC only: four lines,
+                                                  // `answer` the index of the one to type
 };
 ```
 

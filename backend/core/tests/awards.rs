@@ -422,3 +422,52 @@ fn beating_the_clock_is_earned_only_by_a_submit_that_actually_did() {
     let fresh = awards::evaluate(&store.conn(), ALICE).unwrap();
     assert!(fresh.iter().any(|a| a.id == "beat-the-clock"), "{fresh:?}");
 }
+
+#[test]
+fn a_first_clear_writes_its_grant_to_the_ledger_once() {
+    let (_tmp, store) = store_with(&[
+        ("rust.basic.01.a", "rust", "basic", 2),
+        ("rust.advanced.02.b", "rust", "advanced", 3),
+    ]);
+    let conn = store.conn();
+
+    let first = progress::record_clear(&conn, ALICE, "rust.basic.01.a", 10).unwrap();
+    assert_eq!(first.xp_gained, 150, "3 stars × difficulty 2 × basic");
+    assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), 150);
+
+    // Solving it again is accepted, and worth nothing more: the stars were
+    // fixed at the first clear, and the ledger refuses a second row.
+    let again = progress::record_clear(&conn, ALICE, "rust.basic.01.a", 5).unwrap();
+    assert_eq!(again.xp_gained, 0);
+    assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), 150);
+    let rows: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM xp_ledger WHERE address = ?1",
+            rusqlite::params![ALICE],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(rows, 1);
+
+    // The advanced road pays double, and the wire shape says where it lands.
+    let adv = progress::record_clear(&conn, ALICE, "rust.advanced.02.b", 10).unwrap();
+    assert_eq!(adv.xp_gained, 450, "3 × 3 × advanced");
+    let wire = awards::xp_json(&conn, ALICE, adv.xp_gained).unwrap();
+    assert_eq!(wire["gained"], 450);
+    assert_eq!(wire["total"], 600);
+    assert_eq!(wire["level"], awards::level_for_xp(600));
+    assert_eq!(
+        wire["level_up"],
+        awards::level_for_xp(600) > awards::level_for_xp(150)
+    );
+    assert_eq!(
+        wire["into_level"],
+        600 - awards::xp_for_level(awards::level_for_xp(600))
+    );
+
+    // A grant is history: the quest leaving the content pack does not take
+    // the XP with it.
+    conn.execute("DELETE FROM quests WHERE id = 'rust.basic.01.a'", [])
+        .unwrap();
+    assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), 600);
+}

@@ -48,6 +48,7 @@ pub fn category_weight(category: &str) -> i64 {
     match category {
         "hacker" => 3,
         "advanced" => 2,
+        // `basic` and `verybasic` alike: one typed line is one typed line.
         _ => 1,
     }
 }
@@ -61,20 +62,37 @@ pub fn xp_for_clear(stars: i64, difficulty: i64, category: &str) -> i64 {
     25 * stars.max(0) * difficulty.max(1) * category_weight(category)
 }
 
-/// Total XP, derived from the record rather than stored.
+/// Total XP: the sum of the ledger (`0016_xp.sql`).
 ///
-/// A counter would be one more thing that can disagree with the truth; this
-/// cannot, because it *is* the truth, recomputed. It is a single indexed join
-/// over a table with at most a few hundred rows per player.
+/// It used to be recomputed from the progress table on every read, which
+/// could never disagree with the record and could never be shown either — a
+/// clear had no number of its own. Now every clear writes its grant
+/// (`progress::record_clear`), the reply carries it, and the total is what
+/// the rows add up to. It is still not a counter: nothing increments a
+/// column, and deleting a row is the only way the number goes down.
 pub fn total_xp(conn: &Connection, address: &str) -> Result<i64> {
     Ok(conn.query_row(
-        "SELECT COALESCE(sum(25 * p.stars * q.difficulty *
-                  CASE q.category WHEN 'hacker' THEN 3 WHEN 'advanced' THEN 2 ELSE 1 END), 0)
-           FROM progress p JOIN quests q ON q.id = p.quest_id
-          WHERE p.address = ?1 AND p.state = 'cleared'",
+        "SELECT COALESCE(sum(amount), 0) FROM xp_ledger WHERE address = ?1",
         params![address],
         |r| r.get(0),
     )?)
+}
+
+/// A player's XP in the shape the wire carries beside every submit and
+/// `progress.update` (PROTOCOL §4.9, §4.19): the grant, the total, the level
+/// it lands on and whether that level is new.
+pub fn xp_json(conn: &Connection, address: &str, gained: i64) -> Result<serde_json::Value> {
+    let total = total_xp(conn, address)?;
+    let level = level_for_xp(total);
+    let before = level_for_xp(total - gained);
+    Ok(serde_json::json!({
+        "gained": gained,
+        "total": total,
+        "level": level,
+        "into_level": total - xp_for_level(level),
+        "for_next": xp_for_level(level + 1) - xp_for_level(level),
+        "level_up": level > before,
+    }))
 }
 
 /// The XP at which a level begins: level 2 at 100, 3 at 300, 4 at 600 — the

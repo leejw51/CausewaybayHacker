@@ -46,7 +46,14 @@ import { fileURLToPath } from "node:url";
 
 // ---------------------------------------------------------------- the hooks
 
-export const SCREENS = ["boot", "login", "lands", "map", "quest", "result"] as const;
+export const SCREENS = [
+  "boot",
+  "login",
+  "lands",
+  "map",
+  "quest",
+  "result",
+] as const;
 export type Screen = (typeof SCREENS)[number];
 
 /** The lands, in the order the lands screen draws them (`frontend/src/net/protocol.ts`). */
@@ -94,7 +101,8 @@ declare global {
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const WALLET =
-  process.env.CWBWALLET ?? `${ROOT}/../CausewaybayWallet/rustcli/target/debug/cwbwallet`;
+  process.env.CWBWALLET ??
+  `${ROOT}/../CausewaybayWallet/rustcli/target/debug/cwbwallet`;
 const VECTORS = `${ROOT}/tests/vectors/addresses.json`;
 
 export interface Account {
@@ -135,7 +143,15 @@ export function freshAccount(): Account {
   ).phrase;
   const out = execFileSync(
     WALLET,
-    ["--json", "utils", "derive", "--mnemonic", phrase, "--index", String(index)],
+    [
+      "--json",
+      "utils",
+      "derive",
+      "--mnemonic",
+      phrase,
+      "--index",
+      String(index),
+    ],
     { encoding: "utf8" },
   );
   const d = JSON.parse(out).data;
@@ -151,7 +167,12 @@ export function freshAccount(): Account {
 export function fixtureAccount(index = 0): Account {
   const m = JSON.parse(readFileSync(VECTORS, "utf8")).mnemonics[0];
   const a = m.accounts.find((x: { index: number }) => x.index === index);
-  return { privateKey: a.private_key, address: a.address, lower: a.address_lower, index };
+  return {
+    privateKey: a.private_key,
+    address: a.address,
+    lower: a.address_lower,
+    index,
+  };
 }
 
 // ------------------------------------------------------------ the driving
@@ -204,9 +225,16 @@ export async function sceneNow(page: Page): Promise<string | null> {
  * makes whatever the caller asserts next deterministic, and it is the only
  * reason to pay for one at all.
  */
-export async function atScreen(page: Page, want: Screen, timeout = 90_000): Promise<void> {
+export async function atScreen(
+  page: Page,
+  want: Screen,
+  timeout = 90_000,
+): Promise<void> {
   await expect
-    .poll(async () => sceneNow(page), { timeout, message: `waiting for the ${want} screen` })
+    .poll(async () => sceneNow(page), {
+      timeout,
+      message: `waiting for the ${want} screen`,
+    })
     .toBe(want);
   await page.evaluate(() => {
     const api = window.__cwbCapture;
@@ -228,7 +256,11 @@ export async function atScreen(page: Page, want: Screen, timeout = 90_000): Prom
  * `buttons()` reads the same rects the scene hit-tests against, so it cannot
  * disagree with what a click does. Nothing here is a guess any more.
  */
-export async function clickButton(page: Page, id: string, timeout = 30_000): Promise<void> {
+export async function clickButton(
+  page: Page,
+  id: string,
+  timeout = 30_000,
+): Promise<void> {
   const deadline = Date.now() + timeout;
   for (;;) {
     const found = await page.evaluate((wanted) => {
@@ -298,7 +330,10 @@ export async function logout(page: Page): Promise<void> {
  * The hit point is returned so a retry can click the *same* place instead of
  * sweeping again — see `enterRustQuest` for why that matters.
  */
-export async function pickCategory(page: Page, category = "basic"): Promise<void> {
+export async function pickCategory(
+  page: Page,
+  category = "basic",
+): Promise<void> {
   await atScreen(page, "lands");
   await clickButton(page, `cat:${category}`);
   await atScreen(page, "map");
@@ -360,7 +395,11 @@ export async function editorText(page: Page): Promise<string> {
  * (SPEC §12), and starters differ between quests and certainly between
  * languages. So ask the wire for the starters of everything open, and match.
  */
-export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string | null> {
+export async function identifyOpenQuest(
+  page: Page,
+  wire: Wire,
+  category = "basic",
+): Promise<string | null> {
   // The editor is filled by the `quest.get` reply, a round trip after the
   // scene appears. Reading it too early gets an empty box and a confident
   // `null`.
@@ -402,10 +441,14 @@ export async function identifyOpenQuest(page: Page, wire: Wire): Promise<string 
   const lands: readonly Land[] = guess ? [guess] : LANDS;
   const LOOK_AT = 8;
   for (const land of lands) {
-    const nodes = (await wire.mapOf(land)).sort((a, b) => a.node - b.node).slice(0, LOOK_AT);
+    const nodes = (await wire.mapOf(land, category))
+      .sort((a, b) => a.node - b.node)
+      .slice(0, LOOK_AT);
     for (const node of nodes) {
       const got = await wire.ok("quest.get", { quest_id: node.quest_id });
-      const starter = flatten(String((got.quest as { starter?: string }).starter ?? ""));
+      const starter = flatten(
+        String((got.quest as { starter?: string }).starter ?? ""),
+      );
       if (starter && starter === shown) return node.quest_id;
     }
   }
@@ -554,18 +597,31 @@ export class Wire {
         { encoding: "utf8" },
       ),
     ).data.signature;
-    const login = await w.call("auth.login", { address: account.address, signature: sig });
+    const login = await w.call("auth.login", {
+      address: account.address,
+      signature: sig,
+    });
     if (login.type !== "auth.login.ok")
-      throw new Error(`the wire could not log in: ${JSON.stringify(login.payload)}`);
+      throw new Error(
+        `the wire could not log in: ${JSON.stringify(login.payload)}`,
+      );
     return w;
   }
 
   private open(url: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(url.replace(/^http/, "ws").replace(/\/$/, "") + "/ws");
-      const timer = setTimeout(() => reject(new Error(`no websocket at ${url}`)), 10_000);
+      this.ws = new WebSocket(
+        url.replace(/^http/, "ws").replace(/\/$/, "") + "/ws",
+      );
+      const timer = setTimeout(
+        () => reject(new Error(`no websocket at ${url}`)),
+        10_000,
+      );
       this.ws.addEventListener("open", () => (clearTimeout(timer), resolve()));
-      this.ws.addEventListener("error", () => (clearTimeout(timer), reject(new Error(url))));
+      this.ws.addEventListener(
+        "error",
+        () => (clearTimeout(timer), reject(new Error(url))),
+      );
       this.ws.addEventListener("message", (e) => {
         const f = JSON.parse(String(e.data)) as WireFrame;
         if (f.id && this.pending.has(f.id)) {
@@ -576,19 +632,29 @@ export class Wire {
     });
   }
 
-  call(type: string, payload: Record<string, unknown> = {}): Promise<WireFrame> {
+  call(
+    type: string,
+    payload: Record<string, unknown> = {},
+  ): Promise<WireFrame> {
     const id = `w-${++this.n}`;
     const p = new Promise<WireFrame>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`no reply to ${type}`)), 30_000);
+      const timer = setTimeout(
+        () => reject(new Error(`no reply to ${type}`)),
+        30_000,
+      );
       this.pending.set(id, (f) => (clearTimeout(timer), resolve(f)));
     });
     this.ws.send(JSON.stringify({ v: 1, id, type, payload }));
     return p;
   }
 
-  async ok(type: string, payload: Record<string, unknown> = {}): Promise<WirePayload> {
+  async ok(
+    type: string,
+    payload: Record<string, unknown> = {},
+  ): Promise<WirePayload> {
     const f = await this.call(type, payload);
-    if (f.type !== `${type}.ok`) throw new Error(`${type} failed: ${JSON.stringify(f.payload)}`);
+    if (f.type !== `${type}.ok`)
+      throw new Error(`${type} failed: ${JSON.stringify(f.payload)}`);
     return f.payload;
   }
 
@@ -614,10 +680,14 @@ export class Wire {
       const source = sourceThatPrints(visible);
       if (source) return { node, source };
     }
-    throw new Error("no open quest whose visible case can be answered by printing");
+    throw new Error(
+      "no open quest whose visible case can be answered by printing",
+    );
   }
 
-  async history(): Promise<{ id: string; verdict: string; quest_id: string }[]> {
+  async history(): Promise<
+    { id: string; verdict: string; quest_id: string }[]
+  > {
     return (await this.ok("stats.history", { limit: 50 })).attempts as {
       id: string;
       verdict: string;
@@ -670,7 +740,8 @@ export function sourceThatPrints(
   return `fn main() {\n${lines.map((l) => `    println!("${l}");`).join("\n")}\n}\n`;
 }
 
-export const WRONG_SOURCE = 'fn main() { println!("deliberately not the answer"); }\n';
+export const WRONG_SOURCE =
+  'fn main() { println!("deliberately not the answer"); }\n';
 
 // ------------------------------------------------------------- the fixture
 
@@ -709,17 +780,26 @@ export const test = base.extend<{ ready: void }>({
       // It cost one confusing red before it was caught, and it would have
       // cost far more as a silent green.
       const sent: string[] = [];
-      page.on("websocket", (ws) => ws.on("framesent", (f) => sent.push(String(f.payload))));
+      page.on("websocket", (ws) =>
+        ws.on("framesent", (f) => sent.push(String(f.payload))),
+      );
 
-      const info = test.info() as unknown as { _errors: string[]; _sent: string[] };
+      const info = test.info() as unknown as {
+        _errors: string[];
+        _sent: string[];
+      };
       info._errors = errors;
       info._sent = sent;
 
       await page.goto("/");
       await page
-        .waitForFunction(() => typeof window.__cwbCapture?.settle === "function", null, {
-          timeout: 30_000,
-        })
+        .waitForFunction(
+          () => typeof window.__cwbCapture?.settle === "function",
+          null,
+          {
+            timeout: 30_000,
+          },
+        )
         .catch(() => undefined);
       const hooked = await page.evaluate(
         () => typeof window.__cwbCapture?.settle === "function",

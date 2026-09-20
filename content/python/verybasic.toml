@@ -1,0 +1,1690 @@
+# PYTHON LAND — VERY BASIC. The grammar as a question first: four lines, one
+# of them right, and then that line typed. Types, containers, a stack, a
+# queue, a heap, a struct, a thread, a mutex — the constructs a HackerRank-
+# style live coding test leans on, one per node, at Bowrington Road wet
+# market from the 06:00 shutters to the price board. Every quest carries a
+# [quest.quiz]: the choices are code and never translated; the question is
+# the brief. verify_pack swaps each wrong choice into the solution and
+# refuses the quest if it passes, so the quiz has one right answer.
+#
+# Every program is one main.py, run as `python3 -I main.py`, stdlib only.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Every solution and starter in this file is run by
+# tests/content/verify_pack.py and by CI (SPEC §9.4, §9.5).
+
+pack = "python.verybasic"
+land = "python"
+category = "verybasic"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "python.verybasic.01.print"
+node        = 1
+title       = "THE FIRST BOARD"
+difficulty  = 1
+story       = "06:00 on Bowrington Road. The first price board of the day is blank and the marker is in Mei's hand."
+concepts    = ["io", "strings"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+The program must print exactly `hello, causewaybay` on one line. One built-in writes a line to standard output.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+output: hello, causewaybay
+```
+'''
+starter     = '''
+def main():
+    pass  # FILL: greet
+
+
+main()
+'''
+solution    = '''
+def main():
+    print("hello, causewaybay")
+
+
+main()
+'''
+hints = [
+  "print(\"hello, causewaybay\") — parentheses, and the comma inside the string.",
+  "Python 3 has no print statement; print is a function.",
+]
+
+[quest.quiz]
+choices = ["print \"hello, causewaybay\"", "print('hello causewaybay')", "print(\"hello, causewaybay\")", "puts(\"hello, causewaybay\")"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "python.verybasic.02.int-types"
+node        = 2
+title       = "THE SPLIT BILL"
+difficulty  = 1
+story       = "Two coffees, one note at the fish stall's counter. The till has to say how many each and what is left over, and it says nothing."
+concepts    = ["types", "io"]
+requires    = ["python.verybasic.01.print"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief       = '''
+`a` and `b` are integers. The program must print the whole-number quotient and the remainder on one line, separated by a space. Python has one operator for each.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  7 2
+output: 3 1
+```
+'''
+starter     = '''
+a, b = map(int, input().split())
+pass  # FILL: quotient and remainder
+'''
+solution    = '''
+a, b = map(int, input().split())
+print(a // b, a % b)
+'''
+hints = [
+  "print(a // b, a % b) — two slashes divide down to a whole number, percent is the remainder.",
+  "A single slash gives a float: 3.5, not 3.",
+]
+
+[quest.quiz]
+choices = ["print(a / b, a % b)", "print(a // b, a % b)", "print(a div b, a mod b)", "print(a % b, a // b)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven-two", stdin = "7 2\n", expect = "3 1\n", visible = true },
+  { name = "ten-four", stdin = "10 4\n", expect = "2 2\n", visible = false },
+  { name = "nine-three", stdin = "9 3\n", expect = "3 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "python.verybasic.03.floats"
+node        = 3
+title       = "THE EXACT SHARE"
+difficulty  = 1
+story       = "The market's scale shows grams to three places and the receipt wants two. The receipt is blank."
+concepts    = ["types", "io"]
+requires    = ["python.verybasic.02.int-types"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief       = '''
+`x` and `y` are floats. The program must print `x / y` with exactly two digits after the point. An f-string carries a format spec after a colon.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  7 2
+output: 3.50
+```
+'''
+starter     = '''
+x, y = map(float, input().split())
+pass  # FILL: x over y, two decimals
+'''
+solution    = '''
+x, y = map(float, input().split())
+print(f"{x / y:.2f}")
+'''
+hints = [
+  "print(f\"{x / y:.2f}\") — the .2f after the colon is the format.",
+  "round() drops a trailing zero: 3.5, not 3.50.",
+]
+
+[quest.quiz]
+choices = ["print(f\"{x / y:2f}\")", "print(round(x / y, 2))", "print(f\"{x / y:.2d}\")", "print(f\"{x / y:.2f}\")"]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven-two", stdin = "7 2\n", expect = "3.50\n", visible = true },
+  { name = "one-three", stdin = "1 3\n", expect = "0.33\n", visible = false },
+  { name = "ten-four", stdin = "10 4\n", expect = "2.50\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "python.verybasic.04.strings"
+node        = 4
+title       = "THE STALL SIGN"
+difficulty  = 1
+story       = "The vegetable stall's sign is painted in capitals and the notebook has it in lowercase; the sign-writer needs it shouted back."
+concepts    = ["strings", "io"]
+requires    = ["python.verybasic.03.floats"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief       = '''
+`s` is one line of text. After its length, the program must print `s` in upper case. A string method returns a copy with every letter capitalised.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+```
+'''
+starter     = '''
+s = input()
+print(len(s))
+pass  # FILL: s in capitals
+'''
+solution    = '''
+s = input()
+print(len(s))
+print(s.upper())
+'''
+hints = [
+  "print(s.upper()) — a method on the string, called with parentheses.",
+  "capitalize() only raises the first letter.",
+]
+
+[quest.quiz]
+choices = ["print(s.upper())", "print(s.toUpperCase())", "print(s.capitalize())", "print(upper(s))"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "kwan", stdin = "kwan lee\n", expect = "8\nKWAN LEE\n", visible = true },
+  { name = "bok", stdin = "bok choy 3\n", expect = "10\nBOK CHOY 3\n", visible = false },
+  { name = "one", stdin = "x\n", expect = "1\nX\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "python.verybasic.05.bool-if"
+node        = 5
+title       = "EVEN OR ODD"
+difficulty  = 1
+story       = "The stall numbers on Bowrington Road are even on one side and odd on the other; the delivery boy needs the side from the number."
+concepts    = ["control-flow", "types"]
+requires    = ["python.verybasic.04.strings"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief       = '''
+`n` is a positive integer. The program must print `even` when `n` is divisible by two and `odd` otherwise. The condition is an `if` header comparing the remainder to zero.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  4
+output: even
+```
+'''
+starter     = '''
+n = int(input())
+if False:  # FILL: is n even?
+    print("even")
+else:
+    print("odd")
+'''
+solution    = '''
+n = int(input())
+if n % 2 == 0:
+    print("even")
+else:
+    print("odd")
+'''
+hints = [
+  "if n % 2 == 0: — two equals signs compare; one assigns.",
+  "n / 2 is a float division; it is never zero for a positive n.",
+]
+
+[quest.quiz]
+choices = ["if n % 2 == 0:", "if n % 2 = 0:", "if n % 2 == 1:", "if n / 2 == 0:"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4\n", expect = "even\n", visible = true },
+  { name = "seven", stdin = "7\n", expect = "odd\n", visible = false },
+  { name = "ten", stdin = "10\n", expect = "even\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "python.verybasic.06.loops"
+node        = 6
+title       = "THE TALLY"
+difficulty  = 1
+story       = "The bag count for the morning is one plus two plus three up to the last stall, and the notebook shows a zero."
+concepts    = ["control-flow", "io"]
+requires    = ["python.verybasic.05.bool-if"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief       = '''
+`n` is a positive integer. The loop must visit every integer from 1 up to and including `n`, adding each to `total`. `range` takes a start and a stop, and the stop is not included.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  4
+output: 10
+```
+'''
+starter     = '''
+n = int(input())
+total = 0
+for i in []:  # FILL: 1 up to n, inclusive
+    total += i
+print(total)
+'''
+solution    = '''
+n = int(input())
+total = 0
+for i in range(1, n + 1):
+    total += i
+print(total)
+'''
+hints = [
+  "for i in range(1, n + 1): — the stop is exclusive, so it is n + 1.",
+  "range(n) starts at 0 and stops before n.",
+]
+
+[quest.quiz]
+choices = ["for i in range(1, n + 1):", "for i in range(n):", "for i in range(1, n):", "for i in 1..n:"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4\n", expect = "10\n", visible = true },
+  { name = "ten", stdin = "10\n", expect = "55\n", visible = false },
+  { name = "one", stdin = "1\n", expect = "1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "python.verybasic.07.functions"
+node        = 7
+title       = "THE DELIVERY RATE"
+difficulty  = 1
+story       = "The first ten deliveries of the day pay five each and every one after that pays three; the rider's app returns nothing."
+concepts    = ["functions", "control-flow"]
+requires    = ["python.verybasic.06.loops"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief       = '''
+`fare(rides)` must return the pay: the first ten rides at 5 each, every ride after the tenth at 3. A function hands a value back with one keyword.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  3
+output: 15
+```
+'''
+starter     = '''
+def fare(rides):
+    pass  # FILL: the pay for that many rides
+
+
+n = int(input())
+print(fare(n))
+'''
+solution    = '''
+def fare(rides):
+    return min(rides, 10) * 5 + max(rides - 10, 0) * 3
+
+
+n = int(input())
+print(fare(n))
+'''
+hints = [
+  "return min(rides, 10) * 5 + max(rides - 10, 0) * 3",
+  "A function that prints instead of returning hands back None.",
+]
+
+[quest.quiz]
+choices = ["return rides * 5", "print(min(rides, 10) * 5 + max(rides - 10, 0) * 3)", "return min(rides, 10) * 5 + max(rides - 10, 0) * 3", "return min(rides, 10) * 5 + max(rides - 10) * 3"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n", expect = "15\n", visible = true },
+  { name = "twelve", stdin = "12\n", expect = "56\n", visible = false },
+  { name = "ten", stdin = "10\n", expect = "50\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "python.verybasic.08.structs"
+node        = 8
+title       = "ONE STALL, TWO FIELDS"
+difficulty  = 1
+story       = "Every stall has a name and a price on its card. The card's price field is missing and the label prints half a stall."
+concepts    = ["structs", "bindings"]
+requires    = ["python.verybasic.07.functions"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief       = '''
+`Stall.__init__` receives `name` and `price`. It must store `price` on the object the same way `name` is stored, so `s.price` reads it back.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  tofu 12
+output: tofu 12
+```
+'''
+starter     = '''
+class Stall:
+    def __init__(self, name, price):
+        self.name = name
+        pass  # FILL: keep price on the object
+
+
+name, price = input().split()
+s = Stall(name, int(price))
+print(s.name, s.price)
+'''
+solution    = '''
+class Stall:
+    def __init__(self, name, price):
+        self.name = name
+        self.price = price
+
+
+name, price = input().split()
+s = Stall(name, int(price))
+print(s.name, s.price)
+'''
+hints = [
+  "self.price = price — self is the object; a bare name is a local.",
+  "Two equals signs compare and store nothing.",
+]
+
+[quest.quiz]
+choices = ["self.price = price", "price = price", "self.price == price", "self.price = name"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tofu", stdin = "tofu 12\n", expect = "tofu 12\n", visible = true },
+  { name = "fish", stdin = "fish 48\n", expect = "fish 48\n", visible = false },
+  { name = "egg", stdin = "egg 3\n", expect = "egg 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "python.verybasic.09.struct-method"
+node        = 9
+title       = "THE LINE TOTAL"
+difficulty  = 1
+story       = "Price times quantity is one line of every order at the noodle stall, and the method that should say it says nothing."
+concepts    = ["structs", "functions"]
+requires    = ["python.verybasic.08.structs"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief       = '''
+`Stall.total(self)` must return price times quantity. Inside a method, the object's fields are reached through `self`.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  tofu 12 3
+output: tofu: 36
+```
+'''
+starter     = '''
+class Stall:
+    def __init__(self, name, price, qty):
+        self.name = name
+        self.price = price
+        self.qty = qty
+
+    def total(self):
+        pass  # FILL: price times quantity
+
+
+name, price, qty = input().split()
+s = Stall(name, int(price), int(qty))
+print(f"{s.name}: {s.total()}")
+'''
+solution    = '''
+class Stall:
+    def __init__(self, name, price, qty):
+        self.name = name
+        self.price = price
+        self.qty = qty
+
+    def total(self):
+        return self.price * self.qty
+
+
+name, price, qty = input().split()
+s = Stall(name, int(price), int(qty))
+print(f"{s.name}: {s.total()}")
+'''
+hints = [
+  "return self.price * self.qty — both fields through self.",
+  "price on its own is not defined inside the method.",
+]
+
+[quest.quiz]
+choices = ["return price * qty", "return self.price * self.qty", "return self.price + self.qty", "return self.price * qty"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tofu", stdin = "tofu 12 3\n", expect = "tofu: 36\n", visible = true },
+  { name = "fish", stdin = "fish 48 2\n", expect = "fish: 96\n", visible = false },
+  { name = "egg", stdin = "egg 3 10\n", expect = "egg: 30\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "python.verybasic.10.enums"
+node        = 10
+title       = "THE LINE COLOUR"
+difficulty  = 2
+story       = "The MTR map over the fish stall names three lines; the boy has the word and needs the member of the Enum it stands for."
+concepts    = ["enums", "pattern-matching"]
+requires    = ["python.verybasic.09.struct-method"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief       = '''
+`word` is one of `island`, `tsuenwan`, `kwuntong`. The program must turn it into the matching `Line` member. An Enum class can be indexed by a member's name.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+starter     = '''
+from enum import Enum
+
+
+class Line(Enum):
+    ISLAND = 1
+    TSUENWAN = 2
+    KWUNTONG = 3
+
+
+COLOUR = {Line.ISLAND: "blue", Line.TSUENWAN: "red", Line.KWUNTONG: "green"}
+word = input().strip()
+line = None  # FILL: the Line member named by word
+print(COLOUR[line])
+'''
+solution    = '''
+from enum import Enum
+
+
+class Line(Enum):
+    ISLAND = 1
+    TSUENWAN = 2
+    KWUNTONG = 3
+
+
+COLOUR = {Line.ISLAND: "blue", Line.TSUENWAN: "red", Line.KWUNTONG: "green"}
+word = input().strip()
+line = Line[word.upper()]
+print(COLOUR[line])
+'''
+hints = [
+  "line = Line[word.upper()] — square brackets look a member up by name.",
+  "Line(...) with parentheses looks up by value, and the value is a number.",
+]
+
+[quest.quiz]
+choices = ["line = Line[word.upper()]", "line = Line(word.upper())", "line = Line.word", "line = Line[word]"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tsuenwan", stdin = "tsuenwan\n", expect = "red\n", visible = true },
+  { name = "island", stdin = "island\n", expect = "blue\n", visible = false },
+  { name = "kwuntong", stdin = "kwuntong\n", expect = "green\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "python.verybasic.11.vector"
+node        = 11
+title       = "THE MORNING LIST"
+difficulty  = 1
+story       = "Every crate off the lorry goes on the morning list in the order it came, and the list stays empty."
+concepts    = ["slices", "iteration"]
+requires    = ["python.verybasic.10.enums"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''
+`xs` starts empty. Each integer `x` read in the loop must be added at the end, keeping the input's order. A list has one method for that.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 4
+        3 1 4 1
+```
+'''
+starter     = '''
+xs = []
+for tok in input().split():
+    x = int(tok)
+    pass  # FILL: add x at the end
+print(len(xs))
+print(*xs)
+'''
+solution    = '''
+xs = []
+for tok in input().split():
+    x = int(tok)
+    xs.append(x)
+print(len(xs))
+print(*xs)
+'''
+hints = [
+  "xs.append(x) — one value, on the end.",
+  "insert(0, x) puts it at the front and reverses the order.",
+]
+
+[quest.quiz]
+choices = ["xs.append(x)", "xs.push(x)", "xs.add(x)", "xs.insert(0, x)"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "4\n3 1 4 1\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "1\n7\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "5\n5 4 3 2 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "python.verybasic.12.vector-edit"
+node        = 12
+title       = "THE FIRST CRATE GOES"
+difficulty  = 1
+story       = "The first crate on the morning list was sold before the list was read out; it has to go, and everything after it moves up one."
+concepts    = ["slices", "collections"]
+requires    = ["python.verybasic.11.vector"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''
+`xs` holds the line's integers. The program must remove the element at index 0 so the rest shift down. One statement deletes by index.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 1 4 1
+```
+'''
+starter     = '''
+xs = [int(t) for t in input().split()]
+pass  # FILL: remove the element at index 0
+print(*xs)
+'''
+solution    = '''
+xs = [int(t) for t in input().split()]
+del xs[0]
+print(*xs)
+'''
+hints = [
+  "del xs[0] — del takes the indexed slot away.",
+  "remove(0) looks for the value 0, not the index.",
+]
+
+[quest.quiz]
+choices = ["xs.remove(0)", "xs.pop()", "delete xs[0]", "del xs[0]"]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "1 4 1\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "7\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "4 3 2 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "python.verybasic.13.list"
+node        = 13
+title       = "THE FRONT OF THE CHAIN"
+difficulty  = 1
+story       = "The delivery chain hangs off the counter and the newest ticket goes on at the front; the boy keeps putting it on the back."
+concepts    = ["collections", "iteration"]
+requires    = ["python.verybasic.12.vector-edit"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''
+`chain` is a `deque`. Each `x` read in the loop must be added at the FRONT, so the last one read ends up first. A deque has a method for that end.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+starter     = '''
+from collections import deque
+
+chain = deque()
+for tok in input().split():
+    x = int(tok)
+    pass  # FILL: add x at the front
+print(*chain)
+'''
+solution    = '''
+from collections import deque
+
+chain = deque()
+for tok in input().split():
+    x = int(tok)
+    chain.appendleft(x)
+print(*chain)
+'''
+hints = [
+  "chain.appendleft(x) — one word, no underscore.",
+  "append(x) goes on the back.",
+]
+
+[quest.quiz]
+choices = ["chain.append_left(x)", "chain.append(x)", "chain.insert(x)", "chain.appendleft(x)"]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "3 2 1\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "7\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "1 2 3 4 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "python.verybasic.14.maps"
+node        = 14
+title       = "THE TALLY NOTEBOOK"
+difficulty  = 1
+story       = "One notebook per stall, one line per item, a count next to each; the first time an item appears there is no line to add to."
+concepts    = ["collections", "strings"]
+requires    = ["python.verybasic.13.list"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''
+`counts` is a dict. For each word `w` the program must add one to its count, starting from zero the first time. `get` reads with a default.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        har 1
+        mai 2
+        siu 2
+```
+'''
+starter     = '''
+counts = {}
+for w in input().split():
+    pass  # FILL: one more w
+for w in sorted(counts):
+    print(w, counts[w])
+'''
+solution    = '''
+counts = {}
+for w in input().split():
+    counts[w] = counts.get(w, 0) + 1
+for w in sorted(counts):
+    print(w, counts[w])
+'''
+hints = [
+  "counts[w] = counts.get(w, 0) + 1 — get with a default, then store.",
+  "+= 1 on a missing key raises KeyError.",
+]
+
+[quest.quiz]
+choices = ["counts[w] = counts.get(w, 0) + 1", "counts[w] += 1", "counts[w] = counts.get(w) + 1", "counts[w] = counts.get(w, 0)"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "siu-mai", stdin = "siu mai har gau siu mai\n", expect = "gau 1\nhar 1\nmai 2\nsiu 2\n", visible = true },
+  { name = "one", stdin = "tofu\n", expect = "tofu 1\n", visible = false },
+  { name = "three", stdin = "a b a\n", expect = "a 2\nb 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "python.verybasic.15.hashtable"
+node        = 15
+title       = "THE LOOKUP"
+difficulty  = 1
+story       = "The stall table maps a name to its number, and asking for a stall that is not there should say -1, not crash the board."
+concepts    = ["collections", "hashing"]
+requires    = ["python.verybasic.14.maps"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''
+`table` maps names to stall numbers. For the word `w` the program must print its number, or `-1` when `w` is not in the table. A dict method reads with a default.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  2
+        tofu 3
+        fish 7
+        egg
+output: -1
+```
+'''
+starter     = '''
+table = {}
+n = int(input())
+for _ in range(n):
+    name, num = input().split()
+    table[name] = int(num)
+w = input().strip()
+pass  # FILL: the number for w, or -1
+'''
+solution    = '''
+table = {}
+n = int(input())
+for _ in range(n):
+    name, num = input().split()
+    table[name] = int(num)
+w = input().strip()
+print(table.get(w, -1))
+'''
+hints = [
+  "print(table.get(w, -1)) — the second argument is the default.",
+  "table[w] raises KeyError when w is missing.",
+]
+
+[quest.quiz]
+choices = ["print(table[w])", "print(table.get(w, -1))", "print(table.get(w))", "print(table.get(w, -1)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "missing", stdin = "2\ntofu 3\nfish 7\negg\n", expect = "-1\n", visible = true },
+  { name = "hit", stdin = "2\ntofu 3\nfish 7\nfish\n", expect = "7\n", visible = false },
+  { name = "one", stdin = "1\nbun 9\nbun\n", expect = "9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "python.verybasic.16.sets"
+node        = 16
+title       = "DISTINCT PRICES"
+difficulty  = 1
+story       = "Six stalls, four different prices. The board wants how many different prices there are, and it prints six."
+concepts    = ["collections", "types"]
+requires    = ["python.verybasic.15.hashtable"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+`xs` holds the line's integers. The program must print how many DISTINCT values there are. A set keeps one of each.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  3 5 3 8 5 3
+output: 3
+```
+'''
+starter     = '''
+xs = [int(t) for t in input().split()]
+pass  # FILL: how many distinct values
+'''
+solution    = '''
+xs = [int(t) for t in input().split()]
+print(len(set(xs)))
+'''
+hints = [
+  "print(len(set(xs))) — set() drops the duplicates, len counts.",
+  "len(xs) counts every value, duplicates included.",
+]
+
+[quest.quiz]
+choices = ["print(len(set(xs)))", "print(len(xs))", "print(set(xs).size())", "print(len(set xs))"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six", stdin = "3 5 3 8 5 3\n", expect = "3\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "1\n", visible = false },
+  { name = "all", stdin = "1 2 3\n", expect = "3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "python.verybasic.17.stack"
+node        = 17
+title       = "THE PLATE STACK"
+difficulty  = 1
+story       = "Plates go on the pile and come off the top; the dishwasher keeps taking one from the bottom."
+concepts    = ["stacks-queues", "collections"]
+requires    = ["python.verybasic.16.sets"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+`stack` is a list used as a stack. The program must take the TOP (last) element off into `top`. One list method removes and returns the last item.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 4
+        1 2 3
+```
+'''
+starter     = '''
+stack = [int(t) for t in input().split()]
+top = None  # FILL: take the top off the stack
+print(top)
+print(*stack)
+'''
+solution    = '''
+stack = [int(t) for t in input().split()]
+top = stack.pop()
+print(top)
+print(*stack)
+'''
+hints = [
+  "top = stack.pop() — no argument means the last one.",
+  "stack[-1] reads the top but leaves it on the pile.",
+]
+
+[quest.quiz]
+choices = ["top = stack.pop(0)", "top = stack.top()", "top = stack[-1]", "top = stack.pop()"]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "4\n1 2 3\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "7\n9\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "1\n5 4 3 2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "python.verybasic.18.queue"
+node        = 18
+title       = "THE TICKET QUEUE"
+difficulty  = 1
+story       = "Tickets are called in the order they were taken; the boy keeps calling the newest one."
+concepts    = ["stacks-queues", "collections"]
+requires    = ["python.verybasic.17.stack"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''
+`q` is a `deque` holding the tickets in order. The program must take the FIRST one off into `first`. A deque removes from the front with one method.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 1
+        2 3 4
+```
+'''
+starter     = '''
+from collections import deque
+
+q = deque(int(t) for t in input().split())
+first = None  # FILL: take the first ticket
+print(first)
+print(*q)
+'''
+solution    = '''
+from collections import deque
+
+q = deque(int(t) for t in input().split())
+first = q.popleft()
+print(first)
+print(*q)
+'''
+hints = [
+  "first = q.popleft() — one word.",
+  "pop() takes from the back; q[0] reads without removing.",
+]
+
+[quest.quiz]
+choices = ["first = q.popleft()", "first = q.pop()", "first = q.pop_left()", "first = q[0]"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "1\n2 3 4\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "9\n7\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "5\n4 3 2 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "python.verybasic.19.heap"
+node        = 19
+title       = "THE CHEAPEST FIRST"
+difficulty  = 2
+story       = "Orders come in any order and the kitchen wants the cheapest next, every time; the pile they are kept on has no idea which is cheapest."
+concepts    = ["heaps", "collections"]
+requires    = ["python.verybasic.18.queue"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''
+`heap` starts as an empty list. Each `x` must be pushed so that `heapq.heappop` later returns the smallest first. `heapq` has a push that keeps the heap order.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  5 1 4 2 3
+output: 1 2 3 4 5
+```
+'''
+starter     = '''
+import heapq
+
+heap = []
+for tok in input().split():
+    x = int(tok)
+    pass  # FILL: push x, keeping the heap order
+out = []
+while heap:
+    out.append(heapq.heappop(heap))
+print(*out)
+'''
+solution    = '''
+import heapq
+
+heap = []
+for tok in input().split():
+    x = int(tok)
+    heapq.heappush(heap, x)
+out = []
+while heap:
+    out.append(heapq.heappop(heap))
+print(*out)
+'''
+hints = [
+  "heapq.heappush(heap, x) — the module function, heap first.",
+  "append() puts x on the end and breaks the heap order.",
+]
+
+[quest.quiz]
+choices = ["heapq.heappush(heap, x)", "heap.heappush(x)", "heapq.push(heap, x)", "heap.append(x)"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5 1 4 2 3\n", expect = "1 2 3 4 5\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "7 9\n", visible = false },
+  { name = "six", stdin = "6 2 8 1 9 3\n", expect = "1 2 3 6 8 9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "python.verybasic.20.sorting"
+node        = 20
+title       = "THE PRICE LADDER"
+difficulty  = 1
+story       = "The prices on the board are in the order the stalls opened, and the customer wants them cheapest first."
+concepts    = ["sorting", "slices"]
+requires    = ["python.verybasic.19.heap"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief       = '''
+`xs` holds the line's integers. The program must sort `xs` in place, ascending, before it is printed. A list has a method that does it.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 1 1 3 4
+```
+'''
+starter     = '''
+xs = [int(t) for t in input().split()]
+pass  # FILL: sort xs ascending, in place
+print(*xs)
+'''
+solution    = '''
+xs = [int(t) for t in input().split()]
+xs.sort()
+print(*xs)
+'''
+hints = [
+  "xs.sort() — with the parentheses, or nothing happens.",
+  "sorted(xs, reverse=True) is descending.",
+]
+
+[quest.quiz]
+choices = ["xs = sorted(xs, reverse=True)", "xs.sort()", "xs.sort", "sort(xs)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "1 1 3 4\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "7 9\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "1 2 3 4 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "python.verybasic.21.sort-by-key"
+node        = 21
+title       = "THE LEADERBOARD"
+difficulty  = 2
+story       = "The riders' board is scores high to low, and two riders on the same score go by name; the board is in arrival order."
+concepts    = ["sorting", "closures"]
+requires    = ["python.verybasic.20.sorting"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief       = '''
+`rows` is a list of `(name, score)` pairs. It must be sorted by score descending, then by name ascending. `sort` takes a `key` function returning a tuple.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  3
+        mei 7
+        alex 9
+        bo 7
+output: alex 9
+        bo 7
+        mei 7
+```
+'''
+starter     = '''
+n = int(input())
+rows = []
+for _ in range(n):
+    name, score = input().split()
+    rows.append((name, int(score)))
+pass  # FILL: score descending, then name ascending
+for name, score in rows:
+    print(name, score)
+'''
+solution    = '''
+n = int(input())
+rows = []
+for _ in range(n):
+    name, score = input().split()
+    rows.append((name, int(score)))
+rows.sort(key=lambda r: (-r[1], r[0]))
+for name, score in rows:
+    print(name, score)
+'''
+hints = [
+  "rows.sort(key=lambda r: (-r[1], r[0])) — minus the score to go descending.",
+  "key= is a keyword argument; sort takes no positional function.",
+]
+
+[quest.quiz]
+choices = ["rows.sort(key=lambda r: (-r[1], r[0]))", "rows.sort(key=lambda r: (r[1], r[0]))", "rows.sort(key=(-r[1], r[0]))", "rows.sort(lambda r: (-r[1], r[0]))"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\nmei 7\nalex 9\nbo 7\n", expect = "alex 9\nbo 7\nmei 7\n", visible = true },
+  { name = "two", stdin = "2\nx 1\ny 2\n", expect = "y 2\nx 1\n", visible = false },
+  { name = "tie", stdin = "3\nc 5\na 5\nb 5\n", expect = "a 5\nb 5\nc 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "python.verybasic.22.reverse"
+node        = 22
+title       = "BACK TO FRONT"
+difficulty  = 1
+story       = "The sampan's name is painted on the stern back to front and the log wants it that way."
+concepts    = ["strings", "slices"]
+requires    = ["python.verybasic.21.sort-by-key"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''
+`s` is one line of text. The program must print it reversed. A slice with a step of -1 walks a string backwards.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  kwan lee
+output: eel nawk
+```
+'''
+starter     = '''
+s = input()
+pass  # FILL: s reversed
+'''
+solution    = '''
+s = input()
+print(s[::-1])
+'''
+hints = [
+  "print(s[::-1]) — empty start and stop, step -1.",
+  "reversed(s) is an iterator; printing it shows its address.",
+]
+
+[quest.quiz]
+choices = ["print(s.reverse())", "print(s[::1])", "print(reversed(s))", "print(s[::-1])"]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "kwan", stdin = "kwan lee\n", expect = "eel nawk\n", visible = true },
+  { name = "abc", stdin = "abc\n", expect = "cba\n", visible = false },
+  { name = "one", stdin = "x\n", expect = "x\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "python.verybasic.23.closures"
+node        = 23
+title       = "THE MARKUP"
+difficulty  = 2
+story       = "The fruit stall adds the same markup to every wholesale price, and the function meant to remember the markup forgets it."
+concepts    = ["closures", "functions"]
+requires    = ["python.verybasic.22.reverse"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief       = '''
+`make_adder(k)` defines an inner function `add` that returns `x + k`. It must hand back that inner function itself, so `add(x)` can be called later with `k` remembered.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+starter     = '''
+def make_adder(k):
+    def add(x):
+        return x + k
+    pass  # FILL: hand back the inner function
+
+
+k = int(input())
+nums = [int(t) for t in input().split()]
+add = make_adder(k)
+print(*[add(x) for x in nums])
+'''
+solution    = '''
+def make_adder(k):
+    def add(x):
+        return x + k
+    return add
+
+
+k = int(input())
+nums = [int(t) for t in input().split()]
+add = make_adder(k)
+print(*[add(x) for x in nums])
+'''
+hints = [
+  "return add — the bare name, no parentheses.",
+  "add() calls it with no argument and fails.",
+]
+
+[quest.quiz]
+choices = ["return add", "return add()", "return lambda x: x - k", "return k"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5\n1 2 3\n", expect = "6 7 8\n", visible = true },
+  { name = "neg", stdin = "-2\n10 0 2\n", expect = "8 -2 0\n", visible = false },
+  { name = "big", stdin = "100\n7\n", expect = "107\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "python.verybasic.24.lambdas"
+node        = 24
+title       = "EVEN SQUARES"
+difficulty  = 2
+story       = "The even-numbered stalls pay by the square of their number and the odd ones pay nothing; the ledger wants one total."
+concepts    = ["closures", "iteration"]
+requires    = ["python.verybasic.23.closures"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief       = '''
+`xs` holds the line's integers. `total` must be the sum of the squares of the EVEN values, built with `map` and `filter` and two lambdas.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+starter     = '''
+xs = [int(t) for t in input().split()]
+total = 0  # FILL: sum of the squares of the even values
+print(total)
+'''
+solution    = '''
+xs = [int(t) for t in input().split()]
+total = sum(map(lambda x: x * x, filter(lambda x: x % 2 == 0, xs)))
+print(total)
+'''
+hints = [
+  "total = sum(map(lambda x: x * x, filter(lambda x: x % 2 == 0, xs)))",
+  "filter keeps what the lambda says True for; map transforms.",
+]
+
+[quest.quiz]
+choices = ["total = sum(map(lambda x: x * x, filter(lambda x: x % 2 == 1, xs)))", "total = sum(map(lambda x: x * x, filter(lambda x: x % 2 == 0, xs)))", "total = sum(map(x * x, filter(lambda x: x % 2 == 0, xs)))", "total = sum(map(lambda x: x * 2, filter(lambda x: x % 2 == 0, xs)))"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six", stdin = "1 2 3 4 5 6\n", expect = "56\n", visible = true },
+  { name = "odd", stdin = "1 3 5\n", expect = "0\n", visible = false },
+  { name = "neg", stdin = "-4 3 -2\n", expect = "20\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "python.verybasic.25.threads"
+node        = 25
+title       = "TWELVE STALLS AT ONCE"
+difficulty  = 3
+story       = "Every stall squares its stock count on its own thread, and the order form is printed before any of them has finished."
+concepts    = ["concurrency", "closures"]
+requires    = ["python.verybasic.24.lambdas"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''
+Every thread in `threads` has been started. Before the results are printed, the main thread must WAIT for each one to finish. A thread has one method for that.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+starter     = '''
+import threading
+import time
+
+
+def main():
+    nums = [int(t) for t in input().split()]
+    results = [0] * len(nums)
+
+    def square(i):
+        time.sleep(0.05)
+        results[i] = nums[i] * nums[i]
+
+    threads = [threading.Thread(target=square, args=(i,)) for i in range(len(nums))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        pass  # FILL: wait for t to finish
+    print(*results)
+    print(sum(results))
+
+
+main()
+'''
+solution    = '''
+import threading
+import time
+
+
+def main():
+    nums = [int(t) for t in input().split()]
+    results = [0] * len(nums)
+
+    def square(i):
+        time.sleep(0.05)
+        results[i] = nums[i] * nums[i]
+
+    threads = [threading.Thread(target=square, args=(i,)) for i in range(len(nums))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    print(*results)
+    print(sum(results))
+
+
+main()
+'''
+hints = [
+  "t.join() — blocks until that thread is done.",
+  "start() a second time raises RuntimeError.",
+]
+
+[quest.quiz]
+choices = ["t.join()", "t.wait()", "t.start()", "join(t)"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "1 4 9\n14\n", visible = true },
+  { name = "one", stdin = "12\n", expect = "144\n144\n", visible = false },
+  { name = "five", stdin = "5 -2 0 3 1\n", expect = "25 4 0 9 1\n39\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "python.verybasic.26.mutex"
+node        = 26
+title       = "ONE COUNTER, FOUR HANDS"
+difficulty  = 3
+story       = "Four cashiers add to one counter at the same time; the counter has a lock, and nobody takes it before they write."
+concepts    = ["shared-state", "concurrency"]
+requires    = ["python.verybasic.25.threads"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''
+`lock` is a `threading.Lock`. Before `counter += 1` each worker must TAKE the lock; the release is already written after the write. One method acquires it.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  1000
+output: 4000
+```
+'''
+starter     = '''
+import threading
+
+counter = 0
+lock = threading.Lock()
+
+
+def work(n):
+    global counter
+    for _ in range(n):
+        pass  # FILL: take the lock
+        counter += 1
+        lock.release()
+
+
+n = int(input())
+threads = [threading.Thread(target=work, args=(n,)) for _ in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+print(counter)
+'''
+solution    = '''
+import threading
+
+counter = 0
+lock = threading.Lock()
+
+
+def work(n):
+    global counter
+    for _ in range(n):
+        lock.acquire()
+        counter += 1
+        lock.release()
+
+
+n = int(input())
+threads = [threading.Thread(target=work, args=(n,)) for _ in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+print(counter)
+'''
+hints = [
+  "lock.acquire() — then the write, then the release that is already there.",
+  "Releasing a lock nobody holds raises RuntimeError.",
+]
+
+[quest.quiz]
+choices = ["lock.aquire()", "lock.acquire()", "lock.lock()", "lock.release()"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "thousand", stdin = "1000\n", expect = "4000\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "4\n", visible = false },
+  { name = "fifty", stdin = "50\n", expect = "200\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "python.verybasic.27.binary-tree"
+node        = 27
+title       = "NONE"
+difficulty  = 4
+story       = "05:59 at the price board: the price tree's left branch is None, and the first insert on that side is dropped on the floor."
+concepts    = ["trees", "recursion", "structs"]
+requires    = ["python.verybasic.26.mutex"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief       = '''
+`insert(n, v)` returns the root of the tree with `v` in it; the empty case and the right-hand side are written. For a smaller `v` the left child must be replaced by the result of inserting into it, so a `None` child becomes a node.
+
+Pick the line that does it, then type it where the `# FILL` comment is.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+starter     = '''
+class Node:
+    def __init__(self, val):
+        self.val = val
+        self.left = None
+        self.right = None
+
+
+def insert(n, v):
+    if n is None:
+        return Node(v)
+    if v < n.val:
+        pass  # FILL: insert into the left subtree and keep the result
+    else:
+        n.right = insert(n.right, v)
+    return n
+
+
+def inorder(n, out):
+    if n is None:
+        return
+    inorder(n.left, out)
+    out.append(n.val)
+    inorder(n.right, out)
+
+
+def height(n):
+    if n is None:
+        return 0
+    return 1 + max(height(n.left), height(n.right))
+
+
+root = None
+for tok in input().split():
+    root = insert(root, int(tok))
+out = []
+inorder(root, out)
+print(*out)
+print(height(root))
+'''
+solution    = '''
+class Node:
+    def __init__(self, val):
+        self.val = val
+        self.left = None
+        self.right = None
+
+
+def insert(n, v):
+    if n is None:
+        return Node(v)
+    if v < n.val:
+        n.left = insert(n.left, v)
+    else:
+        n.right = insert(n.right, v)
+    return n
+
+
+def inorder(n, out):
+    if n is None:
+        return
+    inorder(n.left, out)
+    out.append(n.val)
+    inorder(n.right, out)
+
+
+def height(n):
+    if n is None:
+        return 0
+    return 1 + max(height(n.left), height(n.right))
+
+
+root = None
+for tok in input().split():
+    root = insert(root, int(tok))
+out = []
+inorder(root, out)
+print(*out)
+print(height(root))
+'''
+hints = [
+  "n.left = insert(n.left, v) — the recursion returns the subtree's new root; store it.",
+  "Calling insert without storing the result leaves the None where it was.",
+]
+
+[quest.quiz]
+choices = ["n.left = insert(n.right, v)", "insert(n.left, v)", "n.left = insert(n.left, v)", "n.left = insert(n.left)"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "balanced", stdin = "5 3 8 1 4\n", expect = "1 3 4 5 8\n3\n", visible = true },
+  { name = "chain", stdin = "4 3 2 1\n", expect = "1 2 3 4\n4\n", visible = false },
+  { name = "single", stdin = "7\n", expect = "7\n1\n", visible = false },
+  { name = "left-deep", stdin = "9 4 2 6 1\n", expect = "1 2 4 6 9\n4\n", visible = false },
+]

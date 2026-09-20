@@ -50,6 +50,10 @@ pub struct Row {
     /// existed — which is not invented after the fact.
     pub opened_at: Option<String>,
     pub cleared: bool,
+    /// XP this call granted: the clear's worth on a first clear, and zero on
+    /// every later accepted submit (PROTOCOL §4.9). Never read back from the
+    /// database — it is what *happened*, not a column.
+    pub xp_gained: i64,
 }
 
 pub fn get(conn: &Connection, address: &str, quest_id: &str) -> Result<Row> {
@@ -68,6 +72,7 @@ pub fn get(conn: &Connection, address: &str, quest_id: &str) -> Result<Row> {
                     hints_used: r.get(4)?,
                     first_clear_at: r.get(5)?,
                     opened_at: r.get(6)?,
+                    xp_gained: 0,
                 })
             },
         )
@@ -248,7 +253,33 @@ pub fn record_clear(
           WHERE address = ?1 AND quest_id = ?2",
         params![address, quest_id, stars, best, now],
     )?;
-    get(conn, address, quest_id)
+    // The grant, on the first clear only: stars are fixed at that moment
+    // (the failures counted are the ones before `first_clear_at`), so there
+    // is nothing for a later clear to add. Written here, beside the clear it
+    // records, so the ledger cannot say something the progress table does
+    // not. The UNIQUE index refuses a second row for the same clear, and
+    // `INSERT OR IGNORE` makes a replayed clear a no-op rather than an error.
+    let mut xp_gained = 0;
+    if !before.cleared {
+        let (difficulty, category): (i64, String) = conn.query_row(
+            "SELECT difficulty, category FROM quests WHERE id = ?1",
+            params![quest_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        let amount = crate::awards::xp_for_clear(stars, difficulty, &category);
+        let written = conn.execute(
+            "INSERT OR IGNORE INTO xp_ledger
+                (address, quest_id, reason, amount, stars, created_at)
+             VALUES (?1, ?2, 'clear', ?3, ?4, ?5)",
+            params![address, quest_id, amount, stars, now],
+        )?;
+        if written == 1 {
+            xp_gained = amount;
+        }
+    }
+    let mut row = get(conn, address, quest_id)?;
+    row.xp_gained = xp_gained;
+    Ok(row)
 }
 
 /// How many quests this player has cleared, for the `cleared_total` on
@@ -261,8 +292,9 @@ pub fn cleared_total(conn: &Connection, address: &str) -> Result<i64> {
     )?)
 }
 
-/// Every star this player holds, which is what `User.level` and `User.xp` are
-/// derived from (PROTOCOL §5.1).
+/// Every star this player holds. `User.xp` used to be derived from this; it
+/// is read from the ledger now (`awards::total_xp`), and this stays for the
+/// stats screen.
 pub fn stars_total(conn: &Connection, address: &str) -> Result<i64> {
     Ok(conn.query_row(
         "SELECT COALESCE(sum(stars), 0) FROM progress WHERE address = ?1",

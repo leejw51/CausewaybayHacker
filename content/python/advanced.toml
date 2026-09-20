@@ -1,35 +1,1700 @@
-# PYTHON LAND — ADVANCED. The SOGO basement food hall at 12:30: twelve
-# stalls, one floor, one interpreter lock. Threads and joins, a Lock, a
-# Queue, a thread pool, asyncio, context managers, generator pipelines,
-# itertools, functools, Protocol, frozen dataclasses and __slots__, custom
-# exceptions, the iterator protocol, the collections module, and THE GIL.
+# PYTHON LAND — ADVANCED. The morning walk turns into the lunch rush. First
+# the language's own machinery — conversions, lists, strings, dicts, sets,
+# functions, exceptions, comprehensions, sorting, classes, dataclasses,
+# generators, decorators, duck typing, and NONE on the price board — and then
+# the SOGO basement at 12:30, where everything happens at once: threads,
+# locks, queues, pools, asyncio, context managers, itertools, functools, and
+# THE GIL. The grammar drills live on the BASIC road now.
 #
-# Every quest here has a deterministic answer on purpose: results are stored
-# by index and printed in index order, joined before they are read, or pinned
-# by a sentinel. A quest whose output depends on the scheduler is a quest that
-# fails CI at random, and that is not a lesson. Every starter fails for a
-# reason that does not depend on timing either.
-#
-# Every program is one main.py, run as `python3 -I main.py`, stdlib only, and
-# nothing in it needs anything newer than Python 3.10.
+# Every quest here has a deterministic answer on purpose: results are joined in
+# order, collected and sorted, or piped. A quest whose output depends on the
+# scheduler is a quest that fails CI at random, and that is not a lesson.
 #
 # Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
 
 pack = "python.advanced"
 land = "python"
 category = "advanced"
-version = 1
+version = 2
 
 # ---------------------------------------------------------------- 01
 [[quest]]
-id          = "python.advanced.01.threads"
+id          = "python.advanced.01.conversions"
 node        = 1
+title       = "THREE SHAPES, ONE NAME"
+difficulty  = 2
+story       = "The fish stall's notebook holds the price as text, as a number and as dollars, and calls all three of them price."
+concepts    = ["bindings", "types", "strings"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+Read one line: an amount in cents, as digits.
+
+Print three lines:
+
+1. how many characters the stripped text has
+2. the amount as a number
+3. the amount as dollars with exactly two decimals
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+The amount is non-negative. Do it with **one name**, rebound three times —
+`str`, then `int`, then `str` again. Python lets a name hold anything and
+change its mind; the price is that nothing tells you what `cents` is right
+now except reading the code above it.
+
+Do not go through `float` for the dollars. `1234 / 100` is `12.34` today and
+`0.1 + 0.2` is `0.30000000000000004` every day. Integer division and modulo
+give you the two halves exactly, and `f"{cents % 100:02d}"` pads the second
+one.
+'''
+starter     = '''
+def main():
+    cents = input().strip()
+
+    # 1. the character count of `cents`
+    # 2. rebind `cents` to its int value, and print it
+    # 3. rebind `cents` to the formatted dollars, and print it
+    print(cents)
+
+
+main()
+'''
+solution    = '''
+def main():
+    cents = input().strip()
+    print(len(cents))
+
+    cents = int(cents)
+    print(cents)
+
+    cents = f"{cents // 100}.{cents % 100:02d}"
+    print(cents)
+
+
+main()
+'''
+hints = [
+  "len(cents) while cents is still a string is the first line.",
+  "cents = int(cents) is not a conversion in place; it is a new value bound to the old name. The string is gone after it.",
+  ":02d inside an f-string is width two, zero padded, decimal. 5 cents is 0.05, not 0.5.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "dollars",    stdin = "1234\n", expect = "4\n1234\n12.34\n", visible = true },
+  { name = "five-cents", stdin = "5\n",    expect = "1\n5\n0.05\n",     visible = false },
+  { name = "round",      stdin = "100\n",  expect = "3\n100\n1.00\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "python.advanced.02.control-flow"
+node        = 2
+title       = "WHICH AISLE"
+difficulty  = 2
+story       = "The market's aisle numbers are painted on the floor and the sign at the door is supposed to say what each aisle sells. It says the number, every time."
+concepts    = ["control-flow", "io", "functions"]
+requires    = ["python.advanced.01.conversions"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief       = '''
+Read one integer `n`. For every `i` from `1` to `n`, print one line:
+
+* `FISHVEG` if `i` divides by both 3 and 5
+* `FISH` if `i` divides by 3
+* `VEG` if `i` divides by 5
+* otherwise `i` itself
+
+Then keep reading integers, one per line, until you read `0`, and print
+`SKIPPED <k>`, how many non-zero lines you read on the way.
+
+```
+input:  5
+        7
+        8
+        0
+output: 1
+        2
+        FISH
+        4
+        VEG
+        SKIPPED 2
+```
+
+Two loops, two kinds. The first knows how many times it runs before it
+starts: `for i in range(1, n + 1)`. The second does not: `while True` with a
+`break`, because the count is decided by what you read. Python's `range`
+stops **before** its end, and `range(1, n)` is the off-by-one everyone
+writes here once.
+'''
+starter     = '''
+def label(i):
+    # FISHVEG / FISH / VEG / i
+    return i
+
+
+def main():
+    n = int(input())
+    for i in range(1, n):
+        print(label(i))
+
+    skipped = 0
+    # read lines until a 0, counting the non-zero ones
+    print(f"SKIPPED {skipped}")
+
+
+main()
+'''
+solution    = '''
+def label(i):
+    if i % 15 == 0:
+        return "FISHVEG"
+    if i % 3 == 0:
+        return "FISH"
+    if i % 5 == 0:
+        return "VEG"
+    return i
+
+
+def main():
+    n = int(input())
+    for i in range(1, n + 1):
+        print(label(i))
+
+    skipped = 0
+    while True:
+        value = int(input())
+        if value == 0:
+            break
+        skipped += 1
+    print(f"SKIPPED {skipped}")
+
+
+main()
+'''
+hints = [
+  "Check the both-case first, or it never fires. Divisible by 3 and 5 is divisible by 15.",
+  "range(1, n) stops at n - 1. The starter has that bug; the sample output ends one line early.",
+  "while True with a break is how Python spells a loop whose exit is in the middle. There is no do-while.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",    stdin = "5\n7\n8\n0\n",  expect = "1\n2\nFISH\n4\nVEG\nSKIPPED 2\n", visible = true },
+  { name = "fifteen", stdin = "15\n0\n",      expect = "1\n2\nFISH\n4\nVEG\nFISH\n7\n8\nFISH\nVEG\n11\nFISH\n13\n14\nFISHVEG\nSKIPPED 0\n", visible = false },
+  { name = "one",     stdin = "1\n5\n5\n5\n0\n", expect = "1\nSKIPPED 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "python.advanced.03.lists"
+node        = 3
+title       = "THE MIDDLE OF THE LINE"
+difficulty  = 2
+story       = "Forty people queue for the roast goose counter in the SOGO basement. The counter can see the front and the back of the line and nothing in between."
+concepts    = ["slices", "iteration", "control-flow"]
+requires    = ["python.advanced.02.control-flow"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief       = '''
+Standard input is a count `n` on the first line and then `n` integers on the
+second, separated by spaces. `n` is at least `1`, so there is always a first
+value and a last value to print.
+
+Print three lines: the first value, the last value, and the sum of everything
+strictly between them. With fewer than three values that sum is `0`.
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+`nums[1:-1]` is the middle: a slice, which is a **new list** — Python copies
+on slicing, unlike a Rust slice or a Go sub-slice. `nums[-1]` is the last
+element, and negative indices are the whole reason you never write
+`nums[len(nums) - 1]` in Python.
+
+With one value, `nums[1:-1]` is empty and `sum` of it is `0`, so the guard
+the other languages need is free here. That is worth knowing, and worth
+checking rather than assuming.
+'''
+starter     = '''
+import sys
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+
+    # print nums[0], the last element, then the sum of the middle slice
+    print(nums[0])
+
+
+main()
+'''
+solution    = '''
+import sys
+
+
+def main():
+    data = sys.stdin.read().split()
+    nums = [int(t) for t in data[1:]]
+
+    print(nums[0])
+    print(nums[-1])
+    print(sum(nums[1:-1]))
+
+
+main()
+'''
+hints = [
+  "nums[-1] is the last element; nums[-2] is the one before it.",
+  "nums[1:-1] is everything except the first and last, and an empty slice sums to 0 on its own.",
+  "sys.stdin.read().split() reads everything at once and splits on any whitespace, so the line breaks stop mattering.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",   stdin = "5\n4 8 15 16 23\n", expect = "4\n23\n39\n", visible = true },
+  { name = "single", stdin = "1\n7\n",            expect = "7\n7\n0\n",   visible = false },
+  { name = "pair",   stdin = "2\n3 9\n",          expect = "3\n9\n0\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "python.advanced.04.strings"
+node        = 4
+title       = "BYTES ARE NOT LETTERS"
+difficulty  = 2
+story       = "The SOGO basement directory truncates 銅鑼灣 at three bytes and prints one character and a question mark."
+concepts    = ["strings", "types", "slices"]
+requires    = ["python.advanced.03.lists"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief       = '''
+Read one line. Print three lines:
+
+1. its length in **bytes**, encoded as UTF-8
+2. its length in **characters**
+3. the line with its characters reversed
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+The line may contain characters outside ASCII, and then the first two numbers
+are not the same. A Python `str` is a sequence of code points, so `len` is
+the character count; to get bytes you have to ask for them, with
+`.encode("utf-8")`, and `len` of **that** is the other number.
+
+`s[::-1]` reverses a string. It is a slice with a step of `-1`, and it works
+on any sequence.
+'''
+starter     = '''
+def main():
+    line = input()
+
+    # 1. bytes, 2. characters, 3. the characters reversed
+    print(len(line))
+
+
+main()
+'''
+solution    = '''
+def main():
+    line = input()
+
+    print(len(line.encode("utf-8")))
+    print(len(line))
+    print(line[::-1])
+
+
+main()
+'''
+hints = [
+  "len(line) is characters. len(line.encode(\"utf-8\")) is bytes. The starter prints the wrong one first.",
+  "line[::-1] is the whole reversal. Slicing a str gives a str.",
+  "A byte string reversed would cut a multi-byte character in half; reversing the str does not, because a str has no bytes in it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "ascii",     stdin = "causeway\n",  expect = "8\n8\nyawesuac\n",  visible = true },
+  { name = "cantonese", stdin = "銅鑼灣\n",    expect = "9\n3\n灣鑼銅\n",    visible = false },
+  { name = "spaced",    stdin = "Lucky Mac\n", expect = "9\n9\ncaM ykcuL\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "python.advanced.05.dicts"
+node        = 5
+title       = "WHAT THE MARKET SHOUTS"
+difficulty  = 3
+story       = "Bowrington Road at seven: every stall calling something, and the sign board at the Canal Road end wants the ranking."
+concepts    = ["collections", "sorting", "iteration"]
+requires    = ["python.advanced.04.strings"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief       = '''
+Read the whole of standard input and split it on whitespace.
+
+Print each distinct word once, as `<word> <count>`, ordered by count
+descending, and ties broken by the word ascending.
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+A dict remembers insertion order, and that is not the order you want.
+`sorted` with a `key` that returns a tuple sorts on the first element and
+breaks ties on the second, and negating the count is how you get descending
+on one field while the other stays ascending.
+'''
+starter     = '''
+import sys
+
+
+def main():
+    words = sys.stdin.read().split()
+
+    counts = {}
+    for word in words:
+        counts[word] += 1
+
+    for word, count in counts.items():
+        print(f"{word} {count}")
+
+
+main()
+'''
+solution    = '''
+import sys
+
+
+def main():
+    words = sys.stdin.read().split()
+
+    counts = {}
+    for word in words:
+        counts[word] = counts.get(word, 0) + 1
+
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    for word, count in ranked:
+        print(f"{word} {count}")
+
+
+main()
+'''
+hints = [
+  "The starter dies with KeyError on the first word: counts[word] += 1 reads before it writes, and there is nothing to read. counts.get(word, 0) supplies the zero.",
+  "sorted(counts.items(), key=...) gives you (word, count) pairs in the order you asked for. The dict itself stays in insertion order.",
+  "key=lambda item: (-item[1], item[0]) — count descending, then word ascending, in one tuple.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tram",   stdin = "tram tram bus\n", expect = "tram 2\nbus 1\n", visible = true },
+  { name = "ties",   stdin = "a b a c b a\n",   expect = "a 3\nb 2\nc 1\n", visible = false },
+  { name = "single", stdin = "one\n",           expect = "one 1\n",         visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "python.advanced.06.sets"
+node        = 6
+title       = "WHAT BOTH STALLS HAVE"
+difficulty  = 2
+story       = "Two vegetable stalls, one on each side of the aisle, and a customer who wants to know what she can get from either without walking across the wet floor twice."
+concepts    = ["collections", "iteration", "strings"]
+requires    = ["python.advanced.05.dicts"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief       = '''
+Two lines of standard input, each a stall's goods separated by spaces. A
+stall may list the same thing twice; that counts once.
+
+Print three lines:
+
+1. `BOTH` followed by everything on both lists, sorted, space separated — or
+   `BOTH -` if there is nothing
+2. `ONLY_A <k>`: how many things are on the first list and not the second
+3. `ALL <k>`: how many distinct things are on either list
+
+```
+input:  choisum tofu gailan tofu
+        gailan egg
+output: BOTH gailan
+        ONLY_A 2
+        ALL 4
+```
+
+A `set` has no duplicates and no order, and `&`, `-` and `|` are the three
+operations. `sorted` on a set gives you a list, which is the only way to
+print one in a fixed order.
+'''
+starter     = '''
+def main():
+    a = input().split()
+    b = input().split()
+
+    both = []
+    # a set of each, then & - | for the three answers
+    print("BOTH -")
+    print(f"ONLY_A {len(a)}")
+    print(f"ALL {len(a) + len(b)}")
+    _ = both
+
+
+main()
+'''
+solution    = '''
+def main():
+    a = set(input().split())
+    b = set(input().split())
+
+    both = sorted(a & b)
+    print("BOTH " + (" ".join(both) if both else "-"))
+    print(f"ONLY_A {len(a - b)}")
+    print(f"ALL {len(a | b)}")
+
+
+main()
+'''
+hints = [
+  "set(input().split()) builds the set straight from the tokens; the duplicate tofu disappears on the way in.",
+  "a & b is the intersection, a - b is the difference, a | b is the union. len of each is the count.",
+  "\" \".join(sorted(both)) needs strings — these already are — and the `if both else \"-\"` covers the empty case in one expression.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "choisum tofu gailan tofu\ngailan egg\n", expect = "BOTH gailan\nONLY_A 2\nALL 4\n",  visible = true },
+  { name = "disjoint", stdin = "fish\ntofu\n",                          expect = "BOTH -\nONLY_A 1\nALL 2\n",       visible = false },
+  { name = "same",     stdin = "egg egg egg\negg\n",                    expect = "BOTH egg\nONLY_A 0\nALL 1\n",     visible = false },
+  { name = "many",     stdin = "d c b a\na b c d e\n",                  expect = "BOTH a b c d\nONLY_A 0\nALL 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "python.advanced.07.functions"
+node        = 7
+title       = "PER CATTY"
+difficulty  = 2
+story       = "Every price tag on Bowrington Road is per catty unless it says otherwise, and the tag printer insists on being told every time."
+concepts    = ["functions", "strings", "types"]
+requires    = ["python.advanced.06.sets"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<NAME> <CENTS>` or
+`<NAME> <CENTS> <UNIT>`.
+
+Write `tag(name, cents, unit="catty")` returning `<NAME> $<dollars>/<unit>`
+with two decimals, and print one tag per line.
+
+```
+input:  3
+        CHOISUM 1200
+        EGG 250 each
+        GARLIC 800
+output: CHOISUM $12.00/catty
+        EGG $2.50/each
+        GARLIC $8.00/catty
+```
+
+The starter's `tag` has no default, so the two-token lines crash it:
+`TypeError: tag() missing 1 required positional argument`. A default
+argument is part of the function's contract — it says what the caller may
+leave out and what they get when they do.
+
+Split the line with `.split()` and hand the pieces over with `tag(*parts)`
+after converting the cents. The `*` unpacks a list into positional arguments,
+so a two-element list and a three-element list both fit the one signature.
+'''
+starter     = '''
+def tag(name, cents, unit):
+    return f"{name} ${cents // 100}.{cents % 100:02d}/{unit}"
+
+
+def main():
+    n = int(input())
+    for _ in range(n):
+        parts = input().split()
+        parts[1] = int(parts[1])
+        print(tag(*parts))
+
+
+main()
+'''
+solution    = '''
+def tag(name, cents, unit="catty"):
+    return f"{name} ${cents // 100}.{cents % 100:02d}/{unit}"
+
+
+def main():
+    n = int(input())
+    for _ in range(n):
+        parts = input().split()
+        parts[1] = int(parts[1])
+        print(tag(*parts))
+
+
+main()
+'''
+hints = [
+  "unit=\"catty\" in the def line. That is the whole fix.",
+  "Defaults go after the parameters without them — def tag(name, cents, unit=\"catty\") — and a default that is a list or dict is shared between calls, which is the follow-up question.",
+  "tag(*parts) spreads the list; with two parts the default fills the third.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",   stdin = "3\nCHOISUM 1200\nEGG 250 each\nGARLIC 800\n", expect = "CHOISUM $12.00/catty\nEGG $2.50/each\nGARLIC $8.00/catty\n", visible = true },
+  { name = "units",   stdin = "2\nRICE 4500 bag\nFISH 6805 catty\n",         expect = "RICE $45.00/bag\nFISH $68.05/catty\n",                     visible = false },
+  { name = "cheap",   stdin = "1\nSPRINGONION 5\n",                          expect = "SPRINGONION $0.05/catty\n",                              visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "python.advanced.08.exceptions"
+node        = 8
+title       = "THE LINE THAT IS NOT A NUMBER"
+difficulty  = 3
+story       = "The scale at the fish stall prints a column of weights with somebody's phone number in the middle of it."
+concepts    = ["error-handling", "control-flow", "types"]
+requires    = ["python.advanced.07.functions"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines. Each line is supposed to be an
+integer.
+
+For each line print either the value doubled, or `BAD <line>` if it does not
+parse. Finally print `SUM <total>`, where the total is the sum of the values
+you printed.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+`int("xx")` raises `ValueError`. That is the only way Python tells you a
+conversion failed — there is no `Result`, no `(value, ok)`; the failure is an
+exception, and the code that expected a number has to say what it does about
+it with `try`/`except ValueError`.
+
+Catch **`ValueError`**, not `Exception`. A bare `except:` would also swallow
+the `KeyboardInterrupt` and the typo in your own code, which is how programs
+learn to fail silently.
+'''
+starter     = '''
+def double(text):
+    return int(text) * 2
+
+
+def main():
+    n = int(input())
+    total = 0
+    for _ in range(n):
+        line = input().strip()
+        value = double(line)
+        print(value)
+        total += value
+    print(f"SUM {total}")
+
+
+main()
+'''
+solution    = '''
+def double(text):
+    return int(text) * 2
+
+
+def main():
+    n = int(input())
+    total = 0
+    for _ in range(n):
+        line = input().strip()
+        try:
+            value = double(line)
+        except ValueError:
+            print(f"BAD {line}")
+            continue
+        print(value)
+        total += value
+    print(f"SUM {total}")
+
+
+main()
+'''
+hints = [
+  "The starter dies on xx with ValueError: invalid literal for int() with base 10. That message is the exception you catch.",
+  "Keep the try block small: only the call that can fail goes inside it, and the print and the total go after.",
+  "continue inside the except skips the rest of the loop body for that line, so the bad line adds nothing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",   stdin = "3\n21\nxx\n-4\n",     expect = "42\nBAD xx\n-8\nSUM 34\n",     visible = true },
+  { name = "zero",    stdin = "1\n0\n",              expect = "0\nSUM 0\n",                   visible = false },
+  { name = "all-bad", stdin = "2\nhello\nworld\n",   expect = "BAD hello\nBAD world\nSUM 0\n", visible = false },
+  { name = "float",   stdin = "2\n1.5\n3\n",         expect = "BAD 1.5\n6\nSUM 6\n",          visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "python.advanced.09.comprehensions"
+node        = 9
+title       = "ONE PASS DOWN BOWRINGTON ROAD"
+difficulty  = 3
+story       = "Alex says you can do it with three for loops. The aisle is one person wide and the floor is wet; you get one pass."
+concepts    = ["comprehensions", "iteration", "collections"]
+requires    = ["python.advanced.08.exceptions"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief       = '''
+Standard input is one line of integers separated by spaces.
+
+Print three lines:
+
+1. the sum of the even values (`0` if there are none)
+2. every value greater than `10`, doubled, in order, joined by single spaces —
+   or `-` if there are none
+3. how many distinct values there are
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+Use comprehensions, not index loops: a generator expression inside `sum`, a
+list comprehension with an `if` for the second line, and a set comprehension
+for the third. The `if` goes at the end and filters; an expression at the
+front transforms.
+
+`" ".join(...)` wants strings, so the second comprehension has to produce
+`str(v * 2)`, not `v * 2`. That `TypeError: sequence item 0: expected str
+instance, int found` is the one everyone meets on this line.
+'''
+starter     = '''
+import sys
+
+
+def main():
+    nums = [int(t) for t in sys.stdin.read().split()]
+
+    # 1. sum of the even ones
+    # 2. the ones over 10, doubled, joined by spaces, or "-"
+    # 3. how many distinct values
+    print(0)
+    print("-")
+    print(len(nums))
+
+
+main()
+'''
+solution    = '''
+import sys
+
+
+def main():
+    nums = [int(t) for t in sys.stdin.read().split()]
+
+    print(sum(v for v in nums if v % 2 == 0))
+
+    big = [str(v * 2) for v in nums if v > 10]
+    print(" ".join(big) if big else "-")
+
+    distinct = {v for v in nums}
+    print(len(distinct))
+
+
+main()
+'''
+hints = [
+  "sum(v for v in nums if v % 2 == 0) — a generator expression needs no extra brackets when it is the only argument.",
+  "[str(v * 2) for v in nums if v > 10] — transform at the front, filter at the back.",
+  "{v for v in nums} is a set comprehension; set(nums) is the same thing and either is fine here.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",     stdin = "1 2 3 4 12 12 30\n", expect = "60\n24 24 60\n6\n", visible = true },
+  { name = "no-big",    stdin = "1 3 5\n",            expect = "0\n-\n3\n",         visible = false },
+  { name = "negatives", stdin = "-4 -2 0 11\n",       expect = "-6\n22\n4\n",       visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "python.advanced.10.dict-comprehensions"
+node        = 10
+title       = "THE SAME PASS, KEYED"
+difficulty  = 2
+story       = "The stall's prices are on scraps of paper in the order they were written. Auntie wants them as one board, and she wants it twice."
+concepts    = ["comprehensions", "collections", "sorting"]
+requires    = ["python.advanced.09.comprehensions"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<ITEM> <PRICE>`. `PRICE` is
+a whole number of cents. An item appears at most once, and `n` is at least
+`1` — there is always a cheapest item to name.
+
+Print three lines:
+
+1. every item priced **strictly over 100**, as `ITEM=PRICE`, sorted by item,
+   joined by single spaces — or `-` if there are none
+2. every item with its price **halved by integer division**, same format,
+   sorted by item
+3. `CHEAPEST <item>` — the lowest price, ties broken by the item ascending
+
+```
+input:  3
+        LAI-SEE 120
+        CHOY 80
+        BOK-CHOY 250
+output: BOK-CHOY=250 LAI-SEE=120
+        BOK-CHOY=125 CHOY=40 LAI-SEE=60
+        CHEAPEST CHOY
+```
+
+A **dict comprehension** is the list comprehension you already know with a
+key: `{k: v for ...}` instead of `[v for ...]`. The first line filters with an
+`if` at the end and keeps the values as they are; the second transforms the
+value at the front and keeps every key. Both are one line, and neither needs
+an empty dict and a loop that fills it.
+
+`sorted(d.items())` gives you `(key, value)` pairs in key order, which is what
+the first two lines want. For the third, `min` takes the same `key=` a sort
+does — and because a tuple compares left to right, `min(d, key=lambda k: (d[k],
+k))` settles the tie without a second pass.
+'''
+starter     = '''
+def main():
+    n = int(input())
+    prices = {item: int(cents) for item, cents in (input().split() for _ in range(n))}
+
+    # 1. the ones over 100, as ITEM=PRICE, sorted, or "-"
+    # 2. every price halved, same format, sorted
+    # 3. CHEAPEST <item>, ties alphabetical
+    print("-")
+    print("-")
+    print("CHEAPEST")
+
+
+main()
+'''
+solution    = '''
+def main():
+    n = int(input())
+    # the board itself is a dict comprehension: one line per pair, no empty
+    # dict and no loop that fills it
+    prices = {item: int(cents) for item, cents in (input().split() for _ in range(n))}
+
+    dear = {item: price for item, price in prices.items() if price > 100}
+    print(" ".join(f"{k}={v}" for k, v in sorted(dear.items())) if dear else "-")
+
+    half = {item: price // 2 for item, price in prices.items()}
+    print(" ".join(f"{k}={v}" for k, v in sorted(half.items())))
+
+    print("CHEAPEST " + min(prices, key=lambda k: (prices[k], k)))
+
+
+main()
+'''
+hints = [
+  "A dict comprehension is `{key: value for ... }`. The `if` goes at the end and filters; an expression on the value transforms it.",
+  "`sorted(d.items())` sorts by key and hands back pairs, which is exactly what ITEM=PRICE wants.",
+  "For the tie, sort on a tuple: `min(prices, key=lambda k: (prices[k], k))` takes the cheapest, then the alphabetically first among equals.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "board",    stdin = "3\nLAI-SEE 120\nCHOY 80\nBOK-CHOY 250\n",      expect = "BOK-CHOY=250 LAI-SEE=120\nBOK-CHOY=125 CHOY=40 LAI-SEE=60\nCHEAPEST CHOY\n", visible = true },
+  { name = "nothing-dear", stdin = "2\nGAI-LAN 40\nCHOY 60\n",                  expect = "-\nCHOY=30 GAI-LAN=20\nCHEAPEST GAI-LAN\n",                                visible = true },
+  { name = "exactly-100",  stdin = "1\nEDGE 100\n",                              expect = "-\nEDGE=50\nCHEAPEST EDGE\n",                                              visible = false },
+  { name = "tie",      stdin = "3\nZUCCHINI 30\nAUBERGINE 30\nMELON 90\n",     expect = "-\nAUBERGINE=15 MELON=45 ZUCCHINI=15\nCHEAPEST AUBERGINE\n",               visible = false },
+  { name = "odd",      stdin = "2\nODD 101\nONE 1\n",                           expect = "ODD=101\nODD=50 ONE=0\nCHEAPEST ONE\n",                                    visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "python.advanced.11.sorting"
+node        = 11
+title       = "THE RANKING BOARD"
+difficulty  = 3
+story       = "The market office pins up the cheapest choi sum every morning, and the clerk ranks the stalls by hand with two lists and a pencil."
+concepts    = ["sorting", "iteration", "closures"]
+requires    = ["python.advanced.10.dict-comprehensions"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''
+Two lines of standard input: stall names on the first, their prices in cents
+on the second, in the same order. There is at least one stall.
+
+Print the stalls ranked cheapest first as `<rank>. <NAME> <cents>`, with the
+rank starting at `1`, ties broken by name ascending. Then print
+`CHEAPEST <NAME>`.
+
+```
+input:  LAM WONG CHAN
+        1200 900 1200
+output: 1. WONG 900
+        2. CHAN 1200
+        3. LAM 1200
+        CHEAPEST WONG
+```
+
+`zip` pairs the two lists up; `sorted` with a `key` orders the pairs;
+`enumerate(..., start=1)` numbers them. Three built-ins and no index
+arithmetic anywhere — the version with `for i in range(len(names))` is the
+one that gets the tie-break wrong at the third stall.
+'''
+starter     = '''
+def main():
+    names = input().split()
+    prices = [int(t) for t in input().split()]
+
+    for i in range(len(names)):
+        print(f"{i + 1}. {names[i]} {prices[i]}")
+    print(f"CHEAPEST {names[0]}")
+
+
+main()
+'''
+solution    = '''
+def main():
+    names = input().split()
+    prices = [int(t) for t in input().split()]
+
+    ranked = sorted(zip(names, prices), key=lambda pair: (pair[1], pair[0]))
+    for rank, (name, price) in enumerate(ranked, start=1):
+        print(f"{rank}. {name} {price}")
+    print(f"CHEAPEST {ranked[0][0]}")
+
+
+main()
+'''
+hints = [
+  "zip(names, prices) yields (name, price) tuples, one per stall, and stops at the shorter list.",
+  "key=lambda pair: (pair[1], pair[0]) sorts by price and then by name; sorted is stable, but you do not need that when the key is total.",
+  "enumerate(ranked, start=1) gives (rank, (name, price)), and the nested tuple unpacks in the for line.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "LAM WONG CHAN\n1200 900 1200\n", expect = "1. WONG 900\n2. CHAN 1200\n3. LAM 1200\nCHEAPEST WONG\n", visible = true },
+  { name = "one",    stdin = "AH-KEUNG\n5\n",                 expect = "1. AH-KEUNG 5\nCHEAPEST AH-KEUNG\n",                      visible = false },
+  { name = "sorted", stdin = "B A\n1 2\n",                    expect = "1. B 1\n2. A 2\nCHEAPEST B\n",                            visible = false },
+  { name = "ties",   stdin = "Z Y X\n7 7 7\n",                expect = "1. X 7\n2. Y 7\n3. Z 7\nCHEAPEST X\n",                    visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "python.advanced.12.classes"
+node        = 12
+title       = "THE STALL'S NOTEBOOK"
+difficulty  = 3
+story       = "Every stall on Bowrington Road keeps its own notebook of the day's sales, and the tofu stall's has every line written on the cover instead of inside."
+concepts    = ["structs", "functions", "mutability"]
+requires    = ["python.advanced.11.sorting"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<ITEM> <CENTS>`.
+
+Build a `Notebook` class that collects the items, then print each item back
+as `<ITEM> <CENTS>`, in the order it arrived, then `TOTAL <sum>`, and
+finally the notebook itself through `print(book)` — its `__repr__` must
+produce `Notebook(items=<n>, total=<sum>)`.
+
+```
+input:  2
+        TOFU 600
+        SET 2800
+output: TOFU 600
+        SET 2800
+        TOTAL 3400
+        Notebook(items=2, total=3400)
+```
+
+`n` may be `0`, and then the lines are `TOTAL 0` and
+`Notebook(items=0, total=0)`.
+
+The starter has the bug that gives this quest its name: `items = []` sits in
+the **class body**, so it is one list shared by every `Notebook` there will
+ever be, not one per notebook. Anything created in `__init__` through `self`
+belongs to the instance; anything in the class body belongs to the class.
+Mutable class attributes are the Python bug that survives code review most
+often, because the program works right up until there are two of them.
+'''
+starter     = '''
+class Notebook:
+    items = []
+
+    def add(self, name, cents):
+        self.items.append((name, cents))
+
+    def total(self):
+        return sum(cents for _, cents in self.items)
+
+
+def main():
+    n = int(input())
+    book = Notebook()
+    scratch = Notebook()
+    scratch.add("PENCIL", 0)
+    for _ in range(n):
+        name, cents = input().split()
+        book.add(name, int(cents))
+
+    for name, cents in book.items:
+        print(f"{name} {cents}")
+    print(f"TOTAL {book.total()}")
+    print(book)
+
+
+main()
+'''
+solution    = '''
+class Notebook:
+    def __init__(self):
+        # one list per notebook; a list in the class body would be shared
+        self.items = []
+
+    def add(self, name, cents):
+        self.items.append((name, cents))
+
+    def total(self):
+        return sum(cents for _, cents in self.items)
+
+    def __repr__(self):
+        return f"Notebook(items={len(self.items)}, total={self.total()})"
+
+
+def main():
+    n = int(input())
+    book = Notebook()
+    scratch = Notebook()
+    scratch.add("PENCIL", 0)
+    for _ in range(n):
+        name, cents = input().split()
+        book.add(name, int(cents))
+
+    for name, cents in book.items:
+        print(f"{name} {cents}")
+    print(f"TOTAL {book.total()}")
+    print(book)
+
+
+main()
+'''
+hints = [
+  "Run the starter and look at the first line of output: PENCIL 0, from a notebook nobody wrote it in. That is the shared list.",
+  "def __init__(self): self.items = [] — created per instance, in the constructor, through self.",
+  "print(book) calls repr(book) when there is no __str__, so __repr__ is the one method to write. Make it look like the constructor call that would rebuild it; that is the convention.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-items", stdin = "2\nTOFU 600\nSET 2800\n",         expect = "TOFU 600\nSET 2800\nTOTAL 3400\nNotebook(items=2, total=3400)\n",         visible = true },
+  { name = "empty",     stdin = "0\n",                             expect = "TOTAL 0\nNotebook(items=0, total=0)\n",                                   visible = false },
+  { name = "repeats",   stdin = "3\nTEA 1200\nTEA 1200\nPIE 900\n", expect = "TEA 1200\nTEA 1200\nPIE 900\nTOTAL 3300\nNotebook(items=3, total=3300)\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "python.advanced.13.dataclasses"
+node        = 13
+title       = "WHO IS BUYING"
+difficulty  = 3
+story       = "The SOGO basement rice counter charges every card the full price, including the ones that are not adults and the one that is not a card."
+concepts    = ["types", "pattern-matching", "structs"]
+requires    = ["python.advanced.12.classes"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<TYPE> <KG>`.
+
+The base price is `500 + 100 * KG` cents. For each line print one of:
+
+* `ADULT` — the base price
+* `STUDENT` — half the base price, integer division
+* `SENIOR` — always `200`
+* anything else — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+Model the line as a frozen `@dataclass` — `Order(kind: str, kg: int)` —
+and decide the price with **one** `match` on the order. A `match` can
+destructure a dataclass by keyword — `case Order(kind="ADULT", kg=kg):` —
+and its last arm, `case Order(kind=other):`, binds whatever did not match.
+
+The starter's `match` has one arm and then a fall-through `case _:` that
+prints `UNKNOWN` for everything, including the three kinds it is supposed
+to know. Arms are tried in order and the first match wins, so a wildcard has
+to be last and has to be the only thing that is a wildcard.
+'''
+starter     = '''
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Order:
+    kind: str
+    kg: int
+
+
+def price(order):
+    base = 500 + 100 * order.kg
+    match order:
+        case Order(kind="ADULT"):
+            return str(base)
+        case _:
+            return f"UNKNOWN {order.kind}"
+
+
+def main():
+    n = int(input())
+    for _ in range(n):
+        kind, kg = input().split()
+        print(price(Order(kind, int(kg))))
+
+
+main()
+'''
+solution    = '''
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Order:
+    kind: str
+    kg: int
+
+
+def price(order):
+    base = 500 + 100 * order.kg
+    match order:
+        case Order(kind="ADULT"):
+            return str(base)
+        case Order(kind="STUDENT"):
+            return str(base // 2)
+        case Order(kind="SENIOR"):
+            return "200"
+        case Order(kind=other):
+            return f"UNKNOWN {other}"
+
+
+def main():
+    n = int(input())
+    for _ in range(n):
+        kind, kg = input().split()
+        print(price(Order(kind, int(kg))))
+
+
+main()
+'''
+hints = [
+  "One case per kind: case Order(kind=\"STUDENT\"): and so on. A dataclass matches by its field names.",
+  "// is integer division; / would give you 450.0 and the test wants 450.",
+  "case Order(kind=other): is a capture pattern — it always matches and binds the tag — so it goes last, exactly like the `other =>` arm in a Rust match.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-kinds", stdin = "3\nADULT 4\nSTUDENT 4\nSENIOR 4\n", expect = "900\n450\n200\n",         visible = true },
+  { name = "tourist",     stdin = "2\nSTUDENT 0\nTOURIST 9\n",         expect = "250\nUNKNOWN TOURIST\n",  visible = false },
+  { name = "heavy",       stdin = "1\nADULT 12\n",                     expect = "1700\n",                  visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "python.advanced.14.generators"
+node        = 14
+title       = "YOUR OWN FOR LOOP"
+difficulty  = 3
+story       = "The fish stall's ticker lists every price from the opening one up in fixed steps, and keeps no list of them anywhere."
+concepts    = ["generators", "iteration", "functions"]
+requires    = ["python.advanced.13.dataclasses"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''
+Standard input is three integers: `start`, `step`, `count`.
+
+Write a **generator** `ticker(start, step, count)` that yields `count`
+values beginning at `start` and advancing by `step`. Print each on its own
+line, then `SUM <total>` computed by handing a second ticker to `sum`.
+
+```
+input:  5 2 4
+output: 5
+        7
+        9
+        11
+        SUM 32
+        generator
+```
+
+The last line is `type(ticker(...)).__name__`, printed by the starter's
+`main` as it stands. Right now it says `list`.
+
+A function with `yield` in it does not run when you call it. It returns a
+generator, and the body runs one step at a time, each time something asks
+for the next value. That is why `for` works on it, why `sum` works on it,
+and why it can produce a million values without a list of a million values
+ever existing.
+
+The starter builds the list and returns it, which is correct and is not the
+question. A list is every value at once; a generator is one value when
+asked. Turn the `append` into a `yield` and delete the list.
+'''
+starter     = '''
+def ticker(start, step, count):
+    values = []
+    for i in range(count):
+        values.append(start + i * step)
+    return values
+
+
+def main():
+    start, step, count = (int(t) for t in input().split())
+
+    for value in ticker(start, step, count):
+        print(value)
+    print(f"SUM {sum(ticker(start, step, count))}")
+    print(type(ticker(start, step, count)).__name__)
+
+
+main()
+'''
+solution    = '''
+def ticker(start, step, count):
+    value = start
+    for _ in range(count):
+        yield value
+        value += step
+
+
+def main():
+    start, step, count = (int(t) for t in input().split())
+
+    for value in ticker(start, step, count):
+        print(value)
+    print(f"SUM {sum(ticker(start, step, count))}")
+    print(type(ticker(start, step, count)).__name__)
+
+
+main()
+'''
+hints = [
+  "The last line of output is the type's name, and the test wants `generator`. That is what a def with a yield in it returns.",
+  "yield value, then advance. The function pauses at the yield and resumes after it on the next request.",
+  "A generator can be consumed once. That is why main builds a fresh ticker for the sum instead of reusing the one the loop drained.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",     stdin = "5 2 4\n",    expect = "5\n7\n9\n11\nSUM 32\ngenerator\n",       visible = true },
+  { name = "flat",     stdin = "0 0 3\n",    expect = "0\n0\n0\nSUM 0\ngenerator\n",            visible = false },
+  { name = "backward", stdin = "10 -4 4\n",  expect = "10\n6\n2\n-2\nSUM 16\ngenerator\n",      visible = false },
+  { name = "none",     stdin = "7 1 0\n",    expect = "SUM 0\ngenerator\n",                     visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "python.advanced.15.decorators"
+node        = 15
+title       = "WRAPPED"
+difficulty  = 3
+story       = "The market office wants to know how many times the price function was called today, and the function does not want to know it is being watched."
+concepts    = ["decorators", "functions", "closures"]
+requires    = ["python.advanced.14.generators"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` weights in kg.
+
+`price(kg)` is `500 + 100 * kg`. Decorate it with `@counted` so that every
+call is counted without `price` knowing. Print one price per weight, then
+`CALLS <n>`, then `NAME <price.__name__>` — which must still say `price`.
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        CALLS 3
+        NAME price
+```
+
+A decorator is a function that takes a function and returns a function. The
+one it returns is usually a closure called `wrapper` that does something and
+then calls the original — and unless you say otherwise, `wrapper` is what
+the name `price` now refers to, `__name__` and all. `functools.wraps` copies
+the original's name and docstring onto the wrapper. The starter forgot it,
+and the last line says `NAME wrapper`.
+
+Where does the count live? Not in a global. Attach it to the wrapper —
+`wrapper.calls = 0` — and read `price.calls` afterwards. A function is an
+object and takes attributes like any other.
+'''
+starter     = '''
+import functools
+
+
+def counted(func):
+    def wrapper(*args, **kwargs):
+        wrapper.calls += 1
+        return func(*args, **kwargs)
+
+    wrapper.calls = 0
+    return wrapper
+
+
+@counted
+def price(kg):
+    return 500 + 100 * kg
+
+
+def main():
+    n = int(input())
+    weights = [int(t) for t in input().split()]
+    for kg in weights[:n]:
+        print(price(kg))
+    print(f"CALLS {price.calls}")
+    print(f"NAME {price.__name__}")
+    _ = functools
+
+
+main()
+'''
+solution    = '''
+import functools
+
+
+def counted(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        wrapper.calls += 1
+        return func(*args, **kwargs)
+
+    wrapper.calls = 0
+    return wrapper
+
+
+@counted
+def price(kg):
+    return 500 + 100 * kg
+
+
+def main():
+    n = int(input())
+    weights = [int(t) for t in input().split()]
+    for kg in weights[:n]:
+        print(price(kg))
+    print(f"CALLS {price.calls}")
+    print(f"NAME {price.__name__}")
+
+
+main()
+'''
+hints = [
+  "@functools.wraps(func) on the line above def wrapper. One decorator inside your decorator.",
+  "@counted above def price is the same as price = counted(price) after it. The name is rebound to whatever counted returned.",
+  "*args, **kwargs is how the wrapper forwards any signature at all without knowing it, which is what makes the decorator reusable.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n",  expect = "600\n700\n800\nCALLS 3\nNAME price\n", visible = true },
+  { name = "one",   stdin = "1\n0\n",      expect = "500\nCALLS 1\nNAME price\n",           visible = false },
+  { name = "none",  stdin = "0\n\n",       expect = "CALLS 0\nNAME price\n",                visible = false },
+  { name = "heavy", stdin = "2\n10 20\n",  expect = "1500\n2500\nCALLS 2\nNAME price\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "python.advanced.16.duck-typing"
+node        = 16
+title       = "IF IT QUACKS"
+difficulty  = 3
+story       = "A plastic bag from the egg stall. Nobody asked what it is; they asked how many are in it, whether the duck eggs are, and to go through it one at a time."
+concepts    = ["duck-typing", "structs", "iteration"]
+requires    = ["python.advanced.15.decorators"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+Standard input is one line of goods separated by spaces, then one line with
+a single word to look for.
+
+Put the goods in a `Bag` and print:
+
+1. `LEN <k>` — from `len(bag)`
+2. the goods, one per line — from `for item in bag`
+3. `HAS <WORD> YES` or `HAS <WORD> NO` — from `word in bag`
+4. `LONGEST <item>` — from `max(bag, key=len)`, the first one on a tie
+
+```
+input:  egg duckegg tofu
+        duckegg
+output: LEN 3
+        egg
+        duckegg
+        tofu
+        HAS duckegg YES
+        LONGEST duckegg
+```
+
+`Bag` does not inherit from `list` and does not need to. `len` calls
+`__len__`, `for` calls `__iter__`, `in` calls `__contains__`, and `max`
+only needs `__iter__`. Python never asks what a thing *is*; it asks whether
+it has the method, at the moment it needs it. The starter has none of them,
+and the first error is `TypeError: object of type 'Bag' has no len()`.
+
+`__contains__` is optional: without it, `in` falls back to iterating and
+comparing, which is correct and slower. Write it anyway, because it is what
+an interviewer means when they say "make it a container".
+'''
+starter     = '''
+class Bag:
+    def __init__(self, goods):
+        self._goods = list(goods)
+
+    # __len__, __iter__, __contains__
+
+
+def main():
+    bag = Bag(input().split())
+    word = input().strip()
+
+    print(f"LEN {len(bag)}")
+    for item in bag:
+        print(item)
+    print(f"HAS {word} {'YES' if word in bag else 'NO'}")
+    print(f"LONGEST {max(bag, key=len)}")
+
+
+main()
+'''
+solution    = '''
+class Bag:
+    def __init__(self, goods):
+        self._goods = list(goods)
+
+    def __len__(self):
+        return len(self._goods)
+
+    def __iter__(self):
+        return iter(self._goods)
+
+    def __contains__(self, item):
+        return item in self._goods
+
+
+def main():
+    bag = Bag(input().split())
+    word = input().strip()
+
+    print(f"LEN {len(bag)}")
+    for item in bag:
+        print(item)
+    print(f"HAS {word} {'YES' if word in bag else 'NO'}")
+    print(f"LONGEST {max(bag, key=len)}")
+
+
+main()
+'''
+hints = [
+  "def __len__(self): return len(self._goods) — three methods of one line each.",
+  "__iter__ can return iter(self._goods); it does not have to be a generator, though `yield from self._goods` also works.",
+  "max(bag, key=len) keeps the first of equal-length items, which is why the sample says duckegg and not something later.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",   stdin = "egg duckegg tofu\nduckegg\n", expect = "LEN 3\negg\nduckegg\ntofu\nHAS duckegg YES\nLONGEST duckegg\n", visible = true },
+  { name = "missing", stdin = "fish\nchicken\n",             expect = "LEN 1\nfish\nHAS chicken NO\nLONGEST fish\n",                 visible = false },
+  { name = "tie",     stdin = "ab cd e\ne\n",                expect = "LEN 3\nab\ncd\ne\nHAS e YES\nLONGEST ab\n",                  visible = false },
+]
+
+# ---------------------------------------------------------------- 18  BOSS
+
+[[quest]]
+id          = "python.advanced.17.none"
+node        = 17
+title       = "THE 05:59 BOARD"
+difficulty  = 4
+story       = "05:59 on Bowrington Road. The price board asks the notebook for a stall that has not opened yet, and the notebook answers with nothing, and the board prints the nothing's price."
+concepts    = ["zero-values", "error-handling", "structs", "duck-typing"]
+requires    = ["python.advanced.16.duck-typing", "python.advanced.08.exceptions"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<STALL> <CENTS>` — the
+stalls that have opened — then a count `q` and `q` stall names to look up.
+
+For each query print `<STALL> <cents>`, or `<STALL> NONE` if that stall is
+not open. Then print `MISSING <k>` and `CHEAPEST <STALL>` — the open stall
+with the lowest price, ties by name — or `CHEAPEST NONE` if nothing is open.
+
+```
+input:  2
+        LAM 1200
+        WONG 900
+        3
+        WONG
+        CHAN
+        LAM
+output: WONG 900
+        CHAN NONE
+        LAM 1200
+        MISSING 1
+        CHEAPEST WONG
+```
+
+The starter crashes on `CHAN`:
+
+```
+AttributeError: 'NoneType' object has no attribute 'cents'
+```
+
+That line is the boss. It never points at the bug. It points at the place
+where a `None` was finally *used*, which can be any distance from the place
+it was *made* — and in the starter it was made in two different places.
+`lookup` returns `None` for a stall that is not there, by design, and the
+caller reads `.cents` off it without asking. And `cheapest` has no `return`
+on one path, so it returns `None` **implicitly**, and the caller does the
+same thing to that.
+
+Every function in Python returns something. A function that falls off the
+end returns `None`. A `dict.get` with no default returns `None`. Neither is
+an error at the time; both become one later. The fix is the same both times:
+the code that can receive a `None` checks for it, with `is None`, before it
+touches an attribute. Not `== None`, not `if not stall` — a stall with a
+price of `0` is a real stall, and `not` would throw it away.
+
+Make `lookup` and `cheapest` return `Optional[Stall]` **on purpose**, say so
+in the annotation, and handle the `None` where it lands.
+'''
+starter     = '''
+import sys
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass
+class Stall:
+    name: str
+    cents: int
+
+
+def lookup(board: dict, name: str) -> Optional[Stall]:
+    return board.get(name)
+
+
+def cheapest(board: dict) -> Optional[Stall]:
+    if board:
+        best = min(board.values(), key=lambda s: (s.cents, s.name))
+        best  # the return is missing
+
+
+def main():
+    tokens = iter(sys.stdin.read().split())
+    n = int(next(tokens))
+    board = {}
+    for _ in range(n):
+        name, cents = next(tokens), int(next(tokens))
+        board[name] = Stall(name, cents)
+
+    q = int(next(tokens))
+    missing = 0
+    for _ in range(q):
+        name = next(tokens)
+        stall = lookup(board, name)
+        print(f"{name} {stall.cents}")
+
+    print(f"MISSING {missing}")
+    print(f"CHEAPEST {cheapest(board).name}")
+
+
+main()
+'''
+solution    = '''
+import sys
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass
+class Stall:
+    name: str
+    cents: int
+
+
+def lookup(board: dict, name: str) -> Optional[Stall]:
+    # dict.get returns None for a missing key; that None is the contract,
+    # and the annotation says so out loud
+    return board.get(name)
+
+
+def cheapest(board: dict) -> Optional[Stall]:
+    if not board:
+        return None
+    return min(board.values(), key=lambda s: (s.cents, s.name))
+
+
+def main():
+    tokens = iter(sys.stdin.read().split())
+    n = int(next(tokens))
+    board = {}
+    for _ in range(n):
+        name, cents = next(tokens), int(next(tokens))
+        board[name] = Stall(name, cents)
+
+    q = int(next(tokens))
+    missing = 0
+    for _ in range(q):
+        name = next(tokens)
+        stall = lookup(board, name)
+        if stall is None:
+            missing += 1
+            print(f"{name} NONE")
+        else:
+            print(f"{name} {stall.cents}")
+
+    print(f"MISSING {missing}")
+    best = cheapest(board)
+    print(f"CHEAPEST {best.name if best is not None else 'NONE'}")
+
+
+main()
+'''
+hints = [
+  "Read the traceback bottom up: the AttributeError is on the print, but the None came out of lookup one line earlier, and out of board.get before that.",
+  "if stall is None: is the check. `is`, because None is a single object and identity is the honest comparison; `==` can be overridden and `not stall` is wrong for a falsy-but-real value.",
+  "cheapest has two paths and only one of them has a return. Python does not warn about that; it hands the caller None and lets the caller find out. Give the empty case an explicit `return None` so the reader can see it was meant.",
+  "Optional[Stall] in the annotation is not enforced by the interpreter. It is a note to the reader and to the type checker, and the reader is the one on the clock.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "2\nLAM 1200\nWONG 900\n3\nWONG\nCHAN\nLAM\n", expect = "WONG 900\nCHAN NONE\nLAM 1200\nMISSING 1\nCHEAPEST WONG\n", visible = true },
+  { name = "nothing", stdin = "0\n2\nA\nB\n",                                expect = "A NONE\nB NONE\nMISSING 2\nCHEAPEST NONE\n",               visible = false },
+  { name = "free",    stdin = "2\nFREE 0\nCHEAP 1\n1\nFREE\n",               expect = "FREE 0\nMISSING 0\nCHEAPEST FREE\n",                       visible = false },
+  { name = "tie",     stdin = "3\nC 5\nA 5\nB 5\n2\nB\nZ\n",                 expect = "B 5\nZ NONE\nMISSING 1\nCHEAPEST A\n",                     visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "python.advanced.01.threads"
+node        = 18
 title       = "TWELVE STALLS, ONE FLOOR"
 difficulty  = 3
 story       = "12:30 in the SOGO basement. Twelve stalls take orders at once, and the runner who collects the totals reads the board before any of them has written on it."
 concepts    = ["concurrency", "closures", "functions"]
-requires    = []
-map          = { x = 0.044, y = 0.146, kind = "quest" }
+requires    = ["python.advanced.17.none"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -133,16 +1798,16 @@ cases = [
   { name = "wide",   stdin = "4\n0 1 10 100\n", expect = "0\n1\n100\n10000\nTHREADS 4\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 02
+# ---------------------------------------------------------------- 19
 [[quest]]
 id          = "python.advanced.02.lock"
-node        = 2
+node        = 19
 title       = "ONE DRAWER, EIGHT HANDS"
 difficulty  = 3
 story       = "Every stall in the basement pays into the one cash drawer at the food hall office, and at close the drawer has nothing in it and every stall swears it paid."
 concepts    = ["shared-state", "concurrency", "thread-safety"]
 requires    = ["python.advanced.01.threads"]
-map          = { x = 0.275, y = 0.058, kind = "quest" }
+map          = { x = 0.619, y = 0.533, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -249,16 +1914,16 @@ cases = [
   { name = "big",    stdin = "3\n1000000 1000000 1000000\n", expect = "TOTAL 3000000\nHITS 3\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 03
+# ---------------------------------------------------------------- 20
 [[quest]]
 id          = "python.advanced.03.queue"
-node        = 3
+node        = 20
 title       = "WHO CLOSES THE HATCH"
 difficulty  = 3
 story       = "The roast goose counter passes every order through the hatch to the kitchen, and after the last one the kitchen stands there waiting for a next that never comes."
 concepts    = ["channels", "concurrency", "iteration"]
 requires    = ["python.advanced.02.lock"]
-map          = { x = 0.389, y = 0.132, kind = "quest" }
+map          = { x = 0.801, y = 0.447, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -375,16 +2040,16 @@ cases = [
   { name = "signed", stdin = "4\n-1 -2 3 4\n", expect = "-10\n-20\n30\n40\nSUM 40\nCLOSED\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 04
+# ---------------------------------------------------------------- 21
 [[quest]]
 id          = "python.advanced.04.thread-pool"
-node        = 4
+node        = 21
 title       = "EIGHT PORTERS"
 difficulty  = 4
 story       = "Forty crates on the SOGO loading dock and eight porters. Nobody wants forty porters; they want the eight never standing still."
 concepts    = ["concurrency", "collections", "closures"]
 requires    = ["python.advanced.03.queue"]
-map          = { x = 0.602, y = 0.065, kind = "quest" }
+map          = { x = 0.901, y = 0.543, kind = "quest" }
 brief       = '''
 Standard input is two integers `w` and `n`, then `n` values.
 
@@ -479,16 +2144,16 @@ cases = [
   { name = "more-workers", stdin = "3 5\n1 2 3 4 5\n", expect = "0 1\n1 4\n2 9\n3 16\n4 25\nWORKERS 3\n",   visible = false },
 ]
 
-# ---------------------------------------------------------------- 05
+# ---------------------------------------------------------------- 22
 [[quest]]
 id          = "python.advanced.05.asyncio"
-node        = 5
+node        = 22
 title       = "WHERE DOES ASYNC ACTUALLY RUN"
 difficulty  = 4
 story       = "Mei has written `async def` for four years and has never once seen the thing that drives it. The order board in the basement has one loop and every stall takes turns on it."
 concepts    = ["async", "concurrency", "functions"]
 requires    = ["python.advanced.04.thread-pool"]
-map          = { x = 0.716, y = 0.137, kind = "quest" }
+map          = { x = 0.953, y = 0.667, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -598,16 +2263,16 @@ cases = [
   { name = "four",  stdin = "4\n1 1 1 1\n", expect = "2\n2\n2\n2\nSUM 8\nTASKS 4\n",    visible = false },
 ]
 
-# ---------------------------------------------------------------- 06
+# ---------------------------------------------------------------- 23
 [[quest]]
 id          = "python.advanced.06.async-queue"
-node        = 6
+node        = 23
 title       = "WHO SAYS IT IS DONE"
 difficulty  = 4
 story       = "Three runners clear the order queue in the basement and the floor manager waits for the queue to say it is empty. It never says so, because nobody told it a ticket was finished."
 concepts    = ["async", "channels", "concurrency", "deadlock"]
 requires    = ["python.advanced.05.asyncio"]
-map          = { x = 0.962, y = 0.054, kind = "quest" }
+map          = { x = 0.750, y = 0.724, kind = "quest" }
 brief       = '''
 Standard input is two integers `w` and `n`, then `n` values.
 
@@ -734,16 +2399,16 @@ cases = [
   { name = "more-workers",  stdin = "4 1\n7\n",       expect = "70\nCONSUMERS 4\n",             visible = false },
 ]
 
-# ---------------------------------------------------------------- 07
+# ---------------------------------------------------------------- 24
 [[quest]]
 id          = "python.advanced.07.context-managers"
-node        = 7
+node        = 24
 title       = "THE SHUTTER COMES DOWN ANYWAY"
 difficulty  = 4
 story       = "A stall in the basement opens its shutter for every order and closes it after. The one that got a bad order at 12:40 has been open since, because the closing code was after the line that failed."
 concepts    = ["error-handling", "generators", "functions"]
 requires    = ["python.advanced.06.async-queue"]
-map          = { x = 0.898, y = 0.526, kind = "quest" }
+map          = { x = 0.666, y = 0.676, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines of `<STALL> <CENTS>`, where
 `CENTS` is supposed to be an integer.
@@ -861,16 +2526,16 @@ cases = [
   { name = "all-bad", stdin = "2\nA x\nB y\n",                    expect = "OPEN A\nSHUT A\nBAD A\nOPEN B\nSHUT B\nBAD B\nTOTAL 0\nREJECTED 2\n",                       visible = false },
 ]
 
-# ---------------------------------------------------------------- 08
+# ---------------------------------------------------------------- 25
 [[quest]]
 id          = "python.advanced.08.pipeline"
-node        = 8
+node        = 25
 title       = "THE LINE COOK"
 difficulty  = 4
 story       = "Chef Bo's line in the basement kitchen: one station squares the order, the next keeps the running count, and nobody waits for the whole batch."
 concepts    = ["generators", "iteration", "closures"]
 requires    = ["python.advanced.07.context-managers"]
-map          = { x = 0.785, y = 0.463, kind = "quest" }
+map          = { x = 0.472, y = 0.739, kind = "quest" }
 brief       = '''
 Standard input is a count `n` and then `n` integers.
 
@@ -977,16 +2642,16 @@ cases = [
   { name = "repeat", stdin = "4\n0 2 2 2\n", expect = "0 0\n4 4\n4 8\n4 12\nPIPE 4\n",  visible = false },
 ]
 
-# ---------------------------------------------------------------- 09
+# ---------------------------------------------------------------- 26
 [[quest]]
 id          = "python.advanced.09.itertools"
-node        = 9
+node        = 26
 title       = "THE TOOLBOX ON THE SHELF"
 difficulty  = 3
 story       = "The basement office has a shelf of tools nobody opens, and the clerk counts runs of identical tickets by hand every afternoon."
 concepts    = ["generators", "iteration", "collections", "imports"]
 requires    = ["python.advanced.08.pipeline"]
-map          = { x = 0.557, y = 0.538, kind = "quest" }
+map          = { x = 0.394, y = 0.686, kind = "quest" }
 brief       = '''
 Standard input is one line of integers.
 
@@ -1074,16 +2739,16 @@ cases = [
   { name = "one",    stdin = "-5\n",          expect = "SUMS -5\nRUNS -5x1\nPAIRS 0\n",                     visible = false },
 ]
 
-# ---------------------------------------------------------------- 10
+# ---------------------------------------------------------------- 27
 [[quest]]
 id          = "python.advanced.10.functools"
-node        = 10
+node        = 27
 title       = "REMEMBER WHAT YOU WORKED OUT"
 difficulty  = 4
 story       = "The tofu stall works out the same day's price from the same two numbers eleven thousand times before lunch, from scratch, every time."
 concepts    = ["decorators", "recursion", "functions", "closures"]
 requires    = ["python.advanced.09.itertools"]
-map          = { x = 0.447, y = 0.480, kind = "quest" }
+map          = { x = 0.199, y = 0.742, kind = "quest" }
 brief       = '''
 Standard input is `n k bits`: two integers and a string of binary digits.
 
@@ -1193,16 +2858,16 @@ cases = [
   { name = "deep",   stdin = "400 1 1\n",      expect = "FIB 176023680645013966468226945392411250770384383304492191886725992896575345044216019675\nPRODUCT 1\nBIN 1\nMISSES 401\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 11
+# ---------------------------------------------------------------- 28
 [[quest]]
 id          = "python.advanced.11.protocol"
-node        = 11
+node        = 28
 title       = "IT ONLY HAS TO RENDER"
 difficulty  = 4
 story       = "The SOGO basement directory lists stalls and counters, printed by two different programs, and the board only wants to know that each of them can draw itself."
 concepts    = ["duck-typing", "dispatch", "structs"]
 requires    = ["python.advanced.10.functools"]
-map          = { x = 0.222, y = 0.514, kind = "quest" }
+map          = { x = 0.114, y = 0.663, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines, each either
 
@@ -1358,16 +3023,16 @@ cases = [
   { name = "none",     stdin = "0\n",                                       expect = "SIGNS 0\nSTALLS 0\n",                                visible = false },
 ]
 
-# ---------------------------------------------------------------- 12
+# ---------------------------------------------------------------- 29
 [[quest]]
 id          = "python.advanced.12.frozen"
-node        = 12
+node        = 29
 title       = "IT DOES NOT CHANGE"
 difficulty  = 4
 story       = "The printed price list for the day is handed to every stall at 06:00, and by 12:30 three of them have written on it and one has added a column that is not there."
 concepts    = ["structs", "mutability", "error-handling"]
 requires    = ["python.advanced.11.protocol"]
-map          = { x = 0.116, y = 0.476, kind = "quest" }
+map          = { x = 0.059, y = 0.950, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines of `<NAME> <CENTS>`.
 
@@ -1511,16 +3176,16 @@ cases = [
   { name = "distinct", stdin = "2\nA 1\nA 2\n",                   expect = "FROZEN A\nFROZEN A\nSLOTS YES\nIN_SET 2\nTOTAL 3\n",                   visible = false },
 ]
 
-# ---------------------------------------------------------------- 13
+# ---------------------------------------------------------------- 30
 [[quest]]
 id          = "python.advanced.13.exceptions"
-node        = 13
+node        = 30
 title       = "AN ERROR OF YOUR OWN"
 difficulty  = 4
 story       = "Four layers of the rice counter's pricing each raise their own thing, and the counter's front end catches one of them and is taken down by the others."
 concepts    = ["error-handling", "structs", "control-flow"]
 requires    = ["python.advanced.12.frozen"]
-map          = { x = 0.045, y = 0.931, kind = "quest" }
+map          = { x = 0.260, y = 0.857, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines, each meant to be a weight in
 kg.
@@ -1659,16 +3324,16 @@ cases = [
   { name = "negative", stdin = "1\n-1\n",          expect = "negative weight: -1\nERRORS 1\n",                    visible = false },
 ]
 
-# ---------------------------------------------------------------- 14
+# ---------------------------------------------------------------- 31
 [[quest]]
 id          = "python.advanced.14.iterator"
-node        = 14
+node        = 31
 title       = "NEXT, UNTIL IT STOPS"
 difficulty  = 4
 story       = "The ticket machine at the basement entrance hands out numbers from a start in fixed steps and keeps no list of them, and the queue board wants to loop over it like any list."
 concepts    = ["iteration", "duck-typing", "structs"]
 requires    = ["python.advanced.13.exceptions"]
-map          = { x = 0.287, y = 0.854, kind = "quest" }
+map          = { x = 0.335, y = 0.936, kind = "quest" }
 brief       = '''
 Standard input is three integers: `start`, `step`, `count`.
 
@@ -1773,16 +3438,16 @@ cases = [
   { name = "backward", stdin = "10 -4 4\n", expect = "10\n6\n2\n-2\nSUM 16\n",    visible = false },
 ]
 
-# ---------------------------------------------------------------- 15
+# ---------------------------------------------------------------- 32
 [[quest]]
 id          = "python.advanced.15.collections"
-node        = 15
+node        = 32
 title       = "THE RIGHT CONTAINER"
 difficulty  = 4
 story       = "The basement office keeps the day's tickets in one long list and answers every question about them by reading it from the top."
 concepts    = ["collections", "heaps", "binary-search", "sorting"]
 requires    = ["python.advanced.14.iterator"]
-map          = { x = 0.391, y = 0.950, kind = "quest" }
+map          = { x = 0.538, y = 0.857, kind = "quest" }
 brief       = '''
 Three lines of standard input: a line of words, a line of integers already
 **sorted ascending**, and one integer `x`.
@@ -1894,16 +3559,16 @@ cases = [
   { name = "before", stdin = "fish tofu fish\n5 5 5\n1\n",            expect = "TOP fish 2\nBISECT 0 0\nSMALLEST3 5 5 5\nGROUPS f:2 t:1\n",    visible = false },
 ]
 
-# ---------------------------------------------------------------- 16
+# ---------------------------------------------------------------- 33
 [[quest]]
 id          = "python.advanced.16.timeouts"
-node        = 16
+node        = 33
 title       = "STOP WAITING"
 difficulty  = 4
 story       = "The order board pings every stall for its wait time, and the stall whose card reader is down never answers, so the board never redraws."
 concepts    = ["async", "cancellation", "error-handling"]
 requires    = ["python.advanced.15.collections"]
-map          = { x = 0.619, y = 0.868, kind = "quest" }
+map          = { x = 0.605, y = 0.932, kind = "quest" }
 brief       = '''
 Standard input is a count `n`, then `n` lines of `<STALL> <SECONDS>`, where
 `SECONDS` is `0` for a stall that answers at once and `1` for one that does
@@ -2054,15 +3719,16 @@ cases = [
 ]
 
 # ---------------------------------------------------------------- 17  BOSS
+
 [[quest]]
 id          = "python.advanced.17.gil"
-node        = 17
+node        = 34
 title       = "THE GIL"
 difficulty  = 5
 story       = "SOGO basement, twelve stalls, one lock on the whole floor. Everything that was supposed to happen at once happened one at a time, and the totals came back as nothing at all."
 concepts    = ["concurrency", "shared-state", "thread-safety", "data-races"]
 requires    = ["python.advanced.16.timeouts", "python.advanced.02.lock"]
-map          = { x = 0.719, y = 0.950, kind = "boss" }
+map          = { x = 0.818, y = 0.870, kind = "boss" }
 brief       = '''
 Standard input is two integers `k` and `n`.
 

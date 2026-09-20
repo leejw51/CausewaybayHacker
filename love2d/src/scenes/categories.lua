@@ -25,7 +25,7 @@ local BLURB = {
 -- SPEC §0's order. `world.lands` does not promise one, and which row is drawn
 -- first is presentation rather than a rule — but a category list that
 -- reorders itself between two calls is a category list a player mis-clicks.
-local ORDER = { basic = 1, advanced = 2, hacker = 3 }
+local ORDER = { verybasic = 1, basic = 2, advanced = 3, hacker = 4 }
 
 local function ordered(categories)
   local out = {}
@@ -273,7 +273,7 @@ function Categories:draw()
     -- The gutter plate's width, not the whole row: to its right is the
     -- mascot, and a blurb given the row would be drawn underneath it.
     local blurb_w = m.label_w
-    UI.text(cat.category:upper(), pad + 14, ry + 12, 13, color, "left", blurb_w)
+    UI.text(I18n.t(Land.category_label(cat.category)), pad + 14, ry + 12, 13, color, "left", blurb_w)
     -- Only the blurb lines the row has room for, and none when it has room
     -- for none: a blurb wrapped to eight lines is drawn through the plate
     -- under it, and one clipped mid-sentence says less than nothing.

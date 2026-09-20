@@ -183,6 +183,13 @@ pub struct Tests {
     pub hidden_count: i64,
 }
 
+/// §5.3 `quiz`: the question is the brief; these are the answers.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Quiz {
+    pub choices: Vec<String>,
+    pub answer: i64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Quest {
     pub id: String,
@@ -203,6 +210,9 @@ pub struct Quest {
     #[serde(default)]
     pub deadline_at: Option<String>,
     pub starter: String,
+    /// §5.3: VERY BASIC only — four lines, `answer` the index of the one to type.
+    #[serde(default)]
+    pub quiz: Option<Quiz>,
     #[serde(default)]
     pub concepts: Vec<String>,
     #[serde(default)]

@@ -42,6 +42,8 @@ pub struct Quest {
     pub tests: serde_json::Value,
     pub checksum: String,
     pub map: MapPos,
+    /// VERY BASIC: `{ "choices": [4], "answer": i }`; absent on every other road.
+    pub quiz: Option<serde_json::Value>,
     /// Which language `title`, `brief`, `story` and `hints` are in right now.
     /// `"en"` straight out of the database; `localized` swaps the four in
     /// from `quest_text` and says so here, so `to_wire` can tell the client
@@ -95,6 +97,7 @@ impl Quest {
             "difficulty": self.difficulty,
             "time_limit_s": self.time_limit_s,
             "starter": self.starter,
+            "quiz": self.quiz,
             // The source of the player's most recent run or submit on this
             // quest, or null on a first visit — so the editor opens where
             // they left off instead of the bare starter. See
@@ -206,7 +209,7 @@ impl Quest {
 
 const COLUMNS: &str = "id, pack, land, category, node, title, brief, story, difficulty,
                        time_limit_s, starter, solution, hints, concepts, tests, checksum,
-                       map_x, map_y, map_kind";
+                       map_x, map_y, map_kind, quiz";
 
 fn row_to_quest(row: &rusqlite::Row<'_>) -> rusqlite::Result<Quest> {
     let hints: String = row.get(12)?;
@@ -234,6 +237,9 @@ fn row_to_quest(row: &rusqlite::Row<'_>) -> rusqlite::Result<Quest> {
             y: row.get(17)?,
             kind: row.get(18)?,
         },
+        quiz: row
+            .get::<_, Option<String>>(19)?
+            .and_then(|s| serde_json::from_str(&s).ok()),
         text_locale: "en".into(),
     })
 }

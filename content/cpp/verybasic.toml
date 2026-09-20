@@ -1,0 +1,2401 @@
+# C++ LAND — VERY BASIC. The typhoon shelter at first light. The grammar
+# asked as a question first: each node is one construct — a type, a string,
+# a loop, a function, a struct, an enum, a vector, a list, a map, a hash
+# table, a set, a stack, a queue, a heap, a sort, a lambda, a thread, a
+# mutex, a tree — with four candidate lines, one right. Pick it, then type it
+# where the `// FILL` comment is. One line, every time; the answer is given
+# away nowhere but the quiz, and verify_pack swaps every wrong choice into the
+# solution to prove it fails. The road for the grammar a live coding test
+# leans on.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Every solution and starter in this file is run by
+# tests/content/verify_pack.py and by CI (SPEC §9.4, §9.5).
+
+pack = "cpp.verybasic"
+land = "cpp"
+category = "verybasic"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "cpp.verybasic.01.print"
+node        = 1
+title       = "THE GUN'S FIRST WORD"
+difficulty  = 1
+story       = "12:00 at the Noon Day Gun. The firing log is meant to open with one line and the line is missing."
+concepts    = ["io", "strings"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+The program must print exactly `hello, causewaybay` and a newline. In C++
+that is one statement sent to the standard output stream.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  (nothing)
+output: hello, causewaybay
+```
+'''
+starter     = '''
+#include <iostream>
+
+int main() {
+    // FILL: print the greeting
+}
+'''
+solution    = '''
+#include <iostream>
+
+int main() {
+    // FILL: print the greeting
+    std::cout << "hello, causewaybay" << '\n';
+}
+'''
+hints = [
+  "`std::cout << \"hello, causewaybay\" << '\\n';` — the stream, the string, the newline, the semicolon.",
+  "Single quotes make a character constant; a string needs double quotes.",
+]
+
+[quest.quiz]
+choices = [
+
+  "std::cout << \"hello, causewaybay\" << '\\n';",
+  "std::cout << \"hello, causewaybay\"",
+  "std::cout << \"hello causewaybay\" << '\\n';",
+  "std::cout << 'hello, causewaybay' << '\\n';",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+  { name = "ignores-input", stdin = "12\n", expect = "hello, causewaybay\n", visible = false },
+  { name = "twice-ignored", stdin = "a b\n", expect = "hello, causewaybay\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "cpp.verybasic.02.int-types"
+node        = 2
+title       = "A NUMBER TOO BIG FOR INT"
+difficulty  = 1
+story       = "The gun's log counts shells fired since 1860 in hundredths, and the register that held it is 32 bits wide."
+concepts    = ["types", "bindings"]
+requires    = ["cpp.verybasic.01.print"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief       = '''
+Read `a`. The program needs `big`, a 64-bit integer holding `a` times one
+billion — a value an `int` cannot hold once `a` is more than 2.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  3
+output: 3000000000
+```
+'''
+starter     = '''
+#include <iostream>
+
+int main() {
+    long long a = 0;
+    std::cin >> a;
+    long long big = 0;  // FILL: a times one billion, in 64 bits
+    std::cout << big << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+
+int main() {
+    long long a = 0;
+    std::cin >> a;
+    long long big = a * 1000000000LL;
+    std::cout << big << '\n';
+}
+'''
+hints = [
+  "`long long big = a * 1000000000LL;` — the `LL` suffix makes the constant 64-bit too.",
+  "An `int` is 32 bits: five billion does not fit and the result is garbage.",
+]
+
+[quest.quiz]
+choices = [
+
+  "int big = a * 1000000000;",
+  "long big = a * 1000000000LL",
+  "long long big = a * 1000000000LL;",
+  "long long big = a + 1000000000LL;",
+]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n", expect = "3000000000\n", visible = true },
+  { name = "five", stdin = "5\n", expect = "5000000000\n", visible = false },
+  { name = "zero", stdin = "0\n", expect = "0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "cpp.verybasic.03.floats"
+node        = 3
+title       = "THE TIDE IN DECIMALS"
+difficulty  = 1
+story       = "The tide table divides one reading by another and prints whole numbers where the harbour master wanted two decimals."
+concepts    = ["types", "io"]
+requires    = ["cpp.verybasic.02.int-types"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief       = '''
+Read two positive integers `a` and `b`. The program needs `q`, the quotient
+as a `double` — one integer divided by another is an integer unless one of
+them is converted first.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  7 2
+output: 3.50
+```
+'''
+starter     = '''
+#include <iomanip>
+#include <iostream>
+
+int main() {
+    long long a = 0, b = 0;
+    std::cin >> a >> b;
+    double q = 0;  // FILL: a divided by b, as a double
+    std::cout << std::fixed << std::setprecision(2) << q << '\n';
+}
+'''
+solution    = '''
+#include <iomanip>
+#include <iostream>
+
+int main() {
+    long long a = 0, b = 0;
+    std::cin >> a >> b;
+    double q = static_cast<double>(a) / b;
+    std::cout << std::fixed << std::setprecision(2) << q << '\n';
+}
+'''
+hints = [
+  "`double q = static_cast<double>(a) / b;` — convert one side before dividing.",
+  "`a / b` with two integers rounds down to an integer before it becomes a double.",
+]
+
+[quest.quiz]
+choices = [
+
+  "double q = static_cast<double>(a) / b;",
+  "double q = a / b;",
+  "double q = a / b.0;",
+  "float q = a / static_cast<float>(b)",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven-two", stdin = "7 2\n", expect = "3.50\n", visible = true },
+  { name = "one-three", stdin = "1 3\n", expect = "0.33\n", visible = false },
+  { name = "exact", stdin = "9 3\n", expect = "3.00\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "cpp.verybasic.04.strings"
+node        = 4
+title       = "HOW LONG IS THE NAME"
+difficulty  = 1
+story       = "A sampan's name is painted on the bow and the harbour log wants its length in characters."
+concepts    = ["strings", "types"]
+requires    = ["cpp.verybasic.03.floats"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief       = '''
+Read one line into `s`. The program must print how many characters it
+holds — a `std::string` knows its own length.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  kwan lee
+output: 8
+```
+'''
+starter     = '''
+#include <iostream>
+#include <string>
+
+int main() {
+    std::string s;
+    std::getline(std::cin, s);
+    // FILL: print the number of characters in s
+}
+'''
+solution    = '''
+#include <iostream>
+#include <string>
+
+int main() {
+    std::string s;
+    std::getline(std::cin, s);
+    // FILL: print the number of characters in s
+    std::cout << s.size() << '\n';
+}
+'''
+hints = [
+  "`std::cout << s.size() << '\\n';` — `size()` is a call, so it needs its parentheses.",
+  "`sizeof(s)` is the size of the string object itself, not of the text in it.",
+]
+
+[quest.quiz]
+choices = [
+
+  "std::cout << s.size << '\\n';",
+  "std::cout << s.size() << '\\n';",
+  "std::cout << s.length << '\\n';",
+  "std::cout << sizeof(s) << '\\n';",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "kwan-lee", stdin = "kwan lee\n", expect = "8\n", visible = true },
+  { name = "gun", stdin = "gun\n", expect = "3\n", visible = false },
+  { name = "longer", stdin = "Noon Day Gun\n", expect = "12\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "cpp.verybasic.05.bool-if"
+node        = 5
+title       = "EVEN OR ODD"
+difficulty  = 1
+story       = "The slipway winch takes sampans two at a time, and the tally says whether the last one goes up alone."
+concepts    = ["control-flow", "types"]
+requires    = ["cpp.verybasic.04.strings"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief       = '''
+Read `n`. The program needs `even`, a `bool` that is true when `n` divides
+by two with nothing left over.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  4
+output: even
+```
+'''
+starter     = '''
+#include <iostream>
+
+int main() {
+    long long n = 0;
+    std::cin >> n;
+    bool even = false;  // FILL: true when n is even
+    std::cout << (even ? "even" : "odd") << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+
+int main() {
+    long long n = 0;
+    std::cin >> n;
+    bool even = n % 2 == 0;
+    std::cout << (even ? "even" : "odd") << '\n';
+}
+'''
+hints = [
+  "`bool even = n % 2 == 0;` — `%` is the remainder, `==` the comparison.",
+  "A single `=` assigns; comparing needs two.",
+]
+
+[quest.quiz]
+choices = [
+
+  "bool even = n % 2 == 0;",
+  "bool even = n % 2 = 0;",
+  "bool even = n / 2 == 0;",
+  "bool even = n % 2;",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4\n", expect = "even\n", visible = true },
+  { name = "seven", stdin = "7\n", expect = "odd\n", visible = false },
+  { name = "zero", stdin = "0\n", expect = "even\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "cpp.verybasic.06.loops"
+node        = 6
+title       = "COUNTING THE SALUTE"
+difficulty  = 1
+story       = "The gun fires n rounds and the log adds their numbers up, but the loop it uses never starts."
+concepts    = ["control-flow", "io"]
+requires    = ["cpp.verybasic.05.bool-if"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief       = '''
+Read `n`. The program must add `1 + 2 + … + n` into `sum`. The body of the
+loop is written; the `for` header that walks `i` from 1 to `n` is the hole.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  10
+output: 55
+```
+'''
+starter     = '''
+#include <iostream>
+
+int main() {
+    long long n = 0;
+    std::cin >> n;
+    long long sum = 0;
+    // FILL: the loop header, i from 1 up to and including n
+    for (long long i = 0; i < 0; ++i) {
+        sum += i;
+    }
+    std::cout << sum << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+
+int main() {
+    long long n = 0;
+    std::cin >> n;
+    long long sum = 0;
+    // FILL: the loop header, i from 1 up to and including n
+    for (long long i = 1; i <= n; ++i) {
+        sum += i;
+    }
+    std::cout << sum << '\n';
+}
+'''
+hints = [
+  "`for (long long i = 1; i <= n; ++i) {` — three clauses separated by semicolons.",
+  "`<` stops one short; `<=` includes `n` itself.",
+]
+
+[quest.quiz]
+choices = [
+
+  "for (long long i = 1; i <= n; ++i) {",
+  "for (long long i = 1; i < n; ++i) {",
+  "for (long long i = 1, i <= n, ++i) {",
+  "for long long i = 1; i <= n; ++i {",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "ten", stdin = "10\n", expect = "55\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "1\n", visible = false },
+  { name = "hundred", stdin = "100\n", expect = "5050\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "cpp.verybasic.07.functions"
+node        = 7
+title       = "THE SQUARE OF IT"
+difficulty  = 1
+story       = "The pump room's gauge shows a reading and the display wants its square, and the function that should do it returns nothing useful."
+concepts    = ["functions", "types"]
+requires    = ["cpp.verybasic.06.loops"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief       = '''
+`square` takes a number and must return that number multiplied by itself.
+Its body is the hole; `main` reads `x` and prints `square(x)`.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  7
+output: 49
+```
+'''
+starter     = '''
+#include <iostream>
+
+long long square(long long x) {
+    // FILL: return x times x
+    return 0;
+}
+
+int main() {
+    long long x = 0;
+    std::cin >> x;
+    std::cout << square(x) << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+
+long long square(long long x) {
+    // FILL: return x times x
+    return x * x;
+}
+
+int main() {
+    long long x = 0;
+    std::cin >> x;
+    std::cout << square(x) << '\n';
+}
+'''
+hints = [
+  "`return x * x;` — multiply, and return the result.",
+  "`^` is bitwise XOR in C++, not a power.",
+]
+
+[quest.quiz]
+choices = [
+
+  "return x ^ 2;",
+  "return x * x;",
+  "return x * x",
+  "return x + x;",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven", stdin = "7\n", expect = "49\n", visible = true },
+  { name = "twelve", stdin = "12\n", expect = "144\n", visible = false },
+  { name = "negative", stdin = "-3\n", expect = "9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "cpp.verybasic.08.structs"
+node        = 8
+title       = "ONE STALL, TWO FIELDS"
+difficulty  = 1
+story       = "The typhoon shelter's stall register keeps a name and a price per stall, and the record for the new stall is empty."
+concepts    = ["structs", "types"]
+requires    = ["cpp.verybasic.07.functions"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief       = '''
+`Stall` has a `name` and a `price`. The program has read both and needs
+`s`, a `Stall` built from them — an aggregate is initialised with braces,
+fields in order.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  fish 40
+output: fish 40
+```
+'''
+starter     = '''
+#include <iostream>
+#include <string>
+
+struct Stall {
+    std::string name;
+    long long price;
+};
+
+int main() {
+    std::string name;
+    long long price = 0;
+    std::cin >> name >> price;
+    Stall s{};  // FILL: a Stall from name and price
+    std::cout << s.name << ' ' << s.price << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <string>
+
+struct Stall {
+    std::string name;
+    long long price;
+};
+
+int main() {
+    std::string name;
+    long long price = 0;
+    std::cin >> name >> price;
+    Stall s{name, price};
+    std::cout << s.name << ' ' << s.price << '\n';
+}
+'''
+hints = [
+  "`Stall s{name, price};` — braces, the fields in the order the struct declares them.",
+  "One initialiser fills only the first field; the price is then zero.",
+]
+
+[quest.quiz]
+choices = [
+
+  "Stall s = {price, name};",
+  "Stall s{name};",
+  "Stall s{name, price};",
+  "Stall s{name, price}",
+]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "fish", stdin = "fish 40\n", expect = "fish 40\n", visible = true },
+  { name = "crab", stdin = "crab 120\n", expect = "crab 120\n", visible = false },
+  { name = "rice", stdin = "rice 8\n", expect = "rice 8\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "cpp.verybasic.09.struct-method"
+node        = 9
+title       = "THE STALL'S OWN TOTAL"
+difficulty  = 1
+story       = "Each stall record knows its price and quantity, and its `total()` answers zero to every question."
+concepts    = ["structs", "functions"]
+requires    = ["cpp.verybasic.08.structs"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief       = '''
+`Stall::total` must return `price` times `qty`. Inside a member function
+the fields are used by name. The body is the hole.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  fish 40 3
+output: fish: 120
+```
+'''
+starter     = '''
+#include <iostream>
+#include <string>
+
+struct Stall {
+    std::string name;
+    long long price;
+    long long qty;
+    long long total() const {
+        // FILL: price times qty
+        return 0;
+    }
+};
+
+int main() {
+    Stall s;
+    std::cin >> s.name >> s.price >> s.qty;
+    std::cout << s.name << ": " << s.total() << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <string>
+
+struct Stall {
+    std::string name;
+    long long price;
+    long long qty;
+    long long total() const {
+        // FILL: price times qty
+        return price * qty;
+    }
+};
+
+int main() {
+    Stall s;
+    std::cin >> s.name >> s.price >> s.qty;
+    std::cout << s.name << ": " << s.total() << '\n';
+}
+'''
+hints = [
+  "`return price * qty;` — the fields, by name, multiplied.",
+  "`this` is a pointer, so it would be `this->price`; the bare name is simpler.",
+]
+
+[quest.quiz]
+choices = [
+
+  "return price + qty;",
+  "return this.price * this.qty;",
+  "return price * qty",
+  "return price * qty;",
+]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "fish", stdin = "fish 40 3\n", expect = "fish: 120\n", visible = true },
+  { name = "crab", stdin = "crab 120 2\n", expect = "crab: 240\n", visible = false },
+  { name = "none", stdin = "rice 8 0\n", expect = "rice: 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "cpp.verybasic.10.enums"
+node        = 10
+title       = "TWO LINES, TWO COLOURS"
+difficulty  = 1
+story       = "The interchange sign over the shelter's bus stop names two MTR lines and the wire that picks the enumerator is cut."
+concepts    = ["enums", "control-flow"]
+requires    = ["cpp.verybasic.09.struct-method"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief       = '''
+Read one word, `island` or `tsuenwan`. The program needs `line`, a `Line`
+enumerator chosen by the word; the `switch` that prints the colour is
+written. An `enum class` enumerator is always written with its type.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+starter     = '''
+#include <iostream>
+#include <string>
+
+enum class Line { Island, TsuenWan };
+
+int main() {
+    std::string word;
+    std::cin >> word;
+    Line line = Line::Island;  // FILL: Island for "island", TsuenWan otherwise
+    switch (line) {
+        case Line::Island: std::cout << "blue\n"; break;
+        case Line::TsuenWan: std::cout << "red\n"; break;
+    }
+}
+'''
+solution    = '''
+#include <iostream>
+#include <string>
+
+enum class Line { Island, TsuenWan };
+
+int main() {
+    std::string word;
+    std::cin >> word;
+    Line line = word == "island" ? Line::Island : Line::TsuenWan;
+    switch (line) {
+        case Line::Island: std::cout << "blue\n"; break;
+        case Line::TsuenWan: std::cout << "red\n"; break;
+    }
+}
+'''
+hints = [
+  "`Line line = word == \"island\" ? Line::Island : Line::TsuenWan;` — the conditional operator, enumerators qualified.",
+  "Without `Line::` in front, `Island` is not a name the compiler knows.",
+]
+
+[quest.quiz]
+choices = [
+
+  "Line line = word == \"island\" ? Island : TsuenWan;",
+  "Line line = word == \"island\" ? Line::Island : Line::TsuenWan;",
+  "Line line = word == \"island\" ? Line::TsuenWan : Line::Island;",
+  "Line line = (word == \"island\") ? Line::Island : Line::TsuenWan",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tsuenwan", stdin = "tsuenwan\n", expect = "red\n", visible = true },
+  { name = "island", stdin = "island\n", expect = "blue\n", visible = false },
+  { name = "other", stdin = "kwuntong\n", expect = "red\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "cpp.verybasic.11.vector"
+node        = 11
+title       = "THE CATCH, ONE BY ONE"
+difficulty  = 1
+story       = "The sampans land their catch one number at a time and the tally vector stays empty."
+concepts    = ["slices", "iteration"]
+requires    = ["cpp.verybasic.10.enums"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''
+Read a line of integers. Each value `x` must be appended to the vector
+`xs` as it is read; the loop and the print-out are written.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 4
+        1 2 3 4
+```
+'''
+starter     = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) {
+        // FILL: append x to xs
+    }
+    std::cout << xs.size() << '\n';
+    for (size_t i = 0; i < xs.size(); ++i) {
+        std::cout << xs[i] << (i + 1 < xs.size() ? ' ' : '\n');
+    }
+}
+'''
+solution    = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> xs;
+    long long x = 0;
+    while (in >> x) {
+        // FILL: append x to xs
+        xs.push_back(x);
+    }
+    std::cout << xs.size() << '\n';
+    for (size_t i = 0; i < xs.size(); ++i) {
+        std::cout << xs[i] << (i + 1 < xs.size() ? ' ' : '\n');
+    }
+}
+'''
+hints = [
+  "`xs.push_back(x);` — a vector grows at the back.",
+  "`push` belongs to `std::stack`; a vector says `push_back`.",
+]
+
+[quest.quiz]
+choices = [
+
+  "xs.push_back(x);",
+  "xs.push(x);",
+  "xs.push_back(x)",
+  "xs.push_back(x + 1);",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "4\n1 2 3 4\n", visible = true },
+  { name = "one", stdin = "9\n", expect = "1\n9\n", visible = false },
+  { name = "five", stdin = "5 3 8 1 2\n", expect = "5\n5 3 8 1 2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "cpp.verybasic.12.vector-edit"
+node        = 12
+title       = "THE FIRST ONE OFF"
+difficulty  = 1
+story       = "The winch queue is a vector of sampan numbers and the first one has already gone up, but it is still on the list."
+concepts    = ["slices", "collections"]
+requires    = ["cpp.verybasic.11.vector"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''
+`v` holds the line's integers. The program must remove the first element —
+`erase` takes an iterator to the element to drop — and print the rest.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 2 3 4
+```
+'''
+starter     = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+
+    // FILL: drop the first element of v
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << v[i] << (i + 1 < v.size() ? ' ' : '\n');
+    }
+}
+'''
+solution    = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+
+    // FILL: drop the first element of v
+    v.erase(v.begin());
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << v[i] << (i + 1 < v.size() ? ' ' : '\n');
+    }
+}
+'''
+hints = [
+  "`v.erase(v.begin());` — `begin()` is the iterator to the first element.",
+  "`pop_back` removes the last one; there is no `pop_front` on a vector.",
+]
+
+[quest.quiz]
+choices = [
+
+  "v.erase(0);",
+  "v.erase(v.begin());",
+  "v.pop_back();",
+  "v.erase(v.begin())",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "2 3 4\n", visible = true },
+  { name = "two", stdin = "7 9\n", expect = "9\n", visible = false },
+  { name = "five", stdin = "5 3 8 1 2\n", expect = "3 8 1 2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "cpp.verybasic.13.list"
+node        = 13
+title       = "FRONT OF THE LINE"
+difficulty  = 1
+story       = "The shelter's mooring list is a linked list and every new sampan is meant to go in at the front."
+concepts    = ["collections", "iteration"]
+requires    = ["cpp.verybasic.12.vector-edit"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''
+Read a line of integers. Each `x` must be pushed onto the FRONT of the
+`std::list` `l`, so the last one read prints first. The loop and the
+print-out are written.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+starter     = '''
+#include <iostream>
+#include <list>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::list<long long> l;
+    long long x = 0;
+    while (in >> x) {
+        // FILL: put x at the front of l
+    }
+    bool first = true;
+    for (long long v : l) {
+        std::cout << (first ? "" : " ") << v;
+        first = false;
+    }
+    std::cout << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <list>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::list<long long> l;
+    long long x = 0;
+    while (in >> x) {
+        // FILL: put x at the front of l
+        l.push_front(x);
+    }
+    bool first = true;
+    for (long long v : l) {
+        std::cout << (first ? "" : " ") << v;
+        first = false;
+    }
+    std::cout << '\n';
+}
+'''
+hints = [
+  "`l.push_front(x);` — a list can grow at either end in constant time.",
+  "`push_back` keeps the input order; the front is what reverses it.",
+]
+
+[quest.quiz]
+choices = [
+
+  "l.push_back(x);",
+  "l.push_front(x);",
+  "l.push_front(x)",
+  "l.insert(x);",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "3 2 1\n", visible = true },
+  { name = "one", stdin = "4\n", expect = "4\n", visible = false },
+  { name = "five", stdin = "5 3 8 1 2\n", expect = "2 1 8 3 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "cpp.verybasic.14.maps"
+node        = 14
+title       = "THE TALLY BOARD"
+difficulty  = 1
+story       = "The typhoon shelter's tally board counts each kind of catch and the count never moves."
+concepts    = ["collections", "strings"]
+requires    = ["cpp.verybasic.13.list"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''
+Read a line of words. For each word `w` the count in `counts` must go up
+by one — a `std::map` makes a missing key with a zero the first time it
+is indexed. The loop and the sorted print-out are written.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  fish crab fish
+output: crab 1
+        fish 2
+```
+'''
+starter     = '''
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::map<std::string, int> counts;
+    std::string w;
+    while (in >> w) {
+        // FILL: one more w
+    }
+    for (const auto& kv : counts) {
+        std::cout << kv.first << ' ' << kv.second << '\n';
+    }
+}
+'''
+solution    = '''
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::map<std::string, int> counts;
+    std::string w;
+    while (in >> w) {
+        // FILL: one more w
+        ++counts[w];
+    }
+    for (const auto& kv : counts) {
+        std::cout << kv.first << ' ' << kv.second << '\n';
+    }
+}
+'''
+hints = [
+  "`++counts[w];` — indexing creates the key at zero, then the increment.",
+  "`at()` throws on a key that is not there yet; `[]` makes it.",
+]
+
+[quest.quiz]
+choices = [
+
+  "++counts[w];",
+  "--counts[w];",
+  "++counts.at(w);",
+  "++counts[w]",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "catch", stdin = "fish crab fish\n", expect = "crab 1\nfish 2\n", visible = true },
+  { name = "one", stdin = "eel\n", expect = "eel 1\n", visible = false },
+  { name = "many", stdin = "a b a c b a\n", expect = "a 3\nb 2\nc 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "cpp.verybasic.15.hashtable"
+node        = 15
+title       = "LOOK IT UP, OR NOT"
+difficulty  = 2
+story       = "The stall prices sit in a hash table and a query for a stall nobody has heard of must answer minus one, not a made-up zero."
+concepts    = ["collections", "hashing"]
+requires    = ["cpp.verybasic.14.maps"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''
+`table` maps stall names to prices, built from the first line. Read one
+name `q`. The program needs `price`: the table's value when the key is
+there, `-1` when it is not — and `[]` would quietly insert a zero.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  fish 40 crab 120
+        fish
+output: 40
+```
+'''
+starter     = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::unordered_map<std::string, long long> table;
+    std::string name;
+    long long p = 0;
+    while (in >> name >> p) table[name] = p;
+    std::string q;
+    std::cin >> q;
+    long long price = -1;  // FILL: the price of q, or -1 when q is not a key
+    std::cout << price << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::unordered_map<std::string, long long> table;
+    std::string name;
+    long long p = 0;
+    while (in >> name >> p) table[name] = p;
+    std::string q;
+    std::cin >> q;
+    long long price = table.count(q) ? table[q] : -1;
+    std::cout << price << '\n';
+}
+'''
+hints = [
+  "`long long price = table.count(q) ? table[q] : -1;` — ask first, then index.",
+  "`table[q]` on a missing key inserts it with 0 — the query would print 0, not -1.",
+]
+
+[quest.quiz]
+choices = [
+
+  "long long price = table.count(q) ? table[q] : -1;",
+  "long long price = table[q];",
+  "long long price = table.count(q) ? table.at[q] : -1;",
+  "long long price = table.contains(q) ? table[q] : -1",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "found", stdin = "fish 40 crab 120\nfish\n", expect = "40\n", visible = true },
+  { name = "missing", stdin = "fish 40 crab 120\neel\n", expect = "-1\n", visible = false },
+  { name = "other", stdin = "fish 40 crab 120\ncrab\n", expect = "120\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "cpp.verybasic.16.sets"
+node        = 16
+title       = "EACH NUMBER ONCE"
+difficulty  = 1
+story       = "Mooring numbers arrive with repeats and the register should hold each one once, in order."
+concepts    = ["collections", "sorting"]
+requires    = ["cpp.verybasic.15.hashtable"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+Read a line of integers. Each `x` must go into the `std::set` `seen`,
+which keeps one copy of each value in ascending order. The print-out of
+the size and the values is written.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  3 1 3 2 1
+output: 3
+        1 2 3
+```
+'''
+starter     = '''
+#include <iostream>
+#include <set>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::set<long long> seen;
+    long long x = 0;
+    while (in >> x) {
+        // FILL: put x in the set
+    }
+    std::cout << seen.size() << '\n';
+    bool first = true;
+    for (long long v : seen) {
+        std::cout << (first ? "" : " ") << v;
+        first = false;
+    }
+    std::cout << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <set>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::set<long long> seen;
+    long long x = 0;
+    while (in >> x) {
+        // FILL: put x in the set
+        seen.insert(x);
+    }
+    std::cout << seen.size() << '\n';
+    bool first = true;
+    for (long long v : seen) {
+        std::cout << (first ? "" : " ") << v;
+        first = false;
+    }
+    std::cout << '\n';
+}
+'''
+hints = [
+  "`seen.insert(x);` — a set has `insert`, and it ignores a value it already has.",
+  "`push_back` is a sequence's word; a set has no back.",
+]
+
+[quest.quiz]
+choices = [
+
+  "seen.push_back(x);",
+  "seen.insert(x);",
+  "seen.insert(x)",
+  "seen.insert(x + 1);",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "repeats", stdin = "3 1 3 2 1\n", expect = "3\n1 2 3\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "1\n7\n", visible = false },
+  { name = "all-same", stdin = "4 4 4\n", expect = "1\n4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "cpp.verybasic.17.stack"
+node        = 17
+title       = "LAST IN, FIRST OUT"
+difficulty  = 1
+story       = "Plates stack up at the shelter's kitchen pass and come off the top, and the stack never takes a plate."
+concepts    = ["stacks-queues", "collections"]
+requires    = ["cpp.verybasic.16.sets"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+Read a line of integers. Each `x` must be pushed onto the `std::stack`
+`st`; the program then pops everything, printing the values last-in first.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 4 3 2 1
+```
+'''
+starter     = '''
+#include <iostream>
+#include <sstream>
+#include <stack>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::stack<long long> st;
+    long long x = 0;
+    while (in >> x) {
+        // FILL: push x onto the stack
+    }
+    bool first = true;
+    while (!st.empty()) {
+        std::cout << (first ? "" : " ") << st.top();
+        first = false;
+        st.pop();
+    }
+    std::cout << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <sstream>
+#include <stack>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::stack<long long> st;
+    long long x = 0;
+    while (in >> x) {
+        // FILL: push x onto the stack
+        st.push(x);
+    }
+    bool first = true;
+    while (!st.empty()) {
+        std::cout << (first ? "" : " ") << st.top();
+        first = false;
+        st.pop();
+    }
+    std::cout << '\n';
+}
+'''
+hints = [
+  "`st.push(x);` — a stack pushes, and `top()` sees the last push.",
+  "`push_back` is for a vector; `std::stack` says `push`.",
+]
+
+[quest.quiz]
+choices = [
+
+  "st.push_back(x);",
+  "st.push(x)",
+  "st.push(x);",
+  "st.push(-x);",
+]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "4 3 2 1\n", visible = true },
+  { name = "one", stdin = "5\n", expect = "5\n", visible = false },
+  { name = "five", stdin = "5 3 8 1 2\n", expect = "2 1 8 3 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "cpp.verybasic.18.queue"
+node        = 18
+title       = "FIRST IN, FIRST OUT"
+difficulty  = 1
+story       = "Customers line up at the noodle stall in the shelter and are served in the order they came, but the queue takes nobody."
+concepts    = ["stacks-queues", "collections"]
+requires    = ["cpp.verybasic.17.stack"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''
+Read a line of integers. Each `x` must be pushed onto the `std::queue`
+`q`; the program then takes them off the front in the order they came.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 1 2 3 4
+```
+'''
+starter     = '''
+#include <iostream>
+#include <queue>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::queue<long long> q;
+    long long x = 0;
+    while (in >> x) {
+        // FILL: push x onto the queue
+    }
+    bool first = true;
+    while (!q.empty()) {
+        std::cout << (first ? "" : " ") << q.front();
+        first = false;
+        q.pop();
+    }
+    std::cout << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <queue>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::queue<long long> q;
+    long long x = 0;
+    while (in >> x) {
+        // FILL: push x onto the queue
+        q.push(x);
+    }
+    bool first = true;
+    while (!q.empty()) {
+        std::cout << (first ? "" : " ") << q.front();
+        first = false;
+        q.pop();
+    }
+    std::cout << '\n';
+}
+'''
+hints = [
+  "`q.push(x);` — in at the back, `front()` to read, `pop()` to take.",
+  "`push_front` is a `deque` word; a queue only pushes at the back.",
+]
+
+[quest.quiz]
+choices = [
+
+  "q.push_front(x);",
+  "q.push(x);",
+  "q.push(x)",
+  "q.push(x + 1);",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "1 2 3 4\n", visible = true },
+  { name = "one", stdin = "5\n", expect = "5\n", visible = false },
+  { name = "five", stdin = "5 3 8 1 2\n", expect = "5 3 8 1 2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "cpp.verybasic.19.heap"
+node        = 19
+title       = "THE SMALLEST NEXT"
+difficulty  = 2
+story       = "The winch takes the lightest sampan next, every time, and the heap that should hand it over is the wrong way up."
+concepts    = ["heaps", "collections"]
+requires    = ["cpp.verybasic.18.queue"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''
+Read a line of integers. The program pushes them all onto `pq` and pops
+them one by one, and they must come out smallest first. A
+`std::priority_queue` is a max-heap unless it is declared with `std::greater`
+as its comparator; the declaration of `pq` is the hole.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  5 3 8 1 2
+output: 1 2 3 5 8
+```
+'''
+starter     = '''
+#include <functional>
+#include <iostream>
+#include <queue>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    // FILL: pq, a min-heap of long long
+    std::priority_queue<long long> pq;
+    long long x = 0;
+    while (in >> x) pq.push(x);
+    bool first = true;
+    while (!pq.empty()) {
+        std::cout << (first ? "" : " ") << pq.top();
+        first = false;
+        pq.pop();
+    }
+    std::cout << '\n';
+}
+'''
+solution    = '''
+#include <functional>
+#include <iostream>
+#include <queue>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    // FILL: pq, a min-heap of long long
+    std::priority_queue<long long, std::vector<long long>, std::greater<long long>> pq;
+    long long x = 0;
+    while (in >> x) pq.push(x);
+    bool first = true;
+    while (!pq.empty()) {
+        std::cout << (first ? "" : " ") << pq.top();
+        first = false;
+        pq.pop();
+    }
+    std::cout << '\n';
+}
+'''
+hints = [
+  "`std::priority_queue<long long, std::vector<long long>, std::greater<long long>> pq;` — value type, container, comparator.",
+  "The comparator is the third template argument; the second is the container.",
+]
+
+[quest.quiz]
+choices = [
+
+  "std::priority_queue<long long, std::vector<long long>, std::greater<long long>> pq;",
+  "std::priority_queue<long long> pq;",
+  "std::priority_queue<long long, std::greater<long long>> pq;",
+  "std::min_heap<long long> pq;",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5 3 8 1 2\n", expect = "1 2 3 5 8\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "7\n", visible = false },
+  { name = "sorted-already", stdin = "1 2 3\n", expect = "1 2 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "cpp.verybasic.20.sorting"
+node        = 20
+title       = "DEPTH ORDER"
+difficulty  = 1
+story       = "The moorings are logged in the order the boats arrived and the chart wants them by depth, smallest first."
+concepts    = ["sorting", "slices"]
+requires    = ["cpp.verybasic.19.heap"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief       = '''
+`v` holds the line's integers. The program must sort them ascending in
+place — the algorithm takes the pair of iterators that bounds the range.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  5 3 8 1 2
+output: 1 2 3 5 8
+```
+'''
+starter     = '''
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+
+    // FILL: sort v ascending
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << v[i] << (i + 1 < v.size() ? ' ' : '\n');
+    }
+}
+'''
+solution    = '''
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+
+    // FILL: sort v ascending
+    std::sort(v.begin(), v.end());
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << v[i] << (i + 1 < v.size() ? ' ' : '\n');
+    }
+}
+'''
+hints = [
+  "`std::sort(v.begin(), v.end());` — a range is two iterators.",
+  "`std::greater` sorts descending; the default is ascending.",
+]
+
+[quest.quiz]
+choices = [
+
+  "std::sort(v);",
+  "std::sort(v.begin(), v.end());",
+  "std::sort(v.begin(), v.end(), std::greater<>{});",
+  "std::sort(v.begin(), v.end())",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5 3 8 1 2\n", expect = "1 2 3 5 8\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "7 9\n", visible = false },
+  { name = "dupes", stdin = "4 1 4 2\n", expect = "1 2 4 4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "cpp.verybasic.21.sort-by-key"
+node        = 21
+title       = "THE HEAVIEST CATCH FIRST"
+difficulty  = 2
+story       = "The catch log lists each sampan's name and weight, and the board wants the biggest haul at the top."
+concepts    = ["sorting", "closures", "structs"]
+requires    = ["cpp.verybasic.20.sorting"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief       = '''
+`rows` holds `Row{name, score}` records. The program must sort them by
+`score`, highest first — `std::sort` with a comparator lambda that says
+when `a` goes before `b`. Scores are distinct.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  3
+        mei 40
+        alex 90
+        sam 65
+output: alex 90
+        sam 65
+        mei 40
+```
+'''
+starter     = '''
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <vector>
+
+struct Row {
+    std::string name;
+    long long score;
+};
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<Row> rows(n);
+    for (auto& r : rows) std::cin >> r.name >> r.score;
+    // FILL: highest score first
+    for (const auto& r : rows) std::cout << r.name << ' ' << r.score << '\n';
+}
+'''
+solution    = '''
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <vector>
+
+struct Row {
+    std::string name;
+    long long score;
+};
+
+int main() {
+    int n = 0;
+    std::cin >> n;
+    std::vector<Row> rows(n);
+    for (auto& r : rows) std::cin >> r.name >> r.score;
+    // FILL: highest score first
+    std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.score > b.score; });
+    for (const auto& r : rows) std::cout << r.name << ' ' << r.score << '\n';
+}
+'''
+hints = [
+  "`std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.score > b.score; });` — the lambda answers \"does a come first?\".",
+  "`<` would put the smallest first; `>` puts the largest first.",
+]
+
+[quest.quiz]
+choices = [
+
+  "std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.score > b.score; });",
+  "std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.score < b.score; });",
+  "std::sort(rows.begin(), rows.end(), [](Row a, Row b) { return a.score > b.score });",
+  "std::sort(rows.begin(), rows.end(), Row::score);",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\nmei 40\nalex 90\nsam 65\n", expect = "alex 90\nsam 65\nmei 40\n", visible = true },
+  { name = "one", stdin = "1\nmei 5\n", expect = "mei 5\n", visible = false },
+  { name = "four", stdin = "4\na 1\nb 4\nc 3\nd 2\n", expect = "b 4\nc 3\nd 2\na 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "cpp.verybasic.22.reverse"
+node        = 22
+title       = "BACK TO FRONT"
+difficulty  = 1
+story       = "The tide readings were logged newest first and the chart reads them oldest first."
+concepts    = ["slices", "iteration"]
+requires    = ["cpp.verybasic.21.sort-by-key"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''
+`v` holds the line's integers. The program must reverse them in place —
+the algorithm from `<algorithm>` over the whole range.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 4 3 2 1
+```
+'''
+starter     = '''
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+
+    // FILL: reverse v in place
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << v[i] << (i + 1 < v.size() ? ' ' : '\n');
+    }
+}
+'''
+solution    = '''
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+
+    // FILL: reverse v in place
+    std::reverse(v.begin(), v.end());
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << v[i] << (i + 1 < v.size() ? ' ' : '\n');
+    }
+}
+'''
+hints = [
+  "`std::reverse(v.begin(), v.end());` — an algorithm over a range, not a method.",
+  "A vector has no `reverse()` member; `std::list` does, a vector uses the algorithm.",
+]
+
+[quest.quiz]
+choices = [
+
+  "v.reverse();",
+  "std::reverse(v.begin() + 1, v.end());",
+  "std::reverse(v.begin(), v.end());",
+  "std::reverse(v.begin(), v.end())",
+]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "4 3 2 1\n", visible = true },
+  { name = "one", stdin = "9\n", expect = "9\n", visible = false },
+  { name = "five", stdin = "5 3 8 1 2\n", expect = "2 1 8 3 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "cpp.verybasic.23.closures"
+node        = 23
+title       = "THE TIDE OFFSET"
+difficulty  = 2
+story       = "Every reading gets the same offset added and the lambda that should remember the offset forgot it."
+concepts    = ["closures", "functions"]
+requires    = ["cpp.verybasic.22.reverse"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief       = '''
+Read `k`, then a line of integers. The program needs `add`, a lambda that
+captures `k` and returns its argument plus `k`; it is applied to every
+value and the results are printed.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+starter     = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    long long k = 0;
+    std::cin >> k;
+    std::string rest;
+    std::getline(std::cin, rest);
+    std::getline(std::cin, rest);
+    std::istringstream in(rest);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+    auto add = [](long long x) { return x; };  // FILL: capture k, return x + k
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << add(v[i]) << (i + 1 < v.size() ? ' ' : '\n');
+    }
+}
+'''
+solution    = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    long long k = 0;
+    std::cin >> k;
+    std::string rest;
+    std::getline(std::cin, rest);
+    std::getline(std::cin, rest);
+    std::istringstream in(rest);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+    auto add = [k](long long x) { return x + k; };
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << add(v[i]) << (i + 1 < v.size() ? ' ' : '\n');
+    }
+}
+'''
+hints = [
+  "`auto add = [k](long long x) { return x + k; };` — `[k]` is the capture.",
+  "With an empty `[]` the lambda cannot see `k` at all.",
+]
+
+[quest.quiz]
+choices = [
+
+  "auto add = [k](long long x) { return x + k; };",
+  "auto add = [](long long x) { return x + k; };",
+  "auto add = [k](long long x) { return x - k; };",
+  "auto add = [k](long long x) { return x + k; }",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5\n1 2 3\n", expect = "6 7 8\n", visible = true },
+  { name = "zero", stdin = "0\n4 4\n", expect = "4 4\n", visible = false },
+  { name = "negative", stdin = "-3\n10 0 3\n", expect = "7 -3 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "cpp.verybasic.24.lambdas"
+node        = 24
+title       = "COUNT THE EVEN BERTHS"
+difficulty  = 2
+story       = "The berth numbers along the wall come in a list and the office wants to know how many are even."
+concepts    = ["closures", "iteration"]
+requires    = ["cpp.verybasic.23.closures"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief       = '''
+`v` holds the line's integers. The program needs `evens`: how many of
+them are even, counted by `std::count_if` with a lambda that says which
+values to count.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  1 2 3 4 6
+output: 3
+```
+'''
+starter     = '''
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+
+    long long evens = 0;  // FILL: count the even values with count_if
+    std::cout << evens << '\n';
+}
+'''
+solution    = '''
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+
+    long long evens = std::count_if(v.begin(), v.end(), [](long long x) { return x % 2 == 0; });
+    std::cout << evens << '\n';
+}
+'''
+hints = [
+  "`long long evens = std::count_if(v.begin(), v.end(), [](long long x) { return x % 2 == 0; });` — the range, then the test.",
+  "`std::count` counts a value; `count_if` counts what a predicate says yes to.",
+]
+
+[quest.quiz]
+choices = [
+
+  "long long evens = std::count_if(v.begin(), v.end(), [](long long x) { return x % 2 == 0; });",
+  "long long evens = std::count_if(v.begin(), v.end(), [](long long x) { return x % 2 == 1; });",
+  "long long evens = std::count_if(v, [](long long x) { return x % 2 == 0; });",
+  "long long evens = std::count(v.begin(), v.end(), [](long long x) { return x % 2 == 0; });",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "1 2 3 4 6\n", expect = "3\n", visible = true },
+  { name = "none", stdin = "1 3 5\n", expect = "0\n", visible = false },
+  { name = "all", stdin = "2 4\n", expect = "2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "cpp.verybasic.25.threads"
+node        = 25
+title       = "ONE WINCH, ONE THREAD"
+difficulty  = 3
+story       = "The slipway sums its sampan weights on a second thread while the main one waits, and the thread never starts."
+concepts    = ["concurrency", "closures"]
+requires    = ["cpp.verybasic.24.lambdas"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''
+`v` holds the line's integers and `sum_of` adds them up. The program
+needs `t`, a `std::thread` running a lambda that stores `sum_of(v)` into
+`result`; `main` joins it and prints. The lambda must capture by reference
+to reach `v` and `result`.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 10
+```
+'''
+starter     = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
+
+long long sum_of(const std::vector<long long>& v) {
+    long long s = 0;
+    for (long long x : v) s += x;
+    return s;
+}
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+
+    long long result = 0;
+    std::thread t([] {});  // FILL: a thread that stores sum_of(v) in result
+    t.join();
+    std::cout << result << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
+
+long long sum_of(const std::vector<long long>& v) {
+    long long s = 0;
+    for (long long x : v) s += x;
+    return s;
+}
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    std::vector<long long> v;
+    long long x = 0;
+    while (in >> x) v.push_back(x);
+
+    long long result = 0;
+    std::thread t([&] { result = sum_of(v); });
+    t.join();
+    std::cout << result << '\n';
+}
+'''
+hints = [
+  "`std::thread t([&] { result = sum_of(v); });` — a thread is built from something callable.",
+  "`[&]` captures by reference, which is how the lambda can write `result`.",
+]
+
+[quest.quiz]
+choices = [
+
+  "std::thread t([&] { result = sum_of(v); });",
+  "std::thread t(sum_of(v));",
+  "std::thread t([] { result = sum_of(v); });",
+  "std::thread t([&] { result = sum_of(v) / 2; });",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "10\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "7\n", visible = false },
+  { name = "five", stdin = "5 3 8 1 2\n", expect = "19\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "cpp.verybasic.26.mutex"
+node        = 26
+title       = "FOUR HANDS ON ONE COUNTER"
+difficulty  = 3
+story       = "Four threads add to one counter in the pump room and the lock that should keep them in turn is held forever after the first pass."
+concepts    = ["shared-state", "concurrency", "raii"]
+requires    = ["cpp.verybasic.25.threads"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''
+Four threads each add one to `counter` a hundred thousand times. Every
+pass through the loop must hold the mutex `mu` while it adds — and release
+it at the end of the pass. The placeholder locks and never unlocks, so the
+second pass waits forever; a lock guard releases when it goes out of scope.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  (nothing)
+output: 400000
+```
+'''
+starter     = '''
+#include <iostream>
+#include <mutex>
+#include <thread>
+#include <vector>
+
+long long counter = 0;
+std::mutex mu;
+
+void work() {
+    for (int i = 0; i < 100000; ++i) {
+        // FILL: hold mu for this pass, released at the closing brace
+        mu.lock();
+        counter += 1;
+    }
+}
+
+int main() {
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 4; ++i) threads.emplace_back(work);
+    for (auto& t : threads) t.join();
+    std::cout << counter << '\n';
+}
+'''
+solution    = '''
+#include <iostream>
+#include <mutex>
+#include <thread>
+#include <vector>
+
+long long counter = 0;
+std::mutex mu;
+
+void work() {
+    for (int i = 0; i < 100000; ++i) {
+        // FILL: hold mu for this pass, released at the closing brace
+        std::lock_guard<std::mutex> lock(mu);
+        counter += 1;
+    }
+}
+
+int main() {
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 4; ++i) threads.emplace_back(work);
+    for (auto& t : threads) t.join();
+    std::cout << counter << '\n';
+}
+'''
+hints = [
+  "`std::lock_guard<std::mutex> lock(mu);` — locks now, unlocks when `lock` dies at the `}`.",
+  "`mu.lock()` alone is never undone; the next pass blocks on a mutex this thread already holds.",
+]
+
+[quest.quiz]
+choices = [
+
+  "mu.lock();",
+  "std::lock_guard<std::mutex> lock(mu);",
+  "std::lock_guard<std::mutex> lock(mu)",
+  "std::lock_guard<std::mutex> lock(counter);",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four-hundred-thousand", stdin = "", expect = "400000\n", visible = true },
+  { name = "ignores-input", stdin = "x\n", expect = "400000\n", visible = false },
+  { name = "again", stdin = "1 2\n", expect = "400000\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "cpp.verybasic.27.binary-tree"
+node        = 27
+title       = "SEGFAULT"
+difficulty  = 4
+story       = "12:00 at the Noon Day Gun. The firing table is a search tree, and the insert that should walk down the right side stops at the root."
+concepts    = ["trees", "recursion", "pointers"]
+requires    = ["cpp.verybasic.26.mutex"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief       = '''
+`insert` puts `v` into the search tree rooted at `n`: the empty case is
+written and makes a new node. The hole is the one line that sends `v` down
+the correct side — left when it is smaller than `n->val`, right otherwise —
+storing what the recursion returns. Inorder traversal then prints ascending.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+```
+'''
+starter     = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+struct Node {
+    long long val;
+    Node* left = nullptr;
+    Node* right = nullptr;
+};
+
+Node* insert(Node* n, long long v) {
+    if (!n) return new Node{v};
+    // FILL: send v down the correct side, storing what comes back
+    return n;
+}
+
+void inorder(const Node* n, std::vector<long long>& out) {
+    if (!n) return;
+    inorder(n->left, out);
+    out.push_back(n->val);
+    inorder(n->right, out);
+}
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    Node* root = nullptr;
+    long long x = 0;
+    while (in >> x) root = insert(root, x);
+    std::vector<long long> out;
+    inorder(root, out);
+    for (size_t i = 0; i < out.size(); ++i) {
+        std::cout << out[i] << (i + 1 < out.size() ? ' ' : '\n');
+    }
+}
+'''
+solution    = '''
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+struct Node {
+    long long val;
+    Node* left = nullptr;
+    Node* right = nullptr;
+};
+
+Node* insert(Node* n, long long v) {
+    if (!n) return new Node{v};
+    // FILL: send v down the correct side, storing what comes back
+    if (v < n->val) n->left = insert(n->left, v); else n->right = insert(n->right, v);
+    return n;
+}
+
+void inorder(const Node* n, std::vector<long long>& out) {
+    if (!n) return;
+    inorder(n->left, out);
+    out.push_back(n->val);
+    inorder(n->right, out);
+}
+
+int main() {
+    std::string line;
+    std::getline(std::cin, line);
+    std::istringstream in(line);
+    Node* root = nullptr;
+    long long x = 0;
+    while (in >> x) root = insert(root, x);
+    std::vector<long long> out;
+    inorder(root, out);
+    for (size_t i = 0; i < out.size(); ++i) {
+        std::cout << out[i] << (i + 1 < out.size() ? ' ' : '\n');
+    }
+}
+'''
+hints = [
+  "`if (v < n->val) n->left = insert(n->left, v); else n->right = insert(n->right, v);` — recurse into one side and store the result.",
+  "`n` is a pointer: `->`, not `.`; and smaller goes left.",
+]
+
+[quest.quiz]
+choices = [
+
+  "if (v < n->val) n->left = insert(n->left, v); else n->right = insert(n->right, v);",
+  "if (v < n->val) n->left = insert(n->left, v); else n->right = insert(n->right, v)",
+  "if (v < n->val) n->right = insert(n->right, v); else n->left = insert(n->left, v);",
+  "if (v < n.val) n.left = insert(n.left, v); else n.right = insert(n.right, v);",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5 3 8 1 4\n", expect = "1 3 4 5 8\n", visible = true },
+  { name = "chain", stdin = "1 2 3\n", expect = "1 2 3\n", visible = false },
+  { name = "seven", stdin = "50 30 70 20 40 60 80\n", expect = "20 30 40 50 60 70 80\n", visible = false },
+]

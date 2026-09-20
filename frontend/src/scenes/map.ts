@@ -25,7 +25,7 @@
  * it.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, width, wrap } from "../engine/text";
+import { elide, ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme, TRACK_HAZE } from "../engine/theme";
 import { btnBox, clipped, fill, panel, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import {
@@ -68,7 +68,7 @@ const PLATE: Record<Land, string> = {
  * cycle in (`LANDS` comes from the protocol so every screen agrees on it), and
  * there is one of each so the player can see every place from any one of them.
  */
-const CATEGORIES: readonly Category[] = ["basic", "advanced", "hacker"];
+const CATEGORIES: readonly Category[] = ["verybasic", "basic", "advanced", "hacker"];
 
 /**
  * Where each of the six maps was left, keyed by land and category.
@@ -111,6 +111,76 @@ const BOSS: Record<string, string> = {
 };
 
 /** Four scaled pixels, rounded — the gap between a label and its value. */
+/**
+ * The phone register's geometry: the overworld is the screen.
+ *
+ * On a phone the bar is one row (MENU and the three roads), the plate takes
+ * the full width less a gutter and as much height as the art's aspect allows
+ * between the bar and a short strip, and the strip — the node's name, its
+ * facts and one finger-tall GO IN button — hugs the plate's bottom edge. What
+ * is left over is split above and below, so the pair sits in the middle
+ * rather than the strip drifting to the footer.
+ *
+ * Before this the map on a phone was a stamp: four rows of chips took the top
+ * third, the old detail slab took another, and twenty-seven coins were drawn
+ * on a plate a third of the screen wide. Pure, so `tests/map.test.ts` can pin
+ * that the plate really is the widest thing on the screen.
+ */
+export interface PhoneMap {
+  plate: Rect;
+  strip: Rect;
+}
+
+export function phoneMapLayout(
+  vw: number,
+  vh: number,
+  s: number,
+  barBottom: number,
+  stripH: number,
+  footerH: number,
+  art: { w: number; h: number },
+): PhoneMap {
+  const gutter = Math.round(6 * s);
+  const gap = Math.round(6 * s);
+  const top = barBottom + gap;
+  const bottom = vh - footerH - gap;
+  const availW = vw - gutter * 2;
+  // Held sideways there is no height to stack in: the strip stands beside
+  // the plate at a third of the width, and the plate takes the rest.
+  if (vw > vh) {
+    const stripW = Math.round(availW * 0.34);
+    const roomW = availW - stripW - gap;
+    const roomH = Math.max(40, bottom - top);
+    const k = Math.min(roomW / art.w, roomH / art.h);
+    const pw = Math.max(40, Math.round(art.w * k));
+    const ph = Math.max(40, Math.round(art.h * k));
+    const sh = Math.min(stripH, roomH);
+    return {
+      plate: [gutter + Math.round((roomW - pw) / 2), top + Math.round((roomH - ph) / 2), pw, ph],
+      strip: [gutter + roomW + gap, top + Math.round((roomH - sh) / 2), stripW, sh],
+    };
+  }
+  const availH = Math.max(40, bottom - top - stripH - gap);
+  const scale = Math.min(availW / art.w, availH / art.h);
+  const w = Math.max(40, Math.round(art.w * scale));
+  const h = Math.max(40, Math.round(art.h * scale));
+  const spare = Math.max(0, availH - h);
+  const py = top + Math.round(spare / 2);
+  const plate: Rect = [gutter + Math.round((availW - w) / 2), py, w, h];
+  const strip: Rect = [gutter, py + h + gap, availW, stripH];
+  return { plate, strip };
+}
+
+/**
+ * A coin's radius on a phone: the design radius, or smaller when the plate is
+ * narrow enough that neighbours at the packs' minimum spacing (0.06 of the
+ * plate) would sit on top of each other. Seven hundredths of the plate across
+ * is a coin you can still read a number on and still tell from its neighbour.
+ */
+export function phoneCoinRadius(plateW: number, base: number): number {
+  return Math.min(base, Math.max(8, Math.round(plateW * 0.04)));
+}
+
 function f8(s: number): number {
   return Math.round(4 * s);
 }
@@ -134,6 +204,15 @@ export class MapScene implements Scene {
   private readonly plateIn = new Tween(seconds("panel"));
   /** The land/category switcher's hit rects, rebuilt every frame from `bar()`. */
   private readonly bar = new Buttons();
+  /**
+   * The phone's MENU sheet: the land switch, the ways off the map and the
+   * language, folded away behind one button so the overworld gets the
+   * screen. Its hit rects, rebuilt every frame while it is open.
+   */
+  private readonly sheet = new Buttons();
+  private sheetOpen = false;
+  /** The phone's bottom strip, laid out with the plate; unused elsewhere. */
+  private strip: Rect = [0, 0, 1, 1];
   /** Set by `switchTo`, so the next `refresh` restores that map's cursor. */
   private justSwitched = false;
   private readonly infoIn = new Tween(seconds("panel"), seconds("stagger") * 2);
@@ -383,6 +462,21 @@ export class MapScene implements Scene {
 
   private barItems(): Array<{ id: string; label: string; lit: boolean; group: number }> {
     const phone = this.app.layout.isPhone();
+    // A phone: one row. The three roads — the thing you switch most while on
+    // a map — and MENU, which opens the sheet with everything else in it.
+    // Ten chips a finger tall were four rows, and the overworld under them
+    // was a stamp.
+    if (phone) {
+      return [
+        { id: "menu", label: t("map.menu"), lit: false, group: 0 },
+        ...CATEGORIES.map((c) => ({
+          id: `cat:${c}`,
+          label: t(`map.${c}` as "map.basic"),
+          lit: c === this.category,
+          group: 1,
+        })),
+      ];
+    }
     return [
       ...LANDS.map((l) => ({
         id: `land:${l}`,
@@ -592,6 +686,10 @@ export class MapScene implements Scene {
   // -- input ---------------------------------------------------------------
 
   key(name: string, ev?: KeyboardEvent): void {
+    if (this.sheetOpen) {
+      if (name === "escape") this.sheetOpen = false;
+      return;
+    }
     if (name === "escape") return void this.app.go(new LandsScene(this.app), "back");
     // Switching is a look, not a commitment: one `world.map` call, reversible
     // with the same key. It is allowed to interrupt a walk, because the walk
@@ -622,37 +720,73 @@ export class MapScene implements Scene {
   }
 
   controls(): Buttons[] {
-    return [this.bar];
+    return this.sheetOpen ? [this.sheet, this.bar] : [this.bar];
+  }
+
+  /**
+   * One button, by id, from the bar or the sheet. The two share this so the
+   * phone's sheet cannot come to mean something different from the desktop's
+   * bar for the same id.
+   */
+  private act(id: string): void {
+    const [kind, value] = id.split(":");
+    if (id === "menu") {
+      // On a phone MENU opens the sheet; everywhere else it is ALL MAPS.
+      if (this.app.layout.isPhone()) this.sheetOpen = true;
+      else void this.app.go(new LandsScene(this.app), "back");
+    } else if (id === "close") this.sheetOpen = false;
+    else if (id === "enter") this.choose(this.nodes[this.selected]);
+    else if (id === "play") void this.app.go(new PlaygroundScene(this.app), "forward");
+    // Before the land/category dispatch, not after it. `aux:search` splits
+    // into `["aux", "search"]`, and a fall-through would have sent
+    // `switchTo(this.land, "search")` to `world.map` as a category.
+    else if (kind === "aux") void openAux(this.app, id);
+    else if (id === "lang") void setLocale(nextLocale());
+    else if (kind === "land") this.switchTo(value as Land, this.category);
+    else if (kind === "cat") this.switchTo(this.land, value as Category);
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
+    // The sheet, while it is open, is the whole screen: a tap on one of its
+    // buttons acts and closes it, a tap anywhere else just closes it.
+    if (this.sheetOpen) {
+      const on = this.sheet.hit(x, y);
+      if (phase === "move") this.sheet.hovered = on?.id ?? null;
+      if (phase === "down") {
+        this.sheetOpen = false;
+        if (on) this.act(on.id);
+      }
+      return;
+    }
     // The strip is above the overworld and is tested first: a button that
     // happens to overlap a far node must not enter a street.
     const onBar = this.bar.hit(x, y);
     if (phase === "move") this.bar.hovered = onBar?.id ?? null;
     if (onBar) {
-      if (phase === "down") {
-        const [kind, value] = onBar.id.split(":");
-        if (onBar.id === "menu") void this.app.go(new LandsScene(this.app), "back");
-        else if (onBar.id === "play") void this.app.go(new PlaygroundScene(this.app), "forward");
-        // Before the land/category dispatch, not after it. `aux:search` splits
-        // into `["aux", "search"]`, and a fall-through would have sent
-        // `switchTo(this.land, "search")` to `world.map` as a category.
-        else if (kind === "aux") void openAux(this.app, onBar.id);
-        else if (onBar.id === "lang") void setLocale(nextLocale());
-        else if (kind === "land") this.switchTo(value as Land, this.category);
-        else this.switchTo(this.land, value as Category);
-      }
+      if (phase === "down") this.act(onBar.id);
       return;
     }
+    const phone = this.app.layout.isPhone();
+    // A finger is wider than a cursor: on a phone a coin's hit area is at
+    // least the touch target, whatever the coin was drawn at.
+    const reach = phone ? this.app.layout.minTouchH() / 2 : 0;
     for (let i = 0; i < this.nodes.length; i++) {
       const [nx, ny] = this.nodeAt(this.nodes[i]);
-      if (Math.hypot(x - nx, y - ny) > this.nodeRadius(this.nodes[i]) * 1.4) continue;
+      if (Math.hypot(x - nx, y - ny) > Math.max(reach, this.nodeRadius(this.nodes[i]) * 1.4))
+        continue;
       if (phase === "move" && this.selected !== i) {
         this.selected = i;
         this.app.chip.blip();
       }
       if (phase === "down") {
+        // A phone has no hover, so the first tap is the look and the second
+        // is the step: tapping a coin selects it and fills the strip, tapping
+        // the selected coin (or GO IN) walks there. A click goes straight in.
+        if (phone && this.selected !== i) {
+          this.selected = i;
+          this.app.chip.blip();
+          return;
+        }
         this.selected = i;
         this.choose(this.nodes[i]);
       }
@@ -793,6 +927,7 @@ export class MapScene implements Scene {
     const { layout } = this.app;
     const s = layout.uiScale();
     const f = ensureFonts(s);
+    if (layout.isPhone()) return this.stripH();
     // On a phone the title takes two lines and the facts stack — see
     // `drawInfo` — and the plate is measured for both.
     const phone = layout.isPhone();
@@ -814,19 +949,56 @@ export class MapScene implements Scene {
     );
   }
 
+  /** The phone's strip: a name, a row of facts, and a finger-tall GO IN. */
+  private stripH(): number {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const f = ensureFonts(s);
+    const btnH = Math.max(layout.minTouchH(), f.button.height + 20);
+    // Sideways the facts stack (see `drawStrip`), so the strip is measured
+    // for the taller of the two arrangements it can take.
+    const facts = layout.isPortrait()
+      ? difficultyH()
+      : difficultyH() + Math.round(6 * s) + f.stationSm.height + Math.round(f8(s)) + f.small.height;
+    return (
+      Math.round(8 * s) +
+      f.station.height +
+      Math.round(6 * s) +
+      facts +
+      Math.round(8 * s) +
+      btnH +
+      Math.round(8 * s)
+    );
+  }
+
   private mapPlate(): Rect {
     const { layout } = this.app;
     const s = layout.uiScale();
     const portrait = layout.isPortrait();
+    const size = this.app.assets?.size(PLATE[this.land], portrait) ?? { w: 3, h: 2 };
+    if (layout.isPhone()) {
+      const barBottom = Math.round(38 * s) + Math.round(8 * s) + this.barLayout().h;
+      const geo = phoneMapLayout(
+        layout.vw,
+        layout.vh,
+        s,
+        barBottom,
+        this.stripH(),
+        footerH(layout),
+        size,
+      );
+      this.strip = geo.strip;
+      return geo.plate;
+    }
     const top = Math.round(38 * s) + Math.round(8 * s) + this.barLayout().h + Math.round(10 * s);
     const bottom = layout.vh - footerH(layout) - Math.round(8 * s);
     const infoH = this.infoH();
     const availX = Math.round(8 * s);
     const availW = layout.vw - Math.round(16 * s);
     const availH = Math.max(40, bottom - top - infoH - Math.round(8 * s));
-    // From the manifest, not from a loaded image: the JPEG arrives late and a
-    // plate that resized when it landed would move every node under the cursor.
-    const size = this.app.assets?.size(PLATE[this.land], portrait) ?? { w: 3, h: 2 };
+    // From the manifest (`size` above), not from a loaded image: the JPEG
+    // arrives late and a plate that resized when it landed would move every
+    // node under the cursor.
     const scale = Math.min(availW / size.w, availH / size.h);
     const w = Math.max(40, Math.round(size.w * scale));
     const h = Math.max(40, Math.round(size.h * scale));
@@ -867,7 +1039,8 @@ export class MapScene implements Scene {
    * half feel loose.
    */
   private nodeRadius(n?: MapNode): number {
-    const base = Math.round(18 * this.app.layout.uiScale());
+    const design = Math.round(18 * this.app.layout.uiScale());
+    const base = this.app.layout.isPhone() ? phoneCoinRadius(this.plate[2], design) : design;
     const gl = this.app.backdrop;
     if (!n || !gl?.map.active) return base;
     return base * gl.map.scaleAt(n.x, n.y);
@@ -904,7 +1077,7 @@ export class MapScene implements Scene {
     });
     g.restore();
 
-    header(g, this.app, `${landName(this.land)} · ${this.category.toUpperCase()}`);
+    header(g, this.app, `${landName(this.land)} · ${t(`map.${this.category}` as "map.basic")}`);
     // Outside the plate's lift and alpha: the switcher is chrome, and chrome
     // that fades in with the ground reads as part of the ground.
     this.drawBar(g, Math.round(38 * s) + Math.round(8 * s));
@@ -912,7 +1085,8 @@ export class MapScene implements Scene {
     g.save();
     g.globalAlpha = Math.min(1, this.infoIn.raw * 2.2);
     g.translate(0, infoDrop);
-    this.drawInfo(g, accent);
+    if (layout.isPhone()) this.drawStrip(g, accent);
+    else this.drawInfo(g, accent);
     g.restore();
 
     if (this.status) {
@@ -936,6 +1110,157 @@ export class MapScene implements Scene {
       // this is the screen they are on when they want it.
       t("map.footer"),
     );
+    // Last, over everything: the sheet is modal while it is open.
+    this.drawSheet(g);
+  }
+
+  /**
+   * The phone's MENU: the four lands, then the ways off the map and the
+   * language, as finger-tall buttons on a panel over the dimmed overworld.
+   * Laid out first and painted second, so the panel is as tall as its rows.
+   */
+  private drawSheet(g: Ctx): void {
+    if (!this.sheetOpen) {
+      this.sheet.reset();
+      return;
+    }
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const f = fonts.button;
+    const minH = Math.max(layout.minTouchH(), f.height + 20);
+    const pad = Math.round(14 * s);
+    const x = Math.round(8 * s);
+    const w = layout.vw - x * 2;
+    const y = Math.round(38 * s) + Math.round(8 * s) + this.barLayout().h + Math.round(10 * s);
+    const gap = Math.round(f.size * 0.5);
+    this.sheet.reset();
+    // The lands, on their own row, the one you are in lit.
+    this.sheet.row(
+      f,
+      [x + pad, y + pad, w - pad * 2, 0],
+      LANDS.map((l) => ({
+        id: `land:${l}`,
+        label: t(`map.${l}` as "map.rust"),
+        primary: l === this.land,
+      })),
+      minH,
+    );
+    let bottom = y + pad;
+    for (const b of this.sheet.list()) bottom = Math.max(bottom, b.rect[1] + b.rect[3]);
+    // Then the ways out, each on a row of its own where it does not fit
+    // beside the last: `row` wraps, and the ids are the bar's own.
+    const ways = [
+      { id: "aux:maps", label: MENU_LABEL() },
+      { id: "play", label: PLAY_LABEL() },
+      ...AUX_BAR().map((a) => ({ id: a.id, label: a.label })),
+      { id: "lang", label: LOCALES.find((l) => l.id === locale())?.label ?? "ENGLISH" },
+      { id: "close", label: t("map.close"), strong: true },
+    ];
+    const held = this.sheet.list().slice();
+    this.sheet.reset();
+    for (const b of held) this.sheet.add(b);
+    this.sheet.row(f, [x + pad, bottom + gap * 2, w - pad * 2, 0], ways, minH);
+    for (const b of this.sheet.list()) bottom = Math.max(bottom, b.rect[1] + b.rect[3]);
+    const h = bottom + pad - y;
+    fill(g, Theme.ink, 0, 0, layout.vw, layout.vh, 0.55);
+    panel(g, x, y, w, h, Theme.paper);
+    for (const b of this.sheet.list()) {
+      const land = b.id.startsWith("land:") ? (b.id.slice(5) as Land) : null;
+      if (land && b.primary) {
+        panel(g, b.rect[0], b.rect[1], b.rect[2], b.rect[3], landColour(land));
+        g.fillStyle = css(Theme.ink);
+        printf(
+          g,
+          f,
+          b.label,
+          b.rect[0],
+          b.rect[1] + 8 + Math.floor((b.rect[3] - 8 - f.height) * 0.5),
+          b.rect[2],
+          "center",
+        );
+        b.painted = true;
+      }
+    }
+    this.sheet.draw(g, f);
+  }
+
+  /**
+   * The phone's strip under the plate: the street's number and name, its
+   * difficulty, the stars and tries, and one finger-tall GO IN. The desktop
+   * slab has room for the boss art and a sentence of advice; a phone does
+   * not, and the plate above is where the room went.
+   */
+  private drawStrip(g: Ctx, accent: readonly [number, number, number, number]): void {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const [x, top, w, h] = this.strip;
+    if (h < 20) return;
+    panel(g, x, top, w, h, Theme.paper);
+    fill(g, accent, x + 6, top + 8, Math.round(4 * s), h - Math.round(14 * s));
+    const n = this.nodes[this.selected];
+    const ix = x + Math.round(18 * s);
+    const iw = w - Math.round(32 * s);
+    let iy = top + Math.round(8 * s);
+    if (!n) {
+      g.fillStyle = css(Theme.dim);
+      printf(g, fonts.small, this.status || t("map.none"), ix, iy, iw, "center");
+      return;
+    }
+    g.fillStyle = css(n.state === "cleared" ? Theme.admit : accent);
+    const title = `${String(n.node).padStart(2, "0")}  ${n.title}${n.kind === "boss" ? `  ·  ${t("map.boss")}` : ""}`;
+    printf(g, fonts.station, elide(fonts.station, title, iw), ix, iy, iw, "left");
+    iy += fonts.station.height + Math.round(6 * s);
+    // The facts on one row: difficulty, then stars, then tries. Beside the
+    // plate (a phone held sideways) the strip is narrow and stars and tries
+    // share the second row under the difficulty.
+    const narrow = iw < Math.round(300 * s);
+    const col = narrow ? iw / 2 : iw / 3;
+    drawDifficulty(
+      g,
+      ix,
+      iy,
+      Math.min(Math.round(120 * s), Math.round(col * 0.9)),
+      n.difficulty,
+      5,
+    );
+    if (narrow) iy += difficultyH() + Math.round(6 * s);
+    const starX = narrow ? ix : ix + col;
+    const tryX = narrow ? ix + col : ix + col * 2;
+    const valueY = iy + fonts.stationSm.height + Math.round(f8(s));
+    g.fillStyle = css(Theme.cream, 0.8);
+    printf(g, fonts.stationSm, t("map.stars"), starX, iy, col, "left");
+    drawStars(
+      g,
+      starX + Math.round(7 * s),
+      valueY + Math.round(5 * s),
+      Math.round(7 * s),
+      n.stars,
+      3,
+    );
+    g.fillStyle = css(Theme.cream, 0.8);
+    printf(g, fonts.stationSm, t("map.tries"), tryX, iy, col, "left");
+    g.fillStyle = css(n.attempts > 0 ? Theme.cream : Theme.dim);
+    printf(g, fonts.small, String(n.attempts), tryX, valueY, col, "left");
+    iy +=
+      (narrow ? fonts.stationSm.height + Math.round(f8(s)) + fonts.small.height : difficultyH()) +
+      Math.round(8 * s);
+    // GO IN, the width of the strip: the one thing to do on this screen.
+    const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
+    const label =
+      n.state === "cleared"
+        ? `${t("map.goIn")}  ·  ★ ${n.stars}/3`
+        : n.kind === "boss"
+          ? `${t("map.goIn")}  ·  ${t("map.boss")}`
+          : t("map.goIn");
+    const bx = ix - Math.round(4 * s);
+    const bw = iw + Math.round(8 * s);
+    pixBtn(g, fonts.button, bx, iy, bw, btnH, label, {
+      lit: true,
+      hover: this.bar.hovered === "enter",
+    });
+    this.bar.add({ id: "enter", rect: [bx, iy, bw, btnH], label });
   }
 
   /** The map's own frame, plus the background art if it arrived. */
@@ -1101,7 +1426,10 @@ export class MapScene implements Scene {
 
       // The number rides on the marker at `ui` size. At `stationSm` — an 8px
       // pixel font — it was a smudge inside an 18px circle.
-      const nf = n.kind === "boss" ? fonts.stationSm : fonts.ui;
+      // On a phone the coins are smaller than the design and the pixel face
+      // is two ems wide for two digits: the chrome face, whose advance is
+      // narrow, fits every number on every coin.
+      const nf = n.kind === "boss" || this.app.layout.isPhone() ? fonts.stationSm : fonts.ui;
       // On a locked node the number sits low, so the padlock's shackle stays
       // visible above it — the lock is the whole reason the marker is there.
       const ny = y - nf.height / 2 + (n.state === "locked" ? rr * 0.22 : 0);

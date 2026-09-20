@@ -192,6 +192,16 @@ pub fn print_quest(paint: &Paint, quest: &Quest, want_solution: bool) {
     println!();
     println!("{}", render::indent(quest.brief.trim(), "  "));
 
+    // VERY BASIC: the four lines. The right one is not marked — the quiz is
+    // the point — and whichever is typed is what the tests will judge.
+    if let Some(quiz) = &quest.quiz {
+        println!();
+        println!("  {}", paint.bold("PICK THE LINE, THEN TYPE IT"));
+        for (i, choice) in quiz.choices.iter().enumerate() {
+            println!("  {}  {}", paint.dim(&format!("{}.", i + 1)), choice);
+        }
+    }
+
     // §4.8: `tests.visible`, never `tests.cases` — the latter is the content
     // pack's name and would render an empty list that looks like a quest with
     // no tests rather than like a bug.

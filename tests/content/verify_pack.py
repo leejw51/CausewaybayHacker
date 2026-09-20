@@ -60,7 +60,7 @@ SCRATCH = pathlib.Path(
 )
 CACHE = pathlib.Path(os.environ.get("CWBHACKER_CI_CACHE", _root / "cache"))
 
-ID_RE = re.compile(r"^(rust|go|cpp|python)\.(basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
+ID_RE = re.compile(r"^(rust|go|cpp|python)\.(verybasic|basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
 
 MISTAKE_MAP_HEADING = "## 2. Mistake kind → concepts"
 
@@ -239,6 +239,39 @@ def brief_examples(brief):
 
 
 # ---------------------------------------------------------------- structure
+# The most lines a `basic` solution may add over its starter. BASIC is
+# grammar practice, not a coding quiz: the brief explains a construct and
+# shows its syntax, the starter is the whole program with a small hole, and
+# the player types the idiom — one or two lines, and up to four on a
+# container drill, where the lines are add, remove, edit and sort.
+# Placeholder lines the solution drops cost nothing; only lines the starter
+# does not have are counted — and the `ANSWER:` comment the starter carries
+# at each hole is a comment, so it neither counts nor clears anything.
+BASIC_MAX_ADDED = 4
+# VERY BASIC is the same grammar asked as a question first: four choices,
+# one right, and then the one line typed. One line, always.
+VERYBASIC_MAX_ADDED = 1
+MAX_ADDED = {"basic": BASIC_MAX_ADDED, "verybasic": VERYBASIC_MAX_ADDED}
+
+# `* ` and `*/` are the inside and the end of a block comment; a bare `*` is
+# not, or Rust's `*count.entry(..) += 1` would be free.
+COMMENT_STARTS = ("//", "#", "/*", "* ", "*/")
+
+
+def added_lines(starter, solution):
+    """The solution's lines that the starter does not have: non-blank, not a
+    comment, compared with the indentation stripped so a re-indented scaffold
+    line is not counted as new writing."""
+    have = {l.strip() for l in starter.split("\n") if l.strip()}
+    out = []
+    for line in solution.split("\n"):
+        t = line.strip()
+        if not t or t.startswith(COMMENT_STARTS) or t in have:
+            continue
+        out.append(t)
+    return out
+
+
 def structural(pack, path, vocab):
     errs = []
     land, cat = pack["land"], pack["category"]
@@ -337,6 +370,52 @@ def structural(pack, path, vocab):
             if norm("trim", example) not in shown:
                 errs.append(f"{qid}: brief's worked output {example!r} "
                             f"matches no visible case")
+        # BASIC is the grammar road (README, docs/story.md §4): the brief
+        # explains one construct, the starter is the whole program, and the
+        # player fills a hole of one or two lines. A basic quest whose answer
+        # is a program is an advanced quest filed on the wrong road, and the
+        # map's "0/18" would be promising a morning walk it does not deliver.
+        # Counted as the solution's non-blank, non-comment lines that the
+        # starter does not already have, so a scaffold the player leaves
+        # alone costs nothing.
+        if cat in MAX_ADDED:
+            added = added_lines(q["starter"], q["solution"])
+            if len(added) > MAX_ADDED[cat]:
+                errs.append(f"{qid}: solution adds {len(added)} lines over its "
+                            f"starter (> {MAX_ADDED[cat]}) — a {cat} quest is a "
+                            f"grammar drill; the scaffolding belongs in the starter")
+        # VERY BASIC: the quiz. Four choices, one of which is exactly the line
+        # the solution adds; the answer given away nowhere in the starter or
+        # the brief; and (checked by `main`, since it compiles) each wrong
+        # choice must fail when swapped into the solution — otherwise the quiz
+        # has two right answers and the player who picked the other was
+        # right too.
+        if cat == "verybasic":
+            quiz = q.get("quiz")
+            added = added_lines(q["starter"], q["solution"])
+            if not quiz:
+                errs.append(f"{qid}: a verybasic quest needs [quest.quiz]")
+            else:
+                choices = quiz.get("choices", [])
+                answer = quiz.get("answer", -1)
+                if len(choices) != 4:
+                    errs.append(f"{qid}: quiz has {len(choices)} choices, want 4")
+                if not (isinstance(answer, int) and 0 <= answer < len(choices)):
+                    errs.append(f"{qid}: quiz.answer {answer!r} out of range")
+                elif len(added) != 1:
+                    errs.append(f"{qid}: a verybasic solution adds {len(added)} lines; the quiz is about one")
+                else:
+                    right = choices[answer].strip()
+                    if right != added[0]:
+                        errs.append(f"{qid}: quiz answer {right!r} is not the line the solution adds {added[0]!r}")
+                    if sum(1 for c in choices if c.strip() == right) != 1:
+                        errs.append(f"{qid}: the right answer appears more than once among the choices")
+                    if right in q["starter"] or right in q["brief"]:
+                        errs.append(f"{qid}: the answer line is given away in the starter or the brief")
+                if len(set(c.strip() for c in choices)) != len(choices):
+                    errs.append(f"{qid}: duplicate choices")
+        elif "quiz" in q:
+            errs.append(f"{qid}: only verybasic quests carry a quiz")
     # map layout: not a straight line, no two nodes on top of each other
     for i in range(len(pts)):
         for j in range(i + 1, len(pts)):
@@ -574,7 +653,28 @@ def main(argv):
             vis = sum(1 for c in q["tests"]["cases"] if c.get("visible"))
             sol_ok = sv == "accepted" and sp == st
             start_ok = not (tv == "accepted" and tp == tt)
-            if not sol_ok or not start_ok:
+            # VERY BASIC: every wrong choice, swapped in for the answer line,
+            # must not pass. Three more judges per quest; the quiz is honest.
+            quiz_ok = True
+            quiz = q.get("quiz")
+            if pack["category"] == "verybasic" and quiz and len(quiz.get("choices", [])) == 4:
+                right = quiz["choices"][quiz["answer"]].strip()
+                for k, wrong in enumerate(quiz["choices"]):
+                    if k == quiz["answer"]:
+                        continue
+                    lines = q["solution"].split("\n")
+                    swapped = []
+                    for line in lines:
+                        if line.strip() == right:
+                            indent = line[: len(line) - len(line.lstrip())]
+                            swapped.append(indent + wrong.strip())
+                        else:
+                            swapped.append(line)
+                    wv, wp, wt, _ = judge(land, "\n".join(swapped), q, SCRATCH / f"{q['id']}.wrong{k}")
+                    if wv == "accepted" and wp == wt:
+                        quiz_ok = False
+                        print(f"        WRONG CHOICE {k} ALSO PASSES: {wrong!r}")
+            if not sol_ok or not start_ok or not quiz_ok:
                 all_ok = False
             for c in q.get("concepts", []):
                 concept_use.setdefault(c, set()).add(q["id"])

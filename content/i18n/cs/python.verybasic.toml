@@ -1,0 +1,564 @@
+# PYTHON LAND — VERY BASIC, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/python/verybasic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, the quiz's four choices, sample input and output and the exact
+# strings a program must print are the English pack's and are never translated.
+
+pack   = "python.verybasic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.verybasic.01.print"
+title = "První tabule"
+story = "06:00 na Bowrington Road. První cenová tabule dne je prázdná a fix je v Meiině ruce."
+brief = '''
+Program musí vypsat přesně `hello, causewaybay` na jeden řádek. Jedna vestavěná funkce zapíše řádek na standardní výstup.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+output: hello, causewaybay
+```
+'''
+hints = [
+  "print(\"hello, causewaybay\") — závorky a čárka uvnitř řetězce.",
+  "Python 3 nemá příkaz print; print je funkce.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.verybasic.02.int-types"
+title = "Rozdělený účet"
+story = "Dvě kávy, jedna bankovka u pultu rybího stánku. Pokladna má říct, kolik na každého a co zbude, a neříká nic."
+brief = '''
+`a` a `b` jsou celá čísla. Program musí vypsat celočíselný podíl a zbytek na jeden řádek, oddělené mezerou. Python má na každé jeden operátor.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  7 2
+output: 3 1
+```
+'''
+hints = [
+  "print(a // b, a % b) — dvě lomítka dělí dolů na celé číslo, procento je zbytek.",
+  "Jedno lomítko dá float: 3.5, ne 3.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.verybasic.03.floats"
+title = "Přesný podíl"
+story = "Váha na trhu ukazuje gramy na tři místa a účtenka chce dvě. Účtenka je prázdná."
+brief = '''
+`x` a `y` jsou floaty. Program musí vypsat `x / y` s přesně dvěma číslicemi za tečkou. F-string nese formátovací specifikaci za dvojtečkou.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  7 2
+output: 3.50
+```
+'''
+hints = [
+  "print(f\"{x / y:.2f}\") — .2f za dvojtečkou je formát.",
+  "round() zahodí koncovou nulu: 3.5, ne 3.50.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.verybasic.04.strings"
+title = "Štít stánku"
+story = "Štít zeleninového stánku je namalovaný velkými písmeny a v sešitě je malými; písmomalíř to potřebuje zakřičet zpátky."
+brief = '''
+`s` je jeden řádek textu. Po jeho délce musí program vypsat `s` velkými písmeny. Řetězcová metoda vrátí kopii s každým písmenem velkým.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+```
+'''
+hints = [
+  "print(s.upper()) — metoda na řetězci, volaná se závorkami.",
+  "capitalize() zvětší jen první písmeno.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.verybasic.05.bool-if"
+title = "Sudé, nebo liché"
+story = "Čísla stánků na Bowrington Road jsou na jedné straně sudá a na druhé lichá; poslíček potřebuje z čísla stranu."
+brief = '''
+`n` je kladné celé číslo. Program musí vypsat `even`, když je `n` dělitelné dvěma, a jinak `odd`. Podmínka je hlavička `if` porovnávající zbytek s nulou.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  4
+output: even
+```
+'''
+hints = [
+  "if n % 2 == 0: — dvě rovnítka porovnávají; jedno přiřazuje.",
+  "n / 2 je dělení s floatem; pro kladné n není nikdy nula.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.verybasic.06.loops"
+title = "Součet"
+story = "Počet tašek za ráno je jedna plus dvě plus tři až po poslední stánek a v sešitě je nula."
+brief = '''
+`n` je kladné celé číslo. Smyčka musí projít každé celé číslo od 1 až po `n` včetně a každé přičíst do `total`. `range` bere začátek a konec a konec není zahrnutý.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  4
+output: 10
+```
+'''
+hints = [
+  "for i in range(1, n + 1): — konec je vyloučený, takže je to n + 1.",
+  "range(n) začíná na 0 a končí před n.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.verybasic.07.functions"
+title = "Sazba za rozvoz"
+story = "Prvních deset rozvozů dne platí pět každý a každý další platí tři; kurýrova aplikace nevrací nic."
+brief = '''
+`fare(rides)` musí vrátit výplatu: prvních deset jízd po 5, každá jízda po desáté po 3. Funkce vrací hodnotu jedním klíčovým slovem.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  3
+output: 15
+```
+'''
+hints = [
+  "return min(rides, 10) * 5 + max(rides - 10, 0) * 3",
+  "Funkce, která místo návratu tiskne, vrací None.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.verybasic.08.structs"
+title = "Jeden stánek, dvě pole"
+story = "Každý stánek má na kartě jméno a cenu. Pole ceny na kartě chybí a štítek tiskne půlku stánku."
+brief = '''
+`Stall.__init__` dostává `name` a `price`. Musí uložit `price` na objekt stejně, jako se ukládá `name`, aby ho `s.price` přečetlo zpět.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  tofu 12
+output: tofu 12
+```
+'''
+hints = [
+  "self.price = price — self je objekt; holé jméno je lokální proměnná.",
+  "Dvě rovnítka porovnávají a nic neukládají.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.verybasic.09.struct-method"
+title = "Součet řádku"
+story = "Cena krát množství je jeden řádek každé objednávky u nudlového stánku a metoda, která ho má říct, neříká nic."
+brief = '''
+`Stall.total(self)` musí vrátit cenu krát množství. Uvnitř metody se k polím objektu dostaneš přes `self`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  tofu 12 3
+output: tofu: 36
+```
+'''
+hints = [
+  "return self.price * self.qty — obě pole přes self.",
+  "price samo o sobě není uvnitř metody definované.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.verybasic.10.enums"
+title = "Barva linky"
+story = "Mapa MTR nad rybím stánkem jmenuje tři linky; chlapec má slovo a potřebuje člen Enumu, který znamená."
+brief = '''
+`word` je jedno z `island`, `tsuenwan`, `kwuntong`. Program ho musí proměnit na odpovídající člen `Line`. Třídu Enum lze indexovat jménem člena.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "line = Line[word.upper()] — hranaté závorky hledají člena podle jména.",
+  "Line(...) se závorkami hledá podle hodnoty a hodnota je číslo.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.verybasic.11.vector"
+title = "Ranní seznam"
+story = "Každá bedna z náklaďáku jde na ranní seznam v pořadí, v jakém přišla, a seznam zůstává prázdný."
+brief = '''
+`xs` začíná prázdný. Každé celé číslo `x` přečtené ve smyčce se musí přidat na konec, v pořadí vstupu. Seznam na to má jednu metodu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  3 1 4 1
+output: 4
+        3 1 4 1
+```
+'''
+hints = [
+  "xs.append(x) — jedna hodnota, na konec.",
+  "insert(0, x) ji dá na začátek a obrátí pořadí.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.verybasic.12.vector-edit"
+title = "První bedna jde pryč"
+story = "První bedna na ranním seznamu se prodala, než se seznam přečetl; musí pryč a všechno za ní se posune o jedno výš."
+brief = '''
+`xs` drží celá čísla z řádku. Program musí odstranit prvek na indexu 0, aby se zbytek posunul dolů. Jeden příkaz maže podle indexu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  3 1 4 1
+output: 1 4 1
+```
+'''
+hints = [
+  "del xs[0] — del odebere políčko na indexu.",
+  "remove(0) hledá hodnotu 0, ne index.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.verybasic.13.list"
+title = "Začátek řetězu"
+story = "Rozvážkový řetěz visí u pultu a nejnovější lístek jde na začátek; chlapec ho pořád dává na konec."
+brief = '''
+`chain` je `deque`. Každé `x` přečtené ve smyčce se musí přidat na ZAČÁTEK, aby to poslední přečtené skončilo první. Deque má pro ten konec metodu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+hints = [
+  "chain.appendleft(x) — jedno slovo, bez podtržítka.",
+  "append(x) jde na konec.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.verybasic.14.maps"
+title = "Sešit se součty"
+story = "Jeden sešit na stánek, jeden řádek na položku, vedle každé počet; když se položka objeví poprvé, není řádek, ke kterému přičíst."
+brief = '''
+`counts` je dict. Pro každé slovo `w` musí program přičíst jedničku k jeho počtu, poprvé od nuly. `get` čte s výchozí hodnotou.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        har 1
+        mai 2
+        siu 2
+```
+'''
+hints = [
+  "counts[w] = counts.get(w, 0) + 1 — get s výchozí hodnotou a pak uložit.",
+  "+= 1 na chybějícím klíči vyvolá KeyError.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.verybasic.15.hashtable"
+title = "Vyhledání"
+story = "Tabulka stánků mapuje jméno na číslo a dotaz na stánek, který tam není, má říct -1, ne shodit tabuli."
+brief = '''
+`table` mapuje jména na čísla stánků. Pro slovo `w` musí program vypsat jeho číslo, nebo `-1`, když `w` v tabulce není. Metoda dictu čte s výchozí hodnotou.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  2
+        tofu 3
+        fish 7
+        egg
+output: -1
+```
+'''
+hints = [
+  "print(table.get(w, -1)) — druhý argument je výchozí hodnota.",
+  "table[w] vyvolá KeyError, když w chybí.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.verybasic.16.sets"
+title = "Různé ceny"
+story = "Šest stánků, čtyři různé ceny. Tabule chce, kolik je různých cen, a tiskne šest."
+brief = '''
+`xs` drží celá čísla z řádku. Program musí vypsat, kolik je RŮZNÝCH hodnot. Množina si nechá od každé jednu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  3 5 3 8 5 3
+output: 3
+```
+'''
+hints = [
+  "print(len(set(xs))) — set() zahodí duplicity, len počítá.",
+  "len(xs) počítá každou hodnotu, včetně duplicit.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.verybasic.17.stack"
+title = "Hromada talířů"
+story = "Talíře jdou na hromadu a berou se z vrchu; myčka pořád bere jeden zespodu."
+brief = '''
+`stack` je seznam použitý jako zásobník. Program musí vzít VRCHNÍ (poslední) prvek do `top`. Jedna metoda seznamu odebere a vrátí poslední položku.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  1 2 3 4
+output: 4
+        1 2 3
+```
+'''
+hints = [
+  "top = stack.pop() — bez argumentu znamená ten poslední.",
+  "stack[-1] přečte vršek, ale nechá ho na hromadě.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "python.verybasic.18.queue"
+title = "Fronta lístků"
+story = "Lístky se vyvolávají v pořadí, v jakém byly vzaty; chlapec pořád vyvolává ten nejnovější."
+brief = '''
+`q` je `deque` s lístky v pořadí. Program musí vzít PRVNÍ do `first`. Deque odebírá z čela jednou metodou.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  1 2 3 4
+output: 1
+        2 3 4
+```
+'''
+hints = [
+  "first = q.popleft() — jedno slovo.",
+  "pop() bere zezadu; q[0] čte bez odebrání.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "python.verybasic.19.heap"
+title = "Nejlevnější první"
+story = "Objednávky chodí v libovolném pořadí a kuchyně chce pokaždé tu nejlevnější další; hromada, na které leží, netuší, která to je."
+brief = '''
+`heap` začíná jako prázdný seznam. Každé `x` se musí vložit tak, aby `heapq.heappop` později vracel nejmenší první. `heapq` má push, který udrží pořadí haldy.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  5 1 4 2 3
+output: 1 2 3 4 5
+```
+'''
+hints = [
+  "heapq.heappush(heap, x) — funkce modulu, halda první.",
+  "append() dá x na konec a rozbije pořadí haldy.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "python.verybasic.20.sorting"
+title = "Cenový žebřík"
+story = "Ceny na tabuli jsou v pořadí, v jakém stánky otevřely, a zákazník je chce od nejlevnější."
+brief = '''
+`xs` drží celá čísla z řádku. Program musí `xs` seřadit na místě, vzestupně, než se vypíše. Seznam na to má metodu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  3 1 4 1
+output: 1 1 3 4
+```
+'''
+hints = [
+  "xs.sort() — se závorkami, jinak se nic nestane.",
+  "sorted(xs, reverse=True) je sestupně.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "python.verybasic.21.sort-by-key"
+title = "Žebříček"
+story = "Tabule kurýrů je skóre od nejvyššího a dva kurýři se stejným skóre jdou podle jména; tabule je v pořadí příchodu."
+brief = '''
+`rows` je seznam dvojic `(name, score)`. Musí se seřadit podle skóre sestupně, pak podle jména vzestupně. `sort` bere funkci `key`, která vrací n-tici.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  3
+        mei 7
+        alex 9
+        bo 7
+output: alex 9
+        bo 7
+        mei 7
+```
+'''
+hints = [
+  "rows.sort(key=lambda r: (-r[1], r[0])) — mínus skóre, aby šlo sestupně.",
+  "key= je pojmenovaný argument; sort žádnou poziční funkci nebere.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "python.verybasic.22.reverse"
+title = "Pozpátku"
+story = "Jméno sampanu je na zádi namalované pozpátku a lodní deník ho tak chce."
+brief = '''
+`s` je jeden řádek textu. Program ho musí vypsat obráceně. Řez s krokem -1 projde řetězec pozpátku.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  kwan lee
+output: eel nawk
+```
+'''
+hints = [
+  "print(s[::-1]) — prázdný začátek a konec, krok -1.",
+  "reversed(s) je iterátor; jeho vytištění ukáže adresu.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "python.verybasic.23.closures"
+title = "Přirážka"
+story = "Ovocný stánek přičítá stejnou přirážku ke každé velkoobchodní ceně a funkce, která si má přirážku pamatovat, ji zapomíná."
+brief = '''
+`make_adder(k)` definuje vnitřní funkci `add`, která vrací `x + k`. Musí vrátit tu vnitřní funkci samotnou, aby se `add(x)` dalo zavolat později s `k` zapamatovaným.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "return add — holé jméno, bez závorek.",
+  "add() ji zavolá bez argumentu a selže.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "python.verybasic.24.lambdas"
+title = "Sudé mocniny"
+story = "Sudě číslované stánky platí druhou mocninou svého čísla a liché neplatí nic; účetní kniha chce jeden součet."
+brief = '''
+`xs` drží celá čísla z řádku. `total` musí být součet druhých mocnin SUDÝCH hodnot, sestavený pomocí `map`, `filter` a dvou lambd.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "total = sum(map(lambda x: x * x, filter(lambda x: x % 2 == 0, xs)))",
+  "filter nechá to, pro co lambda řekne True; map proměňuje.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "python.verybasic.25.threads"
+title = "Dvanáct stánků najednou"
+story = "Každý stánek umocňuje svůj stav zásob na vlastním vlákně a objednávkový formulář se tiskne dřív, než kterýkoli skončí."
+brief = '''
+Každé vlákno v `threads` bylo spuštěno. Než se vypíšou výsledky, hlavní vlákno musí POČKAT, až každé skončí. Vlákno na to má jednu metodu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "t.join() — blokuje, dokud to vlákno neskončí.",
+  "start() podruhé vyvolá RuntimeError.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "python.verybasic.26.mutex"
+title = "Jedno počítadlo, čtyři ruce"
+story = "Čtyři pokladní přičítají k jednomu počítadlu ve stejnou chvíli; počítadlo má zámek a nikdo ho před zápisem nebere."
+brief = '''
+`lock` je `threading.Lock`. Před `counter += 1` musí každý pracovník zámek VZÍT; uvolnění je už napsané za zápisem. Jedna metoda ho získá.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  1000
+output: 4000
+```
+'''
+hints = [
+  "lock.acquire() — pak zápis, pak uvolnění, které tam už je.",
+  "Uvolnění zámku, který nikdo nedrží, vyvolá RuntimeError.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "python.verybasic.27.binary-tree"
+title = "None"
+story = "05:59 u cenové tabule: levá větev cenového stromu je None a první vložení na tu stranu spadne na zem."
+brief = '''
+`insert(n, v)` vrací kořen stromu s `v` uvnitř; prázdný případ a pravá strana jsou napsané. Pro menší `v` se levé dítě musí nahradit výsledkem vložení do něj, aby se z dítěte `None` stal uzel.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "n.left = insert(n.left, v) — rekurze vrací nový kořen podstromu; ulož ho.",
+  "Volání insert bez uložení výsledku nechá None tam, kde bylo.",
+]

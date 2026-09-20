@@ -98,6 +98,67 @@ const MASCOT_COMFY = 76;
 const MASCOT_WIDE = 0.62;
 
 /**
+ * The right-hand column, top to bottom: **the CODE PLAYGROUND tile first**,
+ * then the land's record strip, then the three roads, and at the foot the
+ * AUTO SELECT / language row.
+ *
+ * The tile used to sit at the bottom, under the roads and under a row of
+ * buttons, at a fifth of the column. The playground is one of the main things
+ * this game is (docs/agent.md) — the scratchpad with a compiler and the Rust
+ * coder behind it, the screen a player opens between every quest — and the
+ * last slot in a column is where a screen puts the thing it expects nobody to
+ * want. So it leads: the first thing in the column, and the tallest single
+ * thing in it.
+ *
+ * Pure, and font-free — every height comes in already measured — so the
+ * order and the fit are checkable without a canvas (`lands.test.ts`). The
+ * roads give way before the tile does, down to `floorH`; when even that does
+ * not fit, the tile drops to a button's height (`tight`) and *stays on top*.
+ * A road behind a tile is a road nobody can reach, and a tile at the bottom
+ * is the old screen back again.
+ */
+export interface RoadColumn {
+  /** The playground tile: the top of the column. */
+  tile: Rect;
+  /** The cleared/stars strip, under the tile. */
+  record: Rect;
+  /** One per road, in the order given, under the record. */
+  rows: Rect[];
+  /** The AUTO SELECT + language row: the foot of the column. */
+  buttons: Rect;
+  /** True when the tile had to shrink to a button's height to fit the roads. */
+  tight: boolean;
+}
+
+export function roadColumn(
+  panel: Rect,
+  roads: number,
+  gap: number,
+  recH: number,
+  floorH: number,
+  minRowH: number,
+  playH: number,
+  tileFull: number,
+): RoadColumn {
+  const [x, y, w, h] = panel;
+  // What the column needs with the tile at full height and every road at
+  // its floor: if even that overflows, the tile gives.
+  const fixed = recH + playH + gap * 4 + roads * (floorH + gap);
+  const tight = fixed + Math.max(playH, tileFull) > h;
+  const tileH = tight ? playH : Math.max(playH, tileFull);
+  const tile: Rect = [x, y, w, tileH];
+  const record: Rect = [x, y + tileH + gap, w, recH];
+  const buttons: Rect = [x, y + h - playH, w, playH];
+  const rowsTop = record[1] + recH + gap * 2;
+  const rowsBottom = buttons[1] - gap * 2;
+  const share = Math.floor((rowsBottom - rowsTop) / Math.max(1, roads)) - gap;
+  const rowH = Math.max(floorH, Math.min(minRowH, share));
+  const rows: Rect[] = [];
+  for (let i = 0; i < roads; i++) rows.push([x, rowsTop + i * (rowH + gap), w, rowH]);
+  return { tile, record, rows, buttons, tight };
+}
+
+/**
  * Cut already-wrapped lines to at most `max`, marking the cut.
  *
  * The ellipsis goes on the **last line kept**, not on a line of its own, so a
@@ -204,6 +265,7 @@ export function landGrid(
 }
 
 const CAT_LINE: Record<Category, () => string> = {
+  verybasic: () => t("lands.verybasicBlurb"),
   basic: () => t("lands.basicBlurb"),
   advanced: () => t("lands.advancedBlurb"),
   hacker: () => t("lands.hackerBlurb"),
@@ -388,12 +450,17 @@ export class LandsScene implements Scene {
     // The name at the road's size when it fits, a step down when it does
     // not: a title elided to "CODE PLAYGR…" is a tile that cannot say what
     // it is, and the languages' names for it are longer than the English.
+    // A step *up* when the tile is tall enough to carry it: this is the
+    // column's lead, and a lead set in the roads' face reads as a fourth road.
+    const roomy = !tight && h >= Math.round(84 * s);
     const titleFont =
-      width(fonts.button, title) <= tw
-        ? fonts.button
-        : width(fonts.station, title) <= tw
-          ? fonts.station
-          : fonts.small;
+      roomy && width(fonts.stamp, title) <= tw
+        ? fonts.stamp
+        : width(fonts.button, title) <= tw
+          ? fonts.button
+          : width(fonts.station, title) <= tw
+            ? fonts.station
+            : fonts.small;
     if (tight) {
       g.fillStyle = css(Theme.coin, 0.85 + 0.15 * lit);
       printf(
@@ -863,7 +930,7 @@ export class LandsScene implements Scene {
       const row = this.lands.find((l) => l.land === this.land);
       // A fixed order, not the server's. `world.lands` does not promise one, and
       // a map whose rows move between sessions is a map you cannot learn.
-      const ORDER: Category[] = ["basic", "advanced", "hacker"];
+      const ORDER: Category[] = ["verybasic", "basic", "advanced", "hacker"];
       const cats: CategorySummary[] = row
         ? ORDER.map((c) => row.categories.find((x) => x.category === c)).filter(
             (c): c is CategorySummary => c !== undefined,
@@ -895,8 +962,38 @@ export class LandsScene implements Scene {
       // space on either side.
       const rec = this.record(this.land);
       const recH = fonts.stationSm.height + Math.round(14 * s);
-      fill(g, Theme.navy, right[0], right[1], right[2], recH, 0.9);
-      fill(g, landColour(this.land), right[0], right[1], Math.round(3 * s), recH);
+      const minRowH = Math.max(layout.minTouchH(), Math.round(fonts.button.height + 52 * s));
+      // The AUTO SELECT / language row's height, and the least the tile may be.
+      const playH = Math.max(
+        layout.minTouchH(),
+        fonts.button.height + 20,
+        fonts.small.height * 2 + Math.round(4 * s),
+      );
+      // **The CODE PLAYGROUND tile leads the column.** It is the main feature
+      // of this screen after the land itself (docs/agent.md): a scratchpad
+      // with a compiler and the Rust coder behind it. It used to be a strip
+      // at the foot of the column at a fifth of the height, under the roads
+      // and under a row of buttons — the slot a screen gives to the thing it
+      // expects nobody to want. Now it is first and the tallest single thing
+      // in the column: three tenths of the panel, with its emblem and the
+      // coder hovering over it. See `roadColumn` for the order and the fit.
+      const tileFull = Math.max(playH, Math.round(Math.min(150 * s, right[3] * 0.3)));
+      const floorH = fonts.button.height + Math.round(14 * s);
+      const col = roadColumn(right, cats.length, gap, recH, floorH, minRowH, playH, tileFull);
+      const tight = col.tight;
+      const rowH = col.rows[0]?.[3] ?? floorH;
+
+      // The tile, first.
+      this.drawPlaygroundTile(g, col.tile, s, tight);
+      this.landBtns.add({
+        id: "playground",
+        rect: col.tile,
+        label: t("lands.codePlayground"),
+      });
+
+      const [recX, recY] = col.record;
+      fill(g, Theme.navy, recX, recY, right[2], recH, 0.9);
+      fill(g, landColour(this.land), recX, recY, Math.round(3 * s), recH);
       g.fillStyle = css(Theme.cream);
       printf(
         g,
@@ -905,7 +1002,7 @@ export class LandsScene implements Scene {
           ? t("lands.clearedOf", { cleared: rec.cleared, total: rec.total })
           : t("lands.nothingYet"),
         right[0] + Math.round(12 * s),
-        right[1] + Math.round(7 * s),
+        recY + Math.round(7 * s),
         right[2] - Math.round(24 * s),
         "left",
       );
@@ -915,7 +1012,7 @@ export class LandsScene implements Scene {
         fonts.stationSm,
         `★ ${rec.stars}`,
         right[0],
-        right[1] + Math.round(7 * s),
+        recY + Math.round(7 * s),
         right[2] - Math.round(12 * s),
         "right",
       );
@@ -924,45 +1021,19 @@ export class LandsScene implements Scene {
           g,
           Theme.admit,
           right[0],
-          right[1] + recH - 2,
+          recY + recH - 2,
           Math.round((right[2] * rec.cleared) / rec.total),
           2,
         );
       }
 
-      const rowsTop = right[1] + recH + gap * 2;
-      const minRowH = Math.max(layout.minTouchH(), Math.round(fonts.button.height + 52 * s));
-      // The scratchpad lives under the three roads, with its own band of air,
-      // because it is not a fourth road: nothing there is scored.
-      const playH = Math.max(
-        layout.minTouchH(),
-        fonts.button.height + 20,
-        fonts.small.height * 2 + Math.round(4 * s),
-      );
-      // Under the three roads: one row of two small buttons — AUTO SELECT and
-      // the language — and under that **the CODE PLAYGROUND tile**, as tall as
-      // a road, with its own emblem and the Rust coder hovering over it. The
-      // playground is one of the main things this game is (docs/agent.md),
-      // and a small button in the corner said otherwise.
-      //
-      // The tile gives way first: when the column cannot afford its full
-      // height it drops to a button's, keeps its emblem, and the roads keep
-      // theirs. A road behind a tile is a road nobody can reach.
-      const tileFull = Math.max(playH, Math.round(Math.min(96 * s, right[3] * 0.2)));
-      const floorH = fonts.button.height + Math.round(14 * s);
-      const needed = cats.length * (floorH + gap) + playH + tileFull + gap * 3;
-      const tight = needed > right[3] - (rowsTop - right[1]);
-      const tileH = tight ? playH : tileFull;
-      const buttonBand = playH + tileH + gap * 3;
-      const rowsBottom = right[1] + right[3] - buttonBand;
-      // The rows share what the column has. Both heights above are
-      // preferences, not floors — including the finger floor: in a phone's
-      // browser, with its own chrome taking a fifth of the screen, three
-      // rows at `minTouchH` ran under the two buttons below them and HACKER
-      // was a road nobody could see. A row shorter than a fingertip can
-      // still be read and still be tapped; a row behind a button cannot.
-      const share = Math.floor((rowsBottom - rowsTop) / cats.length) - gap;
-      const rowH = Math.max(floorH, Math.min(minRowH, share));
+      // The rows share what the column has, under the tile and the record
+      // and above the buttons. Both heights are preferences, not floors —
+      // including the finger floor: in a phone's browser, with its own chrome
+      // taking a fifth of the screen, three rows at `minTouchH` ran under the
+      // two buttons below them and HACKER was a road nobody could see. A row
+      // shorter than a fingertip can still be read and still be tapped; a row
+      // behind a button cannot. `roadColumn` did the arithmetic above.
 
       // **One column for the counts, decided once for every row.** Each row
       // used to decide alone whether its count fitted beside its name, and
@@ -995,7 +1066,7 @@ export class LandsScene implements Scene {
       );
       const inlineAll = nameW + countW + Math.round(8 * s) <= colTw;
 
-      let y = rowsTop;
+      let y = col.rows[0]?.[1] ?? col.record[1] + recH + gap * 2;
       for (const c of cats) {
         // Nothing is *locked* (PROTOCOL §4.7): a road with streets in it is a
         // road you may walk down today, whatever you have cleared. `open` is
@@ -1217,7 +1288,7 @@ export class LandsScene implements Scene {
         layout.minTouchH(),
       );
       const abw = Math.max(aw, Math.round(right[2] * 0.4));
-      const aby = right[1] + right[3] - tileH - gap - playH;
+      const aby = col.buttons[1];
       const ahov = this.landBtns.hovered === "auto";
       pixBtn(g, fonts.button, right[0], aby, abw, playH, t("lands.autoSelect"), {
         hover: ahov,
@@ -1241,15 +1312,6 @@ export class LandsScene implements Scene {
       const lhov = this.landBtns.hovered === "lang";
       pixBtn(g, fonts.button, lbx, aby, lw, playH, langLabel, { hover: lhov, quiet: !lhov });
       this.landBtns.add({ id: "lang", rect: [lbx, aby, lw, playH], label: langLabel });
-
-      // The tile.
-      const pby = right[1] + right[3] - tileH;
-      this.drawPlaygroundTile(g, [right[0], pby, right[2], tileH], s, tight);
-      this.landBtns.add({
-        id: "playground",
-        rect: [right[0], pby, right[2], tileH],
-        label: t("lands.codePlayground"),
-      });
 
       if (this.error) {
         g.fillStyle = css(Theme.red);

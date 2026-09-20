@@ -36,11 +36,13 @@ id    = "go.basic.02.vars"
 title = "八達通讀卡機"
 story = "天后站部讀卡機顯示咗餘額之後，本來顯示每日上限同按金嗰兩格，而家係兩個空格。"
 brief = '''
-由標準輸入讀一個整數 `n`。
+變數用 `var` 宣告，或者用 `:=` 即場整一個，佢會由右手邊攞型別。`fmt.Println` 印出佢嘅參數，中間隔一個空格，尾加換行。`int64` 嘅算術結果仍然係 `int64`：`n * n` 係另一個整數。
 
-印三行：`n`，然後 `n` 嘅兩倍，然後 `n` 乘以自己。
+```
+fmt.Println(n * n)
+```
 
-`n` 放得入 `int64`，而且可以係負數。
+餘額 `n` 已經讀咗同印咗，`n * 2` 亦印咗。寫第三個 print：`n` 乘自己。
 
 ```
 input:  12
@@ -50,512 +52,732 @@ output: 12
 ```
 '''
 hints = [
-  "讀入嗰部分已經幫你做咗；n 已經裝住個值。",
-  "fmt.Println 乜嘢值都收，所以呢度唔使格式字串。",
-  "負數 n 平方之後係正數。個測試知道嘅。",
+  "fmt.Println(n * n)",
+  "同上面嗰行一樣形狀：n * 2 變做 n * n。",
 ]
 
 # ---------------------------------------------------------------- 03
 [[quest]]
-id    = "go.basic.03.control-flow"
-title = "電車定港鐵"
-story = "銅鑼灣站大堂個板本來係話邊班車到緊。而家佢每一分鐘都只係顯示嗰分鐘嘅數字。"
+id    = "go.basic.03.types"
+title = "車費分單"
+story = "天后個 Lucky Mac 櫃台，兩個車手分一張單，張收據印出嘅份額係一個整數、一個餘數，然後先係真正嘅數字。"
 brief = '''
-讀一個整數 `n`。對每個由 `1` 到 `n` 嘅 `i`，印一行：
-
-* `i` 同時被 3 同 5 整除就印 `TRAMMTR`
-* `i` 被 3 整除就印 `TRAM`
-* `i` 被 5 整除就印 `MTR`
-* 否則印 `i` 本身
+Go 永遠唔會幫你轉數。兩個整數嘅 `a / b` 係整數除法（向零捨去），`a % b` 係餘數。想要真正嘅商就要先用 `float64(...)` 轉兩邊，`fmt.Printf` 配 `%.2f` 會印出小數點後準確兩位嘅浮點數。
 
 ```
-input:  5
-output: 1
-        2
-        TRAM
-        4
-        MTR
+fmt.Printf("%.2f\n", float64(a)/float64(b))
 ```
 
-Go 嘅 `switch` 可以冇 subject，每個 arm 收一個布林條件，而且唔會 fall through。
-用佢。
+整數份額同餘數已經印咗。寫第三行：真正嘅份額，兩位小數。
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
 '''
 hints = [
-  "先 check 兩樣都中嘅情況，唔係佢永遠都唔會觸發。",
-  "switch { case cond: } 唔使 subject，亦都唔使 break。",
-  "被 3 同 5 整除，即係被 15 整除。",
+  "fmt.Printf(\"%.2f\\n\", float64(a)/float64(b))",
+  "兩邊都要轉：float64(a) / b 編譯唔過，因為 float64 同 int64 唔可以相除。",
 ]
 
 # ---------------------------------------------------------------- 04
 [[quest]]
-id    = "go.basic.04.slices"
-title = "車廂中間"
-story = "2 號月台數到邊個最先上車、邊個最後上車，中間嘅人全部唔見晒。"
+id    = "go.basic.04.strings"
+title = "站名"
+story = "銅鑼灣個月台牌顯示一次站名，然後大楷嗰度係空嘅，再然後鏡面嗰邊倒轉寫嗰度又係空嘅。"
 brief = '''
-標準輸入第一行係個數量 `n`，第二行係 `n` 個整數，用空格分開。`n` 至少係 `1`。
-
-印三行：第一個值、最後一個值，同埋嚴格喺佢哋兩個之間所有值嘅總和。少過三個值嘅話，
-嗰個總和係 `0`。
+`string` 係一個唯讀嘅 byte slice。`len(s)` 係佢嘅 byte 長度，`strings` package 有日常嘅轉換，想逐個字元行就將佢轉做 `[]rune`。下面個 `reverse` helper 就係做呢個行走；你淨係要呼叫佢。
 
 ```
-input:  5
-        4 8 15 16 23
-output: 4
-        23
-        39
+fmt.Println(strings.ToUpper(line))
+fmt.Println(reverse(line))
+```
+
+長度已經印咗。寫下面兩行：個名嘅大楷，然後個名倒轉。
+
+```
+input:  causeway bay
+output: 12
+        CAUSEWAY BAY
+        yab yawesuac
 ```
 '''
 hints = [
-  "nums[1:len(nums)-1] 同原本嗰個共用同一個 backing array — 佢係一個 view，唔係 copy。",
-  "得一個或者兩個值嘅時候，嗰個 slice 表達式會係空或者無效；用 if 守住佢。",
-  "range 一個 slice 會畀你 index 同 value；唔要 index 就用 _ 頂住。",
+  "fmt.Println(strings.ToUpper(line)) 然後 fmt.Println(reverse(line))。",
+  "_ = strings.ToUpper 嗰行淨係為咗令 import 有用到；你真係呼叫 strings.ToUpper 之後就刪走佢。",
 ]
 
 # ---------------------------------------------------------------- 05
 [[quest]]
-id    = "go.basic.05.maps"
-title = "大堂嗌緊乜"
-story = "九點鐘嘅銅鑼灣轉車站。廣播板想要個排名，但係 map 係冇次序嘅。"
+id    = "go.basic.05.loops"
+title = "每第三班車"
+story = "金鐘個開出班次牌應該要加埋朝早嘅班次，再講有幾多班係每第三班嘅特快。佢顯示兩個零。"
 brief = '''
-讀晒成個標準輸入，按空白字元切開。
-
-每個唔同嘅字印一次，格式係 `<word> <count>`，按次數由多到少排，次數一樣就按字由細到大排。
+Go 淨係得一個迴圈關鍵字。`for init; condition; step { }` 用嚟數數，入面嘅 `if` 唔使括號，淨係要大括號。`sum += i` 原地加落一個變數，`i%3 == 0` 就係問 `i` 係咪 3 嘅倍數。
 
 ```
-input:  tram tram bus
-output: tram 2
-        bus 1
+for i := 1; i <= n; i++ {
+	sum += i
+	if i%3 == 0 { threes++ }
+}
 ```
 
-喺 Go 入面 range 一個 map，次序係刻意隨機嘅。印之前先收集好。
+迴圈開頭已經寫好。填佢嘅主體：將 `i` 加落 `sum`，係 3 嘅倍數就喺 `threes` 數一下（一個 `if` 寫一行都得）。
+
+```
+input:  10
+output: 55
+        3
+```
 '''
 hints = [
-  "counts[word]++ 對唔存在嘅 key 都得：int 嘅零值係 0。",
-  "sort.Slice 收一個 less function — i 要排喺 j 前面嘅時候就 return true。",
-  "打和嘅處理就係同一個 function 入面嘅第二個比較。",
+  "一行 sum += i，下一行 if i%3 == 0 { threes++ }。",
+  "if 就算得一個陳述式都要大括號；但唔使括號。",
 ]
 
 # ---------------------------------------------------------------- 06
 [[quest]]
-id    = "go.basic.06.strings"
-title = "byte 唔係字"
-story = "B 出口個指示牌將「銅鑼灣」截到三個 byte，出嚟係一個半字加一個問號。"
+id    = "go.basic.06.functions"
+title = "車手嘅費率"
+story = "Alex 個外賣 app 一更頭十程一個價，之後另一個價，廚房部平板上面個派錢函數對所有人都回傳零。"
 brief = '''
-讀一行。印三行：
-
-1. 佢有幾多個 **byte**
-2. 佢有幾多個 **rune**
-3. 呢一行嘅 rune 倒轉排
+函數嘅參數名後面跟型別，結果型別喺括號後面。`return` 帶住一個值結束佢；`if` 入面嘅 `return` 會提早結束，所以 `if` 之後嗰行淨係喺條件為假嘅時候先會行。
 
 ```
-input:  causeway
-output: 8
-        8
-        yawesuac
+func fare(rides int) int {
+	if rides <= 10 { return rides * 5 }
+	return 50 + (rides-10)*3
+}
 ```
 
-呢一行可能有 ASCII 以外嘅字元，嗰陣頭兩個數字就唔會一樣。`len(s)` 係 byte 數，
-一直都係。
+頭十程每程畀 5，之後每程畀 3。`fare` 已經宣告同呼叫；寫佢嘅主體：十程或以下嘅提早 `return`，同其餘嘅 `return`。
+
+```
+input:  12
+output: 56
+```
 '''
 hints = [
-  "len(line) 係 byte 數；[]rune(line) 係解碼之後嗰個。",
-  "倒轉個 byte slice 會將一個多 byte 嘅字元切開兩半。",
-  "兩個 index 由兩邊行埋嚟，一邊行一邊交換，成個倒轉就係咁。",
+  "if rides <= 10 { return rides * 5 } 然後 return 50 + (rides-10)*3。",
+  "十程每程 5 就係 50；第二條公式由嗰度開始數。",
 ]
 
 # ---------------------------------------------------------------- 07
 [[quest]]
 id    = "go.basic.07.structs"
-title = "收銀機"
-story = "Lucky Mac 個櫃檯加咗一行落張單，到下一行嗰陣佢已經唔見咗。個 method 攞咗個 copy。"
+title = "單上面一行"
+story = "Lucky Mac 個落單螢幕每件嘢一行 — 名、價錢、幾多件 — 而每一行嘅總數欄都係零。"
 brief = '''
-標準輸入係個數量 `n`，然後 `n` 行 `<ITEM> <CENTS>`。
-
-將啲項目收集喺一個 `Till` 度，然後按到達次序將每個項目印返出嚟，格式係
-`<ITEM> <CENTS>`，最後印 `TOTAL <sum>`。
+`struct` 將幾個有名嘅 field 放埋一齊。佢嘅值用一個命名 field 嘅字面量砌出嚟，method 係一個名前面有 receiver 嘅函數：`func (it Item) Total() int` 用 `it.Total()` 呼叫，經 `it` 讀 field。
 
 ```
-input:  2
-        HASHBROWN 600
-        SET 2800
-output: HASHBROWN 600
-        SET 2800
-        TOTAL 3400
+it := Item{Name: name, Price: price, Qty: qty}
+return it.Price * it.Qty
 ```
 
-`n` 可以係 `0`，嗰陣唯一嗰行就係 `TOTAL 0`。
+`Item` 同佢嘅 `Total` method 已經宣告。寫用讀入嘅三個值砌 `it` 嘅字面量，同 `Total` 嘅一行主體。
 
-value receiver 嘅 method 攞到嘅係個 till 嘅 copy。`Add` 一定要改到真嗰個。
+```
+input:  tea 12 3
+output: tea: 36
+```
 '''
 hints = [
-  "func (t *Till) Add — pointer receiver 改嘅係 caller 手上嗰個 till。",
-  "till.Add(...) 照樣寫都得；因為 till 係 addressable，Go 會自動幫你攞地址。",
-  "Total 只係讀，但係同一個 type 上面嘅 receiver 要保持一致。",
+  "it := Item{Name: name, Price: price, Qty: qty} — 而 Total 入面 return it.Price * it.Qty。",
+  "字面量用咗三個名之後就刪走 _, _, _ = 嗰行；Go 唔接受冇用嘅變數。",
 ]
 
 # ---------------------------------------------------------------- 08
 [[quest]]
-id    = "go.basic.08.interfaces"
-title = "一張清單，兩樣嘢"
-story = "希慎廣場個指示牌同出面個電車站係兩個唔同嘅程式印嘅，邊個都放唔入對方嘅清單。"
+id    = "go.basic.08.enums"
+title = "路線顏色"
+story = "金鐘個轉車站地圖識得三條線嘅名，但係全部油成灰色。"
 brief = '''
-標準輸入係個數量 `n`，然後 `n` 行，每行係以下其中一種
-
-* `SHOP <NAME> <FLOOR>` — 顯示成 `<NAME> / F<FLOOR>`
-* `STOP <ROUTE>` — 顯示成 `TRAM <ROUTE>`
-
-按次序印出每個 sign 顯示嘅樣，然後印 `SIGNS <n>`，再印 `SHOPS <k>`，`k` 係入面
-有幾多個係舖頭 — 要用 **type switch** 數，唔係用你 parse 嗰陣留低嘅 flag。
+Go 冇 `enum` 關鍵字。慣用做法係一個命名嘅整數型別，加一個用 `iota` 嘅 `const` 區塊，佢會由上到下將常數編做 0、1、2。對住呢種值嘅 `switch` 每個常數列一個 `case`，`case` 可以同佢嘅 `return` 寫喺同一行。
 
 ```
-input:  3
-        SHOP HYSAN 4
-        STOP 2
-        SHOP SOGO 1
-output: HYSAN / F4
-        TRAM 2
-        SOGO / F1
-        SIGNS 3
-        SHOPS 2
+type Line int
+
+const (
+	Island Line = iota
+	TsuenWan
+	KwunTong
+)
+
+switch l {
+case Island: return "blue"
+case TsuenWan: return "red"
+case KwunTong: return "green"
+}
+```
+
+`Line`、佢嘅三個常數同 `parse` 已經寫好，`colour` 對 `Island` 已經答 `blue`。加埋欠嘅兩個 case：`TsuenWan` 係 `red`，`KwunTong` 係 `green`。
+
+```
+input:  tsuenwan
+output: red
 ```
 '''
 hints = [
-  "冇 `implements` 呢個 keyword。畀每個 struct 一個 Render() string method，佢就滿足 Sign。",
-  "直接將個具體值 append 入 []Sign — Go 會幫你包住佢。",
-  "switch sign.(type) { case Shop: } 就係 type switch；要攞個值嘅寫法係 switch v := sign.(type)。",
+  "case TsuenWan: return \"red\" 同 case KwunTong: return \"green\"，各自一行，放喺 Island 嗰個 case 下面。",
+  "Go 嘅 switch 唔會 fall through：每個 case 自己完，唔使 break。",
 ]
 
 # ---------------------------------------------------------------- 09
 [[quest]]
-id    = "go.basic.09.errors"
-title = "唔係數字嗰一行"
-story = "騎手記錄由車廠送返嚟，個欄中間夾住咗唔知邊個嘅午餐單。"
+id    = "go.basic.09.vector"
+title = "車廂點數"
+story = "銅鑼灣 2 號月台由每道門讀上車人數，但一個都冇留低：冇總數，冇第一道門，冇最後一道。"
 brief = '''
-標準輸入係個數量 `n`，然後 `n` 行。每行應該係一個整數。
-
-每一行，印個值嘅兩倍，或者 parse 唔到就印 `BAD <line>`。最後印 `SUM <total>`，
-即係你印過嗰啲值嘅總和。
+slice 係 Go 嘅可加長列表，對佢做嘅三件事就係下面三行。`append` 加喺尾
+再將個 slice 交返畀你，所以永遠要賦返落去。刪走 index 1 又係 `append`：
+佢前面嗰截駁埋佢後面嗰截。改就係普通索引 —— `xs[0] = 99` 就地覆蓋第一個。
+`sort.Ints` 將成個 slice 就地由細到大排好。
 
 ```
-input:  3
-        21
-        xx
-        -4
-output: 42
-        BAD xx
-        -8
-        SUM 34
+xs = append(xs, v)
+xs = append(xs[:1], xs[2:]...)
+xs[0] = 99
+sort.Ints(xs)
 ```
 
-定義一個 sentinel `var ErrNotANumber = errors.New(...)`，用
-`fmt.Errorf("...: %w", ErrNotANumber)` 包住佢，再喺 `main` 入面用 `errors.Is`
-認返佢出嚟。error 係一個值；呢樣嘢就係咁樣換返嚟嘅。
+每個門數 `v` 喺一個迴圈入面讀入（至少兩個）。喺迴圈入面打 `append`，之後
+打刪、改同排序，代替四個佔位；長度同個 slice 會印出嚟。
+
+```
+input:  3 7 2 5
+output: 3
+        2 5 99
+```
 '''
 hints = [
-  "strconv.ParseInt(s, 10, 64) 回傳 (int64, error) — 第二個值唔係話唔睇就得。",
-  "fmt.Errorf 入面嘅 %w 令被包住嘅 error 仲搵得返；%v 就會將佢壓成純文字。",
-  "errors.Is 會沿住成條 wrap chain 行，所以個訊息加咗嘢之後佢照樣認得。",
+  "迴圈入面 xs = append(xs, v)；之後 xs = append(xs[:1], xs[2:]...)、xs[0] = 99 同 sort.Ints(xs)。",
+  "xs[:1] 係 index 1 之前嘅全部，xs[2:] 係之後嘅全部；append 將兩截駁埋，個 ... 將第二個 slice 攤開做參數。",
 ]
 
 # ---------------------------------------------------------------- 10
 [[quest]]
-id    = "go.basic.10.closures"
-title = "門口人數"
-story = "Lucky Mac 數住邊個入嚟邊個出去，經理想要收舖嗰陣個數，中間發生咩事都好。"
+id    = "go.basic.10.maps"
+title = "落單點算"
+story = "Lucky Mac 廚房部打印機每嗌一樣嘢就吐一張，但從來唔講呢個高峰期每樣嘢實際落咗幾多。"
 brief = '''
-標準輸入係個數量 `n`，然後 `n` 行，每行係 `IN` 或者 `OUT`。
-
-維持一個永遠唔會跌到零以下嘅計數。每個指令之後印一次個數。`main` return 嗰陣，
-印 `CLOSED <final>` — 要由 `defer` 印，唔係喺 function 尾印。
+`map[string]int` 用一個字做 key 存一個計數。加係 `counts[w]++` —— 冇嘅
+key 讀出嚟係零，所以第一次見到就變 1。刪係 `delete(counts, k)`，key 唔喺度
+就靜靜地乜都唔做。改係賦值：`counts["bun"] = 10` 覆蓋嗰個 key 下面嘅計數
+（唔存在就會插入）。map 冇次序 —— range 出嚟係亂嘅 —— 所以啲 key 收集入
+一個 slice（已經寫好），印之前用 `sort.Strings` 排好。
 
 ```
-input:  4
-        IN
-        IN
-        OUT
-        IN
-output: 1
-        2
-        1
-        2
-        CLOSED 2
+counts[w]++
+delete(counts, "tea")
+counts["bun"] = 10
+sort.Strings(keys)
 ```
 
-個計數器本身係一個 closure：一個回傳 function 嘅 function，個總數就夾喺佢哋兩個
-之間。答案入面冇 package 層級嘅變數。
+每個字 `w` 喺一個迴圈入面讀入。喺迴圈入面打計數，之後打 `delete` 走 `tea`
+同改 `bun`，`keys` 砌好之後打排序，代替四個佔位；排好嘅 `字 計數` 會逐行印。
+
+```
+input:  tea bun tea rice tea bun
+output: bun 10
+        rice 1
+```
 '''
 hints = [
-  "total 住喺 makeCounter 個 frame 入面，回傳嗰個 function 令佢一直生存。呢個就係 closure。",
-  "defer func(){ ... }() 喺 return 嗰陣先行，而個 closure 係嗰陣先讀 `last` — 唔係寫 defer 嗰陣。",
-  "如果個 defer 係收 argument 嘅，佢就會喺 defer 嗰一刻攞住個值。兩樣都試下，睇下佢點變。",
+  "迴圈入面 counts[w]++；之後 delete(counts, \"tea\") 同 counts[\"bun\"] = 10；keys 砌好之後 sort.Strings(keys)。",
+  "向一個 key 賦值，key 存唔存在都係同一行：存在就覆蓋，唔存在就插入。",
 ]
 
 # ---------------------------------------------------------------- 11
 [[quest]]
-id    = "go.basic.11.generics"
-title = "一個 function，任何 list"
-story = "Alex 已經寫咗四次 Sum — 訂單一次、騎手一次、分鐘一次、仙一次 — 第五次就嚟到期。"
+id    = "go.basic.11.sets"
+title = "唔同嘅車手"
+story = "一朝早有四十個車手號碼經過 Lucky Mac 道門，大部分都係嗰八個人，但更表塊板將每次到嚟都當係新車手。"
 brief = '''
-標準輸入係一行整數，用空格分開。
-
-印三行：
-
-1. 每個值嘅兩倍，用單個空格連埋
-2. 原本啲值嘅總和
-3. 有幾多個大過 `10`
+Go 冇 set 類型；值類型係空 struct 嘅 map 就係慣用寫法。加係
+`seen[v] = struct{}{}`；刪係 `delete`。set 冇改 —— 成員只有喺度或者唔喺度
+—— 所以將 `3` 變做 `4` 係一刪一加，呢度寫喺同一行。`len(seen)` 係唔重複嘅
+數目；啲 key 出嚟冇次序，所以收集入一個 slice（已經寫好），用 `sort.Ints`
+排好。
 
 ```
-input:  1 2 3 4 12
-output: 2 4 6 8 24
-        22
-        1
+seen[v] = struct{}{}
+delete(seen, 8)
+delete(seen, 3); seen[4] = struct{}{}
+sort.Ints(keys)
 ```
 
-寫三個泛型 helper 而且要用佢哋：`MapSlice[T, U any]`、用 `~int64 | ~float64`
-constraint 嘅 `Sum[T Number]`，同埋收一個 predicate 嘅 `Count[T any]`。
+每個車手號碼 `v` 喺一個迴圈入面讀入。喺迴圈入面打加，之後打刪 `8` 同
+`3` 變 `4` 嘅改，`keys` 砌好之後打排序，代替四個佔位；唔重複嘅數目同排好
+嘅號碼會印出嚟。
+
+```
+input:  8 3 8 5 3 8
+output: 2
+        4 5
+```
 '''
 hints = [
-  "MapSlice 會改變元素嘅 type，所以佢要兩個 type parameter，唔係一個。",
-  "call site 會由個 slice 同個 function 推斷出 T 同 U — 你唔使寫 MapSlice[int64, string]。",
-  "~int64 嘅意思係 int64 加埋任何 underlying type 係 int64 嘅嘢，named type 就係咁樣過到關。",
+  "迴圈入面 seen[v] = struct{}{}；之後 delete(seen, 8) 同 delete(seen, 3); seen[4] = struct{}{}；keys 砌好之後 sort.Ints(keys)。",
+  "delete 一個唔喺度嘅值乜都唔做，加一個已經喺度嘅乜都唔變：無論輸入係乜，改嘅兩半都可以安全咁行。",
 ]
 
 # ---------------------------------------------------------------- 12
 [[quest]]
-id    = "go.basic.12.defer-panic-recover"
-title = "跌低咗又企返起身"
-story = "以前一張壞單就可以令成部收銀機死機，成個更嘅記錄一齊冇埋。"
+id    = "go.basic.12.stack-queue"
+title = "碟同條隊"
+story = "Lucky Mac 出餐位啲乾淨碟一隻疊一隻，由最頂攞走；啲客喺收銀機前排隊，由最前面走。個螢幕將兩樣嘢做成一樣。"
 brief = '''
-標準輸入係個數量 `n`，然後 `n` 行。每行係一個整數、`BOOM` 呢個字，或者其他嘢。
-
-寫 `run(text string) (out string)`，回傳個值嘅兩倍，parse 唔到就回傳 `BAD <text>`
-— 遇到 `BOOM` 就 **panic**，然後喺一個 deferred function 入面 recover，等 caller
-攞到 `RECOVERED boom`，而唔係一個死咗嘅程式。每個輸入印一行，最後由 `main` 入面
-嘅 `defer` 印 `CLOSED <n>`。
+slice 就係 stack。推入係 `append`；彈出係將最後一個元素切走；頂係
+`stack[len(stack)-1]`，可以直接賦值 —— 唔使拎走就改到最頂嗰隻碟。queue
+嗰邊用 `queue = queue[1:]` 由前面攞，已經寫好。stack 永遠唔會排序 —— 次序
+*本身*就係佢嘅重點 —— 所以呢個練習係三行，唔係四行。
 
 ```
-input:  4
-        21
-        BOOM
-        xx
-        -4
-output: 42
-        RECOVERED boom
-        BAD xx
-        -8
-        CLOSED 4
+stack = append(stack, v)
+stack = stack[:len(stack)-1]
+stack[len(stack)-1] = 99
 ```
 
-三件事，三件都係考點：`recover` 只係喺 deferred function 入面先有作用；
-**named** return value 係令 deferred function 可以喺 panic 之後改變回傳值嘅關鍵；
-`main` 入面嘅 `defer` 喺 return 嗰陣先行，所以個 loop 點行都好，`CLOSED` 一定係
-最後一行。
+啲數讀入 `xs`（至少兩個）。喺 `xs` 嘅迴圈入面打推入，之後打彈出同改頂，
+代替三個佔位；stack 同 queue 嘅頭兩個會印出嚟。
+
+```
+input:  1 2 3 4
+output: 1 2 99
+        1 2
+```
 '''
 hints = [
-  "回傳值一定要有名 — out string — 唔係嘅話個 deferred function 冇嘢可以 assign。",
-  "冇 panic 嘅時候 recover() 回傳 nil，所以個 if 就係分辨兩條路嘅方法。",
-  "main 入面嗰個 deferred closure 係行嗰陣先讀 `done`，唔係寫嗰陣，所以佢見到嘅係最終嘅數。",
+  "迴圈入面 stack = append(stack, v)；之後 stack = stack[:len(stack)-1] 同 stack[len(stack)-1] = 99。",
+  "彈出係將 slice 收窄；冇嘢被抄，亦冇嘢被釋放。彈出之後，len(stack)-1 指嘅係原本頂下面嗰個元素。",
 ]
 
 # ---------------------------------------------------------------- 13
 [[quest]]
-id    = "go.basic.13.zero-values"
-title = "冇嘢唔等於冇嘢"
-story = "更表個 map 從來冇整過出嚟，段碼成個朝早讀住佢，一次都冇投訴過。"
+id    = "go.basic.13.sorting"
+title = "到站牌"
+story = "天后個到站牌按數據入嚟嘅次序列出下幾班車，即係根本冇次序。"
 brief = '''
-標準輸入係個數量 `n`，然後 `n` 個字。
-
-按次序印四行：
-
-1. `READ <v>` — 一個 **nil** map 對一個佢冇嘅 key 會畀你乜
-2. `LEN <k>` — 將全部 `n` 個字 append 入一個 **nil** slice 之後嘅長度
-3. `WRITE <ok|panic>` — 向嗰個 nil map assign 有冇 panic
-   （要 recover 佢；唔好畀個程式死）
-4. `FOUND <k>` — 有幾多個字係一個*已初始化*、預先放咗 `a` 同 `b` 嘅 map 嘅 key
+`sort` package 原地排序一個 slice。`sort.Ints(xs)` 將整數排成升序。降序冇 `sort.IntsDesc`；你要將個 slice 包做 `sort.IntSlice`，用 `sort.Reverse` 反轉佢嘅次序，再交畀 `sort.Sort`。
 
 ```
-input:  3
-        a b c
-output: READ 0
-        LEN 3
-        WRITE panic
-        FOUND 2
+sort.Ints(xs)
+sort.Sort(sort.Reverse(sort.IntSlice(xs)))
 ```
 
-nil map 同 nil slice 唔係同一種「冇」。讀一個 nil map 係合法嘅，會畀你值嘅 type
-嘅零值；寫入去就會 panic，因為根本冇個表可以寫。`append` 入一個 nil slice 係合法
-嘅，佢會自己分配 — 所以 `var s []T` 係慣用嘅空 slice，而 `var m map[K]V` 就唔係
-慣用嘅空 map。
+喺第一個 print 之前寫升序排序，第二個 print 之前寫降序排序。印出嘅部分已經寫好。
+
+```
+input:  5 2 9 1
+output: 1 2 5 9
+        9 5 2 1
+```
 '''
 hints = [
-  "喺 nil map 上面 empty[\"missing\"] 唔係 error — 佢係 int 嘅零值，即係 0。",
-  "append 應付得到 nil slice：佢會幫你分配第一個 backing array，所以你從來唔使為咗起頭而 make()。",
-  "個寫入一定要喺一個有 deferred recover 嘅 function 入面發生，唔係個 panic 會喺第四行之前就搞死個程式。",
+  "先 sort.Ints(xs)；再 sort.Sort(sort.Reverse(sort.IntSlice(xs)))。",
+  "sort.IntSlice(xs) 係轉換，唔係複製 — 排序仍然喺 xs 入面發生。",
 ]
 
 # ---------------------------------------------------------------- 14
 [[quest]]
-id    = "go.basic.14.embedding"
-title = "佢乜都冇繼承到"
-story = "總站就係一個站加多啲嘢。Alex 寫咗兩次，多咗一次。"
+id    = "go.basic.14.sort-by-key"
+title = "車手排行榜"
+story = "Lucky Mac 更表塊板應該按送餐數排車手，最多排先，同數按名，但佢係按佢哋打卡嘅次序列出。"
 brief = '''
-標準輸入係個數量 `n`，然後 `n` 行，每行係 `STOP <NAME>` 或者 `TERM <NAME> <LINES>`。
-
-畀 `Stop` 一個回傳佢個名嘅 `Describe() string`。令 `Terminus` **embed** `Stop`
-再加一個 `Lines int`，同埋畀佢自己一個 `Describe`，呼叫 embed 嗰個之後加上
-`(<lines> lines)`。
-
-印每個嘅 `Describe()`，然後印 `TERMINI <k>`，個數要用 type switch 行一個
-`[]Describer` 數出嚟。
+`sort.Slice` 可以排任何 slice，只要畀佢一個 `less(i, j)` 函數，話元素 `i` 係咪應該排喺元素 `j` 前面。兩層次序就係先比第一個 key，打和先跌落第二個。降序就係將比較反轉。
 
 ```
-input:  3
-        STOP CAUSEWAY
-        TERM KENNEDY 2
-        STOP TINHAU
-output: CAUSEWAY
-        KENNEDY (2 lines)
-        TINHAU
-        TERMINI 1
+sort.Slice(entries, func(i, j int) bool {
+	a, b := entries[i], entries[j]
+	if a.Score != b.Score { return a.Score > b.Score }
+	return a.Name < b.Name
+})
 ```
 
-embedding 唔係繼承。`Terminus` 唔會*變成*一個 `Stop`；佢係入面裝住一個，而入面
-嗰個值嘅 method 會被 **promote** 到外面嘅 type，除非外面嘅 type 自己聲明咗一個。
-`t.Stop.Describe()` 就係你搵返被遮住嗰個嘅方法，而且冇 `super`。
+`sort.Slice` 嘅呼叫同函數嘅開頭已經寫好。寫佢嘅兩行：分數唔同就按分數降序，打和就按名升序。
+
+```
+input:  4
+        alex 12
+        mei 15
+        bo 12
+        sam 9
+output: mei 15
+        alex 12
+        bo 12
+        sam 9
+```
 '''
 hints = [
-  "embed 咗嘅 field 冇自己嘅名 — 喺 literal 入面同 t.Stop.Describe() 入面都係寫做 `Stop`。",
-  "Terminus 滿足 Describer 係因為佢自己嗰個 Describe；冇嘅話佢會透過 promote 上嚟嘅 Stop method 去滿足。",
-  "d.(Terminus) 用 comma-ok 寫法就係 type assertion；多過兩種嘅時候，type switch 做嘅係同一件事。",
+  "if a.Score != b.Score { return a.Score > b.Score } 然後 return a.Name < b.Name。",
+  "less 答嘅係「i 係咪先行？」：分數高嘅先行，分數一樣就名細嘅先行。",
 ]
 
 # ---------------------------------------------------------------- 15
 [[quest]]
-id    = "go.basic.15.variadics"
-title = "有幾多就幾多"
-story = "有時係兩張單，有時係成個架嘅單，個 function 唔應該理呢樣嘢。"
+id    = "go.basic.15.closures"
+title = "附加費"
+story = "今晚經過銅鑼灣閘機嘅每程車費都加同一個附加費，而閘機個加數器係喺未有人講個數之前寫嘅。"
 brief = '''
-標準輸入係個數量 `n`，然後 `n` 個整數。
-
-寫 `total(values ...int64) (sum int64, count int)` — variadic，有 named return
-value — 然後用三種方式呼叫佢。印：
-
-1. `ALL <sum> <count>` — 成個 slice，用 `...` 展開
-2. `NONE <sum> <count>` — 完全冇 argument 咁呼叫
-3. `TWO <sum> <count>` — 頭兩個值逐個傳入，唔夠兩個就有幾多傳幾多
+函數字面量係一個冇名嘅函數，喺需要嘅地方即場整出嚟，好似任何值咁存落一個變數。佢可以用周圍嘅變數 — 呢度係 `k` — 之後都繼續用得：呢個就係 closure。呼叫佢係 `add(x)`，同任何函數一樣。
 
 ```
-input:  4
-        1 2 3 4
-output: ALL 10 4
-        NONE 0 0
-        TWO 3 2
+add := func(x int) int { return x + k }
 ```
 
-喺 function 入面 `values` 就係一個普通嘅 `[]int64`，冇 argument 嘅時候佢係 `nil`
-— `range` 同 `len` 都應付得到，唔使特別處理。`total(list...)` 係將現有嘅 slice
-直接傳過去，唔係 copy 一份新嘅；`total(list)` 就 compile 唔到，知道點解先係考點。
+寫整 `add` 嗰一行：一個接收 `int` 並回傳佢加 `k` 嘅函數字面量。佢會套用喺每個車費上面再幫你印出。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
 '''
 hints = [
-  "有 named result 嘅時候，淨係寫 `return` 就會回傳 sum 同 count 當時嘅值。",
-  "total(list...) 會展開；total(list) 就係想將一個 []int64 當成單一個 int64 傳入去，compile 唔到。",
-  "冇 argument 嘅時候 values 係 nil，而 len(nil slice) 係 0 — 唔使守住。",
+  "add := func(x int) int { return x + k }",
+  "k 唔係參數；字面量直接伸手出去讀佢。佢用到 k 之後就刪走 _ = k 嗰行。",
 ]
 
 # ---------------------------------------------------------------- 16
 [[quest]]
-id    = "go.basic.16.json"
-title = "tag 就係合約"
-story = "車廠個 API 送嚟嘅 key 係細楷，Go export 出去嘅 field 係大楷，成個星期冇人睇得出點解每張單都係空嘅。"
+id    = "go.basic.16.lambdas"
+title = "淨係雙數門"
+story = "金鐘啲月台感應器報告每道門，個模型只想要雙數門平方再加埋，而部平板有個 filter 同一個 map，乜都未插入去。"
 brief = '''
-標準輸入係一行：一個 JSON array 嘅訂單，每張單有一個 `item` 字串同一個 `cents`
-數字。
-
-Unmarshal 佢，每張單印一行 `<ITEM> <CENTS>`，然後 marshal 並印出一個摘要
-object，key 一定要係 `count` 同 `total`，而且要係呢個次序。如果輸入唔係有效嘅
-JSON，就印 `BAD JSON`，其他嘢一律唔印。
+函數字面量可以直接當參數傳入另一個函數，完全唔使有名。`filter` 留低 `func(int) bool` 話 yes 嘅元素；`mapInts` 將每個元素換成 `func(int) int` 回傳嘅嘢。兩個都寫咗喺 `main` 上面；你淨係要提供嗰兩個字面量。
 
 ```
-input:  [{"item":"SET","cents":2800},{"item":"PIE","cents":900}]
-output: SET 2800
-        PIE 900
-        {"count":2,"total":3700}
+evens := filter(xs, func(x int) bool { return x%2 == 0 })
+squares := mapInts(evens, func(x int) int { return x * x })
 ```
 
-一個 field 一定要 **export** 咗，`encoding/json` 先會見到佢 — 細楷嘅 field 對
-marshaller 嚟講係隱形嘅，一聲都唔會出。之後個 struct tag 先話畀佢知喺 wire 上面
-叫咩名。`Marshal` 係按聲明次序寫 field 嘅，所以摘要嘅 key 次序係由你決定，唔係
-由 map 決定。
+寫呢兩個呼叫：留低雙數，再將佢哋平方。總和已經幫你加埋同印出。
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
 '''
 hints = [
-  "tag 放喺 type 後面嘅 backtick 入面：Item string `json:\"item\"`。",
-  "Unmarshal 收嘅係目標嘅 pointer — &orders，唔係 orders — 唔係嘅話佢冇嘢可以填。",
-  "睇下 Unmarshal 個 error。輸入壞咗嘅時候 orders 會留空，一個唔理 error 嘅程式會開開心心印一個零嘅摘要。",
+  "filter(xs, func(x int) bool { return x%2 == 0 }) 同 mapInts(evens, func(x int) int { return x * x })。",
+  "字面量嘅簽名一定要同參數完全一樣：keep 係 func(int) bool，f 係 func(int) int。",
 ]
 
 # ---------------------------------------------------------------- 17
 [[quest]]
-id    = "go.basic.17.testing"
-title = "自己證明"
-story = "06:40 冇人會幫你 check 呢樣嘢。個表就喺度；令佢變綠。"
+id    = "go.basic.17.threads"
+title = "一單一個車手"
+story = "八張單同時由 Lucky Mac 道門踩八架單車出去，而塊板一張都唔等，就加埋成晚嘅數。"
 brief = '''
-個程式有一個表，入面係四個已知正確嘅 `(km, fare)` 案例，佢會逐個用嚟 check
-`fare`，印 `<name> ok` 或者 `<name> FAIL got <g> want <w>`，然後印
-`PASSED <k>/4`。最後佢由標準輸入讀一個距離，印 `FARE <x>`。
-
-`fare(km)` 應該係 `500 + 100 * km`。starter 嗰個係錯嘅，而個表捉到佢 — 呢個
-正正就係重點。
+`go f()` 喺自己嘅 goroutine 上面開始 `f`，唔會等。`sync.WaitGroup` 就係 `main` 等晒佢哋嘅方法：每次開始前 `Add(1)`，每個完成時喺入面 `Done()` — 用 defer，咁無論函數點樣退出都會行 — `Wait()` 就阻塞到個數返到零。呢度每個 goroutine 淨係寫自己嘅 `results[i]`，所以冇嘢係共用嘅。
 
 ```
-input:  4
-output: zero ok
-        one ok
-        four ok
-        ten ok
-        PASSED 4/4
-        FARE 900
+var wg sync.WaitGroup
+for i, x := range xs {
+	wg.Add(1)
+	go func(i, x int) {
+		defer wg.Done()
+		results[i] = x * x
+	}(i, x)
+}
+wg.Wait()
 ```
 
-唔好掂個表；佢就係規格。呢個**就係** Go 嘅 table-driven test，只係冇咗個
-harness：喺真正嘅 package 入面佢係 `func TestFare(t *testing.T)`，配
-`for _, c := range cases` 同 `t.Run(c.name, ...)`，由 `go test` 行。個表兩邊
-都係一樣嘅。
+迴圈、`Add` 同 goroutine 嘅形狀已經寫好。填佢嘅主體：`defer wg.Done()`，然後將 `x * x` 存入 `results[i]`。
+
+```
+input:  1 2 3 4
+output: 1 4 9 16
+        30
+```
 '''
 hints = [
-  "個表就係規格。錯嘅係個 function。",
-  "四個案例有三個失敗，過到嗰個係 km = 0，呢個正正就係點解一個測試案例證明唔到任何嘢。",
-  "喺 package 入面呢個係 func TestFare(t *testing.T) 配 t.Run(c.name, func(t *testing.T){ ... })，咁失敗嘅時候佢會自己報名。",
+  "第一行 defer wg.Done()，第二行 results[i] = x * x。",
+  "defer 會喺 goroutine 返回時行 Done，中間發生乜都唔緊要；一開始就淨係寫 wg.Done() 嘅話，就係未做嘢先話「完成」。",
 ]
 
 # ---------------------------------------------------------------- 18
 [[quest]]
-id    = "go.basic.18.nil-and-order"
+id    = "go.basic.18.binary-tree"
 title = "NULLPTR"
-story = "11:55，Lucky Mac 前枱收銀機。每張單都過到，有啲根本唔存在，部收銀機照樣讀佢哋。"
+story = "11:55 Lucky Mac 前面部收銀機將每張單按號碼歸檔入一棵樹，而棵樹嘅 root 係 nil，佢照跟住個 nil 行。每張單都過到，但一張都唔存在。"
 brief = '''
-標準輸入係個數量 `n`，然後 `n` 行。每行係 `<NAME> <CENTS>`，或者單一個 `-`，
-意思係張單從來冇到過：slice 入面一個 nil 嘅 `*Order`。
-
-將真正嘅訂單按 cents **由大到小**排，一樣就按名由細到大排，印成 `<NAME> <CENTS>`。
-然後印 `NIL <count>` — 有幾多張係唔見咗嘅。
+二元搜尋樹係一個兩個子節點都係指向同一種 struct 嘅指標嘅 `struct`，空樹係 `nil`。插入係遞歸嘅：`nil` 子樹變做新節點，否則個值落入左邊或者右邊嘅子樹 — 因為遞歸會回傳子樹嘅新根，你要將佢賦值返入子節點 field。`n` 係 `nil` 嘅時候跟 `n.Left` 走，個程式就會死；`nil` 檢查永遠行先。
 
 ```
-input:  4
-        SET 2800
-        -
-        PIE 900
-        TEA 1200
-output: SET 2800
-        TEA 1200
-        PIE 900
-        NIL 1
+type Node struct {
+	Val         int
+	Left, Right *Node
+}
+if v < n.Val {
+	n.Left = insert(n.Left, v)
+} else {
+	n.Right = insert(n.Right, v)
+}
 ```
 
-每一個 nil 都要喺任何嘢 dereference 佢之前搵出嚟，包括你交畀 `sort.Slice` 嗰個
-比較 function。成個 boss 就係咁。
+`Node`、`insert` 嘅 `nil` 檢查、佢嘅 `if v < n.Val` / `else`、`inorder`、`height` 同 `main` 已經寫好。填嗰兩個分支：左邊嘅賦值同右邊嘅賦值。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
 '''
 hints = [
-  "slice 入面一個 nil *Order 本身冇問題，直到有嘢讀佢個 field 為止。先篩，後排。",
-  "strings.Fields 對 \"-\" 會畀一個 field，所以 len(fields) < 2 就係你嘅「單唔見咗」測試。",
-  "由大到小就係 less function 入面嘅 >；打和嘅處理係佢後面嘅第二個比較。",
+  "第一個分支 n.Left = insert(n.Left, v)，第二個分支 n.Right = insert(n.Right, v)。",
+  "insert 回傳子樹嘅根 — 子節點本來係 nil 嘅話就係一個全新嘅節點 — 所以結果一定要存返入子節點 field，否則棵樹永遠唔會長大。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.basic.04.int-types"
+title = "一個數嘅闊度"
+story = "天后個八達通讀卡機將車費放喺一個 32 位嘅格仔，全日總數放喺 64 位嗰個，而今日兩個都印住同一個零。"
+brief = '''
+Go 嘅整數有唔同闊度：`int32` 同 `int64` 有正負，`uint32` 同 `uint64` 唔會低過零。冇嘢會自動轉換 — 你要將目標類型當函數咁寫，`uint64(a)`，個值就會抄入較闊嗰個格仔。`math` 套件幫啲邊界改咗名：`math.MaxInt32` 係最大嘅 `int32`，`math.MaxUint64` 係最大嘅 `uint64`。
+
+```
+b := uint64(a)
+fmt.Println(math.MaxInt32)
+```
+
+`a` 已經讀入做 `int32`。喺兩個佔位嗰度打轉換入 `b` 嗰行，同印 `math.MaxInt32` 嗰行；另外兩行已經幫你印好。
+
+```
+input:  7
+output: 7
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "b := uint64(a) — 類型名就係轉換；跟住 fmt.Println(math.MaxInt32)。",
+  "闊度係類型嘅一部分：int32 同 int64 唔會唔寫明轉換就混埋一齊。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.basic.05.big-int"
+title = "三十二個位元組"
+story = "騎手部電話上面個錢包地址係三十二個位元組闊，而顯示佢嘅 app 有三十二個位元組嘅零。"
+brief = '''
+冇一個內建整數係 256 位闊，而一個雜湊或者一條鎖匙就啱啱係咁：三十二個位元組。`math/big` 可以裝任何大小嘅數，`FillBytes` 將佢以大端序寫入你遞畀佢嘅位元組陣列，左邊補零。`hex.EncodeToString` 就將啲位元組變做你喺鏈上見開嘅嗰六十四個十六進制字元。
+
+```
+n.FillBytes(buf[:])
+```
+
+`n` 已經由 stdin 嘅十進制解析好，`buf` 係一個 `[32]byte`。打嗰一行將 `n` 填入 `buf`；長度同十六進制已經幫你印好。
+
+```
+input:  255
+output: 32
+        00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "n.FillBytes(buf[:]) — 陣列用 [:] 變做切片，FillBytes 將個數寫入去。",
+  "大端序即係最後一個位元組係最低位：255 落喺 buf[31]，係 ff。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.basic.06.floats"
+title = "兩種小數"
+story = "金鐘個轉車站時鐘將秒數放喺 float64，出發板就將佢捨入做 float32，兩塊板喺第十個位開始唔同。"
+brief = '''
+一個小數冇特別講明就係 `float64`；`float32` 係一半闊度，大約保留七位數字。`strconv.ParseFloat` 由文字讀一個出嚟（個 `64` 係要解析入去嘅闊度），`float32(x)` 將佢抄入較窄嘅類型，一路捨入。`%.10f` 印十個位，兩者就係喺嗰度開始有分別。
+
+```
+x, _ := strconv.ParseFloat(s, 64)
+y := float32(x)
+```
+
+`s` 係 stdin 嘅文字。喺兩個佔位嗰度打解析入 `x` 嗰行同轉換入 `y` 嗰行；兩個都已經幫你印好。
+
+```
+input:  3.14159265358979
+output: 3.1415926536
+        3.1415927410
+```
+'''
+hints = [
+  "x, _ := strconv.ParseFloat(s, 64) 跟住 y := float32(x)。",
+  "ParseFloat 回傳兩個值；呢度個 _ 係將錯誤掉咗佢，因為輸入係已知冇問題嘅。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.basic.08.string-slices"
+title = "頭四個字母"
+story = "銅鑼灣站塊站牌顯示個名嘅頭四個字母，後面跟住條線嘅尾綴，而塊牌淨係顯示緊個尾綴。"
+brief = '''
+字串同其他嘢一樣可以切片：`s[0:4]` 係佢頭四個位元組。字串永遠唔會變，所以切片乜都唔會抄、乜都唔會整壞 — 新值 `t` 係佢自己一個字串，`s` 仍然完整。追加係 `+=`：由舊字串同新一截砌一個新字串出嚟。
+
+```
+t := s[0:4]
+t += "_bay"
+```
+
+`s` 係 stdin 嗰個字。喺兩個佔位嗰度打切片入 `t` 同追加；之後會印 `t`，再印冇郁過嘅 `s`。
+
+```
+input:  causeway
+output: caus_bay
+        causeway
+```
+'''
+hints = [
+  "t := s[0:4] 跟住 t += \"_bay\"。",
+  "s[a:b] 由索引 a 行到 b 之前、唔包括 b — 0:4 係四個位元組。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.basic.09.int-slices"
+title = "時間表嘅一截"
+story = "個騎手由全日時間表抽第二同第三個站出嚟用，而部電話上面個副本係兩個零。"
+brief = '''
+`xs[1:3]` 係一個望住第二同第三個元素嘅窗口 — 同一段記憶體，唔係副本。`copy(dst, src)` 將啲值搬入一個你用 `make` 整出嚟嘅切片，咁 `dst` 就係自己一個；`append` 就令佢增長。之後改 `dst`，`xs` 郁都唔郁。
+
+```
+copy(dst, xs[1:3])
+dst = append(dst, 99)
+```
+
+`xs` 由 stdin 讀入，`dst` 係一個 `make([]int, 2)`。喺兩個佔位嗰度打 copy 同 append；之後會印 `dst` 同冇郁過嘅 `xs`。
+
+```
+input:  1 2 3 4 5
+output: [2 3 99]
+        [1 2 3 4 5]
+```
+'''
+hints = [
+  "copy(dst, xs[1:3]) 跟住 dst = append(dst, 99)。",
+  "copy 填幾多個元素，睇短嗰邊有幾多；dst 整出嚟嗰陣有兩個位。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.basic.10.byte-slices"
+title = "一個字嘅位元組"
+story = "幸運麥當勞部飛紙機係用位元組唔係字母做嘢嘅：上面個碼三個位元組，之後個名跟兩個感嘆號，而佢印咗三個空格。"
+brief = '''
+`[]byte(s)` 將一個字串抄入一個你可以改嘅位元組切片。佢同任何切片一樣可以切 — `b[:3]` 係頭三個位元組 — 用 `append` 增長，用 `...` 將另一個切片攤開加入去。`hex.EncodeToString` 將位元組顯示做十六進制對；`string(b)` 就將佢哋變返文字。
+
+```
+b := []byte(s)
+b = append(b, []byte("!!")...)
+```
+
+`s` 係 stdin 嗰個字。喺兩個佔位嗰度打轉換入 `b` 同追加；頭三個位元組嘅十六進制同成個 `b` 嘅文字會幫你印。
+
+```
+input:  gopher
+output: 676f70
+        gopher!!
+```
+'''
+hints = [
+  "b := []byte(s) 跟住 b = append(b, []byte(\"!!\")...)。",
+  "切片後面嘅 ... 係將佢啲元素攤開做獨立參數；冇咗佢 append 就要單個位元組。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.basic.16.list"
+title = "落單條鏈"
+story = "幸運麥當勞出餐口啲單掛喺一條鏈上面，最新嘅喺後面，前面有個標記，而條鏈空吊吊。"
+brief = '''
+`container/list` 係雙向鏈表。`PushBack` 將值掛喺尾。`Remove` 將一個元素
+喺任何位置拎走 —— `l.Front()` 就係第一個。改要經個元素：`e.Value` 係可以
+賦值嘅欄位，所以 `l.Front().Value = 99` 就地改寫第一張單。list 自己冇
+sort：由 `l.Front()` 用 `e.Next()` 行一次，將值抄入 slice `vals`（已經寫好），
+再用 `sort.Ints` 排嗰個。
+
+```
+l.PushBack(v)
+l.Remove(l.Front())
+l.Front().Value = 99
+sort.Ints(vals)
+```
+
+每個數 `v` 喺一個迴圈入面讀入（至少兩個）。喺迴圈入面打 `PushBack`，之後
+打刪同改，行完之後打排序，代替四個佔位；長度同排好嘅值會印出嚟。
+
+```
+input:  3 1 2
+output: 2
+        2 99
+```
+'''
+hints = [
+  "迴圈入面 l.PushBack(v)；之後 l.Remove(l.Front()) 同 l.Front().Value = 99；行完之後 sort.Ints(vals)。",
+  "Remove 收 *Element 而唔係值，所以畀佢 l.Front()；之後原本第二個變咗新嘅頭，改嘅就係佢。e.Value 係 interface{}，所以行嗰度寫 e.Value.(int)。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "go.basic.18.hashtable"
+title = "點算，減一"
+story = "廚房將每一個喺出餐口嗌過嘅字都點算一次，劃走 the 呢個字，而每晚讀返出嚟嘅次序都唔同。"
+brief = '''
+Go 嘅 map 係雜湊表：key 雜湊落一個格，所以加、刪、查全部一樣價錢，十個
+key 定一千萬個都係 —— 代價就係行過去冇固定次序。加係 `counts[w]++`；刪係
+`delete`；安全咁改一個項目係 comma-ok 寫法 `n, ok := counts[k]`，寫返之前
+先話你知個 key 之前喺唔喺度。啲 key 收集入一個 slice（已經寫好），再用
+`sort.Strings` 排好，唔係每晚個數都唔同樣。
+
+```
+counts[w]++
+delete(counts, "the")
+if n, ok := counts["tram"]; ok { counts["tram"] = n * 100 }
+sort.Strings(keys)
+```
+
+每個字 `w` 喺一個迴圈入面讀入。喺迴圈入面打計數，之後打 `delete` 同
+comma-ok 嘅改，`keys` 砌好之後打排序，代替四個佔位；大細同排好嘅數會印出嚟。
+
+```
+input:  the tram the wire the
+output: 2
+        tram 100
+        wire 1
+```
+'''
+hints = [
+  "迴圈入面 counts[w]++；之後 delete(counts, \"the\") 同 if n, ok := counts[\"tram\"]; ok { counts[\"tram\"] = n * 100 }；keys 砌好之後 sort.Strings(keys)。",
+  "comma-ok 讀永遠唔會插入：\"tram\" 唔喺度時 ok 係 false，乜都唔寫 —— 普通 counts[\"tram\"] 讀會畀返 0，而賦值就會創建個 key。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "go.basic.22.reverse"
+title = "沿線倒返轉"
+story = "尾班車由港島線嘅尾行返頭，而出發板仲係照朝早嗰個方向列住啲站同目的地。"
+brief = '''
+`slices.Reverse` 將一個切片就地倒轉，無論佢裝住乜。字串唔可以就地倒轉 — 佢永遠唔變 — 所以要先抄入一個 `[]rune`（一個字元一個 rune，咁重音同中日韓字先會完整），倒轉嗰個，再用 `string(r)` 變返做字串。
+
+```
+slices.Reverse(xs)
+slices.Reverse(r)
+```
+
+`xs` 裝住第一行嘅數字，`r` 已經係第二行個字嘅 rune。喺兩個佔位嗰度打兩個倒轉；兩個都幫你印好。
+
+```
+input:  1 2 3
+        tram
+output: 3 2 1
+        mart
+```
+'''
+hints = [
+  "slices.Reverse(xs) 跟住 slices.Reverse(r) — 就地嘅，乜都唔使賦值。",
+  "[]rune(word) 將字串抄做可以重排嘅字元；string(r) 將佢哋駁返埋。",
 ]

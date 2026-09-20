@@ -135,8 +135,11 @@ export const ja: Partial<Catalogue> = {
   "lands.goBlurb": "ゴルーチン、チャネル、頭にまるごと入る小さな言語。",
   "lands.cppBlurb": "ポインタ、RAII、未定義動作。すべてはアドレスで、誰も検査してくれない。",
   "lands.pythonBlurb": "辞書、ジェネレータ、ダックタイピング。走るまで型はなく、六時に走り出す。",
-  "lands.basicBlurb": "朝の散歩。店先、屋台、レジ — 機械が書いたものを読む。",
-  "lands.advancedBlurb": "昼のラッシュ。ひとつのカウンターにレジがふたつ、しかも同時に起きた。",
+  "lands.verybasicBlurb": "クイズ。どの行が正しい文法か。四つから一つ選び、その行を打つ。",
+  "lands.basicBlurb":
+    "朝の散歩。文法をひとつずつ読んで、一、二行だけ書く — 型、ループ、構造体、ソート、クロージャ、スレッド、木。",
+  "lands.advancedBlurb":
+    "文法を使う小さなコーディング問題、それから昼のラッシュ。ひとつのカウンターにレジがふたつ、同時に。",
   "lands.hackerBlurb": "面接。部屋がひとつ、時計がひとつ、行を代わりに書くものは何もない。",
   "lands.category": "{land} — カテゴリ",
   "lands.clearedOf": "{total} 中 {cleared} クリア",
@@ -153,10 +156,14 @@ export const ja: Partial<Catalogue> = {
   "lands.noWorld": "サーバーがワールド情報を送りませんでした",
   "lands.footer": "←→  ランド   クリック  カテゴリ   F7  言語   F1  画面の向き   F3  ログアウト",
 
+  "map.menu": "メニュー",
+  "map.close": "閉じる",
+  "map.goIn": "入る",
   "map.allMaps": "すべてのマップ",
   "map.playground": "プレイグラウンド",
   "map.allMapsShort": "マップ",
   "map.playgroundShort": "練習",
+  "map.verybasic": "超基礎",
   "map.basic": "ベーシック",
   "map.advanced": "アドバンス",
   "map.hacker": "ハッカー",
@@ -177,6 +184,8 @@ export const ja: Partial<Catalogue> = {
   "map.footer": "←→  ストリート   ENTER  入る   TAB  ランド   Q/E  カテゴリ   F1  画面の向き",
 
   "quest.loading": "読み込み中",
+  "quest.quizPick": "正しい行を選んで、その行を打つ  (1–4)",
+  "quest.quizRight": "正解 — その行を打とう",
   "quest.job": "今回の課題",
   "quest.sample": "サンプル · {name}",
   "quest.in": "入力",
@@ -293,6 +302,10 @@ export const ja: Partial<Catalogue> = {
   "result.runnerSaw": "ランナーが見たもの",
   "result.again": "もう一度",
   "result.tryAgain": "やり直す",
+  "result.xpGained": "+{xp} XP",
+  "result.levelUp": "レベル {level}",
+  "result.xpTotal": "{xp} XP · レベル {level}",
+  "result.next": "次へ",
   "result.backToMap": "マップへ戻る",
   "result.footer": "ENTER  マップ   R  やり直す   F1  画面の向き   F3  ログアウト",
 

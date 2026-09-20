@@ -17,7 +17,7 @@ local Lands = {}
 Lands.__index = Lands
 
 local LAND_ORDER = Land.ORDER
-local CATEGORY_ORDER = { basic = 1, advanced = 2, hacker = 3 }
+local CATEGORY_ORDER = { verybasic = 1, basic = 2, advanced = 3, hacker = 4 }
 
 --- SPEC §0's order. `world.lands` does not promise one, and the rows were
 --- arriving alphabetical — ADVANCED, BASIC, HACKER — which reads as a list of
@@ -48,7 +48,7 @@ function Lands.new(app)
     -- when it was pressed, so it can push in.
     picked_at = 0,
     pressed_at = nil,
-    -- Which of the two buttons under the cards the pointer is over.
+    -- Which of the tile and the buttons the pointer is over.
     hover = nil,
   }, Lands)
 end
@@ -140,7 +140,9 @@ function Lands:card_rects()
   -- Measured from the type, not fixed: the title above the cards and the
   -- footer below them both grow when the player asks for bigger type.
   local pad = 16
-  local top = math.floor(24 + UI.lineHeight(Lands.title_size(Layout.vw)) + 18)
+  -- Under the CODE PLAYGROUND tile, which leads the screen (`tile_rect`).
+  local tile = self:tile_rect()
+  local top = tile.y + tile.h + (portrait and 14 or 18)
   local bottom = Lands.band_top() - 10
   local out = {}
   if portrait then
@@ -163,11 +165,27 @@ function Lands:card_rects()
   return out, n
 end
 
---- The band under the cards: two buttons, WEAKEST and PLAYGROUND — the
---- browser's AUTO SELECT and PLAYGROUND row. Both are "somewhere other than
---- a land to go", and they are the same size because neither is the primary
---- action here. `W` and `P` still work; the buttons are an addition, because
---- a key nobody can see is not a feature.
+--- **The CODE PLAYGROUND tile: the first thing under the title.**
+---
+--- It used to be one of two small buttons in the band under the cards, the
+--- slot a screen gives to the thing it expects nobody to want. The
+--- playground is one of the main things this game is (docs/agent.md) — the
+--- scratchpad with a compiler and the Rust coder behind it — so it leads,
+--- full width, about a quarter of the room between the title and the band,
+--- and the cards take what is left. One function, read by the draw, the
+--- hover and the click, like `card_rects` and `button_rects`.
+function Lands:tile_rect()
+  local vw = Layout.vw
+  local pad = 16
+  local top = math.floor(24 + UI.lineHeight(Lands.title_size(vw)) + 18)
+  local bottom = Lands.band_top() - 10
+  local h = math.max(math.floor(Lands.band_height() * 1.8), math.floor((bottom - top) * 0.28))
+  return { x = pad, y = top, w = vw - pad * 2, h = h }
+end
+
+--- The band under the cards: WEAKEST — the browser's AUTO SELECT. The
+--- playground moved up into its own tile; `P` still opens it from anywhere
+--- on this screen, and the footer says so.
 function Lands.band_height()
   return math.max(36, UI.lineHeight(10) + 18)
 end
@@ -180,21 +198,49 @@ end
 --- The two buttons — **one function, read by the draw and by the click.**
 function Lands:button_rects()
   local vw = Layout.vw
-  local pad, gap = 16, 12
+  local pad = 16
   local bh = Lands.band_height()
   local y = Lands.band_top()
-  local labels = {
-    weakest = I18n.t("WEAKEST") .. "  W",
-    playground = I18n.t("PLAYGROUND") .. "  P",
-  }
-  local want = math.max(200, UI.textWidth(labels.weakest, 10) + 40,
-    UI.textWidth(labels.playground, 10) + 40)
-  local bw = math.min(math.floor((vw - pad * 2 - gap) / 2), want)
-  local x = math.floor((vw - bw * 2 - gap) / 2)
+  local label = I18n.t("WEAKEST") .. "  W"
+  local bw = math.min(vw - pad * 2, math.max(200, UI.textWidth(label, 10) + 40))
+  local x = math.floor((vw - bw) / 2)
   return {
-    weakest = { x = x, y = y, w = bw, h = bh, label = labels.weakest },
-    playground = { x = x + bw + gap, y = y, w = bw, h = bh, label = labels.playground },
+    weakest = { x = x, y = y, w = bw, h = bh, label = label },
   }
+end
+
+--- The tile, drawn: the playground's own warm colour rather than a land's,
+--- lit under the pointer, the name and the one sentence on the left and the
+--- Rust coder hovering on the right when the art is there.
+function Lands:draw_tile(r)
+  local hot = self.hover == "tile"
+  UI.panel(r.x, r.y, r.w, r.h, {
+    fill = Theme.withAlpha(Theme.navy, hot and 0.97 or 0.9),
+    tint = hot and Theme.cream or Theme.coin,
+  })
+  local pad = 14
+  local t = Anim.now()
+  -- The coder on the right, only while the tile is tall enough for a figure
+  -- to read as one; the words own the left two thirds either way.
+  local art_w = 0
+  if r.h >= 72 then
+    local size = math.floor(r.h * 0.72)
+    local bob = Anim.bob(t, { amount = 3, period = 2.4 })
+    if Assets.sprite("agent_coder", r.x + r.w - pad - size * 0.5, r.y + r.h - 8 + bob, size) then
+      art_w = size + pad
+    end
+  end
+  local tw = r.w - pad * 2 - art_w
+  local title = I18n.t("CODE PLAYGROUND")
+  local size = UI.fitSize(title, tw, 14, 8)
+  local ty = r.y + pad
+  UI.text(title, r.x + pad, ty, size, hot and Theme.cream or Theme.coin)
+  local note = I18n.t("write anything, run it — the Rust coder flies beside you")
+  local ny = ty + UI.lineHeight(size) + 6
+  if ny + UI.lineHeight(8) <= r.y + r.h - 8 then
+    UI.paragraph(note, r.x + pad, ny, tw, 8, Theme.withAlpha(Theme.cream, hot and 0.9 or 0.7),
+      math.max(1, math.floor((r.y + r.h - 8 - ny) / UI.lineHeight(8))))
+  end
 end
 
 --- The largest size on the ladder at which the title still fits across the
@@ -218,6 +264,8 @@ function Lands:draw()
 
   UI.text(I18n.t("PICK A LAND"), 0, 24, Lands.title_size(vw), Theme.coin, "center", vw)
 
+  self:draw_tile(self:tile_rect())
+
   local rects, n = self:card_rects()
   for i = 1, n do
     local r = rects[i]
@@ -225,7 +273,7 @@ function Lands:draw()
   end
 
   local buttons = self:button_rects()
-  for _, id in ipairs({ "weakest", "playground" }) do
+  for _, id in ipairs({ "weakest" }) do
     local b = buttons[id]
     local state = (id == "weakest" and self.auto_busy) and "disabled"
       or (self.hover == id and "hot" or "normal")
@@ -292,7 +340,7 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
   local row_size = 9
   local show_count = true
   for _, cat in ipairs(land and land.categories or {}) do
-    local probe = I18n.t(cat.category:upper()) .. "  " .. ("%d/%d"):format(cat.cleared, cat.total)
+    local probe = I18n.t(Land.category_label(cat.category)) .. "  " .. ("%d/%d"):format(cat.cleared, cat.total)
     row_size = math.min(row_size, UI.fitSize(probe, row_room, 9, 5))
     -- When the floor still cannot hold both, the count goes and the bar
     -- under the name carries the progress on its own.
@@ -301,7 +349,7 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
   if not show_count then
     row_size = 9
     for _, cat in ipairs(land and land.categories or {}) do
-      row_size = math.min(row_size, UI.fitSize(I18n.t(cat.category:upper()), row_room, 9, 5))
+      row_size = math.min(row_size, UI.fitSize(I18n.t(Land.category_label(cat.category)), row_room, 9, 5))
     end
   end
   -- A row is its own type plus a bar and air, never less than the sprite.
@@ -363,7 +411,7 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
       local count = ("%d/%d"):format(cat.cleared, cat.total)
       local count_w = UI.textWidth(count, row_size)
       local badge = 26
-      UI.text(I18n.t(cat.category:upper()), label_x, row + 3, row_size, color)
+      UI.text(I18n.t(Land.category_label(cat.category)), label_x, row + 3, row_size, color)
       if show_count then
         UI.text(count, x + w - pad - badge - count_w, row + 3, row_size, color)
       end
@@ -467,7 +515,8 @@ end
 function Lands:mousemoved(x, y)
   local buttons = self:button_rects()
   local over = nil
-  for _, id in ipairs({ "weakest", "playground" }) do
+  if inside(self:tile_rect(), x, y) then over = "tile" end
+  for _, id in ipairs({ "weakest" }) do
     if inside(buttons[id], x, y) then over = id end
   end
   self.hover = over
@@ -475,7 +524,7 @@ end
 
 function Lands:mousepressed(x, y)
   local buttons = self:button_rects()
-  if inside(buttons.playground, x, y) then
+  if inside(self:tile_rect(), x, y) then
     SFX.play("select")
     self.app:go("playground")
     return

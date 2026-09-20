@@ -273,6 +273,10 @@ pub fn run(
     let stars;
     let cleared_total;
     let unlocked;
+    // The XP this submit was worth and where it leaves the player (PROTOCOL
+    // §4.9). `gained` is zero on everything but a first clear; the rest is
+    // read after the grant so the reply and the ledger agree.
+    let xp;
     {
         let conn = state.store.conn();
         attempts::insert(&conn, &record)?;
@@ -280,6 +284,7 @@ pub fn run(
         // of what someone is struggling with, and SPEC §7's drills are built
         // from this table.
         mistakes::record(&conn, &attempt_id, address, &quest_id, &found, mode)?;
+        let gained;
         if accepted && mode.is_submit() {
             let row = progress::record_clear(
                 &conn,
@@ -288,9 +293,12 @@ pub fn run(
                 report.compile_ms + report.run_ms,
             )?;
             stars = row.stars;
+            gained = row.xp_gained;
         } else {
             stars = progress::get(&conn, address, &quest_id)?.stars;
+            gained = 0;
         }
+        xp = cwbhacker_core::awards::xp_json(&conn, address, gained)?;
         cleared_total = progress::cleared_total(&conn, address)?;
         // A clear is the event worth spending a snapshot on: it is the only
         // one that moves `weakest` from "stuck" to "costly", and it is rare
@@ -351,6 +359,8 @@ pub fn run(
                 "stars": stars,
                 "cleared_total": cleared_total,
                 "unlocked": unlocked,
+                // §4.19: the other window's level should move with this one.
+                "xp": xp,
             }),
         );
         send(out, update.clone());
@@ -373,6 +383,7 @@ pub fn run(
     }
 
     Ok(json!({
+        "xp": xp,
         "attempt": {
             "id": attempt_id,
             "quest_id": quest_id,

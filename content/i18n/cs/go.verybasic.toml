@@ -1,0 +1,567 @@
+# GO LAND — VERY BASIC, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/go/verybasic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, the quiz's four choices, sample input and output and the exact
+# strings a program must print are the English pack's and are never translated.
+
+pack   = "go.verybasic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "go.verybasic.01.print"
+title = "První řádek"
+story = "Tin Hau, 06:00, roleta napůl nahoře. Obrazovka na automatu na lístky má zdravit a místo toho tiskne prázdný řádek."
+brief = '''
+Program, který říká jednu věc, potřebuje jedno volání z `fmt`: to, které vypíše svůj argument a ukončí řádek.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  
+output: hello, causewaybay
+```
+'''
+hints = [
+  "fmt.Println(\"hello, causewaybay\") — řetězec v dvojitých uvozovkách, malými písmeny, jedna čárka.",
+  "print bez fmt píše na stderr a Print bez ln neukončí řádek.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.verybasic.02.int-types"
+title = "Široké číslo"
+story = "Čtečka Octopus v Tin Hau počítá přiložení v int32 a denní součet se do něj nevejde."
+brief = '''
+`n` je `int32`. Vynásobit ho čtyřmi miliardami chce nejdřív širší typ: převeď `n` na `int64` a pak násob.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  7
+output: 28000000000
+```
+'''
+hints = [
+  "wide := int64(n) * 4000000000 — nejdřív převést, pak násobit v širokém typu.",
+  "n * 4000000000 se dělá v int32 a konstanta se nevejde, takže se to nezkompiluje.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.verybasic.03.floats"
+title = "Jízdné v desetinách"
+story = "Jízdné na tabuli je text. Čtečka ho potřebuje jako float64, než ho může zdvojnásobit."
+brief = '''
+`s` je jízdné jako řetězec. `strconv` z něj udělá `float64` jedním voláním, které vrátí číslo a chybu; číslo si nech, chybu zahoď.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  0.1
+output: 0.100000000
+        0.20
+```
+'''
+hints = [
+  "x, _ := strconv.ParseFloat(s, 64) — dva výsledky a 64 je šířka, kterou chceš.",
+  "S 32 se hodnota nejdřív zaokrouhlí na float32; devátá desetina to ukáže.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.verybasic.04.strings"
+title = "Stanice velkými písmeny"
+story = "Cedule na nástupišti v Tin Hau chce název stanice velkými písmeny a čtečka má jen tvar malými."
+brief = '''
+`line` je jeden řádek textu. Balíček `strings` má funkci, která ho vrátí velkými písmeny.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tin hau
+output: TIN HAU
+        7
+```
+'''
+hints = [
+  "up := strings.ToUpper(line) — funkce balíčku, která bere řetězec, ne metoda na něm.",
+  "Řetězce v Go nemají metody pro velikost písmen; strings.Title dělá velké první písmeno slov, což není totéž.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.verybasic.05.bool-if"
+title = "Sudý vůz"
+story = "Vozy se sudými čísly staví u širokého nástupiště; displej si každý druhý vlak vybere špatně."
+brief = '''
+`n` je číslo vozu. Program vypíše `even`, když se `n` dělí dvěma beze zbytku, jinak `odd`. Řádek s `if` potřebuje test zbytku.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  4
+output: even
+```
+'''
+hints = [
+  "if n%2 == 0 { — % je zbytek, == porovnání.",
+  "Jedno = je přiřazení a n/2 je podíl, ne zbytek.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.verybasic.06.loops"
+title = "Počítání zastávek"
+story = "Linka má n zastávek a tabule je sčítá od 1 do n; smyčka, kterou spouští, končí o jednu dřív."
+brief = '''
+`n` je přečteno. Smyčka musí proběhnout `i` od 1 až po `n` včetně a každé `i` přičíst do `sum`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5
+output: 15
+```
+'''
+hints = [
+  "for i := 1; i <= n; i++ { — tři části a <= nechá n uvnitř.",
+  "i = 1 bez := nic nedeklaruje a < n končí o jedno dřív.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.verybasic.07.functions"
+title = "Sazba pro kurýra"
+story = "Každá rozvážka platí pět plus tříkorunový bonus jednou za noc. Funkce sazby zatím nevrací nic."
+brief = '''
+`fare` bere počet jízd a musí vrátit pět za jízdu plus tři. Napiš její řádek s `return`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  4
+output: 23
+```
+'''
+hints = [
+  "return rides*5 + 3 — nejdřív násobit, pak přičíst bonus.",
+  "rides * (5 + 3) je osm za jízdu; rides + 5*3 přičte patnáct k počtu.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.verybasic.08.structs"
+title = "Jeden stánek, dvě pole"
+story = "Karta stánku v Lucky Macu má jméno a cenu a objednávková obrazovka ji staví s oběma poli prázdnými."
+brief = '''
+`Stall` má pole `Name` a `Price`. Sestav jeden z `name` a `price` pomocí struktury s pojmenovanými poli.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  noodles 12
+output: noodles 24
+```
+'''
+hints = [
+  "s := Stall{Name: name, Price: price} — jména polí, dvojtečky, čárky.",
+  "Tři hodnoty je o jednu víc a pole mají typy, kterým hodnoty musí odpovídat.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.verybasic.09.struct-method"
+title = "Součet stánku"
+story = "Stánek zná svou cenu i množství; jeho metoda Total vrací pro každou objednávku nulu."
+brief = '''
+`Total` je metoda na `Stall`. Její řádek s `return` musí dát cenu krát množství, přečtené přes receiver `s`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 4
+output: 12
+```
+'''
+hints = [
+  "return s.Price * s.Qty — k polím se dostaneš přes receiver.",
+  "Price samo o sobě není v dosahu; receiver s je to, jak metoda vidí svou strukturu.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.verybasic.10.enums"
+title = "Třetí linka"
+story = "Cedule na přestupu čísluje své linky 0, 1, 2 a číslo převádí zpět na linku, než ji pojmenuje."
+brief = '''
+`Line` je typ s `iota` a hodnotami `Island`, `TsuenWan`, `KwunTong`. Proměň celé číslo `n` na `Line`, aby ho `switch` níže mohl porovnat.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  2
+output: kwuntong
+```
+'''
+hints = [
+  "line := Line(n) — konverze, zapsaná jako volání funkce na typu.",
+  "line := n je int a switch ho porovnává s konstantami Line, což se nezkompiluje.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.verybasic.11.vector"
+title = "Seznam vozů"
+story = "Každé číslo vozu, které přijde po drátě, má jít na konec seznamu; seznam zůstává prázdný."
+brief = '''
+`xs` je slice intů. Uvnitř smyčky dej každé `v` na jeho konec vestavěnou funkcí, která slice zvětší.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 1 4 1
+output: 4
+        3 1 4 1
+```
+'''
+hints = [
+  "xs = append(xs, v) — append vrací zvětšený slice, tak ho přiřaď zpět.",
+  "Slice nemá metody; append je vestavěná funkce, která bere slice jako první.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.verybasic.12.vector-edit"
+title = "Druhý vůz ven"
+story = "Vůz dva se odpojí od vlaku. Seznam vyhodí špatný, nebo nevyhodí nic."
+brief = '''
+`xs` drží celá čísla z řádku, nejméně čtyři. Odstraň prvek na indexu 1 spojením slice před ním se slicem za ním.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 1 4 1
+output: 3 4 1
+```
+'''
+hints = [
+  "xs = append(xs[:1], xs[2:]...) — ... rozprostře ocas do append.",
+  "Bez ... dostane append slice tam, kde chce inty, a to se nezkompiluje.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.verybasic.13.list"
+title = "Fronta kurýrů, spojová"
+story = "Kurýři se hlásí jeden po druhém a spojový seznam u dveří si nenechá ani jednoho."
+brief = '''
+`l` je `container/list`. Dej každé `v` na jeho konec; průchod od `Front` je vypíše v pořadí.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  4 5 6
+output: 4 5 6
+```
+'''
+hints = [
+  "l.PushBack(v) — metoda, která přidává na konec container/list.",
+  "PushFront existuje taky a vypsal by je pozpátku.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.verybasic.14.maps"
+title = "Součet objednávek"
+story = "Každé jídlo objednané v Lucky Macu má přičíst jedničku ke svému počtu; součet se nehýbe."
+brief = '''
+`counts` je `map[string]int`. Uvnitř smyčky přičti jedničku k počtu pro `w` — chybějící klíč se čte jako nula, takže to zvládne jeden výraz.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  rice tea rice bun
+output: bun 1
+        rice 2
+        tea 1
+```
+'''
+hints = [
+  "counts[w]++ — indexuj mapu a ++ přičte jedničku k tomu, co tam je (nula, když nic).",
+  "counts[w] = 1 zapomene každé opakování.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.verybasic.15.hashtable"
+title = "Jméno na číslo"
+story = "Rejstřík kurýrů mapuje jméno na číslo v konstantním čase a vyhledání odpovídá -1 pro každého."
+brief = '''
+`table` je `map[string]int` — hashovací tabulka v Go. V první smyčce ulož každé `name` s jeho indexem `i`; vyhledávání níže používají tvar čárka-ok.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  alex mei kit
+        mei kit bo
+output: 1
+        2
+        -1
+```
+'''
+hints = [
+  "table[name] = i — klíč vlevo v závorkách, hodnota vpravo.",
+  "Klíč musí být řetězec; table[i] indexuje intem, což není typ klíče mapy.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.verybasic.16.sets"
+title = "Různí kurýři"
+story = "Čtyřicet jízd, osm kurýrů. Množina, která má počítat různé kurýry, nepočítá nic."
+brief = '''
+`seen` je `map[int]struct{}` — množina. Zaznamenej do ní každé `v`; prázdná struktura je hodnota, která nic nestojí.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  8 3 8 5 3 8
+output: 3
+```
+'''
+hints = [
+  "seen[v] = struct{}{} — typ a pak pár složených závorek, který jednu vytvoří.",
+  "true je bool a typ hodnoty mapy je struct{}.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "go.verybasic.17.stack"
+title = "Dva z vrchu"
+story = "Talíře se skládají u výdeje a berou se z vrchu; pokladna přečte vrchní talíř dvakrát a nikdy ho nevezme."
+brief = '''
+`stack` je slice použitý jako zásobník. `top` se čte z jeho konce; řádek za tím musí ten poslední prvek zahodit přeřezáním.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 1 4 1
+output: 1
+        4
+        2
+```
+'''
+hints = [
+  "stack = stack[:len(stack)-1] — všechno kromě posledního prvku.",
+  "stack[1:] zahodí začátek, což je tah fronty, ne zásobníku.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "go.verybasic.18.queue"
+title = "Dva z čela"
+story = "Zákazníci stojí frontu u pokladny a odcházejí z čela; obrazovka obslouží stejného zákazníka dvakrát."
+brief = '''
+`queue` je slice použitý jako fronta. `front` je jeho první prvek; řádek za tím musí ten prvek zahodit přeřezáním od indexu 1.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 1 4 1
+output: 3
+        1
+        2
+```
+'''
+hints = [
+  "queue = queue[1:] — všechno od druhého prvku dál.",
+  "queue[:1] nechá jen čelo a queue[0:] nechá všechno.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "go.verybasic.19.heap"
+title = "Nejmenší první"
+story = "Objednávky se vydávají od nejmenšího čísla. Halda, která je má držet, se plní ručně a vychází v libovolném pořadí."
+brief = '''
+`h` je `*IntHeap`, který implementuje `heap.Interface`. Vlož každé `v` přes balíček `heap`, aby se pořadí udrželo; výběry níže vycházejí od nejmenšího.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 1 4 2
+output: 1 2 4 5
+```
+'''
+hints = [
+  "heap.Push(h, v) — funkce balíčku, dostane haldu a hodnotu.",
+  "Vložení &v podá haldě ukazatel; její Push předpokládá int a spadne.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "go.verybasic.20.sorting"
+title = "Tabule příjezdů"
+story = "Tabule vypisuje příjezdy v pořadí, v jakém byly napsány. Chce je vzestupně."
+brief = '''
+`xs` je slice intů. Jedno volání z balíčku `sort` ho srovná vzestupně, na místě.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 1 4 1
+output: 1 1 3 4
+```
+'''
+hints = [
+  "sort.Ints(xs) — množné číslo, pro []int, a řadí na místě.",
+  "sort.Sort chce typ s Len, Less a Swap; prostý []int takový není.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "go.verybasic.21.sort-by-key"
+title = "Žebříček kurýrů"
+story = "Žebříček má jména a skóre a vypisuje je v pořadí, v jakém se přihlásili."
+brief = '''
+`rows` je slice `Row{Name, Score}`. Seřaď ho podle `Score`, nejvyšší první, pomocí `sort.Slice` a funkce less přes indexy.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3
+        alex 40
+        mei 75
+        kit 12
+output: mei 75
+        alex 40
+        kit 12
+```
+'''
+hints = [
+  "sort.Slice(rows, func(i, j int) bool { return rows[i].Score > rows[j].Score }) — > pro sestupně.",
+  "Parametry funkce less potřebují svůj typ, int, jinak se to nezkompiluje.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "go.verybasic.22.reverse"
+title = "Linka pozpátku"
+story = "Poslední vlak projíždí stanice v opačném pořadí a tabule je pořád vypisuje popředu."
+brief = '''
+`xs` je slice intů. Balíček `slices` ho jedním voláním obrátí na místě.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 1 4 1
+output: 1 4 1 3
+```
+'''
+hints = [
+  "slices.Reverse(xs) — na místě, bez návratové hodnoty.",
+  "Bere samotný slice, ne ukazatel na něj, a přiřazení jeho výsledku se nezkompiluje.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "go.verybasic.23.closures"
+title = "Přirážka"
+story = "Každé jízdné na noční tabuli dostane stejnou přirážku; funkce, která ji přičítá, zapomněla částku."
+brief = '''
+`k` se čte první. `add` musí být funkční literál, který vezme int a vrátí ho plus `k` — closure nad `k`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "add := func(x int) int { return x + k } — typ parametru, typ výsledku a k zvenčí.",
+  "Bez typu výsledku literál nic nevrací a x * k je jiná funkce.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "go.verybasic.24.lambdas"
+title = "Každé dveře na druhou"
+story = "Model nástupiště chce každé číslo dveří na druhou a pomocná funkce, která mapuje funkci přes dveře, nedostane nic."
+brief = '''
+`apply` bere slice a funkci a vrací zmapovaný slice. Zavolej ji na `xs` s funkčním literálem, který umocní svůj argument na druhou.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3
+output: 1 4 9
+```
+'''
+hints = [
+  "ys := apply(xs, func(x int) int { return x * x }) — celý literál je argument.",
+  "x * x samo o sobě není funkce a literál bez typu výsledku nic nevrací.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "go.verybasic.25.threads"
+title = "Jeden kurýr na objednávku"
+story = "Osm objednávek opouští kuchyni na osmi kolech najednou a tabule na žádnou z nich nečeká."
+brief = '''
+Jedna goroutina na číslo: každá umocní své `x` do `results[i]` a po dokončení dá signál `WaitGroup`. Spusť ji klíčovým slovem `go` a předej dovnitř `i` a `x`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 1 4 9 16
+        30
+```
+'''
+hints = [
+  "go func(i, x int) { defer wg.Done(); results[i] = x * x }(i, x) — literál a pak volání s hodnotami ze smyčky.",
+  "Bez Done se WaitGroup nikdy nevrátí; bez (i, x) se literál nikdy nezavolá.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "go.verybasic.26.mutex"
+title = "Jeden součet, mnoho rukou"
+story = "Každý kurýr přičítá své jízdné k jednomu součtu najednou a součet vychází špatně o částku, kterou nikdo neumí zopakovat."
+brief = '''
+`total` sdílí každá goroutina. Řádek, který k němu přičítá `x`, musí být sevřený mezi `mu.Lock()` a `mu.Unlock()` — tady všechny tři na jednom řádku.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 10
+```
+'''
+hints = [
+  "mu.Lock(); total += x; mu.Unlock() — zamknout, sáhnout na sdílenou hodnotu, odemknout.",
+  "Lock bez Unlock drží každou další goroutinu navždy a WaitGroup s ní.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "go.verybasic.27.binary-tree"
+title = "Nullptr"
+story = "Přední pokladna v Lucky Macu v 11:55 zakládá každou objednávku do stromu podle čísla a levá větev se založí a pak zahodí."
+brief = '''
+`insert` vloží `v` do podstromu s kořenem `n` a vrátí kořen toho podstromu. Větev `if` řeší menší `v`: rekurzivně vejdi do levého dítěte a ulož, co se vrátí.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "n.Left = insert(n.Left, v) — rekurzivní volání vrací kořen podstromu, tak ho přiřaď zpět.",
+  "insert(n.Left, v) samotné nový uzel zahodí; nic ho neuloží.",
+]

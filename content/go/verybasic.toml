@@ -1,0 +1,2671 @@
+# GO LAND — VERY BASIC. The grammar asked as a question first. Tin Hau at
+# 06:00, before the Island Line opens: every node shows a whole program with
+# one hole and four lines that might fill it — one right, three that will not
+# compile, will crash, or will print the wrong thing. Pick the line, then type
+# it. Types, containers, a stack, a queue, a heap, a struct, a goroutine, a
+# mutex, and a binary search tree at the boss: the grammar a live coding test
+# leans on, one line at a time. Nothing here is timed; verify_pack refuses a
+# very-basic solution that adds more than one line, and it swaps every wrong
+# choice into the solution to prove it fails.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Every solution and starter in this file is run by
+# tools/verify_pack.py and by CI (SPEC §9.4, §9.5).
+
+pack = "go.verybasic"
+land = "go"
+category = "verybasic"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "go.verybasic.01.print"
+node        = 1
+title       = "THE FIRST LINE"
+difficulty  = 1
+story       = "Tin Hau, 06:00, the shutter half up. The screen on the ticket machine is meant to greet and prints an empty line instead."
+concepts    = ["io", "strings"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+A program that says one thing needs one call from `fmt`: the one that prints its argument and ends the line.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  
+output: hello, causewaybay
+```
+'''
+starter     = '''
+package main
+
+import "fmt"
+
+func main() {
+	// FILL: print the greeting, and end the line
+	fmt.Print("")
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+func main() {
+	// FILL: print the greeting, and end the line
+	fmt.Println("hello, causewaybay")
+}
+'''
+hints = [
+  "fmt.Println(\"hello, causewaybay\") — the string in double quotes, lowercase, one comma.",
+  "print without fmt writes to stderr, and Print without ln does not end the line.",
+]
+
+[quest.quiz]
+choices = [
+  "fmt.Println(hello, causewaybay)",
+  "fmt.Println(\"hello, causewaybay\")",
+  "print(\"hello, causewaybay\")",
+  "fmt.Println(\"Hello, Causewaybay\")",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+  { name = "again", stdin = "", expect = "hello, causewaybay\n", visible = false },
+  { name = "still", stdin = "", expect = "hello, causewaybay\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "go.verybasic.02.int-types"
+node        = 2
+title       = "THE WIDE NUMBER"
+difficulty  = 1
+story       = "The Octopus reader at Tin Hau counts taps in an int32 and the day's total does not fit in it."
+concepts    = ["types", "bindings"]
+requires    = ["go.verybasic.01.print"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief       = '''
+`n` is an `int32`. Multiplying it by four billion needs a wider type first: convert `n` to `int64`, then multiply.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  7
+output: 28000000000
+```
+'''
+starter     = '''
+package main
+
+import "fmt"
+
+func main() {
+	var n int32
+	fmt.Scan(&n)
+	// FILL: n as an int64, times 4000000000
+	wide := int64(0)
+	fmt.Println(wide)
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+func main() {
+	var n int32
+	fmt.Scan(&n)
+	// FILL: n as an int64, times 4000000000
+	wide := int64(n) * 4000000000
+	fmt.Println(wide)
+}
+'''
+hints = [
+  "wide := int64(n) * 4000000000 — convert first, then multiply in the wide type.",
+  "n * 4000000000 is done in int32 and the constant does not fit, so it does not compile.",
+]
+
+[quest.quiz]
+choices = [
+  "wide := int64(n) * 4000000000",
+  "wide := n * 4000000000",
+  "wide := int64(n * 4000000000)",
+  "wide := int64(n) * 4000000",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven", stdin = "7\n", expect = "28000000000\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "4000000000\n", visible = false },
+  { name = "big", stdin = "12\n", expect = "48000000000\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "go.verybasic.03.floats"
+node        = 3
+title       = "THE FARE IN DECIMALS"
+difficulty  = 1
+story       = "The fare on the board is text. The reader needs it as a float64 before it can double it."
+concepts    = ["types", "io"]
+requires    = ["go.verybasic.02.int-types"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief       = '''
+`s` is the fare as a string. `strconv` turns it into a `float64` with one call that returns the number and an error; keep the number, drop the error.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  0.1
+output: 0.100000000
+        0.20
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"strconv"
+)
+
+func main() {
+	var s string
+	fmt.Scan(&s)
+	_ = strconv.ParseFloat
+	// FILL: s as a float64, error dropped
+	x, _ := 0.0, s
+	fmt.Printf("%.9f\n", x)
+	fmt.Printf("%.2f\n", x*2)
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"strconv"
+)
+
+func main() {
+	var s string
+	fmt.Scan(&s)
+	_ = strconv.ParseFloat
+	// FILL: s as a float64, error dropped
+	x, _ := strconv.ParseFloat(s, 64)
+	fmt.Printf("%.9f\n", x)
+	fmt.Printf("%.2f\n", x*2)
+}
+'''
+hints = [
+  "x, _ := strconv.ParseFloat(s, 64) — two results, and 64 is the width you want.",
+  "With 32 the value is rounded to a float32 first; the ninth decimal shows it.",
+]
+
+[quest.quiz]
+choices = [
+  "x := strconv.ParseFloat(s, 64)",
+  "x, _ := strconv.ParseFloat(s, 32)",
+  "x, _ := strconv.Atoi(s)",
+  "x, _ := strconv.ParseFloat(s, 64)",
+]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tenth", stdin = "0.1\n", expect = "0.100000000\n0.20\n", visible = true },
+  { name = "fare", stdin = "2.75\n", expect = "2.750000000\n5.50\n", visible = false },
+  { name = "third", stdin = "0.3\n", expect = "0.300000000\n0.60\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "go.verybasic.04.strings"
+node        = 4
+title       = "THE STATION IN CAPITALS"
+difficulty  = 1
+story       = "The platform sign at Tin Hau wants the station name in capitals and the reader has only the lowercase form."
+concepts    = ["strings", "types"]
+requires    = ["go.verybasic.03.floats"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief       = '''
+`line` is one line of text. The `strings` package has a function that returns it in upper case.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  tin hau
+output: TIN HAU
+        7
+```
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+)
+
+func main() {
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Scan()
+	line := sc.Text()
+	_ = strings.ToUpper
+	// FILL: line in capitals
+	up := line
+	fmt.Println(up)
+	fmt.Println(len(up))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+)
+
+func main() {
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Scan()
+	line := sc.Text()
+	_ = strings.ToUpper
+	// FILL: line in capitals
+	up := strings.ToUpper(line)
+	fmt.Println(up)
+	fmt.Println(len(up))
+}
+'''
+hints = [
+  "up := strings.ToUpper(line) — a package function that takes the string, not a method on it.",
+  "Go strings have no methods for case; strings.Title capitalises words, which is not the same.",
+]
+
+[quest.quiz]
+choices = [
+  "up := line.ToUpper()",
+  "up := strings.ToLower(line)",
+  "up := strings.ToUpper(line)",
+  "up := strings.Title(line)",
+]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tin-hau", stdin = "tin hau\n", expect = "TIN HAU\n7\n", visible = true },
+  { name = "admiralty", stdin = "admiralty station\n", expect = "ADMIRALTY STATION\n17\n", visible = false },
+  { name = "mixed", stdin = "Lucky mac\n", expect = "LUCKY MAC\n9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "go.verybasic.05.bool-if"
+node        = 5
+title       = "THE EVEN CARRIAGE"
+difficulty  = 1
+story       = "Carriages with even numbers stop at the wide platform; the display picks the wrong one every other train."
+concepts    = ["control-flow", "types"]
+requires    = ["go.verybasic.04.strings"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief       = '''
+`n` is a carriage number. The program prints `even` when `n` divides by two with nothing left, `odd` otherwise. The `if` line needs the remainder test.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  4
+output: even
+```
+'''
+starter     = '''
+package main
+
+import "fmt"
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	// FILL: when n is even
+	if false {
+		fmt.Println("even")
+	} else {
+		fmt.Println("odd")
+	}
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	// FILL: when n is even
+	if n%2 == 0 {
+		fmt.Println("even")
+	} else {
+		fmt.Println("odd")
+	}
+}
+'''
+hints = [
+  "if n%2 == 0 { — % is the remainder, == the comparison.",
+  "A single = is assignment, and n/2 is a quotient, not a remainder.",
+]
+
+[quest.quiz]
+choices = [
+  "if n%2 = 0 {",
+  "if n%2 == 0 {",
+  "if n/2 == 0 {",
+  "if n%2 == 1 {",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4\n", expect = "even\n", visible = true },
+  { name = "seven", stdin = "7\n", expect = "odd\n", visible = false },
+  { name = "ten", stdin = "10\n", expect = "even\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "go.verybasic.06.loops"
+node        = 6
+title       = "COUNTING THE STOPS"
+difficulty  = 1
+story       = "The line has n stops and the tally board adds them 1 to n; the loop it runs stops one short."
+concepts    = ["control-flow", "iteration"]
+requires    = ["go.verybasic.05.bool-if"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief       = '''
+`n` is read. The loop must run `i` from 1 up to and including `n`, adding each `i` to `sum`.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  5
+output: 15
+```
+'''
+starter     = '''
+package main
+
+import "fmt"
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	sum := 0
+	// FILL: i from 1 to n, inclusive
+	for i := 0; i < 0; i++ {
+		sum += i
+	}
+	fmt.Println(sum)
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	sum := 0
+	// FILL: i from 1 to n, inclusive
+	for i := 1; i <= n; i++ {
+		sum += i
+	}
+	fmt.Println(sum)
+}
+'''
+hints = [
+  "for i := 1; i <= n; i++ { — three clauses, and <= keeps n in.",
+  "i = 1 without := declares nothing, and < n stops one early.",
+]
+
+[quest.quiz]
+choices = [
+  "for i := 1; i < n; i++ {",
+  "for i = 1; i <= n; i++ {",
+  "for i := 0; i <= n; i += 2 {",
+  "for i := 1; i <= n; i++ {",
+]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5\n", expect = "15\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "1\n", visible = false },
+  { name = "ten", stdin = "10\n", expect = "55\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "go.verybasic.07.functions"
+node        = 7
+title       = "THE RIDER'S RATE"
+difficulty  = 1
+story       = "Every delivery pays five, plus a three-dollar bonus once a night. The rate function returns nothing yet."
+concepts    = ["functions", "types"]
+requires    = ["go.verybasic.06.loops"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief       = '''
+`fare` takes the number of rides and must return five per ride plus three. Write its `return` line.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  4
+output: 23
+```
+'''
+starter     = '''
+package main
+
+import "fmt"
+
+func fare(rides int) int {
+	// FILL: five per ride, plus three
+	return 0
+}
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	fmt.Println(fare(n))
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+func fare(rides int) int {
+	// FILL: five per ride, plus three
+	return rides*5 + 3
+}
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	fmt.Println(fare(n))
+}
+'''
+hints = [
+  "return rides*5 + 3 — multiply first, then add the bonus.",
+  "rides * (5 + 3) is eight per ride; rides + 5*3 adds fifteen to the count.",
+]
+
+[quest.quiz]
+choices = [
+  "return rides*5 + 3",
+  "return rides*5 + \"3\"",
+  "return rides + 5*3",
+  "return rides * (5 + 3)",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4\n", expect = "23\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "8\n", visible = false },
+  { name = "ten", stdin = "10\n", expect = "53\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "go.verybasic.08.structs"
+node        = 8
+title       = "ONE STALL, TWO FIELDS"
+difficulty  = 1
+story       = "The Lucky Mac stall card has a name and a price, and the order screen builds it with both fields empty."
+concepts    = ["structs", "bindings"]
+requires    = ["go.verybasic.07.functions"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief       = '''
+`Stall` has fields `Name` and `Price`. Build one from `name` and `price` using a keyed struct literal.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  noodles 12
+output: noodles 24
+```
+'''
+starter     = '''
+package main
+
+import "fmt"
+
+type Stall struct {
+	Name  string
+	Price int
+}
+
+func main() {
+	var name string
+	var price int
+	fmt.Scan(&name, &price)
+	// FILL: a Stall with both fields set
+	s := Stall{}
+	fmt.Println(s.Name, s.Price*2)
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+type Stall struct {
+	Name  string
+	Price int
+}
+
+func main() {
+	var name string
+	var price int
+	fmt.Scan(&name, &price)
+	// FILL: a Stall with both fields set
+	s := Stall{Name: name, Price: price}
+	fmt.Println(s.Name, s.Price*2)
+}
+'''
+hints = [
+  "s := Stall{Name: name, Price: price} — field names, colons, commas.",
+  "Three values is one too many, and the fields have types the values must match.",
+]
+
+[quest.quiz]
+choices = [
+  "s := Stall{name, price, 0}",
+  "s := Stall{Name: price, Price: name}",
+  "s := Stall{Name: name, Price: price}",
+  "s := Stall{Price: price}",
+]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "noodles", stdin = "noodles 12\n", expect = "noodles 24\n", visible = true },
+  { name = "tea", stdin = "tea 8\n", expect = "tea 16\n", visible = false },
+  { name = "bun", stdin = "bun 15\n", expect = "bun 30\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "go.verybasic.09.struct-method"
+node        = 9
+title       = "THE STALL'S TOTAL"
+difficulty  = 1
+story       = "The stall knows its price and its quantity; its Total method returns zero for every order."
+concepts    = ["structs", "functions"]
+requires    = ["go.verybasic.08.structs"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief       = '''
+`Total` is a method on `Stall`. Its `return` line must give price times quantity, read through the receiver `s`.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  3 4
+output: 12
+```
+'''
+starter     = '''
+package main
+
+import "fmt"
+
+type Stall struct {
+	Price int
+	Qty   int
+}
+
+func (s Stall) Total() int {
+	// FILL: price times quantity
+	return 0
+}
+
+func main() {
+	var p, q int
+	fmt.Scan(&p, &q)
+	s := Stall{Price: p, Qty: q}
+	fmt.Println(s.Total())
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+type Stall struct {
+	Price int
+	Qty   int
+}
+
+func (s Stall) Total() int {
+	// FILL: price times quantity
+	return s.Price * s.Qty
+}
+
+func main() {
+	var p, q int
+	fmt.Scan(&p, &q)
+	s := Stall{Price: p, Qty: q}
+	fmt.Println(s.Total())
+}
+'''
+hints = [
+  "return s.Price * s.Qty — fields are reached through the receiver.",
+  "Price on its own is not in scope; the receiver s is how a method sees its struct.",
+]
+
+[quest.quiz]
+choices = [
+  "return Price * Qty",
+  "return s.Price * s.Qty",
+  "return s.Price + s.Qty",
+  "return s.Price * s.Price",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-four", stdin = "3 4\n", expect = "12\n", visible = true },
+  { name = "two-two", stdin = "2 2\n", expect = "4\n", visible = false },
+  { name = "five-one", stdin = "5 1\n", expect = "5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "go.verybasic.10.enums"
+node        = 10
+title       = "THE THIRD LINE"
+difficulty  = 1
+story       = "The interchange sign numbers its lines 0, 1, 2 and turns the number back into a line before it names it."
+concepts    = ["enums", "types"]
+requires    = ["go.verybasic.09.struct-method"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief       = '''
+`Line` is an `iota` type with `Island`, `TsuenWan`, `KwunTong`. Turn the integer `n` into a `Line` so the `switch` below can compare it.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  2
+output: kwuntong
+```
+'''
+starter     = '''
+package main
+
+import "fmt"
+
+type Line int
+
+const (
+	Island Line = iota
+	TsuenWan
+	KwunTong
+)
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	// FILL: n as a Line
+	line := Island
+	switch line {
+	case Island:
+		fmt.Println("island")
+	case TsuenWan:
+		fmt.Println("tsuenwan")
+	case KwunTong:
+		fmt.Println("kwuntong")
+	}
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+type Line int
+
+const (
+	Island Line = iota
+	TsuenWan
+	KwunTong
+)
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	// FILL: n as a Line
+	line := Line(n)
+	switch line {
+	case Island:
+		fmt.Println("island")
+	case TsuenWan:
+		fmt.Println("tsuenwan")
+	case KwunTong:
+		fmt.Println("kwuntong")
+	}
+}
+'''
+hints = [
+  "line := Line(n) — a conversion, written like a function call on the type.",
+  "line := n is an int, and the switch compares it with Line constants, which does not compile.",
+]
+
+[quest.quiz]
+choices = [
+  "line := n",
+  "line := Line(n + 1)",
+  "line := Line(n",
+  "line := Line(n)",
+]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two", stdin = "2\n", expect = "kwuntong\n", visible = true },
+  { name = "zero", stdin = "0\n", expect = "island\n", visible = false },
+  { name = "one", stdin = "1\n", expect = "tsuenwan\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "go.verybasic.11.vector"
+node        = 11
+title       = "THE CARRIAGE LIST"
+difficulty  = 1
+story       = "Every carriage number that comes down the wire should go on the end of the list; the list stays empty."
+concepts    = ["slices", "iteration"]
+requires    = ["go.verybasic.10.enums"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''
+`xs` is a slice of ints. Inside the loop, put each `v` on its end with the built-in that grows a slice.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 4
+        3 1 4 1
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		// FILL: v onto the end of xs
+		_ = v
+	}
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(x))
+	}
+	fmt.Println(len(xs))
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		// FILL: v onto the end of xs
+		xs = append(xs, v)
+	}
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(x))
+	}
+	fmt.Println(len(xs))
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+hints = [
+  "xs = append(xs, v) — append returns the grown slice, so assign it back.",
+  "A slice has no methods; append is a built-in that takes the slice first.",
+]
+
+[quest.quiz]
+choices = [
+  "xs = append(v)",
+  "xs.append(v)",
+  "xs = append(xs, v)",
+  "xs = append(xs, 0)",
+]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "4\n3 1 4 1\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "2\n9 7\n", visible = false },
+  { name = "five", stdin = "5 2 8 6 3\n", expect = "5\n5 2 8 6 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "go.verybasic.12.vector-edit"
+node        = 12
+title       = "THE SECOND CARRIAGE OUT"
+difficulty  = 1
+story       = "Carriage two is taken off the train. The list drops the wrong one, or drops nothing."
+concepts    = ["slices", "collections"]
+requires    = ["go.verybasic.11.vector"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''
+`xs` holds the line's integers, at least four. Remove the element at index 1 by joining the slice before it to the slice after it.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 3 4 1
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	// FILL: drop index 1
+	_ = xs
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(x))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	// FILL: drop index 1
+	xs = append(xs[:1], xs[2:]...)
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(x))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+hints = [
+  "xs = append(xs[:1], xs[2:]...) — the ... spreads the tail into append.",
+  "Without the ... append is handed a slice where it wants ints, and that does not compile.",
+]
+
+[quest.quiz]
+choices = [
+  "xs = append(xs[:1], xs[2:]...)",
+  "xs = append(xs[:1], xs[2:])",
+  "xs = xs[2:]",
+  "xs = append(xs[:2], xs[3:]...)",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "3 4 1\n", visible = true },
+  { name = "five", stdin = "5 2 8 6 3\n", expect = "5 8 6 3\n", visible = false },
+  { name = "six", stdin = "1 2 3 4 5 6\n", expect = "1 3 4 5 6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "go.verybasic.13.list"
+node        = 13
+title       = "THE RIDER QUEUE, LINKED"
+difficulty  = 1
+story       = "Riders clock in one after another and the linked list at the door keeps none of them."
+concepts    = ["collections", "iteration"]
+requires    = ["go.verybasic.12.vector-edit"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''
+`l` is a `container/list`. Put each `v` at the back of it; the walk from `Front` prints them in order.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  4 5 6
+output: 4 5 6
+```
+'''
+starter     = '''
+package main
+
+import (
+	"container/list"
+	"fmt"
+	"strings"
+)
+
+func main() {
+	l := list.New()
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		// FILL: v at the back of l
+		_ = v
+	}
+	var out []string
+	for e := l.Front(); e != nil; e = e.Next() {
+		out = append(out, fmt.Sprint(e.Value))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"container/list"
+	"fmt"
+	"strings"
+)
+
+func main() {
+	l := list.New()
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		// FILL: v at the back of l
+		l.PushBack(v)
+	}
+	var out []string
+	for e := l.Front(); e != nil; e = e.Next() {
+		out = append(out, fmt.Sprint(e.Value))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+hints = [
+  "l.PushBack(v) — the method that appends to a container/list.",
+  "PushFront exists too, and it would print them backwards.",
+]
+
+[quest.quiz]
+choices = [
+  "l.Push(v)",
+  "l.PushBack(v)",
+  "l.PushFront(v)",
+  "l.PushBack(v * 2)",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "4 5 6\n", expect = "4 5 6\n", visible = true },
+  { name = "two", stdin = "9 1\n", expect = "9 1\n", visible = false },
+  { name = "five", stdin = "1 2 3 4 5\n", expect = "1 2 3 4 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "go.verybasic.14.maps"
+node        = 14
+title       = "THE ORDER TALLY"
+difficulty  = 1
+story       = "Every dish ordered at Lucky Mac should add one to its count; the tally never moves."
+concepts    = ["collections", "strings"]
+requires    = ["go.verybasic.13.list"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''
+`counts` is a `map[string]int`. Inside the loop, add one to the count for `w` — a missing key reads as zero, so one expression does it.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  rice tea rice bun
+output: bun 1
+        rice 2
+        tea 1
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+)
+
+func main() {
+	counts := map[string]int{}
+	var w string
+	for {
+		if _, err := fmt.Scan(&w); err != nil {
+			break
+		}
+		// FILL: one more w
+		_ = w
+	}
+	keys := make([]string, 0, len(counts))
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Println(k, counts[k])
+	}
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+)
+
+func main() {
+	counts := map[string]int{}
+	var w string
+	for {
+		if _, err := fmt.Scan(&w); err != nil {
+			break
+		}
+		// FILL: one more w
+		counts[w]++
+	}
+	keys := make([]string, 0, len(counts))
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Println(k, counts[k])
+	}
+}
+'''
+hints = [
+  "counts[w]++ — index the map, and ++ adds one to what is there (zero if nothing).",
+  "counts[w] = 1 forgets every repeat.",
+]
+
+[quest.quiz]
+choices = [
+  "counts[w] += \"1\"",
+  "counts[w] = 1",
+  "counts[w]--",
+  "counts[w]++",
+]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "dishes", stdin = "rice tea rice bun\n", expect = "bun 1\nrice 2\ntea 1\n", visible = true },
+  { name = "one", stdin = "tea\n", expect = "tea 1\n", visible = false },
+  { name = "many", stdin = "a b a b a\n", expect = "a 3\nb 2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "go.verybasic.15.hashtable"
+node        = 15
+title       = "THE NAME TO A NUMBER"
+difficulty  = 1
+story       = "The rider register maps a name to a number in constant time, and the lookup answers -1 for everyone."
+concepts    = ["collections", "hashing"]
+requires    = ["go.verybasic.14.maps"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''
+`table` is a `map[string]int` — Go's hash table. In the first loop, store each `name` with its index `i`; the lookups below use the comma-ok form.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  alex mei kit
+        mei kit bo
+output: 1
+        2
+        -1
+```
+'''
+starter     = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+)
+
+func main() {
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Scan()
+	names := strings.Fields(sc.Text())
+	sc.Scan()
+	queries := strings.Fields(sc.Text())
+	table := map[string]int{}
+	for i, name := range names {
+		// FILL: name maps to i
+		_, _ = name, i
+	}
+	for _, q := range queries {
+		if idx, ok := table[q]; ok {
+			fmt.Println(idx)
+		} else {
+			fmt.Println(-1)
+		}
+	}
+}
+'''
+solution    = '''
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+)
+
+func main() {
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Scan()
+	names := strings.Fields(sc.Text())
+	sc.Scan()
+	queries := strings.Fields(sc.Text())
+	table := map[string]int{}
+	for i, name := range names {
+		// FILL: name maps to i
+		table[name] = i
+	}
+	for _, q := range queries {
+		if idx, ok := table[q]; ok {
+			fmt.Println(idx)
+		} else {
+			fmt.Println(-1)
+		}
+	}
+}
+'''
+hints = [
+  "table[name] = i — key on the left in the brackets, value on the right.",
+  "The key must be the string; table[i] indexes by int, which is not the map's key type.",
+]
+
+[quest.quiz]
+choices = [
+  "table[name] = i",
+  "table[i] = name",
+  "table[name] = 0",
+  "table[name]++",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "riders", stdin = "alex mei kit\nmei kit bo\n", expect = "1\n2\n-1\n", visible = true },
+  { name = "one", stdin = "bo\nbo alex\n", expect = "0\n-1\n", visible = false },
+  { name = "four", stdin = "a b c d\nd c b a\n", expect = "3\n2\n1\n0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "go.verybasic.16.sets"
+node        = 16
+title       = "DISTINCT RIDERS"
+difficulty  = 1
+story       = "Forty rides, eight riders. The set that should count distinct riders counts nothing."
+concepts    = ["collections", "types"]
+requires    = ["go.verybasic.15.hashtable"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+`seen` is a `map[int]struct{}` — a set. Record each `v` in it; the empty struct is the value that costs nothing.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  8 3 8 5 3 8
+output: 3
+```
+'''
+starter     = '''
+package main
+
+import "fmt"
+
+func main() {
+	seen := map[int]struct{}{}
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		// FILL: v is in the set
+		_ = v
+	}
+	fmt.Println(len(seen))
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+func main() {
+	seen := map[int]struct{}{}
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		// FILL: v is in the set
+		seen[v] = struct{}{}
+	}
+	fmt.Println(len(seen))
+}
+'''
+hints = [
+  "seen[v] = struct{}{} — the type, then a pair of braces to make one.",
+  "true is a bool, and the map's value type is struct{}.",
+]
+
+[quest.quiz]
+choices = [
+  "seen[v] = true",
+  "seen[v] = struct{}",
+  "seen[v] = struct{}{}",
+  "seen[0] = struct{}{}",
+]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six", stdin = "8 3 8 5 3 8\n", expect = "3\n", visible = true },
+  { name = "one", stdin = "4\n", expect = "1\n", visible = false },
+  { name = "all", stdin = "1 2 3 4\n", expect = "4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "go.verybasic.17.stack"
+node        = 17
+title       = "TWO OFF THE TOP"
+difficulty  = 1
+story       = "Plates stack at the pass and come off the top; the till reads the top plate twice and never takes it."
+concepts    = ["stacks-queues", "slices"]
+requires    = ["go.verybasic.16.sets"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+`stack` is a slice used as a stack. `top` is read from its end; the line after must drop that last element by reslicing.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 1
+        4
+        2
+```
+'''
+starter     = '''
+package main
+
+import "fmt"
+
+func main() {
+	var stack []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		stack = append(stack, v)
+	}
+	for k := 0; k < 2; k++ {
+		top := stack[len(stack)-1]
+		fmt.Println(top)
+		// FILL: pop the top
+		_ = top
+	}
+	fmt.Println(len(stack))
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+func main() {
+	var stack []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		stack = append(stack, v)
+	}
+	for k := 0; k < 2; k++ {
+		top := stack[len(stack)-1]
+		fmt.Println(top)
+		// FILL: pop the top
+		stack = stack[:len(stack)-1]
+	}
+	fmt.Println(len(stack))
+}
+'''
+hints = [
+  "stack = stack[:len(stack)-1] — everything but the last element.",
+  "stack[1:] drops the front, which is a queue's move, not a stack's.",
+]
+
+[quest.quiz]
+choices = [
+  "stack = stack[1:]",
+  "stack = stack[:len(stack)]",
+  "stack.pop()",
+  "stack = stack[:len(stack)-1]",
+]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "1\n4\n2\n", visible = true },
+  { name = "three", stdin = "5 6 7\n", expect = "7\n6\n1\n", visible = false },
+  { name = "five", stdin = "2 4 6 8 10\n", expect = "10\n8\n3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "go.verybasic.18.queue"
+node        = 18
+title       = "TWO OFF THE FRONT"
+difficulty  = 1
+story       = "Customers queue at the till and come off the front; the screen serves the same customer twice."
+concepts    = ["stacks-queues", "slices"]
+requires    = ["go.verybasic.17.stack"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''
+`queue` is a slice used as a queue. `front` is its first element; the line after must drop that element by reslicing from index 1.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 3
+        1
+        2
+```
+'''
+starter     = '''
+package main
+
+import "fmt"
+
+func main() {
+	var queue []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		queue = append(queue, v)
+	}
+	for k := 0; k < 2; k++ {
+		front := queue[0]
+		fmt.Println(front)
+		// FILL: dequeue the front
+		_ = front
+	}
+	fmt.Println(len(queue))
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+func main() {
+	var queue []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		queue = append(queue, v)
+	}
+	for k := 0; k < 2; k++ {
+		front := queue[0]
+		fmt.Println(front)
+		// FILL: dequeue the front
+		queue = queue[1:]
+	}
+	fmt.Println(len(queue))
+}
+'''
+hints = [
+  "queue = queue[1:] — everything from the second element on.",
+  "queue[:1] keeps only the front, and queue[0:] keeps everything.",
+]
+
+[quest.quiz]
+choices = [
+  "queue = queue[:1]",
+  "queue = queue[1:]",
+  "queue = queue[0:]",
+  "queue = queue.pop(0)",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "3\n1\n2\n", visible = true },
+  { name = "three", stdin = "5 6 7\n", expect = "5\n6\n1\n", visible = false },
+  { name = "five", stdin = "2 4 6 8 10\n", expect = "2\n4\n3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "go.verybasic.19.heap"
+node        = 19
+title       = "THE SMALLEST FIRST"
+difficulty  = 2
+story       = "Orders are served smallest number first. The heap that should hold them is pushed to by hand and comes out in any order."
+concepts    = ["heaps", "collections"]
+requires    = ["go.verybasic.18.queue"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''
+`h` is a `*IntHeap`, which implements `heap.Interface`. Push each `v` through the `heap` package so the order is kept; the pops below come out smallest first.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  5 1 4 2
+output: 1 2 4 5
+```
+'''
+starter     = '''
+package main
+
+import (
+	"container/heap"
+	"fmt"
+	"strings"
+)
+
+type IntHeap []int
+
+func (h IntHeap) Len() int           { return len(h) }
+func (h IntHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h IntHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *IntHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *IntHeap) Pop() any {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[:n-1]
+	return x
+}
+
+func main() {
+	h := &IntHeap{}
+	heap.Init(h)
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		// FILL: v into the heap
+		_ = v
+	}
+	var out []string
+	for h.Len() > 0 {
+		out = append(out, fmt.Sprint(heap.Pop(h).(int)))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"container/heap"
+	"fmt"
+	"strings"
+)
+
+type IntHeap []int
+
+func (h IntHeap) Len() int           { return len(h) }
+func (h IntHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h IntHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *IntHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *IntHeap) Pop() any {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[:n-1]
+	return x
+}
+
+func main() {
+	h := &IntHeap{}
+	heap.Init(h)
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		// FILL: v into the heap
+		heap.Push(h, v)
+	}
+	var out []string
+	for h.Len() > 0 {
+		out = append(out, fmt.Sprint(heap.Pop(h).(int)))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+hints = [
+  "heap.Push(h, v) — the package function, given the heap and the value.",
+  "Pushing &v hands the heap a pointer; its Push asserts an int and panics.",
+]
+
+[quest.quiz]
+choices = [
+  "heap.Push(h, v)",
+  "heap.Push(v)",
+  "heap.Push(h, &v)",
+  "heap.Push(h, v*2)",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "5 1 4 2\n", expect = "1 2 4 5\n", visible = true },
+  { name = "six", stdin = "9 3 7 3 8 1\n", expect = "1 3 3 7 8 9\n", visible = false },
+  { name = "one", stdin = "6\n", expect = "6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "go.verybasic.20.sorting"
+node        = 20
+title       = "THE ARRIVALS BOARD"
+difficulty  = 1
+story       = "The board lists arrivals in the order they were typed. It wants them ascending."
+concepts    = ["sorting", "slices"]
+requires    = ["go.verybasic.19.heap"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief       = '''
+`xs` is a slice of ints. One call from the `sort` package puts it in ascending order, in place.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 1 1 3 4
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	_ = sort.Ints
+	// FILL: ascending, in place
+	_ = xs
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(x))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	_ = sort.Ints
+	// FILL: ascending, in place
+	sort.Ints(xs)
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(x))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+hints = [
+  "sort.Ints(xs) — plural, for a []int, and it sorts in place.",
+  "sort.Sort wants a type with Len, Less and Swap; a plain []int is not one.",
+]
+
+[quest.quiz]
+choices = [
+  "sort.Int(xs)",
+  "sort.Sort(xs)",
+  "sort.Ints(xs)",
+  "sort.Strings(xs)",
+]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "1 1 3 4\n", visible = true },
+  { name = "five", stdin = "9 7 5 3 1\n", expect = "1 3 5 7 9\n", visible = false },
+  { name = "two", stdin = "2 1\n", expect = "1 2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "go.verybasic.21.sort-by-key"
+node        = 21
+title       = "THE RIDER LEADERBOARD"
+difficulty  = 2
+story       = "The leaderboard has names and scores and lists them in the order they clocked in."
+concepts    = ["sorting", "structs", "closures"]
+requires    = ["go.verybasic.20.sorting"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief       = '''
+`rows` is a slice of `Row{Name, Score}`. Sort it by `Score`, highest first, with `sort.Slice` and a less function over the indexes.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  3
+        alex 40
+        mei 75
+        kit 12
+output: mei 75
+        alex 40
+        kit 12
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+)
+
+type Row struct {
+	Name  string
+	Score int
+}
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	rows := make([]Row, n)
+	for i := range rows {
+		fmt.Scan(&rows[i].Name, &rows[i].Score)
+	}
+	_ = sort.Slice
+	// FILL: highest score first
+	_ = rows
+	for _, r := range rows {
+		fmt.Println(r.Name, r.Score)
+	}
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"sort"
+)
+
+type Row struct {
+	Name  string
+	Score int
+}
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	rows := make([]Row, n)
+	for i := range rows {
+		fmt.Scan(&rows[i].Name, &rows[i].Score)
+	}
+	_ = sort.Slice
+	// FILL: highest score first
+	sort.Slice(rows, func(i, j int) bool { return rows[i].Score > rows[j].Score })
+	for _, r := range rows {
+		fmt.Println(r.Name, r.Score)
+	}
+}
+'''
+hints = [
+  "sort.Slice(rows, func(i, j int) bool { return rows[i].Score > rows[j].Score }) — > for descending.",
+  "The less function's parameters need their type, int, or it does not compile.",
+]
+
+[quest.quiz]
+choices = [
+  "sort.Slice(rows, func(i, j int) bool { return rows[i].Score < rows[j].Score })",
+  "sort.Slice(rows, func(i, j int) bool { return rows[i].Score > rows[j].Score })",
+  "sort.Slice(rows, func(i, j) bool { return rows[i].Score > rows[j].Score })",
+  "sort.Sort(rows)",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\nalex 40\nmei 75\nkit 12\n", expect = "mei 75\nalex 40\nkit 12\n", visible = true },
+  { name = "two", stdin = "2\nbo 5\nsam 9\n", expect = "sam 9\nbo 5\n", visible = false },
+  { name = "four", stdin = "4\na 1\nb 3\nc 2\nd 4\n", expect = "d 4\nb 3\nc 2\na 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "go.verybasic.22.reverse"
+node        = 22
+title       = "THE LINE BACKWARDS"
+difficulty  = 1
+story       = "The last train runs the stations in reverse and the board still lists them forwards."
+concepts    = ["slices", "iteration"]
+requires    = ["go.verybasic.21.sort-by-key"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''
+`xs` is a slice of ints. The `slices` package reverses it in place with one call.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 1 4 1 3
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	_ = slices.Reverse[[]int]
+	// FILL: xs backwards, in place
+	_ = xs
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(x))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	_ = slices.Reverse[[]int]
+	// FILL: xs backwards, in place
+	slices.Reverse(xs)
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(x))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+hints = [
+  "slices.Reverse(xs) — in place, no value returned.",
+  "It takes the slice itself, not a pointer to it, and assigning its result does not compile.",
+]
+
+[quest.quiz]
+choices = [
+  "slices.Reverse(&xs)",
+  "xs = slices.Reverse(xs)",
+  "slices.Sort(xs)",
+  "slices.Reverse(xs)",
+]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "1 4 1 3\n", visible = true },
+  { name = "five", stdin = "1 2 3 4 5\n", expect = "5 4 3 2 1\n", visible = false },
+  { name = "two", stdin = "9 7\n", expect = "7 9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "go.verybasic.23.closures"
+node        = 23
+title       = "THE SURCHARGE"
+difficulty  = 1
+story       = "Every fare on the night board gets the same surcharge; the function that adds it forgot the amount."
+concepts    = ["closures", "functions"]
+requires    = ["go.verybasic.22.reverse"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief       = '''
+`k` is read first. `add` must be a function literal that takes an int and returns it plus `k` — a closure over `k`.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	var k int
+	fmt.Scan(&k)
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	// FILL: a function that adds k
+	add := func(x int) int { return x }
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(add(x)))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	var k int
+	fmt.Scan(&k)
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	// FILL: a function that adds k
+	add := func(x int) int { return x + k }
+	var out []string
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(add(x)))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+hints = [
+  "add := func(x int) int { return x + k } — parameter type, result type, and k from outside.",
+  "Without the result type the literal returns nothing, and x * k is a different function.",
+]
+
+[quest.quiz]
+choices = [
+  "add := func(x int) { return x + k }",
+  "add := func(x int) int { return x * k }",
+  "add := func(x int) int { return x + k }",
+  "add := func(x) int { return x + k }",
+]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5\n1 2 3\n", expect = "6 7 8\n", visible = true },
+  { name = "zero", stdin = "0\n4 4\n", expect = "4 4\n", visible = false },
+  { name = "neg", stdin = "-3\n10 0 3\n", expect = "7 -3 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "go.verybasic.24.lambdas"
+node        = 24
+title       = "EVERY DOOR, SQUARED"
+difficulty  = 1
+story       = "The platform model wants every door number squared, and the helper that maps a function over the doors is handed nothing."
+concepts    = ["closures", "iteration"]
+requires    = ["go.verybasic.23.closures"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief       = '''
+`apply` takes a slice and a function and returns the mapped slice. Call it on `xs` with a function literal that squares its argument.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  1 2 3
+output: 1 4 9
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func apply(xs []int, f func(int) int) []int {
+	out := make([]int, len(xs))
+	for i, x := range xs {
+		out[i] = f(x)
+	}
+	return out
+}
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	// FILL: xs with every value squared
+	ys := xs
+	var out []string
+	for _, y := range ys {
+		out = append(out, fmt.Sprint(y))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func apply(xs []int, f func(int) int) []int {
+	out := make([]int, len(xs))
+	for i, x := range xs {
+		out[i] = f(x)
+	}
+	return out
+}
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	// FILL: xs with every value squared
+	ys := apply(xs, func(x int) int { return x * x })
+	var out []string
+	for _, y := range ys {
+		out = append(out, fmt.Sprint(y))
+	}
+	fmt.Println(strings.Join(out, " "))
+}
+'''
+hints = [
+  "ys := apply(xs, func(x int) int { return x * x }) — the whole literal is the argument.",
+  "x * x on its own is not a function, and a literal with no result type returns nothing.",
+]
+
+[quest.quiz]
+choices = [
+  "ys := apply(xs, func(x int) int { return x * x })",
+  "ys := apply(xs, func(x int) { return x * x })",
+  "ys := apply(xs, func(x int) int { return x + x })",
+  "ys := apply(xs, x * x)",
+]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "1 4 9\n", visible = true },
+  { name = "four", stdin = "4 5 6 7\n", expect = "16 25 36 49\n", visible = false },
+  { name = "neg", stdin = "-3 0 3\n", expect = "9 0 9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "go.verybasic.25.threads"
+node        = 25
+title       = "ONE RIDER PER ORDER"
+difficulty  = 3
+story       = "Eight orders leave the kitchen on eight bikes at once and the board waits for none of them."
+concepts    = ["concurrency", "closures"]
+requires    = ["go.verybasic.24.lambdas"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''
+One goroutine per number: each squares its `x` into `results[i]` and signals the `WaitGroup` when done. Start it with the `go` keyword, passing `i` and `x` in.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 1 4 9 16
+        30
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+	"sync"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	results := make([]int, len(xs))
+	var wg sync.WaitGroup
+	for i, x := range xs {
+		wg.Add(1)
+		// FILL: a goroutine that squares x into results[i] and calls Done
+		wg.Done()
+	}
+	wg.Wait()
+	total := 0
+	var out []string
+	for _, r := range results {
+		total += r
+		out = append(out, fmt.Sprint(r))
+	}
+	fmt.Println(strings.Join(out, " "))
+	fmt.Println(total)
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+	"sync"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	results := make([]int, len(xs))
+	var wg sync.WaitGroup
+	for i, x := range xs {
+		wg.Add(1)
+		// FILL: a goroutine that squares x into results[i] and calls Done
+		go func(i, x int) { defer wg.Done(); results[i] = x * x }(i, x)
+	}
+	wg.Wait()
+	total := 0
+	var out []string
+	for _, r := range results {
+		total += r
+		out = append(out, fmt.Sprint(r))
+	}
+	fmt.Println(strings.Join(out, " "))
+	fmt.Println(total)
+}
+'''
+hints = [
+  "go func(i, x int) { defer wg.Done(); results[i] = x * x }(i, x) — the literal, then the call with the loop values.",
+  "Without Done the WaitGroup never returns; without the (i, x) the literal is never called.",
+]
+
+[quest.quiz]
+choices = [
+  "go func(i, x int) { results[i] = x * x }(i, x)",
+  "go func(i, x int) { defer wg.Done(); results[i] = x * x }(i, x)",
+  "go func(i, x int) { defer wg.Done(); results[i] = x + x }(i, x)",
+  "go func(i, x int) { defer wg.Done(); results[i] = x * x }",
+]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "1 4 9 16\n30\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "49\n49\n", visible = false },
+  { name = "eight", stdin = "3 1 4 1 5 9 2 6\n", expect = "9 1 16 1 25 81 4 36\n173\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "go.verybasic.26.mutex"
+node        = 26
+title       = "ONE TOTAL, MANY HANDS"
+difficulty  = 3
+story       = "Every rider adds their fares to one total at once, and the total comes back wrong by an amount nobody can reproduce."
+concepts    = ["shared-state", "concurrency"]
+requires    = ["go.verybasic.25.threads"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''
+`total` is shared by every goroutine. The line that adds `x` to it must be held between `mu.Lock()` and `mu.Unlock()` — all three on one line here.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 10
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"sync"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	total := 0
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, x := range xs {
+		wg.Add(1)
+		go func(x int) {
+			defer wg.Done()
+			// FILL: add x to total, under the lock
+			_ = x
+		}(x)
+	}
+	wg.Wait()
+	fmt.Println(total)
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"sync"
+)
+
+func main() {
+	var xs []int
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		xs = append(xs, v)
+	}
+	total := 0
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, x := range xs {
+		wg.Add(1)
+		go func(x int) {
+			defer wg.Done()
+			// FILL: add x to total, under the lock
+			mu.Lock(); total += x; mu.Unlock()
+		}(x)
+	}
+	wg.Wait()
+	fmt.Println(total)
+}
+'''
+hints = [
+  "mu.Lock(); total += x; mu.Unlock() — lock, touch the shared value, unlock.",
+  "A Lock with no Unlock holds every other goroutine forever, and the WaitGroup with it.",
+]
+
+[quest.quiz]
+choices = [
+  "mu.Lock(); total += x",
+  "mu.Lock(); total += x; mu.Unlock",
+  "lock.Lock(); total += x; lock.Unlock()",
+  "mu.Lock(); total += x; mu.Unlock()",
+]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "10\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "7\n", visible = false },
+  { name = "eight", stdin = "3 1 4 1 5 9 2 6\n", expect = "31\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "go.verybasic.27.binary-tree"
+node        = 27
+title       = "NULLPTR"
+difficulty  = 4
+story       = "Lucky Mac's front till at 11:55 files every order into a tree by number, and the left branch is filed and then thrown away."
+concepts    = ["trees", "recursion", "structs"]
+requires    = ["go.verybasic.26.mutex"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief       = '''
+`insert` puts `v` into the subtree rooted at `n` and returns that subtree's root. The `if` branch handles a smaller `v`: recurse into the left child and store what comes back.
+
+Pick the line that does it, then type it where the `// FILL` comment is.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+starter     = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+type Node struct {
+	Val         int
+	Left, Right *Node
+}
+
+func insert(n *Node, v int) *Node {
+	if n == nil {
+		return &Node{Val: v}
+	}
+	if v < n.Val {
+		// FILL: v goes into the left subtree
+		_ = v
+	} else {
+		n.Right = insert(n.Right, v)
+	}
+	return n
+}
+
+func inorder(n *Node, out *[]string) {
+	if n == nil {
+		return
+	}
+	inorder(n.Left, out)
+	*out = append(*out, fmt.Sprint(n.Val))
+	inorder(n.Right, out)
+}
+
+func height(n *Node) int {
+	if n == nil {
+		return 0
+	}
+	l, r := height(n.Left), height(n.Right)
+	if r > l {
+		return 1 + r
+	}
+	return 1 + l
+}
+
+func main() {
+	var root *Node
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		root = insert(root, v)
+	}
+	var out []string
+	inorder(root, &out)
+	fmt.Println(strings.Join(out, " "))
+	fmt.Println(height(root))
+}
+'''
+solution    = '''
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+type Node struct {
+	Val         int
+	Left, Right *Node
+}
+
+func insert(n *Node, v int) *Node {
+	if n == nil {
+		return &Node{Val: v}
+	}
+	if v < n.Val {
+		// FILL: v goes into the left subtree
+		n.Left = insert(n.Left, v)
+	} else {
+		n.Right = insert(n.Right, v)
+	}
+	return n
+}
+
+func inorder(n *Node, out *[]string) {
+	if n == nil {
+		return
+	}
+	inorder(n.Left, out)
+	*out = append(*out, fmt.Sprint(n.Val))
+	inorder(n.Right, out)
+}
+
+func height(n *Node) int {
+	if n == nil {
+		return 0
+	}
+	l, r := height(n.Left), height(n.Right)
+	if r > l {
+		return 1 + r
+	}
+	return 1 + l
+}
+
+func main() {
+	var root *Node
+	var v int
+	for {
+		if _, err := fmt.Scan(&v); err != nil {
+			break
+		}
+		root = insert(root, v)
+	}
+	var out []string
+	inorder(root, &out)
+	fmt.Println(strings.Join(out, " "))
+	fmt.Println(height(root))
+}
+'''
+hints = [
+  "n.Left = insert(n.Left, v) — the recursive call returns the subtree's root, so assign it back.",
+  "insert(n.Left, v) alone throws the new node away; nothing stores it.",
+]
+
+[quest.quiz]
+choices = [
+  "n.Left = insert(n.Right, v)",
+  "insert(n.Left, v)",
+  "n.Left = insert(n.Left, v)",
+  "n.Left = insert(n.Left)",
+]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5 3 8 1 4\n", expect = "1 3 4 5 8\n3\n", visible = true },
+  { name = "chain", stdin = "1 2 3 4\n", expect = "1 2 3 4\n4\n", visible = false },
+  { name = "seven", stdin = "50 30 70 20 40 60 80\n", expect = "20 30 40 50 60 70 80\n3\n", visible = false },
+  { name = "left", stdin = "9 4 2 6 1\n", expect = "1 2 4 6 9\n4\n", visible = false },
+]

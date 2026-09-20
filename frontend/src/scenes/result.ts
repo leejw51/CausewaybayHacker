@@ -15,8 +15,18 @@ import { ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { clipped, fill, rowsIn, well, type Ctx, type Rect } from "../engine/ui";
 import { burstPlan, type Plan } from "../engine/burst";
+import {
+  celebrationPlan,
+  cometAt,
+  cometTrail,
+  countUp,
+  flashAlpha,
+  zoomIn,
+  zoomOut,
+  type Celebration,
+} from "../engine/celebrate";
 import { cosine, expOut } from "../engine/ease";
-import { seconds, Tween } from "../engine/motion";
+import { reducedMotion, seconds, Tween } from "../engine/motion";
 import { star as starAt } from "../engine/ui";
 import {
   Buttons,
@@ -29,7 +39,7 @@ import {
   landColour,
   titledPanel,
 } from "../ui/chrome";
-import type { Attempt, Category, Land } from "../net/protocol";
+import type { Attempt, Category, Land, XpGain } from "../net/protocol";
 import { MapScene } from "./map";
 import { QuestScene, ranCases } from "./quest";
 import { t } from "../i18n";
@@ -53,6 +63,29 @@ export class ResultScene implements Scene {
     return verdictText(this.attempt.verdict);
   }
   private confetti: Plan | null = null;
+  /**
+   * The clear, on top of the confetti: a flash, light trails spiralling out
+   * from the stamp, the XP zooming in and counting up, and on a level-up the
+   * new level slammed in over it (`engine/celebrate.ts`). Planned once on
+   * entry, keyed off `attempt.cleared` — a re-solve is accepted and gets the
+   * stamp, not the fireworks, and is worth no XP.
+   */
+  private fx: Celebration | null = null;
+  /** When the celebration set off, on the scene clock; -1 until the stamp lands. */
+  private fxAt = -1;
+  /** The XP number arriving, then the level over it. */
+  private readonly xpIn = new Tween(seconds("verdict"), 0.1);
+  private readonly levelIn = new Tween(seconds("stamp"), seconds("verdict") * 0.9);
+  private readonly levelOut = new Tween(seconds("verdict"), seconds("verdict") * 0.9 + 1.6);
+  private xpRung = false;
+  /**
+   * The node after this one, so NEXT has somewhere to go. Asked of the
+   * server on entry (`world.map`, the same list the map draws from): the
+   * next node by number, on this land and road, whatever its state — every
+   * node is playable (PROTOCOL §4.7). Null on the last node of a map, and
+   * the button is simply not there.
+   */
+  private nextId: string | null = null;
 
   /**
    * The verdict is a sequence, not a screen that appears. Word, then stars one
@@ -109,7 +142,14 @@ export class ResultScene implements Scene {
     readonly attempt: Attempt,
     /** The source that produced this verdict, carried back to TRY AGAIN. */
     private readonly source?: string,
+    /** §4.9: what this submit was worth and where it left the player. */
+    private readonly xp?: XpGain,
   ) {}
+
+  /** Whether this screen has a number to celebrate at all. */
+  private get gained(): number {
+    return this.attempt.cleared && this.xp ? this.xp.gained : 0;
+  }
 
   enter(): void {
     for (let i = 0; i < 3; i++) {
@@ -121,6 +161,27 @@ export class ResultScene implements Scene {
       const { vw, vh } = this.app.layout;
       this.confetti = burstPlan(vw / 2, vh * 0.35, 90);
     }
+    void this.findNext();
+  }
+
+  private async findNext(): Promise<void> {
+    try {
+      const res = await this.app.client.request("world.map", {
+        land: this.land,
+        category: this.category,
+      });
+      const nodes = [...res.nodes].sort((a, b) => a.node - b.node);
+      const at = nodes.findIndex((n) => n.quest_id === this.questId);
+      this.nextId = at >= 0 && at + 1 < nodes.length ? nodes[at + 1].quest_id : null;
+    } catch {
+      this.nextId = null;
+    }
+  }
+
+  /** NEXT: the node after this one, straight into its editor. */
+  private next(): void {
+    if (!this.nextId) return;
+    void this.app.go(new QuestScene(this.app, this.land, this.category, this.nextId), "forward");
   }
 
   /**
@@ -154,6 +215,27 @@ export class ResultScene implements Scene {
       // currency as the failures, so a clear is not the only thing on this
       // screen with no weight.
       this.app.shake(0.3);
+      // The clear sets off on the same frame: the stamp is the hit, the
+      // light is what comes off it.
+      if (this.attempt.cleared) {
+        this.fxAt = this.t;
+        if (!reducedMotion()) {
+          const { vw, vh } = this.app.layout;
+          this.fx = celebrationPlan(vw / 2, vh * 0.42, Math.min(vw, vh) * 0.48, 28);
+        }
+      }
+    }
+    if (this.fxAt >= 0) {
+      this.xpIn.update(dt);
+      if (this.xp?.level_up) {
+        this.levelIn.update(dt);
+        this.levelOut.update(dt);
+      }
+      // The coin rings once, when the number has arrived.
+      if (!this.xpRung && this.gained > 0 && this.xpIn.raw >= 1) {
+        this.xpRung = true;
+        this.app.chip.coin();
+      }
     }
     // A breath held just short of the landing.
     if (!this.held && this.passed && this.stamp.raw >= 0.8) {
@@ -172,7 +254,13 @@ export class ResultScene implements Scene {
   }
 
   key(name: string): void {
-    if (name === "escape" || name === "return" || name === "kpenter") this.toMap();
+    if (name === "escape") this.toMap();
+    // ENTER takes the lit button: NEXT after a pass, the map otherwise.
+    if (name === "return" || name === "kpenter") {
+      if (this.passed && this.nextId) this.next();
+      else this.toMap();
+    }
+    if (name === "n") this.next();
     if (name === "r") this.retry();
   }
 
@@ -191,6 +279,7 @@ export class ResultScene implements Scene {
     this.app.chip.select();
     if (hit.id === "map") this.toMap();
     if (hit.id === "retry") this.retry();
+    if (hit.id === "next") this.next();
   }
 
   private toMap(): void {
@@ -284,6 +373,11 @@ export class ResultScene implements Scene {
     // two rows, and a band sized for one drew the second under the footer,
     // where it could not be pressed.
     const btnLabels = [ok ? t("result.again") : t("result.tryAgain"), t("result.backToMap")];
+    // NEXT, after a pass, when there is a next: the road continues from the
+    // verdict, not from the map. Lit, because it is what a player who just
+    // cleared something does next.
+    const showNext = ok && this.nextId !== null;
+    if (showNext) btnLabels.splice(1, 0, t("result.next"));
     const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
     const btnRows = rowsIn(fonts.button, btnLabels, whole.body[2], layout.minTouchH());
     const btnGap = Math.round(fonts.button.size * 0.5);
@@ -520,6 +614,8 @@ export class ResultScene implements Scene {
 
     this.drawConfetti(g);
 
+    this.drawCelebration(g, s, fonts);
+
     const rowsH = btnRows * btnH + (btnRows - 1) * btnGap;
     const btnRect: Rect = [
       f.body[0],
@@ -531,10 +627,16 @@ export class ResultScene implements Scene {
     this.buttons.row(
       fonts.button,
       btnRect,
-      [
-        { id: "retry", label: btnLabels[0] },
-        { id: "map", label: btnLabels[1] },
-      ],
+      showNext
+        ? [
+            { id: "retry", label: btnLabels[0] },
+            { id: "next", label: btnLabels[1], strong: true },
+            { id: "map", label: btnLabels[2] },
+          ]
+        : [
+            { id: "retry", label: btnLabels[0] },
+            { id: "map", label: btnLabels[1] },
+          ],
       layout.minTouchH(),
     );
     this.buttons.draw(g, fonts.button);
@@ -548,6 +650,143 @@ export class ResultScene implements Scene {
    * function of its age and nothing is integrated frame to frame. That is why
    * the confetti looks the same on a 60 Hz screen and a 144 Hz one.
    */
+  /**
+   * The clear, painted over everything: the flash, the streaks with their
+   * tails, the XP arriving, the level over it. Closed-form like the confetti
+   * — every position is a function of the age since the stamp landed.
+   */
+  private drawCelebration(g: Ctx, s: number, fonts: ReturnType<typeof ensureFonts>): void {
+    if (this.fxAt < 0) return;
+    const age = this.t - this.fxAt;
+    const { vw, vh } = this.app.layout;
+    const fx = this.fx;
+
+    if (fx) {
+      // The flash: the whole frame, lit and let go.
+      const flash = flashAlpha(age, fx.flash);
+      if (flash > 0) {
+        g.globalAlpha = flash;
+        g.fillStyle = css(Theme.cream);
+        g.fillRect(0, 0, vw, vh);
+        g.globalAlpha = 1;
+      }
+      g.save();
+      // Light adds: two streaks crossing are brighter where they cross.
+      g.globalCompositeOperation = "lighter";
+      for (const r of fx.rings) {
+        const ra = age - r.delay;
+        if (ra < 0 || ra > r.life) continue;
+        const u = ra / r.life;
+        g.globalAlpha = (1 - u) * (r.glow ? 0.35 : 0.8);
+        g.strokeStyle = css(r.color);
+        g.lineWidth = Math.max(1, r.radius * 0.05 * (1 - u));
+        g.beginPath();
+        g.arc(r.x, r.y, r.radius * expOut(u), 0, Math.PI * 2);
+        g.stroke();
+      }
+      g.lineCap = "round";
+      g.lineJoin = "round";
+      for (const c of fx.comets) {
+        const ca = age - c.delay;
+        if (ca < 0 || ca > c.life) continue;
+        const head = cometAt(c, ca);
+        const pts = cometTrail(c, ca);
+        // The tail, as a run of short strokes thinning and dimming toward
+        // the old end, then a white core on the head.
+        for (let i = 1; i < pts.length; i++) {
+          const k = i / (pts.length - 1);
+          g.globalAlpha = head.alpha * k * k * 0.9;
+          g.strokeStyle = css(c.color);
+          g.lineWidth = Math.max(1, c.width * s * k);
+          g.beginPath();
+          g.moveTo(pts[i - 1][0], pts[i - 1][1]);
+          g.lineTo(pts[i][0], pts[i][1]);
+          g.stroke();
+        }
+        g.globalAlpha = head.alpha;
+        g.fillStyle = "#ffffff";
+        g.beginPath();
+        g.arc(head.x, head.y, Math.max(1, c.width * s * 0.55), 0, Math.PI * 2);
+        g.fill();
+      }
+      g.restore();
+      g.globalAlpha = 1;
+      g.lineWidth = 1;
+    }
+
+    // The XP: from far too big, counting up as it lands, over the stamp.
+    const gained = this.gained;
+    if (gained > 0 && this.xpIn.raw > 0) {
+      const { scale, alpha } = zoomIn(this.xpIn.raw);
+      const font = fonts.title;
+      const label = t("result.xpGained", { xp: countUp(0, gained, this.xpIn.raw) });
+      const cx = vw / 2;
+      const cy = vh * 0.42 - font.height / 2;
+      g.save();
+      g.globalAlpha = alpha;
+      g.translate(cx, cy + font.height / 2);
+      g.scale(scale, scale);
+      g.translate(-cx, -(cy + font.height / 2));
+      // A dark halo so the number reads over whatever it lands on.
+      g.fillStyle = css(Theme.ink, 0.85);
+      for (const [ox, oy] of [
+        [-2, 0],
+        [2, 0],
+        [0, -2],
+        [0, 2],
+      ]) {
+        printf(g, font, label, ox, cy + oy, vw, "center");
+      }
+      g.fillStyle = css(Theme.coin);
+      printf(g, font, label, 0, cy, vw, "center");
+      g.restore();
+      // Where it leaves the player, once the number has settled.
+      if (this.xp && this.xpIn.raw >= 1) {
+        g.globalAlpha = Math.min(1, (age - seconds("verdict") - 0.1) * 3);
+        g.fillStyle = css(Theme.cream, 0.9);
+        printf(
+          g,
+          fonts.stationSm,
+          t("result.xpTotal", { xp: this.xp.total, level: this.xp.level }),
+          0,
+          cy + font.height + Math.round(6 * s),
+          vw,
+          "center",
+        );
+        g.globalAlpha = 1;
+      }
+    }
+
+    // The level, slammed in over the number and let go.
+    if (this.xp?.level_up && this.levelIn.raw > 0 && this.levelOut.raw < 1) {
+      const arrive = zoomIn(this.levelIn.raw);
+      const leave = zoomOut(this.levelOut.raw);
+      const scale = arrive.scale * leave.scale;
+      const alpha = arrive.alpha * leave.alpha;
+      const font = fonts.title;
+      const label = t("result.levelUp", { level: this.xp.level });
+      const cx = vw / 2;
+      const cy = vh * 0.42 + font.height * 1.4;
+      g.save();
+      g.globalAlpha = alpha;
+      g.translate(cx, cy + font.height / 2);
+      g.scale(scale, scale);
+      g.translate(-cx, -(cy + font.height / 2));
+      g.fillStyle = css(Theme.ink, 0.85);
+      for (const [ox, oy] of [
+        [-2, 0],
+        [2, 0],
+        [0, -2],
+        [0, 2],
+      ]) {
+        printf(g, font, label, ox, cy + oy, vw, "center");
+      }
+      g.fillStyle = css(Theme.pink);
+      printf(g, font, label, 0, cy, vw, "center");
+      g.restore();
+    }
+  }
+
   private drawConfetti(g: Ctx): void {
     const plan = this.confetti;
     if (!plan) return;

@@ -16,6 +16,7 @@ local I18n = require("src.i18n")
 local Ease = require("src.ease")
 local Anim = require("src.anim")
 local Clock = require("src.clock")
+local Celebrate = require("src.celebrate")
 
 local Result = {}
 Result.__index = Result
@@ -36,10 +37,16 @@ end
 
 function Result:enter(params)
   self.attempt = params.attempt or self.app.last_attempt
+  -- §4.9 / §5.1b: the grant, the total, the level, and whether it is new.
+  self.xp = params.xp
   self.quest = params.quest
   self.log = params.log
   self.t = 0
   self.started = Anim.now()
+  -- The clear's light: planned on the frame the stamp lands, so the fanfare
+  -- never plays before the thing it celebrates arrives.
+  self.fx = nil
+  self.fx_at = nil
   self.next_id = nil
   self:find_next()
 end
@@ -246,6 +253,13 @@ function Result:draw()
       local label = "CLEARED"
       local font_size = 12
       local lw = UI.textWidth(label, font_size)
+      if not self.fx_at then
+        self.fx_at = self:age()
+        self.fx_x, self.fx_y = cx + 10 + lw / 2, cy + 17
+        if self.xp and (self.xp.gained or 0) > 0 then
+          self.fx = Celebrate.plan(self.fx_x, self.fx_y, math.min(vw, vh) * 0.42, 28)
+        end
+      end
       love.graphics.push()
       love.graphics.translate(cx + 10 + lw / 2, cy + 17)
       love.graphics.scale(stamp_scale, stamp_scale)
@@ -330,12 +344,105 @@ function Result:draw()
   end
 
   UI.text(a.id or "", x + 10, vh - foot + 6, 7, Theme.withAlpha(Theme.cream, 0.4))
-  self.app:footer(I18n.t("ENTER retry   N next   ESC map   ARROWS scroll"))
+  self:draw_celebration(vw, vh, x + w / 2, y + (vh - y - foot) * 0.42)
+  self.app:footer(I18n.t("ENTER next/retry   N next   ESC map   ARROWS scroll"))
+end
+
+--- The clear, painted over everything: the flash, the streaks with their
+--- tails, the XP arriving, the level over it. Closed-form like the rest of
+--- the client's motion — every position is a function of the age since the
+--- stamp landed (`src/celebrate.lua`, the browser's plan number for number).
+function Result:draw_celebration(vw, vh, px, py)
+  if not self.fx_at then return end
+  local age = self:age() - self.fx_at
+  local fx = self.fx
+  local xp = self.xp
+
+  if fx then
+    local flash = Celebrate.flash_alpha(age, fx.flash)
+    if flash > 0 then
+      UI.setColor(Theme.cream, flash)
+      love.graphics.rectangle("fill", 0, 0, vw, vh)
+    end
+    -- Light adds: two streaks crossing are brighter where they cross.
+    love.graphics.setBlendMode("add")
+    for _, r in ipairs(fx.rings) do
+      local ra = age - r.delay
+      if ra >= 0 and ra <= r.life then
+        local u = ra / r.life
+        UI.setColor(r.color, (1 - u) * (r.glow and 0.35 or 0.8))
+        love.graphics.setLineWidth(math.max(1, r.radius * 0.05 * (1 - u)))
+        love.graphics.circle("line", r.x, r.y, r.radius * Ease.expOut(u))
+      end
+    end
+    for _, c in ipairs(fx.comets) do
+      local ca = age - c.delay
+      if ca >= 0 and ca <= c.life then
+        local hx, hy, ha = Celebrate.at(c, ca)
+        local pts = Celebrate.trail(c, ca)
+        for i = 2, #pts do
+          local k = (i - 1) / (#pts - 1)
+          UI.setColor(c.color, ha * k * k * 0.9)
+          love.graphics.setLineWidth(math.max(1, c.width * k))
+          love.graphics.line(pts[i - 1][1], pts[i - 1][2], pts[i][1], pts[i][2])
+        end
+        love.graphics.setColor(1, 1, 1, ha)
+        love.graphics.circle("fill", hx, hy, math.max(1, c.width * 0.55))
+      end
+    end
+    love.graphics.setBlendMode("alpha")
+    love.graphics.setLineWidth(1)
+    love.graphics.setColor(1, 1, 1, 1)
+  end
+
+  local gained = (xp and xp.gained) or 0
+  if gained <= 0 then return end
+  -- The number: from far too big, counting up as it lands.
+  local u = Ease.clamp((age - 0.1) / 0.7, 0, 1)
+  local size = 18
+  local lh = UI.lineHeight(size)
+  if u > 0 then
+    local scale, alpha = Celebrate.zoom_in(u)
+    local label = I18n.t("+%d XP", Celebrate.count_up(0, gained, u))
+    local lw = UI.textWidth(label, size)
+    love.graphics.push()
+    love.graphics.translate(px, py)
+    love.graphics.scale(scale, scale)
+    UI.text(label, -lw / 2, -lh / 2, size, Theme.withAlpha(Theme.coin, alpha))
+    love.graphics.pop()
+    if u >= 1 then
+      local settle = Ease.clamp((age - 0.8) * 3, 0, 1)
+      UI.text(I18n.t("%d XP · LEVEL %d", xp.total or 0, xp.level or 1),
+        0, py + lh / 2 + 6, 8, Theme.withAlpha(Theme.cream, 0.9 * settle), "center", vw)
+    end
+  end
+  -- The level, slammed in over the number and let go.
+  if xp.level_up then
+    local ui = Ease.clamp((age - 0.63) / 0.46, 0, 1)
+    local uo = Ease.clamp((age - 0.63 - 1.6) / 0.7, 0, 1)
+    if ui > 0 and uo < 1 then
+      local s1, a1 = Celebrate.zoom_in(ui)
+      local s2, a2 = Celebrate.zoom_out(uo)
+      local label = I18n.t("LEVEL %d", xp.level or 1)
+      local lw = UI.textWidth(label, size)
+      love.graphics.push()
+      love.graphics.translate(px, py + lh * 1.6)
+      love.graphics.scale(s1 * s2, s1 * s2)
+      UI.text(label, -lw / 2, -lh / 2, size, Theme.withAlpha(Theme.pink, a1 * a2))
+      love.graphics.pop()
+    end
+  end
 end
 
 function Result:keypressed(key)
+  -- ENTER takes the lit button, as the web does: NEXT after an acceptance
+  -- with somewhere to go, RETRY otherwise.
   if key == "return" or key == "kpenter" then
-    self:retry()
+    if self.attempt and self.attempt.verdict == "accepted" and self.next_id then
+      self:next_quest()
+    else
+      self:retry()
+    end
     return true
   end
   if key == "n" then

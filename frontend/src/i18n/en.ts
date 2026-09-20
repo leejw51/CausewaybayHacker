@@ -150,10 +150,11 @@ export const en = {
     "Pointers, RAII, undefined behaviour. Everything is an address and nothing checks you.",
   "lands.pythonBlurb":
     "Dicts, generators, duck typing. Nothing is typed until it runs, and it runs at six.",
+  "lands.verybasicBlurb": "The quiz. Which line is the grammar? Pick one of four, then type it.",
   "lands.basicBlurb":
-    "The morning walk. Shopfronts, kiosks and tills — read what the machine wrote.",
+    "The morning walk. One construct at a time, explained, and one or two lines to type — types, loops, structs, sorts, closures, a thread, a tree.",
   "lands.advancedBlurb":
-    "The lunch rush. Two tills on one counter, and both of them happened at once.",
+    "Small coding quizzes on the grammar, then the lunch rush: two tills on one counter, both at once.",
   "lands.hackerBlurb": "The interview. One room, one clock, and nothing finishing your lines.",
   "lands.category": "{land} — CATEGORY",
   "lands.clearedOf": "{cleared} / {total} CLEARED",
@@ -171,10 +172,14 @@ export const en = {
   "lands.footer": "←→  LAND   CLICK  CATEGORY   F7  LANGUAGE   F1  ORIENTATION   F3  LOG OUT",
 
   // -- the map -------------------------------------------------------------
+  "map.menu": "MENU",
+  "map.close": "CLOSE",
+  "map.goIn": "GO IN",
   "map.allMaps": "ALL MAPS",
   "map.playground": "PLAYGROUND",
   "map.allMapsShort": "MAPS",
   "map.playgroundShort": "PLAY",
+  "map.verybasic": "VERY BASIC",
   "map.basic": "BASIC",
   "map.advanced": "ADVANCED",
   "map.hacker": "HACKER",
@@ -197,6 +202,8 @@ export const en = {
   // -- the quest screen ----------------------------------------------------
   "quest.loading": "LOADING",
   "quest.job": "THE JOB",
+  "quest.quizPick": "PICK THE LINE, THEN TYPE IT  (1–4)",
+  "quest.quizRight": "RIGHT — NOW TYPE IT",
   "quest.sample": "SAMPLE · {name}",
   "quest.in": "in",
   "quest.out": "out",
@@ -315,7 +322,11 @@ export const en = {
   "result.again": "AGAIN",
   "result.tryAgain": "TRY AGAIN",
   "result.backToMap": "BACK TO THE MAP",
-  "result.footer": "ENTER  MAP   R  TRY AGAIN   F1  ORIENTATION   F3  LOG OUT",
+  "result.next": "NEXT",
+  "result.xpGained": "+{xp} XP",
+  "result.levelUp": "LEVEL {level}",
+  "result.xpTotal": "{xp} XP · LEVEL {level}",
+  "result.footer": "ENTER  NEXT / MAP   N  NEXT   R  TRY AGAIN   F1  ORIENTATION   F3  LOG OUT",
 
   // -- the playground ------------------------------------------------------
   "pg.title": "PLAYGROUND · {name}",

@@ -173,6 +173,11 @@ return {
   ["AI MODE"] = "REŽIM AI",
   ["WEAKEST"] = "SLABINY",
   ["PLAYGROUND"] = "HŘIŠTĚ",
+  ["CODE PLAYGROUND"] = "HŘIŠTĚ PRO KÓD",
+  ["write anything, run it — the Rust coder flies beside you"] = "napiš cokoli, spusť to — Rust kodér letí vedle tebe",
+  ["+%d XP"] = "+%d bodů XP",
+  ["%d XP · LEVEL %d"] = "%d XP · ÚROVEŇ %d",
+  ["LEVEL %d"] = "ÚROVEŇ %d",
   ["SHELF"] = "POLICE",
   ["CLEARED"] = "HOTOVO",
   ["STARS"] = "HVĚZDY",
@@ -233,7 +238,7 @@ return {
   ["looking for the stage beating you most…"] = "hledám úroveň, která tě poráží nejvíc…",
   ["nothing has beaten you yet — pick a land"] = "zatím tě nic neporazilo — vyber si zemi",
   ["ARROWS mode   ENTER start   N next   F finish   ESC back"] = "ŠIPKY režim   ENTER start   N další   F konec   ESC zpět",
-  ["ENTER retry   N next   ESC map   ARROWS scroll"] = "ENTER znovu   N další   ESC mapa   ŠIPKY posun",
+  ["ENTER next/retry   N next   ESC map   ARROWS scroll"] = "ENTER další/znovu   N další   ESC mapa   ŠIPKY posun",
   ["R refresh   H history   ARROWS scroll   ESC back"] = "R obnovit   H historie   ŠIPKY posun   ESC zpět",
   ["TYPE to search   ENTER go   TAB mode   ARROWS pick   ESC back"] = "PIŠ pro hledání   ENTER dál   TAB režim   ŠIPKY výběr   ESC zpět",
   -- Two spaces between the pairs rather than three, and the imperative
@@ -244,7 +249,10 @@ return {
   -- rather than by compromise.
   ["F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"] = "F5 spusť  F2 formát  TAB jazyk  CTRL-S ulož  CTRL-N nový  ESC zpět",
   ["F6 reset   F7 hint   F8 log   F9 $EDITOR   ESC map"] = "F6 reset   F7 nápověda   F8 log   F9 $EDITOR   ESC mapa",
+  ["VERY BASIC"] = "ÚPLNÝ ZÁKLAD",
   ["BASIC"] = "ZÁKLADY",
+  ["PICK THE LINE, THEN TYPE IT  (1–4)"] = "VYBER SPRÁVNÝ ŘÁDEK A NAPIŠ HO  (1–4)",
+  ["RIGHT — NOW TYPE IT"] = "SPRÁVNĚ — TEĎ HO NAPIŠ",
   ["ADVANCED"] = "POKROČILÉ",
   ["OPEN"] = "OTEVŘENO",
 

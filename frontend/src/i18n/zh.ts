@@ -130,8 +130,11 @@ export const zh: Partial<Catalogue> = {
   "lands.goBlurb": "goroutine、channel，一门装得进脑子的小语言。",
   "lands.cppBlurb": "指针、RAII、未定义行为。一切都是地址，没有东西替你检查。",
   "lands.pythonBlurb": "字典、生成器、鸭子类型。跑起来之前什么都没有类型，而它六点就跑。",
-  "lands.basicBlurb": "早晨的散步。店面、小摊、收银台 — 读懂机器写了什么。",
-  "lands.advancedBlurb": "午市高峰。一个柜台两台收银机，而且两边同时发生。",
+  "lands.verybasicBlurb": "小测验。哪一行才是对的语法？四选一，然后把它敲出来。",
+  "lands.basicBlurb":
+    "早晨的散步。一次一个语法点，先讲解，再填一两行 — 类型、循环、结构体、排序、闭包、线程、树。",
+  "lands.advancedBlurb":
+    "先做用上这些语法的小编程题，然后是午市高峰：一个柜台两台收银机，同时发生。",
   "lands.hackerBlurb": "面试。一个房间，一只钟，没有谁替你把行写完。",
   "lands.category": "{land} — 分类",
   "lands.clearedOf": "{total} 条中通关 {cleared} 条",
@@ -148,10 +151,14 @@ export const zh: Partial<Catalogue> = {
   "lands.noWorld": "服务器没有把世界发过来",
   "lands.footer": "←→  领地   点击  分类   F7  语言   F1  屏幕方向   F3  退出登录",
 
+  "map.menu": "菜单",
+  "map.close": "关闭",
+  "map.goIn": "进入",
   "map.allMaps": "所有地图",
   "map.playground": "练习场",
   "map.allMapsShort": "地图",
   "map.playgroundShort": "练习",
+  "map.verybasic": "入门",
   "map.basic": "基础",
   "map.advanced": "进阶",
   "map.hacker": "黑客",
@@ -172,6 +179,8 @@ export const zh: Partial<Catalogue> = {
   "map.footer": "←→  街道   ENTER  进去   TAB  领地   Q/E  分类   F1  屏幕方向",
 
   "quest.loading": "载入中",
+  "quest.quizPick": "选出对的那一行，然后敲出来  (1–4)",
+  "quest.quizRight": "答对了 — 现在把它敲出来",
   "quest.job": "这次的任务",
   "quest.sample": "样例 · {name}",
   "quest.in": "输入",
@@ -286,6 +295,10 @@ export const zh: Partial<Catalogue> = {
   "result.runnerSaw": "运行器看到的",
   "result.again": "再来一次",
   "result.tryAgain": "再试一次",
+  "result.xpGained": "+{xp} XP",
+  "result.levelUp": "等级 {level}",
+  "result.xpTotal": "{xp} XP · 等级 {level}",
+  "result.next": "下一题",
   "result.backToMap": "回到地图",
   "result.footer": "ENTER  地图   R  再试一次   F1  屏幕方向   F3  退出登录",
 

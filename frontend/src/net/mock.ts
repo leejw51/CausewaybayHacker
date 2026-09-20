@@ -26,7 +26,7 @@
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { decode, encode } from "./codec";
-import type { Attempt, Category, Land, MapNode, Position, Quest, User } from "./protocol";
+import type { XpGain, Attempt, Category, Land, MapNode, Position, Quest, User } from "./protocol";
 import type { Transport, TransportFactory, TransportHandlers } from "./transport";
 import { deterministicUsername } from "../wallet/username";
 
@@ -359,6 +359,9 @@ function ragged(text: string): string[] {
  * A mock connection. One per `connect()`, so closing and reopening exercises
  * the client's reconnect-with-token path for real.
  */
+/** The mock's XP ledger: one number, because there is one player here. */
+let XP_TOTAL = 0;
+
 export function mockTransport(): TransportFactory {
   return (h: TransportHandlers): Transport => {
     let closed = false;
@@ -629,6 +632,7 @@ export function mockTransport(): TransportFactory {
 
           const broken = !/fn\s+main\s*\(/.test(source);
           let attempt: Attempt;
+          let xp: XpGain | undefined;
           if (broken) {
             const stderr = "error[E0601]: `main` function not found in crate `main`\n";
             log(attemptId, "stderr", stderr);
@@ -724,6 +728,27 @@ export function mockTransport(): TransportFactory {
               cleared: first,
               created_at: now(),
             };
+            // §4.9: the XP this submit was worth, on the server's own curve
+            // (`awards.rs`): 25 × stars × difficulty × the category weight,
+            // once, on the first clear.
+            const weight = q.category === "hacker" ? 3 : q.category === "advanced" ? 2 : 1;
+            const gained = first ? 25 * row.stars * q.difficulty * weight : 0;
+            XP_TOTAL += gained;
+            const levelOf = (xp: number) => {
+              let level = 1;
+              while ((100 * level * (level + 1)) / 2 <= xp) level++;
+              return level;
+            };
+            const xpAt = (level: number) => (100 * (level - 1) * level) / 2;
+            const level = levelOf(XP_TOTAL);
+            xp = {
+              gained,
+              total: XP_TOTAL,
+              level,
+              into_level: XP_TOTAL - xpAt(level),
+              for_next: xpAt(level + 1) - xpAt(level),
+              level_up: level > levelOf(XP_TOTAL - gained),
+            };
 
             if (passed) {
               emit(null, "progress.update", {
@@ -732,6 +757,7 @@ export function mockTransport(): TransportFactory {
                 stars: row.stars,
                 cleared_total: QUESTS.filter((x) => rows.get(x.id)!.state === "cleared").length,
                 unlocked,
+                xp,
               });
               if (first) {
                 emit(null, "award", {
@@ -745,7 +771,7 @@ export function mockTransport(): TransportFactory {
           }
           saveWorld();
           submitting = false;
-          return ok(id, type, { attempt });
+          return ok(id, type, { attempt, xp });
         }
 
         case "stats.summary": {

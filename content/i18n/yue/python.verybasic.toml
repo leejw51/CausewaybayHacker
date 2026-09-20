@@ -1,0 +1,567 @@
+# PYTHON LAND — VERY BASIC, in Cantonese (colloquial written Cantonese,
+# traditional characters). A translation pack (SPEC §12.1): the prose of
+# `content/python/verybasic.toml`, quest by quest, and nothing else. Code
+# blocks, identifiers, the quiz choices, sample input and output and the exact
+# strings a program must print are the English pack's and are copied
+# verbatim, never translated.
+
+
+pack   = "python.verybasic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.verybasic.01.print"
+title = "第一塊板"
+story = "寶靈頓道 06:00。全日第一塊價錢板係空白，個筆喺阿美手上。"
+brief = '''
+程式要喺一行印出正正係 `hello, causewaybay`。有一個內建函數會寫一行去標準輸出。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+output: hello, causewaybay
+```
+'''
+hints = [
+  "print(\"hello, causewaybay\") — 括號，逗號喺字串入面。",
+  "Python 3 冇 print 陳述式；print 係函數。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.verybasic.02.int-types"
+title = "分單"
+story = "兩杯咖啡，魚檔櫃檯一張紙幣。個收銀機要講每人幾多、剩幾多，但乜都冇講。"
+brief = '''
+`a` 同 `b` 係整數。程式要喺一行印出整數商同餘數，用空格分開。Python 每樣都有一個運算符。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  7 2
+output: 3 1
+```
+'''
+hints = [
+  "print(a // b, a % b) — 兩條斜線除到整數，百分號係餘數。",
+  "單一條斜線畀個 float：3.5，唔係 3。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.verybasic.03.floats"
+title = "準確嘅份額"
+story = "街市個磅顯示克數到三個位，收據要兩個位。收據係空白。"
+brief = '''
+`x` 同 `y` 係 float。程式要印 `x / y`，小數點後正正兩位。f-string 喺冒號後面帶格式規格。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  7 2
+output: 3.50
+```
+'''
+hints = [
+  "print(f\"{x / y:.2f}\") — 冒號後面嘅 .2f 就係格式。",
+  "round() 會掉走尾隨嘅零：3.5，唔係 3.50。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.verybasic.04.strings"
+title = "檔口招牌"
+story = "菜檔個招牌係大楷畫嘅，本簿係細楷；寫招牌嘅要人大聲讀返。"
+brief = '''
+`s` 係一行文字。喺佢長度之後，程式要用大楷印 `s`。有個字串方法會回傳每個字母都大楷嘅副本。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+```
+'''
+hints = [
+  "print(s.upper()) — 字串上嘅方法，用括號呼叫。",
+  "capitalize() 只係將第一個字母變大楷。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.verybasic.05.bool-if"
+title = "單定雙"
+story = "寶靈頓道嘅檔口號碼一邊雙數一邊單數；送貨仔要由號碼知道邊一邊。"
+brief = '''
+`n` 係正整數。`n` 可以被二整除就印 `even`，否則印 `odd`。條件係一個 `if` 標頭，將餘數同零比較。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  4
+output: even
+```
+'''
+hints = [
+  "if n % 2 == 0: — 兩個等號係比較；一個係指定。",
+  "n / 2 係浮點除法；對正數 n 嚟講永遠唔會係零。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.verybasic.06.loops"
+title = "點算"
+story = "朝早嘅袋數係一加二加三直到最後一檔，而本簿顯示零。"
+brief = '''
+`n` 係正整數。個迴圈要行過由 1 到 `n`（包括 `n`）每個整數，將每個加落 `total`。`range` 攞一個起點同終點，終點唔包括在內。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  4
+output: 10
+```
+'''
+hints = [
+  "for i in range(1, n + 1): — 終點唔包括，所以係 n + 1。",
+  "range(n) 由 0 開始，喺 n 之前停。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.verybasic.07.functions"
+title = "送貨薪率"
+story = "全日頭十單每單五蚊，之後每單三蚊；車手個 app 乜都唔回傳。"
+brief = '''
+`fare(rides)` 要回傳工資：頭十單每單 5，第十單之後每單 3。函數用一個關鍵字交返個值。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  3
+output: 15
+```
+'''
+hints = [
+  "return min(rides, 10) * 5 + max(rides - 10, 0) * 3",
+  "一個 print 而唔 return 嘅函數交返嘅係 None。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.verybasic.08.structs"
+title = "一個檔口，兩個欄位"
+story = "每個檔口張卡都有名同價錢。張卡嘅價錢欄位唔見咗，個標籤印出半個檔口。"
+brief = '''
+`Stall.__init__` 收到 `name` 同 `price`。佢要用同存 `name` 一樣嘅方法將 `price` 存喺物件上，咁 `s.price` 先讀得返。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  tofu 12
+output: tofu 12
+```
+'''
+hints = [
+  "self.price = price — self 係個物件；淨係一個名係區域變數。",
+  "兩個等號係比較，乜都唔會存。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.verybasic.09.struct-method"
+title = "一行總數"
+story = "價錢乘數量係麵檔每張單嘅一行，但本應講出嚟嘅方法乜都冇講。"
+brief = '''
+`Stall.total(self)` 要回傳價錢乘數量。喺方法入面，物件嘅欄位透過 `self` 接觸。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  tofu 12 3
+output: tofu: 36
+```
+'''
+hints = [
+  "return self.price * self.qty — 兩個欄位都經 self。",
+  "淨係 price 喺方法入面冇定義。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.verybasic.10.enums"
+title = "路線顏色"
+story = "魚檔上面幅港鐵圖有三條線；個細路有個字，要搵佢代表嘅 Enum 成員。"
+brief = '''
+`word` 係 `island`、`tsuenwan`、`kwuntong` 其中一個。程式要將佢變做對應嘅 `Line` 成員。Enum 類別可以用成員名做索引。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "line = Line[word.upper()] — 方括號按名查一個成員。",
+  "Line(...) 用括號係按值查，而個值係數字。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.verybasic.11.vector"
+title = "朝早清單"
+story = "每個由貨車落嚟嘅箱都按次序上朝早清單，但清單一直係空。"
+brief = '''
+`xs` 一開始係空。迴圈入面讀到嘅每個整數 `x` 都要加喺尾，保持輸入次序。清單有一個方法做呢樣嘢。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 4
+        3 1 4 1
+```
+'''
+hints = [
+  "xs.append(x) — 一個值，放喺尾。",
+  "insert(0, x) 放喺前面，會倒轉次序。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.verybasic.12.vector-edit"
+title = "第一箱走咗"
+story = "朝早清單第一箱喺讀清單之前已經賣咗；佢要走，後面嘅每樣嘢向前移一格。"
+brief = '''
+`xs` 裝住嗰行嘅整數。程式要移走索引 0 嘅元素，令其餘嘅向前移。有一個陳述式按索引刪除。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 1 4 1
+```
+'''
+hints = [
+  "del xs[0] — del 將索引嗰格拎走。",
+  "remove(0) 搵嘅係值 0，唔係索引。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.verybasic.13.list"
+title = "鏈嘅前面"
+story = "送貨鏈掛喺櫃檯，最新嘅飛掛喺最前；個細路一直掛喺後面。"
+brief = '''
+`chain` 係一個 `deque`。迴圈入面讀到嘅每個 `x` 都要加喺最前面，咁最後讀到嗰個就會排第一。deque 有一個方法係針對嗰一端。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+hints = [
+  "chain.appendleft(x) — 一個字，冇底線。",
+  "append(x) 放喺後面。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.verybasic.14.maps"
+title = "點算簿"
+story = "一檔一本簿，一件貨一行，旁邊一個計數；一件貨第一次出現時冇行可以加。"
+brief = '''
+`counts` 係一個 dict。每個字 `w` 程式都要將佢個計數加一，第一次由零開始。`get` 帶預設值讀取。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        har 1
+        mai 2
+        siu 2
+```
+'''
+hints = [
+  "counts[w] = counts.get(w, 0) + 1 — 帶預設值 get，然後存。",
+  "對唔存在嘅 key 做 += 1 會 raise KeyError。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.verybasic.15.hashtable"
+title = "查表"
+story = "檔口表將名對應去號碼，問一個唔存在嘅檔口應該答 -1，唔係令個板當機。"
+brief = '''
+`table` 將名對應去檔口號碼。對於字 `w`，程式要印佢個號碼，`w` 唔喺表入面就印 `-1`。有個 dict 方法帶預設值讀取。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  2
+        tofu 3
+        fish 7
+        egg
+output: -1
+```
+'''
+hints = [
+  "print(table.get(w, -1)) — 第二個參數係預設值。",
+  "table[w] 喺 w 唔存在時會 raise KeyError。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.verybasic.16.sets"
+title = "唔同嘅價錢"
+story = "六個檔口，四個唔同價錢。個板想知有幾多個唔同價錢，但佢印六。"
+brief = '''
+`xs` 裝住嗰行嘅整數。程式要印有幾多個唔同嘅值。集合每樣淨係留一個。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  3 5 3 8 5 3
+output: 3
+```
+'''
+hints = [
+  "print(len(set(xs))) — set() 掉走重複，len 數。",
+  "len(xs) 數晒每個值，連重複嘅都計。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.verybasic.17.stack"
+title = "疊碟"
+story = "碟放上疊，由頂部攞落嚟；洗碗嘅一直由底部攞。"
+brief = '''
+`stack` 係一個當做棧用嘅清單。程式要將頂部（最後）嘅元素攞落 `top`。有一個清單方法移除並回傳最後一個項目。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 4
+        1 2 3
+```
+'''
+hints = [
+  "top = stack.pop() — 冇參數即係最後一個。",
+  "stack[-1] 讀頂部但留佢喺疊上。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "python.verybasic.18.queue"
+title = "籌號隊"
+story = "籌號按攞籌次序叫；個細路一直叫最新嗰個。"
+brief = '''
+`q` 係一個按次序裝住籌號嘅 `deque`。程式要將第一個攞落 `first`。deque 用一個方法由前面移除。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 1
+        2 3 4
+```
+'''
+hints = [
+  "first = q.popleft() — 一個字。",
+  "pop() 由後面攞；q[0] 讀但唔移除。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "python.verybasic.19.heap"
+title = "最平先"
+story = "落單次序亂，廚房每次都想要最平嗰單；裝住佢哋嘅堆完全唔知邊個最平。"
+brief = '''
+`heap` 一開始係空清單。每個 `x` 都要 push 入去，令之後 `heapq.heappop` 由最細開始回傳。`heapq` 有一個保持堆次序嘅 push。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  5 1 4 2 3
+output: 1 2 3 4 5
+```
+'''
+hints = [
+  "heapq.heappush(heap, x) — 模組函數，先 heap。",
+  "append() 將 x 放喺尾，會破壞堆次序。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "python.verybasic.20.sorting"
+title = "價錢梯"
+story = "板上嘅價錢係按檔口開檔次序，客人想最平先。"
+brief = '''
+`xs` 裝住嗰行嘅整數。程式要喺印之前就地升序排序 `xs`。清單有一個方法做呢樣嘢。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 1 1 3 4
+```
+'''
+hints = [
+  "xs.sort() — 要有括號，否則乜都唔會發生。",
+  "sorted(xs, reverse=True) 係降序。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "python.verybasic.21.sort-by-key"
+title = "排行榜"
+story = "車手個榜係分數由高到低，同分嘅兩個車手按名；個榜而家係到達次序。"
+brief = '''
+`rows` 係一個 `(name, score)` 對嘅清單。要按分數降序、再按名升序排序。`sort` 攞一個回傳 tuple 嘅 `key` 函數。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  3
+        mei 7
+        alex 9
+        bo 7
+output: alex 9
+        bo 7
+        mei 7
+```
+'''
+hints = [
+  "rows.sort(key=lambda r: (-r[1], r[0])) — 分數加負號變降序。",
+  "key= 係關鍵字參數；sort 唔接受位置參數嘅函數。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "python.verybasic.22.reverse"
+title = "由尾到頭"
+story = "舢舨個名喺船尾係倒轉畫嘅，而個記錄簿就係想要咁。"
+brief = '''
+`s` 係一行文字。程式要倒轉印出嚟。步長係 -1 嘅切片會倒住行一個字串。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  kwan lee
+output: eel nawk
+```
+'''
+hints = [
+  "print(s[::-1]) — 起點終點留空，步長 -1。",
+  "reversed(s) 係迭代器；印佢出嚟會顯示佢個地址。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "python.verybasic.23.closures"
+title = "加價"
+story = "生果檔每個批發價都加同一個加價，但本應記住個加價嘅函數忘記咗佢。"
+brief = '''
+`make_adder(k)` 入面定義咗一個內部函數 `add`，回傳 `x + k`。佢要交返嗰個內部函數本身，咁之後叫 `add(x)` 時 `k` 仲記得住。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "return add — 淨係個名，冇括號。",
+  "add() 係冇參數咁叫佢，會失敗。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "python.verybasic.24.lambdas"
+title = "雙數平方"
+story = "雙數檔口按檔號嘅平方畀錢，單數嘅唔使畀；個帳簿想要一個總數。"
+brief = '''
+`xs` 裝住嗰行嘅整數。`total` 要係雙數值嘅平方和，用 `map`、`filter` 同兩個 lambda 砌出嚟。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "total = sum(map(lambda x: x * x, filter(lambda x: x % 2 == 0, xs)))",
+  "filter 留低 lambda 話 True 嘅；map 做轉換。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "python.verybasic.25.threads"
+title = "十二個檔口一齊"
+story = "每個檔口喺自己線程上將存貨數平方，而落單表喺任何一個完成之前已經印咗。"
+brief = '''
+`threads` 入面每條線程都已經開始。喺印結果之前，主線程要等每一條完成。線程有一個方法做呢樣嘢。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "t.join() — 阻塞直到嗰條線程完成。",
+  "第二次 start() 會 raise RuntimeError。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "python.verybasic.26.mutex"
+title = "一個計數器，四隻手"
+story = "四個收銀員同時加落同一個計數器；個計數器有個鎖，但冇人寫之前攞佢。"
+brief = '''
+`lock` 係一個 `threading.Lock`。每個工作者喺 `counter += 1` 之前都要攞個鎖；寫完之後嘅釋放已經寫好。有一個方法係攞鎖。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  1000
+output: 4000
+```
+'''
+hints = [
+  "lock.acquire() — 然後寫，然後係已經喺度嘅釋放。",
+  "釋放一個冇人持有嘅鎖會 raise RuntimeError。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "python.verybasic.27.binary-tree"
+title = "NONE"
+story = "05:59 喺價錢板：價錢樹嘅左枝係 None，而嗰邊第一次插入就跌咗落地。"
+brief = '''
+`insert(n, v)` 回傳裝住 `v` 嘅樹嘅根；空嘅情況同右邊已經寫好。對於較細嘅 `v`，左子節點要換做插入佢入面嘅結果，咁 `None` 子節點就變做一個節點。
+
+揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "n.left = insert(n.left, v) — 遞迴回傳子樹嘅新根；存住佢。",
+  "叫 insert 但唔存結果，會留低嗰個 None。",
+]

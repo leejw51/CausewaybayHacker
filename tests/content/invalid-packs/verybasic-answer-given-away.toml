@@ -1,0 +1,50 @@
+# A VERY BASIC quest whose brief prints the answer line. The quiz IS the
+# answer on that road: four choices, one right, picked before it is typed.
+# A brief that shows the line makes the choice a formality. Refused by
+# `verify_pack.py` (structural, "given away"), not by the importer.
+pack = "rust.verybasic"
+land = "rust"
+category = "verybasic"
+version = 1
+
+[[quest]]
+id = "rust.verybasic.01.print"
+node = 1
+title = "GIVEN AWAY"
+difficulty = 1
+story = "A napkin with the answer already on it."
+concepts = ["io", "strings"]
+requires = []
+map = { x = 0.1, y = 0.1, kind = "quest" }
+brief = '''
+Type `println!("hello, causewaybay");` where the FILL comment is.
+
+```
+input:
+output: hello, causewaybay
+```
+'''
+starter = '''
+fn main() {
+    // FILL
+}
+'''
+solution = '''
+fn main() {
+    println!("hello, causewaybay");
+}
+'''
+hints = ["It has a bang.", "Lowercase."]
+
+[quest.quiz]
+choices = ["print!(\"hello, causewaybay\");", "println!(\"hello, causewaybay\");", "println(\"hello, causewaybay\");", "puts(\"hello, causewaybay\");"]
+answer = 1
+
+[quest.tests]
+harness = "stdio"
+timeout_ms = 5000
+match = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+  { name = "again",  stdin = "x\n", expect = "hello, causewaybay\n", visible = false },
+]

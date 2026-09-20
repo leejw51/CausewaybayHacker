@@ -32,11 +32,13 @@ id    = "rust.basic.02.bindings"
 title = "車費牌"
 story = "波斯富街電車站個車費牌淨係顯示一個數，之後日票同月票嗰兩格都係空嘅。"
 brief = '''
-由標準輸入讀一個整數 `n`。
+`let` 幫一個值改個名。型別可以寫喺冒號後面，`println!("{}", …)` 會印出大括號入面嘅嘢，跟住換行。`i64` 嘅算術就好似喺紙上面咁寫。
 
-印三行：`n`，然後 `n` 嘅兩倍，然後 `n` 乘自己。
+```
+println!("{}", n * n);
+```
 
-`n` 裝得入 `i64`，可以係負數。
+`n` 已經讀咗，頭兩行亦幫你印咗。喺 `// FILL` 註解嗰度打呢一行：第三個 `println!`，`n` 乘自己。
 
 ```
 input:  12
@@ -46,547 +48,708 @@ output: 12
 ```
 '''
 hints = [
-  "讀入嗰part已經幫你寫好。將 _n 前面條底線拎走，直接用佢。",
-  "println! 食一個格式字串：println!(\"{}\", n)。",
-  "負數 n 嘅平方係正數。測試係知嘅。",
+  "println!(\"{}\", n * n);",
+  "上面兩行係同一個形狀；淨係第二個參數入面條式唔同。",
 ]
 
 # ---------------------------------------------------------------- 03
 [[quest]]
-id    = "rust.basic.03.shadowing"
-title = "三個名，一個名"
-story = "崇光過路口嗰部售票機將個價錢當文字又當數字又當錢咁存，而三個都叫做 price。"
+id    = "rust.basic.03.types"
+title = "分單"
+story = "波斯富街個報攤，兩杯咖啡一張紙幣。個收銀機要講每人幾多、剩幾多、同埋準確嘅份額，今日三行全部空白。"
 brief = '''
-讀一行：一個以仙為單位嘅金額，用數字寫。
-
-印三行：
-
-1. trim 咗之後嘅文字有幾多個字元
-2. 個金額，當數字
-3. 個金額換做元，啱啱好兩個小數位
+兩個整數相除得返整數：`7 / 2` 係 `3`，`7 % 2` 係餘數 `1`。想要小數就要先轉型 — `as f64` 將整數變做浮點數 — 格式字串入面嘅 `{:.2}` 會印出小數點後準確兩位。
 
 ```
-input:  1234
-output: 4
-        1234
-        12.34
+println!("{:.2}", a as f64 / b as f64);
 ```
 
-金額唔會係負數，裝得入 `i64`。用一個名做晒，shadow 兩次 —— 先係
-`&str`，再係 `i64`，最後係 `String`。
+`a` 同 `b` 已經讀咗，整數除法同餘數亦印咗。喺 `// FILL` 註解嗰度打呢一行。
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
 '''
 hints = [
-  "第二個 `let cents = ...` 唔係賦值；佢係開一個新嘅 binding，遮住舊嗰個，而且可以係另一個型。",
-  "所以 shadowing 唔係 `mut`：`mut` 保住個型，shadowing 唔保。",
-  "兩個小數位、前面補零，係 {:02} 呢個闊度 flag。",
+  "println!(\"{:.2}\", a as f64 / b as f64);",
+  "除之前兩邊都要用 `as f64` 轉型，否則係整數除法，小數位一早冇咗。",
 ]
 
 # ---------------------------------------------------------------- 04
 [[quest]]
-id    = "rust.basic.04.the-move"
-title = "一張收據"
-story = "Lucky Mac 部收銀機印完收據之後就講唔到多謝，因為佢連個名都跟張紙一齊交咗出去。"
+id    = "rust.basic.04.strings"
+title = "招牌"
+story = "渣甸坊個招牌師傅要個名三個樣：數幾多個字母嚟報價、大楷寫上塊板、同埋鏡像寫喺玻璃入面。"
 brief = '''
-讀一行：一個顧客名。印兩行：
+`String` 用 `.len()` 知自己幾長，用 `.to_uppercase()` 整個大楷副本。冇 `.reverse()`：你要用 `.chars()` 逐個字元行，用 `.rev()` 掉轉頭行，再用 `.collect()` 收集成一個新嘅 `String`。`let` 上面個型別話畀 `collect` 知要砌乜。
 
 ```
-input:  MEI
-output: RECEIPT: MEI
-        THANK YOU, MEI
+let rev: String = line.chars().rev().collect();
 ```
 
-個 starter 編譯唔到。`receipt` 係**以值**攞走個名，所以呼叫完之後 `main`
-已經唔再擁有佢，冇得再印多次。
+一行已經讀咗，長度同大楷亦印咗。喺 `// FILL` 註解下面，用呢句 `let` 取代佔位嗰句 `let rev`。
 
-改法係畀 `receipt` *睇一睇*個名，而唔係攞走佢。唔准 clone。
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
 '''
 hints = [
-  "個錯誤係 E0382：borrow of moved value。個 move 係喺呼叫嗰下發生，唔係喺印嗰下。",
-  "型係 &str 嘅參數係借；型係 String 嘅參數係攞走。",
-  "先改個簽名，之後呼叫嗰邊就要加個 &。",
+  "let rev: String = line.chars().rev().collect();",
+  "`.chars()` 係逐個字元嘅 iterator，`.rev()` 倒住行，`.collect()` 砌出 `let` 要嘅 `String`。",
 ]
 
 # ---------------------------------------------------------------- 05
 [[quest]]
-id    = "rust.basic.05.slices"
-title = "條隊嘅中間"
-story = "四十個人排喺希慎廣場出面。櫃檯睇到條隊嘅頭同尾，中間嘅一個都睇唔到。"
+id    = "rust.basic.05.loops"
+title = "電車數站"
+story = "怡和街電車個售票員喺紙條上面數站：累計總數，每第三個站打一個剔。張紙條第一行之後全部空白。"
 brief = '''
-標準輸入第一行係一個數量 `n`，第二行係 `n` 個整數，用空格分開。
-
-印三行：第一個值、最後一個值，同埋嚴格喺佢哋兩個之間所有數嘅總和。
-唔夠三個值嘅話，個總和係 `0`。
+`for` 迴圈行一個範圍。`1..n` 喺 `n` 前面停；`1..=n` 包埋 `n`。迴圈變數每一圈都係新嘅綁定，`+=` 就加落一個 `mut` 總數度。
 
 ```
-input:  5
-        4 8 15 16 23
-output: 4
-        23
-        39
+for i in 1..=n {
+    sum += i;
+    if i % 3 == 0 {
+        ticks += 1;
+    }
+}
+```
+
+`n` 已經讀咗，總數已經宣告同印出，迴圈主體亦寫好。用第一行 `for i in 1..=n {` 取代佔位嗰句 `for i in 0..0 {`。
+
+```
+input:  6
+output: 21
+        2
 ```
 '''
 hints = [
-  "nums[1..nums.len() - 1] 係個 Vec 嘅一個 slice，唔係一個副本。",
-  "得一個或者兩個值嘅時候，嗰個範圍會係空或者倒轉 —— 索引之前用個 if 擋住先。",
-  "一個 &i64 嘅 iterator 可以直接 sum 做一個 i64。",
+  "for i in 1..=n {",
+  "`..=` 係包含尾嘅範圍。`1..n` 會少一個，總和就差咗 `n`。",
 ]
 
 # ---------------------------------------------------------------- 06
 [[quest]]
-id    = "rust.basic.06.strings"
-title = "byte 唔係字"
-story = "時代廣場個指示牌將「銅鑼灣」截做三個字元，結果得返一個半。"
+id    = "rust.basic.06.functions"
+title = "車票卡"
+story = "波斯富街電車站部機賣車票卡：頭十程一個價，之後平啲。今日每張卡都印總數係零。"
 brief = '''
-讀一行。印三行：
-
-1. 佢有幾多個 **byte**
-2. 佢有幾多個**字元**
-3. 呢一行，將啲字元倒轉
+函數係 `fn name(parameter: Type) -> ReturnType { body }`。主體最後一個表達式，唔加分號，就係回傳值 — `if … else …` 本身係表達式，所以可以做最後嗰行。
 
 ```
-input:  causeway
-output: 8
-        8
-        yawesuac
+fn fare(rides: i64) -> i64 {
+    if rides <= 10 { rides * 5 } else { 50 + (rides - 10) * 3 }
+}
 ```
 
-呢一行可能有 ASCII 以外嘅字元，到時頭兩個數就唔會一樣。呢個正正就係重點。
+`fare` 已經宣告，`main` 讀入 `n` 再印 `fare(n)`。用嗰句 `if … else` 做主體，取代佔位嘅 `0`。
+
+```
+input:  12
+output: 56
+```
 '''
 hints = [
-  "str::len 係 byte 長度。一直都係。",
-  "chars() 係逐個 scalar value 行，所以 chars().count() 就係另一個數。",
-  "chars().rev().collect::<String>() 倒轉係安全嘅；倒轉啲 byte 就唔係。",
+  "if rides <= 10 { rides * 5 } else { 50 + (rides - 10) * 3 }",
+  "唔使 `return`，唔使分號：`if … else` 係最後一個表達式，佢嘅值就係 `fare` 畀返嘅嘢。",
 ]
 
 # ---------------------------------------------------------------- 07
 [[quest]]
 id    = "rust.basic.07.structs"
-title = "收銀機"
-story = "Lucky Mac 前面個櫃檯將張單每一行都放喺同一個地方 —— 直到個建議將個 struct 換成一句註解為止。"
+title = "檔口卡"
+story = "渣甸坊每個檔口都有張卡：一個名、一個價錢、一個數量。部打卡機印出一個冒號同一個零，前面乜都冇。"
 brief = '''
-標準輸入係一個數量 `n`，然後 `n` 行 `<ITEM> <CENTS>`。
-
-寫一個 `Till` 收集啲項目，然後將每個項目照 `<ITEM> <CENTS>` 印返出嚟，
-一行一個，跟到達嘅次序，最後印 `TOTAL <sum>`。
+`struct` 將幾個有名嘅 field 放埋一齊。值係用一個逐個 field 命名嘅字面量砌出嚟 — 當本地變數同 field 同名，`name: name` 可以縮短做 `name`。Method 住喺 `impl` 區塊入面，接收 `&self`，經佢讀 field。
 
 ```
-input:  2
-        HASHBROWN 600
-        SET 2800
-output: HASHBROWN 600
-        SET 2800
-        TOTAL 3400
+impl Stall {
+    fn total(&self) -> i64 {
+        self.price * self.qty
+    }
+}
+
+let stall = Stall { name, price, qty };
 ```
 
-`n` 可以係 `0`，咁嘅話唯一嗰行就係 `TOTAL 0`。
+`Stall` 同佢嘅 `impl` 已經宣告，`name`、`price`、`qty` 已經讀咗。用 `total` 嘅主體取代佔位嘅 `0`，用嗰句 `let stall` 字面量取代佔位嗰句。
+
+```
+input:  mango 12 3
+output: mango: 36
+```
 '''
 hints = [
-  "一個裝 (String, i64) 嘅 Vec 就夠。個 struct 嘅作用係等部收銀機擁有自己嗰啲行。",
-  "add 會改變部收銀機，所以佢攞 &mut self；total 淨係讀，所以佢攞 &self。",
-  "用 &till.items 嚟 iterate 係借，正正係你想要嘅 —— 印嘢唔應該清空部收銀機。",
+  "let stall = Stall { name, price, qty }; — 而 total 入面：self.price * self.qty",
+  "喺 method 入面 field 係經 `self` 攞；喺 `main` 入面啲變數已經係 field 嘅名，所以字面量可以淨係列個名。",
 ]
 
 # ---------------------------------------------------------------- 08
 [[quest]]
 id    = "rust.basic.08.enums"
-title = "邊個搭緊車"
-story = "銅鑼灣個閘機每一張卡都收成人車費，包括嗰啲唔係成人嘅，同埋嗰張根本唔係卡嘅。"
+title = "路線顏色"
+story = "時代廣場地底個港鐵指示牌識得三條線，每條線油自己嘅顏色。個顏色查表對三條線都回傳空字串。"
 brief = '''
-標準輸入係一個數量 `n`，然後 `n` 行 `<TYPE> <KM>`。
-
-基本車費係 `500 + 100 * KM` 仙。每一行印以下其中一樣：
-
-* `ADULT` —— 基本車費
-* `STUDENT` —— 基本車費嘅一半，整數除法
-* `SENIOR` —— 永遠係 `200`
-* 其他任何嘢 —— `UNKNOWN <TYPE>`
+`enum` 係一個封閉嘅變體集合，`match` 每個變體揀一個分支。每個 arm 係 `Pattern => value,`，編譯器堅持每個變體都要有 arm — 漏一個就 build 唔到。
 
 ```
-input:  3
-        ADULT 4
-        STUDENT 4
-        SENIOR 4
-output: 900
-        450
-        200
+let colour = match line {
+    Line::Island => "blue",
+    Line::TsuenWan => "red",
+    Line::KwunTong => "green",
+};
 ```
 
-用一個有四個 variant 嘅 `enum` 嚟表示乘客，其中一個 variant 帶住嗰個
-認唔出嘅 tag，然後用一個 `match` 決定車費。
+`Line` 同字→變體嗰個 `match` 已經寫好，顏色 `match` 嘅第一個 arm 亦喺度。喺 `// FILL` 註解嗰度打另外兩個 arm，然後刪走 `_ => ""` 嗰行。
+
+```
+input:  tsuenwan
+output: red
+```
 '''
 hints = [
-  "variant 可以帶數據：Other(String) 裝住嗰個對唔上嘅 tag。",
-  "對 &str 做 match，最後一個 arm 綁住剩低所有嘢：`other => ...`。",
-  "對 &Rider 做 match，喺 Other 嗰個 arm 攞到嘅係 &String —— format! 一樣食得。",
+  "Line::TsuenWan => \"red\", 同 Line::KwunTong => \"green\",",
+  "三個變體都有 arm 之後，`_ => \"\"` 呢個兜底 arm 永遠去唔到，可以刪走。",
 ]
 
 # ---------------------------------------------------------------- 09
 [[quest]]
-id    = "rust.basic.09.maps"
-title = "個墟嗌緊乜"
-story = "九點嘅渣甸坊：每個檔口都嗌緊啲嘢，而個告示板想要個排名。"
+id    = "rust.basic.09.vector"
+title = "希慎廣場條隊"
+story = "希慎廣場個門口人員每組客到嘅時候都將人數寫落紙條。佢要講有幾多組、第一組、最後一組同總數，張紙條一直係空嘅。"
 brief = '''
-讀晒成個標準輸入，用空白字元切開。
-
-每個唔同嘅字印一次，格式係 `<word> <count>`，按次數由多到少排，
-次數一樣就按個字由細到大排。
+`Vec<T>` 係可以加長嘅列表，對佢做嘅三件事就係下面呢幾行。`.push(x)` 加喺
+最尾；`.remove(i)` 拎走第 `i` 個，後面嘅全部向前移；`v[i] = x` 就地改第 `i`
+個；`.sort()` 將成個 Vec 由細到大排好。四樣嘢都要個 `Vec` 係 `mut` 先得。
 
 ```
-input:  tram tram bus
-output: tram 2
-        bus 1
+v.push(100);
+v.remove(0);
+v[0] = -1;
+v.sort();
+```
+
+`v` 裝住嗰行嘅整數，結果同長度會印出嚟。喺四個 `// FILL` 註解嘅位置，
+照次序打呢四行。
+
+```
+input:  1 9 5 2
+output: -1 2 5 100
+        4
 ```
 '''
 hints = [
-  "*counts.entry(word).or_insert(0) += 1 已經係成個計數迴圈。",
-  "HashMap 冇次序。印之前先 collect 落一個 Vec。",
-  "Ordering::then 將個 tie-break 串起嚟：先次數由多到少，再個字由細到大。",
+  "v.push(100); 跟住 v.remove(0); 跟住 v[0] = -1; 跟住 v.sort(); — 加、刪、改、排。",
+  "remove(0) 之後所有嘢向前移，原本第二個變咗 v[0]，改嘅就係佢；sort() 再將剩低嘅排好。",
 ]
 
 # ---------------------------------------------------------------- 10
 [[quest]]
-id    = "rust.basic.10.errors"
-title = "唔係數字嗰一行"
-story = "維園個抄錶員交上嚟一欄數字，中間夾住咗唔知邊個嘅午餐柯打。"
+id    = "rust.basic.10.maps"
+title = "落單簿"
+story = "怡和街間茶餐廳每張單嗌一次，廚房想要每碟餸嘅點算，按字母順序排。個簿有餸名冇數字。"
 brief = '''
-標準輸入係一個數量 `n`，然後 `n` 行。每一行應該係一個整數。
-
-每一行印個值嘅兩倍，或者 parse 唔到嘅話印 `BAD <line>`。最後印
-`SUM <total>`，total 係你印咗出嚟嗰啲值嘅總和。
+`BTreeMap` 每個 key 存一個值，而且自己會將 key 排好 —— 冇嘢要排，行過去
+已經係順序。`.insert(k, v)` 加一個 key（或者換佢個值）；`.remove(&k)` 拎走
+一個 key；`.get_mut(&k)` 畀你一個已存在嘅值嘅可變引用 —— 係個 `Option`，
+所以要 unwrap，`*` 就係畀你透過佢賦值。
 
 ```
-input:  3
-        21
-        xx
-        -4
-output: 42
-        BAD xx
-        -8
-        SUM 34
+count.insert("bill".to_string(), 1);
+count.remove("tea");
+*count.get_mut("bill").unwrap() = 9;
 ```
 
-寫一個用 `?` 嘅 `fn double(text: &str) -> Result<i64, ParseIntError>`，
-然後喺 `main` 用一個 `match` 處理兩種結果。
+`count` 已經數好嗰行嘅字，會按 key 次序印出嚟。喺 `// FILL` 註解嘅位置，
+照次序打呢三行。
+
+```
+input:  tea toast tea
+output: bill 9
+        toast 1
+```
 '''
 hints = [
-  "對 Result 用 `?`，佢會幫你將個錯誤由 function 返回出去，所以 double 嘅內容得兩行。",
-  "match double(line) 啱啱好兩個 arm：Ok(value) 同 Err(_)。",
-  "SUM 係你印咗出嚟嘅嘢嘅總和 —— 係兩倍之後嘅值，唔係原本嘅。",
+  "count.insert(\"bill\".to_string(), 1); 跟住 count.remove(\"tea\"); 跟住 *count.get_mut(\"bill\").unwrap() = 9;",
+  "key 係 String，所以 insert 要 \"bill\".to_string()；remove 同 get_mut 收 &str，\"tea\" 本身已經係。",
 ]
 
 # ---------------------------------------------------------------- 11
 [[quest]]
-id    = "rust.basic.11.iterators"
-title = "怡和街一次過"
-story = "Alex 話用三個 for 迴圈就得。你見識過怡和街嘅車流；你得一次過嘅機會。"
+id    = "rust.basic.11.sets"
+title = "印花簿"
+story = "波斯富街報攤本積分簿每次幫襯蓋一個印，同一個檔口蓋咗兩次。店員要知有幾多個唔同嘅檔口，同埋佢哋嘅號碼按順序排。"
 brief = '''
-標準輸入係一行整數，用空格分開。
-
-印三行：
-
-1. 所有偶數嘅總和（冇嘅話係 `0`）
-2. 每個大過 `10` 嘅值，乘二，跟原本次序，用一個空格串起 ——
-   冇嘅話印 `-`
-3. 有幾多個唔同嘅值
+set 每個值只存一次，`BTreeSet` 仲會自己排好，所以冇 sort 要叫 —— 遍歷
+已經係順序。`.insert(x)` 加一個值（已經有就乜都唔做）；`.remove(&x)` 拎走
+一個，並回傳佢之前係咪喺度。set 冇「改」：個值本身就係 key，所以改一個
+值即係刪走舊嘅、加入新嘅 —— 第三行做嘅就係咁，而且只喺舊嘅真係喺度先做。
 
 ```
-input:  1 2 3 4 12 12 30
-output: 60
-        24 24 60
-        6
+seen.insert(100);
+seen.remove(&1);
+if seen.remove(&2) { seen.insert(20); }
 ```
 
-用 iterator adapter —— `filter`、`map`、`sum`、`collect` —— 唔好用索引迴圈。
+`seen` 已經裝住嗰行唔重複嘅整數，會印佢嘅大細同內容。喺 `// FILL` 註解
+嘅位置，照次序打呢三行。
+
+```
+input:  3 1 3 2 1
+output: 3
+        3 20 100
+```
 '''
 hints = [
-  "nums.iter() 產出 &i64，而 filter 交畀個 closure 嘅係佢嘅一個 reference，所以個參數係 &&i64。喺 pattern 度拆開佢 —— |&&n| n % 2 == 0 —— 好過估個 body 要幾多粒星。",
-  "join 要字串，所以每個數先用 to_string() map 一次，再 collect 落一個 Vec<String>。",
-  "直接由個 iterator 起一個 HashSet，用 len() 就攞到唔同值嘅數量。",
+  "seen.insert(100); 跟住 seen.remove(&1); 跟住 if seen.remove(&2) { seen.insert(20); }",
+  "remove 收引用（&1），值喺度就回傳 true —— 個 if 用嘅就係呢個，所以冇 2 嘅 set 會原封不動。",
 ]
 
 # ---------------------------------------------------------------- 12
 [[quest]]
-id    = "rust.basic.12.str-and-string"
-title = "第一條問題"
-story = "香港每一次 Rust 面試都係用呢條開場，而阿薇已經答衰咗兩次。"
+id    = "rust.basic.12.stack-queue"
+title = "疊碟"
+story = "寶靈頓道點心檔個櫃台，啲碟一隻疊一隻，由最頂攞走；籌號就由條隊最前面攞走。兩疊嘢都放喺度冇人郁。"
 brief = '''
-讀一行。印三行：
-
-1. 佢第一個用空白字元分開嘅字，以一個**借用**嘅 `&str` 嘅形式 ——
-   唔准 allocate，唔准 `to_string()`
-2. 嗰個字轉大楷，呢個一定要係一個擁有嘅 `String`，因為大楷版本
-   唔係任何已經存在嘅嘢嘅 slice
-3. 兩個比較起嚟相等就印 `SAME YES`，否則印 `SAME NO`
+`Vec` 就係 stack：`.push(x)` 放上頂，`.pop()` 拎走頂（係個 `Option`），
+`.last_mut()` 係頂嘅可變引用，用嚟就地改佢。`VecDeque` 就係 queue：
+`.push_back(x)` 排入後面，`.pop_front()` 由前面離開 —— 嗰邊已經寫好。
 
 ```
-input:  lucky mac
-output: lucky
-        LUCKY
-        SAME NO
+stack.push(42);
+stack.pop();
+*stack.last_mut().unwrap() = 0;
 ```
 
-`&str` 係一個望住其他人擁有嘅文字嘅 view。`String` 擁有一個可以增長嘅
-buffer。`first_word` 返回一個 view，所以佢嘅返回型係由佢個參數借嘅，
-乜都唔 allocate —— 呢個就係佢哋真正想問嗰條問題嘅完整答案。
+兩個容器都裝住嗰行嘅整數。喺 `// FILL` 註解嘅位置，照次序打呢三行 stack
+嘅嘢；之後 stack 由底到頂印出嚟，下一行係 queue 嘅頭。
+
+```
+input:  1 2 3 4
+output: 1 2 3 0
+        1
+```
 '''
 hints = [
-  "split_whitespace().next() 畀你 Option<&str>，再對佢用 unwrap_or，空行就變成空字。",
-  "to_uppercase 返回 String，唔係 &str —— 佢一定要 allocate，因為個結果唔係輸入嘅一部分。",
-  "&str 同 String 可以直接比較；標準庫實現咗佢哋之間嘅相等，所以你唔使 as_str()。",
+  "stack.push(42); 跟住 stack.pop(); 跟住 *stack.last_mut().unwrap() = 0;",
+  "個 pop 即刻將 42 拎返走，所以改嘅係之前喺頂嘅嗰個值 —— 後入先出。",
 ]
 
 # ---------------------------------------------------------------- 13
 [[quest]]
-id    = "rust.basic.13.combinators"
-title = "一個 unwrap 都冇"
-story = "Alex 成日話 Rust 版全部都係 unwrap。再寫一次個讀欄程式，會出錯嗰part唔准有 unwrap。"
+id    = "rust.basic.13.sorting"
+title = "價錢梯"
+story = "寶靈頓道間生果檔，塊板要最平排先，畀老闆睇嗰份就要最貴排先。兩塊板都係按啲箱落貨車嘅次序列價錢。"
 brief = '''
-標準輸入係一個數量 `n`，然後 `n` 行，每行應該係一個整數。
-
-每一行印個值嘅兩倍，parse 唔到就印 `-1`。然後印 `SOME <k>`，即係有幾多行
-parse 到，同埋 `FIRST <v>` —— 第一個 parse 到嘅值 —— 或者 `FIRST NONE`。
+`.sort()` 將一個 `mut` `Vec` 原地排成升序。其他次序就用 `.sort_by`，佢接收一個比較兩個元素嘅 closure：`a.cmp(b)` 係升序，所以 `b.cmp(a)` 係降序。
 
 ```
-input:  3
-        21
-        xx
-        -4
-output: 42
-        -1
-        -8
-        SOME 2
-        FIRST 21
+asc.sort();
+desc.sort_by(|a, b| b.cmp(a));
 ```
 
-用 combinator 嚟做：`.ok()` 將 `Result` 變做 `Option`，`.map(|v| v * 2)`
-淨係對存在嘅值起作用，而 `.unwrap_or(-1)` 喺冇值嘅時候提供答案。
-`find_map` 一次過就畀到你最後嗰行。
+啲數已經複製咗兩份，兩份都會印出。喺 `// FILL` 註解嗰度打呢兩行。
 
-`unwrap()` 喺 parse 到嗰啲行都「得」嘅，然後喺 `xx` 就會拖冧成個程式。
-`unwrap_or` 唔會 panic。知道邊個係邊個，就係呢條街嘅任務。
+```
+input:  5 2 9 1
+output: 1 2 5 9
+        9 5 2 1
+```
 '''
 hints = [
-  "parse::<i64>() 呢度要用 turbofish，因為下游冇嘢幫編譯器釘死個型。",
-  ".ok() 係故意將個錯誤掉走 —— 你唔係要報告點解失敗，淨係報告佢失敗咗。",
-  "find_map 會一直行個 closure，直到有一次返回 Some，所以佢喺第一行 parse 到嘅地方就停。",
+  "asc.sort(); — 同 desc.sort_by(|a, b| b.cmp(a));",
+  "兩個都係原地排序，唔回傳嘢，所以係自己一行嘅陳述式，唔係用嚟賦值。",
 ]
 
 # ---------------------------------------------------------------- 14
 [[quest]]
-id    = "rust.basic.14.matching"
-title = "件嘢嘅形狀"
-story = "個送餐 app 食四個指令，而舊嘅碼係用九個層層疊嘅 if 去 check 佢哋。"
+id    = "rust.basic.14.sort-by-key"
+title = "排行榜"
+story = "時代廣場樓上間機舖貼出高分榜，最高分排先，同分就按名。塊板依然係啲人啱啱行入嚟嘅次序。"
 brief = '''
-標準輸入係一個數量 `n`，然後 `n` 行，每行係 `<COMMAND>` 或者
-`<COMMAND> <ARG>`。
-
-每一行印：
-
-* `GO <n>` 而 `n` 大過零 —— `FORWARD <n>`
-* `GO <n>` 而 `n` 係零或者以下 —— `STAY`
-* `STOP` —— `HALT`
-* 其他任何嘢 —— `UNKNOWN <COMMAND>`
-
-然後印 `MOVED <total>`，即係你所有向前行嘅總和。
+`.sort_by_key` 按 closure 對每個元素回傳嘅嘢排序。Tuple 係逐個 field 比較，所以用 tuple 做 key 就係先按第一個 field 排，打和就睇第二個；用 `std::cmp::Reverse` 包住一個 field 就將嗰個 field 變做降序。
 
 ```
-input:  4
-        GO 3
-        GO -1
-        STOP
-        JUMP 9
-output: FORWARD 3
-        STAY
-        HALT
-        UNKNOWN JUMP
-        MOVED 3
+rows.sort_by_key(|r| (std::cmp::Reverse(r.1), r.0.clone()));
 ```
 
-對切開咗嘅一行做一個 `match`，喺 `GO` 嗰個 arm 用一個 **guard** 分開
-兩種情況，唔使第二個分支。用 slice pattern —— `["GO", arg]`—— 去 match，
-就將一行有幾多截變成 pattern 嘅一部分，而唔係你自己手寫嘅長度檢查。
+啲行已經讀成 `(String, i64)` 對，亦會印出。喺 `// FILL` 註解嗰度打呢一行。
+
+```
+input:  3
+        mei 90
+        alex 95
+        kit 90
+output: alex 95
+        kit 90
+        mei 90
+```
 '''
 hints = [
-  "parts.as_slice() 就係將個 Vec 變成 slice pattern 可以 match 嘅嘢。",
-  "pattern 後面嘅 `if` 係一個 match guard —— 佢分開兩個形狀一樣嘅 arm。",
-  "`[command, ..]` 綁住第一個元素、唔理其餘；`[]` 係空行，你一樣要覆蓋。",
+  "rows.sort_by_key(|r| (std::cmp::Reverse(r.1), r.0.clone()));",
+  "個 key 係一個 tuple：`Reverse(score)` 令分數降序，後面嘅 `name.clone()` 用字母順序解決打和。",
 ]
 
 # ---------------------------------------------------------------- 15
 [[quest]]
-id    = "rust.basic.15.modules"
-title = "邊個准睇呢樣嘢"
-story = "個車費表漏咗去三個檔案，其中兩個俾人改咗。將佢放喺一道門後面。"
+id    = "rust.basic.15.closures"
+title = "服務費"
+story = "希慎廣場美食廣場部單據機，每一行都加同一個費用。佢畀人講咗個費用一次，第一行都未印就唔記得咗。"
 brief = '''
-標準輸入係一個數量 `n`，然後 `n` 個以 km 為單位嘅距離。
-
-將車費邏輯整理做一個 module：
-
-* `mod fares`，入面有一個**公開**嘅 `adult(km) -> i64`，同一個**私有**嘅
-  `base(km)`，由 `adult` 呼叫 —— `500 + 100 * km`
-* 一個嵌套嘅 `mod fares::pass`，入面有一個公開嘅 `monthly() -> i64`，
-  返回 `50000`
-
-每個距離印一個成人車費，然後印 `MONTHLY <x>`。
+Closure 係寫喺行內嘅函數：`|x| x + 1`。佢可以用周圍 scope 嘅變數而唔使人遞畀佢 — 呢個就係捕捉。寫明參數型別 `|x: i64|` 係可選嘅，但可以免得編譯器估。
 
 ```
-input:  3
+let add = |x: i64| x + k;
+```
+
+`k` 同啲數已經讀咗，`add` 會套用喺每個數上面再印出。用呢一行取代佔位嗰句 `let add`。
+
+```
+input:  5
         1 2 3
-output: 600
-        700
-        800
-        MONTHLY 50000
+output: 6 7 8
 ```
-
-個 starter 編譯唔到：啲 item 係存在嘅，但係冇一樣係 `pub`，而一個 module
-嘅內容預設係對佢私有。呢個預設正正就係個功能 —— `base` 唔係介面嘅一部分，
-而編譯器就係保住呢件事嘅嘢。嵌套嘅 module 要喺 `mod` 嗰行自己有 `pub`，
-唔係淨係入面個 function 有就得。
 '''
 hints = [
-  "個錯誤係 E0603：個 item 係存在嘅，只係私有。三個 pub 就修好成個檔案。",
-  "base 係故意保持私有 —— 佢係呢度唯一一樣同其他人無關嘅嘢。",
-  "將個 function 變公開唔等於將道門變公開：`mod pass` 一樣要 pub。",
+  "let add = |x: i64| x + k;",
+  "`k` 淨係被讀，所以 closure 係借佢；唔使 `move`，`k` 之後照用得。",
 ]
 
 # ---------------------------------------------------------------- 16
 [[quest]]
-id    = "rust.basic.16.smart-pointers"
-title = "編譯器講得出嘅大細"
-story = "Lucky Mac 個單據插：每張單都釘喺下面嗰張上面，一路釘落去到個櫃檯為止。"
+id    = "rust.basic.16.lambdas"
+title = "雙數枱"
+story = "維多利亞公園個美食節將啲枱編號，只有雙數枱要交每平方米嘅徵費。夾板上面個徵費總數係零。"
 brief = '''
-標準輸入係一個數量 `n`，然後 `n` 個以仙為單位嘅金額。
-
-用一條鏈裝住佢哋，一個金額一個節點，跟到達嘅次序：
+Iterator adapter 可以串起嚟：`.iter()` 行一個 `Vec`，`.filter(…)` 留低 closure 話 yes 嘅元素，`.map(…)` 將每個換成 closure 回傳嘅嘢，`.sum()` 加晒。直到最尾嘅 `.sum()` 拉動之前乜都唔會行。啲 closure 見到嘅係 reference，所以 `filter` 攞到 `&&x`，`map` 攞到 `&x`。
 
 ```
-struct Entry {
-    cents: i64,
-    next: Option<Box<Entry>>,
-}
+let total: i64 = nums.iter().filter(|&&x| x % 2 == 0).map(|&x| x * x).sum();
 ```
 
-印三行：
-
-1. 啲金額，跟次序，用空格分開，冇嘅話印 `-`
-2. `SUM <total>`，要由一個**遞歸**嘅 function 行成條鏈計出嚟
-3. `LAST <cents>` —— 最後一個節點嘅金額 —— 或者 `LAST NONE`
+啲數已經讀咗，`total` 亦會印出。用呢一行取代佔位嗰句 `let total: i64 = 0;`。
 
 ```
-input:  5
-        1 2 3 4 5
-output: 1 2 3 4 5
-        SUM 15
-        LAST 5
+input:  1 2 3 4 5 6
+output: 56
 ```
-
-個 starter 編譯唔到，而個錯誤正正係 `Box` 存在嘅理由。寫
-`next: Option<Entry>`，編譯器就要將 `Entry` 喺記憶體度排好：佢要 `8` 個
-byte 畀 `cents`，再加一個 `Entry` 有幾大 —— 而呢樣正正係佢計緊嘅嘢。
-E0072，*recursive type has infinite size*。
-
-`Box<Entry>` 係一個指住 heap 上一塊 allocation 嘅指針，而一個指針嘅大細
-編譯器本來就知。佢擁有佢指住嘅嘢：啱啱好一個擁有者，`Box` drop 嘅時候
-釋放，冇計數，冇共享。`Option<Box<Entry>>` 用一個指針大細嘅值，同時係
-條鏈嘅尾同埋條鏈入面嘅一個節點 —— 個 `None` 係用 null 地址嚟存，唔係額外
-一個 tag byte，所以比起淨係 `Box` 一啲成本都冇多。
 '''
 hints = [
-  "一個字就修好個編譯錯誤：Option<Entry> 變 Option<Box<Entry>>，而個 constructor 加一個 Box::new。",
-  "由後面砌返去前面 —— 倒轉 iterate 啲金額，每個新節點都攞你已經有嗰條鏈做佢嘅 next。由前砌到後就要一個指住條尾嘅 cursor，嗰場 borrow 嘅爭拗你而家未需要。",
-  "想行但唔想消耗，就揸住一個 Option<&Box<Entry>>：用 head.as_ref() 起步，用 entry.next.as_ref() 行一步。.as_ref() 將 &Option<T> 變做 Option<&T>，呢一下就係保住成條鏈唔散嘅動作。",
-  "遞歸嘅 sum 唔使 mut 唔使迴圈：Some(entry) => entry.cents + sum(&entry.next)，None => 0。",
+  "let total: i64 = nums.iter().filter(|&&x| x % 2 == 0).map(|&x| x * x).sum();",
+  "`let` 上面嘅 `: i64` 話畀 `sum` 知加做邊種數；冇佢嘅話編譯器會問你想要邊種數字型別。",
 ]
 
 # ---------------------------------------------------------------- 17
 [[quest]]
-id    = "rust.basic.17.testing"
-title = "自己證明畀自己睇"
-story = "06:40 冇人會幫你 check 呢樣嘢。個表就喺度；整佢變綠。"
+id    = "rust.basic.17.threads"
+title = "四部收銀機"
+story = "渣甸坊同時開四部收銀機，每部做自己張單。經理按收銀機次序收單，個托盤返嚟係空嘅。"
 brief = '''
-個程式有一個表，入面係四對已知正確嘅 `(km, fare)`，佢會逐一用嚟 check
-`fare`，印 `<name> ok` 或者 `<name> FAIL got <g> want <w>`，然後印
-`PASSED <k>/4`。最後佢由標準輸入讀一個距離，印 `FARE <x>`。
-
-`fare(km)` 應該係 `500 + 100 * km`。個 starter 嗰個係錯嘅，而個表捉到佢
-—— 呢個就係成件事嘅重點。
+`thread::spawn` 開一條線程行一個 closure，畀返一個 `JoinHandle`。`move` 畀 closure 自己一份佢用到嘅嘢，咁條線程就唔會借用一個可能已經冇咗嘅 stack frame。`.join()` 等條線程完，以 `Result` 形式回傳 closure 回傳嘅嘢。
 
 ```
-input:  4
-output: zero ok
-        one ok
-        four ok
-        ten ok
-        PASSED 4/4
-        FARE 900
+handles.push(thread::spawn(move || x * x));
+squares.push(h.join().unwrap());
 ```
 
-唔好掂個表；佢就係規格。喺一個真正嘅 crate 入面，佢會住喺
-`#[cfg(test)] mod tests`，由 `cargo test` 行。個表點都係一樣嘅 ——
-唯一唔同嘅係個 harness，而一個你讀得明嘅表，值錢過一個你讀唔明嘅 harness。
+兩個迴圈都寫好。喺第一個 `// FILL` 註解嗰度打第一行，喺第二個嗰度打第二行。
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
 '''
 hints = [
-  "個表就係規格。錯嘅係個 function。",
-  "四個 case 有三個唔過，過嗰個係 km = 0，正正就係點解一個測試 case 證明唔到任何嘢。",
-  "喺一個 crate 入面，呢啲就係 #[cfg(test)] mod tests，入面有 #[test] fn fares() 同 assert_eq!(fare(arg), want)。",
+  "handles.push(thread::spawn(move || x * x)); — 然後 squares.push(h.join().unwrap());",
+  "按 handle push 嘅次序 join，輸出先會跟輸入次序；線程本身幾時完都得。",
 ]
 
 # ---------------------------------------------------------------- 18
 [[quest]]
-id    = "rust.basic.18.traits"
+id    = "rust.basic.18.binary-tree"
 title = "自動補完"
-story = "波斯富街部電話亭你未有一行佢就幫你寫完每一行。不過你自己改名嗰個 trait，佢冇嘢補畀你。"
+story = "波斯富街個電話亭，灰色鬼字又返嚟，遞上一棵佢見過一千次嘅樹。你自己一個節點一個節點種出嚟嗰棵，佢冇補完可以畀；你唔種，棵樹就一直係空嘅。"
 brief = '''
-標準輸入係一個數量 `n`，然後 `n` 行，每行係以下其中一種
-
-* `SHOP <NAME> <FLOOR>`
-* `STOP <ROUTE>` —— `ROUTE` 係一個數
-
-每個牌印一行 `<tag> <rendering>`，然後印 `SIGNS <n>`：
-
-* `Shop` render 做 `<NAME> / F<FLOOR>`，佢嘅 tag 係 `SIGN`
-* `Stop` render 做佢嘅路線號碼，佢嘅 tag 係 `TRAM`
+二元搜尋樹係一個有值同兩個可選子節點嘅 `Node`，`Option<Box<Node>>`：`None` 係空子樹，`Some(Box::new(…))` 係真嘅。插入係遞歸嘅 — 空子樹變做一塊新葉；真嘅就將值交落佢屬於嘅嗰邊，再存返回嚟嘅子樹。`.take()` 將子節點由佢嘅 `Option` 搬出嚟，咁先可以交畀遞歸呼叫再放返。
 
 ```
-input:  3
-        SHOP HYSAN 4
-        STOP 2
-        SHOP SOGO 1
-output: SIGN HYSAN / F4
-        TRAM 2
-        SIGN SOGO / F1
-        SIGNS 3
-```
-
-宣告一個 trait，為兩個唔同嘅 struct 實現佢：
-
-```
-trait Sign {
-    fn render(&self) -> String;      // required: no body, every implementor writes one
-    fn tag(&self) -> &'static str { "SIGN" }   // provided: an implementor gets this free
+if value < n.value {
+    n.left = insert(n.left.take(), value);
+} else {
+    n.right = insert(n.right.take(), value);
 }
 ```
 
-`tag` 係一個**預設方法**。`Shop` 乜都唔講就攞到 `SIGN`；`Stop` 自己寫一個，
-攞到 `TRAM`。呢個就係面試嗰陣好多人唔記得嘅 trait 嘅另一半：trait 唔止係
-一張簽名清單，佢可以帶住行為，而 override 係你自己揀嘅。
+`Node`、`inorder`、`height`、`main` 同 `insert` 嘅形狀已經寫好，直到嗰個 `if … else`。喺 `// FILL` 註解嗰度打嗰兩行賦值。
 
-透過**一個** function 印嘢：`fn show<T: Sign>(sign: &T)`。個 bound 就係
-份合約 —— `show` 對 `Shop` 或者 `Stop` 一無所知，佢淨係知交畀佢嘅嘢有
-`render` 同 `tag`。編譯器為每個具體嘅型印一份 `show`，啲呼叫係直接嘅。
-
-個 starter 編譯唔到。個 trait 宣告咗，啲 struct 亦都存在，但係單憑咁樣
-你乜都攞唔到：`show(&Shop { .. })` 係 E0277，*the trait bound `Shop: Sign`
-is not satisfied*。宣告一個 trait 同實現佢係兩個獨立嘅動作，而喺 Rust
-入面第二個永遠都要明文寫出嚟。
-
-兩種牌放落同一個 `Vec` 會係另一個機制 —— `Box<dyn Sign>`，一個指針加一個
-vtable，執行嗰陣先查。你呢度唔需要佢，因為每個呼叫點都仲見到具體嘅型。
-嗰個係下一張地圖嘅問題，而佢問嘅正正係：你手上揸住嘅係兩者之中邊一個。
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
 '''
 hints = [
-  "impl Sign for Shop 係寫喺 struct 外面。trait 講係乜；impl 講點做；而編譯器唔會由前者推斷出後者。",
-  "Shop 個 impl 完全唔寫 tag，佢就攞 trait 嗰個版本。喺 Stop 個 impl 度寫，Stop 嗰個就贏。預設方法嘅全部就係咁。",
-  "show<T: Sign>(sign: &T) 係 generic 嘅，所以個型要喺呼叫嘅地方已經知道 —— 即係喺 match 嘅 arm 入面，你仲見到自己啱啱砌咗乜嘅時候。",
-  "一個 Vec 同時裝住兩種就要 Box<dyn Sign>，嗰個係另一個機制，執行嗰陣要查表。冇人問你要呢樣嘢，而喺一條關於 trait 嘅問題度伸手攞佢，會係錯嘅答案。",
+  "n.left = insert(n.left.take(), value); — 同 n.right = insert(n.right.take(), value);",
+  "`take()` 留低 `None`，將子節點畀你傳落去；將呼叫嘅結果賦值返去就係將長大咗嘅子樹放返。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.basic.04.int-types"
+title = "計數器嘅闊度"
+story = "波斯富街電車站個計數器，用一個 32 位嘅格仔裝住個數，全日總數就裝喺 64 位嗰個，而將一個抄入另一個嘅嗰行唔見咗。"
+brief = '''
+整數係有闊度嘅。`i32` 係 32 位、有正負；`u64` 係 64 位、永遠唔會負。Rust 唔會自動幫你喺兩者之間轉換：要用 `as`，而且要你講明目標類型。每個闊度都知道自己嘅上限 — `i32::MAX`、`u64::MAX` — 係一個常數。
+
+```
+let b: u64 = a as u64;
+println!("{}", u64::MAX);
+```
+
+`a` 已經讀入做 `i32`。喺第一個 `// FILL` 度照樣打嗰行轉換，第二個 `// FILL` 度打 `u64::MAX` 嗰行。
+
+```
+input:  21
+output: 21
+        42
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "let b: u64 = a as u64; — 跟住最後一行打 println!(\"{}\", u64::MAX);",
+  "`as` 係由一個整數闊度去另一個嘅唯一方法；冇咗佢，`let b: u64 = a;` 係編譯唔過嘅。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.basic.05.big-int"
+title = "三十二個位元組"
+story = "銅鑼灣每一條鎖匙、每一個雜湊都係三十二個位元組闊。個報攤將呢個字印做六十四個十六進制數字，而今日每一個都係零。"
+brief = '''
+冇 256 位嘅整數類型，所以一個 32 位元組嘅數就係一個 32 個位元組嘅陣列：`[u8; 32]`。`u128` 係最闊嘅整數，`to_be_bytes()` 將佢變做 16 個位元組、最高位行先，而 `copy_from_slice` 將一個切片寫入另一個同樣長度嘅切片 — 呢度係個字嘅最後 16 個位元組，等個數好似寫喺紙上咁靠右企。
+
+```
+word[16..].copy_from_slice(&n.to_be_bytes());
+```
+
+`word` 一開始係 32 個零位元組，之後會印做十六進制。喺 `// FILL` 註解嗰度照樣打嗰行。
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+        64
+```
+'''
+hints = [
+  "word[16..].copy_from_slice(&n.to_be_bytes());",
+  "`word[16..]` 係最後十六個位元組，`n.to_be_bytes()` 係十六個位元組；copy_from_slice 要兩邊長度一樣先得。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.basic.06.floats"
+title = "磅嘅兩個讀數"
+story = "渣甸坊個生果磅用雙精度記住重量，錶面就顯示單精度嗰個，而今朝兩個都讀住零。"
+brief = '''
+`f64` 係 64 位浮點數，冇特別原因就用佢；`f32` 係一半闊度，大約七位有效數字。一旦講明類型，`parse()` 就可以由文字讀出任何一種，`as f32` 將一個 `f64` 收窄，而格式字串入面嘅 `{:.3}` 會印小數點後三位。
+
+```
+let x: f64 = s.parse().unwrap();
+let y = x as f32;
+```
+
+`s` 係 trim 過嘅輸入。喺兩個佔位嗰度照樣打呢兩行。
+
+```
+input:  3.14159265358979
+output: 3.141593
+        3.142
+        6.3
+```
+'''
+hints = [
+  "let x: f64 = s.parse().unwrap(); 跟住 let y = x as f32;",
+  "parse() 要知道類型：綁定上面嘅 `: f64` 就係話畀佢知嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.basic.08.string-slices"
+title = "招牌，一截一截"
+story = "怡和街個招牌師傅將舖名嘅頭三個字母切出嚟，抄落一塊新板，再喺後面畫個尾綴，而塊板係空白嘅。"
+brief = '''
+`&str` 可以按位元組範圍切片：`&s[..3]` 係頭三個位元組，由 `s` 借過嚟，唔係抄。`String::from(head)` 整一個可以增長嘅自有副本，`push_str` 就直接喺佢後面加嘢。（範圍以位元組計，所以呢個係畀 ASCII 文字用嘅；切開一個多位元組字元嘅範圍會 panic。）
+
+```
+let head: &str = &s[..3];
+t.push_str("-lane");
+```
+
+`s` 係 trim 過嘅輸入，`t` 由 `head` 整出嚟。喺第一個 `// FILL` 度打切片，第二個度打追加。
+
+```
+input:  percival
+output: per
+        per-lane
+        8
+```
+'''
+hints = [
+  "let head: &str = &s[..3]; 然後喺 t 整好之後，t.push_str(\"-lane\");",
+  "`&s[..3]` 係借；String::from 係抄；push_str 加落個副本度，`s` 冇郁過。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.basic.09.int-slices"
+title = "條龍嘅中間"
+story = "希慎廣場個排隊計數器將條龍中間嗰兩個人抄落一張新名單，再將成條龍抄喺後面，而張名單一直係空嘅。"
+brief = '''
+`v[1..3]` 係一個 `Vec` 嘅切片：第 1 同第 2 個元素，借嘅。`.to_vec()` 將一個切片抄入一個屬於自己嘅新 `Vec`，`extend_from_slice` 就將一個切片嘅每個元素加落一個 `Vec` 嘅尾。先抄，再加 — 原本嘅 `v` 由頭到尾冇變過。
+
+```
+let mut middle: Vec<i64> = v[1..3].to_vec();
+middle.extend_from_slice(&v);
+```
+
+`v` 由輸入讀入。喺兩個佔位嗰度照樣打呢兩行。
+
+```
+input:  1 2 3 4
+output: 2 3 1 2 3 4
+        6
+```
+'''
+hints = [
+  "let mut middle: Vec<i64> = v[1..3].to_vec(); 跟住 middle.extend_from_slice(&v);",
+  "Vec 上面嘅範圍係切片；to_vec() 係嗰個令你可以 extend 嘅副本。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.basic.10.byte-slices"
+title = "個名嘅位元組"
+story = "時代廣場個閘機將個名當做原始位元組嚟讀，留低頭兩個，再喺後面印個感嘆號，而印出嚟係空嘅。"
+brief = '''
+`s.as_bytes()` 係將文字當做 `&[u8]` — 一個位元組切片，每個係一個 `u8`。佢同任何切片一樣可以按範圍切，`.to_vec()` 將佢抄入一個 `Vec<u8>`，`extend_from_slice` 就加多啲位元組；`"!".as_bytes()` 係一個字面值嘅位元組。`{:02x}` 將一個位元組印做兩個十六進制數字，`String::from_utf8_lossy` 就將位元組變返文字。
+
+```
+let mut head: Vec<u8> = bytes[..2].to_vec();
+head.extend_from_slice("!".as_bytes());
+```
+
+`bytes` 係輸入嘅位元組。喺兩個佔位嗰度照樣打呢兩行。
+
+```
+input:  mei
+output: 6d6521
+        me!
+```
+'''
+hints = [
+  "let mut head: Vec<u8> = bytes[..2].to_vec(); 跟住 head.extend_from_slice(\"!\".as_bytes());",
+  "bytes[..2] 係一個 &[u8]；to_vec() 令佢自有；extend_from_slice 收另一個 &[u8]。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.basic.16.list"
+title = "電車龍，兩頭"
+story = "波斯富街條電車龍喺後面上客，喺前面畀查票員上，而車上有邊個嘅名單係空嘅。"
+brief = '''
+`LinkedList` 係一條喺兩頭改都好平嘅序列。`.push_back(x)` 加喺尾；
+`.pop_front()` 拎走頭；`.front_mut()` 畀你個頭嘅可變引用 —— 係個 `Option`，
+所以要 unwrap，前面個 `*` 就係畀你透過佢賦值。`LinkedList` 冇 `sort`：要排
+就將佢抄入一個 `Vec`（starter 已經抄咗，叫 `sorted`）再排嗰個。（`Vec` 幾乎
+永遠係更好嘅選擇；呢個係要識個名嘅嗰個。）
+
+```
+list.push_back(0);
+list.pop_front();
+*list.front_mut().unwrap() = 9;
+sorted.sort();
+```
+
+`list` 由嗰行嘅整數砌成；先印佢，再印排好嘅副本，再印長度。喺 `// FILL`
+註解嘅位置，照次序打呢四行。
+
+```
+input:  3 1 4
+output: 9 4 0
+        0 4 9
+        3
+```
+'''
+hints = [
+  "list.push_back(0); 跟住 list.pop_front(); 跟住 *list.front_mut().unwrap() = 9; 跟住 sorted.sort();",
+  "front_mut() 係 Option<&mut i64>：unwrap 佢，再透過 * 賦值 —— pop 之後個頭就係原本第二個。sorted 係 Vec，所以有 sort()。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.basic.18.hashtable"
+title = "落單簿，冇排序"
+story = "寶靈頓道嘅點心檔今次用雜湊表記數，讀返出嚟嘅次序就睇個表心情，每朝都唔同。"
+brief = '''
+`HashMap` 同 `BTreeMap` 係同一個意思 —— 每個 key 一個值 —— 但佢係將 key
+雜湊而唔係排序：查找係常數時間，而遍歷次序係任意嘅，每次行都唔同，所以印
+之前要先排好啲 key。三個操作都係同樣三個：`.insert(k, v)` 加，`.remove(&k)`
+刪，`.get_mut(&k)` 改。
+
+```
+counts.insert("bun".to_string(), 1);
+counts.remove("siu");
+*counts.get_mut("bun").unwrap() = 4;
+keys.sort();
+```
+
+`counts` 已經數好嗰行嘅字，啲 key 會收集入 `keys` 嚟印。喺 `// FILL` 註解
+嘅位置，照次序打呢四行 —— 排序係第四行，喺 `keys` 砌好之後。
+
+```
+input:  siu mai har gau siu mai
+output: bun 4
+        gau 1
+        har 1
+        mai 2
+```
+'''
+hints = [
+  "counts.insert(\"bun\".to_string(), 1); 跟住 counts.remove(\"siu\"); 跟住 *counts.get_mut(\"bun\").unwrap() = 4; 跟住 keys.sort();",
+  "同 BTreeMap 嗰幾行一樣，只係改咗名；之後個 keys.sort() 就係用 HashMap 嘅代價。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.basic.22.reverse"
+title = "電車，倒轉行"
+story = "怡和街架電車去到線尾就照原路倒轉行返啲站，而車廠張名單仲係順住讀。"
+brief = '''
+`Vec` 可以就地倒轉：`v.reverse()` 就搞掂，唔使抄。字串唔可以按字元索引，所以要透過佢嘅迭代器倒轉：`s.chars().rev()` 倒住行一次，`collect::<String>()` 就由佢吐出嚟嘅嘢砌一個新字串。
+
+```
+v.reverse();
+let rev: String = s.chars().rev().collect();
+```
+
+`v` 係第一行，`s` 係第二行。喺兩個佔位嗰度照樣打呢兩行。
+
+```
+input:  1 2 3
+        tram
+output: 3 2 1
+        mart
+```
+'''
+hints = [
+  "v.reverse(); 跟住 let rev: String = s.chars().rev().collect();",
+  "reverse() 係原地改 v；chars().rev().collect() 整一個新 String，`s` 冇郁過。",
 ]

@@ -8,13 +8,14 @@ Every skill is still in there somewhere. You get them back one street at a time,
 in Rust, in Go, in C++ and in Python, and then you go and fight the thing that
 took them.
 
-Four lands — **RUST LAND**, **GO LAND**, **C++ LAND** and **PYTHON LAND**. Three
+Four lands — **RUST LAND**, **GO LAND**, **C++ LAND** and **PYTHON LAND**. Four
 roads through each:
 
 | | |
 | --- | --- |
-| **BASIC** | the grammar: bindings, shadowing, slices, errors, structs, traits/interfaces, pointers, dicts |
-| **ADVANCED** | threads, channels, mutexes, lifetimes, goroutines, `select`, async, RAII, generators |
+| **VERY BASIC** | the quiz: types, containers, a thread, a mutex, a heap, a stack, a struct — the grammar a live coding test leans on, asked as a question first. Four lines, one right; pick it, then type it; untimed |
+| **BASIC** | grammar activation, not a quiz: each node shows one construct — integer widths and a 32-byte value, floats, strings, slicing/copy/append of strings, arrays and bytes, a loop, a function, a struct, an enum, a vector, a linked list, an ordered map and a hash table, a set, a stack and a queue (each practised as add, remove, edit and sort), sorting and reversing, a closure, a lambda, a thread, a binary tree — with the exact line to type, in the brief and again as an `ANSWER:` comment at the hole; you type it, it compiles, the idiom is back in the fingers; untimed |
+| **ADVANCED** | simple coding quizzes that use the basic grammar — ownership, slices, errors, traits/interfaces, pointers, iterators, generics — and then the lunch rush: threads, channels, mutexes, lifetimes, goroutines, `select`, async, RAII, generators |
 | **HACKER** | the live interview: timed HackerRank-shaped quests, hidden tests, the same 34 problems in every land |
 
 Each road is a Super Mario World overworld. Clear a node, it is stamped
