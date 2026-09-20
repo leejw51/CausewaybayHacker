@@ -347,15 +347,28 @@ fn python_stdio_is_open_and_the_other_harnesses_are_refused() {
     }
 }
 
-/// There is no Python formatter, and the gate says so before anything is
-/// spawned.
+/// Python's formatter is `black`, which does not ship with the interpreter:
+/// the gate answers for the machine it is on, and a machine without it says
+/// so before anything is spawned rather than mangling the source.
 #[test]
-fn python_has_no_formatter() {
-    assert!(!cwbhacker_runner::format::is_supported("python"));
+fn python_formats_only_where_black_is_installed() {
+    let have = std::process::Command::new("python3")
+        .args(["-m", "black", "--version"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    assert_eq!(cwbhacker_runner::format::is_supported("python"), have);
     let out = cwbhacker_runner::format::format("python", HELLO).unwrap();
-    assert_eq!(out.source, HELLO);
-    assert!(!out.changed);
-    assert!(out.problem.unwrap().contains("python"));
+    if have {
+        // HELLO is already tidy, so the answer is "nothing to do", not a
+        // rewrite — and never a mangling.
+        assert_eq!(out.problem, None);
+        assert!(out.source.contains("hello"), "{}", out.source);
+    } else {
+        assert_eq!(out.source, HELLO);
+        assert!(!out.changed);
+        assert!(out.problem.unwrap().contains("black"));
+    }
 }
 
 /// SPEC §1: nothing outside the home is written. `py_compile`'s `.pyc` lands
