@@ -50,10 +50,33 @@ pub struct Row {
     /// existed — which is not invented after the fact.
     pub opened_at: Option<String>,
     pub cleared: bool,
-    /// XP this call granted: the clear's worth on a first clear, and zero on
-    /// every later accepted submit (PROTOCOL §4.9). Never read back from the
-    /// database — it is what *happened*, not a column.
+    /// XP this call granted: the clear's worth on a first clear, a fifth of
+    /// it on a re-clear (`practice`, capped), zero otherwise (PROTOCOL §4.9).
+    /// Never read back from the database — it is what *happened*, not a
+    /// column.
     pub xp_gained: i64,
+    /// How many times this quest has been re-cleared since its first clear:
+    /// accepted submits after `first_clear_at`. The map colours the stamp by
+    /// it (PROTOCOL §5.2 `practised`).
+    pub practised: i64,
+}
+
+/// The most `practice` grants one quest pays. Ten re-clears is a habit;
+/// past that the XP stops and the stamp keeps counting.
+pub const PRACTICE_CAP: i64 = 10;
+
+/// Accepted submits beyond the one that cleared it: the practice count.
+/// Counted, not dated — the clearing submit and a re-clear a second later
+/// share a timestamp at this resolution, and "all accepted submits but one"
+/// is the same number without the race.
+pub fn practised(conn: &Connection, address: &str, quest_id: &str) -> Result<i64> {
+    let accepted: i64 = conn.query_row(
+        "SELECT count(*) FROM attempts
+          WHERE address = ?1 AND quest_id = ?2 AND mode = 'submit' AND verdict = 'accepted'",
+        params![address, quest_id],
+        |r| r.get(0),
+    )?;
+    Ok((accepted - 1).max(0))
 }
 
 pub fn get(conn: &Connection, address: &str, quest_id: &str) -> Result<Row> {
@@ -73,6 +96,7 @@ pub fn get(conn: &Connection, address: &str, quest_id: &str) -> Result<Row> {
                     first_clear_at: r.get(5)?,
                     opened_at: r.get(6)?,
                     xp_gained: 0,
+                    practised: 0,
                 })
             },
         )
@@ -260,25 +284,46 @@ pub fn record_clear(
     // not. The UNIQUE index refuses a second row for the same clear, and
     // `INSERT OR IGNORE` makes a replayed clear a no-op rather than an error.
     let mut xp_gained = 0;
+    let (difficulty, category): (i64, String) = conn.query_row(
+        "SELECT difficulty, category FROM quests WHERE id = ?1",
+        params![quest_id],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    let worth = crate::awards::xp_for_clear(stars, difficulty, &category);
     if !before.cleared {
-        let (difficulty, category): (i64, String) = conn.query_row(
-            "SELECT difficulty, category FROM quests WHERE id = ?1",
-            params![quest_id],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        )?;
-        let amount = crate::awards::xp_for_clear(stars, difficulty, &category);
         let written = conn.execute(
             "INSERT OR IGNORE INTO xp_ledger
                 (address, quest_id, reason, amount, stars, created_at)
              VALUES (?1, ?2, 'clear', ?3, ?4, ?5)",
-            params![address, quest_id, amount, stars, now],
+            params![address, quest_id, worth, stars, now],
         )?;
         if written == 1 {
+            xp_gained = worth;
+        }
+    } else {
+        // Practice: a re-clear is worth a fifth of the clear, never less than
+        // five, and at most PRACTICE_CAP times — repetition is the point of
+        // the grammar roads, farming is not.
+        let granted: i64 = conn.query_row(
+            "SELECT count(*) FROM xp_ledger
+              WHERE address = ?1 AND quest_id = ?2 AND reason = 'practice'",
+            params![address, quest_id],
+            |r| r.get(0),
+        )?;
+        if granted < PRACTICE_CAP {
+            let amount = (worth / 5).max(5);
+            conn.execute(
+                "INSERT INTO xp_ledger
+                    (address, quest_id, reason, amount, stars, created_at)
+                 VALUES (?1, ?2, 'practice', ?3, ?4, ?5)",
+                params![address, quest_id, amount, stars, now],
+            )?;
             xp_gained = amount;
         }
     }
     let mut row = get(conn, address, quest_id)?;
     row.xp_gained = xp_gained;
+    row.practised = practised(conn, address, quest_id)?;
     Ok(row)
 }
 

@@ -460,6 +460,7 @@ function Quest:execute(mode)
 
     self.attempt = attempt
     self.app.last_attempt = attempt
+    self.app.session:apply_xp(payload.xp)
     self.app:go("result", {
       attempt = attempt,
       -- §4.9: what this submit was worth and where it left the player.

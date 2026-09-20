@@ -180,6 +180,8 @@ export interface MapNode {
   kind: "quest" | "boss" | "gate";
   requires: string[];
   attempts: number;
+  /** §5.2: accepted submits beyond the one that cleared it. Colours the stamp. */
+  practised?: number;
   /**
    * §4.7 — the language `title` is in: the `locale` the map was asked with
    * when a translation of this quest exists, `"en"` otherwise. Per node, since
@@ -616,8 +618,9 @@ export interface Responses {
   ping: { t: string };
   "auth.challenge": { nonce: string; message: string; expires_at: string };
   /** §4.3. `position` is null for a player who has never been anywhere. */
-  "auth.login": { token: string; user: User; position: Position | null };
-  "auth.resume": { token: string; user: User; position: Position | null };
+  /** §4.3. `formats` names the lands whose FORMAT works on this server. */
+  "auth.login": { token: string; user: User; position: Position | null; formats?: Land[] };
+  "auth.resume": { token: string; user: User; position: Position | null; formats?: Land[] };
   "profile.update": { user: User };
   "world.lands": { lands: Array<{ land: Land; categories: CategorySummary[] }> };
   "world.map": {
@@ -626,6 +629,11 @@ export interface Responses {
     nodes: MapNode[];
     /** Pairs of quest ids, given explicitly so a client never infers the shape. */
     edges: Array<[string, string]>;
+    /** §4.7: how far along this road the player is, counted by the server. */
+    cleared?: number;
+    total?: number;
+    stars?: number;
+    stars_total?: number;
   };
   "quest.get": { quest: Quest };
   /**
@@ -723,6 +731,8 @@ export interface Events {
   "progress.update": {
     /** §4.19: the same reading of the ledger the submit reply got. */
     xp?: XpGain;
+    /** §4.19: re-clears so far; a re-clear sends this event too. */
+    practised?: number;
     quest_id: string;
     state: NodeState;
     stars: Stars;

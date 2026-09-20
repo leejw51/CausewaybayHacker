@@ -91,6 +91,11 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0017_verybasic",
         include_str!("../migrations/0017_verybasic.sql"),
     ),
+    (
+        18,
+        "0018_practice",
+        include_str!("../migrations/0018_practice.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {

@@ -146,9 +146,13 @@ export class ResultScene implements Scene {
     private readonly xp?: XpGain,
   ) {}
 
-  /** Whether this screen has a number to celebrate at all. */
+  /**
+   * The XP this submit was worth: the clear's on a first clear, a fifth of
+   * it on practice (PROTOCOL §4.9), zero on a failure. Practice gets the
+   * number and the coin, not the fireworks.
+   */
   private get gained(): number {
-    return this.attempt.cleared && this.xp ? this.xp.gained : 0;
+    return this.passed && this.xp ? this.xp.gained : 0;
   }
 
   enter(): void {
@@ -216,10 +220,11 @@ export class ResultScene implements Scene {
       // screen with no weight.
       this.app.shake(0.3);
       // The clear sets off on the same frame: the stamp is the hit, the
-      // light is what comes off it.
-      if (this.attempt.cleared) {
+      // light is what comes off it. Practice gets the number without the
+      // light: the fireworks are for the first time.
+      if (this.attempt.cleared || this.gained > 0) {
         this.fxAt = this.t;
-        if (!reducedMotion()) {
+        if (this.attempt.cleared && !reducedMotion()) {
           const { vw, vh } = this.app.layout;
           this.fx = celebrationPlan(vw / 2, vh * 0.42, Math.min(vw, vh) * 0.48, 28);
         }
@@ -719,7 +724,9 @@ export class ResultScene implements Scene {
     if (gained > 0 && this.xpIn.raw > 0) {
       const { scale, alpha } = zoomIn(this.xpIn.raw);
       const font = fonts.title;
-      const label = t("result.xpGained", { xp: countUp(0, gained, this.xpIn.raw) });
+      const label = this.attempt.cleared
+        ? t("result.xpGained", { xp: countUp(0, gained, this.xpIn.raw) })
+        : t("result.practice", { xp: countUp(0, gained, this.xpIn.raw) });
       const cx = vw / 2;
       const cy = vh * 0.42 - font.height / 2;
       g.save();

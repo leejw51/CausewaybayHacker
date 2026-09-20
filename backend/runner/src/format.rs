@@ -52,8 +52,32 @@ pub fn is_supported(lang: &str) -> bool {
     match lang {
         "rust" | "go" => true,
         "cpp" => clang_format_is_installed(),
+        "python" => black_is_installed(),
         _ => false,
     }
+}
+
+/// Every land that can be formatted on this machine, for a client to draw
+/// its button with (PROTOCOL §4.3): a button that always refuses is worse
+/// than no button.
+pub fn supported_langs() -> Vec<&'static str> {
+    ["rust", "go", "cpp", "python"]
+        .into_iter()
+        .filter(|lang| is_supported(lang))
+        .collect()
+}
+
+/// Python's formatter is `black`, which is not in the standard library and
+/// is asked of the machine rather than assumed — the same rule `cpp` gets.
+/// It is run through `python3 -m black` so a `pip install black` into the
+/// interpreter the runner already uses is found without a second PATH entry.
+fn black_is_installed() -> bool {
+    std::process::Command::new("python3")
+        .args(["-m", "black", "--version"])
+        .stdin(std::process::Stdio::null())
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false)
 }
 
 fn clang_format_is_installed() -> bool {
@@ -84,6 +108,18 @@ pub fn format(lang: &str, source: &str) -> std::io::Result<Formatted> {
             return Ok(Formatted::unchanged(
                 source,
                 "clang-format is not installed on this machine",
+            ))
+        }
+        "python" if black_is_installed() => {
+            // `-` is stdin to stdout; `-q` keeps the summary off stderr.
+            let mut c = Command::new("python3");
+            c.args(["-m", "black", "-q", "-"]);
+            c
+        }
+        "python" => {
+            return Ok(Formatted::unchanged(
+                source,
+                "black is not installed on this machine",
             ))
         }
         other => {

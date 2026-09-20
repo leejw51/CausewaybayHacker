@@ -137,7 +137,16 @@ pub fn auth_login(
     drop(conn);
 
     session.address = Some(address);
-    Ok(json!({ "token": token, "user": user, "position": position }))
+    Ok(json!({
+        "token": token,
+        "user": user,
+        "position": position,
+        // §4.3: the lands whose FORMAT works on this machine. `rustfmt` and
+        // `gofmt` ship with their toolchains; `clang-format` and `black` do
+        // not, so a client draws the button from this list rather than
+        // offering one that always refuses.
+        "formats": cwbhacker_runner::format::supported_langs(),
+    }))
 }
 
 /// §4.4. The token is **rotated**: the one that comes back is the one to keep.
@@ -159,7 +168,12 @@ pub fn auth_resume(
     let position = position::get(&conn, &address)?;
     drop(conn);
     session.address = Some(address);
-    Ok(json!({ "token": fresh, "user": user, "position": position }))
+    Ok(json!({
+        "token": fresh,
+        "user": user,
+        "position": position,
+        "formats": cwbhacker_runner::format::supported_langs(),
+    }))
 }
 
 pub fn profile_update(
@@ -219,6 +233,12 @@ pub fn world_map(
         "category": category,
         "nodes": map.nodes,
         "edges": map.edges,
+        // §4.7: how far along this road the player is. Counted here so the
+        // two clients cannot each grow their own arithmetic.
+        "cleared": map.cleared,
+        "total": map.total,
+        "stars": map.stars,
+        "stars_total": map.stars_total,
     }))
 }
 

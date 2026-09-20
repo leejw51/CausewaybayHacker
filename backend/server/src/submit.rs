@@ -277,6 +277,7 @@ pub fn run(
     // §4.9). `gained` is zero on everything but a first clear; the rest is
     // read after the grant so the reply and the ledger agree.
     let xp;
+    let practised;
     {
         let conn = state.store.conn();
         attempts::insert(&conn, &record)?;
@@ -294,9 +295,11 @@ pub fn run(
             )?;
             stars = row.stars;
             gained = row.xp_gained;
+            practised = row.practised;
         } else {
             stars = progress::get(&conn, address, &quest_id)?.stars;
             gained = 0;
+            practised = 0;
         }
         xp = cwbhacker_core::awards::xp_json(&conn, address, gained)?;
         cleared_total = progress::cleared_total(&conn, address)?;
@@ -350,7 +353,10 @@ pub fn run(
         }
     }
 
-    if just_cleared {
+    // A first clear moves the map; a re-clear moves the stamp's colour and
+    // the level. Both are worth telling every window about (§4.19).
+    let re_cleared = accepted && mode.is_submit() && !just_cleared;
+    if just_cleared || re_cleared {
         let update = ServerFrame::event(
             "progress.update",
             json!({
@@ -359,6 +365,7 @@ pub fn run(
                 "stars": stars,
                 "cleared_total": cleared_total,
                 "unlocked": unlocked,
+                "practised": practised,
                 // §4.19: the other window's level should move with this one.
                 "xp": xp,
             }),

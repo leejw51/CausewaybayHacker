@@ -220,7 +220,9 @@ return function()
     T.eq(I18n.t("PICK A LAND"), "땅을 고르세요")
     T.eq(I18n.t("a string nobody has translated"), "a string nobody has translated",
       "the key IS the English, which is what makes a partial screen readable")
-    T.eq(I18n.t("%d / %d CLEARED", 1, 18), "1 / 18 클리어")
+    -- A live format string: the map's road tally. (It was `%d / %d CLEARED`
+    -- until the header stopped counting nodes for itself.)
+    T.eq(I18n.t("%d/%d CLEARED · %d%%", 1, 18, 6), "1/18 클리어 · 6%")
     I18n.set("en")
     T.eq(I18n.t("PICK A LAND"), "PICK A LAND")
     T.eq(I18n.t(nil), "")

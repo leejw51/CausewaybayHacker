@@ -11,6 +11,7 @@
 -- and the local reference is dropped before the reply is even sent.
 
 local Store = require("src.store")
+local I18n = require("src.i18n")
 local Wallet = require("src.wallet")
 local errors = require("src.net.errors")
 local json = require("src.json")
@@ -82,6 +83,10 @@ function M.new(opts)
     self:fire("bye", payload)
   end)
 
+  -- §4.19: a clear in any window moves the level; the header reads it here.
+  self.client:on("progress.update", function(payload)
+    self:apply_xp(payload and payload.xp)
+  end)
   for _, event in ipairs({ "run.stage", "run.log", "progress.update", "award" }) do
     self.client:on(event, function(payload, env)
       self:fire(event, payload, env)
@@ -413,6 +418,25 @@ function Session:request(type_name, payload, cb)
       cb(ok, reply, (not ok) and errors.classify(reply.code) or nil, env)
     end
   end)
+end
+
+--- PROTOCOL §5.1 `User.xp`/`level`, as the latest `XpGain` on the wire read
+--- them (`quest.submit.ok` §4.9, `progress.update` §4.19).
+function Session:apply_xp(xp)
+  if type(xp) ~= "table" or not self.user then return end
+  if xp.total then self.user.xp = xp.total end
+  if xp.level then self.user.level = xp.level end
+end
+
+--- "LV 3 · 425 XP" for the header, or nil when the server has not said.
+--- Module-level so it can be checked without a session.
+function Session.xp_label_for(user)
+  if type(user) ~= "table" or user.xp == nil then return nil end
+  return I18n.t("LV %d · %d XP", tonumber(user.level) or 1, tonumber(user.xp) or 0)
+end
+
+function Session:xp_label()
+  return Session.xp_label_for(self.user)
 end
 
 function Session:display_name()

@@ -298,7 +298,8 @@ once can pin one with the optional `nonce`.
 
 ← payload: {
     "token": "base64url, 43 chars",
-    "user":  User                        §5.1
+    "user":  User,                       §5.1
+    "formats": ["rust","go"]             the lands whose FORMAT works here
   }
 ```
 
@@ -345,8 +346,14 @@ forget it on reload.
 
 ```json
 → payload: { "token": "…" }
-← payload: { "token": "…", "user": User }
+← payload: { "token": "…", "user": User, "formats": ["rust","go"] }
 ```
+
+`formats` is the set of lands whose FORMAT this server can actually run:
+`rustfmt` and `gofmt` ship with their toolchains, while `clang-format` and
+`black` are asked of the machine. A client draws the button from this list —
+a button that always refuses is worse than no button. An older server omits
+the field; then a client may show the button and let the error speak.
 
 The returned token may differ from the one sent — the server rotates on use.
 **Store the returned one.** An expired or unknown token is `unauthorized`.
@@ -394,7 +401,9 @@ One overworld.
 ← payload: {
     "land": "rust", "category": "basic",
     "nodes": [ MapNode, … ],              §5.2, ordered by node
-    "edges": [ ["rust.basic.01.hello", "rust.basic.02.bindings"], … ]
+    "edges": [ ["rust.basic.01.hello", "rust.basic.02.bindings"], … ],
+    "cleared": 12, "total": 27,           how far along this road the player is
+    "stars": 31, "stars_total": 81        — counted by the server, not the client
   }
 ```
 
@@ -480,11 +489,12 @@ The main event.
 ```
 
 `xp` is what this submit was worth and where it leaves the player: `gained`
-is the clear's XP on a **first clear** and `0` on everything else — a run, a
-failure, a re-solve — and `total`, `level`, `into_level`, `for_next` and
-`level_up` are the ledger's reading after the grant, so the screen and the
+is the clear's XP on a **first clear**, a fifth of it (never under 5) on a
+**re-clear** — practice, paid at most ten times per quest (`0018_practice.sql`)
+— and `0` on a run or a failure; `total`, `level`, `into_level`, `for_next`
+and `level_up` are the ledger's reading after the grant, so the screen and the
 record cannot disagree. The grant is written to the server's XP ledger in the
-same transaction as the clear (SPEC §2; `0016_xp.sql`), once per quest.
+same transaction as the clear (SPEC §2; `0016_xp.sql`).
 
 While it runs the server pushes `run.stage` and `run.log` events (§4.17,
 §4.18) carrying the same `attempt_id` that the final `Attempt` will have. The
@@ -1153,11 +1163,13 @@ the truncated-to-64-KiB copy is in the `Attempt`.
 { "v":1, "id":null, "type":"progress.update",
   "payload": { "quest_id":"…", "state":"cleared", "stars":3,
                "cleared_total":15, "unlocked":["rust.basic.04.slices"],
-               "xp": XpGain } }
+               "practised": 0, "xp": XpGain } }
 ```
 
 Sent when a clear changes the map, including the nodes it unlocked, so a client
-updates the overworld without refetching it. `xp` is the same reading the
+updates the overworld without refetching it — and on a **re-clear** too, with
+`practised` (§5.2) counting it, so the stamp's colour and the level move in
+every window. `xp` is the same reading the
 `quest.submit.ok` carried (§4.9, §5.1b), so the other window's level moves
 with this one. Also sent to **the same user's
 other open connections**, which is how two windows stay in step.
@@ -1267,6 +1279,7 @@ type MapNode = {
   difficulty: 1|2|3|4|5;
   state: "open" | "cleared";             // never "locked" — see §4.7
   stars: 0|1|2|3;
+  practised: number;                     // accepted submits beyond the clearing one
   x: number; y: number;                  // 0..1 of the map image
   kind: "quest" | "boss" | "gate";
   requires: string[];                    // quest ids

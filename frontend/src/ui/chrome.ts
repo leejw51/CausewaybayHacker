@@ -180,7 +180,11 @@ export function header(g: Ctx, app: App, title: string): void {
     app.addressLabel && !layout.isPhone()
       ? `${app.addressLabel.slice(0, 6)}…${app.addressLabel.slice(-4)}`
       : "";
-  const label = who ? `${who}  ${t("chrome.logout")}` : t("chrome.logout");
+  // The level and the XP, the ledger's own number (PROTOCOL §5.1), beside
+  // the address: the one figure the whole loop adds to, on every screen.
+  const u = app.client.user;
+  const xp = u ? t("chrome.xp", { level: u.level, xp: u.xp }) : "";
+  const label = [xp, who, t("chrome.logout")].filter(Boolean).join("  ");
   const pad = Math.round(8 * s);
   const w = app.addressLabel ? width(sm, label) + pad * 2 : 0;
   const bx = layout.vw - w - Math.round(6 * s);
@@ -439,6 +443,25 @@ export function clearRibbon(g: Ctx, cx: number, cy: number, w: number): void {
 }
 
 /**
+ * A hand pointing down at what is still open.
+ *
+ * The map fills up with CLEARED stamps, and past the halfway mark the one
+ * question a player has — *what have I not done* — is the hardest thing on
+ * the screen to answer. Every street still open wears this.
+ *
+ * `art/node_hand.png`, drawn from the fingertip: the caller points it at the
+ * thing rather than positioning a box. No fallback shape — a marker that is
+ * missing for one frame while the art loads is a marker nobody notices, and
+ * the coin under it is still there.
+ */
+export function pointingHand(g: Ctx, app: App, cx: number, cy: number, w: number): void {
+  const art = app.assets?.picture("node_hand");
+  if (!art) return;
+  const h = (w * art.naturalHeight) / art.naturalWidth;
+  g.drawImage(art, cx - w / 2, cy - h, w, h);
+}
+
+/**
  * The `CLEARED` stamp: the ring from `art/stamp_cleared.png` with the word
  * printed over it at runtime.
  *
@@ -457,6 +480,7 @@ export function clearedStamp(
   cy: number,
   w: number,
   angle = -0.18,
+  practised = 0,
 ): void {
   const f = font("stamp");
   const label = t("chrome.cleared");
@@ -467,6 +491,21 @@ export function clearedStamp(
   g.rotate(angle);
   if (ring) {
     g.drawImage(ring, -w / 2, -w / 2, w, w);
+    // A practised node wears the stamp in a different colour: the ring's
+    // green recoloured through the sprite's own alpha, so a street played
+    // again reads as a different kind of done at a glance, and its count
+    // rides on the rim.
+    if (practised > 0) {
+      // Clipped to the ring's own circle: `source-atop` would tint whatever
+      // opaque thing the stamp is lying on, and on the map that is the slab.
+      g.save();
+      g.beginPath();
+      g.arc(0, 0, w * 0.47, 0, Math.PI * 2);
+      g.clip();
+      g.fillStyle = css(Theme.cyan, 0.5);
+      g.fillRect(-w / 2, -w / 2, w, w);
+      g.restore();
+    }
   } else {
     // No art yet: a drawn ring, so the moment still lands on the first clear
     // of a cold cache rather than showing a bare word.
@@ -487,6 +526,18 @@ export function clearedStamp(
   g.fillStyle = css(Theme.cream);
   printf(g, f, label, -tw / 2, -f.height / 2, tw, "center");
   g.restore();
+  if (practised > 0) {
+    // The count, upright, on the rim's lower right.
+    const sf = font("stationSm");
+    const tag = `×${practised}`;
+    const tagW = width(sf, tag) + 8;
+    const bx = cx + w * 0.22;
+    const by = cy + w * 0.26;
+    fill(g, Theme.ink, bx, by, tagW, sf.height + 4, 0.9);
+    fill(g, Theme.cyan, bx + 1, by + 1, tagW - 2, sf.height + 2, 0.9);
+    g.fillStyle = css(Theme.ink);
+    printf(g, sf, tag, bx, by + 2, tagW, "center");
+  }
 }
 
 /** A titled panel with its face inset returned, so callers draw inside it. */

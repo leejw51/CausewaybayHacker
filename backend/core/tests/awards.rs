@@ -435,39 +435,87 @@ fn a_first_clear_writes_its_grant_to_the_ledger_once() {
     assert_eq!(first.xp_gained, 150, "3 stars × difficulty 2 × basic");
     assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), 150);
 
-    // Solving it again is accepted, and worth nothing more: the stars were
-    // fixed at the first clear, and the ledger refuses a second row.
+    // Solving it again is practice: a fifth of the clear (0018), as its own
+    // row — the `clear` row is still granted once.
     let again = progress::record_clear(&conn, ALICE, "rust.basic.01.a", 5).unwrap();
-    assert_eq!(again.xp_gained, 0);
-    assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), 150);
-    let rows: i64 = conn
+    assert_eq!(again.xp_gained, 30);
+    assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), 180);
+    let (clears, practices): (i64, i64) = conn
         .query_row(
-            "SELECT count(*) FROM xp_ledger WHERE address = ?1",
+            "SELECT sum(reason = 'clear'), sum(reason = 'practice') FROM xp_ledger WHERE address = ?1",
             rusqlite::params![ALICE],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .unwrap();
-    assert_eq!(rows, 1);
+    assert_eq!((clears, practices), (1, 1));
 
     // The advanced road pays double, and the wire shape says where it lands.
     let adv = progress::record_clear(&conn, ALICE, "rust.advanced.02.b", 10).unwrap();
     assert_eq!(adv.xp_gained, 450, "3 × 3 × advanced");
     let wire = awards::xp_json(&conn, ALICE, adv.xp_gained).unwrap();
     assert_eq!(wire["gained"], 450);
-    assert_eq!(wire["total"], 600);
-    assert_eq!(wire["level"], awards::level_for_xp(600));
+    assert_eq!(wire["total"], 630);
+    assert_eq!(wire["level"], awards::level_for_xp(630));
     assert_eq!(
         wire["level_up"],
-        awards::level_for_xp(600) > awards::level_for_xp(150)
+        awards::level_for_xp(630) > awards::level_for_xp(180)
     );
     assert_eq!(
         wire["into_level"],
-        600 - awards::xp_for_level(awards::level_for_xp(600))
+        630 - awards::xp_for_level(awards::level_for_xp(630))
     );
 
     // A grant is history: the quest leaving the content pack does not take
     // the XP with it.
     conn.execute("DELETE FROM quests WHERE id = 'rust.basic.01.a'", [])
         .unwrap();
-    assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), 600);
+    assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), 630);
+}
+
+#[test]
+fn practising_a_cleared_quest_pays_a_fifth_and_then_stops() {
+    let (_tmp, store) = store_with(&[("rust.basic.01.a", "rust", "basic", 2)]);
+    let conn = store.conn();
+    // An accepted submit on the record, with the connection already held:
+    // `submit()` takes its own guard and the guard is not reentrant. The
+    // server inserts the attempt before it records the clear, so the
+    // clearing submit is on the record too.
+    let accept = |conn: &rusqlite::Connection| {
+        let id = cwbhacker_core::ids::attempt_id();
+        let mut record = attempts::new_record(
+            id,
+            ALICE,
+            "rust.basic.01.a",
+            "rust",
+            attempts::Mode::Submit,
+            "fn main(){}".into(),
+        );
+        record.verdict = "accepted".into();
+        attempts::insert(conn, &record).unwrap();
+    };
+    accept(&conn);
+    let first = progress::record_clear(&conn, ALICE, "rust.basic.01.a", 10).unwrap();
+    assert_eq!(first.xp_gained, 150);
+    assert_eq!(first.practised, 0, "the clearing submit is not practice");
+
+    // Each re-clear is an accepted submit after the first clear, worth a
+    // fifth of the clear — 30 — until the cap.
+    let mut total = 150;
+    for i in 1..=progress::PRACTICE_CAP {
+        accept(&conn);
+        let again = progress::record_clear(&conn, ALICE, "rust.basic.01.a", 5).unwrap();
+        assert_eq!(again.xp_gained, 30, "practice {i} pays a fifth");
+        assert_eq!(again.practised, i, "the stamp counts every re-clear");
+        total += 30;
+        assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), total);
+    }
+    accept(&conn);
+    let past = progress::record_clear(&conn, ALICE, "rust.basic.01.a", 5).unwrap();
+    assert_eq!(past.xp_gained, 0, "past the cap practice is free");
+    assert_eq!(
+        past.practised,
+        progress::PRACTICE_CAP + 1,
+        "but still counted"
+    );
+    assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), total);
 }

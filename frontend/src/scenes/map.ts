@@ -31,6 +31,7 @@ import { btnBox, clipped, fill, panel, pixBtn, type Ctx, type Rect } from "../en
 import {
   clearRibbon,
   clearedStamp,
+  pointingHand,
   difficulty as drawDifficulty,
   difficultyH,
   footer,
@@ -199,6 +200,13 @@ export class MapScene implements Scene {
   private readonly neon = new NeonRail();
   private status = "";
   private plate: Rect = [0, 0, 1, 1];
+  /**
+   * This road's progress, as the server counted it (`world.map`). Kept rather
+   * than derived: the two clients would each have their own arithmetic, and
+   * the number a player reads should be the record's, not a rendering's.
+   */
+  private tally: { cleared: number; total: number; stars: number; starsTotal: number } | null =
+    null;
   /** Each node's arrival, staggered, so the overworld assembles itself. */
   private pops: Tween[] = [];
   private readonly plateIn = new Tween(seconds("panel"));
@@ -328,6 +336,18 @@ export class MapScene implements Scene {
       const first = this.nodes.length === 0;
       this.nodes = res.nodes.slice().sort((a, b) => a.node - b.node);
       this.edges = res.edges;
+      // The road's progress, as the server counted it. An older server sends
+      // none, and then the chip is simply not drawn — a client that counted
+      // for itself would be a second arithmetic to keep in step.
+      this.tally =
+        res.cleared === undefined || res.total === undefined
+          ? null
+          : {
+              cleared: res.cleared,
+              total: res.total,
+              stars: res.stars ?? 0,
+              starsTotal: res.stars_total ?? res.total * 3,
+            };
       // Only the first load pops the nodes in. A refresh after a clear should
       // change one stamp, not replay the whole opening.
       if (first) {
@@ -1208,9 +1228,12 @@ export class MapScene implements Scene {
       printf(g, fonts.small, this.status || t("map.none"), ix, iy, iw, "center");
       return;
     }
+    // The road's progress rides on the title's row, right-aligned; the title
+    // elides around whatever it took.
+    const took = this.drawTally(g, ix + iw, iy, iw * 0.5);
     g.fillStyle = css(n.state === "cleared" ? Theme.admit : accent);
     const title = `${String(n.node).padStart(2, "0")}  ${n.title}${n.kind === "boss" ? `  ·  ${t("map.boss")}` : ""}`;
-    printf(g, fonts.station, elide(fonts.station, title, iw), ix, iy, iw, "left");
+    printf(g, fonts.station, elide(fonts.station, title, iw - took), ix, iy, iw - took, "left");
     iy += fonts.station.height + Math.round(6 * s);
     // The facts on one row: difficulty, then stars, then tries. Beside the
     // plate (a phone held sideways) the strip is narrow and stars and tries
@@ -1382,6 +1405,39 @@ export class MapScene implements Scene {
     return this.nodes.find((n) => n.state !== "cleared");
   }
 
+  /**
+   * How far along this road the player is: the count, the percentage and a
+   * bar, right-aligned on the detail panel's title row. The numbers are the
+   * server's (`world.map`), not counted here — see `tally`.
+   *
+   * On the panel rather than on the plate: every pack starts its route in
+   * the plate's top-left corner, so a chip there covers node 1's stamp, and
+   * the other three corners belong to some pack's nodes too. The panel is
+   * chrome and has room. Returns the width it took, so the title elides
+   * around it rather than running under it.
+   */
+  private drawTally(g: Ctx, right: number, y: number, room: number): number {
+    const tally = this.tally;
+    if (!tally || tally.total === 0) return 0;
+    const s = this.app.layout.uiScale();
+    const f = ensureFonts(s).stationSm;
+    const pct = Math.round((tally.cleared / tally.total) * 100);
+    // The full count where it fits, the percentage alone where it does not:
+    // a narrow panel is the phone's, and there the bar carries most of it.
+    const full = t("map.tally", { cleared: tally.cleared, total: tally.total, pct });
+    const label = width(f, full) <= room ? full : `${pct}%`;
+    const w = width(f, label);
+    if (w > room) return 0;
+    const x = right - w;
+    g.fillStyle = css(Theme.cream, 0.85);
+    printf(g, f, label, x, y, w, "right");
+    // The bar under it: the same fact, without reading.
+    const by = y + f.height + Math.round(2 * s);
+    fill(g, Theme.dim, x, by, w, 2, 0.5);
+    fill(g, Theme.admit, x, by, Math.round((w * tally.cleared) / tally.total), 2);
+    return w + Math.round(10 * s);
+  }
+
   private drawNodes(g: Ctx): void {
     const s = this.app.layout.uiScale();
     const fonts = ensureFonts(s);
@@ -1459,17 +1515,12 @@ export class MapScene implements Scene {
         drawStars(g, x - r * 1.2, y + r * 2.3, r * 0.42, n.stars, 3);
       }
       // The route's advice, and the only thing left of the old gate: the first
-      // street not yet cleared wears a chevron. Nothing is forbidden; this
-      // just answers "where was I".
-      if (n.quest_id === next?.quest_id && !chosen) {
+      // street not yet cleared wears a hand. **One** hand — a marker on every
+      // open street is a map of hands, which points at nothing. Nothing is
+      // forbidden; this just answers "where was I".
+      if (n.quest_id === next?.quest_id) {
         const bob = Math.sin(this.t * 3) * rr * 0.12;
-        g.fillStyle = css(Theme.coin, 0.9);
-        g.beginPath();
-        g.moveTo(x, y - rr * 1.5 - bob);
-        g.lineTo(x - rr * 0.4, y - rr * 2.1 - bob);
-        g.lineTo(x + rr * 0.4, y - rr * 2.1 - bob);
-        g.closePath();
-        g.fill();
+        pointingHand(g, this.app, x, y - rr * 0.95 - bob, rr * 1.4);
       }
       if (chosen) {
         g.strokeStyle = css(Theme.cyan, 0.8 + 0.2 * Math.sin(this.t * 8));
@@ -1715,16 +1766,27 @@ export class MapScene implements Scene {
     if (n.state === "cleared") {
       // On its own ground at the end of the plate, not dropped across the
       // stars: the payoff and the score are two facts, not one collision.
-      clearedStamp(g, this.app, x + w - stampW * 0.72, top + h / 2, stampW, -0.14);
+      clearedStamp(
+        g,
+        this.app,
+        x + w - stampW * 0.72,
+        top + h / 2,
+        stampW,
+        -0.14,
+        n.practised ?? 0,
+      );
     }
 
     g.fillStyle = css(accent);
+    // The road's progress rides on the title's row, right-aligned; the title
+    // wraps around whatever it took.
+    const took = this.drawTally(g, ix + textW, iy, textW * 0.5);
     const titleText = `${String(n.node).padStart(2, "0")}  ${n.title}${n.kind === "boss" ? `  ·  ${t("map.boss")}` : ""}`;
     // Wrapped, and advanced by the lines it took: a title that wrapped on a
     // phone was printed through the facts under it.
-    const titleLines = wrap(fonts.station, titleText, textW).slice(0, 2);
+    const titleLines = wrap(fonts.station, titleText, textW - took).slice(0, 2);
     for (const line of titleLines) {
-      printf(g, fonts.station, line, ix, iy, textW, "left");
+      printf(g, fonts.station, line, ix, iy, textW - took, "left");
       iy += fonts.station.height;
     }
     iy += Math.round(10 * s);
@@ -1785,7 +1847,10 @@ export class MapScene implements Scene {
     let line: string;
     let colour = Theme.coin;
     if (n.state === "cleared") {
-      line = t("map.clearedLine", { stars: n.stars });
+      line =
+        (n.practised ?? 0) > 0
+          ? t("map.practisedLine", { stars: n.stars, n: n.practised ?? 0 })
+          : t("map.clearedLine", { stars: n.stars });
       colour = Theme.admit;
     } else if (next && next.quest_id === n.quest_id) {
       line = n.kind === "boss" ? t("map.nextBoss") : t("map.next");

@@ -81,6 +81,8 @@ pub struct MapNode {
     pub kind: String,
     pub requires: Vec<String>,
     pub attempts: i64,
+    /// Re-clears since the first clear (PROTOCOL §5.2); the stamp's colour.
+    pub practised: i64,
     /// The language `title` is in — `"en"`, or the locale the caller asked
     /// for when a translation of this quest exists. Per node rather than per
     /// map because a translation file may cover a pack partially (SPEC §12.1)
@@ -91,6 +93,14 @@ pub struct MapNode {
 pub struct Map {
     pub nodes: Vec<MapNode>,
     pub edges: Vec<(String, String)>,
+    /// How far along this road the player is (PROTOCOL §4.7). Counted here
+    /// rather than on the client: the two clients would each have their own
+    /// arithmetic, and "38%" is a fact about the record, not a rendering.
+    pub cleared: i64,
+    pub total: i64,
+    /// Stars held out of the stars on offer, three a node.
+    pub stars: i64,
+    pub stars_total: i64,
 }
 
 pub fn map(conn: &Connection, address: &str, land: &str, category: &str) -> Result<Map> {
@@ -133,9 +143,20 @@ pub fn map_localized(
             kind: quest.map.kind.clone(),
             requires,
             attempts: row.attempts,
+            practised: if row.cleared {
+                progress::practised(conn, address, &quest.id)?
+            } else {
+                0
+            },
         });
     }
+    let cleared = nodes.iter().filter(|n| n.state == State::Cleared).count() as i64;
+    let stars = nodes.iter().map(|n| n.stars).sum();
     Ok(Map {
+        cleared,
+        total: nodes.len() as i64,
+        stars,
+        stars_total: nodes.len() as i64 * 3,
         nodes,
         edges: quests::edges(conn, land, category)?,
     })

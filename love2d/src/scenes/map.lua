@@ -181,6 +181,21 @@ function Map:refresh()
       end
       self.nodes = payload.nodes or {}
       self.edges = payload.edges or {}
+      -- §4.7: how far along this road the player is, counted by the server.
+      -- Kept, never recomputed: two clients each counting for themselves is
+      -- two arithmetics to keep in step, and the number a player reads
+      -- should be the record's. An older server sends none of these, and
+      -- then nothing is drawn rather than a figure this screen invented.
+      if payload.cleared and payload.total then
+        self.tally = {
+          cleared = payload.cleared,
+          total = payload.total,
+          stars = payload.stars or 0,
+          stars_total = payload.stars_total or (payload.total * 3),
+        }
+      else
+        self.tally = nil
+      end
       -- §5.2: `state` is `open` or `cleared`, never `locked`. A server that
       -- has not shipped §4.7 yet still sends `locked`, and this screen must
       -- not draw the word on a node the player can walk straight into —
@@ -214,9 +229,7 @@ function Map:refresh()
       if found then
         self.cursor = found
       else
-        for i, node in ipairs(self.nodes) do
-          if node.state ~= "cleared" then self.cursor = i; break end
-        end
+        self.cursor = Map.next_index(self.nodes) or self.cursor
       end
       self.cursor = math.max(1, math.min(#self.nodes, self.cursor))
       -- She appears where the player left off rather than walking in from
@@ -227,6 +240,47 @@ function Map:refresh()
     end)
 end
 
+--- Where the suggested route has got to: the first node in pack order the
+--- player has not cleared, or nil on a map with nothing left. The cursor
+--- falls back to it when the player has never been here, and the hand marks
+--- it — one hand, on the node to do next. Pure, so it can be checked
+--- headless.
+function Map.next_index(nodes)
+  for i, node in ipairs(nodes or {}) do
+    if node.state ~= "cleared" then return i end
+  end
+  return nil
+end
+
+--- The stamp's tint for a cleared node: nil (the ring as painted) until the
+--- node has been re-cleared, cyan after. Pure, so it can be checked headless.
+function Map.stamp_color(practised)
+  if (tonumber(practised) or 0) > 0 then
+    return { Theme.cyan[1], Theme.cyan[2], Theme.cyan[3], 1 }
+  end
+  return nil
+end
+
+--- The road's completion, as a line: the count and the percentage where
+--- there is room for them, the percentage alone where there is not, and
+--- nothing at all when the server did not say (an older server, or a map
+--- that has not loaded). Pure — `measure` is the text measurer — so the
+--- choice can be checked headless.
+---
+--- The percentage is formatted rather than translated: `"%d%%"` has no word
+--- in it, and an entry identical to the English in every language is what
+--- `tests/test_i18n.lua` counts as an untranslated file.
+function Map.tally_label(cleared, total, room, measure)
+  cleared, total = tonumber(cleared), tonumber(total)
+  if not cleared or not total or total <= 0 then return nil end
+  local pct = math.floor((cleared / total) * 100 + 0.5)
+  local full = I18n.t("%d/%d CLEARED · %d%%", cleared, total, pct)
+  if not measure or measure(full) <= (room or math.huge) then return full end
+  local short = ("%d%%"):format(pct)
+  if measure(short) <= (room or math.huge) then return short end
+  return nil
+end
+
 --- §4.19: patch the map rather than refetching it.
 function Map:apply_progress(payload)
   if not self.nodes then return end
@@ -235,6 +289,7 @@ function Map:apply_progress(payload)
     local node = self.nodes[index]
     if payload.state then node.state = payload.state end
     if payload.stars then node.stars = payload.stars end
+    if payload.practised then node.practised = payload.practised end
     if payload.state == "cleared" then
       self.stamped[payload.quest_id] = 0
       SFX.play("stamp")
@@ -668,16 +723,9 @@ function Map:draw_header()
     x = x + q_tag
   end
 
-  local cleared, total = 0, 0
-  for _, node in ipairs(self.nodes or {}) do
-    total = total + 1
-    if node.state == "cleared" then cleared = cleared + 1 end
-  end
-  local progress = I18n.t("%d / %d CLEARED", cleared, total)
-  local pw = UI.textWidth(progress, land_size)
-  if vw - 10 - pw > x + 16 then
-    UI.text(progress, vw - 10 - pw, (h - label_h) / 2, land_size, Theme.cream)
-  end
+  -- The count used to be a walk over `self.nodes` here. It is the server's
+  -- now (`world.map`), and it is drawn on the node card with its bar rather
+  -- than twice on one screen — see `draw_node_card`.
 end
 
 function Map:draw_edges()
@@ -735,6 +783,7 @@ function Map:draw_nodes()
   -- `uiScale` is still right for. Type went the other way this round: see
   -- `Layout.uiScale`'s note for why a pixel face may not be multiplied by 1.5.
   local scale = Layout.uiScale()
+  local next_i = Map.next_index(self.nodes)
   for i, node in ipairs(self.nodes) do
     local x, y = self:node_xy(node)
     local selected = i == self.cursor
@@ -780,14 +829,40 @@ function Map:draw_nodes()
     -- The sprite is a wordless ring by design — `docs/design-review.md` says
     -- the word is printed over it at runtime so it can be translated.
     if node.state == "cleared" then
-      if Assets.marker("stamp_cleared", x, y, size * 1.15) then
+      -- A practised node wears the stamp in another colour (the ring tinted
+      -- cyan) with its count on the rim: a street played again is a
+      -- different kind of done, and the map should say so at a glance.
+      local tint = Map.stamp_color(node.practised)
+      if Assets.marker("stamp_cleared", x, y, size * 1.15, { color = tint }) then
         local w = UI.textWidth("CLEARED", 6)
         UI.text(I18n.t("CLEARED"), x - w / 2, y - 3, 6, Theme.cream)
       else
-        UI.setColor(Theme.admit)
+        UI.setColor(tint and Theme.cyan or Theme.admit)
         love.graphics.circle("line", x, y, size * 0.5)
         love.graphics.setColor(1, 1, 1, 1)
       end
+      if (node.practised or 0) > 0 then
+        local tag = ("×%d"):format(node.practised)
+        local tw = UI.textWidth(tag, 6) + 4
+        UI.setColor(Theme.ink, 0.9)
+        love.graphics.rectangle("fill", x + size * 0.22, y + size * 0.26, tw, UI.lineHeight(6) + 2)
+        UI.setColor(Theme.cyan, 0.9)
+        love.graphics.rectangle("fill", x + size * 0.22 + 1, y + size * 0.26 + 1, tw - 2, UI.lineHeight(6))
+        love.graphics.setColor(1, 1, 1, 1)
+        UI.text(tag, x + size * 0.22 + 2, y + size * 0.26 + 1, 6, Theme.ink)
+      end
+    end
+
+    if i == next_i then
+      -- **One hand, on the node the route suggests next.** A hand over every
+      -- node still open was a field of hands — the mark that is supposed to
+      -- say *here* saying it twenty times over. This is the street to walk
+      -- down; every other open node is a plain coin, which is what it is.
+      local hs = size * 0.6
+      local hb = Anim.bob(self.t, { amount = 2, period = 1.7 })
+      -- `Assets.marker` draws centred, and the sprite points at its own
+      -- bottom edge: put that edge just over the coin's top.
+      Assets.marker("node_hand", x, y - size * 0.40 - hb - hs * 0.5, hs)
     end
 
     if (node.stars or 0) > 0 then
@@ -885,6 +960,15 @@ function Map:draw_node_card(node)
   -- the card has to be as tall as the lines that width makes of it, or the
   -- second line of the title is printed through the id (portrait, step 4).
   local title_w = w - 24 - boss_w
+  -- The road's progress rides on the title's row, right-aligned, and the
+  -- title wraps around whatever width it took. Half the row at most: a
+  -- title is content and this is chrome.
+  local tally = self.tally
+    and Map.tally_label(self.tally.cleared, self.tally.total, title_w * 0.5,
+      function(text) return UI.textWidth(text, 7) end)
+    or nil
+  local tally_w = tally and (UI.textWidth(tally, 7) + 10) or 0
+  title_w = title_w - tally_w
   local title = ("%02d  %s"):format(node.node, node.title or "")
   local title_lines = math.max(1, #UI.wrap(title, title_w, 11))
   local id_lines = math.max(1, #UI.wrap(node.quest_id or "", title_w, 7))
@@ -925,12 +1009,29 @@ function Map:draw_node_card(node)
   local r4 = r3 + row3_h + 6
   local r4b = split4 and (r4 + math.max(meta_h, UI.lineHeight(8)) + 4) or r4
   UI.text(title, x + 12, r1, 11, color, "left", title_w)
+  if tally then
+    local tx = x + 12 + title_w + 10
+    UI.text(tally, tx, r1, 7, Theme.withAlpha(color, 0.85), "left", tally_w)
+    -- The same fact without reading: a two-pixel bar under the words.
+    local bw = UI.textWidth(tally, 7)
+    local by = r1 + UI.lineHeight(7) + 2
+    UI.setColor(Theme.dim, 0.5)
+    love.graphics.rectangle("fill", tx, by, bw, 2)
+    UI.setColor(Theme.admit)
+    love.graphics.rectangle("fill", tx, by,
+      math.floor(bw * self.tally.cleared / math.max(1, self.tally.total)), 2)
+    love.graphics.setColor(1, 1, 1, 1)
+  end
   UI.text(node.quest_id or "", x + 12, r2, 7, Theme.withAlpha(color, 0.6),
     "left", title_w)
 
+  local practised = node.practised or 0
   local state_color = ({ open = Theme.coin, cleared = Theme.admit })[node.state]
     or Theme.cream
-  UI.text(I18n.t((node.state or "?"):upper()), x + 12, r3, 9, state_color)
+  if node.state == "cleared" and practised > 0 then state_color = Theme.cyan end
+  UI.text(node.state == "cleared" and practised > 0
+    and I18n.t("CLEARED · PRACTISED ×%d", practised)
+    or I18n.t((node.state or "?"):upper()), x + 12, r3, 9, state_color)
   -- Difficulty is a segmented bar; stars are stars. Two scales, two shapes,
   -- and a row of text between them (design review §4).
   local dl = I18n.t("DIFFICULTY") .. " "

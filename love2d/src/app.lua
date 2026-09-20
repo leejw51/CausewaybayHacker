@@ -635,7 +635,9 @@ end
 function App:footer(hint)
   local left = hint or ""
   if self.session and self.session.authed then
+    local xp = self.session.xp_label and self.session:xp_label() or nil
     left = ("%s  %s   %s"):format(self.session:display_name(), self.session:short_address(), left)
+    if xp then left = xp .. "  " .. left end
   end
   local state = self:display_state()
   -- **First**, because this is also what decides whether the buttons can

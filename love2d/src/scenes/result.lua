@@ -273,6 +273,13 @@ function Result:draw()
   elseif accepted then
     cy = cy + UI.text(I18n.t("already cleared — stars keep the best run"), cx, cy, 8,
       Theme.withAlpha(Theme.cream, 0.7)) + 10
+    -- Practice: the number and the coin, not the fireworks (§4.9 — a
+    -- re-clear pays a fifth of the clear, at most ten times).
+    if not self.fx_at and self.xp and (self.xp.gained or 0) > 0 and self:age() > 0.3 then
+      self.fx_at = self:age()
+      self.fx_x, self.fx_y = cx + (w - 32) / 2, cy + 8
+      self.fx = nil
+    end
   end
 
   if a.mistakes and #a.mistakes > 0 then
@@ -403,7 +410,9 @@ function Result:draw_celebration(vw, vh, px, py)
   local lh = UI.lineHeight(size)
   if u > 0 then
     local scale, alpha = Celebrate.zoom_in(u)
-    local label = I18n.t("+%d XP", Celebrate.count_up(0, gained, u))
+    local label = (self.attempt and self.attempt.cleared)
+      and I18n.t("+%d XP", Celebrate.count_up(0, gained, u))
+      or I18n.t("PRACTICE +%d XP", Celebrate.count_up(0, gained, u))
     local lw = UI.textWidth(label, size)
     love.graphics.push()
     love.graphics.translate(px, py)

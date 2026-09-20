@@ -385,13 +385,10 @@ fn the_xp_ledger_arrived_with_0016_and_was_backfilled() {
 }
 
 #[test]
-fn the_newest_migration_widens_category_and_adds_the_quiz() {
-    // The "newest migration" pin: fails loudly if a 0018 is added without a
-    // test of its own here. 0017 rebuilds `quests`: a row survives with its
-    // rowid, a 'verybasic' quest is now insertable, and `quiz` is a column.
-    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
-    assert_eq!(previous, 16);
-    let conn = database_at_version(previous);
+fn a_verybasic_quest_with_a_quiz_arrived_with_0017() {
+    // 0017 rebuilds `quests`: a row survives with its rowid, a 'verybasic'
+    // quest is now insertable, and `quiz` is a column.
+    let conn = database_at_version(16);
     conn.execute(
         "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
                              starter, solution, tests, checksum)
@@ -434,4 +431,56 @@ fn the_newest_migration_widens_category_and_adds_the_quiz() {
         )
         .unwrap();
     assert_eq!(hits, 1, "the FTS triggers were put back");
+}
+
+#[test]
+fn the_newest_migration_lets_the_ledger_pay_for_practice() {
+    // The "newest migration" pin: fails loudly if a 0019 is added without a
+    // test of its own here. 0018 rebuilds `xp_ledger`: the clear rows survive
+    // with their ids, a second `practice` row for the same quest is
+    // insertable, and a second `clear` row still is not.
+    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
+    assert_eq!(previous, 17);
+    let conn = database_at_version(previous);
+    conn.execute(
+        "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
+           VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO xp_ledger (id, address, quest_id, reason, amount, stars, created_at)
+           VALUES (7, '0xaa', 'rust.basic.01.a', 'clear', 75, 3, '2026-02-01T00:00:00Z')",
+        [],
+    )
+    .unwrap();
+
+    db::prepare(&conn).unwrap();
+
+    let (id, amount): (i64, i64) = conn
+        .query_row(
+            "SELECT id, amount FROM xp_ledger WHERE quest_id = 'rust.basic.01.a'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        (id, amount),
+        (7, 75),
+        "the clear row came through with its id"
+    );
+    for _ in 0..2 {
+        conn.execute(
+            "INSERT INTO xp_ledger (address, quest_id, reason, amount, stars, created_at)
+               VALUES ('0xaa', 'rust.basic.01.a', 'practice', 15, 3, '2026-03-01T00:00:00Z')",
+            [],
+        )
+        .expect("practice rows repeat");
+    }
+    let dup = conn.execute(
+        "INSERT INTO xp_ledger (address, quest_id, reason, amount, stars, created_at)
+           VALUES ('0xaa', 'rust.basic.01.a', 'clear', 75, 3, '2026-03-02T00:00:00Z')",
+        [],
+    );
+    assert!(dup.is_err(), "a clear is still granted once");
 }

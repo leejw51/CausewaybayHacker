@@ -130,6 +130,59 @@ return function()
     end
     Layout.font, Layout.mode, Layout.vw, Layout.vh = was_font, was_mode, was_vw, was_vh
   end)
+  T.section("map — a practised node, and the header's number")
+
+  T.case("the stamp is tinted only once a node has been played again", function()
+    local Map = require("src.scenes.map")
+    T.eq(Map.stamp_color(nil), nil, "never re-cleared: the ring as painted")
+    T.eq(Map.stamp_color(0), nil)
+    local tint = Map.stamp_color(3)
+    T.ok(type(tint) == "table" and #tint == 4, "re-cleared: a colour")
+    T.eq(tint[1], Theme.cyan[1]); T.eq(tint[2], Theme.cyan[2]); T.eq(tint[3], Theme.cyan[3])
+  end)
+
+  T.case("one hand, on the street the route suggests next", function()
+    local Map = require("src.scenes.map")
+    local nodes = {
+      { state = "cleared" }, { state = "cleared" }, { state = "open" }, { state = "open" },
+    }
+    T.eq(Map.next_index(nodes), 3, "the first not cleared, in pack order")
+    T.eq(Map.next_index({ { state = "open" } }), 1)
+    T.eq(Map.next_index({ { state = "cleared" }, { state = "cleared" } }), nil,
+      "a finished road wears no hand at all")
+    T.eq(Map.next_index({}), nil)
+    T.eq(Map.next_index(nil), nil)
+  end)
+
+  T.case("the road's completion is the server's number, or nothing", function()
+    local Map = require("src.scenes.map")
+    -- A measurer standing in for the type: every character one pixel wide.
+    local wide = function(text) return #text end
+    T.eq(Map.tally_label(12, 27, 100, wide), "12/27 CLEARED · 44%",
+      "the count and the percentage, where there is room")
+    T.eq(Map.tally_label(12, 27, 6, wide), "44%",
+      "a narrow card keeps the percentage and drops the rest")
+    T.eq(Map.tally_label(12, 27, 1, wide), nil, "no room for either: nothing")
+    T.eq(Map.tally_label(0, 27, 100, wide), "0/27 CLEARED · 0%")
+    T.eq(Map.tally_label(27, 27, 100, wide), "27/27 CLEARED · 100%")
+  end)
+
+  T.case("an older server says nothing about the road, and nothing is invented", function()
+    local Map = require("src.scenes.map")
+    local wide = function(text) return #text end
+    T.eq(Map.tally_label(nil, nil, 100, wide), nil, "no fields at all")
+    T.eq(Map.tally_label(3, nil, 100, wide), nil, "half the fields is not a number")
+    T.eq(Map.tally_label(0, 0, 100, wide), nil, "an empty road has no percentage")
+  end)
+
+  T.case("the header prints the level and XP the server said, or nothing", function()
+    local Session = require("src.session").Session
+    T.eq(Session.xp_label_for({ xp = 425, level = 3 }), "LV 3 · 425 XP")
+    T.eq(Session.xp_label_for({ xp = 0, level = 1 }), "LV 1 · 0 XP")
+    T.eq(Session.xp_label_for({ name = "mei" }), nil, "an older server says no xp")
+    T.eq(Session.xp_label_for(nil), nil)
+  end)
+
   T.section("lands — the fourth road, and the quiz's pure parts")
 
   T.case("VERY BASIC walks first, and every road has a label", function()

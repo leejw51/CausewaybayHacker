@@ -159,3 +159,56 @@ fn clang_format_tidies_cpp_where_it_exists() {
     let out = format::format("cpp", broken).unwrap();
     assert!(out.source.contains("int main()"), "{out:?}");
 }
+
+#[test]
+fn black_tidies_python_and_says_it_changed_something() {
+    if !have_module("black") {
+        return;
+    }
+    let out = format::format("python", "def main():\n  x=1\n  print( x )\nmain()\n").unwrap();
+    assert!(out.changed, "black left it alone: {:?}", out.source);
+    assert!(out.source.contains("    x = 1"), "{}", out.source);
+    assert_eq!(out.problem, None);
+}
+
+#[test]
+fn python_that_does_not_parse_comes_back_byte_for_byte() {
+    if !have_module("black") {
+        return;
+    }
+    // The property this whole file exists for: a formatter that mangles what
+    // it could not parse destroys work that is backed up nowhere.
+    let broken = "def main(:\n  x=1\n";
+    let out = format::format("python", broken).unwrap();
+    assert_eq!(out.source, broken);
+    assert!(!out.changed);
+    assert!(out.problem.is_some(), "it must say why");
+}
+
+#[test]
+fn the_supported_list_is_what_this_machine_can_actually_run() {
+    // Every land on the list formats; every land off it does not. This is
+    // what a client draws its FORMAT button from (§4.3), so the two answers
+    // must be the same answer.
+    let langs = format::supported_langs();
+    for lang in ["rust", "go", "cpp", "python"] {
+        assert_eq!(
+            langs.contains(&lang),
+            format::is_supported(lang),
+            "{lang} disagrees with the list"
+        );
+    }
+    assert!(langs.contains(&"rust"), "rustfmt ships with the toolchain");
+    assert!(
+        !langs.contains(&"zig"),
+        "a land with no formatter is off the list"
+    );
+}
+
+fn have_module(module: &str) -> bool {
+    std::process::Command::new("python3")
+        .args(["-m", module, "--version"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}

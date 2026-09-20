@@ -678,6 +678,7 @@ export class QuestScene implements Scene {
         else this.app.chip.fail();
         return;
       }
+      if ("xp" in res) this.app.client.applyXp(res.xp);
       this.showResult(res.attempt, "xp" in res ? res.xp : undefined);
     } catch (e) {
       this.stage = "idle";
@@ -1645,6 +1646,13 @@ export class QuestScene implements Scene {
     }
     this.app.chip.select();
     switch (hit.id) {
+      // FORMAT had a keystroke (Ctrl/Cmd+Shift+F) and a button, and only the
+      // keystroke was wired: the button drew, lit on hover and did nothing.
+      // On a phone, where there is no keystroke, the formatter was
+      // unreachable altogether.
+      case "format":
+        void this.format();
+        break;
       case "agent":
         this.coder?.toggle();
         break;
@@ -2011,7 +2019,9 @@ export class QuestScene implements Scene {
         primary: this.stage === "idle",
         strong: false,
       },
-      { id: "format", label: t("quest.format"), dim: this.formatting },
+      ...(this.app.client.canFormat(this.land)
+        ? [{ id: "format", label: t("quest.format"), dim: this.formatting }]
+        : []),
       { id: "agent", label: t("agent.button"), strong: this.coder?.open ?? false },
       { id: "undo", label: t("quest.undo"), dim: !steps.undo },
       { id: "redo", label: t("quest.redo"), dim: !steps.redo },
@@ -2069,7 +2079,9 @@ export class QuestScene implements Scene {
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
-      { id: "format", label: t("quest.format"), dim: this.formatting },
+      ...(this.app.client.canFormat(this.land)
+        ? [{ id: "format", label: t("quest.format"), dim: this.formatting }]
+        : []),
       { id: "undo", label: t("quest.undo"), dim: !steps.undo },
       { id: "redo", label: t("quest.redo"), dim: !steps.redo },
       // `strong` while it is on: a different colour rather than a louder one,

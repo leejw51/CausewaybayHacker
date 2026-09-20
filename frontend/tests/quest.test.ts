@@ -6,6 +6,8 @@
  * screenshot can see — which is the entire reason they are functions with
  * names, and the entire reason this file exists.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   briefNeedsNote,
@@ -252,5 +254,39 @@ describe("whether a run's cases describe something that ran", () => {
     ] as const) {
       expect(ranCases({ verdict })).toBe(true);
     }
+  });
+});
+
+/**
+ * Every button the quest screen draws must be a button the quest screen
+ * answers.
+ *
+ * FORMAT shipped with a keystroke (Ctrl/Cmd+Shift+F) and a button, and only
+ * the keystroke was wired: the button drew, lit under the pointer and did
+ * nothing, and on a phone — no keystroke — the formatter could not be
+ * reached at all. Nobody noticed because the two ways in were written months
+ * apart. This reads the scene's own source and asserts the pair: the ids it
+ * puts in a `Buttons` list and the ids its pointer dispatch handles are the
+ * same set.
+ */
+describe("the buttons and the dispatch agree", () => {
+  const src = readFileSync(join(__dirname, "..", "src", "scenes", "quest.ts"), "utf8");
+
+  /** `{ id: "run", … }` and `this.bar.add({ id: "unfocus", … })`. */
+  const drawn = new Set([...src.matchAll(/\bid:\s*"([a-z][a-z0-9]*)"/g)].map((m) => m[1]));
+  /** `case "run":` in the pointer's switch. */
+  const handled = new Set([...src.matchAll(/case "([a-z][a-z0-9]*)":/g)].map((m) => m[1]));
+
+  it("hands every drawn button to the dispatch", () => {
+    // The choices are dispatched by prefix (`choice:0`…), and a couple of ids
+    // belong to other machinery; everything else must have a case.
+    const exempt = new Set(["quest", "boss", "gate"]);
+    const orphans = [...drawn].filter((id) => !handled.has(id) && !exempt.has(id));
+    expect(orphans, "drawn but never dispatched").toEqual([]);
+  });
+
+  it("keeps FORMAT among them, which is the one that was missing", () => {
+    expect(drawn.has("format")).toBe(true);
+    expect(handled.has("format")).toBe(true);
   });
 });

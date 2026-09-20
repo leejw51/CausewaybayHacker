@@ -179,6 +179,7 @@ export class Client {
   forgetToken(): void {
     this.token = null;
     this.user = null;
+    this.formats = null;
     this.hadSession = false;
   }
 
@@ -448,6 +449,7 @@ export class Client {
     );
     this.lastAuth = "login";
     this.adopt(res.token, res.user);
+    this.formats = res.formats ?? null;
     this.position = res.position;
     return res.user;
   }
@@ -457,11 +459,29 @@ export class Client {
     // §4.4 carries the place too, so a reconnect mid-session does not have to
     // be told again where the player is.
     this.position = res.position;
+    this.formats = res.formats ?? null;
     // §4.4 / §8.7: the server rotates on use. Storing the one we sent would
     // work until it didn't, on whichever reconnect happened to be the second.
     this.lastAuth = "resume";
     this.adopt(res.token, res.user);
     return res.user;
+  }
+
+  /**
+   * The lands whose FORMAT this server can actually run (§4.3).
+   *
+   * `rustfmt` and `gofmt` ship with their toolchains; `clang-format` and
+   * `black` do not, so which lands can be formatted is a fact about the
+   * machine the server is on. Null until a login or resume says — and then a
+   * screen draws the button from this rather than offering one that always
+   * refuses. An older server omits the field, and null means "show it and
+   * let the error speak", which is what every client did before.
+   */
+  formats: string[] | null = null;
+
+  /** Whether FORMAT is worth drawing for this land. */
+  canFormat(lang: string): boolean {
+    return this.formats === null || this.formats.includes(lang);
   }
 
   private adopt(token: string, user: User): void {
@@ -485,7 +505,18 @@ export class Client {
     return () => set!.delete(fn as (p: unknown) => void);
   }
 
+  /** §5.1 `User.xp`/`level`, as the latest `XpGain` on the wire read them. */
+  applyXp(xp: { total: number; level: number } | undefined): void {
+    if (!xp || !this.user) return;
+    this.user = { ...this.user, xp: xp.total, level: xp.level };
+  }
+
   private emit(type: string, payload: unknown): void {
+    // The header shows the level; a clear in any window moves it here.
+    if (type === "progress.update") {
+      const p = payload as { xp?: { total: number; level: number } };
+      this.applyXp(p.xp);
+    }
     const set = this.listeners.get(type);
     if (!set) return; // §8.3: an unknown or unwatched event is simply ignored
     for (const fn of [...set]) {

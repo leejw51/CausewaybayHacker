@@ -1889,7 +1889,9 @@ export class PlaygroundScene implements Scene {
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
-      { id: "format", label: t("pg.format"), dim: this.formatting },
+      ...(this.app.client.canFormat(this.land)
+        ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
+        : []),
       { id: "agent", label: t("agent.button"), strong: this.coder?.open ?? false },
       // The editor's own history, as buttons — for a phone, where there is
       // no Ctrl+Z. Client-side only (see `Editor.canUndo`).
@@ -2211,7 +2213,9 @@ export class PlaygroundScene implements Scene {
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
-      { id: "format", label: t("pg.format"), dim: this.formatting },
+      ...(this.app.client.canFormat(this.land)
+        ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
+        : []),
       { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
       // The way out of the crowding, on the screen that is crowded. Never
       // dropped: on a phone it is the only way the editor gets the window.

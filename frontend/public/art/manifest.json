@@ -538,6 +538,21 @@
       }
     },
     {
+      "name": "node_hand",
+      "file": "node_hand.png",
+      "w": 64,
+      "h": 64,
+      "box": {
+        "cx": 31.5,
+        "feet": 63.0,
+        "h": 64.0,
+        "minx": 14,
+        "miny": 0,
+        "maxx": 49,
+        "maxy": 63
+      }
+    },
+    {
       "name": "node_locked",
       "file": "node_locked.png",
       "w": 64,

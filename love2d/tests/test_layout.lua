@@ -251,6 +251,35 @@ return function()
         T.ok(ok, ("%s in %s: %s"):format(name, mode, tostring(err)))
         if not ok then love.graphics.setCanvas() end
       end
+
+      -- The map with something on it: the scenes above draw their empty
+      -- state, and the branches that only exist once `world.map` has
+      -- answered — the hand over a node not yet cleared, the road's tally on
+      -- the card and its bar — would never run. A nil in either is a crash
+      -- on the one screen a player looks at most.
+      local ok, err = pcall(function()
+        app:go("map", { land = "rust", category = "basic" })
+        local scene = app.scene
+        scene.nodes = {
+          { quest_id = "a", node = 1, title = "FIRST LIGHT", state = "cleared",
+            stars = 3, practised = 2, difficulty = 1, attempts = 4, x = 0.2, y = 0.3,
+            kind = "quest", requires = {} },
+          { quest_id = "b", node = 2, title = "THE FARE BOARD", state = "open",
+            stars = 0, difficulty = 2, attempts = 0, x = 0.6, y = 0.7,
+            kind = "quest", requires = { "a" } },
+        }
+        scene.by_id = { a = 1, b = 2 }
+        scene.edges = { { "a", "b" } }
+        scene.tally = { cleared = 1, total = 2, stars = 3, stars_total = 6 }
+        for _, at_node in ipairs({ 1, 2 }) do
+          scene.cursor = at_node
+          love.graphics.setCanvas(Layout.canvas)
+          app:draw()
+          love.graphics.setCanvas()
+        end
+      end)
+      T.ok(ok, ("map with nodes in %s: %s"):format(mode, tostring(err)))
+      if not ok then love.graphics.setCanvas() end
     end
   end)
 

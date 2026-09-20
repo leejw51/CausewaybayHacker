@@ -507,11 +507,12 @@ async fn a_clear_earns_something_and_the_shelf_remembers() {
         "a re-clear handed out a badge twice"
     );
 
-    // And the user's level and xp travel with them.
+    // And the user's level and xp travel with them. The re-clear was
+    // practice: a fifth of the 75, so 15 (0018), on top of the clear.
     let user = client.ok("profile.update", json!({})).await["user"].clone();
-    assert_eq!(user["xp"].as_i64(), Some(75), "{user}");
+    assert_eq!(user["xp"].as_i64(), Some(90), "{user}");
     assert_eq!(user["level"].as_i64(), Some(1));
-    assert_eq!(user["xp_into_level"].as_i64(), Some(75));
+    assert_eq!(user["xp_into_level"].as_i64(), Some(90));
     assert_eq!(user["xp_for_next"].as_i64(), Some(100));
 
     // The second clear — a difficulty-2 quest, so 150 xp — crosses it, and
@@ -528,7 +529,7 @@ async fn a_clear_earns_something_and_the_shelf_remembers() {
         .collect();
     assert_eq!(levels, vec!["level-2"], "{:?}", client.events);
     let user = client.ok("profile.update", json!({})).await["user"].clone();
-    assert_eq!(user["xp"].as_i64(), Some(225));
+    assert_eq!(user["xp"].as_i64(), Some(240), "75 + 15 practice + 150");
     assert_eq!(user["level"].as_i64(), Some(2));
     server.handle.abort();
 }

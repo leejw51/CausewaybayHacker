@@ -2831,6 +2831,20 @@ directory.
 one SELECT and no write, and returns the same `updated_at`. Without that a list
 sorted by `updated_at` shuffles every few seconds while nobody is typing.
 
+## 2026-09-20 — BE: practice pays, a fifth at a time
+
+A cleared node played again used to be worth nothing, which told the player
+the wrong thing: repetition is the whole point of the grammar roads. A
+re-clear now writes a `practice` row to the ledger worth a fifth of the clear
+(never under 5), at most ten times per quest, so practising pays and farming
+does not (`0018_practice.sql` rebuilds the ledger: the CHECK admits the
+reason, and "one clear per quest" is a partial unique index). The map node
+carries `practised` — accepted submits beyond the clearing one, counted rather
+than dated because two submits a second apart share a timestamp — and both
+clients wear the stamp in a second colour with the count on the rim. The
+header shows the level and the XP, straight off `User` and the latest
+`XpGain`.
+
 ## 2026-09-20 — BE: XP is a ledger, and a clear says what it was worth
 
 Until now `User.xp` was recomputed on every read from the progress table. It
