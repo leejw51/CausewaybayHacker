@@ -519,3 +519,150 @@ fn practising_a_cleared_quest_pays_a_fifth_and_then_stops() {
     );
     assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), total);
 }
+
+#[test]
+fn a_reset_clears_the_road_but_not_the_record_or_the_xp() {
+    let (_tmp, store) = store_with(&[
+        ("rust.basic.01.a", "rust", "basic", 2),
+        ("rust.basic.02.b", "rust", "basic", 1),
+        ("go.basic.01.c", "go", "basic", 1),
+    ]);
+    let conn = store.conn();
+    let accept = |conn: &rusqlite::Connection, quest: &str| {
+        let mut record = attempts::new_record(
+            cwbhacker_core::ids::attempt_id(),
+            ALICE,
+            quest,
+            "rust",
+            attempts::Mode::Submit,
+            "fn main(){}".into(),
+        );
+        record.verdict = "accepted".into();
+        attempts::insert(conn, &record).unwrap();
+    };
+    accept(&conn, "rust.basic.01.a");
+    progress::record_clear(&conn, ALICE, "rust.basic.01.a", 10).unwrap();
+    accept(&conn, "go.basic.01.c");
+    progress::record_clear(&conn, ALICE, "go.basic.01.c", 10).unwrap();
+    let earned = awards::total_xp(&conn, ALICE).unwrap();
+    assert!(earned > 0);
+
+    let reset = progress::reset_road(&conn, ALICE, "rust", "basic").unwrap();
+    assert_eq!(reset, 1, "only the rows this player had on that road");
+
+    // The road is untouched again…
+    let row = progress::get(&conn, ALICE, "rust.basic.01.a").unwrap();
+    assert!(!row.cleared);
+    assert_eq!(row.stars, 0);
+    assert_eq!(row.attempts, 0);
+    assert!(row.first_clear_at.is_none());
+    assert!(row.reset_at.is_some(), "the reset is dated, for the stars");
+
+    // …the other road is not…
+    assert!(
+        progress::get(&conn, ALICE, "go.basic.01.c")
+            .unwrap()
+            .cleared
+    );
+
+    // …the attempts are still the training data (SPEC §7)…
+    let kept: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM attempts WHERE address = ?1 AND quest_id = 'rust.basic.01.a'",
+            rusqlite::params![ALICE],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        kept, 1,
+        "a reset must not delete the record of what happened"
+    );
+
+    // …and the XP is history: kept, and not earnable twice.
+    assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), earned);
+    accept(&conn, "rust.basic.01.a");
+    let again = progress::record_clear(&conn, ALICE, "rust.basic.01.a", 10).unwrap();
+    assert_eq!(
+        again.xp_gained, 0,
+        "clearing it again after a reset pays nothing"
+    );
+    assert_eq!(awards::total_xp(&conn, ALICE).unwrap(), earned);
+}
+
+#[test]
+fn stars_after_a_reset_are_judged_on_this_walk_only() {
+    let (_tmp, store) = store_with(&[("rust.basic.01.a", "rust", "basic", 1)]);
+    let conn = store.conn();
+    let submit = |conn: &rusqlite::Connection, verdict: &str| {
+        let mut record = attempts::new_record(
+            cwbhacker_core::ids::attempt_id(),
+            ALICE,
+            "rust.basic.01.a",
+            "rust",
+            attempts::Mode::Submit,
+            "fn main(){}".into(),
+        );
+        record.verdict = verdict.into();
+        attempts::insert(conn, &record).unwrap();
+    };
+    // A messy first walk: three failures, then a clear. One star.
+    for _ in 0..3 {
+        submit(&conn, "wrong_answer");
+    }
+    submit(&conn, "accepted");
+    let first = progress::record_clear(&conn, ALICE, "rust.basic.01.a", 10).unwrap();
+    assert_eq!(first.stars, 1);
+
+    progress::reset_road(&conn, ALICE, "rust", "basic").unwrap();
+    // A clean second walk. The old failures are still on the record and must
+    // not be counted against it — a fresh start that cannot earn three stars
+    // is not a fresh start.
+    submit(&conn, "accepted");
+    let after = progress::record_clear(&conn, ALICE, "rust.basic.01.a", 10).unwrap();
+    assert_eq!(after.stars, 3, "the failures before the reset were counted");
+}
+
+#[test]
+fn a_failure_after_a_reset_still_costs_a_star() {
+    // The other half of the boundary. `record_clear` counts the failures
+    // dated *after* `reset_at`, and the test above only proves the old ones
+    // are dropped — a count that dropped everything would pass it too.
+    //
+    // The dates are written by hand because SPEC §2.2 stamps to the second:
+    // a reset and a failure inside the same second compare equal, `>` is
+    // false, and a test that submits as fast as a test does would be reading
+    // the clock's resolution rather than the rule.
+    let (_tmp, store) = store_with(&[("rust.basic.01.a", "rust", "basic", 1)]);
+    let conn = store.conn();
+    let submit = |conn: &rusqlite::Connection, verdict: &str, at: &str| {
+        let mut record = attempts::new_record(
+            cwbhacker_core::ids::attempt_id(),
+            ALICE,
+            "rust.basic.01.a",
+            "rust",
+            attempts::Mode::Submit,
+            "fn main(){}".into(),
+        );
+        record.verdict = verdict.into();
+        record.created_at = at.into();
+        attempts::insert(conn, &record).unwrap();
+    };
+    submit(&conn, "accepted", "2026-01-01T00:00:00Z");
+    progress::record_clear(&conn, ALICE, "rust.basic.01.a", 10).unwrap();
+    progress::reset_road(&conn, ALICE, "rust", "basic").unwrap();
+    let reset_at = progress::get(&conn, ALICE, "rust.basic.01.a")
+        .unwrap()
+        .reset_at
+        .expect("the reset is dated");
+
+    // Two failures on this walk, a minute after the reset, then a clear.
+    let later = |mins: i64| {
+        let t = cwbhacker_core::time::parse(&reset_at).unwrap() + chrono::Duration::minutes(mins);
+        cwbhacker_core::time::stamp(t)
+    };
+    submit(&conn, "wrong_answer", &later(1));
+    submit(&conn, "wrong_answer", &later(2));
+    submit(&conn, "accepted", &later(3));
+    let after = progress::record_clear(&conn, ALICE, "rust.basic.01.a", 10).unwrap();
+    assert_eq!(after.stars, 2, "a failure on this walk has to count");
+}

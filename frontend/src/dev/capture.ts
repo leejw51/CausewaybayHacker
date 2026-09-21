@@ -246,6 +246,21 @@ export function install(app: App): void {
     fps: () => app.fps(),
     buttons: () => {
       const out: ReturnType<CaptureApi["buttons"]> = [];
+      // The open question first: while a modal is up it is the only thing on
+      // the screen that can be pressed, and a test that found a scene button
+      // underneath it would be clicking through a confirmation.
+      for (const b of app.modalButtons) {
+        const [x, y, w, h] = b.rect;
+        const [left, top] = app.layout.toClient(x, y);
+        const [right, bottom] = app.layout.toClient(x + w, y + h);
+        out.push({
+          id: b.id,
+          label: b.label,
+          dim: false,
+          rect: [x, y, w, h],
+          client: [left, top, right - left, bottom - top],
+        });
+      }
       for (const list of app.currentScene?.controls?.() ?? []) {
         for (const b of list.list()) {
           const [x, y, w, h] = b.rect;

@@ -94,6 +94,9 @@ end
 function Map:leave()
   self.app.session:off_all(self.subscriptions)
   self.subscriptions = nil
+  -- A question nobody is looking at any more is not a question.
+  self.confirm_reset = nil
+  self.confirm_rects = nil
 end
 
 function Map:key()
@@ -116,6 +119,7 @@ function Map:switch(land, category)
   land = land or self.land
   category = category or self.category
   if land == self.land and category == self.category then return end
+  self:cancel_reset()
 
   -- Remember where the player was on the map being left.
   local here = self:node_at(self.cursor)
@@ -279,6 +283,90 @@ function Map.tally_label(cleared, total, room, measure)
   local short = ("%d%%"):format(pct)
   if measure(short) <= (room or math.huge) then return short end
   return nil
+end
+
+--- Is there anything on this road to undo?
+---
+--- The button is offered on the strength of the server's count and nothing
+--- else: no count (an older server, or a map still loading) and no cleared
+--- street both mean there is nothing to take away, and a button that does
+--- nothing is worse than no button. Pure, so the rule is checkable headless.
+function Map.reset_offered(tally)
+  return tally ~= nil and (tonumber(tally.cleared) or 0) > 0
+end
+
+--- The road, named the way the switch names it.
+---
+--- Deliberately the same shape as the toast in `Map:switch` — land name,
+--- slash, translated category — because the player has just read that
+--- sentence, and a confirm panel that names the road differently from the
+--- row above it is a panel about some other road.
+function Map.road_name(land, category)
+  return ("%s / %s"):format(Land.name(land), I18n.t(Land.category_label(category)))
+end
+
+--- What the confirm panel asks, with the road named and the cost counted.
+---
+--- **The order of the two numbers is load-bearing.** Lua's `string.format`
+--- has no positional arguments, so every translation of this sentence has to
+--- say the cleared count before the total; a translation that reads more
+--- naturally the other way around would print "27 of 3" and pass the
+--- specifier check in `tests/test_i18n.lua`, which only compares which
+--- specifiers appear. `tests/test_lands.lua` pins the order in Korean.
+function Map.reset_body(road, cleared, total)
+  return I18n.t("%s goes back to untouched — %d of %d streets lose their "
+    .. "stamp and stars. Your XP and your mistakes are kept, and clearing "
+    .. "them again pays no XP.", road or "?", tonumber(cleared) or 0,
+    tonumber(total) or 0)
+end
+
+--- The button asks; it does not act.
+---
+--- There is no reusable confirm in this client — `src/scenes/login.lua` is a
+--- screen of its own and `src/scenes/quest.lua` arms with a second press —
+--- so this is a panel drawn by the scene that raised it. The road, the count
+--- and the total are copied out **now**, so the sentence on screen keeps
+--- naming the road it was opened for even if something else moves underneath.
+function Map:ask_reset()
+  if self.iris or self.walk then return end
+  if not Map.reset_offered(self.tally) then return end
+  SFX.play("move")
+  self.confirm_reset = {
+    road = Map.road_name(self.land, self.category),
+    cleared = self.tally.cleared,
+    total = self.tally.total,
+  }
+end
+
+function Map:cancel_reset()
+  if not self.confirm_reset then return end
+  self.confirm_reset = nil
+  self.confirm_rects = nil
+end
+
+--- PROTOCOL §4.7b: clear this road's progress, then ask the map again.
+---
+--- The answer carries the four totals back "so a client redraws without
+--- asking again", and they are not used here on purpose. The stamps, the
+--- stars, the lit half of every edge and the suggested next node all come
+--- out of `world.map`, and patching four numbers locally would leave a screen
+--- that agrees with the server about the tally and disagrees about
+--- everything under it. One refresh, one source.
+function Map:do_reset()
+  self:cancel_reset()
+  self.app.session:request("world.reset",
+    { land = self.land, category = self.category },
+    function(ok, _, why)
+      if not ok then
+        -- Not `self.error`: that line is only drawn where the node card is
+        -- not, and after a failed reset the card is still there. The toast
+        -- is what this scene says over a map that is still on screen.
+        self.app:toast((why and why.player)
+          or I18n.t("the reset did not go through"))
+        return
+      end
+      self:refresh()
+    end)
 end
 
 --- §4.19: patch the map rather than refetching it.
@@ -560,6 +648,12 @@ function Map:draw()
   end
 
   self:draw_iris()
+  self:draw_confirm()
+
+  if self.confirm_reset then
+    self.app:footer(I18n.t("ESC keep my progress   CLICK to reset"))
+    return
+  end
 
   self.app:footer(I18n.t(self.walk
     and "ANY KEY skip"
@@ -572,13 +666,53 @@ function Map:draw()
     or "ARROWS node   ENTER play   P playground   T stats   ESC back"))
 end
 
---- The header: two land buttons, three category tabs, the count.
+--- The confirm panel, over the map it is about.
 ---
---- The switch has to be **visible**. A keybinding nobody can see is not a
---- feature, and the whole reason for this row is that reaching HACKER used to
---- cost a trip out to two other screens. `CausewaybayGolang` puts "the three
---- big buttons" for its language tracks on its map for the same reason; these
---- are the same idea with this game's two lands and three categories.
+--- **Enter does not take the destructive button.** ESC, ENTER and SPACE all
+--- land on KEEP MY PROGRESS — a player who reached for the key that has
+--- meant "yes, go on" on every other screen in this client keeps their road —
+--- and RESET IT is reached by pointing at it, which is a thing nobody does by
+--- reflex. KEEP is the lit button for the same reason.
+function Map:draw_confirm()
+  if not self.confirm_reset then return end
+  local vw, vh = Layout.vw, Layout.vh
+  local ask = self.confirm_reset
+
+  -- The map goes dim rather than away: the road being talked about is the
+  -- one behind the panel, and a player deciding wants to see it.
+  UI.setColor(Theme.void, 0.82)
+  love.graphics.rectangle("fill", 0, 0, vw, vh)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  local title_size, body_size, button_size = 12, 8, 9
+  local w = math.min(vw - 32, 460)
+  local pad = 16
+  local body = Map.reset_body(ask.road, ask.cleared, ask.total)
+  local lines = UI.wrap(body, w - pad * 2, body_size)
+  local step = UI.lineHeight(body_size) + 2
+  local title_h = UI.lineHeight(title_size)
+  local bh = math.max(32, UI.lineHeight(button_size) + 14)
+  local h = pad + title_h + 10 + #lines * step + 14 + bh + pad
+  local x = math.floor((vw - w) / 2)
+  local y = math.floor((vh - h) / 2)
+
+  UI.panel(x, y, w, h, { tint = Theme.red })
+  UI.text(I18n.t("WALK IT AGAIN?"), x, y + pad, title_size, Theme.coin, "center", w)
+  UI.paragraph(body, x + pad, y + pad + title_h + 10, w - pad * 2, body_size,
+    Theme.cream)
+
+  local gap = 10
+  local keep_w = math.floor((w - pad * 2 - gap) / 2)
+  local row = y + h - pad - bh
+  local keep = { x = x + pad, y = row, w = keep_w, h = bh }
+  local go = { x = keep.x + keep_w + gap, y = row,
+    w = w - pad * 2 - keep_w - gap, h = bh }
+  UI.button(keep.x, keep.y, keep.w, keep.h, I18n.t("KEEP MY PROGRESS"),
+    "hot", button_size)
+  UI.button(go.x, go.y, go.w, go.h, I18n.t("RESET IT"), nil, button_size)
+  self.confirm_rects = { keep = keep, go = go }
+end
+
 --- The iris: everything outside a shrinking circle goes to ink.
 ---
 --- Drawn with a stencil rather than a shader, because a shader is another
@@ -604,6 +738,18 @@ function Map:draw_iris()
   love.graphics.setColor(1, 1, 1, 1)
 end
 
+--- The header: two land buttons, three category tabs, the count.
+---
+--- The switch has to be **visible**. A keybinding nobody can see is not a
+--- feature, and the whole reason for this row is that reaching HACKER used to
+--- cost a trip out to two other screens. `CausewaybayGolang` puts "the three
+--- big buttons" for its language tracks on its map for the same reason; these
+--- are the same idea with this game's two lands and three categories.
+---
+--- RESET THIS ROAD sits at the right end, apart from the switches and only
+--- when there is something to undo. It is measured into the row's budget
+--- like everything else here, so the tabs shrink around it rather than run
+--- underneath it.
 function Map:draw_header()
   local vw = Layout.vw
   -- **Every number in this row is measured from the type in it.** It was
@@ -620,6 +766,9 @@ function Map:draw_header()
 
   self.land_rects = {}
   self.category_rects = {}
+  -- Cleared every frame: a hit rect that outlives the button it belonged to
+  -- is a reset that fires from a blank piece of header.
+  self.reset_rect = nil
   self.header_h = h
 
   -- What the row needs if nothing is squeezed, and what it actually has.
@@ -634,8 +783,12 @@ function Map:draw_header()
   end
   local tab_tag = UI.textWidth("TAB", tag_size) + 8
   local q_tag = UI.textWidth("Q", tag_size) + 8
+  local reset_label = I18n.t("RESET THIS ROAD")
+  local offer_reset = Map.reset_offered(self.tally)
+  local reset_w = offer_reset and (UI.textWidth(reset_label, cat_size) + 16) or 0
+  local reset_gap = offer_reset and 12 or 0
   local wanted = 10 + #LANDS * (land_w + 6) + tab_tag
-    + #CATEGORIES * (cat_w + 4) + q_tag + 10
+    + #CATEGORIES * (cat_w + 4) + q_tag + reset_gap + reset_w + 10
   -- Too narrow for all of it — a portrait canvas in a language with wide
   -- glyphs — so the two key tags go first and then everything shrinks
   -- proportionally. Shrinking is the last resort, not the first.
@@ -659,13 +812,16 @@ function Map:draw_header()
     for _, category in ipairs(CATEGORIES) do
       cat_w = math.max(cat_w, UI.textWidth(I18n.t(Land.category_label(category)), cat_size) + 16)
     end
-    wanted = 10 + #LANDS * (land_w + 6) + tab_tag + #CATEGORIES * (cat_w + 4) + q_tag + 10
+    if offer_reset then reset_w = UI.textWidth(reset_label, cat_size) + 16 end
+    wanted = 10 + #LANDS * (land_w + 6) + tab_tag + #CATEGORIES * (cat_w + 4)
+      + q_tag + reset_gap + reset_w + 10
   end
   if wanted > vw then
-    local squeeze = (vw - 20 - #LANDS * 6 - #CATEGORIES * 4)
-      / math.max(1, #LANDS * land_w + #CATEGORIES * cat_w)
+    local squeeze = (vw - 20 - #LANDS * 6 - #CATEGORIES * 4 - reset_gap)
+      / math.max(1, #LANDS * land_w + #CATEGORIES * cat_w + reset_w)
     land_w = math.floor(land_w * squeeze)
     cat_w = math.floor(cat_w * squeeze)
+    reset_w = math.floor(reset_w * squeeze)
   end
 
   local x = 10
@@ -721,6 +877,21 @@ function Map:draw_header()
   if show_tags then
     UI.text("Q", x + 2, cy, tag_size, Theme.withAlpha(Theme.cream, 0.4))
     x = x + q_tag
+  end
+
+  -- RESET THIS ROAD, at the far right and only where the server's count says
+  -- there is something to take away. Right-aligned rather than next in the
+  -- flow so that a destructive button never ends up shoulder to shoulder
+  -- with the tab the player was aiming for.
+  if offer_reset and reset_w > 12 then
+    local rw = math.min(reset_w, vw - 10 - x)
+    if rw > 12 then
+      local rx = vw - 10 - rw
+      local rh = math.max(28, UI.lineHeight(cat_size) + 12)
+      local ry = (h - rh) / 2
+      UI.button(rx, ry, rw, rh, reset_label, nil, cat_size)
+      self.reset_rect = { x = rx, y = ry, w = rw, h = rh }
+    end
   end
 
   -- The count used to be a walk over `self.nodes` here. It is the server's
@@ -1097,6 +1268,15 @@ function Map:wheelmoved(_, dy)
 end
 
 function Map:keypressed(key)
+  -- The confirm panel takes the whole keyboard while it is up. Not politeness:
+  -- TAB and Q left live under it would let the player switch land, and then
+  -- RESET IT would clear a road the panel never named.
+  if self.confirm_reset then
+    if key == "escape" or key == "return" or key == "kpenter" or key == "space" then
+      self:cancel_reset()
+    end
+    return true
+  end
   -- **Any key lands her immediately.** Not just the one that started it: a
   -- player reaching for the next thing has already decided, and an animation
   -- that eats that keystroke is a toll.
@@ -1128,6 +1308,17 @@ function Map:mousepressed(x, y)
   local function inside(r)
     return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
   end
+  if self.confirm_reset then
+    local rects = self.confirm_rects or {}
+    if inside(rects.go) then
+      self:do_reset()
+    else
+      -- KEEP, and anywhere off the panel. A click that missed is not a yes.
+      self:cancel_reset()
+    end
+    return
+  end
+  if inside(self.reset_rect) then self:ask_reset(); return end
   for land, rect in pairs(self.land_rects or {}) do
     if inside(rect) then self:switch(land, self.category); return end
   end

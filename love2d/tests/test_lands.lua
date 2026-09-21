@@ -218,4 +218,59 @@ return function()
     T.eq(boxes[2].h, 50, "a wrapped choice gets a taller well")
   end)
 
+  T.section("lands — RESET THIS ROAD, and the sentence that asks first")
+
+  T.case("the button is offered only where the server counted something", function()
+    -- The rule is the server's count and nothing else. An older server sends
+    -- no tally at all, and a road nobody has walked has nothing to take away;
+    -- a button for either is a button that does nothing.
+    T.nope(Map.reset_offered(nil), "no tally, no button")
+    T.nope(Map.reset_offered({}), "a tally with no count is not a count")
+    T.nope(Map.reset_offered({ cleared = 0, total = 27 }), "an untouched road")
+    T.ok(Map.reset_offered({ cleared = 1, total = 27 }), "one street is enough")
+    T.ok(Map.reset_offered({ cleared = 27, total = 27 }), "a finished road")
+  end)
+
+  T.case("the panel names the road the way the switch named it", function()
+    local I18n = require("src.i18n")
+    local was = I18n.lang
+    I18n.set("en")
+    T.eq(Map.road_name("go", "verybasic"), "GO / VERY BASIC")
+    T.eq(Map.road_name("cpp", "hacker"), "C++ / HACKER", "nobody calls it CPP")
+    I18n.set(was)
+  end)
+
+  T.case("the question counts what is lost, cleared first", function()
+    local I18n = require("src.i18n")
+    local was = I18n.lang
+    I18n.set("en")
+    local body = Map.reset_body("GO / BASIC", 3, 27)
+    T.ok(body:find("GO / BASIC", 1, true) ~= nil, "it names the road")
+    T.ok(body:find("3 of 27", 1, true) ~= nil, "three of twenty-seven, not the other way")
+    T.ok(body:find("XP", 1, true) ~= nil, "and says what survives")
+    T.eq(Map.reset_body("GO / BASIC", nil, nil):find("0 of 0", 1, true) ~= nil, true,
+      "missing numbers read as nothing lost rather than raising in a draw call")
+    I18n.set(was)
+  end)
+
+  T.case("every translation of the question keeps the two numbers in order", function()
+    -- `string.format` has no positional arguments, so a translation that
+    -- reads more naturally as "27 中 3" would print the two numbers swapped
+    -- and still pass the specifier check in `tests/test_i18n.lua`, which only
+    -- compares which specifiers appear. This is where that is caught.
+    local I18n = require("src.i18n")
+    local was = I18n.lang
+    for _, lang in ipairs(I18n.LANGS) do
+      I18n.set(lang)
+      local body = Map.reset_body("GO / BASIC", 3, 27)
+      local cleared_at = body:find("3", 1, true)
+      local total_at = body:find("27", 1, true)
+      T.ok(cleared_at ~= nil and total_at ~= nil,
+        lang .. " prints both numbers: " .. body)
+      T.ok(cleared_at < total_at,
+        lang .. " says the cleared count first: " .. body)
+    end
+    I18n.set(was)
+  end)
+
 end

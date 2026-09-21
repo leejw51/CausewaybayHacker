@@ -921,6 +921,24 @@ export class App {
     return this.modal !== null;
   }
 
+  /**
+   * The open question's two buttons, for `dev/capture.ts`.
+   *
+   * A modal is app-level furniture and not in any scene's `controls()`, so
+   * until this existed a test could only answer one by pressing Enter — the
+   * safe answer — or by guessing at pixels. Every destructive thing in this
+   * game is behind one of these, which made exactly the interesting half of
+   * each of them unreachable from a test.
+   */
+  get modalButtons(): Array<{ id: string; label: string; rect: Rect }> {
+    const m = this.modal;
+    if (!m?.rects) return [];
+    return [
+      { id: "modal:confirm", label: m.confirm, rect: m.rects.confirm },
+      { id: "modal:cancel", label: m.cancel, rect: m.rects.cancel },
+    ];
+  }
+
   private drawModal(g: Ctx): void {
     const m = this.modal;
     if (!m) return;

@@ -49,6 +49,9 @@ pub struct Row {
     /// §4.8b). `None` on an untimed quest, and on one cleared before the clock
     /// existed — which is not invented after the fact.
     pub opened_at: Option<String>,
+    /// When this quest was last RESET, if it was (0019). Stars are counted
+    /// from the failures after it.
+    pub reset_at: Option<String>,
     pub cleared: bool,
     /// XP this call granted: the clear's worth on a first clear, a fifth of
     /// it on a re-clear (`practice`, capped), zero otherwise (PROTOCOL §4.9).
@@ -82,7 +85,8 @@ pub fn practised(conn: &Connection, address: &str, quest_id: &str) -> Result<i64
 pub fn get(conn: &Connection, address: &str, quest_id: &str) -> Result<Row> {
     let row = conn
         .query_row(
-            "SELECT state, stars, best_ms, attempts, hints_used, first_clear_at, opened_at
+            "SELECT state, stars, best_ms, attempts, hints_used, first_clear_at, opened_at,
+                    reset_at
                FROM progress WHERE address = ?1 AND quest_id = ?2",
             params![address, quest_id],
             |r| {
@@ -95,6 +99,7 @@ pub fn get(conn: &Connection, address: &str, quest_id: &str) -> Result<Row> {
                     hints_used: r.get(4)?,
                     first_clear_at: r.get(5)?,
                     opened_at: r.get(6)?,
+                    reset_at: r.get(7)?,
                     xp_gained: 0,
                     practised: 0,
                 })
@@ -256,12 +261,15 @@ pub fn record_clear(
     // retroactively made their original clear a worse one.
     // Submits only (PROTOCOL §4.9b): a star is about the record, and pressing
     // RUN while you work the problem out is not a failed attempt.
+    // …and only the failures since the last RESET (0019): a road walked
+    // again from the start is judged on this walk, not on the one before it.
     let failures: i64 = conn.query_row(
         "SELECT count(*) FROM attempts
           WHERE address = ?1 AND quest_id = ?2 AND mode = 'submit'
             AND verdict <> 'accepted'
-            AND (?3 IS NULL OR created_at < ?3)",
-        params![address, quest_id, before.first_clear_at],
+            AND (?3 IS NULL OR created_at < ?3)
+            AND (?4 IS NULL OR created_at > ?4)",
+        params![address, quest_id, before.first_clear_at, before.reset_at],
         |r| r.get(0),
     )?;
     let stars = stars_for(failures, before.hints_used).max(before.stars);
@@ -325,6 +333,33 @@ pub fn record_clear(
     row.xp_gained = xp_gained;
     row.practised = practised(conn, address, quest_id)?;
     Ok(row)
+}
+
+/// Walk one road again from the start (PROTOCOL §4.7b).
+///
+/// Every quest of `land`/`category` goes back to untouched for this player:
+/// no stamp, no stars, no counts, no clock. What is deliberately kept is
+/// everything that is a *record* rather than a *state* — the attempts and
+/// the mistakes, which are SPEC §7's training data and which the server
+/// never deletes, and the XP ledger, which is history. A re-clear after a
+/// reset therefore pays nothing: the `clear` row is already in the ledger
+/// and its unique index refuses the second one. Practice is free; farming is
+/// not possible.
+///
+/// Returns how many quests were reset — zero when the player had never
+/// touched this road, which is not an error, just nothing to do.
+pub fn reset_road(conn: &Connection, address: &str, land: &str, category: &str) -> Result<i64> {
+    let now = now_stamp();
+    let changed = conn.execute(
+        "UPDATE progress
+            SET state = 'open', stars = 0, best_ms = NULL, attempts = 0,
+                hints_used = 0, first_clear_at = NULL, opened_at = NULL,
+                reset_at = ?4, updated_at = ?4
+          WHERE address = ?1
+            AND quest_id IN (SELECT id FROM quests WHERE land = ?2 AND category = ?3)",
+        params![address, land, category, now],
+    )?;
+    Ok(changed as i64)
 }
 
 /// How many quests this player has cleared, for the `cleared_total` on

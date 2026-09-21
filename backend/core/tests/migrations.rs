@@ -434,14 +434,11 @@ fn a_verybasic_quest_with_a_quiz_arrived_with_0017() {
 }
 
 #[test]
-fn the_newest_migration_lets_the_ledger_pay_for_practice() {
-    // The "newest migration" pin: fails loudly if a 0019 is added without a
-    // test of its own here. 0018 rebuilds `xp_ledger`: the clear rows survive
-    // with their ids, a second `practice` row for the same quest is
-    // insertable, and a second `clear` row still is not.
-    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
-    assert_eq!(previous, 17);
-    let conn = database_at_version(previous);
+fn the_ledger_learned_to_pay_for_practice_with_0018() {
+    // 0018 rebuilds `xp_ledger`: the clear rows survive with their ids, a
+    // second `practice` row for the same quest is insertable, and a second
+    // `clear` row still is not.
+    let conn = database_at_version(17);
     conn.execute(
         "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
            VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}')",
@@ -483,4 +480,52 @@ fn the_newest_migration_lets_the_ledger_pay_for_practice() {
         [],
     );
     assert!(dup.is_err(), "a clear is still granted once");
+}
+
+#[test]
+fn the_newest_migration_lets_a_road_be_walked_again() {
+    // The "newest migration" pin: fails loudly if a 0020 is added without a
+    // test of its own here. 0019 adds `progress.reset_at` — the date a road
+    // was put back to untouched, which is where the star count starts from.
+    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
+    assert_eq!(previous, 18);
+    let conn = database_at_version(previous);
+    conn.execute(
+        "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
+           VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum)
+         VALUES ('rust.basic.01.a', 'p', 'rust', 'basic', 1, 't', 'b', 's', 1, 's', 's', '{}', 'c')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO progress (address, quest_id, state, stars, attempts, hints_used,
+                               first_clear_at, updated_at)
+           VALUES ('0xaa', 'rust.basic.01.a', 'cleared', 3, 1, 0,
+                   '2026-02-01T00:00:00Z', '2026-02-01T00:00:00Z')",
+        [],
+    )
+    .unwrap();
+
+    db::prepare(&conn).unwrap();
+
+    let (stars, reset_at): (i64, Option<String>) = conn
+        .query_row(
+            "SELECT stars, reset_at FROM progress WHERE address = '0xaa'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(stars, 3, "the upgrade kept the row it found");
+    assert_eq!(reset_at, None, "a road nobody has reset has no reset date");
+    conn.execute(
+        "UPDATE progress SET reset_at = '2026-03-01T00:00:00Z' WHERE address = '0xaa'",
+        [],
+    )
+    .expect("the column is writable");
 }

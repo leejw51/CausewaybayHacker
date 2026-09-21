@@ -2831,6 +2831,25 @@ directory.
 one SELECT and no write, and returns the same `updated_at`. Without that a list
 sorted by `updated_at` shuffles every few seconds while nobody is typing.
 
+## 2026-09-21 — BE: a road can be walked again, and it costs nothing
+
+A player who has cleared a road and wants the practice had no way back: the
+stamps are permanent by design (SPEC §0, "for good"), and the only reset in
+the game was the editor's. RESET on the map screen clears one land's one road
+— stamps, stars, counts, clock — after a question that names the road.
+
+What it keeps is the part that is a *record* rather than a *state*: the
+attempt log and the mistakes, which SPEC §7 says the server never deletes,
+and the XP ledger. That last one is also the whole anti-farm rule, and it
+needed no code: `record_clear` grants the `clear` row once and the ledger's
+unique index refuses the second, so reset-and-clear pays nothing while the
+practice grants keep working.
+
+One thing did need a column. Stars are counted from the failures before the
+first clear, so a road you reset would be judged on every failure you ever
+made on it — a fresh start that cannot earn three stars is not a fresh
+start. `0019_reset` adds `progress.reset_at` and the count starts there.
+
 ## 2026-09-21 — BE: every land formats, and the server says so at boot
 
 FORMAT was broken in three ways at once and each hid the others. The quest
@@ -6880,3 +6899,28 @@ TOCTOU against the next attempt); the mock's ~25 unimplemented message types
 of attempt build directories; and migration 0014's join, which can duplicate
 a message id on identical `(created_at, text, role, photo)` — an applied
 migration is not edited, and a dedupe would be a 0016.
+
+## 2026-09-21 — the clients ask before they throw work away, and Enter never says yes
+
+RESET is the one control in the game that destroys a player's progress, so
+both clients spend a question on it. The web map raises the app's modal; the
+LÖVE map draws its own panel, because that client has no reusable one — its
+login is a screen and its quest arms on a second press.
+
+Two rules are shared and neither is cosmetic. **The question names the road**,
+land and category, in the same words the header just used, and copies the
+counts at the moment it opens, so the sentence on screen keeps describing the
+road it was raised for even if something moves underneath. **Enter is not
+yes**: ESC, ENTER and SPACE all take the keep button, which is also the lit
+one, and the destructive button is reached only by pointing at it. A player
+who has spent the last hour pressing Enter to mean "go on" does not lose a
+road to muscle memory.
+
+The button offers itself only when the server's tally says something has been
+cleared, so it takes itself off the bar the moment there is nothing to undo,
+and the panel swallows the keyboard while it is up — TAB left live under it
+would let the player switch land and then confirm a road the question never
+named. Neither client patches its own numbers afterwards: `world.reset`
+returns the four totals, and both throw them away and refetch the map, because
+a screen that agrees with the server about the tally and disagrees about the
+stamps under it is worse than a screen that waits.

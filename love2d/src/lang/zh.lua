@@ -331,4 +331,15 @@ return {
   ["STORY  [F10]"] = "故事  [F10]",
   ["watch the opening again"] = "再看一次开场",
   ["signed out"] = "已登出",
+  -- The map's RESET THIS ROAD, and the panel that asks first.
+  -- The body says the cleared count before the total in every language:
+  -- `string.format` has no positional arguments, so the other order
+  -- prints the two numbers swapped.
+  ["RESET THIS ROAD"] = "重置这条路",
+  ["WALK IT AGAIN?"] = "再走一遍？",
+  ["%s goes back to untouched — %d of %d streets lose their stamp and stars. Your XP and your mistakes are kept, and clearing them again pays no XP."] = "%s 会回到未开始的状态 — 已通关的 %d 关（共 %d 关）会失去印章和星星。XP 和错题记录保留，再次通关不再给 XP。",
+  ["RESET IT"] = "重置",
+  ["KEEP MY PROGRESS"] = "保留进度",
+  ["the reset did not go through"] = "重置没有成功",
+  ["ESC keep my progress   CLICK to reset"] = "ESC 保留进度   点击重置",
 }

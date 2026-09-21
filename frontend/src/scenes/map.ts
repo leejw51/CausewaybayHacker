@@ -207,6 +207,8 @@ export class MapScene implements Scene {
    */
   private tally: { cleared: number; total: number; stars: number; starsTotal: number } | null =
     null;
+  /** One reset at a time; the button is a request, not a queue. */
+  private resetting = false;
   /** Each node's arrival, staggered, so the overworld assembles itself. */
   private pops: Tween[] = [];
   private readonly plateIn = new Tween(seconds("panel"));
@@ -519,6 +521,20 @@ export class MapScene implements Scene {
       // like one: nothing there is scored, and a button that looked like a
       // category would promise otherwise.
       { id: "play", label: phone ? t("map.playgroundShort") : PLAY_LABEL(), lit: false, group: 2 },
+      // Walk this road again from the start. It asks first — it is the one
+      // control on this screen that throws work away — and it is drawn only
+      // once there is something to throw away, so a fresh road does not
+      // offer to be reset.
+      ...((this.tally?.cleared ?? 0) > 0
+        ? [
+            {
+              id: "reset",
+              label: phone ? t("map.resetShort") : t("map.reset"),
+              lit: false,
+              group: 2,
+            },
+          ]
+        : []),
       // Search, stats and AI mode. They were on F4/F5/F6 and nowhere else,
       // which meant three finished screens that a player could only reach by
       // being told they existed. The ids are `ui/auxnav.ts`'s own, so
@@ -757,6 +773,7 @@ export class MapScene implements Scene {
     } else if (id === "close") this.sheetOpen = false;
     else if (id === "enter") this.choose(this.nodes[this.selected]);
     else if (id === "play") void this.app.go(new PlaygroundScene(this.app), "forward");
+    else if (id === "reset") void this.resetRoad();
     // Before the land/category dispatch, not after it. `aux:search` splits
     // into `["aux", "search"]`, and a fall-through would have sent
     // `switchTo(this.land, "search")` to `world.map` as a category.
@@ -1416,6 +1433,43 @@ export class MapScene implements Scene {
    * chrome and has room. Returns the width it took, so the title elides
    * around it rather than running under it.
    */
+  /**
+   * RESET: this road, back to untouched, after the player says yes.
+   *
+   * The question names the road and what survives, because "are you sure" on
+   * its own does not tell anyone what they are about to lose. The XP and the
+   * mistakes stay (PROTOCOL §4.7b), and saying so is the difference between
+   * a button people use and a button people avoid.
+   */
+  private async resetRoad(): Promise<void> {
+    const tally = this.tally;
+    if (!tally || tally.cleared === 0 || this.resetting) return;
+    const road = `${landName(this.land)} · ${t(`map.${this.category}` as "map.basic")}`;
+    const yes = await this.app.ask({
+      title: t("map.resetTitle"),
+      body: t("map.resetBody", { road, cleared: tally.cleared, total: tally.total }),
+      confirm: t("map.resetGo"),
+      cancel: t("map.resetKeep"),
+    });
+    if (!yes) return;
+    this.resetting = true;
+    try {
+      await this.app.client.request("world.reset", {
+        land: this.land,
+        category: this.category,
+      });
+      // Re-read rather than patch: the server has just decided what this
+      // road looks like, and the map is drawn from what it says.
+      await this.refresh();
+      this.app.chip.select();
+    } catch (e) {
+      this.status = t("map.resetFailed");
+      console.warn("[map] reset failed", e);
+    } finally {
+      this.resetting = false;
+    }
+  }
+
   private drawTally(g: Ctx, right: number, y: number, room: number): number {
     const tally = this.tally;
     if (!tally || tally.total === 0) return 0;

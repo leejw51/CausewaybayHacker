@@ -349,4 +349,15 @@ return {
   ["STORY  [F10]"] = "PŘÍBĚH  [F10]",
   ["watch the opening again"] = "přehrát úvod znovu",
   ["signed out"] = "Odhlášeno",
+  -- The map's RESET THIS ROAD, and the panel that asks first.
+  -- The body says the cleared count before the total in every language:
+  -- `string.format` has no positional arguments, so the other order
+  -- prints the two numbers swapped.
+  ["RESET THIS ROAD"] = "VYNULOVAT CESTU",
+  ["WALK IT AGAIN?"] = "PROJÍT JI ZNOVU?",
+  ["%s goes back to untouched — %d of %d streets lose their stamp and stars. Your XP and your mistakes are kept, and clearing them again pays no XP."] = "%s se vrátí na začátek — %d z %d ulic přijde o razítko a hvězdy. XP a chyby zůstanou a další vyčištění už XP nepřinese.",
+  ["RESET IT"] = "VYNULOVAT",
+  ["KEEP MY PROGRESS"] = "PONECHAT POSTUP",
+  ["the reset did not go through"] = "vynulování neproběhlo",
+  ["ESC keep my progress   CLICK to reset"] = "ESC ponechat postup   KLIKNUTÍM vynulovat",
 }

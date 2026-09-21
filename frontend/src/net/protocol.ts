@@ -548,6 +548,8 @@ export interface Requests {
   /** `locale` on these four is the UI language; §4.7/§4.8 substitute quest
    *  prose where a translation exists and answer `text_locale` either way. */
   "world.map": { land: Land; category: Category; locale?: string };
+  /** §4.7b. Destructive: only ever sent after the player said yes. */
+  "world.reset": { land: Land; category: Category };
   "quest.get": { quest_id: string; locale?: string };
   "quest.submit": { quest_id: string; lang: Land; source: string };
   /** §4.9b — the same shape, deliberately, so one code path sends either. */
@@ -634,6 +636,16 @@ export interface Responses {
     total?: number;
     stars?: number;
     stars_total?: number;
+  };
+  "world.reset": {
+    land: Land;
+    category: Category;
+    /** How many quests went back to untouched. */
+    reset: number;
+    cleared: number;
+    total: number;
+    stars: number;
+    stars_total: number;
   };
   "quest.get": { quest: Quest };
   /**

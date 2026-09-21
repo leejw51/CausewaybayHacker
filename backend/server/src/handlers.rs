@@ -242,6 +242,44 @@ pub fn world_map(
     }))
 }
 
+/// `world.reset` (PROTOCOL §4.7b): walk this road again from the start.
+///
+/// The destructive half of the map, so it is a message of its own rather
+/// than a flag on another: a client asks for it only because a player said
+/// yes to a question naming the road. What it clears is progress — the
+/// stamps, the stars, the counts. What it keeps is the attempt log, the
+/// mistakes and the XP already earned, for the reasons `progress::reset_road`
+/// gives.
+pub fn world_reset(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let land = str_field(payload, "land")?;
+    let category = str_field(payload, "category")?;
+    let conn = state.store.conn();
+    // The same refusal `world.map` gives, and for the same reason: a road no
+    // pack defines is `not_found`, not an empty reset that reports success.
+    let map = world::map(&conn, address, &land, &category)?;
+    if map.nodes.is_empty() {
+        return Err(not_found(format!(
+            "no quests in land {land:?}, category {category:?}"
+        )));
+    }
+    let reset = progress::reset_road(&conn, address, &land, &category)?;
+    let after = world::map(&conn, address, &land, &category)?;
+    Ok(json!({
+        "land": land,
+        "category": category,
+        "reset": reset,
+        "cleared": after.cleared,
+        "total": after.total,
+        "stars": after.stars,
+        "stars_total": after.stars_total,
+    }))
+}
+
 /// Open the quest. There is nothing to refuse any more (PROTOCOL §4.7): a
 /// player may enter any node at any time, and `requires` is advice the client
 /// draws rather than a gate the server enforces. The function stays because

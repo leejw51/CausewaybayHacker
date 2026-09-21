@@ -434,6 +434,32 @@ advice; the player decides.
 because removing a code from a closed set is the one change that breaks an
 exhaustive client, and because a future mode may want it.
 
+### 4.7b `world.reset`
+
+```json
+→ payload: { "land": "go", "category": "verybasic" }
+← payload: { "land": "go", "category": "verybasic", "reset": 27,
+             "cleared": 0, "total": 27, "stars": 0, "stars_total": 81 }
+```
+
+Walk one road again from the start: every quest of that land and category
+goes back to untouched for this player — no stamp, no stars, no attempt
+count, no clock. `reset` is how many rows were cleared, and the four totals
+are the road's progress afterwards, so a client redraws without asking again.
+
+What it does **not** touch is anything that is a record rather than a state:
+the attempt log and the mistakes (SPEC §7's training data, which the server
+never deletes) and the XP ledger. A clear after a reset therefore **pays no
+XP** — the `clear` row is already in the ledger and the index refuses the
+second — while practice grants keep working. Practising is free; farming is
+not possible.
+
+Stars are counted from the failures *since* the reset, so a road walked
+again can be walked perfectly.
+
+A land or category no pack defines is `not_found`. A player who had never
+touched the road gets `reset: 0`, which is not an error.
+
 ### 4.8 `quest.get`
 
 ```json

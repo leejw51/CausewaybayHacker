@@ -330,4 +330,15 @@ return {
   ["STORY  [F10]"] = "ストーリー  [F10]",
   ["watch the opening again"] = "オープニングをもう一度見る",
   ["signed out"] = "サインアウトしました",
+  -- The map's RESET THIS ROAD, and the panel that asks first.
+  -- The body says the cleared count before the total in every language:
+  -- `string.format` has no positional arguments, so the other order
+  -- prints the two numbers swapped.
+  ["RESET THIS ROAD"] = "この道をリセット",
+  ["WALK IT AGAIN?"] = "もう一度歩く？",
+  ["%s goes back to untouched — %d of %d streets lose their stamp and stars. Your XP and your mistakes are kept, and clearing them again pays no XP."] = "%s が最初の状態に戻ります — クリア済み %d 件（全 %d 件）のスタンプと星が消えます。XPと間違いの記録は残り、もう一度クリアしてもXPは入りません。",
+  ["RESET IT"] = "リセットする",
+  ["KEEP MY PROGRESS"] = "このままにする",
+  ["the reset did not go through"] = "リセットできませんでした",
+  ["ESC keep my progress   CLICK to reset"] = "ESC このままにする   クリックでリセット",
 }

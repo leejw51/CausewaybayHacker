@@ -277,6 +277,45 @@ return function()
           app:draw()
           love.graphics.setCanvas()
         end
+        -- And the panel that asks before RESET THIS ROAD acts: a wrapped
+        -- paragraph and two buttons, measured from the type in them, which
+        -- is exactly the kind of layout that comes out nil in the other
+        -- orientation. Drawn in every language, because the sentence is the
+        -- longest thing this screen can be asked to fit.
+        local I18n = require("src.i18n")
+        local was = I18n.lang
+        for _, lang in ipairs(I18n.LANGS) do
+          I18n.set(lang)
+          love.graphics.setCanvas(Layout.canvas)
+          app:draw()
+          love.graphics.setCanvas()
+          -- **The button has to survive the squeeze.** The header measures
+          -- itself from the type in it and shrinks when the row is tight, and
+          -- there is no keybinding for RESET THIS ROAD — a label the row
+          -- quietly dropped in Czech at portrait width would make the feature
+          -- unreachable with nothing on screen to say so.
+          T.ok(scene.reset_rect ~= nil,
+            ("%s/%s: the reset button is on the header"):format(mode, lang))
+          scene:ask_reset()
+          love.graphics.setCanvas(Layout.canvas)
+          app:draw()
+          love.graphics.setCanvas()
+          scene:cancel_reset()
+        end
+        I18n.set(was)
+
+        -- And it is gone again the moment the server's count says there is
+        -- nothing to take away.
+        for _, empty in ipairs({ { cleared = 0, total = 2, stars = 0, stars_total = 6 },
+                                 false }) do
+          scene.tally = empty or nil
+          love.graphics.setCanvas(Layout.canvas)
+          app:draw()
+          love.graphics.setCanvas()
+          T.eq(scene.reset_rect, nil,
+            mode .. ": an untouched road offers no reset")
+        end
+        scene.tally = { cleared = 1, total = 2, stars = 3, stars_total = 6 }
       end)
       T.ok(ok, ("map with nodes in %s: %s"):format(mode, tostring(err)))
       if not ok then love.graphics.setCanvas() end

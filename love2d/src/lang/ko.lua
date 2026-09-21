@@ -328,4 +328,15 @@ return {
   ["STORY  [F10]"] = "이야기  [F10]",
   ["watch the opening again"] = "오프닝을 다시 봅니다",
   ["signed out"] = "로그아웃했습니다",
+  -- The map's RESET THIS ROAD, and the panel that asks first.
+  -- The body says the cleared count before the total in every language:
+  -- `string.format` has no positional arguments, so the other order
+  -- prints the two numbers swapped.
+  ["RESET THIS ROAD"] = "이 길 초기화",
+  ["WALK IT AGAIN?"] = "다시 걸을까요?",
+  ["%s goes back to untouched — %d of %d streets lose their stamp and stars. Your XP and your mistakes are kept, and clearing them again pays no XP."] = "%s이(가) 처음 상태로 돌아갑니다 — 클리어한 %d개(전체 %d개) 길의 도장과 별이 사라집니다. XP와 실수 기록은 남고, 다시 클리어해도 XP는 주지 않습니다.",
+  ["RESET IT"] = "초기화하기",
+  ["KEEP MY PROGRESS"] = "그대로 두기",
+  ["the reset did not go through"] = "초기화하지 못했습니다",
+  ["ESC keep my progress   CLICK to reset"] = "ESC 그대로 두기   클릭하면 초기화",
 }
