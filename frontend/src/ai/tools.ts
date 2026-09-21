@@ -32,6 +32,46 @@ export interface RunReport {
 }
 
 /**
+ * What the person has been asked to do, on a screen that asks anything.
+ *
+ * The playground has none of this — a pad is whatever the person wants it to
+ * be — so it is null there. On a quest it is the difference between an agent
+ * that can only read the file and one that can answer "why is this wrong?",
+ * which is the only question anybody actually has on a graded screen.
+ *
+ * A plain shape, deliberately: `ai/` does not import the wire's `Quest`, the
+ * scene builds this out of one, and the LÖVE client builds the same table out
+ * of its own (docs/agent.md §8 — the prompt is pinned in both suites, so what
+ * feeds it has to be a shape both can make).
+ */
+export interface TaskBrief {
+  title: string;
+  /** The exercise, in the language the screen is showing it in. */
+  brief: string;
+  story?: string;
+  /** The cases the person can see. The hidden ones are a count, never data. */
+  tests: Array<{ stdin: string; expect: string }>;
+  hiddenCount: number;
+  cleared: boolean;
+  /**
+   * The reference answer — present only when the server sent one, which it
+   * does only for a quest this player has already cleared (PROTOCOL §4.8).
+   * There is no path here for an unsolved quest's answer, because the client
+   * never has it.
+   */
+  solution?: string;
+  /** What the last RUN said, when there has been one this visit. */
+  lastRun?: {
+    verdict: string;
+    passed: number;
+    total: number;
+    stderr: string;
+    /** The visible cases that did not pass, with what came out. */
+    failing: Array<{ stdin: string; expect: string; got: string }>;
+  };
+}
+
+/**
  * The screen's side of the bargain. `write` and `insert` are slow on purpose
  * — they resolve once the typist has finished (or was stopped) — so the
  * model's next turn is not asked for while the program is still appearing.
@@ -55,6 +95,12 @@ export interface Bench {
   search: ((q: string) => Promise<string>) | null;
   /** Make a picture and post it in the room (playground, openai/grok only). */
   image: ((prompt: string) => Promise<string>) | null;
+  /**
+   * The exercise this screen is set to, or null on one that sets none. Read
+   * on every ask rather than once at mount, so the last run in it is the last
+   * run and not the one the panel opened on.
+   */
+  task?: (() => TaskBrief | null) | null;
 }
 
 export const TOOLS: ToolDef[] = [

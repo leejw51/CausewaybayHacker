@@ -17,6 +17,7 @@ local Typist = require("src.agent.typist")
 local Tools = require("src.agent.tools")
 local SSE = require("src.agent.sse")
 local SpriteM = require("src.agent.sprite")
+local Notes = require("src.agent.notes")
 local Sync = require("src.agent.sync")
 local Tips = require("src.agent.tips")
 local SessionM = require("src.agent.session")
@@ -490,6 +491,44 @@ return function()
     T.eq(room.cursor, 400)
   end)
 
+  T.section("the coder — the answer, as a comment in the file")
+
+  T.case("marks the first line and lines up the rest under it", function()
+    -- The browser's `commentLines` (`frontend/src/ai/notes.ts`), asserted to
+    -- the same shape: two clients that comment differently are two different
+    -- files after the same question.
+    local one = Notes.comment_lines("A slice is a window on an array.", "go")
+    T.eq(#one, 1)
+    T.eq(one[1], "// AI: A slice is a window on an array.")
+    T.eq(Notes.comment_lines("hello", "python")[1], "# AI: hello")
+    T.eq(Notes.comment_lines("hello", "cpp")[1], "// AI: hello")
+  end)
+
+  T.case("wraps long prose and leaves no line uncommented", function()
+    local text = "A slice is a window on an array: append may or may not give you a new one, "
+      .. "and the only way to be sure is to assign the result back to the same name."
+    local lines = Notes.comment_lines(text, "rust")
+    T.ok(#lines > 1, "it wrapped")
+    local back = {}
+    for _, line in ipairs(lines) do
+      T.ok(line:sub(1, 2) == "//", "every line is a comment")
+      T.ok(#line <= 72, "and none runs into the margin")
+      back[#back + 1] = (line:gsub("^//%s*", ""):gsub("^AI:%s*", ""))
+    end
+    T.eq(table.concat(back, " "), text, "the words survive the wrap, in order")
+  end)
+
+  T.case("keeps a word longer than the line rather than cutting it", function()
+    local url = "https://example.com/a/very/long/path/that/will/not/fit/on/one/line/at/all"
+    local joined = table.concat(Notes.comment_lines("see " .. url .. " for more", "go"), "\n")
+    T.ok(joined:find(url, 1, true), "the url is whole")
+  end)
+
+  T.case("is nothing at all for a reply with nothing in it", function()
+    T.eq(#Notes.comment_lines("", "go"), 0)
+    T.eq(#Notes.comment_lines("   \n  ", "go"), 0)
+  end)
+
   T.section("the coder — the standing orders")
 
   T.case("puts the file, the language and the rules in the system prompt", function()
@@ -508,6 +547,72 @@ return function()
       read = function() return "" end }, false)
     T.ok(mute:find("cannot run code", 1, true), "a screen that cannot run says so")
     T.ok(mute:find("The person is learning Go", 1, true))
+  end)
+
+  T.case("tells the coder what the exercise is, when the screen sets one", function()
+    -- The quest screen's half of the prompt (the browser's `TaskBrief`).
+    -- Without it the coder can read the file and nothing else, which makes
+    -- the one question anybody has on a graded screen unanswerable.
+    local task = {
+      title = "Thirty-two bytes",
+      brief = "Write n into buf, big-endian.",
+      story = "The chain sees a hash as 64 hex digits.",
+      tests = { { stdin = "255\n", expect = "32\n" } },
+      hidden_count = 3,
+      cleared = false,
+      last_run = {
+        verdict = "wrong_answer", passed = 0, total = 1,
+        stderr = "cannot use buf as []byte value",
+        failing = { { stdin = "255\n", expect = "32\n", got = "31\n" } },
+      },
+    }
+    local prompt = SessionM.system_prompt({
+      lang = "go", file = "main.go",
+      read = function() return "package main" end,
+      task = function() return task end,
+    }, false)
+    T.ok(prompt:find("Thirty-two bytes", 1, true), "the title is in it")
+    T.ok(prompt:find("big-endian", 1, true), "and the brief")
+    T.ok(prompt:find("3 hidden case(s)", 1, true), "the hidden ones stay a number")
+    T.ok(prompt:find("wrong_answer", 1, true), "the last run is in it")
+    T.ok(prompt:find("cannot use buf", 1, true), "with what the compiler said")
+    T.ok(prompt:find('expected "32\\n", got "31\\n"', 1, true), "and what came out")
+    -- The file is still last, after the exercise.
+    T.ok(prompt:find("Thirty-two bytes", 1, true) < prompt:find("The file is main.go", 1, true),
+      "the exercise comes before the file")
+  end)
+
+  T.case("says nothing about an exercise on a screen that sets none", function()
+    local plain = SessionM.system_prompt({
+      lang = "rust", file = "main.rs",
+      read = function() return "fn main() {}" end,
+    }, false)
+    T.ok(not plain:find("graded exercise", 1, true), "the playground's prompt is unchanged")
+    local none = SessionM.system_prompt({
+      lang = "rust", file = "main.rs",
+      read = function() return "fn main() {}" end,
+      task = function() return nil end,
+    }, false)
+    T.ok(not none:find("graded exercise", 1, true), "and a screen whose task is nil says nothing")
+  end)
+
+  T.case("carries the answer only when the player already has it", function()
+    local base = {
+      title = "t", brief = "b", tests = {}, hidden_count = 0, cleared = false,
+    }
+    local bench = function(task)
+      return {
+        lang = "rust", file = "main.rs",
+        read = function() return "" end,
+        task = function() return task end,
+      }
+    end
+    T.ok(not SessionM.system_prompt(bench(base), false):find("reference answer", 1, true))
+    local cleared = base
+    cleared = { title = "t", brief = "b", tests = {}, hidden_count = 0,
+      cleared = true, solution = "fn main() { -- the answer\nend" }
+    T.ok(SessionM.system_prompt(bench(cleared), false):find("reference answer", 1, true),
+      "a cleared quest may have its answer explained")
   end)
 
   T.case("the tool catalogue is the browser's, word for word", function()

@@ -94,6 +94,7 @@ local CoderM = require("src.agent.coder")
 local Land = require("src.land")
 local Editor = require("src.editor")
 local CodePane = require("src.codepane")
+local Json = require("src.json")
 local runlog = require("src.net.runlog")
 local Edits = require("src.net.edits")
 local External = require("src.external")
@@ -291,10 +292,58 @@ function Quest:toast_lift()
   return math.max(0, (Layout.vh - UI.footerHeight()) - r.y + 8)
 end
 
+--- The exercise, for the coder's prompt (`agent/session.lua`, and the
+--- browser's `TaskBrief`).
+---
+--- Built on every ask rather than handed over at mount, so the run report in
+--- it is the last run. Nil until `quest.get` has answered. `solution` is only
+--- ever in the payload for a quest this player has already cleared (§4.8), so
+--- there is no path here for an unsolved quest's answer.
+function Quest:task_brief()
+  local q = self.quest
+  if not q then return nil end
+  local tests = {}
+  for _, c in ipairs((q.tests or {}).visible or {}) do
+    tests[#tests + 1] = { stdin = c.stdin, expect = c.expect }
+  end
+  local last_run = nil
+  local a = self.run_attempt
+  if a then
+    local failing = {}
+    for _, c in ipairs(a.cases or {}) do
+      if c.visible and not c.passed then
+        failing[#failing + 1] = { stdin = c.stdin or "", expect = c.expect or "", got = c.got or "" }
+      end
+    end
+    last_run = {
+      verdict = a.verdict,
+      passed = a.tests_passed or 0,
+      total = a.tests_total or 0,
+      stderr = a.stderr or "",
+      failing = failing,
+    }
+  end
+  return {
+    title = q.title or "",
+    brief = q.brief or "",
+    story = q.story,
+    tests = tests,
+    hidden_count = (q.tests or {}).hidden_count or 0,
+    cleared = q.state == "cleared",
+    solution = q.solution,
+    last_run = last_run,
+  }
+end
+
 function Quest:agent_host()
   local scene = self
   return {
     lang = function() return (scene.quest and scene.quest.land) or scene.app.land or "rust" end,
+    -- What the person was asked to do, the cases they can see, and what the
+    -- last RUN said. Without it the coder on a graded screen can read the
+    -- file and nothing else, which makes the one question anybody has here —
+    -- "why is this wrong?" — the one it cannot answer.
+    task = function() return scene:task_brief() end,
     caret = function()
       if not scene.pane then return nil end
       return scene.pane:cell(scene.editor.line, scene.editor.col)
@@ -544,6 +593,75 @@ function Quest:reset()
     self.editor.dirty = false
     self.app:toast(I18n.t("starter code restored"))
   end)
+end
+
+--- The question and the code, on the clipboard, in one press.
+---
+--- The browser's `askBlock` (`frontend/src/scenes/quest.ts`), for the person
+--- whose AI is in another window rather than in this one: the brief they were
+--- set, their program, and the last run's report, fenced as Markdown because
+--- every chat box reads Markdown. Nothing in it is anything they cannot
+--- already see — the hidden cases stay a number, and the answer is not in it.
+function Quest:copy_ask()
+  local q = self.quest
+  if not q then return end
+  local lang = q.land or self.app.land or "rust"
+  local file = "main." .. (lang == "cpp" and "cpp" or lang == "go" and "go"
+    or lang == "python" and "py" or "rs")
+  local fence = lang == "python" and "python" or lang == "cpp" and "cpp"
+    or lang == "go" and "go" or "rust"
+  local out = {}
+  local function put(line) out[#out + 1] = line end
+
+  put("## " .. I18n.t("the brief"))
+  put("")
+  put(("%02d  %s"):format(q.node or 0, q.title or ""))
+  put("")
+  put((q.brief or ""):gsub("%s+$", ""))
+  local tests = (q.tests or {}).visible or {}
+  for _, c in ipairs(tests) do
+    put("")
+    put(("%s:"):format(c.name or "case"))
+    if c.stdin and c.stdin ~= "" then put("  in   " .. Json.encode(c.stdin)) end
+    put("  out  " .. Json.encode(c.expect or ""))
+  end
+  local hidden = (q.tests or {}).hidden_count or 0
+  if hidden > 0 then
+    put("")
+    put(("+ %d hidden case(s)"):format(hidden))
+  end
+  if q.story and q.story ~= "" then
+    put("")
+    put("“" .. q.story .. "”")
+  end
+
+  put("")
+  put("## " .. file)
+  put("")
+  put("```" .. fence)
+  put((self.editor:text()):gsub("%s+$", ""))
+  put("```")
+
+  local a = self.run_attempt
+  if a then
+    put("")
+    put("## " .. I18n.t("the output"))
+    put("")
+    put("```")
+    put(("%s — %d/%d"):format(a.verdict or "?", a.tests_passed or 0, a.tests_total or 0))
+    for _, c in ipairs(a.cases or {}) do
+      if c.visible and not c.passed then
+        put(("%s: expected %s got %s"):format(c.name or "case",
+          Json.encode(c.expect or ""), Json.encode(c.got or "")))
+      end
+    end
+    if a.stderr and a.stderr ~= "" then put(a.stderr) end
+    put("```")
+  end
+
+  love.system.setClipboardText(table.concat(out, "\n") .. "\n")
+  SFX.play("select")
+  self.app:toast(I18n.t("the question and your code, copied"))
 end
 
 function Quest:take_hint()
@@ -1490,8 +1608,14 @@ function Quest:draw_code()
       state = (usable and not self.run_unsupported) and "hot" or "disabled" },
     { id = "format", label = I18n.t("FORMAT"),
       state = (usable and not self.format_unsupported) and "normal" or "disabled" },
-    { id = "agent", label = I18n.t("AGENT"),
+    -- ASK AI, not AGENT: on a graded screen the press means "I have a
+    -- question about this", and it lands in the question field.
+    { id = "agent", label = I18n.t("ASK AI"),
       state = (self.coder and self.coder.panel.open) and "hot" or "normal" },
+    -- The other way to ask, and the one that needs no key: the question and
+    -- the code on the clipboard, for whatever the person has open elsewhere.
+    { id = "copyask", label = I18n.t("COPY Q+CODE"),
+      state = self.quest and "normal" or "disabled" },
     { id = "undo", label = I18n.t("UNDO"),
       state = (live and Edits.can_undo(self.edit)) and "normal" or "disabled" },
     { id = "redo", label = I18n.t("REDO"),
@@ -3042,7 +3166,13 @@ function Quest:mousepressed(x, y, button)
       return
     end
     local r = self.code_rects or {}
-    if inside(r.agent) then self.coder:toggle(); return end
+    if inside(r.agent) then
+      -- Open: straight into the question. Already open: the same press puts
+      -- it away, which is what a lit button means everywhere else here.
+      if self.coder.panel.open then self.coder:toggle() else self.coder:open_ask() end
+      return
+    end
+    if inside(r.copyask) then self:copy_ask(); return end
     if inside(r.run) then self:run(); return end
     if inside(r.format) then self:format(); return end
     if inside(r.undo) then self:stack_undo(); return end

@@ -66,6 +66,16 @@ shape by its adapter, executed by the scene through a `Bench` interface:
 | `search_notes {q}` | `playground.chat.search` over this user's chatrooms | hits |
 | `make_image {prompt}` | image generation on openai/grok; refused on anthropic | "posted photo" |
 
+**The answer is also written into the file, as a comment** (`ai/notes.ts`,
+`src/agent/notes.lua`). Every reply's prose is wrapped at 72 columns, prefixed
+with the land's line comment and an `AI:` mark, and put in **above the line
+the caret is on**, indented like it — one change, so one CTRL+Z takes the
+block back out. The room scrolls and the bubble fades; the file is what gets
+saved, and the question was about the line the person was looking at. It does
+not fire while the typist is still working (the last characters of a written
+program may still be arriving), and the COMMENT switch in SETUP turns it off.
+On by default.
+
 `write_code` and `insert_code` go through `ai/typist.ts`: 35–70 ms a
 character with jitter, ~180 ms at a newline, bursts on long identifiers, so it
 reads as somebody typing rather than a paste. The sprite hovers at the caret
@@ -296,6 +306,23 @@ The quest screen has the same panel with no persistence: a quest has no
 folder, so the room lives for the visit. It gets `read_code`, `write_code`,
 `insert_code`; not `run_code` (a quest RUN is an attempt and counts), and not
 `make_image` or `search_notes`.
+
+What it does get that the playground has not is **the exercise**: `Bench.task`
+(`ai/tools.ts` `TaskBrief`) carries the brief the person is reading, the
+visible cases, the count of the hidden ones, and the last RUN's verdict,
+stderr and got-vs-expected — read on every ask, so the report in it is the
+last one. `systemPrompt` puts it before the file. Nothing in it is anything
+the player cannot see on screen: the hidden cases stay a number, and
+`solution` is only ever in the payload for a quest they have already cleared
+(PROTOCOL §4.8). One rule comes with it — explain, name the line, and write
+the whole answer into the editor only when asked outright.
+
+The button says **ASK AI** rather than AGENT and opens the panel on CHAT with
+the caret in the field (`Coder.openAsk`), because on a graded screen the press
+means "I have a question about this". Beside it, **COPY Q+CODE** puts the
+brief, the program and the last run on the clipboard as fenced Markdown, for
+the person whose AI is in another tab — the one way to ask that needs no key
+at all.
 
 ## 8. Files
 

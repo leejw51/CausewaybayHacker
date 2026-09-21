@@ -120,7 +120,10 @@ export async function listModels(provider: Provider, key: string): Promise<strin
   if (provider === "openrouter") {
     const known = /^(openai|anthropic|x-ai|google|meta-llama|qwen|deepseek|mistralai)\//;
     const chat = out.filter((id) => !/(embedding|tts|whisper|image|vision-only)/.test(id));
-    return [...chat.filter((id) => known.test(id)).sort(), ...chat.filter((id) => !known.test(id)).sort()];
+    return [
+      ...chat.filter((id) => known.test(id)).sort(),
+      ...chat.filter((id) => !known.test(id)).sort(),
+    ];
   }
   return out.sort();
 }

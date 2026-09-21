@@ -198,7 +198,7 @@ export const cs: Partial<Catalogue> = {
   "map.resetShort": "VYNULOVAT",
   "map.resetTitle": "PROJÍT JI ZNOVU?",
   "map.resetBody":
-    "{road} se vrátí na začátek — {cleared} z {total} ulic přijde o razítko a hvězdy. XP a chyby zůstanou a další vyčištění už XP nepřinese.",
+    "{road} se vrátí na začátek — {cleared} z {total} ulic přijde o razítko a hvězdy a každý editor na cestě se vrátí ke svému startovnímu kódu. XP a chyby zůstanou a další vyčištění už XP nepřinese.",
   "map.resetGo": "VYNULOVAT",
   "map.resetKeep": "PONECHAT POSTUP",
   "map.resetFailed": "vynulování neproběhlo",
@@ -247,6 +247,7 @@ export const cs: Partial<Catalogue> = {
   "quest.lobby": "HALA",
   "quest.copyBrief": "KOPÍROVAT ZADÁNÍ",
   "quest.copyCode": "KOPÍROVAT KÓD",
+  "quest.copyAsk": "KOPÍROVAT ZADÁNÍ+KÓD",
   "quest.copyOutput": "KOPÍROVAT VÝSTUP",
   "quest.paste": "VLOŽIT",
   "quest.briefSide": "ZADÁNÍ: VEDLE",
@@ -415,6 +416,7 @@ export const cs: Partial<Catalogue> = {
   "lands.codePlaygroundNote":
     "napiš cokoli, spusť to, a rustový kodér — AI agent — létá vedle tebe",
   "agent.button": "AGENT",
+  "agent.ask": "ZEPTAT SE AI",
   "agent.title": "RUSTOVÝ KODÉR",
   "agent.setup": "NASTAVENÍ",
   "agent.chat": "CHAT",
@@ -428,6 +430,10 @@ export const cs: Partial<Catalogue> = {
   "agent.auto": "AUTO",
   "agent.autoOn": "automatické posouzení: zapnuto — nejvýš jednou za tři minuty, jen po pauze",
   "agent.autoOff": "automatické posouzení: vypnuto",
+  "agent.notes": "KOMENTÁŘ",
+  "agent.notesOn":
+    "odpovědi se zapisují do souboru jako komentář nad kurzorem — CTRL+Z je vezme zpět",
+  "agent.notesOff": "odpovědi zůstanou v místnosti",
   "agent.keyHint": "vlož API klíč {provider} — zůstane jen v tomto prohlížeči",
   "agent.modelHint": "název modelu",
   "agent.fetchModels": "NAČÍST MODELY",
@@ -717,6 +723,7 @@ export const cs: Partial<Catalogue> = {
   "clip.sameAlready": "schránka už se shoduje s tím, co je v editoru",
   "clip.theBrief": "zadání",
   "clip.yourCode": "tvůj kód",
+  "clip.questionAndCode": "zadání a tvůj kód",
   "clip.theInput": "vstup",
   "clip.pasteInputByKey": "tato stránka nemůže číst schránku — vložte přímo do pole STDIN",
   "clip.theOutput": "výstup",

@@ -451,14 +451,24 @@ function Panel:draw_setup(rect, x, y, w, row)
   UI.button(fetch_r.x, fetch_r.y, fetch_r.w, fetch_r.h, I18n.t("MODELS"), "normal", 7)
   self.rects["fetch"] = fetch_r
 
-  -- And the two switches, on the floor.
-  local half = math.floor((w - 4) / 2)
-  local auto_r = { x = x, y = switches_y, w = half, h = field_h }
+  -- And the three switches, on the floor. Thirds rather than halves since
+  -- COMMENT joined them: a switch that says only "ON" is a switch nobody can
+  -- read, so each keeps its name and they share the width evenly.
+  local third = math.floor((w - 8) / 3)
+  local auto_r = { x = x, y = switches_y, w = third, h = field_h }
   UI.button(auto_r.x, auto_r.y, auto_r.w, auto_r.h,
     I18n.t("AUTO") .. ": " .. (Prefs.auto() and I18n.t("ON") or I18n.t("OFF")),
     Prefs.auto() and "hot" or "normal", 7)
   self.rects["auto"] = auto_r
-  local shown_r = { x = x + half + 4, y = switches_y, w = half, h = field_h }
+  -- Whether an answer is also left in the file as a comment
+  -- (`src/agent/notes.lua`).
+  local notes_r = { x = x + third + 4, y = switches_y, w = third, h = field_h }
+  UI.button(notes_r.x, notes_r.y, notes_r.w, notes_r.h,
+    I18n.t("COMMENT") .. ": " .. (Prefs.notes() and I18n.t("ON") or I18n.t("OFF")),
+    Prefs.notes() and "hot" or "normal", 7)
+  self.rects["notes"] = notes_r
+  local shown_r = { x = x + (third + 4) * 2, y = switches_y, w = w - (third + 4) * 2,
+    h = field_h }
   UI.button(shown_r.x, shown_r.y, shown_r.w, shown_r.h,
     I18n.t("CODER") .. ": " .. (Prefs.shown() and I18n.t("ON") or I18n.t("OFF")),
     Prefs.shown() and "hot" or "normal", 7)
@@ -545,6 +555,8 @@ function Panel:pressed(id)
     self.host.fetch_models()
   elseif id == "auto" then
     Prefs.set_auto(not Prefs.auto())
+  elseif id == "notes" then
+    Prefs.set_notes(not Prefs.notes())
   elseif id == "shown" then
     Prefs.set_shown(not Prefs.shown())
   elseif id == "send" then

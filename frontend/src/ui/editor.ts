@@ -1325,6 +1325,42 @@ export class Editor {
     return true;
   }
 
+  /**
+   * Put whole lines in **above** the line the caret is on, indented like it,
+   * and leave the caret on the same text it was on.
+   *
+   * For the coder's answer-as-a-comment (`ai/notes.ts`): the person asked
+   * about the line they were looking at, so the answer belongs directly above
+   * it and their caret should not move relative to their code. One dispatch,
+   * so one CTRL+Z takes the whole block back out again — which is the only
+   * promise worth making about text that appeared in somebody's file without
+   * them typing it.
+   */
+  noteAbove(lines: string[]): void {
+    if (lines.length === 0) return;
+    const state = this.view.state;
+    const head = state.selection.main.head;
+    // A caret at the very top usually means nobody has put it anywhere: the
+    // question was typed into the chat field and the editor has never been
+    // clicked. An answer about the program then belongs after the program,
+    // not wedged above its first line — which on every land is `package
+    // main` or `use`, the one place a remark reads as a mistake.
+    if (head === 0 && state.doc.length > 0) {
+      const tail = state.doc.toString().endsWith("\n") ? "" : "\n";
+      this.appendAtEnd(tail + lines.join("\n") + "\n");
+      return;
+    }
+    const line = state.doc.lineAt(head);
+    const indent = /^[ \t]*/.exec(line.text)?.[0] ?? "";
+    const insert = lines.map((l) => indent + l).join("\n") + "\n";
+    this.view.dispatch({
+      changes: { from: line.from, insert },
+      selection: { anchor: head + insert.length },
+      scrollIntoView: true,
+      userEvent: "input.agent",
+    });
+  }
+
   /** Put the caret at `pos`, scrolled into view. */
   seek(pos: number): void {
     const p = Math.max(0, Math.min(this.view.state.doc.length, pos));

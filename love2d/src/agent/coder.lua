@@ -39,6 +39,7 @@ local Ease = require("src.ease")
 local Layout = require("src.layout")
 
 local Prefs = require("src.agent.prefs")
+local Notes = require("src.agent.notes")
 local SpriteM = require("src.agent.sprite")
 local PanelM = require("src.agent.panel")
 local SessionM = require("src.agent.session")
@@ -157,6 +158,19 @@ function Coder:toggle()
   SFX.play("select")
 end
 
+--- ASK: the room, open on CHAT with the caret already in the field.
+---
+--- The browser's `Coder.openAsk`. On a graded screen the press means "I have
+--- a question", not "show me the panel", so it lands where the question is
+--- typed rather than wherever the panel was left.
+function Coder:open_ask()
+  self.panel.open = true
+  self.panel.view = "chat"
+  self.panel.focus = "input"
+  self:sync_room()
+  SFX.play("select")
+end
+
 --- Agent mode: the sprite lives only while the panel is open.
 function Coder:active()
   return Prefs.shown() and self.panel.open
@@ -239,6 +253,9 @@ function Coder:bench()
       local r = coder:type_out(replace)
       return { ok = not r.stopped, why = r.stopped and "Stopped by the person." or nil }
     end,
+    -- Asked here rather than copied, so the exercise the prompt carries is
+    -- the one on screen — the last RUN in it changes while the panel is open.
+    task = coder.host.task and function() return coder.host.task() end or nil,
     run = coder.host.run and function(stdin)
       return coder:await_run(stdin)
     end or nil,
@@ -519,10 +536,28 @@ function Coder:listener()
         -- The streamed line is now a kept one.
         coder.live.live = nil
         coder:keep("agent", coder.live.text)
+        coder:note_in_code(coder.live.text)
         coder.live = nil
       end
     end,
   }
+end
+
+--- The answer, written into the file as a comment above the caret's line.
+---
+--- The browser's `Coder.noteInCode`. The bubble fades and the room scrolls;
+--- the file is what gets saved, and the question was about the line the
+--- person was looking at. Not while the typist is working — the model may
+--- have just written a program and its last characters may still be arriving
+--- — and not when the switch in SETUP is off.
+function Coder:note_in_code(reply)
+  if not Prefs.notes() or self.typist:busy() then return end
+  if not self.editor then return end
+  local lines = Notes.comment_lines(reply, self.host.lang())
+  if #lines == 0 then return end
+  self.editor:note_above(lines)
+  if self.host.touched then self.host.touched() end
+  SFX.play("select")
 end
 
 --- The one place an ask starts. Everything else — WRITE, REVIEW — is this

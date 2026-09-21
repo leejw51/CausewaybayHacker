@@ -23,6 +23,7 @@
 local Prefs = require("src.agent.prefs")
 local Providers = require("src.agent.providers")
 local Tools = require("src.agent.tools")
+local json = require("src.json")
 
 local M = {}
 
@@ -39,13 +40,91 @@ local LANG_NAME = {
   python = "Python 3",
 }
 
---- The coder's standing orders. Stable text first, the file last.
+--- The most of one stream or one wrong answer that goes into the prompt.
+local CLIP = 2000
+
+local function clip(text)
+  if #text <= CLIP then return text end
+  return text:sub(1, CLIP) .. ("\n… (%d more characters)"):format(#text - CLIP)
+end
+
+--- JSON's spelling of a string, for the sample cases: a newline has to be
+--- visible in the prompt as `\n` or a one-line expectation reads as two.
+local function quoted(text)
+  return json.encode(tostring(text or ""))
+end
+
+--- The exercise, for the screens that set one (`bench.task`).
+---
+--- Everything in here is something the person is already looking at: the
+--- brief they are reading, the sample cases under it, the report the last RUN
+--- printed, and — only on a quest they have already cleared, because that is
+--- the only time the server sends it — the reference answer. The hidden cases
+--- are a number, the way they are on the screen.
+local function task_lines(task, out)
+  out[#out + 1] = ""
+  out[#out + 1] =
+    "The person is not writing whatever they like: this screen is a graded exercise, and this is it."
+  out[#out + 1] = ""
+  out[#out + 1] = ("Title: %s"):format(task.title or "")
+  out[#out + 1] = ("Brief: %s"):format(task.brief or "")
+  if task.story and task.story:match("%S") then
+    out[#out + 1] = ("Story: %s"):format(task.story)
+  end
+  local tests = task.tests or {}
+  if #tests > 0 then
+    out[#out + 1] = ""
+    out[#out + 1] = "The sample cases (stdin → expected stdout):"
+    for _, c in ipairs(tests) do
+      out[#out + 1] = ("- %s → %s"):format(quoted(c.stdin), quoted(c.expect))
+    end
+  end
+  if (task.hidden_count or 0) > 0 then
+    out[#out + 1] = ("There are also %d hidden case(s) nobody can see, including you. A program that only answers the samples will fail them.")
+      :format(task.hidden_count)
+  end
+  local run = task.last_run
+  if run then
+    out[#out + 1] = ""
+    out[#out + 1] = ("The last RUN: %s, %d/%d of the visible cases passed.")
+      :format(run.verdict or "?", run.passed or 0, run.total or 0)
+    if run.stderr and run.stderr:match("%S") then
+      out[#out + 1] = "What the compiler or the program said:"
+      out[#out + 1] = "```"
+      out[#out + 1] = clip(run.stderr)
+      out[#out + 1] = "```"
+    end
+    for _, c in ipairs(run.failing or {}) do
+      out[#out + 1] = ("Failed on %s: expected %s, got %s.")
+        :format(quoted(c.stdin), quoted(c.expect), quoted(clip(c.got or "")))
+    end
+  end
+  if task.cleared then
+    out[#out + 1] = ""
+    out[#out + 1] =
+      "The person has already cleared this one; they are here to practise or to understand it."
+  end
+  if task.solution and task.solution:match("%S") then
+    out[#out + 1] = ""
+    out[#out + 1] =
+      "The reference answer (they have cleared this quest, so they can already read it — use it to explain, not to replace their own):"
+    out[#out + 1] = "```"
+    out[#out + 1] = task.solution
+    out[#out + 1] = "```"
+  end
+  out[#out + 1] = ""
+  out[#out + 1] =
+    "On a graded screen: answer the question they asked. Explain, name the line, say what the compiler is complaining about. They learn nothing from a program that appeared while they were reading, so write the whole answer into the editor only when they ask you for it outright — and then say what it does."
+end
+
+--- The coder's standing orders. Stable text first, the exercise, the file last.
 ---
 --- Word-for-word the browser's (`frontend/src/ai/session.ts`). The prompt is
 --- what makes the character; two clients with different prompts would be two
 --- different characters wearing the same sprite.
 function M.system_prompt(bench, can_run)
   local lang = LANG_NAME[bench.lang] or bench.lang
+  local task = bench.task and bench.task() or nil
   local lines = {
     ("You are the Rust coder — a small pixel-art character on a flying keyboard who lives on the code screen of Causewaybay Hacker, a 16-bit coding game set in Hong Kong. The person is learning %s. You are their pair: a friendly senior engineer who explains briefly and lets the code speak."):format(lang),
     "",
@@ -61,12 +140,16 @@ function M.system_prompt(bench, can_run)
     "- Keep the person's style, names and formatting unless asked. Keep the program's existing behaviour unless asked.",
     "- Never invent an API. If unsure, prefer the plain standard-library way.",
     "- A picture is not a program. When the person asks for a picture, image, drawing or photo, call make_image with a prompt; do not write code that prints one, and do not describe it instead.",
+  }
+  if task then task_lines(task, lines) end
+  local tail = {
     "",
     ("The file is %s. Its current text, with line numbers (do not include the numbers in edits):"):format(bench.file),
     "```",
     Tools.numbered(bench.read()),
     "```",
   }
+  for _, line in ipairs(tail) do lines[#lines + 1] = line end
   return table.concat(lines, "\n")
 end
 

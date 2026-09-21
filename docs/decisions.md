@@ -6986,3 +6986,91 @@ every node, because `attempts` counts submits. That is the player who most
 needs the button, and it was the one player the gate hid it from. The question
 it asks is the guard; a reset of a road nobody has touched is `reset: 0` and a
 no-op, which is a fair answer to a press that asked for nothing.
+
+## 2026-09-21 — the coder is told what the exercise is, the button says ASK AI, and one press copies the question with the code
+
+The agent has been on the quest screen since it shipped, and on that screen it
+could read the file and nothing else. So it could see `n.FillBytes(buf[:])`
+and could not see that the brief asked for exactly that line — which makes the
+only question anybody has on a graded screen, *why is this wrong*, the one
+question it could not answer. Three changes, one about what it knows and two
+about how it is reached.
+
+**The exercise goes in the prompt, as `Bench.task`.** Title, brief, story, the
+visible cases, the number of hidden ones, and the last RUN — verdict, what the
+compiler said, and got-against-expected on each visible case that failed. It
+is a getter, not a snapshot: the panel is open across runs, and a report from
+before the last one would be worse than none. The playground passes nothing
+and its prompt is unchanged, which is what the test asserts.
+
+**Nothing in it is anything the player cannot already see.** The hidden cases
+are a count on the screen and a count in the prompt. `solution` is in the
+`quest.get` payload only for a quest this player has already cleared (§4.8),
+so a prompt that includes it when present cannot leak an unsolved answer —
+there is nothing to leak, the client does not have it. The one new rule says
+to explain and to type the whole answer only when asked outright. A rule and
+not a gate, deliberately: the agent could already `write_code` on a quest, and
+SOLVE's star still costs a star. Making the agent refuse would be a fence
+around a field with no other side.
+
+**ASK AI, not AGENT.** The label named the machinery; the press means "I have
+a question". It now opens on CHAT with the caret in the field — `askNow` sets
+a wish that the draw honours once the field has been placed, because focusing
+an overlay input that is still hidden does nothing in any browser. Pressing it
+while the panel is open still closes it, which is what a lit button means
+everywhere else on this bench.
+
+**COPY Q+CODE, for the AI that is in another tab.** The brief, the program and
+the last run, fenced as Markdown, in one press. It sits on the bench and not
+with the clipboard chips in the tool row, because that row is the row that
+goes away in the compact register — and a tablet is exactly where somebody is
+reading the brief on one side and has ChatGPT open on the other. It needs no
+key, no provider and no network from us at all, which makes it the only way to
+ask that works on a plane, on an insecure origin (where COPY falls back to the
+textarea), and for a player who has never opened SETUP.
+
+Both clients: the prompt is pinned word-for-word in `love2d/src/agent/
+session.lua` (§8), the LÖVE bench gets the same two buttons, and its copy
+writes the same block through `love.system.setClipboardText`.
+
+**ASK takes the code page first, because the room is drawn on no other.**
+Pressed on the split page the old AGENT button did *nothing a player could
+see*: `panel.open` went true, the sprite flew in, the button lit — and
+`drawFocus` is the only draw that carves a rectangle for the panel, so the
+room had nowhere to be. The split page is not somewhere to fix that: the
+editor already has half a screen there, and 38% of that half is a column six
+characters wide. So ASK sets `focus` and opens the room on the page that has
+space for it, and leaving that page closes the room rather than leaving a lit
+button over a panel nobody can see. That pair is the whole fix: the lit state
+and the visible state cannot disagree any more.
+
+## 2026-09-21 — the coder's answer is left in the file, as a comment
+
+Asked on the code page, the coder answered in the room and in a bubble, and
+both of those are gone by tomorrow. The file is not: it is what the pad saves
+and what the quest screen keeps as a draft. So every reply is now also written
+into the buffer as a comment block — wrapped at 72 columns, the land's own
+line comment, an `AI:` mark on the first line and the rest aligned under it.
+
+**Above the caret's line, indented like it.** The question was about the line
+the person was looking at, so that is where the answer belongs; putting it at
+the top of the file or at the end would make them go and find it. The caret
+stays on the code it was on, which is the part that has to be true or the next
+keystroke lands somewhere nobody chose.
+
+**One change, one CTRL+Z.** Text that appears in somebody's file without them
+typing it has to come out in a single press. `Editor.noteAbove` is one
+dispatch for the whole block, and the LÖVE editor pushes one undo entry rather
+than one per line.
+
+**Instant, not typed.** `write_code` types at a person's speed because the
+program appearing is the point. A comment is not the point — it is the answer
+in the margin — and four hundred characters at 50 ms each is twenty seconds of
+a locked editor to read two sentences. It also stays out of the way while the
+typist *is* working: a comment landing in the middle of a half-typed statement
+would be a syntax error the agent wrote.
+
+**A switch, on by default.** COMMENT sits beside AUTO in SETUP, because every
+other thing the agent does on its own has one. On by default: it is what was
+asked for, and the press that turns it off is one press away in the panel that
+just answered.

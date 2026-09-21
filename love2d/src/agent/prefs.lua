@@ -76,7 +76,8 @@ local dir = nil
 local secure = nil
 
 local function blank()
-  return { provider = "anthropic", keys = {}, models = {}, auto = false, shown = true }
+  return { provider = "anthropic", keys = {}, models = {}, auto = false, shown = true,
+    notes = true }
 end
 
 --- True when `name` is a provider this client knows.
@@ -115,6 +116,7 @@ function M.open(opts)
     state.models = type(value.models) == "table" and value.models or {}
     state.auto = value.auto and true or false
     state.shown = value.shown ~= false
+    state.notes = value.notes ~= false
   end
   return state
 end
@@ -213,6 +215,19 @@ end
 
 function M.set_shown(on)
   ensure().shown = on and true or false
+  return save()
+end
+
+--- Whether an answer is also written into the file as a comment
+--- (`src/agent/notes.lua`, the browser's `ai/notes.ts`). On by default: the
+--- room scrolls, the file is kept, and the reply is about the code it lands
+--- in.
+function M.notes()
+  return ensure().notes
+end
+
+function M.set_notes(on)
+  ensure().notes = on and true or false
   return save()
 end
 

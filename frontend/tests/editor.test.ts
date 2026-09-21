@@ -430,3 +430,56 @@ describe("the editor's own history as buttons", () => {
     }
   });
 });
+
+describe("the coder's answer, put in above the caret", () => {
+  it("goes in above the caret's line, indented like it, and comes out in one undo", async () => {
+    const { Editor } = await import("../src/ui/editor");
+    const ed = new Editor("go", "func main() {\n    fmt.Println(a)\n}\n");
+    try {
+      // The caret inside the indented line, as it would be while reading it.
+      ed.seek(ed.source.indexOf("fmt.Println"));
+      ed.noteAbove(["// AI: a is a slice", "//     of five ints"]);
+      const lines = ed.source.split("\n");
+      expect(lines[1]).toBe("    // AI: a is a slice");
+      expect(lines[2]).toBe("    //     of five ints");
+      expect(lines[3]).toBe("    fmt.Println(a)");
+      // The caret is still on the code the answer was about.
+      expect(ed.source.slice(ed.caretPos).startsWith("fmt.Println")).toBe(true);
+      // And one press takes the whole block out, not one line of it.
+      expect(ed.undo()).toBe(true);
+      expect(ed.source).toBe("func main() {\n    fmt.Println(a)\n}\n");
+    } finally {
+      ed.destroy();
+    }
+  });
+
+  it("writes nothing when there is nothing to say", async () => {
+    const { Editor } = await import("../src/ui/editor");
+    const ed = new Editor("rust", "fn main() {}\n");
+    try {
+      ed.noteAbove([]);
+      expect(ed.source).toBe("fn main() {}\n");
+      expect(ed.canUndo).toBe(false);
+    } finally {
+      ed.destroy();
+    }
+  });
+});
+
+describe("the answer when the caret has never been put anywhere", () => {
+  it("goes after the program rather than above its first line", async () => {
+    const { Editor } = await import("../src/ui/editor");
+    const ed = new Editor("go", "package main\n\nfunc main() {}\n");
+    try {
+      // A fresh editor: the caret is at 0 because nobody has clicked in it.
+      expect(ed.caretPos).toBe(0);
+      ed.noteAbove(["// AI: it prints nothing yet"]);
+      expect(ed.source.startsWith("package main")).toBe(true);
+      expect(ed.source.trimEnd().endsWith("// AI: it prints nothing yet")).toBe(true);
+      expect(ed.undo()).toBe(true);
+      expect(ed.source).toBe("package main\n\nfunc main() {}\n");
+    } finally {
+      ed.destroy();
+    }
+  });
+});

@@ -23,9 +23,11 @@ import {
   PROVIDERS,
   readAuto,
   readKey,
+  readNotes,
   readModel,
   readShown,
   writeAuto,
+  writeNotes,
   writeShown,
   writeKey,
   writeModel,
@@ -161,8 +163,28 @@ export class Panel {
     this.field = this.keyField = this.modelField = null;
   }
 
+  /**
+   * Open on CHAT with the caret already in the question field — the one
+   * press that means "I want to ask something", rather than open-the-panel
+   * then find-the-box.
+   *
+   * The focus is not taken here. The field is an overlay input placed by
+   * `drawChat` each frame and hidden while the panel is closed, and focusing
+   * a hidden element does nothing on any browser; so the wish is recorded and
+   * the draw honours it the moment the field has somewhere to be.
+   */
+  askNow(): void {
+    this.open = true;
+    this.mode = "chat";
+    this.wantsFocus = true;
+  }
+
+  /** Set by `askNow`, consumed by the draw that places the field. */
+  private wantsFocus = false;
+
   /** Nothing of the panel is on screen: put the fields away. */
   hideFields(): void {
+    this.wantsFocus = false;
     this.field?.hide();
     this.keyField?.hide();
     this.modelField?.hide();
@@ -359,6 +381,9 @@ export class Panel {
       { id: "savekey", label: t("agent.save"), primary: true },
       { id: "fetch", label: t("agent.fetchModels"), dim: this.fetching },
       { id: "auto", label: t("agent.auto"), strong: auto },
+      // Whether an answer is also left in the file as a comment
+      // (`ai/notes.ts`). Lit when it is, like AUTO beside it.
+      { id: "notes", label: t("agent.notes"), strong: readNotes() },
       // The character itself, on or off. The verbs do not depend on it.
       { id: "coder", label: readShown() ? t("agent.coderOn") : t("agent.coderOff") },
     ];
@@ -498,6 +523,10 @@ export class Panel {
     }
     well(g, rect[0], fieldY, rect[2], fieldH, [0.06, 0.05, 0.14, 0.98]);
     this.field?.place([rect[0] + 4, fieldY + 3, rect[2] - 8, fieldH - 6], body.size);
+    if (this.wantsFocus) {
+      this.wantsFocus = false;
+      setTimeout(() => this.fieldEl.focus(), 0);
+    }
 
     // The room.
     const listH = fieldY - gap - rect[1];
@@ -741,6 +770,13 @@ export class Panel {
         const on = !readAuto();
         writeAuto(on);
         this.status = on ? t("agent.autoOn") : t("agent.autoOff");
+        this.app.chip.blip();
+        break;
+      }
+      case "notes": {
+        const on = !readNotes();
+        writeNotes(on);
+        this.status = on ? t("agent.notesOn") : t("agent.notesOff");
         this.app.chip.blip();
         break;
       }

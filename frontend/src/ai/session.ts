@@ -14,7 +14,7 @@
  */
 import { needsKey, readKey, readModel, type Provider } from "./prefs";
 import { chat, type Msg, type Part, type Turn } from "./providers";
-import { numbered, runTool, toolsFor, type Bench } from "./tools";
+import { numbered, runTool, toolsFor, type Bench, type TaskBrief } from "./tools";
 
 /** How many times in one ask the model may come back for another tool. */
 export const MAX_ROUNDS = 10;
@@ -41,9 +41,78 @@ const LANG_NAME: Record<string, string> = {
   python: "Python 3",
 };
 
-/** The agent's standing orders. Stable text first, the file last. */
+/** The most of one stream or one wrong answer that goes into the prompt. */
+const CLIP = 2000;
+
+const clip = (text: string): string =>
+  text.length > CLIP ? `${text.slice(0, CLIP)}\n… (${text.length - CLIP} more characters)` : text;
+
+/**
+ * The exercise, for the screens that set one (`Bench.task`).
+ *
+ * Everything in here is something the person is already looking at: the
+ * brief they are reading, the sample cases under it, the report the last RUN
+ * printed, and — only on a quest they have already cleared, because that is
+ * the only time the server sends it — the reference answer. The hidden cases
+ * are a number, the way they are on the screen; there is nothing here for an
+ * unsolved quest's answer to come through, because the client does not have
+ * it either.
+ */
+function taskLines(task: TaskBrief): string[] {
+  const out = [
+    "",
+    "The person is not writing whatever they like: this screen is a graded exercise, and this is it.",
+    "",
+    `Title: ${task.title}`,
+    `Brief: ${task.brief}`,
+  ];
+  if (task.story?.trim()) out.push(`Story: ${task.story}`);
+  if (task.tests.length > 0) {
+    out.push("", "The sample cases (stdin → expected stdout):");
+    for (const c of task.tests)
+      out.push(`- ${JSON.stringify(c.stdin)} → ${JSON.stringify(c.expect)}`);
+  }
+  if (task.hiddenCount > 0) {
+    out.push(
+      `There are also ${task.hiddenCount} hidden case(s) nobody can see, including you. A program that only answers the samples will fail them.`,
+    );
+  }
+  if (task.lastRun) {
+    const r = task.lastRun;
+    out.push("", `The last RUN: ${r.verdict}, ${r.passed}/${r.total} of the visible cases passed.`);
+    if (r.stderr.trim())
+      out.push("What the compiler or the program said:", "```", clip(r.stderr), "```");
+    for (const c of r.failing) {
+      out.push(
+        `Failed on ${JSON.stringify(c.stdin)}: expected ${JSON.stringify(c.expect)}, got ${JSON.stringify(clip(c.got))}.`,
+      );
+    }
+  }
+  if (task.cleared)
+    out.push(
+      "",
+      "The person has already cleared this one; they are here to practise or to understand it.",
+    );
+  if (task.solution?.trim()) {
+    out.push(
+      "",
+      "The reference answer (they have cleared this quest, so they can already read it — use it to explain, not to replace their own):",
+      "```",
+      task.solution,
+      "```",
+    );
+  }
+  out.push(
+    "",
+    "On a graded screen: answer the question they asked. Explain, name the line, say what the compiler is complaining about. They learn nothing from a program that appeared while they were reading, so write the whole answer into the editor only when they ask you for it outright — and then say what it does.",
+  );
+  return out;
+}
+
+/** The agent's standing orders. Stable text first, the exercise, the file last. */
 export function systemPrompt(bench: Bench, canRun: boolean): string {
   const lang = LANG_NAME[bench.lang] ?? bench.lang;
+  const task = bench.task?.() ?? null;
   return [
     `You are the Rust coder — a small pixel-art character on a flying keyboard who lives on the code screen of Causewaybay Hacker, a 16-bit coding game set in Hong Kong. The person is learning ${lang}. You are their pair: a friendly senior engineer who explains briefly and lets the code speak.`,
     "",
@@ -59,6 +128,7 @@ export function systemPrompt(bench: Bench, canRun: boolean): string {
     "- Keep the person's style, names and formatting unless asked. Keep the program's existing behaviour unless asked.",
     "- Never invent an API. If unsure, prefer the plain standard-library way.",
     "- A picture is not a program. When the person asks for a picture, image, drawing or photo, call make_image with a prompt; do not write code that prints one, and do not describe it instead.",
+    ...(task ? taskLines(task) : []),
     "",
     `The file is ${bench.file}. Its current text, with line numbers (do not include the numbers in edits):`,
     "```",

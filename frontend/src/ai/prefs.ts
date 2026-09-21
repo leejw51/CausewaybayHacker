@@ -76,6 +76,7 @@ export const PROVIDER_BOT: Record<Provider, string> = {
 const PROVIDER_KEY = "ai.provider";
 const AUTO_KEY = "ai.auto";
 const SHOWN_KEY = "ai.shown";
+const NOTES_KEY = "ai.notes";
 const keyKey = (p: Provider) => `ai.key.${p}`;
 const modelKey = (p: Provider) => `ai.model.${p}`;
 
@@ -123,6 +124,20 @@ export function readShown(): boolean {
 
 export function writeShown(on: boolean): void {
   writePref(SHOWN_KEY, on ? "1" : "0");
+}
+
+/**
+ * Whether an answer is also written into the file as a comment
+ * (`ai/notes.ts`). On by default: the room scrolls, the file is kept, and the
+ * reply is about the code it lands in. One CTRL+Z takes a block back out, and
+ * this switch stops them arriving at all.
+ */
+export function readNotes(): boolean {
+  return readPref(NOTES_KEY) !== "0";
+}
+
+export function writeNotes(on: boolean): void {
+  writePref(NOTES_KEY, on ? "1" : "0");
 }
 
 /** A key's shape for the setup line: the first and last few characters. */

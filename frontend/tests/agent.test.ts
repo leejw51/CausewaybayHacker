@@ -27,8 +27,9 @@ import {
   needsKey,
   ollamaHost,
 } from "../src/ai/prefs";
-import { numbered, runTool, toolsFor, type Bench } from "../src/ai/tools";
+import { numbered, runTool, toolsFor, type Bench, type TaskBrief } from "../src/ai/tools";
 import { systemPrompt, MAX_ROUNDS } from "../src/ai/session";
+import { commentLines } from "../src/ai/notes";
 
 describe("the typing schedule", () => {
   it("never types faster than the floor", () => {
@@ -628,5 +629,130 @@ describe("the tools", () => {
     expect(p).toContain("cannot run code");
     expect(systemPrompt(bench(), true)).toContain("run_code");
     expect(MAX_ROUNDS).toBeGreaterThan(3);
+  });
+
+  it("tells the agent what the exercise is, when the screen sets one", () => {
+    const task: TaskBrief = {
+      title: "Thirty-two bytes",
+      brief: "Write n into buf, big-endian, zero-padded on the left.",
+      story: "The chain sees a hash as 64 hex digits.",
+      tests: [{ stdin: "255\n", expect: "32\n00…ff\n" }],
+      hiddenCount: 3,
+      cleared: false,
+      lastRun: {
+        verdict: "wrong_answer",
+        passed: 0,
+        total: 1,
+        stderr: "cannot use buf (variable of type [32]byte) as []byte value",
+        failing: [{ stdin: "255\n", expect: "32\n", got: "31\n" }],
+      },
+    };
+    const p = systemPrompt(bench({ task: () => task }), false);
+    expect(p).toContain("Thirty-two bytes");
+    expect(p).toContain("big-endian");
+    expect(p).toContain("The chain sees a hash");
+    expect(p).toContain("3 hidden case(s)");
+    expect(p).toContain("wrong_answer");
+    expect(p).toContain("cannot use buf");
+    // What came out against what was wanted, which is the whole question.
+    expect(p).toContain('expected "32\\n", got "31\\n"');
+    // And the file is still last, after the exercise.
+    expect(p.indexOf("Thirty-two bytes")).toBeLessThan(p.indexOf("The file is main.rs"));
+  });
+
+  it("says nothing about an exercise on a screen that sets none", () => {
+    const p = systemPrompt(bench(), false);
+    expect(p).not.toContain("graded exercise");
+    expect(systemPrompt(bench({ task: () => null }), false)).not.toContain("graded exercise");
+  });
+
+  it("carries the answer only when the player already has it", () => {
+    const base: TaskBrief = {
+      title: "t",
+      brief: "b",
+      tests: [],
+      hiddenCount: 0,
+      cleared: false,
+    };
+    expect(systemPrompt(bench({ task: () => base }), false)).not.toContain("reference answer");
+    const cleared = systemPrompt(
+      bench({
+        task: () => ({ ...base, cleared: true, solution: "fn main() { /* the answer */ }" }),
+      }),
+      false,
+    );
+    expect(cleared).toContain("reference answer");
+    expect(cleared).toContain("the answer");
+  });
+
+  it("clips a stream nobody needs three thousand characters of", () => {
+    const p = systemPrompt(
+      bench({
+        task: () => ({
+          title: "t",
+          brief: "b",
+          tests: [],
+          hiddenCount: 0,
+          cleared: false,
+          lastRun: {
+            verdict: "runtime_error",
+            passed: 0,
+            total: 1,
+            stderr: "x".repeat(9000),
+            failing: [],
+          },
+        }),
+      }),
+      false,
+    );
+    expect(p).toContain("more characters)");
+    expect(p.length).toBeLessThan(6000);
+  });
+});
+
+describe("the answer, as a comment in the file", () => {
+  it("marks the first line and lines up the rest under it", () => {
+    const lines = commentLines("A slice is a window on an array.", "go");
+    expect(lines).toEqual(["// AI: A slice is a window on an array."]);
+  });
+
+  it("wraps long prose and keeps every line a comment", () => {
+    const text =
+      "A slice is a window on an array: append may or may not give you a new one, " +
+      "and the only way to be sure is to assign the result back to the same name.";
+    const lines = commentLines(text, "rust");
+    expect(lines.length).toBeGreaterThan(1);
+    // Every line, not just the first — a bare line in the middle would be code.
+    for (const line of lines) expect(line.startsWith("//")).toBe(true);
+    // And nothing runs off into the margin.
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(72);
+    // The words survive the wrap, in order.
+    const back = lines
+      .map((l) => l.replace(/^\/\/\s*(AI:)?\s*/, ""))
+      .join(" ")
+      .replace(/\s+/g, " ");
+    expect(back).toBe(text);
+  });
+
+  it("uses the land's own comment mark", () => {
+    expect(commentLines("hello", "python")[0]).toBe("# AI: hello");
+    expect(commentLines("hello", "cpp")[0]).toBe("// AI: hello");
+  });
+
+  it("keeps a word that is longer than the line rather than cutting it", () => {
+    const url = "https://example.com/a/very/long/path/that/will/not/fit/on/one/line/at/all";
+    const lines = commentLines(`see ${url} for more`, "go");
+    expect(lines.join("\n")).toContain(url);
+  });
+
+  it("is nothing at all for a reply with nothing in it", () => {
+    expect(commentLines("", "go")).toEqual([]);
+    expect(commentLines("   \n  ", "go")).toEqual([]);
+  });
+
+  it("does not leave a bare blank line between paragraphs", () => {
+    const lines = commentLines("First thought.\n\nSecond thought.", "go");
+    for (const line of lines) expect(line.startsWith("//")).toBe(true);
+    expect(lines.join(" ")).toContain("Second thought.");
   });
 });

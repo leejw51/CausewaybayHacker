@@ -32,6 +32,7 @@ import {
   readKey,
   needsKey,
   readModel,
+  readNotes,
   readProvider,
   readShown,
   type Provider,
@@ -39,9 +40,10 @@ import {
 import { Session, type Listener, type Mood } from "../../ai/session";
 import { Typist } from "../../ai/typist";
 import { advise, nextTip, TIPS } from "../../ai/tips";
+import { commentLines } from "../../ai/notes";
 import { helpAt, type CodeContext } from "../../ai/help";
 import { completeAt } from "../../ai/complete";
-import type { Bench, RunReport } from "../../ai/tools";
+import type { Bench, RunReport, TaskBrief } from "../../ai/tools";
 import { image as makeImage } from "../../ai/providers";
 import { burstPlan, coinPlan, pointerPlan } from "../../engine/burst";
 import type { CodeFx } from "../codefx";
@@ -70,6 +72,12 @@ export interface Host {
   ensureRoom(): Promise<string | null>;
   /** The pad's name, for the line that says it now exists. */
   roomName(): string;
+  /**
+   * The exercise the screen is set to, for the prompt — the brief, the sample
+   * cases, and what the last RUN said. Absent on the playground, which sets
+   * nobody anything. Asked on every ask, so the answer is current.
+   */
+  task?: () => TaskBrief | null;
   /** RUN as the button does, or null where a run would count against the player. */
   run: ((source: string, stdin?: string) => Promise<RunReport>) | null;
   format: (() => Promise<{ changed: boolean; problem?: string }>) | null;
@@ -285,6 +293,20 @@ export class Coder {
 
   get open(): boolean {
     return this.panel.open;
+  }
+
+  /**
+   * ASK: open the room straight into the question. The panel comes up on
+   * CHAT with the caret in the field, rather than wherever it was left, so
+   * the press means "I have a question" and not "show me the panel". What a
+   * press on an *open* panel does is the screen's to decide — the quest bench
+   * closes it, the way every other lit button there does.
+   */
+  openAsk(): void {
+    this.panel.askNow();
+    this.syncRoom();
+    if (this.room && this.held.cursor > 0) void this.refreshRoom(this.room);
+    this.host.chip.select();
   }
 
   toggle(): void {
@@ -542,6 +564,7 @@ export class Coder {
         });
         return r.stopped ? { ok: false, why: "stopped by the person" } : { ok: true };
       },
+      task: host.task ? () => host.task!() : null,
       run: host.run
         ? async (stdin) => {
             const r = await host.run!(this.editor?.source ?? "", stdin);
@@ -702,6 +725,7 @@ export class Coder {
       const reply = await session.ask(provider, text);
       if (reply.trim()) {
         this.say(reply, "say");
+        this.noteInCode(reply);
         const said = [...this.panel.items]
           .reverse()
           .find((i) => i.role === "agent" && i.id === undefined);
@@ -723,6 +747,31 @@ export class Coder {
         this.live = null;
       }
     }
+  }
+
+  /**
+   * The answer, written into the file as a comment above the caret's line.
+   *
+   * The bubble fades and the room scrolls; the file is what gets saved, and
+   * the question was about the line the person was looking at. So the reply
+   * goes there too — `ai/notes.ts` shapes it, `Editor.noteAbove` puts it in
+   * as one change, and one CTRL+Z takes it back out.
+   *
+   * Not while the typist is working: the model may have just written a
+   * program and the last characters of it may still be arriving, and a
+   * comment landing in the middle of that would be a comment inside a
+   * half-typed statement. Off with the switch in SETUP, and off on a screen
+   * with no editor to write into.
+   */
+  private noteInCode(reply: string): void {
+    if (!readNotes() || this.typist.busy) return;
+    const editor = this.editor;
+    if (!editor) return;
+    const lines = commentLines(reply, this.host.lang());
+    if (lines.length === 0) return;
+    editor.noteAbove(lines);
+    this.host.touched();
+    this.host.chip.blip();
   }
 
   send(text: string): Promise<void> {

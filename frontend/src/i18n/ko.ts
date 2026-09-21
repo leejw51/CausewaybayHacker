@@ -184,7 +184,7 @@ export const ko: Partial<Catalogue> = {
   "map.resetShort": "초기화",
   "map.resetTitle": "다시 걸을까요?",
   "map.resetBody":
-    "{road}이(가) 처음 상태로 돌아갑니다 — {total}개 중 {cleared}개의 도장과 별이 사라집니다. XP와 실수 기록은 남고, 다시 클리어해도 XP는 주지 않습니다.",
+    "{road}이(가) 처음 상태로 돌아갑니다 — {total}개 중 {cleared}개의 도장과 별이 사라지고, 각 문제의 코드는 처음 코드로 되돌아갑니다. XP와 실수 기록은 남고, 다시 클리어해도 XP는 주지 않습니다.",
   "map.resetGo": "초기화",
   "map.resetKeep": "그대로 두기",
   "map.resetFailed": "초기화하지 못했습니다",
@@ -233,6 +233,7 @@ export const ko: Partial<Catalogue> = {
   "quest.lobby": "로비",
   "quest.copyBrief": "과제 복사",
   "quest.copyCode": "코드 복사",
+  "quest.copyAsk": "문제+코드 복사",
   "quest.copyOutput": "출력 복사",
   "quest.paste": "붙여넣기",
   "quest.briefSide": "과제: 옆",
@@ -396,6 +397,7 @@ export const ko: Partial<Catalogue> = {
   "lands.codePlaygroundNote":
     "무엇이든 쓰고 실행하세요. AI 에이전트 러스트 코더가 옆에서 날아다닙니다",
   "agent.button": "에이전트",
+  "agent.ask": "AI에게 묻기",
   "agent.title": "러스트 코더",
   "agent.setup": "설정",
   "agent.chat": "대화",
@@ -409,6 +411,9 @@ export const ko: Partial<Catalogue> = {
   "agent.auto": "자동",
   "agent.autoOn": "자동 리뷰: 켬 — 3분에 최대 한 번, 손을 멈춘 뒤에만",
   "agent.autoOff": "자동 리뷰: 끔",
+  "agent.notes": "주석",
+  "agent.notesOn": "답변을 커서 윗줄에 주석으로 넣습니다 — CTRL+Z로 되돌릴 수 있습니다",
+  "agent.notesOff": "답변은 대화창에만 남습니다",
   "agent.keyHint": "{provider} API 키를 붙여넣으세요 — 이 브라우저에만 저장됩니다",
   "agent.modelHint": "모델 이름",
   "agent.fetchModels": "모델 목록",
@@ -700,6 +705,7 @@ export const ko: Partial<Catalogue> = {
   "clip.sameAlready": "클립보드 내용이 편집기의 내용과 이미 같습니다",
   "clip.theBrief": "과제",
   "clip.yourCode": "당신의 코드",
+  "clip.questionAndCode": "문제와 당신의 코드",
   "clip.theInput": "입력",
   "clip.pasteInputByKey":
     "이 페이지는 클립보드를 읽을 수 없습니다 — 표준 입력 상자에 직접 붙여넣으세요",

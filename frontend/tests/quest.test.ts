@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  askBlock,
   briefNeedsNote,
   clearsForAnswer,
   editControls,
@@ -288,5 +289,45 @@ describe("the buttons and the dispatch agree", () => {
   it("keeps FORMAT among them, which is the one that was missing", () => {
     expect(drawn.has("format")).toBe(true);
     expect(handled.has("format")).toBe(true);
+  });
+});
+
+describe("the question and the code, on the clipboard", () => {
+  const parts = {
+    brief: "05  Thirty-two bytes\n\nWrite n into buf, big-endian.\n",
+    file: "main.go",
+    fence: "go",
+    source: "package main\n\nfunc main() {}\n",
+    output: "wrong answer\n0 / 1 cases\n",
+  };
+
+  it("carries both halves, fenced for whatever chat box it is pasted into", () => {
+    const text = askBlock(parts);
+    expect(text).toContain("Thirty-two bytes");
+    expect(text).toContain("## main.go");
+    expect(text).toContain("```go");
+    expect(text).toContain("package main");
+    // The brief comes first: it is the question, and the code is the answer
+    // so far. A reader that gets them the other way round reads a program
+    // before it knows what the program was for.
+    expect(text.indexOf("Thirty-two bytes")).toBeLessThan(text.indexOf("package main"));
+    // Every fence is closed, or the paste swallows whatever follows it.
+    expect((text.match(/```/g) ?? []).length % 2).toBe(0);
+  });
+
+  it("takes the console along when there is one, and leaves the heading out when there is not", () => {
+    expect(askBlock(parts)).toContain("wrong answer");
+    expect(askBlock({ ...parts, output: "   \n" })).not.toContain("```\n\n```");
+    expect(
+      askBlock({ ...parts, output: "" })
+        .trimEnd()
+        .endsWith("```"),
+    ).toBe(true);
+  });
+
+  it("copies the code alone before the quest has arrived", () => {
+    const text = askBlock({ ...parts, brief: "", output: "" });
+    expect(text).toContain("package main");
+    expect(text.startsWith("## main.go")).toBe(true);
   });
 });

@@ -56,6 +56,7 @@ import { burstPlan } from "../engine/burst";
 import { Overlay } from "../ui/overlay";
 import { CodeFx } from "../ui/codefx";
 import { Coder } from "../ui/agent/coder";
+import type { TaskBrief } from "../ai/tools";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
 import type { Attempt, XpGain, Category, EditState, Land, Quest, RunStage } from "../net/protocol";
@@ -90,6 +91,12 @@ const STACK_KEY = "quest.stack";
 const FONT_KEY = CODE_FONT_KEY;
 const STACKS = ["auto", "row", "column"] as const;
 /** Half again down, two and a half times up, in steps somebody can feel. */
+/**
+ * The fence a Markdown reader wants for each land. `cpp` and `py` are the
+ * tags every renderer knows; the file's own extension is not always one.
+ */
+const FENCE_LANG: Record<Land, string> = { rust: "rust", go: "go", cpp: "cpp", python: "python" };
+
 const FONT_MIN = CODE_FONT_MIN;
 const FONT_MAX = CODE_FONT_MAX;
 const FONT_STEP = 0.15;
@@ -148,6 +155,40 @@ export function openingSource(
   quest: { draft?: string | null; starter: string },
 ): string {
   return local ?? quest.draft ?? quest.starter;
+}
+
+/**
+ * The exercise and the code in one block, for asking somebody else.
+ *
+ * The player's own AI is a browser tab away, and what it needs is both
+ * halves: the question they were set and the program they have so far. Two
+ * presses and a hand-assembled paste is how that goes wrong — the code
+ * without the brief, or the brief without the last error — so one press
+ * produces the whole thing, fenced as Markdown, because every chat box on the
+ * internet reads Markdown.
+ *
+ * Nothing in it is anything the player cannot already see: the brief is COPY
+ * BRIEF's text, the code is theirs, and the output is the console in front of
+ * them. The hidden cases stay a number, and the answer — which the server
+ * sends only once a quest is cleared — is not in it at all.
+ *
+ * Each section is left out when it is empty, so a quest that has not loaded
+ * yet copies the code alone rather than a heading over nothing.
+ */
+export function askBlock(parts: {
+  brief: string;
+  file: string;
+  fence: string;
+  source: string;
+  output: string;
+}): string {
+  const out: string[] = [];
+  const brief = parts.brief.trim();
+  if (brief) out.push(`## ${t("clip.theBrief")}`, "", brief, "");
+  out.push(`## ${parts.file}`, "", "```" + parts.fence, parts.source.trimEnd(), "```");
+  const output = parts.output.trim();
+  if (output) out.push("", `## ${t("clip.theOutput")}`, "", "```", output, "```");
+  return out.join("\n") + "\n";
 }
 
 /**
@@ -550,6 +591,14 @@ export class QuestScene implements Scene {
       this.coder?.leave();
       this.coder = new Coder(this.app, {
         lang: () => this.land,
+        // §4.8's quest, as the agent needs it: what the person was asked to
+        // do, the cases they can see, and what the last RUN said. Without it
+        // the agent on this screen can read the file and nothing else, which
+        // makes the one question anybody has here — "why is this wrong?" —
+        // the one question it cannot answer. The hidden cases go in as a
+        // count, and `solution` is only ever in the payload for a quest this
+        // player has already cleared.
+        task: () => this.taskBrief(),
         roomId: () => null,
         roomKey: () => "quest",
         ensureRoom: async () => null,
@@ -703,6 +752,69 @@ export class QuestScene implements Scene {
           ? playerText(e.payload.code)
           : t("quest.runFailed");
     }
+  }
+
+  /**
+   * The exercise, for the agent's prompt (`ai/tools.ts` `TaskBrief`).
+   *
+   * Built fresh on every ask rather than handed over at mount, so the run
+   * report in it is the last run and not whichever one the panel happened to
+   * open on. Null until `quest.get` has answered: an agent told about an
+   * exercise that has not arrived would be told about nothing.
+   *
+   * The last *submit* is not here. A submit leaves this screen for the
+   * verdict, and TRY AGAIN comes back with the source and not the attempt;
+   * what the agent sees of a failure is therefore the RUN, which is the
+   * button a person presses while they are still working on it.
+   */
+  private taskBrief(): TaskBrief | null {
+    const q = this.quest;
+    if (!q) return null;
+    const run = this.runResult;
+    return {
+      title: q.title,
+      brief: q.brief,
+      story: q.story,
+      tests: q.tests.visible.map((c) => ({ stdin: c.stdin, expect: c.expect })),
+      hiddenCount: q.tests.hidden_count,
+      cleared: q.state === "cleared",
+      solution: q.solution,
+      lastRun: run
+        ? {
+            verdict: run.verdict,
+            passed: run.tests_passed,
+            total: run.tests_total,
+            stderr: run.stderr,
+            failing: run.cases
+              .filter((c) => c.visible && !c.passed)
+              .map((c) => ({ stdin: c.stdin ?? "", expect: c.expect ?? "", got: c.got ?? "" })),
+          }
+        : undefined,
+    };
+  }
+
+  /**
+   * ASK AI, from either page.
+   *
+   * The room is drawn by `drawFocus` and by nothing else: on the split page
+   * the editor has half a screen already and a panel carved out of that half
+   * would be a column of six characters. So the press that asks a question
+   * takes the code page first and opens the room there, where there is room
+   * for it. That is not a detour — it is the same move a person makes by hand
+   * — and it is why the button did nothing at all on the split page before,
+   * which is the bug this exists to close: `panel.open` went true, the panel
+   * had nowhere to be drawn, and the screen looked broken.
+   */
+  private askAi(): void {
+    if (!this.coder) return;
+    if (!this.focus) {
+      this.focus = true;
+      // The same silence `case "focus"` asks for: the code page is somebody
+      // working, and a loop over a writing session is the thing you cannot
+      // un-hear.
+      this.app.chip.music("stop");
+    }
+    this.coder.openAsk();
   }
 
   /** Every visible case the run actually executed came back passing. */
@@ -1415,6 +1527,32 @@ export class QuestScene implements Scene {
     return out.join("\n") + "\n";
   }
 
+  /**
+   * The exercise and the code in one block, for asking somebody else.
+   *
+   * The player's own AI is a browser tab away, and what it needs is both
+   * halves: the question they were set and the program they have so far. Two
+   * presses and a hand-assembled paste is how that goes wrong — the code
+   * without the brief, or the brief without the last error — so this is one
+   * press that produces the whole thing, fenced as Markdown because every
+   * chat box on the internet reads Markdown.
+   *
+   * Nothing here is anything the player cannot already see: `briefText` is
+   * the COPY BRIEF button's text, the code is theirs, and the run report is
+   * the console they are looking at. The hidden cases stay a number, and the
+   * answer — which the server only sends once a quest is cleared — is not in
+   * it at all.
+   */
+  private askText(): string {
+    return askBlock({
+      brief: this.quest ? this.briefText() : "",
+      file: MAIN_FILE[this.land],
+      fence: FENCE_LANG[this.land],
+      source: this.editor?.source ?? "",
+      output: this.consoleText(),
+    });
+  }
+
   /** Everything in the console drawer, including the run report above it. */
   private consoleText(): string {
     const out: string[] = [];
@@ -1453,19 +1591,23 @@ export class QuestScene implements Scene {
     else this.app.chip.fail();
   }
 
-  private async copy(what: "brief" | "code" | "output"): Promise<void> {
+  private async copy(what: "brief" | "code" | "output" | "ask"): Promise<void> {
     const text =
       what === "brief"
         ? this.briefText()
         : what === "code"
           ? (this.editor?.source ?? "")
-          : this.consoleText();
+          : what === "ask"
+            ? this.askText()
+            : this.consoleText();
     const name =
       what === "brief"
         ? t("clip.theBrief")
         : what === "code"
           ? t("clip.yourCode")
-          : t("clip.theOutput");
+          : what === "ask"
+            ? t("clip.questionAndCode")
+            : t("clip.theOutput");
     this.report(name, await copyText(text), "copy");
   }
 
@@ -1654,7 +1796,12 @@ export class QuestScene implements Scene {
         void this.format();
         break;
       case "agent":
-        this.coder?.toggle();
+        // Open *and* in view: the same press closes it, which is what a lit
+        // button means everywhere else here. Open but not in view cannot
+        // happen any more (`unfocus` closes it), and if it ever does the
+        // press that fixes it is the one that shows the room.
+        if (this.coder?.open && this.focus) this.coder.toggle();
+        else this.askAi();
         break;
       case "focus":
         this.focus = true;
@@ -1667,6 +1814,10 @@ export class QuestScene implements Scene {
         break;
       case "unfocus":
         this.focus = false;
+        // The room goes with the page it is drawn on. Left open behind the
+        // split page it would be a lit button over a panel nobody can see —
+        // which is exactly how ASK looked before it took this page first.
+        if (this.coder?.open) this.coder.toggle();
         break;
       case "answer":
         void this.toggleAnswer();
@@ -1716,6 +1867,9 @@ export class QuestScene implements Scene {
         break;
       case "lobby":
         void this.leaveTo("lobby");
+        break;
+      case "copyask":
+        void this.copy("ask");
         break;
       case "copybrief":
         void this.copy("brief");
@@ -2022,7 +2176,22 @@ export class QuestScene implements Scene {
       ...(this.app.client.canFormat(this.land)
         ? [{ id: "format", label: t("quest.format"), dim: this.formatting }]
         : []),
-      { id: "agent", label: t("agent.button"), strong: this.coder?.open ?? false },
+      // ASK AI, not AGENT. On a graded screen the thing a person wants is to
+      // ask a question about the exercise in front of them, so the button
+      // says that and the press lands in the question field with the caret
+      // already in it — the panel, the provider tabs and SETUP are all still
+      // there, one press further in.
+      // Lit only while the room is both open and drawn — `askAi` and
+      // `unfocus` keep those two together, and the label must not be able to
+      // claim otherwise.
+      { id: "agent", label: t("agent.ask"), strong: (this.coder?.open ?? false) && this.focus },
+      // The other way to ask, and the one that needs no key: the question and
+      // the code, fenced, on the clipboard, for whatever the person already
+      // has open in another tab. It lives on the bench rather than with the
+      // clipboard chips in the tool row because the tool row is the row that
+      // goes away on a phone (`toolItems`), and this is the press that
+      // matters most exactly there.
+      { id: "copyask", label: t("quest.copyAsk"), dim: !this.quest && !this.editor },
       { id: "undo", label: t("quest.undo"), dim: !steps.undo },
       { id: "redo", label: t("quest.redo"), dim: !steps.redo },
       { id: "hint", label: hintLabel, dim: hintsLeft <= 0 },

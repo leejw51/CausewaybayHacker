@@ -198,7 +198,7 @@ export const en = {
   "map.resetShort": "RESET",
   "map.resetTitle": "WALK IT AGAIN?",
   "map.resetBody":
-    "{road} goes back to untouched — {cleared} of {total} streets lose their stamp and stars. Your XP and your mistakes are kept, and clearing them again pays no XP.",
+    "{road} goes back to untouched — {cleared} of {total} streets lose their stamp and stars, and every editor on the road goes back to its starter. Your XP and your mistakes are kept, and clearing them again pays no XP.",
   "map.resetGo": "RESET IT",
   "map.resetKeep": "KEEP MY PROGRESS",
   "map.resetFailed": "the reset did not go through",
@@ -249,6 +249,7 @@ export const en = {
   "quest.lobby": "LOBBY",
   "quest.copyBrief": "COPY BRIEF",
   "quest.copyCode": "COPY CODE",
+  "quest.copyAsk": "COPY Q+CODE",
   "quest.copyOutput": "COPY OUTPUT",
   "quest.paste": "PASTE",
   "quest.briefSide": "BRIEF: SIDE",
@@ -415,6 +416,7 @@ export const en = {
   "lands.codePlaygroundNote":
     "write anything, run it, and the Rust coder — an AI agent — flies beside you",
   "agent.button": "AGENT",
+  "agent.ask": "ASK AI",
   "agent.title": "RUST CODER",
   "agent.setup": "SETUP",
   "agent.chat": "CHAT",
@@ -428,6 +430,10 @@ export const en = {
   "agent.auto": "AUTO",
   "agent.autoOn": "auto review: on — at most one call every three minutes, only after a pause",
   "agent.autoOff": "auto review: off",
+  "agent.notes": "COMMENT",
+  "agent.notesOn":
+    "answers are written into the file as a comment above the caret — CTRL+Z takes one back out",
+  "agent.notesOff": "answers stay in the room",
   "agent.keyHint": "paste the {provider} api key — it stays in this browser",
   "agent.modelHint": "model name",
   "agent.fetchModels": "FETCH MODELS",
@@ -730,6 +736,7 @@ export const en = {
   "clip.sameAlready": "the clipboard already matches what is in the editor",
   "clip.theBrief": "the brief",
   "clip.yourCode": "your code",
+  "clip.questionAndCode": "the question and your code",
   "clip.theInput": "the input",
   "clip.pasteInputByKey":
     "this page cannot read the clipboard — leave CODE and paste into the STDIN box",

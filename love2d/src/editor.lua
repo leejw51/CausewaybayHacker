@@ -468,6 +468,42 @@ end
 --- does survive; the ink stream is what catches everything else.
 ---
 --- One `push_undo` and no other, so ctrl-Z puts the buffer back in one press.
+--- Put whole lines in **above** the line the caret is on, indented like it,
+--- and leave the caret on the same text it was on.
+---
+--- The browser's `Editor.noteAbove`: for the coder's answer-as-a-comment
+--- (`src/agent/notes.lua`). One undo entry, not one per line — text that
+--- appeared in somebody's file without them typing it has to come back out
+--- in a single press.
+function Editor:note_above(lines)
+  if self.read_only or not lines or #lines == 0 then return end
+  self:bump()
+  self:push_undo(false)
+  self:clear_selection()
+  -- A caret at the very top usually means nobody has put it anywhere: the
+  -- question was typed into the room and the code has never been touched. An
+  -- answer about the program then belongs after the program, not wedged above
+  -- its first line. (The browser's `noteAbove` does the same.)
+  if self.line == 1 and self.col == 1 and #self.lines > 1 then
+    for _, line in ipairs(lines) do
+      self.lines[#self.lines + 1] = line
+    end
+    self.line = #self.lines
+    self.col = #(self.lines[self.line] or "") + 1
+    self:bump()
+    return
+  end
+  local current = self.lines[self.line] or ""
+  local indent = current:match("^[ \t]*") or ""
+  local at = self.line
+  for i, line in ipairs(lines) do
+    table.insert(self.lines, at + i - 1, indent .. line)
+  end
+  -- The caret keeps the text it was on, which is now further down.
+  self.line = self.line + #lines
+  self:bump()
+end
+
 function Editor:replace_all(text)
   if self.read_only then return false end
   self:bump()

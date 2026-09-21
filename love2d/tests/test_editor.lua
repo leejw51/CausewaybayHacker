@@ -898,6 +898,43 @@ return function()
     T.eq(ed:text(), "one\ntwo")
   end)
 
+  T.section("editor — the coder's answer, put in above the caret")
+
+  T.case("goes in above the caret's line, indented like it, in one undo", function()
+    local ed = editor.new({})
+    ed:set_text("func main() {\n    fmt.Println(a)\n}")
+    ed.line, ed.col = 2, 5
+    ed:note_above({ "// AI: a is a slice", "//     of five ints" })
+    local lines = {}
+    for line in (ed:text() .. "\n"):gmatch("(.-)\n") do lines[#lines + 1] = line end
+    T.eq(lines[2], "    // AI: a is a slice", "the first line takes the caret line's indent")
+    T.eq(lines[3], "    //     of five ints")
+    T.eq(lines[4], "    fmt.Println(a)", "the code it was about is still under it")
+    T.eq(ed.line, 4, "and the caret is still on that code")
+    -- One press takes the whole block out again, not one line of it.
+    T.ok(ed:undo(), "there is something to undo")
+    T.eq(ed:text(), "func main() {\n    fmt.Println(a)\n}", "all of it, in one step")
+  end)
+
+  T.case("goes after the program when the caret was never put anywhere", function()
+    local ed = editor.new({})
+    ed:set_text("package main\n\nfunc main() {}")
+    T.eq(ed.line, 1)
+    T.eq(ed.col, 1)
+    ed:note_above({ "// AI: it prints nothing yet" })
+    local text = ed:text()
+    T.ok(text:sub(1, 12) == "package main", "the top of the file is untouched")
+    T.ok(text:find("// AI: it prints nothing yet", 1, true) > #"package main",
+      "and the answer is after the program")
+  end)
+
+  T.case("nothing to say is nothing written", function()
+    local ed = editor.new({})
+    ed:set_text("x")
+    ed:note_above({})
+    T.eq(ed:text(), "x")
+  end)
+
   T.section("editor — no love in the model")
 
   T.case("src/editor.lua does not reference love", function()
