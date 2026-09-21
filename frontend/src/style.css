@@ -269,8 +269,36 @@ body {
    read; what has been typed *instead of* it is marked in the failure colour,
    because the whole point of the mode is to see the divergence and fix it. */
 .cwb-editor .cwb-ghost {
-  color: rgba(252, 236, 200, 0.32);
+  /* Bright enough to read without leaning in. It was 0.32 and players said
+     the drill was hard for the wrong reason — squinting at the target is not
+     the exercise, typing it is. */
+  color: rgba(252, 236, 200, 0.55);
   white-space: pre-wrap;
+  /* The answer arrives rather than appears: `scenes/quest.ts` eases this
+     from 0 when the mode comes on. No CSS transition — the value is set
+     every frame, and a transition on it would restart every frame. */
+  opacity: var(--cwb-ghost-in, 1);
+}
+/* A hole in the drill: the word BLANKS and "type only the answer" are asking
+   for. It is drawn — the answer is on screen either way — and what marks it
+   as yours is that it breathes.
+
+   Two brightnesses, both eased in TypeScript (`holeGlow`) and written here
+   every frame: the hole you are standing on burns in and out exponentially,
+   and the ones further down sit dim and steady so the page is not a
+   fairground. Reduced motion pins both, in `scenes/quest.ts`, where the
+   curve is. */
+.cwb-editor .cwb-blank {
+  /* `Theme.coin`. Not a colour of its own: the ghost is the page's cream,
+     the coder's suggestion is its cyan, and a hole is the bit worth
+     something — which is also the colour of the coins that fly out of it
+     when it is typed. */
+  color: rgba(248, 208, 48, 0.95);
+  opacity: var(--cwb-hole-rest, 0.5);
+}
+.cwb-editor .cwb-blank-now {
+  opacity: var(--cwb-hole-now, 1);
+  text-shadow: 0 0 6px rgba(248, 208, 48, 0.45);
 }
 /* The coder's suggestion. The drill's ghost is the page's own ink faded;
    this one is the agent's cyan, because it is the agent talking and the two

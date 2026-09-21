@@ -115,6 +115,13 @@ const AUTO_DELTA = 40;
 const HINT_AFTER = 0.28;
 const HELP_AFTER = 1.1;
 
+/**
+ * The shortest gap between two dives at the caret while a drill is filling
+ * words in. Short enough to feel like it is watching, long enough that a
+ * fast typist does not drag the sprite up and down the file.
+ */
+const CHEER_EVERY = 2.6;
+
 /** How long a bubble stays, plus a share per character. */
 const BUBBLE_BASE = 4.5;
 const BUBBLE_PER_CHAR = 0.045;
@@ -173,6 +180,10 @@ export class Coder {
   private bubble: { text: string; until: number; tone: "say" | "tip" | "busy" } | null = null;
   /** How present the sprite is, 0..1: eased in when agent mode opens, out when it closes. */
   private presence = 0;
+  /** Whether a drill has the sprite out (`follow`). */
+  private follows = false;
+  /** When the last `cheer` flew, so they do not stack up. */
+  private cheeredAt = -99;
   private wasActive = false;
   /** When the pointer last moved, on the coder's clock, for the calm. */
   private pointerAt = -Infinity;
@@ -242,11 +253,54 @@ export class Coder {
   }
 
   /**
-   * Agent mode: the sprite lives only while the panel is open. Off, it
-   * fades out and stops; on, it arrives huge and shrinks to size.
+   * Agent mode: the sprite lives while the panel is open — or while a drill
+   * is on. Off, it fades out and stops; on, it arrives huge and shrinks to
+   * size.
+   *
+   * **The drill is the coder's other job.** ANSWER, BLANKS and "type only
+   * the answer" finish words and close brackets for the player
+   * (`scenes/quest.ts` `fillBlanks`), and a screen where text appears that
+   * nobody typed should show who is typing it. So the sprite comes out with
+   * the mode and flies over the editor while it lasts.
+   *
+   * It is presence only: `update` keeps the tips, the advice, the grey
+   * suggestion and AUTO behind `panel.open`, so nothing here asks anything
+   * of a model and nothing talks over the exercise (docs/agent.md §1).
    */
   get active(): boolean {
-    return readShown() && this.panel.open;
+    return readShown() && (this.panel.open || this.follows);
+  }
+
+  /**
+   * Whether a drill is on, set by the screen that owns the mode.
+   *
+   * Not read from anywhere: the editor knows it has a target, but "is the
+   * player drilling" is the quest screen's fact and the screen says so.
+   */
+  follow(on: boolean): void {
+    this.follows = on;
+  }
+
+  /**
+   * The drill just typed something for the player. Look pleased about it.
+   *
+   * A kick every time — it is one frame of squash and costs nothing — and a
+   * roll now and then, because a character that celebrated every completed
+   * word would be a strobe.
+   *
+   * **Nothing at the caret.** The particles over the editor have one owner
+   * (`scenes/quest.ts` `answerTick`), and a second burst from over here
+   * would land on top of the coins the word is already flying in on. Same
+   * reason `peek` is not called: it parks the sprite on the line being read
+   * off, which is the one thing this screen cannot spare.
+   */
+  cheer(): void {
+    if (!this.active) return;
+    this.sprite.kick();
+    if (this.t - this.cheeredAt < CHEER_EVERY) return;
+    this.cheeredAt = this.t;
+    this.sprite.roll();
+    if (this.panel.open) this.sprite.peek();
   }
 
   /** Whether a virtual point is on the sprite. */
@@ -950,9 +1004,11 @@ export class Coder {
       // completions for, and a ghost beside it would be typed straight over.
       this.editor?.suggest(null);
       this.lastPos = -1;
-    } else this.caretWork(dt);
-    // Held for a reader: no tips or advice over the words being read.
-    if (!busy && !this.sprite.holding) {
+    } else if (this.panel.open) this.caretWork(dt);
+    // Held for a reader: no tips or advice over the words being read — and
+    // none at all when the sprite is only out because a drill is on: the
+    // player is copying an answer, and a bubble over it is in the way.
+    if (!busy && !this.sprite.holding && this.panel.open) {
       // Advice: read the text once it has sat still.
       if (!this.advised && this.sinceChange >= ADVISE_AFTER && src.trim()) {
         this.advised = true;

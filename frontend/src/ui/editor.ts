@@ -155,21 +155,51 @@ const retro = HighlightStyle.define([
  * point of the mode is to notice the divergence and fix it.
  */
 class GhostText extends WidgetType {
-  constructor(
-    readonly text: string,
-    readonly block: boolean,
-  ) {
+  constructor(readonly segs: readonly GhostSeg[]) {
     super();
   }
   eq(other: GhostText): boolean {
-    return other.text === this.text && other.block === this.block;
+    return (
+      other.segs.length === this.segs.length &&
+      other.segs.every(
+        (g, i) =>
+          g.text === this.segs[i].text &&
+          g.hole === this.segs[i].hole &&
+          g.now === this.segs[i].now,
+      )
+    );
   }
   toDOM(): HTMLElement {
-    const el = document.createElement(this.block ? "div" : "span");
-    // An empty ghost is not a ghost: it is the marker for a divergence that
-    // has no width of its own — a stray blank line past the end.
-    el.className = this.text === "" ? "cwb-wrong cwb-wrong-empty" : "cwb-ghost";
-    el.textContent = this.text;
+    const el = document.createElement("span");
+    el.className = "cwb-ghost";
+    for (const g of this.segs) {
+      const part = document.createElement("span");
+      // A hole is the thing being asked for, so it is the thing that moves:
+      // `cwb-blank` breathes it in and out (`style.css`) while the rest of
+      // the answer sits still behind the typing.
+      part.className = g.hole ? (g.now ? "cwb-blank cwb-blank-now" : "cwb-blank") : "cwb-plain";
+      part.textContent = g.text;
+      el.appendChild(part);
+    }
+    return el;
+  }
+  ignoreEvent(): boolean {
+    return false;
+  }
+}
+
+/**
+ * A divergence with no width of its own — a stray blank line past the end of
+ * the answer. A mark over it is a zero-length range, which draws nothing, so
+ * the count would say FIX THE RED with no red anywhere on screen.
+ */
+class WrongEmpty extends WidgetType {
+  eq(): boolean {
+    return true;
+  }
+  toDOM(): HTMLElement {
+    const el = document.createElement("span");
+    el.className = "cwb-wrong cwb-wrong-empty";
     return el;
   }
   ignoreEvent(): boolean {
@@ -325,6 +355,19 @@ export function solutionBlanks(answer: string, starter: string): Blank[] {
   return out;
 }
 
+/**
+ * The hole the typing is on at `at` characters in: the first one it has not
+ * got past.
+ *
+ * The buffer is always a prefix of the answer, so "how far in" is all that
+ * is needed to say which hole is live — no caret, no selection. The ghost
+ * uses it to pick the hole that breathes and the quest screen to notice one
+ * being left behind.
+ */
+export function holeAt(blanks: readonly Blank[], at: number): Blank | null {
+  return blanks.find((b) => b.to > at) ?? null;
+}
+
 /** True while `at` is inside a hole — the part that is the player's to type. */
 function blankAt(blanks: Blank[], at: number): Blank | undefined {
   return blanks.find((b) => at >= b.from && at < b.to);
@@ -351,34 +394,100 @@ export function blanksFill(typed: string, target: Target): string | null {
   return upto > matched ? text.slice(matched, upto) : null;
 }
 
+/** One run of the ghost, and whether it is a hole the drill is asking for. */
+export interface GhostSeg {
+  text: string;
+  hole: boolean;
+  /** The hole the player is on, as opposed to the ones further down. */
+  now: boolean;
+}
+
 /**
- * The answer as the *ghost* should show it: holes masked.
+ * How brightly the hole you are on is burning, 0..1, at `t` seconds.
  *
- * Drawing the real text inside a hole would hand the player the very word
- * the drill is asking them for. The mask keeps the line's shape — and its
- * width — so the program on screen still reads as the program.
+ * **Exponential, not a sine.** A sine spends most of its time halfway, which
+ * on a word you are trying to read is the worst place to be. This rushes in
+ * on `1 - e^-kt`, *holds* at the top for a beat — the beat you read it in —
+ * decays away on `e^-kt`, and rests dark before coming round again. So the
+ * word is either legible or out of the way, and barely anything in between.
+ *
+ * Pure, and fed the scene's own clock rather than the wall's, because the
+ * capture hook steps the game a frame at a time and a screenshot has to be
+ * the same picture every run (`dev/capture.ts`).
  */
-export function maskBlanks(target: Target): string {
-  const { text, blanks } = target;
-  if (blanks.length === 0) return text;
-  let out = "";
-  let at = 0;
+export const HOLE_LOW = 0.12;
+export function holeGlow(t: number, period = 2.8): number {
+  const u = (((t % period) + period) % period) / period;
+  const k = 6;
+  const span = 1 - HOLE_LOW;
+  if (u < 0.25) return HOLE_LOW + span * (1 - Math.exp((-k * u) / 0.25));
+  if (u < 0.55) return 1;
+  if (u < 0.85) return HOLE_LOW + span * Math.exp((-k * (u - 0.55)) / 0.3);
+  return HOLE_LOW;
+}
+
+/**
+ * A slice of the answer, cut where the holes start and end.
+ *
+ * The holes used to be drawn as rows of `_`, and that was the drill being
+ * strict for its own sake: a player who cannot remember the word has nothing
+ * to look at, no way to find out, and a screen of underscores to stare at.
+ * So the word is drawn — it is the answer, the same answer plain ANSWER puts
+ * on screen — and what marks it out as *yours to type* is that it breathes
+ * rather than that it is missing. A hint you can read is still a hint you
+ * have to type.
+ *
+ * `from`/`to` are offsets into the whole answer, because the ghost is built
+ * a line at a time and each line has to know where it sits in the holes.
+ * Runs of the same kind are merged, so the DOM gets one span per run.
+ */
+export function ghostSegments(
+  text: string,
+  blanks: readonly Blank[],
+  from: number,
+  to: number,
+  now: Blank | null = null,
+): GhostSeg[] {
+  const out: GhostSeg[] = [];
+  const push = (part: string, hole: boolean, isNow: boolean): void => {
+    if (part === "") return;
+    const last = out[out.length - 1];
+    if (last && last.hole === hole && last.now === isNow) last.text += part;
+    else out.push({ text: part, hole, now: isNow });
+  };
+  let at = Math.max(0, from);
+  const end = Math.min(to, text.length);
+  // The holes are in order and do not overlap (`answerBlanks`,
+  // `solutionBlanks`), so one pass over the ones this slice touches is enough.
   for (const b of blanks) {
-    out += text.slice(at, b.from) + "_".repeat(b.to - b.from);
-    at = b.to;
+    if (b.to <= at) continue;
+    if (b.from >= end) break;
+    push(text.slice(at, Math.min(b.from, end)), false, false);
+    at = Math.max(at, Math.min(b.from, end));
+    push(text.slice(at, Math.min(b.to, end)), true, now !== null && b.from === now.from);
+    at = Math.min(b.to, end);
   }
-  return out + text.slice(at);
+  push(text.slice(at, end), false, false);
+  return out;
 }
 
 function ghostFor(view: EditorView): DecorationSet {
   const target = view.state.field(answerField, false) ?? null;
   if (target === null) return Decoration.none;
   const doc = view.state.doc;
-  // Two readings of the same answer: what is drawn (holes masked) and what
-  // is compared against (the answer itself). Comparing against the mask
-  // would call a correctly typed word a divergence.
   const want = target.text.split("\n");
-  const shown = maskBlanks(target).split("\n");
+  // Where each line of the answer starts inside the answer, so a line's
+  // ghost can be cut against holes that are held as whole-answer offsets.
+  const starts: number[] = [];
+  for (let i = 0, at = 0; i < want.length; i++) {
+    starts.push(at);
+    at += want[i].length + 1;
+  }
+  // The hole the player is on: the buffer is always a prefix of the answer,
+  // so it is the first one the typing has not got past. That one breathes;
+  // the rest sit dim, or a whole solution line pulsing would be the screen
+  // flashing at somebody trying to read it.
+  const now = holeAt(target.blanks, doc.length);
   const out: Range<Decoration>[] = [];
   const last = doc.lines;
   for (let i = 1; i <= last; i++) {
@@ -389,12 +498,9 @@ function ghostFor(view: EditorView): DecorationSet {
       if (line.text.length > 0) {
         out.push(Decoration.mark({ class: "cwb-wrong" }).range(line.from, line.to));
       } else {
-        // **An empty line is a divergence with no width.** A mark over it is
-        // a zero-length range, which draws nothing — so the count said FIX
-        // THE RED with no red anywhere on screen. A stray blank line is the
-        // commonest way to be past the end of an answer, so it gets a mark
-        // of its own.
-        out.push(Decoration.widget({ widget: new GhostText("", false), side: 1 }).range(line.to));
+        // A stray blank line is the commonest way to be past the end of an
+        // answer, and it has no width to mark — so it gets a widget.
+        out.push(Decoration.widget({ widget: new WrongEmpty(), side: 1 }).range(line.to));
       }
       continue;
     }
@@ -410,10 +516,31 @@ function ghostFor(view: EditorView): DecorationSet {
     // as this line's inline one. Two widgets at one position is a range set
     // CodeMirror will not take, the plugin that built it is dropped, and the
     // ghost silently does not appear at all.
-    let rest = (shown[i - 1] ?? line_target).slice(k);
-    if (i === last && want.length > last) rest += "\n" + shown.slice(last).join("\n");
-    if (rest.length > 0) {
-      out.push(Decoration.widget({ widget: new GhostText(rest, false), side: 1 }).range(line.to));
+    const segs = ghostSegments(
+      target.text,
+      target.blanks,
+      starts[i - 1] + k,
+      starts[i - 1] + line_target.length,
+      now,
+    );
+    if (i === last && want.length > last) {
+      for (let j = last; j < want.length; j++) {
+        segs.push({ text: "\n", hole: false, now: false });
+        for (const g of ghostSegments(
+          target.text,
+          target.blanks,
+          starts[j],
+          starts[j] + want[j].length,
+          now,
+        )) {
+          const tail = segs[segs.length - 1];
+          if (tail.hole === g.hole && tail.now === g.now) tail.text += g.text;
+          else segs.push(g);
+        }
+      }
+    }
+    if (segs.some((g) => g.text.length > 0)) {
+      out.push(Decoration.widget({ widget: new GhostText(segs), side: 1 }).range(line.to));
     }
   }
   return Decoration.set(out, true);
@@ -500,6 +627,65 @@ export function answerIndent(typed: string, answer: string): string | null {
   if (matched > 0 && answer[matched - 1] !== "\n") return null;
   const run = /^[ \t]+/.exec(answer.slice(matched))?.[0] ?? "";
   return run.length > 0 ? run : null;
+}
+
+/**
+ * The closing half of a pair, typed for the player.
+ *
+ * "Complete `()` and `\"\"` automatically" is what every editor does with
+ * `closeBrackets`, and this mode cannot have it: a `)` put in *after* the
+ * caret is not a prefix of the answer, so the drill would call the editor's
+ * own helpfulness a divergence (which is why `autoClose` is switched off
+ * while a target is set). So the pair is closed from the *answer* instead,
+ * and one character behind: the moment what is typed is a clean prefix and
+ * the answer's next character is a closer, it goes in by itself.
+ *
+ * The player therefore types `(`, types what goes inside it, and never types
+ * the `)` — the same bargain `closeBrackets` offers, with the mode's own
+ * rules kept: everything inserted is the answer, in order.
+ *
+ * `>` is in the set for `Vec<i32>`, and a `>` that was a comparison is no
+ * loss: everything this puts in is the answer's own next character.
+ *
+ * A quote is a closer only when it closes one. `"` opens and closes with the
+ * same character, so the line's own quotes up to here are counted: an odd
+ * number means this one ends the string, an even number means it starts the
+ * next, and a string nobody has opened is the player's to open.
+ */
+export function answerCloser(typed: string, answer: string): string | null {
+  const { matched } = answerProgress(typed, answer);
+  if (typed.length !== matched) return null;
+  const ch = answer[matched];
+  if (ch === undefined) return null;
+  if (ch === ")" || ch === "]" || ch === "}" || ch === ">") return ch;
+  if (ch !== '"' && ch !== "'" && ch !== "`") return null;
+  const from = answer.lastIndexOf("\n", matched - 1) + 1;
+  let n = 0;
+  for (let i = from; i < matched; i++) if (answer[i] === ch && answer[i - 1] !== "\\") n++;
+  return n % 2 === 1 ? ch : null;
+}
+
+/**
+ * The rest of a word, once the player has typed the start of it.
+ *
+ * The drill is about remembering what the program says, not about spelling
+ * `WaitGroup` by hand, so a few characters are enough: type `Wa` and the
+ * word finishes itself. There is only ever one right continuation — the
+ * answer's — so this cannot guess wrong the way a completion engine can.
+ *
+ * `min` characters of the word have to be typed first, or the whole answer
+ * would type itself the moment the mode came on. Only words: the run is
+ * `[A-Za-z_][A-Za-z0-9_]*` or a number, which is the same thing BLANKS cuts
+ * its holes out of, so a hole finishes itself under the same rule.
+ */
+export function answerWord(typed: string, answer: string, min = 2): string | null {
+  const { matched } = answerProgress(typed, answer);
+  if (typed.length !== matched || matched === 0) return null;
+  // Where the word the caret is standing at the end of began.
+  const before = /[A-Za-z_][A-Za-z0-9_]*$|[0-9]+$/.exec(answer.slice(0, matched))?.[0] ?? "";
+  if (before.length < min) return null;
+  const rest = /^[A-Za-z0-9_]+/.exec(answer.slice(matched))?.[0] ?? "";
+  return rest.length > 0 ? rest : null;
 }
 
 export function answerProgress(typed: string, answer: string): AnswerProgress {
@@ -1246,6 +1432,36 @@ export class Editor {
   /** What is being offered at the caret, if anything. */
   get suggestion(): Suggest | null {
     return this.view.state.field(suggestField, false) ?? null;
+  }
+
+  /**
+   * How the drill's ghost is lit, this frame.
+   *
+   * Three numbers on the element, read by three rules in `style.css`: the
+   * hole you are on, the holes you are not, and how far the whole ghost has
+   * faded in. **Set per frame rather than animated in CSS**, the way the
+   * agent's own presence is (`agent/layer.ts`): a transition on top of a
+   * value that changes every frame restarts every frame and never arrives,
+   * and a keyframe animation cannot be stepped by the capture hook.
+   *
+   * Compared before it is written, so a still screen is not a style
+   * invalidation sixty times a second.
+   */
+  setGlow(now: number, rest: number, fade: number): void {
+    const set = (name: string, v: number): void => {
+      const s = v.toFixed(3);
+      if (this.dom.style.getPropertyValue(name) !== s) this.dom.style.setProperty(name, s);
+    };
+    set("--cwb-hole-now", now);
+    set("--cwb-hole-rest", rest);
+    set("--cwb-ghost-in", fade);
+  }
+
+  /** Where a position in the document is on the page, for an effect at it. */
+  clientAt(pos: number): [number, number] | null {
+    const at = Math.max(0, Math.min(pos, this.view.state.doc.length));
+    const c = this.view.coordsAtPos(at);
+    return c ? [c.left, (c.top + c.bottom) / 2] : null;
   }
 
   /** Where the caret is on the page, for an effect thrown at it. */

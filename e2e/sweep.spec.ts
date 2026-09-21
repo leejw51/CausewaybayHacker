@@ -57,7 +57,9 @@ async function shot(page: Page, name: string): Promise<string> {
   const line = `[shot] ${project()}-${name}.png scroll=${overflow.sw}x${overflow.sh} client=${overflow.cw}x${overflow.ch}`;
   console.log(line);
   test.info().annotations.push({ type: "shot", description: line });
-  expect(overflow.sw, `${name}: horizontal page scroll`).toBeLessThanOrEqual(overflow.cw);
+  expect(overflow.sw, `${name}: horizontal page scroll`).toBeLessThanOrEqual(
+    overflow.cw,
+  );
   return path;
 }
 
@@ -76,7 +78,10 @@ async function toLogin(page: Page): Promise<void> {
 /** `atScreen` for the screens the fixture's `Screen` type does not list. */
 async function at(page: Page, want: string, timeout = 90_000): Promise<void> {
   await expect
-    .poll(async () => sceneNow(page), { timeout, message: `waiting for the ${want} screen` })
+    .poll(async () => sceneNow(page), {
+      timeout,
+      message: `waiting for the ${want} screen`,
+    })
     .toBe(want);
   await page.evaluate(() => {
     window.__cwbCapture?.settle();
@@ -85,10 +90,16 @@ async function at(page: Page, want: string, timeout = 90_000): Promise<void> {
 }
 
 async function buttonIds(page: Page): Promise<string[]> {
-  return page.evaluate(() => (window.__cwbCapture?.buttons() ?? []).map((b) => b.id));
+  return page.evaluate(() =>
+    (window.__cwbCapture?.buttons() ?? []).map((b) => b.id),
+  );
 }
 
-async function waitButton(page: Page, prefix: string, timeout = 30_000): Promise<string> {
+async function waitButton(
+  page: Page,
+  prefix: string,
+  timeout = 30_000,
+): Promise<string> {
   let found = "";
   await expect
     .poll(
@@ -169,11 +180,19 @@ async function backToMap(page: Page): Promise<void> {
   const info = await page.evaluate(() => {
     const all = window.__cwbCapture?.buttons() ?? [];
     const b = all.find((x) => x.id === "map");
-    return { btn: b ?? null, vh: innerHeight, vw: innerWidth, ids: all.map((x) => x.id) };
+    return {
+      btn: b ?? null,
+      vh: innerHeight,
+      vw: innerWidth,
+      ids: all.map((x) => x.id),
+    };
   });
   const b = info.btn;
   const inside =
-    !!b && b.client[1] >= 0 && b.client[1] + b.client[3] <= info.vh && b.client[0] >= 0;
+    !!b &&
+    b.client[1] >= 0 &&
+    b.client[1] + b.client[3] <= info.vh &&
+    b.client[0] >= 0;
   const line = `[result] ${project()} map button client=${JSON.stringify(b?.client)} viewport=${info.vw}x${info.vh} inside=${inside}`;
   console.log(line);
   test.info().annotations.push({ type: "result-buttons", description: line });
@@ -183,12 +202,16 @@ async function backToMap(page: Page): Promise<void> {
     await page.keyboard.press("Enter");
   }
   await atScreen(page, "map");
-  expect.soft(inside, `BACK TO THE MAP is not fully inside the viewport: ${line}`).toBe(true);
+  expect
+    .soft(inside, `BACK TO THE MAP is not fully inside the viewport: ${line}`)
+    .toBe(true);
 }
 
 // -------------------------------------------------------------------- tests
 
-test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async ({ page }) => {
+test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async ({
+  page,
+}) => {
   const account = freshAccount();
   const wire = await Wire.as(BACKEND, account);
   try {
@@ -223,7 +246,10 @@ test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async 
     const weakest = (await wire.ok("stats.weakest", { limit: 1 })).weakest as {
       quest_id: string;
     }[];
-    expect(weakest[0]?.quest_id, "the server's weakest is the failed quest").toBe(questId);
+    expect(
+      weakest[0]?.quest_id,
+      "the server's weakest is the failed quest",
+    ).toBe(questId);
     await clickButton(page, "auto");
     await atScreen(page, "quest");
     const got = (await wire.ok("quest.get", { quest_id: questId })).quest as {
@@ -232,22 +258,28 @@ test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async 
     };
     const shown = flatten(await waitEditor(page));
     const expected = flatten(got.draft ?? got.starter);
-    expect(shown, "AUTO SELECT opened the quest that beat us (editor shows its draft)").toBe(
-      expected,
-    );
+    expect(
+      shown,
+      "AUTO SELECT opened the quest that beat us (editor shows its draft)",
+    ).toBe(expected);
     await shot(page, "06-auto-select-quest");
 
     // ---- SOLVE, then SUBMIT ----------------------------------------------
     const before = await editorText(page);
     await clickButton(page, "solve");
     await expect
-      .poll(async () => editorText(page), { timeout: 30_000, message: "SOLVE filled the editor" })
+      .poll(async () => editorText(page), {
+        timeout: 30_000,
+        message: "SOLVE filled the editor",
+      })
       .not.toBe(before);
     await shot(page, "07-quest-solved");
     await submit(page);
     await shot(page, "08-result-accepted");
     history = await wire.history();
-    expect(history[0].verdict, "the solved source is accepted").toBe("accepted");
+    expect(history[0].verdict, "the solved source is accepted").toBe(
+      "accepted",
+    );
     const node = await wire.node(questId);
     expect(node?.state).toBe("cleared");
     console.log(`[flow] cleared ${questId} stars=${node?.stars}`);
@@ -270,7 +302,9 @@ test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async 
 
     // ---- reload: still cleared -------------------------------------------
     await page.reload();
-    await page.waitForFunction(() => typeof window.__cwbCapture?.settle === "function");
+    await page.waitForFunction(
+      () => typeof window.__cwbCapture?.settle === "function",
+    );
     await expect
       .poll(async () => sceneNow(page), { timeout: 60_000 })
       .not.toMatch(/^(boot|login|title|story)$/);
@@ -284,14 +318,21 @@ test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async 
     }
     await atScreen(page, "map");
     await shot(page, "11-map-after-reload");
-    expect((await wire.node(questId))?.state, "cleared after reload").toBe("cleared");
+    expect((await wire.node(questId))?.state, "cleared after reload").toBe(
+      "cleared",
+    );
 
     // ---- stats reflect it ------------------------------------------------
     await page.keyboard.press("F5");
     await at(page, "stats");
     await shot(page, "12-stats");
-    const summary = (await wire.ok("stats.summary", {})) as { cleared: number; attempts: number };
-    console.log(`[flow] stats.summary cleared=${summary.cleared} attempts=${summary.attempts}`);
+    const summary = (await wire.ok("stats.summary", {})) as {
+      cleared: number;
+      attempts: number;
+    };
+    console.log(
+      `[flow] stats.summary cleared=${summary.cleared} attempts=${summary.attempts}`,
+    );
     expect(summary.cleared).toBeGreaterThanOrEqual(1);
     expect(summary.attempts).toBeGreaterThanOrEqual(2);
     for (const tab of ["shelf", "log", "drill"]) {
@@ -306,7 +347,9 @@ test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async 
   }
 });
 
-test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ page }) => {
+test("3g: CODE mode leaves the player on the quest screen, signed in", async ({
+  page,
+}) => {
   // The header is not drawn in CODE mode, and `app.logoutRect` is only ever
   // cleared by `header()`. Left over from the previous frame it sits in the
   // top right corner — under DONE — and `App`'s pointer handler tests it
@@ -318,12 +361,16 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   await pickLand(page, "rust");
   await pickCategory(page, "basic");
   await openSelectedNode(page);
-  const code = await page.evaluate(() => window.__cwbCapture!.buttonAt("focus"));
+  const code = await page.evaluate(() =>
+    window.__cwbCapture!.buttonAt("focus"),
+  );
   expect(code).not.toBeNull();
   await page.mouse.click(code![0], code![1]);
   await page.waitForTimeout(700);
   await shot(page, "60-code-mode");
-  const done = await page.evaluate(() => window.__cwbCapture!.buttonAt("unfocus"));
+  const done = await page.evaluate(() =>
+    window.__cwbCapture!.buttonAt("unfocus"),
+  );
   expect(done).not.toBeNull();
   // The controls a writing session actually uses are on this screen too.
   const onCode = await buttonIds(page);
@@ -334,7 +381,9 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   // ANSWER: the reference solution as ghost text *behind* what is typed —
   // the buffer is untouched, the ghost is in the editor's own layout, and
   // what has been typed instead of the answer is marked.
-  const answer = await page.evaluate(() => window.__cwbCapture!.buttonAt("answer"));
+  const answer = await page.evaluate(() =>
+    window.__cwbCapture!.buttonAt("answer"),
+  );
   // The *document*, with the ghost taken back out. `editorText` scrapes the
   // rendered lines, and the ghost is rendered inside them on purpose — which
   // is exactly why the buffer has to be read without it here.
@@ -352,10 +401,14 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   expect(before.trim().length).toBeGreaterThan(0);
   await page.mouse.click(answer![0], answer![1]);
   await expect
-    .poll(async () => page.evaluate(() => document.querySelectorAll(".cwb-ghost").length), {
-      timeout: 30_000,
-      message: "waiting for the answer ghost",
-    })
+    .poll(
+      async () =>
+        page.evaluate(() => document.querySelectorAll(".cwb-ghost").length),
+      {
+        timeout: 30_000,
+        message: "waiting for the answer ghost",
+      },
+    )
     .toBeGreaterThan(0);
   // The starter goes: it is the server's boilerplate, and against the answer
   // it is a screenful of red nobody typed.
@@ -376,22 +429,29 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
 
   // +LINE hands over a line at a time. Pressed until it stops, it is the
   // answer — which is the whole of what the button promises.
-  const line = await page.evaluate(() => window.__cwbCapture!.buttonAt("complete"));
+  const line = await page.evaluate(() =>
+    window.__cwbCapture!.buttonAt("complete"),
+  );
   expect(line).not.toBeNull();
-  const ghosts = () => page.evaluate(() => document.querySelectorAll(".cwb-ghost").length);
+  const ghosts = () =>
+    page.evaluate(() => document.querySelectorAll(".cwb-ghost").length);
   for (let i = 0; i < 40 && (await ghosts()) > 0; i++) {
     await page.mouse.click(line![0], line![1]);
     await page.waitForTimeout(140);
   }
   await page.waitForTimeout(400);
   expect(await ghosts()).toBe(0);
-  expect(await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length)).toBe(0);
+  expect(
+    await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length),
+  ).toBe(0);
   await shot(page, "64-answer-completed");
 
   // BLANKS: the same answer with holes in it. The code is on the screen and
   // only the gaps are the player's to type — so the buffer arrives mostly
   // filled, with underscores where the words were taken out.
-  const blanks = await page.evaluate(() => window.__cwbCapture!.buttonAt("blanks"));
+  const blanks = await page.evaluate(() =>
+    window.__cwbCapture!.buttonAt("blanks"),
+  );
   expect(blanks).not.toBeNull();
   await page.mouse.click(blanks![0], blanks![1]);
   await page.waitForTimeout(900);
@@ -399,13 +459,19 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   expect(drill.length).toBeGreaterThan(0);
   // Something is filled in for you, and something is left to do.
   expect(await ghosts()).toBeGreaterThan(0);
-  expect(await page.evaluate(() => document.body.innerText.includes("_"))).toBe(true);
+  // The holes are drawn as the words they are, breathing, rather than as
+  // rows of underscores: a hint you can read is still a hint you must type.
+  const holes = () =>
+    page.evaluate(() => document.querySelectorAll(".cwb-blank").length);
+  expect(await holes()).toBeGreaterThan(0);
   await shot(page, "65-blanks");
 
   // ANSWER ONLY: the quest's own scaffold types itself and what is left to
   // type is the solution — so the buffer arrives with real code in it, not
   // just the run up to the first word.
-  const solution = await page.evaluate(() => window.__cwbCapture!.buttonAt("solution"));
+  const solution = await page.evaluate(() =>
+    window.__cwbCapture!.buttonAt("solution"),
+  );
   expect(solution).not.toBeNull();
   await page.mouse.click(solution![0], solution![1]);
   await page.waitForTimeout(900);
@@ -419,7 +485,7 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   await page.mouse.click(blanks![0], blanks![1]);
   await page.waitForTimeout(700);
   expect(await ghosts()).toBeGreaterThan(0);
-  expect(await page.evaluate(() => document.body.innerText.includes("_"))).toBe(true);
+  expect(await holes()).toBeGreaterThan(0);
 
   // +LINE hands a whole line over, holes and all; pressed until it stops,
   // the drill is done and the buffer is the answer again.
@@ -429,7 +495,9 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   }
   await page.waitForTimeout(400);
   expect(await ghosts()).toBe(0);
-  expect(await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length)).toBe(0);
+  expect(
+    await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length),
+  ).toBe(0);
   await shot(page, "66-blanks-done");
   // Back to plain ANSWER for the checks below.
   await page.mouse.click(blanks![0], blanks![1]);
@@ -467,11 +535,15 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   // both game canvases are under the overlay and the editor's face is all
   // but opaque. A burst on the game canvas would be a burst nobody sees.
   const sparks = await page.evaluate(() => {
-    const el = document.querySelector(".cwb-sparks") as HTMLCanvasElement | null;
+    const el = document.querySelector(
+      ".cwb-sparks",
+    ) as HTMLCanvasElement | null;
     if (!el) return null;
     const ed = document.querySelector(".cwb-editor");
     return {
-      over: !!(ed && el.compareDocumentPosition(ed) & Node.DOCUMENT_POSITION_PRECEDING),
+      over: !!(
+        ed && el.compareDocumentPosition(ed) & Node.DOCUMENT_POSITION_PRECEDING
+      ),
       clicks: getComputedStyle(el).pointerEvents,
     };
   });
@@ -482,11 +554,15 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({ 
   await page.mouse.click(done![0], done![1]);
   await page.waitForTimeout(900);
   expect(await sceneNow(page)).toBe("quest");
-  expect(await page.evaluate(() => window.__cwbCapture!.buttonAt("focus"))).not.toBeNull();
+  expect(
+    await page.evaluate(() => window.__cwbCapture!.buttonAt("focus")),
+  ).not.toBeNull();
   await shot(page, "61-done-back-on-the-quest");
 });
 
-test("3h: a tab-indented answer can be finished — ENTER leaves no red", async ({ page }) => {
+test("3h: a tab-indented answer can be finished — ENTER leaves no red", async ({
+  page,
+}) => {
   // The report: on a Go quest — gofmt indents with tabs — the ANSWER target
   // stuck at 161 / 333 and the space bar would not clear the red. It could
   // not: the editor's auto-indent puts *spaces* in, the answer wanted a tab,
@@ -497,16 +573,24 @@ test("3h: a tab-indented answer can be finished — ENTER leaves no red", async 
   await pickLand(page, "go");
   await pickCategory(page, "basic");
   await openSelectedNode(page);
-  const code = await page.evaluate(() => window.__cwbCapture!.buttonAt("focus"));
+  const code = await page.evaluate(() =>
+    window.__cwbCapture!.buttonAt("focus"),
+  );
   await page.mouse.click(code![0], code![1]);
   await page.waitForTimeout(500);
-  const answer = await page.evaluate(() => window.__cwbCapture!.buttonAt("answer"));
+  const answer = await page.evaluate(() =>
+    window.__cwbCapture!.buttonAt("answer"),
+  );
   await page.mouse.click(answer![0], answer![1]);
   await expect
-    .poll(async () => page.evaluate(() => document.querySelectorAll(".cwb-ghost").length), {
-      timeout: 30_000,
-      message: "waiting for the answer ghost",
-    })
+    .poll(
+      async () =>
+        page.evaluate(() => document.querySelectorAll(".cwb-ghost").length),
+      {
+        timeout: 30_000,
+        message: "waiting for the answer ghost",
+      },
+    )
     .toBeGreaterThan(0);
 
   // Walk down the file the way a player does — a line, then ENTER, then a
@@ -524,7 +608,9 @@ test("3h: a tab-indented answer can be finished — ENTER leaves no red", async 
     );
   const wrongNow = () =>
     page.evaluate(() => document.querySelectorAll(".cwb-wrong").length);
-  const line = await page.evaluate(() => window.__cwbCapture!.buttonAt("complete"));
+  const line = await page.evaluate(() =>
+    window.__cwbCapture!.buttonAt("complete"),
+  );
   for (let i = 0; i < 16; i++) {
     const doc = await docText();
     if (doc.includes("\t")) break;
@@ -548,7 +634,9 @@ test("3h: a tab-indented answer can be finished — ENTER leaves no red", async 
   await shot(page, "67-tab-indent");
 });
 
-test("4b: AUTO SELECT with no failures says so and stays put", async ({ page }) => {
+test("4b: AUTO SELECT with no failures says so and stays put", async ({
+  page,
+}) => {
   const account = freshAccount();
   await signIn(page, account);
   await clickButton(page, "auto");
@@ -557,7 +645,9 @@ test("4b: AUTO SELECT with no failures says so and stays put", async ({ page }) 
   await shot(page, "13-auto-select-none");
 });
 
-test("3a: NEW WALLET via the UI signs in, and STORY replays", async ({ page }) => {
+test("3a: NEW WALLET via the UI signs in, and STORY replays", async ({
+  page,
+}) => {
   await toLogin(page);
   // The opening, on demand.
   await clickButton(page, "story");
@@ -594,16 +684,21 @@ test("3b: search — type, submit, results, open one", async ({ page }) => {
   // appears, open it; otherwise record the unbuilt notice and move on.
   await page.waitForTimeout(2500);
   let hit = (await buttonIds(page)).find((i) => i.startsWith("hit:")) ?? "";
-  console.log(`[search] after SEARCH: hit=${hit || "(none)"}; ids=${(await buttonIds(page)).join(",")}`);
+  console.log(
+    `[search] after SEARCH: hit=${hit || "(none)"}; ids=${(await buttonIds(page)).join(",")}`,
+  );
   await shot(page, "18-search-results");
   await clickButton(page, "mode:bm25");
   await clickButton(page, "go");
   await page.waitForTimeout(2500);
-  hit = hit || ((await buttonIds(page)).find((i) => i.startsWith("hit:")) ?? "");
+  hit =
+    hit || ((await buttonIds(page)).find((i) => i.startsWith("hit:")) ?? "");
   await shot(page, "18-search-results-text");
   test.info().annotations.push({
     type: "search",
-    description: hit ? `opened ${hit}` : "search.query is not built on this server (milestone 2)",
+    description: hit
+      ? `opened ${hit}`
+      : "search.query is not built on this server (milestone 2)",
   });
   if (hit) {
     await clickButton(page, hit);
@@ -658,9 +753,13 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   await signIn(page, account);
   // Listen to the wire from this page, then reload so the socket is caught.
   const received: string[] = [];
-  page.on("websocket", (ws) => ws.on("framereceived", (f) => received.push(String(f.payload))));
+  page.on("websocket", (ws) =>
+    ws.on("framereceived", (f) => received.push(String(f.payload))),
+  );
   await page.reload();
-  await page.waitForFunction(() => typeof window.__cwbCapture?.settle === "function");
+  await page.waitForFunction(
+    () => typeof window.__cwbCapture?.settle === "function",
+  );
   await expect
     .poll(async () => sceneNow(page), { timeout: 60_000 })
     .not.toMatch(/^(boot|login|title|story)$/);
@@ -674,13 +773,16 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   await at(page, "playground");
   await waitEditor(page);
   await shot(page, "23-playground");
-  await setSource(page, 'fn main() { println!("hello from playground {}", 6 * 7); }\n');
+  await setSource(
+    page,
+    'fn main() { println!("hello from playground {}", 6 * 7); }\n',
+  );
   await clickButton(page, "run");
   await expect
-    .poll(
-      () => received.some((f) => f.includes("hello from playground 42")),
-      { timeout: 180_000, message: "the run's stdout came back over the wire" },
-    )
+    .poll(() => received.some((f) => f.includes("hello from playground 42")), {
+      timeout: 180_000,
+      message: "the run's stdout came back over the wire",
+    })
     .toBe(true);
   await page.waitForTimeout(800);
   await shot(page, "24-playground-output");
@@ -702,7 +804,9 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   await clickButton(page, "fontdown");
   await page.waitForTimeout(500);
   const smaller = await codePx();
-  console.log(`[playground] code size ${beforeFont} -> ${bigger} -> ${smaller}`);
+  console.log(
+    `[playground] code size ${beforeFont} -> ${bigger} -> ${smaller}`,
+  );
   expect(bigger, "A+ makes the code bigger").toBeGreaterThan(beforeFont);
   expect(smaller, "A- takes it back down").toBeLessThan(bigger);
   // It is the same preference the quest screen keeps, so it survives a visit
@@ -715,7 +819,9 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   const faceOf = () =>
     page.evaluate(() => {
       const el = document.querySelector(".cm-content") as HTMLElement | null;
-      return el ? getComputedStyle(el).fontFamily.split(",")[0].replace(/"/g, "") : "";
+      return el
+        ? getComputedStyle(el).fontFamily.split(",")[0].replace(/"/g, "")
+        : "";
     });
   const colsOf = async () =>
     page.evaluate(() => {
@@ -737,11 +843,16 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   await page.waitForTimeout(700);
   const face2 = await faceOf();
   const cols2 = await colsOf();
-  console.log(`[playground] columns ${face0}=${cols0} ${face1}=${cols1} ${face2}=${cols2}`);
+  console.log(
+    `[playground] columns ${face0}=${cols0} ${face1}=${cols1} ${face2}=${cols2}`,
+  );
   console.log(`[playground] code face ${face0} -> ${face1} -> ${face2}`);
   expect(face1, "the face button changes the face").not.toBe(face0);
   expect(face2, "and again, to a third").not.toBe(face1);
-  expect(await pref(page, "quest.face"), "the choice is remembered").toBeTruthy();
+  expect(
+    await pref(page, "quest.face"),
+    "the choice is remembered",
+  ).toBeTruthy();
   // Round the cycle and back to where it started.
   await clickButton(page, "face");
   await page.waitForTimeout(700);
@@ -756,7 +867,8 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   // of a glyph or of the gap between two, depending on the word.
   const landPixels = async (id: string) => {
     const box = await page.evaluate(
-      (b) => window.__cwbCapture!.buttons().find((x) => x.id === b)?.client ?? null,
+      (b) =>
+        window.__cwbCapture!.buttons().find((x) => x.id === b)?.client ?? null,
       id,
     );
     if (!box) return null;
@@ -773,12 +885,17 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   const rustLit = await landPixels("rust");
   const goUnlit = await landPixels("go");
   expect(rustLit, "the selected land is painted").not.toBeNull();
-  expect(rustLit, "the chosen land does not look like an unchosen one").not.toBe(goUnlit);
+  expect(
+    rustLit,
+    "the chosen land does not look like an unchosen one",
+  ).not.toBe(goUnlit);
   await clickButton(page, "go");
   await page.waitForTimeout(700);
   const goLit = await landPixels("go");
   const rustUnlit = await landPixels("rust");
-  console.log(`[playground] lands rust ${rustLit}->${rustUnlit}, go ${goUnlit}->${goLit}`);
+  console.log(
+    `[playground] lands rust ${rustLit}->${rustUnlit}, go ${goUnlit}->${goLit}`,
+  );
   // Each land wears its own colour when it is live — rust orange, go cyan —
   // so the lit ones differ from each other as well as from the unlit.
   expect(goLit, "GO lights when GO is chosen").not.toBe(goUnlit);
@@ -801,22 +918,35 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   await clickButton(page, "code");
   await page.waitForTimeout(700);
   const focused = await editorH();
-  console.log(`[playground] editor ${Math.round(framed)}px framed -> ${Math.round(focused)}px CODE`);
+  console.log(
+    `[playground] editor ${Math.round(framed)}px framed -> ${Math.round(focused)}px CODE`,
+  );
   expect(focused).toBeGreaterThan(framed * 1.5);
   // And stdin is **kept** here, on its own line above the editor. It is the
   // one thing CODE cannot take back from the code: a scratchpad has no test
   // cases, so this box is the only way a program that reads gets fed at all.
   const stdinHere = await page.evaluate(() => {
-    const ta = document.querySelector("textarea.cwb-field") as HTMLElement | null;
+    const ta = document.querySelector(
+      "textarea.cwb-field",
+    ) as HTMLElement | null;
     const r = ta?.getBoundingClientRect();
     return r ? { h: Math.round(r.height), top: Math.round(r.top) } : null;
   });
-  const codeTop = await page.evaluate(
-    () => Math.round((document.querySelector(".cm-editor") as HTMLElement).getBoundingClientRect().top),
+  const codeTop = await page.evaluate(() =>
+    Math.round(
+      (
+        document.querySelector(".cm-editor") as HTMLElement
+      ).getBoundingClientRect().top,
+    ),
   );
-  console.log(`[playground] CODE stdin ${JSON.stringify(stdinHere)} above editor at ${codeTop}`);
+  console.log(
+    `[playground] CODE stdin ${JSON.stringify(stdinHere)} above editor at ${codeTop}`,
+  );
   expect(stdinHere, "the stdin field is on screen in CODE").not.toBeNull();
-  expect(stdinHere!.h, "and it is one line tall, not collapsed").toBeGreaterThan(10);
+  expect(
+    stdinHere!.h,
+    "and it is one line tall, not collapsed",
+  ).toBeGreaterThan(10);
   expect(stdinHere!.top, "above the editor, not over it").toBeLessThan(codeTop);
   await shot(page, "23b-playground-code");
 
@@ -828,32 +958,50 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   await page.waitForTimeout(600);
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   console.log(`[playground] copied ${JSON.stringify(copied.slice(0, 40))}`);
-  expect(copied, "COPY CODE puts the editor on the clipboard").toContain("fn main");
-  await page.evaluate(() => navigator.clipboard.writeText("fn main() { /* from the clipboard */ }\n"));
+  expect(copied, "COPY CODE puts the editor on the clipboard").toContain(
+    "fn main",
+  );
+  await page.evaluate(() =>
+    navigator.clipboard.writeText("fn main() { /* from the clipboard */ }\n"),
+  );
   await clickButton(page, "pastecode");
   await page.waitForTimeout(700);
-  expect(await editorText(page), "PASTE replaces the editor").toContain("from the clipboard");
+  expect(await editorText(page), "PASTE replaces the editor").toContain(
+    "from the clipboard",
+  );
   await clickButton(page, "copycode");
   await page.waitForTimeout(600);
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("from the clipboard");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+    "from the clipboard",
+  );
 
   // With output on screen, a landscape window puts it **beside** the code and
   // an upright one under it. Measured off the editor's width: stacked, it has
   // the whole panel; beside, it gives up a third of it.
   await clickButton(page, "run");
   await expect
-    .poll(async () => page.evaluate(() => document.body.innerText.length >= 0), { timeout: 120_000 })
+    .poll(
+      async () => page.evaluate(() => document.body.innerText.length >= 0),
+      { timeout: 120_000 },
+    )
     .toBe(true);
   await page.waitForTimeout(3000);
   const edBox = async () =>
     page.evaluate(() => {
       const el = document.querySelector(".cm-editor") as HTMLElement | null;
       const r = el?.getBoundingClientRect();
-      return r ? { w: r.width, h: r.height, vw: window.innerWidth, vh: window.innerHeight } : null;
+      return r
+        ? {
+            w: r.width,
+            h: r.height,
+            vw: window.innerWidth,
+            vh: window.innerHeight,
+          }
+        : null;
     });
   const laid = await edBox();
   const wide = (laid?.vw ?? 0) > (laid?.vh ?? 0);
-  const share = (laid!.w / laid!.vw);
+  const share = laid!.w / laid!.vw;
   console.log(
     `[playground] CODE editor ${Math.round(laid!.w)}x${Math.round(laid!.h)} of ${laid!.vw}x${laid!.vh}` +
       ` (${wide ? "landscape" : "portrait"}, ${(share * 100).toFixed(0)}% wide)`,
@@ -861,47 +1009,73 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   // And stdin keeps the output company across the short axis: stacked above
   // it in the column when wide, beside it in the band when tall.
   const boxes = await page.evaluate(() => {
-    const el = (q: string) => document.querySelector(q)?.getBoundingClientRect();
+    const el = (q: string) =>
+      document.querySelector(q)?.getBoundingClientRect();
     const ed = el(".cm-editor");
     const ta = el("textarea.cwb-field");
     return ed && ta
       ? {
-          ed: { x: Math.round(ed.x), y: Math.round(ed.y), w: Math.round(ed.width), h: Math.round(ed.height) },
-          ta: { x: Math.round(ta.x), y: Math.round(ta.y), w: Math.round(ta.width), h: Math.round(ta.height) },
+          ed: {
+            x: Math.round(ed.x),
+            y: Math.round(ed.y),
+            w: Math.round(ed.width),
+            h: Math.round(ed.height),
+          },
+          ta: {
+            x: Math.round(ta.x),
+            y: Math.round(ta.y),
+            w: Math.round(ta.width),
+            h: Math.round(ta.height),
+          },
         }
       : null;
   });
-  console.log(`[playground] stdin ${JSON.stringify(boxes?.ta)} editor ${JSON.stringify(boxes?.ed)}`);
+  console.log(
+    `[playground] stdin ${JSON.stringify(boxes?.ta)} editor ${JSON.stringify(boxes?.ed)}`,
+  );
   expect(boxes, "both the editor and stdin are on screen").not.toBeNull();
   if (wide) {
-    expect(share, "landscape gives the output a column beside the code").toBeLessThan(0.8);
-    expect(boxes!.ta.x, "stdin is in the column beside the code").toBeGreaterThanOrEqual(
-      boxes!.ed.x + boxes!.ed.w - 4,
-    );
+    expect(
+      share,
+      "landscape gives the output a column beside the code",
+    ).toBeLessThan(0.8);
+    expect(
+      boxes!.ta.x,
+      "stdin is in the column beside the code",
+    ).toBeGreaterThanOrEqual(boxes!.ed.x + boxes!.ed.w - 4);
   } else {
     expect(share, "upright keeps the code full width").toBeGreaterThan(0.85);
-    expect(boxes!.ta.y, "stdin is in the band under the code").toBeGreaterThanOrEqual(
-      boxes!.ed.y + boxes!.ed.h - 4,
-    );
-    expect(boxes!.ta.w, "and it takes only part of that band's width").toBeLessThan(
-      boxes!.ed.w * 0.6,
-    );
+    expect(
+      boxes!.ta.y,
+      "stdin is in the band under the code",
+    ).toBeGreaterThanOrEqual(boxes!.ed.y + boxes!.ed.h - 4);
+    expect(
+      boxes!.ta.w,
+      "and it takes only part of that band's width",
+    ).toBeLessThan(boxes!.ed.w * 0.6);
     // Side by side means the same height: a full panel with a one-line sliver
     // beside it does not read as a pair.
     const outH = await page.evaluate(() => {
       const c = document.querySelector("#game") as HTMLCanvasElement;
       return Math.round(c.getBoundingClientRect().height);
     });
-    expect(boxes!.ta.h, "stdin is a band, not a sliver, beside the output").toBeGreaterThan(
-      outH * 0.1,
-    );
+    expect(
+      boxes!.ta.h,
+      "stdin is a band, not a sliver, beside the output",
+    ).toBeGreaterThan(outH * 0.1);
     // The label is over the field, not beside it: alongside, `표준 입력` takes
     // two thirds of a narrow box and the input gets the third that is left.
     const band = await page.evaluate(() => {
       const c = document.querySelector("#game") as HTMLCanvasElement;
       const r = c.getBoundingClientRect();
-      const ta = document.querySelector("textarea.cwb-field")!.getBoundingClientRect();
-      return { taW: Math.round(ta.width), taX: Math.round(ta.x), canvasX: Math.round(r.x) };
+      const ta = document
+        .querySelector("textarea.cwb-field")!
+        .getBoundingClientRect();
+      return {
+        taW: Math.round(ta.width),
+        taX: Math.round(ta.x),
+        canvasX: Math.round(r.x),
+      };
     });
     console.log(`[playground] stdin field ${band.taW}px wide in a band`);
     expect(band.taW, "the field has most of its box's width").toBeGreaterThan(
@@ -918,7 +1092,10 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   await page.evaluate(() => {
     const w = window as unknown as { __copied?: string };
     w.__copied = "";
-    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined,
+      configurable: true,
+    });
     document.execCommand = (cmd: string) => {
       if (cmd === "copy") {
         const el = document.activeElement as HTMLTextAreaElement | null;
@@ -928,19 +1105,27 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
     };
   });
   const grab = async (id: string) => {
-    await page.evaluate(() => ((window as unknown as { __copied?: string }).__copied = ""));
+    await page.evaluate(
+      () => ((window as unknown as { __copied?: string }).__copied = ""),
+    );
     await clickButton(page, id);
     await page.waitForTimeout(500);
-    return page.evaluate(() => (window as unknown as { __copied?: string }).__copied ?? "");
+    return page.evaluate(
+      () => (window as unknown as { __copied?: string }).__copied ?? "",
+    );
   };
   const fbCode = await grab("copycode");
   const fbOut = await grab("copyout");
   console.log(
     `[playground] no-async: code ${JSON.stringify(fbCode.slice(0, 26))} out ${JSON.stringify(fbOut.slice(0, 26))}`,
   );
-  expect(fbCode, "COPY CODE works with no async clipboard").toContain("fn main");
+  expect(fbCode, "COPY CODE works with no async clipboard").toContain(
+    "fn main",
+  );
   expect(fbOut.length, "COPY OUTPUT copies something").toBeGreaterThan(0);
-  expect(fbOut, "COPY OUTPUT copies the run, not the code").not.toContain("fn main");
+  expect(fbOut, "COPY OUTPUT copies the run, not the code").not.toContain(
+    "fn main",
+  );
 
   // **One entry, two things.** The input belongs to the pad: a scratchpad has
   // no test cases, so this is the only thing its program will ever read, and
@@ -964,11 +1149,15 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
     )
     .toBe(true);
   const padId = await page.evaluate(
-    () => window.__cwbCapture!.buttons().find((b) => b.id.startsWith("snip:"))?.id ?? "",
+    () =>
+      window.__cwbCapture!.buttons().find((b) => b.id.startsWith("snip:"))
+        ?.id ?? "",
   );
   // Away and back, through the server rather than through this page's memory.
   await page.reload();
-  await page.waitForFunction(() => typeof window.__cwbCapture?.settle === "function");
+  await page.waitForFunction(
+    () => typeof window.__cwbCapture?.settle === "function",
+  );
   // A reload lands where the server remembers the player being (§1.3), which
   // is the lobby — the scratchpad is not a place in the world.
   await expect
@@ -981,20 +1170,26 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   }
   await atScreen(page, "lands");
   await clickButton(page, "playground");
-  await expect.poll(async () => sceneNow(page), { timeout: 30_000 }).toBe("playground");
+  await expect
+    .poll(async () => sceneNow(page), { timeout: 30_000 })
+    .toBe("playground");
   await page.waitForSelector(".cm-editor");
   await page.waitForTimeout(900);
   await clickButton(page, padId);
   await page.waitForTimeout(1200);
   const fedBack = await page.locator("textarea.cwb-field").first().inputValue();
-  console.log(`[playground] pad reopened with stdin ${JSON.stringify(fedBack)}`);
+  console.log(
+    `[playground] pad reopened with stdin ${JSON.stringify(fedBack)}`,
+  );
   expect(fedBack, "the pad kept its input").toContain("7 11");
   await clickButton(page, "code");
   await page.waitForTimeout(800);
 
   // The display toggles are buttons here, not only F-keys — this is the
   // screen people reach for on a phone, and a phone has no F11.
-  const ids = await page.evaluate(() => window.__cwbCapture!.buttons().map((b) => b.id));
+  const ids = await page.evaluate(() =>
+    window.__cwbCapture!.buttons().map((b) => b.id),
+  );
   expect(ids).toContain("fullscreen");
   expect(ids).toContain("orient");
   const before = await page.evaluate(() => window.__cwbCapture!.orientation());
@@ -1027,7 +1222,12 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   const sel = await page.evaluate(() => {
     const el = document.activeElement as HTMLInputElement | null;
     if (!el || el.tagName !== "INPUT") return null;
-    return { start: el.selectionStart, end: el.selectionEnd, dir: el.selectionDirection, len: el.value.length };
+    return {
+      start: el.selectionStart,
+      end: el.selectionEnd,
+      dir: el.selectionDirection,
+      len: el.value.length,
+    };
   });
   console.log(`[playground] rename selection ${JSON.stringify(sel)}`);
   expect(sel, "the name field has the focus").not.toBeNull();
@@ -1115,7 +1315,9 @@ test("3e: display controls — orientation (F1), CRT (F2), fullscreen, language 
   expect(order).toEqual(["ko", "yue", "zh", "ja", "cs", "en"]);
 });
 
-test("3f: every language on the login screen, via the LANG button", async ({ page }) => {
+test("3f: every language on the login screen, via the LANG button", async ({
+  page,
+}) => {
   await toLogin(page);
   const order: string[] = [];
   for (let i = 0; i < 6; i++) {
@@ -1232,7 +1434,9 @@ test("5b: Korean (CJK) at the smallest, default and largest code size, plus the 
   }
 });
 
-test("5c: the other CJK locales and Czech on the map and quest", async ({ page }) => {
+test("5c: the other CJK locales and Czech on the map and quest", async ({
+  page,
+}) => {
   const account = freshAccount();
   const wire = await Wire.as(BACKEND, account);
   try {

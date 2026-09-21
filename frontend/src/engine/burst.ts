@@ -541,6 +541,63 @@ export function keyPlan(
 }
 
 /**
+ * A word the drill typed for you, arriving.
+ *
+ * **Sized to the text, not to the screen.** The first version of this was
+ * `coinPlan`, and over a five-letter word its fixed 46- and 70-pixel rings
+ * collapsed into one flash that covered the line it was celebrating. So:
+ * sparks along the span the word occupies, thrown up and lit in order from
+ * where you stopped typing to where the word ends, and one ring a character
+ * cell wide at the far end. It reads as the word being drawn in, left to
+ * right, and it is over in a third of a second.
+ *
+ * `x0` is where the letters you typed end, `x1` where the word does; both
+ * on the baseline `y`.
+ */
+export function fillPlan(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  cell: Cell,
+  color: RGBA,
+  rng: Rng = Math.random,
+): Plan {
+  const [cw, ch] = cell;
+  const span = Math.max(cw, Math.hypot(x1 - x0, y1 - y0));
+  // One spark per character of the word, within reason: a long identifier
+  // should not cost more than a short one.
+  const count = Math.max(3, Math.min(10, Math.round(span / cw)));
+  const particles: Particle[] = [];
+  for (let i = 0; i < count; i++) {
+    const u = count === 1 ? 1 : i / (count - 1);
+    const x = x0 + (x1 - x0) * u;
+    const y = y0 + (y1 - y0) * u;
+    const ang = -Math.PI / 2 + (rng() - 0.5) * 0.9;
+    const reach = between(rng, 0.5, 1.4) * ch;
+    particles.push(
+      thrown(x, y, Math.cos(ang) * reach, Math.sin(ang) * reach, {
+        life: between(rng, 0.26, 0.46),
+        // In order, so the word lights up the way it was written.
+        delay: u * 0.11 + rng() * 0.02,
+        size: between(rng, 0.22, 0.42) * ch,
+        // Two in three the drill's own colour, the third white-hot: a spark
+        // has a core, the same as a keystroke's.
+        color: i % 3 === 2 ? Theme.cream : color,
+        shape: 0,
+        trail: true,
+        gravity: 210,
+        seed: rng(),
+      }),
+    );
+  }
+  return {
+    particles,
+    rings: [{ x: x1, y: y1, radius: ch * 0.8, life: 0.24, delay: 0.1, color, glow: true }],
+  };
+}
+
+/**
  * ENTER: dust. The caret lands on a new line and kicks up a puff along it —
  * soft, slow, grey-cream motes that drift up and thin out, the way dust does
  * when something drops onto a shelf. `x, y` is where the caret landed.

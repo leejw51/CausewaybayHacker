@@ -7074,3 +7074,70 @@ would be a syntax error the agent wrote.
 other thing the agent does on its own has one. On by default: it is what was
 asked for, and the press that turns it off is one press away in the panel that
 just answered.
+
+## 2026-09-21 — the drill types with you, and the blanks are readable
+
+Three modes on the code screen ask a player to copy an answer: 따라치기
+(ANSWER), 빈칸 따라치기 (BLANKS) and 답만 타이핑 (ANSWER ONLY). They were
+accurate and they were work. A word had to be spelled out by hand, every
+bracket had to be closed by hand — `closeBrackets` is switched off in these
+modes, because a `)` put in after the caret is not a prefix of the answer and
+the drill would mark the editor's own helpfulness as a divergence — and the
+holes were drawn as rows of `_`, which tells a player who cannot remember the
+word nothing at all.
+
+**Two more things the drill types for itself.** `answerWord` finishes the
+word once two characters of it are typed: there is exactly one right
+continuation, the answer's, so this cannot guess wrong the way a completion
+engine can, and the exercise was never spelling `WaitGroup` by hand.
+`answerCloser` puts in the bracket or quote that closes one you opened, one
+character behind — the moment the buffer is a clean prefix and the answer's
+next character is a closer, it goes in. That is the bargain `closeBrackets`
+offers, kept inside the mode's own rule: everything inserted is the answer,
+in order, so the buffer stays a prefix and the count, the ghost and the
+bursts all keep working unchanged. A quote is a closer only when the line's
+quotes before it are odd. Both join `answerIndent` and `blanksFill` in one
+loop, so `pr` finishes `println`, the `(` you type takes its `"` from you and
+the line closes itself.
+
+**The holes are the answer, breathing.** `maskBlanks` is gone and
+`ghostSegments` is in its place: the ghost is cut at the hole boundaries and
+drawn as the word it is, in the palette's coin, and what marks it as yours to
+type is that it moves. `holeGlow` is the curve — `1 - e^-kt` in, a held beat
+at the top, `e^-kt` out, and a rest — because a sine spends most of its time
+halfway, which on a word you are trying to read is the worst place to be.
+Only the hole you are on breathes; the rest sit dim, or a whole ANSWER ONLY
+line would be the page flashing at somebody trying to read it.
+
+**Eased in TypeScript, written as a variable.** `--cwb-hole-now`,
+`--cwb-hole-rest` and `--cwb-ghost-in` are set per frame by `Editor.setGlow`,
+the way the agent's presence already is: a CSS transition over a value that
+changes every frame restarts every frame and never arrives, and a keyframe
+animation cannot be stepped by the capture hook. Reduced motion pins both
+brightnesses rather than removing the distinction. The ghost itself fades up
+over 0.42 s when a mode comes on — fade-in only; delaying `setAnswer(null)`
+on the way out would keep `autoClose` off while the player is already typing.
+
+**The bursts are the size of the text now.** `burstPlan`'s shockwave is 90
+and 150 virtual pixels wide whatever `n` is — it is the street-cleared
+firework — and over a 16-pixel line of code it is a flash that hides the
+character it is pointing at. Every drill moment but the finished answer is
+played at a third of that, and it is over quicker. A word that finishes
+itself gets `fillPlan` instead: sparks along the span the word occupies, lit
+in order from where you stopped typing to where the word ends, and one ring
+a character cell wide. The first version of that was `coinPlan`, whose fixed
+rings over a five-letter word covered the line they were celebrating.
+
+**The coder comes out with the mode.** `Coder.active` is now
+`readShown() && (panel.open || follows)`: text appearing in the file that
+nobody typed should have somebody visible putting it there. Presence only —
+the tips, the advice, the grey suggestion and AUTO all stay behind
+`panel.open`, so a drill costs nothing and says nothing, and `cheer()` is a
+squash and an occasional barrel roll with no particles of its own, because
+the editor's effects have one owner (`answerTick`).
+
+Both clients. The LÖVE side is `Quest.answer_word`, `Quest.answer_closer`,
+`Quest.ghost_segments`, `Quest.hole_glow`, `Plan.fill` and a `scale` on
+`Fx:burst`; `answer_closer` compares quotes by byte, because a lone `"` in
+`src/scenes/quest.lua` leaves `tests/test_screens.lua` pairing the rest of
+the file's string literals off by one.

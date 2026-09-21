@@ -105,6 +105,17 @@ after the effects layer, so it is painted over both; `pointer-events: none`,
 like `.cwb-sparks`. Reduced motion: no wander, the sprite sits in a corner and
 only the bubble moves.
 
+**Out with the panel, and out with a drill.** `Coder.active` is
+`readShown() && (panel.open || follows)`, and `follow(on)` is set by the quest
+screen when ANSWER, BLANKS or "type only the answer" comes on: those modes
+finish the player's words and close their brackets for them
+(`scenes/quest.ts` `fillBlanks`), and text that appears on its own should have
+somebody visible putting it there. Presence only — the tips, the advice, the
+grey suggestion and AUTO all stay behind `panel.open`, so a drill costs
+nothing and says nothing. `cheer()` is what the screen calls when the drill
+types: a squash every time, a barrel roll now and then, and no particles,
+because the editor's own effects have one owner (`answerTick`).
+
 ## 5. Tips, advice and help with no model in them
 
 Four things the coder does with no key, no network and no model in them. The

@@ -11,11 +11,16 @@
 import { describe, expect, it } from "vitest";
 import {
   answerBlanks,
+  answerCloser,
   answerCompletion,
   answerIndent,
   answerProgress,
+  answerWord,
   blanksFill,
-  maskBlanks,
+  ghostSegments,
+  holeAt,
+  holeGlow,
+  HOLE_LOW,
   narrowEdit,
   solutionBlanks,
 } from "../src/ui/editor";
@@ -147,19 +152,126 @@ describe("answerBlanks", () => {
     }
   });
 
-  it("masks the holes and nothing else, keeping the line's width", () => {
-    const target = { text: answer, blanks: answerBlanks(answer, 5) };
-    const masked = maskBlanks(target);
-    expect(masked.length).toBe(answer.length);
-    for (const b of target.blanks) {
-      expect(masked.slice(b.from, b.to)).toBe("_".repeat(b.to - b.from));
+  it("cuts the ghost at the holes and nowhere else", () => {
+    const blanks = answerBlanks(answer, 5);
+    const segs = ghostSegments(answer, blanks, 0, answer.length);
+    // The whole answer is drawn — the holes are a hint, not a hole in the
+    // page — and every character of one is inside a marked run.
+    expect(segs.map((g) => g.text).join("")).toBe(answer);
+    for (const b of blanks) {
+      let at = 0;
+      for (const g of segs) {
+        const end = at + g.text.length;
+        if (at < b.to && end > b.from) expect(g.hole).toBe(true);
+        at = end;
+      }
     }
-    // Everything outside a hole is the program, untouched.
-    let at = 0;
-    for (const b of target.blanks) {
-      expect(masked.slice(at, b.from)).toBe(answer.slice(at, b.from));
-      at = b.to;
+  });
+});
+
+describe("ghostSegments", () => {
+  const text = "abcdefgh";
+
+  it("merges runs of the same kind and keeps the order", () => {
+    const segs = ghostSegments(text, [{ from: 2, to: 4 }], 0, text.length);
+    expect(segs).toEqual([
+      { text: "ab", hole: false, now: false },
+      { text: "cd", hole: true, now: false },
+      { text: "efgh", hole: false, now: false },
+    ]);
+  });
+
+  it("cuts a hole that the slice only half covers", () => {
+    expect(ghostSegments(text, [{ from: 2, to: 6 }], 3, 5)).toEqual([
+      { text: "de", hole: true, now: false },
+    ]);
+  });
+
+  it("is the plain text when the slice touches no hole", () => {
+    expect(ghostSegments(text, [{ from: 0, to: 2 }], 4, 7)).toEqual([
+      { text: "efg", hole: false, now: false },
+    ]);
+  });
+
+  it("has nothing to say about an empty slice", () => {
+    expect(ghostSegments(text, [{ from: 0, to: 2 }], 3, 3)).toEqual([]);
+  });
+
+  it("marks the one hole the player is on, and only that one", () => {
+    const blanks = [
+      { from: 1, to: 3 },
+      { from: 5, to: 7 },
+    ];
+    const segs = ghostSegments(text, blanks, 0, text.length, blanks[1]);
+    expect(segs.filter((g) => g.now).map((g) => g.text)).toEqual(["fg"]);
+    // A run that is a hole and a run that is *the* hole never merge, or the
+    // two would be drawn in one span at one brightness.
+    expect(segs.filter((g) => g.hole).length).toBe(2);
+  });
+});
+
+/**
+ * Which hole is live, which is the whole of what "the hole you are on"
+ * means: the buffer is a prefix, so how far in says it.
+ */
+describe("holeAt", () => {
+  const blanks = [
+    { from: 3, to: 7 },
+    { from: 9, to: 12 },
+  ];
+
+  it("is the first hole the typing has not got past", () => {
+    expect(holeAt(blanks, 0)).toBe(blanks[0]);
+    expect(holeAt(blanks, 5)).toBe(blanks[0]);
+    // The last character of the hole typed: it is behind you now.
+    expect(holeAt(blanks, 7)).toBe(blanks[1]);
+    expect(holeAt(blanks, 12)).toBeNull();
+  });
+
+  it("changes the moment the last character of a hole is typed by hand", () => {
+    // This is what makes a finished hole a *moment*: the scene compares the
+    // hole live before a keystroke with the one live after it, and the
+    // interesting case is the player typing the last character themselves,
+    // with nothing left for the drill to fill. Before the keystroke the
+    // answer was matched to 6; after it, to 7.
+    expect(holeAt(blanks, 6)).not.toBe(holeAt(blanks, 7));
+  });
+
+  it("has nothing to say about a drill with no holes", () => {
+    expect(holeAt([], 4)).toBeNull();
+  });
+});
+
+/**
+ * How the hole you are on breathes: in fast, held where it can be read, out
+ * on a decay, and dark for a beat before it comes round again.
+ */
+describe("holeGlow", () => {
+  it("stays inside the light it is given", () => {
+    for (let t = 0; t < 6; t += 0.017) {
+      const g = holeGlow(t);
+      expect(g).toBeGreaterThanOrEqual(HOLE_LOW - 1e-9);
+      expect(g).toBeLessThanOrEqual(1 + 1e-9);
     }
+  });
+
+  it("rises, holds, falls, rests", () => {
+    expect(holeGlow(0)).toBeCloseTo(HOLE_LOW, 3);
+    // A quarter in it is up, and it is still up a third of a period later.
+    expect(holeGlow(2.8 * 0.3)).toBeCloseTo(1, 3);
+    expect(holeGlow(2.8 * 0.5)).toBeCloseTo(1, 3);
+    // Two thirds in it is on the way down, and by the end it is resting.
+    expect(holeGlow(2.8 * 0.7)).toBeLessThan(0.6);
+    expect(holeGlow(2.8 * 0.95)).toBeCloseTo(HOLE_LOW, 3);
+  });
+
+  it("is exponential, not a sine: most of the rise is in the first half", () => {
+    const quarter = holeGlow(2.8 * 0.0625);
+    expect(quarter).toBeGreaterThan(0.6);
+  });
+
+  it("comes round again, and the same way every time", () => {
+    for (const t of [0.4, 1.1, 2.0]) expect(holeGlow(t + 2.8)).toBeCloseTo(holeGlow(t), 9);
   });
 });
 
@@ -290,6 +402,74 @@ describe("answerIndent", () => {
     }
     expect(typed).toBe(tabs);
     expect(byHand).not.toContain("\t");
+  });
+});
+
+/**
+ * The two rules that make the drill cheap to type: a word finishes itself
+ * once you have said which word it is, and the bracket or quote that closes
+ * one you opened goes in by itself.
+ *
+ * Both are the same bargain as `answerIndent`: everything they put in is the
+ * answer's own next characters, so the buffer stays a prefix and the count,
+ * the bursts and the ghost keep working unchanged.
+ */
+describe("answerWord", () => {
+  const answer = 'fn main() {\n    println!("hi");\n}\n';
+
+  it("finishes a word once enough of it is typed to be sure", () => {
+    expect(answerWord("fn ma", answer)).toBe("in");
+    expect(answerWord("fn main() {\n    pri", answer)).toBe("ntln");
+  });
+
+  it("waits for the first few characters — or the whole answer types itself", () => {
+    expect(answerWord("", answer)).toBeNull();
+    expect(answerWord("f", answer)).toBeNull();
+    expect(answerWord("fn m", answer)).toBeNull();
+  });
+
+  it("has nothing to add to a word that is already whole", () => {
+    expect(answerWord("fn main", answer)).toBeNull();
+  });
+
+  it("does not start a word for you", () => {
+    // The caret is after `{`, and the next word has not been begun.
+    expect(answerWord("fn main() {\n    ", answer)).toBeNull();
+  });
+
+  it("refuses past a divergence, like everything else in the mode", () => {
+    expect(answerWord("fn mai%", answer)).toBeNull();
+  });
+});
+
+describe("answerCloser", () => {
+  const answer = 'fn main() {\n    println!("hi");\n}\n';
+
+  it("closes a bracket the player opened", () => {
+    expect(answerCloser("fn main(", answer)).toBe(")");
+    expect(answerCloser('fn main() {\n    println!("hi"', answer)).toBe(")");
+  });
+
+  it("closes a string, and never opens one", () => {
+    // Two quotes on the line before this one: the next is the opener of a
+    // string that is the player's to start.
+    expect(answerCloser("fn main() {\n    println!(", answer)).toBeNull();
+    // One quote before it: this one ends the string.
+    expect(answerCloser('fn main() {\n    println!("hi', answer)).toBe('"');
+  });
+
+  it("closes a block, once the line it is on has been reached", () => {
+    expect(answerCloser('fn main() {\n    println!("hi");\n', answer)).toBe("}");
+  });
+
+  it("gives nothing where the next character is the player's", () => {
+    expect(answerCloser("", answer)).toBeNull();
+    expect(answerCloser("fn main", answer)).toBeNull();
+    expect(answerCloser(answer, answer)).toBeNull();
+  });
+
+  it("refuses past a divergence, like everything else in the mode", () => {
+    expect(answerCloser("fn maim(", answer)).toBeNull();
   });
 });
 

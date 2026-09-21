@@ -39,9 +39,14 @@ import {
   Editor,
   MAIN_FILE,
   answerBlanks,
+  answerCloser,
   answerCompletion,
   answerIndent,
   answerProgress,
+  answerWord,
+  holeAt,
+  holeGlow,
+  HOLE_LOW,
   CODE_FACE_KEY,
   CODE_FONT_KEY,
   CODE_FONT_MAX,
@@ -52,7 +57,7 @@ import {
   type Blank,
   type Target,
 } from "../ui/editor";
-import { burstPlan } from "../engine/burst";
+import { burstPlan, coinPlan, fillPlan } from "../engine/burst";
 import { Overlay } from "../ui/overlay";
 import { CodeFx } from "../ui/codefx";
 import { Coder } from "../ui/agent/coder";
@@ -330,6 +335,22 @@ const STREET: Record<string, string> = {
   "python/hacker": "bg_room732",
 };
 
+/**
+ * How big a drill moment is drawn, as a share of the celebration burst.
+ *
+ * A wrong character, a line closed, a hole left behind: these happen on a
+ * line of code the player is reading, and the full-size shockwave covers it.
+ * The finished answer is the exception and keeps its firework.
+ */
+const DRILL_SPARK = 0.34;
+
+/** What one round of the drill's own typing put in, for the effects layer. */
+interface Fill {
+  chars: number;
+  /** `[from, to)` of a word that finished itself, in document offsets. */
+  word: [number, number] | null;
+}
+
 export class QuestScene implements Scene {
   readonly name = "quest";
   readonly mood = "quest" as const;
@@ -489,6 +510,10 @@ export class QuestScene implements Scene {
    */
   /** Which drill is on: none, random gaps, or "type only the answer". */
   private drill: "none" | "blanks" | "solution" = "none";
+  /** The ghost's arrival, restarted every time a mode is switched on. */
+  private ghostIn = new Tween(0.42, 0, true);
+  /** Where the `matched / total` count is drawn, for the coins to fly at. */
+  private statusAt: [number, number] | null = null;
   private answerBusy = false;
   private answerProg: AnswerProgress = { matched: 0, wrong: 0, done: false, total: 0 };
   /**
@@ -993,6 +1018,7 @@ export class QuestScene implements Scene {
       this.answerOn = false;
       this.drill = "none";
       this.editor.setAnswer(null);
+      this.coder?.follow(false);
       // The caret goes back where the typing happens, for the reason every
       // other canvas button on this screen hands it over: the player pressed
       // a button and the next thing they want to do is write.
@@ -1148,6 +1174,14 @@ export class QuestScene implements Scene {
     const target = this.target();
     if (!this.editor) return;
     this.editor.setAnswer(target);
+    // The coder comes out with the mode and goes away with it: it is the
+    // one finishing the words, so it is on screen while it does.
+    this.coder?.follow(target !== null);
+    // The answer fades up rather than appearing: a screenful of text that
+    // arrives between two frames reads as a glitch, and this is the moment
+    // the player has just paid a star for.
+    if (target) this.ghostIn.restart();
+    else this.ghostIn.finish();
     if (target) {
       this.fillBlanks(target);
       this.answerProg = answerProgress(this.editor.source, target.text);
@@ -1162,19 +1196,50 @@ export class QuestScene implements Scene {
    * last character of a word should not have to wait a keystroke for the
    * line to catch up.
    */
-  private fillBlanks(target: Target): void {
-    if (!this.editor) return;
+  private fillBlanks(target: Target): Fill {
+    if (!this.editor) return { chars: 0, word: null };
+    let typed = 0;
+    let word: [number, number] | null = null;
     for (let i = 0; i < 200; i++) {
-      // The answer's own indentation, then — in BLANKS — everything up to
-      // the next hole. Indentation goes in either mode: it cannot be typed
-      // against an answer that indents differently from the editor, and it
-      // was never the thing being asked.
+      // Four things the drill types for you, in the order they come up:
+      //
+      //   * the answer's own indentation, in every mode — it cannot be typed
+      //     against an answer that indents differently from the editor, and
+      //     it was never the thing being asked;
+      //   * in BLANKS and "type only the answer", everything from here to
+      //     the next hole;
+      //   * the rest of the word you have started — a few characters is
+      //     enough to say which word you meant, and there is only one it
+      //     could be;
+      //   * the bracket or quote that closes one you opened, which is what
+      //     every other editor's `closeBrackets` does and this one cannot
+      //     (see `answerCloser`).
+      //
+      // Each one leaves the buffer a longer prefix of the answer, so the
+      // loop just goes round again: `pr` finishes `println`, the `(` you
+      // type takes its `"` from you, and the line closes itself.
+      const src = this.editor.source;
+      const grown = answerWord(src, target.text);
       const add =
-        answerIndent(this.editor.source, target.text) ??
-        (target.blanks.length > 0 ? blanksFill(this.editor.source, target) : null);
+        answerIndent(src, target.text) ??
+        (target.blanks.length > 0 ? blanksFill(src, target) : null) ??
+        grown ??
+        answerCloser(src, target.text);
       if (add === null) break;
+      // Where a completed word began, so the effect can fly from the letters
+      // the player typed to the ones that arrived by themselves.
+      if (add === grown) {
+        const head = /[A-Za-z0-9_]+$/.exec(src)?.[0] ?? "";
+        word = [src.length - head.length, src.length + add.length];
+      }
       this.editor.appendAtEnd(add);
+      typed += add.length;
     }
+    // Somebody typed two letters and a word appeared: that is the coder's
+    // doing, and the coder should look like it did it. Nothing is asked of a
+    // model — this is a sprite noticing (docs/agent.md §1).
+    if (typed > 0) this.coder?.cheer();
+    return { chars: typed, word };
   }
 
   /**
@@ -1188,19 +1253,48 @@ export class QuestScene implements Scene {
   private answerTick(): void {
     if (!this.answerOn || this.answerText === null || !this.editor) return;
     const was = this.answerProg;
+    // Which hole was live *before* this keystroke. Read from the progress
+    // the last tick left behind, not from the buffer: by the time this runs
+    // the character is already in, so a hole finished by hand would look
+    // like a hole nobody was ever standing in.
+    const target = this.target();
+    const holeBefore = target ? holeAt(target.blanks, was.matched) : null;
     // The gaps close themselves: everything between one hole and the next is
     // typed for the player as they arrive at it.
-    const target = this.target();
-    if (target) this.fillBlanks(target);
+    const fill = target ? this.fillBlanks(target) : null;
     const now = answerProgress(this.editor.source, this.answerText);
     this.answerProg = now;
     const at = this.caretVirtual();
     if (!at) return;
     if (now.done && !was.done) {
-      // Every character, typed. The one big one.
+      // Every character, typed. The one big one — and the count it has been
+      // filling all this time gets the coins.
       this.spark(at, 70, Theme.admit);
+      this.coins(at, this.statusAt ?? [at[0], 0], 22);
       this.app.chip.coin();
       return;
+    }
+    // **What the drill typed for you, made visible.** A word that finished
+    // itself flies into place from the letters you did type; a hole you have
+    // just left behind gets its own small burst. Both are moments, not a
+    // sparkle per character — the rule the rest of this method is written
+    // to, because an effect on every keystroke is an effect nobody sees.
+    if (fill && fill.word) {
+      const from = this.virtualAt(fill.word[0]);
+      const to = this.virtualAt(fill.word[1]);
+      if (from && to && !reducedMotion()) {
+        this.fx?.play(fillPlan(from[0], from[1], to[0], to[1], this.cellVirtual(), Theme.coin));
+      }
+      this.app.chip.blip();
+    }
+    // `else`: a word that finished itself inside a hole finishes the hole
+    // too, and two celebrations at one caret on one keystroke is the noise
+    // the rest of this method is written to avoid.
+    // A hole is behind you when the one that was live is not the live one
+    // any more — whether you typed its last character or the drill did.
+    else if (target && holeBefore && holeAt(target.blanks, now.matched) !== holeBefore) {
+      this.spark(at, 16, Theme.coin, DRILL_SPARK);
+      this.app.chip.blip();
     }
     if (now.wrong > was.wrong || now.matched < was.matched) {
       // **The divergence *growing*, not merely existing.** A quest opens with
@@ -1208,14 +1302,14 @@ export class QuestScene implements Scene {
       // so "wrong where it was right before" would never fire on the very
       // screen it is for. Each keystroke that takes you further from the
       // target gets its own small burst, at the caret, where the fix is.
-      this.spark(at, 10, Theme.red);
+      this.spark(at, 10, Theme.red, DRILL_SPARK);
       this.app.chip.fail();
       return;
     }
     if (was.wrong > 0 && now.wrong === 0) {
       // Back on the target. Worth as much as finishing a line, and the
       // moment a player most wants told.
-      this.spark(at, 20, Theme.cyan);
+      this.spark(at, 20, Theme.cyan, DRILL_SPARK);
       this.app.chip.blip();
       return;
     }
@@ -1223,7 +1317,7 @@ export class QuestScene implements Scene {
       now.matched > was.matched &&
       this.answerText.slice(was.matched, now.matched).includes("\n")
     ) {
-      this.spark(at, 16, Theme.coin);
+      this.spark(at, 16, Theme.coin, DRILL_SPARK);
       this.app.chip.blip();
     }
   }
@@ -1248,11 +1342,84 @@ export class QuestScene implements Scene {
     return this.app.layout.toVirtual(c[0], c[1]);
   }
 
-  /** One burst, in one colour, at a point. */
-  private spark(at: [number, number], n: number, colour: RGBA): void {
+  /**
+   * The ghost's light, this frame.
+   *
+   * The curve is `holeGlow` and the clock is the scene's own `t`, so a
+   * capture steps it like everything else. Reduced motion keeps both
+   * brightnesses still — the hole you are on is simply the brighter one,
+   * which is all the breathing was ever saying.
+   */
+  private glow(): void {
+    if (!this.editor) return;
+    const fade = this.ghostIn.out;
+    if (reducedMotion()) {
+      this.editor.setGlow(0.95, 0.5, fade);
+      return;
+    }
+    const g = holeGlow(this.t);
+    // The holes further down move a little with the one you are on, so the
+    // page breathes as one thing rather than one word twitching in a still
+    // paragraph.
+    this.editor.setGlow(g, HOLE_LOW + 0.3 + 0.12 * g, fade);
+  }
+
+  /** Where a place in the document is, in the game's own coordinates. */
+  private virtualAt(pos: number): [number, number] | null {
+    const c = this.editor?.clientAt(pos);
+    return c ? this.app.layout.toVirtual(c[0], c[1]) : null;
+  }
+
+  /** One character's cell, in the game's own coordinates. */
+  private cellVirtual(): [number, number] {
+    const c = this.editor?.cellClient() ?? [8, 16];
+    const k = this.app.layout.cssScale || 1;
+    return [Math.max(4, c[0] / k), Math.max(8, c[1] / k)];
+  }
+
+  /**
+   * A stream of light from one place on the screen to another: at the end of
+   * the whole answer, everything flying at the counter that has been keeping
+   * score.
+   *
+   * `coinPlan`'s arc and its staggered departures are what make it read as
+   * one gesture rather than a puff — the same flight the awards screen uses
+   * for its coins. It is for the long throw only: over a five-letter word
+   * its rings are wider than the word (`fillPlan` is the one for that).
+   */
+  private coins(from: [number, number], to: [number, number], n: number): void {
+    if (reducedMotion()) return;
+    // `coinPlan` is already the palette's coin, which is the colour the
+    // holes are drawn in: what flies is what was written.
+    this.fx?.play(coinPlan(from[0], from[1], to[0], to[1], n).plan);
+  }
+
+  /**
+   * One burst, in one colour, at a point — and, for the small moments, at
+   * the size of the text it happens on.
+   *
+   * `burstPlan` is the street-cleared firework: its shockwave is 90 and 150
+   * virtual pixels wide whatever `n` is, which over a 16-pixel line of code
+   * is a flash that hides the very character it is pointing at. A keystroke
+   * is not a level ending, so everything but the finished answer is played
+   * at `scale` — the reach, the grain and the rings all come in together,
+   * and it is over quicker.
+   */
+  private spark(at: [number, number], n: number, colour: RGBA, scale = 1): void {
     const plan = burstPlan(at[0], at[1], n);
-    for (const p of plan.particles) p.color = colour;
-    for (const r of plan.rings) r.color = colour;
+    for (const p of plan.particles) {
+      p.color = colour;
+      if (scale === 1) continue;
+      p.dx *= scale;
+      p.dy *= scale;
+      p.gravity *= scale;
+      p.size *= Math.max(0.5, scale);
+      p.life *= 0.7;
+    }
+    for (const r of plan.rings) {
+      r.color = colour;
+      r.radius *= scale;
+    }
     this.fx?.play(plan);
   }
 
@@ -1902,6 +2069,8 @@ export class QuestScene implements Scene {
     this.t += dt;
     this.fx?.frame(dt);
     this.coder?.update(dt);
+    this.ghostIn.update(dt);
+    this.glow();
     if (this.quest && this.askedLocale !== null && this.askedLocale !== locale()) {
       // F7 changed the language under an open quest. The interface re-reads
       // its own strings for free; the prose came from the server in the old
@@ -2324,6 +2493,8 @@ export class QuestScene implements Scene {
       !on ? Theme.dim : prog.done ? Theme.admit : prog.wrong > 0 ? Theme.red : Theme.coin,
     );
     printf(g, f, status, pad + Math.round(8 * s), statusY, layout.vw - pad * 2, "left");
+    // Where the coins go when the last character of the answer lands.
+    this.statusAt = [pad + Math.round(8 * s) + f.size * 6, statusY + f.height / 2];
 
     const top = strip + Math.round(6 * s);
     const body: Rect = [pad, top, layout.vw - pad * 2, layout.vh - top - pad];

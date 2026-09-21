@@ -780,6 +780,84 @@ function Quest:complete_line()
   SFX.play("move")
 end
 
+--- The closing half of a pair, typed for the player.
+---
+--- "Complete `()` and `""` automatically" is what every editor does, and
+--- this mode cannot have it: a `)` put in after the caret is not a prefix of
+--- the answer, so the drill would call the editor's own helpfulness a
+--- divergence (which is why `auto_close` is off while the mode is on). So
+--- the pair is closed from the *answer*, one character behind: the moment
+--- what is typed is a clean prefix and the answer's next character is a
+--- closer, it goes in by itself.
+---
+--- A quote is a closer only when it closes one: `"` opens and closes with
+--- the same character, so the line's own quotes up to here are counted.
+function Quest.answer_closer(typed, answer)
+  local p = Quest.answer_progress(typed, answer)
+  if #typed ~= p.matched then return nil end
+  local ch = answer:sub(p.matched + 1, p.matched + 1)
+  if ch == "" then return nil end
+  if ch == ")" or ch == "]" or ch == "}" or ch == ">" then return ch end
+  -- The quotes by byte rather than as literals: a lone double quote inside
+  -- this file would leave `tests/test_screens.lua` pairing the rest of its
+  -- string literals off by one, and that guard is worth more than the two
+  -- characters it costs here. 34 is a double quote, 39 a single, 96 a
+  -- backtick, 92 a backslash.
+  local b = answer:byte(p.matched + 1)
+  if b ~= 34 and b ~= 39 and b ~= 96 then return nil end
+  local from = 1
+  local nl = answer:sub(1, p.matched):find("\n[^\n]*$")
+  if nl then from = nl + 1 end
+  local n = 0
+  for i = from, p.matched do
+    if answer:byte(i) == b and answer:byte(i - 1) ~= 92 then n = n + 1 end
+  end
+  if n % 2 == 1 then return ch end
+  return nil
+end
+
+--- The rest of a word, once the player has typed the start of it.
+---
+--- The drill is about remembering what the program says, not about spelling
+--- `WaitGroup` by hand, so a few characters are enough: type `Wa` and the
+--- word finishes itself. There is only one right continuation — the
+--- answer's — so this cannot guess wrong the way a completion engine can.
+--- `min` characters have to be typed first, or the whole answer would type
+--- itself the moment the mode came on.
+function Quest.answer_word(typed, answer, min)
+  min = min or 2
+  local p = Quest.answer_progress(typed, answer)
+  if #typed ~= p.matched or p.matched == 0 then return nil end
+  local head = answer:sub(1, p.matched):match("[%a_][%w_]*$") or
+    answer:sub(1, p.matched):match("%d+$")
+  if not head or #head < min then return nil end
+  local rest = answer:sub(p.matched + 1):match("^[%w_]+")
+  if rest and #rest > 0 then return rest end
+  return nil
+end
+
+--- How brightly the hole you are on is burning, 0..1, at `t` seconds.
+---
+--- **Exponential, not a sine.** A sine spends most of its time halfway,
+--- which on a word you are trying to read is the worst place to be. This
+--- rushes in on `1 - e^-kt`, holds at the top for the beat you read it in,
+--- decays on `e^-kt`, and rests dark before coming round again.
+Quest.HOLE_LOW = 0.12
+--- How big a drill moment is drawn, as a share of the celebration burst. A
+--- wrong character, a line closed, a hole left behind: these happen on a
+--- line of code the player is reading, and the full-size shockwave covers
+--- it. The finished answer is the exception and keeps its firework.
+Quest.DRILL_SPARK = 0.34
+function Quest.hole_glow(t, period)
+  period = period or 2.8
+  local u = (t % period) / period
+  local k, span = 6, 1 - Quest.HOLE_LOW
+  if u < 0.25 then return Quest.HOLE_LOW + span * (1 - math.exp(-k * u / 0.25)) end
+  if u < 0.55 then return 1 end
+  if u < 0.85 then return Quest.HOLE_LOW + span * math.exp(-k * (u - 0.55) / 0.3) end
+  return Quest.HOLE_LOW
+end
+
 --- The holes BLANKS cuts in the answer, as `{ from, to }` byte offsets.
 ---
 --- **Words, not characters.** A gap in the middle of `println` is a typing
@@ -890,6 +968,16 @@ function Quest.solution_blanks(answer, starter)
   return out
 end
 
+--- The hole the typing is on at `at` characters in: the first one it has
+--- not got past. The buffer is always a prefix of the answer, so how far in
+--- is all that is needed to say which hole is live.
+function Quest.hole_at(blanks, at)
+  for _, b in ipairs(blanks or {}) do
+    if b.to > at then return b end
+  end
+  return nil
+end
+
 --- The hole `at` is standing in, if any. Offsets are 0-based, as the spans.
 local function blank_at(blanks, at)
   for _, b in ipairs(blanks or {}) do
@@ -918,21 +1006,43 @@ function Quest.blanks_fill(typed, answer, blanks)
   return answer:sub(p.matched + 1, upto)
 end
 
---- The answer as the *ghost* should show it: holes masked.
+--- A slice of the answer, cut where the holes start and end.
 ---
---- Drawing the real text inside a hole would hand the player the very word
---- the drill is asking for. The mask keeps the line's shape — and its width
---- — so the program on screen still reads as the program.
-function Quest.mask_blanks(answer, blanks)
-  if not blanks or #blanks == 0 then return answer end
-  local out, at = {}, 0
-  for _, b in ipairs(blanks) do
-    out[#out + 1] = answer:sub(at + 1, b.from)
-    out[#out + 1] = ("_"):rep(b.to - b.from)
-    at = b.to
+--- The holes used to be drawn as rows of `_`, and that was the drill being
+--- strict for its own sake: a player who cannot remember the word has
+--- nothing to look at and no way to find out. So the word is drawn — it is
+--- the answer, the same answer plain ANSWER puts on screen — and what marks
+--- it as *yours to type* is that it breathes (`hole_glow`) rather than that
+--- it is missing. A hint you can read is still a hint you have to type.
+---
+--- `from`/`to` are 0-based byte offsets into the whole answer, because the
+--- ghost is drawn a line at a time and each line has to know where it sits
+--- in the holes. `now` is the hole the player is on, marked so it can be
+--- drawn brighter than the ones further down. Runs of the same kind merge.
+function Quest.ghost_segments(answer, blanks, from, to, now)
+  local out = {}
+  local function push(text, hole, is_now)
+    if text == "" then return end
+    local last = out[#out]
+    if last and last.hole == hole and last.now == is_now then
+      last.text = last.text .. text
+    else
+      out[#out + 1] = { text = text, hole = hole, now = is_now }
+    end
   end
-  out[#out + 1] = answer:sub(at + 1)
-  return table.concat(out)
+  local at = math.max(0, from)
+  local stop = math.min(to, #answer)
+  for _, b in ipairs(blanks or {}) do
+    if b.to > at then
+      if b.from >= stop then break end
+      push(answer:sub(at + 1, math.min(b.from, stop)), false, false)
+      at = math.max(at, math.min(b.from, stop))
+      push(answer:sub(at + 1, math.min(b.to, stop)), true, now ~= nil and b.from == now.from)
+      at = math.min(b.to, stop)
+    end
+  end
+  push(answer:sub(at + 1, stop), false, false)
+  return out
 end
 
 --- Whether ANSWER should empty the buffer as it opens.
@@ -1031,14 +1141,24 @@ function Quest:arm_answer()
   -- would call a correctly typed word a divergence.
   self.blanks = self:drill_blanks()
   self.answer_lines = {}
-  local shown = Quest.mask_blanks(self.answer_text, self.blanks)
-  for chunk in (shown .. "\n"):gmatch("(.-)\n") do
+  -- The real answer, not a masked copy: the holes are drawn in their own
+  -- colour where they fall (`ghost_segments`), so the line and the thing
+  -- compared against are one string again.
+  for chunk in (self.answer_text .. "\n"):gmatch("(.-)\n") do
     self.answer_lines[#self.answer_lines + 1] = chunk
   end
   -- `gmatch` over `text .. "\n"` gives one trailing empty piece for a source
   -- that already ended in a newline; it is not a line of the answer.
   if self.answer_text:sub(-1) == "\n" then
     self.answer_lines[#self.answer_lines] = nil
+  end
+  -- Where each line of the answer starts inside it, so the draw can cut a
+  -- line's ghost against holes held as whole-answer offsets.
+  self.answer_starts = {}
+  local at = 0
+  for i, chunk in ipairs(self.answer_lines) do
+    self.answer_starts[i] = at
+    at = at + #chunk + 1
   end
   self:fill_blanks()
   self.answer_prog = Quest.answer_progress(self.editor:text(), self.answer_text)
@@ -1108,20 +1228,40 @@ end
 --- the next the moment a hole is finished, and a player who typed the last
 --- character of a word should not wait a keystroke for the line to catch up.
 function Quest:fill_blanks()
-  if not self.answer_on or not self.editor or not self.answer_text then return end
+  local none = { chars = 0, word = nil }
+  if not self.answer_on or not self.editor or not self.answer_text then return none end
+  local typed, word = 0, nil
   for _ = 1, 200 do
     -- The answer's own indentation, then — in BLANKS — everything up to the
     -- next hole. Indentation goes in either mode: it cannot be typed against
     -- an answer that indents differently from this editor, and it was never
     -- the thing being asked.
-    local add = Quest.answer_indent(self.editor:text(), self.answer_text)
+    -- Four things the drill types for you, in the order they come up: the
+    -- answer's own indentation; in a drill, everything up to the next hole;
+    -- the rest of the word you have started, because a few characters say
+    -- which word you meant and there is only one it could be; and the
+    -- bracket or quote that closes one you opened.
+    local src = self.editor:text()
+    local add = Quest.answer_indent(src, self.answer_text)
     if not add and self.drill ~= "none" and self.blanks then
-      add = Quest.blanks_fill(self.editor:text(), self.answer_text, self.blanks)
+      add = Quest.blanks_fill(src, self.answer_text, self.blanks)
     end
+    local grown = nil
+    if not add then
+      grown = Quest.answer_word(src, self.answer_text)
+      add = grown
+    end
+    if not add then add = Quest.answer_closer(src, self.answer_text) end
     if not add then break end
+    if add == grown then
+      local head = src:match("[%w_]+$") or ""
+      word = { #src - #head, #src + #add }
+    end
     self.editor:move("doc_end")
     self.editor:insert(add)
+    typed = typed + #add
   end
+  return { chars = typed, word = word }
 end
 
 --- BLANKS on, BLANKS off. It needs the answer, so it fetches it the way
@@ -1164,10 +1304,15 @@ function Quest:answer_tick()
   local text = self.editor:text()
   if text == self.answer_seen then return end
   self.answer_seen = text
-  self:fill_blanks()
+  -- Which hole was live *before* this keystroke. Read from the progress the
+  -- last tick left behind, not from the buffer: by the time this runs the
+  -- character is already in, so a hole finished by hand would look like a
+  -- hole nobody was ever standing in.
+  local was = self.answer_prog
+  local hole_before = Quest.hole_at(self.blanks, was.matched)
+  local fill = self:fill_blanks()
   text = self.editor:text()
   self.answer_seen = text
-  local was = self.answer_prog
   local now = Quest.answer_progress(text, self.answer_text)
   self.answer_prog = now
   local x, y = self:caret_xy()
@@ -1175,18 +1320,34 @@ function Quest:answer_tick()
   if now.done and not was.done then
     self.fx:burst(x, y, 70, Theme.admit)
     SFX.play("accepted")
+  -- **What the drill typed for you, made visible.** A word that finished
+  -- itself lights up along the letters that arrived; a hole left behind
+  -- gets its own small burst. One or the other, never both: a word that
+  -- finishes inside a hole finishes the hole too.
+  elseif fill and fill.word then
+    local wx, wy = self:offset_xy(fill.word[1])
+    local ex, ey = self:offset_xy(fill.word[2])
+    if wx and ex then
+      self.fx:fill(wx, wy, ex, ey, { self:cell_size() }, Theme.coin)
+    end
+    SFX.play("move")
+  -- A hole is behind you when the one that was live is not the live one any
+  -- more — whether you typed its last character or the drill did.
+  elseif hole_before and Quest.hole_at(self.blanks, now.matched) ~= hole_before then
+    self.fx:burst(x, y, 16, Theme.coin, Quest.DRILL_SPARK)
+    SFX.play("move")
   elseif now.wrong > was.wrong or now.matched < was.matched then
     -- **The divergence *growing*, not merely existing.** A quest opens with
     -- boilerplate in the buffer that is already not the answer, so "wrong
     -- where it was right before" would never fire on the screen it is for.
-    self.fx:burst(x, y, 10, Theme.red)
+    self.fx:burst(x, y, 10, Theme.red, Quest.DRILL_SPARK)
     SFX.play("rejected")
   elseif was.wrong > 0 and now.wrong == 0 then
-    self.fx:burst(x, y, 20, Theme.cyan)
+    self.fx:burst(x, y, 20, Theme.cyan, Quest.DRILL_SPARK)
     SFX.play("move")
   elseif now.matched > was.matched
     and self.answer_text:sub(was.matched + 1, now.matched):find("\n", 1, true) then
-    self.fx:burst(x, y, 16, Theme.coin)
+    self.fx:burst(x, y, 16, Theme.coin, Quest.DRILL_SPARK)
     SFX.play("move")
   end
 end
@@ -1201,6 +1362,67 @@ function Quest:caret_xy()
   local x = geo.x0 + geo.gutter + geo.font:getWidth(line:sub(1, self.editor.col - 1))
   local y = geo.y0 + (row - 1) * geo.line_h + geo.line_h / 2
   return x, y
+end
+
+--- One line of the ghost, from character `k` onward, with its holes in
+--- their own colour.
+---
+--- The browser draws this with a span per run and two CSS variables
+--- (`ui/editor.ts` `setGlow`); here it is the same two brightnesses printed
+--- one run at a time. The hole the player is on breathes on `hole_glow`;
+--- the ones further down sit dim and nearly steady, so the page reads as
+--- one thing rather than one word twitching in a still paragraph.
+function Quest:draw_ghost(want, index, k, x, y, font)
+  local from = (self.answer_starts and self.answer_starts[index] or 0) + k
+  local upto = from + #want - k
+  local now = nil
+  if self.blanks and self.editor then
+    now = Quest.hole_at(self.blanks, #self.editor:text())
+  end
+  local segs = Quest.ghost_segments(self.answer_text or want, self.blanks, from, upto, now)
+  if #segs == 0 then
+    UI.setColor(Theme.withAlpha(Theme.cream, 0.42))
+    love.graphics.print(want:sub(k + 1), x, y)
+    return
+  end
+  local g = Quest.hole_glow(self.t or 0)
+  local rest = Quest.HOLE_LOW + 0.3 + 0.12 * g
+  for _, seg in ipairs(segs) do
+    if seg.hole then
+      UI.setColor(Theme.withAlpha(Theme.coin, seg.now and g or rest))
+    else
+      UI.setColor(Theme.withAlpha(Theme.cream, 0.42))
+    end
+    love.graphics.print(seg.text, x, y)
+    x = x + font:getWidth(seg.text)
+  end
+end
+
+--- Where a byte offset in the document is on the screen, for an effect
+--- thrown at a word rather than at the caret. `nil` when the line it is on
+--- has scrolled out of the well.
+function Quest:offset_xy(pos)
+  local geo = self.editor_geo
+  if not geo or not self.editor then return nil end
+  local at, index = 0, 1
+  local lines = self.editor.lines
+  while index <= #lines and at + #lines[index] < pos do
+    at = at + #lines[index] + 1
+    index = index + 1
+  end
+  local row = index - self.editor.scroll
+  if row < 1 or row > (self.visible_rows or 0) then return nil end
+  local line = lines[index] or ""
+  local x = geo.x0 + geo.gutter + geo.font:getWidth(line:sub(1, math.max(0, pos - at)))
+  local y = geo.y0 + (row - 1) * geo.line_h + geo.line_h / 2
+  return x, y
+end
+
+--- One character's cell: how wide a character is and how tall a line.
+function Quest:cell_size()
+  local geo = self.editor_geo
+  if not geo then return 8, 16 end
+  return math.max(4, geo.font:getWidth("M")), geo.line_h
 end
 
 function Quest:solve()
@@ -2446,8 +2668,7 @@ function Quest:draw_editor(rect, tint, bare)
             math.max(2, font:getWidth(line:sub(k + 1))), line_h)
         end
         if k < #want then
-          UI.setColor(Theme.withAlpha(Theme.cream, 0.3))
-          love.graphics.print(want:sub(k + 1), x0 + gutter - shift + typed_w, y)
+          self:draw_ghost(want, index, k, x0 + gutter - shift + typed_w, y, font)
         end
       elseif #line > 0 then
         -- Typed past the end of the answer: all of this line is divergence.
@@ -2470,10 +2691,10 @@ function Quest:draw_editor(rect, tint, bare)
   if self.answer_on and self.answer_lines then
     local after = self.editor:line_count()
     local row = after - self.editor.scroll + 1
-    UI.setColor(Theme.withAlpha(Theme.cream, 0.3))
     for i = after + 1, #self.answer_lines do
       if row > rows then break end
-      love.graphics.print(self.answer_lines[i], x0 + gutter - shift, y0 + (row - 1) * line_h)
+      self:draw_ghost(self.answer_lines[i], i, 0, x0 + gutter - shift,
+        y0 + (row - 1) * line_h, font)
       row = row + 1
     end
     love.graphics.setColor(1, 1, 1, 1)

@@ -142,17 +142,34 @@ end
 
 --- A burst at a point, `n` strong, all in one colour — the quest screen's
 --- ANSWER-mode sparks, which `src/sparks.lua` used to draw.
-function Fx:burst(x, y, n, color)
+---
+--- `scale` shrinks it to the size of the text it happens on. `Plan.burst` is
+--- the street-cleared firework and its shockwave is 90 and 150 pixels wide
+--- whatever `n` is, which over a line of code is a flash that hides the very
+--- character it is pointing at. A keystroke is not a level ending.
+function Fx:burst(x, y, n, color, scale)
   local plan = Plan.burst(x, y, n)
-  if color then
-    for _, p in ipairs(plan.particles) do
-      p.color = color
-    end
-    for _, r in ipairs(plan.rings) do
-      r.color = color
+  scale = scale or 1
+  for _, p in ipairs(plan.particles) do
+    if color then p.color = color end
+    if scale ~= 1 then
+      p.dx = p.dx * scale
+      p.dy = p.dy * scale
+      p.gravity = p.gravity * scale
+      p.size = p.size * math.max(0.5, scale)
+      p.life = p.life * 0.7
     end
   end
+  for _, r in ipairs(plan.rings) do
+    if color then r.color = color end
+    r.radius = r.radius * scale
+  end
   self:play(plan)
+end
+
+--- A word the drill finished for the player, lighting up where it landed.
+function Fx:fill(x0, y0, x1, y1, cell, color)
+  self:play(Plan.fill(x0, y0, x1, y1, cell, color))
 end
 
 --- The caret moved: its smear, drawn as a stroked path that shortens from

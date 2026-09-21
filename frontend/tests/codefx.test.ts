@@ -22,6 +22,7 @@ import {
   isJump,
   jumpPlan,
   keyPlan,
+  fillPlan,
   linkPlan,
   loopPlan,
   pathPoint,
@@ -424,5 +425,49 @@ describe("bracketPairAt", () => {
     expect(bracketPairAt(st, 18)).toEqual([12, 18]);
     // Caret in the middle of the expression: no bracket beside it.
     expect(bracketPairAt(st, 15)).toBeNull();
+  });
+});
+
+/**
+ * A word the drill typed for you: sized to the text it lands on, because
+ * the first version was `coinPlan` and its fixed rings covered the line.
+ */
+describe("fillPlan", () => {
+  const cell = [8, 16] as const;
+
+  it("is no wider than the word and the cell it is drawn in", () => {
+    const plan = fillPlan(100, 50, 140, 50, cell, Theme.coin, seeded(3));
+    for (const p of plan.particles) {
+      expect(p.x).toBeGreaterThanOrEqual(100);
+      expect(p.x).toBeLessThanOrEqual(140);
+      // Thrown about a character high, not across the screen.
+      expect(Math.abs(p.dx)).toBeLessThan(cell[1] * 2);
+      expect(Math.abs(p.dy)).toBeLessThan(cell[1] * 2);
+    }
+    expect(plan.rings).toHaveLength(1);
+    expect(plan.rings[0].radius).toBeLessThan(cell[1]);
+    expect([plan.rings[0].x, plan.rings[0].y]).toEqual([140, 50]);
+  });
+
+  it("lights up in order, from what you typed to what arrived", () => {
+    const plan = fillPlan(0, 0, 80, 0, cell, Theme.coin, seeded(11));
+    const byX = [...plan.particles].sort((a, b) => a.x - b.x);
+    for (let i = 1; i < byX.length; i++) {
+      // Each one starts after the one to its left, give or take the jitter.
+      expect(byX[i].delay).toBeGreaterThan(byX[i - 1].delay - 0.03);
+    }
+  });
+
+  it("costs a long word no more than a short one", () => {
+    const short = fillPlan(0, 0, 16, 0, cell, Theme.coin, seeded(5));
+    const long = fillPlan(0, 0, 900, 0, cell, Theme.coin, seeded(5));
+    expect(short.particles.length).toBeGreaterThanOrEqual(3);
+    expect(long.particles.length).toBeLessThanOrEqual(10);
+  });
+
+  it("is gone in under half a second", () => {
+    for (const p of fillPlan(0, 0, 60, 0, cell, Theme.coin, seeded(9)).particles) {
+      expect(p.delay + p.life).toBeLessThan(0.6);
+    }
   });
 });

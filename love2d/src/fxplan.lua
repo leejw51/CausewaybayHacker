@@ -430,6 +430,43 @@ function M.link(a, b, cell, rng)
   }
 end
 
+--- A word the drill typed for you, arriving.
+---
+--- **Sized to the text, not to the screen.** `M.burst`'s shockwave is 90 and
+--- 150 pixels wide whatever `n` is, which over a line of code is a flash
+--- that hides the very characters it is celebrating. So: sparks along the
+--- span the word occupies, lit in order from where you stopped typing to
+--- where the word ends, and one ring a character cell wide at the far end.
+function M.fill(x0, y0, x1, y1, cell, color, rng)
+  rng = rng or math.random
+  local cw, ch = cell[1], cell[2]
+  local span = math.max(cw, math.sqrt((x1 - x0) ^ 2 + (y1 - y0) ^ 2))
+  local count = math.max(3, math.min(10, math.floor(span / cw + 0.5)))
+  local particles = {}
+  for i = 0, count - 1 do
+    local u = count == 1 and 1 or i / (count - 1)
+    local x, y = x0 + (x1 - x0) * u, y0 + (y1 - y0) * u
+    local ang = -math.pi / 2 + (rng() - 0.5) * 0.9
+    local reach = between(rng, 0.5, 1.4) * ch
+    particles[#particles + 1] = thrown(x, y, math.cos(ang) * reach, math.sin(ang) * reach, {
+      life = between(rng, 0.26, 0.46),
+      delay = u * 0.11 + rng() * 0.02,
+      size = between(rng, 0.22, 0.42) * ch,
+      color = (i % 3 == 2) and Theme.cream or color,
+      shape = 0,
+      trail = true,
+      gravity = 210,
+      seed = rng(),
+    })
+  end
+  return {
+    particles = particles,
+    rings = {
+      { x = x1, y = y1, radius = ch * 0.8, life = 0.24, delay = 0.1, color = color, glow = true },
+    },
+  }
+end
+
 --- The burst a right answer gets, `n` sparks strong: a shell of glowing
 --- points thrown every way with trails, gold stars further out, paper thrown
 --- up that takes its time to fall, and a flash with a shockwave. What

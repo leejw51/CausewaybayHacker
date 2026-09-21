@@ -570,12 +570,53 @@ return function()
       T.ok(#Quest.answer_blanks(answer, seed) > 0, "a drill always has a hole in it")
     end
 
-    -- The mask hides the holes and nothing else, at the same width.
+    -- The ghost is cut at the holes, not masked: the word is drawn, and
+    -- what marks it as the player's is that it breathes.
     local blanks = { { from = 3, to = 7 } } -- `main`
-    local masked = Quest.mask_blanks(answer, blanks)
-    T.eq(#masked, #answer, "the mask does not change the shape of the program")
-    T.eq(masked:sub(4, 7), "____", "the hole is hidden")
-    T.eq(masked:sub(1, 3), "fn ", "and the rest of the line is not")
+    local segs = Quest.ghost_segments(answer, blanks, 0, #answer, blanks[1])
+    local rebuilt = {}
+    for _, seg in ipairs(segs) do rebuilt[#rebuilt + 1] = seg.text end
+    T.eq(table.concat(rebuilt), answer, "the whole answer is drawn")
+    T.eq(#segs, 3, "before the hole, the hole, after it")
+    T.eq(segs[1].text, "fn ", "the run before")
+    T.eq(segs[2].text, "main", "the hole itself, in the clear")
+    T.eq(segs[2].hole, true, "and marked as one")
+    T.eq(segs[2].now, true, "the one the player is on")
+    T.eq(segs[3].hole, false, "the rest of the program is not")
+    -- A slice that only half covers a hole is still a hole.
+    local half = Quest.ghost_segments(answer, blanks, 4, 6, nil)
+    T.eq(#half, 1, "one run")
+    T.eq(half[1].text, "ai", "the part of the hole the slice holds")
+    T.eq(half[1].hole, true, "still the drill's")
+    T.eq(half[1].now, false, "but not the one being typed")
+
+    -- A few characters of a word finish it, and a closer closes itself.
+    T.eq(Quest.answer_word("fn ma", answer), "in", "two characters are enough")
+    T.eq(Quest.answer_word("fn m", answer), nil, "one is not")
+    T.eq(Quest.answer_word("fn main", answer), nil, "a whole word has no rest")
+    T.eq(Quest.answer_word("fn mai%", answer), nil, "never past a divergence")
+    T.eq(Quest.answer_closer("fn main(", answer), ")", "the bracket you opened")
+    T.eq(Quest.answer_closer("fn main", answer), nil, "nothing where the next is yours")
+    T.eq(Quest.answer_closer("fn maim(", answer), nil, "never past a divergence")
+
+    -- Which hole is live, and the moment it stops being: the scene compares
+    -- the one live before a keystroke with the one after, so a hole whose
+    -- last character the player typed themselves is still a moment.
+    local two = { { from = 3, to = 7 }, { from = 9, to = 12 } }
+    T.eq(Quest.hole_at(two, 0), two[1], "the first hole the typing is short of")
+    T.eq(Quest.hole_at(two, 6), two[1], "one character to go, still in it")
+    T.eq(Quest.hole_at(two, 7), two[2], "typed by hand, and it is behind you")
+    T.eq(Quest.hole_at(two, 12), nil, "past the last one there is none")
+    T.eq(Quest.hole_at({}, 4), nil, "a drill with no holes has no live one")
+
+    -- The hole you are on breathes: in fast, held, out on a decay, dark.
+    T.eq(Quest.hole_glow(0) <= Quest.HOLE_LOW + 1e-9, true, "starts dark")
+    T.eq(Quest.hole_glow(2.8 * 0.3) > 0.99, true, "up by a third of the way")
+    T.eq(Quest.hole_glow(2.8 * 0.7) < 0.6, true, "and on the way down by two")
+    for t = 0, 5.6, 0.05 do
+      local g = Quest.hole_glow(t)
+      T.eq(g >= Quest.HOLE_LOW - 1e-9 and g <= 1 + 1e-9, true, "inside its own light")
+    end
 
     -- The fill types everything that is not the drill, and stops at a hole.
     T.eq(Quest.blanks_fill("", answer, blanks), "fn ", "up to the hole")
