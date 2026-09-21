@@ -139,8 +139,10 @@ fn a_formatter_gets_a_timeout_of_its_own() {
 #[test]
 fn clang_format_tidies_cpp_where_it_exists() {
     let untidy = "#include <iostream>\nint main(){std::cout<<\"hi\";}\n";
-    if !have("clang-format") {
-        assert!(!format::is_supported("cpp"));
+    // Asked of the gate, not of PATH: on macOS `clang-format` ships inside
+    // the developer directory and is reached through `xcrun`, so "not on
+    // PATH" is not the same question as "this machine cannot format C++".
+    if !format::is_supported("cpp") {
         let out = format::format("cpp", untidy).unwrap();
         assert_eq!(out.source, untidy);
         assert!(!out.changed);
@@ -211,4 +213,64 @@ fn have_module(module: &str) -> bool {
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
+}
+
+// ---------------------------------------------------------------------------
+// What the server says it can do, at boot and on the wire
+// ---------------------------------------------------------------------------
+
+#[test]
+fn the_toolchain_report_covers_every_land_and_agrees_with_the_gate() {
+    let report = format::toolchains();
+    let lands: Vec<_> = report.iter().map(|t| t.land).collect();
+    assert_eq!(
+        lands,
+        vec!["rust", "go", "cpp", "python"],
+        "a land without a row is a land nobody is told about"
+    );
+    for tool in &report {
+        assert_eq!(
+            tool.formats,
+            format::is_supported(tool.land),
+            "{}: the boot report and the gate disagree",
+            tool.land
+        );
+        assert!(!tool.compiler.is_empty() && !tool.formatter.is_empty());
+    }
+}
+
+#[test]
+fn a_missing_tool_comes_with_the_command_that_installs_it() {
+    for tool in format::toolchains() {
+        if tool.compiles && tool.formats {
+            assert!(
+                tool.install.is_empty(),
+                "{}: nothing is missing, so there is nothing to advise",
+                tool.land
+            );
+        } else {
+            // The whole point of the line: a warning that says only "missing"
+            // is a warning the reader has to go and research.
+            assert!(
+                !tool.install.trim().is_empty(),
+                "{}: missing something and saying nothing about it",
+                tool.land
+            );
+        }
+    }
+}
+
+#[test]
+fn this_machine_can_format_rust_go_and_python_at_least() {
+    // The three that need no system package: `rustfmt` and `gofmt` ship with
+    // their toolchains, and `black` is a pip install into the interpreter the
+    // runner already needs. A machine that can build this project and cannot
+    // format these three has something wrong with it, and CI should say so
+    // rather than skipping quietly.
+    for land in ["rust", "go", "python"] {
+        assert!(
+            format::is_supported(land),
+            "{land} cannot be formatted here; `cwbhacker doctor` prints how to fix it"
+        );
+    }
 }

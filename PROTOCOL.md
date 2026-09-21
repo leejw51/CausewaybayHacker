@@ -631,11 +631,21 @@ each** — the same ceiling as a submission, because it is the same question
 ### 4.9d `code.format`
 
 Run the language's own formatter over the source and hand it back. `rustfmt`
-for Rust, `gofmt` for Go, `clang-format` for C++ — the tools the player's
-colleagues would use, not a house style invented here. Python has none, and
-C++ has one only while `clang-format` is on the server's PATH; a `code.format`
-for a language without a formatter is answered with an `.err`, never with the
-source handed back untouched as if it had been looked at.
+for Rust, `gofmt` for Go, `clang-format` for C++, `black` for Python — the
+tools the player's colleagues would use, not a house style invented here.
+**All four run on the server**; no client formats anything itself.
+
+Two of them ship with their toolchain and two are asked of the machine:
+`clang-format` is looked for on `PATH` and then through `xcrun --find`, which
+is where macOS keeps it (Xcode's command line tools ship one, and it is not
+on `PATH` — a server that only checked `PATH` reported "no C++ formatter"
+while holding one), and `black` is run as `python3 -m black`. Which lands can
+be formatted is therefore a fact about the machine: the server prints it at
+boot with the command that installs whatever is missing, `cwbhacker doctor`
+prints the same list, and `auth.login` / `auth.resume` carry it as `formats`
+(§4.3) so a client draws the button only where it works. A `code.format` for
+a language this server cannot format is answered with an `.err`, never with
+the source handed back untouched as if it had been looked at.
 
 ```json
 → payload: { "lang": "rust", "source": "fn main(){let x=1;}" }

@@ -196,6 +196,13 @@ fn serve(
 
     let root = repo_root();
     let content_dir = content_dir.unwrap_or_else(|| root.join("content"));
+    // What this machine can actually do, before anything asks it to. A land
+    // whose compiler is missing is a quarter of the map that cannot be
+    // played; a land whose formatter is missing is a button that will not be
+    // drawn. Both are worth saying at boot, with the one line that fixes it,
+    // rather than at the moment a player presses something.
+    report_toolchains();
+
     if no_import {
         tracing::info!("skipping the content import (--no-import)");
     } else {
@@ -329,7 +336,6 @@ fn doctor(home: &Path) -> Result<()> {
         ("go", "go", ["version"]),
         ("c++", "c++", ["--version"]),
         ("python3", "python3", ["--version"]),
-        ("clang-format", "clang-format", ["--version"]),
         ("node", "node", ["--version"]),
     ] {
         match std::process::Command::new(program).args(args).output() {
@@ -345,16 +351,29 @@ fn doctor(home: &Path) -> Result<()> {
                 // not the server's problem, and clang-format only takes the
                 // C++ land's format button away.
                 let fatal = matches!(label, "rustc" | "cargo" | "go" | "c++" | "python3");
-                let note = match label {
-                    _ if fatal => "  (required)",
-                    "clang-format" => "  (formatting C++ is off without it)",
-                    _ => "",
-                };
+                let note = if fatal { "  (required)" } else { "" };
                 println!("{label:<11} MISSING{note}");
                 if fatal {
                     bad += 1;
                 }
             }
+        }
+    }
+
+    // The formatters, asked of the runner rather than of PATH: on macOS
+    // `clang-format` lives inside Xcode and only `xcrun` knows the way, and
+    // Python's `black` is a module rather than a program. The two answers
+    // must be one answer, or `doctor` and the game disagree about which
+    // button exists.
+    for tool in cwbhacker_runner::format::toolchains() {
+        let label = format!("fmt {}", tool.land);
+        if tool.formats {
+            println!("{label:<11} {}", tool.formatter);
+        } else {
+            println!(
+                "{label:<11} MISSING  ({} — {})",
+                tool.formatter, tool.install
+            );
         }
     }
 
@@ -478,4 +497,40 @@ fn prune(
 
 fn chrono_days(days: i64) -> std::time::Duration {
     std::time::Duration::from_secs((days.max(0) * 86_400) as u64)
+}
+
+/// The compilers and formatters this machine has, on the way up.
+fn report_toolchains() {
+    for tool in cwbhacker_runner::format::toolchains() {
+        if tool.compiles && tool.formats {
+            tracing::info!(
+                land = tool.land,
+                compiler = tool.compiler,
+                formatter = tool.formatter,
+                "toolchain ready"
+            );
+            continue;
+        }
+        // Loud, and with the command: a warning that says only "missing" is a
+        // warning the reader has to go and research.
+        tracing::warn!(
+            land = tool.land,
+            compiler = tool.compiler,
+            compiles = tool.compiles,
+            formatter = tool.formatter,
+            formats = tool.formats,
+            install = %tool.install,
+            "toolchain incomplete"
+        );
+        let what = match (tool.compiles, tool.formats) {
+            (false, false) => format!("{} and {}", tool.compiler, tool.formatter),
+            (false, true) => tool.compiler.to_string(),
+            _ => tool.formatter.to_string(),
+        };
+        eprintln!(
+            "cwbhacker: {} land is missing {what}\n  install it with: {}",
+            tool.land.to_uppercase(),
+            tool.install
+        );
+    }
 }

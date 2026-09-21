@@ -69,8 +69,11 @@ make help       # the rest
 ```
 
 Needs Rust, Go, a C++ compiler, Python 3 and Node. `make doctor` says which of
-them it cannot find (`clang-format` is optional; without it the C++ land just
-has no `fmt`).
+them it cannot find, and the server prints the same list on the way up with
+the command that installs whatever is missing. The formatters are part of it:
+`rustfmt` and `gofmt` ship with their toolchains, `clang-format` comes from
+Xcode or your package manager, and Python's `black` is `python3 -m pip install
+black`. A land whose formatter is missing simply has no `fmt` button.
 
 **From a phone, use port 5390 — not the dev server's 5291.** The page and the
 websocket have to share an origin: the built bundle derives the socket from the

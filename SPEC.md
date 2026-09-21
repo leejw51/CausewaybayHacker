@@ -687,8 +687,12 @@ c++ -std=c++20 -O2 -pthread -Wall main.cpp -o prog
 ```
 
 `c++` is the system driver (clang on macOS, gcc on Linux). No package cache.
-Formatter: `clang-format --style=LLVM` on stdin (optional: `is_supported` may be true
-only when `clang-format` is on PATH).
+Formatter: `clang-format --style=LLVM` on stdin, found on `PATH` or through
+`xcrun --find clang-format` (macOS keeps it inside Xcode's command line tools,
+off `PATH`). `is_supported("cpp")` is true only when one of the two answers.
+Unlike the other three it is a **token** formatter: it never fails to parse,
+so it rewrites half-written code instead of refusing. It cannot lose a
+character doing it, which is the property that matters.
 
 **Python**
 
@@ -698,7 +702,9 @@ python3 -I main.py                    # the run, per case, under the same limits
 ```
 
 `-I` = isolated mode (no user site, no PYTHON* env). Needs Python ≥ 3.10.
-No formatter (`is_supported("python") == false`).
+Formatter: `python3 -m black -q -` on stdin — a module rather than a program,
+so it is found in whichever interpreter the runner already uses.
+`is_supported("python")` is true only when that module answers.
 
 Both are stdio-harness only. `Harness::Cargo` / `Harness::Gotest` remain
 rust-only / go-only; `unsupported()` returns a message for any other pairing.

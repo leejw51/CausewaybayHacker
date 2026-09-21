@@ -2831,6 +2831,31 @@ directory.
 one SELECT and no write, and returns the same `updated_at`. Without that a list
 sorted by `updated_at` shuffles every few seconds while nobody is typing.
 
+## 2026-09-21 — BE: every land formats, and the server says so at boot
+
+FORMAT was broken in three ways at once and each hid the others. The quest
+screen drew the button and never dispatched it, so it worked only from
+Ctrl/Cmd+Shift+F and, on a phone, not at all. Python had no formatter. And
+C++ reported "clang-format is not installed" on every Mac while holding one:
+Xcode's command line tools ship it *inside the developer directory*, off
+`PATH`, where only `xcrun --find` knows the way — which is exactly how `c++`
+itself is found on that machine, so checking `PATH` alone was the bug.
+
+Now: `rustfmt`, `gofmt`, `clang-format` (PATH, then `xcrun`) and `black`
+(`python3 -m black`), all four on the server. Which ones exist is a fact about
+the machine, so it is reported rather than assumed — at boot, as a line per
+land with the command that installs whatever is missing; by `cwbhacker
+doctor`, from the same function; and on the wire as `formats` in the login
+reply, which is what both clients draw the button from. A button that always
+refuses is worse than no button.
+
+One property had to be restated rather than asserted. Three of the four tools
+parse before they print, so half-written code comes back byte for byte.
+`clang-format` does not parse at all — that is why it can format a fragment
+inside an IDE — so it always rewrites. The guarantee there is that it cannot
+lose a character, and the test checks that instead of pretending the tools
+are alike.
+
 ## 2026-09-20 — BE: practice pays, a fifth at a time
 
 A cleared node played again used to be worth nothing, which told the player

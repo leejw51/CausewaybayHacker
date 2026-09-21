@@ -80,13 +80,44 @@ fn black_is_installed() -> bool {
         .unwrap_or(false)
 }
 
-fn clang_format_is_installed() -> bool {
-    std::process::Command::new("clang-format")
-        .arg("--version")
+/// Where `clang-format` is, if it is anywhere.
+///
+/// On PATH is the Linux answer and the answer for anyone who installed it
+/// themselves. On macOS it usually is **not** on PATH: Xcode's command line
+/// tools ship it inside the developer directory, where only `xcrun` knows
+/// the way — the same place `c++` itself comes from on that machine. Asking
+/// `xcrun` is therefore not a special case, it is how this platform names
+/// its toolchain, and without it every Mac reported "no C++ formatter"
+/// while holding one.
+fn clang_format_path() -> Option<std::ffi::OsString> {
+    let runs = |program: &std::ffi::OsStr| {
+        std::process::Command::new(program)
+            .arg("--version")
+            .stdin(std::process::Stdio::null())
+            .output()
+            .map(|out| out.status.success())
+            .unwrap_or(false)
+    };
+    let plain = std::ffi::OsString::from("clang-format");
+    if runs(&plain) {
+        return Some(plain);
+    }
+    let found = std::process::Command::new("xcrun")
+        .args(["--find", "clang-format"])
         .stdin(std::process::Stdio::null())
         .output()
-        .map(|out| out.status.success())
-        .unwrap_or(false)
+        .ok()
+        .filter(|out| out.status.success())?;
+    let path = String::from_utf8(found.stdout).ok()?.trim().to_string();
+    if path.is_empty() {
+        return None;
+    }
+    let path = std::ffi::OsString::from(path);
+    runs(&path).then_some(path)
+}
+
+fn clang_format_is_installed() -> bool {
+    clang_format_path().is_some()
 }
 
 pub fn format(lang: &str, source: &str) -> std::io::Result<Formatted> {
@@ -99,8 +130,10 @@ pub fn format(lang: &str, source: &str) -> std::io::Result<Formatted> {
         "go" => Command::new("gofmt"),
         "cpp" if clang_format_is_installed() => {
             // LLVM style is the tool's own default, named so the answer does
-            // not depend on a `.clang-format` the player cannot see.
-            let mut c = Command::new("clang-format");
+            // not depend on a `.clang-format` the player cannot see. The
+            // program is the resolved path, not the bare name: on macOS the
+            // bare name is not on PATH at all.
+            let mut c = Command::new(clang_format_path().expect("just checked"));
             c.arg("--style=LLVM").arg("--assume-filename=main.cpp");
             c
         }
@@ -197,4 +230,89 @@ fn first_complaint(stderr: &str) -> String {
     } else {
         line.to_string()
     }
+}
+
+// ---------------------------------------------------------------------------
+// What this machine can actually do
+// ---------------------------------------------------------------------------
+
+/// One land's toolchain, as this machine has it.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Toolchain {
+    pub land: &'static str,
+    /// The compiler or interpreter, and whether it answered.
+    pub compiler: &'static str,
+    pub compiles: bool,
+    /// The formatter behind `code.format`, and whether it answered.
+    pub formatter: &'static str,
+    pub formats: bool,
+    /// What to type when one of them is missing. Empty when both are here.
+    pub install: String,
+}
+
+fn answers(program: &str, args: &[&str]) -> bool {
+    std::process::Command::new(program)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false)
+}
+
+/// Every land, its compiler and its formatter, checked by running them.
+///
+/// The server prints this on the way up. A land whose compiler is missing is
+/// a quarter of the map that cannot be played, and a land whose formatter is
+/// missing is a button that will not be drawn — both are worth knowing at
+/// boot rather than at the moment a player presses something. The advice is
+/// per platform, because "install clang-format" is three different sentences
+/// on three machines.
+pub fn toolchains() -> Vec<Toolchain> {
+    let mac = cfg!(target_os = "macos");
+    let cpp_hint = if mac {
+        "xcode-select --install   (Xcode ships clang-format; xcrun finds it)"
+    } else {
+        "apt install build-essential clang-format"
+    };
+    let mut out = Vec::new();
+    for (land, compiler, args, formatter, hint) in [
+        (
+            "rust",
+            "rustc",
+            &["--version"][..],
+            "rustfmt",
+            "https://rustup.rs   then: rustup component add rustfmt",
+        ),
+        (
+            "go",
+            "go",
+            &["version"][..],
+            "gofmt",
+            "https://go.dev/dl/   (gofmt ships with it)",
+        ),
+        ("cpp", "c++", &["--version"][..], "clang-format", cpp_hint),
+        (
+            "python",
+            "python3",
+            &["--version"][..],
+            "black",
+            "python3 -m pip install black",
+        ),
+    ] {
+        let compiles = answers(compiler, args);
+        let formats = is_supported(land);
+        out.push(Toolchain {
+            land,
+            compiler,
+            compiles,
+            formatter,
+            formats,
+            install: if compiles && formats {
+                String::new()
+            } else {
+                hint.to_string()
+            },
+        });
+    }
+    out
 }
