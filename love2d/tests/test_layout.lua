@@ -304,17 +304,29 @@ return function()
         end
         I18n.set(was)
 
-        -- And it is gone again the moment the server's count says there is
-        -- nothing to take away.
-        for _, empty in ipairs({ { cleared = 0, total = 2, stars = 0, stars_total = 6 },
-                                 false }) do
-          scene.tally = empty or nil
-          love.graphics.setCanvas(Layout.canvas)
-          app:draw()
-          love.graphics.setCanvas()
-          T.eq(scene.reset_rect, nil,
-            mode .. ": an untouched road offers no reset")
-        end
+        -- **An untouched road offers it too.** This asserted the opposite
+        -- until RESET started taking the drafts and the undo stacks with the
+        -- stamps (PROTOCOL §4.7b): a player who has written half a program
+        -- on every node and cleared none of them has a road full of work to
+        -- put back, and `cleared`, `stars` and `attempts` are all zero
+        -- there. `Map.reset_offered` and the browser both say yes to that
+        -- road now (`tests/test_lands.lua`), and this is the drawing half of
+        -- the same rule.
+        scene.tally = { cleared = 0, total = 2, stars = 0, stars_total = 6 }
+        love.graphics.setCanvas(Layout.canvas)
+        app:draw()
+        love.graphics.setCanvas()
+        T.ok(scene.reset_rect ~= nil,
+          mode .. ": an untouched road offers a reset — the drafts it cannot see")
+
+        -- And it is gone where there is no road to reset: a map that has not
+        -- heard back from `world.map` yet knows of no streets at all, and a
+        -- button for that one would do nothing.
+        scene.tally = nil
+        love.graphics.setCanvas(Layout.canvas)
+        app:draw()
+        love.graphics.setCanvas()
+        T.eq(scene.reset_rect, nil, mode .. ": no tally, no reset")
         scene.tally = { cleared = 1, total = 2, stars = 3, stars_total = 6 }
       end)
       T.ok(ok, ("map with nodes in %s: %s"):format(mode, tostring(err)))
