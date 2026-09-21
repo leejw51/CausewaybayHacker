@@ -268,6 +268,13 @@ pub fn world_reset(
         )));
     }
     let reset = progress::reset_road(&conn, address, &land, &category)?;
+    // The undo history goes with the stamps. §4.11c gives the stack
+    // precedence over the draft when the quest screen opens, so a road whose
+    // stacks survived would hand every reset node back the code that cleared
+    // it — a map with no stamps on it and the answers still in the editors.
+    // The attempts stay; they are the record, and the draft is gated on
+    // `reset_at` instead (`attempts::latest_source`).
+    edits::clear_road(&conn, state.store.home(), address, &land, &category)?;
     let after = world::map(&conn, address, &land, &category)?;
     Ok(json!({
         "land": land,
@@ -326,7 +333,10 @@ pub fn quest_get(
     // Opening a stage is the other half of §1.3. After `readable_quest`, so a
     // quest the player cannot reach never becomes the place they are put back.
     position::mark_quest(&conn, address, &quest_id)?;
-    let draft = attempts::latest_source(&conn, address, &quest_id)?;
+    // §4.8 + §4.7b: the draft is the last attempt *since the last reset of
+    // this road*. A road reset back to untouched must not open its nodes on
+    // the code that cleared them.
+    let draft = attempts::latest_source(&conn, address, &quest_id, row.reset_at.as_deref())?;
     Ok(json!({
         "quest": quest.to_wire(
             quest_state,
@@ -689,7 +699,7 @@ pub fn ai_next(
     } else {
         None
     };
-    let draft = attempts::latest_source(&conn, address, &step.quest_id)?;
+    let draft = attempts::latest_source(&conn, address, &step.quest_id, row.reset_at.as_deref())?;
     Ok(json!({
         "quest": quest.to_wire(
             quest_state,

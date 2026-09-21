@@ -232,3 +232,174 @@ fn resetting_a_road_nobody_has_touched_is_not_an_error() {
     assert_eq!(out["reset"], 0, "nothing to do is not a failure");
     assert_eq!(out["cleared"], 0);
 }
+
+/// The editor, after a reset, opens on the starter — and that is two things,
+/// because two of them decide what the quest screen shows.
+///
+/// `Quest.draft` (§4.8) is the last attempt's source and the stack (§4.11c)
+/// is the undo history, which wins over the draft when the screen opens. A
+/// reset that cleared the stamp and left either of those behind would hand
+/// the player back the very code that cleared the node, which is the bug this
+/// test exists to keep fixed: the map says untouched, the editor says solved.
+#[test]
+fn a_reset_puts_the_editor_back_to_the_starter() {
+    let tmp = tempfile::tempdir().unwrap();
+    let state = state(tmp.path());
+    let session = alice();
+    let quest = clear_first(&state);
+
+    // The player's own code, on both of the paths that remember it.
+    handlers::edit_push(
+        &state,
+        &session,
+        &json!({ "quest_id": quest, "source": "fn main(){ /* solved */ }" }),
+    )
+    .unwrap();
+    let before = handlers::quest_get(&state, &session, &json!({ "quest_id": quest })).unwrap();
+    assert_eq!(
+        before["quest"]["draft"], "fn main(){}",
+        "the submit is the draft to begin with"
+    );
+    let stack = handlers::edit_state(&state, &session, &json!({ "quest_id": quest })).unwrap();
+    assert_eq!(stack["depth"], 1, "and the stack has the typing");
+
+    handlers::world_reset(
+        &state,
+        &session,
+        &json!({ "land": "rust", "category": "basic" }),
+    )
+    .unwrap();
+
+    let after = handlers::quest_get(&state, &session, &json!({ "quest_id": quest })).unwrap();
+    assert!(
+        after["quest"]["draft"].is_null(),
+        "a reset road opens on the starter, not on the code that cleared it"
+    );
+    let stack = handlers::edit_state(&state, &session, &json!({ "quest_id": quest })).unwrap();
+    assert_eq!(stack["depth"], 0, "the undo history went with the stamps");
+    assert_eq!(stack["cursor"], 0);
+    assert!(stack["source"].is_null(), "null source means the starter");
+
+    // The attempt itself is still on the record — the draft is gated, not
+    // deleted (SPEC §7).
+    let conn = state.store.conn();
+    let kept: i64 = conn
+        .query_row(
+            &format!(
+                "SELECT count(*) FROM attempts WHERE address = '{ALICE}' AND quest_id = '{quest}'"
+            ),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(kept, 1);
+}
+
+/// …and the next attempt after the reset is a draft again. The gate is a
+/// date, not a switch: work done on the new walk is kept the way it always
+/// was, or the feature would have traded one lost-work bug for another.
+#[test]
+fn work_done_after_a_reset_is_remembered_again() {
+    let tmp = tempfile::tempdir().unwrap();
+    let state = state(tmp.path());
+    let session = alice();
+    let quest = clear_first(&state);
+
+    handlers::world_reset(
+        &state,
+        &session,
+        &json!({ "land": "rust", "category": "basic" }),
+    )
+    .unwrap();
+
+    {
+        let conn = state.store.conn();
+        let reset_at = progress::get(&conn, ALICE, &quest)
+            .unwrap()
+            .reset_at
+            .unwrap();
+        let mut record = attempts::new_record(
+            ids::attempt_id(),
+            ALICE,
+            &quest,
+            "rust",
+            attempts::Mode::Run,
+            "fn main(){ /* the new walk */ }".into(),
+        );
+        // Dated by hand, and far enough ahead to be unambiguous: both columns
+        // are RFC 3339 to the second in the same zone, the gate is a string
+        // `>` on them, and an attempt written inside the same second as the
+        // reset would land on the wrong side of it for reasons that have
+        // nothing to do with what this test is about.
+        record.created_at = "2099-01-01T00:00:00Z".into();
+        assert!(record.created_at > reset_at);
+        attempts::insert(&conn, &record).unwrap();
+    }
+
+    let out = handlers::quest_get(&state, &session, &json!({ "quest_id": quest })).unwrap();
+    assert_eq!(
+        out["quest"]["draft"], "fn main(){ /* the new walk */ }",
+        "the walk after the reset keeps its own work"
+    );
+}
+
+/// A quest the player only ever pressed RUN on is reset too.
+///
+/// RUN writes an attempt and deliberately does not touch `progress` — that
+/// column is the record of submissions — so before 0019's date could be
+/// written on it there had to be a row to write it on. Without that, the one
+/// kind of node a player is most likely to have left half-written would come
+/// back from a reset still holding the code they left in it.
+#[test]
+fn a_reset_reaches_a_quest_that_was_only_ever_run() {
+    let tmp = tempfile::tempdir().unwrap();
+    let state = state(tmp.path());
+    let session = alice();
+
+    let quest: String = {
+        let conn = state.store.conn();
+        let id: String = conn
+            .query_row(
+                "SELECT id FROM quests WHERE land = 'rust' AND category = 'basic' ORDER BY node LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        // A run, and only a run: no submit, no hint, no clock.
+        let record = attempts::new_record(
+            ids::attempt_id(),
+            ALICE,
+            &id,
+            "rust",
+            attempts::Mode::Run,
+            "fn main(){ /* half-written */ }".into(),
+        );
+        attempts::insert(&conn, &record).unwrap();
+        let row: i64 = conn
+            .query_row(
+                &format!("SELECT count(*) FROM progress WHERE address = '{ALICE}'"),
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(row, 0, "RUN does not write progress, which is the point");
+        id
+    };
+
+    let before = handlers::quest_get(&state, &session, &json!({ "quest_id": quest })).unwrap();
+    assert_eq!(before["quest"]["draft"], "fn main(){ /* half-written */ }");
+
+    let out = handlers::world_reset(
+        &state,
+        &session,
+        &json!({ "land": "rust", "category": "basic" }),
+    )
+    .unwrap();
+    assert_eq!(out["reset"], 1, "a quest with attempts is a quest to reset");
+
+    let after = handlers::quest_get(&state, &session, &json!({ "quest_id": quest })).unwrap();
+    assert!(
+        after["quest"]["draft"].is_null(),
+        "the run-only quest opens on the starter too"
+    );
+}

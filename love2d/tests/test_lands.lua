@@ -225,8 +225,10 @@ return function()
     -- no tally at all, and a road nobody has walked has nothing to take away;
     -- a button for either is a button that does nothing.
     T.nope(Map.reset_offered(nil), "no tally, no button")
-    T.nope(Map.reset_offered({}), "a tally with no count is not a count")
-    T.nope(Map.reset_offered({ cleared = 0, total = 27 }), "an untouched road")
+    T.nope(Map.reset_offered({}), "a tally with no count is not a road yet")
+    -- Every road that exists, cleared or not: the work a reset takes back is
+    -- mostly the drafts, and no count on the map can see one.
+    T.ok(Map.reset_offered({ cleared = 0, total = 27 }), "a road with nothing cleared on it")
     T.ok(Map.reset_offered({ cleared = 1, total = 27 }), "one street is enough")
     T.ok(Map.reset_offered({ cleared = 27, total = 27 }), "a finished road")
   end)

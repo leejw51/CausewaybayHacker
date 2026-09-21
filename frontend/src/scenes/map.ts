@@ -522,19 +522,25 @@ export class MapScene implements Scene {
       // category would promise otherwise.
       { id: "play", label: phone ? t("map.playgroundShort") : PLAY_LABEL(), lit: false, group: 2 },
       // Walk this road again from the start. It asks first — it is the one
-      // control on this screen that throws work away — and it is drawn only
-      // once there is something to throw away, so a fresh road does not
-      // offer to be reset.
-      ...((this.tally?.cleared ?? 0) > 0
-        ? [
-            {
-              id: "reset",
-              label: phone ? t("map.resetShort") : t("map.reset"),
-              lit: false,
-              group: 2,
-            },
-          ]
-        : []),
+      // control on this screen that throws work away — and it is always
+      // offered, on every road.
+      //
+      // It used to appear only once `cleared > 0`, on the reasoning that a
+      // road with no stamps has nothing to take back. That stopped being true
+      // when RESET started taking the drafts and the undo stacks with the
+      // stamps (PROTOCOL §4.7b): a player who has written half a program on
+      // every node of ADVANCED and cleared none of them has a road full of
+      // work to put back, and the map cannot see any of it — `cleared`,
+      // `stars` and `attempts` are all zero there, because `attempts` counts
+      // submits. Hiding the button on that road hid it from exactly the
+      // person who needed it. The question it asks is the guard, and a reset
+      // of a road nobody has touched is `reset: 0` and a no-op.
+      {
+        id: "reset",
+        label: phone ? t("map.resetShort") : t("map.reset"),
+        lit: false,
+        group: 2,
+      },
       // Search, stats and AI mode. They were on F4/F5/F6 and nowhere else,
       // which meant three finished screens that a player could only reach by
       // being told they existed. The ids are `ui/auxnav.ts`'s own, so
@@ -1443,7 +1449,7 @@ export class MapScene implements Scene {
    */
   private async resetRoad(): Promise<void> {
     const tally = this.tally;
-    if (!tally || tally.cleared === 0 || this.resetting) return;
+    if (!tally || this.resetting) return;
     const road = `${landName(this.land)} · ${t(`map.${this.category}` as "map.basic")}`;
     const yes = await this.app.ask({
       title: t("map.resetTitle"),

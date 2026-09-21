@@ -406,3 +406,47 @@ fn an_unknown_quest_is_not_found_everywhere() {
         assert_eq!(err.code, cwbhacker_core::Code::NotFound, "{}", err.message);
     }
 }
+
+/// `world.reset` takes the road's stacks with it (PROTOCOL §4.7b) — every
+/// quest of that land and category, this player's only, and only that road.
+/// The stack decides what the editor opens on, so a road left with its
+/// history is a road that re-opens on the code that cleared it.
+#[test]
+fn a_road_reset_clears_that_road_s_stacks_and_no_others() {
+    let (_tmp, store) = store();
+    let conn = store.conn();
+    let home = store.home();
+
+    for text in ["one", "two"] {
+        edits::push(&conn, home, ALICE, HELLO, text).unwrap();
+    }
+    edits::push(&conn, home, ALICE, SUM, "alice on the second node").unwrap();
+    edits::push(&conn, home, BOB, HELLO, "bob's own work").unwrap();
+    edits::push(&conn, home, ALICE, "cpp.basic.01.hello", "another land").unwrap();
+
+    let cleared = edits::clear_road(&conn, home, ALICE, "rust", "basic").unwrap();
+    assert_eq!(cleared, 2, "two of alice's rust/basic quests had a stack");
+
+    for quest in [HELLO, SUM] {
+        let state = edits::state(&conn, home, ALICE, quest).unwrap();
+        assert_eq!((state.cursor, state.depth), (0, 0), "{quest}");
+        assert_eq!(state.source, None, "{quest} opens on the starter");
+        assert_eq!(blobs(&store, ALICE, quest), 0, "{quest} kept a blob");
+    }
+
+    // Another player's history on the same road, and the same player's on
+    // another road, are somebody else's business.
+    assert_eq!(edits::state(&conn, home, BOB, HELLO).unwrap().depth, 1);
+    assert_eq!(
+        edits::state(&conn, home, ALICE, "cpp.basic.01.hello")
+            .unwrap()
+            .depth,
+        1
+    );
+
+    // A road nobody has typed on is zero, not an error.
+    assert_eq!(
+        edits::clear_road(&conn, home, ALICE, "rust", "basic").unwrap(),
+        0
+    );
+}

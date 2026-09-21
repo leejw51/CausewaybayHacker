@@ -347,9 +347,29 @@ pub fn record_clear(
 /// not possible.
 ///
 /// Returns how many quests were reset — zero when the player had never
-/// touched this road, which is not an error, just nothing to do.
+/// touched this road, which is not an error, just nothing to do. Touched
+/// includes "pressed RUN on and never submitted": that quest has a draft to
+/// take back even though it has no stamp to clear.
 pub fn reset_road(conn: &Connection, address: &str, land: &str, category: &str) -> Result<i64> {
     let now = now_stamp();
+    // A quest the player has only ever pressed RUN on has no progress row —
+    // `bump_attempt` is a submit-only call, on purpose, because iterating with
+    // RUN must not read as failing repeatedly. It does have attempts, though,
+    // and therefore a draft, and a reset that could not date it would leave
+    // that quest opening on the code from before the reset. So every quest on
+    // this road the player has attempted gets a row first, and the UPDATE
+    // below dates all of them together. A row created here is 'open' with
+    // nothing in it, which is what the UPDATE would have made of it anyway.
+    conn.execute(
+        "INSERT OR IGNORE INTO progress
+           (address, quest_id, state, stars, attempts, hints_used, updated_at)
+         SELECT ?1, q.id, 'open', 0, 0, 0, ?4
+           FROM quests q
+          WHERE q.land = ?2 AND q.category = ?3
+            AND EXISTS (SELECT 1 FROM attempts a
+                         WHERE a.address = ?1 AND a.quest_id = q.id)",
+        params![address, land, category, now],
+    )?;
     let changed = conn.execute(
         "UPDATE progress
             SET state = 'open', stars = 0, best_ms = NULL, attempts = 0,

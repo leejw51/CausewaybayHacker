@@ -6924,3 +6924,65 @@ named. Neither client patches its own numbers afterwards: `world.reset`
 returns the four totals, and both throw them away and refetch the map, because
 a screen that agrees with the server about the tally and disagrees about the
 stamps under it is worse than a screen that waits.
+
+## 2026-09-21 — a reset road opens on the starter, in both of the places the editor remembers
+
+The stamps went and the code stayed. RESET cleared the map, and then a node
+opened on the very solution that had cleared it — the player's own answer
+handed back to them at the top of a road they had just asked to walk again.
+The cause is that the quest screen's text comes from two places and the reset
+knew about neither.
+
+**`Quest.draft` is gated on the reset, not deleted.** The draft is a read of
+`attempts` (§4.8), and that table is SPEC §7's training data: the server never
+deletes it, the mistakes are built from it, and a reset that swept it would
+delete the curriculum to tidy a buffer. So `attempts::latest_source` takes a
+`since` — the road's `progress.reset_at`, which 0019 already writes — and
+answers "the last attempt **on this walk**". This is the same gate
+`record_clear` puts on the failures it counts stars from, with the same
+column, and that is the argument for it: a reset already means "judge me on
+this walk", and the editor is now judged the same way. Every attempt is still
+in `stats.history`, still in the mistakes, still on disk.
+
+**The stack could not be gated, so it goes.** §4.11c gives `EditState.source`
+precedence over the draft when the screen opens, deliberately — it moves on
+the idle push where the draft moves only on RUN and SUBMIT — so gating the
+draft alone would have fixed nothing the player can see. The stack is state
+and not a record: it holds no verdict, nothing is learned from it, and its
+entire purpose is to be what the editor opens on. `edits::clear_road` drops
+the road's stacks the way `edit.clear` drops one, blobs and all, inside
+`world.reset`.
+
+**This does not contradict `quest.reset` leaving the draft alone.** They are
+different questions asked by different buttons. The RESET on the bench resets
+*the editor* — it is not an attempt, it records nothing, and it is pressed by
+a player who wants the starter back in front of them for a minute with their
+work still safe where it was. The RESET on the map resets *the road*, and its
+whole promise is that the road is untouched afterwards. A road that is
+untouched except for the answers in its editors has not been reset.
+
+**A quest that was only ever RUN needed a row before it could be dated.**
+`bump_attempt` is submit-only — iterating with RUN must not read as failing
+repeatedly — so a node the player ran and never submitted has attempts, and
+therefore a draft, and no `progress` row for `reset_at` to be written on. That
+is exactly the node most likely to be holding half-written code, and it would
+have walked through the reset untouched. `reset_road` now inserts a bare
+`open` row for every quest on the road the player has an attempt on, before
+the UPDATE that dates them, so `reset` counts a quest that was worked on
+without ever being submitted. That is the honest count: it had something to
+take back.
+
+The reply is unchanged — the same four totals — so neither client needed a
+line. Both already refetch the map afterwards, and both already ask
+`edit.state` when a quest screen opens, which is where they will now be told
+`depth: 0`.
+
+**RESET is offered on every road, not only on one with a stamp on it.** The
+button appeared only once `cleared > 0`, which was right when a reset was
+about stamps. It is not any more: the drafts and the undo stacks go with them,
+and the map cannot see a single one of those — `cleared`, `stars` and
+`attempts` are all zero on a road where somebody has written half a program on
+every node, because `attempts` counts submits. That is the player who most
+needs the button, and it was the one player the gate hid it from. The question
+it asks is the guard; a reset of a road nobody has touched is `reset: 0` and a
+no-op, which is a fair answer to a press that asked for nothing.

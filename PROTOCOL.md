@@ -447,18 +447,28 @@ goes back to untouched for this player — no stamp, no stars, no attempt
 count, no clock. `reset` is how many rows were cleared, and the four totals
 are the road's progress afterwards, so a client redraws without asking again.
 
+What goes back to untouched includes **what the editor opens on**: every
+node of the road loses its undo stack (§4.11c), and `Quest.draft` (§4.8) stops
+reporting the attempts from before the reset, so a reset node opens on its
+`starter`. A road whose stamps were cleared and whose editors still held the
+code that earned them would be a reset in the map's eyes only.
+
 What it does **not** touch is anything that is a record rather than a state:
 the attempt log and the mistakes (SPEC §7's training data, which the server
-never deletes) and the XP ledger. A clear after a reset therefore **pays no
-XP** — the `clear` row is already in the ledger and the index refuses the
-second — while practice grants keep working. Practising is free; farming is
-not possible.
+never deletes) and the XP ledger. The attempts from before the reset are still
+there, still in `stats.history`, and still the curriculum — the draft is
+*gated* on the reset's date, not deleted. A clear after a reset therefore
+**pays no XP** — the `clear` row is already in the ledger and the index
+refuses the second — while practice grants keep working. Practising is free;
+farming is not possible.
 
 Stars are counted from the failures *since* the reset, so a road walked
 again can be walked perfectly.
 
 A land or category no pack defines is `not_found`. A player who had never
-touched the road gets `reset: 0`, which is not an error.
+touched the road gets `reset: 0`, which is not an error. A quest they have
+only ever pressed RUN on counts as touched and is reset with the rest — it has
+no stamp to clear, but it does have a draft to take back.
 
 ### 4.8 `quest.get`
 
@@ -483,7 +493,8 @@ rather than letting it read as a translation somebody abandoned. `ai.next`
 
 **`Quest.draft`** is the source of the player's own most recent attempt at
 this quest — a run or a submit, either counts — or `null` on a quest nobody
-has touched yet. This is not a new save path: SPEC §2.2 already keeps every
+has touched yet, and on one whose road has been reset since (§4.7b) and not
+attempted again. This is not a new save path: SPEC §2.2 already keeps every
 attempt's source verbatim, so a draft is a read of data the server already
 had, not a second copy of it. A client opens the editor on `draft ?? starter`,
 and a player who typed for ten minutes, closed the tab, and came back finds
@@ -1006,6 +1017,13 @@ the player runs or submits, while the stack also moves on undo and redo. A
 client opening a quest asks for both and shows the stack's `source` whenever
 `depth > 0`; `draft ?? starter` is the fallback for a quest with no stack yet,
 which is every quest before its first push.
+
+**`world.reset` empties the stacks of the road it resets** (§4.7b), and it is
+the only message other than `edit.clear` that ever does. The stack is state —
+it is what the screen opens on — and a road going back to untouched takes it
+with it, or the reset node would still open on the code that cleared it. A
+client that has the quest screen open when the reset lands learns this the
+next time it asks, as it does for every other change here.
 
 **Nothing is broadcast when the stack changes.** Unlike `progress.update`
 (§4.19), there is no server-initiated event here: two windows open on the same

@@ -285,14 +285,21 @@ function Map.tally_label(cleared, total, room, measure)
   return nil
 end
 
---- Is there anything on this road to undo?
+--- Is there a road here to reset?
 ---
---- The button is offered on the strength of the server's count and nothing
---- else: no count (an older server, or a map still loading) and no cleared
---- street both mean there is nothing to take away, and a button that does
---- nothing is worse than no button. Pure, so the rule is checkable headless.
+--- Every road, once the map has loaded. It used to want a cleared street
+--- first, on the reasoning that a road with no stamps had nothing to take
+--- back. RESET takes the drafts and the undo stacks with the stamps now
+--- (PROTOCOL §4.7b), and a player who has written half a program on every
+--- node of ADVANCED and cleared none of them has a road full of work that no
+--- count on this screen can see — `cleared`, `stars` and `attempts` are all
+--- zero there, because `attempts` counts submits. The question the button
+--- asks is the guard; a reset of a road nobody has touched is `reset: 0`.
+---
+--- Still nil-guarded: a map that has not answered yet has no road to name in
+--- the question. Pure, so the rule is checkable headless.
 function Map.reset_offered(tally)
-  return tally ~= nil and (tonumber(tally.cleared) or 0) > 0
+  return tally ~= nil and (tonumber(tally.total) or 0) > 0
 end
 
 --- The road, named the way the switch names it.
@@ -315,7 +322,8 @@ end
 --- specifiers appear. `tests/test_lands.lua` pins the order in Korean.
 function Map.reset_body(road, cleared, total)
   return I18n.t("%s goes back to untouched — %d of %d streets lose their "
-    .. "stamp and stars. Your XP and your mistakes are kept, and clearing "
+    .. "stamp and stars, and every editor on the road goes back to its "
+    .. "starter. Your XP and your mistakes are kept, and clearing "
     .. "them again pays no XP.", road or "?", tonumber(cleared) or 0,
     tonumber(total) or 0)
 end

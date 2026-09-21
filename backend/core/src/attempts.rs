@@ -137,11 +137,26 @@ pub fn write_to_disk(
 /// worked on before restores where you left off instead of the bare starter.
 /// Not a separate save path: every run and submit already write this row
 /// (§2.2), so this is a read of data that already exists, not a new one.
-pub fn latest_source(conn: &Connection, address: &str, quest_id: &str) -> Result<Option<String>> {
+///
+/// `since` is the road's `progress.reset_at` (0019), and it is what makes
+/// RESET on the map mean what it says. A reset road goes back to untouched,
+/// and a node whose editor opens on the solution the player wrote before the
+/// reset is not untouched — it is the answer, handed back. The attempts
+/// themselves stay where they are, because they are SPEC §7's training data
+/// and the server never deletes them; what changes is only which of them this
+/// screen is allowed to call "where you left off". `None` means the road has
+/// never been reset, and then every attempt counts, as it always did.
+pub fn latest_source(
+    conn: &Connection,
+    address: &str,
+    quest_id: &str,
+    since: Option<&str>,
+) -> Result<Option<String>> {
     conn.query_row(
         "SELECT source FROM attempts WHERE address = ?1 AND quest_id = ?2
+            AND (?3 IS NULL OR created_at > ?3)
           ORDER BY created_at DESC, rowid DESC LIMIT 1",
-        params![address, quest_id],
+        params![address, quest_id, since],
         |row| row.get(0),
     )
     .optional()

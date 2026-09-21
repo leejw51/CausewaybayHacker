@@ -304,6 +304,47 @@ pub fn clear(conn: &Connection, home: &Home, address: &str, quest_id: &str) -> R
     state_of(home, &address, quest_id, ext, &[], 0)
 }
 
+/// Every stack on one road, dropped — the edit half of `world.reset`
+/// (PROTOCOL §4.7b).
+///
+/// A road that goes back to untouched has to take the undo history with it.
+/// The stack is *state*, not a record: it is what the editor opens on, since
+/// §4.11c gives it precedence over the draft, so leaving it behind would mean
+/// a reset node that still opens on the code that cleared it — with the stamp
+/// gone from the map and the answer still in the buffer, which is the one
+/// thing a reset is for. The attempts and the mistakes stay; they are the
+/// record, and nothing here touches them.
+///
+/// Returns how many stacks had anything in them. Quests the player never
+/// opened have no rows and cost one query each.
+pub fn clear_road(
+    conn: &Connection,
+    home: &Home,
+    address: &str,
+    land: &str,
+    category: &str,
+) -> Result<i64> {
+    let address = address.to_ascii_lowercase();
+    // The ids come from the quests table rather than from the caller, so the
+    // only path this ever builds is one the importer wrote (module docs).
+    let ids: Vec<String> = {
+        let mut stmt =
+            conn.prepare("SELECT id FROM quests WHERE land = ?1 AND category = ?2 ORDER BY node")?;
+        let rows = stmt.query_map(params![land, category], |r| r.get::<_, String>(0))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    let mut cleared = 0;
+    for id in ids {
+        let (entries, _) = load(conn, &address, &id)?;
+        if entries.is_empty() {
+            continue;
+        }
+        clear(conn, home, &address, &id)?;
+        cleared += 1;
+    }
+    Ok(cleared)
+}
+
 /// Replace one stack's rows wholesale, in one transaction.
 ///
 /// Rewriting all of it rather than patching the difference is the point: `seq`
