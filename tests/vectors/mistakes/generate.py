@@ -173,7 +173,10 @@ GAPS = {
 #
 # (quest id, pack file, kind, code)
 CONTENT_CASES = [
-    ("rust.basic.04.the-move", "rust/basic", "borrow-after-move", "E0382"),
+    # Was `rust.basic.04.the-move` until BASIC became grammar drills and the
+    # quest moved to ADVANCED under a new id. The fixture reads the starter
+    # out of `content/**` at generate time, so a rename shows up here.
+    ("rust.advanced.02.the-move", "rust/advanced", "borrow-after-move", "E0382"),
     ("rust.advanced.02.move", "rust/advanced", "lifetime", "E0373"),
     ("rust.advanced.05.rwlock", "rust/advanced", "mutability", "E0596"),
     ("rust.advanced.06.lifetimes", "rust/advanced", "lifetime", "E0106"),
@@ -646,6 +649,7 @@ def content_starters(build_root: pathlib.Path) -> list:
             out.append(
                 {
                     "quest_id": quest_id,
+                    "lang": quest_id.split(".", 1)[0],
                     "kind": kind,
                     "code": code,
                     "verified": False,
@@ -656,9 +660,14 @@ def content_starters(build_root: pathlib.Path) -> list:
         doc = tomllib.loads(toml_path.read_bytes().decode())
         quest = next((q for q in doc["quest"] if q["id"] == quest_id), None)
         if quest is None:
+            # `lang` is not decoration: `build_doc` keys its code-collision
+            # table on it for every case, verified or not. Without it a quest
+            # that was renamed out of its pack crashed the generator with a
+            # KeyError instead of being reported as the stale claim it is.
             out.append(
                 {
                     "quest_id": quest_id,
+                    "lang": quest_id.split(".", 1)[0],
                     "kind": kind,
                     "code": code,
                     "verified": False,
@@ -723,10 +732,31 @@ def run_case(lang: str, src: pathlib.Path, work: pathlib.Path, build_root: pathl
     raise SystemExit(f"no runner for land {lang!r}")
 
 
+def plain_output() -> None:
+    """Take the colour out of every child process's environment.
+
+    Python 3.13 colourises tracebacks, and it obeys `FORCE_COLOR` even when
+    its stderr is a pipe — which is what this generator captures. A shell
+    that exports it (several editors and CI wrappers do) does not change what
+    the interpreter *says*, only how it is painted, and the fixture would
+    record `\x1b[1;35mNameError\x1b[0m` as the mistake's identity. Every
+    classifier reading it then looks for a needle that is no longer there.
+
+    Cleared once, here, rather than per `subprocess.run`: the point is that
+    nothing this file shells out to should be painting anything, and the
+    captures have to be the same bytes on every machine that regenerates them.
+    """
+    for painted in ("FORCE_COLOR", "CLICOLOR_FORCE", "CLICOLOR"):
+        os.environ.pop(painted, None)
+    os.environ["NO_COLOR"] = "1"
+    os.environ["PYTHON_COLORS"] = "0"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
+    plain_output()
 
     path = HERE / "expected.json"
     old = path.read_text() if path.exists() else None

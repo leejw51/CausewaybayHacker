@@ -319,7 +319,10 @@ mod tests {
         let b64 = base64::engine::general_purpose::STANDARD.encode(&packed);
         assert_eq!(inflate_label(&b64).unwrap(), src);
         assert!(inflate_label("not base64!").is_err());
-        assert!(inflate_label(&base64::engine::general_purpose::STANDARD.encode(b"\xff\xfe\x00")).is_err());
+        assert!(
+            inflate_label(&base64::engine::general_purpose::STANDARD.encode(b"\xff\xfe\x00"))
+                .is_err()
+        );
     }
 
     #[test]

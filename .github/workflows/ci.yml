@@ -128,6 +128,16 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # `black` is the Python land's formatter (backend/runner/src/format.rs),
+      # and `code.format` is a wire feature, not a convenience — so a runner
+      # that cannot format Python is a runner this job has to fail on. It is
+      # a pip install into the interpreter the tests already need; nothing
+      # else in the image provides it.
+      - name: Install black, the Python formatter
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check black
+          python3 -m black --version
+
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: backend

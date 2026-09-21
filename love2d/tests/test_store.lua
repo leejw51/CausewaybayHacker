@@ -581,7 +581,15 @@ return function()
       T.ok(not line:find("abandon", 1, true), "the log never holds the key")
     end
     -- On disk, owner-only, and readable by a fresh store.
-    local mode = io.popen(("stat -f %%Lp %q 2>/dev/null || stat -c %%a %q"):format(dir .. "/key-0xabc0", dir .. "/key-0xabc0")):read("*l")
+    --
+    -- **GNU first, BSD second.** Both stats print the mode and neither
+    -- understands the other's flag, but they fail differently: BSD `stat -c`
+    -- is an unknown option and exits non-zero, so the fallback runs, while
+    -- GNU `stat -f` is *valid* — it reports the filesystem — and exits zero
+    -- with "  File: …" where the mode should be. Tried the other way round,
+    -- this line passes on a laptop and reads a filesystem on CI.
+    local key = dir .. "/key-0xabc0"
+    local mode = io.popen(("stat -c %%a %q 2>/dev/null || stat -f %%Lp %q"):format(key, key)):read("*l")
     T.eq(mode, "600")
     Store.reset()
     Store.open({ dir = dir })

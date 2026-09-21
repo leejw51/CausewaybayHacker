@@ -291,12 +291,19 @@ behave alike:
 
   | quest | kind | code |
   | --- | --- | --- |
-  | `rust.basic.04.the-move` | `borrow-after-move` | E0382 |
+  | `rust.advanced.02.the-move` | `borrow-after-move` | E0382 |
   | `rust.advanced.02.move` | `lifetime` | **E0373** |
   | `rust.advanced.05.rwlock` | `mutability` | E0596 |
   | `rust.advanced.06.lifetimes` | `lifetime` | E0106 |
   | `rust.advanced.07.generics` | `type-mismatch` | E0308 |
-  | `go.advanced.09.errors-in-flight` | `unused` | `imported and not used` |
+  | `go.advanced.12.chan-directions` | `other` | `go:invalid-operation` |
+
+  Two rows have moved since they were first written, which is the arrangement
+  working rather than failing: `the-move` came over from `rust/basic` when
+  BASIC became grammar drills, and `chan-directions` replaced
+  `go.advanced.09.errors-in-flight` once PM fixed that starter into
+  compiling. Both were noticed because the generator reads the pack, not a
+  copy.
 
 ### Coverage, honestly
 
