@@ -131,6 +131,7 @@ return {
   ["goroutines, channels, interfaces"] = "goroutines、channels、interfaces",
   ["threads, mutexes, the STL"] = "threads、mutexes、そして STL",
   ["dicts, generators, the GIL"] = "dicts、generators、そして GIL",
+  ["tensors, gradients, attention"] = "テンソル、勾配、attention",
   ["both rankings, fused"] = "二つのランキングを統合",
   ["the words you typed"] = "入力した語そのもの",
   ["what you meant"] = "言いたかった意味",

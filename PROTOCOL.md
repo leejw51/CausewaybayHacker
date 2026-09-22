@@ -1346,7 +1346,7 @@ type MapNode = {
 
 ```ts
 type Quest = {
-  id: string; land: "rust"|"go"|"cpp"|"python"; category: "verybasic"|"basic"|"advanced"|"hacker";
+  id: string; land: "rust"|"go"|"cpp"|"python"|"pytorch"; category: "verybasic"|"basic"|"advanced"|"hacker";
   node: number; title: string; brief: string; story: string;
   /** §4.8 — the language of title, story, brief and the hints. "en" unless a
    *  translation (SPEC §12.1) was substituted for the `locale` the client
@@ -1417,7 +1417,7 @@ cleared" — re-solving a cleared quest reports `verdict: "accepted"` with
 ```ts
 type PlaygroundRun = {
   attempt_id: string;                    // for correlating the stream only
-  lang: "rust" | "go" | "cpp" | "python";
+  lang: "rust" | "go" | "cpp" | "python" | "pytorch";
   outcome: "ok" | "compile_error" | "runtime_error" | "timeout" | "output_limit";
   compile_ms: number; run_ms: number;
   exit_code: number | null;
@@ -1431,7 +1431,7 @@ type PlaygroundRun = {
 
 type Snippet = {
   id: string;                            // "pg_" + 16 hex
-  name: string; lang: "rust" | "go" | "cpp" | "python"; source: string;
+  name: string; lang: "rust" | "go" | "cpp" | "python" | "pytorch"; source: string;
   created_at: string; updated_at: string;
 };
 type SnippetBrief = Omit<Snippet, "source"> & { bytes: number };

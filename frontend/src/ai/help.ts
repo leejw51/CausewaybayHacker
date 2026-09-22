@@ -78,7 +78,7 @@ const QUIET = new Set([
  * is transparent: the walk goes outward through it, which is how `Block`
  * under a `ForExpression` reports the loop rather than the braces.
  */
-const NODES: Record<Land, Record<string, string>> = {
+const NODES_BY_LAND = {
   rust: {
     MatchExpression:
       "`match` must cover every case. A `_ => …` arm is the catch-all, and the compiler counts the rest for you.",
@@ -311,6 +311,16 @@ const NODES: Record<Land, Record<string, string>> = {
 };
 
 /**
+ * PyTorch Land is parsed by the same `@lezer/python` grammar, so a `for` is a
+ * `ForStatement` in both and the construct help is the same sentence. The
+ * *words* differ, and those are the catalogue below.
+ */
+const NODES: Record<Land, Record<string, string>> = {
+  ...NODES_BY_LAND,
+  pytorch: NODES_BY_LAND.python,
+};
+
+/**
  * The word catalogue: names worth a sentence when the caret is on one.
  *
  * Checked before the construct, because "you are on `unwrap`" is more use
@@ -469,6 +479,45 @@ const WORDS: Record<Land, Record<string, string>> = {
       "`finally` runs on the way out, including through a `return`. A `return` inside one swallows the exception.",
     import:
       "Import at the top, absolute paths. A circular import usually means the two modules are one.",
+  },
+  pytorch: {
+    tensor:
+      "`torch.tensor(data)` copies the data and infers the dtype: a list of ints gives `int64`, a list with a `.` in it gives `float32`.",
+    shape:
+      "`x.shape` is a `torch.Size`, which is a tuple. Print it before anything else — most PyTorch bugs are a shape you assumed.",
+    reshape:
+      "`reshape` copies when it has to, so it works on a transposed tensor. `view` refuses one. `-1` means work this axis out from the others.",
+    view: "`view` needs the memory already laid out that way. After a `transpose` it raises; `reshape` or `.contiguous().view(…)` is the fix.",
+    backward:
+      "`loss.backward()` is called on the end of the graph, never on a parameter, and it **adds** into `.grad` rather than replacing it.",
+    grad: "`.grad` is `None` until a backward pass has run, and keeps accumulating after that. `zero_grad()` is what clears it.",
+    zero_grad:
+      "Clear, compute, apply: `opt.zero_grad()`, `loss.backward()`, `opt.step()`. Any other order applies a gradient from last time.",
+    step: "`opt.step()` is the line that actually moves the parameters. Without it the gradient is computed and thrown away.",
+    no_grad:
+      "`with torch.no_grad():` stops the graph being recorded. It does **not** turn dropout off — that is `model.eval()`.",
+    eval: "`model.eval()` switches dropout off and batch-norm to its running statistics. Serving a model still in `train()` is the classic bug.",
+    detach:
+      "`detach()` leaves the graph and shares the memory. `clone()` copies and stays in it. For a snapshot you want `detach().clone()`.",
+    item: "`.item()` pulls the Python number out of a one-element tensor. Log that, not the tensor — the tensor keeps its whole graph alive.",
+    softmax:
+      "`torch.softmax(x, dim=…)` needs the axis. On `(batch, classes)` it is `dim=1`; `dim=0` makes the batch sum to one, which means nothing.",
+    CrossEntropyLoss:
+      "Takes **raw logits** and **integer** labels. The softmax is inside it, so softmaxing first applies it twice and training stalls.",
+    Linear:
+      "`nn.Linear(in_features, out_features)` — in first, out second. The weight is stored as `(out, in)`, which is why the forward pass transposes it.",
+    Module:
+      "Assign layers to `self` in `__init__` so they register as parameters, and call `super().__init__()` first. A layer in a plain list never trains.",
+    forward:
+      "Call the model, not `model.forward(x)` — calling it runs the hooks that `forward` alone skips.",
+    parameters:
+      "`model.parameters()` yields the learnable tensors. `sum(p.numel() for p in …)` is the parameter count; `len(…)` is the tensor count.",
+    keepdim:
+      "`keepdim=True` leaves the reduced axis in as size 1, so the result still broadcasts back against the original.",
+    masked_fill:
+      "Mask the **scores** with `-inf` before the softmax. Zeroing probabilities afterwards leaves a row that sums to less than one.",
+    manual_seed:
+      "`torch.manual_seed` fixes one global stream, so anything else that draws from it shifts your numbers. A `torch.Generator` is a stream of its own.",
   },
 };
 

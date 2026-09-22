@@ -76,8 +76,13 @@ const env = {
   python: which("python3"),
   go: which("go"),
   // The C++ land goes through the system driver, whatever it is; the Python
-  // land through the same python3 the test scripts already need.
+  // land through the same python3 the test scripts already need; and the
+  // PyTorch land through that python3 with `torch` importable, which is a
+  // question only the interpreter can answer.
   cpp: which("c++"),
+  torch:
+    which("python3") &&
+    spawnSync("python3", ["-I", "-c", "import torch"], { stdio: "ignore" }).status === 0,
   rustc: which("rustc"),
   luajit: which("luajit"),
   love: which("love") || existsSync(join(ROOT, "love2d/build/love.app/Contents/MacOS/love")),
@@ -92,6 +97,55 @@ const env = {
 //
 // `needs` is checked before anything runs, so a missing toolchain is a
 // reasoned skip rather than a crash forty seconds in.
+
+// The content suite's arguments, which depend on what is installed.
+//
+// Sixteen of the twenty packs need only the four compilers; the four pytorch
+// ones need `torch` as well, and torch is a package inside an interpreter
+// rather than a program on PATH — the one toolchain here that a perfectly
+// ordinary machine will not have. Making the whole suite need it would mean
+// that a laptop without torch silently stops verifying rust, go, cpp and
+// python too, which is the opposite of what a missing optional dependency
+// should cost.
+//
+// `--complete` goes with them. Its question — is every slug in
+// docs/concepts.md reachable from some §7.1 mistake kind? — can only be
+// answered over the full set, because the twelve tensor slugs live in
+// exactly the packs that were dropped. Asking it of sixteen files would fail
+// on the twelve every time, so it is asked when it can be answered.
+const PACKS_COMPILED = [
+  "content/rust/verybasic.toml",
+  "content/rust/basic.toml",
+  "content/rust/advanced.toml",
+  "content/rust/hacker.toml",
+  "content/go/verybasic.toml",
+  "content/go/basic.toml",
+  "content/go/advanced.toml",
+  "content/go/hacker.toml",
+  "content/cpp/verybasic.toml",
+  "content/cpp/basic.toml",
+  "content/cpp/advanced.toml",
+  "content/cpp/hacker.toml",
+  "content/python/verybasic.toml",
+  "content/python/basic.toml",
+  "content/python/advanced.toml",
+  "content/python/hacker.toml",
+];
+const PACKS_PYTORCH = [
+  "content/pytorch/verybasic.toml",
+  "content/pytorch/basic.toml",
+  "content/pytorch/advanced.toml",
+  "content/pytorch/hacker.toml",
+];
+// PM's two newer gates, both worth having in CI:
+//   * a brief's worked example must match a visible case — it caught a quest
+//     whose brief showed `1 3` where its test expected `3 1`, unsolvable as
+//     written and invisible to every other check;
+//   * `--complete` fails on a concept slug no §7.1 mistake kind can reach,
+//     so the AI drills cannot be pointed at a dead end.
+const CONTENT_ARGS = env.torch
+  ? ["--complete", ...PACKS_COMPILED, ...PACKS_PYTORCH]
+  : PACKS_COMPILED;
 
 /** @type {{name:string, what:string, cwd:string, cmd:string[], needs:[boolean,string][], server?:boolean, slow?:boolean, note?:string}[]} */
 const SUITES = [
@@ -168,39 +222,17 @@ const SUITES = [
     name: "content",
     what: "every reference solution is accepted and no starter is (SPEC §9.4, §9.5)",
     cwd: ROOT,
-    cmd: [
-      "python3",
-      "tests/content/verify_pack.py",
-      // PM's two newer gates, both worth having in CI:
-      //   * a brief's worked example must match a visible case — it caught a
-      //     quest whose brief showed `1 3` where its test expected `3 1`,
-      //     unsolvable as written and invisible to every other check;
-      //   * `--complete` fails on a concept slug no §7.1 mistake kind can
-      //     reach, so the AI drills cannot be pointed at a dead end.
-      "--complete",
-      "content/rust/verybasic.toml",
-      "content/rust/basic.toml",
-      "content/rust/advanced.toml",
-      "content/rust/hacker.toml",
-      "content/go/verybasic.toml",
-      "content/go/basic.toml",
-      "content/go/advanced.toml",
-      "content/go/hacker.toml",
-      "content/cpp/verybasic.toml",
-      "content/cpp/basic.toml",
-      "content/cpp/advanced.toml",
-      "content/cpp/hacker.toml",
-      "content/python/verybasic.toml",
-      "content/python/basic.toml",
-      "content/python/advanced.toml",
-      "content/python/hacker.toml",
-    ],
+    cmd: ["python3", "tests/content/verify_pack.py", ...CONTENT_ARGS],
     needs: [
       [env.python, "python3 is not on PATH"],
       [env.rustc, "rustc is not on PATH"],
       [env.go, "go is not on PATH"],
       [env.cpp, "c++ is not on PATH"],
     ],
+    note: env.torch
+      ? undefined
+      : "torch is not importable, so the four pytorch packs and --complete were " +
+        "left out — the other sixteen ran (python3 -m pip install torch)",
     slow: true,
   },
   {

@@ -129,6 +129,7 @@ return {
   ["goroutines, channels, interfaces"] = "goroutines, channels, interfaces",
   ["threads, mutexes, the STL"] = "threads, mutexes, 그리고 STL",
   ["dicts, generators, the GIL"] = "dicts, generators, 그리고 GIL",
+  ["tensors, gradients, attention"] = "tensors, gradients, 그리고 attention",
   ["both rankings, fused"] = "두 순위를 합쳐서",
   ["the words you typed"] = "입력한 단어 그대로",
   ["what you meant"] = "말하려던 의미",

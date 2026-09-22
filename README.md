@@ -5,18 +5,18 @@
 In Causeway Bay, a Rust coder wakes up and cannot write a `for` loop. The
 vibe-coding was never a convenience — it was Skynet's long game, and it worked.
 Every skill is still in there somewhere. You get them back one street at a time,
-in Rust, in Go, in C++ and in Python, and then you go and fight the thing that
-took them.
+in Rust, in Go, in C++, in Python and in PyTorch, and then you go and fight
+the thing that took them — which, by the fifth land, you can build.
 
-Four lands — **RUST LAND**, **GO LAND**, **C++ LAND** and **PYTHON LAND**. Four
-roads through each:
+Five lands — **RUST LAND**, **GO LAND**, **C++ LAND**, **PYTHON LAND** and
+**PYTORCH LAND**. Four roads through each:
 
 | | |
 | --- | --- |
 | **VERY BASIC** | the quiz: types, containers, a thread, a mutex, a heap, a stack, a struct — the grammar a live coding test leans on, asked as a question first. Four lines, one right; pick it, then type it; untimed |
 | **BASIC** | grammar activation, not a quiz: each node shows one construct — integer widths and a 32-byte value, floats, strings, slicing/copy/append of strings, arrays and bytes, a loop, a function, a struct, an enum, a vector, a linked list, an ordered map and a hash table, a set, a stack and a queue (each practised as add, remove, edit and sort), sorting and reversing, a closure, a lambda, a thread, a binary tree — with the exact line to type, in the brief and again as an `ANSWER:` comment at the hole; you type it, it compiles, the idiom is back in the fingers; untimed |
 | **ADVANCED** | simple coding quizzes that use the basic grammar — ownership, slices, errors, traits/interfaces, pointers, iterators, generics — and then the lunch rush: threads, channels, mutexes, lifetimes, goroutines, `select`, async, RAII, generators |
-| **HACKER** | the live interview: timed HackerRank-shaped quests, hidden tests, the same 34 problems in every land |
+| **HACKER** | the live interview: timed HackerRank-shaped quests, hidden tests, the same 34 problems in every land — except PyTorch Land, whose interview is the machine-learning one: write softmax so it does not overflow, write cross-entropy so it matches the library, write Adam so it matches the library, mask a padded batch, cache the keys and values, build a transformer block that agrees with a reference to 1e-5 |
 
 Each road is a Super Mario World overworld. Clear a node, it is stamped
 `CLEARED`, for good.
@@ -68,12 +68,37 @@ make test       # everything
 make help       # the rest
 ```
 
-Needs Rust, Go, a C++ compiler, Python 3 and Node. `make doctor` says which of
-them it cannot find, and the server prints the same list on the way up with
-the command that installs whatever is missing. The formatters are part of it:
-`rustfmt` and `gofmt` ship with their toolchains, `clang-format` comes from
-Xcode or your package manager, and Python's `black` is `python3 -m pip install
-black`. A land whose formatter is missing simply has no `fmt` button.
+Needs **Rust, Go, a C++ compiler, Python 3, Anaconda** — one per land — and
+Node for the browser client. `make doctor` says which of them it cannot find,
+and the server prints the same list on the way up with the command that
+installs whatever is missing.
+
+PyTorch Land is the odd one out, and worth a line of its own: its toolchain is
+not a program on PATH but a **package inside an interpreter**, so a machine can
+have a perfectly good `python3` and still not be able to run a single one of
+its 122 nodes. It also cannot be a `pip install torch` into the system
+interpreter — macOS's own python3 and any PEP 668 distribution refuse to
+install into themselves, and the `--user` they suggest is the one place the
+runner's isolated `python3 -I` will not look (SPEC §5.1). So PyTorch Land gets
+an environment of its own:
+
+```bash
+conda create -n cwbhacker python=3.13 -y
+conda run -n cwbhacker pip install torch numpy black
+```
+
+`make` finds that env by name and puts it first on PATH for everything it
+starts — the server, `doctor`, the content gate — so there is nothing to
+remember and nothing to activate. A venv at `~/.causewaybayhacker/venv` is
+picked up the same way if you would rather not have conda, and
+`GAME_PY_BIN=/path/to/bin` overrides both. Python 3.10+ (SPEC §5.1); `numpy`
+is imported by no quest and installed anyway, because torch without it writes
+a warning to stderr on every single run.
+
+The formatters are part of the same list: `rustfmt` and `gofmt` ship with their
+toolchains, `clang-format` comes from Xcode or your package manager, and
+Python's and PyTorch's `black` is in the line above. A land whose formatter is
+missing simply has no `fmt` button.
 
 **From a phone, use port 5390 — not the dev server's 5291.** The page and the
 websocket have to share an origin: the built bundle derives the socket from the

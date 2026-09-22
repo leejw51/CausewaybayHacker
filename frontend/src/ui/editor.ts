@@ -77,7 +77,7 @@ import type { Land } from "../net/protocol";
 import type { CodeContext } from "../ai/help";
 
 /** The syntax mode per land: highlighting and indentation, nothing cleverer. */
-const MODE: Record<Land, () => Extension> = { rust, go, cpp, python };
+const MODE: Record<Land, () => Extension> = { rust, go, cpp, python, pytorch: python };
 
 /**
  * The file the server compiles for each land (SPEC §5.1), which is what the
@@ -108,6 +108,7 @@ export const INDENT: Record<Land, string> = {
   go: "\t",
   cpp: "    ",
   python: "    ",
+  pytorch: "    ",
 };
 
 export const MAIN_FILE: Record<Land, string> = {
@@ -115,6 +116,7 @@ export const MAIN_FILE: Record<Land, string> = {
   go: "main.go",
   cpp: "main.cpp",
   python: "main.py",
+  pytorch: "main.py",
 };
 
 const hex = (c: readonly [number, number, number, number]) =>
@@ -893,6 +895,7 @@ const LOOPS: Record<Land, ReadonlySet<string>> = {
   go: new Set(["ForStatement"]),
   cpp: new Set(["ForStatement", "WhileStatement", "DoStatement", "ForRangeLoop"]),
   python: new Set(["ForStatement", "WhileStatement"]),
+  pytorch: new Set(["ForStatement", "WhileStatement"]),
 };
 
 /**

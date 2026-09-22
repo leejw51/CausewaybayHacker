@@ -336,11 +336,28 @@ pub const CONCEPT_VOCABULARY: &[&str] = &[
     "math",
     "prefix-sums",
     "greedy",
+    // PyTorch — everything is a shape. Its twelve are this land's alone; the
+    // other four have no `backward()` to get wrong.
+    "tensors",
+    "broadcasting",
+    "autograd",
+    "modules",
+    "optimizers",
+    "loss-functions",
+    "training-loop",
+    "inference",
+    "datasets",
+    "initialization",
+    "attention",
+    "embeddings",
 ];
 
 /// SPEC §12's rules, all of them, before a single row is written.
 pub fn validate(pack: &Pack) -> Result<()> {
-    if !matches!(pack.land.as_str(), "rust" | "go" | "cpp" | "python") {
+    if !matches!(
+        pack.land.as_str(),
+        "rust" | "go" | "cpp" | "python" | "pytorch"
+    ) {
         return Err(bad_request(format!("unknown land '{}'", pack.land)));
     }
     if !matches!(

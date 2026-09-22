@@ -183,8 +183,8 @@ const GO_QUESTS = [
 ];
 
 /**
- * One quest each for the two newer lands, for the same reason as the Go one:
- * `world.lands` fabricates four lands and a land with an empty map is a mock
+ * One quest each for the three newer lands, for the same reason as the Go one:
+ * `world.lands` fabricates five lands and a land with an empty map is a mock
  * bug, not a server one.
  */
 const CPP_QUESTS = [
@@ -220,7 +220,30 @@ const PYTHON_QUESTS = [
   },
 ];
 
-const LANDS = { rust: QUESTS, go: GO_QUESTS, cpp: CPP_QUESTS, python: PYTHON_QUESTS };
+const PYTORCH_QUESTS = [
+  {
+    id: "pytorch.basic.01.hello",
+    node: 1,
+    title: "FIRST LIGHT",
+    difficulty: 1,
+    kind: "quest",
+    x: 0.12,
+    y: 0.74,
+    requires: [],
+    starter: "import torch\n\n\ndef main():\n    pass\n\n\nmain()\n",
+    solution: 'import torch\n\nprint("hello, causewaybay")\n',
+    expect: "hello, causewaybay\n",
+    hints: [],
+  },
+];
+
+const LANDS = {
+  rust: QUESTS,
+  go: GO_QUESTS,
+  cpp: CPP_QUESTS,
+  python: PYTHON_QUESTS,
+  pytorch: PYTORCH_QUESTS,
+};
 const questsOf = (land) => LANDS[land] ?? [];
 const findQuest = (id) => Object.values(LANDS).flat().find((q) => q.id === id);
 // The land is the first segment of the id (SPEC §4.1), never a lookup.
@@ -633,6 +656,8 @@ wss.on("connection", (ws) => {
             // `std::cout << "…\n"` carries its own newline, unlike the others.
             cpp: () => /std::cout << "([^"]*)\\n"/.exec(src)?.[1],
             python: () => /print\("([^"]*)"\)/.exec(src)?.[1],
+            // Same shape as Python's, because it is Python's runner.
+            pytorch: () => /print\("([^"]*)"\)/.exec(src)?.[1],
           }[langOf(q.id)]?.();
           const ok = printed !== undefined && `${printed}\n` === q.expect;
           const had = progress.get(`${me}|${q.id}`);

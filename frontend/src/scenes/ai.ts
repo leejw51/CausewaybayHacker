@@ -413,6 +413,7 @@ export class AiScene implements Scene {
       ["land:go", T("ai.go"), "go"],
       ["land:cpp", T("ai.cpp"), "cpp"],
       ["land:python", T("ai.python"), "python"],
+      ["land:pytorch", T("ai.pytorch"), "pytorch"],
     ] as Array<[string, string, Land | null]>) {
       const cw = width(fonts.stationSm, label) + Math.round(14 * s);
       const on = value === this.landFilter;

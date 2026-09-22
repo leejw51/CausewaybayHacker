@@ -77,6 +77,20 @@ export const TIPS: Record<Land, readonly string[]> = {
     "`sorted(xs, key=…)` returns a new list; `xs.sort()` sorts in place and returns `None`.",
     '`__name__ == "__main__"` is the line between a script and a module.',
   ],
+  pytorch: [
+    "Shape first. Print `tuple(x.shape)` before you print anything else.",
+    "`zero_grad`, `backward`, `step` — in that order. `backward` adds into `.grad`; it never clears it.",
+    "`nn.CrossEntropyLoss` takes raw logits. Softmax it yourself and you have softmaxed twice.",
+    "`model.eval()` for dropout and batch-norm; `torch.no_grad()` for the graph. You usually want both.",
+    "`view` needs contiguous memory, `reshape` does not. After a `transpose`, reach for `reshape`.",
+    "`detach()` leaves the graph and shares the memory; `clone()` copies and stays. They are not the same tool.",
+    "Keep `loss.item()`, not `loss`. Holding the tensor holds the whole graph behind it.",
+    "`keepdim=True` on a reduction, or the axis vanishes and the broadcast lines up against the wrong one.",
+    "A trailing underscore is in-place: `add_`, `relu_`. Autograd will notice, one backward pass later.",
+    "Mask before the softmax, with `-inf`. Zeroing afterwards leaves a row that sums to less than one.",
+    "`torch.manual_seed` fixes one global stream; pass a `torch.Generator` when you want a reproducible one.",
+    "The scale in attention is the square root of the *head* dimension, not the model dimension.",
+  ],
 };
 
 /** The next tip after `last`, never the same one twice running. */

@@ -146,17 +146,48 @@ pub fn unsupported(lang: &str, spec: &TestSpec) -> Option<String> {
         // missing feature and should say so. The C++ and Python lands are
         // stdio only: `cargo` and `gotest` are the test frameworks of the
         // languages they are named after.
+        //
+        // PyTorch Land is the one land whose toolchain is not a program on
+        // PATH but a package inside one, and the only land that can be
+        // installed and still be missing. Every node of it opens with
+        // `import torch`, so on a machine without it every submission dies
+        // of a `ModuleNotFoundError` — which is a real Python exception, and
+        // would be filed as the player's own `py:exception`, and would teach
+        // the drills that this person keeps failing to import things. That
+        // is exactly the fabricated curriculum this function exists to
+        // prevent, so the question is asked here, before an attempt row is
+        // written, and the answer is a refusal with the command in it.
+        ("pytorch", Harness::Stdio) => (!torch_is_installed()).then(|| {
+            format!(
+                "this machine's python3 cannot import torch, which every \
+                 PyTorch Land quest needs: {}",
+                format::TORCH_HINT
+            )
+        }),
         ("rust" | "go" | "cpp" | "python", Harness::Stdio) => None,
         ("rust", Harness::Cargo) => None,
         ("go", Harness::Gotest) => None,
-        ("rust" | "cpp" | "python", Harness::Gotest) => Some(format!(
+        ("rust" | "cpp" | "python" | "pytorch", Harness::Gotest) => Some(format!(
             "the gotest harness is not a {lang} harness (SPEC §5.2)"
         )),
-        ("go" | "cpp" | "python", Harness::Cargo) => Some(format!(
+        ("go" | "cpp" | "python" | "pytorch", Harness::Cargo) => Some(format!(
             "the cargo harness is not a {lang} harness (SPEC §5.2)"
         )),
         (other, _) => Some(format!("there is no runner for '{other}'")),
     }
+}
+
+/// Whether this machine's `python3` can `import torch`, asked once.
+///
+/// [`unsupported`] is on the path of every submission and every playground
+/// run, and the answer costs an interpreter start. It is cached for the life
+/// of the process because installing torch into a running server does not
+/// make the running server able to use it either: the boot report already
+/// prints the machine's toolchains (SPEC §5.1), and the fix for both is the
+/// same restart.
+fn torch_is_installed() -> bool {
+    static TORCH: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *TORCH.get_or_init(format::torch_is_installed)
 }
 
 /// Dispatch on the land. A language or harness this build cannot judge comes
@@ -167,7 +198,10 @@ pub fn run(sub: &Submission) -> Report {
         "rust" => rust::run(sub),
         "go" => go::run(sub),
         "cpp" => cpp::run(sub),
-        "python" => python::run(sub),
+        // PYTORCH is Python plus torch: the same interpreter, the same
+        // `main.py`, the same stdio harness. What differs is only what a
+        // program is allowed to import, and that is the content's business.
+        "python" | "pytorch" => python::run(sub),
         other => Report::internal(format!("unknown language '{other}'")),
     }
 }

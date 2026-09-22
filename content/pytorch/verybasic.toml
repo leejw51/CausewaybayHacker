@@ -1,0 +1,1722 @@
+# PYTORCH LAND — VERY BASIC. The grammar of a tensor asked as a question
+# first: four lines, one of them right, and then that line typed. A shape, a
+# dtype, an index, a broadcast, a matmul, a gradient, a layer, a loss, a step
+# — the constructs a live coding test on a machine-learning team leans on,
+# one per node, in the basement of the Chow Yei Ching Building from the
+# 23:00 cold aisle to the first optimiser step. Every quest carries a
+# [quest.quiz]: the choices are code and never translated; the question is
+# the brief. verify_pack swaps each wrong choice into the solution and
+# refuses the quest if it passes, so the quiz has one right answer.
+#
+# Every program is one main.py, run as `python3 -I main.py`, torch only —
+# no torchvision, no network, no downloads. MNIST and GPT-2 appear on the
+# later roads as the shapes they really are, generated in the program.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Every solution and starter in this file is run by
+# tests/content/verify_pack.py and by CI (SPEC §9.4, §9.5).
+
+pack = "pytorch.verybasic"
+land = "pytorch"
+category = "verybasic"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "pytorch.verybasic.01.first-tensor"
+node        = 1
+title       = "THE FIRST TENSOR"
+difficulty  = 1
+story       = "23:00 in the machine room under the Chow Yei Ching Building. The console is open, torch is imported, and nothing has been made yet."
+concepts    = ["tensors", "io"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+A tensor is the one value this land is built out of. `torch.tensor` builds one from a Python list, keeping the order it was given.
+
+Pick the line that builds the tensor `1 2 3`, then type it where the `# FILL` comment is.
+
+```
+output: [1, 2, 3]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = None  # FILL: a tensor of 1, 2, 3
+    print(x.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.tensor([1, 2, 3])
+    print(x.tolist())
+
+
+main()
+'''
+hints = [
+  "torch.tensor takes one argument — the list — not three numbers.",
+  "The order of the list is the order of the tensor; nothing is sorted for you.",
+]
+
+[quest.quiz]
+choices = ["x = torch.tensor(1, 2, 3)", "x = tensor([1, 2, 3])", "x = torch.tensor([1, 2, 3])", "x = torch.tensor([3, 2, 1])"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "builds", stdin = "", expect = "[1, 2, 3]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "pytorch.verybasic.02.shape"
+node        = 2
+title       = "WHAT SHAPE IS THIS"
+difficulty  = 1
+story       = "The rack aisle is two rows of twelve and the inventory script insists it is twenty-four of something. Nobody can say of what."
+concepts    = ["tensors", "io"]
+requires    = ["pytorch.verybasic.01.first-tensor"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief       = '''
+Every tensor knows its own shape. `x.shape` is a `torch.Size`, which is a tuple underneath — `tuple(...)` prints it as one, with no `torch.Size` around it.
+
+The tensor is already built. Pick the line that prints its shape as a plain tuple.
+
+```
+output: (2, 3)
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = torch.zeros(2, 3)
+    pass  # FILL: print the shape as a tuple
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.zeros(2, 3)
+    print(tuple(x.shape))
+
+
+main()
+'''
+hints = [
+  "tuple(x.shape) — the shape is already a sequence; tuple() only changes how it prints.",
+  "print(x.shape) prints torch.Size([2, 3]), which is not the same text.",
+]
+
+[quest.quiz]
+choices = ["print(x.shape)", "print(tuple(x.shape))", "print(len(x))", "print(x.size)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-by-three", stdin = "", expect = "(2, 3)\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "pytorch.verybasic.03.dtype"
+node        = 3
+title       = "THE INTEGER THAT WAS NOT"
+difficulty  = 1
+story       = "The power log divides watts by samples and gets zero for every row. The watts are whole numbers and so is the answer, which is the problem."
+concepts    = ["tensors", "types"]
+requires    = ["pytorch.verybasic.02.shape"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief       = '''
+A tensor has one dtype for all of it, and `torch.tensor` infers it from what you hand over: a list of Python `int` gives `torch.int64`, a list with a `.` in it gives `torch.float32`.
+
+Pick the line that builds a float tensor, so the dtype printed is the float one.
+
+```
+output: torch.float32
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = None  # FILL: a float tensor holding 1 and 2
+    print(x.dtype)
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.tensor([1.0, 2.0])
+    print(x.dtype)
+
+
+main()
+'''
+hints = [
+  "torch.tensor([1.0, 2.0]) — the decimal point is what makes it float.",
+  "A list of plain ints infers torch.int64, and integer division is where the zeros came from.",
+]
+
+[quest.quiz]
+choices = ["x = torch.tensor([1, 2])", "x = torch.tensor([1.0, 2.0])", "x = torch.tensor([1, 2], dtype=torch.int32)", "x = torch.tensor(['1.0', '2.0'])"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "float32", stdin = "", expect = "torch.float32\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "pytorch.verybasic.04.zeros"
+node        = 4
+title       = "THE EMPTY RACK"
+difficulty  = 1
+story       = "A fresh accumulator for the fan-speed readings: three rows of four, all of it zero until the first reading lands."
+concepts    = ["tensors", "initialization"]
+requires    = ["pytorch.verybasic.03.dtype"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief       = '''
+`torch.zeros` takes the sizes as separate arguments — one per dimension — and fills the tensor with zeros.
+
+Pick the line that makes three rows of four, then type it.
+
+```
+output: (3, 4) 0.0
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = None  # FILL: three rows of four zeros
+    print(tuple(x.shape), x.sum().item())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.zeros(3, 4)
+    print(tuple(x.shape), x.sum().item())
+
+
+main()
+'''
+hints = [
+  "torch.zeros(3, 4) — rows first, then columns.",
+  "torch.zeros(4, 3) is four rows of three, which is a different tensor.",
+]
+
+[quest.quiz]
+choices = ["x = torch.zeros(4, 3)", "x = torch.zeros(12)", "x = torch.zeros(3, 4)", "x = torch.ones(3, 4)"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-by-four", stdin = "", expect = "(3, 4) 0.0\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "pytorch.verybasic.05.arange"
+node        = 5
+title       = "COUNTING THE NODES"
+difficulty  = 1
+story       = "Six machines, and the label maker wants them numbered from zero the way the switch ports already are."
+concepts    = ["tensors", "iteration"]
+requires    = ["pytorch.verybasic.04.zeros"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief       = '''
+`torch.arange(n)` is `range(n)` as a tensor: `0` up to but not including `n`.
+
+Pick the line that counts zero to five, then type it.
+
+```
+output: [0, 1, 2, 3, 4, 5]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = None  # FILL: 0 through 5
+    print(x.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.arange(6)
+    print(x.tolist())
+
+
+main()
+'''
+hints = [
+  "torch.arange(6) stops before 6, so the last number is 5.",
+  "torch.arange(5) stops at 4, which is one short.",
+]
+
+[quest.quiz]
+choices = ["x = torch.arange(5)", "x = torch.arange(6)", "x = torch.arange(1, 6)", "x = torch.range(6)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "zero-to-five", stdin = "", expect = "[0, 1, 2, 3, 4, 5]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "pytorch.verybasic.06.reshape"
+node        = 6
+title       = "THE SAME TWELVE"
+difficulty  = 1
+story       = "Twelve sensor readings arrive in one long line. The report wants them as three racks of four and refuses to draw a line."
+concepts    = ["tensors", "broadcasting"]
+requires    = ["pytorch.verybasic.05.arange"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief       = '''
+`reshape` gives the same numbers a different shape. The element count has to match: twelve numbers can be `(3, 4)` or `(4, 3)` or `(2, 6)`, never `(5, 5)`.
+
+Pick the line that lays the twelve out as three rows of four.
+
+```
+output: [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = torch.arange(12)
+    y = None  # FILL: the same twelve as three rows of four
+    print(y.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.arange(12)
+    y = x.reshape(3, 4)
+    print(y.tolist())
+
+
+main()
+'''
+hints = [
+  "x.reshape(3, 4) — the row count first, and 3 * 4 has to equal 12.",
+  "reshape does not copy or reorder; the numbers come out in the order they went in.",
+]
+
+[quest.quiz]
+choices = ["y = x.reshape(4, 3)", "y = x.reshape(3, 5)", "y = x.reshape(3, 4)", "y = x.reshape(12)"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-rows", stdin = "", expect = "[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "pytorch.verybasic.07.index"
+node        = 7
+title       = "ONE READING"
+difficulty  = 1
+story       = "The cold-aisle probe reports a grid of temperatures and the alarm only cares about the one in the middle row, second column."
+concepts    = ["tensors", "slices"]
+requires    = ["pytorch.verybasic.06.reshape"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief       = '''
+A 2-D tensor is indexed row first, then column, both from zero: `x[r, c]`. The result is still a tensor — a 0-dimensional one — and `.item()` pulls the Python number out of it.
+
+Pick the line that reads row 1, column 2.
+
+```
+output: 6
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = torch.arange(12).reshape(3, 4)
+    v = None  # FILL: row 1, column 2
+    print(v.item())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.arange(12).reshape(3, 4)
+    v = x[1, 2]
+    print(v.item())
+
+
+main()
+'''
+hints = [
+  "x[1, 2] — row index first, column index second, both counting from zero.",
+  "x[2, 1] is a different cell; the comma is not symmetric.",
+]
+
+[quest.quiz]
+choices = ["v = x[2, 1]", "v = x[1, 2]", "v = x[1][2][0]", "v = x(1, 2)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "middle-row", stdin = "", expect = "6\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "pytorch.verybasic.08.slice"
+node        = 8
+title       = "THE SECOND COLUMN"
+difficulty  = 1
+story       = "Every rack reports four numbers and only the second one is the inlet temperature. The graph wants that column and is drawing all four."
+concepts    = ["tensors", "slices"]
+requires    = ["pytorch.verybasic.07.index"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief       = '''
+`:` means *every index on this axis*. `x[:, 1]` is therefore every row's column 1 — one number per row, and the row axis disappears.
+
+Pick the line that takes column 1 out of every row.
+
+```
+output: [1, 5, 9]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = torch.arange(12).reshape(3, 4)
+    col = None  # FILL: column 1 of every row
+    print(col.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.arange(12).reshape(3, 4)
+    col = x[:, 1]
+    print(col.tolist())
+
+
+main()
+'''
+hints = [
+  "x[:, 1] — the colon is the row axis, the 1 is the column.",
+  "x[1, :] is row 1, which is four numbers, not three.",
+]
+
+[quest.quiz]
+choices = ["col = x[1, :]", "col = x[:, 1]", "col = x[:][1]", "col = x[:, 1:]"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "column-one", stdin = "", expect = "[1, 5, 9]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "pytorch.verybasic.09.elementwise"
+node        = 9
+title       = "TWO PROBES AGREE"
+difficulty  = 1
+story       = "Two probes on the same rack, and the report wants the pair added position by position. The loop that does it takes longer than the reading interval."
+concepts    = ["tensors", "broadcasting"]
+requires    = ["pytorch.verybasic.08.slice"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief       = '''
+Arithmetic on two tensors of the same shape is elementwise, and there is no loop: `a + b` adds position by position and gives a tensor of the same shape.
+
+Pick the line that adds the two probes.
+
+```
+output: [11, 22, 33]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    a = torch.tensor([1, 2, 3])
+    b = torch.tensor([10, 20, 30])
+    c = None  # FILL: the two added position by position
+    print(c.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    a = torch.tensor([1, 2, 3])
+    b = torch.tensor([10, 20, 30])
+    c = a + b
+    print(c.tolist())
+
+
+main()
+'''
+hints = [
+  "a + b — the operator is already elementwise; nothing has to be written around it.",
+  "torch.cat joins two tensors end to end, which gives six numbers, not three.",
+]
+
+[quest.quiz]
+choices = ["c = torch.cat([a, b])", "c = a + b", "c = a * b", "c = a.dot(b)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "added", stdin = "", expect = "[11, 22, 33]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "pytorch.verybasic.10.broadcast"
+node        = 10
+title       = "ONE OFFSET, EVERY ROW"
+difficulty  = 2
+story       = "Every probe reads ten degrees low. The calibration script writes a loop over the rows and the rows are about to become a million."
+concepts    = ["broadcasting", "tensors"]
+requires    = ["pytorch.verybasic.09.elementwise"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief       = '''
+Broadcasting is the rule that lets shapes that are not equal meet anyway. A tensor of shape `(3,)` added to one of shape `(2, 3)` is stretched across the rows — the same three numbers added to every row, with no copy made.
+
+Pick the line that adds the one offset row to both rows of the grid.
+
+```
+output: [[11, 22, 33], [14, 25, 36]]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    grid = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    off = torch.tensor([10, 20, 30])
+    out = None  # FILL: the offset added to every row
+    print(out.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    grid = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    off = torch.tensor([10, 20, 30])
+    out = grid + off
+    print(out.tolist())
+
+
+main()
+'''
+hints = [
+  "grid + off — the trailing axis is 3 on both sides, so the shapes are compatible and off is stretched down the rows.",
+  "off.unsqueeze(1) would make it a column, which broadcasts the wrong way.",
+]
+
+[quest.quiz]
+choices = ["out = grid + off.unsqueeze(1)", "out = grid + off", "out = grid + off.sum()", "out = grid * off"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "broadcast", stdin = "", expect = "[[11, 22, 33], [14, 25, 36]]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "pytorch.verybasic.11.matmul"
+node        = 11
+title       = "THE INNER DIMENSION"
+difficulty  = 2
+story       = "A batch of two readings through a three-by-two mixing table. `*` gives an error about shapes and the error is right."
+concepts    = ["tensors", "broadcasting"]
+requires    = ["pytorch.verybasic.10.broadcast"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''
+`@` is matrix multiplication and `*` is elementwise. `(2, 3) @ (3, 2)` works because the inner dimensions agree — the 3 and the 3 — and the result is `(2, 2)`.
+
+Pick the line that multiplies the batch by the table.
+
+```
+output: [[22, 28], [49, 64]]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    a = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    b = torch.tensor([[1, 2], [3, 4], [5, 6]])
+    c = None  # FILL: the matrix product
+    print(c.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    a = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    b = torch.tensor([[1, 2], [3, 4], [5, 6]])
+    c = a @ b
+    print(c.tolist())
+
+
+main()
+'''
+hints = [
+  "a @ b — the at sign, not the star.",
+  "b @ a also runs, and gives a (3, 3), which is the other product entirely.",
+]
+
+[quest.quiz]
+choices = ["c = a * b", "c = b @ a", "c = a @ b", "c = a.dot(b)"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "product", stdin = "", expect = "[[22, 28], [49, 64]]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "pytorch.verybasic.12.sum-axis"
+node        = 12
+title       = "PER RACK, NOT IN TOTAL"
+difficulty  = 2
+story       = "The power report adds every number in the grid and prints one figure for the whole basement. Facilities want one figure per rack."
+concepts    = ["tensors", "iteration"]
+requires    = ["pytorch.verybasic.11.matmul"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''
+`x.sum()` collapses everything to one number. `dim=` says *which axis to collapse*: `dim=1` sums along the columns and leaves one number per row.
+
+Pick the line that gives one total per row.
+
+```
+output: [6, 15]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    per_row = None  # FILL: one total per row
+    print(per_row.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    per_row = x.sum(dim=1)
+    print(per_row.tolist())
+
+
+main()
+'''
+hints = [
+  "x.sum(dim=1) — dim names the axis that disappears, and the columns are axis 1.",
+  "dim=0 collapses the rows instead and gives one number per column.",
+]
+
+[quest.quiz]
+choices = ["per_row = x.sum()", "per_row = x.sum(dim=0)", "per_row = x.sum(dim=1)", "per_row = x.sum(axis=None)"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "per-row", stdin = "", expect = "[6, 15]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "pytorch.verybasic.13.mean"
+node        = 13
+title       = "THE AVERAGE INLET"
+difficulty  = 1
+story       = "Four inlet temperatures and a mean that comes out as a whole number every single time, which the cooling curve does not believe."
+concepts    = ["tensors", "types"]
+requires    = ["pytorch.verybasic.12.sum-axis"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''
+`mean` is only defined for floating point tensors — an integer tensor raises rather than quietly rounding. `x.float()` returns a float copy, and the mean of it is a float.
+
+Pick the line that takes the mean of the four readings.
+
+```
+output: 2.5
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = torch.tensor([1, 2, 3, 4])
+    m = None  # FILL: the mean, as a float
+    print(m.item())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.tensor([1, 2, 3, 4])
+    m = x.float().mean()
+    print(m.item())
+
+
+main()
+'''
+hints = [
+  "x.float().mean() — convert first, then average.",
+  "x.mean() on an int64 tensor raises; torch will not pick a dtype for you here.",
+]
+
+[quest.quiz]
+choices = ["m = x.mean()", "m = x.float().mean()", "m = x.float().sum()", "m = x.mean().float()"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mean", stdin = "", expect = "2.5\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "pytorch.verybasic.14.argmax"
+node        = 14
+title       = "WHICH ONE WON"
+difficulty  = 2
+story       = "The classifier prints the score of the class it picked, which is a number nobody can act on. The question was always which class."
+concepts    = ["tensors", "inference"]
+requires    = ["pytorch.verybasic.13.mean"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''
+`max` gives the largest value. `argmax` gives *where* the largest value is — the index — which is what a classifier's answer actually is.
+
+Pick the line that gives the index of the largest score.
+
+```
+output: 2
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    scores = torch.tensor([0.1, 0.3, 0.9, 0.2])
+    pick = None  # FILL: the index of the largest score
+    print(pick.item())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    scores = torch.tensor([0.1, 0.3, 0.9, 0.2])
+    pick = scores.argmax()
+    print(pick.item())
+
+
+main()
+'''
+hints = [
+  "scores.argmax() — arg means the index of, not the value at.",
+  "scores.max() gives 0.9, which is the score and not the class.",
+]
+
+[quest.quiz]
+choices = ["pick = scores.max()", "pick = scores.argmax()", "pick = scores.argmin()", "pick = scores.sort()"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "third-class", stdin = "", expect = "2\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "pytorch.verybasic.15.mask"
+node        = 15
+title       = "OVER THE LINE"
+difficulty  = 2
+story       = "Six inlet temperatures and a thermal cut-out at 30. The alarm counts with a Python loop and the loop is inside the reading interval."
+concepts    = ["tensors", "broadcasting"]
+requires    = ["pytorch.verybasic.14.argmax"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''
+Comparing a tensor with a number gives a tensor of `True`/`False`, one per element. Summing that boolean tensor counts the `True`s, because `True` is 1.
+
+Pick the line that counts the readings strictly above 30.
+
+```
+output: 2
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    t = torch.tensor([28, 31, 29, 30, 35, 27])
+    hot = None  # FILL: how many are above 30
+    print(hot.item())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    t = torch.tensor([28, 31, 29, 30, 35, 27])
+    hot = (t > 30).sum()
+    print(hot.item())
+
+
+main()
+'''
+hints = [
+  "(t > 30).sum() — the parentheses matter, because .sum() binds tighter than >.",
+  "t >= 30 includes the reading that is exactly at the cut-out, which is not above it.",
+]
+
+[quest.quiz]
+choices = ["hot = (t >= 30).sum()", "hot = (t > 30).sum()", "hot = t.sum() > 30", "hot = (t > 30).count()"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-hot", stdin = "", expect = "2\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "pytorch.verybasic.16.cat"
+node        = 16
+title       = "TWO BATCHES, ONE BATCH"
+difficulty  = 2
+story       = "Two capture files, two rows each, and the loader wants one tensor of four rows before it will do anything at all."
+concepts    = ["tensors", "datasets"]
+requires    = ["pytorch.verybasic.15.mask"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+`torch.cat` joins tensors along an axis that already exists. Joining two `(2, 2)` along `dim=0` stacks the rows and gives `(4, 2)`.
+
+Pick the line that makes one batch of four rows.
+
+```
+output: (4, 2)
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    a = torch.tensor([[1, 2], [3, 4]])
+    b = torch.tensor([[5, 6], [7, 8]])
+    both = None  # FILL: one tensor of four rows
+    print(tuple(both.shape))
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    a = torch.tensor([[1, 2], [3, 4]])
+    b = torch.tensor([[5, 6], [7, 8]])
+    both = torch.cat([a, b], dim=0)
+    print(tuple(both.shape))
+
+
+main()
+'''
+hints = [
+  "torch.cat([a, b], dim=0) — the tensors go in a list, and dim=0 is the row axis.",
+  "torch.stack makes a new axis instead, so the shape would be (2, 2, 2).",
+]
+
+[quest.quiz]
+choices = ["both = torch.stack([a, b])", "both = torch.cat([a, b], dim=1)", "both = torch.cat([a, b], dim=0)", "both = torch.cat(a, b)"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four-rows", stdin = "", expect = "(4, 2)\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "pytorch.verybasic.17.unsqueeze"
+node        = 17
+title       = "A BATCH OF ONE"
+difficulty  = 2
+story       = "One reading, handed to a model that has only ever seen batches. It refuses: it wants two dimensions and it has been given one."
+concepts    = ["tensors", "inference"]
+requires    = ["pytorch.verybasic.16.cat"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+A model trained on batches expects a batch axis in front. `unsqueeze(0)` inserts a new axis of size 1 at position 0, turning `(3,)` into `(1, 3)` — one sample, three features — without changing a number.
+
+Pick the line that makes the single reading a batch of one.
+
+```
+output: (1, 3)
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    one = torch.tensor([1.0, 2.0, 3.0])
+    batch = None  # FILL: the same reading with a batch axis in front
+    print(tuple(batch.shape))
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    one = torch.tensor([1.0, 2.0, 3.0])
+    batch = one.unsqueeze(0)
+    print(tuple(batch.shape))
+
+
+main()
+'''
+hints = [
+  "one.unsqueeze(0) — the 0 is where the new axis goes, and the batch axis goes in front.",
+  "unsqueeze(1) gives (3, 1), which is three batches of one feature — the other way round.",
+]
+
+[quest.quiz]
+choices = ["batch = one.unsqueeze(1)", "batch = one.unsqueeze(0)", "batch = one.squeeze(0)", "batch = one.reshape(3, 1)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "batch-of-one", stdin = "", expect = "(1, 3)\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "pytorch.verybasic.18.transpose"
+node        = 18
+title       = "THE TABLE THE OTHER WAY"
+difficulty  = 2
+story       = "The mixing table arrived with the rows and columns the wrong way round and the matmul says the inner dimensions do not agree."
+concepts    = ["tensors", "slices"]
+requires    = ["pytorch.verybasic.17.unsqueeze"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''
+`x.t()` swaps the two axes of a 2-D tensor: a `(2, 3)` becomes a `(3, 2)`, row `i` column `j` becoming row `j` column `i`.
+
+Pick the line that transposes the table.
+
+```
+output: [[1, 4], [2, 5], [3, 6]]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    y = None  # FILL: rows and columns swapped
+    print(y.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    y = x.t()
+    print(y.tolist())
+
+
+main()
+'''
+hints = [
+  "x.t() — the short one, and it is a method call, so the parentheses are needed.",
+  "x.reshape(3, 2) also gives a (3, 2), but the numbers land in the wrong cells.",
+]
+
+[quest.quiz]
+choices = ["y = x.reshape(3, 2)", "y = x.t()", "y = x.T()", "y = x.flip(0)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "transposed", stdin = "", expect = "[[1, 4], [2, 5], [3, 6]]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "pytorch.verybasic.19.requires-grad"
+node        = 19
+title       = "THE ONE THAT LEARNS"
+difficulty  = 2
+story       = "The first parameter in the basement. It holds a number, and nothing so far has any idea which way to move it."
+concepts    = ["autograd", "tensors"]
+requires    = ["pytorch.verybasic.18.transpose"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''
+A tensor only records what happens to it if you ask. `requires_grad=True` marks a tensor as something to be learned, and from then on every operation on it is remembered so a gradient can be traced back.
+
+Pick the line that makes a learnable tensor holding 2.0.
+
+```
+output: True 2.0
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    w = None  # FILL: a learnable tensor holding 2.0
+    print(w.requires_grad, w.item())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    w = torch.tensor(2.0, requires_grad=True)
+    print(w.requires_grad, w.item())
+
+
+main()
+'''
+hints = [
+  "torch.tensor(2.0, requires_grad=True) — the flag is a keyword argument on the constructor.",
+  "requires_grad only works on a float tensor; an int tensor cannot carry a gradient.",
+]
+
+[quest.quiz]
+choices = ["w = torch.tensor(2.0)", "w = torch.tensor(2.0, requires_grad=True)", "w = torch.tensor(2, requires_grad=True)", "w = torch.tensor(2.0).requires_grad"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "learnable", stdin = "", expect = "True 2.0\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "pytorch.verybasic.20.backward"
+node        = 20
+title       = "WHICH WAY IS DOWN"
+difficulty  = 2
+story       = "`w` is 3.0, the loss is `w * w`, and `w.grad` is None. Nothing has told the graph to run backwards yet."
+concepts    = ["autograd", "training-loop"]
+requires    = ["pytorch.verybasic.19.requires-grad"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief       = '''
+The forward pass builds a graph; `backward()` walks it in reverse and leaves the gradient in `.grad`. For `y = w * w` the derivative is `2w`, so at `w = 3.0` the gradient is `6.0`.
+
+Pick the line that runs the backward pass.
+
+```
+output: 6.0
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    w = torch.tensor(3.0, requires_grad=True)
+    y = w * w
+    pass  # FILL: run the backward pass
+    print(w.grad.item())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    w = torch.tensor(3.0, requires_grad=True)
+    y = w * w
+    y.backward()
+    print(w.grad.item())
+
+
+main()
+'''
+hints = [
+  "y.backward() — it is called on the loss, the end of the graph, not on the parameter.",
+  "w.backward() asks the parameter to differentiate itself, which is not what backward means.",
+]
+
+[quest.quiz]
+choices = ["w.backward()", "y.backward()", "y.grad()", "torch.backward(w)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-w", stdin = "", expect = "6.0\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "pytorch.verybasic.21.no-grad"
+node        = 21
+title       = "NOT WHILE WE ARE LOOKING"
+difficulty  = 2
+story       = "The evaluation pass builds a graph it never uses, and the basement's memory graph climbs every time the validation set is scored."
+concepts    = ["inference", "autograd"]
+requires    = ["pytorch.verybasic.20.backward"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief       = '''
+Inference does not need a graph. Torch has a context manager that switches the recording off for the block it wraps, so results come out with `requires_grad` false and nothing is kept for a backward pass that is never going to happen.
+
+The `with` is already written. Pick the line that builds the context manager it enters.
+
+```
+output: False
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    w = torch.tensor(3.0, requires_grad=True)
+    ctx = None  # FILL: the context manager that records nothing
+    with ctx:
+        y = w * w
+    print(y.requires_grad)
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    w = torch.tensor(3.0, requires_grad=True)
+    ctx = torch.no_grad()
+    with ctx:
+        y = w * w
+    print(y.requires_grad)
+
+
+main()
+'''
+hints = [
+  "It is the one whose name says what it does: no gradients, for the length of the block.",
+  "It has to be called — the bare attribute is not a context manager and `with` will refuse it.",
+]
+
+[quest.quiz]
+choices = ["ctx = torch.enable_grad()", "ctx = torch.no_grad()", "ctx = torch.no_grad", "ctx = torch.autograd.set_grad_enabled(True)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "not-recorded", stdin = "", expect = "False\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "pytorch.verybasic.22.linear"
+node        = 22
+title       = "THE FIRST LAYER"
+difficulty  = 2
+story       = "Four features in, two classes out, and the layer that is supposed to sit between them has not been built."
+concepts    = ["modules", "tensors"]
+requires    = ["pytorch.verybasic.21.no-grad"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''
+`nn.Linear(in_features, out_features)` is one matrix multiply and one bias add, with the weights created for you. The argument order is *in* first, *out* second — a `(batch, 4)` goes in and a `(batch, 2)` comes out.
+
+Pick the line that builds the layer.
+
+```
+output: (3, 2)
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    layer = None  # FILL: four features in, two out
+    x = torch.zeros(3, 4)
+    print(tuple(layer(x).shape))
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    layer = nn.Linear(4, 2)
+    x = torch.zeros(3, 4)
+    print(tuple(layer(x).shape))
+
+
+main()
+'''
+hints = [
+  "nn.Linear(4, 2) — in features first, out features second.",
+  "nn.Linear(2, 4) builds the layer the other way round and the input no longer fits it.",
+]
+
+[quest.quiz]
+choices = ["layer = nn.Linear(2, 4)", "layer = nn.Linear(4, 2)", "layer = nn.Linear(4)", "layer = nn.Linear(3, 4)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-by-two", stdin = "", expect = "(3, 2)\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "pytorch.verybasic.23.parameters"
+node        = 23
+title       = "HOW BIG IS IT"
+difficulty  = 2
+story       = "The grant application wants a parameter count and the only number anyone has is the number of layers."
+concepts    = ["modules", "initialization"]
+requires    = ["pytorch.verybasic.22.linear"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief       = '''
+`model.parameters()` yields every learnable tensor the module owns, and `p.numel()` is how many numbers are in one of them. A `Linear(4, 2)` owns a `(2, 4)` weight and a `(2,)` bias: 8 + 2 = 10.
+
+Pick the line that totals them.
+
+```
+output: 10
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    model = nn.Linear(4, 2)
+    total = None  # FILL: how many numbers the model holds
+    print(total)
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    model = nn.Linear(4, 2)
+    total = sum(p.numel() for p in model.parameters())
+    print(total)
+
+
+main()
+'''
+hints = [
+  "sum(p.numel() for p in model.parameters()) — numel is the count of numbers, not of tensors.",
+  "len(list(model.parameters())) counts the tensors, which is 2: one weight and one bias.",
+]
+
+[quest.quiz]
+choices = ["total = len(list(model.parameters()))", "total = sum(p.numel() for p in model.parameters())", "total = sum(len(p) for p in model.parameters())", "total = model.parameters().numel()"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "ten", stdin = "", expect = "10\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "pytorch.verybasic.24.relu"
+node        = 24
+title       = "THE BEND"
+difficulty  = 2
+story       = "Two linear layers stacked with nothing between them, and the whole stack collapses into one line no matter how many are added."
+concepts    = ["modules", "loss-functions"]
+requires    = ["pytorch.verybasic.23.parameters"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief       = '''
+Stacked linear layers are still linear; what makes a network able to bend is the activation between them. ReLU is the simplest: it keeps positives and sets everything negative to zero.
+
+Pick the line that applies it.
+
+```
+output: [0.0, 0.0, 1.5]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = torch.tensor([-2.0, 0.0, 1.5])
+    y = None  # FILL: negatives clamped to zero
+    print(y.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.tensor([-2.0, 0.0, 1.5])
+    y = torch.relu(x)
+    print(y.tolist())
+
+
+main()
+'''
+hints = [
+  "torch.relu(x) — max(0, x) applied to every element.",
+  "torch.abs would turn -2.0 into 2.0, which is a different function entirely.",
+]
+
+[quest.quiz]
+choices = ["y = torch.abs(x)", "y = torch.relu(x)", "y = torch.sigmoid(x)", "y = torch.relu(x, 0)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "clamped", stdin = "", expect = "[0.0, 0.0, 1.5]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "pytorch.verybasic.25.softmax"
+node        = 25
+title       = "SCORES INTO ODDS"
+difficulty  = 2
+story       = "The console prints three raw scores and the operator on the night shift is asked how confident the model is. There is no answer in a raw score."
+concepts    = ["inference", "loss-functions"]
+requires    = ["pytorch.verybasic.24.relu"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''
+Softmax turns a row of scores into a row of probabilities: everything positive, and the row adding to 1. `dim=` says which axis has to sum to one — for a row of class scores, that is the last one.
+
+Pick the line that softmaxes along the row.
+
+```
+output: 1.0 2
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    scores = torch.tensor([1.0, 2.0, 3.0])
+    p = None  # FILL: the scores as probabilities over the row
+    print(round(p.sum().item(), 4), p.argmax().item())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    scores = torch.tensor([1.0, 2.0, 3.0])
+    p = torch.softmax(scores, dim=0)
+    print(round(p.sum().item(), 4), p.argmax().item())
+
+
+main()
+'''
+hints = [
+  "torch.softmax(scores, dim=0) — dim is required, and this tensor has only axis 0.",
+  "Softmax is monotonic: the largest score stays the largest probability.",
+]
+
+[quest.quiz]
+choices = ["p = torch.softmax(scores)", "p = torch.softmax(scores, dim=0)", "p = torch.log_softmax(scores, dim=0)", "p = torch.sigmoid(scores)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sums-to-one", stdin = "", expect = "1.0 2\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "pytorch.verybasic.26.mse"
+node        = 26
+title       = "HOW WRONG, IN ONE NUMBER"
+difficulty  = 2
+story       = "The prediction is 3.0 and the truth is 1.0, and the training loop has nothing to minimise because nobody has said what wrong means."
+concepts    = ["loss-functions", "training-loop"]
+requires    = ["pytorch.verybasic.25.softmax"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''
+A loss is one number saying how wrong a prediction is. Mean squared error is the square of the difference, averaged: for `3.0` against `1.0` that is `(3 - 1)² = 4.0`.
+
+Pick the line that builds the loss function.
+
+```
+output: 4.0
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    pred = torch.tensor([3.0])
+    want = torch.tensor([1.0])
+    loss_fn = None  # FILL: mean squared error
+    print(loss_fn(pred, want).item())
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    pred = torch.tensor([3.0])
+    want = torch.tensor([1.0])
+    loss_fn = nn.MSELoss()
+    print(loss_fn(pred, want).item())
+
+
+main()
+'''
+hints = [
+  "nn.MSELoss() — it is a class, so it is built first and called second.",
+  "nn.L1Loss() is the absolute difference, which would give 2.0 rather than 4.0.",
+]
+
+[quest.quiz]
+choices = ["loss_fn = nn.L1Loss()", "loss_fn = nn.MSELoss()", "loss_fn = nn.MSELoss", "loss_fn = nn.CrossEntropyLoss()"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "squared", stdin = "", expect = "4.0\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 27  BOSS
+[[quest]]
+id          = "pytorch.verybasic.27.first-step"
+node        = 27
+title       = "THE FIRST STEP"
+difficulty  = 3
+story       = "Everything is in place — a parameter, a loss, a gradient — and the number never moves. The optimiser has been built and never asked to do anything."
+concepts    = ["optimizers", "training-loop", "autograd"]
+requires    = ["pytorch.verybasic.26.mse"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief       = '''
+This is the whole loop, once: forward, loss, `backward()`, and then the thing that actually moves the parameter. The optimiser applies the gradients sitting in `.grad`, and it is the optimiser's own method that does it — without that call the gradient is computed and thrown away, and the parameter is exactly where it started.
+
+`w` starts at `5.0`, the target is `0.0`, the loss is `w * w`, so the gradient is `10.0`. With plain SGD at `lr=0.1` the step is `w - 0.1 * 10.0`.
+
+Pick the line that takes the step.
+
+```
+output: 4.0 moved
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    w = torch.tensor(5.0, requires_grad=True)
+    opt = torch.optim.SGD([w], lr=0.1)
+    before = w.item()
+    loss = w * w
+    opt.zero_grad()
+    loss.backward()
+    pass  # FILL: apply the gradient
+    print(round(w.item(), 4), "moved" if w.item() != before else "stuck")
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    w = torch.tensor(5.0, requires_grad=True)
+    opt = torch.optim.SGD([w], lr=0.1)
+    before = w.item()
+    loss = w * w
+    opt.zero_grad()
+    loss.backward()
+    opt.step()
+    print(round(w.item(), 4), "moved" if w.item() != before else "stuck")
+
+
+main()
+'''
+hints = [
+  "opt.step() — zero_grad clears, backward fills, step applies. All three, in that order.",
+  "loss.backward() only computes the gradient; it never touches the parameter.",
+]
+
+[quest.quiz]
+choices = ["opt.zero_grad()", "opt.step()", "loss.step()", "w.step()"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "moved", stdin = "", expect = "4.0 moved\n", visible = true },
+]

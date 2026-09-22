@@ -60,7 +60,7 @@ SCRATCH = pathlib.Path(
 )
 CACHE = pathlib.Path(os.environ.get("CWBHACKER_CI_CACHE", _root / "cache"))
 
-ID_RE = re.compile(r"^(rust|go|cpp|python)\.(verybasic|basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
+ID_RE = re.compile(r"^(rust|go|cpp|python|pytorch)\.(verybasic|basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
 
 MISTAKE_MAP_HEADING = "## 2. Mistake kind → concepts"
 
@@ -160,10 +160,16 @@ def build(lang, src, workdir):
         p = subprocess.run(
             ["c++", "-std=c++20", "-O2", "-pthread", "-Wall", "-o", "prog", "main.cpp"],
             cwd=workdir, capture_output=True, text=True, timeout=180)
-    elif lang == "python":
+    elif lang in ("python", "pytorch"):
         # Python has no compile step; the "build" is a syntax check, so a
         # SyntaxError lands as compile_error the way it does in the runner,
         # and `prog` is a tiny launcher so run_case stays one code path.
+        #
+        # PYTORCH is the same interpreter with torch in its site-packages,
+        # which is why it shares this arm rather than getting one of its own:
+        # `python3 -I` finds an installed torch (`-I` drops PYTHONPATH and the
+        # user site, not the interpreter's own), so the only difference
+        # between the two lands is what a program is allowed to import.
         f = workdir / "main.py"
         f.write_text(src)
         p = subprocess.run(

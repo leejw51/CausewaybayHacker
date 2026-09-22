@@ -836,7 +836,9 @@ pub fn classify_compile(lang: &str, stderr: &str) -> Vec<Mistake> {
     match lang {
         "go" => classify_go_build(stderr),
         "cpp" => classify_cpp_build(stderr),
-        "python" => classify_python_compile(stderr),
+        // PyTorch Land runs the same interpreter, so a `SyntaxError` there is
+        // the same `py:syntax` it is in Python Land.
+        "python" | "pytorch" => classify_python_compile(stderr),
         _ => classify_rust_json(stderr),
     }
 }
@@ -849,7 +851,7 @@ pub fn classify_runtime(lang: &str, stderr: &str) -> Vec<Mistake> {
     match lang {
         "go" => classify_go_runtime(stderr),
         "cpp" => classify_cpp_runtime(stderr),
-        "python" => classify_python_runtime(stderr),
+        "python" | "pytorch" => classify_python_runtime(stderr),
         _ => classify_rust_runtime(stderr),
     }
 }
@@ -1004,8 +1006,12 @@ pub fn concepts_for(kind: &str) -> &'static [&'static str] {
             "error-handling",
             "pattern-matching",
             "duck-typing",
+            // A shape that does not line up is this land's type error, and it
+            // is the one a PyTorch player makes most.
+            "tensors",
+            "broadcasting",
         ],
-        "unknown-name" => &["bindings", "imports", "functions", "decorators"],
+        "unknown-name" => &["bindings", "imports", "functions", "decorators", "modules"],
         "missing-trait" => &["traits", "generics", "iteration", "duck-typing"],
         "unused" => &["bindings", "imports"],
         "mutability" => &["mutability", "borrowing", "slices"],
@@ -1015,11 +1021,21 @@ pub fn concepts_for(kind: &str) -> &'static [&'static str] {
             "structs",
             "pointers",
             "undefined-behaviour",
+            // `.grad` is None until a backward pass has run, which reaches the
+            // player as exactly this.
+            "autograd",
         ],
-        "index-range" => &["slices", "iteration", "two-pointers", "undefined-behaviour"],
+        "index-range" => &[
+            "slices",
+            "iteration",
+            "two-pointers",
+            "undefined-behaviour",
+            // A token id past the end of the table.
+            "embeddings",
+        ],
         "data-race" => &["data-races", "shared-state", "concurrency"],
         "deadlock" => &["deadlock", "channels", "shared-state"],
-        "unhandled-error" => &["error-handling", "pattern-matching"],
+        "unhandled-error" => &["error-handling", "pattern-matching", "optimizers"],
         "syntax" => &["bindings", "control-flow", "functions"],
         "wrong-answer" => &[
             "complexity",
@@ -1028,6 +1044,11 @@ pub fn concepts_for(kind: &str) -> &'static [&'static str] {
             "io",
             "comprehensions",
             "generators",
+            "training-loop",
+            "loss-functions",
+            "inference",
+            "attention",
+            "initialization",
         ],
         "timeout" => &[
             "complexity",
@@ -1035,6 +1056,7 @@ pub fn concepts_for(kind: &str) -> &'static [&'static str] {
             "binary-search",
             "two-pointers",
             "generators",
+            "datasets",
         ],
         _ => &[],
     }

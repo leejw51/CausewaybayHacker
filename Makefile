@@ -52,6 +52,38 @@ RUN        := .run
 BACK_BIN   := backend/target/debug/cwbhacker
 VITE       := frontend/node_modules/.bin/vite
 
+# **The game's own python leads PATH, when the machine has one set aside.**
+#
+# PyTorch Land's toolchain is the fifth entry on the list — RUST, GO, C++,
+# PYTHON, ANACONDA — and the odd one out: not a program on PATH but a package
+# inside an interpreter. The interpreters a Mac or a PEP 668 distribution
+# hands you refuse to install into themselves, so the answer everywhere
+# (`make doctor`, SPEC §5.1, the runner's own hint) is an environment of the
+# game's own: a conda env named `cwbhacker`, or a venv at $(HOME_DIR)/venv.
+#
+# Finding it cannot be the player's job. `make start` from an ordinary shell
+# finds /usr/bin/python3 — on a Mac, a 3.9 with no torch — and the fifth land
+# goes back to dying of ModuleNotFoundError on every node, which is how this
+# rule came to be written. So if one of these exists, everything this Makefile
+# starts sees it first: the server, `doctor`, the content gate. Nothing
+# exists, nothing changes; the ambient python3 is used exactly as before.
+#
+# In order: an override you set, then conda, then a venv. The conda roots are
+# listed rather than resolved through `conda` itself, because `conda` is a
+# shell function on a configured machine and not a program a Makefile can run.
+CONDA_ENV  := $(firstword $(wildcard \
+                $(patsubst %/bin/conda,%,$(CONDA_EXE))/envs/cwbhacker/bin \
+                /opt/anaconda3/envs/cwbhacker/bin \
+                /opt/miniconda3/envs/cwbhacker/bin \
+                $(HOME)/anaconda3/envs/cwbhacker/bin \
+                $(HOME)/miniconda3/envs/cwbhacker/bin \
+                $(HOME)/miniforge3/envs/cwbhacker/bin))
+GAME_PY_BIN ?= $(firstword $(CONDA_ENV) $(wildcard $(HOME_DIR)/venv/bin))
+ifneq ($(wildcard $(GAME_PY_BIN)/python3),)
+PATH       := $(GAME_PY_BIN):$(PATH)
+export PATH
+endif
+
 # How long `start` waits for a port to answer before calling it a failure.
 WAIT_SECS  ?= 90
 
@@ -390,6 +422,22 @@ doctor: ## check the toolchains and the server's own view of things
 	@command -v go    >/dev/null && go version        || echo "MISSING: go     — needed for the go land"
 	@command -v c++   >/dev/null && c++ --version | head -1 || echo "MISSING: c++    — needed for the cpp land (clang or gcc)"
 	@command -v python3 >/dev/null && python3 --version || echo "MISSING: python3 — needed for the python land (3.10+)"
+	@if python3 -I -c "import torch" 2>/dev/null; then \
+	  python3 -I -c "import torch; print('torch      ', torch.__version__)"; \
+	  python3 -I -c "import numpy" 2>/dev/null \
+	    || printf 'no numpy beside torch — torch prints a NumPy warning on stderr on every\n            import, which lands in every attempt: pip install numpy\n'; \
+	else \
+	  printf 'MISSING: torch   — needed for the pytorch land. Give it an env of its own:\n'; \
+	  printf '           conda create -n cwbhacker python=3.13 -y\n'; \
+	  printf '           conda run -n cwbhacker pip install torch numpy black\n'; \
+	  printf '           and this Makefile will find it by name and put it first on PATH\n'; \
+	  printf '           for everything it starts. No conda? A venv at\n'; \
+	  printf '           ~/.causewaybayhacker/venv is picked up the same way, and\n'; \
+	  printf '           GAME_PY_BIN=/path/to/bin overrides both. An env of its own because\n'; \
+	  printf "           macOS's own python3 and any PEP 668 distribution refuse to install\n"; \
+	  printf '           into themselves, and the --user they suggest instead is the one\n'; \
+	  printf '           place the isolated "python3 -I" the runner uses will not look.\n'; \
+	fi
 	@command -v clang-format >/dev/null && clang-format --version || echo "no clang-format on PATH — optional; the cpp land has no fmt without it"
 	@command -v node  >/dev/null && node --version    || echo "MISSING: node   — needed for the browser client"
 	@command -v love  >/dev/null && love --version    || echo "no love on PATH — 'make -C love2d love-bin' fetches it"

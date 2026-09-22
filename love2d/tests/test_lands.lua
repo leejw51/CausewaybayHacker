@@ -16,11 +16,12 @@ return function()
   T.section("lands — the four, and what each resolves to")
 
   T.case("the order is SPEC §0's, and every land has a name", function()
-    T.same(Land.ORDER, { "rust", "go", "cpp", "python" })
+    T.same(Land.ORDER, { "rust", "go", "cpp", "python", "pytorch" })
     T.eq(Land.name("rust"), "RUST")
     T.eq(Land.name("go"), "GO")
     T.eq(Land.name("cpp"), "C++", "nobody calls it CPP")
     T.eq(Land.name("python"), "PYTHON")
+    T.eq(Land.name("pytorch"), "PYTORCH")
     T.eq(Land.name("zig"), "ZIG", "a land the client has not heard of keeps its id")
     T.eq(Land.name(nil), "?")
   end)
@@ -28,7 +29,8 @@ return function()
   T.case("unknown lands sort last, and the bob phases are spread out", function()
     T.eq(Land.rank("rust"), 1)
     T.eq(Land.rank("python"), 4)
-    T.eq(Land.rank("zig"), 5)
+    T.eq(Land.rank("pytorch"), 5)
+    T.eq(Land.rank("zig"), 6)
     local seen = {}
     for _, land in ipairs(Land.ORDER) do
       local phase = Land.phase(land)
@@ -81,6 +83,7 @@ return function()
     end
     T.eq(Land.MASCOT.cpp, "sprite_cpp")
     T.eq(Land.MASCOT.python, "sprite_python")
+    T.eq(Land.MASCOT.pytorch, "sprite_pytorch")
     -- Headless there are no images at all, so `pick` finds nothing — which
     -- is the behaviour on a checkout without `art/`, and must not error.
     T.eq(Land.mascot("cpp"), nil)
@@ -88,7 +91,7 @@ return function()
   end)
 
   T.case("each land has a scratch-file extension for $EDITOR", function()
-    T.same(External.EXT, { rust = "rs", go = "go", cpp = "cpp", python = "py" })
+    T.same(External.EXT, { rust = "rs", go = "go", cpp = "cpp", python = "py", pytorch = "py" })
     for _, land in ipairs(Land.ORDER) do
       T.ok(External.EXT[land] ~= nil, land .. " has an extension")
     end

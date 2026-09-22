@@ -38,6 +38,7 @@ local LANG_NAME = {
   go = "Go",
   cpp = "C++ (C++20)",
   python = "Python 3",
+  pytorch = "Python 3 + PyTorch",
 }
 
 --- The most of one stream or one wrong answer that goes into the prompt.

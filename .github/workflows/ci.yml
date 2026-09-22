@@ -64,6 +64,26 @@ env:
   # What the runner hands submitted Python programs to (SPEC §5.1 needs 3.10+;
   # this is the version development happens on).
   PYTHON_VERSION: "3.13"
+  # What PyTorch Land's quests import, pinned like every other toolchain here.
+  # The reason is sharper than for the rest, because a pack's expected output
+  # is a number: `pytorch.hacker.18.adam` prints `-0.123053` for four steps of
+  # a float32 Adam, and a bump that changes a kernel, a default or the RNG
+  # would turn a green suite red in a way that reads like broken content.
+  #
+  # The content is in fact robust to this — every case of all 122 quests was
+  # re-verified byte for byte on torch 2.8.0 / python 3.9 and again on
+  # 2.14.0 / python 3.13, both on macOS arm64, which is a different arch, a
+  # different interpreter and six minor versions apart — so the pin is not
+  # load-bearing for correctness. It is here so that the day one of them does
+  # move, it moves in a diff someone wrote on purpose.
+  #
+  # The CPU index is ~200MB against the default build's ~2GB of CUDA that no
+  # runner here has a card for. `numpy` is imported by no quest and installed
+  # anyway: without it torch writes "Failed to initialize NumPy" to stderr on
+  # every import, which is every run of every node, into `attempts.stderr`
+  # and in front of the player.
+  TORCH_VERSION: "2.14.0"
+  TORCH_INDEX: "https://download.pytorch.org/whl/cpu"
   # The C++ compiler is not installed but pinned by the runner image: `c++`
   # on ubuntu-24.04 is g++ 13, which has all of C++20 the quests use. This
   # records the expectation so a runner-image bump that changes it is a
@@ -137,6 +157,22 @@ jobs:
         run: |
           python3 -m pip install --quiet --disable-pip-version-check black
           python3 -m black --version
+
+      # PyTorch Land is the fifth land (SPEC §0) and `torch` is the one thing
+      # its 122 quests cannot run without. Version, index and the numpy
+      # beside it are all explained at TORCH_VERSION above. `python3 -I` —
+      # which is how the runner starts a program (SPEC §5.1) — drops
+      # PYTHONPATH and the user site directory but not the interpreter's own
+      # site-packages, which is where pip puts this, so the import is checked
+      # the way a quest will actually do it, and the way `doctor` asks
+      # (runner/src/format.rs: TORCH_PROBE).
+      - name: Install torch, the PyTorch land's toolchain
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check \
+            --index-url ${{ env.TORCH_INDEX }} torch==${{ env.TORCH_VERSION }} numpy
+          python3 -I -c "import torch, numpy; print(torch.__version__)"
+          test -z "$(python3 -I -c 'import torch' 2>&1)" \
+            || { echo "importing torch writes to stderr; it lands in every attempt"; exit 1; }
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -371,6 +407,22 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # PyTorch Land is the fifth land (SPEC §0) and `torch` is the one thing
+      # its 122 quests cannot run without. Version, index and the numpy
+      # beside it are all explained at TORCH_VERSION above. `python3 -I` —
+      # which is how the runner starts a program (SPEC §5.1) — drops
+      # PYTHONPATH and the user site directory but not the interpreter's own
+      # site-packages, which is where pip puts this, so the import is checked
+      # the way a quest will actually do it, and the way `doctor` asks
+      # (runner/src/format.rs: TORCH_PROBE).
+      - name: Install torch, the PyTorch land's toolchain
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check \
+            --index-url ${{ env.TORCH_INDEX }} torch==${{ env.TORCH_VERSION }} numpy
+          python3 -I -c "import torch, numpy; print(torch.__version__)"
+          test -z "$(python3 -I -c 'import torch' 2>&1)" \
+            || { echo "importing torch writes to stderr; it lands in every attempt"; exit 1; }
+
       # The data-race fixture is checked with `go run -race`, and the first
       # `-race` build on a fresh runner instruments the standard library from
       # scratch — minutes of work that blew the generator's per-run timeout
@@ -423,6 +475,8 @@ jobs:
           content/go/basic.toml content/go/advanced.toml content/go/hacker.toml
           content/cpp/basic.toml content/cpp/advanced.toml content/cpp/hacker.toml
           content/python/basic.toml content/python/advanced.toml content/python/hacker.toml
+          content/pytorch/verybasic.toml content/pytorch/basic.toml
+          content/pytorch/advanced.toml content/pytorch/hacker.toml
 
       # Every translation file under content/i18n/<locale>/ that EXISTS keeps
       # every rule of SPEC §12.1: real quest ids, matching hint counts, '''
@@ -441,6 +495,7 @@ jobs:
       - run: >
           python3 tests/content/verify_pack.py --i18n
           content/rust/*.toml content/go/*.toml content/cpp/*.toml content/python/*.toml
+          content/pytorch/*.toml
 
   # A dry run of the server tarball, on every push and pull request. It is the
   # whole release path minus signing: the frontend and both binaries are

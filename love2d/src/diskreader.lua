@@ -15,7 +15,7 @@ local Poster = require("src.poster")
 
 local Reader = {}
 
-local LANDS = { rust = true, go = true, cpp = true, python = true }
+local LANDS = { rust = true, go = true, cpp = true, python = true, pytorch = true }
 
 --- The verdict on a claim, given `recover(message, signature) -> address|nil`.
 function Reader.judge(source, address, signature, recover)

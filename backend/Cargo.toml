@@ -16,15 +16,15 @@ resolver = "2"
 members = ["core", "runner", "server", "cli"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.85"
 license = "MIT"
 
 [workspace.dependencies]
-cwbhacker-core = { path = "core", version = "0.1.0" }
-cwbhacker-runner = { path = "runner", version = "0.1.0" }
-cwbhacker-server = { path = "server", version = "0.1.0" }
+cwbhacker-core = { path = "core", version = "0.1.1" }
+cwbhacker-runner = { path = "runner", version = "0.1.1" }
+cwbhacker-server = { path = "server", version = "0.1.1" }
 
 anyhow = "1"
 axum = { version = "0.8", features = ["ws", "macros"] }

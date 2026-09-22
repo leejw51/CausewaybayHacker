@@ -1218,3 +1218,99 @@ prompt = ""
 # fx_star, ui_coin and fx_confetti are CausewaybayGolang's
 # (typescript/public/art/, same author, same licence), copied as they are:
 # already keyed and already at game size.
+
+# ---------------------------------------------------------------------------
+# PYTORCH LAND — the teaching cluster in the basement of the Chow Yei Ching
+# Building (docs/story.md §3). Two floors under the last interview, where the
+# thing that finishes everybody's lines actually lives.
+#
+# The files on disk for these seven names were placeholders — drawn by a
+# `pytorch_placeholder.py` so the fifth land was playable before it had art —
+# and are now the real thing, rolled from the prompts below with
+# `art/tools/reroll.py --land pytorch`. That placeholder script has been
+# deleted; these recipes are what the land's art is made of now.
+#
+# `reroll.py` is the one to use on a name this file already carries: `gen.sh`
+# would append a second `[[asset]]` block with the same name, and then nobody
+# can tell which recipe the file on disk came from.
+#
+# map_pytorch / map_pytorch_p are the shared plate, which is what map_rust,
+# map_cpp and map_python are too — one machine-room plate is on the list.
+# ---------------------------------------------------------------------------
+
+[[asset]]
+name = "sprite_pytorch"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-22"
+rerolls = 1
+note = "PYTORCH LAND's mascot — docs/story.md §1. A pilot light: the smallest flame that stays lit, sitting on a rack unit in the cold aisle. Friendly rather than dangerous, because the land is where Mei learns to build the thing rather than where it threatens her."
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The character is a small friendly cartoon flame creature sitting on a low dark grey server rack unit: a rounded teardrop body of fire with a pale butter-yellow core, a warm orange middle and a deep red-orange outer edge, two small round black eyes near the top of the flame, a tiny contented smile. Two small stubby arms of flame rest on the rack. The rack unit under him is a flat charcoal box with three tiny green status lights along its front. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights up the flame, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "mascot_pytorch_basic"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-22"
+rerolls = 1
+note = "BASIC on PyTorch Land: the flame learning the grammar of a tensor."
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the character). A small friendly cartoon flame creature — pale butter-yellow core, warm orange middle, deep red-orange edge, two round black eyes, a small smile — sitting cross-legged on a charcoal server rack unit and holding up a tiny blank slate. Two green status lights on the rack. Chunky hard-edged pixels, bold dark outline, flat cel shading, saturated Super Mario World colours, no anti-aliasing, no gradient, no glow. Absolutely no text, no letters, no numbers — the slate is completely blank. Painted 16-bit console game sprite."""
+
+[[asset]]
+name = "mascot_pytorch_advanced"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-22"
+rerolls = 1
+note = "ADVANCED on PyTorch Land: the flame burning taller, with the rack lit right across."
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the character). A cartoon flame creature burning noticeably taller and brighter — pale butter-yellow core, warm orange middle, deep red-orange edge, two round black eyes, a determined expression — standing on a charcoal server rack whose front is lit with a row of blue and green status lights. Chunky hard-edged pixels, bold dark outline, flat cel shading, saturated Super Mario World colours, no anti-aliasing, no gradient, no glow. Absolutely no text, no letters, no numbers. Painted 16-bit console game sprite."""
+
+[[asset]]
+name = "mascot_pytorch_hacker"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-22"
+rerolls = 1
+note = "HACKER on PyTorch Land: the fifth interview, and the flame is the tallest it gets."
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the character). A cartoon flame creature at full height, narrow and fierce — pale butter-yellow core, warm orange middle, deep red-orange edge, two round black eyes narrowed in concentration — on a charcoal server rack lit end to end with red and green status lights. Chunky hard-edged pixels, bold dark outline, flat cel shading, saturated Super Mario World colours, no anti-aliasing, no gradient, no glow. Absolutely no text, no letters, no numbers. Painted 16-bit console game sprite."""
+
+[[asset]]
+name = "emblem_pytorch_basic"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-22"
+rerolls = 1
+note = "The BASIC band on CHOOSE YOUR LAND: the cold aisle with the lights barely on."
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A row of dark charcoal server racks seen head on down a cold aisle, a few small green status lights on their fronts, and a small warm flame standing in the middle of the aisle lighting the floor. Deep blue-black machine-room dark behind, red-orange light pooling around the flame. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "emblem_pytorch_advanced"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-22"
+rerolls = 1
+note = "The ADVANCED band: the same aisle with every rack running."
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A row of dark charcoal server racks down a cold aisle, every rack front covered in blue and green status lights, cables looped overhead, and a taller warm flame standing in the middle of the aisle. Deep blue-black machine-room dark, red-orange light on the floor. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "emblem_pytorch_hacker"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-22"
+rerolls = 1
+note = "The HACKER band: the aisle at the far end, where the rack is the thing itself."
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A cold aisle of dark charcoal server racks receding to one tall rack at the far end lit entirely in red, cables overhead, and a tall narrow flame standing in front of it. Deep blue-black machine-room dark, hard red light. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers. Painted 16-bit console game background art."""

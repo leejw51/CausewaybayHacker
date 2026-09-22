@@ -100,7 +100,14 @@ const STACKS = ["auto", "row", "column"] as const;
  * The fence a Markdown reader wants for each land. `cpp` and `py` are the
  * tags every renderer knows; the file's own extension is not always one.
  */
-const FENCE_LANG: Record<Land, string> = { rust: "rust", go: "go", cpp: "cpp", python: "python" };
+const FENCE_LANG: Record<Land, string> = {
+  rust: "rust",
+  go: "go",
+  cpp: "cpp",
+  python: "python",
+  // PyTorch Land is Python to every Markdown renderer there is.
+  pytorch: "python",
+};
 
 const FONT_MIN = CODE_FONT_MIN;
 const FONT_MAX = CODE_FONT_MAX;

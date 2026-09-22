@@ -101,6 +101,11 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0019_reset",
         include_str!("../migrations/0019_reset.sql"),
     ),
+    (
+        20,
+        "0020_pytorch",
+        include_str!("../migrations/0020_pytorch.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {

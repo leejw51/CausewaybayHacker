@@ -16,10 +16,10 @@ import { python } from "@codemirror/lang-python";
 import type { CodeContext } from "../src/ai/help";
 import type { Land } from "../src/net/protocol";
 
-/** The caret in a fixture. Not a character any of the four grammars uses. */
+/** The caret in a fixture. Not a character any of the grammars uses. */
 const MARK = "‸";
 
-const MODE: Record<Land, () => Extension> = { rust, go, cpp, python };
+const MODE: Record<Land, () => Extension> = { rust, go, cpp, python, pytorch: python };
 
 /** The context the editor would build, from a fixture with the caret at `‸`. */
 export function contextOf(lang: Land, marked: string): CodeContext {

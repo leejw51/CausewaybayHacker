@@ -130,6 +130,10 @@ function Quest.backdrop(land, category)
   if land == "cpp" then
     return Assets.pick(advanced and "bg_datacentre" or "bg_street", "bg_street", "bg_flat")
   end
+  if land == "pytorch" then
+    -- PyTorch Land is the teaching cluster: the machine room on every road.
+    return Assets.pick("bg_datacentre", "bg_street", "bg_flat")
+  end
   if land == "python" then
     return Assets.pick(advanced and "bg_times" or "bg_till", "bg_till", "bg_flat")
   end
@@ -607,9 +611,9 @@ function Quest:copy_ask()
   if not q then return end
   local lang = q.land or self.app.land or "rust"
   local file = "main." .. (lang == "cpp" and "cpp" or lang == "go" and "go"
-    or lang == "python" and "py" or "rs")
-  local fence = lang == "python" and "python" or lang == "cpp" and "cpp"
-    or lang == "go" and "go" or "rust"
+    or lang == "python" and "py" or lang == "pytorch" and "py" or "rs")
+  local fence = lang == "python" and "python" or lang == "pytorch" and "python"
+    or lang == "cpp" and "cpp" or lang == "go" and "go" or "rust"
   local out = {}
   local function put(line) out[#out + 1] = line end
 

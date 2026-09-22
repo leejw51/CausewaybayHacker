@@ -136,6 +136,8 @@ export const ja: Partial<Catalogue> = {
   "lands.goBlurb": "ゴルーチン、チャネル、頭にまるごと入る小さな言語。",
   "lands.cppBlurb": "ポインタ、RAII、未定義動作。すべてはアドレスで、誰も検査してくれない。",
   "lands.pythonBlurb": "辞書、ジェネレータ、ダックタイピング。走るまで型はなく、六時に走り出す。",
+  "lands.pytorchBlurb":
+    "テンソル、勾配、アテンション。すべては形であり、地下のあれも同じ形でできている。",
   "lands.verybasicBlurb": "クイズ。どの行が正しい文法か。四つから一つ選び、その行を打つ。",
   "lands.basicBlurb":
     "朝の散歩。文法をひとつずつ読んで、一、二行だけ書く — 型、ループ、構造体、ソート、クロージャ、スレッド、木。",
@@ -172,6 +174,7 @@ export const ja: Partial<Catalogue> = {
   "map.go": "GO",
   "map.cpp": "C++",
   "map.python": "PYTHON",
+  "map.pytorch": "PYTORCH",
   "map.none": "このストリートにはまだ何もありません",
   "map.failed": "マップを読み込めませんでした",
   "map.stars": "スター",
@@ -503,6 +506,7 @@ export const ja: Partial<Catalogue> = {
   "search.go": "GO",
   "search.cpp": "C++",
   "search.python": "PYTHON",
+  "search.pytorch": "PYTORCH",
   "search.unified": "統合",
   "search.text": "語句",
   "search.meaning": "意味",
@@ -592,6 +596,7 @@ export const ja: Partial<Catalogue> = {
   "ai.go": "GO",
   "ai.cpp": "C++",
   "ai.python": "PYTHON",
+  "ai.pytorch": "PYTORCH",
   "ai.newPlan": "新しい計画",
   "ai.drillSize": "{n} 問ドリル",
   "ai.coach": "コーチ",

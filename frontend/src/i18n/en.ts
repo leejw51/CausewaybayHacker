@@ -151,6 +151,8 @@ export const en = {
     "Pointers, RAII, undefined behaviour. Everything is an address and nothing checks you.",
   "lands.pythonBlurb":
     "Dicts, generators, duck typing. Nothing is typed until it runs, and it runs at six.",
+  "lands.pytorchBlurb":
+    "Tensors, gradients, attention. Everything is a shape, and the thing in the basement is made of them.",
   "lands.verybasicBlurb": "The quiz. Which line is the grammar? Pick one of four, then type it.",
   "lands.basicBlurb":
     "The morning walk. One construct at a time, explained, and one or two lines to type — types, loops, structs, sorts, closures, a thread, a tree.",
@@ -188,6 +190,7 @@ export const en = {
   "map.go": "GO",
   "map.cpp": "C++",
   "map.python": "PYTHON",
+  "map.pytorch": "PYTORCH",
   "map.none": "no streets here yet",
   "map.failed": "could not read the map",
   "map.stars": "STARS",
@@ -528,6 +531,7 @@ export const en = {
   "search.go": "GO",
   "search.cpp": "C++",
   "search.python": "PYTHON",
+  "search.pytorch": "PYTORCH",
   "search.unified": "UNIFIED",
   "search.text": "TEXT",
   "search.meaning": "MEANING",
@@ -620,6 +624,7 @@ export const en = {
   "ai.go": "GO",
   "ai.cpp": "C++",
   "ai.python": "PYTHON",
+  "ai.pytorch": "PYTORCH",
   "ai.newPlan": "NEW PLAN",
   "ai.drillSize": "DRILL {n}",
   "ai.coach": "THE COACH",

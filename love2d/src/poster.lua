@@ -357,6 +357,7 @@ local KEYWORDS = {
   go = "break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var true false nil",
   cpp = "alignas alignof and asm auto bool break case catch char class const constexpr continue default delete do double else enum explicit export extern false float for friend goto if inline int long mutable namespace new noexcept nullptr operator private protected public register return short signed sizeof static struct switch template this throw true try typedef typename union unsigned using virtual void volatile while include",
   python = "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield print",
+  pytorch = "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield print torch nn tensor shape dtype grad backward forward parameters zero_grad step no_grad eval train softmax relu Linear Module Sequential Embedding LayerNorm Conv2d Dropout Adam SGD",
 }
 local KW = {}
 for lang, list in pairs(KEYWORDS) do

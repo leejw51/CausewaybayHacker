@@ -32,6 +32,9 @@ fn untidy(lang: &str) -> &'static str {
         "go" => "package main\nimport \"fmt\"\nfunc main(){x:=1\nfmt.Println(x)}\n",
         "cpp" => "#include <iostream>\nint main(){int x=1;std::cout<<x<<\"\\n\";}\n",
         "python" => "def main():\n  x=1\n  print( x )\nmain()\n",
+        // PyTorch Land is black's too, and the import is what makes the
+        // fixture this land's rather than a copy of the one above.
+        "pytorch" => "import torch\ndef main():\n  x=torch.tensor([1])\n  print( x )\nmain()\n",
         other => panic!("no fixture for {other}"),
     }
 }
@@ -43,11 +46,12 @@ fn tidy_mark(lang: &str) -> &'static str {
         "go" => "\tx := 1",
         "cpp" => "int main() {",
         "python" => "    x = 1",
+        "pytorch" => "    x = torch.tensor([1])",
         other => panic!("no mark for {other}"),
     }
 }
 
-const LANDS: [&str; 4] = ["rust", "go", "cpp", "python"];
+const LANDS: [&str; 5] = ["rust", "go", "cpp", "python", "pytorch"];
 
 #[test]
 fn every_advertised_land_formats_and_the_rest_refuse_cleanly() {

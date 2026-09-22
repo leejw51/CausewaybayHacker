@@ -9,7 +9,13 @@ interviewer rather than as their author, listing what a screen could ask that
 a cleared player would still not recognise, and then closing what was worth
 closing. **The residual list in §5 is the important part of this document.**
 
-State of the content: **278 quests** across four lands. `basic` is 18 in Rust
+State of the content when this audit was written: **278 quests** across four
+lands. It is **608 across five** now — the four roads are 27/27/33–34/34 per
+land, and PYTORCH LAND joined with 122 of its own (`docs/story.md` §3). The
+paragraph below is the audit's own snapshot and is kept as it was written;
+§5's residual list is what this document is for.
+
+At the time of the audit: **278 quests** across four lands. `basic` is 18 in Rust
 and Go and 19 in C++ and Python, `advanced` is 17 everywhere, `hacker` is 34
 everywhere. The two extra `basic` quests are the hash table (`cpp`) and the
 dict comprehension (`python`), which the other two lands cover inside existing

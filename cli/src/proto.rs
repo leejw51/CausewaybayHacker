@@ -235,13 +235,19 @@ impl Quest {
         &self.land
     }
 
-    /// The scratch file's extension, per land. `python` is the one land whose
-    /// file is not named after the land itself.
+    /// The scratch file's extension, per land.
+    ///
+    /// Two lands are not named after their extension: `python`, and `pytorch`
+    /// — which *is* Python, writes a `main.py` on the server
+    /// (`core::attempts::source_filename`) and must write a `.py` here too.
+    /// It fell through to the `rs` arm, so every PyTorch quest arrived in the
+    /// terminal client as a Rust file: opened as Rust by the editor,
+    /// highlighted as Rust, and handed to `rustfmt` by `cwbh fmt`.
     pub fn file_extension(&self) -> &str {
         match self.land.as_str() {
             "go" => "go",
             "cpp" => "cpp",
-            "python" => "py",
+            "python" | "pytorch" => "py",
             _ => "rs",
         }
     }
@@ -595,5 +601,29 @@ mod tests {
         assert_eq!(quest.lang(), "rust");
         assert_eq!(quest.file_extension(), "rs");
         assert_eq!(quest.tests.hidden_count, 2);
+    }
+
+    /// Every land's scratch file is named the way the server names it
+    /// (SPEC §1's `source_filename`). PyTorch Land shipped landing in the
+    /// `rs` fall-through, which is how a tensor quest came to open in a
+    /// file called `pytorch.hacker.04.stable-softmax.rs`.
+    #[test]
+    fn every_land_gets_its_own_extension() {
+        let ext = |land: &str| {
+            let quest: Quest = serde_json::from_value(serde_json::json!({
+                "id": format!("{land}.basic.01.x"), "land": land, "category": "basic",
+                "node": 1, "title": "X", "difficulty": 1,
+                "time_limit_s": null, "opened_at": null, "deadline_at": null,
+                "starter": "", "state": "open", "stars": 0,
+                "tests": { "match": "trim", "timeout_ms": 5000, "visible": [], "hidden_count": 0 }
+            }))
+            .unwrap();
+            quest.file_extension().to_string()
+        };
+        assert_eq!(ext("rust"), "rs");
+        assert_eq!(ext("go"), "go");
+        assert_eq!(ext("cpp"), "cpp");
+        assert_eq!(ext("python"), "py");
+        assert_eq!(ext("pytorch"), "py");
     }
 }

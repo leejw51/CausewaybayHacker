@@ -34,16 +34,18 @@ T.land = {
   go = { 80 / 255, 216 / 255, 248 / 255, 1 },
   cpp = { 0 / 255, 89 / 255, 156 / 255, 1 },
   python = { 255 / 255, 212 / 255, 59 / 255, 1 },
+  pytorch = { 232 / 255, 72 / 255, 32 / 255, 1 },
 }
 -- The haze is the tint at map strength: a deep blue over the typhoon
--- shelter at noon, a warm amber over the wet market at dawn. Python's is
--- the faintest because gold over a whole plate reads as a sepia filter
--- before it reads as a colour.
+-- shelter at noon, a warm amber over the wet market at dawn, and a torch
+-- red over the machine room at night. Python's is the faintest because gold
+-- over a whole plate reads as a sepia filter before it reads as a colour.
 T.haze = {
   rust = { 0.95, 0.47, 0.16, 0.16 },
   go = { 80 / 255, 216 / 255, 248 / 255, 0.14 },
   cpp = { 0 / 255, 89 / 255, 156 / 255, 0.18 },
   python = { 255 / 255, 212 / 255, 59 / 255, 0.12 },
+  pytorch = { 232 / 255, 72 / 255, 32 / 255, 0.18 },
 }
 
 -- The editor's colours, keyed by `src/editor.lua`'s span kinds. Chosen out of

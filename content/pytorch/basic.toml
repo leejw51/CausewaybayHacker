@@ -1,0 +1,1898 @@
+# PYTORCH LAND — BASIC. The grammar road: the teaching cluster in the
+# basement of the Chow Yei Ching Building, from the night shift's first
+# tensor to a network that learns XOR. This is grammar practice, not a quiz:
+# the brief explains one thing and shows how it is written, the starter is
+# the whole program, and the player types the one to four lines that use it —
+# a tensor off stdin, a reshape, a normalisation, a layer written out by
+# hand, relu, sigmoid, softmax, argmax, one-hot, accuracy, a loss, a
+# gradient, zero_grad, a step by hand, an optimiser, a fitted line,
+# Sequential, a Module of one's own, the loop, eval, a state dict, batching,
+# a DataLoader, a held-out split, and the hidden layer for the boss. Nothing
+# here is timed, and verify_pack refuses a basic solution that adds more than
+# four lines over its starter.
+#
+# Every program is one main.py, run as `python3 -I main.py`, torch only —
+# no torchvision, no network, no downloads. Every model is seeded, and every
+# expected output is a shape, a count, a flag or a rounded number, because a
+# raw float from a training run is not the same on two machines.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Every solution and starter in this file is run by
+# tests/content/verify_pack.py and by CI (SPEC §9.4, §9.5).
+
+pack = "pytorch.basic"
+land = "pytorch"
+category = "basic"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "pytorch.basic.01.night-shift"
+node        = 1
+title       = "THE NIGHT SHIFT"
+difficulty  = 1
+story       = "23:00 in the machine room. A line of readings comes off the console as text, and every tool downstairs wants a tensor."
+concepts    = ["tensors", "io"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+One line of whitespace-separated numbers arrives on standard input. Turn it into a **float** tensor and print its shape as a tuple and its total.
+
+`input().split()` gives a list of strings; `float(t)` converts one. A list comprehension over the two of them is the whole conversion, and `torch.tensor` takes the list.
+
+The total is printed with `.item()`, which pulls the Python number out of a 0-dimensional tensor, rounded to four places so a repeating decimal cannot disagree with itself.
+
+```
+input: 1 2 3 4
+output: (4,) 10.0
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = None  # your code here
+    # ANSWER: x = torch.tensor([float(t) for t in input().split()])
+    print(tuple(x.shape), round(x.sum().item(), 4))
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.tensor([float(t) for t in input().split()])
+    print(tuple(x.shape), round(x.sum().item(), 4))
+
+
+main()
+'''
+hints = [
+  "torch.tensor([float(t) for t in input().split()]) — split, convert, wrap.",
+  "A one-dimensional shape prints with a trailing comma: (4,), not (4).",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "(4,) 10.0\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "(1,) 7.0\n", visible = false },
+  { name = "negatives", stdin = "-1.5 2.5\n", expect = "(2,) 1.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "pytorch.basic.02.the-batch"
+node        = 2
+title       = "SIX INTO TWO"
+difficulty  = 1
+story       = "Six numbers arrive flat off the wire. The model was written for two samples of three features and refuses the flat line."
+concepts    = ["tensors", "datasets"]
+requires    = ["pytorch.basic.01.night-shift"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief       = '''
+A model almost never wants a flat line; it wants `(batch, features)`. `reshape` gives the same numbers a new shape, and `-1` in one position means *work this one out from the others*.
+
+Reshape the flat reading into rows of three, however many rows that turns out to be, and print the shape and the last number of the first row.
+
+```
+input: 1 2 3 4 5 6
+output: (2, 3) 3.0
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    flat = torch.tensor([float(t) for t in input().split()])
+    batch = None  # your code here
+    # ANSWER: batch = flat.reshape(-1, 3)
+    print(tuple(batch.shape), batch[0, 2].item())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    flat = torch.tensor([float(t) for t in input().split()])
+    batch = flat.reshape(-1, 3)
+    print(tuple(batch.shape), batch[0, 2].item())
+
+
+main()
+'''
+hints = [
+  "flat.reshape(-1, 3) — three columns, and the row count is inferred.",
+  "reshape(3, -1) would be three rows of however many, which is the other way round.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-rows", stdin = "1 2 3 4 5 6\n", expect = "(2, 3) 3.0\n", visible = true },
+  { name = "three-rows", stdin = "1 1 1 2 2 2 3 3 3\n", expect = "(3, 3) 1.0\n", visible = false },
+  { name = "one-row", stdin = "9 8 7\n", expect = "(1, 3) 7.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "pytorch.basic.03.normalise"
+node        = 3
+title       = "THE SCALE NOBODY AGREED ON"
+difficulty  = 2
+story       = "One feature is measured in degrees and the next in watts. The model spends every step of training learning that watts are bigger."
+concepts    = ["broadcasting", "datasets"]
+requires    = ["pytorch.basic.02.the-batch"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief       = '''
+Standardising a feature means subtracting its mean and dividing by its standard deviation, so every column comes out centred on zero with a spread of one.
+
+The mean over `dim=0` is one number per column — shape `(features,)` — and subtracting it from a `(batch, features)` broadcasts down the rows. The same for the standard deviation.
+
+Print the rounded column means afterwards; they are zero by construction.
+
+```
+input: 1 10 2 20 3 30
+output: [0.0, 0.0] [1.0, 1.0]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = torch.tensor([float(t) for t in input().split()]).reshape(-1, 2)
+    z = None  # your code here
+    # ANSWER: z = (x - x.mean(dim=0)) / x.std(dim=0)
+    print([round(v, 4) for v in z.mean(dim=0).tolist()],
+          [round(v, 4) for v in z.std(dim=0).tolist()])
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.tensor([float(t) for t in input().split()]).reshape(-1, 2)
+    z = (x - x.mean(dim=0)) / x.std(dim=0)
+    print([round(v, 4) for v in z.mean(dim=0).tolist()],
+          [round(v, 4) for v in z.std(dim=0).tolist()])
+
+
+main()
+'''
+hints = [
+  "(x - x.mean(dim=0)) / x.std(dim=0) — dim=0 collapses the rows, leaving one number per column.",
+  "Without dim=0 you get the mean of the whole tensor, which mixes the two features together.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-features", stdin = "1 10 2 20 3 30\n", expect = "[0.0, 0.0] [1.0, 1.0]\n", visible = true },
+  { name = "four-rows", stdin = "1 2 3 4 5 6 7 8\n", expect = "[0.0, 0.0] [1.0, 1.0]\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "pytorch.basic.04.split-xy"
+node        = 4
+title       = "THE LABEL COLUMN"
+difficulty  = 2
+story       = "The capture file has the label glued on as the last column, and the model has been training on the answer."
+concepts    = ["slices", "datasets"]
+requires    = ["pytorch.basic.03.normalise"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief       = '''
+A raw table usually carries the label in with the features. Splitting it is two slices: everything up to the last column, and the last column on its own.
+
+`x[:, :-1]` is every row, every column but the last. `x[:, -1]` is every row's last column, and the column axis disappears, so it comes out as one number per row.
+
+Print the two shapes, then the labels.
+
+```
+input: 1 2 0 3 4 1
+output: (2, 2) (2,) [0.0, 1.0]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    table = torch.tensor([float(t) for t in input().split()]).reshape(-1, 3)
+    feats = None  # your code here
+    labels = None
+    # ANSWER: feats = table[:, :-1]
+    # ANSWER: labels = table[:, -1]
+    print(tuple(feats.shape), tuple(labels.shape), labels.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    table = torch.tensor([float(t) for t in input().split()]).reshape(-1, 3)
+    feats = table[:, :-1]
+    labels = table[:, -1]
+    print(tuple(feats.shape), tuple(labels.shape), labels.tolist())
+
+
+main()
+'''
+hints = [
+  "table[:, :-1] and table[:, -1] — a slice keeps the axis, a single index drops it.",
+  "table[:, -1:] would keep the column axis and give (2, 1), which is not the same shape.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-rows", stdin = "1 2 0 3 4 1\n", expect = "(2, 2) (2,) [0.0, 1.0]\n", visible = true },
+  { name = "three-rows", stdin = "1 1 1 2 2 0 3 3 1\n", expect = "(3, 2) (3,) [1.0, 0.0, 1.0]\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "pytorch.basic.05.layer-by-hand"
+node        = 5
+title       = "A LAYER, WRITTEN OUT"
+difficulty  = 2
+story       = "Before the layer is a class it is two operations, and the night shift wants to see them once with nothing hiding them."
+concepts    = ["modules", "broadcasting"]
+requires    = ["pytorch.basic.04.split-xy"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief       = '''
+A linear layer is a matrix multiply and a bias add, and nothing else. For a batch `x` of shape `(batch, in)` and a weight `W` of shape `(out, in)` — the shape torch stores it in — the output is `x @ W.t() + b`.
+
+`W.t()` is `(in, out)`, so the inner dimensions agree, and `b` of shape `(out,)` broadcasts across the batch.
+
+Write it out and print the shape and the rounded result.
+
+```
+output: (2, 2) [[1.0, 2.0], [3.0, 6.0]]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = torch.tensor([[1.0, 0.0], [1.0, 2.0]])
+    W = torch.tensor([[1.0, 1.0], [2.0, 2.0]])
+    b = torch.tensor([0.0, 0.0])
+    out = None  # your code here
+    # ANSWER: out = x @ W.t() + b
+    print(tuple(out.shape), [[round(v, 4) for v in row] for row in out.tolist()])
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.tensor([[1.0, 0.0], [1.0, 2.0]])
+    W = torch.tensor([[1.0, 1.0], [2.0, 2.0]])
+    b = torch.tensor([0.0, 0.0])
+    out = x @ W.t() + b
+    print(tuple(out.shape), [[round(v, 4) for v in row] for row in out.tolist()])
+
+
+main()
+'''
+hints = [
+  "x @ W.t() + b — the transpose is what makes the inner dimensions meet.",
+  "x @ W would also run here because the matrix is square, and it computes the wrong thing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-by-two", stdin = "", expect = "(2, 2) [[1.0, 2.0], [3.0, 6.0]]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "pytorch.basic.06.relu"
+node        = 6
+title       = "STACKED FLAT"
+difficulty  = 2
+story       = "Three linear layers in a row, and the whole stack draws exactly the same straight line one layer did."
+concepts    = ["modules", "inference"]
+requires    = ["pytorch.basic.05.layer-by-hand"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief       = '''
+Two linear layers with nothing between them are one linear layer. The activation is what makes depth mean anything, and ReLU is the one almost everything uses: keep the positives, zero the rest.
+
+Apply it to the layer's output, then report how many of the numbers survived.
+
+```
+output: [0.0, 0.0, 1.0, 3.0] 2
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    z = torch.tensor([-2.0, -0.5, 1.0, 3.0])
+    a = None  # your code here
+    alive = None
+    # ANSWER: a = torch.relu(z)
+    # ANSWER: alive = (a > 0).sum().item()
+    print(a.tolist(), alive)
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    z = torch.tensor([-2.0, -0.5, 1.0, 3.0])
+    a = torch.relu(z)
+    alive = (a > 0).sum().item()
+    print(a.tolist(), alive)
+
+
+main()
+'''
+hints = [
+  "torch.relu(z) keeps the positives and floors everything else at zero.",
+  "(a > 0).sum() counts booleans, because True is 1 when summed.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-alive", stdin = "", expect = "[0.0, 0.0, 1.0, 3.0] 2\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "pytorch.basic.07.sigmoid"
+node        = 7
+title       = "IS IT ON FIRE"
+difficulty  = 2
+story       = "The thermal model outputs 4.2, and the question the night shift asked was whether the rack is about to trip."
+concepts    = ["inference", "loss-functions"]
+requires    = ["pytorch.basic.06.relu"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief       = '''
+A single output neuron produces a raw score on `(-∞, ∞)`. Sigmoid squashes it to `(0, 1)`, where it can be read as a probability, and the decision boundary — score 0, probability 0.5 — is where a yes becomes a no.
+
+Turn the scores into probabilities and into yes/no decisions at 0.5.
+
+```
+output: [0.0474, 0.5, 0.9526] [0, 1, 1]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    scores = torch.tensor([-3.0, 0.0, 3.0])
+    probs = None  # your code here
+    calls = None
+    # ANSWER: probs = torch.sigmoid(scores)
+    # ANSWER: calls = (probs >= 0.5).int()
+    print([round(v, 4) for v in probs.tolist()], calls.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    scores = torch.tensor([-3.0, 0.0, 3.0])
+    probs = torch.sigmoid(scores)
+    calls = (probs >= 0.5).int()
+    print([round(v, 4) for v in probs.tolist()], calls.tolist())
+
+
+main()
+'''
+hints = [
+  "torch.sigmoid(scores) — a score of 0 comes out as exactly 0.5.",
+  "(probs >= 0.5).int() turns the booleans into 0 and 1 so they print as numbers.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "boundary", stdin = "", expect = "[0.0474, 0.5, 0.9526] [0, 1, 1]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "pytorch.basic.08.softmax-rows"
+node        = 8
+title       = "EVERY ROW ITS OWN"
+difficulty  = 2
+story       = "A batch of four samples, three classes each, and the confidence numbers add up to one across the whole batch instead of across each row."
+concepts    = ["inference", "broadcasting"]
+requires    = ["pytorch.basic.07.sigmoid"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief       = '''
+On a batch of logits of shape `(batch, classes)`, softmax has to be taken over the **class** axis — `dim=1` — so every row sums to one on its own. `dim=0` would make every *column* sum to one, which is a statement about the batch and means nothing.
+
+Softmax the batch over its classes and print the per-row totals.
+
+```
+output: [1.0, 1.0] (2, 3)
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    logits = torch.tensor([[1.0, 2.0, 3.0], [3.0, 1.0, 0.0]])
+    probs = None  # your code here
+    # ANSWER: probs = torch.softmax(logits, dim=1)
+    print([round(v, 4) for v in probs.sum(dim=1).tolist()], tuple(probs.shape))
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    logits = torch.tensor([[1.0, 2.0, 3.0], [3.0, 1.0, 0.0]])
+    probs = torch.softmax(logits, dim=1)
+    print([round(v, 4) for v in probs.sum(dim=1).tolist()], tuple(probs.shape))
+
+
+main()
+'''
+hints = [
+  "torch.softmax(logits, dim=1) — dim=1 is the class axis on a (batch, classes) tensor.",
+  "dim=-1 means the same thing here and keeps working if a batch axis is added later.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "rows-sum-to-one", stdin = "", expect = "[1.0, 1.0] (2, 3)\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "pytorch.basic.09.predict"
+node        = 9
+title       = "THE ANSWER, NOT THE SCORE"
+difficulty  = 2
+story       = "The dashboard shows three confidence bars per sample and the operator has to read off which class won by eye, four hundred times a night."
+concepts    = ["inference", "tensors"]
+requires    = ["pytorch.basic.08.softmax-rows"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief       = '''
+A classifier's prediction is the index of the largest logit in each row: `argmax` over the class axis. Softmax does not change which one is largest, so the prediction can be read straight off the logits.
+
+Print the predicted class for every row of the batch.
+
+```
+output: [2, 0, 1]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    logits = torch.tensor([[1.0, 2.0, 3.0], [3.0, 1.0, 0.0], [0.0, 5.0, 2.0]])
+    pred = None  # your code here
+    # ANSWER: pred = logits.argmax(dim=1)
+    print(pred.tolist())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    logits = torch.tensor([[1.0, 2.0, 3.0], [3.0, 1.0, 0.0], [0.0, 5.0, 2.0]])
+    pred = logits.argmax(dim=1)
+    print(pred.tolist())
+
+
+main()
+'''
+hints = [
+  "logits.argmax(dim=1) — one index per row, so the result is (batch,).",
+  "Without dim it flattens the whole batch and gives one index into all of it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-rows", stdin = "", expect = "[2, 0, 1]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "pytorch.basic.10.accuracy"
+node        = 10
+title       = "HOW OFTEN IS IT RIGHT"
+difficulty  = 2
+story       = "The model is described in the stand-up as doing well. Nobody in the room has a number."
+concepts    = ["inference", "testing"]
+requires    = ["pytorch.basic.09.predict"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief       = '''
+Accuracy is the fraction of predictions that match the label. Comparing two tensors elementwise gives booleans; booleans cannot be averaged, so they are cast to float first, and then `mean()` is the fraction.
+
+Print the accuracy rounded to four places and the number of hits.
+
+```
+output: 0.75 3
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    pred = torch.tensor([0, 1, 2, 1])
+    want = torch.tensor([0, 1, 2, 0])
+    acc = None  # your code here
+    hits = None
+    # ANSWER: acc = (pred == want).float().mean().item()
+    # ANSWER: hits = (pred == want).sum().item()
+    print(round(acc, 4), hits)
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    pred = torch.tensor([0, 1, 2, 1])
+    want = torch.tensor([0, 1, 2, 0])
+    acc = (pred == want).float().mean().item()
+    hits = (pred == want).sum().item()
+    print(round(acc, 4), hits)
+
+
+main()
+'''
+hints = [
+  "(pred == want).float().mean() — the cast to float is what makes mean legal.",
+  "mean() straight on a bool tensor raises; torch will not pick a dtype for you.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-of-four", stdin = "", expect = "0.75 3\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "pytorch.basic.11.mse-by-hand"
+node        = 11
+title       = "HOW WRONG, BY HAND"
+difficulty  = 2
+story       = "The loss curve is flat and nobody trusts the library. Write the number out once and see it move."
+concepts    = ["loss-functions", "tensors"]
+requires    = ["pytorch.basic.10.accuracy"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''
+Mean squared error is exactly its name: the difference, squared, averaged. Written out that is `((pred - want) ** 2).mean()`, and `nn.MSELoss()(pred, want)` is the same number.
+
+Compute it both ways and print them.
+
+```
+output: 1.5 1.5
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    pred = torch.tensor([1.0, 2.0, 3.0, 4.0])
+    want = torch.tensor([0.0, 2.0, 1.0, 5.0])
+    by_hand = None  # your code here
+    from_lib = None
+    # ANSWER: by_hand = ((pred - want) ** 2).mean()
+    # ANSWER: from_lib = nn.MSELoss()(pred, want)
+    print(round(by_hand.item(), 4), round(from_lib.item(), 4))
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    pred = torch.tensor([1.0, 2.0, 3.0, 4.0])
+    want = torch.tensor([0.0, 2.0, 1.0, 5.0])
+    by_hand = ((pred - want) ** 2).mean()
+    from_lib = nn.MSELoss()(pred, want)
+    print(round(by_hand.item(), 4), round(from_lib.item(), 4))
+
+
+main()
+'''
+hints = [
+  "((pred - want) ** 2).mean() — square before averaging, or the signs cancel.",
+  "nn.MSELoss() is built first and then called on the pair: nn.MSELoss()(pred, want).",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "both-agree", stdin = "", expect = "1.5 1.5\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "pytorch.basic.12.cross-entropy"
+node        = 12
+title       = "THE LOSS THAT TAKES LOGITS"
+difficulty  = 2
+story       = "Someone softmaxed the output and then handed it to the classification loss, and the model stopped learning without ever erroring."
+concepts    = ["loss-functions", "training-loop"]
+requires    = ["pytorch.basic.11.mse-by-hand"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''
+`nn.CrossEntropyLoss` takes **raw logits**, not probabilities — the softmax is inside it. The targets are class **indices** of dtype `int64`, one per row, not one-hot rows.
+
+Feed it the logits and the indices and print the loss. A confident, correct batch has a loss near zero.
+
+```
+output: 0.0659
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    logits = torch.tensor([[4.0, 1.0, 0.0], [0.0, 4.0, 1.0]])
+    want = torch.tensor([0, 1])
+    loss = None  # your code here
+    # ANSWER: loss = nn.CrossEntropyLoss()(logits, want)
+    print(round(loss.item(), 4))
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    logits = torch.tensor([[4.0, 1.0, 0.0], [0.0, 4.0, 1.0]])
+    want = torch.tensor([0, 1])
+    loss = nn.CrossEntropyLoss()(logits, want)
+    print(round(loss.item(), 4))
+
+
+main()
+'''
+hints = [
+  "nn.CrossEntropyLoss()(logits, want) — the logits go in raw; do not softmax them first.",
+  "The targets are indices, so they must be int64 — a float target raises.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "confident", stdin = "", expect = "0.0659\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "pytorch.basic.13.the-gradient"
+node        = 13
+title       = "THE SLOPE AT THIS POINT"
+difficulty  = 2
+story       = "The parameter is 4.0, the loss is its square, and the only question a training step ever asks is which direction is downhill."
+concepts    = ["autograd", "training-loop"]
+requires    = ["pytorch.basic.12.cross-entropy"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''
+Mark the parameter as learnable, run the forward pass, and call `backward()` on the loss. The gradient of `w * w` is `2w`, so at `4.0` it lands as `8.0` in `w.grad`.
+
+`.grad` is `None` until a backward pass has run — that is the usual reason a first training loop prints `None` and stops.
+
+```
+output: 8.0
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    w = torch.tensor(4.0, requires_grad=True)
+    loss = w * w
+    pass  # your code here
+    # ANSWER: loss.backward()
+    print(w.grad.item())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    w = torch.tensor(4.0, requires_grad=True)
+    loss = w * w
+    loss.backward()
+    print(w.grad.item())
+
+
+main()
+'''
+hints = [
+  "loss.backward() — called on the end of the graph, never on the parameter.",
+  "The gradient lands in w.grad; backward() itself returns nothing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-w", stdin = "", expect = "8.0\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "pytorch.basic.14.accumulate"
+node        = 14
+title       = "IT KEPT THE LAST ONE"
+difficulty  = 2
+story       = "Two backward passes, and the gradient is twice what the arithmetic says. Nothing was cleared between them."
+concepts    = ["autograd", "optimizers"]
+requires    = ["pytorch.basic.13.the-gradient"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''
+`backward()` **adds** into `.grad`; it does not replace it. Two passes over the same parameter therefore leave the sum of both gradients, which is why every training loop clears the gradients before the backward pass.
+
+Run the second pass with the gradients cleared first, so the printed number is one pass' worth: `2w` at `3.0`.
+
+```
+output: 12.0 6.0
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    w = torch.tensor(3.0, requires_grad=True)
+    (w * w).backward()
+    (w * w).backward()
+    both = w.grad.item()
+    pass  # your code here
+    # ANSWER: w.grad = None
+    (w * w).backward()
+    print(both, w.grad.item())
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    w = torch.tensor(3.0, requires_grad=True)
+    (w * w).backward()
+    (w * w).backward()
+    both = w.grad.item()
+    w.grad = None
+    (w * w).backward()
+    print(both, w.grad.item())
+
+
+main()
+'''
+hints = [
+  "w.grad = None clears it; the next backward pass starts from nothing.",
+  "An optimiser does this for you — opt.zero_grad() is the same idea, over every parameter it holds.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "cleared", stdin = "", expect = "12.0 6.0\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "pytorch.basic.15.step-by-hand"
+node        = 15
+title       = "DOWNHILL, ONCE"
+difficulty  = 3
+story       = "Before the optimiser is an object it is one subtraction, and the night shift wants to see the subtraction."
+concepts    = ["optimizers", "autograd"]
+requires    = ["pytorch.basic.14.accumulate"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''
+Gradient descent is `w ← w - lr * w.grad`, and that is the whole algorithm. It has to happen with the graph switched off — the update is bookkeeping, not part of the model — so it goes inside `torch.no_grad()`.
+
+`w` starts at `5.0`, the gradient of `w * w` is `10.0`, and `lr` is `0.1`.
+
+```
+output: 4.0
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    w = torch.tensor(5.0, requires_grad=True)
+    lr = 0.1
+    (w * w).backward()
+    with torch.no_grad():
+        pass  # your code here
+        # ANSWER: w -= lr * w.grad
+    print(round(w.item(), 4))
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    w = torch.tensor(5.0, requires_grad=True)
+    lr = 0.1
+    (w * w).backward()
+    with torch.no_grad():
+        w -= lr * w.grad
+    print(round(w.item(), 4))
+
+
+main()
+'''
+hints = [
+  "w -= lr * w.grad — minus, because the gradient points uphill.",
+  "It has to be inside the no_grad block, or torch refuses to modify a leaf that requires grad in place.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "one-step", stdin = "", expect = "4.0\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "pytorch.basic.16.optimiser"
+node        = 16
+title       = "THE THREE LINES"
+difficulty  = 3
+story       = "Every training loop ever written is the same three lines in the same order, and the one the night shift copied has them in a different order."
+concepts    = ["optimizers", "training-loop"]
+requires    = ["pytorch.basic.15.step-by-hand"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+An optimiser holds the parameters and does the update. The body of the loop is always the same three calls, in this order: clear the old gradients, run the backward pass, apply the step.
+
+Twenty steps of SGD at `lr=0.1` on `w * w` from `5.0` drive `w` towards zero.
+
+```
+output: 0.0576
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    w = torch.tensor(5.0, requires_grad=True)
+    opt = torch.optim.SGD([w], lr=0.1)
+    for _ in range(20):
+        loss = w * w
+        pass  # your code here
+        # ANSWER: opt.zero_grad()
+        # ANSWER: loss.backward()
+        # ANSWER: opt.step()
+    print(round(w.item(), 4))
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    w = torch.tensor(5.0, requires_grad=True)
+    opt = torch.optim.SGD([w], lr=0.1)
+    for _ in range(20):
+        loss = w * w
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    print(round(w.item(), 4))
+
+
+main()
+'''
+hints = [
+  "zero_grad, backward, step — clear, compute, apply.",
+  "Calling step() before backward() applies whatever was left in .grad from last time.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "twenty-steps", stdin = "", expect = "0.0576\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "pytorch.basic.17.fit-a-line"
+node        = 17
+title       = "TWO X PLUS ONE"
+difficulty  = 3
+story       = "The fan curve is a straight line and nobody wrote down its slope. There are four measurements taped to the rack door."
+concepts    = ["training-loop", "modules"]
+requires    = ["pytorch.basic.16.optimiser"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+This is the smallest real training run there is: one `Linear(1, 1)`, four points that lie exactly on `y = 2x + 1`, and enough steps of Adam to find the two numbers.
+
+The loop body is the three calls you already know, with the forward pass and the loss in front of them.
+
+```
+output: 2.0 1.0
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    x = torch.tensor([[0.0], [1.0], [2.0], [3.0]])
+    y = 2 * x + 1
+    model = nn.Linear(1, 1)
+    opt = torch.optim.Adam(model.parameters(), lr=0.1)
+    loss_fn = nn.MSELoss()
+    for _ in range(2000):
+        pass  # your code here
+        # ANSWER: loss = loss_fn(model(x), y)
+        # ANSWER: opt.zero_grad()
+        # ANSWER: loss.backward()
+        # ANSWER: opt.step()
+    print(round(model.weight.item(), 1), round(model.bias.item(), 1))
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    x = torch.tensor([[0.0], [1.0], [2.0], [3.0]])
+    y = 2 * x + 1
+    model = nn.Linear(1, 1)
+    opt = torch.optim.Adam(model.parameters(), lr=0.1)
+    loss_fn = nn.MSELoss()
+    for _ in range(2000):
+        loss = loss_fn(model(x), y)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    print(round(model.weight.item(), 1), round(model.bias.item(), 1))
+
+
+main()
+'''
+hints = [
+  "model(x) runs the forward pass; never call model.forward(x) directly.",
+  "loss = loss_fn(model(x), y), then zero_grad, backward, step.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 30000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "found-the-line", stdin = "", expect = "2.0 1.0\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "pytorch.basic.18.sequential"
+node        = 18
+title       = "TWO LAYERS AND A BEND"
+difficulty  = 2
+story       = "The first network with a hidden layer in it, and it has to be built before it can be wrong."
+concepts    = ["modules", "initialization"]
+requires    = ["pytorch.basic.17.fit-a-line"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''
+`nn.Sequential` chains modules: the output of each is the input of the next. Four features in, eight hidden, ReLU between, three classes out — the smallest network anyone actually ships.
+
+The parameter count is `(8*4 + 8) + (3*8 + 3) = 67`.
+
+```
+output: (2, 3) 67
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    model = None  # your code here
+    # ANSWER: model = nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 3))
+    x = torch.zeros(2, 4)
+    print(tuple(model(x).shape), sum(p.numel() for p in model.parameters()))
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    model = nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 3))
+    x = torch.zeros(2, 4)
+    print(tuple(model(x).shape), sum(p.numel() for p in model.parameters()))
+
+
+main()
+'''
+hints = [
+  "nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 3)) — the hidden width appears twice, as out then in.",
+  "nn.ReLU() is a module and is built with parentheses; torch.relu is the function version.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sixty-seven", stdin = "", expect = "(2, 3) 67\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "pytorch.basic.19.module"
+node        = 19
+title       = "A NET OF ONE'S OWN"
+difficulty  = 3
+story       = "Sequential runs out the moment anything happens twice, and the thing in the basement is nothing but the same block, repeated."
+concepts    = ["modules", "initialization"]
+requires    = ["pytorch.basic.18.sequential"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''
+A real model is a class. Two rules, and they are the two rules people break: assign the layers to `self` in `__init__` so they register as parameters, and call `super().__init__()` before you do.
+
+`forward` says what happens; calling the model calls `forward`.
+
+```
+output: (2, 1) 21
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+class Net(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = None  # your code here
+        self.fc2 = None
+        # ANSWER: self.fc1 = nn.Linear(3, 4)
+        # ANSWER: self.fc2 = nn.Linear(4, 1)
+
+    def forward(self, x):
+        return self.fc2(torch.relu(self.fc1(x)))
+
+
+def main():
+    torch.manual_seed(0)
+    model = Net()
+    print(tuple(model(torch.zeros(2, 3)).shape),
+          sum(p.numel() for p in model.parameters()))
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+class Net(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(3, 4)
+        self.fc2 = nn.Linear(4, 1)
+
+    def forward(self, x):
+        return self.fc2(torch.relu(self.fc1(x)))
+
+
+def main():
+    torch.manual_seed(0)
+    model = Net()
+    print(tuple(model(torch.zeros(2, 3)).shape),
+          sum(p.numel() for p in model.parameters()))
+
+
+main()
+'''
+hints = [
+  "self.fc1 = nn.Linear(3, 4) and self.fc2 = nn.Linear(4, 1) — the 4 is the hidden width, out then in.",
+  "A layer stored in a plain list instead of on self never appears in parameters() and never trains.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "twenty-one", stdin = "", expect = "(2, 1) 21\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "pytorch.basic.20.train-classifier"
+node        = 20
+title       = "TWO CLUSTERS"
+difficulty  = 3
+story       = "Cold aisle or hot aisle, from two numbers. The clusters are a mile apart and the model still gets half of them wrong, because nobody has trained it."
+concepts    = ["training-loop", "loss-functions"]
+requires    = ["pytorch.basic.19.module"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief       = '''
+The first classifier: two well-separated clusters, two classes, cross-entropy, and two hundred steps. Everything is built; the loop body is missing.
+
+Cross-entropy takes the raw logits the model returns and the integer labels — no softmax, no one-hot.
+
+```
+output: 1.0
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    x = torch.cat([torch.randn(20, 2) - 3, torch.randn(20, 2) + 3])
+    y = torch.cat([torch.zeros(20, dtype=torch.long), torch.ones(20, dtype=torch.long)])
+    model = nn.Sequential(nn.Linear(2, 8), nn.ReLU(), nn.Linear(8, 2))
+    opt = torch.optim.Adam(model.parameters(), lr=0.05)
+    loss_fn = nn.CrossEntropyLoss()
+    for _ in range(200):
+        pass  # your code here
+        # ANSWER: loss = loss_fn(model(x), y)
+        # ANSWER: opt.zero_grad()
+        # ANSWER: loss.backward()
+        # ANSWER: opt.step()
+    acc = (model(x).argmax(dim=1) == y).float().mean().item()
+    print(round(acc, 4))
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    x = torch.cat([torch.randn(20, 2) - 3, torch.randn(20, 2) + 3])
+    y = torch.cat([torch.zeros(20, dtype=torch.long), torch.ones(20, dtype=torch.long)])
+    model = nn.Sequential(nn.Linear(2, 8), nn.ReLU(), nn.Linear(8, 2))
+    opt = torch.optim.Adam(model.parameters(), lr=0.05)
+    loss_fn = nn.CrossEntropyLoss()
+    for _ in range(200):
+        loss = loss_fn(model(x), y)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    acc = (model(x).argmax(dim=1) == y).float().mean().item()
+    print(round(acc, 4))
+
+
+main()
+'''
+hints = [
+  "loss = loss_fn(model(x), y), then the three calls in their order.",
+  "The labels are already int64; cross-entropy wants indices, not one-hot rows.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 30000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "separable", stdin = "", expect = "1.0\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "pytorch.basic.21.eval-mode"
+node        = 21
+title       = "STILL IN TRAINING"
+difficulty  = 2
+story       = "The validation numbers move every time the same validation set is scored. Dropout is still switched on."
+concepts    = ["inference", "modules"]
+requires    = ["pytorch.basic.20.train-classifier"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief       = '''
+Some layers behave differently while training. Dropout zeroes activations at random during training and does nothing at all during evaluation, and `model.eval()` is what flips the switch. `model.train()` puts it back.
+
+Scoring twice in eval mode gives the same answer twice; scoring twice in train mode does not.
+
+```
+output: True
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    model = nn.Sequential(nn.Linear(4, 8), nn.Dropout(0.5), nn.Linear(8, 2))
+    x = torch.randn(3, 4)
+    pass  # your code here
+    # ANSWER: model.eval()
+    with torch.no_grad():
+        a = model(x)
+        b = model(x)
+    print(torch.equal(a, b))
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    model = nn.Sequential(nn.Linear(4, 8), nn.Dropout(0.5), nn.Linear(8, 2))
+    x = torch.randn(3, 4)
+    model.eval()
+    with torch.no_grad():
+        a = model(x)
+        b = model(x)
+    print(torch.equal(a, b))
+
+
+main()
+'''
+hints = [
+  "model.eval() — it returns the model, but it is called for the switch it flips.",
+  "no_grad only stops the graph being recorded; it does not turn dropout off.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "repeatable", stdin = "", expect = "True\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "pytorch.basic.22.state-dict"
+node        = 22
+title       = "WHAT A MODEL IS, SAVED"
+difficulty  = 2
+story       = "Four hours of training in the basement, and the process is about to be killed for the maintenance window."
+concepts    = ["modules", "inference"]
+requires    = ["pytorch.basic.21.eval-mode"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''
+A saved model is not the code; it is the numbers. `state_dict()` is an ordered dict of every parameter, and `load_state_dict()` puts them into another model of the same shape — which is why loading into a differently shaped model fails loudly rather than quietly.
+
+Copy the trained weights into a fresh model and check they now agree.
+
+```
+output: True
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    trained = nn.Linear(3, 2)
+    with torch.no_grad():
+        trained.weight.fill_(0.5)
+        trained.bias.fill_(-1.0)
+    fresh = nn.Linear(3, 2)
+    pass  # your code here
+    # ANSWER: fresh.load_state_dict(trained.state_dict())
+    x = torch.randn(4, 3)
+    with torch.no_grad():
+        print(torch.equal(trained(x), fresh(x)))
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    trained = nn.Linear(3, 2)
+    with torch.no_grad():
+        trained.weight.fill_(0.5)
+        trained.bias.fill_(-1.0)
+    fresh = nn.Linear(3, 2)
+    fresh.load_state_dict(trained.state_dict())
+    x = torch.randn(4, 3)
+    with torch.no_grad():
+        print(torch.equal(trained(x), fresh(x)))
+
+
+main()
+'''
+hints = [
+  "fresh.load_state_dict(trained.state_dict()) — read from one, load into the other.",
+  "fresh = trained would make them the same object, which proves nothing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "same-weights", stdin = "", expect = "True\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "pytorch.basic.23.minibatch"
+node        = 23
+title       = "NOT ALL AT ONCE"
+difficulty  = 3
+story       = "The whole capture goes through in one tensor, the allocator gives up, and the job dies four minutes in."
+concepts    = ["datasets", "training-loop"]
+requires    = ["pytorch.basic.22.state-dict"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief       = '''
+A mini-batch is a slice. Walking `range(0, n, bs)` and taking `x[i:i + bs]` gives batches of `bs`, and a last short one when `n` does not divide evenly — which is the batch that breaks code assuming every batch is full.
+
+Ten samples in batches of four: print each batch's row count.
+
+```
+output: [4, 4, 2]
+```
+'''
+starter     = '''
+import torch
+
+
+def main():
+    x = torch.arange(30.0).reshape(10, 3)
+    bs = 4
+    sizes = []
+    for i in range(0, len(x), bs):
+        pass  # your code here
+        # ANSWER: batch = x[i:i + bs]
+        # ANSWER: sizes.append(batch.shape[0])
+    print(sizes)
+
+
+main()
+'''
+solution    = '''
+import torch
+
+
+def main():
+    x = torch.arange(30.0).reshape(10, 3)
+    bs = 4
+    sizes = []
+    for i in range(0, len(x), bs):
+        batch = x[i:i + bs]
+        sizes.append(batch.shape[0])
+    print(sizes)
+
+
+main()
+'''
+hints = [
+  "x[i:i + bs] — slicing past the end is not an error; it just gives what is left.",
+  "The last batch is short. Code that hard-codes bs anywhere downstream breaks on exactly this batch.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "short-last", stdin = "", expect = "[4, 4, 2]\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "pytorch.basic.24.dataloader"
+node        = 24
+title       = "THE LOADER"
+difficulty  = 3
+story       = "The hand-written batching loop is forty lines and has a bug in the shuffle. Torch has shipped this since the beginning."
+concepts    = ["datasets", "iteration"]
+requires    = ["pytorch.basic.23.minibatch"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief       = '''
+`TensorDataset` pairs the features and the labels so an index gives both; `DataLoader` batches and shuffles them. Iterating it yields `(features, labels)` pairs, already sliced.
+
+With `shuffle=False` the order is the order the tensors were in, so the run is repeatable.
+
+```
+output: 3 [4, 4, 2] 10
+```
+'''
+starter     = '''
+import torch
+from torch.utils.data import TensorDataset, DataLoader
+
+
+def main():
+    x = torch.arange(30.0).reshape(10, 3)
+    y = torch.arange(10)
+    ds = None  # your code here
+    dl = None
+    # ANSWER: ds = TensorDataset(x, y)
+    # ANSWER: dl = DataLoader(ds, batch_size=4, shuffle=False)
+    sizes = [len(by) for _, by in dl]
+    print(len(sizes), sizes, len(ds))
+
+
+main()
+'''
+solution    = '''
+import torch
+from torch.utils.data import TensorDataset, DataLoader
+
+
+def main():
+    x = torch.arange(30.0).reshape(10, 3)
+    y = torch.arange(10)
+    ds = TensorDataset(x, y)
+    dl = DataLoader(ds, batch_size=4, shuffle=False)
+    sizes = [len(by) for _, by in dl]
+    print(len(sizes), sizes, len(ds))
+
+
+main()
+'''
+hints = [
+  "TensorDataset(x, y) then DataLoader(ds, batch_size=4, shuffle=False).",
+  "len(dl) is the number of batches; len(ds) is the number of samples. They are different numbers.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 30000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-batches", stdin = "", expect = "3 [4, 4, 2] 10\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "pytorch.basic.25.holdout"
+node        = 25
+title       = "THE PART IT NEVER SAW"
+difficulty  = 3
+story       = "The model scores a hundred percent on the data it was trained on, which is the one number that has never predicted anything."
+concepts    = ["datasets", "testing"]
+requires    = ["pytorch.basic.24.dataloader"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''
+Training accuracy is not a result. Hold a slice back before training, never let the optimiser see it, and score on that.
+
+Forty samples: the first thirty train, the last ten are the test set. Print both shapes and the held-out accuracy.
+
+```
+output: (30, 2) (10, 2) 1.0
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    x = torch.cat([torch.randn(20, 2) - 3, torch.randn(20, 2) + 3])
+    y = torch.cat([torch.zeros(20, dtype=torch.long), torch.ones(20, dtype=torch.long)])
+    perm = torch.randperm(40)
+    x, y = x[perm], y[perm]
+    x_tr, y_tr = None, None  # your code here
+    x_te, y_te = None, None
+    # ANSWER: x_tr, y_tr = x[:30], y[:30]
+    # ANSWER: x_te, y_te = x[30:], y[30:]
+    model = nn.Sequential(nn.Linear(2, 8), nn.ReLU(), nn.Linear(8, 2))
+    opt = torch.optim.Adam(model.parameters(), lr=0.05)
+    loss_fn = nn.CrossEntropyLoss()
+    for _ in range(200):
+        loss = loss_fn(model(x_tr), y_tr)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    model.eval()
+    with torch.no_grad():
+        acc = (model(x_te).argmax(dim=1) == y_te).float().mean().item()
+    print(tuple(x_tr.shape), tuple(x_te.shape), round(acc, 4))
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    x = torch.cat([torch.randn(20, 2) - 3, torch.randn(20, 2) + 3])
+    y = torch.cat([torch.zeros(20, dtype=torch.long), torch.ones(20, dtype=torch.long)])
+    perm = torch.randperm(40)
+    x, y = x[perm], y[perm]
+    x_tr, y_tr = x[:30], y[:30]
+    x_te, y_te = x[30:], y[30:]
+    model = nn.Sequential(nn.Linear(2, 8), nn.ReLU(), nn.Linear(8, 2))
+    opt = torch.optim.Adam(model.parameters(), lr=0.05)
+    loss_fn = nn.CrossEntropyLoss()
+    for _ in range(200):
+        loss = loss_fn(model(x_tr), y_tr)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    model.eval()
+    with torch.no_grad():
+        acc = (model(x_te).argmax(dim=1) == y_te).float().mean().item()
+    print(tuple(x_tr.shape), tuple(x_te.shape), round(acc, 4))
+
+
+main()
+'''
+hints = [
+  "x[:30] and x[30:] — the same split has to be applied to the labels, or every row is mislabelled.",
+  "The shuffle happens before the split; splitting a sorted-by-class dataset gives a test set of one class.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 30000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "held-out", stdin = "", expect = "(30, 2) (10, 2) 1.0\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "pytorch.basic.26.loss-goes-down"
+node        = 26
+title       = "IS IT LEARNING AT ALL"
+difficulty  = 3
+story       = "The loop runs, the fans spin up, and four hours later nobody can say whether anything happened. Nothing was recorded."
+concepts    = ["training-loop", "testing"]
+requires    = ["pytorch.basic.25.holdout"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''
+The cheapest test a training loop can have: record the loss at the start and at the end, and assert that it went down. A loop that runs without learning looks exactly like a loop that learns, until this is printed.
+
+Record the first and last loss, and print whether the second is smaller.
+
+```
+output: True True
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    x = torch.randn(32, 4)
+    y = x.sum(dim=1, keepdim=True)
+    model = nn.Sequential(nn.Linear(4, 16), nn.ReLU(), nn.Linear(16, 1))
+    opt = torch.optim.Adam(model.parameters(), lr=0.05)
+    loss_fn = nn.MSELoss()
+    first = last = None
+    for step in range(300):
+        loss = loss_fn(model(x), y)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+        pass  # your code here
+        # ANSWER: first = loss.item() if step == 0 else first
+        # ANSWER: last = loss.item()
+    print(last < first, last < 0.1)
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(0)
+    x = torch.randn(32, 4)
+    y = x.sum(dim=1, keepdim=True)
+    model = nn.Sequential(nn.Linear(4, 16), nn.ReLU(), nn.Linear(16, 1))
+    opt = torch.optim.Adam(model.parameters(), lr=0.05)
+    loss_fn = nn.MSELoss()
+    first = last = None
+    for step in range(300):
+        loss = loss_fn(model(x), y)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+        first = loss.item() if step == 0 else first
+        last = loss.item()
+    print(last < first, last < 0.1)
+
+
+main()
+'''
+hints = [
+  "Record loss.item() on step 0 into first, and every step into last.",
+  "Keep the float, not the tensor: holding the tensor holds the whole graph alive with it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 30000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "went-down", stdin = "", expect = "True True\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 27  BOSS
+[[quest]]
+id          = "pytorch.basic.27.xor"
+node        = 27
+title       = "THE STRAIGHT LINE"
+difficulty  = 4
+story       = "Four points, two classes, and a model that has been trained for an hour and still gets two of the four wrong. No amount of training will fix it; no straight line separates them."
+concepts    = ["modules", "training-loop", "initialization"]
+requires    = ["pytorch.basic.26.loss-goes-down"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief       = '''
+XOR is the oldest proof in the subject that depth is not decoration. `(0,0)` and `(1,1)` are one class; `(0,1)` and `(1,0)` are the other, and no straight line puts those two pairs on opposite sides. A single `Linear` cannot do it at any learning rate, for any number of steps.
+
+A hidden layer with a nonlinearity between can, and that is the whole of the network in the basement in one node: build `2 → 8 → 1`, with a bend in the middle.
+
+The training loop is written. Build the model, and print its four predictions at a 0.5 threshold.
+
+```
+output: [0, 1, 1, 0] True
+```
+'''
+starter     = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(7)
+    x = torch.tensor([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
+    y = torch.tensor([[0.0], [1.0], [1.0], [0.0]])
+    model = None  # your code here
+    # ANSWER: model = nn.Sequential(nn.Linear(2, 8), nn.Tanh(), nn.Linear(8, 1))
+    opt = torch.optim.Adam(model.parameters(), lr=0.1)
+    loss_fn = nn.MSELoss()
+    for _ in range(400):
+        loss = loss_fn(model(x), y)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    model.eval()
+    with torch.no_grad():
+        pred = [int(v > 0.5) for v in model(x).flatten().tolist()]
+    print(pred, loss.item() < 0.01)
+
+
+main()
+'''
+solution    = '''
+import torch
+import torch.nn as nn
+
+
+def main():
+    torch.manual_seed(7)
+    x = torch.tensor([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
+    y = torch.tensor([[0.0], [1.0], [1.0], [0.0]])
+    model = nn.Sequential(nn.Linear(2, 8), nn.Tanh(), nn.Linear(8, 1))
+    opt = torch.optim.Adam(model.parameters(), lr=0.1)
+    loss_fn = nn.MSELoss()
+    for _ in range(400):
+        loss = loss_fn(model(x), y)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    model.eval()
+    with torch.no_grad():
+        pred = [int(v > 0.5) for v in model(x).flatten().tolist()]
+    print(pred, loss.item() < 0.01)
+
+
+main()
+'''
+hints = [
+  "nn.Sequential(nn.Linear(2, 8), nn.Tanh(), nn.Linear(8, 1)) — two in, eight hidden, one out.",
+  "Without the activation the two Linears collapse into one and two of the four stay wrong forever.",
+  "Tanh is smoother than ReLU on a problem this small, and a small ReLU layer can start dead and never recover.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 30000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "xor-learned", stdin = "", expect = "[0, 1, 1, 0] True\n", visible = true },
+]

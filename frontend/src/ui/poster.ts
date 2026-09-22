@@ -388,6 +388,7 @@ const PARSER: Record<Land, LRLanguage> = {
   go: goLanguage,
   cpp: cppLanguage,
   python: pythonLanguage,
+  pytorch: pythonLanguage,
 };
 
 /**

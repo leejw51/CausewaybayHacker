@@ -52,6 +52,8 @@ export const TRACK_COL: Record<string, RGBA> = {
   // ISO C++ blue #00599C and Python gold #FFD43B, each snapped to the grid.
   cpp: c(0, 88, 152),
   python: c(248, 208, 56),
+  // The torch flame, snapped to the same 8-per-channel grid.
+  pytorch: c(232, 72, 32),
 };
 
 export const TRACK_HAZE: Record<string, RGBA> = {
@@ -61,6 +63,8 @@ export const TRACK_HAZE: Record<string, RGBA> = {
   // PYTHON LAND is the wet market at dawn: a warm amber under fluorescent light.
   cpp: [0.0, 0.12, 0.3, 0.28],
   python: [0.3, 0.2, 0.02, 0.24],
+  // PYTORCH LAND is the machine room at night: fan light and a red glow.
+  pytorch: [0.28, 0.06, 0.02, 0.3],
 };
 
 /** A colour a canvas will take, with an optional alpha override. */

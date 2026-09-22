@@ -40,12 +40,14 @@ const NPC: Record<Land, string> = {
   go: "sprite_gogo",
   cpp: "sprite_cpp",
   python: "sprite_python",
+  pytorch: "sprite_pytorch",
 };
 const BLURB: Record<Land, () => string> = {
   rust: () => t("lands.rustBlurb"),
   go: () => t("lands.goBlurb"),
   cpp: () => t("lands.cppBlurb"),
   python: () => t("lands.pythonBlurb"),
+  pytorch: () => t("lands.pytorchBlurb"),
 };
 
 /**
@@ -218,9 +220,11 @@ export interface LandGrid {
  * @param col       the column to fill: `[x, y, w, h]`
  * @param count     how many lands there are
  * @param gap       pixels between plates, both ways
- * @param minCol    narrowest a plate may be before two columns stop being worth it
+ * @param minCol    narrowest a plate may be before another column stops being worth it
  * @param viableH   plate height with the smallest mascot still worth drawing
  * @param comfortableH plate height with the mascot at the size it wants
+ * @param floorH    plate height with no mascot at all: title, sentence, record.
+ *                  The last thing given up before a land goes off the column.
  * @param selected  index of the chosen land, which must stay on screen
  * @param scroll    the scroll as it stands, before clamping
  */
@@ -231,14 +235,32 @@ export function landGrid(
   minCol: number,
   viableH: number,
   comfortableH: number,
+  floorH: number,
   selected: number,
   scroll: number,
 ): LandGrid {
   const [lx, ly, lw, lh] = col;
   const n = Math.max(1, count);
-  // Two across only when both halves are still wide enough to read, and only
-  // when there is something to gain — two lands stacked are already fine.
-  const cols = n > 2 && Math.floor((lw - gap) / 2) >= minCol ? 2 : 1;
+  // **As many across as it takes to need the fewest rows.**
+  //
+  // This used to read "two across, or one" — which was right for four lands
+  // and wrong the moment there were five. Five in two columns is three rows,
+  // the third of them below the bottom of the column, and PYTORCH was a land
+  // you could only find by scrolling a column most people never learn
+  // scrolls. That is the same bug the four-land screen shipped with, one land
+  // further along, and hardcoding `3` would only move it again at six.
+  //
+  // So: the widest the column can hold at `minCol`, and then the fewest rows
+  // that fit the lands into it — preferring a balanced grid, because four in
+  // a three-wide column is 2x2 and not 3+1. Two lands stay stacked; one
+  // beside the other was never the problem two lands had.
+  const fitCols = Math.max(1, Math.floor((lw + gap) / (minCol + gap)));
+  let cols = 1;
+  if (n > 2) {
+    let r = 1;
+    while (Math.ceil(n / r) > fitCols) r++;
+    cols = Math.ceil(n / r);
+  }
   const rows = Math.ceil(n / cols);
   const pw = Math.floor((lw - gap * (cols - 1)) / cols);
   const fair = Math.floor((lh - gap * (rows - 1)) / rows);
@@ -246,7 +268,18 @@ export function landGrid(
   // fall back to the comfortable floor — which means scrolling — only when it
   // does not. Twenty pixels of extra mascot is not worth hiding a land behind
   // a scroll nobody knows is there.
-  const ph = fair >= viableH ? fair : Math.max(fair, comfortableH);
+  //
+  // And when the fair share is under even the viable height, **the mascot
+  // gives before a land does**: down to `floorH`, which is the plate with no
+  // mascot in it at all, the plates take the fair share and every land stays
+  // on the column. This is the trade the phone branch of the caller already
+  // makes by passing floors of zero; it belongs here, for every screen, for
+  // the same reason — a land nobody can see is a land nobody picks, and the
+  // mascot is decoration on a screen whose whole job is the choice. Only when
+  // the column cannot hold `floorH` per land does it go back to the
+  // comfortable plate and scroll.
+  const ph =
+    fair >= viableH ? fair : fair >= floorH ? fair : Math.max(fair, comfortableH);
   const total = ph * rows + gap * (rows - 1);
   const overflow = Math.max(0, total - lh);
   // Clamp first, then drag the window to the selected plate's row, so the
@@ -862,7 +895,7 @@ export class LandsScene implements Scene {
       // same rule `landGrid` uses, so ask it once for the shape, measure, then
       // ask again for the final geometry. The first call's heights are only
       // ever used to pick a column count, which does not depend on them.
-      const shape = landGrid(f.left, LANDS.length, gap, MIN_COL, 0, 0, 0, 0);
+      const shape = landGrid(f.left, LANDS.length, gap, MIN_COL, 0, 0, 0, 0, 0);
       // **On a phone every land is on screen, mascot or no mascot.**
       // The floors below are "a plate tall enough to be worth looking at",
       // and on a phone insisting on them made the column taller than the
@@ -878,6 +911,10 @@ export class LandsScene implements Scene {
         MIN_COL,
         phone ? 0 : this.plateHeight(s, shape.pw, 52),
         phone ? 0 : this.plateHeight(s, shape.pw),
+        // The plate with no mascot in it: the last height given up before a
+        // land would go off the bottom. On a phone the floors are already
+        // zero and this changes nothing.
+        phone ? 0 : this.plateHeight(s, shape.pw, 0),
         LANDS.indexOf(this.land),
         this.scroll,
       );

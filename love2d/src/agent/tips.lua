@@ -86,6 +86,20 @@ M.TIPS = {
     "`sorted(xs, key=…)` returns a new list; `xs.sort()` sorts in place and returns `None`.",
     "`__name__ == \"__main__\"` is the line between a script and a module.",
   },
+  pytorch = {
+    "Shape first. Print `tuple(x.shape)` before you print anything else.",
+    "`zero_grad`, `backward`, `step` — in that order. `backward` adds into `.grad`; it never clears it.",
+    "`nn.CrossEntropyLoss` takes raw logits. Softmax it yourself and you have softmaxed twice.",
+    "`model.eval()` for dropout and batch-norm; `torch.no_grad()` for the graph. You usually want both.",
+    "`view` needs contiguous memory, `reshape` does not. After a `transpose`, reach for `reshape`.",
+    "`detach()` leaves the graph and shares the memory; `clone()` copies and stays. Different tools.",
+    "Keep `loss.item()`, not `loss`. Holding the tensor holds the whole graph behind it.",
+    "`keepdim=True` on a reduction, or the axis vanishes and the broadcast lines up wrong.",
+    "A trailing underscore is in-place: `add_`, `relu_`. Autograd notices one backward pass later.",
+    "Mask before the softmax, with `-inf`. Zeroing after leaves a row summing to less than one.",
+    "`torch.manual_seed` fixes one global stream; pass a `Generator` for a reproducible one.",
+    "The scale in attention is the square root of the *head* dimension, not the model dimension.",
+  },
 }
 
 --- The next tip after `last`, never the same one twice running.
@@ -554,6 +568,31 @@ function M.advise(lang, source)
       say(
         "go.string-concat",
         "String `+=` in a loop copies the whole string each time — `strings.Builder`."
+      )
+    end
+  elseif lang == "pytorch" then
+    if source:find("softmax") and source:find("CrossEntropyLoss") then
+      say(
+        "pytorch.double-softmax",
+        "`nn.CrossEntropyLoss` softmaxes internally — feeding it softmaxed values applies it twice."
+      )
+    end
+    if source:find("backward%(%)") and not source:find("zero_grad") then
+      say(
+        "pytorch.no-zero-grad",
+        "`backward()` adds into `.grad`. Without `zero_grad()` the gradients of every step accumulate."
+      )
+    end
+    if source:find("%.grad") and source:find("%-=") and not source:find("no_grad") then
+      say(
+        "pytorch.update-in-graph",
+        "Updating a parameter outside `torch.no_grad()` records the update itself into the graph."
+      )
+    end
+    if source:find("Dropout") and not source:find("%.eval%(%)") then
+      say(
+        "pytorch.still-training",
+        "There is a `Dropout` here and no `model.eval()` — inference would still be dropping units."
       )
     end
   elseif lang == "cpp" then

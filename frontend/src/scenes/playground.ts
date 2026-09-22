@@ -111,6 +111,9 @@ const STARTER: Record<Land, string> = {
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hello, causewaybay")\n}\n',
   cpp: '#include <iostream>\n\nint main() {\n    std::cout << "hello, causewaybay\\n";\n}\n',
   python: 'print("hello, causewaybay")\n',
+  // The scratchpad opens on the import, because a PyTorch Land scratchpad
+  // without it is four keystrokes from being a Python Land scratchpad.
+  pytorch: 'import torch\n\nprint("hello, causewaybay", torch.tensor([1, 2, 3]).tolist())\n',
 };
 
 /** The outcomes as the poster prints them: English, whatever the screen is in. */

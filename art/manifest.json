@@ -61,6 +61,18 @@
       "h": 1152
     },
     {
+      "name": "map_pytorch",
+      "file": "map_pytorch.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "map_pytorch_p",
+      "file": "map_pytorch_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
       "name": "bg_street",
       "file": "bg_street.jpg",
       "w": 1152,
@@ -189,6 +201,21 @@
         "minx": 7,
         "miny": 33,
         "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "sprite_pytorch",
+      "file": "sprite_pytorch.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 16,
+        "miny": 7,
+        "maxx": 111,
         "maxy": 120
       }
     },
@@ -535,21 +562,6 @@
         "miny": 3,
         "maxx": 59,
         "maxy": 59
-      }
-    },
-    {
-      "name": "node_hand",
-      "file": "node_hand.png",
-      "w": 64,
-      "h": 64,
-      "box": {
-        "cx": 31.5,
-        "feet": 63.0,
-        "h": 64.0,
-        "minx": 14,
-        "miny": 0,
-        "maxx": 49,
-        "maxy": 63
       }
     },
     {
@@ -984,6 +996,51 @@
       }
     },
     {
+      "name": "emblem_pytorch_basic",
+      "file": "emblem_pytorch_basic.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 57,
+        "miny": 7,
+        "maxx": 326,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_pytorch_advanced",
+      "file": "emblem_pytorch_advanced.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 23,
+        "miny": 7,
+        "maxx": 359,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_pytorch_hacker",
+      "file": "emblem_pytorch_hacker.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 90,
+        "miny": 7,
+        "maxx": 293,
+        "maxy": 120
+      }
+    },
+    {
       "name": "mascot_rust_basic",
       "file": "mascot_rust_basic.png",
       "w": 128,
@@ -1160,6 +1217,51 @@
         "minx": 8,
         "miny": 7,
         "maxx": 118,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_pytorch_basic",
+      "file": "mascot_pytorch_basic.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 21,
+        "miny": 7,
+        "maxx": 106,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_pytorch_advanced",
+      "file": "mascot_pytorch_advanced.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 25,
+        "miny": 7,
+        "maxx": 101,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_pytorch_hacker",
+      "file": "mascot_pytorch_hacker.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 19,
+        "miny": 7,
+        "maxx": 107,
         "maxy": 120
       }
     },

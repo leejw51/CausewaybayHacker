@@ -18,8 +18,11 @@
 # ---------------------------------------------------------------------------
 # Generate one piece of scene art with Grok (xAI) and save it as PNG:
 #
-#   GROK_API_KEY=... art/tools/grok_image.sh art/raw/bg_street.png 3:2 "prompt"
+#   XAI_API_KEY=... art/tools/grok_image.sh art/raw/bg_street.png 3:2 "prompt"
 #
+# The key is read from XAI_API_KEY or GROK_API_KEY, in that order. XAI_API_KEY
+# is the name xAI's own console, SDK and docs use; GROK_API_KEY is the name
+# this script was copied in with and is kept so nobody's shell profile breaks.
 set -eu
 
 out=${1:?usage: grok_image.sh <out.png> <aspect_ratio> <prompt>}
@@ -28,7 +31,8 @@ shift 2
 prompt=$*
 model=${GROK_IMAGE_MODEL:-grok-imagine-image}
 
-[ -n "${GROK_API_KEY:-}" ] || { echo "GROK_API_KEY is not set" >&2; exit 1; }
+key=${XAI_API_KEY:-${GROK_API_KEY:-}}
+[ -n "$key" ] || { echo "neither XAI_API_KEY nor GROK_API_KEY is set" >&2; exit 1; }
 
 body=$(python3 - "$model" "$aspect" "$prompt" <<'PY'
 import json, sys
@@ -46,7 +50,7 @@ PY
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
 curl -sS -m 300 https://api.x.ai/v1/images/generations \
-  -H "Authorization: Bearer $GROK_API_KEY" \
+  -H "Authorization: Bearer $key" \
   -H "Content-Type: application/json" \
   -d "$body" -o "$tmp"
 

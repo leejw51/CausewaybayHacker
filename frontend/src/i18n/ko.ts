@@ -137,6 +137,8 @@ export const ko: Partial<Catalogue> = {
   "lands.cppBlurb": "포인터, RAII, 미정의 동작. 모든 것이 주소이고 아무도 당신을 검사하지 않는다.",
   "lands.pythonBlurb":
     "딕셔너리, 제너레이터, 덕 타이핑. 실행되기 전까지는 아무것도 타입이 없고, 여섯 시에 실행된다.",
+  "lands.pytorchBlurb":
+    "텐서, 그래디언트, 어텐션. 모든 것이 shape이고, 지하실의 그것도 그것으로 만들어졌다.",
   "lands.verybasicBlurb": "퀴즈. 어느 줄이 맞는 문법인가? 넷 중 하나를 고르고, 그 줄을 친다.",
   "lands.basicBlurb":
     "아침 산책. 문법 하나씩 설명을 읽고 한두 줄만 채운다 — 타입, 반복문, 구조체, 정렬, 클로저, 스레드, 트리.",
@@ -173,6 +175,7 @@ export const ko: Partial<Catalogue> = {
   "map.go": "GO",
   "map.cpp": "C++",
   "map.python": "PYTHON",
+  "map.pytorch": "PYTORCH",
   "map.none": "아직 이 거리에는 아무것도 없습니다",
   "map.failed": "지도를 읽지 못했습니다",
   "map.stars": "별",
@@ -506,6 +509,7 @@ export const ko: Partial<Catalogue> = {
   "search.go": "GO",
   "search.cpp": "C++",
   "search.python": "PYTHON",
+  "search.pytorch": "PYTORCH",
   "search.unified": "통합",
   "search.text": "단어",
   "search.meaning": "의미",
@@ -594,6 +598,7 @@ export const ko: Partial<Catalogue> = {
   "ai.go": "GO",
   "ai.cpp": "C++",
   "ai.python": "PYTHON",
+  "ai.pytorch": "PYTORCH",
   "ai.newPlan": "새 계획",
   "ai.drillSize": "{n}개 훈련",
   "ai.coach": "코치",

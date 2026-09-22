@@ -150,6 +150,7 @@ describe("the template table itself", () => {
       go: (l) => `package main\nfunc f() {\n\t${l}\n}\n`,
       cpp: (l) => `int main() {\n  ${l}\n}\n`,
       python: (l) => `def f():\n    ${l}\n`,
+      pytorch: (l) => `def f():\n    ${l}\n`,
     };
     for (const t of all) {
       const marked = around[t.id]

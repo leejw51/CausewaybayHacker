@@ -13,12 +13,12 @@ local Assets = require("src.assets")
 local Land = {}
 
 -- SPEC §0's order: the two lands the game shipped with, then the two that
--- joined them.
-Land.ORDER = { "rust", "go", "cpp", "python" }
+-- joined them, then the one the ending was always about.
+Land.ORDER = { "rust", "go", "cpp", "python", "pytorch" }
 
 -- The name on the card. `("cpp"):upper()` is "CPP", which nobody calls the
 -- language; the other three happen to upper-case into themselves.
-Land.NAME = { rust = "RUST", go = "GO", cpp = "C++", python = "PYTHON" }
+Land.NAME = { rust = "RUST", go = "GO", cpp = "C++", python = "PYTHON", pytorch = "PYTORCH" }
 
 -- The land's mascot, and what stands in while the art is being drawn: the
 -- platypus is a hue-shifted Ferris until it is not, and the coiled python a
@@ -29,8 +29,9 @@ Land.MASCOT = {
   go = "sprite_gogo",
   cpp = "sprite_cpp",
   python = "sprite_python",
+  pytorch = "sprite_pytorch",
 }
-local STANDIN = { cpp = "sprite_ferris", python = "sprite_gogo" }
+local STANDIN = { cpp = "sprite_ferris", python = "sprite_gogo", pytorch = "sprite_python" }
 
 function Land.name(land)
   return Land.NAME[land] or tostring(land or "?"):upper()

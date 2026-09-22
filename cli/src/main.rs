@@ -90,7 +90,7 @@ enum Command {
     Maps,
     /// One overworld: its nodes, their state and their stars.
     Map {
-        /// rust | go | cpp | python
+        /// rust | go | cpp | python | pytorch
         land: String,
         /// basic | advanced | hacker
         category: String,
@@ -181,7 +181,7 @@ enum Command {
 
     /// The full-screen client: a map you can walk, a quest pane, live output.
     Tui {
-        /// Start on this land: rust | go | cpp | python.
+        /// Start on this land: rust | go | cpp | python | pytorch.
         #[arg(long, default_value = "rust")]
         land: String,
         /// Start on this category.

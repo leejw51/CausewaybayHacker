@@ -347,6 +347,43 @@ fn python_stdio_is_open_and_the_other_harnesses_are_refused() {
     }
 }
 
+/// PyTorch Land shares this runner, and shares this test — except that its
+/// stdio gate is not unconditional. `torch` is a package rather than a
+/// program, so the land can be present in the content and absent from the
+/// machine, and a submission to it must be refused *before* an attempt row
+/// exists: a `ModuleNotFoundError` is a real exception and would be filed as
+/// the player's own mistake (SPEC §7). Asserted against the probe rather
+/// than against a constant, so it holds on a machine with torch and on one
+/// without, which is the only way CI and a laptop can run the same test.
+#[test]
+fn pytorch_stdio_is_open_only_where_torch_is_importable() {
+    let stdio_spec = stdio(serde_json::json!([
+        { "name": "any", "stdin": "", "expect": "x", "visible": true }
+    ]));
+    let refusal = cwbhacker_runner::unsupported("pytorch", &stdio_spec);
+    assert_eq!(
+        refusal.is_none(),
+        cwbhacker_runner::format::torch_is_installed(),
+        "the gate and the probe disagree about torch: {refusal:?}"
+    );
+    if let Some(reason) = refusal {
+        assert!(reason.contains("torch"), "{reason}");
+        assert!(
+            reason.contains("pip install"),
+            "a refusal without the command to fix it: {reason}"
+        );
+    }
+    for harness in ["cargo", "gotest"] {
+        let wrong = spec(serde_json::json!({
+            "harness": harness,
+            "cases": [ { "name": "t", "visible": true } ]
+        }));
+        let reason = cwbhacker_runner::unsupported("pytorch", &wrong)
+            .unwrap_or_else(|| panic!("the {harness} harness must be refused for pytorch"));
+        assert!(reason.contains("pytorch"), "{reason}");
+    }
+}
+
 /// Python's formatter is `black`, which does not ship with the interpreter:
 /// the gate answers for the machine it is on, and a machine without it says
 /// so before anything is spawned rather than mangling the source.

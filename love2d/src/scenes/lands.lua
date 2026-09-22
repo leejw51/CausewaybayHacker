@@ -39,6 +39,7 @@ local BLURB = {
   go = "goroutines, channels, interfaces",
   cpp = "threads, mutexes, the STL",
   python = "dicts, generators, the GIL",
+  pytorch = "tensors, gradients, attention",
 }
 
 function Lands.new(app)

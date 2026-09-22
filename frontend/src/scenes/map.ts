@@ -61,6 +61,7 @@ const PLATE: Record<Land, string> = {
   go: "map_go",
   cpp: "map_cpp",
   python: "map_python",
+  pytorch: "map_pytorch",
 };
 
 /**

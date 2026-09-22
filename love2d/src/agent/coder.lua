@@ -223,7 +223,7 @@ function Coder:bench()
   return {
     lang = self.host.lang(),
     file = "main." .. (self.host.lang() == "cpp" and "cpp" or self.host.lang() == "go" and "go"
-      or self.host.lang() == "python" and "py" or "rs"),
+      or self.host.lang() == "python" and "py" or self.host.lang() == "pytorch" and "py" or "rs"),
     read = function()
       return coder.editor and coder.editor:text() or ""
     end,

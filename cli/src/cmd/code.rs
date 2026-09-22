@@ -405,6 +405,8 @@ fn formatter_label(lang: &str) -> &'static str {
         "rust" => "rustfmt",
         "go" => "gofmt",
         "cpp" => "clang-format",
+        // Both Python lands format with black; the fifth is not a language.
+        "python" | "pytorch" => "black",
         _ => "formatter",
     }
 }

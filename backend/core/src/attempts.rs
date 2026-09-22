@@ -108,7 +108,9 @@ pub fn source_filename(lang: &str) -> &'static str {
     match lang {
         "go" => "main.go",
         "cpp" => "main.cpp",
-        "python" => "main.py",
+        // PYTORCH is the Python interpreter with torch in its site-packages,
+        // so its programs are `main.py` too (SPEC §5.1).
+        "python" | "pytorch" => "main.py",
         _ => "main.rs",
     }
 }

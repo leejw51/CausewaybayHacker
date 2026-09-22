@@ -90,7 +90,7 @@ test.describe("the lands are drawn in their own colours", () => {
     await atScreen(page, "lands");
 
     const seen: Record<string, [number, number, number]> = {};
-    for (const land of ["rust", "go", "cpp", "python"] as Land[]) {
+    for (const land of ["rust", "go", "cpp", "python", "pytorch"] as Land[]) {
       await pickLand(page, land);
       // Settle so the plate's open/close tween has finished and the bar is at
       // full strength rather than mid-fade.
@@ -112,7 +112,10 @@ test.describe("the lands are drawn in their own colours", () => {
     }
   });
 
-  test("C++ is blue and Python is gold, not merely different", async ({ page, ready }) => {
+  test("C++ is blue, Python is gold and PyTorch is flame, not merely different", async ({
+    page,
+    ready,
+  }) => {
     void ready;
     await page.goto("/");
     await login(page, freshAccount());
@@ -133,6 +136,20 @@ test.describe("the lands are drawn in their own colours", () => {
     // Python gold is #FFD43B: red and green dominate, blue trails.
     expect(python[0], `python bar ${python} is not gold`).toBeGreaterThan(python[2]);
     expect(python[1], `python bar ${python} is not gold`).toBeGreaterThan(python[2]);
+
+    await pickLand(page, "pytorch");
+    await page.evaluate(() => window.__cwbCapture?.settle(1.5));
+    const pytorch = await plateBarColour(page, "pytorch");
+    await page.evaluate(() => window.__cwbCapture?.resume());
+
+    // The torch flame is #E84820: red dominates both of the others, which is
+    // what keeps it apart from Python's gold, where green is nearly as high.
+    expect(pytorch[0], `pytorch bar ${pytorch} is not flame`).toBeGreaterThan(pytorch[1]);
+    expect(pytorch[0], `pytorch bar ${pytorch} is not flame`).toBeGreaterThan(pytorch[2]);
+    expect(
+      pytorch[1] - pytorch[2],
+      `pytorch bar ${pytorch} is gold, not flame`,
+    ).toBeLessThan(python[1] - python[2]);
   });
 });
 

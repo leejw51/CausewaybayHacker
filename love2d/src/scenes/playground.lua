@@ -60,6 +60,7 @@ local STARTER = {
   go = 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hello")\n}\n',
   cpp = '#include <iostream>\n\nint main() {\n    std::cout << "hello\\n";\n}\n',
   python = 'print("hello")\n',
+  pytorch = 'import torch\n\nprint("hello", torch.tensor([1, 2, 3]).tolist())\n',
 }
 Playground.LANGS = LANGS
 Playground.STARTER = STARTER
@@ -1641,7 +1642,7 @@ function Playground:make_poster(lib)
   local rendered = Poster.make({
     lang = self.lang,
     name = pad_name,
-    file = ({ rust = "main.rs", go = "main.go", cpp = "main.cpp", python = "main.py" })[self.lang],
+    file = ({ rust = "main.rs", go = "main.go", cpp = "main.cpp", python = "main.py", pytorch = "main.py" })[self.lang],
     source = source,
     run = Poster.run_of(self.result, log_lines),
     user = { name = self.app.session:display_name() or "hacker", address = address },

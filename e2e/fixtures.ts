@@ -57,7 +57,7 @@ export const SCREENS = [
 export type Screen = (typeof SCREENS)[number];
 
 /** The lands, in the order the lands screen draws them (`frontend/src/net/protocol.ts`). */
-export const LANDS = ["rust", "go", "cpp", "python"] as const;
+export const LANDS = ["rust", "go", "cpp", "python", "pytorch"] as const;
 export type Land = (typeof LANDS)[number];
 
 /** `frontend/src/dev/capture.ts`, as much of it as this suite uses. */

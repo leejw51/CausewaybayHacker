@@ -150,6 +150,8 @@ export const cs: Partial<Catalogue> = {
     "Ukazatele, RAII, nedefinované chování. Všechno je adresa a nikdo tě nekontroluje.",
   "lands.pythonBlurb":
     "Slovníky, generátory, kachní typování. Nic nemá typ, dokud to neběží, a běží to v šest.",
+  "lands.pytorchBlurb":
+    "Tenzory, gradienty, attention. Všechno je tvar a ta věc ve sklepě je z nich poskládaná.",
   "lands.verybasicBlurb":
     "Kvíz. Který řádek je správná gramatika? Vyber jeden ze čtyř a pak ho napiš.",
   "lands.basicBlurb":
@@ -187,6 +189,7 @@ export const cs: Partial<Catalogue> = {
   "map.go": "GO",
   "map.cpp": "C++",
   "map.python": "PYTHON",
+  "map.pytorch": "PYTORCH",
   "map.none": "v této ulici zatím nic není",
   "map.failed": "mapu se nepodařilo načíst",
   "map.stars": "HVĚZDY",
@@ -524,6 +527,7 @@ export const cs: Partial<Catalogue> = {
   "search.go": "GO",
   "search.cpp": "C++",
   "search.python": "PYTHON",
+  "search.pytorch": "PYTORCH",
   "search.unified": "SPOJENĚ",
   "search.text": "SLOVA",
   "search.meaning": "VÝZNAM",
@@ -614,6 +618,7 @@ export const cs: Partial<Catalogue> = {
   "ai.go": "GO",
   "ai.cpp": "C++",
   "ai.python": "PYTHON",
+  "ai.pytorch": "PYTORCH",
   "ai.newPlan": "NOVÝ PLÁN",
   "ai.drillSize": "TRÉNINK {n}",
   "ai.coach": "TRENÉR",

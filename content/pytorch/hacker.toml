@@ -1,0 +1,2875 @@
+# PYTORCH LAND — HACKER. The fifth interview. HKU, Chow Yei Ching Building,
+# Room 7-32, a clock on the wall, and the subject is the rack in the basement
+# two floors down.
+#
+# Every quest here carries `time_limit_s` — the player's clock for the whole
+# quest, not the per-run `timeout_ms` — and at least one hidden case.
+# See docs/decisions.md, 2026-09-11, for where that key lives in the TOML.
+#
+# The other four hacker packs mirror each other node for node, because the
+# same algorithm question can be sat in any of those four languages. This one
+# does not mirror them and is not meant to: it is the live-coding knowledge
+# base for a machine-learning role — write softmax so it does not overflow,
+# write cross-entropy so it matches the library, write Adam so it matches the
+# library, mask a padded batch, cache the keys and values, and build a
+# transformer block that agrees with a reference implementation to 1e-5.
+# Every answer is a tensor program, and a Python loop over the batch is the
+# thing these questions exist to weed out.
+#
+# Nothing is downloaded and nothing is random unless it is seeded. Every
+# expected output is a shape, a count, a flag or a rounded number.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Every solution and starter in this file is run by
+# tests/content/verify_pack.py and by CI (SPEC §9.4, §9.5).
+
+pack = "pytorch.hacker"
+land = "pytorch"
+category = "hacker"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id           = "pytorch.hacker.01.pairwise"
+node         = 1
+title        = "EVERY PAIR, NO LOOP"
+difficulty   = 3
+time_limit_s = 600
+story        = "Room 7-32, fifth time. The first question is the one everybody gets, and the clock starts on the way in."
+concepts     = ["broadcasting", "complexity"]
+requires     = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief        = '''
+Line one is `n d`. Then `n` rows of `d` floats.
+
+Print the `n × n` matrix of Euclidean distances, each rounded to three places, one row per line, values separated by single spaces.
+
+The answer they are looking for has no Python loop in it. Broadcasting `(n, 1, d)` against `(1, n, d)` gives every difference at once.
+
+```
+input:  3 2
+        0 0
+        3 4
+        0 4
+output: 0.0 5.0 4.0
+        5.0 0.0 3.0
+        4.0 3.0 0.0
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, d = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n * d]]).reshape(n, d)
+    dist = torch.zeros(n, n)
+    for row in dist.tolist():
+        print(" ".join(str(round(v, 3)) for v in row))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, d = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n * d]]).reshape(n, d)
+    dist = (x.unsqueeze(1) - x.unsqueeze(0)).pow(2).sum(dim=-1).sqrt()
+    for row in dist.tolist():
+        print(" ".join(str(round(v, 3)) for v in row))
+
+
+main()
+'''
+hints = [
+  "(x.unsqueeze(1) - x.unsqueeze(0)) has shape (n, n, d) — every difference of every pair.",
+  "torch.cdist(x, x) is the library answer; the interview usually wants the broadcast written out.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "triangle", stdin = "3 2\n0 0\n3 4\n0 4\n", expect = "0.0 5.0 4.0\n5.0 0.0 3.0\n4.0 3.0 0.0\n", visible = true },
+  { name = "one-point", stdin = "1 3\n1 2 3\n", expect = "0.0\n", visible = false },
+  { name = "line", stdin = "2 1\n-2\n5\n", expect = "0.0 7.0\n7.0 0.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id           = "pytorch.hacker.02.topk-accuracy"
+node         = 2
+title        = "IN THE TOP FIVE"
+difficulty   = 3
+time_limit_s = 600
+story        = "The paper claims top-5 and the code computes top-1. Nobody noticed until the reviewer asked for the number."
+concepts     = ["inference", "testing"]
+requires     = ["pytorch.hacker.01.pairwise"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief        = '''
+Line one is `n c k`. Then `n` rows of `c` logits. The last line is `n` integer labels.
+
+Print top-1 accuracy and top-`k` accuracy, each rounded to four places, separated by a space. A sample counts for top-`k` if its label is among the `k` largest logits of its row.
+
+`topk` returns values and indices; the indices are what this question is about.
+
+```
+input:  3 4 2
+        1 2 3 0
+        5 1 0 2
+        0 1 4 3
+        2 0 3
+output: 0.6667 1.0
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c, k = int(data[0]), int(data[1]), int(data[2])
+    logits = torch.tensor([float(t) for t in data[3:3 + n * c]]).reshape(n, c)
+    want = torch.tensor([int(t) for t in data[3 + n * c:3 + n * c + n]])
+    top1 = 0.0
+    topk = 0.0
+    print(round(top1, 4), round(topk, 4))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c, k = int(data[0]), int(data[1]), int(data[2])
+    logits = torch.tensor([float(t) for t in data[3:3 + n * c]]).reshape(n, c)
+    want = torch.tensor([int(t) for t in data[3 + n * c:3 + n * c + n]])
+    idx = logits.topk(k, dim=1).indices
+    top1 = (idx[:, 0] == want).float().mean().item()
+    topk = (idx == want.unsqueeze(1)).any(dim=1).float().mean().item()
+    print(round(top1, 4), round(topk, 4))
+
+
+main()
+'''
+hints = [
+  "logits.topk(k, dim=1).indices is (n, k), already sorted best first, so column 0 is the top-1 prediction.",
+  "(idx == want.unsqueeze(1)).any(dim=1) — the unsqueeze is what lets the label broadcast across the k columns.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-samples", stdin = "3 4 2\n1 2 3 0\n5 1 0 2\n0 1 4 3\n2 0 3\n", expect = "0.6667 1.0\n", visible = true },
+  { name = "all-wrong", stdin = "2 3 1\n5 0 0\n5 0 0\n1 2\n", expect = "0.0 0.0\n", visible = false },
+  { name = "k-is-c", stdin = "2 3 3\n1 2 3\n3 2 1\n0 2\n", expect = "0.0 1.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id           = "pytorch.hacker.03.cosine"
+node         = 3
+title        = "THE ANGLE, NOT THE LENGTH"
+difficulty   = 3
+time_limit_s = 600
+story        = "The retrieval ranks by dot product and the longest vector wins every query regardless of what it says."
+concepts     = ["embeddings", "broadcasting"]
+requires     = ["pytorch.hacker.02.topk-accuracy"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief        = '''
+Line one is `n m d`. Then `n` query rows of `d` floats, then `m` document rows of `d` floats.
+
+Print the `n × m` cosine similarity matrix, rounded to four places, one row per line.
+
+Cosine similarity is the dot product of the **normalised** vectors. Normalising first and then multiplying is the answer that stays one matmul; dividing afterwards needs an outer product of norms and is where people lose the thread.
+
+```
+input:  2 2 2
+        1 0
+        0 2
+        1 0
+        1 1
+output: 1.0 0.7071
+        0.0 0.7071
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, m, d = int(data[0]), int(data[1]), int(data[2])
+    nums = [float(t) for t in data[3:3 + (n + m) * d]]
+    q = torch.tensor(nums[:n * d]).reshape(n, d)
+    k = torch.tensor(nums[n * d:]).reshape(m, d)
+    sim = torch.zeros(n, m)
+    for row in sim.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, m, d = int(data[0]), int(data[1]), int(data[2])
+    nums = [float(t) for t in data[3:3 + (n + m) * d]]
+    q = torch.tensor(nums[:n * d]).reshape(n, d)
+    k = torch.tensor(nums[n * d:]).reshape(m, d)
+    qn = q / q.norm(dim=1, keepdim=True)
+    kn = k / k.norm(dim=1, keepdim=True)
+    sim = qn @ kn.t()
+    for row in sim.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+hints = [
+  "q / q.norm(dim=1, keepdim=True) — keepdim is what makes the division broadcast down the rows.",
+  "Then one matmul: qn @ kn.t(). A zero vector would divide by zero, which is what the eps in F.normalize is for.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-by-two", stdin = "2 2 2\n1 0\n0 2\n1 0\n1 1\n", expect = "1.0 0.7071\n0.0 0.7071\n", visible = true },
+  { name = "opposite", stdin = "1 2 2\n1 0\n-1 0\n1 0\n", expect = "-1.0 1.0\n", visible = false },
+  { name = "scale-blind", stdin = "1 1 3\n2 4 6\n1 2 3\n", expect = "1.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id           = "pytorch.hacker.04.stable-softmax"
+node         = 4
+title        = "WRITE SOFTMAX"
+difficulty   = 3
+time_limit_s = 900
+story        = "Write softmax. It is the first thing they ask, and the answer they are listening for is the subtraction nobody writes on the first try."
+concepts     = ["loss-functions", "broadcasting"]
+requires     = ["pytorch.hacker.03.cosine"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief        = '''
+Line one is `n c`. Then `n` rows of `c` logits.
+
+Print, for each row, the softmax rounded to four places — computed **without** `torch.softmax`.
+
+`exp` of a large logit overflows to `inf` and the row becomes `nan`. Subtracting each row's maximum first changes nothing mathematically and everything numerically, because the largest exponent becomes `exp(0)`.
+
+```
+input:  2 3
+        1 2 3
+        1000 1000 1000
+output: 0.09 0.2447 0.6652
+        0.3333 0.3333 0.3333
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n * c]]).reshape(n, c)
+    p = torch.exp(x) / torch.exp(x).sum(dim=1, keepdim=True)
+    for row in p.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n * c]]).reshape(n, c)
+    e = torch.exp(x - x.max(dim=1, keepdim=True).values)
+    p = e / e.sum(dim=1, keepdim=True)
+    for row in p.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+hints = [
+  "x - x.max(dim=1, keepdim=True).values, then exp, then divide by the row sum.",
+  "max(dim=...) returns values and indices; .values is the half you want, and keepdim keeps the broadcast honest.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "overflow", stdin = "2 3\n1 2 3\n1000 1000 1000\n", expect = "0.09 0.2447 0.6652\n0.3333 0.3333 0.3333\n", visible = true },
+  { name = "underflow", stdin = "1 2\n-1000 -1000\n", expect = "0.5 0.5\n", visible = false },
+  { name = "one-class", stdin = "1 1\n7\n", expect = "1.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id           = "pytorch.hacker.05.cross-entropy"
+node         = 5
+title        = "WRITE CROSS ENTROPY"
+difficulty   = 4
+time_limit_s = 900
+story        = "Now write the loss, and make it agree with the library to five decimal places on the batch they hand you."
+concepts     = ["loss-functions", "inference"]
+requires     = ["pytorch.hacker.04.stable-softmax"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief        = '''
+Line one is `n c`. Then `n` rows of `c` logits, then a line of `n` labels.
+
+Print your cross-entropy, rounded to five places, then `True` if it matches `nn.CrossEntropyLoss` to `1e-5`.
+
+Cross-entropy of a batch is the mean over rows of `-log_softmax(logits)[row, label]`. Written that way it is stable, it is one `gather`, and it is the answer they want. Written as `-log(softmax(x))` it is the answer that returns `inf` on the hidden case.
+
+```
+input:  2 3
+        1 2 3
+        3 1 0
+        2 0
+output: 0.28873 True
+```
+'''
+starter      = '''
+import sys
+import torch
+import torch.nn as nn
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n * c]]).reshape(n, c)
+    y = torch.tensor([int(t) for t in data[2 + n * c:2 + n * c + n]])
+    mine = torch.tensor(0.0)
+    ref = nn.CrossEntropyLoss()(x, y)
+    print(round(mine.item(), 5), bool(torch.allclose(mine, ref, atol=1e-5)))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+import torch.nn as nn
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n * c]]).reshape(n, c)
+    y = torch.tensor([int(t) for t in data[2 + n * c:2 + n * c + n]])
+    logp = torch.log_softmax(x, dim=1)
+    mine = -logp.gather(1, y.unsqueeze(1)).squeeze(1).mean()
+    ref = nn.CrossEntropyLoss()(x, y)
+    print(round(mine.item(), 5), bool(torch.allclose(mine, ref, atol=1e-5)))
+
+
+main()
+'''
+hints = [
+  "log_softmax first, then gather the true class, then negate and take the mean.",
+  "The default reduction is the mean over the batch, not the sum — that is the other half of matching the library.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "small-batch", stdin = "2 3\n1 2 3\n3 1 0\n2 0\n", expect = "0.28873 True\n", visible = true },
+  { name = "huge-logits", stdin = "1 2\n1000 0\n1\n", expect = "1000.0 True\n", visible = false },
+  { name = "uniform", stdin = "1 4\n0 0 0 0\n1\n", expect = "1.38629 True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id           = "pytorch.hacker.06.one-hot"
+node         = 6
+title        = "WITHOUT THE HELPER"
+difficulty   = 3
+time_limit_s = 600
+story        = "No `F.one_hot`, says the interviewer. Two ways, and the one they are waiting for is the scatter."
+concepts     = ["tensors", "embeddings"]
+requires     = ["pytorch.hacker.05.cross-entropy"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief        = '''
+Line one is `n c`. Line two is `n` labels.
+
+Print the `n × c` one-hot matrix as integers, one row per line.
+
+`zeros(n, c).scatter_(1, labels.unsqueeze(1), 1.0)` writes a one into the labelled column of each row. The comparison form — `labels.unsqueeze(1) == arange(c)` — is the other accepted answer and is easier to defend out loud.
+
+```
+input:  3 4
+        2 0 3
+output: 0 0 1 0
+        1 0 0 0
+        0 0 0 1
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c = int(data[0]), int(data[1])
+    y = torch.tensor([int(t) for t in data[2:2 + n]])
+    hot = torch.zeros(n, c)
+    for row in hot.int().tolist():
+        print(" ".join(str(v) for v in row))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c = int(data[0]), int(data[1])
+    y = torch.tensor([int(t) for t in data[2:2 + n]])
+    hot = torch.zeros(n, c).scatter_(1, y.unsqueeze(1), 1.0)
+    for row in hot.int().tolist():
+        print(" ".join(str(v) for v in row))
+
+
+main()
+'''
+hints = [
+  "torch.zeros(n, c).scatter_(1, y.unsqueeze(1), 1.0) — dim 1, index shaped like the source.",
+  "y.unsqueeze(1) == torch.arange(c) gives the same matrix as booleans, and reads better in an interview.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-rows", stdin = "3 4\n2 0 3\n", expect = "0 0 1 0\n1 0 0 0\n0 0 0 1\n", visible = true },
+  { name = "binary", stdin = "2 2\n1 1\n", expect = "0 1\n0 1\n", visible = false },
+  { name = "single", stdin = "1 3\n0\n", expect = "1 0 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id           = "pytorch.hacker.07.normal-equations"
+node         = 7
+title        = "NO GRADIENT DESCENT"
+difficulty   = 4
+time_limit_s = 900
+story        = "Fit the line without training it. Least squares has a closed form and they want to know whether you know it."
+concepts     = ["math", "tensors"]
+requires     = ["pytorch.hacker.06.one-hot"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief        = '''
+Line one is `n d`. Then `n` rows of `d` features, then a line of `n` targets.
+
+Print the `d + 1` least-squares coefficients — `d` weights then the intercept — each rounded to four places, on one line.
+
+The intercept comes from appending a column of ones, and the solution is `(XᵀX)⁻¹Xᵀy`. Use `torch.linalg.lstsq`, which does it without forming the inverse; an interviewer will take either as long as the bias column is there.
+
+```
+input:  3 1
+        0
+        1
+        2
+        1 3 5
+output: 2.0 1.0
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, d = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n * d]]).reshape(n, d)
+    y = torch.tensor([float(t) for t in data[2 + n * d:2 + n * d + n]])
+    beta = torch.zeros(d + 1)
+    print(" ".join(str(round(v, 4)) for v in beta.tolist()))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, d = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n * d]]).reshape(n, d)
+    y = torch.tensor([float(t) for t in data[2 + n * d:2 + n * d + n]])
+    xb = torch.cat([x, torch.ones(n, 1)], dim=1)
+    beta = torch.linalg.lstsq(xb, y.unsqueeze(1)).solution.squeeze(1)
+    print(" ".join(str(round(v, 4)) for v in beta.tolist()))
+
+
+main()
+'''
+hints = [
+  "Append the ones column with torch.cat([x, torch.ones(n, 1)], dim=1) — that column is the intercept.",
+  "torch.linalg.lstsq(xb, y.unsqueeze(1)).solution — it wants a matrix on the right-hand side.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-x-plus-one", stdin = "3 1\n0\n1\n2\n1 3 5\n", expect = "2.0 1.0\n", visible = true },
+  { name = "downhill", stdin = "3 1\n0\n1\n2\n5 3 1\n", expect = "-2.0 5.0\n", visible = false },
+  { name = "two-features", stdin = "4 2\n0 0\n1 0\n0 1\n1 1\n1 2 3 4\n", expect = "1.0 2.0 1.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id           = "pytorch.hacker.08.kmeans-step"
+node         = 8
+title        = "ONE ITERATION"
+difficulty   = 4
+time_limit_s = 900
+story        = "Assign, then average, then say what changed. They want the loop body, not the library."
+concepts     = ["broadcasting", "complexity"]
+requires     = ["pytorch.hacker.07.normal-equations"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief        = '''
+Line one is `n k d`. Then `n` points of `d` floats, then `k` centroid rows of `d` floats.
+
+Print the assignment of each point on the first line, then the `k` updated centroids, one per line, rounded to four places. A centroid with no points keeps its old position.
+
+One iteration is: distances by broadcasting, `argmin` for the assignment, and a masked mean per cluster.
+
+```
+input:  4 2 1
+        0
+        1
+        10
+        11
+        0
+        10
+output: 0 0 1 1
+        0.5
+        10.5
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, k, d = int(data[0]), int(data[1]), int(data[2])
+    nums = [float(t) for t in data[3:3 + (n + k) * d]]
+    x = torch.tensor(nums[:n * d]).reshape(n, d)
+    c = torch.tensor(nums[n * d:]).reshape(k, d)
+    assign = torch.zeros(n, dtype=torch.long)
+    new_c = c.clone()
+    print(" ".join(str(v) for v in assign.tolist()))
+    for row in new_c.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, k, d = int(data[0]), int(data[1]), int(data[2])
+    nums = [float(t) for t in data[3:3 + (n + k) * d]]
+    x = torch.tensor(nums[:n * d]).reshape(n, d)
+    c = torch.tensor(nums[n * d:]).reshape(k, d)
+    dist = (x.unsqueeze(1) - c.unsqueeze(0)).pow(2).sum(dim=-1)
+    assign = dist.argmin(dim=1)
+    new_c = c.clone()
+    for j in range(k):
+        mask = assign == j
+        if mask.any():
+            new_c[j] = x[mask].mean(dim=0)
+    print(" ".join(str(v) for v in assign.tolist()))
+    for row in new_c.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+hints = [
+  "(x.unsqueeze(1) - c.unsqueeze(0)) is (n, k, d); square, sum the last axis, argmin over k.",
+  "An empty cluster has no mean — guard it, or the centroid becomes nan and never recovers.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-clusters", stdin = "4 2 1\n0\n1\n10\n11\n0\n10\n", expect = "0 0 1 1\n0.5\n10.5\n", visible = true },
+  { name = "empty-cluster", stdin = "2 2 1\n0\n1\n0\n100\n", expect = "0 0\n0.5\n100.0\n", visible = false },
+  { name = "two-d", stdin = "3 1 2\n0 0\n2 0\n1 3\n5 5\n", expect = "0 0 0\n1.0 1.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id           = "pytorch.hacker.09.iou"
+node         = 9
+title        = "HOW MUCH DO THEY OVERLAP"
+difficulty   = 4
+time_limit_s = 900
+story        = "Detection boxes, and the metric that decides whether a prediction counts. The clamp at zero is the line people forget."
+concepts     = ["broadcasting", "matrix"]
+requires     = ["pytorch.hacker.08.kmeans-step"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief        = '''
+Line one is `n m`. Then `n` boxes and `m` boxes, each as `x1 y1 x2 y2`.
+
+Print the `n × m` IoU matrix, rounded to four places, one row per line.
+
+Intersection is the overlap of the two intervals on each axis, **clamped at zero** — two boxes that do not touch give a negative width, and without the clamp the product of two negatives comes out positive and the metric silently reports an overlap that is not there.
+
+```
+input:  2 1
+        0 0 2 2
+        1 1 3 3
+        0 0 2 2
+output: 1.0
+        0.1429
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, m = int(data[0]), int(data[1])
+    nums = [float(t) for t in data[2:2 + (n + m) * 4]]
+    a = torch.tensor(nums[:n * 4]).reshape(n, 4)
+    b = torch.tensor(nums[n * 4:]).reshape(m, 4)
+    iou = torch.zeros(n, m)
+    for row in iou.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, m = int(data[0]), int(data[1])
+    nums = [float(t) for t in data[2:2 + (n + m) * 4]]
+    a = torch.tensor(nums[:n * 4]).reshape(n, 4)
+    b = torch.tensor(nums[n * 4:]).reshape(m, 4)
+    lt = torch.maximum(a[:, None, :2], b[None, :, :2])
+    rb = torch.minimum(a[:, None, 2:], b[None, :, 2:])
+    wh = (rb - lt).clamp(min=0)
+    inter = wh[..., 0] * wh[..., 1]
+    area_a = (a[:, 2] - a[:, 0]) * (a[:, 3] - a[:, 1])
+    area_b = (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1])
+    iou = inter / (area_a[:, None] + area_b[None, :] - inter)
+    for row in iou.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+hints = [
+  "Top-left is the elementwise maximum of the two corners, bottom-right the minimum; then (rb - lt).clamp(min=0).",
+  "The union is areaA + areaB - intersection — subtract it or every overlap is understated.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "partial", stdin = "2 1\n0 0 2 2\n1 1 3 3\n0 0 2 2\n", expect = "1.0\n0.1429\n", visible = true },
+  { name = "disjoint", stdin = "1 1\n0 0 1 1\n5 5 6 6\n", expect = "0.0\n", visible = false },
+  { name = "contained", stdin = "1 1\n0 0 4 4\n1 1 3 3\n", expect = "0.25\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id           = "pytorch.hacker.10.nms"
+node         = 10
+title        = "KEEP ONE PER THING"
+difficulty   = 4
+time_limit_s = 1200
+story        = "Nine boxes on one rack door and the detector is convinced there are nine rack doors."
+concepts     = ["greedy", "sorting"]
+requires     = ["pytorch.hacker.09.iou"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief        = '''
+Line one is `n thr`. Then `n` rows of `x1 y1 x2 y2 score`.
+
+Print the indices kept by non-maximum suppression, in the order they are kept, space-separated. Print an empty line if none are kept.
+
+NMS is greedy: take the highest-scoring box, keep it, drop every remaining box whose IoU with it is **greater than** `thr`, repeat. A box exactly at the threshold survives.
+
+```
+input:  3 0.5
+        0 0 2 2 0.9
+        0 0 2 2 0.8
+        5 5 7 7 0.7
+output: 0 2
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, thr = int(data[0]), float(data[1])
+    b = torch.tensor([float(t) for t in data[2:2 + n * 5]]).reshape(n, 5)
+    boxes, scores = b[:, :4], b[:, 4]
+    keep = []
+    print(" ".join(str(i) for i in keep))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, thr = int(data[0]), float(data[1])
+    b = torch.tensor([float(t) for t in data[2:2 + n * 5]]).reshape(n, 5)
+    boxes, scores = b[:, :4], b[:, 4]
+    area = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+    order = scores.argsort(descending=True).tolist()
+    keep = []
+    while order:
+        i = order.pop(0)
+        keep.append(i)
+        rest = []
+        for j in order:
+            lt = torch.maximum(boxes[i, :2], boxes[j, :2])
+            rb = torch.minimum(boxes[i, 2:], boxes[j, 2:])
+            wh = (rb - lt).clamp(min=0)
+            inter = (wh[0] * wh[1]).item()
+            iou = inter / (area[i].item() + area[j].item() - inter)
+            if iou <= thr:
+                rest.append(j)
+        order = rest
+    print(" ".join(str(i) for i in keep))
+
+
+main()
+'''
+hints = [
+  "Sort by score descending, pop the best, filter the rest by IoU against it, repeat.",
+  "The comparison is strictly greater than the threshold for suppression, so a box exactly at thr is kept.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "duplicate", stdin = "3 0.5\n0 0 2 2 0.9\n0 0 2 2 0.8\n5 5 7 7 0.7\n", expect = "0 2\n", visible = true },
+  { name = "all-kept", stdin = "2 0.5\n0 0 1 1 0.5\n9 9 10 10 0.9\n", expect = "1 0\n", visible = false },
+  { name = "one-box", stdin = "1 0.1\n0 0 1 1 0.3\n", expect = "0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id           = "pytorch.hacker.11.dropout"
+node         = 11
+title        = "WRITE DROPOUT"
+difficulty   = 4
+time_limit_s = 900
+story        = "Write dropout, they say, and then: what does it do at inference time? The second question is the real one."
+concepts     = ["inference", "modules"]
+requires     = ["pytorch.hacker.10.nms"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief        = '''
+Line one is `n p seed`, with `p` the drop probability.
+
+Print the fraction that survived and the mean of the output, each rounded to **one** place, and `True` if the expected value was preserved — that is, if the surviving elements were scaled by `1/(1-p)`.
+
+One place, because the exact draw is the generator's business and not the question's: what is being checked is that the output still averages 1 after a proportion `p` of it has been thrown away.
+
+This is **inverted** dropout, which is what every framework implements: the scaling happens during training so that inference is just the identity, with nothing to remember and nothing to switch off.
+
+```
+input:  1000 0.5 0
+output: 0.5 1.0 True
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, p, seed = int(data[0]), float(data[1]), int(data[2])
+    g = torch.Generator().manual_seed(seed)
+    x = torch.ones(n)
+    keep = (torch.rand(n, generator=g) >= p).float()
+    out = x * keep
+    print(round(keep.mean().item(), 1), round(out.mean().item(), 1),
+          abs(out.mean().item() - 1.0) < 0.05)
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, p, seed = int(data[0]), float(data[1]), int(data[2])
+    g = torch.Generator().manual_seed(seed)
+    x = torch.ones(n)
+    keep = (torch.rand(n, generator=g) >= p).float()
+    out = x * keep / (1.0 - p)
+    print(round(keep.mean().item(), 1), round(out.mean().item(), 1),
+          abs(out.mean().item() - 1.0) < 0.05)
+
+
+main()
+'''
+hints = [
+  "Divide by (1 - p) on the training path; that is the whole difference between dropout and zeroing things out.",
+  "Without the scaling the activations shrink by a factor of (1 - p) and every layer downstream sees the wrong scale at inference.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "half", stdin = "1000 0.5 0\n", expect = "0.5 1.0 True\n", visible = true },
+  { name = "keep-all", stdin = "100 0.0 1\n", expect = "1.0 1.0 True\n", visible = false },
+  { name = "heavy", stdin = "2000 0.8 7\n", expect = "0.2 1.0 True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id           = "pytorch.hacker.12.gelu"
+node         = 12
+title        = "THE ONE IN THE TRANSFORMER"
+difficulty   = 3
+time_limit_s = 900
+story        = "The MLP in the block uses neither ReLU nor sigmoid, and the candidate is asked to write the one it does use."
+concepts     = ["modules", "math"]
+requires     = ["pytorch.hacker.11.dropout"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` floats.
+
+Print your exact GELU, rounded to four places, then `True` if it matches `nn.GELU()` to `1e-5`.
+
+Exact GELU is `x · Φ(x)`, where `Φ` is the standard normal CDF: `0.5 · (1 + erf(x/√2))`. The `tanh` form is an approximation and does **not** match the default to `1e-5`, which is the trap in the question.
+
+```
+input:  3
+        -1 0 1
+output: -0.1587 0.0 0.8413 True
+```
+'''
+starter      = '''
+import sys
+import torch
+import torch.nn as nn
+
+
+def main():
+    data = sys.stdin.read().split()
+    n = int(data[0])
+    x = torch.tensor([float(t) for t in data[1:1 + n]])
+    mine = torch.zeros(n)
+    ref = nn.GELU()(x)
+    print(" ".join(str(round(v, 4)) for v in mine.tolist()),
+          bool(torch.allclose(mine, ref, atol=1e-5)))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+import torch.nn as nn
+
+
+def main():
+    data = sys.stdin.read().split()
+    n = int(data[0])
+    x = torch.tensor([float(t) for t in data[1:1 + n]])
+    mine = x * 0.5 * (1.0 + torch.erf(x / 2.0 ** 0.5))
+    ref = nn.GELU()(x)
+    print(" ".join(str(round(v, 4)) for v in mine.tolist()),
+          bool(torch.allclose(mine, ref, atol=1e-5)))
+
+
+main()
+'''
+hints = [
+  "x * 0.5 * (1 + torch.erf(x / 2 ** 0.5)) — torch.erf is the error function.",
+  "nn.GELU(approximate=\"tanh\") is the other one; the default is exact and that is what you have to match.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-points", stdin = "3\n-1 0 1\n", expect = "-0.1587 0.0 0.8413 True\n", visible = true },
+  { name = "saturated", stdin = "2\n-3 6\n", expect = "-0.004 6.0 True\n", visible = false },
+  { name = "half", stdin = "1\n0.5\n", expect = "0.3457 True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id           = "pytorch.hacker.13.rmsnorm"
+node         = 13
+title        = "NO MEAN AT ALL"
+difficulty   = 4
+time_limit_s = 900
+story        = "The newer models dropped the centring step and got the same result for less arithmetic. Write the one they kept."
+concepts     = ["modules", "attention"]
+requires     = ["pytorch.hacker.12.gelu"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief        = '''
+Line one is `n d`. Then `n` rows of `d` floats.
+
+Print each normalised row, rounded to four places, one per line.
+
+RMSNorm divides by the root mean square of the row and does **not** subtract the mean: `x / sqrt(mean(x²) + eps)`. Use `eps = 1e-6`. That is the whole difference from LayerNorm, and it is why it is cheaper.
+
+```
+input:  2 4
+        1 1 1 1
+        0 0 0 2
+output: 1.0 1.0 1.0 1.0
+        0.0 0.0 0.0 2.0
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, d = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n * d]]).reshape(n, d)
+    out = x.clone()
+    for row in out.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, d = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n * d]]).reshape(n, d)
+    out = x / torch.sqrt(x.pow(2).mean(dim=-1, keepdim=True) + 1e-6)
+    for row in out.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+hints = [
+  "x.pow(2).mean(dim=-1, keepdim=True) then sqrt — keepdim, so it broadcasts back across the row.",
+  "There is no mean subtraction and no bias; a row of all ones comes out as a row of all ones.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-rows", stdin = "2 4\n1 1 1 1\n0 0 0 2\n", expect = "1.0 1.0 1.0 1.0\n0.0 0.0 0.0 2.0\n", visible = true },
+  { name = "scale-invariant", stdin = "1 2\n3 4\n", expect = "0.8485 1.1314\n", visible = false },
+  { name = "negatives", stdin = "1 2\n-1 1\n", expect = "-1.0 1.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id           = "pytorch.hacker.14.sinusoidal"
+node         = 14
+title        = "POSITION WITHOUT PARAMETERS"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The original paper's positional encoding: no table, no training, and it extends past the longest sequence anyone showed it."
+concepts     = ["embeddings", "math"]
+requires     = ["pytorch.hacker.13.rmsnorm"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief        = '''
+Line one is `t d`, with `d` even.
+
+Print the `t × d` sinusoidal positional encoding, rounded to four places, one row per line.
+
+Even columns are `sin(pos / 10000^(2i/d))` and odd columns are `cos` of the same argument, where `i` is the pair index. Position 0 is therefore `sin(0), cos(0), sin(0), cos(0), …` — an alternating row of zeros and ones, which is the check worth doing first.
+
+```
+input:  2 4
+output: 0.0 1.0 0.0 1.0
+        0.8415 0.5403 0.01 0.9999
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    t, d = int(data[0]), int(data[1])
+    pe = torch.zeros(t, d)
+    for row in pe.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    t, d = int(data[0]), int(data[1])
+    pos = torch.arange(t).unsqueeze(1).float()
+    i = torch.arange(0, d, 2).float()
+    freq = 1.0 / (10000.0 ** (i / d))
+    pe = torch.zeros(t, d)
+    pe[:, 0::2] = torch.sin(pos * freq)
+    pe[:, 1::2] = torch.cos(pos * freq)
+    for row in pe.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+hints = [
+  "The frequencies are 1 / 10000 ** (i / d) for i in arange(0, d, 2) — one per pair, not one per column.",
+  "pe[:, 0::2] and pe[:, 1::2] are the even and odd columns; both take the same (t, d/2) argument.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-by-four", stdin = "2 4\n", expect = "0.0 1.0 0.0 1.0\n0.8415 0.5403 0.01 0.9999\n", visible = true },
+  { name = "first-row", stdin = "1 6\n", expect = "0.0 1.0 0.0 1.0 0.0 1.0\n", visible = false },
+  { name = "two-wide", stdin = "3 2\n", expect = "0.0 1.0\n0.8415 0.5403\n0.9093 -0.4161\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id           = "pytorch.hacker.15.label-smoothing"
+node         = 15
+title        = "NEVER QUITE CERTAIN"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The model is right and enormously overconfident, and the calibration plot is a cliff."
+concepts     = ["loss-functions", "training-loop"]
+requires     = ["pytorch.hacker.14.sinusoidal"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief        = '''
+Line one is `n c eps`. Then `n` rows of `c` logits, then a line of `n` labels.
+
+Print your smoothed loss rounded to five places, then `True` if it matches `nn.CrossEntropyLoss(label_smoothing=eps)` to `1e-5`.
+
+Label smoothing replaces the one-hot target with `1 - eps` on the true class and `eps / c` spread over **all** `c` classes — including the true one, which is the detail that decides whether your number matches the library's.
+
+```
+input:  2 3 0.1
+        1 2 3
+        3 1 0
+        2 0
+output: 0.42206 True
+```
+'''
+starter      = '''
+import sys
+import torch
+import torch.nn as nn
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c, eps = int(data[0]), int(data[1]), float(data[2])
+    x = torch.tensor([float(t) for t in data[3:3 + n * c]]).reshape(n, c)
+    y = torch.tensor([int(t) for t in data[3 + n * c:3 + n * c + n]])
+    mine = torch.tensor(0.0)
+    ref = nn.CrossEntropyLoss(label_smoothing=eps)(x, y)
+    print(round(mine.item(), 5), bool(torch.allclose(mine, ref, atol=1e-5)))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+import torch.nn as nn
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c, eps = int(data[0]), int(data[1]), float(data[2])
+    x = torch.tensor([float(t) for t in data[3:3 + n * c]]).reshape(n, c)
+    y = torch.tensor([int(t) for t in data[3 + n * c:3 + n * c + n]])
+    logp = torch.log_softmax(x, dim=1)
+    nll = -logp.gather(1, y.unsqueeze(1)).squeeze(1)
+    smooth = -logp.mean(dim=1)
+    mine = ((1.0 - eps) * nll + eps * smooth).mean()
+    ref = nn.CrossEntropyLoss(label_smoothing=eps)(x, y)
+    print(round(mine.item(), 5), bool(torch.allclose(mine, ref, atol=1e-5)))
+
+
+main()
+'''
+hints = [
+  "(1 - eps) * nll + eps * (-logp.mean(dim=1)) — the second term is the uniform part, over every class.",
+  "eps / c spread over all c classes is exactly the mean of -log_softmax across the row.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "smoothed", stdin = "2 3 0.1\n1 2 3\n3 1 0\n2 0\n", expect = "0.42206 True\n", visible = true },
+  { name = "no-smoothing", stdin = "2 3 0.0\n1 2 3\n3 1 0\n2 0\n", expect = "0.28873 True\n", visible = false },
+  { name = "uniform-logits", stdin = "1 4 0.2\n0 0 0 0\n1\n", expect = "1.38629 True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id           = "pytorch.hacker.16.focal"
+node         = 16
+title        = "THE EASY ONES STOP COUNTING"
+difficulty   = 4
+time_limit_s = 1200
+story        = "Ten thousand background patches and forty real ones, and the loss is entirely made of background the model already gets right."
+concepts     = ["loss-functions", "datasets"]
+requires     = ["pytorch.hacker.15.label-smoothing"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief        = '''
+Line one is `n gamma`. Line two is `n` logits for a binary problem. Line three is `n` labels, each 0 or 1.
+
+Print the mean focal loss rounded to five places, and the mean plain binary cross-entropy rounded to five places.
+
+Focal loss is `-(1 - p_t)^γ · log(p_t)`, where `p_t` is the probability the model gave the **true** label. A confident, correct prediction has `p_t` near 1, so `(1 - p_t)^γ` is near zero and it stops contributing.
+
+```
+input:  2 2.0
+        4 -4
+        1 0
+output: 0.00001 0.01815
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, gamma = int(data[0]), float(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n]])
+    y = torch.tensor([float(t) for t in data[2 + n:2 + 2 * n]])
+    focal = torch.tensor(0.0)
+    bce = torch.tensor(0.0)
+    print(f"{focal.item():.5f} {bce.item():.5f}")
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, gamma = int(data[0]), float(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n]])
+    y = torch.tensor([float(t) for t in data[2 + n:2 + 2 * n]])
+    p = torch.sigmoid(x)
+    pt = torch.where(y > 0.5, p, 1.0 - p)
+    focal = (-(1.0 - pt) ** gamma * torch.log(pt)).mean()
+    bce = (-torch.log(pt)).mean()
+    print(f"{focal.item():.5f} {bce.item():.5f}")
+
+
+main()
+'''
+hints = [
+  "torch.where(y > 0.5, p, 1 - p) is p_t — the probability of whichever label is the true one.",
+  "gamma = 0 collapses focal loss back to plain BCE, which is the check to run first.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "confident", stdin = "2 2.0\n4 -4\n1 0\n", expect = "0.00001 0.01815\n", visible = true },
+  { name = "gamma-zero", stdin = "2 0.0\n4 -4\n1 0\n", expect = "0.01815 0.01815\n", visible = false },
+  { name = "wrong-and-sure", stdin = "1 2.0\n4\n0\n", expect = "3.87491 4.01815\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id           = "pytorch.hacker.17.grad-accumulation"
+node         = 17
+title        = "A BATCH THAT DOES NOT FIT"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The paper's batch size is 512 and the card holds 128. The answer is four backward passes and one step, and the division everybody forgets."
+concepts     = ["optimizers", "training-loop"]
+requires     = ["pytorch.hacker.16.focal"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief        = '''
+Accumulating gradients over `k` micro-batches and stepping once is equivalent to one big batch — **if** each micro-batch's loss is divided by `k` first. Without the division the gradient is `k` times too large and the effective learning rate silently multiplies.
+
+Line one is `n k`. Then `n` floats, one sample each.
+
+Print the accumulated gradient and the whole-batch gradient, each rounded to six places, and `True` if they agree to `1e-6`.
+
+```
+input:  4 2
+        1 2 3 4
+output: 2.5 2.5 True
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, k = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n]])
+    size = n // k
+
+    w = torch.tensor(0.0, requires_grad=True)
+    for j in range(k):
+        chunk = x[j * size:(j + 1) * size]
+        loss = (w * chunk).mean()
+        loss.backward()
+    acc = w.grad.item()
+
+    v = torch.tensor(0.0, requires_grad=True)
+    (v * x).mean().backward()
+    full = v.grad.item()
+    print(round(acc, 6), round(full, 6), abs(acc - full) < 1e-6)
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, k = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + n]])
+    size = n // k
+
+    w = torch.tensor(0.0, requires_grad=True)
+    for j in range(k):
+        chunk = x[j * size:(j + 1) * size]
+        loss = (w * chunk).mean() / k
+        loss.backward()
+    acc = w.grad.item()
+
+    v = torch.tensor(0.0, requires_grad=True)
+    (v * x).mean().backward()
+    full = v.grad.item()
+    print(round(acc, 6), round(full, 6), abs(acc - full) < 1e-6)
+
+
+main()
+'''
+hints = [
+  "Divide each micro-batch loss by k before its backward pass.",
+  "This holds because the micro-batches are equal size; with a short last batch the weighting has to be by sample count.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-chunks", stdin = "4 2\n1 2 3 4\n", expect = "2.5 2.5 True\n", visible = true },
+  { name = "four-chunks", stdin = "4 4\n1 2 3 4\n", expect = "2.5 2.5 True\n", visible = false },
+  { name = "one-chunk", stdin = "3 1\n3 3 3\n", expect = "3.0 3.0 True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id           = "pytorch.hacker.18.adam"
+node         = 18
+title        = "WRITE ADAM"
+difficulty   = 5
+time_limit_s = 1800
+story        = "Write Adam from memory, and make it agree with the library after three steps. The bias correction is the question."
+concepts     = ["optimizers", "math"]
+requires     = ["pytorch.hacker.17.grad-accumulation"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief        = '''
+Line one is `steps lr`. Line two is `steps` gradients, one per step, applied to a scalar parameter starting at `0`.
+
+Print your parameter after the steps, rounded to six places, then torch's, then `True` if they agree to `1e-6`.
+
+Adam, with `β₁ = 0.9`, `β₂ = 0.999`, `eps = 1e-8`:
+
+```
+m = b1*m + (1-b1)*g
+v = b2*v + (1-b2)*g*g
+mh = m / (1 - b1**t)
+vh = v / (1 - b2**t)
+w = w - lr * mh / (sqrt(vh) + eps)
+```
+
+`t` counts from **1**. Without the bias correction the first steps are far too small, because `m` and `v` start at zero.
+
+```
+input:  3 0.1
+        1 1 1
+output: -0.3 -0.3 True
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    steps, lr = int(data[0]), float(data[1])
+    gs = [float(t) for t in data[2:2 + steps]]
+
+    w, m, v = 0.0, 0.0, 0.0
+    b1, b2, eps = 0.9, 0.999, 1e-8
+    for t, g in enumerate(gs, start=1):
+        pass
+
+    p = torch.tensor(0.0, requires_grad=True)
+    opt = torch.optim.Adam([p], lr=lr, betas=(b1, b2), eps=eps)
+    for g in gs:
+        opt.zero_grad()
+        p.grad = torch.tensor(g)
+        opt.step()
+    print(round(w, 6), round(p.item(), 6), abs(w - p.item()) < 1e-6)
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    steps, lr = int(data[0]), float(data[1])
+    gs = [float(t) for t in data[2:2 + steps]]
+
+    w, m, v = 0.0, 0.0, 0.0
+    b1, b2, eps = 0.9, 0.999, 1e-8
+    for t, g in enumerate(gs, start=1):
+        m = b1 * m + (1 - b1) * g
+        v = b2 * v + (1 - b2) * g * g
+        mh = m / (1 - b1 ** t)
+        vh = v / (1 - b2 ** t)
+        w = w - lr * mh / (vh ** 0.5 + eps)
+
+    p = torch.tensor(0.0, requires_grad=True)
+    opt = torch.optim.Adam([p], lr=lr, betas=(b1, b2), eps=eps)
+    for g in gs:
+        opt.zero_grad()
+        p.grad = torch.tensor(g)
+        opt.step()
+    print(round(w, 6), round(p.item(), 6), abs(w - p.item()) < 1e-6)
+
+
+main()
+'''
+hints = [
+  "t starts at 1, so enumerate(gs, start=1) — a t of 0 divides by zero on the very first correction.",
+  "With a constant gradient the corrected mh/sqrt(vh) is almost exactly 1, so each step moves about lr.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "constant-grad", stdin = "3 0.1\n1 1 1\n", expect = "-0.3 -0.3 True\n", visible = true },
+  { name = "one-step", stdin = "1 0.5\n2\n", expect = "-0.5 -0.5 True\n", visible = false },
+  { name = "sign-flip", stdin = "4 0.1\n1 -1 1 -1\n", expect = "-0.123053 -0.123053 True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id           = "pytorch.hacker.19.padding-mask"
+node         = 19
+title        = "THE BATCH THAT IS NOT SQUARE"
+difficulty   = 4
+time_limit_s = 900
+story        = "Sentences of four different lengths in one tensor, and the model is averaging over the padding."
+concepts     = ["attention", "datasets"]
+requires     = ["pytorch.hacker.18.adam"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief        = '''
+Line one is `n t`. Line two is `n` lengths. Then `n` rows of `t` floats.
+
+Print the mask as integers, one row per line, then the per-row mean over the **real** positions only, rounded to four places, on one line.
+
+`torch.arange(t) < lengths.unsqueeze(1)` is the mask in one line, with no loop. The masked mean is the masked sum divided by the length — dividing by `t` is the bug this question is about.
+
+```
+input:  2 4
+        2 4
+        1 2 9 9
+        1 2 3 4
+output: 1 1 0 0
+        1 1 1 1
+        1.5 2.5
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, t = int(data[0]), int(data[1])
+    lens = torch.tensor([int(v) for v in data[2:2 + n]])
+    x = torch.tensor([float(v) for v in data[2 + n:2 + n + n * t]]).reshape(n, t)
+    mask = torch.zeros(n, t, dtype=torch.bool)
+    means = torch.zeros(n)
+    for row in mask.int().tolist():
+        print(" ".join(str(v) for v in row))
+    print(" ".join(str(round(v, 4)) for v in means.tolist()))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, t = int(data[0]), int(data[1])
+    lens = torch.tensor([int(v) for v in data[2:2 + n]])
+    x = torch.tensor([float(v) for v in data[2 + n:2 + n + n * t]]).reshape(n, t)
+    mask = torch.arange(t) < lens.unsqueeze(1)
+    means = (x * mask).sum(dim=1) / mask.sum(dim=1)
+    for row in mask.int().tolist():
+        print(" ".join(str(v) for v in row))
+    print(" ".join(str(round(v, 4)) for v in means.tolist()))
+
+
+main()
+'''
+hints = [
+  "torch.arange(t) < lens.unsqueeze(1) — the arange broadcasts across the batch.",
+  "Divide by mask.sum(dim=1), not by t, or every short row is pulled towards zero.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-lengths", stdin = "2 4\n2 4\n1 2 9 9\n1 2 3 4\n", expect = "1 1 0 0\n1 1 1 1\n1.5 2.5\n", visible = true },
+  { name = "length-one", stdin = "1 3\n1\n5 7 9\n", expect = "1 0 0\n5.0\n", visible = false },
+  { name = "all-full", stdin = "2 2\n2 2\n1 3\n2 4\n", expect = "1 1\n1 1\n2.0 3.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id           = "pytorch.hacker.20.masked-attention"
+node         = 20
+title        = "ATTENTION WITH HOLES IN IT"
+difficulty   = 5
+time_limit_s = 1500
+story        = "The padded slots are being attended to. The fix is one masked_fill in exactly one place, and the place is the question."
+concepts     = ["attention", "inference"]
+requires     = ["pytorch.hacker.19.padding-mask"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief        = '''
+Line one is `t d len`, where `len` is how many of the `t` positions are real. Then `t` rows of `d` floats, used as `q`, `k` and `v` alike.
+
+Print the attention weights for the first query, rounded to four places, and `True` if every row still sums to one.
+
+The key mask is applied to the **scores**, before the softmax, as `-inf` on the padded keys. Every query then distributes all of its attention over the real positions only.
+
+```
+input:  3 2 2
+        1 0
+        0 1
+        9 9
+output: 0.6698 0.3302 0.0 True
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    t, d, ln = int(data[0]), int(data[1]), int(data[2])
+    x = torch.tensor([float(v) for v in data[3:3 + t * d]]).reshape(t, d)
+    scores = x @ x.t() / d ** 0.5
+    att = torch.softmax(scores, dim=-1)
+    print(" ".join(str(round(v, 4)) for v in att[0].tolist()),
+          bool(torch.allclose(att.sum(dim=-1), torch.ones(t), atol=1e-5)))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    t, d, ln = int(data[0]), int(data[1]), int(data[2])
+    x = torch.tensor([float(v) for v in data[3:3 + t * d]]).reshape(t, d)
+    scores = x @ x.t() / d ** 0.5
+    keep = torch.arange(t) < ln
+    scores = scores.masked_fill(~keep.unsqueeze(0), float("-inf"))
+    att = torch.softmax(scores, dim=-1)
+    print(" ".join(str(round(v, 4)) for v in att[0].tolist()),
+          bool(torch.allclose(att.sum(dim=-1), torch.ones(t), atol=1e-5)))
+
+
+main()
+'''
+hints = [
+  "The mask goes on the key axis: ~keep.unsqueeze(0) masks columns, which is every query's view of the padded keys.",
+  "Masking the query axis instead gives whole rows of -inf, and softmax of that is nan.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "one-padded", stdin = "3 2 2\n1 0\n0 1\n9 9\n", expect = "0.6698 0.3302 0.0 True\n", visible = true },
+  { name = "nothing-padded", stdin = "2 2 2\n1 0\n0 1\n", expect = "0.6698 0.3302 True\n", visible = false },
+  { name = "only-first", stdin = "2 2 1\n1 0\n0 1\n", expect = "1.0 0.0 True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id           = "pytorch.hacker.21.unfold"
+node         = 21
+title        = "EVERY WINDOW AT ONCE"
+difficulty   = 4
+time_limit_s = 1200
+story        = "A sliding window over a long signal, and the Python loop that does it is four hundred times slower than the line that does not."
+concepts     = ["tensors", "two-pointers"]
+requires     = ["pytorch.hacker.20.masked-attention"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief        = '''
+Line one is `n k s`. Line two is `n` floats.
+
+Print the shape of the windowed view as a tuple, then each window's mean on one line, rounded to four places.
+
+`x.unfold(0, k, s)` gives every length-`k` window with stride `s` as a **view** — no copy, no loop, and the window axis lands last.
+
+```
+input:  6 3 1
+        1 2 3 4 5 6
+output: (4, 3)
+        2.0 3.0 4.0 5.0
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, k, s = int(data[0]), int(data[1]), int(data[2])
+    x = torch.tensor([float(v) for v in data[3:3 + n]])
+    win = x.reshape(1, n)
+    print(tuple(win.shape))
+    print(" ".join(str(round(v, 4)) for v in win.mean(dim=-1).tolist()))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, k, s = int(data[0]), int(data[1]), int(data[2])
+    x = torch.tensor([float(v) for v in data[3:3 + n]])
+    win = x.unfold(0, k, s)
+    print(tuple(win.shape))
+    print(" ".join(str(round(v, 4)) for v in win.mean(dim=-1).tolist()))
+
+
+main()
+'''
+hints = [
+  "x.unfold(0, k, s) — dimension, size, step, in that order.",
+  "The number of windows is (n - k) // s + 1, and the result is a view, so writing to it writes to x.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "stride-one", stdin = "6 3 1\n1 2 3 4 5 6\n", expect = "(4, 3)\n2.0 3.0 4.0 5.0\n", visible = true },
+  { name = "stride-two", stdin = "6 2 2\n1 2 3 4 5 6\n", expect = "(3, 2)\n1.5 3.5 5.5\n", visible = false },
+  { name = "whole", stdin = "3 3 1\n2 4 6\n", expect = "(1, 3)\n4.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id           = "pytorch.hacker.22.conv-by-hand"
+node         = 22
+title        = "A CONVOLUTION IS A MATMUL"
+difficulty   = 5
+time_limit_s = 1500
+story        = "They ask how a convolution is actually implemented, and the answer is that it is not a convolution at all once it reaches the hardware."
+concepts     = ["modules", "matrix"]
+requires     = ["pytorch.hacker.21.unfold"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief        = '''
+Line one is `n k`. Line two is `n` floats — the signal. Line three is `k` floats — the kernel.
+
+Print your 1-D valid cross-correlation rounded to four places, then `True` if it matches `nn.functional.conv1d` to `1e-5`.
+
+Unfold the signal into windows and multiply by the kernel: `windows @ kernel`. That is im2col, and it is why convolutions run at matmul speed. Note that torch's `conv1d` is a cross-correlation — it does **not** flip the kernel, which is the other half of the question.
+
+```
+input:  5 3
+        1 2 3 4 5
+        1 0 -1
+output: -2.0 -2.0 -2.0 True
+```
+'''
+starter      = '''
+import sys
+import torch
+import torch.nn.functional as F
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, k = int(data[0]), int(data[1])
+    x = torch.tensor([float(v) for v in data[2:2 + n]])
+    w = torch.tensor([float(v) for v in data[2 + n:2 + n + k]])
+    mine = torch.zeros(n - k + 1)
+    ref = F.conv1d(x.view(1, 1, n), w.view(1, 1, k)).flatten()
+    print(" ".join(str(round(v, 4)) for v in mine.tolist()),
+          bool(torch.allclose(mine, ref, atol=1e-5)))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+import torch.nn.functional as F
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, k = int(data[0]), int(data[1])
+    x = torch.tensor([float(v) for v in data[2:2 + n]])
+    w = torch.tensor([float(v) for v in data[2 + n:2 + n + k]])
+    mine = x.unfold(0, k, 1) @ w
+    ref = F.conv1d(x.view(1, 1, n), w.view(1, 1, k)).flatten()
+    print(" ".join(str(round(v, 4)) for v in mine.tolist()),
+          bool(torch.allclose(mine, ref, atol=1e-5)))
+
+
+main()
+'''
+hints = [
+  "x.unfold(0, k, 1) is (n - k + 1, k); one matmul with the kernel finishes it.",
+  "If you flip the kernel you get a true convolution, and it will not match conv1d.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "edge-filter", stdin = "5 3\n1 2 3 4 5\n1 0 -1\n", expect = "-2.0 -2.0 -2.0 True\n", visible = true },
+  { name = "identity", stdin = "4 1\n1 2 3 4\n1\n", expect = "1.0 2.0 3.0 4.0 True\n", visible = false },
+  { name = "full-width", stdin = "3 3\n1 2 3\n1 1 1\n", expect = "6.0 True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id           = "pytorch.hacker.23.maxpool"
+node         = 23
+title        = "WRITE MAX POOLING"
+difficulty   = 4
+time_limit_s = 1200
+story        = "Halve the picture and keep the strongest thing in each square. No pooling layer, says the interviewer."
+concepts     = ["matrix", "modules"]
+requires     = ["pytorch.hacker.22.conv-by-hand"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief        = '''
+Line one is `h w` with both even. Then `h` rows of `w` floats.
+
+Print the 2×2 max-pooled result rounded to four places, one row per line, then `True` if it matches `nn.functional.max_pool2d` to `1e-5`.
+
+Reshaping to `(h/2, 2, w/2, 2)` puts the two window axes where a pair of `amax` calls can reach them. The common wrong answer reshapes to `(h/2, w/2, 2, 2)`, which interleaves the wrong elements and still runs.
+
+```
+input:  4 4
+        1 2 3 4
+        5 6 7 8
+        9 10 11 12
+        13 14 15 16
+output: 6.0 8.0
+        14.0 16.0
+        True
+```
+'''
+starter      = '''
+import sys
+import torch
+import torch.nn.functional as F
+
+
+def main():
+    data = sys.stdin.read().split()
+    h, w = int(data[0]), int(data[1])
+    x = torch.tensor([float(v) for v in data[2:2 + h * w]]).reshape(h, w)
+    out = x[: h // 2, : w // 2]
+    ref = F.max_pool2d(x.view(1, 1, h, w), 2).view(h // 2, w // 2)
+    for row in out.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+    print(bool(torch.allclose(out, ref, atol=1e-5)))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+import torch.nn.functional as F
+
+
+def main():
+    data = sys.stdin.read().split()
+    h, w = int(data[0]), int(data[1])
+    x = torch.tensor([float(v) for v in data[2:2 + h * w]]).reshape(h, w)
+    out = x.reshape(h // 2, 2, w // 2, 2).amax(dim=(1, 3))
+    ref = F.max_pool2d(x.view(1, 1, h, w), 2).view(h // 2, w // 2)
+    for row in out.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+    print(bool(torch.allclose(out, ref, atol=1e-5)))
+
+
+main()
+'''
+hints = [
+  "x.reshape(h // 2, 2, w // 2, 2) then .amax(dim=(1, 3)) — the two size-2 axes are the window.",
+  "amax takes a tuple of dimensions; max does not, which is why it is the one to reach for here.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four-by-four", stdin = "4 4\n1 2 3 4\n5 6 7 8\n9 10 11 12\n13 14 15 16\n", expect = "6.0 8.0\n14.0 16.0\nTrue\n", visible = true },
+  { name = "one-window", stdin = "2 2\n-1 -5\n-3 -2\n", expect = "-1.0\nTrue\n", visible = false },
+  { name = "wide", stdin = "2 6\n1 9 2 8 3 7\n0 0 0 0 0 0\n", expect = "9.0 8.0 7.0\nTrue\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id           = "pytorch.hacker.24.segment-sum"
+node         = 24
+title        = "SUM PER GROUP"
+difficulty   = 4
+time_limit_s = 1200
+story        = "Pool the token vectors per sentence, with sentences of every length in one flat tensor. The loop over groups is the slow part of the whole pipeline."
+concepts     = ["embeddings", "hashing"]
+requires     = ["pytorch.hacker.23.maxpool"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief        = '''
+Line one is `n g`. Line two is `n` group ids in `[0, g)`. Line three is `n` floats.
+
+Print the sum within each group, rounded to four places, on one line. A group with no members is `0.0`.
+
+`index_add_` (or `scatter_add_`) does it in one call, with no loop and no sort — which is exactly how `EmbeddingBag` pools a batch of variable-length sequences.
+
+```
+input:  5 3
+        0 2 0 1 2
+        1 2 3 4 5
+output: 4.0 4.0 7.0
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, g = int(data[0]), int(data[1])
+    grp = torch.tensor([int(v) for v in data[2:2 + n]])
+    val = torch.tensor([float(v) for v in data[2 + n:2 + 2 * n]])
+    out = torch.zeros(g)
+    print(" ".join(str(round(v, 4)) for v in out.tolist()))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, g = int(data[0]), int(data[1])
+    grp = torch.tensor([int(v) for v in data[2:2 + n]])
+    val = torch.tensor([float(v) for v in data[2 + n:2 + 2 * n]])
+    out = torch.zeros(g).index_add_(0, grp, val)
+    print(" ".join(str(round(v, 4)) for v in out.tolist()))
+
+
+main()
+'''
+hints = [
+  "torch.zeros(g).index_add_(0, grp, val) — repeated indices accumulate, which is the whole point.",
+  "Plain indexed assignment, out[grp] = val, keeps only the last write per index instead of summing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-groups", stdin = "5 3\n0 2 0 1 2\n1 2 3 4 5\n", expect = "4.0 4.0 7.0\n", visible = true },
+  { name = "empty-group", stdin = "2 3\n0 0\n1.5 2.5\n", expect = "4.0 0.0 0.0\n", visible = false },
+  { name = "all-one-group", stdin = "4 1\n0 0 0 0\n1 1 1 1\n", expect = "4.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id           = "pytorch.hacker.25.running-stats"
+node         = 25
+title        = "MEAN AND VARIANCE IN ONE PASS"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The dataset does not fit in memory and the normalisation constants have to come off one pass over it."
+concepts     = ["datasets", "math"]
+requires     = ["pytorch.hacker.24.segment-sum"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief        = '''
+Line one is `n bs`. Line two is `n` floats, to be consumed in chunks of `bs`.
+
+Print the running mean and the running **population** variance, rounded to five places, then `True` if both match a single pass over the whole tensor to `1e-4`.
+
+Keeping a count, a sum and a sum of squares is enough: `var = E[x²] - E[x]²`. It is the formula every framework's `BatchNorm` buffer uses, and it is also the one that loses precision when the mean is large — worth saying out loud.
+
+```
+input:  6 2
+        1 2 3 4 5 6
+output: 3.5 2.91667 True
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, bs = int(data[0]), int(data[1])
+    x = torch.tensor([float(v) for v in data[2:2 + n]])
+    count, total, sq = 0, 0.0, 0.0
+    for i in range(0, n, bs):
+        chunk = x[i:i + bs]
+    mean = 0.0
+    var = 0.0
+    ok = (abs(mean - x.mean().item()) < 1e-4
+          and abs(var - x.var(unbiased=False).item()) < 1e-4)
+    print(round(mean, 5), round(var, 5), ok)
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, bs = int(data[0]), int(data[1])
+    x = torch.tensor([float(v) for v in data[2:2 + n]])
+    count, total, sq = 0, 0.0, 0.0
+    for i in range(0, n, bs):
+        chunk = x[i:i + bs]
+        count += chunk.numel()
+        total += chunk.sum().item()
+        sq += chunk.pow(2).sum().item()
+    mean = total / count
+    var = sq / count - mean * mean
+    ok = (abs(mean - x.mean().item()) < 1e-4
+          and abs(var - x.var(unbiased=False).item()) < 1e-4)
+    print(round(mean, 5), round(var, 5), ok)
+
+
+main()
+'''
+hints = [
+  "Accumulate count, sum and sum of squares; then mean = sum/count and var = sq/count - mean².",
+  "unbiased=False is the population variance — dividing by n, which is what this formula gives.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six-in-threes", stdin = "6 2\n1 2 3 4 5 6\n", expect = "3.5 2.91667 True\n", visible = true },
+  { name = "short-last", stdin = "5 2\n2 2 2 2 2\n", expect = "2.0 0.0 True\n", visible = false },
+  { name = "one-chunk", stdin = "4 4\n0 0 4 4\n", expect = "2.0 4.0 True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id           = "pytorch.hacker.26.mixup"
+node         = 26
+title        = "TWO SAMPLES, ONE TARGET"
+difficulty   = 4
+time_limit_s = 1200
+story        = "Train on the average of two images and the average of their labels. It should not work and it does."
+concepts     = ["datasets", "loss-functions"]
+requires     = ["pytorch.hacker.25.running-stats"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief        = '''
+Line one is `n c lam`. Then `n` rows of `c` logits, then `n` labels, then `n` permutation indices.
+
+Print the mixup loss rounded to five places, and `True` if it equals the soft-target route — building `lam * onehot(y) + (1 - lam) * onehot(y[perm])` and taking `-(target * log_softmax(x)).sum(1).mean()` — to `1e-5`. That reference is already written; yours is the one-line version.
+
+Mixing the **loss** rather than the one-hot target is the standard implementation, and the two are identical for cross-entropy because it is linear in the target. Proving that to yourself is the question.
+
+```
+input:  2 3 0.7
+        1 2 3
+        3 1 0
+        2 0
+        1 0
+output: 1.03873 True
+```
+'''
+starter      = '''
+import sys
+import torch
+import torch.nn as nn
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c, lam = int(data[0]), int(data[1]), float(data[2])
+    p = 3 + n * c
+    x = torch.tensor([float(v) for v in data[3:p]]).reshape(n, c)
+    y = torch.tensor([int(v) for v in data[p:p + n]])
+    perm = torch.tensor([int(v) for v in data[p + n:p + 2 * n]])
+    ce = nn.CrossEntropyLoss()
+    logp = torch.log_softmax(x, dim=1)
+    hot = torch.zeros(n, c).scatter_(1, y.unsqueeze(1), 1.0)
+    mixed_target = lam * hot + (1 - lam) * hot[perm]
+    ref = -(mixed_target * logp).sum(dim=1).mean()
+    loss = torch.tensor(0.0)
+    print(round(loss.item(), 5), bool(torch.allclose(loss, ref, atol=1e-5)))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+import torch.nn as nn
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, c, lam = int(data[0]), int(data[1]), float(data[2])
+    p = 3 + n * c
+    x = torch.tensor([float(v) for v in data[3:p]]).reshape(n, c)
+    y = torch.tensor([int(v) for v in data[p:p + n]])
+    perm = torch.tensor([int(v) for v in data[p + n:p + 2 * n]])
+    ce = nn.CrossEntropyLoss()
+    logp = torch.log_softmax(x, dim=1)
+    hot = torch.zeros(n, c).scatter_(1, y.unsqueeze(1), 1.0)
+    mixed_target = lam * hot + (1 - lam) * hot[perm]
+    ref = -(mixed_target * logp).sum(dim=1).mean()
+    loss = lam * ce(x, y) + (1 - lam) * ce(x, y[perm])
+    print(round(loss.item(), 5), bool(torch.allclose(loss, ref, atol=1e-5)))
+
+
+main()
+'''
+hints = [
+  "lam * ce(x, y) + (1 - lam) * ce(x, y[perm]) — y[perm] is the shuffled partner label.",
+  "In a real implementation the inputs are mixed too, with the same lam drawn from a Beta distribution.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed", stdin = "2 3 0.7\n1 2 3\n3 1 0\n2 0\n1 0\n", expect = "1.03873 True\n", visible = true },
+  { name = "lam-one", stdin = "2 3 1.0\n1 2 3\n3 1 0\n2 0\n1 0\n", expect = "0.28873 True\n", visible = false },
+  { name = "identity-perm", stdin = "2 3 0.5\n1 2 3\n3 1 0\n2 0\n0 1\n", expect = "0.28873 True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id           = "pytorch.hacker.27.sgd-from-scratch"
+node         = 27
+title        = "WRITE SGD, ALL OF IT"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Momentum and weight decay together, and the question is which one is applied first."
+concepts     = ["optimizers", "math"]
+requires     = ["pytorch.hacker.26.mixup"]
+map          = { x = 0.199, y = 0.742, kind = "quest" }
+brief        = '''
+Line one is `steps lr mu wd`. Line two is `steps` gradients for a scalar parameter starting at `1.0`.
+
+Print your parameter after the steps rounded to six places, then torch's, then `True` if they agree to `1e-6`.
+
+Torch's order is: weight decay is folded into the gradient **first**, then momentum accumulates the decayed gradient, then the step is taken.
+
+```
+g = g + wd * w
+b = mu * b + g
+w = w - lr * b
+```
+
+Decaying after the momentum, or decaying the weight directly rather than the gradient, gives a different trajectory — that difference is what AdamW is about.
+
+```
+input:  3 0.1 0.9 0.1
+        1 1 1
+output: 0.388169 0.388169 True
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    steps, lr, mu, wd = int(data[0]), float(data[1]), float(data[2]), float(data[3])
+    gs = [float(t) for t in data[4:4 + steps]]
+
+    w, b = 1.0, 0.0
+    for t, g in enumerate(gs):
+        pass
+
+    p = torch.tensor(1.0, requires_grad=True)
+    opt = torch.optim.SGD([p], lr=lr, momentum=mu, weight_decay=wd)
+    for g in gs:
+        opt.zero_grad()
+        p.grad = torch.tensor(g)
+        opt.step()
+    print(round(w, 6), round(p.item(), 6), abs(w - p.item()) < 1e-6)
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    steps, lr, mu, wd = int(data[0]), float(data[1]), float(data[2]), float(data[3])
+    gs = [float(t) for t in data[4:4 + steps]]
+
+    w, b = 1.0, 0.0
+    for t, g in enumerate(gs):
+        d = g + wd * w
+        b = mu * b + d if t > 0 else d
+        w = w - lr * b
+
+    p = torch.tensor(1.0, requires_grad=True)
+    opt = torch.optim.SGD([p], lr=lr, momentum=mu, weight_decay=wd)
+    for g in gs:
+        opt.zero_grad()
+        p.grad = torch.tensor(g)
+        opt.step()
+    print(round(w, 6), round(p.item(), 6), abs(w - p.item()) < 1e-6)
+
+
+main()
+'''
+hints = [
+  "d = g + wd * w first, then the buffer, then the step.",
+  "Torch initialises the momentum buffer to the first decayed gradient rather than to mu * 0 + g — the same thing here, and worth knowing it is a special case.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "all-three", stdin = "3 0.1 0.9 0.1\n1 1 1\n", expect = "0.388169 0.388169 True\n", visible = true },
+  { name = "no-momentum", stdin = "2 0.5 0.0 0.0\n1 1\n", expect = "0.0 0.0 True\n", visible = false },
+  { name = "decay-only", stdin = "1 0.1 0.0 0.5\n0\n", expect = "0.95 0.95 True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id           = "pytorch.hacker.28.perplexity"
+node         = 28
+title        = "THE NUMBER ON THE PAPER"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The language model's headline metric, and the candidate is asked what it would be for a model that guesses uniformly."
+concepts     = ["loss-functions", "inference"]
+requires     = ["pytorch.hacker.27.sgd-from-scratch"]
+map          = { x = 0.114, y = 0.663, kind = "quest" }
+brief        = '''
+Line one is `t v`. Then `t` rows of `v` logits, then a line of `t` target tokens.
+
+Print the mean cross-entropy and the perplexity, each rounded to four places.
+
+Perplexity is `exp(mean cross-entropy)`. A model that spreads its probability uniformly over `v` tokens has a perplexity of exactly `v` — that is the sanity check, and it is what makes the number comparable across vocabularies of the same size and meaningless across different ones.
+
+```
+input:  2 4
+        0 0 0 0
+        0 0 0 0
+        1 3
+output: 1.3863 4.0
+```
+'''
+starter      = '''
+import sys
+import torch
+import torch.nn as nn
+
+
+def main():
+    data = sys.stdin.read().split()
+    t, v = int(data[0]), int(data[1])
+    x = torch.tensor([float(u) for u in data[2:2 + t * v]]).reshape(t, v)
+    y = torch.tensor([int(u) for u in data[2 + t * v:2 + t * v + t]])
+    ce = torch.tensor(0.0)
+    ppl = torch.tensor(0.0)
+    print(round(ce.item(), 4), round(ppl.item(), 4))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+import torch.nn as nn
+
+
+def main():
+    data = sys.stdin.read().split()
+    t, v = int(data[0]), int(data[1])
+    x = torch.tensor([float(u) for u in data[2:2 + t * v]]).reshape(t, v)
+    y = torch.tensor([int(u) for u in data[2 + t * v:2 + t * v + t]])
+    ce = nn.CrossEntropyLoss()(x, y)
+    ppl = torch.exp(ce)
+    print(round(ce.item(), 4), round(ppl.item(), 4))
+
+
+main()
+'''
+hints = [
+  "torch.exp of the mean cross-entropy — exponentiating a summed loss instead gives a number that grows with the length of the text.",
+  "Uniform logits over v tokens give ln(v), and exp of that is v.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "uniform", stdin = "2 4\n0 0 0 0\n0 0 0 0\n1 3\n", expect = "1.3863 4.0\n", visible = true },
+  { name = "certain", stdin = "1 3\n100 0 0\n0\n", expect = "0.0 1.0\n", visible = false },
+  { name = "two-way", stdin = "1 2\n0 0\n0\n", expect = "0.6931 2.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id           = "pytorch.hacker.29.top-k-filter"
+node         = 29
+title        = "ONLY THE PLAUSIBLE ONES"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The sampler occasionally reaches into the tail and the completion goes somewhere nobody can explain."
+concepts     = ["inference", "heaps"]
+requires     = ["pytorch.hacker.28.perplexity"]
+map          = { x = 0.059, y = 0.950, kind = "quest" }
+brief        = '''
+Line one is `v k`. Line two is `v` logits.
+
+Print the filtered probabilities rounded to four places on one line: everything outside the top `k` is zero, and the survivors are renormalised to sum to one.
+
+The standard implementation sets the excluded logits to `-inf` and softmaxes, which renormalises for free. Taking the `k`-th largest as the threshold with `topk(...).values[-1]` keeps ties, which is the behaviour a reviewer will ask about.
+
+```
+input:  5 2
+        1 2 3 4 5
+output: 0.0 0.0 0.0 0.2689 0.7311
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    v, k = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + v]])
+    p = torch.softmax(x, dim=0)
+    print(" ".join(str(round(u, 4)) for u in p.tolist()))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    v, k = int(data[0]), int(data[1])
+    x = torch.tensor([float(t) for t in data[2:2 + v]])
+    thr = x.topk(k).values[-1]
+    p = torch.softmax(x.masked_fill(x < thr, float("-inf")), dim=0)
+    print(" ".join(str(round(u, 4)) for u in p.tolist()))
+
+
+main()
+'''
+hints = [
+  "thr = x.topk(k).values[-1] is the k-th largest; mask everything strictly below it.",
+  "Masking before the softmax is what renormalises the survivors; zeroing afterwards leaves them summing to less than one.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "top-two", stdin = "5 2\n1 2 3 4 5\n", expect = "0.0 0.0 0.0 0.2689 0.7311\n", visible = true },
+  { name = "k-is-v", stdin = "3 3\n0 0 0\n", expect = "0.3333 0.3333 0.3333\n", visible = false },
+  { name = "greedy", stdin = "4 1\n1 9 2 3\n", expect = "0.0 1.0 0.0 0.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id           = "pytorch.hacker.30.beam-search"
+node         = 30
+title        = "TWO CANDIDATES AT A TIME"
+difficulty   = 5
+time_limit_s = 1800
+story        = "Greedy takes the best token and loses the best sentence. Keep two and the difference shows up on the second word."
+concepts     = ["backtracking", "inference"]
+requires     = ["pytorch.hacker.29.top-k-filter"]
+map          = { x = 0.260, y = 0.857, kind = "quest" }
+brief        = '''
+Line one is `steps v beam`. Then `steps` rows of `v` log-probabilities, used at every beam alike — a toy model that ignores its own history.
+
+Print the best sequence found by beam search as space-separated token ids, then its total log-probability rounded to four places.
+
+At each step, extend every live beam by every token, score by the **summed** log-probability, and keep the best `beam`. Scoring by the last step alone is greedy wearing a beam's clothes.
+
+```
+input:  2 3 2
+        -0.1 -0.2 -3.0
+        -2.0 -0.05 -1.0
+output: 0 1
+        -0.15
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    steps, v, beam = int(data[0]), int(data[1]), int(data[2])
+    lp = torch.tensor([float(t) for t in data[3:3 + steps * v]]).reshape(steps, v)
+    live = [([], 0.0)]
+    best = live[0]
+    print(" ".join(str(t) for t in best[0]))
+    print(round(best[1], 4))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    steps, v, beam = int(data[0]), int(data[1]), int(data[2])
+    lp = torch.tensor([float(t) for t in data[3:3 + steps * v]]).reshape(steps, v)
+    live = [([], 0.0)]
+    for s in range(steps):
+        cand = []
+        for seq, score in live:
+            for tok in range(v):
+                cand.append((seq + [tok], score + lp[s, tok].item()))
+        cand.sort(key=lambda p: -p[1])
+        live = cand[:beam]
+    best = live[0]
+    print(" ".join(str(t) for t in best[0]))
+    print(round(best[1], 4))
+
+
+main()
+'''
+hints = [
+  "Expand every live beam by every token, sort by the running total, keep the best `beam`.",
+  "Length-normalise the score by dividing by the sequence length if you want it to stop preferring short sequences — say so out loud even when it is not asked for.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-steps", stdin = "2 3 2\n-0.1 -0.2 -3.0\n-2.0 -0.05 -1.0\n", expect = "0 1\n-0.15\n", visible = true },
+  { name = "one-step", stdin = "1 3 2\n-5.0 -0.5 -1.0\n", expect = "1\n-0.5\n", visible = false },
+  { name = "beam-of-one", stdin = "2 2 1\n-0.1 -0.9\n-0.9 -0.1\n", expect = "0 1\n-0.2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id           = "pytorch.hacker.31.kv-cache"
+node         = 31
+title        = "DO NOT RECOMPUTE THE PAST"
+difficulty   = 5
+time_limit_s = 1800
+story        = "Generating the thousandth token re-reads the first nine hundred and ninety-nine. It does not have to; they have not changed."
+concepts     = ["attention", "complexity"]
+requires     = ["pytorch.hacker.30.beam-search"]
+map          = { x = 0.335, y = 0.936, kind = "quest" }
+brief        = '''
+Line one is `t d`. Then `t` rows of `d` floats, used as `q`, `k` and `v`.
+
+Print `True` if the cached step matches the full recomputation to `1e-5`, then the last output row rounded to four places.
+
+Because the mask is causal, the keys and values of the earlier positions never change. Generating step `t` therefore needs one new query against the **whole** cache — `(1, t)` scores rather than `(t, t)` — which is what turns generation from quadratic per token into linear.
+
+Compute the last row both ways: once by running the full causal attention, once from the cache.
+
+```
+input:  3 2
+        1 0
+        0 1
+        1 1
+output: True 0.7517 0.7517
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    t, d = int(data[0]), int(data[1])
+    x = torch.tensor([float(u) for u in data[2:2 + t * d]]).reshape(t, d)
+    scores = x @ x.t() / d ** 0.5
+    mask = torch.tril(torch.ones(t, t))
+    full = (torch.softmax(scores.masked_fill(mask == 0, float("-inf")), dim=-1) @ x)[-1]
+    cached = torch.zeros(d)
+    print(bool(torch.allclose(full, cached, atol=1e-5)),
+          " ".join(str(round(u, 4)) for u in cached.tolist()))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    t, d = int(data[0]), int(data[1])
+    x = torch.tensor([float(u) for u in data[2:2 + t * d]]).reshape(t, d)
+    scores = x @ x.t() / d ** 0.5
+    mask = torch.tril(torch.ones(t, t))
+    full = (torch.softmax(scores.masked_fill(mask == 0, float("-inf")), dim=-1) @ x)[-1]
+    q = x[-1:]
+    k_cache, v_cache = x, x
+    cached = (torch.softmax(q @ k_cache.t() / d ** 0.5, dim=-1) @ v_cache)[0]
+    print(bool(torch.allclose(full, cached, atol=1e-5)),
+          " ".join(str(round(u, 4)) for u in cached.tolist()))
+
+
+main()
+'''
+hints = [
+  "The last query is x[-1:], keeping the row axis; the cache is every key and value so far.",
+  "No mask is needed on the cached step — the last position may attend to everything before it, which is the whole cache.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-steps", stdin = "3 2\n1 0\n0 1\n1 1\n", expect = "True 0.7517 0.7517\n", visible = true },
+  { name = "single", stdin = "1 2\n3 4\n", expect = "True 3.0 4.0\n", visible = false },
+  { name = "two-steps", stdin = "2 1\n1\n2\n", expect = "True 1.8808\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id           = "pytorch.hacker.32.head-split"
+node         = 32
+title        = "FOUR HEADS OUT OF ONE MATRIX"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The heads are not four matrices. They are one matrix and a reshape, and getting the reshape wrong mixes the heads together silently."
+concepts     = ["attention", "tensors"]
+requires     = ["pytorch.hacker.31.kv-cache"]
+map          = { x = 0.538, y = 0.857, kind = "quest" }
+brief        = '''
+Line one is `b t d h`, with `h` dividing `d`.
+
+Split a `(b, t, d)` into heads, merge it back, and print the split shape, the merged shape, and `True` if the round trip is exact.
+
+Split is `view(b, t, h, d//h).transpose(1, 2)`; merge is `transpose(1, 2)` then `reshape`. The transpose is what makes the head axis a batch axis, and it is also why the merge needs `reshape` rather than `view` — after the transpose the memory is no longer contiguous.
+
+```
+input:  2 5 8 4
+output: (2, 4, 5, 2) (2, 5, 8) True
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    b, t, d, h = (int(v) for v in sys.stdin.read().split()[:4])
+    torch.manual_seed(0)
+    x = torch.randn(b, t, d)
+    heads = None
+    back = None
+    print(tuple(heads.shape), tuple(back.shape), torch.equal(x, back))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    b, t, d, h = (int(v) for v in sys.stdin.read().split()[:4])
+    torch.manual_seed(0)
+    x = torch.randn(b, t, d)
+    heads = x.view(b, t, h, d // h).transpose(1, 2)
+    back = heads.transpose(1, 2).reshape(b, t, d)
+    print(tuple(heads.shape), tuple(back.shape), torch.equal(x, back))
+
+
+main()
+'''
+hints = [
+  "x.view(b, t, h, d // h).transpose(1, 2) — split the feature axis, then swap time and head.",
+  "The merge is heads.transpose(1, 2).reshape(b, t, d); view raises there, because the transpose broke contiguity.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four-heads", stdin = "2 5 8 4\n", expect = "(2, 4, 5, 2) (2, 5, 8) True\n", visible = true },
+  { name = "one-head", stdin = "1 3 4 1\n", expect = "(1, 1, 3, 4) (1, 3, 4) True\n", visible = false },
+  { name = "head-per-feature", stdin = "1 2 4 4\n", expect = "(1, 4, 2, 1) (1, 2, 4) True\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id           = "pytorch.hacker.33.reorder-beams"
+node         = 33
+title        = "THE CACHE FOLLOWS THE BEAM"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Beam three was pruned and beam one forked in two, and the key-value cache is still laid out the way it was before either happened."
+concepts     = ["inference", "tensors"]
+requires     = ["pytorch.hacker.32.head-split"]
+map          = { x = 0.605, y = 0.932, kind = "quest" }
+brief        = '''
+Line one is `n t`. Then `n` cache rows of `t` floats. Line last is `n` parent indices saying which old beam each new beam came from.
+
+Print the reordered cache, one row per line, rounded to four places.
+
+`cache.index_select(0, parents)` is the whole operation, and it handles a repeated parent — one beam forking into two — which is exactly what a `for` loop with in-place assignment gets wrong.
+
+```
+input:  3 2
+        1 1
+        2 2
+        3 3
+        2 0 0
+output: 3.0 3.0
+        1.0 1.0
+        1.0 1.0
+```
+'''
+starter      = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, t = int(data[0]), int(data[1])
+    cache = torch.tensor([float(v) for v in data[2:2 + n * t]]).reshape(n, t)
+    parents = torch.tensor([int(v) for v in data[2 + n * t:2 + n * t + n]])
+    out = cache
+    for row in out.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+
+
+def main():
+    data = sys.stdin.read().split()
+    n, t = int(data[0]), int(data[1])
+    cache = torch.tensor([float(v) for v in data[2:2 + n * t]]).reshape(n, t)
+    parents = torch.tensor([int(v) for v in data[2 + n * t:2 + n * t + n]])
+    out = cache.index_select(0, parents)
+    for row in out.tolist():
+        print(" ".join(str(round(v, 4)) for v in row))
+
+
+main()
+'''
+hints = [
+  "cache.index_select(0, parents) — or the equivalent cache[parents], which reads better.",
+  "index_select copies, so a forked parent gives two independent rows rather than two views of one.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 20000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "forked", stdin = "3 2\n1 1\n2 2\n3 3\n2 0 0\n", expect = "3.0 3.0\n1.0 1.0\n1.0 1.0\n", visible = true },
+  { name = "identity", stdin = "2 1\n5\n7\n0 1\n", expect = "5.0\n7.0\n", visible = false },
+  { name = "all-one-parent", stdin = "2 2\n1 2\n3 4\n1 1\n", expect = "3.0 4.0\n3.0 4.0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 34  BOSS
+[[quest]]
+id           = "pytorch.hacker.34.teaching-cluster"
+node         = 34
+title        = "THE TEACHING CLUSTER"
+difficulty   = 5
+time_limit_s = 1800
+story        = "Room 7-32, the last question, and it is the thing two floors down. Build one block of it, and prove it cannot read the future."
+concepts     = ["attention", "modules", "inference"]
+requires     = ["pytorch.hacker.33.reorder-beams"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief        = '''
+Line one is `t d h seed`.
+
+Write the forward pass of one **pre-norm causal transformer block**: LayerNorm, multi-head causal self-attention, residual, LayerNorm, GELU MLP, residual. Every weight is given; only `forward` is missing.
+
+Print four things: the output shape, `True` if the attention core matches `F.scaled_dot_product_attention(..., is_causal=True)` to `1e-5`, `True` if the block is causal — changing the **last** token must leave every earlier output row untouched — and `True` if the output is finite.
+
+Causality is the property, not the code. A block that passes the shape check and fails this one is the bug that trains to a perfect loss and generates noise.
+
+```
+input:  6 16 4 0
+output: (6, 16) True True True
+```
+'''
+starter      = '''
+import sys
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+def main():
+    t, d, h, seed = (int(v) for v in sys.stdin.read().split()[:4])
+    torch.manual_seed(seed)
+    ln1, ln2 = nn.LayerNorm(d), nn.LayerNorm(d)
+    qkv, proj = nn.Linear(d, 3 * d), nn.Linear(d, d)
+    mlp = nn.Sequential(nn.Linear(d, 4 * d), nn.GELU(), nn.Linear(4 * d, d))
+
+    def attend(x):
+        q, k, v = qkv(ln1(x)).split(d, dim=-1)
+        q = q.view(t, h, d // h).transpose(0, 1)
+        k = k.view(t, h, d // h).transpose(0, 1)
+        v = v.view(t, h, d // h).transpose(0, 1)
+        y = torch.zeros_like(q)
+        return y.transpose(0, 1).reshape(t, d)
+
+    def block(x):
+        return x
+
+    x = torch.randn(t, d)
+    with torch.no_grad():
+        out = block(x)
+        q, k, v = qkv(ln1(x)).split(d, dim=-1)
+        q = q.view(t, h, d // h).transpose(0, 1)
+        k = k.view(t, h, d // h).transpose(0, 1)
+        v = v.view(t, h, d // h).transpose(0, 1)
+        ref = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        ref = ref.transpose(0, 1).reshape(t, d)
+        poked = x.clone()
+        poked[-1] += 100.0
+        out2 = block(poked)
+    print(tuple(out.shape),
+          bool(torch.allclose(attend(x), ref, atol=1e-5)),
+          bool(torch.allclose(out[:-1], out2[:-1], atol=1e-5)),
+          bool(torch.isfinite(out).all()))
+
+
+main()
+'''
+solution     = '''
+import sys
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+def main():
+    t, d, h, seed = (int(v) for v in sys.stdin.read().split()[:4])
+    torch.manual_seed(seed)
+    ln1, ln2 = nn.LayerNorm(d), nn.LayerNorm(d)
+    qkv, proj = nn.Linear(d, 3 * d), nn.Linear(d, d)
+    mlp = nn.Sequential(nn.Linear(d, 4 * d), nn.GELU(), nn.Linear(4 * d, d))
+
+    def attend(x):
+        q, k, v = qkv(ln1(x)).split(d, dim=-1)
+        q = q.view(t, h, d // h).transpose(0, 1)
+        k = k.view(t, h, d // h).transpose(0, 1)
+        v = v.view(t, h, d // h).transpose(0, 1)
+        att = (q @ k.transpose(-2, -1)) / (d // h) ** 0.5
+        mask = torch.tril(torch.ones(t, t))
+        att = att.masked_fill(mask == 0, float("-inf")).softmax(dim=-1)
+        y = att @ v
+        return y.transpose(0, 1).reshape(t, d)
+
+    def block(x):
+        x = x + proj(attend(x))
+        x = x + mlp(ln2(x))
+        return x
+
+    x = torch.randn(t, d)
+    with torch.no_grad():
+        out = block(x)
+        q, k, v = qkv(ln1(x)).split(d, dim=-1)
+        q = q.view(t, h, d // h).transpose(0, 1)
+        k = k.view(t, h, d // h).transpose(0, 1)
+        v = v.view(t, h, d // h).transpose(0, 1)
+        ref = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        ref = ref.transpose(0, 1).reshape(t, d)
+        poked = x.clone()
+        poked[-1] += 100.0
+        out2 = block(poked)
+    print(tuple(out.shape),
+          bool(torch.allclose(attend(x), ref, atol=1e-5)),
+          bool(torch.allclose(out[:-1], out2[:-1], atol=1e-5)),
+          bool(torch.isfinite(out).all()))
+
+
+main()
+'''
+hints = [
+  "attend: scale by sqrt(d // h) — the head dimension — then masked_fill with the lower-triangular mask, then softmax, then @ v.",
+  "block is two residuals: x = x + proj(attend(x)) and then x = x + mlp(ln2(x)). Pre-norm means the LayerNorm is inside each branch, never on the residual itself.",
+  "If the causality check fails, the mask is missing or applied after the softmax; if the reference check fails, the scale is d rather than d // h.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 30000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six-tokens", stdin = "6 16 4 0\n", expect = "(6, 16) True True True\n", visible = true },
+  { name = "one-head", stdin = "4 8 1 3\n", expect = "(4, 8) True True True\n", visible = false },
+  { name = "single-token", stdin = "1 8 2 1\n", expect = "(1, 8) True True True\n", visible = false },
+  { name = "longer", stdin = "12 32 8 7\n", expect = "(12, 32) True True True\n", visible = false },
+]

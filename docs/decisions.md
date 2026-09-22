@@ -7141,3 +7141,95 @@ Both clients. The LÖVE side is `Quest.answer_word`, `Quest.answer_closer`,
 `Fx:burst`; `answer_closer` compares quotes by byte, because a lone `"` in
 `src/scenes/quest.lua` leaves `tests/test_screens.lua` pairing the rest of
 the file's string literals off by one.
+
+## 2026-09-22 — A fifth land: PYTORCH, and twelve slugs to go with it
+
+PYTORCH LAND is `rust`, `go`, `cpp`, `python`, **`pytorch`**. It is the one
+land that is not a language, and the reason it is a land rather than a fifth
+category under `python` is that the roads are the axis the game already has:
+a player picks a land and walks four roads through it, and "PyTorch" is a
+thing you learn the way you learn a language, one construct at a time, not a
+harder set of Python quests.
+
+**It is Python underneath, everywhere it can be.** `pytorch` dispatches to
+`runner/src/python.rs`, writes the same `main.py`, runs the same
+`python3 -m py_compile` then `python3 -I main.py`, formats with the same
+`black`, and classifies with the same `py:` codes — a `TypeError` out of a
+tensor is a `TypeError`. There is no `pytorch:` prefix and there should not
+be one. What differs is one question: whether `torch` imports. That is what
+`cwbhacker doctor` and the boot report check for this land
+(`runner/src/format.rs`), because a `python3` without it cannot run one node.
+
+**Nothing is downloaded.** SPEC §1 gives the runner no network and the image
+has no `torchvision`, so the content generates what it needs: the ADVANCED
+road's digits are MNIST-*shaped* — 28×28×1, ten classes, `(N, C, H, W)`, a
+bar per class under noise, generated from a seeded `torch.Generator` — and
+the GPT-2 on its last node is built out of its own parts at fourteen thousand
+parameters and trained on an eight-token sequence. The briefs say so rather
+than implying a download that is not happening.
+
+**Every expected output is a shape, a count, a flag or a rounded number.** A
+raw float off a training run is not the same on two machines or two torch
+versions, and `match = "trim"` compares bytes. So the packs assert
+`tuple(x.shape)`, parameter counts, `acc > 0.95`, `loss.item() < 0.01`,
+`torch.allclose(mine, reference)` and argmax predictions on trivially
+separable data. Two things this cost us, both worth writing down: a value
+that rounds to zero prints as `-0.0` and has to be designed out of a case,
+and `round()` renders a small number in scientific notation, so the focal-loss
+quest prints with an explicit `:.5f` instead.
+
+**Twelve slugs, per the rule in `docs/concepts.md`.** `tensors`,
+`broadcasting`, `autograd`, `modules`, `optimizers`, `loss-functions`,
+`training-loop`, `inference`, `datasets`, `initialization`, `attention`,
+`embeddings` — 66 to 78. They get a section of their own rather than a column
+in the four-language grid, because every one is this land's alone; the other
+four have no `backward()` to get wrong. Each is named by at least one §2
+mistake-kind row, which is the rule that keeps the drill able to reach them:
+`autograd` under `nil-deref` (`.grad` is `None` until a backward pass has
+run, which is literally a `NoneType` attribute), `embeddings` under
+`index-range` (an out-of-range token id), `tensors` and `broadcasting` under
+`type-mismatch`, `datasets` under `timeout`, `optimizers` under
+`unhandled-error`, and the remaining five under `wrong-answer`.
+
+**The HACKER road does not mirror the other four.** The other four ask the
+same thirty-four algorithm questions node for node, deliberately, so the
+interview can be sat in any of them. This one is the machine-learning
+interview instead — write softmax so it does not overflow, write
+cross-entropy so it matches the library, write Adam so it matches the
+library, mask a padded batch, cache the keys and values, write NMS, write
+dropout and then say what it does at inference time — and mirroring it onto
+`rust.hacker` would be a category error. `verify_pack.py` never required the
+mirror; only the convention did.
+
+**Migration 0020** widens three CHECK constraints (`quests.land`,
+`attempts.lang`, `snippets.lang`) by rebuilding the three tables, which is
+what 0008 and 0017 did before it and what SQLite still requires. Foreign keys
+are off for the run and `foreign_key_check` gates the commit, the FTS5
+triggers go back verbatim and the index is rebuilt.
+
+**The art shipped as a placeholder and no longer is.** The land went in with
+`art/tools/pytorch_placeholder.py` drawing a pixel pilot light on a rack unit
+— enough for the manifest and `frontend/tests/art.test.ts` to be honest about
+what was on disk — and the seven recipes sat in `art/prompts.toml` waiting to
+be rolled. They have been: the mascot is a flame creature on a server rack,
+taller and fiercer per road, and the emblems are a cold aisle that goes from
+a few green lights to one red rack at the far end. The placeholder script is
+deleted; the recipes stay, because an asset nobody can regenerate is a
+liability. The map plates are the shared plate — which is what `map_rust`,
+`map_cpp` and `map_python` are too.
+
+**Re-rolling is `art/tools/reroll.py`, not `gen.sh`.** `gen.sh` is for an
+asset that does not exist yet: it generates and then *appends* an `[[asset]]`
+block. Run against a name `prompts.toml` already carries, it leaves two
+blocks with one name and nobody can say which recipe the file on disk came
+from. `reroll.py` reads the recipe that is already written down, rolls it,
+processes it the same way, and stamps `generated` and `rerolls` in place —
+`art/tools/reroll.py --land pytorch`, or by name, with `--dry-run` to see
+what it would do first. The key is `XAI_API_KEY` (or `GROK_API_KEY`).
+
+While rolling these, two things in the recorded recipes turned out not to
+reproduce: the three emblems were written as `kind = "emblem"`, `aspect =
+"3:1"` where every other emblem in the file is `kind = "sprite"`, `aspect =
+"16:9"` — and `process.py` knows `sprite` and treats everything else as a
+background, so it would have written a JPEG into a `.png` and skipped the
+magenta knockout entirely. Corrected to match the other twelve.

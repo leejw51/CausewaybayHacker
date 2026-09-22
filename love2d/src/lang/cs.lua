@@ -143,6 +143,7 @@ return {
   ["goroutines, channels, interfaces"] = "goroutines, channels, interfaces",
   ["threads, mutexes, the STL"] = "vlákna, mutexy, STL",
   ["dicts, generators, the GIL"] = "slovníky, generátory, GIL",
+  ["tensors, gradients, attention"] = "tenzory, gradienty, attention",
   -- UNREVIEWED: "fused" ranking — no settled term
   ["both rankings, fused"] = "obě pořadí sloučená",
   ["the words you typed"] = "slova, která jsi napsal",

@@ -119,13 +119,15 @@ export function playerText(code: ErrorCode): string {
 // §5 shared shapes
 // ---------------------------------------------------------------------------
 
-export type Land = "rust" | "go" | "cpp" | "python";
+export type Land = "rust" | "go" | "cpp" | "python" | "pytorch";
 /**
  * Every land, in the order the lands screen shows them and the keys cycle
- * through them. One list so a fifth land is one edit, not a hunt through every
- * ternary that used to spell out "rust or go".
+ * through them. One list so a sixth land is one edit, not a hunt through every
+ * ternary that used to spell out "rust or go". The fifth was one edit here and
+ * a type error at every `Record<Land, …>` that had not been told, which is
+ * exactly what this list is for.
  */
-export const LANDS: readonly Land[] = ["rust", "go", "cpp", "python"];
+export const LANDS: readonly Land[] = ["rust", "go", "cpp", "python", "pytorch"];
 export function isLand(v: unknown): v is Land {
   return typeof v === "string" && (LANDS as readonly string[]).includes(v);
 }

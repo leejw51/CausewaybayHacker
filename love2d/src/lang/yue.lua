@@ -134,6 +134,7 @@ return {
   ["goroutines, channels, interfaces"] = "goroutines、channels、interfaces",
   ["threads, mutexes, the STL"] = "threads、mutexes、仲有 STL",
   ["dicts, generators, the GIL"] = "dicts、generators、仲有 GIL",
+  ["tensors, gradients, attention"] = "tensors、gradients、attention",
   -- UNREVIEWED: "fused" ranking — no settled term
   ["both rankings, fused"] = "兩個排名合埋",
   ["the words you typed"] = "你打嘅字",

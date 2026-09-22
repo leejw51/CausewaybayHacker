@@ -27,17 +27,23 @@ const MIN_COL = 260;
 /** The heights the real screen measures at that width, near enough. */
 const VIABLE = 240;
 const COMFORTABLE = 265;
+/**
+ * The same plate with no mascot at all — `plateHeight(s, pw, 0)`, which is
+ * `COMFORTABLE` less the 76 design pixels the mascot asks for. This is the
+ * last height a plate gives up before a land would go off the column.
+ */
+const FLOOR = 189;
 
 describe("landGrid — how many columns", () => {
   it("stacks two lands in one column, which is what two lands always did", () => {
-    const g = landGrid(COL, 2, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 0);
+    const g = landGrid(COL, 2, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
     expect(g.cols).toBe(1);
     expect(g.rows).toBe(2);
     expect(g.pw).toBe(980);
   });
 
   it("puts four lands two across, so every land is on screen at once", () => {
-    const g = landGrid(COL, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 0);
+    const g = landGrid(COL, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
     expect(g.cols).toBe(2);
     expect(g.rows).toBe(2);
     // Two plates and one gap fill the column exactly.
@@ -47,7 +53,7 @@ describe("landGrid — how many columns", () => {
 
   it("falls back to one column when half the width is too narrow to read", () => {
     // A phone: half of 420 is under the 260 a plate needs for its sentence.
-    const g = landGrid([0, 0, 420, 900], 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 0);
+    const g = landGrid([0, 0, 420, 900], 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
     expect(g.cols).toBe(1);
     expect(g.rows).toBe(4);
   });
@@ -55,7 +61,7 @@ describe("landGrid — how many columns", () => {
 
 describe("landGrid — the plate is never shorter than its contents", () => {
   it("takes the fair share when the fair share is tall enough", () => {
-    const g = landGrid(COL, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 0);
+    const g = landGrid(COL, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
     // (520 - 10) / 2 = 255, which clears the 240 a viable mascot needs.
     expect(g.ph).toBe(255);
     expect(g.ph).toBeGreaterThanOrEqual(VIABLE);
@@ -64,19 +70,31 @@ describe("landGrid — the plate is never shorter than its contents", () => {
   it("takes the floor instead of squashing, which is what makes it scroll", () => {
     // A short column: the fair share is well under what a plate needs.
     const short: [number, number, number, number] = [20, 100, 980, 300];
-    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 0);
+    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
     expect(g.ph).toBe(COMFORTABLE);
     expect(g.overflow).toBeGreaterThan(0);
   });
 
-  it("never returns a plate too short for a mascot — the original bug", () => {
-    // Whatever the column, the plate is at least the comfortable floor or a
-    // fair share that already cleared the viable one. This is the invariant
-    // the four-land screen broke: 520/4 = 130, a plate with no room to draw in.
+  it("never returns a plate too short to read — the original bug", () => {
+    // Whatever the column, the plate holds at least its title, its sentence
+    // and its record: `FLOOR`. This is the invariant the four-land screen
+    // broke outright — 520/4 = 130, a plate with no room to draw in — and it
+    // is stated at `FLOOR` rather than at `VIABLE` because the mascot is now
+    // allowed to shrink away before a land is pushed off the column.
     for (const h of [200, 300, 420, 520, 700, 1000]) {
-      const g = landGrid([0, 0, 980, h], 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 0);
-      expect(g.ph).toBeGreaterThanOrEqual(Math.min(VIABLE, COMFORTABLE));
+      const g = landGrid([0, 0, 980, h], 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
+      expect(g.ph).toBeGreaterThanOrEqual(FLOOR);
     }
+  });
+
+  it("shrinks the mascot before it hides a land", () => {
+    // 420 tall, four lands, two rows: the fair share is 205 — under the 240 a
+    // viable mascot wants, over the 189 the rest of the plate needs. The old
+    // rule jumped to COMFORTABLE here and pushed the second row half off the
+    // column for the sake of 60 pixels of mascot.
+    const g = landGrid([0, 0, 980, 420], 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
+    expect(g.ph).toBe(205);
+    expect(g.overflow).toBe(0);
   });
 });
 
@@ -84,7 +102,7 @@ describe("landGrid — scrolling, and keeping the chosen land in view", () => {
   const short: [number, number, number, number] = [20, 100, 980, 300];
 
   it("reports no overflow when everything fits", () => {
-    const g = landGrid(COL, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 0);
+    const g = landGrid(COL, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
     expect(g.overflow).toBe(0);
     expect(g.scroll).toBe(0);
   });
@@ -92,26 +110,26 @@ describe("landGrid — scrolling, and keeping the chosen land in view", () => {
   it("clamps a scroll past the end back to the end", () => {
     // With the selection already on the bottom row, nothing pulls the window
     // back up, so this is the clamp on its own.
-    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 3, 99999);
+    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 3, 99999);
     expect(g.scroll).toBe(g.overflow);
   });
 
   it("clamps a negative scroll back to the top", () => {
-    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, -500);
+    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, -500);
     expect(g.scroll).toBe(0);
   });
 
   it("lets the selection overrule a scroll that would hide it", () => {
     // Scrolled to the bottom, then the player picks the first land with the
     // arrow keys: the window has to come back, or the highlight is off-screen.
-    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 99999);
+    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 99999);
     expect(g.scroll).toBe(0);
   });
 
   it("drags the window down when the chosen land is below the fold", () => {
     // Selecting the last land from a scroll of 0 must move the window, or the
     // arrow keys walk onto a plate the player cannot see.
-    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 3, 0);
+    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 3, 0);
     expect(g.scroll).toBeGreaterThan(0);
     const last = g.origins[3];
     // Its bottom edge is inside the column.
@@ -119,7 +137,7 @@ describe("landGrid — scrolling, and keeping the chosen land in view", () => {
   });
 
   it("drags the window back up when the chosen land is above it", () => {
-    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 9999);
+    const g = landGrid(short, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 9999);
     const first = g.origins[0];
     expect(first.y).toBeGreaterThanOrEqual(short[1] - 1);
   });
@@ -127,7 +145,7 @@ describe("landGrid — scrolling, and keeping the chosen land in view", () => {
 
 describe("landGrid — where the plates actually land", () => {
   it("lays four plates out left-to-right, top-to-bottom", () => {
-    const g = landGrid(COL, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 0);
+    const g = landGrid(COL, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
     const [a, b, c, d] = g.origins;
     expect(a.y).toBe(b.y); // first row shares a baseline
     expect(c.y).toBe(d.y); // and so does the second
@@ -137,7 +155,7 @@ describe("landGrid — where the plates actually land", () => {
   });
 
   it("never overlaps two plates", () => {
-    const g = landGrid(COL, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 0);
+    const g = landGrid(COL, 4, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
     for (let i = 0; i < g.origins.length; i++) {
       for (let j = i + 1; j < g.origins.length; j++) {
         const p = g.origins[i];
@@ -150,14 +168,48 @@ describe("landGrid — where the plates actually land", () => {
   });
 
   it("gives one origin per land, for however many lands there are", () => {
-    const g = landGrid(COL, LANDS.length, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, 0);
+    const g = landGrid(COL, LANDS.length, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
     expect(g.origins).toHaveLength(LANDS.length);
   });
 
-  it("survives a fifth land without anyone touching this function", () => {
-    const g = landGrid(COL, 5, GAP, MIN_COL, VIABLE, COMFORTABLE, 4, 0);
+  it("puts a fifth land three across, not three rows down", () => {
+    // PYTORCH, reported as "not visible" from a real browser. Five lands in a
+    // two-wide grid is three rows; the third was below the bottom of a column
+    // whose scrollbar nobody finds, so the fifth land existed, had a hit box,
+    // and was invisible. 980 wide holds three plates of 320 at MIN_COL, so
+    // five lands cost the same two rows four lands cost.
+    const g = landGrid(COL, 5, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 4, 0);
     expect(g.origins).toHaveLength(5);
+    expect(g.cols).toBe(3);
+    expect(g.rows).toBe(2);
+    expect(g.overflow).toBe(0);
+    // Every plate, the fifth included, is inside the column.
+    for (const o of g.origins) {
+      expect(o.y).toBeGreaterThanOrEqual(COL[1]);
+      expect(o.y + g.ph).toBeLessThanOrEqual(COL[1] + COL[3]);
+    }
+  });
+
+  it("keeps the fifth land on screen where only two columns fit", () => {
+    // The reported window: a portrait browser, a column too narrow for three
+    // plates. Two columns and three rows then have to fit by height, which is
+    // what the mascot gives way for.
+    const narrow: [number, number, number, number] = [0, 0, 620, 640];
+    const g = landGrid(narrow, 5, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
+    expect(g.cols).toBe(2);
     expect(g.rows).toBe(3);
+    expect(g.overflow).toBe(0);
+    for (const o of g.origins) {
+      expect(o.y + g.ph).toBeLessThanOrEqual(narrow[1] + narrow[3]);
+    }
+  });
+
+  it("still scrolls when not even a mascot-less plate fits", () => {
+    // The rule gives up the mascot, not the plate. Five lands in 300px is
+    // 93 a row, under FLOOR, so it goes back to a readable plate and scrolls.
+    const g = landGrid([0, 0, 620, 300], 5, GAP, MIN_COL, VIABLE, COMFORTABLE, FLOOR, 0, 0);
+    expect(g.ph).toBe(COMFORTABLE);
+    expect(g.overflow).toBeGreaterThan(0);
   });
 });
 

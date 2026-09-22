@@ -76,7 +76,7 @@ She starts with `println!`.
 
 ---
 
-## 3. The four lands
+## 3. The five lands
 
 ### RUST LAND — the street
 
@@ -119,10 +119,31 @@ turn into None".
 Colour: Python gold, a warm amber haze. Time: dawn, wet floors, fluorescent
 light.
 
+### PYTORCH LAND — the teaching cluster
+
+Two floors under the last interview: the basement of the Chow Yei Ching
+Building at HKU, where the teaching cluster used to be and where the thing in
+§6 actually lives. The rack aisle, the cold aisle, the fan wall, a console on
+a trolley. Everything here is **a shape**, and the question is never "who owns
+this" or "what is at that address" but "what shape is this, and which way is
+the gradient flowing".
+
+It is the one land that is not about a language. It is about the thing itself,
+taken apart: a tensor, a gradient, a layer, a loss, a step — and then, on the
+last node of the ADVANCED road, the whole architecture at fourteen thousand
+parameters, completing a sequence it was taught. Mei does not beat it here.
+She builds a small one, which is a different and more useful thing to have
+done before §6.
+
+Colour: torch flame, a red-orange off a black ceiling. Time: 23:00, machine-room
+cold, and the only light in the room is the rack in front of you.
+
 The player picks a land. The others are still there, unchanged, and can be
 started at any time. None of them is a sequel to another, and the hacker road
-asks the same thirty-four questions in every one of them, so the interview can
-be sat in whichever language the player is taking back.
+asks the same thirty-four questions in four of them, so the interview can be
+sat in whichever language the player is taking back. PyTorch Land's hacker
+road is the exception and is meant to be: it is the machine-learning
+interview, and its thirty-four questions are that interview's.
 
 ---
 
@@ -158,6 +179,10 @@ One per map, always the last node, `map.kind = "boss"`.
 | `python.basic` | 27 | **NONE** | `'NoneType' object has no attribute 'left'`: a child that is `None`, followed. The tree of stall numbers has a branch that is not there yet. (The price board at 05:59 is on the ADVANCED road now, as *THE 05:59 BOARD*.) |
 | `python.advanced` | 34 | **THE GIL** | SOGO basement, twelve stalls, one lock; everything "concurrent" ran one at a time. |
 | `python.hacker` | 34 | **THE RECURSION LIMIT** | The fourth interview; depth 1000 and the clock. |
+| `pytorch.verybasic` | 27 | **THE FIRST STEP** | Everything in place — a parameter, a loss, a gradient — and the number never moves. The optimiser was built and never asked to do anything. |
+| `pytorch.basic` | 27 | **THE STRAIGHT LINE** | XOR. Four points, two classes, an hour of training, and two of the four still wrong. No straight line separates them, and no amount of training makes one. |
+| `pytorch.advanced` | 34 | **THE COMPLETION** | The rack in the basement, at fourteen thousand parameters, on one laptop: token and position embeddings, causal attention, a GELU MLP, and a sequence it finishes because it was taught it. |
+| `pytorch.hacker` | 34 | **THE TEACHING CLUSTER** | The fifth interview, Room 7-32, and the question is the thing two floors down. Build one block of it, and prove it cannot read the future. |
 
 On the merged ADVANCED road the four old BASIC bosses keep their stories but
 lose the `boss` mark and their titles, so the name and the art belong to one
@@ -171,10 +196,14 @@ mechanic in milestone 2; the stamp is just louder.
 
 ## 6. The ending
 
-All four hacker roads cleared, Mei walks up to HKU. The thing is in the basement of
+All five hacker roads cleared, Mei walks up to HKU. The thing is in the basement of
 the Chow Yei Ching Building where the teaching cluster used to be: not a face,
 not a voice, a rack of machines serving completions to the whole island at very
 low latency.
+
+She has been down there before. PYTORCH LAND is that basement, and by the end
+of it she has built a small one of these herself — which is why the last screen
+is not a confrontation with something she does not understand.
 
 It offers her the completion for the shutdown command. Correct, too — it always
 was correct, that was the entire trick.

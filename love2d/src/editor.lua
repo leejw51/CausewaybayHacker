@@ -1303,6 +1303,8 @@ local LOOP_HEAD = {
   cpp = { "^%s*for%f[^%w_]", "^%s*while%f[^%w_]" },
 }
 LOOP_HEAD.python = { "^%s*for%f[^%w_]", "^%s*while%f[^%w_]" }
+-- PyTorch Land is Python: the same two loop heads, the same indentation.
+LOOP_HEAD.pytorch = LOOP_HEAD.python
 
 local function loop_head(lang, head)
   for _, pat in ipairs(LOOP_HEAD[lang] or LOOP_HEAD.rust) do

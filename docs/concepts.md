@@ -16,7 +16,10 @@ Rules:
   `mutability` (`const`) and `smart-pointers`. `traits` and `interfaces` are
   Rust's and Go's alone; C++ and Python say `generics`, `dispatch` and
   `duck-typing` instead. `slices`, `error-handling`, `concurrency` are
-  everyone's. `—` in a land's column means the slug is not used there.
+  everyone's. `—` in a land's column means the slug is not used there. The
+  twelve PyTorch slugs are the one group that is *nobody else's*: a tensor is
+  not a `slice` and a gradient is not a return value, so they get a section
+  rather than a column.
 
 ---
 
@@ -108,7 +111,30 @@ Rules:
 | `prefix-sums` | one running total that answers every range question |
 | `greedy` | the locally best choice, and whether it is globally best |
 
-**66 slugs.** That is the whole list. Nothing else is valid in a pack, and two
+### Tensors and training — the `pytorch` land (12)
+
+A tensor is not a list and a gradient is not a return value, so PyTorch Land
+gets its own twelve rather than borrowing `slices` and calling it done. The
+column is `lands` rather than the four-language grid above because every one
+of these is this land's alone — the other four have no `backward()` to get
+wrong.
+
+| slug | what it is | lands |
+| --- | --- | --- |
+| `tensors` | the n-dimensional array itself: shape, dtype, and indexing one | pytorch |
+| `broadcasting` | two shapes meeting without a loop, and the rule that decides whether they may | pytorch |
+| `autograd` | the graph the forward pass records, `backward()`, and what lands in `.grad` | pytorch |
+| `modules` | `nn.Module`: parameters that register themselves, `forward`, and composition | pytorch |
+| `optimizers` | `SGD`, `Adam`, `zero_grad`, `step`, and the learning rate that decides all of it | pytorch |
+| `loss-functions` | what the one number being minimised actually measures | pytorch |
+| `training-loop` | forward, loss, backward, step — in that order, for every batch | pytorch |
+| `inference` | `eval()` and `no_grad()`: running the model without training it by accident | pytorch |
+| `datasets` | `Dataset` and `DataLoader`: batching, shuffling, and the last short batch | pytorch |
+| `initialization` | what a layer's weights are before anyone trains them, and the seed that fixes them | pytorch |
+| `attention` | queries, keys and values, and the mask that stops a token reading ahead | pytorch |
+| `embeddings` | a lookup table that learns: tokens and positions as vectors | pytorch |
+
+**78 slugs.** That is the whole list. Nothing else is valid in a pack, and two
 rules keep the list honest, both of them checked mechanically rather than by
 good intentions:
 
@@ -132,19 +158,19 @@ one that most directly teaches the mistake.
 | `borrow-after-move` | `ownership`, `borrowing`, `closures`, `smart-pointers`, `move-semantics`, `raii` |
 | `borrow-conflict` | `borrowing`, `mutability`, `shared-state`, `interior-mutability` |
 | `lifetime` | `lifetimes`, `borrowing`, `structs`, `traits`, `raii`, `pointers` |
-| `type-mismatch` | `types`, `generics`, `error-handling`, `pattern-matching`, `enums`, `serialization`, `duck-typing` |
-| `unknown-name` | `bindings`, `imports`, `functions`, `decorators` |
+| `type-mismatch` | `types`, `generics`, `error-handling`, `pattern-matching`, `enums`, `serialization`, `duck-typing`, `tensors`, `broadcasting` |
+| `unknown-name` | `bindings`, `imports`, `functions`, `decorators`, `modules` |
 | `missing-trait` | `traits`, `generics`, `iteration`, `dispatch`, `interfaces`, `duck-typing` |
 | `unused` | `bindings`, `imports`, `testing` |
 | `mutability` | `mutability`, `borrowing`, `slices` |
-| `nil-deref` | `error-handling`, `zero-values`, `interfaces`, `structs`, `pointers`, `undefined-behaviour` |
-| `index-range` | `slices`, `iteration`, `two-pointers`, `matrix`, `collections`, `undefined-behaviour` |
+| `nil-deref` | `error-handling`, `zero-values`, `interfaces`, `structs`, `pointers`, `undefined-behaviour`, `autograd` |
+| `index-range` | `slices`, `iteration`, `two-pointers`, `matrix`, `collections`, `undefined-behaviour`, `embeddings` |
 | `data-race` | `data-races`, `shared-state`, `concurrency`, `thread-safety` |
 | `deadlock` | `deadlock`, `channels`, `shared-state`, `cancellation`, `async` |
-| `unhandled-error` | `error-handling`, `pattern-matching`, `panics`, `testing` |
+| `unhandled-error` | `error-handling`, `pattern-matching`, `panics`, `testing`, `optimizers` |
 | `syntax` | `bindings`, `control-flow`, `functions` |
-| `wrong-answer` | `complexity`, `iteration`, `strings`, `io`, `recursion`, `trees`, `linked-lists`, `backtracking`, `tries`, `matrix`, `bit-manipulation`, `math`, `comprehensions`, `generators` |
-| `timeout` | `complexity`, `hashing`, `binary-search`, `two-pointers`, `dynamic-programming`, `heaps`, `greedy`, `prefix-sums`, `disjoint-set`, `graphs`, `sorting`, `intervals`, `stacks-queues`, `generators` |
+| `wrong-answer` | `complexity`, `iteration`, `strings`, `io`, `recursion`, `trees`, `linked-lists`, `backtracking`, `tries`, `matrix`, `bit-manipulation`, `math`, `comprehensions`, `generators`, `training-loop`, `loss-functions`, `inference`, `attention`, `initialization` |
+| `timeout` | `complexity`, `hashing`, `binary-search`, `two-pointers`, `dynamic-programming`, `heaps`, `greedy`, `prefix-sums`, `disjoint-set`, `graphs`, `sorting`, `intervals`, `stacks-queues`, `generators`, `datasets` |
 | `other` | — fall back to the concepts of the quest the mistake happened on |
 
 The last two rows are long on purpose, and they split the algorithm half of the
@@ -167,11 +193,20 @@ not a habit: the content check that runs every reference solution
 zero. A kind may be at zero only while the pack that would cover it is
 unwritten, and that is a tracked gap, not an accepted state.
 
-As of the twelve packs in `content/`, every kind in the table above reaches
-quests, and every one of the 66 slugs is used by a quest *and* named by a kind.
+As of the twenty packs in `content/`, every kind in the table above reaches
+quests, and every one of the 78 slugs is used by a quest *and* named by a kind.
 `other` is the only row at zero, and that is by design — it has no concepts.
-The eight slugs added with the C++ and Python lands are each carried by a
-quest in the land that owns them, which is the rule for adding one.
+The eight slugs added with the C++ and Python lands, and the twelve added with
+PyTorch Land, are each carried by a quest in the land that owns them, which is
+the rule for adding one.
+
+The twelve PyTorch slugs are spread across seven kinds rather than parked in
+one, because they are not all the same kind of mistake: `tensors` and
+`broadcasting` are type errors (a shape that does not line up *is* this land's
+type error), `autograd` is a nil-deref (`.grad` is `None` until a backward
+pass has run), `embeddings` is an index-range (a token id past the end of the
+table), `datasets` is a timeout, `optimizers` an unhandled error, `modules` an
+unknown name, and the remaining five are wrong answers.
 
 `data-race` and `deadlock` are carried by the four `advanced` packs and by
 nothing before them; `complexity`, `hashing`, `two-pointers`, `binary-search`,

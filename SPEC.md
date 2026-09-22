@@ -25,8 +25,11 @@ nothing else.
 A 16-bit trainer. A rust coder in Causeway Bay lost their craft to vibe coding —
 Skynet's plan all along — and takes it back one street at a time.
 
-* Four **lands**: `rust`, `go`, `cpp`, `python`. The player picks one; the
-  others are still there.
+* Five **lands**: `rust`, `go`, `cpp`, `python`, `pytorch`. The player picks
+  one; the others are still there. `pytorch` is Python with `torch`: the same
+  interpreter, the same `main.py`, the same stdio harness and the same `py:`
+  mistake codes — what differs is what a program may import, and that is the
+  content's business rather than the runner's.
 * Four **categories** per land: `verybasic` (the quiz: four lines, one right,
   pick it then type it), `basic` (grammar activation: a construct
   shown, one or two lines to type), `advanced` (simple coding quizzes on that grammar — ownership, errors,
@@ -519,7 +522,8 @@ the blob where the queries are makes the database the wrong shape. So
 ~/.causewaybayhacker/edits/<address>/<quest_id>/<sha256>.<ext>
 ```
 
-`<ext>` is the land's source extension — `rs`, `go`, `cpp`, `py`, the same
+`<ext>` is the land's source extension — `rs`, `go`, `cpp`, `py` (twice: the
+PyTorch land's source is a `main.py` like the Python land's), the same
 `source_filename(lang)` that names the file in an attempt directory (§1), so
 one of these opens in an editor and compiles by hand like anything else the
 player wrote. `<address>` is the lowercase form (§3.4), as it is under
@@ -643,7 +647,8 @@ payload that carries an address is ignored, not trusted.
 ### 4.1 Quest ids
 
 `<land>.<category>.<node:02d>.<slug>` — `rust.basic.03.shadowing`,
-`go.hacker.07.two-sum`, `cpp.basic.01.hello`, `python.advanced.17.the-gil`.
+`go.hacker.07.two-sum`, `cpp.basic.01.hello`, `python.advanced.17.the-gil`,
+`pytorch.hacker.34.teaching-cluster`.
 Stable forever; the slug is part of it so a reordered
 map does not renumber someone's cleared list into nonsense. If a node moves,
 the `node` column changes and the id does not.
@@ -706,7 +711,57 @@ Formatter: `python3 -m black -q -` on stdin — a module rather than a program,
 so it is found in whichever interpreter the runner already uses.
 `is_supported("python")` is true only when that module answers.
 
-Both are stdio-harness only. `Harness::Cargo` / `Harness::Gotest` remain
+**PyTorch**
+
+The Python lines above, unchanged. `pytorch` dispatches to the Python runner
+(`runner/src/lib.rs`), writes the same `main.py`, and classifies the same way
+— a `TypeError` out of a tensor is `py:type-error` like any other.
+`is_supported("pytorch")` for the formatter is `black`, as Python's is.
+
+The *land* is checked with **`python3 -I -c "import torch"`** — `TORCH_PROBE`
+in `runner/src/format.rs`, and the `-I` is the whole point of it. That is the
+flag the runner starts every program with, and it drops `PYTHONPATH` and the
+user site directory; a torch that only a bare `python3 -c` can see, which is
+what `pip install --user` leaves behind on the externally-managed
+interpreters this most often meets, is a torch no quest can import. The probe
+must ask the question the runner will ask, or `doctor` reports a land that is
+green and unplayable.
+
+One probe, three readers. `cwbhacker doctor` and the boot report print it.
+`unsupported("pytorch", …)` (§5.1, and the paragraph on fabricated verdicts
+under it) **refuses a submission** when it is false, before an attempt row
+exists — because without torch every node dies of a `ModuleNotFoundError`,
+which is an ordinary Python exception, and would be recorded as the player's
+own `py:exception` and taught back to them by the drills (§7). A missing
+toolchain is the machine's fault and must never enter `mistakes`. The answer
+is cached for the life of the process; installing torch into a running server
+does not help the running server either way.
+
+`numpy` is not imported by any quest, and is installed beside torch anyway:
+without it torch writes `Failed to initialize NumPy` to stderr on every
+import, which means on every run of every node, into `attempts.stderr` and in
+front of the player. It is in CI's install line and in `doctor`'s advice for
+that reason and no other.
+
+**Where that interpreter comes from.** Not the system one: macOS's own
+python3 and any PEP 668 distribution refuse to install into themselves, and
+the `--user` they suggest instead is precisely what `-I` drops. The land gets
+an environment of its own — a conda env named `cwbhacker`, or a venv at
+`~/.causewaybayhacker/venv` — and the Makefile puts its `bin` first on PATH
+for everything it starts, so the server, `doctor` and the content gate all
+resolve the same `python3` without anyone having to activate anything.
+`GAME_PY_BIN` overrides the search. This is a convenience of the build, not a
+rule of the protocol: the runner still just asks PATH for `python3` (§5.1's
+first paragraph), and a server started by hand with a different PATH gets
+whatever that PATH holds — which `doctor` and the boot report will then say
+plainly.
+
+There is no network in the runner (§1) and no `torchvision`, so the land's
+content downloads nothing: the digits on the ADVANCED road are generated in
+the program and the GPT-2 on its last node is built out of its own parts at
+fourteen thousand parameters.
+
+All three are stdio-harness only. `Harness::Cargo` / `Harness::Gotest` remain
 rust-only / go-only; `unsupported()` returns a message for any other pairing.
 
 ### 5.2 The test spec
@@ -715,7 +770,7 @@ rust-only / go-only; `unsupported()` returns a message for any other pairing.
 
 ```json
 {
-  "harness": "stdio",            // "stdio" | "cargo" | "gotest" — cargo is rust-only, gotest go-only; cpp and python are stdio-only
+  "harness": "stdio",            // "stdio" | "cargo" | "gotest" — cargo is rust-only, gotest go-only; cpp, python and pytorch are stdio-only
   "timeout_ms": 5000,
   "compile_timeout_ms": 30000,
   "max_stdout_bytes": 262144,
@@ -940,11 +995,14 @@ and the slug is what they share); a program the kernel stopped is identified
 by its signal. Python: `py_compile` for the one compile-time row, and
 otherwise the last `XxxError:` line of the traceback, which is the whole
 identity Python gives. Every code is prefixed by its land except Rust's,
-whose codes are the compiler's own: `go:`, `cpp:`, `py:`.
+whose codes are the compiler's own: `go:`, `cpp:`, `py:`. There is no
+`pytorch:` prefix and there is not going to be one: PyTorch Land runs the same
+interpreter and raises the same exceptions, so its mistakes are `py:` codes
+and its column below is Python's column.
 
 Kinds (the slug stored in `mistakes.kind`), each mapped from one or more codes:
 
-| kind | rust | go | cpp | python |
+| kind | rust | go | cpp | python / pytorch |
 | --- | --- | --- | --- | --- |
 | `borrow-after-move` | E0382, E0505 | — | `cpp:use-after-move` (clang `-Wall`) | — |
 | `borrow-conflict` | E0499, E0502 | — | — | — |
@@ -1162,9 +1220,11 @@ content/            quest packs (TOML), one file per land+category
   go/{basic,advanced,hacker}.toml
   cpp/{basic,advanced,hacker}.toml
   python/{basic,advanced,hacker}.toml
+  pytorch/{verybasic,basic,advanced,hacker}.toml
   i18n/<locale>/<land>.<category>.toml   translations of the packs above (§12.1)
 docs/               decisions.md, story.md, art.md
-tests/vectors/      shared fixtures: addresses, signatures, mistake sources (four lands)
+tests/vectors/      shared fixtures: addresses, signatures, mistake sources (four
+                    compilers; pytorch shares python's)
 e2e/                playwright: the whole loop, both orientations
 ```
 

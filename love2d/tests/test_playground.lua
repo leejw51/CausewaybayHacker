@@ -105,6 +105,9 @@ return function()
     T.ok(Playground.STARTER.cpp:find('std::cout << "hello\\n";', 1, true) ~= nil,
       "the C++ starter prints an escaped newline, not a literal one")
     T.eq(Playground.STARTER.python, 'print("hello")\n')
+    T.ok(Playground.STARTER.pytorch:find("import torch", 1, true) ~= nil,
+      "the PyTorch starter imports torch, because that is the half of the"
+      .. " toolchain the desk exists to check")
   end)
 
   T.case("the run shares the one execution slot", function()

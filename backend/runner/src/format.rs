@@ -52,7 +52,9 @@ pub fn is_supported(lang: &str) -> bool {
     match lang {
         "rust" | "go" => true,
         "cpp" => clang_format_is_installed(),
-        "python" => black_is_installed(),
+        // PyTorch Land is Python, so its formatter is Python's: one `black`
+        // on the machine formats both lands or neither.
+        "python" | "pytorch" => black_is_installed(),
         _ => false,
     }
 }
@@ -61,7 +63,7 @@ pub fn is_supported(lang: &str) -> bool {
 /// its button with (PROTOCOL §4.3): a button that always refuses is worse
 /// than no button.
 pub fn supported_langs() -> Vec<&'static str> {
-    ["rust", "go", "cpp", "python"]
+    ["rust", "go", "cpp", "python", "pytorch"]
         .into_iter()
         .filter(|lang| is_supported(lang))
         .collect()
@@ -78,6 +80,45 @@ fn black_is_installed() -> bool {
         .output()
         .map(|out| out.status.success())
         .unwrap_or(false)
+}
+
+/// How this machine is asked whether it has torch, in one place.
+///
+/// `-I` is not decoration: it is how the runner starts every program
+/// (`python::run`), and it drops `PYTHONPATH` and the user site directory.
+/// A torch that only a bare `python3 -c` can see — a `pip install --user`,
+/// which is what an externally-managed interpreter pushes people towards —
+/// is a torch no quest can import. Asked with the flag that decides it, or
+/// `cwbhacker doctor` reports a land that is green and unplayable.
+pub(crate) const TORCH_PROBE: &[&str] = &["-I", "-c", "import torch"];
+
+/// What to type when it is not there.
+///
+/// An environment of the land's own rather than a bare `pip install`,
+/// because the interpreters this most often meets — macOS's own, and any PEP
+/// 668 distribution — refuse to install into themselves, and the `--user`
+/// they suggest instead is the one place `-I` will not look. `numpy` is in
+/// the line because torch without it writes a "Failed to initialize NumPy"
+/// warning to stderr on every single import, and a warning on every run of
+/// every node is the kind of noise a player learns to ignore, including when
+/// it is a real one.
+///
+/// A conda env by name, because that is the fifth toolchain on the list the
+/// README prints — RUST, GO, C++, PYTHON, ANACONDA — and because `make`
+/// looks for exactly this name. A venv at `~/.causewaybayhacker/venv` is
+/// found the same way, for a machine with no conda on it.
+pub(crate) const TORCH_HINT: &str = "conda create -n cwbhacker python=3.13 -y && \
+     conda run -n cwbhacker pip install torch numpy black   \
+     (`make` puts that env first on PATH; started by hand, do it yourself. \
+     No conda? python3 -m venv ~/.causewaybayhacker/venv works the same way)";
+
+/// Whether this machine's `python3` can `import torch`, asked by running it.
+///
+/// Uncached on purpose: `doctor` and the boot report exist to tell the truth
+/// about the machine as it is now. The hot path — every submission — caches
+/// this behind [`crate::unsupported`].
+pub fn torch_is_installed() -> bool {
+    answers("python3", TORCH_PROBE)
 }
 
 /// Where `clang-format` is, if it is anywhere.
@@ -143,13 +184,13 @@ pub fn format(lang: &str, source: &str) -> std::io::Result<Formatted> {
                 "clang-format is not installed on this machine",
             ))
         }
-        "python" if black_is_installed() => {
+        "python" | "pytorch" if black_is_installed() => {
             // `-` is stdin to stdout; `-q` keeps the summary off stderr.
             let mut c = Command::new("python3");
             c.args(["-m", "black", "-q", "-"]);
             c
         }
-        "python" => {
+        "python" | "pytorch" => {
             return Ok(Formatted::unchanged(
                 source,
                 "black is not installed on this machine",
@@ -262,7 +303,7 @@ fn answers(program: &str, args: &[&str]) -> bool {
 /// Every land, its compiler and its formatter, checked by running them.
 ///
 /// The server prints this on the way up. A land whose compiler is missing is
-/// a quarter of the map that cannot be played, and a land whose formatter is
+/// a fifth of the map that cannot be played, and a land whose formatter is
 /// missing is a button that will not be drawn — both are worth knowing at
 /// boot rather than at the moment a player presses something. The advice is
 /// per platform, because "install clang-format" is three different sentences
@@ -298,6 +339,12 @@ pub fn toolchains() -> Vec<Toolchain> {
             "black",
             "python3 -m pip install black",
         ),
+        // PyTorch Land's "compiler" is the same `python3`, but a python3
+        // without torch cannot run one node of it. Asking the interpreter to
+        // import it is the only honest check, and it is the one whose answer
+        // decides whether a submission to the land is accepted at all
+        // (`crate::unsupported`).
+        ("pytorch", "python3", TORCH_PROBE, "black", TORCH_HINT),
     ] {
         let compiles = answers(compiler, args);
         let formats = is_supported(land);

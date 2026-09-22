@@ -288,7 +288,7 @@ describe("the plans", () => {
   });
 });
 
-const MODE = { rust, go, cpp, python } as const;
+const MODE = { rust, go, cpp, python, pytorch: python } as const;
 
 function state(lang: Land, doc: string): EditorState {
   return EditorState.create({ doc, extensions: [MODE[lang]()] });

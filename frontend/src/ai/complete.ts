@@ -180,6 +180,45 @@ const TEMPLATES: Record<Land, readonly Template[]> = {
     { id: "py.enumerate", key: "enumerate", lines: ["enumerate($xs)"] },
     { id: "py.range", key: "range", lines: ["range($n)"] },
   ],
+  // PyTorch Land keeps Python's grammar skeletons and adds the ones that are
+  // the actual writing: the loop body in the order it has to be in, a Module
+  // with `super().__init__()` already there, and the two blocks people forget
+  // to open. Every key is the word the first line starts with — the insert is
+  // the template minus what was typed — and no key is a prefix of another.
+  pytorch: [
+    { id: "pt.for", key: "for", stmt: true, lines: ["for x in $xs:", "\t"] },
+    { id: "pt.while", key: "while", stmt: true, lines: ["while $cond:", "\t"] },
+    { id: "pt.if", key: "if", stmt: true, lines: ["if $cond:", "\t"] },
+    { id: "pt.def", key: "def", stmt: true, lines: ["def $name():", "\t"] },
+    { id: "pt.import", key: "import", stmt: true, lines: ["import torch$"] },
+    {
+      id: "pt.class",
+      key: "class",
+      stmt: true,
+      lines: [
+        "class $Net(nn.Module):",
+        "\tdef __init__(self):",
+        "\t\tsuper().__init__()",
+        "\t\t",
+        "",
+        "\tdef forward(self, x):",
+        "\t\treturn x",
+      ],
+    },
+    // The three lines in the one order that works, because the order is the
+    // thing a first training loop gets wrong.
+    {
+      id: "pt.opt",
+      key: "opt",
+      stmt: true,
+      lines: ["opt.zero_grad()", "loss.backward()", "opt.step()$"],
+    },
+    { id: "pt.nograd", key: "with", stmt: true, lines: ["with torch.no_grad():", "\t$"] },
+    { id: "pt.eval", key: "model", stmt: true, lines: ["model.eval()$"] },
+    { id: "pt.linear", key: "nn", lines: ["nn.Linear($in_features, out_features)"] },
+    { id: "pt.tensor", key: "torch", lines: ["torch.tensor($data)"] },
+    { id: "pt.shape", key: "tuple", lines: ["tuple($x.shape)"] },
+  ],
 };
 
 /** Shortest prefix worth guessing from. One letter matches everything. */

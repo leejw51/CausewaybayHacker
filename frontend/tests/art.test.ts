@@ -76,7 +76,13 @@ function readPng(file: string): Png {
   };
 }
 
-const LAND_MASCOTS = ["sprite_ferris", "sprite_gogo", "sprite_cpp", "sprite_python"];
+const LAND_MASCOTS = [
+  "sprite_ferris",
+  "sprite_gogo",
+  "sprite_cpp",
+  "sprite_python",
+  "sprite_pytorch",
+];
 const BOSSES = [
   "boss_autocomplete",
   "boss_deadlock",
@@ -91,7 +97,7 @@ const BOSSES = [
   "boss_recursion",
 ];
 const CATEGORIES = ["basic", "advanced", "hacker"];
-const LANDS = ["rust", "go", "cpp", "python"];
+const LANDS = ["rust", "go", "cpp", "python", "pytorch"];
 
 /** Manifest entries by name, which is how every scene looks art up. */
 const byName = new Map(MANIFEST.art.map((a) => [a.name, a]));
@@ -155,9 +161,10 @@ describe("every sprite kept its transparency", () => {
 });
 
 describe("no two things that should look different are the same file", () => {
-  it("gives each of the four lands its own mascot", () => {
-    // The bug: all four lands shipped the same crab, hue-shifted. Four
-    // distinct files is the property that was false and is now true.
+  it("gives each land its own mascot", () => {
+    // The bug: the lands shipped the same crab, hue-shifted. One distinct
+    // file per land is the property that was false and is now true, and it
+    // has to keep being true every time a land is added.
     const shas = LAND_MASCOTS.map((n) => readPng(byName.get(n)!.file).sha);
     expect(new Set(shas).size).toBe(LAND_MASCOTS.length);
   });

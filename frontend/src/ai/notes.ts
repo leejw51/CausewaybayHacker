@@ -19,6 +19,7 @@ export const LINE_COMMENT: Record<Land, string> = {
   go: "//",
   cpp: "//",
   python: "#",
+  pytorch: "#",
 };
 
 /** The mark that says who wrote the comment, so it reads as the coder's. */

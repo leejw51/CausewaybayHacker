@@ -71,6 +71,7 @@ const LANDS = (): ReadonlyArray<{ id: string; label: string; value: Land | null 
   { id: "land:go", label: t("search.go"), value: "go" },
   { id: "land:cpp", label: t("search.cpp"), value: "cpp" },
   { id: "land:python", label: t("search.python"), value: "python" },
+  { id: "land:pytorch", label: t("search.pytorch"), value: "pytorch" },
 ];
 
 const CATS = (): ReadonlyArray<{ id: string; label: string; value: Category | null }> => [
