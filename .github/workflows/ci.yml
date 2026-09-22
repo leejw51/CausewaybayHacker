@@ -478,6 +478,16 @@ jobs:
           content/pytorch/verybasic.toml content/pytorch/basic.toml
           content/pytorch/advanced.toml content/pytorch/hacker.toml
 
+      # A printed zero must be an exact zero. `pytorch.advanced.17.layernorm`
+      # prints the mean of a normalised row: zero by construction, `1.49e-08`
+      # in float32, and negative that on this runner — so `round(..., 4)` gave
+      # `-0.0` here and `0.0` on the arm64 Mac the pack was verified on, and
+      # the step above went red for a reason that was not in the content. The
+      # check runs each solution twice with the sign of such zeros flipped and
+      # fails if the output changes. Pytorch only: it is the one land whose
+      # answers are floats.
+      - run: python3 tests/content/zero_sign.py content/pytorch/*.toml
+
       # Every translation file under content/i18n/<locale>/ that EXISTS keeps
       # every rule of SPEC §12.1: real quest ids, matching hint counts, '''
       # strings, and the English brief's fenced code blocks verbatim. A

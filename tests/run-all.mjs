@@ -236,6 +236,16 @@ const SUITES = [
     slow: true,
   },
   {
+    name: "content-zero-sign",
+    what: "no pytorch answer depends on the sign of a zero (arch-portable output)",
+    cwd: ROOT,
+    cmd: ["python3", "tests/content/zero_sign.py", ...PACKS_PYTORCH],
+    needs: [
+      [env.python, "python3 is not on PATH"],
+      [env.torch, "torch is not importable — see `make doctor`"],
+    ],
+  },
+  {
     name: "smoke-selftest",
     what: "the contract checker catches 19 deliberately-broken servers",
     cwd: join(ROOT, "tests/smoke"),

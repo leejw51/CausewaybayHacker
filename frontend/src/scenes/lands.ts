@@ -225,7 +225,11 @@ export interface LandGrid {
  * @param comfortableH plate height with the mascot at the size it wants
  * @param floorH    plate height with no mascot at all: title, sentence, record.
  *                  The last thing given up before a land goes off the column.
- * @param selected  index of the chosen land, which must stay on screen
+ * @param selected  index of the chosen land
+ * @param follow    whether to drag the window onto `selected`. True when the
+ *                  selection has just moved — an arrow key walking off the
+ *                  bottom row brings the grid with it — and **false on every
+ *                  other frame**, or the wheel is pointless: see below.
  * @param scroll    the scroll as it stands, before clamping
  */
 export function landGrid(
@@ -237,6 +241,7 @@ export function landGrid(
   comfortableH: number,
   floorH: number,
   selected: number,
+  follow: boolean,
   scroll: number,
 ): LandGrid {
   const [lx, ly, lw, lh] = col;
@@ -282,11 +287,24 @@ export function landGrid(
     fair >= viableH ? fair : fair >= floorH ? fair : Math.max(fair, comfortableH);
   const total = ph * rows + gap * (rows - 1);
   const overflow = Math.max(0, total - lh);
-  // Clamp first, then drag the window to the selected plate's row, so the
-  // arrow keys can walk past the bottom of the grid and the grid follows.
+  // Clamp to the column, always.
   let next = Math.max(0, Math.min(overflow, scroll));
-  const top = Math.floor(Math.max(0, Math.min(n - 1, selected)) / cols) * (ph + gap);
-  next = Math.max(Math.min(next, top), Math.min(overflow, top + ph - lh));
+  // Then, **only when the selection has just moved**, drag the window onto
+  // it, so an arrow key that walks off the bottom row brings the grid with
+  // it. Doing this on every frame instead is what made the wheel look
+  // broken: the chosen land is usually RUST, RUST is the first plate, its
+  // row is `top = 0` — so the clamp below pinned the scroll back to 0 on the
+  // very next draw and the column sprang back under the cursor. It only
+  // appeared to scroll once you had clicked a land in a lower row, which is
+  // not a discoverable rule; it is a bug with a workaround.
+  //
+  // A scroll the player asked for outranks a scroll the layout would like.
+  // The selection is still never *left* off screen: the next time it moves,
+  // this runs again.
+  if (follow) {
+    const top = Math.floor(Math.max(0, Math.min(n - 1, selected)) / cols) * (ph + gap);
+    next = Math.max(Math.min(next, top), Math.min(overflow, top + ph - lh));
+  }
   const origins = [];
   for (let i = 0; i < n; i++) {
     origins.push({
@@ -379,6 +397,12 @@ export class LandsScene implements Scene {
    */
   private scroll = 0;
   private overflow = 0;
+  /**
+   * The land the scroll was last dragged onto, so the drag happens once per
+   * change of selection rather than once per frame. `null` until the first
+   * draw, which is how the chosen land is brought into view on arrival.
+   */
+  private followed: Land | null = null;
 
   constructor(private readonly app: App) {}
 
@@ -895,7 +919,7 @@ export class LandsScene implements Scene {
       // same rule `landGrid` uses, so ask it once for the shape, measure, then
       // ask again for the final geometry. The first call's heights are only
       // ever used to pick a column count, which does not depend on them.
-      const shape = landGrid(f.left, LANDS.length, gap, MIN_COL, 0, 0, 0, 0, 0);
+      const shape = landGrid(f.left, LANDS.length, gap, MIN_COL, 0, 0, 0, 0, false, 0);
       // **On a phone every land is on screen, mascot or no mascot.**
       // The floors below are "a plate tall enough to be worth looking at",
       // and on a phone insisting on them made the column taller than the
@@ -916,8 +940,12 @@ export class LandsScene implements Scene {
         // zero and this changes nothing.
         phone ? 0 : this.plateHeight(s, shape.pw, 0),
         LANDS.indexOf(this.land),
+        // Follow the selection only on the frame it changed on (and on the
+        // first frame, when `followed` is still null), never afterwards.
+        this.followed !== this.land,
         this.scroll,
       );
+      this.followed = this.land;
       this.overflow = grid.overflow;
       this.scroll = grid.scroll;
       const h = grid.ph;
@@ -952,13 +980,18 @@ export class LandsScene implements Scene {
       if (this.overflow > 0) {
         // A column that scrolls and does not say so is a column nobody
         // scrolls — the same rule the quest brief and the console follow.
-        const trackW = Math.max(2, Math.round(3 * s));
+        // Three pixels at 35% is a scrollbar you can miss in a lit room, and
+        // it was missed: the report that brought us here was "it only scrolls
+        // if I click first", from a player who never saw there was more
+        // column. Six, and brighter, on a screen whose every other edge is a
+        // hard outline.
+        const trackW = Math.max(3, Math.round(6 * s));
         const tx = lx + lw - trackW;
-        fill(g, Theme.dim, tx, ly, trackW, lh, 0.35);
+        fill(g, Theme.dim, tx, ly, trackW, lh, 0.55);
         const frac = lh / total;
         const barH = Math.max(Math.round(16 * s), Math.floor(lh * frac));
         const by = ly + Math.round((lh - barH) * (this.scroll / this.overflow));
-        fill(g, landColour(this.land), tx, by, trackW, barH, 0.9);
+        fill(g, landColour(this.land), tx, by, trackW, barH, 1);
       }
     });
 

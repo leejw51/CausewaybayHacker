@@ -1181,6 +1181,8 @@ Written out it is `(x - mean) / sqrt(var + eps)` with mean and variance taken ov
 
 Match `nn.LayerNorm` by hand and print the agreement and a row's mean and standard deviation.
 
+The mean is zero by construction, but in float32 it lands a hair either side of it — and `round(-1e-8, 4)` is `-0.0`, which is not the same text as `0.0`. Which side it lands on is the machine's business, not yours. The `+ 0.0` in the print is what settles it: under IEEE 754, `-0.0 + 0.0` is `0.0`.
+
 ```
 output: True 0.0 1.0
 ```
@@ -1196,7 +1198,7 @@ def main():
     ref = nn.LayerNorm(6, elementwise_affine=False)(x)
     mine = None
     print(torch.allclose(ref, mine, atol=1e-5),
-          round(mine[0].mean().item(), 4),
+          round(mine[0].mean().item(), 4) + 0.0,   # + 0.0: a -0.0 prints as 0.0
           round(mine[0].std(unbiased=False).item(), 4))
 
 
@@ -1214,7 +1216,7 @@ def main():
     mine = (x - x.mean(dim=-1, keepdim=True)) / torch.sqrt(
         x.var(dim=-1, keepdim=True, unbiased=False) + 1e-5)
     print(torch.allclose(ref, mine, atol=1e-5),
-          round(mine[0].mean().item(), 4),
+          round(mine[0].mean().item(), 4) + 0.0,   # + 0.0: a -0.0 prints as 0.0
           round(mine[0].std(unbiased=False).item(), 4))
 
 
