@@ -265,6 +265,8 @@ export const cs: Partial<Catalogue> = {
   "quest.completeLine": "+ŘÁDEK",
   "quest.answerMatched": "SHODA — ZNAK ZA ZNAKEM",
   "quest.answerDiverged": "OPRAV ČERVENÉ",
+  "quest.combo": "KOMBO",
+  "quest.bestCombo": "NEJLEPŠÍ",
   "quest.codeFace": "písmo kódu {name}",
   "quest.fontSize": "velikost kódu {percent} %",
   "quest.leaveMapTitle": "ZPĚT NA MAPU?",

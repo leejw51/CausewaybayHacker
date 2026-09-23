@@ -250,6 +250,8 @@ export const ja: Partial<Catalogue> = {
   "quest.completeLine": "1行",
   "quest.answerMatched": "完全一致",
   "quest.answerDiverged": "赤を直す",
+  "quest.combo": "コンボ",
+  "quest.bestCombo": "最高コンボ",
   "quest.codeFace": "コードの書体 {name}",
   "quest.fontSize": "コードの大きさ {percent}%",
   "quest.leaveMapTitle": "マップへ戻りますか？",

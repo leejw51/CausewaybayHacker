@@ -15,7 +15,9 @@ import {
   answerCompletion,
   answerIndent,
   answerProgress,
+  answerPattern,
   answerWord,
+  Editor,
   blanksFill,
   ghostSegments,
   holeAt,
@@ -439,6 +441,74 @@ describe("answerWord", () => {
 
   it("refuses past a divergence, like everything else in the mode", () => {
     expect(answerWord("fn mai%", answer)).toBeNull();
+  });
+});
+
+/**
+ * The chore, typed for you: whatever the answer has already said, and the
+ * language's own keywords, go in on their first letter.
+ */
+describe("answerPattern", () => {
+  const answer =
+    "use std::io::Read;\n\nfn main() {\n    let mut input = String::new();\n" +
+    "    let m: std::collections::HashMap<String, i64> = std::collections::HashMap::new();\n" +
+    "    for w in input.split_whitespace() {}\n}\n";
+  const at = (s: string) => answer.slice(0, answer.indexOf(s) + 1);
+
+  it("finishes a keyword of the language on its first letter", () => {
+    expect(answerPattern("u", answer, "rust")).toBe("se");
+    expect(answerPattern("use std::io::Read;\n\nf", answer, "rust")).toBe("n");
+  });
+
+  it("finishes a run the file has already said, up to a token's edge", () => {
+    const before = answer.slice(0, answer.indexOf("= std::collections::HashMap::new") + 3);
+    expect(answerPattern(before, answer, "rust")).toBe("td::collections::HashMap");
+    // `input` was typed on line four, so its first letter is enough here.
+    expect(answerPattern(at("input.split"), answer, "rust")).toBe("nput");
+  });
+
+  it("leaves a word nobody has said before, and not a keyword, to answerWord", () => {
+    expect(answerPattern(at("split_whitespace"), answer, "rust")).toBeNull();
+  });
+
+  it("does not reach past the stop it is given", () => {
+    const before = answer.slice(0, answer.indexOf("= std::collections::HashMap::new") + 3);
+    // `std` is a keyword, so the word itself still goes in — and the run
+    // stops at the cap rather than running on into the next hole.
+    expect(answerPattern(before, answer, "rust", before.length + 5)).toBe("td::");
+  });
+
+  it("refuses past a divergence", () => {
+    expect(answerPattern("ux", answer, "rust")).toBeNull();
+  });
+});
+
+describe("a wrong key does not go in", () => {
+  it("refuses a character that is not the answer's next one, and says so", async () => {
+    const ed = new Editor("rust", "");
+    const missed: string[] = [];
+    ed.onMiss = (t) => missed.push(t);
+    try {
+      ed.setAnswer({ text: "fn main() {}\n", blanks: [] });
+      const view = (ed as any).view;
+      const type = (text: string) =>
+        view.dispatch({
+          changes: { from: view.state.doc.length, insert: text },
+          userEvent: "input.type",
+        });
+      type("f");
+      type("x");
+      expect(ed.source).toBe("f");
+      type("n");
+      expect(ed.source).toBe("fn");
+      await Promise.resolve();
+      expect(missed).toEqual(["x"]);
+      // The screen's own fills carry no user event and always go in.
+      ed.appendAtEnd(" main");
+      expect(ed.source).toBe("fn main");
+    } finally {
+      ed.destroy();
+    }
   });
 });
 

@@ -242,6 +242,8 @@ export const zh: Partial<Catalogue> = {
   "quest.completeLine": "补一行",
   "quest.answerMatched": "完全一致",
   "quest.answerDiverged": "修正红色处",
+  "quest.combo": "连击",
+  "quest.bestCombo": "最高连击",
   "quest.codeFace": "代码字体 {name}",
   "quest.fontSize": "代码字号 {percent}%",
   "quest.leaveMapTitle": "回到地图吗？",

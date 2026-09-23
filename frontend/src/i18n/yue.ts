@@ -255,6 +255,8 @@ export const yue: Partial<Catalogue> = {
   "quest.completeLine": "補一行",
   "quest.answerMatched": "完全一致",
   "quest.answerDiverged": "改紅色嗰度",
+  "quest.combo": "連擊",
+  "quest.bestCombo": "最高連擊",
   "quest.codeFace": "代碼字體 {name}",
   "quest.fontSize": "碼嘅字大細 {percent}%",
   "quest.leaveMapTitle": "返地圖？",

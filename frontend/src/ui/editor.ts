@@ -690,6 +690,94 @@ export function answerWord(typed: string, answer: string, min = 2): string | nul
   return rest.length > 0 ? rest : null;
 }
 
+/**
+ * The words each language says over and over — its keywords and the handful
+ * of library names every answer in it reaches for. One letter of one of
+ * these is enough: the answer is known, so `l` can only be `let` when the
+ * answer says `let`, and typing `turn` after `re` a hundred times is the
+ * boring part of copying code, not the learning part.
+ */
+const COMMON: Record<Land, ReadonlySet<string>> = (() => {
+  const py =
+    "def return if elif else for while in import from class self print range len None True False and or not with as lambda try except raise pass break continue yield input int str list dict set append split strip join".split(
+      " ",
+    );
+  return {
+    rust: new Set(
+      "fn let mut use pub struct impl enum match for while loop return if else in as self Self crate mod trait where String Vec Option Some None Ok Err Result Box HashMap println print format vec new unwrap iter collect push len clone to_string std io collections".split(
+        " ",
+      ),
+    ),
+    go: new Set(
+      "func package import var const type struct interface return if else for range map chan go defer select switch case default break continue fmt Println Printf Sprintf make append len string int error nil main bufio os strings strconv".split(
+        " ",
+      ),
+    ),
+    cpp: new Set(
+      "include int void return if else for while auto const std vector string cout cin endl push_back size using namespace class struct template typename include iostream long double bool true false main".split(
+        " ",
+      ),
+    ),
+    python: new Set(py),
+    pytorch: new Set([...py, "torch", "nn", "tensor", "Tensor", "Module", "forward", "backward", "zeros", "ones", "randn", "optim", "grad", "no_grad"]),
+  };
+})();
+
+const WORD_CH = /[A-Za-z0-9_]/;
+
+/**
+ * Everything the answer is about to say that it has said before, once the
+ * player has begun it.
+ *
+ * **Recorded from this source, not from a dictionary.** A program repeats
+ * itself — `std::collections::HashMap` twice on one line, `counts` five
+ * times, `::new()` after every type — and the second time is not the
+ * exercise, it is the chore. So from the start of the word the caret is in,
+ * the longest run the answer has already been through (and so the player
+ * has already typed) goes in on the first letter, stopping at the end of a
+ * line and at a token's edge. A keyword of the language (`COMMON`) goes in
+ * on its first letter too, the first time as well as every time after.
+ *
+ * `stop` caps how far it may reach — BLANKS passes the end of the hole the
+ * caret is in, so a repeat never runs on into the next hole and answers it.
+ */
+export function answerPattern(
+  typed: string,
+  answer: string,
+  lang: Land,
+  stop = Infinity,
+): string | null {
+  const { matched } = answerProgress(typed, answer);
+  if (typed.length !== matched || matched === 0) return null;
+  const head = /[A-Za-z_][A-Za-z0-9_]*$/.exec(answer.slice(0, matched))?.[0] ?? "";
+  if (head.length === 0) return null;
+  const start = matched - head.length;
+  // Where the word the player is in ends, in the answer.
+  let wordEnd = matched;
+  while (wordEnd < answer.length && WORD_CH.test(answer[wordEnd])) wordEnd++;
+  const lineEnd = answer.indexOf("\n", start);
+  const limit = Math.min(lineEnd === -1 ? answer.length : lineEnd, stop);
+  let best = COMMON[lang].has(answer.slice(start, wordEnd)) ? wordEnd : 0;
+  // The longest run from `start` that begins at a word's edge somewhere
+  // earlier in the answer. Quadratic in the worst case, and an answer is a
+  // page of code: a few thousand comparisons per keystroke.
+  for (let j = 0; j < start; j++) {
+    if (j > 0 && WORD_CH.test(answer[j - 1])) continue;
+    if (answer[j] !== answer[start]) continue;
+    let k = 0;
+    while (j + k < start && start + k < limit && answer[j + k] === answer[start + k]) k++;
+    if (start + k > best) best = start + k;
+  }
+  if (best > limit) best = limit;
+  // A run that stops inside a word would leave half of one; back up to the
+  // token's edge, and leave trailing blanks for the player to put in.
+  while (best > matched && WORD_CH.test(answer[best - 1]) && WORD_CH.test(answer[best] ?? "")) best--;
+  while (best > matched && /[ \t]/.test(answer[best - 1])) best--;
+  // The word itself has to be covered, or this is `answerWord`'s job.
+  if (best < wordEnd) return null;
+  return best > matched ? answer.slice(matched, best) : null;
+}
+
 export function answerProgress(typed: string, answer: string): AnswerProgress {
   let k = 0;
   while (k < typed.length && k < answer.length && typed[k] === answer[k]) k++;
@@ -1098,6 +1186,11 @@ export class Editor {
   private lastPair: string | null = null;
   /** Where the caret was last measured, for the smear from there to here. */
   private lastCaret: Pt | null = null;
+  /**
+   * A key the drill refused, with what it would have typed. Set by the
+   * screen that runs the drill.
+   */
+  onMiss: ((text: string) => void) | null = null;
   /** Whether the editor had focus when it was locked, to hand back after. */
   private refocus = false;
 
@@ -1261,6 +1354,32 @@ export class Editor {
         lock.of([]),
         answerField,
         answerEnter,
+        // **A wrong key does not go in.** The drill is copying, and a
+        // character that is not the answer's next one is a key that missed:
+        // it is refused, the screen is told (`onMiss`) so it can say so, and
+        // the caret stays where the right key goes. Deleting, undo, and the
+        // screen's own untagged dispatches are never refused, and neither is
+        // anything that leaves the buffer no further from the answer than it
+        // was — a starter left in the file can still be fixed by hand.
+        EditorState.transactionFilter.of((tr) => {
+          if (!tr.docChanged) return tr;
+          const target = tr.startState.field(answerField, false) ?? null;
+          if (target === null) return tr;
+          const ev = tr.annotation(Transaction.userEvent);
+          if (ev === undefined || /\.agent$/.test(ev) || !/^(input|paste|drop)/.test(ev)) return tr;
+          const after = answerProgress(tr.newDoc.toString(), target.text);
+          if (after.wrong === 0) return tr;
+          const before = answerProgress(tr.startState.doc.toString(), target.text);
+          if (after.wrong <= before.wrong && after.matched >= before.matched) return tr;
+          let text = "";
+          tr.changes.iterChanges((_a, _b, _c, _d, ins) => {
+            text += ins.toString();
+          });
+          const miss = this.onMiss;
+          // Not from inside the filter: whoever hears it may want to dispatch.
+          if (miss) queueMicrotask(() => miss(text));
+          return [];
+        }),
         ghost,
         suggestField,
         hint,
@@ -1383,6 +1502,14 @@ export class Editor {
       selection: { anchor: at + text.length },
       scrollIntoView: true,
     });
+  }
+
+  /** One short shake of the whole editor: a key that missed. */
+  shake(): void {
+    this.dom.classList.remove("cwb-miss");
+    // Read a layout property so the animation starts again from the top.
+    void this.dom.offsetWidth;
+    this.dom.classList.add("cwb-miss");
   }
 
   /** Where the caret is in the document, for anything watching it rest. */

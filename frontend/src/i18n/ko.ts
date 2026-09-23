@@ -251,6 +251,8 @@ export const ko: Partial<Catalogue> = {
   "quest.completeLine": "한 줄",
   "quest.answerMatched": "완전 일치",
   "quest.answerDiverged": "빨간 부분을 고치세요",
+  "quest.combo": "콤보",
+  "quest.bestCombo": "최고 콤보",
   "quest.codeFace": "코드 글꼴 {name}",
   "quest.fontSize": "코드 크기 {percent}%",
   "quest.leaveMapTitle": "지도로 돌아갈까요?",

@@ -42,6 +42,7 @@ import {
   answerCloser,
   answerCompletion,
   answerIndent,
+  answerPattern,
   answerProgress,
   answerWord,
   holeAt,
@@ -524,6 +525,14 @@ export class QuestScene implements Scene {
   private answerBusy = false;
   private answerProg: AnswerProgress = { matched: 0, wrong: 0, done: false, total: 0 };
   /**
+   * Keys in a row that were the answer's, and the best run this screen has
+   * seen. Every tenth one gets its own burst; a miss sets it back to zero.
+   */
+  private combo = 0;
+  private bestCombo = 0;
+  /** The drill's own last insertion, still to be retyped by habit. */
+  private echo = "";
+  /**
    * Effects thrown at the caret — on their own layer *over* the editor.
    *
    * Both game canvases are under `#overlay` and the editor's face is all but
@@ -612,6 +621,7 @@ export class QuestScene implements Scene {
       // but a change is the one moment the edit stack cares about, so it
       // starts the idle timer that eventually takes a copy.
       this.editor = new Editor(this.land, this.opened, () => this.touched());
+      this.editor.onMiss = (text) => this.missed(text);
       // The quiz comes first on VERY BASIC: the editor opens locked and the
       // right choice is the key. A cleared quest is past its quiz.
       this.quizRight = !startsLocked(res.quest.quiz, res.quest.state);
@@ -1181,6 +1191,10 @@ export class QuestScene implements Scene {
     const target = this.target();
     if (!this.editor) return;
     this.editor.setAnswer(target);
+    // A new drill is a new run.
+    this.combo = 0;
+    this.bestCombo = 0;
+    this.echo = "";
     // The coder comes out with the mode and goes away with it: it is the
     // one finishing the words, so it is on screen while it does.
     this.coder?.follow(target !== null);
@@ -1225,8 +1239,16 @@ export class QuestScene implements Scene {
       // Each one leaves the buffer a longer prefix of the answer, so the
       // loop just goes round again: `pr` finishes `println`, the `(` you
       // type takes its `"` from you, and the line closes itself.
+      //
+      // And ahead of the word, anything this file has already said: a run
+      // the answer repeats, or a keyword of the language, goes in on its
+      // first letter (`answerPattern`) — typing the same thing twice is the
+      // part of copying that is chore rather than practice.
       const src = this.editor.source;
-      const grown = answerWord(src, target.text);
+      const hole = target.blanks.find((b) => src.length >= b.from && src.length < b.to);
+      const grown =
+        answerPattern(src, target.text, this.land, hole ? hole.to : Infinity) ??
+        answerWord(src, target.text);
       const add =
         answerIndent(src, target.text) ??
         (target.blanks.length > 0 ? blanksFill(src, target) : null) ??
@@ -1268,9 +1290,14 @@ export class QuestScene implements Scene {
     const holeBefore = target ? holeAt(target.blanks, was.matched) : null;
     // The gaps close themselves: everything between one hole and the next is
     // typed for the player as they arrive at it.
+    const before = this.editor.source.length;
     const fill = target ? this.fillBlanks(target) : null;
+    // What the drill just typed on the player's behalf: keys that retype it
+    // out of habit are swallowed rather than counted as misses (`missed`).
+    this.echo = this.editor.source.slice(before);
     const now = answerProgress(this.editor.source, this.answerText);
     this.answerProg = now;
+    if (now.wrong === 0 && now.matched > was.matched) this.bumpCombo();
     const at = this.caretVirtual();
     if (!at) return;
     if (now.done && !was.done) {
@@ -1327,6 +1354,39 @@ export class QuestScene implements Scene {
       this.spark(at, 16, Theme.coin, DRILL_SPARK);
       this.app.chip.blip();
     }
+  }
+
+  /** One more key that was the answer's. */
+  private bumpCombo(): void {
+    this.combo++;
+    if (this.combo > this.bestCombo) this.bestCombo = this.combo;
+    if (this.combo % 10 !== 0) return;
+    // A milestone: bigger every ten, and in a colour of its own.
+    const at = this.caretVirtual();
+    if (at) this.spark(at, Math.min(60, 14 + this.combo / 2), Theme.cyan, DRILL_SPARK * 1.6);
+    this.app.chip.coin();
+  }
+
+  /**
+   * A key the drill refused.
+   *
+   * Two kinds. Retyping what the drill has just put in for you — the `e` of
+   * a `use` that finished itself, the `)` that closed itself — is habit, not
+   * a mistake: the key is swallowed and the combo stands. Anything else
+   * missed: the editor shakes, the caret flashes red, and the run starts
+   * over.
+   */
+  private missed(text: string): void {
+    if (text.length > 0 && this.echo.startsWith(text)) {
+      this.echo = this.echo.slice(text.length);
+      return;
+    }
+    this.echo = "";
+    this.combo = 0;
+    this.editor?.shake();
+    const at = this.caretVirtual();
+    if (at) this.spark(at, 10, Theme.red, DRILL_SPARK);
+    this.app.chip.fail();
   }
 
   /**
@@ -2493,8 +2553,10 @@ export class QuestScene implements Scene {
         : this.drill === "solution"
           ? `   ${t("quest.solutionOnly")}`
           : "";
+    const combo = on && this.combo >= 3 && !prog.done ? `   ${t("quest.combo")} x${this.combo}` : "";
+    const best = on && prog.done && this.bestCombo >= 3 ? `   ${t("quest.bestCombo")} x${this.bestCombo}` : "";
     const status = on
-      ? `${MAIN_FILE[this.land]}${drill}   ${prog.matched} / ${prog.total}${tail}`
+      ? `${MAIN_FILE[this.land]}${drill}   ${prog.matched} / ${prog.total}${tail}${combo}${best}`
       : MAIN_FILE[this.land];
     g.fillStyle = css(
       !on ? Theme.dim : prog.done ? Theme.admit : prog.wrong > 0 ? Theme.red : Theme.coin,

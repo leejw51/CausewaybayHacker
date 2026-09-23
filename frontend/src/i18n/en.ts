@@ -267,6 +267,8 @@ export const en = {
   "quest.completeLine": "+LINE",
   "quest.answerMatched": "MATCHED — EVERY CHARACTER",
   "quest.answerDiverged": "FIX THE RED",
+  "quest.combo": "COMBO",
+  "quest.bestCombo": "BEST",
   "quest.codeFace": "code face {name}",
   "quest.fontSize": "code size {percent}%",
   "quest.leaveMapTitle": "BACK TO THE MAP?",
