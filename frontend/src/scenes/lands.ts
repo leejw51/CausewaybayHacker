@@ -223,8 +223,6 @@ export interface LandGrid {
  * @param minCol    narrowest a plate may be before another column stops being worth it
  * @param viableH   plate height with the smallest mascot still worth drawing
  * @param comfortableH plate height with the mascot at the size it wants
- * @param floorH    plate height with no mascot at all: title, sentence, record.
- *                  The last thing given up before a land goes off the column.
  * @param selected  index of the chosen land
  * @param follow    whether to drag the window onto `selected`. True when the
  *                  selection has just moved — an arrow key walking off the
@@ -239,7 +237,6 @@ export function landGrid(
   minCol: number,
   viableH: number,
   comfortableH: number,
-  floorH: number,
   selected: number,
   follow: boolean,
   scroll: number,
@@ -274,17 +271,16 @@ export function landGrid(
   // does not. Twenty pixels of extra mascot is not worth hiding a land behind
   // a scroll nobody knows is there.
   //
-  // And when the fair share is under even the viable height, **the mascot
-  // gives before a land does**: down to `floorH`, which is the plate with no
-  // mascot in it at all, the plates take the fair share and every land stays
-  // on the column. This is the trade the phone branch of the caller already
-  // makes by passing floors of zero; it belongs here, for every screen, for
-  // the same reason — a land nobody can see is a land nobody picks, and the
-  // mascot is decoration on a screen whose whole job is the choice. Only when
-  // the column cannot hold `floorH` per land does it go back to the
-  // comfortable plate and scroll.
-  const ph =
-    fair >= viableH ? fair : fair >= floorH ? fair : Math.max(fair, comfortableH);
+  // **The mascot is never traded away for a row.** There was a version of
+  // this that let the plates shrink below `viableH`, down to a plate with no
+  // mascot in it at all, so that five lands always fitted the column. It
+  // fitted them, and it drew five cards of text: `drawLandPlate` skips the
+  // sprite when there is no room for one, and the crab, the gopher, the
+  // platypus, the snake and the flame all went at once. That is most of what
+  // tells the lands apart at a glance — on the one screen whose whole job is
+  // telling them apart. A column that scrolls is a smaller cost than a
+  // screen with nothing on it, now that the wheel works without a click.
+  const ph = fair >= viableH ? fair : Math.max(fair, comfortableH);
   const total = ph * rows + gap * (rows - 1);
   const overflow = Math.max(0, total - lh);
   // Clamp to the column, always.
@@ -580,11 +576,35 @@ export class LandsScene implements Scene {
     return chrome + MASCOT_MIN + Math.round(8 * s) + lines * fonts.small.height + recH;
   }
 
-  private drawLandPlate(g: Ctx, rect: Rect, land: Land, chosen: boolean): void {
+  /**
+   * One land's plate.
+   *
+   * `chosen` is the land whose roads fill the right-hand column — a state, and
+   * it does not move. `lit` is the cursor, from 0 to 1, chased in `update` so
+   * that arriving on a plate is a thing being picked up rather than a
+   * stylesheet changing: the plate rises a few pixels, its border takes the
+   * land's own colour, and the face behind it warms by a whisper. The roads
+   * on the right have answered the cursor since they were written; the plates
+   * did not, which made the most important row of controls on the screen the
+   * only dead one.
+   */
+  private drawLandPlate(g: Ctx, rect: Rect, land: Land, chosen: boolean, lit = 0): void {
     const s = this.app.layout.uiScale();
     const fonts = ensureFonts(s);
     const accent = landColour(land);
-    const inner = titledPanel(g, rect, t(`map.${land}` as "map.rust"), chosen ? accent : Theme.dim);
+    // Up to three pixels, off the top: the same distance the roads slide
+    // sideways, so the two halves of the screen answer in one language.
+    const rise = Math.round(lit * 3 * s);
+    rect = [rect[0], rect[1] - rise, rect[2], rect[3]];
+    // A chosen plate is already at the accent; an unchosen one walks to it.
+    const border = chosen ? accent : lit > 0.01 ? accent : Theme.dim;
+    const inner = titledPanel(g, rect, t(`map.${land}` as "map.rust"), border);
+    if (lit > 0.01 && !chosen) {
+      // The face, at a whisper of the land's own colour — so hovering GO and
+      // hovering RUST do not feel like the same screen, which is the rule the
+      // category rows already follow.
+      fill(g, accent, inner[0], inner[1], inner[2], inner[3], 0.1 * lit);
+    }
     const rec = this.record(land);
 
     // Bottom up: the record on the last line, the sentence above it, and the
@@ -733,7 +753,13 @@ export class LandsScene implements Scene {
     // reads as a stylesheet.
     const k = 1 - Math.exp(-dt * 16);
     for (const [id, v] of this.glow) {
-      const want = this.catBtns.hovered === id ? 1 : 0;
+      // One map, two sets of ids: `cat:<road>` from the right-hand column and
+      // `land:<land>` from the plates. Which collection owns an id is decided
+      // by its prefix, so a plate and a road can be lit at the same time —
+      // which is exactly what happens when the cursor crosses from one to the
+      // other, and the old value has to keep decaying while the new one rises.
+      const hovered = id.startsWith("land:") ? this.landBtns.hovered : this.catBtns.hovered;
+      const want = hovered === id ? 1 : 0;
       this.glow.set(id, v + (want - v) * k);
     }
     // The overworld is a megabyte of JPEG and the player is one click from it.
@@ -746,12 +772,19 @@ export class LandsScene implements Scene {
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
     if (phase === "move") {
+      const wasLand = this.landBtns.hovered;
       this.landBtns.hovered = this.landBtns.hit(x, y)?.id ?? null;
       const was = this.catBtns.hovered;
       this.catBtns.hovered = this.catBtns.hit(x, y)?.id ?? null;
-      // One note when the cursor arrives on a row, and none while it sits
-      // there: a blip per mouse-move event is a rattle, not feedback.
+      // One note when the cursor arrives on a row or a plate, and none while
+      // it sits there: a blip per mouse-move event is a rattle, not feedback.
       if (this.catBtns.hovered && this.catBtns.hovered !== was) this.app.chip.blip();
+      else if (
+        this.landBtns.hovered?.startsWith("land:") &&
+        this.landBtns.hovered !== wasLand
+      ) {
+        this.app.chip.blip();
+      }
       return;
     }
     if (phase !== "down") return;
@@ -919,7 +952,7 @@ export class LandsScene implements Scene {
       // same rule `landGrid` uses, so ask it once for the shape, measure, then
       // ask again for the final geometry. The first call's heights are only
       // ever used to pick a column count, which does not depend on them.
-      const shape = landGrid(f.left, LANDS.length, gap, MIN_COL, 0, 0, 0, 0, false, 0);
+      const shape = landGrid(f.left, LANDS.length, gap, MIN_COL, 0, 0, 0, false, 0);
       // **On a phone every land is on screen, mascot or no mascot.**
       // The floors below are "a plate tall enough to be worth looking at",
       // and on a phone insisting on them made the column taller than the
@@ -935,10 +968,6 @@ export class LandsScene implements Scene {
         MIN_COL,
         phone ? 0 : this.plateHeight(s, shape.pw, 52),
         phone ? 0 : this.plateHeight(s, shape.pw),
-        // The plate with no mascot in it: the last height given up before a
-        // land would go off the bottom. On a phone the floors are already
-        // zero and this changes nothing.
-        phone ? 0 : this.plateHeight(s, shape.pw, 0),
         LANDS.indexOf(this.land),
         // Follow the selection only on the frame it changed on (and on the
         // first frame, when `followed` is still null), never afterwards.
@@ -958,8 +987,17 @@ export class LandsScene implements Scene {
       g.rect(lx, ly, lw, lh);
       g.clip();
       LANDS.forEach((land, i) => {
+        // `update` only chases ids the map already holds, and the plates are
+        // the thing that knows which lands exist.
+        if (!this.glow.has(`land:${land}`)) this.glow.set(`land:${land}`, 0);
         const { x: px, y: py } = grid.origins[i];
-        this.drawLandPlate(g, [px, py, grid.pw, h], land, land === this.land);
+        this.drawLandPlate(
+          g,
+          [px, py, grid.pw, h],
+          land,
+          land === this.land,
+          this.glow.get(`land:${land}`) ?? 0,
+        );
         // The hit box is where the plate *is*, which is the scrolled position
         // — **cut to the column**, as the paint is. A plate scrolled past the
         // column's end is invisible, and on a phone it lies under the
