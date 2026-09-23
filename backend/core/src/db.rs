@@ -106,6 +106,11 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0020_pytorch",
         include_str!("../migrations/0020_pytorch.sql"),
     ),
+    (
+        21,
+        "0021_typescript",
+        include_str!("../migrations/0021_typescript.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {

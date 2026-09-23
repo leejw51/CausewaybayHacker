@@ -97,6 +97,13 @@ env:
   # the quests to, so pinning `g++` there failed on a correct image.
   CXX_EXPECTED: "(Ubuntu 13"
   NODE_VERSION: "24"
+  # TypeScript Land's compiler (SPEC §5.1). Pinned, because a quest's
+  # starter is asserted to *fail* and a newer checker can find a new reason
+  # for it to — or stop finding the old one. The same version the frontend
+  # locks (frontend/package-lock.json), so the content gate on a laptop
+  # and here check with one tsc and format with one prettier.
+  TYPESCRIPT_VERSION: "5.9.3"
+  PRETTIER_VERSION: "3.9.6"
 
 jobs:
   version:
@@ -173,6 +180,20 @@ jobs:
           python3 -I -c "import torch, numpy; print(torch.__version__)"
           test -z "$(python3 -I -c 'import torch' 2>&1)" \
             || { echo "importing torch writes to stderr; it lands in every attempt"; exit 1; }
+
+      # TypeScript Land is the sixth land: `tsc` checks `main.ts` and `node`
+      # runs what it emits (runner/src/typescript.rs). Installed globally,
+      # because the runner looks for both on PATH exactly as the server does
+      # on a player's machine; prettier is the land's `code.format`.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install tsc and prettier, the TypeScript land's toolchain
+        run: |
+          npm install --global --no-fund --no-audit \
+            typescript@${{ env.TYPESCRIPT_VERSION }} prettier@${{ env.PRETTIER_VERSION }}
+          tsc --version
+          prettier --version
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -422,6 +443,20 @@ jobs:
           python3 -I -c "import torch, numpy; print(torch.__version__)"
           test -z "$(python3 -I -c 'import torch' 2>&1)" \
             || { echo "importing torch writes to stderr; it lands in every attempt"; exit 1; }
+
+      # TypeScript Land is the sixth land: `tsc` checks `main.ts` and `node`
+      # runs what it emits (runner/src/typescript.rs). Installed globally,
+      # because the runner looks for both on PATH exactly as the server does
+      # on a player's machine; prettier is the land's `code.format`.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install tsc and prettier, the TypeScript land's toolchain
+        run: |
+          npm install --global --no-fund --no-audit \
+            typescript@${{ env.TYPESCRIPT_VERSION }} prettier@${{ env.PRETTIER_VERSION }}
+          tsc --version
+          prettier --version
 
       # The data-race fixture is checked with `go run -race`, and the first
       # `-race` build on a fresh runner instruments the standard library from

@@ -1,0 +1,4 @@
+<anonymous_script>:1
+{"screens": [1, 2
+
+SyntaxError: Expected ',' or ']' after array element in JSON at position 17 (line 1 column 18)

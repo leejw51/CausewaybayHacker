@@ -60,7 +60,7 @@ SCRATCH = pathlib.Path(
 )
 CACHE = pathlib.Path(os.environ.get("CWBHACKER_CI_CACHE", _root / "cache"))
 
-ID_RE = re.compile(r"^(rust|go|cpp|python|pytorch)\.(verybasic|basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
+ID_RE = re.compile(r"^(rust|go|cpp|python|pytorch|typescript)\.(verybasic|basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
 
 MISTAKE_MAP_HEADING = "## 2. Mistake kind → concepts"
 
@@ -179,9 +179,45 @@ def build(lang, src, workdir):
             launcher = workdir / "prog"
             launcher.write_text("#!/bin/sh\nexec python3 -I \"$(dirname \"$0\")/main.py\"\n")
             launcher.chmod(0o755)
+    elif lang == "typescript":
+        # The runner's own files, not a copy of them (SPEC §5.1): the ambient
+        # declarations that are the whole of Node a quest can see, and the
+        # tsconfig that makes `tsc` strict. `tsc` prints its diagnostics on
+        # stdout, so they are folded into the stderr this returns.
+        f = workdir / "main.ts"
+        f.write_text(src)
+        for name in ("node.d.ts", "tsconfig.json"):
+            shutil.copyfile(TS_FILES / name, workdir / name)
+        p = subprocess.run(
+            [tsc(), "-p", "."],
+            cwd=workdir, capture_output=True, text=True, timeout=120)
+        p = subprocess.CompletedProcess(p.args, p.returncode, "", p.stdout + p.stderr)
+        if p.returncode == 0:
+            launcher = workdir / "prog"
+            launcher.write_text(
+                "#!/bin/sh\nexec node --enable-source-maps \"$(dirname \"$0\")/main.js\"\n")
+            launcher.chmod(0o755)
     else:
         raise ValueError(f"no toolchain for land {lang!r}")
     return p.returncode == 0, p.stderr
+
+
+TS_FILES = REPO / "backend" / "runner" / "src" / "typescript"
+
+
+def tsc():
+    """`tsc` on PATH, else the one the frontend already pins.
+
+    The server finds `tsc` on PATH only; this falls back to the checkout's
+    own so a machine that can build the frontend can check the content too.
+    """
+    found = shutil.which("tsc")
+    if found:
+        return found
+    local = REPO / "frontend" / "node_modules" / ".bin" / "tsc"
+    if local.exists():
+        return str(local)
+    raise SystemExit("typescript: no tsc on PATH (npm install -g typescript)")
 
 
 def run_case(workdir, stdin, timeout_ms, max_bytes):

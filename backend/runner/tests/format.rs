@@ -225,7 +225,7 @@ fn the_toolchain_report_covers_every_land_and_agrees_with_the_gate() {
     let lands: Vec<_> = report.iter().map(|t| t.land).collect();
     assert_eq!(
         lands,
-        vec!["rust", "go", "cpp", "python", "pytorch"],
+        vec!["rust", "go", "cpp", "python", "pytorch", "typescript"],
         "a land without a row is a land nobody is told about"
     );
     for tool in &report {

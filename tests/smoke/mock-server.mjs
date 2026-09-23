@@ -183,8 +183,8 @@ const GO_QUESTS = [
 ];
 
 /**
- * One quest each for the three newer lands, for the same reason as the Go one:
- * `world.lands` fabricates five lands and a land with an empty map is a mock
+ * One quest each for the four newer lands, for the same reason as the Go one:
+ * `world.lands` fabricates six lands and a land with an empty map is a mock
  * bug, not a server one.
  */
 const CPP_QUESTS = [
@@ -237,12 +237,31 @@ const PYTORCH_QUESTS = [
   },
 ];
 
+const TYPESCRIPT_QUESTS = [
+  {
+    id: "typescript.basic.01.hello",
+    node: 1,
+    title: "FIRST LIGHT",
+    difficulty: 1,
+    kind: "quest",
+    x: 0.12,
+    y: 0.74,
+    requires: [],
+    starter:
+      'const input: string = require("fs").readFileSync(0, "utf8");\n\nfunction main(): void {}\n\nmain();\n',
+    solution: 'console.log("hello, causewaybay");\n',
+    expect: "hello, causewaybay\n",
+    hints: [],
+  },
+];
+
 const LANDS = {
   rust: QUESTS,
   go: GO_QUESTS,
   cpp: CPP_QUESTS,
   python: PYTHON_QUESTS,
   pytorch: PYTORCH_QUESTS,
+  typescript: TYPESCRIPT_QUESTS,
 };
 const questsOf = (land) => LANDS[land] ?? [];
 const findQuest = (id) => Object.values(LANDS).flat().find((q) => q.id === id);
@@ -658,6 +677,7 @@ wss.on("connection", (ws) => {
             python: () => /print\("([^"]*)"\)/.exec(src)?.[1],
             // Same shape as Python's, because it is Python's runner.
             pytorch: () => /print\("([^"]*)"\)/.exec(src)?.[1],
+            typescript: () => /console\.log\("([^"]*)"\)/.exec(src)?.[1],
           }[langOf(q.id)]?.();
           const ok = printed !== undefined && `${printed}\n` === q.expect;
           const had = progress.get(`${me}|${q.id}`);

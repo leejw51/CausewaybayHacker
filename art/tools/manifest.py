@@ -19,10 +19,12 @@ ORDER = [
     "map_rust", "map_rust_p", "map_go", "map_go_p",
     "map_cpp", "map_cpp_p", "map_python", "map_python_p",
     "map_pytorch", "map_pytorch_p",
+    "map_typescript", "map_typescript_p",
     "bg_street", "bg_times", "bg_till", "bg_mtr",
     "bg_room732", "bg_room732_p", "bg_datacentre",
     "sprite_mei", "sprite_alex", "sprite_ferris", "sprite_gogo",
     "sprite_cpp", "sprite_python", "sprite_pytorch",
+    "sprite_typescript",
     "agent_skynet",
     # The Rust coder — the AI agent on the code screens — and the three
     # provider bots that fly beside it. Borrowed from CausewaybayRaiden
@@ -57,11 +59,13 @@ ORDER = [
     "emblem_cpp_basic", "emblem_cpp_advanced", "emblem_cpp_hacker",
     "emblem_python_basic", "emblem_python_advanced", "emblem_python_hacker",
     "emblem_pytorch_basic", "emblem_pytorch_advanced", "emblem_pytorch_hacker",
+    "emblem_typescript_basic", "emblem_typescript_advanced", "emblem_typescript_hacker",
     "mascot_rust_basic", "mascot_rust_advanced", "mascot_rust_hacker",
     "mascot_go_basic", "mascot_go_advanced", "mascot_go_hacker",
     "mascot_cpp_basic", "mascot_cpp_advanced", "mascot_cpp_hacker",
     "mascot_python_basic", "mascot_python_advanced", "mascot_python_hacker",
     "mascot_pytorch_basic", "mascot_pytorch_advanced", "mascot_pytorch_hacker",
+    "mascot_typescript_basic", "mascot_typescript_advanced", "mascot_typescript_hacker",
     "badge_cleared", "badge_locked",
     # The playground: the one room in the game with no problem in it.
     "bg_playground", "bg_playground_p",

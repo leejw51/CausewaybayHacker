@@ -103,6 +103,24 @@ describe("helpAt names the construct the caret is in", () => {
     expect(at("python", "s = {x for x in ‸xs}\n")!.id).toBe("python.n.SetComprehensionExpression");
   });
 
+  it("finds TypeScript's own constructs, from its own grammar", () => {
+    expect(at("typescript", "for (const x of xs) {\n  ‸\n}\n")!.id).toBe(
+      "typescript.n.ForStatement",
+    );
+    expect(at("typescript", "interface Point‸ {\n  x: number;\n}\n")!.id).toBe(
+      "typescript.n.InterfaceDeclaration",
+    );
+    // Inside the member's type, the annotation is the nearer construct.
+    expect(at("typescript", "interface P {\n  x: num‸ber;\n}\n")!.id).toBe(
+      "typescript.n.TypeAnnotation",
+    );
+    expect(at("typescript", 'type R = "a" | "b‸" | 1;\n')).toBeNull();
+    expect(at("typescript", "type R = A | ‸B;\n")!.id).toBe("typescript.n.UnionType");
+    expect(at("typescript", "try {\n  f();\n} catch (e) {\n  ‸\n}\n")!.id).toBe(
+      "typescript.n.CatchClause",
+    );
+  });
+
   it("finds a Python match clause and a decorator", () => {
     expect(at("python", "match cmd:\n    case 1:\n        ‸\n")!.id).toBe("python.n.MatchClause");
     expect(at("python", "@d‸\ndef f():\n    pass\n")!.id).toBe("python.n.Decorator");
@@ -120,6 +138,7 @@ describe("helpAt prefers the word the caret is actually on", () => {
     expect(at("go", "package main\nfunc f() {\n\tdefer‸ c.Close()\n}\n")!.id).toBe("go.w.defer");
     expect(at("python", "for i, x in enumerate‸(xs):\n    pass\n")!.id).toBe("python.w.enumerate");
     expect(at("cpp", "int main() { auto b = std::move‸(a); }\n")!.id).toBe("cpp.w.move");
+    expect(at("typescript", "const v: unknown‸ = 1;\n")!.id).toBe("typescript.w.unknown");
   });
 
   it("falls back to the construct when the word is not in the catalogue", () => {
@@ -135,10 +154,11 @@ describe("helpAt keeps quiet where it should", () => {
     expect(at("go", 'package main\nfunc f() {\n\ts := "defer‸ this"\n}\n')).toBeNull();
     expect(at("python", "s = 'for ‸x'\n")).toBeNull();
     expect(at("cpp", "/* the ‸loop */\nint main() {}\n")).toBeNull();
+    expect(at("typescript", "const s = `for ‸x`;\n")).toBeNull();
   });
 
   it("says nothing on an empty document", () => {
-    for (const lang of ["rust", "go", "cpp", "python"] as Land[]) {
+    for (const lang of ["rust", "go", "cpp", "python", "typescript"] as Land[]) {
       expect(at(lang, "‸")).toBeNull();
     }
   });
@@ -170,8 +190,8 @@ describe("the catalogue itself", () => {
     }
   });
 
-  it("covers all four lands on both layers", () => {
-    for (const lang of ["rust", "go", "cpp", "python"]) {
+  it("covers every land with a grammar of its own, on both layers", () => {
+    for (const lang of ["rust", "go", "cpp", "python", "typescript"]) {
       expect(all.filter((h) => h.id.startsWith(`${lang}.w.`)).length).toBeGreaterThan(15);
       expect(all.filter((h) => h.id.startsWith(`${lang}.n.`)).length).toBeGreaterThan(15);
     }

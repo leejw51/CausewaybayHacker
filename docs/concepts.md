@@ -19,7 +19,10 @@ Rules:
   everyone's. `—` in a land's column means the slug is not used there. The
   twelve PyTorch slugs are the one group that is *nobody else's*: a tensor is
   not a `slice` and a gradient is not a return value, so they get a section
-  rather than a column.
+  rather than a column. TypeScript is the opposite case and gets neither: its
+  four packs are ports of Python's, node for node, carrying the same slugs, so
+  a `typescript` column would be the `python` column copied out. It added no
+  slug.
 
 ---
 
@@ -193,7 +196,7 @@ not a habit: the content check that runs every reference solution
 zero. A kind may be at zero only while the pack that would cover it is
 unwritten, and that is a tracked gap, not an accepted state.
 
-As of the twenty packs in `content/`, every kind in the table above reaches
+As of the twenty-four packs in `content/`, every kind in the table above reaches
 quests, and every one of the 78 slugs is used by a quest *and* named by a kind.
 `other` is the only row at zero, and that is by design — it has no concepts.
 The eight slugs added with the C++ and Python lands, and the twelve added with
@@ -208,7 +211,7 @@ pass has run), `embeddings` is an index-range (a token id past the end of the
 table), `datasets` is a timeout, `optimizers` an unhandled error, `modules` an
 unknown name, and the remaining five are wrong answers.
 
-`data-race` and `deadlock` are carried by the four `advanced` packs and by
+`data-race` and `deadlock` are carried by the `advanced` packs and by
 nothing before them; `complexity`, `hashing`, `two-pointers`, `binary-search`,
 `graphs`, `intervals`, `stacks-queues` and `dynamic-programming` only by the
-four `hacker` packs.
+`hacker` packs.

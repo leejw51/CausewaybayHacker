@@ -6,6 +6,8 @@
     "go": "go version go1.27.1 darwin/arm64",
     "cxx": "clang-darwin: Apple clang version 21.0.0 (clang-2100.3.34.2)",
     "python": "Python 3.13.13",
+    "tsc": "Version 5.9.3",
+    "node": "v26.9.0",
     "host": "Darwin 27.0.0 arm64"
   },
   "cpp_toolchains_captured": [
@@ -1373,6 +1375,454 @@
       },
       "captured": "python/recursion.pycompile.txt",
       "captured_runtime": "python/recursion.runtime.txt"
+    },
+    {
+      "file": "typescript/type-mismatch.ts",
+      "lang": "typescript",
+      "kind": "type-mismatch",
+      "code": "TS2322",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 1,
+        "identities": [
+          "TS2322"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "TS2322",
+            "file": "main.ts",
+            "line": 3,
+            "col": 7,
+            "message": "Type 'number' is not assignable to type 'string'."
+          }
+        ]
+      },
+      "captured": "typescript/type-mismatch.tsc.txt"
+    },
+    {
+      "file": "typescript/unknown-name.ts",
+      "lang": "typescript",
+      "kind": "unknown-name",
+      "code": "TS2304",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 1,
+        "identities": [
+          "TS2304"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "TS2304",
+            "file": "main.ts",
+            "line": 3,
+            "col": 21,
+            "message": "Cannot find name 'screenCount'."
+          }
+        ]
+      },
+      "captured": "typescript/unknown-name.tsc.txt"
+    },
+    {
+      "file": "typescript/possibly-undefined.ts",
+      "lang": "typescript",
+      "kind": "nil-deref",
+      "code": "TS18048",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 1,
+        "identities": [
+          "TS18048"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "TS18048",
+            "file": "main.ts",
+            "line": 4,
+            "col": 13,
+            "message": "'eta' is possibly 'undefined'."
+          }
+        ]
+      },
+      "captured": "typescript/possibly-undefined.tsc.txt"
+    },
+    {
+      "file": "typescript/missing-property.ts",
+      "lang": "typescript",
+      "kind": "missing-trait",
+      "code": "TS2339",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 1,
+        "identities": [
+          "TS2339"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "TS2339",
+            "file": "main.ts",
+            "line": 6,
+            "col": 15,
+            "message": "Property 'name' does not exist on type 'Screen'."
+          }
+        ]
+      },
+      "captured": "typescript/missing-property.tsc.txt"
+    },
+    {
+      "file": "typescript/const-assign.ts",
+      "lang": "typescript",
+      "kind": "mutability",
+      "code": "TS2588",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 1,
+        "identities": [
+          "TS2588"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "TS2588",
+            "file": "main.ts",
+            "line": 3,
+            "col": 1,
+            "message": "Cannot assign to 'count' because it is a constant."
+          }
+        ]
+      },
+      "captured": "typescript/const-assign.tsc.txt"
+    },
+    {
+      "file": "typescript/syntax.ts",
+      "lang": "typescript",
+      "kind": "syntax",
+      "code": "TS1005",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 1,
+        "identities": [
+          "TS7010",
+          "TS2300",
+          "TS2842",
+          "TS7031",
+          "TS1005",
+          "TS2300",
+          "TS2842",
+          "TS7031",
+          "TS1005",
+          "TS1005",
+          "TS7006",
+          "TS1005",
+          "TS7006",
+          "TS1005",
+          "TS2554"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "TS7010",
+            "file": "main.ts",
+            "line": 2,
+            "col": 10,
+            "message": "'show', which lacks return-type annotation, implicitly has an 'any' return type."
+          },
+          {
+            "level": "error",
+            "code": "TS2300",
+            "file": "main.ts",
+            "line": 3,
+            "col": 9,
+            "message": "Duplicate identifier '(Missing)'."
+          },
+          {
+            "level": "error",
+            "code": "TS2842",
+            "file": "main.ts",
+            "line": 3,
+            "col": 9,
+            "message": "'(Missing)' is an unused renaming of 'return'. Did you intend to use it as a type annotation?"
+          },
+          {
+            "level": "error",
+            "code": "TS7031",
+            "file": "main.ts",
+            "line": 3,
+            "col": 9,
+            "message": "Binding element '(Missing)' implicitly has an 'any' type."
+          },
+          {
+            "level": "error",
+            "code": "TS1005",
+            "file": "main.ts",
+            "line": 3,
+            "col": 10,
+            "message": "':' expected."
+          },
+          {
+            "level": "error",
+            "code": "TS2300",
+            "file": "main.ts",
+            "line": 3,
+            "col": 11,
+            "message": "Duplicate identifier '(Missing)'."
+          }
+        ]
+      },
+      "captured": "typescript/syntax.tsc.txt"
+    },
+    {
+      "file": "typescript/other-unmatched.ts",
+      "lang": "typescript",
+      "kind": "other",
+      "code": "TS2393",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 1,
+        "identities": [
+          "TS2393",
+          "TS2393"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "code": "TS2393",
+            "file": "main.ts",
+            "line": 2,
+            "col": 10,
+            "message": "Duplicate function implementation."
+          },
+          {
+            "level": "error",
+            "code": "TS2393",
+            "file": "main.ts",
+            "line": 5,
+            "col": 10,
+            "message": "Duplicate function implementation."
+          }
+        ]
+      },
+      "captured": "typescript/other-unmatched.tsc.txt"
+    },
+    {
+      "file": "typescript/undefined-property.ts",
+      "lang": "typescript",
+      "kind": "nil-deref",
+      "code": "ts:undefined-property",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 0,
+        "identities": [
+          "TypeError: Cannot read properties of undefined (reading 'id')"
+        ],
+        "diagnostics": [],
+        "run_command": "node --enable-source-maps main.js",
+        "run_exit": 1,
+        "run_stderr": "<work>/main.ts:6\nconsole.log(screens[0].id);\n                       ^\n\nTypeError: Cannot read properties of undefined (reading 'id')\n"
+      },
+      "captured": "typescript/undefined-property.tsc.txt",
+      "captured_runtime": "typescript/undefined-property.runtime.txt"
+    },
+    {
+      "file": "typescript/not-a-function.ts",
+      "lang": "typescript",
+      "kind": "missing-trait",
+      "code": "ts:not-a-function",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 0,
+        "identities": [
+          "TypeError: feed.screens.map is not a function"
+        ],
+        "diagnostics": [],
+        "run_command": "node --enable-source-maps main.js",
+        "run_exit": 1,
+        "run_stderr": "<work>/main.ts:3\nconsole.log(feed.screens.map((n: number) => n + 1));\n                         ^\n\nTypeError: feed.screens.map is not a function\n"
+      },
+      "captured": "typescript/not-a-function.tsc.txt",
+      "captured_runtime": "typescript/not-a-function.runtime.txt"
+    },
+    {
+      "file": "typescript/reference-error.ts",
+      "lang": "typescript",
+      "kind": "unknown-name",
+      "code": "ts:reference-error",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 0,
+        "identities": [
+          "ReferenceError: Cannot access 'greeting' before initialization"
+        ],
+        "diagnostics": [],
+        "run_command": "node --enable-source-maps main.js",
+        "run_exit": 1,
+        "run_stderr": "<work>/main.ts:3\n  return greeting;\n  ^\n\nReferenceError: Cannot access 'greeting' before initialization\n"
+      },
+      "captured": "typescript/reference-error.tsc.txt",
+      "captured_runtime": "typescript/reference-error.runtime.txt"
+    },
+    {
+      "file": "typescript/range-error.ts",
+      "lang": "typescript",
+      "kind": "index-range",
+      "code": "ts:range-error",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 0,
+        "identities": [
+          "RangeError: Invalid array length"
+        ],
+        "diagnostics": [],
+        "run_command": "node --enable-source-maps main.js",
+        "run_exit": 1,
+        "run_stderr": "<work>/main.ts:3\nconst slots: number[] = new Array(n);\n                        ^\n\nRangeError: Invalid array length\n"
+      },
+      "captured": "typescript/range-error.tsc.txt",
+      "captured_runtime": "typescript/range-error.runtime.txt"
+    },
+    {
+      "file": "typescript/recursion.ts",
+      "lang": "typescript",
+      "kind": "wrong-answer",
+      "code": "ts:recursion",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 0,
+        "identities": [
+          "RangeError: Maximum call stack size exceeded"
+        ],
+        "diagnostics": [],
+        "run_command": "node --enable-source-maps main.js",
+        "run_exit": 1,
+        "run_stderr": "<work>/main.ts:3\n  return depth(n + 1) + 1;\n  ^\n\nRangeError: Maximum call stack size exceeded\n"
+      },
+      "captured": "typescript/recursion.tsc.txt",
+      "captured_runtime": "typescript/recursion.runtime.txt"
+    },
+    {
+      "file": "typescript/json-parse.ts",
+      "lang": "typescript",
+      "kind": "unhandled-error",
+      "code": "ts:json-parse",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 0,
+        "identities": [
+          "SyntaxError: Expected ',' or ']' after array element in JSON at position 17 (line 1 column 18)"
+        ],
+        "diagnostics": [],
+        "run_command": "node --enable-source-maps main.js",
+        "run_exit": 1,
+        "run_stderr": "<anonymous_script>:1\n{\"screens\": [1, 2\n\nSyntaxError: Expected ',' or ']' after array element in JSON at position 17 (line 1 column 18)\n"
+      },
+      "captured": "typescript/json-parse.tsc.txt",
+      "captured_runtime": "typescript/json-parse.runtime.txt"
+    },
+    {
+      "file": "typescript/exception.ts",
+      "lang": "typescript",
+      "kind": "unhandled-error",
+      "code": "ts:exception",
+      "phase": "runtime",
+      "level": "exception",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "tsc -p .",
+        "compile_exit": 0,
+        "identities": [
+          "Error: no such board: -1"
+        ],
+        "diagnostics": [],
+        "run_command": "node --enable-source-maps main.js",
+        "run_exit": 1,
+        "run_stderr": "<work>/main.ts:3\n  if (id < 0) throw new Error(\"no such board: \" + id);\n              ^\n\nError: no such board: -1\n"
+      },
+      "captured": "typescript/exception.tsc.txt",
+      "captured_runtime": "typescript/exception.runtime.txt"
     }
   ],
   "content_starter_cases": [

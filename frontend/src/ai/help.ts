@@ -57,6 +57,8 @@ export interface Help {
  */
 const QUIET = new Set([
   "LineComment",
+  // TypeScript's backtick string. Nothing else has one by this name.
+  "TemplateString",
   "BlockComment",
   "Comment",
   "String",
@@ -308,12 +310,69 @@ const NODES_BY_LAND = {
     ArgList:
       "Keyword arguments may come in any order. `*xs` spreads a list, `**kw` spreads a dict.",
   },
+  // `@lezer/javascript` with its TypeScript dialect. The names are the
+  // grammar's own; `tests/help.test.ts` resolves real carets against them.
+  typescript: {
+    ForStatement:
+      "`for (const x of xs)` walks values; `for (const k in o)` walks keys, as strings. On an array you want `of`.",
+    WhileStatement:
+      "`while (cond) { … }` checks first. `do { … } while (cond);` runs the body once before it asks.",
+    DoStatement: "`do { … } while (cond);` runs once before it asks. The semicolon is part of it.",
+    IfStatement:
+      "Inside `if (x !== undefined)` the compiler narrows `x`: in that block it is no longer `undefined`.",
+    SwitchStatement:
+      "Cases fall through without a `break`. End an exhaustive one with `const _: never = x;` and a missing case will not compile.",
+    TryStatement:
+      "Under strict, `catch (e)` gives `e: unknown`. Narrow it with `e instanceof Error` before you read `e.message`.",
+    CatchClause:
+      "The caught value is `unknown`: anything can be thrown. `instanceof Error` narrows it to something with a message.",
+    ThrowStatement:
+      "Throw an `Error`, not a string: `new Error(msg)` carries a stack as well as the words.",
+    FunctionDeclaration:
+      "Type every parameter; strict mode will not guess them. The return type is inferred, but writing it pins the contract.",
+    ArrowFunction:
+      "An arrow keeps the `this` of where it was written. A body in braces needs its own `return`.",
+    ClassDeclaration:
+      "`constructor(private readonly n: number)` declares and assigns the field at once. `readonly` is checked, not enforced at runtime.",
+    InterfaceDeclaration:
+      "An `interface` names the shape of an object. It is erased at compile time: none of it exists when the program runs.",
+    TypeAliasDeclaration:
+      "`type` names any type — a union, a tuple, a function. An `interface` names only object shapes, but can be extended.",
+    EnumDeclaration:
+      "A numeric `enum` also maps numbers back to names. A union of string literals is often the lighter choice.",
+    VariableDeclaration:
+      "`const` unless it has to change, then `let`. `var` is function-scoped and hoisted, and nobody wants that.",
+    TypeAnnotation:
+      "A `: T` annotation is checked by `tsc` and then erased. Nothing checks it at runtime, which is why input needs parsing.",
+    UnionType:
+      "`A | B` is either one. Narrow it before use — `typeof`, `in`, `instanceof` or a `kind` tag.",
+    ObjectType:
+      "`{ a: number; b?: string }` — the `?` makes `b` possibly `undefined`, and strict makes you check.",
+    ParameterizedType:
+      "`Map<string, number>` fills in the generic. Without it an empty `new Map()` is `Map<any, any>`.",
+    TypeParamList:
+      "`<T>` makes it generic: the caller's type flows through. `<T extends X>` says what `T` must have.",
+    ArrayType:
+      "`number[]` and `Array<number>` are the same type. `readonly number[]` refuses `push`.",
+    TupleType: "`[string, number]` is a fixed-length array with a type for each slot.",
+    AwaitExpression:
+      "`await` pauses this `async` function until the promise settles. Forget it and you hold a `Promise`, not the value.",
+    NewExpression:
+      "`new Map<K, V>()` and `new Set<T>()` want their type arguments when they start out empty.",
+    ConditionalExpression:
+      "`cond ? a : b` is the value-shaped `if`. Nest two and it wants to be an `if`.",
+    ImportDeclaration:
+      "Only `fs` is declared here, and only `readFileSync`. Any other module is a compile error before a line runs.",
+    ObjectExpression:
+      "An object literal is checked for excess properties: a key its type does not have is an error, not a free field.",
+  },
 };
 
 /**
  * PyTorch Land is parsed by the same `@lezer/python` grammar, so a `for` is a
  * `ForStatement` in both and the construct help is the same sentence. The
- * *words* differ, and those are the catalogue below.
+ * *words* differ, and those are the catalogue below. TypeScript Land is its
+ * own grammar and has its own entry above.
  */
 const NODES: Record<Land, Record<string, string>> = {
   ...NODES_BY_LAND,
@@ -518,6 +577,49 @@ const WORDS: Record<Land, Record<string, string>> = {
       "Mask the **scores** with `-inf` before the softmax. Zeroing probabilities afterwards leaves a row that sums to less than one.",
     manual_seed:
       "`torch.manual_seed` fixes one global stream, so anything else that draws from it shifts your numbers. A `torch.Generator` is a stream of its own.",
+  },
+  typescript: {
+    any: "`any` switches the checker off for this value and all it touches. `unknown` is the safe top type: narrow it first.",
+    unknown:
+      "`unknown` accepts anything and allows nothing until you narrow it with `typeof`, `instanceof` or a check of your own.",
+    never:
+      "`never` is the type with no values. A `switch` that assigns its leftover to `never` stops compiling when a case is missing.",
+    readonly:
+      "`readonly` forbids assignment through this name at compile time. A `ReadonlyArray<T>` has no `push` at all.",
+    keyof:
+      "`keyof T` is the union of the property names of `T`. With `K extends keyof T`, `T[K]` is the type of that property.",
+    typeof:
+      "In an expression `typeof x` is a runtime string such as `number`. In a type it is the compile-time type of `x`.",
+    as: "`x as T` tells the compiler to trust you. Nothing checks it at runtime, so a wrong cast is a bug the compiler agreed to.",
+    satisfies:
+      "`satisfies T` checks a value against `T` and keeps its own narrower type. Unlike `as`, it cannot lie.",
+    undefined:
+      "Under strict, `undefined` is its own type. An optional `x?: T` is `T | undefined`, and you check before you use it.",
+    null: "`null` is its own type under strict. `x ?? d` falls back on `null` or `undefined`, but not on `0` or an empty string.",
+    console:
+      "`console.log` prints its arguments separated by spaces, with a newline at the end. It is the stdout this land has.",
+    readFileSync:
+      '`readFileSync(0, "utf8")` reads all of standard input as one string. Split it on newlines for the lines.',
+    require:
+      '`require("fs")` is the one module declared here. There is no @types/node, so any other module is a compile error.',
+    split:
+      '`s.split(" ")` keeps the empty strings between double spaces. `s.trim().split(/\\s+/)` gives only the words.',
+    sort: "`sort()` with no comparator compares as strings, in place. For numbers pass `(a, b) => a - b`.",
+    map: "`map` makes a new array of the same length. It is not a loop for side effects — that is `for…of`.",
+    filter:
+      "`filter` keeps what the callback says yes to. A type guard `(x): x is T => …` narrows the result as well.",
+    reduce:
+      "`reduce` with no starting value throws on an empty array. Give it one: `xs.reduce((a, b) => a + b, 0)`.",
+    Record:
+      "`Record<string, number>` is an object keyed by strings. A missing key reads as `undefined`, whatever the type says.",
+    Map: "A `Map` keeps insertion order and takes any key. `get` returns `V | undefined`, so strict makes you handle the miss.",
+    Set: "A `Set` compares objects by identity: two equal-looking objects are two members. Numbers and strings go by value.",
+    Number:
+      '`Number("12")` is `12`, `Number("")` is `0` and `Number("x")` is `NaN`. Check with `Number.isNaN` when input can be bad.',
+    parseInt:
+      'Pass the radix: `parseInt(s, 10)`. It stops at the first non-digit, so `parseInt("12px", 10)` is `12`.',
+    BigInt:
+      "Past 2^53 a `number` loses integers. A `bigint` such as `10n` is exact, but does not mix with `number` in arithmetic.",
   },
 };
 

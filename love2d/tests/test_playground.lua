@@ -108,6 +108,10 @@ return function()
     T.ok(Playground.STARTER.pytorch:find("import torch", 1, true) ~= nil,
       "the PyTorch starter imports torch, because that is the half of the"
       .. " toolchain the desk exists to check")
+    T.ok(Playground.STARTER.typescript:find('require("fs").readFileSync(0, "utf8")', 1, true) ~= nil,
+      "the TypeScript starter reads stdin the one way node.d.ts declares")
+    T.ok(Playground.STARTER.typescript:find("console.log(", 1, true) ~= nil,
+      "and prints with console.log")
   end)
 
   T.case("the run shares the one execution slot", function()

@@ -54,6 +54,10 @@ export const TRACK_COL: Record<string, RGBA> = {
   python: c(248, 208, 56),
   // The torch flame, snapped to the same 8-per-channel grid.
   pytorch: c(232, 72, 32),
+  // TypeScript blue #3178C6, snapped to the grid. Not C++'s blue: C++ is a
+  // deep navy with no red in it at all, this is the brighter, lighter blue
+  // with red and green both well up — side by side they read as two lands.
+  typescript: c(48, 120, 200),
 };
 
 export const TRACK_HAZE: Record<string, RGBA> = {
@@ -65,6 +69,9 @@ export const TRACK_HAZE: Record<string, RGBA> = {
   python: [0.3, 0.2, 0.02, 0.24],
   // PYTORCH LAND is the machine room at night: fan light and a red glow.
   pytorch: [0.28, 0.06, 0.02, 0.3],
+  // TYPESCRIPT LAND is the office tower at dusk: cold glass, lit floors.
+  // Lighter and greyer than C++'s deep blue, so the two maps do not match.
+  typescript: [0.08, 0.18, 0.34, 0.22],
 };
 
 /** A colour a canvas will take, with an optional alpha override. */

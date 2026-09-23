@@ -850,7 +850,7 @@ return function()
   T.section("the coder — what it says for free")
 
   T.case("has a catalogue for every land, and never repeats a tip", function()
-    for _, lang in ipairs({ "rust", "go", "cpp", "python" }) do
+    for _, lang in ipairs({ "rust", "go", "cpp", "python", "typescript" }) do
       T.ok(#(Tips.TIPS[lang] or {}) >= 8, lang .. " has " .. #(Tips.TIPS[lang] or {}) .. " tips")
     end
     local last = 1

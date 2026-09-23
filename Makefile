@@ -84,6 +84,21 @@ PATH       := $(GAME_PY_BIN):$(PATH)
 export PATH
 endif
 
+# **The frontend's own tsc and prettier trail PATH.**
+#
+# TypeScript Land's toolchain is `tsc` plus the `node` it runs on, and its
+# formatter is `prettier` (SPEC §5.1). The browser client already pins both
+# in frontend/node_modules, so a machine that can build the frontend can
+# play the sixth land without a global `npm install -g` — the server finds
+# them on PATH like every other compiler. *Appended*, not prepended: a tsc
+# the player installed on purpose wins, and nothing else in .bin (vite,
+# vitest) shadows anything, because nothing earlier on PATH is displaced.
+FE_BIN     := $(CURDIR)/frontend/node_modules/.bin
+ifneq ($(wildcard $(FE_BIN)/tsc),)
+PATH       := $(PATH):$(FE_BIN)
+export PATH
+endif
+
 # How long `start` waits for a port to answer before calling it a failure.
 WAIT_SECS  ?= 90
 
@@ -439,7 +454,11 @@ doctor: ## check the toolchains and the server's own view of things
 	  printf '           place the isolated "python3 -I" the runner uses will not look.\n'; \
 	fi
 	@command -v clang-format >/dev/null && clang-format --version || echo "no clang-format on PATH — optional; the cpp land has no fmt without it"
-	@command -v node  >/dev/null && node --version    || echo "MISSING: node   — needed for the browser client"
+	@command -v tsc   >/dev/null && echo "tsc         $$(tsc --version)" \
+	  || echo "MISSING: tsc    — needed for the typescript land: npm install -g typescript (or 'npm ci' in frontend/)"
+	@command -v prettier >/dev/null && echo "prettier    $$(prettier --version)" \
+	  || echo "no prettier on PATH — optional; the typescript land has no fmt without it"
+	@command -v node  >/dev/null && node --version    || echo "MISSING: node   — needed for the browser client and the typescript land"
 	@command -v love  >/dev/null && love --version    || echo "no love on PATH — 'make -C love2d love-bin' fetches it"
 	@test -x $(BACK_BIN) && CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) $(BACK_BIN) doctor \
 	  || echo "backend not built yet — 'make start' or 'cd backend && cargo build'"

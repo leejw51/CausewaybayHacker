@@ -1,0 +1,5 @@
+<work>/main.ts:6
+console.log(screens[0].id);
+                       ^
+
+TypeError: Cannot read properties of undefined (reading 'id')

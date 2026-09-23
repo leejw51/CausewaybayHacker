@@ -248,6 +248,7 @@ impl Quest {
             "go" => "go",
             "cpp" => "cpp",
             "python" | "pytorch" => "py",
+            "typescript" => "ts",
             _ => "rs",
         }
     }
@@ -625,5 +626,6 @@ mod tests {
         assert_eq!(ext("cpp"), "cpp");
         assert_eq!(ext("python"), "py");
         assert_eq!(ext("pytorch"), "py");
+        assert_eq!(ext("typescript"), "ts");
     }
 }

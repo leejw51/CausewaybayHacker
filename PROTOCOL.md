@@ -350,8 +350,8 @@ forget it on reload.
 ```
 
 `formats` is the set of lands whose FORMAT this server can actually run:
-`rustfmt` and `gofmt` ship with their toolchains, while `clang-format` and
-`black` are asked of the machine. A client draws the button from this list —
+`rustfmt` and `gofmt` ship with their toolchains, while `clang-format`,
+`black` and `prettier` are asked of the machine. A client draws the button from this list —
 a button that always refuses is worse than no button. An older server omits
 the field; then a client may show the button and let the error speak.
 
@@ -668,15 +668,18 @@ each** — the same ceiling as a submission, because it is the same question
 ### 4.9d `code.format`
 
 Run the language's own formatter over the source and hand it back. `rustfmt`
-for Rust, `gofmt` for Go, `clang-format` for C++, `black` for Python — the
-tools the player's colleagues would use, not a house style invented here.
-**All four run on the server**; no client formats anything itself.
+for Rust, `gofmt` for Go, `clang-format` for C++, `black` for Python and
+PyTorch, `prettier` for TypeScript — the tools the player's colleagues would
+use, not a house style invented here. **All five run on the server**; no
+client formats anything itself.
 
-Two of them ship with their toolchain and two are asked of the machine:
+Two of them ship with their toolchain and three are asked of the machine:
 `clang-format` is looked for on `PATH` and then through `xcrun --find`, which
 is where macOS keeps it (Xcode's command line tools ship one, and it is not
 on `PATH` — a server that only checked `PATH` reported "no C++ formatter"
-while holding one), and `black` is run as `python3 -m black`. Which lands can
+while holding one), `black` is run as `python3 -m black`, and `prettier` is
+run as `prettier --stdin-filepath main.ts`, the file name being how it picks
+its parser for text that arrives on stdin. Which lands can
 be formatted is therefore a fact about the machine: the server prints it at
 boot with the command that installs whatever is missing, `cwbhacker doctor`
 prints the same list, and `auth.login` / `auth.resume` carry it as `formats`
@@ -1346,7 +1349,7 @@ type MapNode = {
 
 ```ts
 type Quest = {
-  id: string; land: "rust"|"go"|"cpp"|"python"|"pytorch"; category: "verybasic"|"basic"|"advanced"|"hacker";
+  id: string; land: "rust"|"go"|"cpp"|"python"|"pytorch"|"typescript"; category: "verybasic"|"basic"|"advanced"|"hacker";
   node: number; title: string; brief: string; story: string;
   /** §4.8 — the language of title, story, brief and the hints. "en" unless a
    *  translation (SPEC §12.1) was substituted for the `locale` the client
@@ -1417,7 +1420,7 @@ cleared" — re-solving a cleared quest reports `verdict: "accepted"` with
 ```ts
 type PlaygroundRun = {
   attempt_id: string;                    // for correlating the stream only
-  lang: "rust" | "go" | "cpp" | "python" | "pytorch";
+  lang: "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript";
   outcome: "ok" | "compile_error" | "runtime_error" | "timeout" | "output_limit";
   compile_ms: number; run_ms: number;
   exit_code: number | null;
@@ -1431,7 +1434,7 @@ type PlaygroundRun = {
 
 type Snippet = {
   id: string;                            // "pg_" + 16 hex
-  name: string; lang: "rust" | "go" | "cpp" | "python" | "pytorch"; source: string;
+  name: string; lang: "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript"; source: string;
   created_at: string; updated_at: string;
 };
 type SnippetBrief = Omit<Snippet, "source"> & { bytes: number };

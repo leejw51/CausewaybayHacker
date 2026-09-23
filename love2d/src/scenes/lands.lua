@@ -40,6 +40,7 @@ local BLURB = {
   cpp = "threads, mutexes, the STL",
   python = "dicts, generators, the GIL",
   pytorch = "tensors, gradients, attention",
+  typescript = "interfaces, generics, narrowing",
 }
 
 function Lands.new(app)

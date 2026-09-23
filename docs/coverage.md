@@ -10,8 +10,10 @@ a cleared player would still not recognise, and then closing what was worth
 closing. **The residual list in §5 is the important part of this document.**
 
 State of the content when this audit was written: **278 quests** across four
-lands. It is **608 across five** now — the four roads are 27/27/33–34/34 per
-land, and PYTORCH LAND joined with 122 of its own (`docs/story.md` §3). The
+lands. It is **730 across six** now — the four roads are 27/27/33–34/34 per
+land, PYTORCH LAND joined with 122 of its own (`docs/story.md` §3), and
+TYPESCRIPT LAND with 122 more, a port of Python's roads node for node whose
+HACKER road asks the same 34 questions as the other language lands. The
 paragraph below is the audit's own snapshot and is kept as it was written;
 §5's residual list is what this document is for.
 

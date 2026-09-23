@@ -151,6 +151,7 @@ describe("the template table itself", () => {
       cpp: (l) => `int main() {\n  ${l}\n}\n`,
       python: (l) => `def f():\n    ${l}\n`,
       pytorch: (l) => `def f():\n    ${l}\n`,
+      typescript: (l) => `function f(): void {\n  ${l}\n}\n`,
     };
     for (const t of all) {
       const marked = around[t.id]
@@ -160,8 +161,8 @@ describe("the template table itself", () => {
     }
   });
 
-  it("covers all four lands", () => {
-    for (const lang of ["rust", "go", "cpp", "python"] as Land[]) {
+  it("covers every land with a grammar of its own", () => {
+    for (const lang of ["rust", "go", "cpp", "python", "typescript"] as Land[]) {
       expect(all.filter((t) => t.lang === lang).length).toBeGreaterThan(9);
     }
   });

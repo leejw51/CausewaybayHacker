@@ -1,0 +1,4837 @@
+# TYPESCRIPT LAND — ADVANCED. The walk past the screens turns into the rush.
+# First the language's own machinery — conversions, arrays, strings, Maps,
+# Sets, functions, exceptions, array methods, sorting, classes, discriminated
+# unions, generators, higher-order functions, structural typing, and
+# UNDEFINED on the rate board — and then the signage control room at
+# 22:00, where everything is waiting on something: Promise.all, a lost update
+# across an `await`, a mutex built from Promises, async queues, worker pools,
+# try/finally, iterator pipelines, memoisation, type guards, Object.freeze,
+# error hierarchies, hand-written iterators, cancellation tokens, and THE
+# EVENT LOOP. The grammar drills live on the BASIC road now.
+#
+# The land is about types as contracts that are erased at runtime: the
+# compiler checks what the code promises, and `node` runs whatever actually
+# arrived. Several quests here compile cleanly and are still wrong for
+# exactly that reason, and that is the lesson, not an accident.
+#
+# Every quest here has a deterministic answer on purpose: results are joined in
+# order, collected and sorted, or piped, and the event-loop quests use only
+# the orderings Node guarantees — microtasks before macrotasks, setImmediate
+# in FIFO order, timers in expiry order. A quest whose output depends on the
+# scheduler is a quest that fails CI at random, and that is not a lesson.
+#
+# Toolchain: one `main.ts`, `tsc -p .` (strict, es2022, commonjs, lib es2023,
+# no @types/node) against backend/runner/src/typescript/node.d.ts, run as
+# `node --enable-source-maps main.js`. There is no top-level await here, so
+# every async quest wraps its body in `async function main()`.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+
+pack = "typescript.advanced"
+land = "typescript"
+category = "advanced"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "typescript.advanced.01.conversions"
+node        = 1
+title       = "ONE NAME, ONE SHAPE"
+difficulty  = 2
+story       = "19:00, the control room on the thirtieth floor. The feed sends the Times Square slot price as text, the billing screen wants it as a number, and the big screen wants dollars."
+concepts    = ["bindings", "types", "strings"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+Read one line: an amount in cents, as digits.
+
+Print three lines:
+
+1. how many characters the trimmed text has
+2. the amount as a number
+3. the amount as dollars with exactly two decimals
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+The amount is non-negative. In Python you would rebind one name three times.
+TypeScript will not let you: a name keeps the type it was born with, so
+
+```ts
+let cents = input.trim();   // string, for the rest of its life
+cents = Number(cents);      // TS2322: Type 'number' is not assignable to type 'string'.
+```
+
+fails before a line has run. That is the contract doing its job. Give each
+shape its own `const` — the text, the number, the dollars — and the reader
+never has to scroll up to find out what a name is holding right now.
+
+Do not go through floating point for the dollars. `(1234 / 100).toFixed(2)`
+happens to work today and `0.1 + 0.2` is `0.30000000000000004` every day.
+`Math.trunc(cents / 100)` and `cents % 100` are the two halves exactly, and
+`String(cents % 100).padStart(2, "0")` pads the second one.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const text: string = input.trim();
+
+  // 1. the character count of `text`
+  // 2. `text` as a number, under a name of its own
+  // 3. that number as dollars, two decimals
+  console.log(text);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const text: string = input.trim();
+  console.log(`${text.length}`);
+
+  // `text = Number(text)` would not compile: a name keeps its type for life
+  const cents: number = Number(text);
+  console.log(`${cents}`);
+
+  const dollars: string = `${Math.trunc(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
+  console.log(dollars);
+}
+
+main();
+'''
+hints = [
+  "text.length while you still have the string is the first line.",
+  "const cents: number = Number(text) is a new name with a new type. Reusing `text` for it is TS2322, which is the compiler telling you the old contract still stands.",
+  "padStart(2, \"0\") pads on the left to width two: 5 cents is 0.05, not 0.5.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "dollars",    stdin = "1234\n", expect = "4\n1234\n12.34\n", visible = true },
+  { name = "five-cents", stdin = "5\n",    expect = "1\n5\n0.05\n",     visible = false },
+  { name = "round",      stdin = "100\n",  expect = "3\n100\n1.00\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "typescript.advanced.02.control-flow"
+node        = 2
+title       = "WHICH SLOT"
+difficulty  = 2
+story       = "The Times Square screen runs a rotation: every third slot an ad, every fifth the news. The scheduler prints the slot number every time, and the screen shows a number in forty-foot digits."
+concepts    = ["control-flow", "io", "functions"]
+requires    = ["typescript.advanced.01.conversions"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief       = '''
+Read one integer `n`. For every `i` from `1` to `n`, print one line:
+
+* `ADNEWS` if `i` divides by both 3 and 5
+* `AD` if `i` divides by 3
+* `NEWS` if `i` divides by 5
+* otherwise `i` itself
+
+Then keep reading integers, one per line, until you read `0`, and print
+`SKIPPED <k>`, how many non-zero lines you read on the way.
+
+```
+input:  5
+        7
+        8
+        0
+output: 1
+        2
+        AD
+        4
+        NEWS
+        SKIPPED 2
+```
+
+Two loops, two kinds. The first knows how many times it runs before it
+starts: `for (let i = 1; i <= n; i++)`. The second does not: `for (;;)` or
+`while (true)` with a `break`, because the count is decided by what you read.
+`i < n` stops one short, and it is the off-by-one everyone writes here once.
+
+Standard input arrives in one piece. `input.split("\n")` gives you the lines,
+and an index that walks down them is the "read the next line" you would have
+in any other language.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function label(i: number): string {
+  // ADNEWS / AD / NEWS / i
+  return String(i);
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  for (let i = 1; i < n; i++) {
+    console.log(label(i));
+  }
+
+  let skipped = 0;
+  // read lines after the first until a 0, counting the non-zero ones
+  console.log(`SKIPPED ${skipped}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function label(i: number): string {
+  if (i % 15 === 0) return "ADNEWS";
+  if (i % 3 === 0) return "AD";
+  if (i % 5 === 0) return "NEWS";
+  return String(i);
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  for (let i = 1; i <= n; i++) {
+    console.log(label(i));
+  }
+
+  let skipped = 0;
+  let next = 1;
+  while (next < lines.length) {
+    const value = Number(lines[next]);
+    next++;
+    if (value === 0) break;
+    skipped++;
+  }
+  console.log(`SKIPPED ${skipped}`);
+}
+
+main();
+'''
+hints = [
+  "Check the both-case first, or it never fires. Divisible by 3 and 5 is divisible by 15.",
+  "i < n stops at n - 1. The starter has that bug; the sample output ends one line early.",
+  "=== not ==. `\"0\" == 0` is true and `\"\" == 0` is true too, which is how a blank line ends a loop it should not.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",    stdin = "5\n7\n8\n0\n",  expect = "1\n2\nAD\n4\nNEWS\nSKIPPED 2\n", visible = true },
+  { name = "fifteen", stdin = "15\n0\n",      expect = "1\n2\nAD\n4\nNEWS\nAD\n7\n8\nAD\nNEWS\n11\nAD\n13\n14\nADNEWS\nSKIPPED 0\n", visible = false },
+  { name = "one",     stdin = "1\n5\n5\n5\n0\n", expect = "1\nSKIPPED 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "typescript.advanced.03.arrays"
+node        = 3
+title       = "THE MIDDLE OF THE BOARD"
+difficulty  = 2
+story       = "The tram-stop board on Yee Wo Street shows the first tram and the last one of the evening, and the dispatcher wants to know how many seats are in everything between."
+concepts    = ["slices", "iteration", "control-flow"]
+requires    = ["typescript.advanced.02.control-flow"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief       = '''
+Standard input is a count `n` on the first line and then `n` integers on the
+second, separated by spaces. `n` is at least `1`, so there is always a first
+value and a last value to print.
+
+Print three lines: the first value, the last value, and the sum of everything
+strictly between them. With fewer than three values that sum is `0`.
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+`nums.slice(1, -1)` is the middle: a **new array**, copied, with a negative
+end counting from the back. `nums[nums.length - 1]` is the last element, and
+so is `nums.at(-1)` — but look at their types. The index says `number`
+because the compiler trusts you; `at` says `number | undefined` because an
+array can be empty and the compiler cannot see that yours is not. Both are
+the same value at run time. Only one of them is honest about it.
+
+`reduce((sum, v) => sum + v, 0)` adds up the middle. The `0` is not
+decoration: `reduce` on an empty array **with no initial value** throws
+`TypeError: Reduce of empty array with no initial value`, and a one-element
+input makes the middle empty.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const data = input.split(/\s+/).filter((t) => t !== "");
+  const nums: number[] = data.slice(1).map(Number);
+
+  // print nums[0], the last element, then the sum of the middle slice
+  console.log(`${nums[0]}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const data = input.split(/\s+/).filter((t) => t !== "");
+  const nums: number[] = data.slice(1).map(Number);
+
+  console.log(`${nums[0]}`);
+  console.log(`${nums[nums.length - 1]}`);
+  const middle = nums.slice(1, -1);
+  console.log(`${middle.reduce((sum, v) => sum + v, 0)}`);
+}
+
+main();
+'''
+hints = [
+  "nums[nums.length - 1] is the last element. nums.at(-1) is too, and its type admits that it might not be there.",
+  "nums.slice(1, -1) is everything except the first and last; with one or two values it is [].",
+  "reduce needs the 0 as its second argument, or an empty middle throws instead of summing to nothing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",   stdin = "5\n4 8 15 16 23\n", expect = "4\n23\n39\n", visible = true },
+  { name = "single", stdin = "1\n7\n",            expect = "7\n7\n0\n",   visible = false },
+  { name = "pair",   stdin = "2\n3 9\n",          expect = "3\n9\n0\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "typescript.advanced.04.strings"
+node        = 4
+title       = "THREE LENGTHS"
+difficulty  = 2
+story       = "The LED wall on Hysan Place budgets its ticker by `.length`. A tram emoji costs it two, 銅鑼灣 costs it three, and the controller underneath counts nine."
+concepts    = ["strings", "types", "slices"]
+requires    = ["typescript.advanced.03.arrays"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief       = '''
+Read one line. Print three lines:
+
+1. its length in **bytes**, encoded as UTF-8
+2. its length in **characters** (Unicode code points)
+3. the line with its characters reversed
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+A JavaScript string has three lengths, and `.length` is none of the two
+asked for. It counts **UTF-16 code units**: `"銅鑼灣".length` is `3`, which
+looks right, and `"🚋".length` is `2`, which is not. The characters are what
+`for (const ch of s)` and `[...s]` walk — the string iterator steps by code
+point — so `[...s].length` is the second line.
+
+The bytes are the third number. There is no `TextEncoder` or `Buffer` here:
+`node.d.ts` declares neither, and `tsc` would stop you with `TS2304: Cannot
+find name`. Count them from the code points instead — `ch.codePointAt(0)`
+below `0x80` is one byte, below `0x800` two, below `0x10000` three, and
+anything above is four.
+
+`s.split("").reverse().join("")` is the reversal everyone reaches for, and it
+splits a surrogate pair in half. Reverse `[...s]`.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const line = input.split("\n")[0];
+
+  // 1. bytes, 2. characters, 3. the characters reversed
+  console.log(`${line.length}`);
+  console.log(`${line.length}`);
+  console.log(line.split("").reverse().join(""));
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function utf8Bytes(s: string): number {
+  let bytes = 0;
+  for (const ch of s) {
+    const cp = ch.codePointAt(0) ?? 0;
+    bytes += cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+  }
+  return bytes;
+}
+
+function main(): void {
+  const line = input.split("\n")[0];
+  const chars = [...line];
+
+  console.log(`${utf8Bytes(line)}`);
+  console.log(`${chars.length}`);
+  console.log(chars.reverse().join(""));
+}
+
+main();
+'''
+hints = [
+  "[...line] is an array of code points; its length is the character count. line.length is UTF-16 units, and the starter prints it twice.",
+  "for (const ch of line) steps by code point too, so ch.codePointAt(0) is the whole character's number, never half of a pair.",
+  "split(\"\") splits by code unit and breaks the emoji; reversing the spread array keeps each character whole.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "ascii",     stdin = "causeway\n",  expect = "8\n8\nyawesuac\n",  visible = true },
+  { name = "cantonese", stdin = "銅鑼灣\n",    expect = "9\n3\n灣鑼銅\n",    visible = false },
+  { name = "spaced",    stdin = "Lucky Mac\n", expect = "9\n9\ncaM ykcuL\n", visible = false },
+  { name = "tram",      stdin = "🚋 tram\n",   expect = "9\n6\nmart 🚋\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "typescript.advanced.05.maps"
+node        = 5
+title       = "WHAT THE WALL IS SAYING"
+difficulty  = 3
+story       = "The Hysan Place wall ranks the words the feed sends up tonight, and every count on it reads NaN."
+concepts    = ["collections", "sorting", "iteration"]
+requires    = ["typescript.advanced.04.strings"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief       = '''
+Read the whole of standard input and split it on whitespace.
+
+Print each distinct word once, as `<word> <count>`, ordered by count
+descending, and ties broken by the word ascending.
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+The starter counts into a `Record<string, number>`, and the type says every
+key holds a `number`. At run time a key nobody wrote holds `undefined`, and
+`undefined + 1` is `NaN` — no exception, no warning, just a wrong number on
+the wall. Use a `Map<string, number>`: `counts.get(word)` is typed
+`number | undefined`, which is the truth, and `?? 0` is the answer to it.
+
+Sort the entries with a comparator: count descending is `b[1] - a[1]`, and
+when that is `0` fall through to the word. Compare the words with `<` and
+`>`, not `localeCompare` — `localeCompare` asks the machine's locale, and a
+board must read the same on every machine.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const words = input.split(/\s+/).filter((t) => t !== "");
+
+  const counts: Record<string, number> = {};
+  for (const word of words) {
+    counts[word] += 1;
+  }
+
+  for (const [word, count] of Object.entries(counts)) {
+    console.log(`${word} ${count}`);
+  }
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const words = input.split(/\s+/).filter((t) => t !== "");
+
+  const counts = new Map<string, number>();
+  for (const word of words) {
+    counts.set(word, (counts.get(word) ?? 0) + 1);
+  }
+
+  const ranked = [...counts.entries()].sort(
+    (a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+  );
+  for (const [word, count] of ranked) {
+    console.log(`${word} ${count}`);
+  }
+}
+
+main();
+'''
+hints = [
+  "The starter prints NaN because counts[word] was undefined before the +=. The Record type promised a number that was never there.",
+  "counts.set(word, (counts.get(word) ?? 0) + 1) — get admits the miss, ?? supplies the zero.",
+  "b[1] - a[1] || wordOrder: a comparator returning 0 hands the tie to the right side of the ||.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tram",   stdin = "tram tram bus\n", expect = "tram 2\nbus 1\n", visible = true },
+  { name = "ties",   stdin = "a b a c b a\n",   expect = "a 3\nb 2\nc 1\n", visible = false },
+  { name = "single", stdin = "one\n",           expect = "one 1\n",         visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "typescript.advanced.06.sets"
+node        = 6
+title       = "WHAT BOTH SCREENS PLAY"
+difficulty  = 2
+story       = "Two screens face each other across Yee Wo Street, and the advertiser wants to know which clips she is paying to run twice at the same crossing."
+concepts    = ["collections", "iteration", "strings"]
+requires    = ["typescript.advanced.05.maps"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief       = '''
+Two lines of standard input, each a screen's clips separated by spaces. A
+screen may list the same clip twice; that counts once.
+
+Print three lines:
+
+1. `BOTH` followed by every clip on both lists, sorted, space separated — or
+   `BOTH -` if there is nothing
+2. `ONLY_A <k>`: how many clips are on the first list and not the second
+3. `ALL <k>`: how many distinct clips are on either list
+
+```
+input:  milktea sneakers phone sneakers
+        phone watch
+output: BOTH phone
+        ONLY_A 2
+        ALL 4
+```
+
+A `Set` has no duplicates. It also has, in the `es2023` library this land
+compiles against, no `intersection`, `difference` or `union` — those arrived
+in ES2025, and `tsc` would tell you so with `TS2339: Property 'intersection'
+does not exist`. The library you compile against decides what exists, not
+the version of Node you run on. So spell them: `[...a].filter((x) => b.has(x))`
+is the intersection, the same with `!b.has(x)` the difference, and
+`new Set([...a, ...b])` the union.
+
+`.sort()` with no comparator sorts strings by UTF-16 code unit, which is
+exactly right for these and exactly wrong for numbers. The ranking board is
+two quests away.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const [lineA = "", lineB = ""] = input.split("\n");
+  const a = lineA.split(/\s+/).filter((t) => t !== "");
+  const b = lineB.split(/\s+/).filter((t) => t !== "");
+
+  // a Set of each, then the three answers
+  console.log("BOTH -");
+  console.log(`ONLY_A ${a.length}`);
+  console.log(`ALL ${a.length + b.length}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const [lineA = "", lineB = ""] = input.split("\n");
+  const a = new Set(lineA.split(/\s+/).filter((t) => t !== ""));
+  const b = new Set(lineB.split(/\s+/).filter((t) => t !== ""));
+
+  const both = [...a].filter((x) => b.has(x)).sort();
+  console.log("BOTH " + (both.length > 0 ? both.join(" ") : "-"));
+  console.log(`ONLY_A ${[...a].filter((x) => !b.has(x)).length}`);
+  console.log(`ALL ${new Set([...a, ...b]).size}`);
+}
+
+main();
+'''
+hints = [
+  "new Set(tokens) drops the duplicate sneakers on the way in. A Set's count is .size, not .length.",
+  "[...a].filter((x) => b.has(x)) is the intersection; negate the test for the difference; spread both into one Set for the union.",
+  "both.length > 0 ? both.join(\" \") : \"-\" covers the empty case in one expression.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "milktea sneakers phone sneakers\nphone watch\n", expect = "BOTH phone\nONLY_A 2\nALL 4\n",  visible = true },
+  { name = "disjoint", stdin = "news\nweather\n",                               expect = "BOTH -\nONLY_A 1\nALL 2\n",       visible = false },
+  { name = "same",     stdin = "ad ad ad\nad\n",                                expect = "BOTH ad\nONLY_A 0\nALL 1\n",      visible = false },
+  { name = "many",     stdin = "d c b a\na b c d e\n",                          expect = "BOTH a b c d\nONLY_A 0\nALL 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "typescript.advanced.07.functions"
+node        = 7
+title       = "PER HOUR"
+difficulty  = 2
+story       = "Every screen slot on the rate card is per hour unless it says otherwise, and the card printer writes `/undefined` under every one that did not say."
+concepts    = ["functions", "strings", "types"]
+requires    = ["typescript.advanced.06.sets"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<NAME> <CENTS>` or
+`<NAME> <CENTS> <UNIT>`.
+
+Write `tag(name, cents, unit = "hour")` returning `<NAME> $<dollars>/<unit>`
+with two decimals, and print one tag per line.
+
+```
+input:  3
+        TSQ 1200
+        HYSAN 250 minute
+        LEEGARDEN 800
+output: TSQ $12.00/hour
+        HYSAN $2.50/minute
+        LEEGARDEN $8.00/hour
+```
+
+The starter compiles, runs, and prints `TSQ $12.00/undefined`. Look at why.
+`const [name, cents, unit] = line.split(" ")` types all three as `string`,
+because `split` returns `string[]` and the compiler does not know how long
+it is. On a two-token line `unit` is `undefined` at run time, and a template
+literal prints that word faithfully. The type was a promise the array never
+made.
+
+A **default parameter** is the fix, and it works for a reason worth
+knowing: a default fires when the argument is `undefined` — missing, or
+passed explicitly as `undefined`, which is what `tag(name, cents, unit)`
+does here. `null` would not trigger it. The signature is the contract that
+says what the caller may leave out and what they get when they do.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function tag(name: string, cents: number, unit: string): string {
+  return `${name} $${Math.trunc(cents / 100)}.${String(cents % 100).padStart(2, "0")}/${unit}`;
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  for (let i = 1; i <= n; i++) {
+    const [name, cents, unit] = lines[i].trim().split(/\s+/);
+    console.log(tag(name, Number(cents), unit));
+  }
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function tag(name: string, cents: number, unit: string = "hour"): string {
+  return `${name} $${Math.trunc(cents / 100)}.${String(cents % 100).padStart(2, "0")}/${unit}`;
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  for (let i = 1; i <= n; i++) {
+    // on a two-token line `unit` is undefined at run time, whatever its type
+    // says, and undefined is exactly what makes the default fire
+    const [name, cents, unit] = lines[i].trim().split(/\s+/);
+    console.log(tag(name, Number(cents), unit));
+  }
+}
+
+main();
+'''
+hints = [
+  "unit: string = \"hour\" in the parameter list. That is the whole fix.",
+  "A default fires on undefined, including an undefined passed on purpose. `unit ?? \"hour\"` inside the body is the same idea spelled at the call site.",
+  "`$${...}` in a template literal is a literal dollar sign followed by an interpolation.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",   stdin = "3\nTSQ 1200\nHYSAN 250 minute\nLEEGARDEN 800\n", expect = "TSQ $12.00/hour\nHYSAN $2.50/minute\nLEEGARDEN $8.00/hour\n", visible = true },
+  { name = "units",   stdin = "2\nTRAMSTOP 4500 day\nSOGO 6805 hour\n",          expect = "TRAMSTOP $45.00/day\nSOGO $68.05/hour\n",                      visible = false },
+  { name = "cheap",   stdin = "1\nKIOSK 5\n",                                    expect = "KIOSK $0.05/hour\n",                                           visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "typescript.advanced.08.exceptions"
+node        = 8
+title       = "THE LINE THAT IS NOT A NUMBER"
+difficulty  = 3
+story       = "The arrival board at the Yee Wo Street tram stop reads a column of minutes from the feed, and one line in the middle of it says `xx`."
+concepts    = ["error-handling", "control-flow", "types"]
+requires    = ["typescript.advanced.07.functions"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines. Each line is supposed to be an
+integer.
+
+For each line print either the value doubled, or `BAD <line>` if it is not a
+whole number. Finally print `SUM <total>`, where the total is the sum of the
+values you printed.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+`Number("xx")` does not fail. It returns `NaN`, and `Number("1.5")` is
+`1.5` and `Number("")` is `0`. That is why the starter's `double` checks the
+text against a pattern and **throws** `NotANumber` — and why the starter
+dies with that exception on the second line, because nothing catches it.
+
+Wrap the one call that can throw in `try`/`catch`. Under `strict` the
+caught value is typed **`unknown`**: `throw` in JavaScript can throw
+anything, a string or a number or `undefined`, and the compiler will not
+pretend otherwise. There is no `catch (NotANumber e)`. You narrow it
+yourself — `if (err instanceof NotANumber)` — and `throw err` again when it
+is not yours, so a typo in your own code still fails loudly instead of being
+reported as a bad line.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class NotANumber extends Error {}
+
+function double(text: string): number {
+  if (!/^-?\d+$/.test(text)) {
+    throw new NotANumber(`not a whole number: ${text}`);
+  }
+  return Number(text) * 2;
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  let total = 0;
+  for (let i = 1; i <= n; i++) {
+    const line = lines[i].trim();
+    const value = double(line);
+    console.log(`${value}`);
+    total += value;
+  }
+  console.log(`SUM ${total}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class NotANumber extends Error {}
+
+function double(text: string): number {
+  if (!/^-?\d+$/.test(text)) {
+    throw new NotANumber(`not a whole number: ${text}`);
+  }
+  return Number(text) * 2;
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  let total = 0;
+  for (let i = 1; i <= n; i++) {
+    const line = lines[i].trim();
+    let value: number;
+    try {
+      value = double(line);
+    } catch (err: unknown) {
+      if (err instanceof NotANumber) {
+        console.log(`BAD ${line}`);
+        continue;
+      }
+      throw err;
+    }
+    console.log(`${value}`);
+    total += value;
+  }
+  console.log(`SUM ${total}`);
+}
+
+main();
+'''
+hints = [
+  "The starter dies with NotANumber: not a whole number: xx. That class is the one you catch.",
+  "Keep the try block small: only the call that can fail goes inside it, and the print and the total go after.",
+  "catch (err: unknown), then `if (err instanceof NotANumber)`. Anything else is re-thrown with `throw err`; a catch that swallows everything is how programs learn to fail silently.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",   stdin = "3\n21\nxx\n-4\n",     expect = "42\nBAD xx\n-8\nSUM 34\n",     visible = true },
+  { name = "zero",    stdin = "1\n0\n",              expect = "0\nSUM 0\n",                   visible = false },
+  { name = "all-bad", stdin = "2\nhello\nworld\n",   expect = "BAD hello\nBAD world\nSUM 0\n", visible = false },
+  { name = "float",   stdin = "2\n1.5\n3\n",         expect = "BAD 1.5\n6\nSUM 6\n",          visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "typescript.advanced.09.array-methods"
+node        = 9
+title       = "ONE PASS DOWN THE FEED"
+difficulty  = 3
+story       = "Alex says you can do it with three for loops and three counters. The feed to the Hysan Place wall has already moved on by the time the third one finishes."
+concepts    = ["comprehensions", "iteration", "collections"]
+requires    = ["typescript.advanced.08.exceptions"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief       = '''
+Standard input is one line of integers separated by spaces.
+
+Print three lines:
+
+1. the sum of the even values (`0` if there are none)
+2. every value greater than `10`, doubled, in order, joined by single spaces —
+   or `-` if there are none
+3. how many distinct values there are
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+TypeScript has no comprehensions. It has the array methods, and they are
+the same idea written left to right: `filter` keeps, `map` transforms,
+`reduce` folds, and `new Set(...)` dedupes. Each returns a new value and
+none of them needs an index.
+
+`reduce` takes an initial value, and here it is not optional: the sample
+has evens, but one of the hidden cases does not, and
+`[].reduce((a, b) => a + b)` throws `TypeError: Reduce of empty array with
+no initial value`. `reduce((sum, v) => sum + v, 0)` sums nothing to `0`.
+
+Negative numbers: `-4 % 2` is `-0` in JavaScript. `-0 === 0` is `true`, so
+the even test is fine — but print numbers through a template literal, where
+`` `${-0}` `` is `"0"`, and never let a bare `-0` reach `console.log`.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const nums: number[] = input.split(/\s+/).filter((t) => t !== "").map(Number);
+
+  // 1. sum of the even ones
+  // 2. the ones over 10, doubled, joined by spaces, or "-"
+  // 3. how many distinct values
+  console.log("0");
+  console.log("-");
+  console.log(`${nums.length}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const nums: number[] = input.split(/\s+/).filter((t) => t !== "").map(Number);
+
+  const evens = nums.filter((v) => v % 2 === 0).reduce((sum, v) => sum + v, 0);
+  console.log(`${evens}`);
+
+  const big = nums.filter((v) => v > 10).map((v) => v * 2);
+  console.log(big.length > 0 ? big.join(" ") : "-");
+
+  console.log(`${new Set(nums).size}`);
+}
+
+main();
+'''
+hints = [
+  "nums.filter((v) => v % 2 === 0).reduce((sum, v) => sum + v, 0) — keep, then fold, with the 0 as the starting sum.",
+  "filter first, map second: filter on the original value, then double what survived.",
+  "new Set(nums).size is the distinct count. A Set compares numbers by value, so the two 12s are one.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",     stdin = "1 2 3 4 12 12 30\n", expect = "60\n24 24 60\n6\n", visible = true },
+  { name = "no-big",    stdin = "1 3 5\n",            expect = "0\n-\n3\n",         visible = false },
+  { name = "negatives", stdin = "-4 -2 0 11\n",       expect = "-6\n22\n4\n",       visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "typescript.advanced.10.from-entries"
+node        = 10
+title       = "THE SAME PASS, KEYED"
+difficulty  = 2
+story       = "The Lee Garden shopping app gets tonight's prices as a list of pairs in the order the shops typed them. The sale banner wants them as one board, and it wants it twice."
+concepts    = ["comprehensions", "collections", "sorting"]
+requires    = ["typescript.advanced.09.array-methods"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<ITEM> <PRICE>`. `PRICE` is
+a whole number of cents. An item appears at most once, and `n` is at least
+`1` — there is always a cheapest item to name.
+
+Print three lines:
+
+1. every item priced **strictly over 100**, as `ITEM=PRICE`, sorted by item,
+   joined by single spaces — or `-` if there are none
+2. every item with its price **halved and rounded down**, same format,
+   sorted by item
+3. `CHEAPEST <item>` — the lowest price, ties broken by the item ascending
+
+```
+input:  3
+        SCARF 120
+        MUG 80
+        BAG 250
+output: BAG=250 SCARF=120
+        BAG=125 MUG=40 SCARF=60
+        CHEAPEST MUG
+```
+
+`Object.fromEntries(pairs)` builds a keyed object from `[key, value]`
+pairs in one expression, and `Object.entries(obj)` takes it apart again —
+so `Object.fromEntries(Object.entries(prices).filter(...))` is a filtered
+board and the same with `.map(([k, v]) => [k, Math.floor(v / 2)])` is a
+transformed one. Neither needs an empty object and a loop that fills it.
+
+Sort the entries before you print them, even though they look sorted. An
+object keeps string keys in insertion order **except** keys that look like
+array indices — `"7"` before `"10"` before `"SCARF"`, whatever order they
+arrived in. A board keyed by product number would reorder itself. Say the
+order you want.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  const prices: Record<string, number> = Object.fromEntries(
+    lines.slice(1, n + 1).map((line): [string, number] => {
+      const [item, cents] = line.trim().split(/\s+/);
+      return [item, Number(cents)];
+    }),
+  );
+
+  // 1. the ones over 100, as ITEM=PRICE, sorted, or "-"
+  // 2. every price halved, same format, sorted
+  // 3. CHEAPEST <item>, ties alphabetical
+  console.log("-");
+  console.log("-");
+  console.log(`CHEAPEST ${Object.keys(prices).length}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function byKey(a: [string, number], b: [string, number]): number {
+  return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
+}
+
+function board(obj: Record<string, number>): string {
+  return Object.entries(obj).sort(byKey).map(([k, v]) => `${k}=${v}`).join(" ");
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  const prices: Record<string, number> = Object.fromEntries(
+    lines.slice(1, n + 1).map((line): [string, number] => {
+      const [item, cents] = line.trim().split(/\s+/);
+      return [item, Number(cents)];
+    }),
+  );
+
+  const dear = Object.fromEntries(Object.entries(prices).filter(([, v]) => v > 100));
+  console.log(Object.keys(dear).length > 0 ? board(dear) : "-");
+
+  const half = Object.fromEntries(Object.entries(prices).map(([k, v]) => [k, Math.floor(v / 2)]));
+  console.log(board(half));
+
+  const [cheapest] = Object.entries(prices).sort((a, b) => a[1] - b[1] || byKey(a, b));
+  console.log(`CHEAPEST ${cheapest[0]}`);
+}
+
+main();
+'''
+hints = [
+  "Object.fromEntries(Object.entries(prices).filter(([, v]) => v > 100)) — take apart, keep, put back together.",
+  "Object.entries(obj).sort(byKey) gives [key, value] pairs in key order, which is exactly what ITEM=PRICE wants.",
+  "For the cheapest, sort by price and fall through to the name when the prices tie: a[1] - b[1] || byKey(a, b). The first entry wins.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "board",        stdin = "3\nSCARF 120\nMUG 80\nBAG 250\n", expect = "BAG=250 SCARF=120\nBAG=125 MUG=40 SCARF=60\nCHEAPEST MUG\n", visible = true },
+  { name = "nothing-dear", stdin = "2\nPEN 40\nCAP 60\n",             expect = "-\nCAP=30 PEN=20\nCHEAPEST PEN\n",                          visible = true },
+  { name = "exactly-100",  stdin = "1\nEDGE 100\n",                   expect = "-\nEDGE=50\nCHEAPEST EDGE\n",                               visible = false },
+  { name = "tie",          stdin = "3\nZIP 30\nAPP 30\nMAP 90\n",     expect = "-\nAPP=15 MAP=45 ZIP=15\nCHEAPEST APP\n",                   visible = false },
+  { name = "odd",          stdin = "2\nODD 101\nONE 1\n",             expect = "ODD=101\nODD=50 ONE=0\nCHEAPEST ONE\n",                     visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "typescript.advanced.11.sorting"
+node        = 11
+title       = "THE RANKING BOARD"
+difficulty  = 3
+story       = "The ad office on the thirtieth floor ranks tonight's bids for the Times Square screen, and two advertisers who bid the same come out in the order they phoned in."
+concepts    = ["sorting", "iteration", "closures"]
+requires    = ["typescript.advanced.10.from-entries"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''
+Two lines of standard input: advertiser names on the first, their bids in
+cents on the second, in the same order. There is at least one advertiser.
+
+Print the advertisers ranked cheapest first as `<rank>. <NAME> <cents>`,
+with the rank starting at `1`, ties broken by name ascending. Then print
+`CHEAPEST <NAME>`.
+
+```
+input:  LAM WONG CHAN
+        1200 900 1200
+output: 1. WONG 900
+        2. CHAN 1200
+        3. LAM 1200
+        CHEAPEST WONG
+```
+
+`names.map((name, i) => ({ name, cents: bids[i] }))` pairs the two lists
+up; `sort` with a comparator orders the pairs; the index `map` hands you is
+the rank. The comparator returns a negative number, zero or a positive
+number, and the one in the starter never returns anything but the price
+difference — so the tie comes out in input order, because `sort` is
+stable, and stable is not the same as right.
+
+Never call `.sort()` with no comparator on numbers. It converts them to
+strings first, and `[900, 1200].sort()` is `[1200, 900]`, because `"1"`
+comes before `"9"`.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const [nameLine = "", bidLine = ""] = input.split("\n");
+  const names = nameLine.split(/\s+/).filter((t) => t !== "");
+  const bids = bidLine.split(/\s+/).filter((t) => t !== "").map(Number);
+
+  const ranked = names.map((name, i) => ({ name, cents: bids[i] }));
+  ranked.sort((a, b) => a.cents - b.cents);
+
+  ranked.forEach((entry, i) => {
+    console.log(`${i + 1}. ${entry.name} ${entry.cents}`);
+  });
+  console.log(`CHEAPEST ${ranked[0].name}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const [nameLine = "", bidLine = ""] = input.split("\n");
+  const names = nameLine.split(/\s+/).filter((t) => t !== "");
+  const bids = bidLine.split(/\s+/).filter((t) => t !== "").map(Number);
+
+  const ranked = names.map((name, i) => ({ name, cents: bids[i] }));
+  ranked.sort(
+    (a, b) => a.cents - b.cents || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
+  );
+
+  ranked.forEach((entry, i) => {
+    console.log(`${i + 1}. ${entry.name} ${entry.cents}`);
+  });
+  console.log(`CHEAPEST ${ranked[0].name}`);
+}
+
+main();
+'''
+hints = [
+  "a.cents - b.cents is 0 for a tie, and 0 || nameOrder falls through to the name.",
+  "Compare names with < and >. localeCompare would work here and would also ask the machine's locale, which is not a question a ranking board should depend on.",
+  "sort mutates the array in place and returns it. toSorted is the copying version, and it is in es2023.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "LAM WONG CHAN\n1200 900 1200\n", expect = "1. WONG 900\n2. CHAN 1200\n3. LAM 1200\nCHEAPEST WONG\n", visible = true },
+  { name = "one",    stdin = "AH-KEUNG\n5\n",                 expect = "1. AH-KEUNG 5\nCHEAPEST AH-KEUNG\n",                      visible = false },
+  { name = "sorted", stdin = "B A\n1 2\n",                    expect = "1. B 1\n2. A 2\nCHEAPEST B\n",                            visible = false },
+  { name = "ties",   stdin = "Z Y X\n7 7 7\n",                expect = "1. X 7\n2. Y 7\n3. Z 7\nCHEAPEST X\n",                    visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "typescript.advanced.12.classes"
+node        = 12
+title       = "THE OPERATOR'S NOTEBOOK"
+difficulty  = 3
+story       = "Every operator in the control room keeps a notebook of the clips they queued tonight, and the night shift's has a pencil test in it that nobody on the night shift wrote."
+concepts    = ["structs", "functions", "mutability"]
+requires    = ["typescript.advanced.11.sorting"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<CLIP> <CENTS>`.
+
+Build a `Notebook` class that collects the clips, then print each back as
+`<CLIP> <CENTS>`, in the order it arrived, then `TOTAL <sum>`, and finally
+the notebook itself through `` console.log(`${book}`) `` — its `toString()`
+must produce `Notebook(items=<n>, total=<sum>)`.
+
+```
+input:  2
+        TRAILER 600
+        PROMO 2800
+output: TRAILER 600
+        PROMO 2800
+        TOTAL 3400
+        Notebook(items=2, total=3400)
+```
+
+`n` may be `0`, and then the lines are `TOTAL 0` and
+`Notebook(items=0, total=0)`.
+
+The starter declares `items` as **`static`**: one array on the class,
+shared by every `Notebook` there will ever be. A field declared without
+`static` — `items: Entry[] = []` — is initialised once per `new`, and
+belongs to the instance. The starter's `main` makes a scratch notebook and
+writes a pencil test into it, and the pencil test turns up in the real one.
+
+A template literal calls `toString()` on an object. Without one you get the
+default, `[object Object]`, which is also what the starter prints.
+`console.log(book)` is different — it prints Node's inspection of the
+fields — which is why the brief says the template.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+type Entry = [string, number];
+
+class Notebook {
+  static items: Entry[] = [];
+
+  add(name: string, cents: number): void {
+    Notebook.items.push([name, cents]);
+  }
+
+  list(): Entry[] {
+    return Notebook.items;
+  }
+
+  total(): number {
+    return Notebook.items.reduce((sum, [, cents]) => sum + cents, 0);
+  }
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  const book = new Notebook();
+  const scratch = new Notebook();
+  scratch.add("PENCIL", 0);
+  for (let i = 1; i <= n; i++) {
+    const [name, cents] = lines[i].trim().split(/\s+/);
+    book.add(name, Number(cents));
+  }
+
+  for (const [name, cents] of book.list()) {
+    console.log(`${name} ${cents}`);
+  }
+  console.log(`TOTAL ${book.total()}`);
+  console.log(`${book}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+type Entry = [string, number];
+
+class Notebook {
+  // one array per notebook; `static` would be one array per class
+  items: Entry[] = [];
+
+  add(name: string, cents: number): void {
+    this.items.push([name, cents]);
+  }
+
+  list(): Entry[] {
+    return this.items;
+  }
+
+  total(): number {
+    return this.items.reduce((sum, [, cents]) => sum + cents, 0);
+  }
+
+  toString(): string {
+    return `Notebook(items=${this.items.length}, total=${this.total()})`;
+  }
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  const book = new Notebook();
+  const scratch = new Notebook();
+  scratch.add("PENCIL", 0);
+  for (let i = 1; i <= n; i++) {
+    const [name, cents] = lines[i].trim().split(/\s+/);
+    book.add(name, Number(cents));
+  }
+
+  for (const [name, cents] of book.list()) {
+    console.log(`${name} ${cents}`);
+  }
+  console.log(`TOTAL ${book.total()}`);
+  console.log(`${book}`);
+}
+
+main();
+'''
+hints = [
+  "Run the starter and look at the first line of output: PENCIL 0, from a notebook nobody wrote it in. That is the shared static array.",
+  "items: Entry[] = [] without `static`, and `this.items` everywhere the starter says Notebook.items.",
+  "toString(): string { return `Notebook(items=..., total=...)` } — the template literal in main calls it for you.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-items", stdin = "2\nTRAILER 600\nPROMO 2800\n",      expect = "TRAILER 600\nPROMO 2800\nTOTAL 3400\nNotebook(items=2, total=3400)\n",       visible = true },
+  { name = "empty",     stdin = "0\n",                               expect = "TOTAL 0\nNotebook(items=0, total=0)\n",                                     visible = false },
+  { name = "repeats",   stdin = "3\nNEWS 1200\nNEWS 1200\nAD 900\n", expect = "NEWS 1200\nNEWS 1200\nAD 900\nTOTAL 3300\nNotebook(items=3, total=3300)\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "typescript.advanced.13.unions"
+node        = 13
+title       = "WHO IS RIDING"
+difficulty  = 3
+story       = "The fare screen on the Lee Garden minibus stop charges every card the full fare, including the ones that are not adults and the one that is not a card."
+concepts    = ["types", "pattern-matching", "structs"]
+requires    = ["typescript.advanced.12.classes"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<TYPE> <STOPS>`.
+
+The base fare is `500 + 100 * STOPS` cents. For each line print one of:
+
+* `ADULT` — the base fare
+* `STUDENT` — half the base fare, rounded down
+* `SENIOR` — always `200`
+* anything else — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+Model the line as a **discriminated union**: one object type per case, all
+sharing a literal `kind` field, and an `UNKNOWN` case that keeps the raw
+text. `parse` is the only place that looks at the string from the wire;
+after it, the type says which four things an `Order` can be, and a `switch`
+on `order.kind` narrows `order` inside each `case`.
+
+The starter's `switch` has one arm and a `default` that prints `UNKNOWN`
+for everything else — including the two kinds it is supposed to know. Give
+every kind its arm, and make the `default` prove there is nothing left:
+
+```ts
+default: {
+  const unreachable: never = order;
+  return unreachable;
+}
+```
+
+If a fifth kind is ever added to the union and not to the switch, that line
+stops compiling. The union itself is erased at run time — `node` never sees
+it — so the check has to happen here, in `tsc`, or not at all.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+type Order =
+  | { kind: "ADULT"; stops: number }
+  | { kind: "STUDENT"; stops: number }
+  | { kind: "SENIOR"; stops: number }
+  | { kind: "UNKNOWN"; raw: string };
+
+function parse(kind: string, stops: number): Order {
+  switch (kind) {
+    case "ADULT":
+    case "STUDENT":
+    case "SENIOR":
+      return { kind, stops };
+    default:
+      return { kind: "UNKNOWN", raw: kind };
+  }
+}
+
+function fare(order: Order): string {
+  switch (order.kind) {
+    case "ADULT":
+      return `${500 + 100 * order.stops}`;
+    default:
+      return `UNKNOWN ${order.kind}`;
+  }
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  for (let i = 1; i <= n; i++) {
+    const [kind, stops] = lines[i].trim().split(/\s+/);
+    console.log(fare(parse(kind, Number(stops))));
+  }
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+type Order =
+  | { kind: "ADULT"; stops: number }
+  | { kind: "STUDENT"; stops: number }
+  | { kind: "SENIOR"; stops: number }
+  | { kind: "UNKNOWN"; raw: string };
+
+function parse(kind: string, stops: number): Order {
+  switch (kind) {
+    case "ADULT":
+    case "STUDENT":
+    case "SENIOR":
+      return { kind, stops };
+    default:
+      return { kind: "UNKNOWN", raw: kind };
+  }
+}
+
+function fare(order: Order): string {
+  switch (order.kind) {
+    case "ADULT":
+      return `${500 + 100 * order.stops}`;
+    case "STUDENT":
+      return `${Math.floor((500 + 100 * order.stops) / 2)}`;
+    case "SENIOR":
+      return "200";
+    case "UNKNOWN":
+      return `UNKNOWN ${order.raw}`;
+    default: {
+      // every kind is handled above, so `order` is `never` here
+      const unreachable: never = order;
+      return unreachable;
+    }
+  }
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  for (let i = 1; i <= n; i++) {
+    const [kind, stops] = lines[i].trim().split(/\s+/);
+    console.log(fare(parse(kind, Number(stops))));
+  }
+}
+
+main();
+'''
+hints = [
+  "One case per kind. Inside `case \"STUDENT\":` the compiler knows order has a `stops`; inside `case \"UNKNOWN\":` it knows order has a `raw` and no `stops`.",
+  "Math.floor(x / 2) is the rounded-down half. `/` alone gives 450.5 for an odd base, and the board would print it.",
+  "const unreachable: never = order in the default is the exhaustiveness check — the same job as a Rust match with no `_` arm.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-kinds", stdin = "3\nADULT 4\nSTUDENT 4\nSENIOR 4\n", expect = "900\n450\n200\n",         visible = true },
+  { name = "tourist",     stdin = "2\nSTUDENT 0\nTOURIST 9\n",         expect = "250\nUNKNOWN TOURIST\n",  visible = false },
+  { name = "far",         stdin = "1\nADULT 12\n",                     expect = "1700\n",                  visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "typescript.advanced.14.generators"
+node        = 14
+title       = "YOUR OWN FOR LOOP"
+difficulty  = 3
+story       = "The countdown on the Times Square screen steps from one number to the next in fixed jumps, and the controller behind it keeps no list of the numbers anywhere."
+concepts    = ["generators", "iteration", "functions"]
+requires    = ["typescript.advanced.13.unions"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''
+Standard input is three integers: `start`, `step`, `count`.
+
+Write a **generator function** `ticker(start, step, count)` that yields
+`count` values beginning at `start` and advancing by `step`. Print each on
+its own line, then `SUM <total>` computed by walking a second ticker.
+
+```
+input:  5 2 4
+output: 5
+        7
+        9
+        11
+        SUM 32
+        [object Generator]
+```
+
+The last line is `Object.prototype.toString.call(ticker(...))`, printed by
+the starter's `main` as it stands. Right now it says `[object Array]`.
+
+A `function*` does not run when you call it. It returns a generator object,
+and the body runs one step at a time, each time something asks for the next
+value — `for...of`, spread, `Array.from`. That is why it can describe a
+million values without an array of a million values ever existing.
+
+The starter builds the array and returns it, and it type-checks, because
+the return type says `Iterable<number>` and an array is one. The contract
+is satisfied; the question was not. An array is every value at once; a
+generator is one value when asked. Turn the `push` into a `yield` and delete
+the array.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function ticker(start: number, step: number, count: number): Iterable<number> {
+  const values: number[] = [];
+  for (let i = 0; i < count; i++) {
+    values.push(start + i * step);
+  }
+  return values;
+}
+
+function main(): void {
+  const [start, step, count] = input.split(/\s+/).filter((t) => t !== "").map(Number);
+
+  for (const value of ticker(start, step, count)) {
+    console.log(`${value}`);
+  }
+  let sum = 0;
+  for (const value of ticker(start, step, count)) {
+    sum += value;
+  }
+  console.log(`SUM ${sum}`);
+  console.log(Object.prototype.toString.call(ticker(start, step, count)));
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function* ticker(start: number, step: number, count: number): Generator<number> {
+  let value = start;
+  for (let i = 0; i < count; i++) {
+    yield value;
+    value += step;
+  }
+}
+
+function main(): void {
+  const [start, step, count] = input.split(/\s+/).filter((t) => t !== "").map(Number);
+
+  for (const value of ticker(start, step, count)) {
+    console.log(`${value}`);
+  }
+  let sum = 0;
+  for (const value of ticker(start, step, count)) {
+    sum += value;
+  }
+  console.log(`SUM ${sum}`);
+  console.log(Object.prototype.toString.call(ticker(start, step, count)));
+}
+
+main();
+'''
+hints = [
+  "The last line of output is the object's tag, and the test wants [object Generator]. That is what a function* returns.",
+  "yield value, then advance. The function pauses at the yield and resumes after it on the next request.",
+  "A generator can be walked once. That is why main builds a fresh ticker for the sum instead of reusing the one the first loop drained.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",     stdin = "5 2 4\n",    expect = "5\n7\n9\n11\nSUM 32\n[object Generator]\n",  visible = true },
+  { name = "flat",     stdin = "0 0 3\n",    expect = "0\n0\n0\nSUM 0\n[object Generator]\n",       visible = false },
+  { name = "backward", stdin = "10 -4 4\n",  expect = "10\n6\n2\n-2\nSUM 16\n[object Generator]\n", visible = false },
+  { name = "none",     stdin = "7 1 0\n",    expect = "SUM 0\n[object Generator]\n",                visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "typescript.advanced.15.higher-order"
+node        = 15
+title       = "WRAPPED"
+difficulty  = 3
+story       = "The billing screen wants to know how many times the rate function ran tonight, and the rate function does not want to know it is being watched."
+concepts    = ["decorators", "functions", "closures"]
+requires    = ["typescript.advanced.14.generators"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` durations in hours.
+
+`price(hours)` is `500 + 100 * hours`. Wrap it with `counted` so that every
+call is counted without `price` knowing. Print one price per duration, then
+`CALLS <n>`, then `NAME <price.name>` — which must still say `price`.
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        CALLS 3
+        NAME price
+```
+
+TypeScript's `@decorators` exist, but only on classes and their members; a
+free function cannot wear one. What a decorator *is* needs no syntax: a
+function that takes a function and returns a function. So
+`const price = counted(function price(hours: number) { ... })` is the whole
+mechanism, and the generics on `counted` — `<A extends unknown[], R>` —
+are what let it wrap any signature and hand back the same one.
+
+The function `counted` returns is a closure called `wrapper`, and unless you
+say otherwise its `name` is `"wrapper"`: the last line of the starter's
+output. Python has `functools.wraps`; here you copy the name yourself with
+`Object.defineProperty(wrapper, "name", { value: fn.name })` — `name` is
+read-only, so a plain assignment would throw in strict mode.
+
+The count lives on the wrapper: `wrapper.calls = 0` right after the function
+declaration. `tsc` sees that assignment and adds `calls: number` to the
+function's type, so `price.calls` type-checks in `main`.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function counted<A extends unknown[], R>(fn: (...args: A) => R) {
+  function wrapper(...args: A): R {
+    wrapper.calls += 1;
+    return fn(...args);
+  }
+  wrapper.calls = 0;
+  return wrapper;
+}
+
+const price = counted(function price(hours: number): number {
+  return 500 + 100 * hours;
+});
+
+function main(): void {
+  const tokens = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const n = tokens[0];
+  for (const hours of tokens.slice(1, 1 + n)) {
+    console.log(`${price(hours)}`);
+  }
+  console.log(`CALLS ${price.calls}`);
+  console.log(`NAME ${price.name}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function counted<A extends unknown[], R>(fn: (...args: A) => R) {
+  function wrapper(...args: A): R {
+    wrapper.calls += 1;
+    return fn(...args);
+  }
+  wrapper.calls = 0;
+  // functools.wraps by hand: `name` is read-only, so define it
+  Object.defineProperty(wrapper, "name", { value: fn.name });
+  return wrapper;
+}
+
+const price = counted(function price(hours: number): number {
+  return 500 + 100 * hours;
+});
+
+function main(): void {
+  const tokens = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const n = tokens[0];
+  for (const hours of tokens.slice(1, 1 + n)) {
+    console.log(`${price(hours)}`);
+  }
+  console.log(`CALLS ${price.calls}`);
+  console.log(`NAME ${price.name}`);
+}
+
+main();
+'''
+hints = [
+  "Object.defineProperty(wrapper, \"name\", { value: fn.name }) before the return. One line.",
+  "wrapper.name = fn.name compiles and then throws TypeError: Cannot assign to read only property 'name'. defineProperty is the way past it.",
+  "(...args: A) => R with A extends unknown[] is how the wrapper forwards any signature without knowing it, and how price keeps its (hours: number) => number type after wrapping.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n",  expect = "600\n700\n800\nCALLS 3\nNAME price\n", visible = true },
+  { name = "one",   stdin = "1\n0\n",      expect = "500\nCALLS 1\nNAME price\n",           visible = false },
+  { name = "none",  stdin = "0\n\n",       expect = "CALLS 0\nNAME price\n",                visible = false },
+  { name = "long",  stdin = "2\n10 20\n",  expect = "1500\n2500\nCALLS 2\nNAME price\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "typescript.advanced.16.structural"
+node        = 16
+title       = "IF IT HAS THE SHAPE"
+difficulty  = 3
+story       = "A paper bag from Lee Garden. Nobody at the checkout screen asked what it is; they asked how many things are in it, whether the sneakers are, and to go through it one at a time."
+concepts    = ["duck-typing", "structs", "iteration"]
+requires    = ["typescript.advanced.15.higher-order"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+Standard input is one line of goods separated by spaces, then one line with
+a single word to look for.
+
+Put the goods in a `Bag` and hand it to the starter's `report`, which
+prints:
+
+1. `LEN <k>` — from `bag.size`
+2. the goods, one per line — from `for (const item of bag)`
+3. `HAS <WORD> YES` or `HAS <WORD> NO` — from `bag.has(word)`
+4. `LONGEST <item>` — the longest, the first one on a tie
+
+```
+input:  cap sneakers tee
+        sneakers
+output: LEN 3
+        cap
+        sneakers
+        tee
+        HAS sneakers YES
+        LONGEST sneakers
+```
+
+`report` takes a `Container<string>`, and `Bag` does not say
+`implements Container` anywhere. It does not need to. TypeScript's types
+are **structural**: a value fits an interface by having the members, not
+by naming it. That is duck typing, checked by `tsc` before the program runs
+instead of by the interpreter when it gets there. A `Set<string>` fits
+`Container<string>` too, and nobody wrote that down either.
+
+The starter's `Bag` has none of the members, and it does not compile:
+
+```
+error TS2345: Argument of type 'Bag' is not assignable to parameter of type 'Container<string>'.
+```
+
+Give it a `size` getter, a `has` method, and a `[Symbol.iterator]()` —
+the method `for...of` looks up by that symbol, the same way Python's `for`
+looks up `__iter__`.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+interface Container<T> extends Iterable<T> {
+  readonly size: number;
+  has(item: T): boolean;
+}
+
+class Bag {
+  private goods: string[];
+
+  constructor(goods: string[]) {
+    this.goods = [...goods];
+  }
+
+  // size, has, [Symbol.iterator]
+}
+
+function report(bag: Container<string>, word: string): void {
+  console.log(`LEN ${bag.size}`);
+  let longest = "";
+  for (const item of bag) {
+    console.log(item);
+    if (item.length > longest.length) longest = item;
+  }
+  console.log(`HAS ${word} ${bag.has(word) ? "YES" : "NO"}`);
+  console.log(`LONGEST ${longest}`);
+}
+
+function main(): void {
+  const [goodsLine = "", wordLine = ""] = input.split("\n");
+  const bag = new Bag(goodsLine.split(/\s+/).filter((t) => t !== ""));
+  report(bag, wordLine.trim());
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+interface Container<T> extends Iterable<T> {
+  readonly size: number;
+  has(item: T): boolean;
+}
+
+// no `implements Container<string>`: the members are the contract
+class Bag {
+  private goods: string[];
+
+  constructor(goods: string[]) {
+    this.goods = [...goods];
+  }
+
+  get size(): number {
+    return this.goods.length;
+  }
+
+  has(item: string): boolean {
+    return this.goods.includes(item);
+  }
+
+  [Symbol.iterator](): Iterator<string> {
+    return this.goods[Symbol.iterator]();
+  }
+}
+
+function report(bag: Container<string>, word: string): void {
+  console.log(`LEN ${bag.size}`);
+  let longest = "";
+  for (const item of bag) {
+    console.log(item);
+    if (item.length > longest.length) longest = item;
+  }
+  console.log(`HAS ${word} ${bag.has(word) ? "YES" : "NO"}`);
+  console.log(`LONGEST ${longest}`);
+}
+
+function main(): void {
+  const [goodsLine = "", wordLine = ""] = input.split("\n");
+  const bag = new Bag(goodsLine.split(/\s+/).filter((t) => t !== ""));
+  report(bag, wordLine.trim());
+}
+
+main();
+'''
+hints = [
+  "get size(): number { return this.goods.length; } — a getter, because the interface says `size` is a property, not a method.",
+  "[Symbol.iterator]() can hand back the array's own iterator: this.goods[Symbol.iterator](). A `*[Symbol.iterator]() { yield* this.goods; }` generator also works.",
+  "report keeps the first of equal-length items because it only replaces on a strictly longer one — > and not >=.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",   stdin = "cap sneakers tee\nsneakers\n", expect = "LEN 3\ncap\nsneakers\ntee\nHAS sneakers YES\nLONGEST sneakers\n", visible = true },
+  { name = "missing", stdin = "watch\nphone\n",               expect = "LEN 1\nwatch\nHAS phone NO\nLONGEST watch\n",                    visible = false },
+  { name = "tie",     stdin = "ab cd e\ne\n",                 expect = "LEN 3\nab\ncd\ne\nHAS e YES\nLONGEST ab\n",                     visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "typescript.advanced.17.undefined"
+node        = 17
+title       = "THE 23:59 BOARD"
+difficulty  = 4
+story       = "23:59 in the control room. The rate board asks the feed for a screen that is not on tonight, the feed answers with nothing, and the board reads the nothing's price."
+concepts    = ["zero-values", "error-handling", "structs", "duck-typing"]
+requires    = ["typescript.advanced.16.structural", "typescript.advanced.08.exceptions"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<SCREEN> <CENTS>` — the
+screens that are on tonight — then a count `q` and `q` screen names to look
+up.
+
+For each query print `<SCREEN> <cents>`, or `<SCREEN> NONE` if that screen
+is not on. Then print `MISSING <k>` and `CHEAPEST <SCREEN>` — the screen
+with the lowest rate, ties by name — or `CHEAPEST NONE` if nothing is on.
+
+```
+input:  2
+        TSQ 1200
+        HYSAN 900
+        3
+        HYSAN
+        YEEWO
+        TSQ
+output: HYSAN 900
+        YEEWO NONE
+        TSQ 1200
+        MISSING 1
+        CHEAPEST HYSAN
+```
+
+The starter compiles without a single warning and crashes on `YEEWO`:
+
+```
+TypeError: Cannot read properties of undefined (reading 'cents')
+```
+
+That line is the boss of this map. It never points at the bug. It points at
+the place where an `undefined` was finally *used*, and in the starter it was
+made in two places the compiler was told not to worry about.
+
+`lookup` returns `board[name]` from a `Record<string, Screen>`, and the
+index type says `Screen` — not `Screen | undefined` — because TypeScript
+assumes an index you read is an index that exists. The annotation says
+`Screen`, `tsc` believes it, and at run time the key is not there.
+And `cheapest` has no `return` on its main path — it computes the best
+screen and falls off the end — so it returns `undefined` implicitly, which
+its type allows; the caller then reaches through it with
+`!`, the non-null assertion — a promise to the compiler that nobody checks.
+
+Make both functions say `Screen | undefined` **on purpose** — a
+`Map<string, Screen>` has `get`, whose type already admits the miss — and
+handle the `undefined` where it lands, with `=== undefined`. Not `!screen`:
+it works for an object, and the day this board is a `Map<string, number>`,
+the free screen at `0` cents stops existing.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+interface Screen {
+  name: string;
+  cents: number;
+}
+
+function lookup(board: Record<string, Screen>, name: string): Screen {
+  return board[name];
+}
+
+function cheapest(board: Record<string, Screen>): Screen | undefined {
+  const all = Object.values(board);
+  if (all.length === 0) {
+    return undefined;
+  }
+  const best = all.reduce((a, b) =>
+    b.cents < a.cents || (b.cents === a.cents && b.name < a.name) ? b : a,
+  );
+  best; // the return is missing
+}
+
+function main(): void {
+  const tokens = input.split(/\s+/).filter((t) => t !== "");
+  let at = 0;
+  const n = Number(tokens[at++]);
+  const board: Record<string, Screen> = {};
+  for (let i = 0; i < n; i++) {
+    const name = tokens[at++];
+    const cents = Number(tokens[at++]);
+    board[name] = { name, cents };
+  }
+
+  const q = Number(tokens[at++]);
+  let missing = 0;
+  for (let i = 0; i < q; i++) {
+    const name = tokens[at++];
+    const screen = lookup(board, name);
+    console.log(`${name} ${screen.cents}`);
+  }
+
+  console.log(`MISSING ${missing}`);
+  console.log(`CHEAPEST ${cheapest(board)!.name}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+interface Screen {
+  name: string;
+  cents: number;
+}
+
+function lookup(board: Map<string, Screen>, name: string): Screen | undefined {
+  // Map.get admits the miss in its type; the Record index never did
+  return board.get(name);
+}
+
+function cheapest(board: Map<string, Screen>): Screen | undefined {
+  const all = [...board.values()];
+  if (all.length === 0) {
+    return undefined;
+  }
+  return all.reduce((a, b) =>
+    b.cents < a.cents || (b.cents === a.cents && b.name < a.name) ? b : a,
+  );
+}
+
+function main(): void {
+  const tokens = input.split(/\s+/).filter((t) => t !== "");
+  let at = 0;
+  const n = Number(tokens[at++]);
+  const board = new Map<string, Screen>();
+  for (let i = 0; i < n; i++) {
+    const name = tokens[at++];
+    const cents = Number(tokens[at++]);
+    board.set(name, { name, cents });
+  }
+
+  const q = Number(tokens[at++]);
+  let missing = 0;
+  for (let i = 0; i < q; i++) {
+    const name = tokens[at++];
+    const screen = lookup(board, name);
+    if (screen === undefined) {
+      missing++;
+      console.log(`${name} NONE`);
+    } else {
+      console.log(`${name} ${screen.cents}`);
+    }
+  }
+
+  console.log(`MISSING ${missing}`);
+  const best = cheapest(board);
+  console.log(`CHEAPEST ${best === undefined ? "NONE" : best.name}`);
+}
+
+main();
+'''
+hints = [
+  "Read the stack trace from the top: the TypeError is on the console.log, but the undefined came out of lookup one line earlier, and out of the Record index before that.",
+  "Once lookup returns Screen | undefined, `screen.cents` stops compiling until you check. That error is the compiler doing the job the Record index skipped.",
+  "cheapest has two paths and only one of them returns. The other falls off the end, which a `Screen | undefined` return type quietly allows, and the caller's `!` swears it did not. Return `best`, and drop the `!` at the call.",
+  "`!` and `as` are both promises to the compiler that it cannot check. They are erased at run time along with every other type, and what is left is the value that actually arrived.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "2\nTSQ 1200\nHYSAN 900\n3\nHYSAN\nYEEWO\nTSQ\n", expect = "HYSAN 900\nYEEWO NONE\nTSQ 1200\nMISSING 1\nCHEAPEST HYSAN\n", visible = true },
+  { name = "nothing", stdin = "0\n2\nA\nB\n",                                   expect = "A NONE\nB NONE\nMISSING 2\nCHEAPEST NONE\n",                visible = false },
+  { name = "free",    stdin = "2\nFREE 0\nCHEAP 1\n1\nFREE\n",                  expect = "FREE 0\nMISSING 0\nCHEAPEST FREE\n",                        visible = false },
+  { name = "tie",     stdin = "3\nC 5\nA 5\nB 5\n2\nB\nZ\n",                    expect = "B 5\nZ NONE\nMISSING 1\nCHEAPEST A\n",                      visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "typescript.advanced.18.promise-all"
+node        = 18
+title       = "TWELVE SCREENS, ONE THREAD"
+difficulty  = 3
+story       = "22:00 in the signage control room. Twelve screens are asked for their frame counts at once, and the report is printed before any of them has answered."
+concepts    = ["concurrency", "closures", "functions"]
+requires    = ["typescript.advanced.17.undefined"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Start one async task per value that waits one turn of the event loop,
+computes the value's square, and stores it in `results[i]` — its own slot,
+so no two tasks write the same place. Wait for **all** of them, then print
+the results **in index order**, one per line, then `TASKS <n>`.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        TASKS 3
+```
+
+Calling an `async` function starts it immediately. It runs synchronously
+up to its first `await`, and at that point it hands back a `Promise` and
+the caller carries on. There is one thread: the tasks are not running
+somewhere else in the meantime, they are **parked**, waiting for the event
+loop to come back to them — which it can only do once the code that is
+running now gives the thread up.
+
+The starter starts every task and prints straight away, so it prints the
+slots before a single task has been back to fill one: `undefined`, `n`
+times. `await Promise.all(tasks)` is the join. It gives the thread up until
+every task has settled, and it rejects as soon as any one of them throws —
+which is the other reason to hold on to the promises instead of dropping
+them on the floor.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const nums = data.slice(1, 1 + data[0]);
+  const results: (number | undefined)[] = nums.map(() => undefined);
+
+  async function square(index: number, value: number): Promise<void> {
+    await tick();
+    results[index] = value * value;
+  }
+
+  const tasks = nums.map((value, i) => square(i, value));
+  // wait for the tasks here
+
+  for (const value of results) {
+    console.log(`${value}`);
+  }
+  console.log(`TASKS ${nums.length}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const nums = data.slice(1, 1 + data[0]);
+  const results: (number | undefined)[] = nums.map(() => undefined);
+
+  async function square(index: number, value: number): Promise<void> {
+    await tick();
+    results[index] = value * value;
+  }
+
+  const tasks = nums.map((value, i) => square(i, value));
+  // every task is parked on its tick; give the thread up until all are back
+  await Promise.all(tasks);
+
+  for (const value of results) {
+    console.log(`${value}`);
+  }
+  console.log(`TASKS ${nums.length}`);
+}
+
+main();
+'''
+hints = [
+  "await Promise.all(tasks) before the print loop. The starter already built the tasks array; nothing waits on it.",
+  "Start every task, then wait for all of them. `for (const t of tasks) await t;` is also correct here, because the tasks were all started before the first await.",
+  "results is captured by square's closure; it is the same array main prints, which is why the writes are visible after the join.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n2 3 4\n",      expect = "4\n9\n16\nTASKS 3\n",         visible = true },
+  { name = "single", stdin = "1\n-5\n",         expect = "25\nTASKS 1\n",               visible = false },
+  { name = "wide",   stdin = "4\n0 1 10 100\n", expect = "0\n1\n100\n10000\nTASKS 4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "typescript.advanced.19.mutex"
+node        = 19
+title       = "ONE COUNTER, EIGHT SCREENS"
+difficulty  = 3
+story       = "Every screen on the island reports its plays into the one billing counter on the thirtieth floor, and at midnight the counter says one play and every screen swears it reported."
+concepts    = ["shared-state", "concurrency", "thread-safety"]
+requires    = ["typescript.advanced.18.promise-all"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Start one async task per value, all at once. Each reads the shared counter,
+makes a **round trip** to the billing server (the starter's `roundTrip()`,
+one turn of the event loop), and writes the counter back with its value
+added to the total and one added to the hits. Wait for all of them, then
+print `TOTAL <sum>` and `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+JavaScript has one thread, and people will tell you that means it has no
+races. It has no **data** races: no two lines ever run at the same instant.
+It has every other kind. The starter's tasks all read the counter, all
+park on the round trip, and all come back and write `what I read + mine` —
+and what each of them read was `0`. The last one to write wins: `TOTAL 4`,
+`HITS 1`, deterministically, every run. An `await` between a read and a
+write is a door, and anything can walk through it.
+
+Keep the round trip; it is the job. Put a lock around the read, the trip and
+the write. The starter has a `Mutex` class with the right signature and no
+lock in it — `run` just calls the critical section. Make it real, out of
+nothing but Promises: keep a `tail` promise; each caller chains onto the
+tail, replaces it with a promise of its own, waits for the old one, runs,
+and resolves its own in a `finally` so an exception cannot leave the lock
+held.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function roundTrip(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+class Mutex {
+  async run<T>(critical: () => Promise<T>): Promise<T> {
+    return critical();
+  }
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const nums = data.slice(1, 1 + data[0]);
+
+  const counter = { total: 0, hits: 0 };
+  const lock = new Mutex();
+
+  async function report(value: number): Promise<void> {
+    await lock.run(async () => {
+      const seen = { ...counter };
+      await roundTrip();
+      counter.total = seen.total + value;
+      counter.hits = seen.hits + 1;
+    });
+  }
+
+  await Promise.all(nums.map((value) => report(value)));
+
+  console.log(`TOTAL ${counter.total}`);
+  console.log(`HITS ${counter.hits}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function roundTrip(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+class Mutex {
+  private tail: Promise<void> = Promise.resolve();
+
+  async run<T>(critical: () => Promise<T>): Promise<T> {
+    // take a place in the line, then wait for the one ahead of us
+    const ahead = this.tail;
+    let release: () => void = () => {};
+    this.tail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await ahead;
+    try {
+      return await critical();
+    } finally {
+      release();
+    }
+  }
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const nums = data.slice(1, 1 + data[0]);
+
+  const counter = { total: 0, hits: 0 };
+  const lock = new Mutex();
+
+  async function report(value: number): Promise<void> {
+    await lock.run(async () => {
+      const seen = { ...counter };
+      await roundTrip();
+      counter.total = seen.total + value;
+      counter.hits = seen.hits + 1;
+    });
+  }
+
+  await Promise.all(nums.map((value) => report(value)));
+
+  console.log(`TOTAL ${counter.total}`);
+  console.log(`HITS ${counter.hits}`);
+}
+
+main();
+'''
+hints = [
+  "Run the starter: TOTAL is the last value and HITS is 1. Every task read the counter before any task wrote it; the round trip is where they all passed each other.",
+  "The lock is a queue of promises. `const ahead = this.tail; this.tail = <a new promise you can resolve>; await ahead;` — then run, then resolve yours.",
+  "Resolve in `finally`, and `return await critical()` inside the try, so the release happens after the critical section has finished and not when its promise was merely created.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",   stdin = "4\n1 2 3 4\n",                 expect = "TOTAL 10\nHITS 4\n",      visible = true },
+  { name = "single", stdin = "1\n-5\n",                      expect = "TOTAL -5\nHITS 1\n",      visible = false },
+  { name = "big",    stdin = "3\n1000000 1000000 1000000\n", expect = "TOTAL 3000000\nHITS 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "typescript.advanced.20.channel"
+node        = 20
+title       = "WHO CLOSES THE FEED"
+difficulty  = 3
+story       = "The control room pushes every arrival time down the feed to the Yee Wo Street board, and after the last one the board sits waiting for a next that never comes, then goes dark."
+concepts    = ["channels", "concurrency", "iteration"]
+requires    = ["typescript.advanced.19.mutex"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+One producer task sends each value multiplied by ten down a `Channel`, one
+per turn of the event loop, then **closes** it. The main task receives
+until the channel says it is closed, printing each value and keeping a
+total, then prints `SUM <total>` and `CLOSED`.
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+The starter's `Channel` is complete: `send`, `receive`, and `close`, which
+wakes every waiting receiver with `undefined`. The producer never calls
+`close`, so after the last value the receiver awaits a promise nobody will
+ever resolve.
+
+In Go that is `fatal error: all goroutines are asleep - deadlock!`. In
+Python it is a hang until the runner kills it. Node does neither. When the
+event loop has nothing left that could ever wake anything — no timers, no
+I/O, no immediates — the process simply **exits**, status `0`, in the middle
+of your `for (;;)`. The `SUM` line and the `CLOSED` line never run, and from
+the outside it looks like success. That is worse than a crash, and it is
+what the starter does.
+
+The producer closes the channel. Never the consumer — the side that knows
+the stream is over is the side that ends it.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+class Channel<T> {
+  private items: T[] = [];
+  private waiting: ((item: T | undefined) => void)[] = [];
+  private closed = false;
+
+  send(item: T): void {
+    const receiver = this.waiting.shift();
+    if (receiver !== undefined) receiver(item);
+    else this.items.push(item);
+  }
+
+  close(): void {
+    this.closed = true;
+    for (const receiver of this.waiting.splice(0)) receiver(undefined);
+  }
+
+  receive(): Promise<T | undefined> {
+    if (this.items.length > 0) return Promise.resolve(this.items.shift());
+    if (this.closed) return Promise.resolve(undefined);
+    return new Promise((resolve) => this.waiting.push(resolve));
+  }
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const nums = data.slice(1, 1 + data[0]);
+
+  const feed = new Channel<number>();
+
+  async function control(): Promise<void> {
+    for (const value of nums) {
+      await tick();
+      feed.send(value * 10);
+    }
+    // the feed is still open
+  }
+
+  const producer = control();
+
+  let total = 0;
+  for (;;) {
+    const value = await feed.receive();
+    if (value === undefined) break;
+    console.log(`${value}`);
+    total += value;
+  }
+  await producer;
+
+  console.log(`SUM ${total}`);
+  console.log("CLOSED");
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+class Channel<T> {
+  private items: T[] = [];
+  private waiting: ((item: T | undefined) => void)[] = [];
+  private closed = false;
+
+  send(item: T): void {
+    const receiver = this.waiting.shift();
+    if (receiver !== undefined) receiver(item);
+    else this.items.push(item);
+  }
+
+  close(): void {
+    this.closed = true;
+    for (const receiver of this.waiting.splice(0)) receiver(undefined);
+  }
+
+  receive(): Promise<T | undefined> {
+    if (this.items.length > 0) return Promise.resolve(this.items.shift());
+    if (this.closed) return Promise.resolve(undefined);
+    return new Promise((resolve) => this.waiting.push(resolve));
+  }
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const nums = data.slice(1, 1 + data[0]);
+
+  const feed = new Channel<number>();
+
+  async function control(): Promise<void> {
+    for (const value of nums) {
+      await tick();
+      feed.send(value * 10);
+    }
+    feed.close();
+  }
+
+  const producer = control();
+
+  let total = 0;
+  for (;;) {
+    const value = await feed.receive();
+    if (value === undefined) break;
+    console.log(`${value}`);
+    total += value;
+  }
+  await producer;
+
+  console.log(`SUM ${total}`);
+  console.log("CLOSED");
+}
+
+main();
+'''
+hints = [
+  "One line, at the end of control: feed.close().",
+  "The receiver already checks `=== undefined`. It was waiting for something the producer never sent. `if (!value) break` would also stop — on the first 0, which one hidden case sends.",
+  "If undefined could be a real value on the channel, receive would return { done: true } | { done: false, value: T } instead — the same shape an iterator's next() returns, and for the same reason.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n1 2 3\n",     expect = "10\n20\n30\nSUM 60\nCLOSED\n",       visible = true },
+  { name = "zero",   stdin = "1\n0\n",         expect = "0\nSUM 0\nCLOSED\n",                 visible = false },
+  { name = "signed", stdin = "4\n-1 -2 3 4\n", expect = "-10\n-20\n30\n40\nSUM 40\nCLOSED\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "typescript.advanced.21.worker-pool"
+node        = 21
+title       = "EIGHT ENCODERS"
+difficulty  = 4
+story       = "Forty clips to render for the Hysan Place wall and eight encoders in the rack. Nobody wants forty encoders; they want the eight never standing still."
+concepts    = ["concurrency", "collections", "closures"]
+requires    = ["typescript.advanced.20.channel"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief       = '''
+Standard input is two integers `w` and `n`, then `n` values.
+
+Run a pool of `w` workers. Each worker loops: take the next unclaimed index,
+`await render(index, value)` — which returns `[index, value * value]` after
+a few turns of the event loop that depend on the index — and push the pair
+onto `results`, until no index is left. Wait for every worker, sort the
+results by index, print `<index> <value>` one per line, then `WORKERS <w>`.
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+The pairs arrive in the order the jobs **finish**, which is not the order
+they started; carrying the index in the result is what makes the output the
+same every run, and sorting on it is the last line of the answer.
+
+`const i = next++` needs no lock, and it is worth knowing why after the last
+quest: there is no `await` between reading `next` and bumping it, so no
+other worker can get in between. The lock was only ever needed across an
+`await`.
+
+The starter waits for the workers with `workers.forEach(async (w) => {
+await w; })`. It compiles, and it waits for nothing: `forEach` calls the
+async callback, gets a promise back, and throws it away. Every one of the
+callbacks awaits; `main` awaits none of them, and prints an empty result.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function render(index: number, value: number): Promise<[number, number]> {
+  for (let turn = 0; turn <= (index * 7) % 3; turn++) {
+    await tick();
+  }
+  return [index, value * value];
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const [workers, n] = data;
+  const nums = data.slice(2, 2 + n);
+
+  const results: [number, number][] = [];
+  let next = 0;
+
+  async function worker(): Promise<void> {
+    while (next < nums.length) {
+      const i = next++;
+      results.push(await render(i, nums[i]));
+    }
+  }
+
+  const pool = Array.from({ length: workers }, () => worker());
+  pool.forEach(async (running) => {
+    await running;
+  });
+
+  results.sort((a, b) => a[0] - b[0]);
+  for (const [index, value] of results) {
+    console.log(`${index} ${value}`);
+  }
+  console.log(`WORKERS ${workers}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function render(index: number, value: number): Promise<[number, number]> {
+  for (let turn = 0; turn <= (index * 7) % 3; turn++) {
+    await tick();
+  }
+  return [index, value * value];
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const [workers, n] = data;
+  const nums = data.slice(2, 2 + n);
+
+  const results: [number, number][] = [];
+  let next = 0;
+
+  async function worker(): Promise<void> {
+    while (next < nums.length) {
+      // no await between the read and the bump, so no other worker gets in
+      const i = next++;
+      results.push(await render(i, nums[i]));
+    }
+  }
+
+  const pool = Array.from({ length: workers }, () => worker());
+  await Promise.all(pool);
+
+  results.sort((a, b) => a[0] - b[0]);
+  for (const [index, value] of results) {
+    console.log(`${index} ${value}`);
+  }
+  console.log(`WORKERS ${workers}`);
+}
+
+main();
+'''
+hints = [
+  "await Promise.all(pool) in place of the forEach. forEach never waits for anything its callback returns, async or not.",
+  "The results arrive in finishing order; the index in each pair is the only record of where it came from, and the sort puts it back.",
+  "`for (const running of pool) await running;` also works. What does not work is any array method that takes a callback — map, forEach, filter — used as if it would await the callback for you.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-workers",  stdin = "2 3\n2 3 4\n",     expect = "0 4\n1 9\n2 16\nWORKERS 2\n",              visible = true },
+  { name = "one-each",     stdin = "1 1\n-5\n",        expect = "0 25\nWORKERS 1\n",                        visible = false },
+  { name = "more-workers", stdin = "3 5\n1 2 3 4 5\n", expect = "0 1\n1 4\n2 9\n3 16\n4 25\nWORKERS 3\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "typescript.advanced.22.async-await"
+node        = 22
+title       = "WHERE DOES ASYNC ACTUALLY RUN"
+difficulty  = 4
+story       = "Mei has written `await` for four years and has never once seen the thing that drives it. The control room has one loop, and every screen on the island takes turns on it."
+concepts    = ["async", "concurrency", "functions"]
+requires    = ["typescript.advanced.21.worker-pool"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+`async function double(value)` yields once — `await null` — and returns the
+value doubled. Run all `n` of them with `Promise.all`, print each result in
+input order, then `SUM <total>` and `TASKS <n>`.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+The starter's `run` maps the values through `double` and gets an array of
+**promises** — then tells the compiler it is an array of numbers:
+
+```ts
+const results = nums.map((v) => double(v)) as unknown as number[];
+```
+
+`tsc` accepts that, because `as unknown as` is how you tell it to stop
+checking. The cast is erased with every other type, and at run time the
+array is still promises: the output is `[object Promise]` three times and a
+`SUM` that is a string of them glued to a zero. A cast is not a conversion.
+It changes what the compiler believes and nothing about the value.
+
+`Promise.all` takes the promises and resolves to their results **in the
+order you passed them**, whatever order they finished in.
+
+Where does it all run? On the one thread, in turns. `await null` puts the
+rest of the function on the **microtask** queue, which Node drains
+completely before it touches a timer, an immediate or any I/O — the
+macrotasks. A `setTimeout(..., 0)` scheduled before a thousand awaits still
+runs after all of them. Nothing here is parallel; things run in turn, at the
+places they said they could stop.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+async function double(value: number): Promise<number> {
+  await null;
+  return value * 2;
+}
+
+async function run(nums: number[]): Promise<number[]> {
+  const results = nums.map((v) => double(v)) as unknown as number[];
+  return results;
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const nums = data.slice(1, 1 + data[0]);
+
+  const results = await run(nums);
+  for (const value of results) {
+    console.log(`${value}`);
+  }
+  console.log(`SUM ${results.reduce((sum, v) => sum + v, 0)}`);
+  console.log(`TASKS ${nums.length}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+async function double(value: number): Promise<number> {
+  await null;
+  return value * 2;
+}
+
+async function run(nums: number[]): Promise<number[]> {
+  // the promises, awaited together; no cast needed, because now it is true
+  return Promise.all(nums.map((v) => double(v)));
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const nums = data.slice(1, 1 + data[0]);
+
+  const results = await run(nums);
+  for (const value of results) {
+    console.log(`${value}`);
+  }
+  console.log(`SUM ${results.reduce((sum, v) => sum + v, 0)}`);
+  console.log(`TASKS ${nums.length}`);
+}
+
+main();
+'''
+hints = [
+  "Delete the cast and look at what tsc says: Type 'Promise<number>[]' is not assignable to type 'number[]'. That error was the truth the cast was hiding.",
+  "return Promise.all(nums.map((v) => double(v))) — the await is at the caller, where run(nums) is awaited.",
+  "Promise.all keeps argument order. If you wanted results as they finish you would carry the index yourself, exactly like the worker pool.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n",   expect = "2\n4\n6\nSUM 12\nTASKS 3\n",      visible = true },
+  { name = "one",   stdin = "1\n5\n",       expect = "10\nSUM 10\nTASKS 1\n",           visible = false },
+  { name = "mixed", stdin = "2\n0 -3\n",    expect = "0\n-6\nSUM -6\nTASKS 2\n",        visible = false },
+  { name = "four",  stdin = "4\n1 1 1 1\n", expect = "2\n2\n2\n2\nSUM 8\nTASKS 4\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "typescript.advanced.23.work-queue"
+node        = 23
+title       = "WHO SAYS IT IS DONE"
+difficulty  = 4
+story       = "Three operators clear the queue of screen updates and the shift lead waits for the queue to say it is empty. It never says so, because nobody told it an update was finished, and at 23:10 the whole console goes dark."
+concepts    = ["async", "channels", "concurrency", "deadlock"]
+requires    = ["typescript.advanced.22.async-await"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief       = '''
+Standard input is two integers `w` and `n`, then `n` values.
+
+Put `[index, value]` pairs on the starter's `WorkQueue`. Start `w` consumer
+tasks that loop taking a pair, waiting a turn, writing `value * 10` into
+`results[index]`, and calling `taskDone()`. The main task awaits
+`queue.join()`, then closes the queue so the consumers' `get()` returns
+`undefined` and they stop, awaits them, then prints the results in index
+order and `CONSUMERS <w>`.
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+`join()` resolves when every item that was ever `put` has had a matching
+`taskDone()`. The starter's consumers never call it. So `main` waits on
+`join`, the consumers wait on `get` for items that will never come, and
+nothing that could wake anybody is left on the event loop.
+
+That is a **deadlock** — everyone waiting, nobody moving — and it needs no
+threads and no locks: two promises each waiting for the other to move is
+enough. Two async mutexes taken in opposite orders by two tasks is the
+same thing with more ceremony. Node's answer to it is the one from the
+last map: the loop runs dry and the process exits, status `0`, having
+printed nothing at all.
+
+The fix is again one line, on the consumer side.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+class WorkQueue<T> {
+  private items: T[] = [];
+  private getters: ((item: T | undefined) => void)[] = [];
+  private joiners: (() => void)[] = [];
+  private unfinished = 0;
+  private closed = false;
+
+  put(item: T): void {
+    this.unfinished++;
+    const getter = this.getters.shift();
+    if (getter !== undefined) getter(item);
+    else this.items.push(item);
+  }
+
+  get(): Promise<T | undefined> {
+    if (this.items.length > 0) return Promise.resolve(this.items.shift());
+    if (this.closed) return Promise.resolve(undefined);
+    return new Promise((resolve) => this.getters.push(resolve));
+  }
+
+  taskDone(): void {
+    this.unfinished--;
+    if (this.unfinished === 0) {
+      for (const joiner of this.joiners.splice(0)) joiner();
+    }
+  }
+
+  join(): Promise<void> {
+    if (this.unfinished === 0) return Promise.resolve();
+    return new Promise((resolve) => this.joiners.push(resolve));
+  }
+
+  close(): void {
+    this.closed = true;
+    for (const getter of this.getters.splice(0)) getter(undefined);
+  }
+}
+
+async function consumer(queue: WorkQueue<[number, number]>, results: number[]): Promise<void> {
+  for (;;) {
+    const job = await queue.get();
+    if (job === undefined) return;
+    const [index, value] = job;
+    await tick();
+    results[index] = value * 10;
+  }
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const [workers, n] = data;
+  const nums = data.slice(2, 2 + n);
+
+  const queue = new WorkQueue<[number, number]>();
+  const results: number[] = nums.map(() => 0);
+  nums.forEach((value, i) => queue.put([i, value]));
+
+  const consumers = Array.from({ length: workers }, () => consumer(queue, results));
+  await queue.join();
+  queue.close();
+  await Promise.all(consumers);
+
+  for (const value of results) {
+    console.log(`${value}`);
+  }
+  console.log(`CONSUMERS ${workers}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+class WorkQueue<T> {
+  private items: T[] = [];
+  private getters: ((item: T | undefined) => void)[] = [];
+  private joiners: (() => void)[] = [];
+  private unfinished = 0;
+  private closed = false;
+
+  put(item: T): void {
+    this.unfinished++;
+    const getter = this.getters.shift();
+    if (getter !== undefined) getter(item);
+    else this.items.push(item);
+  }
+
+  get(): Promise<T | undefined> {
+    if (this.items.length > 0) return Promise.resolve(this.items.shift());
+    if (this.closed) return Promise.resolve(undefined);
+    return new Promise((resolve) => this.getters.push(resolve));
+  }
+
+  taskDone(): void {
+    this.unfinished--;
+    if (this.unfinished === 0) {
+      for (const joiner of this.joiners.splice(0)) joiner();
+    }
+  }
+
+  join(): Promise<void> {
+    if (this.unfinished === 0) return Promise.resolve();
+    return new Promise((resolve) => this.joiners.push(resolve));
+  }
+
+  close(): void {
+    this.closed = true;
+    for (const getter of this.getters.splice(0)) getter(undefined);
+  }
+}
+
+async function consumer(queue: WorkQueue<[number, number]>, results: number[]): Promise<void> {
+  for (;;) {
+    const job = await queue.get();
+    if (job === undefined) return;
+    const [index, value] = job;
+    await tick();
+    results[index] = value * 10;
+    queue.taskDone();
+  }
+}
+
+async function main(): Promise<void> {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const [workers, n] = data;
+  const nums = data.slice(2, 2 + n);
+
+  const queue = new WorkQueue<[number, number]>();
+  const results: number[] = nums.map(() => 0);
+  nums.forEach((value, i) => queue.put([i, value]));
+
+  const consumers = Array.from({ length: workers }, () => consumer(queue, results));
+  await queue.join();
+  queue.close();
+  await Promise.all(consumers);
+
+  for (const value of results) {
+    console.log(`${value}`);
+  }
+  console.log(`CONSUMERS ${workers}`);
+}
+
+main();
+'''
+hints = [
+  "queue.taskDone() after each item is handled. join counts puts against taskDones and nothing else.",
+  "Run the starter and it prints nothing and exits 0. Not a crash, not a hang: the event loop ran out of things that could ever happen.",
+  "close() wakes every consumer parked in get() with undefined, which ends their loops; that is why main can await them after the join.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-workers", stdin = "3 4\n1 2 3 4\n", expect = "10\n20\n30\n40\nCONSUMERS 3\n", visible = true },
+  { name = "one-worker",    stdin = "1 2\n-1 5\n",    expect = "-10\n50\nCONSUMERS 1\n",        visible = false },
+  { name = "more-workers",  stdin = "4 1\n7\n",       expect = "70\nCONSUMERS 4\n",             visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "typescript.advanced.24.finally"
+node        = 24
+title       = "THE LOCK GOES BACK ON ANYWAY"
+difficulty  = 4
+story       = "The control room unlocks an advertiser's slot for every update and locks it again after. The one that got a bad update at 22:40 has been unlocked since, because the locking code was after the line that failed."
+concepts    = ["error-handling", "generators", "functions"]
+requires    = ["typescript.advanced.23.work-queue"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<NAME> <CENTS>`, where
+`CENTS` is supposed to be an integer.
+
+Write a generator `opened(name)` that prints `OPEN <NAME>`, yields once,
+and prints `SHUT <NAME>` — **whether or not the body raised**. The body is
+a `for (const _ of opened(name))` loop that parses the cents and adds them
+to a total. A line whose cents do not parse is reported as `BAD <NAME>`
+after the slot has shut. Finally print `TOTAL <sum>` and `REJECTED <k>`.
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+`for...of` over a generator is a resource guard, and this is why: when the
+loop body exits early — `break`, `return`, or an exception — `for...of`
+calls the generator's `return()`, which resumes it **at the `yield`** as
+if the `yield` were a `return` statement. The code after the `yield` does
+not run. Code in a `finally` around the `yield` does. The starter has no
+`finally`, and `WONG`'s slot never shuts.
+
+TypeScript 5.2 has `using` and `Symbol.dispose` for exactly this, and they
+are not here: the `es2023` library has no `Symbol.dispose`, so `using`
+does not compile. `try`/`finally` is what `using` is built from.
+
+Do not catch the error inside the generator. The caller wants to print
+`BAD`, and a generator that swallowed it would print `TOTAL` as if nothing
+had happened.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class NotANumber extends Error {}
+
+function parseCents(text: string): number {
+  if (!/^-?\d+$/.test(text)) throw new NotANumber(text);
+  return Number(text);
+}
+
+function* opened(name: string): Generator<void> {
+  console.log(`OPEN ${name}`);
+  yield;
+  console.log(`SHUT ${name}`);
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  let total = 0;
+  let rejected = 0;
+  for (let i = 1; i <= n; i++) {
+    const [name, cents] = lines[i].trim().split(/\s+/);
+    try {
+      for (const _ of opened(name)) {
+        total += parseCents(cents);
+      }
+    } catch (err: unknown) {
+      if (!(err instanceof NotANumber)) throw err;
+      rejected++;
+      console.log(`BAD ${name}`);
+    }
+  }
+  console.log(`TOTAL ${total}`);
+  console.log(`REJECTED ${rejected}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class NotANumber extends Error {}
+
+function parseCents(text: string): number {
+  if (!/^-?\d+$/.test(text)) throw new NotANumber(text);
+  return Number(text);
+}
+
+function* opened(name: string): Generator<void> {
+  console.log(`OPEN ${name}`);
+  try {
+    yield;
+  } finally {
+    // runs on the normal exit, and on the return() for-of sends when the body throws
+    console.log(`SHUT ${name}`);
+  }
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  let total = 0;
+  let rejected = 0;
+  for (let i = 1; i <= n; i++) {
+    const [name, cents] = lines[i].trim().split(/\s+/);
+    try {
+      for (const _ of opened(name)) {
+        total += parseCents(cents);
+      }
+    } catch (err: unknown) {
+      if (!(err instanceof NotANumber)) throw err;
+      rejected++;
+      console.log(`BAD ${name}`);
+    }
+  }
+  console.log(`TOTAL ${total}`);
+  console.log(`REJECTED ${rejected}`);
+}
+
+main();
+'''
+hints = [
+  "try { yield; } finally { console.log(`SHUT ${name}`); } — the finally is the part that runs on every path.",
+  "The exception passes out through the for...of after return() has run the finally, so main's catch still sees it — that is why BAD prints after SHUT.",
+  "A generator is not the only way: a `withSlot(name, body)` function with try/finally around `body()` does the same job. The generator form is the one that shows what for...of does on the way out.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",   stdin = "3\nLAM 1200\nWONG xx\nCHAN 800\n", expect = "OPEN LAM\nSHUT LAM\nOPEN WONG\nSHUT WONG\nBAD WONG\nOPEN CHAN\nSHUT CHAN\nTOTAL 2000\nREJECTED 1\n", visible = true },
+  { name = "clean",   stdin = "1\nLAM 5\n",                       expect = "OPEN LAM\nSHUT LAM\nTOTAL 5\nREJECTED 0\n",                                                 visible = false },
+  { name = "all-bad", stdin = "2\nA x\nB y\n",                    expect = "OPEN A\nSHUT A\nBAD A\nOPEN B\nSHUT B\nBAD B\nTOTAL 0\nREJECTED 2\n",                       visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "typescript.advanced.25.pipeline"
+node        = 25
+title       = "THE FEED STAGES"
+difficulty  = 4
+story       = "The feed to the Yee Wo Street boards passes through two stages on the thirtieth floor: one squares the reading, the next keeps the running count, and the board is supposed to see each one as it comes, not the whole night at 23:59."
+concepts    = ["generators", "iteration", "closures"]
+requires    = ["typescript.advanced.24.finally"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Build a two-stage pipeline of **generators**:
+
+1. `squares(values)` yields each value squared
+2. `running(stream)` takes any `Iterable<number>`, keeps a running total,
+   and yields `[value, total]` pairs
+
+`main` prints each pair as `<square> <total>`, then `PIPE <n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+Neither stage builds an array. Each `yield` hands one item to the next stage
+and pauses; `main` pulls, `running` pulls from `squares`, `squares` pulls
+from the input. Nothing is computed before it is wanted, and the whole
+pipeline holds one item in flight.
+
+The starter's second stage is a generator in name only. It walks the whole
+stream, then yields **once**, at the end, with the last value and the final
+total — which type-checks perfectly, because `Generator<[number, number]>`
+says what each item looks like and nothing about how many there are. The
+board gets one line at midnight.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function* squares(values: Iterable<number>): Generator<number> {
+  for (const value of values) {
+    yield value * value;
+  }
+}
+
+function* running(stream: Iterable<number>): Generator<[number, number]> {
+  let total = 0;
+  let last = 0;
+  for (const value of stream) {
+    total += value;
+    last = value;
+  }
+  yield [last, total];
+}
+
+function main(): void {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const nums = data.slice(1, 1 + data[0]);
+
+  let count = 0;
+  for (const [square, total] of running(squares(nums))) {
+    console.log(`${square} ${total}`);
+    count++;
+  }
+  console.log(`PIPE ${count}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function* squares(values: Iterable<number>): Generator<number> {
+  for (const value of values) {
+    yield value * value;
+  }
+}
+
+function* running(stream: Iterable<number>): Generator<[number, number]> {
+  let total = 0;
+  for (const value of stream) {
+    total += value;
+    yield [value, total];
+  }
+}
+
+function main(): void {
+  const data = input.split(/\s+/).filter((t) => t !== "").map(Number);
+  const nums = data.slice(1, 1 + data[0]);
+
+  let count = 0;
+  for (const [square, total] of running(squares(nums))) {
+    console.log(`${square} ${total}`);
+    count++;
+  }
+  console.log(`PIPE ${count}`);
+}
+
+main();
+'''
+hints = [
+  "Move the yield inside the loop: yield [value, total] once per value.",
+  "The starter's output is one line and PIPE 1. A stage that yields after its loop is an array with extra steps.",
+  "running(squares(nums)) composes because a generator is an Iterable; running never knows or cares that its input is another generator.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n1 2 3\n",   expect = "1 1\n4 5\n9 14\nPIPE 3\n",       visible = true },
+  { name = "single", stdin = "1\n-3\n",      expect = "9 9\nPIPE 1\n",                  visible = false },
+  { name = "repeat", stdin = "4\n0 2 2 2\n", expect = "0 0\n4 4\n4 8\n4 12\nPIPE 4\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "typescript.advanced.26.toolbox"
+node        = 26
+title       = "THE TOOLBOX THAT IS NOT ON THE SHELF"
+difficulty  = 3
+story       = "The control room's manual says to count runs of identical frames with the iterator helpers. The compiler on the thirtieth floor has never heard of them, and the night operator counts by hand."
+concepts    = ["generators", "iteration", "collections", "imports"]
+requires    = ["typescript.advanced.25.pipeline"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''
+Standard input is one line of integers.
+
+Print three lines, each built by a generator of your own:
+
+1. `SUMS` followed by the running sums — `accumulate(values)`
+2. `RUNS` followed by each run of **adjacent** equal values as `<v>x<k>` —
+   `runs(values)`
+3. `PAIRS <k>`: how many unordered pairs of **distinct** values there are —
+   `pairs(items)` over the sorted distinct values
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+Python has `itertools` on the shelf. JavaScript has iterator helpers —
+`Iterator.prototype.map`, `.filter`, `.take` — in Node since version 22,
+and they are **not** on this shelf: the `es2023` library does not declare
+them, so `tsc` says `TS2339: Property 'map' does not exist` however new the
+`node` underneath is. What you can use is what the library declares, and
+what you import. This file imports `readFileSync` from `"fs"` with an ES
+`import` — which makes the file a **module**, and `tsc` compiles it to a
+`require` because the target is CommonJS. Everything else, you write.
+
+`runs` groups **adjacent** equal items only. It is not a count, and the
+sample is chosen so the two disagree: `1` appears four times, in two runs.
+The starter counts into a `Map` for the second line and is wrong on exactly
+that input.
+'''
+starter     = '''
+import { readFileSync } from "fs";
+
+function* accumulate(values: Iterable<number>): Generator<number> {
+  // the running total after each value
+  for (const value of values) {
+    yield value;
+  }
+}
+
+function* runs<T>(values: Iterable<T>): Generator<[T, number]> {
+  const counts = new Map<T, number>();
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  yield* counts;
+}
+
+function* pairs<T>(items: readonly T[]): Generator<[T, T]> {
+  // every [items[i], items[j]] with i < j
+}
+
+function main(): void {
+  const nums = readFileSync(0, "utf8").split(/\s+/).filter((t) => t !== "").map(Number);
+
+  console.log("SUMS " + [...accumulate(nums)].join(" "));
+  console.log("RUNS " + [...runs(nums)].map(([v, k]) => `${v}x${k}`).join(" "));
+
+  const distinct = [...new Set(nums)].sort((a, b) => a - b);
+  let count = 0;
+  for (const _ of pairs(distinct)) {
+    count++;
+  }
+  console.log(`PAIRS ${count}`);
+}
+
+main();
+'''
+solution    = '''
+import { readFileSync } from "fs";
+
+function* accumulate(values: Iterable<number>): Generator<number> {
+  let total = 0;
+  for (const value of values) {
+    total += value;
+    yield total;
+  }
+}
+
+function* runs<T>(values: Iterable<T>): Generator<[T, number]> {
+  // the run in progress; undefined only before the first value
+  let run: { value: T; length: number } | undefined;
+  for (const value of values) {
+    if (run !== undefined && run.value === value) {
+      run.length++;
+      continue;
+    }
+    if (run !== undefined) yield [run.value, run.length];
+    run = { value, length: 1 };
+  }
+  if (run !== undefined) yield [run.value, run.length];
+}
+
+function* pairs<T>(items: readonly T[]): Generator<[T, T]> {
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      yield [items[i], items[j]];
+    }
+  }
+}
+
+function main(): void {
+  const nums = readFileSync(0, "utf8").split(/\s+/).filter((t) => t !== "").map(Number);
+
+  console.log("SUMS " + [...accumulate(nums)].join(" "));
+  console.log("RUNS " + [...runs(nums)].map(([v, k]) => `${v}x${k}`).join(" "));
+
+  const distinct = [...new Set(nums)].sort((a, b) => a - b);
+  let count = 0;
+  for (const _ of pairs(distinct)) {
+    count++;
+  }
+  console.log(`PAIRS ${count}`);
+}
+
+main();
+'''
+hints = [
+  "accumulate keeps a total and yields it after each value; the last one it yields is the sum.",
+  "runs keeps the run in progress. When the next value differs, yield the finished run and start a new one — and after the loop, yield the last run, which nothing else will.",
+  "pairs is two nested loops with j starting at i + 1. The count is n*(n-1)/2, and checking that by hand is how you know you have the right n.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "1 1 2 1 1 3\n", expect = "SUMS 1 2 4 5 6 9\nRUNS 1x2 2x1 1x2 3x1\nPAIRS 3\n", visible = true },
+  { name = "flat",   stdin = "7 7 7\n",       expect = "SUMS 7 14 21\nRUNS 7x3\nPAIRS 0\n",                  visible = false },
+  { name = "rising", stdin = "1 2 3 4\n",     expect = "SUMS 1 3 6 10\nRUNS 1x1 2x1 3x1 4x1\nPAIRS 6\n",    visible = false },
+  { name = "one",    stdin = "-5\n",          expect = "SUMS -5\nRUNS -5x1\nPAIRS 0\n",                     visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "typescript.advanced.27.memo"
+node        = 27
+title       = "REMEMBER WHAT YOU WORKED OUT"
+difficulty  = 4
+story       = "The scheduler for the Times Square screen works out the same rotation from the same two numbers eleven thousand times before midnight, from scratch, every time."
+concepts    = ["decorators", "recursion", "functions", "closures"]
+requires    = ["typescript.advanced.26.toolbox"]
+map          = { x = 0.199, y = 0.742, kind = "quest" }
+brief       = '''
+Standard input is `n k bits`: two integers and a string of binary digits.
+
+Print four lines:
+
+1. `FIB <fib(n)>` — from a **recursive** `fib`, wrapped in a memoising
+   `memo(...)` of your own
+2. `PRODUCT <k!>` — `reduce` with a multiply over `1..k`, with an initial
+   value so `k = 0` gives `1`
+3. `BIN <value>` — `bits` read as base 2 by `fromBinary`, a one-argument
+   function with the radix fixed inside it
+4. `MISSES <m>` — how many times the memo actually ran the body
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` is at most `400`. The starter's wrapper counts calls and remembers
+nothing, so `fib(10)` is 177 calls, `fib(35)` is thirty million and
+`fib(90)` does not finish. With a cache every `fib(i)` runs once and
+`MISSES` is `n + 1`.
+
+The numbers do not fit in a `number`. `fib(90)` is `2880067194370816120`,
+past `Number.MAX_SAFE_INTEGER`, and a `number` would print it wrong without
+a word. Use **`bigint`**: `0n`, `1n`, `BigInt(i)`. A template literal prints
+a bigint as its digits; `console.log(5n)` on its own prints `5n`.
+
+`parseInt(bits)` with no radix reads `1010` as one thousand and ten. The
+starter does that. Fix the radix inside a closure —
+`(text: string) => parseInt(text, 2)` — which is what Python's
+`functools.partial` is: a function with some of its arguments already
+decided. `bind` does the same for **leading** arguments only, and the radix
+is the second one.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function counting<A extends unknown[], R>(fn: (...args: A) => R) {
+  function wrapper(...args: A): R {
+    wrapper.misses += 1;
+    return fn(...args);
+  }
+  wrapper.misses = 0;
+  return wrapper;
+}
+
+const fib: ((n: number) => bigint) & { misses: number } = counting(
+  (n: number): bigint => (n < 2 ? BigInt(n) : fib(n - 1) + fib(n - 2)),
+);
+
+function main(): void {
+  const [nText, kText, bits] = input.split(/\s+/).filter((t) => t !== "");
+  const n = Number(nText);
+  const k = Number(kText);
+
+  console.log(`FIB ${fib(n)}`);
+
+  let product = 1n;
+  for (let i = 1; i <= k; i++) {
+    product *= BigInt(i);
+  }
+  console.log(`PRODUCT ${product}`);
+
+  console.log(`BIN ${parseInt(bits)}`);
+  console.log(`MISSES ${fib.misses}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function memo<K, V>(fn: (key: K) => V) {
+  // boxed so a cached undefined would still count as a hit
+  const cache = new Map<K, { value: V }>();
+  function wrapper(key: K): V {
+    const hit = cache.get(key);
+    if (hit !== undefined) return hit.value;
+    wrapper.misses += 1;
+    const value = fn(key);
+    cache.set(key, { value });
+    return value;
+  }
+  wrapper.misses = 0;
+  return wrapper;
+}
+
+const fib: ((n: number) => bigint) & { misses: number } = memo(
+  (n: number): bigint => (n < 2 ? BigInt(n) : fib(n - 1) + fib(n - 2)),
+);
+
+function main(): void {
+  const [nText, kText, bits] = input.split(/\s+/).filter((t) => t !== "");
+  const n = Number(nText);
+  const k = Number(kText);
+
+  console.log(`FIB ${fib(n)}`);
+
+  const product = Array.from({ length: k }, (_, i) => BigInt(i + 1)).reduce((a, b) => a * b, 1n);
+  console.log(`PRODUCT ${product}`);
+
+  const fromBinary = (text: string): number => parseInt(text, 2);
+  console.log(`BIN ${fromBinary(bits)}`);
+
+  console.log(`MISSES ${fib.misses}`);
+}
+
+main();
+'''
+hints = [
+  "memo keeps a Map from argument to result in its closure; a hit returns from the Map, a miss runs the body, stores the result, and counts.",
+  "fib must call the memoised fib in its recursion, or only the outermost call is cached. Declaring fib with its type up front is what lets the arrow refer to it.",
+  "reduce((a, b) => a * b, 1n) — the second argument is the starting value, and it is what makes the empty range give 1n. It has to be a bigint too: 1 * 1n is TS2365, not a quiet conversion.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5 1010\n",      expect = "FIB 55\nPRODUCT 120\nBIN 10\nMISSES 11\n",                     visible = true },
+  { name = "zero",   stdin = "0 0 0\n",          expect = "FIB 0\nPRODUCT 1\nBIN 0\nMISSES 1\n",                          visible = false },
+  { name = "ninety", stdin = "90 20 11111111\n", expect = "FIB 2880067194370816120\nPRODUCT 2432902008176640000\nBIN 255\nMISSES 91\n", visible = false },
+  { name = "deep",   stdin = "400 1 1\n",        expect = "FIB 176023680645013966468226945392411250770384383304492191886725992896575345044216019675\nPRODUCT 1\nBIN 1\nMISSES 401\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "typescript.advanced.28.type-guard"
+node        = 28
+title       = "IT ONLY HAS TO RENDER"
+difficulty  = 4
+story       = "The Lee Garden directory screen lists shops and service counters that arrive down the same feed from two different systems, and it only wants to know that each of them can draw itself."
+concepts    = ["duck-typing", "dispatch", "structs"]
+requires    = ["typescript.advanced.27.memo"]
+map          = { x = 0.114, y = 0.663, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines, each either
+
+* `SHOP <NAME> <LEVEL>` — renders as `<NAME> / L<LEVEL>`
+* `COUNTER <NUMBER>` — renders as `COUNTER <NUMBER>`
+
+The starter's `parse` turns each line into what the feed would send: a
+`Shop` instance for a shop, and a **plain object** with a `render` method
+for a counter. It hands them over as `unknown[]`, because that is the honest
+type of anything that came down a wire. Print every item that is a `Sign`
+through `show`, then `SIGNS <k>` and `SHOPS <k>` — the second counted with
+`instanceof Shop`.
+
+```
+input:  3
+        SHOP LAM 4
+        COUNTER 2
+        SHOP WONG 1
+output: LAM / L4
+        COUNTER 2
+        WONG / L1
+        SIGNS 3
+        SHOPS 2
+```
+
+`Sign` is an interface, and interfaces are **erased**. At run time there is
+no `Sign` to ask — `x instanceof Sign` does not compile, because there is
+nothing on the right-hand side for it to mean. To get from `unknown` to
+`Sign` you write a **type guard**, `function isSign(x: unknown): x is Sign`,
+and the compiler believes whatever it returns. It checks nothing itself.
+
+The starter's guard returns `x instanceof Shop`. That compiles, it is a
+perfectly good boolean, and it is wrong: the counter is a `Sign` by shape
+and an instance of nothing. The guard lied, the compiler took its word, and
+the counters vanish from the directory. Check the shape instead —
+`typeof x === "object"`, `x !== null`, `"render" in x`, and
+`typeof x.render === "function"` — which is exactly what the interface
+promised and nothing more.
+
+`show(sign)` dispatches at run time: `sign.render()` finds whichever
+`render` the object has, on its prototype or on itself.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+interface Sign {
+  render(): string;
+}
+
+class Shop {
+  constructor(
+    readonly name: string,
+    readonly level: number,
+  ) {}
+
+  render(): string {
+    return `${this.name} / L${this.level}`;
+  }
+}
+
+function parse(line: string): unknown {
+  const parts = line.trim().split(/\s+/);
+  if (parts[0] === "SHOP") return new Shop(parts[1], Number(parts[2]));
+  const number = Number(parts[1]);
+  return { number, render: () => `COUNTER ${number}` };
+}
+
+function isSign(x: unknown): x is Sign {
+  return x instanceof Shop;
+}
+
+function show(sign: Sign): void {
+  console.log(sign.render());
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  const feed: unknown[] = lines.slice(1, n + 1).map(parse);
+
+  let signs = 0;
+  let shops = 0;
+  for (const item of feed) {
+    if (isSign(item)) {
+      show(item);
+      signs++;
+    }
+    if (item instanceof Shop) shops++;
+  }
+  console.log(`SIGNS ${signs}`);
+  console.log(`SHOPS ${shops}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+interface Sign {
+  render(): string;
+}
+
+class Shop {
+  constructor(
+    readonly name: string,
+    readonly level: number,
+  ) {}
+
+  render(): string {
+    return `${this.name} / L${this.level}`;
+  }
+}
+
+function parse(line: string): unknown {
+  const parts = line.trim().split(/\s+/);
+  if (parts[0] === "SHOP") return new Shop(parts[1], Number(parts[2]));
+  const number = Number(parts[1]);
+  return { number, render: () => `COUNTER ${number}` };
+}
+
+function isSign(x: unknown): x is Sign {
+  // the interface is gone at run time; check the shape it promised
+  return typeof x === "object" && x !== null && "render" in x && typeof x.render === "function";
+}
+
+function show(sign: Sign): void {
+  console.log(sign.render());
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  const feed: unknown[] = lines.slice(1, n + 1).map(parse);
+
+  let signs = 0;
+  let shops = 0;
+  for (const item of feed) {
+    if (isSign(item)) {
+      show(item);
+      signs++;
+    }
+    if (item instanceof Shop) shops++;
+  }
+  console.log(`SIGNS ${signs}`);
+  console.log(`SHOPS ${shops}`);
+}
+
+main();
+'''
+hints = [
+  "The whole fix is the body of isSign. The counter is an object literal; nothing it is an instance of has a name.",
+  "\"render\" in x narrows x to something with a render property of type unknown; typeof x.render === \"function\" narrows it the rest of the way. Both are real run-time checks, and that is the difference from the starter.",
+  "A type guard is only as honest as its body. `return true` also compiles. The compiler trusts `x is Sign` the way it trusts `as` and `!` — and all three are erased with the types.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",   stdin = "3\nSHOP LAM 4\nCOUNTER 2\nSHOP WONG 1\n", expect = "LAM / L4\nCOUNTER 2\nWONG / L1\nSIGNS 3\nSHOPS 2\n", visible = true },
+  { name = "counter", stdin = "1\nCOUNTER 116\n",                        expect = "COUNTER 116\nSIGNS 1\nSHOPS 0\n",                  visible = false },
+  { name = "shops",   stdin = "2\nSHOP A 0\nSHOP B 9\n",                 expect = "A / L0\nB / L9\nSIGNS 2\nSHOPS 2\n",               visible = false },
+  { name = "none",    stdin = "0\n",                                     expect = "SIGNS 0\nSHOPS 0\n",                               visible = false },
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "typescript.advanced.29.frozen"
+node        = 29
+title       = "IT DOES NOT CHANGE"
+difficulty  = 4
+story       = "The night's rate card goes out to every screen at 19:00 marked readonly, and by 22:00 three of them have written on it and one has added a column that is not there."
+concepts    = ["structs", "mutability", "error-handling"]
+requires    = ["typescript.advanced.28.type-guard"]
+map          = { x = 0.059, y = 0.950, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<NAME> <CENTS>`.
+
+Build each line into a `Price` with `readonly` fields. Then, for each price,
+try to overwrite its `cents` and print `FROZEN <NAME>` when the attempt
+throws. Next, a `Tally` with one field, `count`: set it, then try to set a
+misspelt `cuont` and print `SEALED YES` when *that* throws. Finally
+`IN_SET <k>`, how many distinct prices there are by name and cents, and
+`TOTAL <sum>`.
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SEALED YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+`readonly` is a contract with the compiler, and like every contract here it
+is **erased**. `price.cents = 0` does not compile — so the starter writes
+through a widened view, `(price as { cents: number }).cents = 0`, which
+compiles because a readonly property is assignable to a mutable one, and at
+run time nothing stands in the way. The rate card is written on, and
+`TOTAL` is `0`. The run-time half of the contract is `Object.freeze(this)`
+at the end of the constructor: assignment to a frozen object's property
+throws a `TypeError` in strict mode, and every file `tsc` emits under
+`strict` starts with `"use strict"`.
+
+`Object.seal(this)` is the other fixed shape: existing fields stay
+writable, and adding a new one — a typo — throws instead of quietly making
+a field nobody reads. The compiler would catch `tally.cuont` too, if you let
+it; the starter does not let it, and neither does a `JSON.parse`.
+
+And a `Set` of objects counts **objects**, not values: the two `LAM 1200`
+prices are two members, because they are two allocations. Key the set by a
+string made of the fields — `` `${name}:${cents}` `` — and they are one.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class Price {
+  constructor(
+    readonly name: string,
+    readonly cents: number,
+  ) {}
+}
+
+class Tally {
+  count = 0;
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  const prices: Price[] = [];
+  for (let i = 1; i <= n; i++) {
+    const [name, cents] = lines[i].trim().split(/\s+/);
+    prices.push(new Price(name, Number(cents)));
+  }
+
+  for (const price of prices) {
+    try {
+      (price as { cents: number }).cents = 0;
+      console.log(`MUTATED ${price.name}`);
+    } catch (err: unknown) {
+      if (!(err instanceof TypeError)) throw err;
+      console.log(`FROZEN ${price.name}`);
+    }
+  }
+
+  const tally = new Tally();
+  tally.count = n;
+  try {
+    (tally as unknown as { cuont: number }).cuont = 0;
+    console.log("SEALED NO");
+  } catch (err: unknown) {
+    if (!(err instanceof TypeError)) throw err;
+    console.log("SEALED YES");
+  }
+
+  console.log(`IN_SET ${new Set(prices).size}`);
+  console.log(`TOTAL ${prices.reduce((sum, p) => sum + p.cents, 0)}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class Price {
+  constructor(
+    readonly name: string,
+    readonly cents: number,
+  ) {
+    // readonly is erased; freeze is what is still there at run time
+    Object.freeze(this);
+  }
+}
+
+class Tally {
+  count = 0;
+
+  constructor() {
+    Object.seal(this);
+  }
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  const prices: Price[] = [];
+  for (let i = 1; i <= n; i++) {
+    const [name, cents] = lines[i].trim().split(/\s+/);
+    prices.push(new Price(name, Number(cents)));
+  }
+
+  for (const price of prices) {
+    try {
+      (price as { cents: number }).cents = 0;
+      console.log(`MUTATED ${price.name}`);
+    } catch (err: unknown) {
+      if (!(err instanceof TypeError)) throw err;
+      console.log(`FROZEN ${price.name}`);
+    }
+  }
+
+  const tally = new Tally();
+  tally.count = n;
+  try {
+    (tally as unknown as { cuont: number }).cuont = 0;
+    console.log("SEALED NO");
+  } catch (err: unknown) {
+    if (!(err instanceof TypeError)) throw err;
+    console.log("SEALED YES");
+  }
+
+  console.log(`IN_SET ${new Set(prices.map((p) => `${p.name}:${p.cents}`)).size}`);
+  console.log(`TOTAL ${prices.reduce((sum, p) => sum + p.cents, 0)}`);
+}
+
+main();
+'''
+hints = [
+  "Object.freeze(this) as the last line of Price's constructor. The parameter properties are assigned before the body runs, so they are already there to freeze.",
+  "Object.seal(this) in a Tally constructor. Class fields are initialised before the constructor body, so count exists by then and stays writable.",
+  "The TOTAL is the sum of the original cents, which only holds because the writes failed. In the starter every price is 0 by then and TOTAL is 0 — the readonly fields were written on, and nothing said a word.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "3\nLAM 1200\nWONG 900\nLAM 1200\n", expect = "FROZEN LAM\nFROZEN WONG\nFROZEN LAM\nSEALED YES\nIN_SET 2\nTOTAL 3300\n", visible = true },
+  { name = "one",      stdin = "1\nCHAN 5\n",                       expect = "FROZEN CHAN\nSEALED YES\nIN_SET 1\nTOTAL 5\n",                          visible = false },
+  { name = "none",     stdin = "0\n",                               expect = "SEALED YES\nIN_SET 0\nTOTAL 0\n",                                      visible = false },
+  { name = "distinct", stdin = "2\nA 1\nA 2\n",                     expect = "FROZEN A\nFROZEN A\nSEALED YES\nIN_SET 2\nTOTAL 3\n",                   visible = false },
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "typescript.advanced.30.error-classes"
+node        = 30
+title       = "AN ERROR OF YOUR OWN"
+difficulty  = 4
+story       = "Four layers of the ad-booking system each throw their own thing, and the booking screen catches one of them and is taken down by the others."
+concepts    = ["error-handling", "structs", "control-flow"]
+requires    = ["typescript.advanced.29.frozen"]
+map          = { x = 0.260, y = 0.857, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines, each meant to be a booking
+length in hours.
+
+Define an error hierarchy: `PriceError extends Error` as the base, with
+`NotANumber` and `Negative` extending it. `Negative` carries the hours and
+its message is `negative hours: <h>`; `NotANumber`'s message is
+`not a number`. `price(text)` converts the text with `BigInt(text)` —
+which throws a `SyntaxError` on anything that is not an integer — throwing
+`NotANumber` **with the `SyntaxError` as its `cause`**, rejects a negative
+length, and otherwise returns `500 + 100 * hours`.
+
+Print each price or the error's message, then `ERRORS <k>`. Narrow to the
+**base class**, once.
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative hours: -2
+        ERRORS 2
+```
+
+The starter narrows with `err instanceof Negative` and re-throws everything
+else, so the `xx` line takes the program down with an uncaught
+`NotANumber`. `err instanceof PriceError` is true for every member of the
+hierarchy, and `err.message` is the message — which lives in the class,
+passed to `super(...)`, not in the handler.
+
+`new NotANumber({ cause })` — `ErrorOptions` is in the `es2022` library —
+records the `SyntaxError` underneath. Nothing here prints it; an uncaught
+one would, as a `[cause]:` block under the stack trace. That chain is the
+reason to pass it.
+
+`class X extends Error` and `instanceof X` work because the target is
+`es2022`. Compiled down to ES5, a subclass of `Error` loses its prototype
+and `instanceof` quietly returns `false` — the reason older codebases are
+full of `Object.setPrototypeOf(this, new.target.prototype)`.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class PriceError extends Error {}
+
+class NotANumber extends PriceError {
+  constructor(options?: ErrorOptions) {
+    super("not a number", options);
+  }
+}
+
+class Negative extends PriceError {
+  constructor(readonly hours: number) {
+    super(`negative hours: ${hours}`);
+  }
+}
+
+function price(text: string): number {
+  let hours: number;
+  try {
+    hours = Number(BigInt(text));
+  } catch (cause: unknown) {
+    throw new NotANumber({ cause });
+  }
+  if (hours < 0) throw new Negative(hours);
+  return 500 + 100 * hours;
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  let errors = 0;
+  for (let i = 1; i <= n; i++) {
+    const line = lines[i].trim();
+    try {
+      console.log(`${price(line)}`);
+    } catch (err: unknown) {
+      if (!(err instanceof Negative)) throw err;
+      errors++;
+      console.log(err.message);
+    }
+  }
+  console.log(`ERRORS ${errors}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class PriceError extends Error {}
+
+class NotANumber extends PriceError {
+  constructor(options?: ErrorOptions) {
+    super("not a number", options);
+  }
+}
+
+class Negative extends PriceError {
+  constructor(readonly hours: number) {
+    super(`negative hours: ${hours}`);
+  }
+}
+
+function price(text: string): number {
+  let hours: number;
+  try {
+    hours = Number(BigInt(text));
+  } catch (cause: unknown) {
+    // the SyntaxError becomes the cause; the caller sees our type
+    throw new NotANumber({ cause });
+  }
+  if (hours < 0) throw new Negative(hours);
+  return 500 + 100 * hours;
+}
+
+function main(): void {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  let errors = 0;
+  for (let i = 1; i <= n; i++) {
+    const line = lines[i].trim();
+    try {
+      console.log(`${price(line)}`);
+    } catch (err: unknown) {
+      if (!(err instanceof PriceError)) throw err;
+      errors++;
+      console.log(err.message);
+    }
+  }
+  console.log(`ERRORS ${errors}`);
+}
+
+main();
+'''
+hints = [
+  "err instanceof PriceError — the base class covers both subclasses, and that is the point of having a base class.",
+  "After the instanceof check, err is a PriceError and err.message type-checks. Before it, err is unknown and nothing does.",
+  "A catch in TypeScript has no type filter, so the order of your instanceof checks is the order of Python's except clauses: a subclass tested after its base class is dead code, and nothing warns you.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",    stdin = "3\n4\nxx\n-2\n",   expect = "900\nnot a number\nnegative hours: -2\nERRORS 2\n", visible = true },
+  { name = "clean",    stdin = "1\n0\n",           expect = "500\nERRORS 0\n",                                   visible = false },
+  { name = "all-junk", stdin = "2\nzz\nyy\n",      expect = "not a number\nnot a number\nERRORS 2\n",            visible = false },
+  { name = "negative", stdin = "1\n-1\n",          expect = "negative hours: -1\nERRORS 1\n",                    visible = false },
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id          = "typescript.advanced.31.iterator"
+node        = 31
+title       = "NEXT, UNTIL IT STOPS"
+difficulty  = 4
+story       = "The ticket machine at the Lee Garden queue hands out numbers from a start in fixed steps and keeps no list of them, and the queue screen always shows one ticket fewer than the machine gave out."
+concepts    = ["iteration", "duck-typing", "structs"]
+requires    = ["typescript.advanced.30.error-classes"]
+map          = { x = 0.335, y = 0.936, kind = "quest" }
+brief       = '''
+Standard input is three integers: `start`, `step`, `count`.
+
+Write a class `Tickets` that implements the **iterator protocol by hand**:
+`[Symbol.iterator]()` returns `this`, and `next()` returns
+`{ done: false, value }` for each of the `count` values and then
+`{ done: true, value: undefined }`. Print each value on its own line, then
+`SUM <total>` computed by walking a second `Tickets`.
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+This is what a generator writes for you. `for...of` calls
+`[Symbol.iterator]()` on the thing once, then `next()` on the result until
+a result says `done: true` — and a result that says `done: true` is not
+looked at again, **value and all**. Spread, `Array.from` and destructuring
+do the same.
+
+The starter's `next` decides `done` after it has used up the ticket, so the
+last real ticket goes out marked `done: true`, and `for...of` drops it. It
+type-checks: `{ done: boolean, value: number }` fits
+`IteratorResult<number>` either way. The contract says what a result looks
+like, not when you are allowed to say you are finished.
+
+`[Symbol.iterator]()` returning `this` is the mark of an **iterator**: it
+can be walked once and is then spent. A **container** returns a fresh
+iterator each time and can be walked repeatedly; `Bag` on this road was
+one. Say which you are writing; the difference shows up the second time
+somebody loops.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class Tickets {
+  private current: number;
+  private left: number;
+
+  constructor(
+    start: number,
+    private readonly step: number,
+    count: number,
+  ) {
+    this.current = start;
+    this.left = count;
+  }
+
+  [Symbol.iterator](): Tickets {
+    return this;
+  }
+
+  next(): IteratorResult<number> {
+    const value = this.current;
+    this.current += this.step;
+    this.left -= 1;
+    return { done: this.left <= 0, value };
+  }
+}
+
+function main(): void {
+  const [start, step, count] = input.split(/\s+/).filter((t) => t !== "").map(Number);
+
+  for (const value of new Tickets(start, step, count)) {
+    console.log(`${value}`);
+  }
+  let sum = 0;
+  for (const value of new Tickets(start, step, count)) {
+    sum += value;
+  }
+  console.log(`SUM ${sum}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class Tickets {
+  private current: number;
+  private left: number;
+
+  constructor(
+    start: number,
+    private readonly step: number,
+    count: number,
+  ) {
+    this.current = start;
+    this.left = count;
+  }
+
+  [Symbol.iterator](): Tickets {
+    return this;
+  }
+
+  next(): IteratorResult<number> {
+    // finished is decided before a ticket is used, not after
+    if (this.left === 0) {
+      return { done: true, value: undefined };
+    }
+    const value = this.current;
+    this.current += this.step;
+    this.left -= 1;
+    return { done: false, value };
+  }
+}
+
+function main(): void {
+  const [start, step, count] = input.split(/\s+/).filter((t) => t !== "").map(Number);
+
+  for (const value of new Tickets(start, step, count)) {
+    console.log(`${value}`);
+  }
+  let sum = 0;
+  for (const value of new Tickets(start, step, count)) {
+    sum += value;
+  }
+  console.log(`SUM ${sum}`);
+}
+
+main();
+'''
+hints = [
+  "Check `left === 0` first and return { done: true, value: undefined }. Only then take the ticket and return { done: false, value }.",
+  "A done result's value is ignored by for...of. The starter's last ticket is in the result that says done, which is why the screen and the sum are both short by the last ticket.",
+  "Save the value you are about to return before you advance, or you are off by one step the other way.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",     stdin = "2 3 5\n",   expect = "2\n5\n8\n11\n14\nSUM 40\n", visible = true },
+  { name = "flat",     stdin = "0 0 3\n",   expect = "0\n0\n0\nSUM 0\n",          visible = false },
+  { name = "backward", stdin = "10 -4 4\n", expect = "10\n6\n2\n-2\nSUM 16\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id          = "typescript.advanced.32.containers"
+node        = 32
+title       = "THE RIGHT CONTAINER"
+difficulty  = 4
+story       = "The signage office keeps the night's play log in one long array and answers every question about it by reading it from the top."
+concepts    = ["collections", "heaps", "binary-search", "sorting"]
+requires    = ["typescript.advanced.31.iterator"]
+map          = { x = 0.538, y = 0.857, kind = "quest" }
+brief       = '''
+Three lines of standard input: a line of words, a line of integers already
+**sorted ascending**, and one integer `x`.
+
+Print four lines:
+
+1. `TOP <word> <count>` — the most frequent word, ties by the word ascending
+2. `BISECT <l> <r>` — the first index whose value is not less than `x`, and
+   the first index whose value is greater than `x`, in the sorted integers
+3. `SMALLEST3` followed by the three smallest integers, popped from the
+   starter's `MinHeap` — or fewer if there are fewer
+4. `GROUPS` followed by `<letter>:<k>` for each first letter of the words,
+   letters ascending — a `Map<string, string[]>` keyed by first letter
+
+```
+input:  tram bus tram bus ferry
+        1 3 3 5 8
+        3
+output: TOP bus 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS b:2 f:1 t:2
+```
+
+The standard library has `Map` and `Set` and nothing else on this shelf —
+no counter, no heap, no bisect. The heap is written for you. The rest is
+yours.
+
+The starter keeps the first word it sees with the highest count, which is
+`tram` here, and the statement says `bus`. Break the tie with a key that
+says what you mean.
+
+The two bisections are one binary search each: keep `lo` and `hi`, look at
+the middle, move one end — `Math.floor((lo + hi) / 2)` or `(lo + hi) >>> 1`.
+Their difference is how many copies of `x` there are, and neither of them
+fails when `x` is absent, which `indexOf` does with a `-1` that looks like
+an index. A heap is the right container when you want the smallest few, over
+and over: sorting all of them to read three values off the front is the
+thing it exists to avoid.
+
+The groups: `groups.get(letter)` is `string[] | undefined`. Create the list
+on a miss, set it, then push.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class MinHeap {
+  private items: number[] = [];
+
+  get size(): number {
+    return this.items.length;
+  }
+
+  push(value: number): void {
+    const a = this.items;
+    a.push(value);
+    let i = a.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (a[parent] <= a[i]) break;
+      [a[parent], a[i]] = [a[i], a[parent]];
+      i = parent;
+    }
+  }
+
+  pop(): number | undefined {
+    const a = this.items;
+    if (a.length === 0) return undefined;
+    const top = a[0];
+    const last = a.pop() as number;
+    if (a.length > 0) {
+      a[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1;
+        const r = l + 1;
+        let m = i;
+        if (l < a.length && a[l] < a[m]) m = l;
+        if (r < a.length && a[r] < a[m]) m = r;
+        if (m === i) break;
+        [a[m], a[i]] = [a[i], a[m]];
+        i = m;
+      }
+    }
+    return top;
+  }
+}
+
+function main(): void {
+  const [wordLine = "", numLine = "", xLine = ""] = input.split("\n");
+  const words = wordLine.split(/\s+/).filter((t) => t !== "");
+  const nums = numLine.split(/\s+/).filter((t) => t !== "").map(Number);
+  const x = Number(xLine);
+
+  const counts = new Map<string, number>();
+  for (const w of words) counts.set(w, (counts.get(w) ?? 0) + 1);
+  let top: [string, number] = ["", 0];
+  for (const entry of counts) {
+    if (entry[1] > top[1]) top = entry;
+  }
+  console.log(`TOP ${top[0]} ${top[1]}`);
+
+  console.log(`BISECT ${nums.indexOf(x)} ${nums.indexOf(x) + 1}`);
+
+  console.log("SMALLEST3 " + [...nums].sort().slice(0, 3).join(" "));
+
+  const groups: Record<string, number> = {};
+  for (const w of words) groups[w[0]] = (groups[w[0]] ?? 0) + 1;
+  console.log("GROUPS " + Object.entries(groups).map(([k, v]) => `${k}:${v}`).join(" "));
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class MinHeap {
+  private items: number[] = [];
+
+  get size(): number {
+    return this.items.length;
+  }
+
+  push(value: number): void {
+    const a = this.items;
+    a.push(value);
+    let i = a.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (a[parent] <= a[i]) break;
+      [a[parent], a[i]] = [a[i], a[parent]];
+      i = parent;
+    }
+  }
+
+  pop(): number | undefined {
+    const a = this.items;
+    if (a.length === 0) return undefined;
+    const top = a[0];
+    const last = a.pop() as number;
+    if (a.length > 0) {
+      a[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1;
+        const r = l + 1;
+        let m = i;
+        if (l < a.length && a[l] < a[m]) m = l;
+        if (r < a.length && a[r] < a[m]) m = r;
+        if (m === i) break;
+        [a[m], a[i]] = [a[i], a[m]];
+        i = m;
+      }
+    }
+    return top;
+  }
+}
+
+// first index whose value is not less than x (left) or greater than x (right)
+function bisect(sorted: readonly number[], x: number, right: boolean): number {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (sorted[mid] < x || (right && sorted[mid] === x)) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function main(): void {
+  const [wordLine = "", numLine = "", xLine = ""] = input.split("\n");
+  const words = wordLine.split(/\s+/).filter((t) => t !== "");
+  const nums = numLine.split(/\s+/).filter((t) => t !== "").map(Number);
+  const x = Number(xLine);
+
+  const counts = new Map<string, number>();
+  for (const w of words) counts.set(w, (counts.get(w) ?? 0) + 1);
+  const [top] = [...counts].sort(
+    (a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+  );
+  console.log(`TOP ${top[0]} ${top[1]}`);
+
+  console.log(`BISECT ${bisect(nums, x, false)} ${bisect(nums, x, true)}`);
+
+  const heap = new MinHeap();
+  for (const v of nums) heap.push(v);
+  const smallest: number[] = [];
+  while (smallest.length < 3 && heap.size > 0) {
+    smallest.push(heap.pop() as number);
+  }
+  console.log("SMALLEST3 " + smallest.join(" "));
+
+  const groups = new Map<string, string[]>();
+  for (const w of words) {
+    let list = groups.get(w[0]);
+    if (list === undefined) {
+      list = [];
+      groups.set(w[0], list);
+    }
+    list.push(w);
+  }
+  const letters = [...groups.keys()].sort();
+  console.log("GROUPS " + letters.map((k) => `${k}:${groups.get(k)?.length ?? 0}`).join(" "));
+}
+
+main();
+'''
+hints = [
+  "Sort the [word, count] entries by count descending, then word ascending, and take the first. Sorting the whole map to get one entry is fine at this size; a single pass that compares with the same rule is the same answer.",
+  "One bisect with a flag: move lo past mid while sorted[mid] < x — and, for the right bisection, while sorted[mid] === x too. indexOf returns -1 when x is absent, and one of the hidden cases is exactly that.",
+  "Map keeps insertion order like an object does, so sort the letters before printing. [...groups.keys()].sort() is the order the statement asks for.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "tram bus tram bus ferry\n1 3 3 5 8\n3\n", expect = "TOP bus 2\nBISECT 1 3\nSMALLEST3 1 3 3\nGROUPS b:2 f:1 t:2\n", visible = true },
+  { name = "absent", stdin = "a b c\n10 20 30\n25\n",                  expect = "TOP a 1\nBISECT 2 2\nSMALLEST3 10 20 30\nGROUPS a:1 b:1 c:1\n", visible = false },
+  { name = "short",  stdin = "zz zz\n4\n4\n",                          expect = "TOP zz 2\nBISECT 0 1\nSMALLEST3 4\nGROUPS z:2\n",              visible = false },
+  { name = "before", stdin = "ferry tram ferry\n5 5 5\n1\n",           expect = "TOP ferry 2\nBISECT 0 0\nSMALLEST3 5 5 5\nGROUPS f:2 t:1\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id          = "typescript.advanced.33.cancellation"
+node        = 33
+title       = "STOP WAITING"
+difficulty  = 4
+story       = "The control room pings every screen for its status before it redraws the island map, and the screen on Tin Hau whose network card is down never answers, so the map never redraws."
+concepts    = ["async", "cancellation", "error-handling"]
+requires    = ["typescript.advanced.32.containers"]
+map          = { x = 0.605, y = 0.932, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<SCREEN> <DOWN>`, where
+`DOWN` is `0` for a screen that answers at once and `1` for one whose
+network card is down and never answers at all.
+
+For each screen, run its `ping(screen, down, token)` under `withTimeout` with a **200 ms** deadline, and print
+`<SCREEN> OK` or `<SCREEN> TIMEOUT`, in input order. Then start a
+`watch(token)` task that loops forever on a 10 ms sleep, cancel its token,
+**await it**, and let it print `CANCELLED` from its `catch` and `CLEANUP`
+from its `finally`. Last, print `TIMEOUTS <k>`.
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+A Promise cannot be cancelled. There is no `.cancel()`, and `Promise.race`
+against a timer only decides who you *listen to* — the loser keeps running,
+and anything it still has pending, a timer or a subscription, keeps holding
+on after your last line. So cancellation is something you
+**pass in**: a token the work checks, or subscribes to. The starter has one,
+`Token`, with `cancel()` and `onCancel(handler)`; `sleep` subscribes, and on
+cancel it clears its timer and rejects with `Cancelled`, and `silence` — the
+dead screen — is a promise that nothing but a cancel will ever settle. (`AbortController`
+is the platform's version of the same thing. It is not declared here.)
+
+`withTimeout(work, ms)` makes a token, races `work(token)` against a timer
+that rejects with `Timeout` **and** cancels the token, and clears its own
+timer in a `finally` when the work wins. The starter never calls it: it
+awaits `ping` directly, and `WONG` never answers. You have seen what Node
+does with that: nothing left that could wake anybody, so the process exits,
+status `0`, after `LAM OK`.
+
+It also cancels `watch` without awaiting it, so `TIMEOUTS` prints before
+the watcher has had its turn — and the watcher's re-thrown `Cancelled`
+lands on nobody, which Node reports as an unhandled rejection and exits
+with status `1`. Re-throw the `Cancelled` inside `watch` after handling it:
+swallowing it is how a task becomes uncancellable. Catch it where you
+awaited the task.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class Cancelled extends Error {}
+class Timeout extends Error {}
+
+class Token {
+  cancelled = false;
+  private handlers: (() => void)[] = [];
+
+  onCancel(handler: () => void): void {
+    if (this.cancelled) handler();
+    else this.handlers.push(handler);
+  }
+
+  cancel(): void {
+    if (this.cancelled) return;
+    this.cancelled = true;
+    for (const handler of this.handlers.splice(0)) handler();
+  }
+}
+
+function sleep(ms: number, token: Token): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(resolve, ms);
+    token.onCancel(() => {
+      clearTimeout(id);
+      reject(new Cancelled());
+    });
+  });
+}
+
+function silence(token: Token): Promise<never> {
+  return new Promise((_, reject) => {
+    token.onCancel(() => reject(new Cancelled()));
+  });
+}
+
+async function ping(screen: string, down: number, token: Token): Promise<string> {
+  if (down === 1) await silence(token);
+  else await sleep(0, token);
+  return `${screen} OK`;
+}
+
+async function withTimeout<T>(work: (token: Token) => Promise<T>, ms: number): Promise<T> {
+  // race work(token) against a deadline that rejects with Timeout and cancels the token
+  return work(new Token());
+}
+
+async function watch(token: Token): Promise<void> {
+  try {
+    for (;;) {
+      await sleep(10, token);
+    }
+  } catch (err: unknown) {
+    if (err instanceof Cancelled) console.log("CANCELLED");
+    throw err;
+  } finally {
+    console.log("CLEANUP");
+  }
+}
+
+async function main(): Promise<void> {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  let timeouts = 0;
+  for (let i = 1; i <= n; i++) {
+    const [screen, down] = lines[i].trim().split(/\s+/);
+    console.log(await ping(screen, Number(down), new Token()));
+  }
+
+  const token = new Token();
+  const watcher = watch(token);
+  token.cancel();
+  console.log(`TIMEOUTS ${timeouts}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class Cancelled extends Error {}
+class Timeout extends Error {}
+
+class Token {
+  cancelled = false;
+  private handlers: (() => void)[] = [];
+
+  onCancel(handler: () => void): void {
+    if (this.cancelled) handler();
+    else this.handlers.push(handler);
+  }
+
+  cancel(): void {
+    if (this.cancelled) return;
+    this.cancelled = true;
+    for (const handler of this.handlers.splice(0)) handler();
+  }
+}
+
+function sleep(ms: number, token: Token): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(resolve, ms);
+    token.onCancel(() => {
+      clearTimeout(id);
+      reject(new Cancelled());
+    });
+  });
+}
+
+function silence(token: Token): Promise<never> {
+  return new Promise((_, reject) => {
+    token.onCancel(() => reject(new Cancelled()));
+  });
+}
+
+async function ping(screen: string, down: number, token: Token): Promise<string> {
+  if (down === 1) await silence(token);
+  else await sleep(0, token);
+  return `${screen} OK`;
+}
+
+async function withTimeout<T>(work: (token: Token) => Promise<T>, ms: number): Promise<T> {
+  const token = new Token();
+  let timer: number | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      // reject first, so the race settles on Timeout; then stop the work
+      reject(new Timeout());
+      token.cancel();
+    }, ms);
+  });
+  try {
+    return await Promise.race([work(token), deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function watch(token: Token): Promise<void> {
+  try {
+    for (;;) {
+      await sleep(10, token);
+    }
+  } catch (err: unknown) {
+    if (err instanceof Cancelled) console.log("CANCELLED");
+    throw err;
+  } finally {
+    console.log("CLEANUP");
+  }
+}
+
+async function main(): Promise<void> {
+  const lines = input.split("\n");
+  const n = Number(lines[0]);
+  let timeouts = 0;
+  for (let i = 1; i <= n; i++) {
+    const [screen, down] = lines[i].trim().split(/\s+/);
+    try {
+      console.log(await withTimeout((token) => ping(screen, Number(down), token), 200));
+    } catch (err: unknown) {
+      if (!(err instanceof Timeout)) throw err;
+      timeouts++;
+      console.log(`${screen} TIMEOUT`);
+    }
+  }
+
+  const token = new Token();
+  const watcher = watch(token);
+  token.cancel();
+  try {
+    await watcher;
+  } catch (err: unknown) {
+    if (!(err instanceof Cancelled)) throw err;
+  }
+  console.log(`TIMEOUTS ${timeouts}`);
+}
+
+main();
+'''
+hints = [
+  "withTimeout: a deadline promise whose setTimeout rejects with Timeout and cancels the token, `return await Promise.race([work(token), deadline])` in a try, and clearTimeout in the finally.",
+  "`await watcher` is what lets the task run its catch and finally before TIMEOUTS prints; it re-throws Cancelled at you, so catch that too — and only that.",
+  "Clear the deadline's timer in the finally. Without it, every screen that answered still leaves a 200 ms timer behind, and the process waits for the last of them before it exits: right output, slower every run. Cancelling the token is the same courtesy in the other direction.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed", stdin = "3\nLAM 0\nWONG 1\nCHAN 0\n", expect = "LAM OK\nWONG TIMEOUT\nCHAN OK\nCANCELLED\nCLEANUP\nTIMEOUTS 1\n", visible = true },
+  { name = "fast",  stdin = "1\nLAM 0\n",                 expect = "LAM OK\nCANCELLED\nCLEANUP\nTIMEOUTS 0\n",                        visible = false },
+  { name = "slow",  stdin = "2\nA 1\nB 1\n",              expect = "A TIMEOUT\nB TIMEOUT\nCANCELLED\nCLEANUP\nTIMEOUTS 2\n",           visible = false },
+  { name = "none",  stdin = "0\n",                        expect = "CANCELLED\nCLEANUP\nTIMEOUTS 0\n",                                visible = false },
+]
+
+# ---------------------------------------------------------------- 34  BOSS
+
+[[quest]]
+id          = "typescript.advanced.34.event-loop"
+node        = 34
+title       = "THE EVENT LOOP"
+difficulty  = 5
+story       = "The signage control room, one thread for every screen on the island. One callback never yields, and every board from Tin Hau to Hysan freezes on the same frame."
+concepts    = ["concurrency", "shared-state", "thread-safety", "data-races"]
+requires    = ["typescript.advanced.33.cancellation", "typescript.advanced.19.mutex"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief       = '''
+Standard input is two integers `k` and `n`.
+
+Split `1..n` into `k` contiguous chunks — chunk `i` is
+`floor(n*i/k) + 1` to `floor(n*(i+1)/k)` inclusive — and sum the squares of
+each chunk with a plain loop, as a `bigint`. Before any of the work starts,
+`main` schedules one board redraw with `setImmediate`, which prints
+`BOARD <finished>`: how many chunks were finished when the board got the
+thread. The board must get it **after the first chunk and before the
+second**. Print `CHUNK <i> <sum>` for each chunk in index order, then
+`TOTAL <sum>`, then `CHUNKS <k>`.
+
+```
+input:  3 10
+output: BOARD 1
+        CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        CHUNKS 3
+```
+
+Node runs your JavaScript on **one thread**, and every screen in the
+building is waiting on it. A callback that is running cannot be
+interrupted — not by a timer, not by I/O, not by the board — until it
+returns or `await`s. The starter wraps each chunk in an `async` function
+and hands them all to `Promise.all`, and it looks concurrent. It is one
+long callback: an `async` function with no `await` inside runs start to
+finish the moment it is called. All `k` chunks are summed before `main`
+ever lets go, the board redraws last, showing `BOARD 3`, and on
+`4 2000000` every screen on the island shows the same frame for the whole
+sum. Nothing you can write here makes the sums run in parallel; Node's
+answer for that is a worker thread, which this `node.d.ts` does not
+declare. Async is for **waiting**. CPU work on the one thread can only be
+made **polite**.
+
+So be polite: one chunk, then give the thread back, then the next. And
+give it back to the right queue. `await null` or `await Promise.resolve()`
+yields to the **microtask** queue, which Node drains to empty before it
+runs a single immediate or timer — the board would still see `BOARD 3`.
+`await new Promise((r) => setImmediate(r))` goes to the back of the line
+behind the board, which was queued first.
+
+And the small bug, which has everything to do with timing. The starter adds
+up with `total += await work(...)`. JavaScript evaluates the left side of
+`+=` **before** the `await`: every task reads `total` as `0`, parks, and
+comes back to write `0 + mine`. The last one wins, and `TOTAL` is the last
+chunk. That is the lost update from the billing counter without a line of
+code between the read and the write for you to see it in — a read and a
+write of shared state with an `await` between them is a race on one thread.
+Read the total after the await, or hold the lock.
+'''
+starter     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+let finished = 0;
+const parts: bigint[] = [];
+
+async function work(index: number, lo: number, hi: number): Promise<bigint> {
+  // sum of i*i for i in lo..hi, as a plain loop on purpose
+  let part = 0n;
+  for (let i = lo; i <= hi; i++) {
+    part += BigInt(i * i);
+  }
+  parts[index] = part;
+  finished++;
+  return part;
+}
+
+async function main(): Promise<void> {
+  const [k, n] = input.split(/\s+/).filter((t) => t !== "").map(Number);
+
+  // the board redraws the next time the loop gets a turn
+  setImmediate(() => console.log(`BOARD ${finished}`));
+
+  let total = 0n;
+  await Promise.all(
+    Array.from({ length: k }, async (_, i) => {
+      const lo = Math.floor((n * i) / k) + 1;
+      const hi = Math.floor((n * (i + 1)) / k);
+      total += await work(i, lo, hi);
+    }),
+  );
+
+  parts.forEach((part, i) => console.log(`CHUNK ${i} ${part}`));
+  console.log(`TOTAL ${total}`);
+  console.log(`CHUNKS ${k}`);
+}
+
+main();
+'''
+solution    = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+let finished = 0;
+const parts: bigint[] = [];
+
+function turn(): Promise<void> {
+  // the back of the macrotask line, behind the board; `await null` would not be
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
+function work(index: number, lo: number, hi: number): bigint {
+  // sum of i*i for i in lo..hi, as a plain loop on purpose: CPU work that
+  // holds the one thread for as long as it runs
+  let part = 0n;
+  for (let i = lo; i <= hi; i++) {
+    part += BigInt(i * i);
+  }
+  parts[index] = part;
+  finished++;
+  return part;
+}
+
+async function main(): Promise<void> {
+  const [k, n] = input.split(/\s+/).filter((t) => t !== "").map(Number);
+
+  // the board redraws the next time the loop gets a turn
+  setImmediate(() => console.log(`BOARD ${finished}`));
+
+  let total = 0n;
+  for (let i = 0; i < k; i++) {
+    const lo = Math.floor((n * i) / k) + 1;
+    const hi = Math.floor((n * (i + 1)) / k);
+    const part = work(i, lo, hi);
+    // read and write the shared total with no await between them
+    total += part;
+    await turn();
+  }
+
+  parts.forEach((part, i) => console.log(`CHUNK ${i} ${part}`));
+  console.log(`TOTAL ${total}`);
+  console.log(`CHUNKS ${k}`);
+}
+
+main();
+'''
+hints = [
+  "Run the starter and read the last line: BOARD 3, printed after everything. The board was scheduled first and still went last, because nothing ever gave the thread back.",
+  "One chunk per turn: a plain for loop over the chunks with `await new Promise((r) => setImmediate(r))` after each. The board's immediate was queued first, so it runs after chunk 0.",
+  "`total += await x` reads total before it awaits. `const part = await x; total += part;` reads it after — or, with no await at all in the loop body, there is nothing to race.",
+  "n*(n+1)*(2n+1)/6 is the closed form for the total. Check TOTAL against it once and you know the chunk boundaries are right.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3 10\n",      expect = "BOARD 1\nCHUNK 0 14\nCHUNK 1 77\nCHUNK 2 294\nTOTAL 385\nCHUNKS 3\n", visible = true },
+  { name = "one",    stdin = "1 4\n",       expect = "BOARD 1\nCHUNK 0 30\nTOTAL 30\nCHUNKS 1\n",                           visible = false },
+  { name = "idle",   stdin = "3 2\n",       expect = "BOARD 1\nCHUNK 0 0\nCHUNK 1 1\nCHUNK 2 4\nTOTAL 5\nCHUNKS 3\n",       visible = false },
+  { name = "big",    stdin = "4 2000000\n", expect = "BOARD 1\nCHUNK 0 41666791666750000\nCHUNK 1 291667041666750000\nCHUNK 2 791667291666750000\nCHUNK 3 1541667541666750000\nTOTAL 2666668666667000000\nCHUNKS 4\n", visible = false },
+]

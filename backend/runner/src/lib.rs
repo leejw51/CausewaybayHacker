@@ -20,6 +20,7 @@ pub mod reap;
 pub mod rust;
 pub mod spec;
 pub mod suite;
+pub mod typescript;
 
 pub use spec::{Case, Harness, MatchMode, TestSpec};
 
@@ -164,13 +165,24 @@ pub fn unsupported(lang: &str, spec: &TestSpec) -> Option<String> {
                 format::TORCH_HINT
             )
         }),
+        // TypeScript Land's toolchain is two programs, `tsc` and the `node`
+        // it runs on, and neither is part of any operating system. Missing,
+        // the runner could only answer `internal_error` for every node of
+        // the map; refused here, the player gets the command to type.
+        ("typescript", Harness::Stdio) => (!typescript_is_installed()).then(|| {
+            format!(
+                "this machine has no tsc and node on PATH, which every \
+                 TypeScript Land quest needs: {}",
+                format::TYPESCRIPT_HINT
+            )
+        }),
         ("rust" | "go" | "cpp" | "python", Harness::Stdio) => None,
         ("rust", Harness::Cargo) => None,
         ("go", Harness::Gotest) => None,
-        ("rust" | "cpp" | "python" | "pytorch", Harness::Gotest) => Some(format!(
+        ("rust" | "cpp" | "python" | "pytorch" | "typescript", Harness::Gotest) => Some(format!(
             "the gotest harness is not a {lang} harness (SPEC §5.2)"
         )),
-        ("go" | "cpp" | "python" | "pytorch", Harness::Cargo) => Some(format!(
+        ("go" | "cpp" | "python" | "pytorch" | "typescript", Harness::Cargo) => Some(format!(
             "the cargo harness is not a {lang} harness (SPEC §5.2)"
         )),
         (other, _) => Some(format!("there is no runner for '{other}'")),
@@ -190,6 +202,13 @@ fn torch_is_installed() -> bool {
     *TORCH.get_or_init(format::torch_is_installed)
 }
 
+/// Whether `tsc` and `node` are both on this process's `PATH`, asked once
+/// for the reason [`torch_is_installed`] gives.
+fn typescript_is_installed() -> bool {
+    static TS: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *TS.get_or_init(format::typescript_is_installed)
+}
+
 /// Dispatch on the land. A language or harness this build cannot judge comes
 /// back as an `internal_error` report rather than a panic — though the server
 /// refuses one before it gets here, having asked [`unsupported`] first.
@@ -202,6 +221,7 @@ pub fn run(sub: &Submission) -> Report {
         // `main.py`, the same stdio harness. What differs is only what a
         // program is allowed to import, and that is the content's business.
         "python" | "pytorch" => python::run(sub),
+        "typescript" => typescript::run(sub),
         other => Report::internal(format!("unknown language '{other}'")),
     }
 }

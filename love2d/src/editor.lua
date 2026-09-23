@@ -135,8 +135,9 @@ function M.new(opts)
     -- test that types a program byte for byte still gets exactly its bytes;
     -- the scenes turn it on, and the ANSWER drill turns it back off.
     auto_close = opts.auto_close or false,
-    -- Which land's loop keywords `loop_closed` reads: "rust", "go", "cpp"
-    -- or "python". Nil reads like Rust.
+    -- Which land's loop keywords `loop_closed` reads, and which words
+    -- `highlight` colours: "rust", "go", "cpp", "python", "pytorch" or
+    -- "typescript". Nil reads like Rust.
     lang = opts.lang,
     -- The origin span of a mouse drag: nil when no button is down.
     drag = nil,
@@ -1305,6 +1306,9 @@ local LOOP_HEAD = {
 LOOP_HEAD.python = { "^%s*for%f[^%w_]", "^%s*while%f[^%w_]" }
 -- PyTorch Land is Python: the same two loop heads, the same indentation.
 LOOP_HEAD.pytorch = LOOP_HEAD.python
+-- TypeScript closes its loops on a brace, like C++: `for (…)`, `for…of`,
+-- `for…in` and `while`, all spelled with the one keyword each.
+LOOP_HEAD.typescript = { "^%s*for%f[^%w_]", "^%s*while%f[^%w_]" }
 
 local function loop_head(lang, head)
   for _, pat in ipairs(LOOP_HEAD[lang] or LOOP_HEAD.rust) do
@@ -1502,7 +1506,28 @@ i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize f32 f64 Some None Ok Err]]):
   M.TYPES[w] = true
 end
 
-function M.highlight(line, state)
+--- TypeScript is not a dialect of Rust, and a handful of Rust's keywords
+--- (`fn`, `impl`, `match`, `mut`) would be plain words in it. `lang ==
+--- "typescript"` swaps in its own two tables, takes `'` and a backtick as
+--- quotes as well as `"`, and has no macros — `x!` there is a non-null
+--- assertion, not an invocation. Every other land reads as before.
+M.TS_KEYWORDS = {}
+for w in ([[let const var function return if else for while do of in new class interface type
+enum extends implements readonly private public protected static abstract async await import
+from export as keyof typeof instanceof satisfies declare namespace switch case default break
+continue try catch finally throw this super yield delete void true false null undefined]]):gmatch("%S+") do
+  M.TS_KEYWORDS[w] = true
+end
+M.TS_TYPES = {}
+for w in ([[number string boolean bigint symbol object never unknown any Array ReadonlyArray Map
+Set Record Partial Readonly Promise Error Math JSON Number String Boolean BigInt]]):gmatch("%S+") do
+  M.TS_TYPES[w] = true
+end
+
+function M.highlight(line, state, lang)
+  local ts = lang == "typescript"
+  local keywords = ts and M.TS_KEYWORDS or M.KEYWORDS
+  local types = ts and M.TS_TYPES or M.TYPES
   local spans = {}
   local i, n = 1, #line
   local start = 1
@@ -1532,13 +1557,13 @@ function M.highlight(line, state)
         i = n + 1
       elseif two == "/*" then
         state = "block_comment"
-      elseif c == '"' then
+      elseif c == '"' or (ts and (c == "'" or c == "`")) then
         local j = i + 1
         while j <= n do
           local cj = line:sub(j, j)
           if cj == "\\" then
             j = j + 2
-          elseif cj == '"' then
+          elseif cj == c then
             j = j + 1
             break
           else
@@ -1556,12 +1581,12 @@ function M.highlight(line, state)
         local j = i
         while j <= n and line:sub(j, j):match("[%w_]") do j = j + 1 end
         local word = line:sub(i, j - 1)
-        if line:sub(j, j) == "!" then
+        if line:sub(j, j) == "!" and not ts then
           push(word .. "!", "macro")
           j = j + 1
-        elseif M.KEYWORDS[word] then
+        elseif keywords[word] then
           push(word, "keyword")
-        elseif M.TYPES[word] then
+        elseif types[word] then
           push(word, "type")
         else
           push(word, "text")

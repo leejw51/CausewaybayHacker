@@ -153,6 +153,8 @@ export const en = {
     "Dicts, generators, duck typing. Nothing is typed until it runs, and it runs at six.",
   "lands.pytorchBlurb":
     "Tensors, gradients, attention. Everything is a shape, and the thing in the basement is made of them.",
+  "lands.typescriptBlurb":
+    "Interfaces, generics, narrowing. Every value has a type before it runs, and the compiler has read all of it.",
   "lands.verybasicBlurb": "The quiz. Which line is the grammar? Pick one of four, then type it.",
   "lands.basicBlurb":
     "The morning walk. One construct at a time, explained, and one or two lines to type — types, loops, structs, sorts, closures, a thread, a tree.",
@@ -191,6 +193,7 @@ export const en = {
   "map.cpp": "C++",
   "map.python": "PYTHON",
   "map.pytorch": "PYTORCH",
+  "map.typescript": "TYPESCRIPT",
   "map.none": "no streets here yet",
   "map.failed": "could not read the map",
   "map.stars": "STARS",
@@ -380,6 +383,8 @@ export const en = {
   "pg.go": "GO",
   "pg.cpp": "C++",
   "pg.python": "PYTHON",
+  "pg.pytorch": "PYTORCH",
+  "pg.typescript": "TYPESCRIPT",
   "pg.stdin": "STDIN",
   "pg.stdinHint": "stdin — what the program reads",
   "pg.unsaved": "UNSAVED",
@@ -534,6 +539,7 @@ export const en = {
   "search.cpp": "C++",
   "search.python": "PYTHON",
   "search.pytorch": "PYTORCH",
+  "search.typescript": "TYPESCRIPT",
   "search.unified": "UNIFIED",
   "search.text": "TEXT",
   "search.meaning": "MEANING",
@@ -627,6 +633,7 @@ export const en = {
   "ai.cpp": "C++",
   "ai.python": "PYTHON",
   "ai.pytorch": "PYTORCH",
+  "ai.typescript": "TYPESCRIPT",
   "ai.newPlan": "NEW PLAN",
   "ai.drillSize": "DRILL {n}",
   "ai.coach": "THE COACH",

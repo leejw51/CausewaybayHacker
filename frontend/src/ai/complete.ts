@@ -219,6 +219,41 @@ const TEMPLATES: Record<Land, readonly Template[]> = {
     { id: "pt.tensor", key: "torch", lines: ["torch.tensor($data)"] },
     { id: "pt.shape", key: "tuple", lines: ["tuple($x.shape)"] },
   ],
+  // TypeScript Land: brace blocks at prettier's two spaces, types written
+  // where strict mode wants them, and the stdin idiom under `require`, since
+  // that is the one module `node.d.ts` declares. No key is a prefix of
+  // another.
+  typescript: [
+    { id: "ts.for", key: "for", stmt: true, lines: ["for (const x of $xs) {", "\t", "}"] },
+    { id: "ts.while", key: "while", stmt: true, lines: ["while ($cond) {", "\t", "}"] },
+    { id: "ts.if", key: "if", stmt: true, lines: ["if ($cond) {", "\t", "}"] },
+    {
+      id: "ts.function",
+      key: "function",
+      stmt: true,
+      lines: ["function $name(): void {", "\t", "}"],
+    },
+    { id: "ts.interface", key: "interface", stmt: true, lines: ["interface $Name {", "\t", "}"] },
+    { id: "ts.type", key: "type", stmt: true, lines: ["type $Name = ;"] },
+    { id: "ts.enum", key: "enum", stmt: true, lines: ["enum $Name {", "\t", "}"] },
+    {
+      id: "ts.class",
+      key: "class",
+      stmt: true,
+      lines: ["class $Name {", "\tconstructor() {}", "}"],
+    },
+    {
+      id: "ts.switch",
+      key: "switch",
+      stmt: true,
+      lines: ["switch ($x) {", "\tcase 1:", "\t\tbreak;", "\tdefault:", "\t\tbreak;", "}"],
+    },
+    { id: "ts.const", key: "const", stmt: true, lines: ["const $x = ;"] },
+    { id: "ts.let", key: "let", stmt: true, lines: ["let $x = ;"] },
+    { id: "ts.console", key: "console", stmt: true, lines: ["console.log($);"] },
+    { id: "ts.require", key: "require", lines: ['require("fs").readFileSync(0, "utf8")$'] },
+    { id: "ts.map", key: "new", lines: ["new Map<$string, number>()"] },
+  ],
 };
 
 /** Shortest prefix worth guessing from. One letter matches everything. */

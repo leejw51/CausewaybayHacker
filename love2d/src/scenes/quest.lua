@@ -137,6 +137,11 @@ function Quest.backdrop(land, category)
   if land == "python" then
     return Assets.pick(advanced and "bg_times" or "bg_till", "bg_till", "bg_flat")
   end
+  if land == "typescript" then
+    -- TypeScript Land is office work: the street for BASIC, the data centre
+    -- the front end is served from for ADVANCED.
+    return Assets.pick(advanced and "bg_datacentre" or "bg_street", "bg_street", "bg_flat")
+  end
   return Assets.pick(advanced and "bg_times" or "bg_street", "bg_street", "bg_flat")
 end
 
@@ -611,8 +616,10 @@ function Quest:copy_ask()
   if not q then return end
   local lang = q.land or self.app.land or "rust"
   local file = "main." .. (lang == "cpp" and "cpp" or lang == "go" and "go"
-    or lang == "python" and "py" or lang == "pytorch" and "py" or "rs")
+    or lang == "python" and "py" or lang == "pytorch" and "py"
+    or lang == "typescript" and "ts" or "rs")
   local fence = lang == "python" and "python" or lang == "pytorch" and "python"
+    or lang == "typescript" and "typescript"
     or lang == "cpp" and "cpp" or lang == "go" and "go" or "rust"
   local out = {}
   local function put(line) out[#out + 1] = line end
@@ -838,6 +845,76 @@ function Quest.answer_word(typed, answer, min)
   local rest = answer:sub(p.matched + 1):match("^[%w_]+")
   if rest and #rest > 0 then return rest end
   return nil
+end
+
+--- The words each language says over and over — its keywords and the
+--- library names every answer in it reaches for. One letter of one of these
+--- is enough: the answer is known, so `l` can only be `let` when the answer
+--- says `let`. `frontend/src/ui/editor.ts` `COMMON` is the same list.
+local function word_set(s)
+  local t = {}
+  for w in s:gmatch("%S+") do t[w] = true end
+  return t
+end
+local PY = "def return if elif else for while in import from class self print range len None True False and or not with as lambda try except raise pass break continue yield input int str list dict set append split strip join"
+Quest.COMMON = {
+  rust = word_set("fn let mut use pub struct impl enum match for while loop return if else in as self Self crate mod trait where String Vec Option Some None Ok Err Result Box HashMap println print format vec new unwrap iter collect push len clone to_string std io collections"),
+  go = word_set("func package import var const type struct interface return if else for range map chan go defer select switch case default break continue fmt Println Printf Sprintf make append len string int error nil main bufio os strings strconv"),
+  cpp = word_set("include int void return if else for while auto const std vector string cout cin endl push_back size using namespace class struct template typename iostream long double bool true false main"),
+  python = word_set(PY),
+  pytorch = word_set(PY .. " torch nn tensor Tensor Module forward backward zeros ones randn optim grad no_grad"),
+  typescript = word_set("let const function return if else for while of in new class interface type enum extends implements readonly private public async await import from export as keyof typeof number string boolean undefined null void never unknown true false console log length push map filter reduce split trim join Array Map Set Record Math require readFileSync"),
+}
+
+--- The 0-based `i`th byte of `s` as a one-character string ("" past the end).
+local function at(s, i) return s:sub(i + 1, i + 1) end
+local function wordy(c) return c ~= "" and c:match("[%w_]") ~= nil end
+
+--- Everything the answer is about to say that it has said before, once the
+--- player has begun it.
+---
+--- **Recorded from this source, not from a dictionary.** A program repeats
+--- itself — `std::collections::HashMap` twice on one line, `counts` five
+--- times — and the second time is the chore, not the exercise. From the start
+--- of the word the caret is in, the longest run the answer has already been
+--- through goes in on the first letter, stopping at the end of the line and
+--- at a token's edge; a keyword of the language (`Quest.COMMON`) goes in on
+--- its first letter the first time too. `stop` caps the reach — BLANKS passes
+--- the end of the hole, so a repeat never runs on into the next one. The
+--- browser's `answerPattern` is the same rule.
+function Quest.answer_pattern(typed, answer, lang, stop)
+  stop = stop or math.huge
+  local p = Quest.answer_progress(typed, answer)
+  if #typed ~= p.matched or p.matched == 0 then return nil end
+  local head = answer:sub(1, p.matched):match("[%a_][%w_]*$")
+  if not head then return nil end
+  local start = p.matched - #head
+  local word_end = p.matched
+  while word_end < #answer and wordy(at(answer, word_end)) do word_end = word_end + 1 end
+  local nl = answer:find("\n", start + 1, true)
+  local limit = math.min(nl and (nl - 1) or #answer, stop)
+  local common = Quest.COMMON[lang] or Quest.COMMON.rust
+  local best = common[answer:sub(start + 1, word_end)] and word_end or 0
+  local first = answer:byte(start + 1)
+  for j = 0, start - 1 do
+    if answer:byte(j + 1) == first and (j == 0 or not wordy(at(answer, j - 1))) then
+      local k = 0
+      while j + k < start and start + k < limit
+        and answer:byte(j + k + 1) == answer:byte(start + k + 1) do
+        k = k + 1
+      end
+      if start + k > best then best = start + k end
+    end
+  end
+  if best > limit then best = limit end
+  -- A run that stops inside a word would leave half of one; back up to the
+  -- token's edge, and leave trailing blanks for the player.
+  while best > p.matched and wordy(at(answer, best - 1)) and wordy(at(answer, best)) do
+    best = best - 1
+  end
+  while best > p.matched and at(answer, best - 1):match("[ \t]") do best = best - 1 end
+  if best < word_end or best <= p.matched then return nil end
+  return answer:sub(p.matched + 1, best)
 end
 
 --- How brightly the hole you are on is burning, 0..1, at `t` seconds.
@@ -1164,6 +1241,8 @@ function Quest:arm_answer()
     self.answer_starts[i] = at
     at = at + #chunk + 1
   end
+  -- A new drill is a new run.
+  self.combo, self.best_combo, self.echo, self.miss_at = 0, 0, "", nil
   self:fill_blanks()
   self.answer_prog = Quest.answer_progress(self.editor:text(), self.answer_text)
   self.answer_seen = self.editor:text()
@@ -1252,7 +1331,15 @@ function Quest:fill_blanks()
     end
     local grown = nil
     if not add then
-      grown = Quest.answer_word(src, self.answer_text)
+      -- Anything this file has said before, or a keyword, on its first
+      -- letter — capped at the hole the caret is in, in a drill with holes.
+      local stop = nil
+      for _, b in ipairs(self.blanks or {}) do
+        if #src >= b.from and #src < b.to then stop = b.to; break end
+      end
+      local land = (self.quest and self.quest.land) or self.app.land or "rust"
+      grown = Quest.answer_pattern(src, self.answer_text, land, stop)
+        or Quest.answer_word(src, self.answer_text)
       add = grown
     end
     if not add then add = Quest.answer_closer(src, self.answer_text) end
@@ -1314,11 +1401,16 @@ function Quest:answer_tick()
   -- hole nobody was ever standing in.
   local was = self.answer_prog
   local hole_before = Quest.hole_at(self.blanks, was.matched)
+  local before = #text
   local fill = self:fill_blanks()
   text = self.editor:text()
   self.answer_seen = text
+  -- What the drill just typed on the player's behalf: keys that retype it
+  -- out of habit are swallowed rather than counted as misses.
+  self.echo = text:sub(before + 1)
   local now = Quest.answer_progress(text, self.answer_text)
   self.answer_prog = now
+  if now.wrong == 0 and now.matched > was.matched then self:bump_combo() end
   local x, y = self:caret_xy()
   if not x then return end
   if now.done and not was.done then
@@ -1354,6 +1446,58 @@ function Quest:answer_tick()
     self.fx:burst(x, y, 16, Theme.coin, Quest.DRILL_SPARK)
     SFX.play("move")
   end
+end
+
+--- One more key that was the answer's. Every tenth gets its own burst.
+function Quest:bump_combo()
+  self.combo = (self.combo or 0) + 1
+  if self.combo > (self.best_combo or 0) then self.best_combo = self.combo end
+  if self.combo % 10 ~= 0 then return end
+  local x, y = self:caret_xy()
+  if x then
+    self.fx:burst(x, y, math.min(60, 14 + self.combo / 2), Theme.cyan, Quest.DRILL_SPARK * 1.6)
+  end
+  SFX.play("coin")
+end
+
+--- A key the drill refused. Retyping what the drill has just put in — the
+--- `e` of a `use` that finished itself — is habit, not a mistake, and is
+--- swallowed. Anything else missed: the count shakes (never the code — see
+--- the run strip), the caret sparks red, and the combo starts over.
+function Quest:drill_missed(text)
+  local echo = self.echo or ""
+  if #text > 0 and echo:sub(1, #text) == text then
+    self.echo = echo:sub(#text + 1)
+    return
+  end
+  self.echo = ""
+  self.combo = 0
+  self.miss_at = Anim.now()
+  local x, y = self:caret_xy()
+  if x then self.fx:burst(x, y, 10, Theme.red, Quest.DRILL_SPARK) end
+  SFX.play("rejected")
+end
+
+--- Whether typing `text` at the caret keeps the buffer the answer.
+---
+--- **A wrong key does not go in.** A character that is not the answer's next
+--- one is refused, the drill is told (`drill_missed`), and the caret stays
+--- where the right key goes. Anything that leaves the buffer no further from
+--- the answer than it was still goes in — a starter left in the file can be
+--- fixed by hand — and so does typing over a selection.
+function Quest:answer_admits(text)
+  if not self.answer_on or not self.answer_text or not self.editor then return true end
+  local ed = self.editor
+  if ed:has_selection() then return true end
+  local src = ed:text()
+  local off = ed.col - 1
+  for i = 1, ed.line - 1 do off = off + #ed.lines[i] + 1 end
+  local after = Quest.answer_progress(src:sub(1, off) .. text .. src:sub(off + 1), self.answer_text)
+  if after.wrong == 0 then return true end
+  local before = Quest.answer_progress(src, self.answer_text)
+  if after.wrong <= before.wrong and after.matched >= before.matched then return true end
+  self:drill_missed(text)
+  return false
 end
 
 --- Where the caret is on screen, for an effect thrown at it.
@@ -1900,6 +2044,11 @@ function Quest:draw_code()
       status = status .. "   " .. I18n.t("ANSWER ONLY")
     end
     status = ("%s   %d / %d"):format(status, p.matched, p.total)
+    if not p.done and (self.combo or 0) >= 3 then
+      status = ("%s   %s x%d"):format(status, I18n.t("COMBO"), self.combo)
+    elseif p.done and (self.best_combo or 0) >= 3 then
+      status = ("%s   %s x%d"):format(status, I18n.t("BEST COMBO"), self.best_combo)
+    end
     if p.done then
       status = status .. "   " .. I18n.t("MATCHED")
       colour = Theme.admit
@@ -1923,7 +2072,12 @@ function Quest:draw_code()
   -- At the size the strip can hold it: with a drill on, this line carries a
   -- file, a mode, a count and a key, and at the larger type steps that is
   -- wider than a phone.
-  UI.text(status, pad + 4, rowsb + 4, UI.fitSize(status, vw - pad * 2 - 8, 7, 4), colour)
+  -- A missed key shakes this line — the count — and not the code under it.
+  local mx = 0
+  if self.answer_on and self.miss_at then
+    mx = Anim.shake(Anim.now() - self.miss_at, { duration = 0.22, amount = 4 })
+  end
+  UI.text(status, pad + 4 + mx, rowsb + 4, UI.fitSize(status, vw - pad * 2 - 8, 7, 4), colour)
 
   local top = strip + 6
   local body = { x = pad, y = top, w = vw - pad * 2, h = vh - top - pad }
@@ -2610,7 +2764,7 @@ function Quest:draw_editor(rect, tint, bare)
   -- Comment state has to be carried from line 1, not from the first visible
   -- line, or scrolling into the middle of a /* … */ colours it as code.
   for i = 1, self.editor.scroll do
-    _, state = Editor.highlight(self.editor.lines[i] or "", state)
+    _, state = Editor.highlight(self.editor.lines[i] or "", state, self.editor.lang)
   end
 
   local sel_l1, sel_c1, sel_l2, sel_c2 = self.editor:selection()
@@ -2647,7 +2801,7 @@ function Quest:draw_editor(rect, tint, bare)
     love.graphics.print(("%4d"):format(index), x0, y)
 
     local spans
-    spans, state = Editor.highlight(line, state)
+    spans, state = Editor.highlight(line, state, self.editor.lang)
     local cx = x0 + gutter - shift
     for _, span in ipairs(spans) do
       UI.setColor(Theme.code[span.kind] or Theme.cream)
@@ -3247,6 +3401,7 @@ function Quest:textinput(text)
     return
   end
   if self.focus == "editor" then
+    if not self:answer_admits(text) then return end
     self.editor:textinput(text)
     SFX.play("type")
   end
@@ -3332,8 +3487,17 @@ function Quest:keypressed(key, mods)
   -- in a moment later, so the editor must not put its guess in first.
   if self.answer_on and self.focus == "editor" and self.editor
     and (key == "return" or key == "kpenter") and not cmd then
-    self.editor:insert("\n")
+    if self:answer_admits("\n") then self.editor:insert("\n") end
     return true
+  end
+  -- TAB is the editor's key and keeps indenting — but in the drill an indent
+  -- the answer does not have is a wrong key like any other, and the drill
+  -- puts the answer's own indentation in by itself (`fill_blanks`).
+  if self.answer_on and self.focus == "editor" and self.editor and key == "tab"
+    and not cmd and not mods.shift and not self.editor:has_selection() then
+    local ed = self.editor
+    local spaces = ed.tab_width - (Editor.char_count(ed.lines[ed.line]:sub(1, ed.col - 1)) % ed.tab_width)
+    if not self:answer_admits(string.rep(" ", spaces)) then return true end
   end
 
   if self:quiz_locked() then

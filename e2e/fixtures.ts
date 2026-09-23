@@ -57,7 +57,14 @@ export const SCREENS = [
 export type Screen = (typeof SCREENS)[number];
 
 /** The lands, in the order the lands screen draws them (`frontend/src/net/protocol.ts`). */
-export const LANDS = ["rust", "go", "cpp", "python", "pytorch"] as const;
+export const LANDS = [
+  "rust",
+  "go",
+  "cpp",
+  "python",
+  "pytorch",
+  "typescript",
+] as const;
 export type Land = (typeof LANDS)[number];
 
 /** `frontend/src/dev/capture.ts`, as much of it as this suite uses. */
@@ -462,12 +469,20 @@ export async function identifyOpenQuest(
  * Which land a starter belongs to, from its shape alone. Each language has one
  * line no other language's `main` would carry, and a `package main` or an
  * `#include` is checked before Python's much vaguer `print(` so a C++ starter
- * that prints is not mistaken for a Python one.
+ * that prints is not mistaken for a Python one. TypeScript goes before Python
+ * too: `import { readFileSync } from "fs"` starts with `import `.
  */
 function landOfStarter(src: string): Land | null {
   if (/^package\s+main\b/m.test(src)) return "go";
   if (/^#include\b/m.test(src)) return "cpp";
   if (/\bfn\s+main\s*\(/.test(src)) return "rust";
+  if (
+    /\bconsole\.log\(|\breadFileSync\(|^\s*(const|let|function|interface|type)\s/m.test(
+      src,
+    )
+  ) {
+    return "typescript";
+  }
   if (/^(def |import |from |print\()/m.test(src)) return "python";
   return null;
 }

@@ -180,7 +180,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "format_code",
     description:
-      "Run the language's own formatter (rustfmt, gofmt, clang-format) over the program in place.",
+      "Run the language's own formatter (rustfmt, gofmt, clang-format, black, prettier) over the program in place.",
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {

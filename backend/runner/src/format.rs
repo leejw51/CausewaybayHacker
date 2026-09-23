@@ -55,6 +55,10 @@ pub fn is_supported(lang: &str) -> bool {
         // PyTorch Land is Python, so its formatter is Python's: one `black`
         // on the machine formats both lands or neither.
         "python" | "pytorch" => black_is_installed(),
+        // `prettier` is to TypeScript what `gofmt` is to Go — the formatter
+        // everyone's colleagues actually run — but it ships with neither
+        // `tsc` nor `node`, so it is asked of the machine like `black`.
+        "typescript" => prettier_is_installed(),
         _ => false,
     }
 }
@@ -63,7 +67,7 @@ pub fn is_supported(lang: &str) -> bool {
 /// its button with (PROTOCOL §4.3): a button that always refuses is worse
 /// than no button.
 pub fn supported_langs() -> Vec<&'static str> {
-    ["rust", "go", "cpp", "python", "pytorch"]
+    ["rust", "go", "cpp", "python", "pytorch", "typescript"]
         .into_iter()
         .filter(|lang| is_supported(lang))
         .collect()
@@ -119,6 +123,25 @@ pub(crate) const TORCH_HINT: &str = "conda create -n cwbhacker python=3.13 -y &&
 /// this behind [`crate::unsupported`].
 pub fn torch_is_installed() -> bool {
     answers("python3", TORCH_PROBE)
+}
+
+/// What to type when TypeScript Land cannot run.
+///
+/// `tsc` runs on `node`, so one install line covers both halves once node is
+/// there; `prettier` rides along because it is the land's formatter and costs
+/// nothing more to ask for in the same breath.
+pub(crate) const TYPESCRIPT_HINT: &str = "install node (https://nodejs.org), then: \
+     npm install -g typescript prettier";
+
+/// Whether `tsc` and `node` both answer. `tsc` is itself a node script, so a
+/// `tsc --version` that succeeds has found a node too — but the runner starts
+/// `node` by name as well, so both are asked.
+pub fn typescript_is_installed() -> bool {
+    answers("tsc", &["--version"]) && answers("node", &["--version"])
+}
+
+fn prettier_is_installed() -> bool {
+    answers("prettier", &["--version"])
 }
 
 /// Where `clang-format` is, if it is anywhere.
@@ -194,6 +217,19 @@ pub fn format(lang: &str, source: &str) -> std::io::Result<Formatted> {
             return Ok(Formatted::unchanged(
                 source,
                 "black is not installed on this machine",
+            ))
+        }
+        "typescript" if prettier_is_installed() => {
+            // The file name is how prettier picks its parser from stdin; its
+            // defaults are the style, as LLVM's are for clang-format.
+            let mut c = Command::new("prettier");
+            c.arg("--stdin-filepath").arg("main.ts");
+            c
+        }
+        "typescript" => {
+            return Ok(Formatted::unchanged(
+                source,
+                "prettier is not installed on this machine",
             ))
         }
         other => {
@@ -345,6 +381,10 @@ pub fn toolchains() -> Vec<Toolchain> {
         // decides whether a submission to the land is accepted at all
         // (`crate::unsupported`).
         ("pytorch", "python3", TORCH_PROBE, "black", TORCH_HINT),
+        // TypeScript Land's compiler is `tsc`; the `node` it runs on and the
+        // `node` that runs the program are the same one, and a `tsc` that
+        // answers has found it.
+        ("typescript", "tsc", &["--version"][..], "prettier", TYPESCRIPT_HINT),
     ] {
         let compiles = answers(compiler, args);
         let formats = is_supported(land);

@@ -1,0 +1,1 @@
+main.ts(3,21): error TS2304: Cannot find name 'screenCount'.

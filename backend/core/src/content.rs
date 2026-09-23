@@ -356,7 +356,7 @@ pub const CONCEPT_VOCABULARY: &[&str] = &[
 pub fn validate(pack: &Pack) -> Result<()> {
     if !matches!(
         pack.land.as_str(),
-        "rust" | "go" | "cpp" | "python" | "pytorch"
+        "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript"
     ) {
         return Err(bad_request(format!("unknown land '{}'", pack.land)));
     }

@@ -152,6 +152,8 @@ export const cs: Partial<Catalogue> = {
     "Slovníky, generátory, kachní typování. Nic nemá typ, dokud to neběží, a běží to v šest.",
   "lands.pytorchBlurb":
     "Tenzory, gradienty, attention. Všechno je tvar a ta věc ve sklepě je z nich poskládaná.",
+  "lands.typescriptBlurb":
+    "Rozhraní, generika, zužování typů. Každá hodnota má typ dřív, než se spustí, a kompilátor už to všechno přečetl.",
   "lands.verybasicBlurb":
     "Kvíz. Který řádek je správná gramatika? Vyber jeden ze čtyř a pak ho napiš.",
   "lands.basicBlurb":
@@ -190,6 +192,7 @@ export const cs: Partial<Catalogue> = {
   "map.cpp": "C++",
   "map.python": "PYTHON",
   "map.pytorch": "PYTORCH",
+  "map.typescript": "TYPESCRIPT",
   "map.none": "v této ulici zatím nic není",
   "map.failed": "mapu se nepodařilo načíst",
   "map.stars": "HVĚZDY",
@@ -379,6 +382,8 @@ export const cs: Partial<Catalogue> = {
   "pg.go": "GO",
   "pg.cpp": "C++",
   "pg.python": "PYTHON",
+  "pg.pytorch": "PYTORCH",
+  "pg.typescript": "TYPESCRIPT",
   "pg.stdin": "STDIN",
   "pg.stdinHint": "stdin — co program čte",
   "pg.unsaved": "NEULOŽENO",
@@ -530,6 +535,7 @@ export const cs: Partial<Catalogue> = {
   "search.cpp": "C++",
   "search.python": "PYTHON",
   "search.pytorch": "PYTORCH",
+  "search.typescript": "TYPESCRIPT",
   "search.unified": "SPOJENĚ",
   "search.text": "SLOVA",
   "search.meaning": "VÝZNAM",
@@ -621,6 +627,7 @@ export const cs: Partial<Catalogue> = {
   "ai.cpp": "C++",
   "ai.python": "PYTHON",
   "ai.pytorch": "PYTORCH",
+  "ai.typescript": "TYPESCRIPT",
   "ai.newPlan": "NOVÝ PLÁN",
   "ai.drillSize": "TRÉNINK {n}",
   "ai.coach": "TRENÉR",

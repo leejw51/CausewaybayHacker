@@ -523,6 +523,29 @@ return function()
     T.eq(spans[1].text, "println!")
   end)
 
+  T.case("TypeScript is coloured as TypeScript, not as Rust", function()
+    local function kind_of(spans, word)
+      for _, s in ipairs(spans) do
+        if s.text == word then return s.kind end
+      end
+    end
+    local spans = editor.highlight("const n: number = xs!.length; // fn", "code", "typescript")
+    T.eq(kind_of(spans, "const"), "keyword")
+    T.eq(kind_of(spans, "number"), "type")
+    T.eq(kind_of(spans, "xs"), "text", "`xs!` is a non-null assertion, not a macro")
+    T.eq(spans[#spans].kind, "comment")
+    -- Single quotes and backticks are strings in TypeScript.
+    local q = editor.highlight("const s = 'a(b' + `c)d`;", "code", "typescript")
+    local strings = {}
+    for _, sp in ipairs(q) do
+      if sp.kind == "string" then strings[#strings + 1] = sp.text end
+    end
+    T.same(strings, { "'a(b'", "`c)d`" })
+    -- Rust's words are plain words there, and TypeScript's are plain in Rust.
+    T.eq(kind_of(editor.highlight("fn impl", "code", "typescript"), "impl"), "text")
+    T.eq(kind_of(editor.highlight("interface X", "code"), "interface"), "text")
+  end)
+
   T.case("a block comment carries across lines", function()
     local _, state = editor.highlight("/* the borrow checker", "code")
     T.eq(state, "block_comment")

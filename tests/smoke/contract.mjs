@@ -1401,7 +1401,7 @@ check(null, "beyond: world.lands, world.map and quest.get match §5", async () =
     assertEq(lands.type, "world.lands.ok", "world.lands");
     for (const l of lands.payload.lands) {
       assert(
-        ["rust", "go", "cpp", "python", "pytorch"].includes(l.land),
+        ["rust", "go", "cpp", "python", "pytorch", "typescript"].includes(l.land),
         `§4.6: land ${l.land}`,
       );
       for (const cat of l.categories) {
@@ -1421,7 +1421,7 @@ check(null, "beyond: world.lands, world.map and quest.get match §5", async () =
     assertEq(map.payload.category, "basic", "§4.7: the map echoes its category");
     for (const n of nodes) {
       assert(
-        /^(rust|go|cpp|python|pytorch)\.(verybasic|basic|advanced|hacker)\.\d{2}\..+$/.test(
+        /^(rust|go|cpp|python|pytorch|typescript)\.(verybasic|basic|advanced|hacker)\.\d{2}\..+$/.test(
           n.quest_id,
         ),
         `SPEC §4.1: quest_id ${n.quest_id}`,

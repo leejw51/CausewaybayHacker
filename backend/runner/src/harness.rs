@@ -35,6 +35,23 @@ pub fn judge_argv(
     compile_ms: i64,
     compiler_stderr: String,
 ) -> std::io::Result<Report> {
+    judge_argv_limited(sub, program, args, compile_ms, compiler_stderr, true)
+}
+
+/// [`judge_argv`] with the address-space cap separable, for the one runtime
+/// that cannot start under it: `node`. V8 reserves its code range and heap
+/// cage as virtual memory before running a line, the same shape of problem
+/// `Limits::address_space` describes for a `-race` binary, so on Linux a
+/// 1 GiB `RLIMIT_AS` is a program that dies at startup. The caller bounds
+/// memory another way (`--max-old-space-size`); every other §5.3 limit holds.
+pub fn judge_argv_limited(
+    sub: &Submission,
+    program: &Path,
+    args: &[&OsStr],
+    compile_ms: i64,
+    compiler_stderr: String,
+    address_space: bool,
+) -> std::io::Result<Report> {
     let mut cases = Vec::with_capacity(sub.spec.cases.len());
     let mut verdict = Verdict::Accepted;
     let mut run_ms = 0i64;
@@ -65,7 +82,7 @@ pub fn judge_argv(
                 max_stdout: sub.spec.max_stdout_bytes,
                 max_stderr: 256 * 1024,
                 apply_rlimits: true,
-                address_space: true,
+                address_space,
             },
             "stdout",
             "stderr",

@@ -82,6 +82,7 @@ const LAND_MASCOTS = [
   "sprite_cpp",
   "sprite_python",
   "sprite_pytorch",
+  "sprite_typescript",
 ];
 const BOSSES = [
   "boss_autocomplete",
@@ -97,7 +98,7 @@ const BOSSES = [
   "boss_recursion",
 ];
 const CATEGORIES = ["basic", "advanced", "hacker"];
-const LANDS = ["rust", "go", "cpp", "python", "pytorch"];
+const LANDS = ["rust", "go", "cpp", "python", "pytorch", "typescript"];
 
 /** Manifest entries by name, which is how every scene looks art up. */
 const byName = new Map(MANIFEST.art.map((a) => [a.name, a]));

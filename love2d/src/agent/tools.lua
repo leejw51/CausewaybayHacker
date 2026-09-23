@@ -78,7 +78,7 @@ M.TOOLS = {
   },
   {
     name = "format_code",
-    description = "Run the language's own formatter (rustfmt, gofmt, clang-format) over the program in place.",
+    description = "Run the language's own formatter (rustfmt, gofmt, clang-format, black, prettier) over the program in place.",
     properties = {},
     required = {},
   },

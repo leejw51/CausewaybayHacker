@@ -13,13 +13,21 @@ import { rust } from "@codemirror/lang-rust";
 import { go } from "@codemirror/lang-go";
 import { cpp } from "@codemirror/lang-cpp";
 import { python } from "@codemirror/lang-python";
+import { javascript } from "@codemirror/lang-javascript";
 import type { CodeContext } from "../src/ai/help";
 import type { Land } from "../src/net/protocol";
 
 /** The caret in a fixture. Not a character any of the grammars uses. */
 const MARK = "‸";
 
-const MODE: Record<Land, () => Extension> = { rust, go, cpp, python, pytorch: python };
+const MODE: Record<Land, () => Extension> = {
+  rust,
+  go,
+  cpp,
+  python,
+  pytorch: python,
+  typescript: () => javascript({ typescript: true }),
+};
 
 /** The context the editor would build, from a fixture with the caret at `‸`. */
 export function contextOf(lang: Land, marked: string): CodeContext {

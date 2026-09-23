@@ -1,0 +1,4550 @@
+# TYPESCRIPT LAND — HACKER. The sixth interview. HKU, Chow Yei Ching Building,
+# Room 7-32 again, a clock on the wall, and this time a language whose types
+# are checked once, before anything runs, and then erased.
+#
+# Every quest here carries `time_limit_s` — the player's clock for the whole
+# quest, not the per-run `timeout_ms` — and at least one hidden case.
+# See docs/decisions.md, 2026-09-11, for where that key lives in the TOML.
+#
+# The 34 problems mirror content/python/hacker.toml node for node — same
+# concepts, difficulty, map, route, clock and test cases — so a player can sit
+# the same interview in any land. The ids mirror too — the LRU boss is
+# `typescript.hacker.28.lru` at node 34, exactly as it is in the other lands —
+# because SPEC §12 makes the id an identity and `node` the position. Node 16,
+# `16.union-find`, takes the `n m seed` input Python converted it to, with the
+# same four cases.
+#
+# One hidden case follows Rust, Go and C++ rather than Python: range-queries
+# runs `500000 4000000 7`, where Python shrank it to 300000 operations for its
+# interpreter. It is forced. At Python's size the naive per-query loop took
+# 17 s here against a 10 s limit, too close to reject it on a faster machine;
+# at the shared size the Fenwick tree takes 0.45 s. Every other case is
+# byte-identical to the Python pack, including the 8000-character one-letter
+# palindrome case, which the quadratic answer clears in 0.12 s.
+#
+# The boss is the one quest whose starter fails for a different reason. The
+# Python boss is THE RECURSION LIMIT, and node's stack, on the order of ten
+# thousand frames, would carry a recursive starter through the 2000-operation
+# case.
+# THE ERASURE's starter is a `Record<number, number>` cache that evicts
+# `Object.keys(cache)[0]`: integer-like keys enumerate in ascending numeric
+# order, not insertion order, and the keys are strings at runtime whatever the
+# type said. Same problem, same cases; its concept `recursion` became `types`,
+# because the starter no longer recurses and the lesson is the erasure.
+#
+# The slow starters were measured on this machine against their 10 s limits:
+# union-find's walk-per-link had not finished after 60 s, the O(n²) inversion
+# count took 42 s, the scanning Dijkstra 26 s, and modular's per-query product
+# had not finished after 30 s. `32.modular` does not multiply two residues with
+# `*`: their product passes 2^53, so it carries a 15-bit split `mulmod`, and
+# its solution precomputes inverse factorials so a query is two of them.
+#
+# Every program is one main.ts, compiled with `tsc -p .` under
+# backend/runner/src/typescript/tsconfig.json (strict, es2022, lib es2023, no
+# @types/node) beside node.d.ts, and run as `node --enable-source-maps main.js`.
+# Standard input is always
+#     const input: string = require("fs").readFileSync(0, "utf8");
+# The generator's 64-bit state is a `bigint` wrapped with `BigInt.asUintN(64,
+# …)`; everything after `x >> 33n` is an exact `number`. No heap, deque or
+# bisect ships with the language, so the solutions that need one write it.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+
+#
+# **Which quests enforce their complexity differs by land, and that is a
+# measurement rather than an oversight.** All the packs hold the same problems
+# in the same order under the same ids, and the small cases are identical
+# wherever the problem is the same problem. What differs is the big case that
+# rejects a correct-but-slow answer: it is sized per land, and in several
+# quests it exists in one land and not another. Whether a generated input can
+# punish the naive answer is a fact about the language and its runtime, and
+# each land measured it rather than assuming it. TypeScript keeps Python's
+# enforced set — union-find, inversions, dijkstra, range-queries, palindrome,
+# modular, grid-paths — and leaves `06.stack` alone for the reason Python
+# gives: the naive next-greater scan is only quadratic on near-descending
+# input, which this generator never produces.
+
+pack = "typescript.hacker"
+land = "typescript"
+category = "hacker"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id           = "typescript.hacker.01.two-sum"
+node         = 1
+title        = "TWO FARES"
+difficulty   = 3
+time_limit_s = 600
+story        = "Room 7-32, sixth time. The first question is the one everybody gets, and the clock starts on the way in."
+concepts     = ["hashing", "complexity", "collections"]
+requires     = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` integers.
+
+Print the **1-based** indices `i j` of two different entries that add up to
+`target`, as `i j` with `i < j`. If more than one pair works, give the one
+whose second index is smallest; if that still ties, the smallest first index.
+If no pair works, print `-1`.
+
+```
+input:  4 9
+        2 7 11 15
+output: 1 2
+```
+
+The hidden cases here are small: they check the tie-break and the
+no-answer case, not your speed. The question is still the linear one — one
+pass, one `Map` — because a real `n` is 200000 and the nested loop is what
+this question exists to weed out. Write the answer the question is asking for,
+not the one that happens to clear these four cases.
+
+`seen.get(key)` is typed `number | undefined`, and the type is telling you
+something: the index you stored may be `0`, and `0` is falsy. `if (i)` drops
+every match whose first half is the first entry. Compare with `!== undefined`.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const data: number[] = input.trim().split(/\s+/).map(Number);
+  const [n, target] = data;
+  const nums = data.slice(2, 2 + n);
+
+  const seen = new Map<number, number>();
+
+  // one pass: for each value, has target - value been seen already?
+  console.log(-1);
+}
+
+main();
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function main(): void {
+  const data: number[] = input.trim().split(/\s+/).map(Number);
+  const [n, target] = data;
+  const nums = data.slice(2, 2 + n);
+
+  const seen = new Map<number, number>();
+  for (let j = 0; j < nums.length; j++) {
+    const i = seen.get(target - nums[j]);
+    // i may be 0, which is falsy: test for undefined, not for truth
+    if (i !== undefined) {
+      console.log(`${i + 1} ${j + 1}`);
+      return;
+    }
+    // keep the first index of a repeated value: that is the tie-break
+    if (!seen.has(nums[j])) seen.set(nums[j], j);
+  }
+  console.log(-1);
+}
+
+main();
+'''
+hints = [
+  "One pass. For each value ask whether target minus it has already been seen.",
+  "Only set a value the first time you see it — `if (!seen.has(x)) seen.set(x, j)` keeps the first index of a repeat, which is the tie-break the statement asks for.",
+  "`seen.get(...)` is `undefined` for a miss and `0` for the first entry. Both are falsy, so `if (i)` cannot tell them apart; `i !== undefined` can.",
+  "Print and return the moment you find it — the first hit as you scan is already the smallest second index.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "4 9\n2 7 11 15\n",      expect = "1 2\n",  visible = true },
+  { name = "late",    stdin = "5 10\n1 2 3 4 6\n",     expect = "4 5\n",  visible = false },
+  { name = "none",    stdin = "3 100\n1 2 3\n",        expect = "-1\n",   visible = false },
+  { name = "signed",  stdin = "6 0\n-3 4 3 90 -1 1\n", expect = "1 3\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id           = "typescript.hacker.02.window"
+node         = 2
+title        = "NO REPEATS"
+difficulty   = 4
+time_limit_s = 900
+story        = "The second question is on the board before you have put the marker down."
+concepts     = ["two-pointers", "strings", "complexity"]
+requires     = ["typescript.hacker.01.two-sum"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief        = '''
+One line of text, no spaces.
+
+Print the length of the longest run of characters with no repeat in it, then
+the run itself. If several runs tie, print the leftmost.
+
+```
+input:  abcabcbb
+output: 3
+        abc
+```
+
+The window only ever moves right. If you find yourself rescanning from the
+start after a repeat, you have written the quadratic one.
+
+The four cases here are a dozen characters at most, and the clock is not
+measuring speed on them — the quadratic one clears them too. There is no big
+hidden case because there is no honest one to build: on text with a small
+alphabet the longest run is bounded by the alphabet, so rescanning costs a
+constant factor and not a quadratic one, and the input that would punish it
+is not text any more. Write the one-pass answer because it is the answer, not
+because these four cases force it.
+
+`text[i]` is one UTF-16 code unit, not one character in every script. The
+input here is plain ASCII, so the two are the same; on a Times Square caption
+with an emoji in it they are not, and the interviewer may ask.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const text = input.trim();
+
+const last = new Map<string, number>();
+
+// print the best length, then the run itself
+console.log(0);
+console.log("?");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const text = input.trim();
+
+const last = new Map<string, number>();
+let start = 0;
+let bestLen = 0;
+let bestStart = 0;
+
+for (let i = 0; i < text.length; i++) {
+  const c = text[i];
+  const previous = last.get(c);
+  if (previous !== undefined && previous >= start) start = previous + 1;
+  last.set(c, i);
+  const length = i - start + 1;
+  if (length > bestLen) {
+    bestLen = length;
+    bestStart = start;
+  }
+}
+
+console.log(bestLen);
+console.log(text.slice(bestStart, bestStart + bestLen));
+'''
+hints = [
+  "Keep the index where each character was last seen in a `Map<string, number>`, and the index the window starts at.",
+  "A repeat only matters if its last position is inside the current window — that is the `previous !== undefined && previous >= start` test.",
+  "Record the best length *and* where it started, or you cannot print the run at the end. `text.slice(start, start + length)` is the run.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "abcabcbb\n",    expect = "3\nabc\n",      visible = true },
+  { name = "one",     stdin = "bbbbb\n",       expect = "1\nb\n",        visible = false },
+  { name = "middle",  stdin = "pwwkew\n",      expect = "3\nwke\n",      visible = false },
+  { name = "street",  stdin = "causewaybay\n", expect = "7\nusewayb\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id           = "typescript.hacker.03.intervals"
+node         = 3
+title        = "THE SHIFT ROTA"
+difficulty   = 4
+time_limit_s = 900
+story        = "They hand you the booking sheet for the Times Square big screen and ask which hours are actually sold."
+concepts     = ["intervals", "sorting", "complexity"]
+requires     = ["typescript.hacker.02.window"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are `<start> <end>` with `start <= end`.
+
+Merge every pair that overlaps or touches, and print the result in increasing
+order, one `<start> <end>` per line, then `COUNT <k>`.
+
+```
+input:  4
+        1 3
+        2 6
+        8 10
+        15 18
+output: 1 6
+        8 10
+        15 18
+        COUNT 3
+```
+
+Touching counts as overlapping: `1 4` and `4 5` merge into `1 5`.
+
+The four cases here are three or four intervals each, and the clock is not
+measuring speed on them. Sorting and sweeping is `O(n log n)`; a version that
+rescans the merged list for every interval is `O(n²)` and clears these four
+just as easily. The bar is real on a real booking sheet. It is not what these
+cases check.
+
+`Array.prototype.sort` with no comparator **converts everything to strings**
+and sorts those. `[[10, 12], [2, 6]].sort()` leaves `10,12` first, because the
+character `1` is less than `2`. Every sort of numbers in this interview takes a
+comparator: `(p, q) => p[0] - q[0]`.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const n = data[0];
+const spans: [number, number][] = [];
+for (let i = 0; i < n; i++) spans.push([data[1 + 2 * i], data[2 + 2 * i]]);
+
+// sort, sweep, merge, print, then COUNT <k>
+console.log(`COUNT ${spans.length}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const n = data[0];
+const spans: [number, number][] = [];
+for (let i = 0; i < n; i++) spans.push([data[1 + 2 * i], data[2 + 2 * i]]);
+
+// a comparator, always: the default sort compares the arrays as strings
+spans.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+
+const merged: [number, number][] = [];
+for (const [start, end] of spans) {
+  const top = merged[merged.length - 1];
+  if (top !== undefined && start <= top[1]) {
+    if (end > top[1]) top[1] = end;
+  } else {
+    merged.push([start, end]);
+  }
+}
+
+const out: string[] = merged.map(([start, end]) => `${start} ${end}`);
+out.push(`COUNT ${merged.length}`);
+console.log(out.join("\n"));
+'''
+hints = [
+  "Sort by start first, with a comparator. After that one left-to-right pass is enough and you never look backwards more than one interval.",
+  "Extend the last merged interval when the new start is <= its end; otherwise push a new one. A `[number, number]` tuple is an array, so `merged[merged.length - 1][1] = end` changes it in place.",
+  "Extend to Math.max(last end, end) — a short interval swallowed by a long one must not shrink it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "4\n1 3\n2 6\n8 10\n15 18\n", expect = "1 6\n8 10\n15 18\nCOUNT 3\n", visible = true },
+  { name = "touching", stdin = "2\n1 4\n4 5\n",              expect = "1 5\nCOUNT 1\n",              visible = false },
+  { name = "point",    stdin = "1\n5 5\n",                   expect = "5 5\nCOUNT 1\n",              visible = false },
+  { name = "unsorted", stdin = "3\n5 6\n1 2\n3 4\n",         expect = "1 2\n3 4\n5 6\nCOUNT 3\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id           = "typescript.hacker.04.grid"
+node         = 4
+title        = "OUT OF THE BUILDING"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A floor plan on the whiteboard, a fire door at the far corner, and the interviewer watching the clock rather than the marker."
+concepts     = ["graphs", "stacks-queues", "complexity"]
+requires     = ["typescript.hacker.03.intervals"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are the floor: `.` is open, `#` is wall.
+
+Start at the top-left `(0,0)` and reach the bottom-right `(r-1, c-1)`, moving
+up, down, left or right through open cells only.
+
+Print the number of **steps** on a shortest route, or `-1` if there is none.
+Then print `REACHED <k>`: how many open cells are reachable from the start,
+counting the start itself.
+
+```
+input:  3 3
+        ...
+        .#.
+        ...
+output: 4
+        REACHED 8
+```
+
+Breadth first, not depth first. A depth-first walk finds *a* route; the
+question asks for the shortest one. And there is no queue in the standard
+library: an array is one, **if** you read it with a moving head index.
+`queue.shift()` moves every remaining element down by one, which is `O(n)`, and
+turns the whole search quadratic.
+
+`grid[r][c]` is typed `string`, and off the edge of the floor it is not one.
+`grid[-1]` is `undefined` at runtime whatever the type says, and
+`undefined[c]` throws. The bounds check is yours to write.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data = input.trim().split(/\s+/);
+const rows = Number(data[0]);
+const cols = Number(data[1]);
+const grid: string[] = data.slice(2, 2 + rows);
+
+const queue: [number, number][] = [];
+let head = 0;
+
+// print the shortest step count or -1, then REACHED <k>
+console.log(-1);
+console.log("REACHED 0");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data = input.trim().split(/\s+/);
+const rows = Number(data[0]);
+const cols = Number(data[1]);
+const grid: string[] = data.slice(2, 2 + rows);
+
+const dist: number[][] = Array.from({ length: rows }, () => new Array<number>(cols).fill(-1));
+const queue: [number, number][] = [];
+let head = 0;
+let reached = 0;
+
+if (grid[0][0] === ".") {
+  dist[0][0] = 0;
+  queue.push([0, 0]);
+  reached = 1;
+}
+
+const steps: [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+while (head < queue.length) {
+  const [r, c] = queue[head++];
+  const next = dist[r][c] + 1;
+  for (const [dr, dc] of steps) {
+    const nr = r + dr;
+    const nc = c + dc;
+    // grid[-1] is undefined at runtime, whatever its type says
+    if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+    if (grid[nr][nc] !== "." || dist[nr][nc] >= 0) continue;
+    dist[nr][nc] = next;
+    reached++;
+    queue.push([nr, nc]);
+  }
+}
+
+console.log(dist[rows - 1][cols - 1]);
+console.log(`REACHED ${reached}`);
+'''
+hints = [
+  "A queue is an array plus a `head` index: push to the back, read `queue[head++]` from the front, and stop when `head === queue.length`. No `shift()`.",
+  "Mark a cell when you push it, not when you pop it, or it goes into the queue several times.",
+  "The distance grid doubles as the visited set: -1 means not seen yet, so you need no second structure.",
+  "Check `nr < 0 || nr >= rows || nc < 0 || nc >= cols` before you index. tsc will not: with this tsconfig `grid[nr]` is typed `string` even when it is `undefined`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 3\n...\n.#.\n...\n",              expect = "4\nREACHED 8\n",   visible = true },
+  { name = "blocked", stdin = "2 2\n.#\n#.\n",                     expect = "-1\nREACHED 1\n",  visible = false },
+  { name = "single",  stdin = "1 1\n.\n",                          expect = "0\nREACHED 1\n",   visible = false },
+  { name = "maze",    stdin = "4 5\n.....\n###.#\n.....\n.#.#.\n", expect = "7\nREACHED 14\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id           = "typescript.hacker.05.binary-search"
+node         = 5
+title        = "HOW BIG A VAN"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The depot wants the smallest van that clears the day's dockets in the days they have. They will not tell you which van; they will tell you if one you name is too small."
+concepts     = ["binary-search", "complexity", "slices"]
+requires     = ["typescript.hacker.04.grid"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief        = '''
+Line one is `n d`. Line two is `n` package weights, in the order they must be
+loaded — the order cannot change.
+
+Find the smallest van capacity that ships all `n` packages in at most `d`
+days, loading in order and never splitting a package.
+
+Print the capacity, then `MAX <heaviest package>`.
+
+```
+input:  10 5
+        1 2 3 4 5 6 7 8 9 10
+output: 15
+        MAX 10
+```
+
+You are not searching the list. You are searching the **answer**: the
+capacities from `max(weights)` to `sum(weights)`, on which "does it fit in
+`d` days" is false, false, false, then true forever. Binary search that. There
+is no list to bisect, only a predicate, so this one is written by hand.
+
+The four cases here are ten weights at most, and the clock is not measuring
+speed on them: walking the capacities up one at a time from `max(weights)`
+clears every one, because every answer is under twenty. It would not clear a
+real docket, where the gap between `max` and `sum` is billions wide — and
+that is the input the question is really about. These cases check that you
+got the search right, not that you wrote one.
+
+The midpoint is `Math.floor((low + high) / 2)`. The shorter `(low + high) >> 1`
+is the one people reach for, and it is a **32-bit** operation: once the sum
+passes `2^31` it comes back negative. A number is a double and holds the sum
+exactly; the shift is what breaks it.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function daysNeeded(weights: number[], capacity: number): number {
+  // how many days does this capacity take, loading in order?
+  return 0;
+}
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, days] = data;
+const weights = data.slice(2, 2 + n);
+
+let heaviest = 0;
+for (const w of weights) if (w > heaviest) heaviest = w;
+
+console.log(0);
+console.log(`MAX ${heaviest}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function daysNeeded(weights: number[], capacity: number): number {
+  let days = 1;
+  let load = 0;
+  for (const w of weights) {
+    if (load + w > capacity) {
+      days++;
+      load = 0;
+    }
+    load += w;
+  }
+  return days;
+}
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, days] = data;
+const weights = data.slice(2, 2 + n);
+
+let heaviest = 0;
+let total = 0;
+for (const w of weights) {
+  if (w > heaviest) heaviest = w;
+  total += w;
+}
+
+let low = heaviest;
+let high = total;
+while (low < high) {
+  // not (low + high) >> 1: that is a 32-bit operation
+  const mid = Math.floor((low + high) / 2);
+  if (daysNeeded(weights, mid) <= days) high = mid;
+  else low = mid + 1;
+}
+
+console.log(low);
+console.log(`MAX ${heaviest}`);
+'''
+hints = [
+  "The lower bound is the heaviest single package — anything smaller can never carry it.",
+  "The upper bound is the total: one day, everything on it.",
+  "Move `high` down to `mid` on success so you keep the smallest capacity that worked, and `low` to `mid + 1` on failure.",
+  "`Math.floor((low + high) / 2)`, not `(low + high) >> 1`: bitwise operators convert to a 32-bit signed integer first, and a billion-wide docket overflows it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5\n1 2 3 4 5 6 7 8 9 10\n", expect = "15\nMAX 10\n", visible = true },
+  { name = "tight",  stdin = "3 3\n3 2 2\n",                 expect = "3\nMAX 3\n",   visible = false },
+  { name = "spread", stdin = "5 4\n1 2 3 1 1\n",             expect = "3\nMAX 3\n",   visible = false },
+  { name = "one",    stdin = "1 1\n7\n",                     expect = "7\nMAX 7\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id           = "typescript.hacker.06.stack"
+node         = 6
+title        = "THE NEXT BIGGER ONE"
+difficulty   = 4
+time_limit_s = 900
+story        = "The Yee Wo Street tram board lists the next arrivals' fares in a column, and they ask one question: for each of them, which is the next one after it that is bigger."
+concepts     = ["stacks-queues", "slices", "complexity"]
+requires     = ["typescript.hacker.05.binary-search"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+For each entry print the first entry **to its right** that is strictly
+greater, or `-1` if there is none. Put them on one line, space separated. Then
+print `NONE <k>`, how many of them were `-1`.
+
+```
+input:  4
+        2 1 2 4
+output: 4 2 4 -1
+        NONE 1
+```
+
+Keep a stack of positions whose answer is still unknown, and it stays
+decreasing from the bottom up. Each position is pushed once and popped once,
+so the whole thing is one pass however it looks. An array is the stack:
+`push` and `pop` at the end are both `O(1)`.
+
+The five cases here are six numbers at most, and the clock is not measuring
+speed on them. Nor would a bigger one, and that is worth knowing: the naive
+answer — for each entry, walk right until something bigger turns up — is
+quadratic only on input that is already close to descending. On random input
+it stops after about `ln(n)` steps on average, so on generated values no run
+limit separates the two. The stack is still the answer, because it is `O(n)`
+on every input including the descending one — but on this quest that is a
+claim you have to take on the argument rather than on the clock.
+
+`pending.pop()` is typed `number | undefined`, because an empty array pops
+`undefined` rather than throwing. Read the top with
+`pending[pending.length - 1]` after checking the length, and the `undefined`
+never arises.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const n = data[0];
+const nums = data.slice(1, 1 + n);
+
+const answer: number[] = new Array<number>(n).fill(-1);
+const pending: number[] = [];
+
+console.log(answer.join(" "));
+console.log(`NONE ${n}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const n = data[0];
+const nums = data.slice(1, 1 + n);
+
+const answer: number[] = new Array<number>(n).fill(-1);
+const pending: number[] = [];
+
+for (let i = 0; i < n; i++) {
+  const value = nums[i];
+  while (pending.length > 0 && nums[pending[pending.length - 1]] < value) {
+    answer[pending.pop()!] = value;
+  }
+  pending.push(i);
+}
+
+console.log(answer.join(" "));
+console.log(`NONE ${answer.filter((v) => v === -1).length}`);
+'''
+hints = [
+  "The stack holds indices that are still waiting for their answer, not values.",
+  "When the new value beats the value at the top of the stack, that index's answer is the new value — and keep popping, it may beat several.",
+  "Strictly greater, so equal values do not resolve each other; they stack up and resolve together later.",
+  "`answer[pending.pop()!] = value` is safe only because the loop condition already checked `pending.length > 0`. The `!` is you telling tsc something it cannot see; make sure it is true.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "4\n2 1 2 4\n",     expect = "4 2 4 -1\nNONE 1\n",        visible = true },
+  { name = "descending", stdin = "3\n5 4 3\n",       expect = "-1 -1 -1\nNONE 3\n",        visible = false },
+  { name = "ascending",  stdin = "5\n1 2 3 4 5\n",   expect = "2 3 4 5 -1\nNONE 1\n",      visible = false },
+  { name = "plateau",    stdin = "6\n2 2 2 1 3 1\n", expect = "3 3 3 3 -1 -1\nNONE 2\n",   visible = false },
+  { name = "single",     stdin = "1\n5\n",           expect = "-1\nNONE 1\n",              visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id           = "typescript.hacker.07.coins"
+node         = 7
+title        = "EXACT CHANGE"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The Percival Street till has three coin trays and a customer who will not take a note."
+concepts     = ["dynamic-programming", "complexity", "slices"]
+requires     = ["typescript.hacker.06.stack"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` coin values. Every coin is available
+in unlimited quantity.
+
+Print the smallest number of coins that makes `target` exactly, or `-1` if it
+cannot be made. Then print `REACH <k>`: how many of the amounts `0..target`
+can be made at all, counting `0`.
+
+```
+input:  3 11
+        1 2 5
+output: 3
+        REACH 12
+```
+
+The hidden cases are small, so what they catch is wrongness rather than
+slowness — and one of them catches the usual wrong answer. Greedy, taking the
+biggest coin that fits and repeating, makes `6` out of `3 4` by grabbing the
+`4` and then failing, and there is a case for exactly that. The other bad
+answer, plain recursion with no table, is not caught here and still is not
+the one to write: `target` is 100000 in the real thing, the same amount gets
+recomputed thousands of times, and a recursion one frame per unit of `target`
+runs out of stack long before that.
+
+`Infinity` is the honest `unreachable` here. It is a `number`, it compares
+greater than every amount, and `Infinity + 1` is still `Infinity`, so the
+relaxation needs no special case — which is not true of the `-1` people
+reach for first.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, target] = data;
+const coins = data.slice(2, 2 + n);
+
+const best: number[] = new Array<number>(target + 1).fill(Infinity);
+
+// fill the table bottom up, then print the answer and REACH <k>
+console.log(-1);
+console.log("REACH 0");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, target] = data;
+const coins = data.slice(2, 2 + n);
+
+// Infinity is unreachable, and Infinity + 1 is still Infinity
+const best: number[] = new Array<number>(target + 1).fill(Infinity);
+best[0] = 0;
+
+for (let amount = 1; amount <= target; amount++) {
+  for (const coin of coins) {
+    if (coin <= amount && best[amount - coin] + 1 < best[amount]) {
+      best[amount] = best[amount - coin] + 1;
+    }
+  }
+}
+
+console.log(best[target] === Infinity ? -1 : best[target]);
+console.log(`REACH ${best.filter((v) => v !== Infinity).length}`);
+'''
+hints = [
+  "best[0] = 0, and best[a] is one more than the cheapest best[a - coin] over every coin that fits.",
+  "`new Array<number>(target + 1).fill(Infinity)` — Infinity + 1 is Infinity, so `Math.min(best[a], best[a - coin] + 1)` is safe even when a - coin is unreachable. A `-1` sentinel would be picked by min every time.",
+  "REACH is just how many cells of the finished table are finite.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "3 11\n1 2 5\n", expect = "3\nREACH 12\n", visible = true },
+  { name = "impossible", stdin = "1 3\n2\n",      expect = "-1\nREACH 2\n", visible = false },
+  { name = "not-greedy", stdin = "2 6\n3 4\n",    expect = "2\nREACH 4\n",  visible = false },
+  { name = "zero",       stdin = "3 0\n1 2 5\n",  expect = "0\nREACH 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id           = "typescript.hacker.08.top-k"
+node         = 8
+title        = "FIVE MOST ASKED"
+difficulty   = 4
+time_limit_s = 900
+story        = "Warm-up round. They ask for the five words that came up most in last year's tickets, and they time it anyway."
+concepts     = ["hashing", "sorting", "complexity"]
+requires     = ["typescript.hacker.07.coins", "typescript.hacker.01.two-sum"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief        = '''
+Line one is `n k`. Line two is `n` words separated by spaces.
+
+Print the `k` most frequent words, most frequent first, ties broken by the
+word ascending, one per line. If there are fewer than `k` distinct words,
+print all of them. Then print `DISTINCT <d>`.
+
+```
+input:  6 2
+        tram tram bus bus bus mtr
+output: bus
+        tram
+        DISTINCT 3
+```
+
+Count with a `Map`, then rank. The tie-break is not decoration. A `Map`
+iterates in **insertion order** — the order the words first appeared in the
+input — and `sort` is stable, so sorting by count alone leaves ties in that
+order, which is not what the statement says and is not what the interviewer
+is listening for. Making the comparison **total** — count descending, then
+the word ascending — is what fixes it.
+
+Compare the words with `<` and `>`, which order by UTF-16 code unit: for
+lowercase ASCII that is the alphabet. `localeCompare` is the other answer
+people give, and it orders by the machine's locale rules, which is a
+different contract from the one the statement wrote.
+
+The four cases here are a handful of words, and the clock is not measuring
+speed on them: counting by scanning the whole list once per distinct word is
+`O(n²)` and clears all four. On a year of tickets it would not. What these
+cases check is the tie-break, which is the part people actually get wrong.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const tokens = input.trim().split(/\s+/);
+const k = Number(tokens[1]);
+const words = tokens.slice(2);
+
+const counts = new Map<string, number>();
+
+// count, rank by count descending then word ascending, print k of them,
+// then DISTINCT <d>
+console.log(`DISTINCT ${counts.size}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const tokens = input.trim().split(/\s+/);
+const k = Number(tokens[1]);
+const words = tokens.slice(2);
+
+const counts = new Map<string, number>();
+for (const word of words) counts.set(word, (counts.get(word) ?? 0) + 1);
+
+// total order: count descending, then the word ascending by code unit
+const ranked = [...counts].sort(
+  (a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+);
+
+const out: string[] = ranked.slice(0, k).map(([word]) => word);
+out.push(`DISTINCT ${ranked.length}`);
+console.log(out.join("\n"));
+'''
+hints = [
+  "`counts.set(word, (counts.get(word) ?? 0) + 1)` is the whole counting loop. Do not try to keep the ranking up to date while counting.",
+  "`(a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)` — count descending, and only when that is 0 does `||` fall through to the word.",
+  "`ranked.slice(0, k)` is safe when there are fewer than k — a slice past the end stops at the end.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "6 2\ntram tram bus bus bus mtr\n", expect = "bus\ntram\nDISTINCT 3\n", visible = true },
+  { name = "one",       stdin = "4 1\na b a c\n",                   expect = "a\nDISTINCT 3\n",         visible = false },
+  { name = "ties",      stdin = "5 3\nx y z x y\n",                 expect = "x\ny\nz\nDISTINCT 3\n",   visible = false },
+  { name = "k-too-big", stdin = "3 5\nq q q\n",                     expect = "q\nDISTINCT 1\n",         visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id           = "typescript.hacker.09.linked-list"
+node         = 9
+title        = "THE CHAIN"
+difficulty   = 4
+time_limit_s = 900
+story        = "They want it without an array. Nodes that point at nodes, because that is the shape the question is really about."
+concepts     = ["linked-lists", "two-pointers", "structs"]
+requires     = ["typescript.hacker.08.top-k"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers, in order.
+
+Build a singly linked list from them — a class with `value` and
+`next: ListNode | null` — and then answer from the nodes. The reversal, the
+middle and the length all come from walking the chain, not from the array you
+read the input into; collecting the output in an array to `join` it at the end
+is fine. Print three lines:
+
+1. the list reversed, space separated
+2. the value at the middle node (for an even `n`, the second of the two)
+3. `LEN <n>` counted by walking the list, not by trusting the input
+
+```
+input:  5
+        1 2 3 4 5
+output: 5 4 3 2 1
+        3
+        LEN 5
+```
+
+The middle is the runner: one pointer one step at a time, one two steps at a
+time, and when the fast one runs out the slow one is there. One pass.
+
+Reverse it with a loop, not a recursion. A recursive reverse is three pretty
+lines and a `RangeError: Maximum call stack size exceeded` somewhere past ten
+thousand nodes, and the version of this question with a million nodes is the
+one that gets asked.
+
+`strictNullChecks` is on, and on this quest it earns its keep: `slow.next` is
+`ListNode | null`, and tsc will not let you step onto it until you have said
+what happens when it is `null`.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class ListNode {
+  constructor(
+    public value: number,
+    public next: ListNode | null = null,
+  ) {}
+}
+
+const values: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+
+let head: ListNode | null = null;
+
+// build the list, reverse it, find the middle by walking twice as fast
+console.log("?");
+console.log(0);
+console.log("LEN 0");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class ListNode {
+  constructor(
+    public value: number,
+    public next: ListNode | null = null,
+  ) {}
+}
+
+const values: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+
+// build it back to front, so each new node points at what we had
+let head: ListNode | null = null;
+for (let i = values.length - 1; i >= 0; i--) head = new ListNode(values[i], head);
+
+// walk it to count, and run a second pointer at half speed for the middle
+let length = 0;
+let slow: ListNode | null = head;
+let fast: ListNode | null = head;
+while (fast !== null) {
+  length++;
+  fast = fast.next;
+  if (fast !== null) {
+    length++;
+    fast = fast.next;
+    slow = slow!.next;
+  }
+}
+const middle = slow !== null ? slow.value : 0;
+
+// reverse by moving nodes off the front of one list onto the front of another
+let reversed: ListNode | null = null;
+let cursor: ListNode | null = head;
+while (cursor !== null) {
+  const following: ListNode | null = cursor.next;
+  cursor.next = reversed;
+  reversed = cursor;
+  cursor = following;
+}
+
+const out: number[] = [];
+for (let walk = reversed; walk !== null; walk = walk.next) out.push(walk.value);
+
+console.log(out.join(" "));
+console.log(middle);
+console.log(`LEN ${length}`);
+'''
+hints = [
+  "Building back to front is the easy direction: each new node takes the old head as its next.",
+  "Save `cursor.next` before you overwrite it. Once `cursor.next` points backwards, the rest of the old list is unreachable.",
+  "For the middle, advance slow only on the steps where fast managed two. tsc narrows `fast` after a `!== null` check, and forgets it again after you reassign it — which is exactly the right thing to forget.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "odd",    stdin = "5\n1 2 3 4 5\n", expect = "5 4 3 2 1\n3\nLEN 5\n", visible = true },
+  { name = "even",   stdin = "4\n7 8 9 10\n",  expect = "10 9 8 7\n9\nLEN 4\n",  visible = false },
+  { name = "single", stdin = "1\n42\n",        expect = "42\n42\nLEN 1\n",       visible = false },
+  { name = "signed", stdin = "3\n-1 0 1\n",    expect = "1 0 -1\n0\nLEN 3\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id           = "typescript.hacker.10.tree-walk"
+node         = 10
+title        = "THREE WAYS ROUND A TREE"
+difficulty   = 4
+time_limit_s = 900
+story        = "A tree on the whiteboard and the question nobody should have to think about twice: name the three orders."
+concepts     = ["trees", "recursion", "stacks-queues"]
+requires     = ["typescript.hacker.09.linked-list"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` values in **level order**, where `-1` means
+"no node here" — so the tree is stored the way a heap is: the children of
+index `i` are `2i+1` and `2i+2`.
+
+Print four lines: the **preorder**, **inorder** and **postorder** walks, each
+space separated, and then `DEPTH <d>` — the number of nodes on the longest
+root-to-leaf path.
+
+```
+input:  5
+        1 2 3 -1 4
+output: 1 2 4 3
+        2 4 1 3
+        4 2 3 1
+        DEPTH 3
+```
+
+Preorder is node, left, right. Inorder is left, node, right. Postorder is
+left, right, node. The recursion is the same three lines each time and only
+the position of the `push` moves. The recursion here is as deep as the tree,
+which for a heap-shaped array is `log n`, so node's stack — on the order of
+ten thousand frames by default — is not a concern. Say that out loud, because it will be
+asked.
+
+Past the end of the array, `tree[i]` is `undefined`, not `-1`. The type says
+`number`; the base case has to check the index as well as the value.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function walk(tree: number[], i: number, order: number, out: number[]): void {
+  // order 0 = preorder, 1 = inorder, 2 = postorder
+}
+
+function depth(tree: number[], i: number): number {
+  return 0;
+}
+
+const tree: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+
+for (let order = 0; order < 3; order++) {
+  const out: number[] = [];
+  walk(tree, 0, order, out);
+  console.log(out.join(" "));
+}
+console.log(`DEPTH ${depth(tree, 0)}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function present(tree: number[], i: number): boolean {
+  // past the end, tree[i] is undefined, whatever the type says
+  return i < tree.length && tree[i] !== -1;
+}
+
+function walk(tree: number[], i: number, order: number, out: number[]): void {
+  if (!present(tree, i)) return;
+  if (order === 0) out.push(tree[i]);
+  walk(tree, 2 * i + 1, order, out);
+  if (order === 1) out.push(tree[i]);
+  walk(tree, 2 * i + 2, order, out);
+  if (order === 2) out.push(tree[i]);
+}
+
+function depth(tree: number[], i: number): number {
+  if (!present(tree, i)) return 0;
+  return 1 + Math.max(depth(tree, 2 * i + 1), depth(tree, 2 * i + 2));
+}
+
+const tree: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+
+for (let order = 0; order < 3; order++) {
+  const out: number[] = [];
+  walk(tree, 0, order, out);
+  console.log(out.join(" "));
+}
+console.log(`DEPTH ${depth(tree, 0)}`);
+'''
+hints = [
+  "One recursive function with the push in three possible places beats three near-identical functions.",
+  "The base case is both conditions at once: past the end of the array, or sitting on a -1.",
+  "Depth is 1 + the deeper of the two children, and 0 for a missing node.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n1 2 3 -1 4\n",        expect = "1 2 4 3\n2 4 1 3\n4 2 3 1\nDEPTH 3\n", visible = true },
+  { name = "leaf",   stdin = "1\n9\n",                 expect = "9\n9\n9\nDEPTH 1\n",                   visible = false },
+  { name = "left",   stdin = "7\n1 2 -1 3 -1 -1 -1\n", expect = "1 2 3\n3 2 1\n3 2 1\nDEPTH 3\n",       visible = false },
+  { name = "full",   stdin = "7\n4 2 6 1 3 5 7\n",     expect = "4 2 1 3 6 5 7\n1 2 3 4 5 6 7\n1 3 2 5 7 6 4\nDEPTH 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id           = "typescript.hacker.11.bst"
+node         = 11
+title        = "IS IT ACTUALLY A BST"
+difficulty   = 4
+time_limit_s = 900
+story        = "The follow-up. Everyone checks the two children and everyone is wrong the first time."
+concepts     = ["trees", "recursion", "binary-search"]
+requires     = ["typescript.hacker.10.tree-walk"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief        = '''
+Same level-order encoding as the last quest: `-1` is a missing node, children
+of `i` are `2i+1` and `2i+2`.
+
+Line one is `n q`. Line two is the `n` tree values. Line three is `q` query
+values.
+
+Print `VALID` or `INVALID` — is this a binary search tree, with every value in
+the left subtree strictly smaller than the node and every value in the right
+strictly larger? Then one line per query: `<value> FOUND <depth>` if it is in
+the tree, `<value> ABSENT` if not, where the root is depth 1.
+
+```
+input:  7 2
+        4 2 6 1 3 5 7
+        3 8
+output: VALID
+        3 FOUND 3
+        8 ABSENT
+```
+
+Checking `left < node < right` at each node **is not enough** — a value deep
+in the left subtree can still be larger than an ancestor. Carry the open
+interval down instead. Every value here is a `number`, and `number` has
+`-Infinity` and `Infinity` in it: they are the bounds "no limit yet", they
+compare correctly with every value, and they need no `null` check.
+
+A query is answered by the **descent**: compare with the node, go left when
+you are smaller and right otherwise, and report `ABSENT` when you fall off
+the tree. That matters because the tree is not promised to be a BST, and in
+one that is not, a value can sit in the array somewhere the descent never
+looks. It is `ABSENT` — you are being asked what the lookup does, not what
+`tree.includes(value)` would find.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function present(tree: number[], i: number): boolean {
+  return i < tree.length && tree[i] !== -1;
+}
+
+function valid(tree: number[], i: number, low: number, high: number): boolean {
+  // the node must sit strictly inside (low, high), and each child
+  // inherits a narrower window
+  return true;
+}
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, q] = data;
+const tree = data.slice(2, 2 + n);
+const queries = data.slice(2 + n, 2 + n + q);
+
+const out: string[] = [valid(tree, 0, -Infinity, Infinity) ? "VALID" : "INVALID"];
+for (const target of queries) out.push(`${target} ABSENT`);
+console.log(out.join("\n"));
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function present(tree: number[], i: number): boolean {
+  return i < tree.length && tree[i] !== -1;
+}
+
+function valid(tree: number[], i: number, low: number, high: number): boolean {
+  if (!present(tree, i)) return true;
+  const value = tree[i];
+  if (value <= low || value >= high) return false;
+  return valid(tree, 2 * i + 1, low, value) && valid(tree, 2 * i + 2, value, high);
+}
+
+function find(tree: number[], target: number): number | null {
+  let i = 0;
+  let depth = 1;
+  while (present(tree, i)) {
+    if (tree[i] === target) return depth;
+    i = target < tree[i] ? 2 * i + 1 : 2 * i + 2;
+    depth++;
+  }
+  return null;
+}
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, q] = data;
+const tree = data.slice(2, 2 + n);
+const queries = data.slice(2 + n, 2 + n + q);
+
+// -Infinity and Infinity are numbers: "no bound yet" needs no null check
+const out: string[] = [valid(tree, 0, -Infinity, Infinity) ? "VALID" : "INVALID"];
+for (const target of queries) {
+  const depth = find(tree, target);
+  out.push(depth === null ? `${target} ABSENT` : `${target} FOUND ${depth}`);
+}
+console.log(out.join("\n"));
+'''
+hints = [
+  "Pass an open interval (low, high) down. The root gets (-Infinity, Infinity); a left child gets (low, node), a right child gets (node, high).",
+  "A missing node is vacuously valid — that is the base case, and it returns true, not false.",
+  "The lookup is the binary search: smaller goes left, otherwise right, and the depth is how many hops it took. Return `null` for a miss and type it `number | null`, so the caller cannot forget the miss.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "7 2\n4 2 6 1 3 5 7\n3 8\n",  expect = "VALID\n3 FOUND 3\n8 ABSENT\n",  visible = true },
+  { name = "sneaky",    stdin = "7 1\n5 1 7 -1 6 -1 -1\n6\n", expect = "INVALID\n6 ABSENT\n",           visible = false },
+  { name = "root",      stdin = "1 1\n10\n10\n",              expect = "VALID\n10 FOUND 1\n",           visible = false },
+  { name = "left-only", stdin = "3 2\n8 4 -1\n4 8\n",         expect = "VALID\n4 FOUND 2\n8 FOUND 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id           = "typescript.hacker.12.heap"
+node         = 12
+title        = "K SORTED QUEUES"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Every screen on the Hysan Place wall sends its playlist already in order. Merge them into one line without sorting the lot again."
+concepts     = ["heaps", "sorting", "complexity"]
+requires     = ["typescript.hacker.11.bst"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief        = '''
+Line one is `k`. Then `k` lines, each a count followed by that many integers,
+already sorted ascending.
+
+Print all of them merged into one ascending line, space separated, then
+`POPS <total count>`.
+
+```
+input:  3
+        3 1 4 5
+        2 1 3
+        2 2 6
+output: 1 1 2 3 4 5 6
+        POPS 7
+```
+
+There is no heap in the standard library, so the heap is part of the answer:
+an array where the children of `i` are `2i+1` and `2i+2`, `push` that sifts
+the new entry up, `pop` that moves the last entry to the root and sifts it
+down. Twenty-five lines, and being able to write them cold is what this quest
+is for. The entry is `[value, which list, how far into it]`, and the
+comparison is value first, then the list index — any order on the tie will do,
+as long as it is *some* order.
+
+The heap holds one entry per list, not one per element, so it stays at size
+`k` however long the lists are.
+
+The four cases here are a handful of numbers across two or three lists, and
+the clock is not measuring speed on them: pouring everything into one array
+and sorting it clears all four, and so does rescanning all `k` heads on every
+step. The heap is what keeps it `O(N log k)` when `k` is large, and that is a
+promise about input these cases do not contain.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+type Entry = [value: number, which: number, at: number];
+
+function less(a: Entry, b: Entry): boolean {
+  return a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
+}
+
+class MinHeap {
+  private items: Entry[] = [];
+
+  get size(): number {
+    return this.items.length;
+  }
+
+  push(entry: Entry): void {
+    // append, then sift up while it beats its parent
+  }
+
+  pop(): Entry | undefined {
+    // take the root, move the last entry up, sift it down
+    return undefined;
+  }
+}
+
+const values: number[] = input.trim().split(/\s+/).map(Number);
+let at = 0;
+const k = values[at++];
+const lists: number[][] = [];
+for (let i = 0; i < k; i++) {
+  const count = values[at++];
+  lists.push(values.slice(at, at + count));
+  at += count;
+}
+
+const heap = new MinHeap();
+
+// seed the heap with the head of each list, then pop and refill
+console.log("?");
+console.log("POPS 0");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+type Entry = [value: number, which: number, at: number];
+
+function less(a: Entry, b: Entry): boolean {
+  return a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
+}
+
+class MinHeap {
+  private items: Entry[] = [];
+
+  get size(): number {
+    return this.items.length;
+  }
+
+  push(entry: Entry): void {
+    const h = this.items;
+    h.push(entry);
+    let i = h.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (!less(h[i], h[parent])) break;
+      [h[i], h[parent]] = [h[parent], h[i]];
+      i = parent;
+    }
+  }
+
+  pop(): Entry | undefined {
+    const h = this.items;
+    const top = h[0];
+    const last = h.pop();
+    if (h.length > 0 && last !== undefined) {
+      h[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1;
+        const r = l + 1;
+        let smallest = i;
+        if (l < h.length && less(h[l], h[smallest])) smallest = l;
+        if (r < h.length && less(h[r], h[smallest])) smallest = r;
+        if (smallest === i) break;
+        [h[i], h[smallest]] = [h[smallest], h[i]];
+        i = smallest;
+      }
+    }
+    return top;
+  }
+}
+
+const values: number[] = input.trim().split(/\s+/).map(Number);
+let at = 0;
+const k = values[at++];
+const lists: number[][] = [];
+for (let i = 0; i < k; i++) {
+  const count = values[at++];
+  lists.push(values.slice(at, at + count));
+  at += count;
+}
+
+const heap = new MinHeap();
+lists.forEach((items, which) => {
+  if (items.length > 0) heap.push([items[0], which, 0]);
+});
+
+const out: number[] = [];
+for (let entry = heap.pop(); entry !== undefined; entry = heap.pop()) {
+  const [value, which, index] = entry;
+  out.push(value);
+  if (index + 1 < lists[which].length) {
+    heap.push([lists[which][index + 1], which, index + 1]);
+  }
+}
+
+console.log(out.join(" "));
+console.log(`POPS ${out.length}`);
+'''
+hints = [
+  "The heap entry has to carry where the value came from, or you cannot refill after popping it. A labelled tuple, `[value: number, which: number, at: number]`, says so in the type.",
+  "Sift up: while the entry is less than its parent `(i - 1) >> 1`, swap them. Sift down: while a child is less, swap with the smaller child. `[h[i], h[p]] = [h[p], h[i]]` swaps without a temporary.",
+  "In `pop`, take the root, then `pop()` the last entry off the array; if anything is left, put that entry at the root and sift it down. Get that order wrong and a one-entry heap hands back its only entry twice.",
+  "Push the next element of a list only when you pop one of its elements — that keeps the heap at k.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3\n3 1 4 5\n2 1 3\n2 2 6\n", expect = "1 1 2 3 4 5 6\nPOPS 7\n", visible = true },
+  { name = "one",    stdin = "1\n3 -5 0 5\n",              expect = "-5 0 5\nPOPS 3\n",         visible = false },
+  { name = "ragged", stdin = "3\n1 9\n0\n4 1 2 3 4\n",     expect = "1 2 3 4 9\nPOPS 5\n",      visible = false },
+  { name = "dupes",  stdin = "2\n2 2 2\n2 2 2\n",          expect = "2 2 2 2\nPOPS 4\n",        visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id           = "typescript.hacker.13.backtracking"
+node         = 13
+title        = "EVERY COMBINATION"
+difficulty   = 4
+time_limit_s = 900
+story        = "List every way the shop could be laid out. All of them, in a fixed order, and do not print the same one twice."
+concepts     = ["backtracking", "recursion", "slices"]
+requires     = ["typescript.hacker.12.heap"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` distinct integers **already in ascending
+order**.
+
+Print every subset, one per line, values space separated, the empty subset as
+`-`. Order them the way the obvious recursion produces them: at each position,
+first the branch that **takes** the element, then the branch that skips it.
+Then print `SUBSETS <2^n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 2 3
+        1 2
+        1 3
+        1
+        2 3
+        2
+        3
+        -
+        SUBSETS 8
+```
+
+Push, recurse, **pop**. The pop is the part people leave out, and the symptom
+is every line after the first being too long. The one shared `chosen` array
+is the point: `[...chosen, x]` on every call would also be correct, and it
+copies the whole selection at every level to avoid writing one line. The order
+here is the recursion's own, and that is what is being checked.
+
+For `2^n`, `1 << n` is a 32-bit shift and is wrong from `n = 31`; the count
+of lines you printed is the honest number anyway.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function build(nums: number[], at: number, chosen: number[], out: string[]): void {
+  // at the end of the list, record `chosen`; otherwise take it, recurse,
+  // undo, then skip it and recurse
+}
+
+const nums: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+
+const out: string[] = [];
+build(nums, 0, [], out);
+
+out.push(`SUBSETS ${out.length}`);
+console.log(out.join("\n"));
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function build(nums: number[], at: number, chosen: number[], out: string[]): void {
+  if (at === nums.length) {
+    out.push(chosen.length > 0 ? chosen.join(" ") : "-");
+    return;
+  }
+
+  chosen.push(nums[at]);
+  build(nums, at + 1, chosen, out);
+  chosen.pop();
+
+  build(nums, at + 1, chosen, out);
+}
+
+const nums: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+
+const out: string[] = [];
+build(nums, 0, [], out);
+
+out.push(`SUBSETS ${out.length}`);
+console.log(out.join("\n"));
+'''
+hints = [
+  "Two recursive calls per element: one with it pushed, one without. Take first, and the order in the sample falls out.",
+  "`chosen.pop()` goes between the two calls. That is the `undo` in try-recurse-undo.",
+  "The base case is `at === nums.length`, and the empty selection there is the empty subset, which still counts. `chosen.join(\" \")` on an empty array is the empty string, so the `-` is yours to write.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n", expect = "1 2 3\n1 2\n1 3\n1\n2 3\n2\n3\n-\nSUBSETS 8\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",     expect = "5\n-\nSUBSETS 2\n",                             visible = false },
+  { name = "two",   stdin = "2\n-1 4\n",  expect = "-1 4\n-1\n4\n-\nSUBSETS 4\n",                   visible = false },
+  { name = "none",  stdin = "0\n\n",      expect = "-\nSUBSETS 1\n",                                visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id           = "typescript.hacker.14.word-search"
+node         = 14
+title        = "IS THE WORD IN THE GRID"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A board of letters and a name. They want to know whether the name is written in it, and they want the count of dead ends."
+concepts     = ["backtracking", "matrix", "graphs"]
+requires     = ["typescript.hacker.13.backtracking"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are a grid of lowercase letters. The
+last line is the word.
+
+The word is in the grid if you can spell it by moving up, down, left or right
+between **adjacent** cells, never using the same cell twice in one attempt.
+
+Print `FOUND` or `ABSENT`, then `STARTS <k>`: how many cells hold the word's
+first letter.
+
+```
+input:  3 4
+        abce
+        sfcs
+        adee
+        abcced
+output: FOUND
+        STARTS 2
+```
+
+Mark the cell used on the way in and **unmark it on the way out**. A cell
+that stays marked after a failed branch makes later branches fail for a reason
+that is not in the grid. A `string` cannot be marked in place — it is
+immutable, and tsc rejects `row[c] = "#"` on one because a string's index
+signature is read-only — so the grid has to become a `string[][]` first, with
+`line.split("")`.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function search(grid: string[][], r: number, c: number, word: string, at: number): boolean {
+  return false;
+}
+
+const data = input.trim().split(/\s+/);
+const rows = Number(data[0]);
+const cols = Number(data[1]);
+const grid: string[][] = data.slice(2, 2 + rows).map((line) => line.split(""));
+const word = data[2 + rows];
+
+let starts = 0;
+
+console.log("ABSENT");
+console.log(`STARTS ${starts}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function search(grid: string[][], r: number, c: number, word: string, at: number): boolean {
+  if (grid[r][c] !== word[at]) return false;
+  if (at + 1 === word.length) return true;
+
+  const here = grid[r][c];
+  grid[r][c] = "#";
+
+  // || short-circuits, so the first direction that spells the rest of the
+  // word stops the other three from being tried at all
+  const found =
+    (r > 0 && search(grid, r - 1, c, word, at + 1)) ||
+    (r + 1 < grid.length && search(grid, r + 1, c, word, at + 1)) ||
+    (c > 0 && search(grid, r, c - 1, word, at + 1)) ||
+    (c + 1 < grid[r].length && search(grid, r, c + 1, word, at + 1));
+
+  grid[r][c] = here;
+  return found;
+}
+
+const data = input.trim().split(/\s+/);
+const rows = Number(data[0]);
+const cols = Number(data[1]);
+const grid: string[][] = data.slice(2, 2 + rows).map((line) => line.split(""));
+const word = data[2 + rows];
+
+// count the starting letters before any cell is marked
+let starts = 0;
+for (const row of grid) for (const cell of row) if (cell === word[0]) starts++;
+
+// stop at the first cell the word spells out from; some() short-circuits
+const cells: [number, number][] = [];
+for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push([r, c]);
+const found = cells.some(([r, c]) => search(grid, r, c, word, 0));
+
+console.log(found ? "FOUND" : "ABSENT");
+console.log(`STARTS ${starts}`);
+'''
+hints = [
+  "Overwrite the cell with a character the word cannot contain, recurse, then put the original back.",
+  "Count the starting letters in a separate pass before you search, or the '#' marks will confuse the count.",
+  "The success base case is `at + 1 === word.length` — checked after matching this cell, not before.",
+  "Chain the four directions with `||` rather than four ifs and a `found` flag: `||` already stops at the first branch that succeeds, and so does `.some()` over the starting cells. Carrying on after a hit is work you were asked not to do.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 4\nabce\nsfcs\nadee\nabcced\n", expect = "FOUND\nSTARTS 2\n",  visible = true },
+  { name = "absent",  stdin = "3 4\nabce\nsfcs\nadee\nabcb\n",   expect = "ABSENT\nSTARTS 2\n", visible = false },
+  { name = "reuse",   stdin = "1 3\naba\naba\n",                 expect = "FOUND\nSTARTS 2\n",  visible = false },
+  { name = "single",  stdin = "1 1\na\na\n",                     expect = "FOUND\nSTARTS 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id           = "typescript.hacker.15.topo-sort"
+node         = 15
+title        = "WHAT ORDER DOES IT BUILD IN"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Eleven packages behind the signage control room's build and a dependency graph. Name an install order, or name the cycle that means there is not one."
+concepts     = ["graphs", "stacks-queues", "sorting"]
+requires     = ["typescript.hacker.14.word-search"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief        = '''
+Line one is `n m`: `n` tasks numbered `0..n-1` and `m` edges. The next `m`
+lines are `<a> <b>`, meaning `a` must be built before `b`.
+
+Print a build order on one line, space separated. When several tasks are ready
+at once, take the **lowest numbered** one, so the answer is unique. If no
+order exists, print `CYCLE` instead. Then print `DONE <how many you ordered>`.
+
+```
+input:  4 4
+        0 1
+        0 2
+        1 3
+        2 3
+output: 0 1 2 3
+        DONE 4
+```
+
+Kahn's algorithm: count how many things each task waits on, start with the
+ones waiting on nothing, and when you take a task, decrement its dependents.
+If you finish with tasks left over, those tasks are the cycle. The ready set
+is a min-heap of task numbers, so "lowest numbered" costs `log n` rather than
+a scan — the same twenty-odd lines as the merge quest, over plain numbers this
+time.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, m] = data;
+
+const after: number[][] = Array.from({ length: n }, () => []);
+const waiting: number[] = new Array<number>(n).fill(0);
+for (let e = 0; e < m; e++) {
+  const a = data[2 + 2 * e];
+  const b = data[3 + 2 * e];
+  after[a].push(b);
+  waiting[b]++;
+}
+
+// a min-heap of ready tasks: start with everything waiting on nothing,
+// take the smallest each time
+const ready: number[] = [];
+
+console.log("CYCLE");
+console.log("DONE 0");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+// a binary min-heap over plain numbers: children of i are 2i+1 and 2i+2
+function heapPush(h: number[], value: number): void {
+  h.push(value);
+  let i = h.length - 1;
+  while (i > 0) {
+    const parent = (i - 1) >> 1;
+    if (h[parent] <= h[i]) break;
+    [h[i], h[parent]] = [h[parent], h[i]];
+    i = parent;
+  }
+}
+
+function heapPop(h: number[]): number | undefined {
+  const top = h[0];
+  const last = h.pop();
+  if (h.length > 0 && last !== undefined) {
+    h[0] = last;
+    let i = 0;
+    for (;;) {
+      const l = 2 * i + 1;
+      const r = l + 1;
+      let smallest = i;
+      if (l < h.length && h[l] < h[smallest]) smallest = l;
+      if (r < h.length && h[r] < h[smallest]) smallest = r;
+      if (smallest === i) break;
+      [h[i], h[smallest]] = [h[smallest], h[i]];
+      i = smallest;
+    }
+  }
+  return top;
+}
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, m] = data;
+
+const after: number[][] = Array.from({ length: n }, () => []);
+const waiting: number[] = new Array<number>(n).fill(0);
+for (let e = 0; e < m; e++) {
+  const a = data[2 + 2 * e];
+  const b = data[3 + 2 * e];
+  after[a].push(b);
+  waiting[b]++;
+}
+
+const ready: number[] = [];
+for (let task = 0; task < n; task++) if (waiting[task] === 0) heapPush(ready, task);
+
+const order: number[] = [];
+for (let task = heapPop(ready); task !== undefined; task = heapPop(ready)) {
+  order.push(task);
+  for (const next of after[task]) {
+    waiting[next]--;
+    if (waiting[next] === 0) heapPush(ready, next);
+  }
+}
+
+console.log(order.length < n ? "CYCLE" : order.join(" "));
+console.log(`DONE ${order.length}`);
+'''
+hints = [
+  "`waiting[b]` is the in-degree of b — how many edges point at it.",
+  "A plain queue gives *an* order; a min-heap gives *the* order the statement asks for. Re-sorting the ready array on every push also gives it, at `O(n log n)` per push.",
+  "You never detect the cycle directly. You notice that fewer than n tasks came out, and the ones left are in it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "diamond", stdin = "4 4\n0 1\n0 2\n1 3\n2 3\n", expect = "0 1 2 3\nDONE 4\n",   visible = true },
+  { name = "cycle",   stdin = "3 3\n0 1\n1 2\n2 0\n",      expect = "CYCLE\nDONE 0\n",     visible = false },
+  { name = "loose",   stdin = "3 0\n",                     expect = "0 1 2\nDONE 3\n",     visible = false },
+  { name = "chain",   stdin = "5 4\n4 3\n3 2\n2 1\n1 0\n", expect = "4 3 2 1 0\nDONE 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id           = "typescript.hacker.16.union-find"
+node         = 16
+title        = "WHO IS CONNECTED TO WHOM"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The tram network, the MTR and the minibus routes on one sheet. How many separate networks are there really."
+concepts     = ["disjoint-set", "graphs", "complexity"]
+requires     = ["typescript.hacker.15.topo-sort"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief        = '''
+Standard input is `n m seed`: `n` stops numbered `0..n-1`, `m` undirected
+links. There are no links in the input — you build them, with **exactly** this
+generator, in 64-bit arithmetic that wraps (a `number` cannot hold it — use a
+`bigint` and `BigInt.asUintN(64, …)`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the m links, in order:
+    a = next() % n
+    b = next() % n
+    link a — b
+```
+
+Print three lines: how many separate networks there are, the size of the
+largest, and `REDUNDANT <k>` — how many of the links joined two stops that
+were already connected. A link from a stop to itself is one of those.
+
+```
+input:  8 5 1
+output: 4
+        5
+        REDUNDANT 1
+```
+
+For `8 5 1` the five links are `6—1`, `4—6`, `2—3`, `2—6`, `1—2`. The last one
+joins two stops already in the same network, so it is the redundant one, and
+what is left is `{1,2,3,4,6}` plus stops `0`, `5` and `7` on their own.
+
+The generator is where this language bites first. A `number` is a double,
+exact only up to `2^53`, and `x * 6364136223846793005` is far past that: in
+`number` arithmetic the state is wrong from the first step, silently. In
+`bigint` it is exact, `BigInt.asUintN(64, …)` is the wrap, and `x >> 33n` is
+below `2^31`, so `Number(x >> 33n)` brings it back as an exact `number` for
+everything else.
+
+**The complexity here is enforced.** One hidden case is `n = 200000` with
+`m = 200000` links. The obvious answer that is not union-find — walk the
+network out from `a` and see whether `b` is already in it, once per link — is
+correct, and it is `O(n)` per link and so `O(n·m)` in total: on this machine
+it had not finished after **a minute**, against a ten second run limit. That
+is what the starter is. Union-find with path compression and union by size
+does the same 200000 links in about **a tenth of a second**, measured here
+with the solution that ships in this quest.
+
+Worth seeing clearly, because it is the most common way to fail a timed
+screen: **the starter is not wrong.** It prints exactly the right answer on
+the sample and on both of the small hidden cases. It is rejected only for
+arriving far too late.
+
+Union-find: every stop points at a parent, `find` walks to the root, `union`
+points one root at the other. Compress the path on the way back out of `find`
+and the whole thing is effectively constant time per query.
+
+Write `find` as a loop. The recursive one is the textbook version, and it is
+a `RangeError: Maximum call stack size exceeded` on a chain some ten thousand
+long — which is exactly the shape union-by-size exists to prevent, and exactly
+the shape a hostile input has before the first `find` ever compresses it.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const [n, m, seed] = input.trim().split(/\s+/).map(Number);
+
+let x = BigInt(seed);
+function next(): number {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  return Number(x >> 33n);
+}
+
+const links: number[][] = Array.from({ length: n }, () => []);
+let redundant = 0;
+
+for (let e = 0; e < m; e++) {
+  const a = next() % n;
+  const b = next() % n;
+
+  // correct, and far too slow: walk the whole network out from a to see
+  // whether b is already in it. This is what the big hidden case rejects.
+  const seen: boolean[] = new Array(n).fill(false);
+  seen[a] = true;
+  const queue: number[] = [a];
+  let head = 0;
+  let found = a === b;
+  while (head < queue.length && !found) {
+    const at = queue[head++];
+    for (const nxt of links[at]) {
+      if (!seen[nxt]) {
+        if (nxt === b) {
+          found = true;
+          break;
+        }
+        seen[nxt] = true;
+        queue.push(nxt);
+      }
+    }
+  }
+  if (found) redundant++;
+  links[a].push(b);
+  links[b].push(a);
+}
+
+let groups = 0;
+let largest = 0;
+const seen: boolean[] = new Array(n).fill(false);
+for (let start = 0; start < n; start++) {
+  if (seen[start]) continue;
+  groups++;
+  seen[start] = true;
+  const queue: number[] = [start];
+  let head = 0;
+  while (head < queue.length) {
+    const at = queue[head++];
+    for (const nxt of links[at]) {
+      if (!seen[nxt]) {
+        seen[nxt] = true;
+        queue.push(nxt);
+      }
+    }
+  }
+  if (queue.length > largest) largest = queue.length;
+}
+
+console.log(groups);
+console.log(largest);
+console.log(`REDUNDANT ${redundant}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function find(parent: Int32Array, x: number): number {
+  let root = x;
+  while (parent[root] !== root) root = parent[root];
+  // path compression: point everything we walked over straight at the root
+  while (parent[x] !== root) {
+    const next = parent[x];
+    parent[x] = root;
+    x = next;
+  }
+  return root;
+}
+
+const [n, m, seed] = input.trim().split(/\s+/).map(Number);
+
+// a number is a double: 64-bit wrapping arithmetic has to be a bigint
+let x = BigInt(seed);
+function next(): number {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  return Number(x >> 33n);
+}
+
+const parent = new Int32Array(n);
+const size = new Int32Array(n).fill(1);
+for (let i = 0; i < n; i++) parent[i] = i;
+let groups = n;
+let redundant = 0;
+
+for (let e = 0; e < m; e++) {
+  let a = find(parent, next() % n);
+  let b = find(parent, next() % n);
+  if (a === b) {
+    redundant++;
+    continue;
+  }
+  // hang the smaller tree under the bigger one
+  if (size[a] < size[b]) [a, b] = [b, a];
+  parent[b] = a;
+  size[a] += size[b];
+  groups--;
+}
+
+let largest = 0;
+for (let i = 0; i < n; i++) {
+  if (parent[i] === i && size[i] > largest) largest = size[i];
+}
+
+console.log(groups);
+console.log(largest);
+console.log(`REDUNDANT ${redundant}`);
+'''
+hints = [
+  "Draw the two endpoints as you go — one generator step each, in that order — rather than building a list of links first. Nothing here needs the links twice.",
+  "Start with every stop as its own parent and n groups; each successful union drops the count by one. An `Int32Array` for the parents is as fast as it gets and says what it holds.",
+  "A link whose two ends already have the same root is the redundant one — count it and move on. A self-link, a === b, falls out of that test on its own.",
+  "Only a root's size entry is meaningful, so read the largest off the roots, not off every index.",
+  "Every literal in the bigint line takes an `n` suffix — `6364136223846793005n` — and mixing a `bigint` with a `number` in one expression is a compile error, not a conversion. That error is tsc doing its job.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 5 1\n",               expect = "4\n5\nREDUNDANT 1\n",              visible = true },
+  { name = "single", stdin = "1 2 7\n",               expect = "1\n1\nREDUNDANT 2\n",              visible = false },
+  { name = "dozen",  stdin = "12 9 99\n",             expect = "5\n5\nREDUNDANT 2\n",              visible = false },
+  { name = "big",    stdin = "200000 200000 12345\n", expect = "32158\n159720\nREDUNDANT 32158\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id           = "typescript.hacker.17.lis"
+node         = 17
+title        = "THE LONGEST RUN UP"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A year of daily takings. They want the longest stretch of improving days, and they do not have to be consecutive."
+concepts     = ["dynamic-programming", "binary-search", "complexity"]
+requires     = ["typescript.hacker.16.union-find"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+Print the length of the longest **strictly increasing subsequence** — the
+values keep their order but need not be adjacent. Then print
+`TAILS <k>` where `k` is that same length, read off the patience-sorting pile
+count.
+
+```
+input:  8
+        10 9 2 5 3 7 101 18
+output: 4
+        TAILS 4
+```
+
+The `O(n²)` table is the answer you should be able to write cold. The `O(n log n)`
+one keeps, for each length, the smallest value a subsequence of that length can
+end on — an array that is always sorted, so the position of a new value is a
+binary search. There is no `bisect` here: it is a lower bound, six lines, and
+the off-by-one in it is the question. Either passes here; the cases are small
+and say so. Write the second one anyway, because the follow-up is always "and
+faster?".
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+// the first index in the sorted array whose value is >= value
+function lowerBound(sorted: number[], value: number): number {
+  return 0;
+}
+
+const nums: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+
+const tails: number[] = [];
+
+// for each value, find where it belongs among the pile tops and put it there
+console.log(0);
+console.log("TAILS 0");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+// the first index in the sorted array whose value is >= value
+function lowerBound(sorted: number[], value: number): number {
+  let low = 0;
+  let high = sorted.length;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if (sorted[mid] < value) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
+const nums: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+
+// tails[i] = the smallest value an increasing subsequence of length i+1
+// can end on. It is sorted, always.
+const tails: number[] = [];
+for (const value of nums) {
+  const at = lowerBound(tails, value);
+  if (at === tails.length) tails.push(value);
+  else tails[at] = value;
+}
+
+console.log(tails.length);
+console.log(`TAILS ${tails.length}`);
+'''
+hints = [
+  "`tails` is not a subsequence. Its length is the answer; its contents are only the best ending values.",
+  "Strictly increasing means you replace the first tail that is >= value — the lower bound. Searching for the first tail that is > value gives you non-decreasing instead.",
+  "Running off the end of tails means this value extends the longest run so far — push it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "8\n10 9 2 5 3 7 101 18\n", expect = "4\nTAILS 4\n", visible = true },
+  { name = "descending", stdin = "4\n5 4 3 2\n",             expect = "1\nTAILS 1\n", visible = false },
+  { name = "flat",       stdin = "5\n7 7 7 7 7\n",           expect = "1\nTAILS 1\n", visible = false },
+  { name = "ascending",  stdin = "6\n1 2 3 4 5 6\n",         expect = "6\nTAILS 6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id           = "typescript.hacker.18.edit-distance"
+node         = 18
+title        = "HOW FAR APART"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Yee Wo Street on one tram board and Yee Woo Street on the next. How many single-character edits between them."
+concepts     = ["dynamic-programming", "strings", "matrix"]
+requires     = ["typescript.hacker.17.lis"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief        = '''
+Two lines, one word each, lowercase. Either line may be **empty**, and then
+the answer is the length of the other one.
+
+Print the **edit distance**: the fewest single-character insertions,
+deletions or substitutions that turn the first into the second. Then print
+`LCS <k>`, the length of their longest common subsequence.
+
+```
+input:  horse
+        ros
+output: 3
+        LCS 2
+```
+
+Two tables over the same two strings, and both are the same three-line
+recurrence with a different tie-break. Fill row by row; the answer is the far
+corner. Row `0` and column `0` are not zero for the edit table — they are the
+cost of deleting or inserting everything.
+
+An empty first line means `input.trim().split(/\s+/)` would hand you the
+second word as the first. Read by lines — `input.split("\n")` — not by tokens,
+on this one.
+
+And build each table row by row. `new Array(h).fill(new Array(w).fill(0))` is
+`h` references to **one** row, so every write lands in all of them;
+`Array.from({ length: h }, () => new Array(w).fill(0))` calls the function once
+per row.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const lines = input.split("\n");
+const a = (lines[0] ?? "").trim();
+const b = (lines[1] ?? "").trim();
+
+const table = (): number[][] =>
+  Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+const edit = table();
+const lcs = table();
+
+// fill both tables; the answers are the bottom-right corners
+console.log(0);
+console.log("LCS 0");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const lines = input.split("\n");
+const a = (lines[0] ?? "").trim();
+const b = (lines[1] ?? "").trim();
+
+// one fresh array per row: fill() with an array would share a single row
+const table = (): number[][] =>
+  Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+
+const edit = table();
+for (let i = 0; i <= a.length; i++) edit[i][0] = i;
+for (let j = 0; j <= b.length; j++) edit[0][j] = j;
+for (let i = 1; i <= a.length; i++) {
+  for (let j = 1; j <= b.length; j++) {
+    if (a[i - 1] === b[j - 1]) edit[i][j] = edit[i - 1][j - 1];
+    else edit[i][j] = 1 + Math.min(edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1]);
+  }
+}
+
+const lcs = table();
+for (let i = 1; i <= a.length; i++) {
+  for (let j = 1; j <= b.length; j++) {
+    if (a[i - 1] === b[j - 1]) lcs[i][j] = lcs[i - 1][j - 1] + 1;
+    else lcs[i][j] = Math.max(lcs[i - 1][j], lcs[i][j - 1]);
+  }
+}
+
+console.log(edit[a.length][b.length]);
+console.log(`LCS ${lcs[a.length][b.length]}`);
+'''
+hints = [
+  "edit[i][0] = i and edit[0][j] = j: turning a prefix into nothing costs one deletion per character.",
+  "Matching characters cost nothing and step diagonally; a mismatch costs one and takes the cheapest of the three neighbours.",
+  "LCS is the same walk with max instead of min, and no diagonal step on a mismatch. And `Array.from` with a function, never `fill` with an array — `fill` puts the same object in every slot.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "horse\nros\n",         expect = "3\nLCS 2\n", visible = true },
+  { name = "same",    stdin = "causeway\ncauseway\n", expect = "0\nLCS 8\n", visible = false },
+  { name = "nothing", stdin = "abc\nxyz\n",           expect = "3\nLCS 0\n", visible = false },
+  { name = "insert",  stdin = "mtr\nmetro\n",         expect = "2\nLCS 3\n", visible = false },
+  { name = "empty",   stdin = "\nabc\n",              expect = "3\nLCS 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id           = "typescript.hacker.19.knapsack"
+node         = 19
+title        = "WHAT FITS IN THE BAG"
+difficulty   = 5
+time_limit_s = 1200
+story        = "One rider, one bag, and a board of orders each with a weight and a tip. Greedy picks the wrong ones."
+concepts     = ["dynamic-programming", "greedy", "slices"]
+requires     = ["typescript.hacker.18.edit-distance"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief        = '''
+Line one is `n cap`. The next `n` lines are `<weight> <value>`. Each item can
+be taken at most **once**.
+
+Print the best total value that fits in `cap`, then `GREEDY <v>`: what you
+would get by repeatedly taking the item with the best value-per-weight that
+still fits. On equal value-per-weight, the lighter item goes first.
+
+```
+input:  3 10
+        6 10
+        5 7
+        5 7
+output: 14
+        GREEDY 10
+```
+
+The two numbers being different is the whole point of the quest, and the
+sample shows it: the best value-per-weight is the `6 10` item at `1.67`, and
+taking it leaves four units of room that nothing fits into. Passing on it and
+taking both `5 7` items is worth `14`. The hidden cases are small, so what
+they check is that you got both numbers right, not that the table is fast.
+
+Compare the ratios exactly. There is no fraction type here, and `value /
+weight` is a double: two ratios that are equal on paper can come out a bit
+apart in binary, and then the tie-break never runs. Cross-multiply instead —
+`a.value * b.weight` against `b.value * a.weight` — which is exact in integers
+for as long as the products stay under `2^53`.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+interface Item {
+  weight: number;
+  value: number;
+}
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, cap] = data;
+const items: Item[] = [];
+for (let i = 0; i < n; i++) items.push({ weight: data[2 + 2 * i], value: data[3 + 2 * i] });
+
+const best: number[] = new Array<number>(cap + 1).fill(0);
+
+// one row per item, capacities walked downwards so each item is used once
+console.log(0);
+console.log("GREEDY 0");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+interface Item {
+  weight: number;
+  value: number;
+}
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, cap] = data;
+const items: Item[] = [];
+for (let i = 0; i < n; i++) items.push({ weight: data[2 + 2 * i], value: data[3 + 2 * i] });
+
+const best: number[] = new Array<number>(cap + 1).fill(0);
+for (const { weight, value } of items) {
+  // downwards, so this item cannot be picked up twice in one pass
+  for (let room = cap; room >= weight; room--) {
+    const candidate = best[room - weight] + value;
+    if (candidate > best[room]) best[room] = candidate;
+  }
+}
+
+// best ratio first, lighter first on a tie; cross-multiplying keeps it exact
+const order = [...items].sort(
+  (a, b) => b.value * a.weight - a.value * b.weight || a.weight - b.weight,
+);
+let room = cap;
+let greedy = 0;
+for (const { weight, value } of order) {
+  if (weight <= room) {
+    room -= weight;
+    greedy += value;
+  }
+}
+
+console.log(best[cap]);
+console.log(`GREEDY ${greedy}`);
+'''
+hints = [
+  "Walk the capacities downwards — `for (let room = cap; room >= weight; room--)` — which is what makes it 0/1 instead of unbounded. Upwards lets the same item be reused.",
+  "The comparator `(a, b) => b.value * a.weight - a.value * b.weight || a.weight - b.weight` puts the best ratio first and the lighter item first on a tie, with no division anywhere.",
+  "The greedy pass is a straight loop over the sorted items — no backtracking, which is exactly why it is wrong.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "3 10\n6 10\n5 7\n5 7\n", expect = "14\nGREEDY 10\n", visible = true },
+  { name = "no-room",   stdin = "2 1\n5 100\n9 900\n",    expect = "0\nGREEDY 0\n",   visible = false },
+  { name = "takes-all", stdin = "3 10\n1 1\n2 2\n3 3\n",  expect = "6\nGREEDY 6\n",   visible = false },
+  { name = "one",       stdin = "1 4\n4 9\n",             expect = "9\nGREEDY 9\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id           = "typescript.hacker.20.bits"
+node         = 20
+title        = "THE ONE THAT IS ALONE"
+difficulty   = 4
+time_limit_s = 600
+story        = "Every docket is scanned twice except one. They will not let you use a Map and they will not let you sort."
+concepts     = ["bit-manipulation", "math", "complexity"]
+requires     = ["typescript.hacker.19.knapsack"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` non-negative integers, in which every value
+appears exactly twice except one.
+
+Print four lines:
+
+1. the value that appears once, found with **xor** and constant extra space
+2. how many `1` bits are set in it
+3. `POW2 YES` if it is a power of two, `POW2 NO` otherwise (`0` is not)
+4. the value with its lowest set bit cleared, or `0` if it has none
+
+```
+input:  5
+        4 1 2 1 2
+output: 4
+        1
+        POW2 YES
+        0
+```
+
+`x ^ x == 0` and `x ^ 0 == x`, and xor does not care what order it happens in.
+That is the whole first line. `x & (x - 1)` clears the lowest set bit, which
+gives you the third and fourth lines for free.
+
+Every bitwise operator here converts its operands to a **32-bit signed**
+integer first. The values in these cases are small, so that costs nothing —
+but `2 ** 31 | 0` is `-2147483648`, and a value at or past `2^31` would come
+out negative or truncated without a word. Past that line, `bigint` has the
+same operators with no width at all. Know where the line is before the
+interviewer asks.
+
+The four cases here are five numbers at most, and the clock is not measuring
+speed on them: a `Map` of counts clears every one, and so would sorting. Nor
+would a bigger case change that, because the bar this question sets is
+**space** — one accumulator and nothing else — and no run limit can tell a
+constant-space answer from a `Map`. That one is on your honour, and on the
+interviewer, who will ask.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const nums: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+
+let alone = 0;
+
+// xor everything together, then read the bits off the result
+console.log(alone);
+console.log(0);
+console.log("POW2 NO");
+console.log(0);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const nums: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+
+// bitwise operators work on 32-bit signed integers; these values fit
+let alone = 0;
+for (const value of nums) alone ^= value;
+
+let bits = 0;
+for (let walk = alone; walk !== 0; walk &= walk - 1) bits++;
+
+const powerOfTwo = alone !== 0 && (alone & (alone - 1)) === 0;
+const cleared = alone === 0 ? 0 : alone & (alone - 1);
+
+console.log(alone);
+console.log(bits);
+console.log(powerOfTwo ? "POW2 YES" : "POW2 NO");
+console.log(cleared);
+'''
+hints = [
+  "The pairs cancel themselves out whatever order they arrive in, so one fold over the array is enough. `nums.reduce((acc, v) => acc ^ v, 0)` is the same loop in one line.",
+  "Counting bits by clearing the lowest one each time runs once per set bit, not once per bit width.",
+  "A power of two has exactly one bit set, so clearing the lowest one leaves zero — and zero itself has to be excluded by hand.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n4 1 2 1 2\n",    expect = "4\n1\nPOW2 YES\n0\n",    visible = true },
+  { name = "seven",  stdin = "3\n7 9 9\n",        expect = "7\n3\nPOW2 NO\n6\n",     visible = false },
+  { name = "single", stdin = "1\n0\n",            expect = "0\n0\nPOW2 NO\n0\n",     visible = false },
+  { name = "big",    stdin = "5\n1024 5 5 8 8\n", expect = "1024\n1\nPOW2 YES\n0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id           = "typescript.hacker.21.matrix"
+node         = 21
+title        = "TURN THE FLOOR PLAN"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The plan is the wrong way up and there is no room on the table for a second copy of it."
+concepts     = ["matrix", "slices", "iteration"]
+requires     = ["typescript.hacker.20.bits"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are an `n × n` grid of integers.
+
+Print the grid rotated **90° clockwise**, `n` lines of space-separated values.
+Then print its values in **spiral order** — outer ring clockwise from the top
+left, inwards — on one line.
+
+```
+input:  3
+        1 2 3
+        4 5 6
+        7 8 9
+output: 7 4 1
+        8 5 2
+        9 6 3
+        1 2 3 6 9 8 7 4 5
+```
+
+The rotation is the one to do in place: transpose, then reverse each row.
+Naming that out loud is half the question. `row.reverse()` reverses in place
+and hands back the same array, which is what you want here and a surprise
+anywhere you meant to keep the original.
+
+The spiral wants the grid as it was, so copy it before you rotate: a copy of
+each row, `grid.map((row) => row.slice())`. `[...grid]` copies the outer array
+and shares every row with the original, and the rotation then writes through
+both.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const n = data[0];
+const grid: number[][] = [];
+for (let r = 0; r < n; r++) grid.push(data.slice(1 + r * n, 1 + (r + 1) * n));
+
+// transpose, reverse each row, print; then walk the spiral
+for (let r = 0; r < n; r++) console.log("?");
+console.log("?");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const n = data[0];
+const original: number[][] = [];
+for (let r = 0; r < n; r++) original.push(data.slice(1 + r * n, 1 + (r + 1) * n));
+
+// a copy of every row, not of the outer array alone
+const grid = original.map((row) => row.slice());
+for (let r = 0; r < n; r++) {
+  for (let c = r + 1; c < n; c++) {
+    [grid[r][c], grid[c][r]] = [grid[c][r], grid[r][c]];
+  }
+}
+for (const row of grid) row.reverse();
+
+const out: string[] = grid.map((row) => row.join(" "));
+
+const spiral: number[] = [];
+let top = 0;
+let bottom = n - 1;
+let left = 0;
+let right = n - 1;
+while (top <= bottom && left <= right) {
+  for (let c = left; c <= right; c++) spiral.push(original[top][c]);
+  top++;
+  for (let r = top; r <= bottom; r++) spiral.push(original[r][right]);
+  right--;
+  if (top <= bottom) {
+    for (let c = right; c >= left; c--) spiral.push(original[bottom][c]);
+    bottom--;
+  }
+  if (left <= right) {
+    for (let r = bottom; r >= top; r--) spiral.push(original[r][left]);
+    left++;
+  }
+}
+out.push(spiral.join(" "));
+console.log(out.join("\n"));
+'''
+hints = [
+  "Transpose by swapping only above the diagonal — c starting at r + 1 — or you swap everything back. `[g[r][c], g[c][r]] = [g[c][r], g[r][c]]` swaps without a temporary.",
+  "`grid.map((row) => row.slice())` is a deep enough copy for a grid of numbers; `grid.slice()` and `[...grid]` are one level short.",
+  "The two `if` guards inside the spiral loop are what stop a single middle row or column being walked twice.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n4 5 6\n7 8 9\n", expect = "7 4 1\n8 5 2\n9 6 3\n1 2 3 6 9 8 7 4 5\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",                   expect = "5\n5\n",                                   visible = false },
+  { name = "two",   stdin = "2\n1 2\n3 4\n",            expect = "3 1\n4 2\n1 2 4 3\n",                      visible = false },
+  { name = "four",  stdin = "4\n1 2 3 4\n5 6 7 8\n9 10 11 12\n13 14 15 16\n", expect = "13 9 5 1\n14 10 6 2\n15 11 7 3\n16 12 8 4\n1 2 3 4 8 12 16 15 14 13 9 5 6 7 11 10\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id           = "typescript.hacker.22.trie"
+node         = 22
+title        = "THE PREFIX BOX"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Autocomplete for the tram-stop board — the honest kind, that only completes what is actually on the list."
+concepts     = ["tries", "strings", "collections"]
+requires     = ["typescript.hacker.21.matrix"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief        = '''
+Line one is `n q`. The next `n` lines are lowercase words to insert. The next
+`q` lines are queries, each `WORD <s>` or `PREFIX <s>`.
+
+Build a trie — a tree of nodes each holding a map from letter to child —
+and answer:
+
+* `WORD <s>` → `YES` if `s` was inserted, `NO` otherwise
+* `PREFIX <s>` → how many of the `n` inserted words start with `s`
+
+The `n` words are not promised to be distinct, and `PREFIX` counts
+**insertions**, not distinct words: insert `tram` twice and `PREFIX tram` is
+`2`. `NODES` counts nodes, so the second insertion adds none.
+
+Then print `NODES <k>`, the number of nodes in the trie including the root.
+
+```
+input:  3 3
+        tram
+        tramway
+        train
+        WORD tram
+        PREFIX tra
+        WORD tra
+output: YES
+        3
+        NO
+        NODES 10
+```
+
+Keep a count on every node of how many inserted words pass through it, and
+`PREFIX` is a walk with no counting at the end. A node is a small class; the
+children are a `Map<string, TrieNode>` keyed by the letter. A plain `{}`
+would survive single letters, and the habit is the problem: key one by whole
+words and `"constructor" in {}` is already `true`, answered by a prototype you
+never inserted into. A `Map` has no inherited keys to trip on.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class TrieNode {
+  children = new Map<string, TrieNode>();
+  through = 0;
+  terminal = false;
+}
+
+const lines = input.split("\n");
+const [n, q] = lines[0].trim().split(/\s+/).map(Number);
+
+const root = new TrieNode();
+let nodes = 1;
+
+for (let i = 0; i < n; i++) {
+  const word = lines[1 + i].trim();
+  // walk down, creating nodes as needed, bumping `through`
+}
+
+const out: string[] = [];
+for (let i = 0; i < q; i++) {
+  const query = lines[1 + n + i].trim().split(/\s+/);
+  out.push("NO");
+}
+out.push(`NODES ${nodes}`);
+console.log(out.join("\n"));
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class TrieNode {
+  children = new Map<string, TrieNode>();
+  through = 0;
+  terminal = false;
+}
+
+const lines = input.split("\n");
+const [n, q] = lines[0].trim().split(/\s+/).map(Number);
+
+const root = new TrieNode();
+let nodes = 1;
+
+for (let i = 0; i < n; i++) {
+  const word = lines[1 + i].trim();
+  let at = root;
+  for (const letter of word) {
+    let child = at.children.get(letter);
+    if (child === undefined) {
+      child = new TrieNode();
+      at.children.set(letter, child);
+      nodes++;
+    }
+    child.through++;
+    at = child;
+  }
+  at.terminal = true;
+}
+
+const out: string[] = [];
+for (let i = 0; i < q; i++) {
+  const [kind, text = ""] = lines[1 + n + i].trim().split(/\s+/);
+
+  let at: TrieNode | undefined = root;
+  for (const letter of text) {
+    at = at.children.get(letter);
+    if (at === undefined) break;
+  }
+
+  if (kind === "WORD") out.push(at !== undefined && at.terminal ? "YES" : "NO");
+  else out.push(String(at !== undefined ? at.through : 0));
+}
+out.push(`NODES ${nodes}`);
+console.log(out.join("\n"));
+'''
+hints = [
+  "`children.get(letter)` returns undefined for a missing child, and undefined is the signal both to create one on insert and to stop on lookup.",
+  "`through` is bumped on the node you step *onto*, so the root never counts itself.",
+  "A query that falls off the trie leaves the cursor `undefined`, and `TrieNode | undefined` makes tsc ask you what NO and 0 look like in that case.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 3\ntram\ntramway\ntrain\nWORD tram\nPREFIX tra\nWORD tra\n", expect = "YES\n3\nNO\nNODES 10\n", visible = true },
+  { name = "missing", stdin = "1 2\nmtr\nPREFIX z\nWORD mtr\n",                              expect = "0\nYES\nNODES 4\n",     visible = false },
+  { name = "nested",  stdin = "2 2\na\nab\nPREFIX a\nWORD a\n",                              expect = "2\nYES\nNODES 3\n",     visible = false },
+  { name = "empty-q", stdin = "2 1\nhku\nhk\nPREFIX hk\n",                                   expect = "2\nNODES 4\n",          visible = false },
+  { name = "twice",   stdin = "3 3\ntram\ntram\ntrap\nPREFIX tram\nPREFIX tra\nWORD tram\n",  expect = "2\n3\nYES\nNODES 6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id           = "typescript.hacker.23.prefix-sums"
+node         = 23
+title        = "HOW MANY WAYS TO HIT THE TARGET"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A day of takings and a number the auditor wants to see. How many runs of consecutive hours add up to exactly that."
+concepts     = ["prefix-sums", "hashing", "complexity"]
+requires     = ["typescript.hacker.22.trie"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief        = '''
+Line one is `n k`. Line two is `n` integers, which may be negative.
+
+Print how many contiguous runs sum to exactly `k`, then `RANGE <s>`, the sum
+of the whole list, read off the last prefix sum rather than by adding again.
+
+```
+input:  5 3
+        1 2 3 -3 3
+output: 5
+        RANGE 6
+```
+
+Negative values kill the sliding window — a window that is too big cannot be
+fixed by shrinking it. What survives is prefix sums: a run `i..j` sums to `k`
+exactly when `prefix[j] - prefix[i] == k`, so count how many earlier prefixes
+equal `prefix[j] - k`. Seed the map with `0 → 1` for runs that start at the
+beginning.
+
+Key it with a `Map<number, number>`. A plain object would take the prefix as
+a key too, and hand it back as a **string**: `Object.keys` of `{ [-2]: 1 }` is
+`["-2"]`. The type said `number`; the runtime did not keep it.
+
+The four cases here are five numbers at most, and the clock is not measuring
+speed on them: the `O(n²)` double loop over every start and every end clears
+all four. The bar is real — on a day of takings that double loop is minutes —
+and it is not what these cases check. What they check is the part that is
+easy to get wrong: the `0 → 1` seed, and looking up before recording.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, k] = data;
+const nums = data.slice(2, 2 + n);
+
+const seen = new Map<number, number>([[0, 1]]);
+
+// running prefix; for each one, how many earlier prefixes were prefix - k
+console.log(0);
+console.log("RANGE 0");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const data: number[] = input.trim().split(/\s+/).map(Number);
+const [n, k] = data;
+const nums = data.slice(2, 2 + n);
+
+const seen = new Map<number, number>([[0, 1]]);
+
+let prefix = 0;
+let runs = 0;
+for (const value of nums) {
+  prefix += value;
+  // look up before recording, or an empty run counts itself when k is 0
+  runs += seen.get(prefix - k) ?? 0;
+  seen.set(prefix, (seen.get(prefix) ?? 0) + 1);
+}
+
+console.log(runs);
+console.log(`RANGE ${prefix}`);
+'''
+hints = [
+  "Look the earlier prefix up *before* you record the current one, or a run of length zero counts itself when k is 0.",
+  "`new Map([[0, 1]])` up front is what lets a run that starts at index 0 be found at all.",
+  "`seen.get(prefix - k) ?? 0` — `??` and not `||`, which would also be right here, but only by the accident that the count it replaces is 0.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "5 3\n1 2 3 -3 3\n",  expect = "5\nRANGE 6\n",  visible = true },
+  { name = "zeroes",   stdin = "3 0\n0 0 0\n",       expect = "6\nRANGE 0\n",  visible = false },
+  { name = "none",     stdin = "3 9\n1 1 1\n",       expect = "0\nRANGE 3\n",  visible = false },
+  { name = "negative", stdin = "4 -2\n-1 -1 2 -2\n", expect = "3\nRANGE -2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id           = "typescript.hacker.24.inversions"
+node         = 24
+title        = "THE ONE THE CLOCK CATCHES"
+difficulty   = 5
+time_limit_s = 1500
+story        = "First question of the afternoon round. The naive answer is correct, and it is the wrong answer."
+concepts     = ["sorting", "complexity", "recursion"]
+requires     = ["typescript.hacker.23.prefix-sums"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief        = '''
+Standard input is two integers, `n` and `seed`. There is no array in the input
+— you build it, with **exactly** this generator, in 64-bit arithmetic that
+wraps:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (mod 2^64)
+    next value = (x >> 33) % 1000000007
+```
+
+Count the **inversions**: pairs `i < j` where `a[i] > a[j]`. Print the count,
+then `MAX <largest value>`.
+
+```
+input:  8 1
+output: 19
+        MAX 908834774
+```
+
+For `8 1` the array is
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`.
+
+**This quest enforces its complexity, and it is the only kind that can.** One
+hidden case is `n = 200000`. The `O(n²)` double loop — which is what the
+starter is — is `2 × 10^10` comparisons and took **forty-two seconds** on
+this machine, against a ten second run limit. Counting inversions during a
+merge sort is `O(n log n)` and finishes in about a tenth of a second. Measured,
+on this machine, with these two programs.
+
+Three things this language decides differently. The generator state does not
+fit a `number` — it is a double, exact only to `2^53` — so it is a `bigint`,
+wrapped with `BigInt.asUintN(64, …)` after every step. The answer,
+`9990744366`, would not fit in a 32-bit integer; a `number` holds it exactly,
+and it stays exact only as long as nothing applies `| 0` or `>>` to it. And
+`Math.max(...values)` spreads two hundred thousand arguments onto the call
+stack, which on this machine is a `RangeError` before it is an answer: take
+the maximum with a loop.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function generate(n: number, seed: number): number[] {
+  let x = BigInt(seed);
+  const values: number[] = [];
+  for (let i = 0; i < n; i++) {
+    x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+    values.push(Number(x >> 33n) % 1000000007);
+  }
+  return values;
+}
+
+const [n, seed] = input.trim().split(/\s+/).map(Number);
+
+const values = generate(n, seed);
+let largest = 0;
+for (const v of values) if (v > largest) largest = v;
+
+// correct, and far too slow: this is what the big hidden case rejects
+let inversions = 0;
+for (let i = 0; i < n; i++) {
+  for (let j = i + 1; j < n; j++) {
+    if (values[i] > values[j]) inversions++;
+  }
+}
+
+console.log(inversions);
+console.log(`MAX ${largest}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+function generate(n: number, seed: number): number[] {
+  // a number is a double, exact only to 2^53: the state has to be a bigint
+  let x = BigInt(seed);
+  const values: number[] = [];
+  for (let i = 0; i < n; i++) {
+    x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+    values.push(Number(x >> 33n) % 1000000007);
+  }
+  return values;
+}
+
+// Merge sort of a[lo..hi), returning how many inversions it removed.
+// `buf` is one scratch array shared by every level.
+function sortCount(a: number[], buf: number[], lo: number, hi: number): number {
+  if (hi - lo < 2) return 0;
+  const mid = lo + Math.floor((hi - lo) / 2);
+  let inversions = sortCount(a, buf, lo, mid) + sortCount(a, buf, mid, hi);
+
+  let i = lo;
+  let j = mid;
+  let k = lo;
+  while (i < mid && j < hi) {
+    if (a[i] <= a[j]) {
+      buf[k++] = a[i++];
+    } else {
+      // a[i..mid) are all greater than a[j]
+      inversions += mid - i;
+      buf[k++] = a[j++];
+    }
+  }
+  while (i < mid) buf[k++] = a[i++];
+  while (j < hi) buf[k++] = a[j++];
+  for (let t = lo; t < hi; t++) a[t] = buf[t];
+  return inversions;
+}
+
+const [n, seed] = input.trim().split(/\s+/).map(Number);
+
+const values = generate(n, seed);
+
+// a loop, not Math.max(...values): 200000 arguments do not fit on the stack
+let largest = 0;
+for (const v of values) if (v > largest) largest = v;
+
+const work = values.slice();
+const inversions = sortCount(work, new Array<number>(n).fill(0), 0, n);
+
+console.log(inversions);
+console.log(`MAX ${largest}`);
+'''
+hints = [
+  "Take the max with a loop before you sort, or sort a copy: a merge sort that works in place leaves the original array reordered. And do not spread 200000 values into `Math.max`.",
+  "When the right-hand value wins the merge, every remaining element of the left half is greater than it — that is `mid - i` inversions in one go, and it is the whole trick.",
+  "The recursion is log2(200000), about eighteen frames deep — nowhere near the limit. Merge through one scratch buffer allocated once, rather than slicing new arrays at every level. A Fenwick tree over the compressed values is the other O(n log n) answer and is worth naming in the room.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 1\n",          expect = "19\nMAX 908834774\n",          visible = true },
+  { name = "single", stdin = "1 7\n",          expect = "0\nMAX 59165271\n",            visible = false },
+  { name = "dozen",  stdin = "12 99\n",        expect = "33\nMAX 998275676\n",          visible = false },
+  { name = "big",    stdin = "200000 12345\n", expect = "9990744366\nMAX 999991076\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id           = "typescript.hacker.25.test-cases"
+node         = 25
+title        = "T TEST CASES FOLLOW"
+difficulty   = 3
+time_limit_s = 900
+story        = "The shape every screen uses, and the bug every candidate writes at least once: the second case remembers the first."
+concepts     = ["io", "collections", "control-flow", "sorting"]
+requires     = ["typescript.hacker.24.inversions"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief        = '''
+Line one is `T`, the number of independent test cases. Each case is a line
+with `n`, then a line with `n` integers — and when `n` is `0` that second line
+is empty.
+
+For each case print the **second largest distinct** value, or `NONE` if there
+are fewer than two distinct values. After all of them print `CASES <T>`.
+
+```
+input:  3
+        5
+        3 1 4 1 5
+        3
+        7 7 7
+        0
+
+output: 4
+        NONE
+        NONE
+        CASES 3
+```
+
+This is the standard competitive-screen wrapper and it fails candidates for
+one reason: state that should have been per-case was declared before the
+loop. Every accumulator, every `Set`, every `best` goes **inside** the `for`.
+
+Read by whitespace token rather than by line, and the empty line for `n = 0`
+stops being a special case at all — which is the second thing this shape
+teaches.
+
+And sort the distinct values with a comparator. `[...distinct].sort()` sorts
+them as strings, so `[9, 10]` comes back `[10, 9]`, and the second largest is
+whichever number happens to spell smaller.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const tokens = input.split(/\s+/).filter((t) => t !== "");
+let at = 0;
+const cases = Number(tokens[at++]);
+
+// declared once, reused for every case — this is the bug
+const distinct = new Set<number>();
+
+const out: string[] = [];
+for (let c = 0; c < cases; c++) {
+  const n = Number(tokens[at++]);
+  for (let i = 0; i < n; i++) distinct.add(Number(tokens[at++]));
+  const ranked = [...distinct].sort((a, b) => a - b);
+  out.push(ranked.length >= 2 ? String(ranked[ranked.length - 2]) : "NONE");
+}
+out.push(`CASES ${cases}`);
+console.log(out.join("\n"));
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const tokens = input.split(/\s+/).filter((t) => t !== "");
+let at = 0;
+const cases = Number(tokens[at++]);
+
+const out: string[] = [];
+for (let c = 0; c < cases; c++) {
+  // fresh for every case
+  const distinct = new Set<number>();
+
+  const n = Number(tokens[at++]);
+  for (let i = 0; i < n; i++) distinct.add(Number(tokens[at++]));
+
+  // a comparator: the default sort would compare the numbers as strings
+  const ranked = [...distinct].sort((a, b) => a - b);
+  out.push(ranked.length >= 2 ? String(ranked[ranked.length - 2]) : "NONE");
+}
+out.push(`CASES ${cases}`);
+console.log(out.join("\n"));
+'''
+hints = [
+  "Move the `Set` inside the loop. That is the entire fix, and it is the entire quest.",
+  "A `Set` de-duplicates and `[...distinct].sort((a, b) => a - b)` orders it, so `ranked[ranked.length - 2]` is the second largest distinct value.",
+  "On a one-element array `ranked[ranked.length - 2]` is `undefined`, not an error, and `console.log` would print the word `undefined` — which is why the length check comes first.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3\n5\n3 1 4 1 5\n3\n7 7 7\n0\n\n",         expect = "4\nNONE\nNONE\nCASES 3\n",     visible = true },
+  { name = "one",    stdin = "1\n2\n10 -10\n",                           expect = "-10\nCASES 1\n",               visible = false },
+  { name = "pairs",  stdin = "2\n1\n5\n4\n2 2 3 3\n",                    expect = "NONE\n2\nCASES 2\n",           visible = false },
+  { name = "leaky",  stdin = "4\n3\n9 8 7\n1\n1\n2\n4 4\n3\n-1 -2 -3\n", expect = "8\nNONE\nNONE\n-2\nCASES 4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id           = "typescript.hacker.26.statistics"
+node         = 26
+title        = "SIX DECIMAL PLACES"
+difficulty   = 3
+time_limit_s = 900
+story        = "They want the numbers rounded the way the spec says, not the way your language happens to print them."
+concepts     = ["math", "sorting", "types"]
+requires     = ["typescript.hacker.25.test-cases"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+Print three lines, each to **six decimal places**: the mean, the **population**
+standard deviation (divide by `n`, not `n - 1`), and the median — which for an
+even `n` is the average of the two middle values.
+
+```
+input:  5
+        2 4 4 4 5
+output: 3.800000
+        0.979796
+        4.000000
+```
+
+This quest is judged with `match = "float:1e-6"`, so the comparison is
+numeric: `3.8` and `3.800000` both pass, and a value that is off by `1e-7`
+passes too. That is deliberate — the point is not your formatter, it is that
+`Math.floor(sum / n)` gives `3`, and that the even-length median is a boundary
+people get wrong under a clock.
+
+Population, not sample. There is no statistics module here, so the formula is
+yours: the mean of the squared deviations, then `Math.sqrt`. Dividing by
+`n - 1` gives the sample deviation, and on a real screen the difference
+between the two is the whole submission. `x.toFixed(6)` is the six decimal
+places.
+
+The values have to be sorted for the median, and sorted as **numbers**:
+`values.sort()` with no comparator puts `10` before `9`.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const values: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+values.sort((a, b) => a - b);
+
+// floor division, so the mean is wrong before anything else is
+const mean = Math.floor(values.reduce((sum, v) => sum + v, 0) / values.length);
+
+console.log(`${mean}.000000`);
+console.log("0.000000");
+console.log(`${values[Math.floor(values.length / 2)]}.000000`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const values: number[] = input.trim().split(/\s+/).slice(1).map(Number);
+// numbers, so a comparator: the default sort compares them as strings
+values.sort((a, b) => a - b);
+const n = values.length;
+
+const mean = values.reduce((sum, v) => sum + v, 0) / n;
+// population: divide by n, not n - 1
+const deviation = Math.sqrt(values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n);
+
+const middle = Math.floor(n / 2);
+const median = n % 2 === 1 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
+
+console.log(mean.toFixed(6));
+console.log(deviation.toFixed(6));
+console.log(median.toFixed(6));
+'''
+hints = [
+  "`/` on two numbers is already true division — there is no integer division to fall into by accident. The starter did it on purpose, with `Math.floor`, and threw the fraction away.",
+  "Population deviation: `Math.sqrt(sum of (v - mean) ** 2 / n)`. Dividing by n - 1 is the sample one and is wrong here.",
+  "For an even count the median is the average of `values[n / 2 - 1]` and `values[n / 2]`, and that subtraction is where the off-by-one lives. Sort with `(a, b) => a - b` first.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "float:1e-6"
+cases = [
+  { name = "odd",    stdin = "5\n2 4 4 4 5\n", expect = "3.800000\n0.979796\n4.000000\n", visible = true },
+  { name = "even",   stdin = "4\n1 2 3 4\n",   expect = "2.500000\n1.118034\n2.500000\n", visible = false },
+  { name = "single", stdin = "1\n7\n",         expect = "7.000000\n0.000000\n7.000000\n", visible = false },
+  { name = "signed", stdin = "2\n-3 3\n",      expect = "0.000000\n3.000000\n0.000000\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id           = "typescript.hacker.27.commands"
+node         = 27
+title        = "THE INPUT IS THE PROBLEM"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The tram-stop board's log comes off the machine wrapped at eighty columns, and the count at the top is a count of commands, not of words."
+concepts     = ["io", "stacks-queues", "control-flow"]
+requires     = ["typescript.hacker.26.statistics"]
+map          = { x = 0.199, y = 0.742, kind = "quest" }
+brief        = '''
+Line one is `k`, the number of **commands** that follow. The commands are
+whitespace-separated tokens packed across the remaining lines however they
+happened to wrap — any number per line, any amount of spacing, possibly a
+trailing blank line.
+
+| command | tokens | effect |
+| --- | --- | --- |
+| `ADD <cents>` | two | push an item |
+| `VOID` | one | remove the last item, or do nothing if there is none |
+| `TOTAL` | one | print the current sum |
+| `CLEAR` | one | remove everything |
+
+After the `k` commands, print `COMMANDS <k>` and `ITEMS <how many are left>`.
+
+```
+input:  5
+        ADD 600 ADD 2800 TOTAL VOID TOTAL
+output: 3400
+        600
+        COMMANDS 5
+        ITEMS 1
+```
+
+`k` counts commands, and `ADD` is one command made of two tokens — so a loop
+that runs `k` times and reads one token per turn stops in the wrong place.
+Read `k` commands, pulling the argument only when the command has one: an
+index into the token array, `tokens[at++]`, is the cursor, and
+`tokens[at++] ?? ""` makes the end of input a value instead of `undefined`.
+
+`VOID` on an empty till and `TOTAL` before anything was added both have to
+work. There is no line in the statement saying they cannot happen, and on a
+real screen that silence is the specification. Two things in this language
+behave differently at that edge: `items.pop()` on an empty array does not
+throw, it returns `undefined` — harmless here, `NaN` the moment you do
+arithmetic with it — and `items.reduce((a, b) => a + b)` with no starting
+value **does** throw on an empty array. Give `reduce` its `0`.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const tokens = input.split(/\s+/).filter((t) => t !== "");
+let at = 0;
+const commands = Number(tokens[at++]);
+
+const items: number[] = [];
+const out: string[] = [];
+
+// one token per command — which is wrong for ADD
+for (let c = 0; c < commands; c++) {
+  const command = tokens[at++] ?? "";
+  if (command === "TOTAL") out.push(String(items.reduce((sum, v) => sum + v, 0)));
+}
+
+out.push(`COMMANDS ${commands}`);
+out.push(`ITEMS ${items.length}`);
+console.log(out.join("\n"));
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const tokens = input.split(/\s+/).filter((t) => t !== "");
+let at = 0;
+const commands = Number(tokens[at++]);
+
+const items: number[] = [];
+const out: string[] = [];
+
+for (let c = 0; c < commands; c++) {
+  const command = tokens[at++] ?? "";
+  if (command === "ADD") {
+    // the argument is a second token of the same command
+    items.push(Number(tokens[at++] ?? "0"));
+  } else if (command === "VOID") {
+    items.pop(); // undefined on an empty till, and nothing uses it
+  } else if (command === "TOTAL") {
+    // reduce with no initial value throws on an empty array
+    out.push(String(items.reduce((sum, v) => sum + v, 0)));
+  } else if (command === "CLEAR") {
+    items.length = 0;
+  }
+}
+
+out.push(`COMMANDS ${commands}`);
+out.push(`ITEMS ${items.length}`);
+console.log(out.join("\n"));
+'''
+hints = [
+  "`input.split(/\\s+/).filter((t) => t !== \"\")` collapses every run of spaces, tabs and newlines, so the wrapping in the file stops mattering the moment you stop reading lines.",
+  "Pull the ADD argument inside the ADD branch, from the same cursor. The loop counter counts commands, not tokens.",
+  "`items.reduce((sum, v) => sum + v, 0)` — the `0` is what makes TOTAL on an empty till print 0 instead of throwing `Reduce of empty array with no initial value`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\nADD 600 ADD 2800 TOTAL VOID TOTAL\n",              expect = "3400\n600\nCOMMANDS 5\nITEMS 1\n", visible = true },
+  { name = "ragged", stdin = "6\nADD 100\n  ADD 200   TOTAL\nVOID\n\nVOID TOTAL\n", expect = "300\n0\nCOMMANDS 6\nITEMS 0\n",    visible = false },
+  { name = "empty",  stdin = "3\nVOID TOTAL VOID\n",                                expect = "0\nCOMMANDS 3\nITEMS 0\n",         visible = false },
+  { name = "clear",  stdin = "6\nADD 1 ADD 2 TOTAL CLEAR TOTAL ADD 9\n",            expect = "3\n0\nCOMMANDS 6\nITEMS 1\n",      visible = false },
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id           = "typescript.hacker.29.dijkstra"
+node         = 28
+title        = "NOT EVERY STREET IS THE SAME LENGTH"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Every map you have cleared so far counted hops. The tram does not care how many stops there are; it cares how long they take."
+concepts     = ["graphs", "heaps", "complexity"]
+requires     = ["typescript.hacker.27.commands"]
+map          = { x = 0.114, y = 0.663, kind = "quest" }
+brief        = '''
+Standard input is `n m seed`: `n` stops, `m` undirected weighted edges. Build
+the graph yourself, with **exactly** this generator, in 64-bit arithmetic that
+wraps (a `bigint`, wrapped with `BigInt.asUintN(64, …)` — a `number` cannot
+hold the state):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for i in 1..n:                  # a spanning tree first, so it is connected
+    p = next() % i
+    w = next() % 1000 + 1
+    edge (p, i, w)
+for the remaining m - (n-1) edges:
+    a = next() % n
+    b = next() % n
+    w = next() % 1000 + 1
+    edge (a, b, w)
+```
+
+Print the sum of the shortest distances from stop `0` to every reachable stop
+(including `0` itself, which is `0`), then `MAX <the largest of them>`.
+
+```
+input:  6 8 1
+output: 4594
+        MAX 1582
+```
+
+**The complexity here is enforced.** One hidden case is `n = 100000`,
+`m = 200000`. Dijkstra is the right algorithm either way; what the clock
+decides is the priority queue. Scanning every unvisited node for the minimum
+is `O(V²)` — `10^10` steps, and on this machine that took **twenty-six
+seconds**, against a ten second run limit. A binary heap makes it
+`O((V + E) log V)` and it finishes in about a quarter of a second. Both measured
+on this machine, with the two programs that ship in this quest: the starter is
+the scanning version.
+
+Worth seeing clearly, because it is the most common way to fail a timed
+screen: **the starter is not wrong.** It prints exactly the right answer. It
+is rejected only for arriving far too late.
+
+There is no priority queue in the standard library; the heap is yours, the
+same one as the merge quest with `[distance, node]` entries ordered by
+distance. It needs no decrease-key: push the improved distance as a new entry
+and skip any entry you pop whose distance is already worse than the one you
+have recorded. That "stale entry" skip is the line people forget, and without
+it the heap grows without bound.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class Rng {
+  private x: bigint;
+  constructor(seed: number) {
+    this.x = BigInt(seed);
+  }
+  next(): number {
+    this.x = BigInt.asUintN(64, this.x * 6364136223846793005n + 1442695040888963407n);
+    return Number(this.x >> 33n);
+  }
+}
+
+type Edge = [to: number, weight: number];
+
+function build(n: number, m: number, seed: number): Edge[][] {
+  const rng = new Rng(seed);
+  const graph: Edge[][] = Array.from({ length: n }, () => []);
+  for (let i = 1; i < n; i++) {
+    const p = rng.next() % i;
+    const w = (rng.next() % 1000) + 1;
+    graph[p].push([i, w]);
+    graph[i].push([p, w]);
+  }
+  for (let e = 0; e < Math.max(0, m - (n - 1)); e++) {
+    const a = rng.next() % n;
+    const b = rng.next() % n;
+    const w = (rng.next() % 1000) + 1;
+    graph[a].push([b, w]);
+    graph[b].push([a, w]);
+  }
+  return graph;
+}
+
+const [n, m, seed] = input.trim().split(/\s+/).map(Number);
+
+const graph = build(n, m, seed);
+const dist: (number | undefined)[] = new Array(n).fill(undefined);
+const done: boolean[] = new Array(n).fill(false);
+dist[0] = 0;
+
+// correct, and far too slow: the minimum is found by scanning every node
+for (let round = 0; round < n; round++) {
+  let best = -1;
+  let bestDist = Infinity;
+  for (let u = 0; u < n; u++) {
+    const d = dist[u];
+    if (!done[u] && d !== undefined && d < bestDist) {
+      bestDist = d;
+      best = u;
+    }
+  }
+  if (best < 0) break;
+  done[best] = true;
+  for (const [v, w] of graph[best]) {
+    const d = dist[v];
+    if (d === undefined || bestDist + w < d) dist[v] = bestDist + w;
+  }
+}
+
+let total = 0;
+let largest = 0;
+for (const d of dist) {
+  if (d === undefined) continue;
+  total += d;
+  if (d > largest) largest = d;
+}
+console.log(total);
+console.log(`MAX ${largest}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+class Rng {
+  private x: bigint;
+  constructor(seed: number) {
+    this.x = BigInt(seed);
+  }
+  next(): number {
+    this.x = BigInt.asUintN(64, this.x * 6364136223846793005n + 1442695040888963407n);
+    return Number(this.x >> 33n);
+  }
+}
+
+type Edge = [to: number, weight: number];
+type Entry = [distance: number, node: number];
+
+class MinHeap {
+  private items: Entry[] = [];
+
+  push(entry: Entry): void {
+    const h = this.items;
+    h.push(entry);
+    let i = h.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (h[parent][0] <= h[i][0]) break;
+      [h[i], h[parent]] = [h[parent], h[i]];
+      i = parent;
+    }
+  }
+
+  pop(): Entry | undefined {
+    const h = this.items;
+    const top = h[0];
+    const last = h.pop();
+    if (h.length > 0 && last !== undefined) {
+      h[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1;
+        const r = l + 1;
+        let smallest = i;
+        if (l < h.length && h[l][0] < h[smallest][0]) smallest = l;
+        if (r < h.length && h[r][0] < h[smallest][0]) smallest = r;
+        if (smallest === i) break;
+        [h[i], h[smallest]] = [h[smallest], h[i]];
+        i = smallest;
+      }
+    }
+    return top;
+  }
+}
+
+function build(n: number, m: number, seed: number): Edge[][] {
+  const rng = new Rng(seed);
+  const graph: Edge[][] = Array.from({ length: n }, () => []);
+  for (let i = 1; i < n; i++) {
+    const p = rng.next() % i;
+    const w = (rng.next() % 1000) + 1;
+    graph[p].push([i, w]);
+    graph[i].push([p, w]);
+  }
+  for (let e = 0; e < Math.max(0, m - (n - 1)); e++) {
+    const a = rng.next() % n;
+    const b = rng.next() % n;
+    const w = (rng.next() % 1000) + 1;
+    graph[a].push([b, w]);
+    graph[b].push([a, w]);
+  }
+  return graph;
+}
+
+const [n, m, seed] = input.trim().split(/\s+/).map(Number);
+
+const graph = build(n, m, seed);
+const dist = new Float64Array(n).fill(Infinity);
+dist[0] = 0;
+
+const heap = new MinHeap();
+heap.push([0, 0]);
+for (let entry = heap.pop(); entry !== undefined; entry = heap.pop()) {
+  const [d, u] = entry;
+  // a stale entry: we already found a shorter way to u
+  if (d > dist[u]) continue;
+  for (const [v, w] of graph[u]) {
+    const candidate = d + w;
+    if (candidate < dist[v]) {
+      dist[v] = candidate;
+      heap.push([candidate, v]);
+    }
+  }
+}
+
+let total = 0;
+let largest = 0;
+for (const d of dist) {
+  if (d === Infinity) continue;
+  total += d;
+  if (d > largest) largest = d;
+}
+console.log(total);
+console.log(`MAX ${largest}`);
+'''
+hints = [
+  "`[distance, node]` entries, compared on the distance alone. A `Float64Array(n).fill(Infinity)` is the distance table, and Infinity is the honest unreached.",
+  "`if (d > dist[u]) continue;` is the stale-entry skip. Without it the algorithm is still correct and the heap fills with obsolete entries.",
+  "The spanning-tree half of the generator guarantees every node is reachable, so filtering out Infinity at the end never removes anything — keep it anyway, because the version of this question with an unreachable node is the follow-up.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "6 8 1\n",           expect = "4594\nMAX 1582\n",      visible = true },
+  { name = "pair",   stdin = "2 1 5\n",           expect = "774\nMAX 774\n",        visible = false },
+  { name = "ten",    stdin = "10 12 3\n",         expect = "12277\nMAX 2237\n",     visible = false },
+  { name = "big",    stdin = "100000 200000 7\n", expect = "249521722\nMAX 6142\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id           = "typescript.hacker.30.range-queries"
+node         = 29
+title        = "TOTALS THAT KEEP CHANGING"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Four million till operations from one day across the whole chain, half of them corrections, and somebody wants the running totals."
+concepts     = ["prefix-sums", "complexity", "collections"]
+requires     = ["typescript.hacker.29.dijkstra"]
+map          = { x = 0.059, y = 0.950, kind = "quest" }
+brief        = '''
+Standard input is `n q seed`. Build an array of `n` values and then run `q`
+operations, all from the same generator, in 64-bit arithmetic that wraps (a
+`bigint`, wrapped with `BigInt.asUintN(64, …)`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+values[i] = next() % 1000            for i in 0..n
+
+for each of the q operations:
+    a = next(); b = next(); c = next()
+    if a % 2 == 0:   UPDATE  values[b % n] += (c % 1000) + 1
+    else:            QUERY   l = b % n, r = c % n, swap them if l > r,
+                             and add sum(values[l..r]) to a running total
+```
+
+Print the running total of every query answer, then `UPDATES <k>`.
+
+```
+input:  8 6 1
+output: 4112
+        UPDATES 3
+```
+
+**The complexity here is enforced.** The naive answer — add up
+`values[l..r]` for every query — is `O(n)` per query, and a tight loop over a
+packed array is fast enough to be deceptive on anything small. So the big
+hidden case is `n = 500000, q = 4000000`, the same size Rust, Go and C++ run.
+At three hundred thousand operations — the size the Python version of this
+quest uses — the naive loop took **seventeen seconds** here, already past the
+ten second run limit, and the big case has thirteen times as many. A Fenwick tree
+does the whole four million in under **half a second**. Both measured, with
+the two programs in this quest.
+
+The lesson is the one an interviewer is fishing for: *point update, range sum*
+is the exact shape a Fenwick tree exists for. Three short functions — add,
+prefix, and range as the difference of two prefixes — and `i & -i` is how you
+step by the lowest set bit. That is a 32-bit operation, and it is exact here
+because every index is below `2^31`. The total is not: it passes `2^32` on the
+big case, and a `number` holds it exactly only because it stays under `2^53`.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const [n, q, seed] = input.trim().split(/\s+/).map(Number);
+
+let x = BigInt(seed);
+function next(): number {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  return Number(x >> 33n);
+}
+
+const values: number[] = [];
+for (let i = 0; i < n; i++) values.push(next() % 1000);
+
+let total = 0;
+let updates = 0;
+for (let op = 0; op < q; op++) {
+  const a = next();
+  const b = next();
+  const c = next();
+  if (a % 2 === 0) {
+    values[b % n] += (c % 1000) + 1;
+    updates++;
+  } else {
+    let l = b % n;
+    let r = c % n;
+    if (l > r) [l, r] = [r, l];
+    // correct, and far too slow at four million operations
+    for (let i = l; i <= r; i++) total += values[i];
+  }
+}
+
+console.log(total);
+console.log(`UPDATES ${updates}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+// Fenwick tree, 1-based inside. `add` and `prefix` are both O(log n).
+class Fenwick {
+  private readonly tree: Float64Array;
+
+  constructor(n: number) {
+    this.tree = new Float64Array(n + 1);
+  }
+
+  add(index: number, delta: number): void {
+    for (let i = index + 1; i < this.tree.length; i += i & -i) {
+      this.tree[i] += delta; // step up by the lowest set bit
+    }
+  }
+
+  prefix(upto: number): number {
+    let total = 0;
+    for (let i = upto; i > 0; i -= i & -i) total += this.tree[i];
+    return total;
+  }
+
+  range(l: number, r: number): number {
+    return this.prefix(r + 1) - this.prefix(l);
+  }
+}
+
+const [n, q, seed] = input.trim().split(/\s+/).map(Number);
+
+let x = BigInt(seed);
+function next(): number {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  return Number(x >> 33n);
+}
+
+const fenwick = new Fenwick(n);
+for (let i = 0; i < n; i++) fenwick.add(i, next() % 1000);
+
+let total = 0;
+let updates = 0;
+for (let op = 0; op < q; op++) {
+  const a = next();
+  const b = next();
+  const c = next();
+  if (a % 2 === 0) {
+    fenwick.add(b % n, (c % 1000) + 1);
+    updates++;
+  } else {
+    let l = b % n;
+    let r = c % n;
+    if (l > r) [l, r] = [r, l];
+    total += fenwick.range(l, r);
+  }
+}
+
+console.log(total);
+console.log(`UPDATES ${updates}`);
+'''
+hints = [
+  "Build the tree by calling add once per initial value. The O(n) bottom-up build is a nice optimisation and is not what the clock is testing.",
+  "`i & -i` isolates the lowest set bit. Adding it walks up the tree; subtracting it walks down.",
+  "`range(l, r)` is `prefix(r + 1) - prefix(l)`, and getting that pair of off-by-ones right is most of the debugging. A `Float64Array(n + 1)` for the tree holds the sums exactly and never turns into an array of mixed types.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 6 1\n",           expect = "4112\nUPDATES 3\n",            visible = true },
+  { name = "no-ups", stdin = "5 4 9\n",           expect = "4458\nUPDATES 0\n",            visible = false },
+  { name = "mid",    stdin = "1000 2000 3\n",     expect = "249603264\nUPDATES 987\n",     visible = false },
+  { name = "big",    stdin = "500000 4000000 7\n", expect = "500026173039045\nUPDATES 2001469\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id           = "typescript.hacker.31.palindrome"
+node         = 30
+title        = "THE SAME BACKWARDS"
+difficulty   = 4
+time_limit_s = 1200
+story        = "Top-twenty question, asked in some form in most screens, and the one most people have written once and never understood."
+concepts     = ["strings", "two-pointers", "complexity"]
+requires     = ["typescript.hacker.30.range-queries"]
+map          = { x = 0.260, y = 0.857, kind = "quest" }
+brief        = '''
+Standard input is `n alphabet seed`. Build the string yourself, in 64-bit
+arithmetic that wraps (a `bigint`, wrapped with `BigInt.asUintN(64, …)`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+s[i] = 'a' + (next() % alphabet)      for i in 0..n
+```
+
+Print the length of the longest palindromic substring, then `AT <index>` — the
+0-based start of the **leftmost** one of that length.
+
+```
+input:  12 3 5
+output: 5
+        AT 1
+```
+
+Expand around each centre. There are `2n - 1` centres, not `n`: every
+character is a centre for the odd-length palindromes, and every gap between
+two characters is a centre for the even-length ones. Forgetting the gaps is
+why a correct-looking solution returns `1` on `abba` — and it is what the
+starter does.
+
+**What the tests do and do not enforce**, plainly. The hidden case that does
+the work is `n = 8000` over a **one**-letter alphabet. It is the worst case
+for expand-around-centre — every centre runs to the end of the string — so the
+right answer does its full `O(n²)` there, thirty-two million character
+comparisons, and finishes in about a tenth of a second on this machine. It
+also rejects check-every-substring-and-test-each-one, which is cubic: on the
+order of `10^11` comparisons at this size, against a ten second limit.
+
+The other big case, `n = 20000` over a two-letter alphabet, is a
+**correctness** case and not a speed one: on a random binary string the
+palindrome test fails after a character or two. It checks that your generator
+and your leftmost-index tie-break agree with ours at scale.
+
+So: the tests reject cubic and accept quadratic. They do **not** demand
+Manacher's algorithm, which is the `O(n)` answer. Know that it exists and what
+it does, because "and can you do better than quadratic?" is the follow-up this
+question is usually asked to set up.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const [n, alphabet, seed] = input.trim().split(/\s+/).map(Number);
+
+let x = BigInt(seed);
+const chars: string[] = [];
+for (let i = 0; i < n; i++) {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  chars.push(String.fromCharCode(97 + (Number(x >> 33n) % alphabet)));
+}
+const s = chars.join("");
+
+// only the odd centres, so every even-length palindrome is invisible
+let bestLen = 0;
+let bestStart = 0;
+for (let centre = 0; centre < n; centre++) {
+  let i = centre;
+  let j = centre;
+  while (i >= 0 && j < n && s[i] === s[j]) {
+    i--;
+    j++;
+  }
+  const length = j - i - 1;
+  if (length > bestLen) {
+    bestLen = length;
+    bestStart = i + 1;
+  }
+}
+
+console.log(bestLen);
+console.log(`AT ${bestStart}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const [n, alphabet, seed] = input.trim().split(/\s+/).map(Number);
+
+let x = BigInt(seed);
+const chars: string[] = [];
+for (let i = 0; i < n; i++) {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  chars.push(String.fromCharCode(97 + (Number(x >> 33n) % alphabet)));
+}
+const s = chars.join("");
+
+let bestLen = 0;
+let bestStart = 0;
+for (let centre = 0; centre < n; centre++) {
+  // odd length: one character at the middle; even length: the gap to the
+  // right of it
+  for (const [i0, j0] of [[centre, centre], [centre, centre + 1]]) {
+    let i = i0;
+    let j = j0;
+    // the bounds are not optional: off both ends, s[i] and s[j] are both
+    // undefined, and undefined === undefined
+    while (i >= 0 && j < n && s[i] === s[j]) {
+      i--;
+      j++;
+    }
+    // i and j have each stepped one too far
+    const length = j - i - 1;
+    if (length > bestLen) {
+      bestLen = length;
+      bestStart = i + 1;
+    }
+  }
+}
+
+console.log(bestLen);
+console.log(`AT ${bestStart}`);
+'''
+hints = [
+  "Two expansions per centre: (c, c) for odd lengths and (c, c + 1) for even ones. The starter is missing the second.",
+  "When the loop stops, i and j have both moved one past the palindrome — so it starts at i + 1 and its length is j - i - 1.",
+  "Only update on a strictly longer palindrome, and the leftmost of each length is the one you keep. And the bounds check is not optional here: off both ends at once, `s[i]` and `s[j]` are both `undefined`, `undefined === undefined` is true, and on the one-letter string the loop never stops.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "12 3 5\n",    expect = "5\nAT 1\n",      visible = true },
+  { name = "one",     stdin = "1 4 2\n",     expect = "1\nAT 0\n",      visible = false },
+  { name = "random",  stdin = "20000 2 9\n", expect = "41\nAT 2166\n",  visible = false },
+  { name = "all-one", stdin = "8000 1 9\n",  expect = "8000\nAT 0\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id           = "typescript.hacker.32.modular"
+node         = 31
+title        = "MODULO ONE BILLION AND SEVEN"
+difficulty   = 5
+time_limit_s = 1500
+story        = "The phrase appears at the bottom of the statement and half the room does not know what it is asking them to do."
+concepts     = ["math", "complexity", "recursion"]
+requires     = ["typescript.hacker.31.palindrome"]
+map          = { x = 0.335, y = 0.936, kind = "quest" }
+brief        = '''
+Standard input is `n q seed`. Generate `q` queries, in 64-bit arithmetic that
+wraps (a `bigint`, wrapped with `BigInt.asUintN(64, …)`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the q queries:
+    a = next() % (n + 1)
+    b = next() % (a + 1)          # so 0 <= b <= a <= n
+```
+
+For each query compute the binomial coefficient `C(a, b)` **modulo
+1000000007**. Print the sum of all `q` answers, itself modulo `1000000007`,
+then `LAST <the final query's answer>`.
+
+```
+input:  10 5 3
+output: 209
+        LAST 1
+```
+
+`C(a, b)` has hundreds of thousands of digits at these sizes, so every
+multiplication is reduced as you go. The problem is the division:
+`a! / (b! (a-b)!)` has no meaning in modular arithmetic. What replaces it is
+the **modular inverse**, and because `1000000007` is prime, Fermat's little
+theorem gives it to you: `inverse(v) = v^(p-2) mod p`, by repeated squaring.
+
+So: precompute `factorial[0..n]` once, and answer each query as
+`f[a] * inv(f[b]) * inv(f[a-b])`.
+
+**And here is the trap this language adds.** Both factors are below `2^30`,
+so their product is below `2^60` — and a `number` is a double, exact only to
+`2^53`. `a * b % P` in plain numbers does not overflow, does not throw, and is
+wrong: with it, even the sample comes out as `504334178`. Either do the
+multiplication in `bigint`, or split one factor into two 15-bit halves so no
+intermediate passes `2^46` — the starter carries that `mulmod` already, and it
+is worth being able to derive.
+
+**The complexity here is enforced.** One hidden case is `n = 200000`,
+`q = 200000`. Computing each coefficient independently — multiply `b` terms,
+divide by `b` terms, one modular inverse each — had not finished after thirty
+seconds here, against the ten second run limit; that is the starter. One
+shared factorial table finishes in about a tenth of a second. Both measured
+on this machine.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const P = 1000000007;
+
+// a * b mod P without leaving the doubles' exact range: a * b itself can be
+// 2^60, and a number is only exact to 2^53, so multiply in two 15-bit halves
+function mulmod(a: number, b: number): number {
+  return (((a * (b >>> 15)) % P) * 32768 + a * (b & 32767)) % P;
+}
+
+function powmod(base: number, exp: number): number {
+  let result = 1;
+  for (; exp > 0; exp = Math.floor(exp / 2)) {
+    if (exp % 2 === 1) result = mulmod(result, base);
+    base = mulmod(base, base);
+  }
+  return result;
+}
+
+const [n, q, seed] = input.trim().split(/\s+/).map(Number);
+
+let x = BigInt(seed);
+function next(): number {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  return Number(x >> 33n);
+}
+
+let total = 0;
+let last = 0;
+for (let k = 0; k < q; k++) {
+  const a = next() % (n + 1);
+  const b = next() % (a + 1);
+
+  // correct, and far too slow: b multiplications and a modular inverse
+  // for every single query
+  let numerator = 1;
+  let denominator = 1;
+  for (let t = 0; t < b; t++) {
+    numerator = mulmod(numerator, a - t);
+    denominator = mulmod(denominator, t + 1);
+  }
+  const value = mulmod(numerator, powmod(denominator, P - 2));
+
+  total = (total + value) % P;
+  last = value;
+}
+
+console.log(total);
+console.log(`LAST ${last}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const P = 1000000007;
+
+// a * b mod P without leaving the doubles' exact range: a * b itself can be
+// 2^60, and a number is only exact to 2^53, so multiply in two 15-bit halves
+// (a * 2^15 stays under 2^45, and so does each partial sum)
+function mulmod(a: number, b: number): number {
+  return (((a * (b >>> 15)) % P) * 32768 + a * (b & 32767)) % P;
+}
+
+// P is prime, so Fermat gives v^(P-2) as the inverse of v
+function powmod(base: number, exp: number): number {
+  let result = 1;
+  for (; exp > 0; exp = Math.floor(exp / 2)) {
+    if (exp % 2 === 1) result = mulmod(result, base);
+    base = mulmod(base, base);
+  }
+  return result;
+}
+
+const [n, q, seed] = input.trim().split(/\s+/).map(Number);
+
+// one shared factorial table, and its inverses walked back down from one pow
+const factorial = new Array<number>(n + 1).fill(1);
+for (let i = 1; i <= n; i++) factorial[i] = mulmod(factorial[i - 1], i);
+const inverse = new Array<number>(n + 1).fill(1);
+inverse[n] = powmod(factorial[n], P - 2);
+for (let i = n; i > 0; i--) inverse[i - 1] = mulmod(inverse[i], i);
+
+let x = BigInt(seed);
+function next(): number {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  return Number(x >> 33n);
+}
+
+let total = 0;
+let last = 0;
+for (let k = 0; k < q; k++) {
+  const a = next() % (n + 1);
+  const b = next() % (a + 1);
+
+  const value = mulmod(mulmod(factorial[a], inverse[b]), inverse[a - b]);
+
+  total = (total + value) % P;
+  last = value;
+}
+
+console.log(total);
+console.log(`LAST ${last}`);
+'''
+hints = [
+  "Reduce after every multiplication, and never multiply two residues with a bare `*`: past 2^53 a double keeps the high bits and drops the low ones, and the low ones are the answer.",
+  "`powmod(v, P - 2)` is the modular inverse, and it only works because P is prime — that is the whole content of Fermat's little theorem here.",
+  "Precomputing inverse factorials as well — `inverse[n] = powmod(factorial[n], P - 2)`, then `inverse[i - 1] = inverse[i] * i` walking down — removes both pows from every query. Two `mulmod`s per query is all that is left.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5 3\n",           expect = "209\nLAST 1\n",               visible = true },
+  { name = "tiny",   stdin = "1 1 1\n",            expect = "1\nLAST 1\n",                 visible = false },
+  { name = "mid",    stdin = "100 50 4\n",         expect = "707023692\nLAST 689856059\n", visible = false },
+  { name = "big",    stdin = "200000 200000 11\n", expect = "390914381\nLAST 201898882\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id           = "typescript.hacker.33.grid-paths"
+node         = 32
+title        = "ACROSS THE BLOCK, NEVER BACKWARDS"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The delivery grid with three streets closed for bamboo. How many ways across, and which way is cheapest."
+concepts     = ["dynamic-programming", "matrix", "math"]
+requires     = ["typescript.hacker.32.modular"]
+map          = { x = 0.538, y = 0.857, kind = "quest" }
+brief        = '''
+Standard input is `r c pct seed`. Build the grid yourself, in row-major order,
+drawing **two** values for every cell, in 64-bit arithmetic that wraps (a
+`bigint`, wrapped with `BigInt.asUintN(64, …)`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for i in 0..r, for j in 0..c:
+    a = next(); b = next()
+    the cell is BLOCKED if  a % 100 < pct,
+        except (0,0) and (r-1,c-1), which are never blocked
+    the cell costs  (b % 9) + 1
+```
+
+Move only **right** or **down**, through open cells. Print:
+
+1. `PATHS <k>` — how many distinct routes from `(0,0)` to `(r-1,c-1)`, modulo
+   `1000000007`
+2. `MIN <cost>` — the smallest total cost of a route, counting both endpoints,
+   or `-1` if there is no route
+
+```
+input:  3 4 30 2
+output: PATHS 9
+        MIN 27
+```
+
+One pass in row-major order does both: a cell's routes are the sum of the
+routes into it from above and from the left, and its best cost is its own cost
+plus the cheaper of those two. Because you only ever move right or down, the
+two cells you need are always already finished — which is why this needs no
+recursion and no visited set. A memoised recursion would also be linear in
+the cells, and on the `1000 × 1000` case it would be two thousand frames deep.
+Node's stack holds that, which is not the same as it being the answer: the
+loop has no depth at all, and a `2000 × 2000` follow-up is one question away.
+
+The `PATHS` count is taken modulo `1000000007` for the usual reason: on the
+`1000 × 1000` hidden case the true number has over six hundred digits. Here
+that is not a style point. A `number` would stop being exact past `2^53`
+within the first few dozen rows and then quietly print a wrong residue, so
+reduce as you add — two residues below `1000000007` sum to under `2^31`, which
+is exact.
+
+**What the big case enforces:** it rejects any answer that enumerates routes.
+There are more of them than there are atoms in the room.
+
+A million cells in a `number[][]` is a million boxed slots in a thousand
+arrays; a flat `Float64Array(r * c)` indexed `i * c + j` is one block of memory
+and the same code.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const P = 1000000007;
+
+const [rows, cols, pct, seed] = input.trim().split(/\s+/).map(Number);
+
+let x = BigInt(seed);
+function next(): number {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  return Number(x >> 33n);
+}
+
+// flat row-major tables: cell (i, j) lives at i * cols + j
+const open = new Uint8Array(rows * cols).fill(1);
+const cost = new Int32Array(rows * cols);
+for (let i = 0; i < rows; i++) {
+  for (let j = 0; j < cols; j++) {
+    const a = next();
+    const b = next();
+    const corner = (i === 0 && j === 0) || (i === rows - 1 && j === cols - 1);
+    if (!corner && a % 100 < pct) open[i * cols + j] = 0;
+    cost[i * cols + j] = (b % 9) + 1;
+  }
+}
+
+// fill `ways` and `best` in row-major order
+const ways = new Float64Array(rows * cols);
+const best = new Float64Array(rows * cols).fill(Infinity);
+
+console.log("PATHS 0");
+console.log("MIN -1");
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+const P = 1000000007;
+
+const [rows, cols, pct, seed] = input.trim().split(/\s+/).map(Number);
+
+let x = BigInt(seed);
+function next(): number {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  return Number(x >> 33n);
+}
+
+// flat row-major tables: cell (i, j) lives at i * cols + j
+const open = new Uint8Array(rows * cols).fill(1);
+const cost = new Int32Array(rows * cols);
+for (let i = 0; i < rows; i++) {
+  for (let j = 0; j < cols; j++) {
+    const a = next();
+    const b = next();
+    const corner = (i === 0 && j === 0) || (i === rows - 1 && j === cols - 1);
+    if (!corner && a % 100 < pct) open[i * cols + j] = 0;
+    cost[i * cols + j] = (b % 9) + 1;
+  }
+}
+
+// Infinity means unreachable; a cell with no reachable neighbour above or
+// left stays that way
+const ways = new Float64Array(rows * cols);
+const best = new Float64Array(rows * cols).fill(Infinity);
+
+for (let i = 0; i < rows; i++) {
+  for (let j = 0; j < cols; j++) {
+    const at = i * cols + j;
+    if (!open[at]) continue;
+    if (at === 0) {
+      ways[0] = 1;
+      best[0] = cost[0];
+      continue;
+    }
+    let routes = 0;
+    let cheapest = Infinity;
+    if (i > 0 && best[at - cols] !== Infinity) {
+      routes += ways[at - cols];
+      cheapest = best[at - cols];
+    }
+    if (j > 0 && best[at - 1] !== Infinity) {
+      routes += ways[at - 1];
+      cheapest = Math.min(cheapest, best[at - 1]);
+    }
+    // two residues below P add to under 2^31: exact, and reduced at once
+    ways[at] = routes % P;
+    best[at] = cheapest + cost[at];
+  }
+}
+
+const end = rows * cols - 1;
+console.log(`PATHS ${ways[end]}`);
+console.log(`MIN ${best[end] === Infinity ? -1 : best[end]}`);
+'''
+hints = [
+  "Draw both values for every cell, including the two corners — the generator does not skip them, it only refuses to block them.",
+  "An open cell with no reachable neighbour above or left is reachable by zero routes and has no best cost. `Infinity` is the honest unreachable: `Math.min` ignores it and `Infinity + cost` is still `Infinity`.",
+  "The destination can be open and still unreachable, which is exactly when PATHS is 0 and MIN is -1. One of the hidden cases is that.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "3 4 30 2\n",        expect = "PATHS 9\nMIN 27\n",           visible = true },
+  { name = "one-cell", stdin = "1 1 0 1\n",         expect = "PATHS 1\nMIN 4\n",            visible = false },
+  { name = "walled",   stdin = "5 5 60 4\n",        expect = "PATHS 0\nMIN -1\n",           visible = false },
+  { name = "big",      stdin = "1000 1000 20 13\n", expect = "PATHS 442990855\nMIN 6890\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id           = "typescript.hacker.34.stable-sort"
+node         = 33
+title        = "TIES KEEP THEIR PLACE"
+difficulty   = 4
+time_limit_s = 900
+story        = "Two riders finished on the same score and the leaderboard on the Times Square screen puts them in a different order every time it redraws."
+concepts     = ["sorting", "slices", "complexity"]
+requires     = ["typescript.hacker.33.grid-paths"]
+map          = { x = 0.605, y = 0.932, kind = "quest" }
+brief        = '''
+Standard input is `n buckets seed`. Build `n` riders, where rider `i` has
+index `i` and a score, in 64-bit arithmetic that wraps (a `bigint`, wrapped
+with `BigInt.asUintN(64, …)`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+score[i] = next() % buckets           for i in 0..n
+```
+
+Sort the riders by score **descending**. Riders with the same score must keep
+the order they arrived in. Print their indices, space separated, then
+`TIES <k>` — how many adjacent pairs in your sorted order have equal scores.
+
+```
+input:  8 3 5
+output: 1 5 6 0 2 3 4 7
+        TIES 6
+```
+
+`buckets` is small, so almost everything is a tie, and the answer is almost
+entirely decided by what happens to them.
+
+**This is the quest about knowing which sort you are holding.**
+`Array.prototype.sort` has been required to be **stable** since ES2019, and
+V8 has kept that promise since 2018. What is *not* stable is sorting ascending
+and then calling `.reverse()`: that reverses the ties along with everything
+else, and it is what the starter does. On the sample it visibly scrambles
+them; on a real input it always will.
+
+There are two correct answers and you should be able to give both. Sort
+descending with a comparator — `(a, b) => b.score - a.score` — and let
+stability do the rest. **Or** make the comparison **total** —
+`b.score - a.score || a.index - b.index` — so no two elements ever compare
+equal and stability stops being a question. The second is what to reach for
+by default; a total order has nothing to prove, including on an engine older
+than the promise.
+
+And the comparator is not optional. `sort()` with none compares the riders
+as the strings their `toString` gives, and an object's is `[object Object]`
+for every one of them.
+
+The clock is not measuring speed here, and there is nothing for it to
+measure: `sort` is `sort` whichever of the two you write. These four cases are
+decided entirely by what happens to the ties. This one is about knowing what
+your sort promises, not about how fast it keeps the promise.
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+interface Rider {
+  score: number;
+  index: number;
+}
+
+const [n, buckets, seed] = input.trim().split(/\s+/).map(Number);
+
+let x = BigInt(seed);
+const riders: Rider[] = [];
+for (let i = 0; i < n; i++) {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  riders.push({ score: Number(x >> 33n) % buckets, index: i });
+}
+
+// ascending, then reversed — so the ties come out backwards
+riders.sort((a, b) => a.score - b.score).reverse();
+
+let ties = 0;
+for (let i = 1; i < riders.length; i++) if (riders[i - 1].score === riders[i].score) ties++;
+console.log(riders.map((r) => r.index).join(" "));
+console.log(`TIES ${ties}`);
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+interface Rider {
+  score: number;
+  index: number;
+}
+
+const [n, buckets, seed] = input.trim().split(/\s+/).map(Number);
+
+let x = BigInt(seed);
+const riders: Rider[] = [];
+for (let i = 0; i < n; i++) {
+  x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+  riders.push({ score: Number(x >> 33n) % buckets, index: i });
+}
+
+// sort is stable (ES2019), so a descending comparator keeps equal scores in
+// arrival order. The equally correct alternative is
+//     (a, b) => b.score - a.score || a.index - b.index
+// which makes the comparison total and so needs no stability at all.
+riders.sort((a, b) => b.score - a.score);
+
+let ties = 0;
+for (let i = 1; i < riders.length; i++) if (riders[i - 1].score === riders[i].score) ties++;
+console.log(riders.map((r) => r.index).join(" "));
+console.log(`TIES ${ties}`);
+'''
+hints = [
+  "Delete the `.reverse()` and flip the comparator to `b.score - a.score`. That is the stable answer, and the language promises it.",
+  "The other answer is `b.score - a.score || a.index - b.index` — a total order, so there are no ties left to be unstable about.",
+  "TIES counts adjacent equal scores in the finished order, and that count is the same whichever of the two you wrote — it is the index order that gives you away.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 3 5\n",    expect = "1 5 6 0 2 3 4 7\nTIES 6\n", visible = true },
+  { name = "three",  stdin = "3 2 1\n",    expect = "1 0 2\nTIES 1\n",           visible = false },
+  { name = "sixty",  stdin = "60 3 11\n",  expect = "2 9 11 12 14 15 16 19 22 23 31 33 36 38 47 48 52 56 57 58 0 1 4 5 6 13 17 18 20 24 27 32 34 35 39 40 42 44 45 46 50 51 53 54 59 3 7 8 10 21 25 26 28 29 30 37 41 43 49 55\nTIES 57\n", visible = false },
+  { name = "many",   stdin = "200 10 4\n", expect = "30 32 45 51 62 71 83 86 87 94 103 118 128 130 142 149 164 170 172 176 180 190 191 194 18 19 20 23 31 38 48 74 91 113 116 129 141 146 148 168 175 187 5 15 17 24 28 50 58 68 88 102 110 124 132 137 188 193 196 198 199 0 9 12 25 26 46 49 52 55 70 75 78 84 97 108 112 134 156 158 163 4 10 21 35 42 73 99 104 106 107 114 120 121 125 131 136 150 160 166 173 174 177 2 8 11 13 16 39 40 41 54 65 72 82 93 95 119 123 143 169 178 179 195 197 7 27 36 47 56 61 64 67 69 76 100 126 140 153 157 161 162 181 1 37 57 60 77 85 92 96 98 105 111 117 133 135 138 159 167 186 192 3 6 14 43 53 59 63 66 80 81 101 109 115 122 127 144 145 151 154 155 165 171 183 189 22 29 33 34 44 79 89 90 139 147 152 182 184 185\nTIES 190\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 34  BOSS
+[[quest]]
+id           = "typescript.hacker.28.lru"
+node         = 34
+title        = "THE ERASURE"
+difficulty   = 5
+time_limit_s = 1800
+story        = "The sixth interview, Room 7-32. The types are gone at runtime and the clock is not."
+concepts     = ["collections", "linked-lists", "types", "complexity"]
+requires     = ["typescript.hacker.34.stable-sort", "typescript.hacker.24.inversions"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief        = '''
+Line one is `cap q`, and then either `q` lines of operations, each
+`PUT <key> <value>` or `GET <key>` — or, when line one carries a **third**
+number `seed`, no further lines at all, and the `q` operations come from the
+generator below.
+
+Implement a fixed-capacity cache that evicts the **least recently used** entry
+when it is full. A `GET` and a `PUT` both count as using a key. A `PUT` of a
+key the cache already holds replaces its value and makes it the most recent —
+it adds no entry, so it evicts nothing however full the cache is.
+
+For each `GET` print the value, or `-1` if it is not there. At the end print
+the surviving keys, most-recently-used first, space separated — or `-` if the
+cache is empty — and then `EVICTED <k>`.
+
+```
+input:  2 6
+        PUT 1 10
+        PUT 2 20
+        GET 1
+        PUT 3 30
+        GET 2
+        GET 3
+output: 10
+        -1
+        30
+        3 1
+        EVICTED 1
+```
+
+Follow the sample through: `GET 1` makes `1` recent again, so when `PUT 3`
+needs room it is `2` that goes. `GET 2` misses. `GET 3` hits and makes `3` the
+most recent, which is why the survivors print as `3 1`.
+
+The generated form, in 64-bit arithmetic that wraps (a `bigint`, wrapped with
+`BigInt.asUintN(64, …)`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the q operations:
+    a   = next()
+    key = next() % (2 * cap)
+    if a % 4 == 0:   GET key
+    else:            PUT key (next() % 100)        # the value is a third draw
+```
+
+**The starter compiles clean under `strict`, and it is wrong.** It keeps the
+cache in a `Record<number, number>` and leans on a fact everybody half
+remembers: objects keep their keys in insertion order. So a touch is delete
+and re-insert, and the coldest entry is `Object.keys(cache)[0]`. Run it on the
+sample and `GET 2` prints `20`.
+
+That is the boss. The type said the keys were `number`s, and the types are
+gone at runtime: an object's keys are **strings**, `Object.keys` hands them
+back as `"1"` and `"2"`, and the insertion-order rule has an exception written
+into the language for exactly these keys — **integer-like keys come first, in
+ascending numeric order**, wherever they were inserted. Deleting `1` and
+putting it back changes nothing about where it sorts. The eviction removes the
+smallest key, not the coldest one, and tsc cannot say a word about it, because
+nothing in the program is ill-typed. Everything it checked was true when it
+checked it.
+
+The fix is the structure that means what the starter assumed: a `Map`. Its
+keys stay `number`s, and its iteration order is insertion order with no
+exceptions. `delete` and `set` is the touch, `cache.keys().next().value` is the
+cold end, `[...cache.keys()].reverse()` is most-recent-first — and all of it is
+`O(1)` per operation, which a hash map into a doubly linked list gives you in
+other languages and which `Map` gives you here with the pointers hidden.
+
+(In the Python version of this interview the boss was the recursion limit,
+and the two-thousand-operation hidden case is still here. Node's stack is
+on the order of ten thousand frames deep, so a head-then-recurse-on-the-tail version
+would get through it — which is a fact about this input, not a reason to
+write one. A sequence of operations is a `for` loop.)
+'''
+starter      = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+type Op = { kind: "GET"; key: number } | { kind: "PUT"; key: number; value: number };
+
+function readOperations(lines: string[]): { cap: number; ops: Op[] } {
+  const header = lines[0].trim().split(/\s+/).map(Number);
+  const [cap, q] = header;
+  const ops: Op[] = [];
+  if (header.length === 3) {
+    let x = BigInt(header[2]);
+    const next = (): number => {
+      x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+      return Number(x >> 33n);
+    };
+    for (let i = 0; i < q; i++) {
+      const a = next();
+      const key = next() % (2 * cap);
+      if (a % 4 === 0) ops.push({ kind: "GET", key });
+      else ops.push({ kind: "PUT", key, value: next() % 100 });
+    }
+  } else {
+    for (const line of lines.slice(1, 1 + q)) {
+      const [kind, key, value] = line.trim().split(/\s+/);
+      if (kind === "GET") ops.push({ kind, key: Number(key) });
+      else ops.push({ kind: "PUT", key: Number(key), value: Number(value) });
+    }
+  }
+  return { cap, ops };
+}
+
+const { cap, ops } = readOperations(input.split("\n"));
+
+// "objects remember insertion order", so the first key is the coldest one:
+// delete and re-insert to touch, evict Object.keys(cache)[0]
+const cache: Record<number, number> = {};
+let size = 0;
+let evicted = 0;
+const out: string[] = [];
+
+for (const op of ops) {
+  if (op.kind === "GET") {
+    if (op.key in cache) {
+      const value = cache[op.key];
+      delete cache[op.key];
+      cache[op.key] = value;
+      out.push(String(value));
+    } else {
+      out.push("-1");
+    }
+    continue;
+  }
+
+  if (op.key in cache) {
+    delete cache[op.key];
+    cache[op.key] = op.value;
+    continue;
+  }
+  if (size >= cap) {
+    const coldest = Object.keys(cache)[0];
+    delete cache[Number(coldest)];
+    size--;
+    evicted++;
+  }
+  cache[op.key] = op.value;
+  size++;
+}
+
+const alive = Object.keys(cache).reverse();
+out.push(alive.length > 0 ? alive.join(" ") : "-");
+out.push(`EVICTED ${evicted}`);
+console.log(out.join("\n"));
+'''
+solution     = '''
+const input: string = require("fs").readFileSync(0, "utf8");
+
+type Op = { kind: "GET"; key: number } | { kind: "PUT"; key: number; value: number };
+
+function readOperations(lines: string[]): { cap: number; ops: Op[] } {
+  const header = lines[0].trim().split(/\s+/).map(Number);
+  const [cap, q] = header;
+  const ops: Op[] = [];
+  if (header.length === 3) {
+    let x = BigInt(header[2]);
+    const next = (): number => {
+      x = BigInt.asUintN(64, x * 6364136223846793005n + 1442695040888963407n);
+      return Number(x >> 33n);
+    };
+    for (let i = 0; i < q; i++) {
+      const a = next();
+      const key = next() % (2 * cap);
+      if (a % 4 === 0) ops.push({ kind: "GET", key });
+      else ops.push({ kind: "PUT", key, value: next() % 100 });
+    }
+  } else {
+    for (const line of lines.slice(1, 1 + q)) {
+      const [kind, key, value] = line.trim().split(/\s+/);
+      if (kind === "GET") ops.push({ kind, key: Number(key) });
+      else ops.push({ kind: "PUT", key: Number(key), value: Number(value) });
+    }
+  }
+  return { cap, ops };
+}
+
+const { cap, ops } = readOperations(input.split("\n"));
+
+// A Map keeps its keys as numbers and in insertion order, whatever they are:
+// cold end first, hot end last. delete + set is the touch, the first key is
+// the eviction, and every one of them is O(1).
+const cache = new Map<number, number>();
+let evicted = 0;
+const out: string[] = [];
+
+for (const op of ops) {
+  if (op.kind === "GET") {
+    const value = cache.get(op.key);
+    if (value === undefined) {
+      out.push("-1");
+    } else {
+      cache.delete(op.key);
+      cache.set(op.key, value);
+      out.push(String(value));
+    }
+    continue;
+  }
+
+  if (cache.has(op.key)) {
+    // an overwrite adds no entry, so it evicts nothing
+    cache.delete(op.key);
+    cache.set(op.key, op.value);
+    continue;
+  }
+  if (cache.size >= cap) {
+    const coldest = cache.keys().next().value;
+    if (coldest !== undefined) {
+      cache.delete(coldest);
+      evicted++;
+    }
+  }
+  cache.set(op.key, op.value);
+}
+
+const alive = [...cache.keys()].reverse();
+out.push(alive.length > 0 ? alive.join(" ") : "-");
+out.push(`EVICTED ${evicted}`);
+console.log(out.join("\n"));
+'''
+hints = [
+  "Run the sample by hand against the starter and print `Object.keys(cache)` after every operation. The order you see is not the order you inserted.",
+  "`Record<number, V>` is a type; the object underneath has string keys, and integer-like string keys enumerate in ascending numeric order before every other key. That rule is in the spec, not an engine quirk.",
+  "`new Map<number, number>()`: `delete` then `set` on every hit and every overwrite, and when a new key arrives at a full cache, delete `cache.keys().next().value`. Overwriting a key that is already present is not an eviction — check `has` before you decide the cache is full.",
+  "The survivors are the Map read from the hot end: `[...cache.keys()].reverse()`, with no sort and no stamps.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "2 6\nPUT 1 10\nPUT 2 20\nGET 1\nPUT 3 30\nGET 2\nGET 3\n", expect = "10\n-1\n30\n3 1\nEVICTED 1\n", visible = true },
+  { name = "overwrite", stdin = "1 3\nPUT 5 1\nPUT 5 2\nGET 5\n",                           expect = "2\n5\nEVICTED 0\n",           visible = false },
+  { name = "miss",      stdin = "2 2\nGET 9\nGET 8\n",                                      expect = "-1\n-1\n-\nEVICTED 0\n",      visible = false },
+  { name = "churn",     stdin = "1 4\nPUT 1 1\nPUT 2 2\nPUT 3 3\nGET 1\n",                  expect = "-1\n3\nEVICTED 2\n",          visible = false },
+  { name = "depth",     stdin = "3 2000 7\n",                                               expect = "-1\n-1\n80\n-1\n-1\n44\n72\n83\n35\n88\n-1\n33\n-1\n7\n7\n7\n-1\n-1\n-1\n-1\n-1\n5\n-1\n-1\n-1\n-1\n-1\n-1\n90\n12\n-1\n48\n-1\n48\n-1\n-1\n-1\n66\n-1\n-1\n-1\n80\n-1\n-1\n2\n-1\n-1\n-1\n43\n50\n-1\n88\n-1\n-1\n35\n-1\n-1\n-1\n90\n90\n18\n18\n-1\n63\n65\n14\n41\n-1\n-1\n82\n66\n9\n-1\n-1\n-1\n-1\n38\n-1\n40\n-1\n-1\n10\n-1\n-1\n42\n-1\n59\n85\n20\n-1\n-1\n24\n-1\n-1\n58\n55\n-1\n-1\n24\n-1\n-1\n-1\n-1\n-1\n19\n38\n-1\n89\n89\n63\n61\n77\n-1\n-1\n-1\n-1\n31\n31\n31\n-1\n-1\n-1\n-1\n47\n84\n47\n-1\n12\n95\n-1\n58\n-1\n-1\n13\n-1\n-1\n-1\n34\n34\n-1\n61\n-1\n82\n87\n52\n68\n-1\n-1\n-1\n-1\n84\n68\n78\n-1\n-1\n-1\n-1\n21\n-1\n-1\n73\n73\n-1\n-1\n-1\n39\n4\n52\n52\n-1\n-1\n-1\n-1\n62\n-1\n-1\n-1\n11\n-1\n49\n93\n-1\n-1\n70\n70\n-1\n70\n-1\n-1\n-1\n-1\n32\n93\n32\n-1\n-1\n-1\n44\n-1\n-1\n35\n13\n81\n-1\n-1\n-1\n49\n58\n-1\n-1\n-1\n66\n66\n-1\n-1\n-1\n76\n-1\n62\n62\n86\n34\n-1\n97\n66\n95\n-1\n-1\n79\n37\n61\n-1\n4\n-1\n27\n-1\n99\n11\n3\n69\n69\n12\n-1\n98\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n28\n-1\n-1\n-1\n29\n21\n68\n89\n55\n-1\n-1\n55\n80\n44\n-1\n-1\n91\n12\n-1\n-1\n-1\n-1\n2\n-1\n33\n2\n-1\n5\n46\n-1\n4\n-1\n4\n-1\n97\n-1\n9\n64\n-1\n-1\n-1\n-1\n-1\n59\n-1\n54\n-1\n-1\n41\n-1\n-1\n98\n-1\n-1\n60\n17\n54\n74\n7\n64\n76\n9\n-1\n-1\n55\n73\n-1\n42\n-1\n7\n81\n-1\n74\n90\n-1\n10\n-1\n-1\n-1\n-1\n-1\n-1\n52\n-1\n71\n74\n-1\n75\n-1\n11\n-1\n49\n-1\n58\n95\n-1\n41\n98\n-1\n16\n45\n-1\n0\n-1\n99\n-1\n-1\n39\n39\n-1\n78\n78\n-1\n62\n-1\n-1\n10\n75\n-1\n-1\n-1\n78\n-1\n35\n-1\n-1\n-1\n-1\n61\n-1\n80\n-1\n-1\n2\n-1\n2\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n42\n-1\n-1\n74\n7\n7\n-1\n58\n-1\n-1\n47\n68\n71\n61\n-1\n66\n-1\n36\n-1\n-1\n87\n-1\n-1\n-1\n50\n-1\n79\n54\n-1\n89\n-1\n-1\n-1\n57\n59\n39\n39\n-1\n-1\n-1\n-1\n70\n-1\n98\n-1\n81\n96\n96\n96\n96\n90\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n38\n-1\n38\n-1\n63\n24\n-1\n83\n24\n21\n-1\n-1\n42\n16\n28\n28\n45\n22\n-1\n-1\n-1\n-1\n91\n-1\n35\n-1\n-1\n28\n84\n-1\n43\n43\n-1\n-1\n-1\n-1\n47\n8\n-1\n-1\n0 1 2\nEVICTED 787\n",        visible = false },
+]

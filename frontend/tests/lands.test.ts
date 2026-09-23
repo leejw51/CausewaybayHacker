@@ -235,6 +235,58 @@ describe("landGrid — where the plates actually land", () => {
     expect(o.y + g.ph).toBeLessThanOrEqual(short[1] + short[3] + 0.001);
   });
 
+  it("puts six lands three across and two down — the same two rows as four", () => {
+    // TYPESCRIPT. The rule that fixed the fifth land was written so a sixth
+    // would not need touching it; this is the proof. 980 wide holds three at
+    // MIN_COL, so six is a full 3x2 with no mascot given up and no scroll.
+    const g = landGrid(COL, 6, GAP, MIN_COL, VIABLE, COMFORTABLE, 5, true, 0);
+    expect(g.cols).toBe(3);
+    expect(g.rows).toBe(2);
+    expect(g.ph).toBeGreaterThanOrEqual(VIABLE);
+    expect(g.overflow).toBe(0);
+    for (const o of g.origins) {
+      expect(o.y).toBeGreaterThanOrEqual(COL[1]);
+      expect(o.y + g.ph).toBeLessThanOrEqual(COL[1] + COL[3]);
+      expect(o.x + g.pw).toBeLessThanOrEqual(COL[0] + COL[2]);
+    }
+  });
+
+  it("never costs a sixth land a row a fifth did not, once two columns fit", () => {
+    // Where one column is all that fits, every land is a row and that is the
+    // phone's problem to solve (below). Anywhere wider, six packs into the
+    // rows five already took: 3+3 where it was 3+2, 2+2+2 where it was 2+2+1.
+    for (const w of [540, 620, 820, 980, 1300, 1800]) {
+      const col: [number, number, number, number] = [0, 0, w, 900];
+      const five = landGrid(col, 5, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, true, 0);
+      const six = landGrid(col, 6, GAP, MIN_COL, VIABLE, COMFORTABLE, 0, true, 0);
+      expect(six.rows, `${w} wide`).toBe(five.rows);
+      // And the grid is balanced: never a lone land on a row of its own.
+      expect(six.cols * six.rows - 6, `${w} wide`).toBeLessThan(six.cols);
+    }
+  });
+
+  it("keeps all six on a phone, upright or on its side", () => {
+    // On a phone the scene passes a MIN_COL of 150 and floors of zero, so the
+    // plates take the fair share and nothing is scrolled out of reach — the
+    // caller's promise, checked here for six at a real phone's column sizes.
+    const PHONE_COL = 150;
+    const shapes: Array<[string, [number, number, number, number]]> = [
+      ["portrait", [16, 120, 358, 520]],
+      ["landscape", [16, 64, 400, 260]],
+    ];
+    for (const [name, col] of shapes) {
+      const g = landGrid(col, 6, GAP, PHONE_COL, 0, 0, 5, true, 0);
+      expect(g.overflow, name).toBe(0);
+      expect(g.cols, name).toBe(2);
+      expect(g.rows, name).toBe(3);
+      for (const o of g.origins) {
+        expect(o.y, name).toBeGreaterThanOrEqual(col[1]);
+        expect(o.y + g.ph, name).toBeLessThanOrEqual(col[1] + col[3]);
+        expect(o.x + g.pw, name).toBeLessThanOrEqual(col[0] + col[2]);
+      }
+    }
+  });
+
   it("still scrolls when not even a mascot-less plate fits", () => {
     // The rule gives up the mascot, not the plate. Five lands in 300px is
     // 93 a row, under FLOOR, so it goes back to a readable plate and scrolls.

@@ -1,0 +1,5 @@
+<work>/main.ts:3
+console.log(feed.screens.map((n: number) => n + 1));
+                         ^
+
+TypeError: feed.screens.map is not a function

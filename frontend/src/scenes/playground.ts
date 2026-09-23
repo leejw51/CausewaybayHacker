@@ -114,6 +114,11 @@ const STARTER: Record<Land, string> = {
   // The scratchpad opens on the import, because a PyTorch Land scratchpad
   // without it is four keystrokes from being a Python Land scratchpad.
   pytorch: 'import torch\n\nprint("hello, causewaybay", torch.tensor([1, 2, 3]).tolist())\n',
+  // Standard input the one way every TypeScript Land quest reads it: the
+  // runner has no @types/node, only the few declarations `node.d.ts` gives,
+  // and `require("fs").readFileSync(0, "utf8")` is the idiom it declares.
+  typescript:
+    'const input: string = require("fs").readFileSync(0, "utf8");\n\nconsole.log("hello, causewaybay");\n',
 };
 
 /** The outcomes as the poster prints them: English, whatever the screen is in. */

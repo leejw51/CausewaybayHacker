@@ -108,6 +108,7 @@ const FENCE_LANG: Record<Land, string> = {
   python: "python",
   // PyTorch Land is Python to every Markdown renderer there is.
   pytorch: "python",
+  typescript: "typescript",
 };
 
 const FONT_MIN = CODE_FONT_MIN;

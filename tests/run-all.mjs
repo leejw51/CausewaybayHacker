@@ -83,6 +83,9 @@ const env = {
   torch:
     which("python3") &&
     spawnSync("python3", ["-I", "-c", "import torch"], { stdio: "ignore" }).status === 0,
+  // TypeScript Land's `tsc`: on PATH, or the one the frontend pins, which is
+  // the same fallback verify_pack.py takes. `node` is this script's own.
+  tsc: which("tsc") || existsSync(join(ROOT, "frontend/node_modules/.bin/tsc")),
   rustc: which("rustc"),
   luajit: which("luajit"),
   love: which("love") || existsSync(join(ROOT, "love2d/build/love.app/Contents/MacOS/love")),
@@ -100,7 +103,7 @@ const env = {
 
 // The content suite's arguments, which depend on what is installed.
 //
-// Sixteen of the twenty packs need only the four compilers; the four pytorch
+// Sixteen of the twenty-four packs need only the four compilers; the four pytorch
 // ones need `torch` as well, and torch is a package inside an interpreter
 // rather than a program on PATH — the one toolchain here that a perfectly
 // ordinary machine will not have. Making the whole suite need it would mean
@@ -137,15 +140,25 @@ const PACKS_PYTORCH = [
   "content/pytorch/advanced.toml",
   "content/pytorch/hacker.toml",
 ];
+// TypeScript Land's four need `tsc`, which is optional the way torch is — a
+// machine without it still verifies the other packs. Unlike torch they carry
+// no slug of their own, so leaving them out does not cost `--complete`.
+const PACKS_TYPESCRIPT = [
+  "content/typescript/verybasic.toml",
+  "content/typescript/basic.toml",
+  "content/typescript/advanced.toml",
+  "content/typescript/hacker.toml",
+];
 // PM's two newer gates, both worth having in CI:
 //   * a brief's worked example must match a visible case — it caught a quest
 //     whose brief showed `1 3` where its test expected `3 1`, unsolvable as
 //     written and invisible to every other check;
 //   * `--complete` fails on a concept slug no §7.1 mistake kind can reach,
 //     so the AI drills cannot be pointed at a dead end.
-const CONTENT_ARGS = env.torch
-  ? ["--complete", ...PACKS_COMPILED, ...PACKS_PYTORCH]
-  : PACKS_COMPILED;
+const CONTENT_ARGS = [
+  ...(env.torch ? ["--complete", ...PACKS_COMPILED, ...PACKS_PYTORCH] : PACKS_COMPILED),
+  ...(env.tsc ? PACKS_TYPESCRIPT : []),
+];
 
 /** @type {{name:string, what:string, cwd:string, cmd:string[], needs:[boolean,string][], server?:boolean, slow?:boolean, note?:string}[]} */
 const SUITES = [
@@ -229,10 +242,19 @@ const SUITES = [
       [env.go, "go is not on PATH"],
       [env.cpp, "c++ is not on PATH"],
     ],
-    note: env.torch
-      ? undefined
-      : "torch is not importable, so the four pytorch packs and --complete were " +
-        "left out — the other sixteen ran (python3 -m pip install torch)",
+    note:
+      [
+        env.torch
+          ? null
+          : "torch is not importable, so the four pytorch packs and --complete were " +
+            "left out (python3 -m pip install torch)",
+        env.tsc
+          ? null
+          : "tsc is not on PATH, so the four typescript packs were left out " +
+            "(npm install -g typescript, or npm ci in frontend/)",
+      ]
+        .filter(Boolean)
+        .join("; ") || undefined,
     slow: true,
   },
   {

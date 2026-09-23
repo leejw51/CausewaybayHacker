@@ -1,0 +1,2 @@
+main.ts(2,10): error TS2393: Duplicate function implementation.
+main.ts(5,10): error TS2393: Duplicate function implementation.

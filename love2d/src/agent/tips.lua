@@ -100,6 +100,22 @@ M.TIPS = {
     "`torch.manual_seed` fixes one global stream; pass a `Generator` for a reproducible one.",
     "The scale in attention is the square root of the *head* dimension, not the model dimension.",
   },
+  -- `tsc` in strict mode against a few dozen lines of `node.d.ts`, not
+  -- @types/node: what is not declared there is TS2304 before a line runs.
+  typescript = {
+    "Read stdin with `require(\"fs\").readFileSync(0, \"utf8\")` — one of the few Node calls declared here.",
+    "There is no @types/node. `process`, `console`, the timers and `readFileSync` are all there is.",
+    "`strict` is on: `null` and `undefined` are their own types, and every parameter wants a type.",
+    "Prefer `unknown` to `any`. `unknown` makes you narrow first; `any` switches the checker off.",
+    "`===`, never `==`. The loose one converts before it compares, and `0 == \"\"` is true.",
+    "A union tagged by `kind` plus a `switch` on `kind` narrows each branch for you.",
+    "End an exhaustive `switch` with `const _: never = x;` and a new case finds every switch.",
+    "`as` is a promise to the compiler, not a check. A wrong cast compiles and fails at runtime.",
+    "`x!` is also a promise. `if (x !== undefined)` narrows instead, and cannot be wrong.",
+    "`sort()` compares as strings: `[10, 9].sort()` is `[10, 9]`. Numbers need `(a, b) => a - b`.",
+    "`readonly` and `as const` cost nothing at runtime and catch the mutation you did not mean.",
+    "`for…of` walks values; `for…in` walks keys, as strings. On an array you want `of`.",
+  },
 }
 
 --- The next tip after `last`, never the same one twice running.
@@ -594,6 +610,35 @@ function M.advise(lang, source)
         "pytorch.still-training",
         "There is a `Dropout` here and no `model.eval()` — inference would still be dropping units."
       )
+    end
+  elseif lang == "typescript" then
+    if source:find(":%s*any%f[^%w_]") or source:find("<any>") or source:find("%f[%w_]as%s+any%f[^%w_]") then
+      say(
+        "ts.any",
+        "An `any` switches the checker off for everything it touches. `unknown` and a narrowing `if` keep it on."
+      )
+    end
+    if source:find("[^=!<>]==[^=]") or source:find("!=[^=]") then
+      say("ts.loose-eq", "`==` converts before it compares. `===` says what you mean.")
+    end
+    if source:find("%.sort%(%s*%)") then
+      say(
+        "ts.sort-default",
+        "`sort()` with no comparator sorts as strings — `[10, 9, 1]` becomes `[1, 10, 9]`. Pass `(a, b) => a - b`."
+      )
+    end
+    local for_in = false
+    for _, decl in ipairs({ "const", "let", "var" }) do
+      if source:find("for%s*%(%s*" .. decl .. "%s+[%w_]+%s+in%f[^%w_]") then for_in = true end
+    end
+    if for_in then
+      say(
+        "ts.for-in",
+        "`for…in` walks the keys, as strings. `for…of` walks the values, which is usually what an array wants."
+      )
+    end
+    if source:find("%f[%w_]var%s+[%w_]") then
+      say("ts.var", "`var` is function-scoped and hoisted. `const`, or `let` when it has to change.")
     end
   elseif lang == "cpp" then
     if source:find("using%s+namespace%s+std%s*;") then

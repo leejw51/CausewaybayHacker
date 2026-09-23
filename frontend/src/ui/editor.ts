@@ -71,13 +71,22 @@ import { rust } from "@codemirror/lang-rust";
 import { go } from "@codemirror/lang-go";
 import { cpp } from "@codemirror/lang-cpp";
 import { python } from "@codemirror/lang-python";
+import { javascript } from "@codemirror/lang-javascript";
 import { RUBBLE_MAX } from "../engine/burst";
 import { Theme } from "../engine/theme";
 import type { Land } from "../net/protocol";
 import type { CodeContext } from "../ai/help";
 
 /** The syntax mode per land: highlighting and indentation, nothing cleverer. */
-const MODE: Record<Land, () => Extension> = { rust, go, cpp, python, pytorch: python };
+const MODE: Record<Land, () => Extension> = {
+  rust,
+  go,
+  cpp,
+  python,
+  pytorch: python,
+  // TypeScript is its own grammar, not a dialect of anything above it.
+  typescript: () => javascript({ typescript: true }),
+};
 
 /**
  * The file the server compiles for each land (SPEC §5.1), which is what the
@@ -109,6 +118,8 @@ export const INDENT: Record<Land, string> = {
   cpp: "    ",
   python: "    ",
   pytorch: "    ",
+  // prettier writes two spaces, and FORMAT is prettier on this land.
+  typescript: "  ",
 };
 
 export const MAIN_FILE: Record<Land, string> = {
@@ -117,6 +128,7 @@ export const MAIN_FILE: Record<Land, string> = {
   cpp: "main.cpp",
   python: "main.py",
   pytorch: "main.py",
+  typescript: "main.ts",
 };
 
 const hex = (c: readonly [number, number, number, number]) =>
@@ -720,6 +732,11 @@ const COMMON: Record<Land, ReadonlySet<string>> = (() => {
     ),
     python: new Set(py),
     pytorch: new Set([...py, "torch", "nn", "tensor", "Tensor", "Module", "forward", "backward", "zeros", "ones", "randn", "optim", "grad", "no_grad"]),
+    typescript: new Set(
+      "let const function return if else for while of in new class interface type enum extends implements readonly private public async await import from export as keyof typeof number string boolean undefined null void never unknown true false console log length push map filter reduce split trim join Array Map Set Record Math require readFileSync".split(
+        " ",
+      ),
+    ),
   };
 })();
 
@@ -984,6 +1001,9 @@ const LOOPS: Record<Land, ReadonlySet<string>> = {
   cpp: new Set(["ForStatement", "WhileStatement", "DoStatement", "ForRangeLoop"]),
   python: new Set(["ForStatement", "WhileStatement"]),
   pytorch: new Set(["ForStatement", "WhileStatement"]),
+  // @lezer/javascript: `for (…;…;…)`, `for…of` and `for…in` are all one
+  // `ForStatement`, told apart only by their spec child.
+  typescript: new Set(["ForStatement", "WhileStatement", "DoStatement"]),
 };
 
 /**
@@ -999,7 +1019,8 @@ export function toneOfNode(name: string, parent: string): Tone | null {
   if (/String|Char|Rune|Format/.test(name)) return "string";
   if (/Integer|Float|Number|Boolean|None|True|False|Escape/.test(name)) return "number";
   if (/Type|Primitive|Class|Namespace|Lifetime/.test(name)) return "type";
-  if (/Identifier|VariableName|DefName|FieldName|Macro|PropertyName/.test(name)) {
+  // `VariableDefinition` is @lezer/javascript's name for the `x` in `const x`.
+  if (/Identifier|VariableName|VariableDefinition|DefName|FieldName|Macro|PropertyName/.test(name)) {
     return /Call|Macro/.test(parent) ? "call" : "name";
   }
   // A keyword's node is named after itself: `for`, `fn`, `return`.

@@ -14,6 +14,7 @@ import { rust } from "@codemirror/lang-rust";
 import { go } from "@codemirror/lang-go";
 import { cpp } from "@codemirror/lang-cpp";
 import { python } from "@codemirror/lang-python";
+import { javascript } from "@codemirror/lang-javascript";
 import { describe, expect, it } from "vitest";
 import {
   RUBBLE_MAX,
@@ -288,7 +289,14 @@ describe("the plans", () => {
   });
 });
 
-const MODE = { rust, go, cpp, python, pytorch: python } as const;
+const MODE = {
+  rust,
+  go,
+  cpp,
+  python,
+  pytorch: python,
+  typescript: () => javascript({ typescript: true }),
+} as const;
 
 function state(lang: Land, doc: string): EditorState {
   return EditorState.create({ doc, extensions: [MODE[lang]()] });
@@ -408,6 +416,32 @@ describe("loopClosedBy: when a loop counts as finished", () => {
     expect(closes("python", first + "\n", first.length - 3, "\n")).toBeNull();
     // A plain character never closes anything.
     expect(closes("python", first, first.length, ")")).toBeNull();
+  });
+
+  it("typescript: for…of, a counting for and a while close on their brace", () => {
+    const of = "function f(xs: number[]): void {\n  for (const x of xs) {\n    console.log(x);\n  ";
+    const r = closes("typescript", of + "\n}\n", of.length, "}");
+    expect(r).not.toBeNull();
+    expect(of.slice(r!.from, r!.from + 3)).toBe("for");
+    const c = "function f(): void {\n  for (let i = 0; i < 3; i++) { ";
+    expect(closes("typescript", c + "\n}\n", c.length, "}")).not.toBeNull();
+    const w = "function f(n: number): void {\n  while (n > 0) { n--; ";
+    expect(closes("typescript", w + "\n}\n", w.length, "}")).not.toBeNull();
+    // The function's own brace, and an `if`'s, are not loops.
+    const fn = "function f(): void {\n  const x = 1;\n";
+    expect(closes("typescript", fn, fn.length, "}")).toBeNull();
+    const i = "function f(): void {\n  if (true) { ";
+    expect(closes("typescript", i + "\n}\n", i.length, "}")).toBeNull();
+  });
+
+  it("typescript has its own colours, not Python's", () => {
+    const ts = 'const n: number = 42;\nconst s = "hi";\n';
+    const st = state("typescript", ts);
+    const at = (needle: string, off = needle.length) => ts.indexOf(needle) + off;
+    expect(toneOf(st, at("const"), "t")).toBe("keyword");
+    expect(toneOf(st, at("42"), "2")).toBe("number");
+    expect(toneOf(st, at('"hi'), "i")).toBe("string");
+    expect(toneOf(st, at("number"), "r")).toBe("type");
   });
 
   it("nothing at all is nothing", () => {

@@ -57,7 +57,7 @@ pub struct SnippetBrief {
 
 fn check_lang(lang: &str) -> Result<()> {
     match lang {
-        "rust" | "go" | "cpp" | "python" | "pytorch" => Ok(()),
+        "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript" => Ok(()),
         other => Err(bad_request(format!("unknown language '{other}'"))),
     }
 }

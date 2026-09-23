@@ -16,12 +16,13 @@ return function()
   T.section("lands — the four, and what each resolves to")
 
   T.case("the order is SPEC §0's, and every land has a name", function()
-    T.same(Land.ORDER, { "rust", "go", "cpp", "python", "pytorch" })
+    T.same(Land.ORDER, { "rust", "go", "cpp", "python", "pytorch", "typescript" })
     T.eq(Land.name("rust"), "RUST")
     T.eq(Land.name("go"), "GO")
     T.eq(Land.name("cpp"), "C++", "nobody calls it CPP")
     T.eq(Land.name("python"), "PYTHON")
     T.eq(Land.name("pytorch"), "PYTORCH")
+    T.eq(Land.name("typescript"), "TYPESCRIPT")
     T.eq(Land.name("zig"), "ZIG", "a land the client has not heard of keeps its id")
     T.eq(Land.name(nil), "?")
   end)
@@ -30,7 +31,8 @@ return function()
     T.eq(Land.rank("rust"), 1)
     T.eq(Land.rank("python"), 4)
     T.eq(Land.rank("pytorch"), 5)
-    T.eq(Land.rank("zig"), 6)
+    T.eq(Land.rank("typescript"), 6)
+    T.eq(Land.rank("zig"), 7)
     local seen = {}
     for _, land in ipairs(Land.ORDER) do
       local phase = Land.phase(land)
@@ -77,6 +79,17 @@ return function()
       math.floor(py[3] * 255 + 0.5) }, { 0xFF, 0xD4, 0x3B })
   end)
 
+  T.case("TypeScript is its own blue, not C++'s", function()
+    -- #3178C6. Both are blue-led, so what has to hold is the difference:
+    -- TypeScript's red and green are well up where C++'s navy has none.
+    local ts, cpp = Theme.land.typescript, Theme.land.cpp
+    T.same({ math.floor(ts[1] * 255 + 0.5), math.floor(ts[2] * 255 + 0.5),
+      math.floor(ts[3] * 255 + 0.5) }, { 0x31, 0x78, 0xC6 })
+    T.ok(ts[3] > ts[1] and ts[3] > ts[2], "blue leads")
+    local d = math.abs(ts[1] - cpp[1]) + math.abs(ts[2] - cpp[2]) + math.abs(ts[3] - cpp[3])
+    T.ok(d * 255 > 90, "far enough from C++'s navy to read as another land")
+  end)
+
   T.case("each land names a mascot sprite; the new ones have a stand-in", function()
     for _, land in ipairs(Land.ORDER) do
       T.ok(Land.MASCOT[land] ~= nil, land .. " has a mascot")
@@ -84,6 +97,7 @@ return function()
     T.eq(Land.MASCOT.cpp, "sprite_cpp")
     T.eq(Land.MASCOT.python, "sprite_python")
     T.eq(Land.MASCOT.pytorch, "sprite_pytorch")
+    T.eq(Land.MASCOT.typescript, "sprite_typescript")
     -- Headless there are no images at all, so `pick` finds nothing — which
     -- is the behaviour on a checkout without `art/`, and must not error.
     T.eq(Land.mascot("cpp"), nil)
@@ -91,7 +105,8 @@ return function()
   end)
 
   T.case("each land has a scratch-file extension for $EDITOR", function()
-    T.same(External.EXT, { rust = "rs", go = "go", cpp = "cpp", python = "py", pytorch = "py" })
+    T.same(External.EXT,
+      { rust = "rs", go = "go", cpp = "cpp", python = "py", pytorch = "py", typescript = "ts" })
     for _, land in ipairs(Land.ORDER) do
       T.ok(External.EXT[land] ~= nil, land .. " has an extension")
     end

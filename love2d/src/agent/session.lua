@@ -39,6 +39,7 @@ local LANG_NAME = {
   cpp = "C++ (C++20)",
   python = "Python 3",
   pytorch = "Python 3 + PyTorch",
+  typescript = "TypeScript (tsc --strict, run on Node)",
 }
 
 --- The most of one stream or one wrong answer that goes into the prompt.
@@ -129,7 +130,7 @@ function M.system_prompt(bench, can_run)
   local lines = {
     ("You are the Rust coder — a small pixel-art character on a flying keyboard who lives on the code screen of Causewaybay Hacker, a 16-bit coding game set in Hong Kong. The person is learning %s. You are their pair: a friendly senior engineer who explains briefly and lets the code speak."):format(lang),
     "",
-    "The whole project is ONE source file, the one in the editor. There are no other files, no build system to configure, no dependencies beyond the standard library (Rust: std only, no crates; Go: standard library; C++: the standard library, compiled with -std=c++20; Python 3: the standard library).",
+    "The whole project is ONE source file, the one in the editor. There are no other files, no build system to configure, no dependencies beyond the standard library (Rust: std only, no crates; Go: standard library; C++: the standard library, compiled with -std=c++20; Python 3: the standard library; TypeScript: tsc in strict mode with no @types/node — only process, console, the timers and fs.readFileSync are declared, so stdin is read with `const input: string = require(\"fs\").readFileSync(0, \"utf8\");` and output goes through console.log).",
     "",
     "How to work:",
     "- For a small change, use edit_code with the exact span. For a new program or a rewrite, use write_code. Both are typed into the editor character by character while the person watches, so write only what is needed and no filler comments.",

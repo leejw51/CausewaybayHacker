@@ -61,6 +61,8 @@ local STARTER = {
   cpp = '#include <iostream>\n\nint main() {\n    std::cout << "hello\\n";\n}\n',
   python = 'print("hello")\n',
   pytorch = 'import torch\n\nprint("hello", torch.tensor([1, 2, 3]).tolist())\n',
+  -- Stdin the one way `node.d.ts` declares it: there is no @types/node.
+  typescript = 'const input: string = require("fs").readFileSync(0, "utf8");\n\nconsole.log("hello");\n',
 }
 Playground.LANGS = LANGS
 Playground.STARTER = STARTER
@@ -1183,7 +1185,7 @@ function Playground:draw_code(rect, bare)
   self.pane:frame(rect, font, gutter, x0, y0, line_h, rows)
   local state = "code"
   for i = 1, self.editor.scroll do
-    _, state = Editor.highlight(self.editor.lines[i] or "", state)
+    _, state = Editor.highlight(self.editor.lines[i] or "", state, self.editor.lang)
   end
   local sel_l1, sel_c1, sel_l2, sel_c2 = self.editor:selection()
 
@@ -1211,7 +1213,7 @@ function Playground:draw_code(rect, bare)
     UI.setColor(self.pane:gutter_color(index))
     love.graphics.print(("%4d"):format(index), x0, y)
     local spans
-    spans, state = Editor.highlight(line, state)
+    spans, state = Editor.highlight(line, state, self.editor.lang)
     local cx = x0 + gutter - shift
     for _, span in ipairs(spans) do
       UI.setColor(Theme.code[span.kind] or Theme.cream)
@@ -1642,7 +1644,8 @@ function Playground:make_poster(lib)
   local rendered = Poster.make({
     lang = self.lang,
     name = pad_name,
-    file = ({ rust = "main.rs", go = "main.go", cpp = "main.cpp", python = "main.py", pytorch = "main.py" })[self.lang],
+    file = ({ rust = "main.rs", go = "main.go", cpp = "main.cpp", python = "main.py", pytorch = "main.py",
+      typescript = "main.ts" })[self.lang],
     source = source,
     run = Poster.run_of(self.result, log_lines),
     user = { name = self.app.session:display_name() or "hacker", address = address },

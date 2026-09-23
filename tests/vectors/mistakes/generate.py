@@ -111,6 +111,25 @@ CASES = [
     ("python/key-error.py", "index-range", "py:key-error", "runtime", "exception"),
     ("python/zero-division.py", "unhandled-error", "py:zero-division", "runtime", "exception"),
     ("python/recursion.py", "wrong-answer", "py:recursion", "runtime", "exception"),
+    # ---- typescript -----------------------------------------------------
+    # Two voices. `tsc` has real codes and they are the identity, as rustc's
+    # are; `node` has exception classes, which get `ts:` slugs the way
+    # Python's get `py:` ones. The runtime rows are the erasure: every one of
+    # them type-checks, and then does the thing the types said it would not.
+    ("typescript/type-mismatch.ts", "type-mismatch", "TS2322", "compile", "error"),
+    ("typescript/unknown-name.ts", "unknown-name", "TS2304", "compile", "error"),
+    ("typescript/possibly-undefined.ts", "nil-deref", "TS18048", "compile", "error"),
+    ("typescript/missing-property.ts", "missing-trait", "TS2339", "compile", "error"),
+    ("typescript/const-assign.ts", "mutability", "TS2588", "compile", "error"),
+    ("typescript/syntax.ts", "syntax", "TS1005", "compile", "error"),
+    ("typescript/other-unmatched.ts", "other", "TS2393", "compile", "error"),
+    ("typescript/undefined-property.ts", "nil-deref", "ts:undefined-property", "runtime", "exception"),
+    ("typescript/not-a-function.ts", "missing-trait", "ts:not-a-function", "runtime", "exception"),
+    ("typescript/reference-error.ts", "unknown-name", "ts:reference-error", "runtime", "exception"),
+    ("typescript/range-error.ts", "index-range", "ts:range-error", "runtime", "exception"),
+    ("typescript/recursion.ts", "wrong-answer", "ts:recursion", "runtime", "exception"),
+    ("typescript/json-parse.ts", "unhandled-error", "ts:json-parse", "runtime", "exception"),
+    ("typescript/exception.ts", "unhandled-error", "ts:exception", "runtime", "exception"),
 ]
 
 # What the row's `code` must be found as in the real output — one needle per
@@ -130,6 +149,13 @@ COMPILE_NEEDLES = {
     "cpp:expected-token": ("expected ';'",),
     "cpp:const-discard": ("const-qualified", "read-only", "discards qualifiers", "drops 'const' qualifier"),
     "py:syntax": ("SyntaxError", "IndentationError"),
+    "TS2322": ("error TS2322:",),
+    "TS2304": ("error TS2304:",),
+    "TS18048": ("error TS18048:",),
+    "TS2339": ("error TS2339:",),
+    "TS2588": ("error TS2588:",),
+    "TS1005": ("error TS1005:",),
+    "TS2393": ("error TS2393:",),
 }
 RUNTIME_NEEDLES = {
     None: ("index out of bounds",),
@@ -148,6 +174,13 @@ RUNTIME_NEEDLES = {
     "py:key-error": ("KeyError:",),
     "py:zero-division": ("ZeroDivisionError:",),
     "py:recursion": ("RecursionError:",),
+    "ts:undefined-property": ("TypeError: Cannot read properties of undefined",),
+    "ts:not-a-function": ("is not a function",),
+    "ts:reference-error": ("ReferenceError:",),
+    "ts:range-error": ("RangeError: Invalid array length",),
+    "ts:recursion": ("RangeError: Maximum call stack size exceeded",),
+    "ts:json-parse": ("SyntaxError:",),
+    "ts:exception": ("Error: no such board",),
 }
 
 # Cases kept in the suite for the evidence they carry, but whose expected
@@ -417,6 +450,95 @@ def parse_python_text(stderr: str) -> list:
     return out
 
 
+# SPEC §5.1: the runner's own tsconfig and ambient declarations, read from
+# where the runner compiles them in rather than copied, so a change to either
+# regenerates here as a changed capture instead of drifting.
+TS_FILES = HERE.parents[2] / "backend" / "runner" / "src" / "typescript"
+TS_RUN = ["node", "--enable-source-maps", "main.js"]
+
+
+def tsc_program() -> str:
+    """`tsc` on PATH, else the frontend's pinned one — verify_pack.py's rule."""
+    found = shutil.which("tsc")
+    if found:
+        return found
+    local = HERE.parents[2] / "frontend" / "node_modules" / ".bin" / "tsc"
+    if local.exists():
+        return str(local)
+    raise SystemExit("typescript fixtures need tsc (npm install -g typescript)")
+
+
+def node_stderr(text: str) -> str:
+    """What node printed, down to the part that is the program's.
+
+    Above the stack: the source-mapped `main.ts:N` header, the source line,
+    the caret, and the `TypeError: …` line — all the classifier reads. Below
+    it: `node:internal/…` frames with line numbers that move with every node
+    release, and a `Node.js v26.9.0` trailer. Kept, they would make `--check`
+    a comparison of this laptop's node against CI's, so they are cut here.
+    """
+    kept = []
+    for line in text.splitlines():
+        if line.startswith("    at ") or line.startswith("Node.js v"):
+            break
+        kept.append(line)
+    while kept and not kept[-1].strip():
+        kept.pop()
+    return normalise_runtime("\n".join(kept) + "\n") if kept else ""
+
+
+def run_typescript(src: pathlib.Path, work: pathlib.Path) -> dict:
+    """`tsc -p .` is the build, and it reports on **stdout**; `node` runs the
+    emitted `main.js` with source maps, so the header names `main.ts`."""
+    shutil.copy(src, work / "main.ts")
+    for name in ("node.d.ts", "tsconfig.json"):
+        shutil.copy(TS_FILES / name, work / name)
+    build = subprocess.run([tsc_program(), "-p", "."], cwd=work, capture_output=True, text=True)
+    said = build.stdout + build.stderr
+    result = {
+        "compiled_as": "main.ts",
+        "compile_command": "tsc -p .",
+        "compile_exit": build.returncode,
+        "compiles": build.returncode == 0,
+        "raw_compile_stderr": said,
+        "diagnostics": parse_tsc_text(said),
+    }
+    if result["compiles"]:
+        try:
+            run_out = subprocess.run(TS_RUN, cwd=work, capture_output=True, text=True, timeout=20)
+            result["run_command"] = " ".join(TS_RUN)
+            result["run_exit"] = run_out.returncode
+            result["run_stdout"] = normalise_runtime(run_out.stdout)
+            result["run_stderr"] = node_stderr(run_out.stderr)
+        except subprocess.TimeoutExpired:
+            result["run_command"] = " ".join(TS_RUN)
+            result["run_exit"] = None
+            result["run_stderr"] = "<timed out after 20s>"
+    return result
+
+
+def parse_tsc_text(stderr: str) -> list:
+    """`main.ts(3,7): error TS2322: message`, one per diagnostic; the indented
+    lines under one elaborate it and are left to the raw capture."""
+    import re
+
+    out = []
+    for line in stderr.splitlines():
+        m = re.match(r"^(.+?)\((\d+),(\d+)\): (error|warning) (TS\d+): (.*)$", line)
+        if m:
+            out.append(
+                {
+                    "level": m.group(4),
+                    "code": m.group(5),
+                    "file": m.group(1),
+                    "line": int(m.group(2)),
+                    "col": int(m.group(3)),
+                    "message": m.group(6),
+                }
+            )
+    return out
+
+
 def run_rust(src: pathlib.Path, work: pathlib.Path) -> dict:
     shutil.copy(src, work / "main.rs")
     compile_out = subprocess.run(
@@ -582,6 +704,12 @@ def observed_identity(lang: str, res: dict) -> list:
         if res.get("run_signal"):
             ids.append(f"<signal {res['run_signal']}>")
         return ids
+    if lang == "typescript":
+        ids = [d["code"] for d in res["diagnostics"]]
+        said = [l for l in (res.get("run_stderr") or "").splitlines() if l[:1].isupper()]
+        if said:
+            ids.append(said[0])
+        return ids
     if lang == "python":
         ids = [d["message"] for d in res["diagnostics"]]
         tail = (res.get("run_stderr") or "").strip().splitlines()
@@ -715,9 +843,15 @@ def content_starters(build_root: pathlib.Path) -> list:
     return out
 
 
-EXTENSION = {"rust": "rs", "go": "go", "cpp": "cpp", "python": "py"}
+EXTENSION = {"rust": "rs", "go": "go", "cpp": "cpp", "python": "py", "typescript": "ts"}
 # What the captured compile stream is called, per land: the tool that wrote it.
-CAPTURE_EXT = {"rust": "rustc.json", "go": "gobuild.txt", "cpp": "cxx.txt", "python": "pycompile.txt"}
+CAPTURE_EXT = {
+    "rust": "rustc.json",
+    "go": "gobuild.txt",
+    "cpp": "cxx.txt",
+    "python": "pycompile.txt",
+    "typescript": "tsc.txt",
+}
 
 
 def run_case(lang: str, src: pathlib.Path, work: pathlib.Path, build_root: pathlib.Path, race: bool = False) -> dict:
@@ -729,6 +863,8 @@ def run_case(lang: str, src: pathlib.Path, work: pathlib.Path, build_root: pathl
         return run_cpp(src, work)
     if lang == "python":
         return run_python(src, work)
+    if lang == "typescript":
+        return run_typescript(src, work)
     raise SystemExit(f"no runner for land {lang!r}")
 
 
@@ -977,6 +1113,8 @@ def build_doc(cases_out: list, content_out: list, cxx_id: str | None, cxx_versio
             "go": tool_version("go", "version"),
             "cxx": f"{cxx_id}: {cxx_version}" if cxx_id else cxx_version,
             "python": tool_version("python3", "--version"),
+            "tsc": tool_version(tsc_program(), "--version"),
+            "node": tool_version("node", "--version"),
             "host": tool_version("uname", "-srm"),
         },
         # Unlike `toolchain`, this IS compared by --check: it is the list of

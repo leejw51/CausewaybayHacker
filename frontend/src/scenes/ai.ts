@@ -379,10 +379,57 @@ export class AiScene implements Scene {
     const btnH = Math.max(touch, fonts.button.height + 20);
     const floor = y + h - navH - btnH - Math.round(18 * s);
 
+    // The one filter §4.16 offers. ANY is the default and is drawn as a choice
+    // rather than as the absence of one.
+    //
+    // **Measured before the plates, and wrapped.** With six lands the row is
+    // seven chips, and TYPESCRIPT alone is ten letters: in a portrait panel it
+    // ran off the right edge, and the last land had a hit box outside the
+    // panel. So the chips are laid out first, onto as many rows as they need,
+    // and the mode plates share out what those rows leave.
+    const chipH = Math.max(touch, fonts.stationSm.height + Math.round(10 * s));
+    const chipGap = Math.round(5 * s);
+    const labelW = width(fonts.stationSm, T("ai.land")) + Math.round(8 * s);
+    const chips = (
+      [
+        ["land:any", T("ai.any"), null],
+        ["land:rust", T("ai.rust"), "rust"],
+        ["land:go", T("ai.go"), "go"],
+        ["land:cpp", T("ai.cpp"), "cpp"],
+        ["land:python", T("ai.python"), "python"],
+        ["land:pytorch", T("ai.pytorch"), "pytorch"],
+        ["land:typescript", T("ai.typescript"), "typescript"],
+      ] as Array<[string, string, Land | null]>
+    ).map(([id, label, value]) => ({
+      id,
+      label,
+      value,
+      cw: width(fonts.stationSm, label) + Math.round(14 * s),
+    }));
+    // Where each chip goes, relative to the first row's top-left.
+    const placed: Array<{ dx: number; dy: number }> = [];
+    {
+      let px = labelW;
+      let py = 0;
+      for (const c of chips) {
+        if (px + c.cw > w && px > labelW) {
+          px = labelW;
+          py += chipH + chipGap;
+        }
+        placed.push({ dx: px, dy: py });
+        px += c.cw + chipGap;
+      }
+    }
+    const chipsH = (placed.length ? placed[placed.length - 1].dy : 0) + chipH;
+
     const gap = Math.round(8 * s);
     const plateH = Math.max(
       Math.round(60 * s),
-      Math.floor((floor - y - gap * (MODES.length - 1) - Math.round(34 * s)) / MODES.length),
+      // The 34 was always the one row's reserve; a second row adds its own.
+      Math.floor(
+        (floor - y - gap * (MODES.length - 1) - Math.round(34 * s) - (chipsH - chipH)) /
+          MODES.length,
+      ),
     );
     let cy = y;
     for (const m of MODES) {
@@ -390,13 +437,8 @@ export class AiScene implements Scene {
       cy += plateH + gap;
     }
 
-    // The one filter §4.16 offers. ANY is the default and is drawn as a choice
-    // rather than as the absence of one.
-    const chipH = Math.max(touch, fonts.stationSm.height + Math.round(10 * s));
-    const chipY = Math.min(cy, floor - chipH);
-    let cx = x;
+    const chipY = Math.min(cy, floor - chipsH);
     g.fillStyle = css(Theme.dim);
-    const labelW = width(fonts.stationSm, T("ai.land")) + Math.round(8 * s);
     printf(
       g,
       fonts.stationSm,
@@ -406,32 +448,24 @@ export class AiScene implements Scene {
       labelW,
       "left",
     );
-    cx += labelW;
-    for (const [id, label, value] of [
-      ["land:any", T("ai.any"), null],
-      ["land:rust", T("ai.rust"), "rust"],
-      ["land:go", T("ai.go"), "go"],
-      ["land:cpp", T("ai.cpp"), "cpp"],
-      ["land:python", T("ai.python"), "python"],
-      ["land:pytorch", T("ai.pytorch"), "pytorch"],
-    ] as Array<[string, string, Land | null]>) {
-      const cw = width(fonts.stationSm, label) + Math.round(14 * s);
+    chips.forEach(({ id, label, value, cw }, i) => {
+      const cx = x + placed[i].dx;
+      const rowY = chipY + placed[i].dy;
       const on = value === this.landFilter;
       const hot = this.picks.hovered === id;
-      fill(g, on ? Theme.coin : Theme.ink, cx, chipY, cw, chipH, on ? 1 : hot ? 0.8 : 0.5);
+      fill(g, on ? Theme.coin : Theme.ink, cx, rowY, cw, chipH, on ? 1 : hot ? 0.8 : 0.5);
       g.fillStyle = css(on ? Theme.ink : hot ? Theme.cream : Theme.cyan);
       printf(
         g,
         fonts.stationSm,
         label,
         cx,
-        chipY + Math.round((chipH - fonts.stationSm.height) / 2),
+        rowY + Math.round((chipH - fonts.stationSm.height) / 2),
         cw,
         "center",
       );
-      this.picks.add({ id, rect: [cx, chipY, cw, chipH], label });
-      cx += cw + Math.round(5 * s);
-    }
+      this.picks.add({ id, rect: [cx, rowY, cw, chipH], label });
+    });
 
     const label = this.busy
       ? "…"

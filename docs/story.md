@@ -76,7 +76,7 @@ She starts with `println!`.
 
 ---
 
-## 3. The five lands
+## 3. The six lands
 
 ### RUST LAND — the street
 
@@ -138,9 +138,24 @@ done before §6.
 Colour: torch flame, a red-orange off a black ceiling. Time: 23:00, machine-room
 cold, and the only light in the room is the rack in front of you.
 
+### TYPESCRIPT LAND — the screens
+
+Causeway Bay after dark, when the screens come on. The big screen over Times
+Square, the LED wall on Hysan Place, the tram-stop arrival boards on Yee Wo
+Street, the Lee Garden shopping app on every phone in the queue, and the
+signage control room on the thirtieth floor that feeds all of them from one
+JSON file. Everything here is **a contract**: a type that says what will
+arrive, checked once, before anything runs — and then erased. At runtime the
+screen gets whatever the feed actually sent. The question is always "what did
+the type promise, and what came down the wire".
+
+Colour: TypeScript blue, brighter and colder than C++'s — LED blue off wet
+tarmac. Time: 19:00 into midnight, the rain just stopped and every surface
+reflecting a screen.
+
 The player picks a land. The others are still there, unchanged, and can be
 started at any time. None of them is a sequel to another, and the hacker road
-asks the same thirty-four questions in four of them, so the interview can be
+asks the same thirty-four questions in five of them, so the interview can be
 sat in whichever language the player is taking back. PyTorch Land's hacker
 road is the exception and is meant to be: it is the machine-learning
 interview, and its thirty-four questions are that interview's.
@@ -183,6 +198,10 @@ One per map, always the last node, `map.kind = "boss"`.
 | `pytorch.basic` | 27 | **THE STRAIGHT LINE** | XOR. Four points, two classes, an hour of training, and two of the four still wrong. No straight line separates them, and no amount of training makes one. |
 | `pytorch.advanced` | 34 | **THE COMPLETION** | The rack in the basement, at fourteen thousand parameters, on one laptop: token and position embeddings, causal attention, a GELU MLP, and a sequence it finishes because it was taught it. |
 | `pytorch.hacker` | 34 | **THE TEACHING CLUSTER** | The fifth interview, Room 7-32, and the question is the thing two floors down. Build one block of it, and prove it cannot read the future. |
+| `typescript.verybasic` | 27 | **ANY** | The feed arrives typed `any`, every check passes, and the Times Square screen shows `undefined` in forty-foot letters. One annotation would have caught it. |
+| `typescript.basic` | 27 | **UNDEFINED** | `Cannot read properties of undefined (reading 'left')`: the tree of screen ids has a branch that is not there yet, and the insert has to look before it walks. |
+| `typescript.advanced` | 34 | **THE EVENT LOOP** | The signage control room, one thread for every screen on the island. One callback never yields, and every board from Tin Hau to Hysan freezes on the same frame. |
+| `typescript.hacker` | 34 | **THE ERASURE** | The sixth interview, Room 7-32. The types are gone at runtime and the clock is not. |
 
 On the merged ADVANCED road the four old BASIC bosses keep their stories but
 lose the `boss` mark and their titles, so the name and the art belong to one
@@ -196,7 +215,7 @@ mechanic in milestone 2; the stamp is just louder.
 
 ## 6. The ending
 
-All five hacker roads cleared, Mei walks up to HKU. The thing is in the basement of
+All six hacker roads cleared, Mei walks up to HKU. The thing is in the basement of
 the Chow Yei Ching Building where the teaching cluster used to be: not a face,
 not a voice, a rack of machines serving completions to the whole island at very
 low latency.

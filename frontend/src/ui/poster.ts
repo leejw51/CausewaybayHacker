@@ -53,6 +53,7 @@ import { rustLanguage } from "@codemirror/lang-rust";
 import { goLanguage } from "@codemirror/lang-go";
 import { cppLanguage } from "@codemirror/lang-cpp";
 import { pythonLanguage } from "@codemirror/lang-python";
+import { typescriptLanguage } from "@codemirror/lang-javascript";
 import type { LRLanguage } from "@codemirror/language";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import qrcode from "qrcode-generator";
@@ -389,6 +390,7 @@ const PARSER: Record<Land, LRLanguage> = {
   cpp: cppLanguage,
   python: pythonLanguage,
   pytorch: pythonLanguage,
+  typescript: typescriptLanguage,
 };
 
 /**

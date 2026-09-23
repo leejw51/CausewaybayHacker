@@ -5,26 +5,28 @@
 In Causeway Bay, a Rust coder wakes up and cannot write a `for` loop. The
 vibe-coding was never a convenience — it was Skynet's long game, and it worked.
 Every skill is still in there somewhere. You get them back one street at a time,
-in Rust, in Go, in C++, in Python and in PyTorch, and then you go and fight
-the thing that took them — which, by the fifth land, you can build.
+in Rust, in Go, in C++, in Python, in PyTorch and in TypeScript, and then you
+go and fight the thing that took them — which, in PyTorch Land, you build a
+small one of yourself.
 
-Five lands — **RUST LAND**, **GO LAND**, **C++ LAND**, **PYTHON LAND** and
-**PYTORCH LAND**. Four roads through each:
+Six lands — **RUST LAND**, **GO LAND**, **C++ LAND**, **PYTHON LAND**,
+**PYTORCH LAND** and **TYPESCRIPT LAND**. Four roads through each:
 
 | | |
 | --- | --- |
 | **VERY BASIC** | the quiz: types, containers, a thread, a mutex, a heap, a stack, a struct — the grammar a live coding test leans on, asked as a question first. Four lines, one right; pick it, then type it; untimed |
 | **BASIC** | grammar activation, not a quiz: each node shows one construct — integer widths and a 32-byte value, floats, strings, slicing/copy/append of strings, arrays and bytes, a loop, a function, a struct, an enum, a vector, a linked list, an ordered map and a hash table, a set, a stack and a queue (each practised as add, remove, edit and sort), sorting and reversing, a closure, a lambda, a thread, a binary tree — with the exact line to type, in the brief and again as an `ANSWER:` comment at the hole; you type it, it compiles, the idiom is back in the fingers; untimed |
 | **ADVANCED** | simple coding quizzes that use the basic grammar — ownership, slices, errors, traits/interfaces, pointers, iterators, generics — and then the lunch rush: threads, channels, mutexes, lifetimes, goroutines, `select`, async, RAII, generators |
-| **HACKER** | the live interview: timed HackerRank-shaped quests, hidden tests, the same 34 problems in every land — except PyTorch Land, whose interview is the machine-learning one: write softmax so it does not overflow, write cross-entropy so it matches the library, write Adam so it matches the library, mask a padded batch, cache the keys and values, build a transformer block that agrees with a reference to 1e-5 |
+| **HACKER** | the live interview: timed HackerRank-shaped quests, hidden tests, the same 34 problems in every land — TypeScript's included — except PyTorch Land, whose interview is the machine-learning one: write softmax so it does not overflow, write cross-entropy so it matches the library, write Adam so it matches the library, mask a padded batch, cache the keys and values, build a transformer block that agrees with a reference to 1e-5 |
 
 Each road is a Super Mario World overworld. Clear a node, it is stamped
 `CLEARED`, for good.
 
 **The code is really compiled.** Rust goes through `rustc`/`cargo`, Go through
 `go build`/`go test`, C++ through the system `c++` (clang or gcc, `-std=c++20`),
-Python through `py_compile` and then `python3 -I`, on your machine, against
-hidden tests. There is no pretend-verdict.
+Python through `py_compile` and then `python3 -I`, TypeScript through a strict
+`tsc` and then `node`, on your machine, against hidden tests. There is no
+pretend-verdict — and no running a TypeScript program `tsc` has rejected.
 
 **Your mistakes are the curriculum.** Every attempt is kept — the source, the
 verdict, the compiler's own error codes. `E0382` five times in a week is not a
@@ -68,10 +70,10 @@ make test       # everything
 make help       # the rest
 ```
 
-Needs **Rust, Go, a C++ compiler, Python 3, Anaconda** — one per land — and
-Node for the browser client. `make doctor` says which of them it cannot find,
-and the server prints the same list on the way up with the command that
-installs whatever is missing.
+Needs **Rust, Go, a C++ compiler, Python 3, Anaconda, Node** — one per land,
+and Node twice, because the browser client is built with it too. `make doctor`
+says which of them it cannot find, and the server prints the same list on the
+way up with the command that installs whatever is missing.
 
 PyTorch Land is the odd one out, and worth a line of its own: its toolchain is
 not a program on PATH but a **package inside an interpreter**, so a machine can
@@ -95,10 +97,24 @@ picked up the same way if you would rather not have conda, and
 is imported by no quest and installed anyway, because torch without it writes
 a warning to stderr on every single run.
 
+TypeScript Land needs `tsc` beside that Node, and usually nothing more:
+
+```bash
+npm install -g typescript prettier
+```
+
+— or not even that. The browser client already pins `tsc` and `prettier` in
+`frontend/`, and once `npm ci` has run there, `make` appends
+`frontend/node_modules/.bin` to PATH for everything it starts. *Appends*: a
+global `tsc` still wins where there is one. The land compiles against its own
+`node.d.ts` rather than `@types/node`, so there is no third version to keep in
+step (SPEC §5.1).
+
 The formatters are part of the same list: `rustfmt` and `gofmt` ship with their
-toolchains, `clang-format` comes from Xcode or your package manager, and
-Python's and PyTorch's `black` is in the line above. A land whose formatter is
-missing simply has no `fmt` button.
+toolchains, `clang-format` comes from Xcode or your package manager,
+Python's and PyTorch's `black` is in the conda line above, and TypeScript's
+`prettier` is in the npm one. A land whose formatter is missing simply has no
+`fmt` button.
 
 **From a phone, use port 5390 — not the dev server's 5291.** The page and the
 websocket have to share an origin: the built bundle derives the socket from the

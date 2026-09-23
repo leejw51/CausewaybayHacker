@@ -73,6 +73,18 @@
       "h": 1152
     },
     {
+      "name": "map_typescript",
+      "file": "map_typescript.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "map_typescript_p",
+      "file": "map_typescript_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
       "name": "bg_street",
       "file": "bg_street.jpg",
       "w": 1152,
@@ -216,6 +228,21 @@
         "minx": 16,
         "miny": 7,
         "maxx": 111,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "sprite_typescript",
+      "file": "sprite_typescript.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 103.0,
+        "minx": 7,
+        "miny": 18,
+        "maxx": 120,
         "maxy": 120
       }
     },
@@ -1041,6 +1068,51 @@
       }
     },
     {
+      "name": "emblem_typescript_basic",
+      "file": "emblem_typescript_basic.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 55,
+        "miny": 7,
+        "maxx": 328,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_typescript_advanced",
+      "file": "emblem_typescript_advanced.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 58,
+        "miny": 7,
+        "maxx": 325,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_typescript_hacker",
+      "file": "emblem_typescript_hacker.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 87,
+        "miny": 7,
+        "maxx": 296,
+        "maxy": 120
+      }
+    },
+    {
       "name": "mascot_rust_basic",
       "file": "mascot_rust_basic.png",
       "w": 128,
@@ -1262,6 +1334,51 @@
         "minx": 19,
         "miny": 7,
         "maxx": 107,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_typescript_basic",
+      "file": "mascot_typescript_basic.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 13,
+        "miny": 7,
+        "maxx": 114,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_typescript_advanced",
+      "file": "mascot_typescript_advanced.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 27,
+        "miny": 7,
+        "maxx": 99,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_typescript_hacker",
+      "file": "mascot_typescript_hacker.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 19,
+        "miny": 7,
+        "maxx": 108,
         "maxy": 120
       }
     },

@@ -35,6 +35,7 @@ fn untidy(lang: &str) -> &'static str {
         // PyTorch Land is black's too, and the import is what makes the
         // fixture this land's rather than a copy of the one above.
         "pytorch" => "import torch\ndef main():\n  x=torch.tensor([1])\n  print( x )\nmain()\n",
+        "typescript" => "function main(){const x:number=1\nconsole.log( x )}\nmain()\n",
         other => panic!("no fixture for {other}"),
     }
 }
@@ -47,11 +48,12 @@ fn tidy_mark(lang: &str) -> &'static str {
         "cpp" => "int main() {",
         "python" => "    x = 1",
         "pytorch" => "    x = torch.tensor([1])",
+        "typescript" => "  const x: number = 1;",
         other => panic!("no mark for {other}"),
     }
 }
 
-const LANDS: [&str; 5] = ["rust", "go", "cpp", "python", "pytorch"];
+const LANDS: [&str; 6] = ["rust", "go", "cpp", "python", "pytorch", "typescript"];
 
 #[test]
 fn every_advertised_land_formats_and_the_rest_refuse_cleanly() {
@@ -115,6 +117,7 @@ fn half_written_source_never_loses_a_character() {
         ("go", "package main\nfunc main( {"),
         ("cpp", "int main( { std::cout <<"),
         ("python", "def main(:\n  x=1\n"),
+        ("typescript", "function main( { const x ="),
     ];
     for (lang, source) in broken {
         if !format::supported_langs().contains(&lang) {

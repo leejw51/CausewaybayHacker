@@ -1314,3 +1314,129 @@ rerolls = 1
 note = "The HACKER band: the aisle at the far end, where the rack is the thing itself."
 prompt = """\
 16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A cold aisle of dark charcoal server racks receding to one tall rack at the far end lit entirely in red, cables overhead, and a tall narrow flame standing in front of it. Deep blue-black machine-room dark, hard red light. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers. Painted 16-bit console game background art."""
+
+# ---------------------------------------------------------------------------
+# TYPESCRIPT LAND — the screens (docs/story.md §3). Causeway Bay after dark,
+# when the screens come on: the big screen over Times Square, the LED wall on
+# Hysan Place, the tram-stop arrival boards on Yee Wo Street, and the signage
+# control room on the thirtieth floor that feeds all of them from one JSON
+# file. Everything is a contract: a type checked once, then erased.
+#
+# Colour: TypeScript blue (#3178C6), brighter and colder than C++'s deep blue —
+# LED blue off wet tarmac, 19:00 into midnight, the rain just stopped.
+#
+# The mascot is a small LED panel creature, identified by its form and its
+# blue rather than by lettering: the header rule (Grok cannot spell) holds
+# here too, and a blue square with white letters on it is somebody's logo.
+#
+# Unlike PYTORCH LAND, this land has its own plate rather than the shared
+# one. It is a top-down overworld like every other plate, not a street-level
+# view: the node layout every land shares puts its first row at y 0.05-0.15,
+# where a street scene would have sky, and a node on sky is floating
+# (art/tools/checknodes.py). The blue lives in the screens, boards and tram,
+# not in the ground — a flat blue ground is what checknodes calls water.
+# Nodes run from the top-left corner to the boss at (0.818, 0.870), so the
+# quiet tram stop is top left and the blazing big screen is bottom right.
+#
+# Rolled with `art/tools/reroll.py --land typescript` and
+# `art/tools/reroll.py map_typescript map_typescript_p`.
+# ---------------------------------------------------------------------------
+
+[[asset]]
+name = "sprite_typescript"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-24"
+rerolls = 1
+note = "TYPESCRIPT LAND's mascot. A tram-stop arrival board that woke up: a small LED panel creature standing on a wet kerb, friendly, because the land is where Mei learns the contract rather than where it bites."
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The character is a small friendly cartoon creature whose whole body is a chunky rectangular LED display panel: a bright cobalt-blue metal frame, a glowing sky-blue screen for a face made of visible square LED dots, two big round white pixel eyes and a tiny contented smile shown on the screen, two short stubby dark-grey legs and two little stubby arms, a short antenna on top with a small white light. He stands on a low slab of dark wet grey kerbstone with a thin pale-blue reflection on it. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no logo. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "mascot_typescript_basic"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-24"
+rerolls = 1
+note = "BASIC on TypeScript Land: the little panel learning what a type is. UNDEFINED waits at the end."
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the character). A small friendly cartoon LED display panel creature — a chunky rectangular body with a bright cobalt-blue frame, a glowing sky-blue screen face made of visible square LED dots with two round white pixel eyes and a small curious smile, short stubby dark-grey legs, a short antenna with a white light — sitting on a dark grey tram-stop bench and holding up a tiny completely blank white card. Chunky hard-edged pixels, bold dark outline, flat cel shading, saturated Super Mario World colours, no anti-aliasing, no gradient, no glow. Absolutely no text, no letters, no numbers, no logo — the card is completely blank. Painted 16-bit console game sprite."""
+
+[[asset]]
+name = "mascot_typescript_advanced"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-24"
+rerolls = 2
+note = "ADVANCED on TypeScript Land: the panel grown taller, its face busy with lit pixels. THE EVENT LOOP waits at the end."
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the character). The same chunky cartoon LED display panel creature grown noticeably taller — its rectangular body is now a tall upright screen twice as tall as it is wide, with a bright cobalt-blue frame, a glowing sky-blue screen of visible square LED dots showing two round white pixel eyes and a determined little mouth near the top, and rows of small cyan and white lit pixels scrolling across the lower half of the screen, short sturdy dark-grey legs, two stubby arms, a short antenna with a white light — standing on a low dark metal street-sign cabinet whose front has a row of small blue and white status lights. Chunky hard-edged pixels, bold dark outline, flat cel shading, saturated Super Mario World colours, no anti-aliasing, no gradient, no glow. Absolutely no text, no letters, no numbers, no logo. Painted 16-bit console game sprite."""
+
+[[asset]]
+name = "mascot_typescript_hacker"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-24"
+rerolls = 1
+note = "HACKER on TypeScript Land: the panel at full height, the brightest screen in the district. THE ERASURE waits at the end."
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the character). The same cartoon LED display panel creature at full height, tall, narrow and fierce — a tall rectangular body with a thick bright cobalt-blue frame, a blazing electric-blue and white screen face of visible square LED dots with two narrowed white pixel eyes in concentration, sharp angular antenna with a white light, strong dark-grey legs planted wide — standing on a dark control-room console lit end to end with blue and red status lights. Chunky hard-edged pixels, bold dark outline, flat cel shading, saturated Super Mario World colours, no anti-aliasing, no gradient, no glow. Absolutely no text, no letters, no numbers, no logo. Painted 16-bit console game sprite."""
+
+[[asset]]
+name = "emblem_typescript_basic"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-24"
+rerolls = 2
+note = "The BASIC band on CHOOSE YOUR LAND: a quiet tram stop on Yee Wo Street, one arrival board lit."
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A wide quiet Hong Kong street at night seen from the side, the scene filling the whole width of the banner: a row of low dark tenement shopfronts with pulled-down grey roller shutters and a few warm yellow upstairs windows, a tram-stop shelter in the middle with one small glowing blue arrival board, overhead tram wires, and a small blue LED panel creature standing on the wet kerb. The road along the bottom is wet black tarmac just after rain with long pale-blue and yellow reflections of the lights on it. Every part of the scene is dark navy, charcoal, blue and warm yellow. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers, no symbols on any screen or board — every screen shows only plain blue light. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "emblem_typescript_advanced"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-24"
+rerolls = 2
+note = "The ADVANCED band: the same street with every screen on — the LED wall, the boards, a tram going by."
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A busy Hong Kong street at night just after rain, the scene filling the whole width of the banner and closed at the top by a solid dark navy night sky: tall buildings whose whole faces are giant glowing LED walls in bright blue and cyan with plain abstract block patterns, a dark-green double-decker tram passing with warm yellow lit windows, rows of glowing blue arrival boards, and a taller blue LED panel creature standing in the middle of the wet street. Wet black tarmac mirrors the screens in long blue, cyan and white reflections only. Every part of the scene is navy, charcoal, blue, cyan, white and warm yellow — no pink, no purple, no red anywhere in the scene. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers, no symbols on any screen or wall — only plain blocks of coloured light. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "emblem_typescript_hacker"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-24"
+rerolls = 1
+note = "The HACKER band: the control room on the thirtieth floor that feeds every screen from one file."
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A dark signage control room high in a tower at night: a curved wall of many monitors all glowing hard electric blue with plain abstract block patterns, one huge central screen blazing white-blue, thick cables across the floor, a long console of blue and red status lights, the rain-wet city lights far below through a window, and a tall fierce blue LED panel creature standing in front of the huge screen. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers, no symbols on any screen — only plain blocks of coloured light. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "map_typescript"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-24"
+rerolls = 1
+note = "The screens after dark, top down: a quiet tram stop top left, the blazing big screen and control-room tower bottom right, where the boss node sits."
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no logos, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges. The TOP-LEFT CORNER, the TOP-RIGHT CORNER, the BOTTOM-LEFT CORNER and the BOTTOM-RIGHT CORNER each contain buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere — every part of the picture has roofs, kerbs, trees, streets or stalls in it. Causeway Bay Hong Kong at night just after the rain, shrunk to a miniature. The ground is warm mid-grey wet paving and dark green grass verges with amber and white street-light reflections in the puddles, clearly lit, never black and never empty. The screens are the light: bright electric TypeScript-blue and cyan LED billboards on the rooftops showing abstract pixel block patterns, glowing blue arrival boards at tram stops, a dark-green double-decker tram on a curving track, shopping-mall facades lined with blue LED strips, shops with warm yellow windows, parks of round green trees, rooftop water tanks. The TOP-LEFT is quiet and dim: a small tram stop with one blue board. The city grows brighter and busier across the map, and the BOTTOM-RIGHT is the brightest place on the map: a big plaza under one huge blazing blue-white giant screen on a tall tower. A wide winding PALE CREAM paved walkway snakes back and forth across the whole map from the top left corner to the bottom right corner in smooth S-bends, bright against the darker ground and unbroken."""
+
+[[asset]]
+name = "map_typescript_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-24"
+rerolls = 2
+note = "The first wording (night-time diorama, TypeScript-blue) was rejected by xAI content moderation twice, with no image; rewritten in the landscape plate form it passed. The first accepted roll had wide empty lawns and was rolled again."
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen, TALL PORTRAIT composition: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no logos, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges, with buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere. Causeway Bay Hong Kong in the evening after a rain shower, shrunk to a miniature. The ground is warm mid-grey wet paving and dark green grass verges with amber and white street-light reflections in the puddles, clearly lit, never black and never empty. The screens are the light: bright electric blue and cyan LED billboards on the rooftops showing abstract pixel block patterns, glowing blue arrival boards at tram stops, a dark-green double-decker tram on a curving track, shopping-mall facades lined with blue LED strips, shops with warm yellow windows, parks of round green trees, rooftop water tanks. The TOP-LEFT is quiet and dim: a small tram stop with one blue board. The town grows brighter going down the map, and the BOTTOM-RIGHT is the brightest place: a big plaza under one huge blue-white giant screen on a tall tower. A wide winding PALE CREAM paved walkway snakes the full height of the map from the top left down to the bottom right in smooth S-bends, bright against the darker ground and unbroken."""

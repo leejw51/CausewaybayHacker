@@ -407,6 +407,7 @@ fn formatter_label(lang: &str) -> &'static str {
         "cpp" => "clang-format",
         // Both Python lands format with black; the fifth is not a language.
         "python" | "pytorch" => "black",
+        "typescript" => "prettier",
         _ => "formatter",
     }
 }
@@ -417,8 +418,9 @@ fn lang_for_path(path: &Path) -> Result<&'static str> {
         Some("go") => Ok("go"),
         Some("cpp") => Ok("cpp"),
         Some("py") => Ok("python"),
+        Some("ts") => Ok("typescript"),
         _ => Err(error::usage(format!(
-            "cannot tell what language {} is; cwbh fmt takes a .rs, .go, .cpp or .py file",
+            "cannot tell what language {} is; cwbh fmt takes a .rs, .go, .cpp, .py or .ts file",
             path.display()
         ))),
     }

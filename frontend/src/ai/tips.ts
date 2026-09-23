@@ -91,6 +91,23 @@ export const TIPS: Record<Land, readonly string[]> = {
     "`torch.manual_seed` fixes one global stream; pass a `torch.Generator` when you want a reproducible one.",
     "The scale in attention is the square root of the *head* dimension, not the model dimension.",
   ],
+  // TypeScript Land runs `tsc` in strict mode against a `node.d.ts` of a few
+  // dozen lines, not @types/node: what is not declared there is TS2304
+  // before a line runs. The tips are about that compiler and that file.
+  typescript: [
+    'Read stdin with `require("fs").readFileSync(0, "utf8")` — it is one of the few Node calls declared here.',
+    "There is no @types/node. `process`, `console`, the timers and `fs.readFileSync` are all there is.",
+    "`strict` is on: `null` and `undefined` are their own types, and `noImplicitAny` wants every parameter typed.",
+    "Prefer `unknown` to `any`. `unknown` makes you narrow before you use it; `any` switches the checker off.",
+    '`===`, never `==`. The loose one converts before it compares, and `0 == ""` is true.',
+    'A discriminated union (`{ kind: "a" } | { kind: "b" }`) plus a `switch` on `kind` narrows each branch for you.',
+    "An exhaustive `switch` ends in `const _: never = x;` — add a case to the union and the compiler finds every switch.",
+    "`as` is a promise to the compiler, not a check. A wrong cast compiles and fails at runtime.",
+    "The `!` in `x!` is also a promise. Narrow with `if (x !== undefined)` instead and it cannot be wrong.",
+    "`sort()` compares as strings: `[10, 9].sort()` is `[10, 9]`. Numbers need `(a, b) => a - b`.",
+    "`readonly` and `as const` cost nothing at runtime and catch the mutation you did not mean.",
+    "`for…of` walks values; `for…in` walks keys, as strings. On an array you almost always want `of`.",
+  ],
 };
 
 /** The next tip after `last`, never the same one twice running. */
@@ -281,6 +298,36 @@ export function advise(lang: Land, source: string): Advice[] {
       }
       if (/\bglobal\s+\w+/.test(source)) {
         say("py.global", "A `global` is a value with no owner. Pass it in and return it out.");
+      }
+      break;
+    }
+    case "typescript": {
+      if (/:\s*any\b|<any>|\bas\s+any\b/.test(source)) {
+        say(
+          "ts.any",
+          "An `any` switches the checker off for everything it touches. `unknown` and a narrowing `if` keep it on.",
+        );
+      }
+      if (/[^=!<>]==[^=]|!=[^=]/.test(source)) {
+        say("ts.loose-eq", "`==` converts before it compares. `===` says what you mean.");
+      }
+      if (/\.sort\(\s*\)/.test(source)) {
+        say(
+          "ts.sort-default",
+          "`sort()` with no comparator sorts as strings — `[10, 9, 1]` becomes `[1, 10, 9]`. Pass `(a, b) => a - b`.",
+        );
+      }
+      if (/\bfor\s*\(\s*(const|let|var)\s+\w+\s+in\b/.test(source)) {
+        say(
+          "ts.for-in",
+          "`for…in` walks the keys, as strings. `for…of` walks the values, which is usually what an array wants.",
+        );
+      }
+      if (/\bvar\s+\w/.test(source)) {
+        say(
+          "ts.var",
+          "`var` is function-scoped and hoisted. `const`, or `let` when it has to change.",
+        );
       }
       break;
     }

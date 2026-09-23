@@ -41,6 +41,7 @@ const NPC: Record<Land, string> = {
   cpp: "sprite_cpp",
   python: "sprite_python",
   pytorch: "sprite_pytorch",
+  typescript: "sprite_typescript",
 };
 const BLURB: Record<Land, () => string> = {
   rust: () => t("lands.rustBlurb"),
@@ -48,6 +49,7 @@ const BLURB: Record<Land, () => string> = {
   cpp: () => t("lands.cppBlurb"),
   python: () => t("lands.pythonBlurb"),
   pytorch: () => t("lands.pytorchBlurb"),
+  typescript: () => t("lands.typescriptBlurb"),
 };
 
 /**

@@ -144,6 +144,7 @@ return {
   ["threads, mutexes, the STL"] = "vlákna, mutexy, STL",
   ["dicts, generators, the GIL"] = "slovníky, generátory, GIL",
   ["tensors, gradients, attention"] = "tenzory, gradienty, attention",
+  ["interfaces, generics, narrowing"] = "rozhraní, generika, zužování typů",
   -- UNREVIEWED: "fused" ranking — no settled term
   ["both rankings, fused"] = "obě pořadí sloučená",
   ["the words you typed"] = "slova, která jsi napsal",
@@ -309,6 +310,8 @@ return {
   ["DONE"] = "HOTOVO",
   ["MATCHED"] = "SHODA",
   ["FIX THE RED"] = "OPRAV ČERVENÉ",
+  ["COMBO"] = "KOMBO",
+  ["BEST COMBO"] = "NEJLEPŠÍ KOMBO",
   ["costs a star"] = "stojí hvězdu",
   ["no answer key here"] = "tady řešení není",
   ["the answer is in the editor — CTRL-Z puts yours back. It can still clear, just not at three stars, and asking is not an attempt — only SUBMIT records one"] = "řešení je v editoru — CTRL-Z vrátí to tvoje. Úlohu pořád splníš, jen už ne na tři hvězdy; podívat se není pokus, zapíše ho teprve SUBMIT",

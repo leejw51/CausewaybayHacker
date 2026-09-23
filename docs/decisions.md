@@ -7233,3 +7233,125 @@ reproduce: the three emblems were written as `kind = "emblem"`, `aspect =
 "16:9"` — and `process.py` knows `sprite` and treats everything else as a
 background, so it would have written a JPEG into a `.png` and skipped the
 magenta knockout entirely. Corrected to match the other twelve.
+
+## 2026-09-24 — A sixth land: TYPESCRIPT, and a compiler that throws its own work away
+
+TYPESCRIPT LAND is `rust`, `go`, `cpp`, `python`, `pytorch`, **`typescript`**.
+Where `pytorch` was a second name on the Python runner, this is a sixth
+toolchain, `runner/src/typescript.rs`, because the thing the land teaches is
+the one property no other land has: `tsc` checks a program and then erases
+the checking, and what runs is JavaScript that never heard of the types. The
+four roads are ports of Python's, node for node — the same concepts, the same
+difficulty, the same map, the same tests, 27/27/34/34 — and the HACKER road
+asks the same thirty-four questions as the other language lands. The bosses
+are `docs/story.md` §5's: ANY, UNDEFINED, THE EVENT LOOP, THE ERASURE.
+
+**`tsc -p .` then `node`, not Node's type stripping.** Node 22+ will run
+`main.ts` directly by deleting the annotations, which would have made this
+land one program instead of two. It would also run a program `tsc` rejects,
+and a land about types must never do that: the assignment of a `string` to a
+`number` has to come back as `compile_error` with `TS2322` on its line, not
+as an accepted run that happened not to care. So the compile phase is a
+strict `tsc`, `noEmitOnError` means a rejected program leaves nothing to run,
+and `node --enable-source-maps main.js` runs what is left, once per case,
+through the stdio harness. Both halves are the lesson: a program that
+type-checks and then reads `.left` off `undefined` is a `runtime_error`,
+because that is what erasure means, and it is the basic road's boss.
+
+**Our own `node.d.ts`, not `@types/node`.** `@types/node` is a package with a
+version, and every machine the server runs on would need that version pinned
+beside `tsc`'s, or the same quest would type-check on one and not another.
+The land does not need Node's API; it needs stdout, stderr, stdin, `exit`,
+the timers and the microtask queue — what an event-loop quest touches and
+nothing else. `runner/src/typescript/node.d.ts` declares exactly that and is
+compiled into the binary; `tsconfig.json` says `types: []`, so a globally
+installed `@types/node` cannot leak in on one machine and not the next. That
+option is the reason the config is a file: a bare-flag `tsc` command line
+cannot say it. Every quest reads its input with one line,
+`const input: string = require("fs").readFileSync(0, "utf8");`, and the
+annotation on it is the point — `readFileSync` returns what the declaration
+says, and the declaration is ours.
+
+**No `RLIMIT_AS` for `node`.** V8 reserves its code range and its heap cage
+as virtual memory at startup, before a line of the program runs, and on
+Linux a 1 GiB address-space limit is a `node` that dies before it starts —
+every TypeScript node a runtime error the player did not write. This is the
+problem `Limits::address_space` already describes for a `-race` binary, and
+it gets the same answer: `harness::judge_argv_limited` leaves that one limit
+off, and the heap is bounded by V8 itself with `--max-old-space-size=512`. A
+program that outgrows it dies of `JavaScript heap out of memory`, which is
+the honest message, and SPEC §7.1 files it as a `timeout` (`ts:heap-limit`):
+an algorithm that kept too much, reached through memory instead of the
+clock. The wall clock, output cap, file-size and process limits all still
+apply (SPEC §5.3).
+
+**`tsc`'s codes are the identity, as `rustc`'s are.** `TS2322` is the same
+mistake in every `tsc` version and every locale, where its prose is neither,
+so the code is stored bare and mapped to a kind by number: `TS1xxx` is the
+parser, the eight "cannot find name/module" codes are `unknown-name`, the
+"possibly `undefined`" family and `TS2454` are `nil-deref` — the erased
+`undefined` caught before it reached the screen — and assignability, arity
+and implicit `any` are `type-mismatch`. An unrecognised code is kept as
+`other` with the code, as for rustc. `unused` is mapped and never fires,
+because the options do not turn it on: a starter that is merely unfinished
+has to run. After erasure there are no codes, only `node`'s exception class,
+and those get `ts:` slugs the way Python's classes get `py:` ones — with the
+line taken from the source-mapped `main.ts:N`, not from JavaScript the player
+never saw. `tsc` writes its diagnostics to stdout; the runner folds them into
+`compiler_stderr`, stdout first, because that is where the classifier reads.
+The fixtures are `tests/vectors/mistakes/typescript/*.ts` with their
+captures, and `generate.py` cuts node's internal stack frames and its
+`Node.js vX` trailer from them so `--check` passes on any node.
+
+**The Makefile appends `frontend/node_modules/.bin` to PATH.** The browser
+client already pins `tsc` 5.9.3 and `prettier` 3.9.6 in its lock file, so a
+checkout that has run `npm ci` has the whole toolchain, `node` aside, without
+installing anything globally. Appended rather than prepended, so a `tsc` the
+player installed on purpose wins over the one that came with the frontend;
+the Python environment is prepended for the opposite reason, because a
+system `python3` there is the one that must lose. As with that environment,
+this is a convenience of the build and not a rule of the protocol: the
+runner resolves `tsc` and `node` on the ambient PATH to absolute paths, since
+the harness runs programs with `PATH=/usr/bin:/bin`, and a server started by
+hand gets whatever its PATH holds. `NODE_COMPILE_CACHE` points `tsc`'s own
+compile cache at `build/typescript/node-compile-cache` rather than the
+attempt directory it would otherwise throw away each time. CI installs the
+same two versions globally (`TYPESCRIPT_VERSION`, `PRETTIER_VERSION`), and
+the numbers are the lock file's so that CI and a bare checkout check quests
+with the same compiler. `make doctor` reports both.
+
+**The gate.** Without `tsc` and `node` every node would fail in a way that
+looks like the player's, so `unsupported("typescript", Stdio)` refuses the
+submission before an attempt row exists, with `install node
+(https://nodejs.org), then: npm install -g typescript prettier`, which is
+what PyTorch Land's missing torch taught. `cargo` and `gotest` harnesses are
+refused for this land as for every land that is not theirs.
+
+**`prettier` is the formatter**, `prettier --stdin-filepath main.ts` on
+stdin: the file name is how it chooses a parser for text with no file. It
+ships with neither `tsc` nor `node`, so it is asked of the machine like
+`black` and `clang-format`, and the boot report's row is `typescript`,
+compiler `tsc`, formatter `prettier`. The CLI gives a
+TypeScript quest the `.ts` extension, and `cwbh fmt` takes it.
+
+**Migration 0021** widens the same three CHECKs (`quests.land`,
+`attempts.lang`, `snippets.lang`) by rebuilding the three tables, exactly as
+0020 did: foreign keys off for the run, rowids carried across for the FTS5
+index, its triggers put back verbatim.
+
+**The content gate builds TypeScript with the runner's own files.**
+`verify_pack.py` copies the runner's `tsconfig.json` and `node.d.ts` beside
+each reference solution, finds `tsc` on PATH or falls back to the
+frontend's, and runs `node --enable-source-maps main.js` — a quest verified
+against a looser config than the server's would be a quest the server
+rejects. `run-all.mjs` verifies the four packs when `tsc` is available, as
+an optional toolchain like torch; the land adds no slugs, so `--complete` is
+unaffected by whether it ran.
+
+**The art.** Grok, through `art/tools/grok_image.sh`, with the recipes in
+`art/prompts.toml` as PyTorch's are: a blue LED-panel creature
+that grows per road for the mascots, three emblems, a sprite, and a night
+overworld that goes from a quiet tram stop to the big screen. The land's
+colour is `#3178C6`. Both clients carry it, with syntax highlighting — the
+web client through `@codemirror/lang-javascript`, a new dependency — and six
+lands fit the lands screen as 3×2 or 2×3.

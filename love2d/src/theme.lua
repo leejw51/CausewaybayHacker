@@ -35,6 +35,9 @@ T.land = {
   cpp = { 0 / 255, 89 / 255, 156 / 255, 1 },
   python = { 255 / 255, 212 / 255, 59 / 255, 1 },
   pytorch = { 232 / 255, 72 / 255, 32 / 255, 1 },
+  -- TypeScript blue #3178C6: lighter and colder than C++'s navy #00599C,
+  -- with red and green both well up where C++ has almost none.
+  typescript = { 49 / 255, 120 / 255, 198 / 255, 1 },
 }
 -- The haze is the tint at map strength: a deep blue over the typhoon
 -- shelter at noon, a warm amber over the wet market at dawn, and a torch
@@ -46,6 +49,7 @@ T.haze = {
   cpp = { 0 / 255, 89 / 255, 156 / 255, 0.18 },
   python = { 255 / 255, 212 / 255, 59 / 255, 0.12 },
   pytorch = { 232 / 255, 72 / 255, 32 / 255, 0.18 },
+  typescript = { 49 / 255, 120 / 255, 198 / 255, 0.16 },
 }
 
 -- The editor's colours, keyed by `src/editor.lua`'s span kinds. Chosen out of

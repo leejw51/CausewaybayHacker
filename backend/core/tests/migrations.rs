@@ -528,15 +528,12 @@ fn migration_0019_lets_a_road_be_walked_again() {
 }
 
 #[test]
-fn the_newest_migration_opens_the_fifth_land() {
-    // The "newest migration" pin: fails loudly if a 0021 is added without a
-    // test of its own here. 0020 widens three CHECK constraints — the ones
+fn migration_0020_opens_the_fifth_land() {
+    // 0020 widens three CHECK constraints — the ones
     // 0008 and 0017 last rebuilt — so `pytorch` is a land the database will
     // accept. Everything already in the three tables has to survive the
     // rebuild, which is the half of this that is worth testing.
-    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
-    assert_eq!(previous, 19);
-    let conn = database_at_version(previous);
+    let conn = database_at_version(19);
     conn.execute(
         "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
            VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}')",
@@ -594,6 +591,114 @@ fn the_newest_migration_opens_the_fifth_land() {
         [],
     )
     .expect("attempts takes the fifth land");
+
+    // A land that is still not a land is still refused, so the rebuild
+    // widened the constraint rather than dropping it.
+    assert!(
+        conn.execute(
+            "INSERT INTO snippets (id, address, name, lang, source, created_at, updated_at)
+               VALUES ('s3', '0xaa', 'nope', 'zig', 'x', '2026-02-03T00:00:00Z', '2026-02-03T00:00:00Z')",
+            [],
+        )
+        .is_err(),
+        "the CHECK is widened, not removed"
+    );
+
+    // And nothing that was there before was lost on the way through.
+    let quests: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quests WHERE id = 'rust.basic.01.a'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(quests, 1, "the rebuild carried the quests across");
+    let snips: i64 = conn
+        .query_row("SELECT count(*) FROM snippets WHERE id = 's1'", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(snips, 1, "the rebuild carried the snippets across");
+
+    // The FTS index is rebuilt by the migration, so search still finds the
+    // row whose table was dropped and recreated underneath it.
+    let hits: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quest_fts WHERE quest_fts MATCH 't'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(hits >= 1, "the FTS index came back with the table");
+}
+
+#[test]
+fn the_newest_migration_opens_the_sixth_land() {
+    // The "newest migration" pin: fails loudly if a 0022 is added without a
+    // test of its own here. 0021 widens the same three CHECK constraints
+    // 0020 rebuilt, so `typescript` is a land the database will
+    // accept. Everything already in the three tables has to survive the
+    // rebuild, which is the half of this that is worth testing.
+    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
+    assert_eq!(previous, 20);
+    let conn = database_at_version(previous);
+    conn.execute(
+        "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
+           VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum)
+         VALUES ('rust.basic.01.a', 'p', 'rust', 'basic', 1, 't', 'b', 's', 1, 's', 's', '{}', 'c')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO snippets (id, address, name, lang, source, created_at, updated_at)
+           VALUES ('s1', '0xaa', 'scratch', 'python', 'print(1)',
+                   '2026-02-01T00:00:00Z', '2026-02-01T00:00:00Z')",
+        [],
+    )
+    .unwrap();
+
+    // Before the migration, the sixth land is not a land.
+    assert!(
+        conn.execute(
+            "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                                 starter, solution, tests, checksum)
+             VALUES ('typescript.basic.01.a', 'p', 'typescript', 'basic', 1, 't', 'b', 's', 1, 's', 's', '{}', 'c')",
+            [],
+        )
+        .is_err(),
+        "0020 has no typescript in its CHECK"
+    );
+
+    db::prepare(&conn).unwrap();
+
+    // After it, it is — in all three tables that name a land.
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum)
+         VALUES ('typescript.basic.01.a', 'p', 'typescript', 'basic', 1, 't', 'b', 's', 1, 's', 's', '{}', 'c')",
+        [],
+    )
+    .expect("quests takes the sixth land");
+    conn.execute(
+        "INSERT INTO snippets (id, address, name, lang, source, created_at, updated_at)
+           VALUES ('s2', '0xaa', 'screens', 'typescript', 'console.log(1)',
+                   '2026-02-02T00:00:00Z', '2026-02-02T00:00:00Z')",
+        [],
+    )
+    .expect("snippets takes the sixth land");
+    conn.execute(
+        "INSERT INTO attempts (id, address, quest_id, lang, source, verdict, created_at)
+           VALUES ('a1', '0xaa', 'typescript.basic.01.a', 'typescript', 'console.log(1)', 'accepted',
+                   '2026-02-02T00:00:00Z')",
+        [],
+    )
+    .expect("attempts takes the sixth land");
 
     // A land that is still not a land is still refused, so the rebuild
     // widened the constraint rather than dropping it.

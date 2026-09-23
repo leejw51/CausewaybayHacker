@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "es2022",
+    "module": "commonjs",
+    "lib": ["es2023"],
+    "types": [],
+    "noEmitOnError": true,
+    "pretty": false,
+    "inlineSourceMap": true,
+    "outDir": ".",
+    "rootDir": "."
+  },
+  "files": ["main.ts", "node.d.ts"]
+}

@@ -18,6 +18,7 @@ nothing else.
    scenes, sprites, input   json    sqlite (bm25+vec)    ──▶     go build / go test
    key derivation (local)           ~/.causewaybayhacker ──▶     c++ -std=c++20
                                                          ──▶     python3 -I
+                                                         ──▶     tsc -p . → node
 ```
 
 ## 0. The shape of the thing
@@ -25,11 +26,13 @@ nothing else.
 A 16-bit trainer. A rust coder in Causeway Bay lost their craft to vibe coding —
 Skynet's plan all along — and takes it back one street at a time.
 
-* Five **lands**: `rust`, `go`, `cpp`, `python`, `pytorch`. The player picks
-  one; the others are still there. `pytorch` is Python with `torch`: the same
-  interpreter, the same `main.py`, the same stdio harness and the same `py:`
-  mistake codes — what differs is what a program may import, and that is the
-  content's business rather than the runner's.
+* Six **lands**: `rust`, `go`, `cpp`, `python`, `pytorch`, `typescript`. The
+  player picks one; the others are still there. `pytorch` is Python with
+  `torch`: the same interpreter, the same `main.py`, the same stdio harness and
+  the same `py:` mistake codes — what differs is what a program may import, and
+  that is the content's business rather than the runner's. `typescript` is the
+  opposite case: a sixth toolchain in its own right, not an alias — `tsc`
+  checks the program and erases the types, and `node` runs what is left.
 * Four **categories** per land: `verybasic` (the quiz: four lines, one right,
   pick it then type it), `basic` (grammar activation: a construct
   shown, one or two lines to type), `advanced` (simple coding quizzes on that grammar — ownership, errors,
@@ -523,7 +526,7 @@ the blob where the queries are makes the database the wrong shape. So
 ```
 
 `<ext>` is the land's source extension — `rs`, `go`, `cpp`, `py` (twice: the
-PyTorch land's source is a `main.py` like the Python land's), the same
+PyTorch land's source is a `main.py` like the Python land's), `ts`, the same
 `source_filename(lang)` that names the file in an attempt directory (§1), so
 one of these opens in an editor and compiles by hand like anything else the
 player wrote. `<address>` is the lowercase form (§3.4), as it is under
@@ -648,7 +651,7 @@ payload that carries an address is ignored, not trusted.
 
 `<land>.<category>.<node:02d>.<slug>` — `rust.basic.03.shadowing`,
 `go.hacker.07.two-sum`, `cpp.basic.01.hello`, `python.advanced.17.the-gil`,
-`pytorch.hacker.34.teaching-cluster`.
+`pytorch.hacker.34.teaching-cluster`, `typescript.basic.01.first-screen`.
 Stable forever; the slug is part of it so a reordered
 map does not renumber someone's cleared list into nonsense. If a node moves,
 the `node` column changes and the id does not.
@@ -761,7 +764,87 @@ content downloads nothing: the digits on the ADVANCED road are generated in
 the program and the GPT-2 on its last node is built out of its own parts at
 fourteen thousand parameters.
 
-All three are stdio-harness only. `Harness::Cargo` / `Harness::Gotest` remain
+**TypeScript**
+
+```
+tsc -p .                                                   # the compile phase: any error ⇒ compile_error
+node --enable-source-maps --max-old-space-size=512 main.js # the run, per case, stdio harness
+```
+
+A real toolchain, not an alias: `runner/src/typescript.rs`. Three files go
+into the attempt directory, not one:
+
+* `main.ts`, the player's;
+* `node.d.ts` (`runner/src/typescript/node.d.ts`, compiled into the binary) —
+  **the whole of Node a quest can see**: `process.stdout.write` /
+  `process.stderr.write`, `process.exit`, `exitCode`, `argv`, `nextTick`;
+  `console.log` / `console.error`; `setTimeout`, `clearTimeout`,
+  `setInterval`, `clearInterval`, `setImmediate`, `queueMicrotask`;
+  `structuredClone`; and `readFileSync(0, "utf8")` from `"fs"`, by `require`
+  or by `import`. It is not `@types/node`, deliberately: that package has a
+  version, and the version would have to be pinned beside `tsc`'s on every
+  machine the server runs on;
+* `tsconfig.json` (`runner/src/typescript/tsconfig.json`): `strict`, `target`
+  `es2022`, `module` `commonjs`, `lib` `["es2023"]`, `types: []`,
+  `noEmitOnError`, `pretty: false`, `inlineSourceMap`. `types: []` is what
+  keeps a globally installed `@types/node` from leaking in on one machine and
+  not another, and a bare-flag command line cannot say it — hence a file.
+
+Every quest reads its input the same way, and there is one idiom for it:
+
+```ts
+const input: string = require("fs").readFileSync(0, "utf8");
+```
+
+**Why not Node's own type stripping.** Node 22+ can run `main.ts` directly by
+deleting the annotations, and would then run a program `tsc` rejects. A land
+about types must never do that: a type error is `compile_error` with `tsc`'s
+own `TS2322` on the line, and a program that type-checks and still reads
+`.left` off `undefined` is `runtime_error`, because that is what erasure means.
+Both halves are the lesson.
+
+`tsc` reports its diagnostics **on stdout**, one line each under
+`pretty: false`, and nothing on stderr unless it crashed; the runner folds the
+two together, stdout first, into `compiler_stderr`, which is where §7.1 looks.
+`inlineSourceMap` and `--enable-source-maps` are what make a runtime stack say
+`main.ts:12:7` rather than a line of emitted JavaScript the player never saw.
+
+`tsc` and `node` are resolved on the **ambient** `PATH` to absolute paths
+before anything runs, for the reason `python3` is: the harness runs the
+program with `PATH=/usr/bin:/bin`, and Homebrew, nvm and the official
+installer all put them somewhere else. `tsc` is itself a node script and
+turns on Node's compile cache under `TMPDIR`, which is the attempt directory;
+`NODE_COMPILE_CACHE` points it at `build/typescript/node-compile-cache`
+instead, inside the home (§1), so the second compile of the day starts warm
+as `CARGO_HOME` makes Rust's do.
+
+Memory is the one §5.3 limit `node` does not get in its usual form, and §5.3
+says why.
+
+`unsupported("typescript", Stdio)` **refuses a submission** when `tsc` or
+`node` does not answer, before an attempt row exists, for the reason given
+under PyTorch: a missing toolchain is the machine's fault and must never enter
+`mistakes`. The hint is `install node (https://nodejs.org), then: npm install
+-g typescript prettier`. The boot report's row is `typescript`, compiler
+`tsc`, formatter `prettier`.
+
+Formatter: `prettier --stdin-filepath main.ts` on stdin — the file name is how
+prettier picks its parser when the text comes on stdin. It ships with neither
+`tsc` nor `node`, so it is asked of the machine like `black` and
+`clang-format`, and `is_supported("typescript")` is true only when it answers.
+
+**Where `tsc` comes from.** Wherever PATH says, and on a machine with nothing
+installed globally that is the checkout itself: the browser client already
+pins `tsc` 5.9.3 and `prettier` 3.9.6 in `frontend/package-lock.json`, and the
+Makefile **appends** `frontend/node_modules/.bin` to PATH for everything it
+starts. Appended, not prepended, so a global `tsc` wins where there is one.
+`make doctor` reports `tsc` and `prettier`. As with Python's environment, this
+is a convenience of the build and not a rule of the protocol: the runner asks
+PATH, and a server started by hand gets whatever that PATH holds. CI installs
+the same two versions globally with `npm` (`TYPESCRIPT_VERSION`,
+`PRETTIER_VERSION`), matching the lock file.
+
+All four are stdio-harness only. `Harness::Cargo` / `Harness::Gotest` remain
 rust-only / go-only; `unsupported()` returns a message for any other pairing.
 
 ### 5.2 The test spec
@@ -770,7 +853,7 @@ rust-only / go-only; `unsupported()` returns a message for any other pairing.
 
 ```json
 {
-  "harness": "stdio",            // "stdio" | "cargo" | "gotest" — cargo is rust-only, gotest go-only; cpp, python and pytorch are stdio-only
+  "harness": "stdio",            // "stdio" | "cargo" | "gotest" — cargo is rust-only, gotest go-only; cpp, python, pytorch and typescript are stdio-only
   "timeout_ms": 5000,
   "compile_timeout_ms": 30000,
   "max_stdout_bytes": 262144,
@@ -795,6 +878,14 @@ after a SIGTERM grace of 500 ms), an output byte cap, a stripped environment
 (`PATH`, `HOME` pointed at the build dir, the toolchain vars above, nothing
 else), no inherited stdin beyond the case's, and `setrlimit` for address space
 (1 GiB), file size (64 MiB) and processes where the platform provides it.
+
+**`node` runs without the address-space cap.** V8 reserves its code range and
+heap cage as virtual memory before it runs a line, so under a 1 GiB
+`RLIMIT_AS` a TypeScript program dies at startup having done nothing. The
+runner leaves that one limit off for `node` (`harness::judge_argv_limited`)
+and bounds the heap with `--max-old-space-size=512` instead; a program that
+outgrows it dies of `JavaScript heap out of memory`, which is the honest
+message. Every other limit in this section applies.
 
 **The timeout is the runner's clock, not the submission's.** Output is drained
 on its own threads, and they are abandoned half a second after the kill.
@@ -994,33 +1085,39 @@ C++: the same, over clang's and gcc's prose (they word one mistake two ways,
 and the slug is what they share); a program the kernel stopped is identified
 by its signal. Python: `py_compile` for the one compile-time row, and
 otherwise the last `XxxError:` line of the traceback, which is the whole
-identity Python gives. Every code is prefixed by its land except Rust's,
-whose codes are the compiler's own: `go:`, `cpp:`, `py:`. There is no
+identity Python gives. TypeScript has two voices, one per half of the land:
+`tsc`'s own error code at compile time (`TS2322`), kept as the identity the
+way rustc's `E0382` is — the same mistake in every version and every locale,
+where the prose is neither — and, once the types are erased, the class of the
+exception `node` threw, given a `ts:` slug the way Python's classes get `py:`
+ones; its line is the source-mapped `main.ts` line from the stack. Every code
+is prefixed by its land except the ones the compiler numbers itself — Rust's
+and `tsc`'s: `go:`, `cpp:`, `py:`, `ts:`. There is no
 `pytorch:` prefix and there is not going to be one: PyTorch Land runs the same
 interpreter and raises the same exceptions, so its mistakes are `py:` codes
 and its column below is Python's column.
 
 Kinds (the slug stored in `mistakes.kind`), each mapped from one or more codes:
 
-| kind | rust | go | cpp | python / pytorch |
-| --- | --- | --- | --- | --- |
-| `borrow-after-move` | E0382, E0505 | — | `cpp:use-after-move` (clang `-Wall`) | — |
-| `borrow-conflict` | E0499, E0502 | — | — | — |
-| `lifetime` | E0106, E0597, E0621, E0373 | — | — | — |
-| `type-mismatch` | E0308 | `cannot use … as … value` | `cpp:no-matching-function`, `cpp:cannot-convert` | `py:type-error` (`TypeError`) |
-| `unknown-name` | E0425, E0433 | `undefined: X` | `cpp:undeclared-identifier` | `py:name-error` (`NameError`) |
-| `missing-trait` | E0277 | — | — | `py:attribute-error` (`AttributeError`, not on `None`) |
-| `unused` | unused_variables, unused_imports | `declared and not used`, `imported and not used` | `cpp:unused` (`-Wall`) | — |
-| `mutability` | E0596, E0594 | — | `cpp:const-discard` | — |
-| `nil-deref` | — | runtime `nil pointer dereference` | `cpp:segfault` (signal 11 / `Segmentation fault`) | `py:none-attribute` (`AttributeError: 'NoneType'`) |
-| `index-range` | runtime `index out of bounds` | runtime `index out of range` | `cpp:out-of-range` (`std::out_of_range`) | `py:index-error`, `py:key-error` |
-| `data-race` | — | `go test -race` report | — | — |
-| `deadlock` | — | `all goroutines are asleep` | — (not detectable; it is a `timeout`) | — |
-| `unhandled-error` | E0277 *discriminated*, see below | `err` assigned and not checked | `cpp:abort` (`terminate called` / signal 6) | `py:zero-division`, `py:value-error`, `py:exception` (any other uncaught) |
-| `syntax` | any parse error | any parse error | `cpp:expected-token` | `py:syntax` (`SyntaxError`, `IndentationError`) |
-| `wrong-answer` | — | — (verdict, not a compiler code) | — | `py:recursion` (`RecursionError`) |
-| `timeout` | — | — | — | — |
-| `other` | anything unmatched, with its code kept | same | `cpp:other` | same |
+| kind | rust | go | cpp | python / pytorch | typescript |
+| --- | --- | --- | --- | --- | --- |
+| `borrow-after-move` | E0382, E0505 | — | `cpp:use-after-move` (clang `-Wall`) | — | — |
+| `borrow-conflict` | E0499, E0502 | — | — | — | — |
+| `lifetime` | E0106, E0597, E0621, E0373 | — | — | — | — |
+| `type-mismatch` | E0308 | `cannot use … as … value` | `cpp:no-matching-function`, `cpp:cannot-convert` | `py:type-error` (`TypeError`) | TS2322, TS2345, TS2554, TS7006, … (assignability, arity, implicit `any`); `ts:type-error` (any other `TypeError`) |
+| `unknown-name` | E0425, E0433 | `undefined: X` | `cpp:undeclared-identifier` | `py:name-error` (`NameError`) | TS2304, TS2552, TS2305, TS2307, TS2583, TS2584, TS2503, TS2448; `ts:reference-error` (`ReferenceError`) |
+| `missing-trait` | E0277 | — | — | `py:attribute-error` (`AttributeError`, not on `None`) | TS2339, TS2551; `ts:not-a-function` (`TypeError: … is not a function` / `is not iterable`) |
+| `unused` | unused_variables, unused_imports | `declared and not used`, `imported and not used` | `cpp:unused` (`-Wall`) | — | TS6133, … (only where the options ask, and they do not — an unfinished starter still runs) |
+| `mutability` | E0596, E0594 | — | `cpp:const-discard` | — | TS2588, TS2540, TS2542 |
+| `nil-deref` | — | runtime `nil pointer dereference` | `cpp:segfault` (signal 11 / `Segmentation fault`) | `py:none-attribute` (`AttributeError: 'NoneType'`) | TS2531, TS2532, TS2533, TS2454, TS2722, TS18047–18049; `ts:undefined-property` (`TypeError: Cannot read/set properties of undefined`/`null`) |
+| `index-range` | runtime `index out of bounds` | runtime `index out of range` | `cpp:out-of-range` (`std::out_of_range`) | `py:index-error`, `py:key-error` | `ts:range-error` (any other `RangeError`) |
+| `data-race` | — | `go test -race` report | — | — | — |
+| `deadlock` | — | `all goroutines are asleep` | — (not detectable; it is a `timeout`) | — | — |
+| `unhandled-error` | E0277 *discriminated*, see below | `err` assigned and not checked | `cpp:abort` (`terminate called` / signal 6) | `py:zero-division`, `py:value-error`, `py:exception` (any other uncaught) | `ts:json-parse` (a runtime `SyntaxError`: `JSON.parse`), `ts:throw` (a thrown non-`Error`), `ts:exception` (any other uncaught) |
+| `syntax` | any parse error | any parse error | `cpp:expected-token` | `py:syntax` (`SyntaxError`, `IndentationError`) | TS1xxx (any parser error) |
+| `wrong-answer` | — | — (verdict, not a compiler code) | — | `py:recursion` (`RecursionError`) | `ts:recursion` (`RangeError: Maximum call stack size exceeded`) |
+| `timeout` | — | — | — | — | `ts:heap-limit` (`JavaScript heap out of memory`) |
+| `other` | anything unmatched, with its code kept | same | `cpp:other` | same | any unmatched `TSnnnn`, with its code kept |
 
 An unmatched code is stored as `other` with `code` set, so the taxonomy can
 grow from real data instead of guesses. **Never drop a code you did not
@@ -1203,7 +1300,7 @@ Both orientations are first-class on every screen, not just the map.
 ```
 backend/            Rust workspace
   core/             domain: store, quests, progress, mistakes, search, drills
-  runner/           compile + run, rust, go, cpp and python, limits and streaming
+  runner/           compile + run, rust, go, cpp, python and typescript, limits and streaming
   server/           axum, the websocket, the message catalogue, static files
   cli/              `cwbhacker`: serve, import, prune, doctor
 love2d/             LÖVE 11.5 desktop client, same protocol
@@ -1221,9 +1318,10 @@ content/            quest packs (TOML), one file per land+category
   cpp/{basic,advanced,hacker}.toml
   python/{basic,advanced,hacker}.toml
   pytorch/{verybasic,basic,advanced,hacker}.toml
+  typescript/{verybasic,basic,advanced,hacker}.toml
   i18n/<locale>/<land>.<category>.toml   translations of the packs above (§12.1)
 docs/               decisions.md, story.md, art.md
-tests/vectors/      shared fixtures: addresses, signatures, mistake sources (four
+tests/vectors/      shared fixtures: addresses, signatures, mistake sources (five
                     compilers; pytorch shares python's)
 e2e/                playwright: the whole loop, both orientations
 ```

@@ -111,6 +111,7 @@ pub fn source_filename(lang: &str) -> &'static str {
         // PYTORCH is the Python interpreter with torch in its site-packages,
         // so its programs are `main.py` too (SPEC §5.1).
         "python" | "pytorch" => "main.py",
+        "typescript" => "main.ts",
         _ => "main.rs",
     }
 }

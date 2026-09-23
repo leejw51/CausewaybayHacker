@@ -76,7 +76,8 @@ void main() {
  * C++ is noon on the typhoon shelter, a hard blue with the sun glaring off the
  * water; Python is the wet market at dawn, amber coming up under a night that
  * has not quite gone; PyTorch is two floors underground, where there is no sky
- * and the only light is the rack in front of you.
+ * and the only light is the rack in front of you; TypeScript is the office
+ * tower at dusk, cold blue glass and every floor still lit.
  */
 const SKY: Record<Land, { top: number; bottom: number; glow: number }> = {
   rust: { top: 0x161e50, bottom: 0x2c1a1e, glow: 0xf27828 },
@@ -86,6 +87,9 @@ const SKY: Record<Land, { top: number; bottom: number; glow: number }> = {
   // PyTorch is the machine room at 23:00: no sky at all, a black ceiling
   // and the rack lights coming up red off the cold aisle.
   pytorch: { top: 0x0c0c18, bottom: 0x2c0c08, glow: 0xe84820 },
+  // TypeScript is the ICC tower at dusk: a clear cold blue going to steel,
+  // and every window lit the same TypeScript blue.
+  typescript: { top: 0x0e2a5c, bottom: 0x0a1428, glow: 0x3178c6 },
 };
 
 /**

@@ -829,6 +829,194 @@ fn sorry_line(message: &str) -> Option<i64> {
     digits.parse::<i64>().ok()
 }
 
+// ---------------------------------------------------------------------------
+// TypeScript (SPEC §7.1's fifth column)
+//
+// Two voices, one per half of the land. `tsc` has real error codes, as
+// `rustc` does, and they are kept as the identity: `TS2322` is the same
+// mistake in every version and every locale, where its prose is neither.
+// With `pretty: false` every diagnostic is one line,
+// `main.ts(3,5): error TS2322: Type 'string' is not assignable to …`, and
+// the indented lines under it elaborate the one above.
+//
+// Then the types are erased and `node` runs what is left, and its voice is
+// an exception class — `TypeError: Cannot read properties of undefined` —
+// with the source-mapped `main.ts:12` above it. Those get `ts:` slugs, the
+// way Python's classes get `py:` ones.
+// ---------------------------------------------------------------------------
+
+/// A `tsc` error code → the kind. `None` is "not in the table": the code is
+/// kept and the row is `other`, as for rustc.
+pub fn typescript_kind(code: &str) -> Option<&'static str> {
+    let number: u32 = code.strip_prefix("TS")?.parse().ok()?;
+    Some(match number {
+        // Every 1xxx is the parser's: nothing was typed yet, the text did
+        // not parse.
+        1000..=1999 => "syntax",
+        // Cannot find name / did you mean / cannot find module / a lib
+        // global that is not in this land's `lib` (TS2583, TS2584).
+        2304 | 2552 | 2305 | 2307 | 2583 | 2584 | 2503 | 2448 => "unknown-name",
+        // "Object is possibly 'undefined'" in its six wordings, and a
+        // variable read before it was ever assigned: the erased `undefined`
+        // the checker caught before it reached the screen.
+        2531 | 2532 | 2533 | 2454 | 2722 | 18047 | 18048 | 18049 => "nil-deref",
+        // "Property 'x' does not exist on type" — Python's AttributeError,
+        // found before the run instead of during it.
+        2339 | 2551 => "missing-trait",
+        // `const`, `readonly`, and a readonly index signature.
+        2588 | 2540 | 2542 => "mutability",
+        // Declared but never read; reported only where the options ask.
+        6133 | 6138 | 6192 | 6196 | 6198 => "unused",
+        // Assignability in all its forms, arity, operands, implicit `any`,
+        // a missing return, a call on something that is not callable.
+        2322 | 2345 | 2352 | 2355 | 2362 | 2363 | 2365 | 2366 | 2367 | 2349 | 2554 | 2555
+        | 2556 | 2739 | 2740 | 2741 | 2769 | 2677 | 2678 | 2820 | 7005 | 7006 | 7008 | 7010
+        | 7015 | 7018 | 7019 | 7031 | 7034 | 7053 => "type-mismatch",
+        _ => return None,
+    })
+}
+
+/// Classify `tsc -p .` output (`pretty: false`): one mistake per `error`
+/// line, in the order the checker reported them.
+pub fn classify_typescript_compile(stderr: &str) -> Vec<Mistake> {
+    let mut out = Vec::new();
+    for line in stderr.lines() {
+        // Continuation lines are indented; a diagnostic is not.
+        if line.starts_with(char::is_whitespace) {
+            continue;
+        }
+        let Some((location, rest)) = line.split_once(": error ") else {
+            continue;
+        };
+        let Some((code, message)) = rest.split_once(": ") else {
+            continue;
+        };
+        let (line_no, col) = typescript_location(location);
+        let kind = typescript_kind(code).unwrap_or("other");
+        out.push(Mistake {
+            kind: kind.into(),
+            code: Some(code.to_string()),
+            message: normalize_message(message),
+            line: line_no,
+            col,
+        });
+    }
+    out
+}
+
+/// `main.ts(3,5)` → `(Some(3), Some(5))`. A diagnostic with no file — a bad
+/// tsconfig, which is the runner's fault — has neither.
+fn typescript_location(location: &str) -> (Option<i64>, Option<i64>) {
+    let Some(inner) = location
+        .rsplit_once('(')
+        .and_then(|(_, rest)| rest.strip_suffix(')'))
+    else {
+        return (None, None);
+    };
+    let mut parts = inner.split(',').map(|n| n.trim().parse::<i64>().ok());
+    (parts.next().flatten(), parts.next().flatten())
+}
+
+/// An uncaught exception's class and message → the kind and the identity.
+pub fn typescript_runtime_kind(class: &str, message: &str) -> (&'static str, &'static str) {
+    match class {
+        // The boss of `typescript.basic`: the type said it was there, and
+        // at runtime it was `undefined`.
+        "TypeError"
+            if message.starts_with("Cannot read properties of")
+                || message.starts_with("Cannot set properties of") =>
+        {
+            ("nil-deref", "ts:undefined-property")
+        }
+        "TypeError" if message.contains("is not a function") || message.contains("is not iterable") => {
+            ("missing-trait", "ts:not-a-function")
+        }
+        "TypeError" => ("type-mismatch", "ts:type-error"),
+        "ReferenceError" => ("unknown-name", "ts:reference-error"),
+        // As with Python's depth limit: the recursion that blew the stack
+        // would have been a loop.
+        "RangeError" if message.contains("Maximum call stack") => ("wrong-answer", "ts:recursion"),
+        "RangeError" => ("index-range", "ts:range-error"),
+        // At runtime a SyntaxError is `JSON.parse` refusing its input — the
+        // feed was not what the type promised, and nothing caught it.
+        "SyntaxError" => ("unhandled-error", "ts:json-parse"),
+        _ => ("unhandled-error", "ts:exception"),
+    }
+}
+
+/// Classify what `node --enable-source-maps main.js` left on stderr.
+pub fn classify_typescript_runtime(stderr: &str) -> Vec<Mistake> {
+    let line = typescript_runtime_line(stderr);
+    // A heap that ran out is an algorithm that kept too much — the same
+    // lesson as a timeout, reached through memory rather than the clock.
+    if stderr.contains("JavaScript heap out of memory") || stderr.contains("Reached heap limit") {
+        return vec![Mistake {
+            kind: "timeout".into(),
+            code: Some("ts:heap-limit".into()),
+            message: "JavaScript heap out of memory".into(),
+            line,
+            col: None,
+        }];
+    }
+    if let Some((class, message)) = first_js_exception(stderr) {
+        let (kind, code) = typescript_runtime_kind(class, message);
+        return vec![Mistake {
+            kind: kind.into(),
+            code: Some(code.into()),
+            message: normalize_message(&format!("{class}: {message}")),
+            line,
+            col: None,
+        }];
+    }
+    // `throw "offline"` — something that is not an Error. Node prints the
+    // source line, a caret under it, and then the value itself.
+    let mut lines = stderr.lines();
+    if lines.by_ref().any(|l| l.trim_start().starts_with('^')) {
+        if let Some(value) = lines.map(str::trim).find(|l| !l.is_empty()) {
+            return vec![Mistake {
+                kind: "unhandled-error".into(),
+                code: Some("ts:throw".into()),
+                message: normalize_message(value),
+                line,
+                col: None,
+            }];
+        }
+    }
+    Vec::new()
+}
+
+/// The first `SomethingError: message` line. Node prints the exception once,
+/// above its stack, and ends with a `Node.js v…` line that is not one — so
+/// the first, not the last as for a Python traceback.
+fn first_js_exception(stderr: &str) -> Option<(&str, &str)> {
+    stderr.lines().find_map(|line| {
+        if line.starts_with(char::is_whitespace) {
+            return None;
+        }
+        let (head, message) = match line.split_once(": ") {
+            Some(pair) => pair,
+            None => (line, ""),
+        };
+        // `Error [ERR_X]: …` carries a code after the class.
+        let class = head.split(' ').next().unwrap_or(head);
+        let is_class = class.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+            && class.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            && class.ends_with("Error");
+        is_class.then(|| (class, message.trim()))
+    })
+}
+
+/// The first `main.ts:N` in the output: the source-mapped header above the
+/// caret, or failing that the innermost stack frame. Either way it is where
+/// the player's code was when it stopped.
+fn typescript_runtime_line(stderr: &str) -> Option<i64> {
+    stderr.lines().find_map(|line| {
+        let (_, rest) = line.split_once("main.ts:")?;
+        let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+        digits.parse::<i64>().ok()
+    })
+}
+
 /// Compile diagnostics, whichever land they came from. Every land has an
 /// explicit arm: a new one falling through to the rustc JSON classifier
 /// would silently find nothing in it and the table would learn nothing.
@@ -839,6 +1027,7 @@ pub fn classify_compile(lang: &str, stderr: &str) -> Vec<Mistake> {
         // PyTorch Land runs the same interpreter, so a `SyntaxError` there is
         // the same `py:syntax` it is in Python Land.
         "python" | "pytorch" => classify_python_compile(stderr),
+        "typescript" => classify_typescript_compile(stderr),
         _ => classify_rust_json(stderr),
     }
 }
@@ -852,6 +1041,7 @@ pub fn classify_runtime(lang: &str, stderr: &str) -> Vec<Mistake> {
         "go" => classify_go_runtime(stderr),
         "cpp" => classify_cpp_runtime(stderr),
         "python" | "pytorch" => classify_python_runtime(stderr),
+        "typescript" => classify_typescript_runtime(stderr),
         _ => classify_rust_runtime(stderr),
     }
 }

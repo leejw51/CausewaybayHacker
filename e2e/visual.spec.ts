@@ -90,7 +90,7 @@ test.describe("the lands are drawn in their own colours", () => {
     await atScreen(page, "lands");
 
     const seen: Record<string, [number, number, number]> = {};
-    for (const land of ["rust", "go", "cpp", "python", "pytorch"] as Land[]) {
+    for (const land of ["rust", "go", "cpp", "python", "pytorch", "typescript"] as Land[]) {
       await pickLand(page, land);
       // Settle so the plate's open/close tween has finished and the bar is at
       // full strength rather than mid-fade.
@@ -112,7 +112,7 @@ test.describe("the lands are drawn in their own colours", () => {
     }
   });
 
-  test("C++ is blue, Python is gold and PyTorch is flame, not merely different", async ({
+  test("C++ is navy, Python is gold, PyTorch is flame and TypeScript is blue, not merely different", async ({
     page,
     ready,
   }) => {
@@ -150,6 +150,25 @@ test.describe("the lands are drawn in their own colours", () => {
       pytorch[1] - pytorch[2],
       `pytorch bar ${pytorch} is gold, not flame`,
     ).toBeLessThan(python[1] - python[2]);
+
+    await pickLand(page, "typescript");
+    await page.evaluate(() => window.__cwbCapture?.settle(1.5));
+    const typescript = await plateBarColour(page, "typescript");
+    await page.evaluate(() => window.__cwbCapture?.resume());
+
+    // TypeScript blue is #3178C6: blue leads, like C++'s — so what keeps the
+    // two lands apart is that TypeScript's is the lighter one, with red and
+    // green both well up where C++'s navy has almost none of either.
+    expect(typescript[2], `typescript bar ${typescript} is not blue`).toBeGreaterThan(
+      typescript[0],
+    );
+    expect(typescript[2], `typescript bar ${typescript} is not blue`).toBeGreaterThan(
+      typescript[1],
+    );
+    expect(
+      typescript[0] + typescript[1],
+      `typescript bar ${typescript} is C++'s navy, not TypeScript's blue`,
+    ).toBeGreaterThan(cpp[0] + cpp[1] + 30);
   });
 });
 

@@ -1,0 +1,2327 @@
+# TYPESCRIPT LAND — BASIC. The grammar road: Causeway Bay after dark, from the
+# 19:00 switch-on of the big screen over Times Square to the thirtieth-floor
+# control room at midnight, one construct per node. This is grammar practice,
+# not a quiz: the brief explains one thing and shows how it is written, the
+# starter is the whole program, and the player types the one or two lines
+# that use it — Number(), toFixed and template literals, integer widths with
+# `>>>` and a bigint, float vs Math.fround, string, array and Uint8Array
+# slices with copy and append, a for loop, a typed function, a class with
+# typed fields, an enum, push/splice/sort with a comparator (the default sort
+# is lexicographic), an array edited at both ends, a Map with `??`, an object
+# as the hash table, a Set, an array as a stack and a queue, toSorted,
+# reverse, a comparator over an interface, a closure, filter/map/reduce with
+# arrow functions, promises and Promise.all, and the two recursive lines of a
+# binary search tree for the boss. Every type here is a contract: tsc checks
+# it once and erases it, and the program runs on whatever came down the wire.
+# Nothing here is timed, and verify_pack refuses a basic solution that adds
+# more than four lines over its starter (two on every node but the container
+# drills).
+#
+# Every program is one main.ts, checked by `tsc -p .` (strict, es2022,
+# commonjs, lib es2023) against backend/runner/src/typescript/node.d.ts — the
+# whole of Node a quest can see — and run as `node --enable-source-maps
+# main.js`. Standard input is read with one idiom everywhere:
+#
+#     const input: string = require("fs").readFileSync(0, "utf8");
+#
+# There are no threads: node 26 is one event loop, promises and `await`.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Every solution and starter in this file is run by
+# tests/content/verify_pack.py and by CI (SPEC §9.4, §9.5).
+
+pack = "typescript.basic"
+land = "typescript"
+category = "basic"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "typescript.basic.01.first-screen"
+node        = 1
+title       = "SWITCH-ON"
+difficulty  = 1
+story       = '''19:00 over Times Square. The rain has just stopped, the big screen comes on, and the first frame of the night is black.'''
+concepts    = ["io", "strings"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+Print exactly:
+
+```
+hello, causewaybay
+```
+
+Lowercase, one comma, one space, one line. Nothing else.
+
+`console.log` adds the newline for you. It also adds a space between
+arguments, which is the first thing about it that people get wrong:
+`console.log("hello,", "causewaybay")` is fine, and
+`console.log("hello, ", "causewaybay")` has two spaces in it.
+'''
+starter     = '''
+function main(): void {
+  // your code here
+  // ANSWER: console.log("hello, causewaybay");
+}
+
+main();
+'''
+solution    = '''
+function main(): void {
+  console.log("hello, causewaybay");
+}
+
+main();
+'''
+hints = [
+  'console.log("hello, causewaybay"); is the whole program.',
+  "The string is exact: lowercase, one comma, one space after it.",
+  "Leave the `main();` call at the bottom. A function that is never called prints nothing, and the starter is exactly that.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "typescript.basic.02.number"
+node        = 2
+title       = "TWELVE TWELVE"
+difficulty  = 1
+story       = '''The Hysan Place wall is told to show a count, twice the count and its square, and the middle line comes up 1212 in letters three storeys tall.'''
+concepts    = ["io", "bindings", "types"]
+requires    = ["typescript.basic.01.first-screen"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief       = '''Standard input arrives as one **string**, newline and all. A string that
+looks like a number is still a string, and `+` on two strings joins them:
+`"12" + "12"` is `"1212"`. `Number()` turns the text into a `number`, and
+skips the whitespace around it on the way.
+
+The starter tells the compiler that the text is a number with `as unknown as
+number`. That is a promise, not a conversion: tsc believes it, erases it, and
+at runtime `n` is still the string `"12"`. Replace that line with a real one:
+
+```
+const n: number = Number(input);
+```
+
+The three `console.log` lines are written.
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const n: number = input.trim() as unknown as number; // FILL: read the text as a number
+  // ANSWER: const n: number = Number(input);
+  console.log(n);
+  console.log(n + n);
+  console.log(n * n);
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const n: number = Number(input);
+  console.log(n);
+  console.log(n + n);
+  console.log(n * n);
+}
+
+main();
+'''
+hints = [
+  "The starter prints 1212 on the second line: n + n joined two strings. The type said number; the value never was one.",
+  "const n: number = Number(input); converts as you read. Number() ignores the newline at the end for you.",
+  "A negative n squared is positive. The test knows.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "twelve", stdin = "12\n", expect = "12\n24\n144\n", visible = true },
+  { name = "negative", stdin = "-3\n", expect = "-3\n-6\n9\n", visible = false },
+  { name = "zero", stdin = "0\n", expect = "0\n0\n0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "typescript.basic.03.types"
+node        = 3
+title       = "THE SHARED SLOT"
+difficulty  = 1
+story       = '''Two advertisers split the Times Square slot hour, and the control room's schedule has a line for the whole minutes each gets, the leftover, and a share that should read to two decimals and reads a question mark.'''
+concepts    = ["types", "io"]
+requires    = ["typescript.basic.02.number"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief       = '''TypeScript has one `number` type, a 64-bit float, so `/` always keeps the
+fraction: `7 / 2` is `3.5`. Integer division is `Math.floor(a / b)`, and `%`
+is the remainder. To print a number with a fixed count of decimals, call
+`.toFixed(2)` on it: it gives back a **string** with exactly two digits after
+the point. (Where Python writes an f-string, TypeScript writes a template
+literal, `` `${x}` ``, and puts the `.toFixed` call inside the braces.)
+
+```
+console.log(Math.floor(a / b));
+console.log(a % b);
+console.log((a / b).toFixed(2));
+```
+
+`a` and `b` are read and the first two prints are written. Type the third
+`console.log` line exactly as shown.
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const [a, b] = input.trim().split(/\s+/).map(Number);
+  console.log(Math.floor(a / b));
+  console.log(a % b);
+  console.log("?"); // FILL: a / b with two decimals
+  // ANSWER: console.log((a / b).toFixed(2));
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const [a, b] = input.trim().split(/\s+/).map(Number);
+  console.log(Math.floor(a / b));
+  console.log(a % b);
+  console.log((a / b).toFixed(2));
+}
+
+main();
+'''
+hints = [
+  "console.log((a / b).toFixed(2)); — the parentheses round a / b come first, then .toFixed(2) on the result.",
+  "a / b.toFixed(2) would call toFixed on b alone, and tsc refuses to divide a number by the string it returns.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven-two", stdin = "7 2\n", expect = "3\n1\n3.50\n", visible = true },
+  { name = "ten-four", stdin = "10 4\n", expect = "2\n2\n2.50\n", visible = false },
+  { name = "exact", stdin = "9 3\n", expect = "3\n0\n3.00\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "typescript.basic.04.int-types"
+node        = 4
+title       = "FOUR BYTES WIDE"
+difficulty  = 1
+story       = '''The LED controller behind the Hysan Place wall keeps each tile's level in four bytes and prints the biggest number it can hold on its status line, and the status line is empty.'''
+concepts    = ["types", "bindings"]
+requires    = ["typescript.basic.03.types"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief       = '''A `number` has no integer width, but the bitwise operators do: every one of
+them works on **32 bits**. `n >>> 0` reinterprets `n` as an unsigned 32-bit
+integer, so `-1 >>> 0` is `4294967295`, and `.toString(16).padStart(8, "0")`
+shows its four bytes as eight hex digits. The same 32 bits are the trap in
+`(1 << 31) - 1`: `1 << 31` is already negative, so write the largest signed
+32-bit integer as `2 ** 31 - 1`. The bitwise operators stop at 32 bits;
+exact counting stops at `2 ** 53`, and past that a `bigint` (`1n`, `64n`)
+takes over.
+
+```
+console.log((n >>> 0).toString(16).padStart(8, "0"));
+console.log(2 ** 31 - 1);
+```
+
+`n` is read and the unsigned 64-bit maximum is printed last, as a bigint.
+Type the two lines above in place of the two `// FILL` markers.
+
+```
+input:  7
+output: 00000007
+        2147483647
+        18446744073709551615
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const n: number = Number(input);
+  // FILL: print n as four bytes (unsigned 32-bit), in hex
+  // ANSWER: console.log((n >>> 0).toString(16).padStart(8, "0"));
+  // FILL: print the largest signed 32-bit integer
+  // ANSWER: console.log(2 ** 31 - 1);
+  console.log(((1n << 64n) - 1n).toString());
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const n: number = Number(input);
+  console.log((n >>> 0).toString(16).padStart(8, "0"));
+  console.log(2 ** 31 - 1);
+  console.log(((1n << 64n) - 1n).toString());
+}
+
+main();
+'''
+hints = [
+  'console.log((n >>> 0).toString(16).padStart(8, "0")); — >>> 0 makes it unsigned 32-bit, toString(16) is hex, padStart fills the left with zeros.',
+  "(1 << 31) - 1 prints -2147483649: the shift is 32-bit and signed. 2 ** 31 - 1 is plain arithmetic and prints 2147483647.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven", stdin = "7\n", expect = "00000007\n2147483647\n18446744073709551615\n", visible = true },
+  { name = "minus-one", stdin = "-1\n", expect = "ffffffff\n2147483647\n18446744073709551615\n", visible = false },
+  { name = "million", stdin = "1000000\n", expect = "000f4240\n2147483647\n18446744073709551615\n", visible = false },
+]
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "typescript.basic.05.big-int"
+node        = 5
+title       = "THIRTY-TWO BYTES"
+difficulty  = 1
+story       = '''Every ad that plays on the Times Square screen is signed with a thirty-two-byte hash, and the control room log prints the big ones as a one followed by a row of zeros that were never in the hash.'''
+concepts    = ["types", "slices", "strings"]
+requires    = ["typescript.basic.04.int-types"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief       = '''A hash, a key, an address: the numbers this game runs on are 256 bits wide
+— thirty-two bytes. A `number` holds 53 bits exactly and rounds the rest
+away without a word, so a hash read with `Number()` comes back wrong. A
+`bigint` has no width: `BigInt(text)` parses the whole decimal, and
+`.toString(16).padStart(64, "0")` lays it out as the sixty-four hex
+characters you have seen on every wallet.
+
+```
+const n: bigint = BigInt(input.trim());
+```
+
+The print is written, and it works on either type. Replace the `Number`
+line with the one above.
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const n: number = Number(input); // FILL: read it as a bigint
+  // ANSWER: const n: bigint = BigInt(input.trim());
+  console.log(n.toString(16).padStart(64, "0"));
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const n: bigint = BigInt(input.trim());
+  console.log(n.toString(16).padStart(64, "0"));
+}
+
+main();
+'''
+hints = [
+  "const n: bigint = BigInt(input.trim()); — BigInt parses the decimal text exactly, however long it is.",
+  "The starter is right for 255 and wrong for 2**256 - 1: Number keeps 53 bits and the rest become zeros.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "ff", stdin = "255\n", expect = "00000000000000000000000000000000000000000000000000000000000000ff\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "0000000000000000000000000000000000000000000000000000000000000001\n", visible = false },
+  { name = "max", stdin = "115792089237316195423570985008687907853269984665640564039457584007913129639935\n", expect = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\n", visible = false },
+]
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "typescript.basic.06.floats"
+node        = 6
+title       = "THREE DECIMAL PLACES"
+difficulty  = 1
+story       = '''The light sensor on the Yee Wo Street tram stop reads to three decimals, the LED driver it feeds keeps only single precision, and the log shows both as zero.'''
+concepts    = ["types", "io"]
+requires    = ["typescript.basic.05.big-int"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief       = '''A `number` is a 64-bit double — `f64` in other lands. There is no 32-bit
+float type, but you can see one: `Math.fround(x)` rounds `x` to the nearest
+single-precision value, which is what a `Float32Array` would store. `.toFixed(3)`
+prints three decimals; `.toFixed(10)` prints enough to see the rounding.
+
+```
+const x: number = Number(s);
+const y: number = Math.fround(x);
+```
+
+`s` is read and both prints are written. Type the two lines above in place
+of the two placeholders.
+
+```
+input:  0.1
+output: 0.100
+        0.1000000015
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const s: string = input.trim();
+  const x: number = 0; // FILL: the text as a number (f64)
+  // ANSWER: const x: number = Number(s);
+  const y: number = 0; // FILL: x rounded to a 32-bit float
+  // ANSWER: const y: number = Math.fround(x);
+  console.log(x.toFixed(3));
+  console.log(y.toFixed(10));
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const s: string = input.trim();
+  const x: number = Number(s);
+  const y: number = Math.fround(x);
+  console.log(x.toFixed(3));
+  console.log(y.toFixed(10));
+}
+
+main();
+'''
+hints = [
+  "const x: number = Number(s); then const y: number = Math.fround(x); — fround is float-round, to single precision.",
+  "new Float32Array([x])[0] gives the same y; Math.fround is the one-call way to write it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tenth", stdin = "0.1\n", expect = "0.100\n0.1000000015\n", visible = true },
+  { name = "pi", stdin = "3.14159\n", expect = "3.142\n3.1415901184\n", visible = false },
+  { name = "exact", stdin = "2.5\n", expect = "2.500\n2.5000000000\n", visible = false },
+]
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "typescript.basic.04.strings"
+node        = 7
+title       = "THE MIRROR"
+difficulty  = 1
+story       = '''The Lee Garden window screen shows each shop's name measured, shouted, and backwards for the glass it reflects in, and tonight it shows the name once, the right way round.'''
+concepts    = ["strings", "iteration"]
+requires    = ["typescript.basic.06.floats"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief       = '''A string knows its own length through `.length`, and makes an upper-case
+copy with `.toUpperCase()`. It has no `reverse`: that belongs to arrays. So
+spread the string into an array of its characters, reverse the array, and
+join it back — `[...s].reverse().join("")`.
+
+```
+console.log(s.length);
+console.log(s.toUpperCase());
+console.log([...s].reverse().join(""));
+```
+
+`s` is read and its length is printed. Type the second and third
+`console.log` lines exactly as shown.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const s: string = input.split("\n")[0];
+  console.log(s.length);
+  // FILL: print s in upper case
+  // ANSWER: console.log(s.toUpperCase());
+  // FILL: print s reversed
+  // ANSWER: console.log([...s].reverse().join(""));
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const s: string = input.split("\n")[0];
+  console.log(s.length);
+  console.log(s.toUpperCase());
+  console.log([...s].reverse().join(""));
+}
+
+main();
+'''
+hints = [
+  'console.log(s.toUpperCase()); then console.log([...s].reverse().join("")); — a method call, then spread, reverse, join.',
+  'join() with no argument puts commas between the letters; join("") puts nothing.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "kwan-lee", stdin = "kwan lee\n", expect = "8\nKWAN LEE\neel nawk\n", visible = true },
+  { name = "tofu", stdin = "tofu\n", expect = "4\nTOFU\nufot\n", visible = false },
+  { name = "mixed", stdin = "Bowrington Rd 6\n", expect = "15\nBOWRINGTON RD 6\n6 dR notgnirwoB\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "typescript.basic.08.string-slices"
+node        = 8
+title       = "THE FIRST FEW LETTERS"
+difficulty  = 1
+story       = '''The arrival board at the Yee Wo Street tram stop has room for the first letters of a destination and a mark, and the feed it reads from must keep the full name exactly as it was.'''
+concepts    = ["strings", "slices"]
+requires    = ["typescript.basic.04.strings"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief       = '''`s.slice(0, n)` is the first `n` characters of `s`, as a new string. A
+string cannot be changed, so a slice is always a copy — `s` is untouched no
+matter what is done with the piece. `+=` on a string builds a new one and
+rebinds the name, which is how you append, and it is why `head` is a `let`.
+
+```
+let head: string = s.slice(0, n);
+head += "!";
+```
+
+`s` and `n` are read, and the two prints are written. Type the two lines
+above in place of the two placeholders.
+
+```
+input:  causeway bay
+        8
+output: causeway!
+        causeway bay
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const lines: string[] = input.split("\n");
+  const s: string = lines[0];
+  const n: number = Number(lines[1]);
+  let head: string = ""; // FILL: the first n characters of s
+  // ANSWER: let head: string = s.slice(0, n);
+  // FILL: append "!" to head
+  // ANSWER: head += "!";
+  console.log(head);
+  console.log(s);
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const lines: string[] = input.split("\n");
+  const s: string = lines[0];
+  const n: number = Number(lines[1]);
+  let head: string = s.slice(0, n);
+  head += "!";
+  console.log(head);
+  console.log(s);
+}
+
+main();
+'''
+hints = [
+  'let head: string = s.slice(0, n); then head += "!"; — the slice is a copy, the += makes another.',
+  "slice(start, end) stops before end, so slice(0, n) is exactly n characters.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "causeway", stdin = "causeway bay\n8\n", expect = "causeway!\ncauseway bay\n", visible = true },
+  { name = "tofu", stdin = "tofu stall\n4\n", expect = "tofu!\ntofu stall\n", visible = false },
+  { name = "all", stdin = "gau\n3\n", expect = "gau!\ngau\n", visible = false },
+]
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "typescript.basic.09.int-slices"
+node        = 9
+title       = "TWO OFF THE TOP"
+difficulty  = 1
+story       = '''The tram board wants the second and third arrival times copied out, the last two tacked on after them, and the feed's own list left exactly as it came.'''
+concepts    = ["slices", "collections"]
+requires    = ["typescript.basic.08.string-slices"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief       = '''`v.slice(1, 3)` is a slice of an array: the items at index 1 and 2, in a
+**new array** — changing it never changes `v`. `.push(...other)` spreads
+every item of `other` onto the end. Slices count from 0 and stop before the
+second number; a negative start counts from the end, so `v.slice(-2)` is the
+last two.
+
+```
+const part: number[] = v.slice(1, 3);
+part.push(...v.slice(-2));
+```
+
+`v` is read and both prints are written. Type the two lines above in place
+of the two placeholders.
+
+```
+input:  1 2 3 4 5
+output: 2 3 4 5
+        1 2 3 4 5
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const v: number[] = input.trim().split(/\s+/).map(Number);
+  const part: number[] = []; // FILL: a copy of the items at index 1 and 2
+  // ANSWER: const part: number[] = v.slice(1, 3);
+  // FILL: append the last two items of v to part
+  // ANSWER: part.push(...v.slice(-2));
+  console.log(part.join(" "));
+  console.log(v.join(" "));
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const v: number[] = input.trim().split(/\s+/).map(Number);
+  const part: number[] = v.slice(1, 3);
+  part.push(...v.slice(-2));
+  console.log(part.join(" "));
+  console.log(v.join(" "));
+}
+
+main();
+'''
+hints = [
+  "const part: number[] = v.slice(1, 3); then part.push(...v.slice(-2)); — slice copies, push appends in place.",
+  "part.push(v.slice(-2)) without the ... pushes one array, not two numbers, and tsc says so.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "1 2 3 4 5\n", expect = "2 3 4 5\n1 2 3 4 5\n", visible = true },
+  { name = "prices", stdin = "10 20 30 40\n", expect = "20 30 30 40\n10 20 30 40\n", visible = false },
+  { name = "six", stdin = "9 8 7 6 5 4\n", expect = "8 7 5 4\n9 8 7 6 5 4\n", visible = false },
+]
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "typescript.basic.10.byte-slices"
+node        = 10
+title       = "THE FIRST THREE BYTES"
+difficulty  = 1
+story       = '''Each tile on the Hysan Place wall takes the first three bytes of a shop's name and a mark after them, logs the bytes in hex, then lights them as letters, and tonight every tile is dark.'''
+concepts    = ["slices", "strings", "types"]
+requires    = ["typescript.basic.09.int-slices"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief       = '''A `Uint8Array` is a row of bytes, one number from 0 to 255 each. The
+captions here are plain ASCII, so the written line builds the bytes one
+character at a time with `charCodeAt`. (There is no `TextEncoder` in this
+land: the only Node a quest can see is `node.d.ts`.) `.slice(0, 3)` is a
+**copy** of the first three bytes — `.subarray` would be a view onto the
+same memory. A typed array has a fixed length and cannot grow, so appending
+means building a new one: `Uint8Array.of(...head, 0x21)`, where `0x21` is
+`"!"`.
+
+```
+let head: Uint8Array = bytes.slice(0, 3);
+head = Uint8Array.of(...head, 0x21);
+```
+
+`s` and `bytes` are read and both prints are written. Type the two lines
+above in place of the two placeholders.
+
+```
+input:  kwan lee
+output: 6b776121
+        kwa!
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const s: string = input.split("\n")[0];
+  const bytes: Uint8Array = Uint8Array.from(s, (c) => c.charCodeAt(0));
+  let head: Uint8Array = new Uint8Array(0); // FILL: a copy of the first three bytes
+  // ANSWER: let head: Uint8Array = bytes.slice(0, 3);
+  // FILL: a new array: head, then the byte 0x21
+  // ANSWER: head = Uint8Array.of(...head, 0x21);
+  console.log(Array.from(head, (b) => b.toString(16).padStart(2, "0")).join(""));
+  console.log(String.fromCharCode(...head));
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const s: string = input.split("\n")[0];
+  const bytes: Uint8Array = Uint8Array.from(s, (c) => c.charCodeAt(0));
+  let head: Uint8Array = bytes.slice(0, 3);
+  head = Uint8Array.of(...head, 0x21);
+  console.log(Array.from(head, (b) => b.toString(16).padStart(2, "0")).join(""));
+  console.log(String.fromCharCode(...head));
+}
+
+main();
+'''
+hints = [
+  "let head: Uint8Array = bytes.slice(0, 3); then head = Uint8Array.of(...head, 0x21); — copy, then build a longer one.",
+  "A Uint8Array has no push: its length is fixed when it is made. Uint8Array.of takes the bytes you want, spread and all.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "kwan", stdin = "kwan lee\n", expect = "6b776121\nkwa!\n", visible = true },
+  { name = "gau", stdin = "gau choi\n", expect = "67617521\ngau!\n", visible = false },
+  { name = "tofu", stdin = "tofu\n", expect = "746f6621\ntof!\n", visible = false },
+]
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "typescript.basic.05.loops"
+node        = 11
+title       = "COUNTING THE FRAMES"
+difficulty  = 1
+story       = '''The Times Square screen numbers the frames of each loop 1 to n, and the operator wants their sum and how many fell on every third, and the counter under the preview reads zero twice.'''
+concepts    = ["control-flow", "io"]
+requires    = ["typescript.basic.10.byte-slices"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''The counting `for` loop has three parts in its parentheses: a start, a
+condition checked before every pass, and a step. `for (let i = 1; i <= n;
+i++)` counts from `1` up to and including `n` — the `<=` is what makes `n`
+itself the last value.
+
+```
+for (let i = 1; i <= n; i++) {
+  total += i;
+  if (i % 3 === 0) {
+    threes += 1;
+  }
+}
+```
+
+`n` is read, `total` and `threes` start at `0`, and the loop body is
+written. Type the `for` line above the body exactly as shown.
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const n: number = Number(input);
+  let total = 0;
+  let threes = 0;
+  for (const i of [] as number[]) { // FILL: 1 up to and including n
+  // ANSWER: for (let i = 1; i <= n; i++) {
+    total += i;
+    if (i % 3 === 0) {
+      threes += 1;
+    }
+  }
+  console.log(total);
+  console.log(threes);
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const n: number = Number(input);
+  let total = 0;
+  let threes = 0;
+  for (let i = 1; i <= n; i++) {
+    total += i;
+    if (i % 3 === 0) {
+      threes += 1;
+    }
+  }
+  console.log(total);
+  console.log(threes);
+}
+
+main();
+'''
+hints = [
+  "for (let i = 1; i <= n; i++) { — start, condition, step, separated by semicolons.",
+  "i < n would stop at n - 1; the sum would be short by n.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "ten", stdin = "10\n", expect = "55\n3\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "1\n0\n", visible = false },
+  { name = "nine", stdin = "9\n", expect = "45\n3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "typescript.basic.06.functions"
+node        = 12
+title       = "THE SLOT RATE"
+difficulty  = 1
+story       = '''The control room bills an advertiser per slot on the big screen, cheaper after the tenth, and the invoice on the thirtieth floor says zero for everybody.'''
+concepts    = ["functions", "control-flow"]
+requires    = ["typescript.basic.05.loops"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''`function` makes a function: a name, its parameters with their types, the
+return type after a colon, and a body in braces. `return` hands a value back
+to whoever called it. The types are the contract — tsc checks every call
+against them and then erases them; the body can still be a single `return`
+with the whole answer as one expression.
+
+```
+function fare(slots: number): number {
+  return Math.min(slots, 10) * 5 + Math.max(slots - 10, 0) * 3;
+}
+```
+
+The first ten slots cost `5` each and every slot after that costs `3`.
+`main` reads `n` and prints `fare(n)`. Type the `return` line in `fare`
+exactly as shown.
+
+```
+input:  12
+output: 56
+```
+'''
+starter     = '''function fare(slots: number): number {
+  return 0; // FILL: 5 for each of the first 10 slots, 3 for each after
+  // ANSWER: return Math.min(slots, 10) * 5 + Math.max(slots - 10, 0) * 3;
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const n: number = Number(input);
+  console.log(fare(n));
+}
+
+main();
+'''
+solution    = '''function fare(slots: number): number {
+  return Math.min(slots, 10) * 5 + Math.max(slots - 10, 0) * 3;
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const n: number = Number(input);
+  console.log(fare(n));
+}
+
+main();
+'''
+hints = [
+  "return Math.min(slots, 10) * 5 + Math.max(slots - 10, 0) * 3; — min caps the cheap slots at ten, max stops the rest going negative.",
+  "The function's job ends at return; nothing after it in the body runs.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "twelve", stdin = "12\n", expect = "56\n", visible = true },
+  { name = "three", stdin = "3\n", expect = "15\n", visible = false },
+  { name = "ten", stdin = "10\n", expect = "50\n", visible = false },
+  { name = "thirty", stdin = "30\n", expect = "110\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "typescript.basic.07.structs"
+node        = 13
+title       = "ONE OFFER, THREE FIELDS"
+difficulty  = 2
+story       = '''The Lee Garden app's offer card has a name, a price and a count on it, and the checkout line under the card reads zero on every phone in the queue.'''
+concepts    = ["structs", "functions"]
+requires    = ["typescript.basic.06.functions"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''A `class` bundles typed fields and the methods that work on them. The
+fields are declared with their types at the top, the `constructor` runs when
+an object is made with `new` and fills them in, and a method reads them
+through `this`. `this` is not optional: a bare `price` inside a method is a
+name tsc cannot find.
+
+```
+class Offer {
+  name: string;
+  price: number;
+  qty: number;
+  // constructor(...) { ... } is written
+
+  total(): number {
+    return this.price * this.qty;
+  }
+}
+```
+
+`Offer`, its fields and its constructor are written, and `main` prints the
+card with a template literal. Type the `return` line of `total` exactly as
+shown.
+
+```
+input:  tofu 8 5
+output: tofu: 40
+```
+'''
+starter     = '''class Offer {
+  name: string;
+  price: number;
+  qty: number;
+
+  constructor(name: string, price: number, qty: number) {
+    this.name = name;
+    this.price = price;
+    this.qty = qty;
+  }
+
+  total(): number {
+    return 0; // FILL: price times qty
+    // ANSWER: return this.price * this.qty;
+  }
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const [name, price, qty] = input.trim().split(/\s+/);
+  const o = new Offer(name, Number(price), Number(qty));
+  console.log(`${o.name}: ${o.total()}`);
+}
+
+main();
+'''
+solution    = '''class Offer {
+  name: string;
+  price: number;
+  qty: number;
+
+  constructor(name: string, price: number, qty: number) {
+    this.name = name;
+    this.price = price;
+    this.qty = qty;
+  }
+
+  total(): number {
+    return this.price * this.qty;
+  }
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const [name, price, qty] = input.trim().split(/\s+/);
+  const o = new Offer(name, Number(price), Number(qty));
+  console.log(`${o.name}: ${o.total()}`);
+}
+
+main();
+'''
+hints = [
+  "return this.price * this.qty; — the fields live on the object, so inside a method they are this.price and this.qty.",
+  "price on its own is not a name in total(); tsc answers with Cannot find name 'price'.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tofu", stdin = "tofu 8 5\n", expect = "tofu: 40\n", visible = true },
+  { name = "choy", stdin = "choy 3 12\n", expect = "choy: 36\n", visible = false },
+  { name = "one", stdin = "egg 1 1\n", expect = "egg: 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "typescript.basic.08.enums"
+node        = 14
+title       = "THREE LINES, THREE COLOURS"
+difficulty  = 2
+story       = '''The MTR screen at the Yee Wo Street exit paints each line in its own colour, and tonight every line on it comes up Island blue.'''
+concepts    = ["enums", "pattern-matching"]
+requires    = ["typescript.basic.07.structs"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''An `enum` is a closed set of named members, and it is the one TypeScript
+type that is still there at runtime: tsc turns it into an object, so
+`Line.TSUENWAN` is `1` and `Line["TSUENWAN"]` looks a member up by its name.
+The compiler only lets you index it with a name it knows, so a string read
+from input is told which names it may be with `as keyof typeof Line` — a
+promise to tsc, not a check. The `switch` over the members is written.
+
+```
+enum Line {
+  ISLAND,
+}
+
+const line: Line = Line[word.toUpperCase() as keyof typeof Line];
+```
+
+Type the `const line` line exactly as shown.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+starter     = '''enum Line {
+  ISLAND,
+  TSUENWAN,
+  KWUNTONG,
+}
+
+function colour(line: Line): string {
+  switch (line) {
+    case Line.ISLAND:
+      return "blue";
+    case Line.TSUENWAN:
+      return "red";
+    case Line.KWUNTONG:
+      return "green";
+  }
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const word: string = input.trim();
+  const line: Line = Line.ISLAND; // FILL: the member whose name is word, upper-cased
+  // ANSWER: const line: Line = Line[word.toUpperCase() as keyof typeof Line];
+  console.log(colour(line));
+}
+
+main();
+'''
+solution    = '''enum Line {
+  ISLAND,
+  TSUENWAN,
+  KWUNTONG,
+}
+
+function colour(line: Line): string {
+  switch (line) {
+    case Line.ISLAND:
+      return "blue";
+    case Line.TSUENWAN:
+      return "red";
+    case Line.KWUNTONG:
+      return "green";
+  }
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const word: string = input.trim();
+  const line: Line = Line[word.toUpperCase() as keyof typeof Line];
+  console.log(colour(line));
+}
+
+main();
+'''
+hints = [
+  "const line: Line = Line[word.toUpperCase() as keyof typeof Line]; — square brackets look a member up by name, and the names are upper-case.",
+  "Without the as keyof typeof Line, tsc refuses: a plain string could be any name, and the enum has only three.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tsuenwan", stdin = "tsuenwan\n", expect = "red\n", visible = true },
+  { name = "island", stdin = "island\n", expect = "blue\n", visible = false },
+  { name = "kwuntong", stdin = "kwuntong\n", expect = "green\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "typescript.basic.09.vector"
+node        = 15
+title       = "THE PLAYLIST"
+difficulty  = 1
+story       = '''The Times Square playlist is a row of ad lengths in seconds; the operator adds one, drops the first, trims another and sorts them, and the sorted list puts 100 before 4.'''
+concepts    = ["slices", "iteration"]
+requires    = ["typescript.basic.08.enums"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''An array is edited in place. `.push(x)` adds a value at the end,
+`.splice(i, 1)` removes one value at an index (the ones after it shift
+down), `xs[i] = x` replaces the value at an index, and `.sort()` puts the
+values in order, in place. **The default sort compares as text**, so
+`[4, 100].sort()` is `[100, 4]`: numbers need a comparator, a function that
+returns a negative number when `a` goes first.
+
+```
+xs.push(100);
+xs.splice(0, 1);
+xs[0] = 7;
+xs.sort((a, b) => a - b);
+```
+
+`xs` holds the line's integers and is printed after each step. Type the
+four lines in place of the four `// FILL` placeholders, in that order.
+
+```
+input:  16 8 15 4
+output: 16 8 15 4 100
+        8 15 4 100
+        7 15 4 100
+        4 7 15 100
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const xs: number[] = input.trim().split(/\s+/).map(Number);
+  // FILL: add 100 at the end
+  // ANSWER: xs.push(100);
+  console.log(xs.join(" "));
+  // FILL: remove the first value
+  // ANSWER: xs.splice(0, 1);
+  console.log(xs.join(" "));
+  // FILL: change the first value to 7
+  // ANSWER: xs[0] = 7;
+  console.log(xs.join(" "));
+  // FILL: sort ascending, as numbers, in place
+  // ANSWER: xs.sort((a, b) => a - b);
+  console.log(xs.join(" "));
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const xs: number[] = input.trim().split(/\s+/).map(Number);
+  xs.push(100);
+  console.log(xs.join(" "));
+  xs.splice(0, 1);
+  console.log(xs.join(" "));
+  xs[0] = 7;
+  console.log(xs.join(" "));
+  xs.sort((a, b) => a - b);
+  console.log(xs.join(" "));
+}
+
+main();
+'''
+hints = [
+  "xs.push(100); then xs.splice(0, 1); then xs[0] = 7; then xs.sort((a, b) => a - b); — one per placeholder, in that order.",
+  "xs.sort() with no comparator prints 100 15 4 7: it sorted the digits as text. (a, b) => a - b sorts them as numbers.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "16 8 15 4\n", expect = "16 8 15 4 100\n8 15 4 100\n7 15 4 100\n4 7 15 100\n", visible = true },
+  { name = "three", stdin = "2 9 1\n", expect = "2 9 1 100\n9 1 100\n7 1 100\n1 7 100\n", visible = false },
+  { name = "fives", stdin = "5 5 5\n", expect = "5 5 5 100\n5 5 100\n7 5 100\n5 7 100\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "typescript.basic.16.list"
+node        = 16
+title       = "THE TICKER"
+difficulty  = 1
+story       = '''The news crawl along the foot of the Hysan Place wall takes a breaking item at the front and drops the oldest off the end, and tonight the crawl runs empty.'''
+concepts    = ["collections", "iteration"]
+requires    = ["typescript.basic.09.vector"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''There is no linked list or deque in the standard library: an array is
+edited at both ends. `.unshift(x)` puts a value on the front, `.pop()` takes
+the last one off, and `chain[i] = x` replaces the value at a position.
+`.toSorted(compare)` gives back a **new** sorted array and leaves the old one
+alone, so the name is pointed at the new one — which is why `chain` is a
+`let`.
+
+```
+chain.unshift(0);
+chain.pop();
+chain[0] = 9;
+chain = chain.toSorted((a, b) => a - b);
+```
+
+`chain` holds the line's integers and is printed after each step. Type the
+four lines in place of the four `// FILL` placeholders, in that order.
+
+```
+input:  3 1 2
+output: 0 3 1 2
+        0 3 1
+        9 3 1
+        1 3 9
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  let chain: number[] = input.trim().split(/\s+/).map(Number);
+  // FILL: put 0 on the front
+  // ANSWER: chain.unshift(0);
+  console.log(chain.join(" "));
+  // FILL: take the last value off the end
+  // ANSWER: chain.pop();
+  console.log(chain.join(" "));
+  // FILL: change the front value to 9
+  // ANSWER: chain[0] = 9;
+  console.log(chain.join(" "));
+  // FILL: point chain at a sorted copy of itself
+  // ANSWER: chain = chain.toSorted((a, b) => a - b);
+  console.log(chain.join(" "));
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  let chain: number[] = input.trim().split(/\s+/).map(Number);
+  chain.unshift(0);
+  console.log(chain.join(" "));
+  chain.pop();
+  console.log(chain.join(" "));
+  chain[0] = 9;
+  console.log(chain.join(" "));
+  chain = chain.toSorted((a, b) => a - b);
+  console.log(chain.join(" "));
+}
+
+main();
+'''
+hints = [
+  "chain.unshift(0); then chain.pop(); then chain[0] = 9; then chain = chain.toSorted((a, b) => a - b); — one per placeholder, in that order.",
+  "toSorted returns the sorted copy and changes nothing; without the chain = in front, the copy is thrown away.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3 1 2\n", expect = "0 3 1 2\n0 3 1\n9 3 1\n1 3 9\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "0 7\n0\n9\n9\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "0 5 4 3 2 1\n0 5 4 3 2\n9 5 4 3 2\n2 3 4 5 9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "typescript.basic.10.maps"
+node        = 17
+title       = "THE TAP COUNT"
+difficulty  = 2
+story       = '''Every tap on the Lee Garden app's food-hall menu is logged as the dish's name, and at 20:00 the kiosk wants one line per dish with a count, and it shows the taps in the order they came.'''
+concepts    = ["collections", "strings"]
+requires    = ["typescript.basic.16.list"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''A `Map<string, number>` is edited by key. `.set(k, v)` stores a value under
+a key — a new key is added, an existing key is overwritten — and
+`.delete(k)` removes a key and its value. `.get(k)` is typed
+`number | undefined`, because the key may not be there, so tsc will not let
+you add to it until you say what a missing key counts as: `?? 0` means "or
+0 if it is undefined". A Map keeps insertion order; `[...counts.keys()].sort()`
+is its keys in ascending order — for strings the default text sort is
+exactly right. The tally is built for you; these four lines change and then
+sort it.
+
+```
+counts.set("tofu", 1);
+counts.delete(first);
+counts.set("tofu", (counts.get("tofu") ?? 0) + 4);
+for (const k of [...counts.keys()].sort()) {
+```
+
+`counts` holds a count per word, `first` is the first word of the line, and
+`show(counts)` prints the tally in insertion order after each edit. Type
+the three edits in place of the three `// FILL` placeholders, then replace
+the last loop's header with the sorted one.
+
+```
+input:  siu mai har gau siu mai
+output: siu=2 mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=5
+        gau 1
+        har 1
+        mai 2
+        tofu 5
+```
+'''
+starter     = '''function show(counts: Map<string, number>): void {
+  console.log([...counts].map(([k, v]) => `${k}=${v}`).join(" "));
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const words: string[] = input.trim().split(/\s+/);
+  const first: string = words[0];
+  const counts = new Map<string, number>();
+  for (const w of words) {
+    counts.set(w, (counts.get(w) ?? 0) + 1);
+  }
+  // FILL: add the key "tofu" with the value 1
+  // ANSWER: counts.set("tofu", 1);
+  show(counts);
+  // FILL: remove the key first
+  // ANSWER: counts.delete(first);
+  show(counts);
+  // FILL: add 4 to the value under "tofu"
+  // ANSWER: counts.set("tofu", (counts.get("tofu") ?? 0) + 4);
+  show(counts);
+  for (const k of counts.keys()) { // FILL: the keys in sorted order
+  // ANSWER: for (const k of [...counts.keys()].sort()) {
+    console.log(k, counts.get(k));
+  }
+}
+
+main();
+'''
+solution    = '''function show(counts: Map<string, number>): void {
+  console.log([...counts].map(([k, v]) => `${k}=${v}`).join(" "));
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const words: string[] = input.trim().split(/\s+/);
+  const first: string = words[0];
+  const counts = new Map<string, number>();
+  for (const w of words) {
+    counts.set(w, (counts.get(w) ?? 0) + 1);
+  }
+  counts.set("tofu", 1);
+  show(counts);
+  counts.delete(first);
+  show(counts);
+  counts.set("tofu", (counts.get("tofu") ?? 0) + 4);
+  show(counts);
+  for (const k of [...counts.keys()].sort()) {
+    console.log(k, counts.get(k));
+  }
+}
+
+main();
+'''
+hints = [
+  'counts.set("tofu", 1); then counts.delete(first); then counts.set("tofu", (counts.get("tofu") ?? 0) + 4); then for (const k of [...counts.keys()].sort()) { as the last loop header.',
+  "counts.keys() is an iterator, not an array, and has no sort; the spread [...] makes it one. The loop body is already there.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "dim-sum", stdin = "siu mai har gau siu mai\n", expect = "siu=2 mai=2 har=1 gau=1 tofu=1\nmai=2 har=1 gau=1 tofu=1\nmai=2 har=1 gau=1 tofu=5\ngau 1\nhar 1\nmai 2\ntofu 5\n", visible = true },
+  { name = "repeat", stdin = "b a b\n", expect = "b=2 a=1 tofu=1\na=1 tofu=1\na=1 tofu=5\na 1\ntofu 5\n", visible = false },
+  { name = "one-word", stdin = "rice\n", expect = "rice=1 tofu=1\ntofu=1\ntofu=5\ntofu 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "typescript.basic.18.hashtable"
+node        = 18
+title       = "THE SCREEN NUMBERS"
+difficulty  = 1
+story       = '''The thirtieth-floor console keeps a table from screen name to screen number, and every lookup typed into it comes back undefined.'''
+concepts    = ["collections", "hashing", "sorting"]
+requires    = ["typescript.basic.10.maps"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''A plain object is the oldest hash table in JavaScript: a key is hashed to
+a slot, so storing, removing and looking up cost the same however many keys
+there are. `table[k] = v` stores (a new key is added), `delete table[k]`
+removes a key, and `table[k] += n` edits the value under a key in place.
+The type `Record<string, number>` promises a number under **every** string,
+and that promise is erased: a missing key is `undefined` at runtime, so a
+lookup says what to show instead with `?? -1`. `Object.keys(table).sort()`
+is the keys in ascending order — the object has an order of its own, and
+it is not that one.
+
+```
+table["bread"] = 99;
+delete table[first];
+table[last] += 10;
+const keys: string[] = Object.keys(table).sort();
+```
+
+`table` maps each screen name on the first line to its position; `first`
+and `last` are the first and last names. The second line's names are
+looked up after the edits and printed, `-1` when missing; then the whole
+table is printed by `keys`. Type the four lines in place of the four
+`// FILL` placeholders, in that order.
+
+```
+input:  tofu fish gau
+        gau bread tofu fish
+output: 12
+        99
+        -1
+        1
+        bread=99 fish=1 gau=12
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const lines: string[] = input.split("\n");
+  const names: string[] = lines[0].trim().split(/\s+/);
+  const first: string = names[0];
+  const last: string = names[names.length - 1];
+  const table: Record<string, number> = {};
+  names.forEach((name, i) => {
+    table[name] = i;
+  });
+  // FILL: store 99 under "bread"
+  // ANSWER: table["bread"] = 99;
+  // FILL: remove the key first
+  // ANSWER: delete table[first];
+  // FILL: add 10 to the value under last
+  // ANSWER: table[last] += 10;
+  for (const w of lines[1].trim().split(/\s+/)) {
+    console.log(table[w] ?? -1);
+  }
+  const keys: string[] = Object.keys(table); // FILL: the keys in sorted order
+  // ANSWER: const keys: string[] = Object.keys(table).sort();
+  console.log(keys.map((k) => `${k}=${table[k]}`).join(" "));
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const lines: string[] = input.split("\n");
+  const names: string[] = lines[0].trim().split(/\s+/);
+  const first: string = names[0];
+  const last: string = names[names.length - 1];
+  const table: Record<string, number> = {};
+  names.forEach((name, i) => {
+    table[name] = i;
+  });
+  table["bread"] = 99;
+  delete table[first];
+  table[last] += 10;
+  for (const w of lines[1].trim().split(/\s+/)) {
+    console.log(table[w] ?? -1);
+  }
+  const keys: string[] = Object.keys(table).sort();
+  console.log(keys.map((k) => `${k}=${table[k]}`).join(" "));
+}
+
+main();
+'''
+hints = [
+  'table["bread"] = 99; then delete table[first]; then table[last] += 10; then const keys: string[] = Object.keys(table).sort(); — one per placeholder, in that order.',
+  "delete is an operator, not a method: delete table[first]. The keys are strings, so the default sort is the right one here.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "tofu fish gau\ngau bread tofu fish\n", expect = "12\n99\n-1\n1\nbread=99 fish=1 gau=12\n", visible = true },
+  { name = "two", stdin = "zed yak\nzed yak bread\n", expect = "-1\n11\n99\nbread=99 yak=11\n", visible = false },
+  { name = "xyz", stdin = "x y z\nz x\n", expect = "12\n-1\nbread=99 y=1 z=12\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "typescript.basic.11.sets"
+node        = 19
+title       = "DISTINCT ROUTES"
+difficulty  = 1
+story       = '''The tram boards along Yee Wo Street report the same few route numbers all evening, and the control room wants how many different routes there were, not how many reports.'''
+concepts    = ["collections", "sorting"]
+requires    = ["typescript.basic.18.hashtable"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''A `Set<number>` holds each value once, and it is edited by value: `.add(x)`
+puts a value in, `.delete(x)` takes a value out (and does nothing if it was
+not there), and there is no "change this value" — a set edits by removing
+one value and adding another, `.delete(a); .add(b)`. `.size` is how many.
+A set keeps insertion order, not sorted order, so it is shown by spreading
+it into an array and sorting that — with a comparator, because these are
+numbers.
+
+```
+seen.add(100);
+seen.delete(first);
+seen.delete(100); seen.add(101);
+console.log([...seen].sort((a, b) => a - b).join(" "));
+```
+
+`seen` holds the line's distinct integers, `first` is the first one, and
+`seen.size` is printed after each edit. Type the four lines in place of
+the four `// FILL` placeholders, in that order.
+
+```
+input:  8 3 8 5 3
+output: 4
+        3
+        3
+        3 5 101
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const nums: number[] = input.trim().split(/\s+/).map(Number);
+  const first: number = nums[0];
+  const seen = new Set<number>(nums);
+  // FILL: put 100 in
+  // ANSWER: seen.add(100);
+  console.log(seen.size);
+  // FILL: take first out
+  // ANSWER: seen.delete(first);
+  console.log(seen.size);
+  // FILL: change 100 into 101: delete one, add the other
+  // ANSWER: seen.delete(100); seen.add(101);
+  console.log(seen.size);
+  // FILL: print the values, sorted as numbers, space-separated
+  // ANSWER: console.log([...seen].sort((a, b) => a - b).join(" "));
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const nums: number[] = input.trim().split(/\s+/).map(Number);
+  const first: number = nums[0];
+  const seen = new Set<number>(nums);
+  seen.add(100);
+  console.log(seen.size);
+  seen.delete(first);
+  console.log(seen.size);
+  seen.delete(100); seen.add(101);
+  console.log(seen.size);
+  console.log([...seen].sort((a, b) => a - b).join(" "));
+}
+
+main();
+'''
+hints = [
+  'seen.add(100); then seen.delete(first); then seen.delete(100); seen.add(101); then console.log([...seen].sort((a, b) => a - b).join(" ")); — one per placeholder.',
+  "Without the comparator the last line is 101 3 5: the default sort compares the digits as text.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "8 3 8 5 3\n", expect = "4\n3\n3\n3 5 101\n", visible = true },
+  { name = "all-same", stdin = "4 4 4\n", expect = "2\n1\n1\n101\n", visible = false },
+  { name = "distinct", stdin = "9 1 5\n", expect = "4\n3\n3\n1 5 101\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "typescript.basic.12.stack-queue"
+node        = 20
+title       = "THE UNDO PILE"
+difficulty  = 2
+story       = '''The operator's console piles up every change so the last one comes off first, and the requests from the shops wait in a line at the side; tonight both panels print the pile untouched.'''
+concepts    = ["stacks-queues", "collections"]
+requires    = ["typescript.basic.11.sets"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief       = '''An array is a stack, edited at its end: `.push(x)` puts a value on top,
+`.pop()` takes the top off, and `stack[stack.length - 1] = x` replaces the
+top in place. There are no negative indexes: `stack[-1] = 9` compiles, runs,
+and quietly stores a property named `"-1"` that nothing ever reads. An array
+is also a queue, taken from the front with `.shift()` — that side is written
+for you.
+
+```
+stack.push(100);
+stack.pop();
+stack[stack.length - 1] = 9;
+```
+
+`stack` and `queue` hold the line's integers; the stack is printed after
+each step, then the queue's front is taken and printed. Type the three
+lines in place of the three `// FILL` placeholders, in that order.
+
+```
+input:  1 2 3 4
+output: 1 2 3 4 100
+        1 2 3 4
+        1 2 3 9
+        1
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const nums: number[] = input.trim().split(/\s+/).map(Number);
+  const stack: number[] = [...nums];
+  const queue: number[] = [...nums];
+  // FILL: push 100 onto the stack
+  // ANSWER: stack.push(100);
+  console.log(stack.join(" "));
+  // FILL: take the top off the stack
+  // ANSWER: stack.pop();
+  console.log(stack.join(" "));
+  // FILL: change the top of the stack to 9
+  // ANSWER: stack[stack.length - 1] = 9;
+  console.log(stack.join(" "));
+  console.log(queue.shift());
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const nums: number[] = input.trim().split(/\s+/).map(Number);
+  const stack: number[] = [...nums];
+  const queue: number[] = [...nums];
+  stack.push(100);
+  console.log(stack.join(" "));
+  stack.pop();
+  console.log(stack.join(" "));
+  stack[stack.length - 1] = 9;
+  console.log(stack.join(" "));
+  console.log(queue.shift());
+}
+
+main();
+'''
+hints = [
+  "stack.push(100); then stack.pop(); then stack[stack.length - 1] = 9; — one per placeholder, in that order.",
+  "stack.at(-1) reads the top but cannot be assigned to; the last index is stack.length - 1.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "1 2 3 4 100\n1 2 3 4\n1 2 3 9\n1\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "9 7 100\n9 7\n9 9\n9\n", visible = false },
+  { name = "three", stdin = "5 1 4\n", expect = "5 1 4 100\n5 1 4\n5 1 9\n5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "typescript.basic.13.sorting"
+node        = 21
+title       = "THE PRICE LADDER"
+difficulty  = 1
+story       = '''The Lee Garden app lists the evening's offers cheapest first on one tab and dearest first on the other, and both tabs show them in the order the shops sent them.'''
+concepts    = ["sorting", "slices"]
+requires    = ["typescript.basic.12.stack-queue"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief       = '''`.toSorted(compare)` returns a new sorted array and leaves the original
+alone. The comparator decides the order: `(a, b) => a - b` is ascending,
+and `(a, b) => b - a` turns it round. (`.sort` does the same in place and
+returns the same array, and without a comparator both sort numbers as
+text.)
+
+```
+const asc: number[] = xs.toSorted((a, b) => a - b);
+const desc: number[] = xs.toSorted((a, b) => b - a);
+```
+
+`xs` is read and both prints are written. Type the two lines exactly as
+shown, in place of the two placeholders.
+
+```
+input:  5 3 9 1
+output: 1 3 5 9
+        9 5 3 1
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const xs: number[] = input.trim().split(/\s+/).map(Number);
+  const asc: number[] = xs; // FILL: ascending copy
+  // ANSWER: const asc: number[] = xs.toSorted((a, b) => a - b);
+  const desc: number[] = xs; // FILL: descending copy
+  // ANSWER: const desc: number[] = xs.toSorted((a, b) => b - a);
+  console.log(asc.join(" "));
+  console.log(desc.join(" "));
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const xs: number[] = input.trim().split(/\s+/).map(Number);
+  const asc: number[] = xs.toSorted((a, b) => a - b);
+  const desc: number[] = xs.toSorted((a, b) => b - a);
+  console.log(asc.join(" "));
+  console.log(desc.join(" "));
+}
+
+main();
+'''
+hints = [
+  "const asc: number[] = xs.toSorted((a, b) => a - b); and const desc: number[] = xs.toSorted((a, b) => b - a);",
+  "xs.sort(...) for both would sort xs itself, and asc and desc would be the same array: both would print the last order.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "5 3 9 1\n", expect = "1 3 5 9\n9 5 3 1\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "7\n7\n", visible = false },
+  { name = "dupes", stdin = "2 2 1 3\n", expect = "1 2 2 3\n3 2 2 1\n", visible = false },
+  { name = "digits", stdin = "10 9 100 1\n", expect = "1 9 10 100\n100 10 9 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "typescript.basic.22.reverse"
+node        = 22
+title       = "BACK TO FRONT"
+difficulty  = 1
+story       = '''The countdown on the Times Square screen has to run from the top down and the sponsor's name is shown mirrored for the glass across the street, and the feed has both the right way round.'''
+concepts    = ["slices", "strings", "iteration"]
+requires    = ["typescript.basic.13.sorting"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''`v.reverse()` turns an array around **in place** — `v` itself is now
+backwards (it also returns `v`, which is easy to mistake for a copy). A
+string cannot be changed and has no `reverse`, so it is spread into an
+array of characters, reversed, and joined back into a new string.
+
+```
+v.reverse();
+const r: string = [...s].reverse().join("");
+```
+
+`v` and `s` are read and both prints are written. Type the two lines above
+in place of the two placeholders.
+
+```
+input:  1 2 3
+        gau
+output: 3 2 1
+        uag
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const lines: string[] = input.split("\n");
+  const v: number[] = lines[0].trim().split(/\s+/).map(Number);
+  const s: string = lines[1];
+  // FILL: reverse v in place
+  // ANSWER: v.reverse();
+  const r: string = s; // FILL: s reversed
+  // ANSWER: const r: string = [...s].reverse().join("");
+  console.log(v.join(" "));
+  console.log(r);
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const lines: string[] = input.split("\n");
+  const v: number[] = lines[0].trim().split(/\s+/).map(Number);
+  const s: string = lines[1];
+  v.reverse();
+  const r: string = [...s].reverse().join("");
+  console.log(v.join(" "));
+  console.log(r);
+}
+
+main();
+'''
+hints = [
+  'v.reverse(); on its own line, then const r: string = [...s].reverse().join("");',
+  "s.reverse() is a compile error: Property 'reverse' does not exist on type 'string'. The array has it; the string does not.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\ngau\n", expect = "3 2 1\nuag\n", visible = true },
+  { name = "five", stdin = "5 4 3 2 1\nbowrington\n", expect = "1 2 3 4 5\nnotgnirwob\n", visible = false },
+  { name = "two", stdin = "9 8\nxy\n", expect = "8 9\nyx\n", visible = false },
+]
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "typescript.basic.14.sort-by-key"
+node        = 23
+title       = "THE LEADERBOARD"
+difficulty  = 3
+story       = '''The Hysan Place wall ranks the evening's shops by taps on the app, most first, and two shops with the same taps go up in alphabetical order; the wall shows them in the order they joined the feed.'''
+concepts    = ["sorting", "structs"]
+requires    = ["typescript.basic.22.reverse"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief       = '''An `interface` names the shape of a value — here, a `Row` with a `name`
+and a `score` — and is erased entirely at runtime. `sort` takes a
+comparator over two rows. `b.score - a.score` puts the bigger score first;
+when it is `0` the scores tie, and `||` falls through to the second
+comparison, the names, compared with `<` and `>` (not `localeCompare`,
+whose answer depends on the machine's locale).
+
+```
+rows.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+```
+
+`rows` is an array of `Row` and the print is written. Type the `sort` line
+exactly as shown, where the `// FILL` comment is.
+
+```
+input:  3
+        mei 40
+        alex 55
+        ken 40
+output: alex 55
+        ken 40
+        mei 40
+```
+'''
+starter     = '''interface Row {
+  name: string;
+  score: number;
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const lines: string[] = input.trim().split("\n");
+  const n: number = Number(lines[0]);
+  const rows: Row[] = [];
+  for (let i = 1; i <= n; i++) {
+    const [name, score] = lines[i].trim().split(/\s+/);
+    rows.push({ name, score: Number(score) });
+  }
+  // FILL: sort rows by score descending, then name ascending
+  // ANSWER: rows.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const r of rows) {
+    console.log(r.name, r.score);
+  }
+}
+
+main();
+'''
+solution    = '''interface Row {
+  name: string;
+  score: number;
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const lines: string[] = input.trim().split("\n");
+  const n: number = Number(lines[0]);
+  const rows: Row[] = [];
+  for (let i = 1; i <= n; i++) {
+    const [name, score] = lines[i].trim().split(/\s+/);
+    rows.push({ name, score: Number(score) });
+  }
+  rows.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const r of rows) {
+    console.log(r.name, r.score);
+  }
+}
+
+main();
+'''
+hints = [
+  "rows.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)); — the score first, reversed; the name only on a tie.",
+  "A comparator returns a number: negative puts a first, positive puts b first, 0 means a tie. 0 || x is x, so the tie falls through to the names.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\nmei 40\nalex 55\nken 40\n", expect = "alex 55\nken 40\nmei 40\n", visible = true },
+  { name = "one", stdin = "1\nsam 9\n", expect = "sam 9\n", visible = false },
+  { name = "ties", stdin = "4\nd 1\nb 2\nc 2\na 1\n", expect = "b 2\nc 2\na 1\nd 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "typescript.basic.15.closures"
+node        = 24
+title       = "THE DELAY"
+difficulty  = 2
+story       = '''Every screen on the island runs a few seconds behind the control room clock, and the function that was meant to remember each screen's delay hands back the times unchanged.'''
+concepts    = ["closures", "functions"]
+requires    = ["typescript.basic.14.sort-by-key"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief       = '''A function defined inside another function can use the outer function's
+names, and keeps using them after the outer function has returned. That is
+a closure: the inner function carries `k` with it. The outer function
+returns the inner one — the function itself, not a call to it — and its
+return type says so: `(x: number) => number` is the type of a function
+from a number to a number.
+
+```
+function makeAdder(k: number): (x: number) => number {
+  function add(x: number): number {
+    return x + k;
+  }
+  return add;
+}
+```
+
+`makeAdder` and its inner `function add` are written, and `main` applies
+the result to every number. Type the two `return` lines exactly as shown,
+in place of the two placeholders.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+starter     = '''function makeAdder(k: number): (x: number) => number {
+  function add(x: number): number {
+    return x; // FILL: x plus the captured k
+    // ANSWER: return x + k;
+  }
+  return (x: number) => x; // FILL: hand back the inner function
+  // ANSWER: return add;
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const lines: string[] = input.split("\n");
+  const k: number = Number(lines[0]);
+  const nums: number[] = lines[1].trim().split(/\s+/).map(Number);
+  const add = makeAdder(k);
+  console.log(nums.map((x) => add(x)).join(" "));
+}
+
+main();
+'''
+solution    = '''function makeAdder(k: number): (x: number) => number {
+  function add(x: number): number {
+    return x + k;
+  }
+  return add;
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const lines: string[] = input.split("\n");
+  const k: number = Number(lines[0]);
+  const nums: number[] = lines[1].trim().split(/\s+/).map(Number);
+  const add = makeAdder(k);
+  console.log(nums.map((x) => add(x)).join(" "));
+}
+
+main();
+'''
+hints = [
+  "return x + k; inside add, then return add; (no parentheses) as makeAdder's last line.",
+  "return add() would call it with no argument, and tsc says Expected 1 arguments, but got 0; the bare name is the function.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5\n1 2 3\n", expect = "6 7 8\n", visible = true },
+  { name = "negative", stdin = "-2\n10 0 2\n", expect = "8 -2 0\n", visible = false },
+  { name = "hundred", stdin = "100\n7\n", expect = "107\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "typescript.basic.16.lambdas"
+node        = 25
+title       = "EVEN SQUARES"
+difficulty  = 2
+story       = '''The control room bills the even-numbered screens by the square of their number, and the bill on the thirtieth-floor printer comes out zero.'''
+concepts    = ["closures", "iteration"]
+requires    = ["typescript.basic.15.closures"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''An arrow function writes a small function without a name: parameters, `=>`,
+one expression, and no `return` keyword. `.filter(f)` keeps the items `f`
+says yes to; `.map(f)` replaces each item with `f(item)`; `.reduce(f, 0)`
+folds what is left into one number, starting from `0`. Read left to right:
+each call hands its array to the next.
+
+```
+const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0);
+```
+
+`xs` is read and the print is written. Type the `const total` line exactly
+as shown.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+starter     = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const xs: number[] = input.trim().split(/\s+/).map(Number);
+  const total: number = 0; // FILL: sum of the squares of the even ones, with filter, map and reduce
+  // ANSWER: const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0);
+  console.log(total);
+}
+
+main();
+'''
+solution    = '''function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const xs: number[] = input.trim().split(/\s+/).map(Number);
+  const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0);
+  console.log(total);
+}
+
+main();
+'''
+hints = [
+  "const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0); — filter, then map, then reduce.",
+  "Leave out the , 0 and reduce on an empty array throws: Reduce of empty array with no initial value. The odd-only test has one.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six", stdin = "1 2 3 4 5 6\n", expect = "56\n", visible = true },
+  { name = "odd-only", stdin = "1 3 5\n", expect = "0\n", visible = false },
+  { name = "negatives", stdin = "-4 3 -2\n", expect = "20\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "typescript.basic.17.threads"
+node        = 26
+title       = "EVERY SCREEN AT ONCE"
+difficulty  = 3
+story       = '''At 23:00 every screen on the island reports its load to the control room at the same moment, and the dashboard prints a row of zeros because it did not wait for any of them.'''
+concepts    = ["concurrency", "closures"]
+requires    = ["typescript.basic.16.lambdas"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''No threads to start here: one thread, and an event loop. Calling an `async`
+function starts it at once and hands back a `Promise` — a value that says
+the work will finish later. `square` sleeps before it writes, so its result
+is not there yet when the call returns. Keep every promise, then
+`await Promise.all(tasks)` waits until all of them have finished — start
+everything first, then wait once, the way threads are started and then
+joined.
+
+```
+for (let i = 0; i < nums.length; i++) {
+  tasks.push(square(i));
+}
+await Promise.all(tasks);
+```
+
+`square(i)` fills `results[i]`, the loop and the two prints are written, and
+`main` is `async` so it may `await`. Type `tasks.push(square(i));` as the
+loop's body and the `await` line under it, exactly as shown.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+starter     = '''function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function main(): Promise<void> {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const nums: number[] = input.trim().split(/\s+/).map(Number);
+  const results: number[] = nums.map(() => 0);
+
+  const square = async (i: number): Promise<void> => {
+    await sleep(10);
+    results[i] = nums[i] * nums[i];
+  };
+
+  const tasks: Promise<void>[] = [];
+  for (let i = 0; i < nums.length; i++) {
+    // FILL: start square(i) and keep its promise
+    // ANSWER: tasks.push(square(i));
+  }
+  // FILL: wait for every one of them
+  // ANSWER: await Promise.all(tasks);
+  console.log(results.join(" "));
+  console.log(results.reduce((a, b) => a + b, 0));
+}
+
+main();
+'''
+solution    = '''function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function main(): Promise<void> {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  const nums: number[] = input.trim().split(/\s+/).map(Number);
+  const results: number[] = nums.map(() => 0);
+
+  const square = async (i: number): Promise<void> => {
+    await sleep(10);
+    results[i] = nums[i] * nums[i];
+  };
+
+  const tasks: Promise<void>[] = [];
+  for (let i = 0; i < nums.length; i++) {
+    tasks.push(square(i));
+  }
+  await Promise.all(tasks);
+  console.log(results.join(" "));
+  console.log(results.reduce((a, b) => a + b, 0));
+}
+
+main();
+'''
+hints = [
+  "tasks.push(square(i)); in the loop, await Promise.all(tasks); after it — start them all, then wait once.",
+  "A promise nobody awaits still runs, but main prints before it is done; await square(i) inside the loop would run them one at a time.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "1 4 9\n14\n", visible = true },
+  { name = "one", stdin = "12\n", expect = "144\n144\n", visible = false },
+  { name = "five", stdin = "5 -2 0 3 1\n", expect = "25 4 0 9 1\n39\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "typescript.basic.18.binary-tree"
+node        = 27
+title       = "UNDEFINED"
+difficulty  = 4
+story       = '''23:59 in the thirtieth-floor control room: the tree of screen ids is one root with nothing under it, and the first lookup dies with Cannot read properties of undefined (reading 'left').'''
+concepts    = ["trees", "recursion", "structs"]
+requires    = ["typescript.basic.17.threads"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief       = '''A binary search tree keeps smaller values in a node's left subtree and
+larger ones in its right. Inserting is recursive: an empty subtree
+(`undefined`) becomes a new `TreeNode`; otherwise the value goes down one
+side, and whatever comes back is stored as that child again, because the
+child may have been `undefined` a moment ago. Following `.left` on an
+`undefined` is the crash this whole road is named after. The type
+`TreeNode | undefined` is the contract that says a child may be missing,
+and strict tsc will not let `n.val` be read until the `undefined` check has
+been passed — that check comes first, and it is written.
+
+```
+if (v < n.val) {
+  n.left = insert(n.left, v);
+} else {
+  n.right = insert(n.right, v);
+}
+```
+
+`TreeNode`, `insert`'s `undefined` case and its `if (v < n.val)` / `else`
+skeleton, `inorder`, `height` and `main` are written. Type the two
+recursive lines exactly as shown, in place of the two `// FILL`
+placeholders.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+starter     = '''class TreeNode {
+  val: number;
+  left: TreeNode | undefined = undefined;
+  right: TreeNode | undefined = undefined;
+
+  constructor(val: number) {
+    this.val = val;
+  }
+}
+
+function insert(n: TreeNode | undefined, v: number): TreeNode {
+  if (n === undefined) {
+    return new TreeNode(v);
+  }
+  if (v < n.val) {
+    // FILL: insert v into the left subtree and store it back
+    // ANSWER: n.left = insert(n.left, v);
+  } else {
+    // FILL: the same on the right
+    // ANSWER: n.right = insert(n.right, v);
+  }
+  return n;
+}
+
+function inorder(n: TreeNode | undefined, out: number[]): void {
+  if (n === undefined) {
+    return;
+  }
+  inorder(n.left, out);
+  out.push(n.val);
+  inorder(n.right, out);
+}
+
+function height(n: TreeNode | undefined): number {
+  if (n === undefined) {
+    return 0;
+  }
+  return 1 + Math.max(height(n.left), height(n.right));
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  let root: TreeNode | undefined = undefined;
+  for (const tok of input.trim().split(/\s+/)) {
+    root = insert(root, Number(tok));
+  }
+  const out: number[] = [];
+  inorder(root, out);
+  console.log(out.join(" "));
+  console.log(height(root));
+}
+
+main();
+'''
+solution    = '''class TreeNode {
+  val: number;
+  left: TreeNode | undefined = undefined;
+  right: TreeNode | undefined = undefined;
+
+  constructor(val: number) {
+    this.val = val;
+  }
+}
+
+function insert(n: TreeNode | undefined, v: number): TreeNode {
+  if (n === undefined) {
+    return new TreeNode(v);
+  }
+  if (v < n.val) {
+    n.left = insert(n.left, v);
+  } else {
+    n.right = insert(n.right, v);
+  }
+  return n;
+}
+
+function inorder(n: TreeNode | undefined, out: number[]): void {
+  if (n === undefined) {
+    return;
+  }
+  inorder(n.left, out);
+  out.push(n.val);
+  inorder(n.right, out);
+}
+
+function height(n: TreeNode | undefined): number {
+  if (n === undefined) {
+    return 0;
+  }
+  return 1 + Math.max(height(n.left), height(n.right));
+}
+
+function main(): void {
+  const input: string = require("fs").readFileSync(0, "utf8");
+  let root: TreeNode | undefined = undefined;
+  for (const tok of input.trim().split(/\s+/)) {
+    root = insert(root, Number(tok));
+  }
+  const out: number[] = [];
+  inorder(root, out);
+  console.log(out.join(" "));
+  console.log(height(root));
+}
+
+main();
+'''
+hints = [
+  "n.left = insert(n.left, v); under the if, n.right = insert(n.right, v); under the else.",
+  "The assignment is the point: insert returns the subtree's root, which is a brand-new TreeNode when the child was undefined.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "balanced", stdin = "5 3 8 1 4\n", expect = "1 3 4 5 8\n3\n", visible = true },
+  { name = "chain", stdin = "1 2 3 4\n", expect = "1 2 3 4\n4\n", visible = false },
+  { name = "single", stdin = "7\n", expect = "7\n1\n", visible = false },
+  { name = "seven", stdin = "50 30 70 20 40 60 80\n", expect = "20 30 40 50 60 70 80\n3\n", visible = false },
+]
