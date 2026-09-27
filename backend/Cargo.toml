@@ -55,3 +55,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 [profile.release]
 strip = true
+
+# What `make start` runs: slower to build, fastest to serve. Not used for
+# `make package` — its RUSTFLAGS add target-cpu=native, which ties the binary
+# to this machine's CPU.
+[profile.fastest]
+inherits = "release"
+lto = "fat"
+codegen-units = 1

@@ -49,7 +49,13 @@ TS_IP       = $$($(TS_BIN) ip -4 2>/dev/null | head -1 || ifconfig 2>/dev/null |
 LAN_IP      = $$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
 HOME_DIR   ?= $(HOME)/.causewaybayhacker
 RUN        := .run
-BACK_BIN   := backend/target/debug/cwbhacker
+# `start` runs the fastest build there is: the `fastest` profile (fat LTO, one
+# codegen unit) tuned for this machine's CPU. It is slow to build and not
+# portable, which is why `package` uses plain `release`. `make start DEBUG=1`
+# for the unoptimised one (quick to build, when iterating on the backend).
+BACK_PROFILE := $(if $(DEBUG),debug,fastest)
+BACK_BIN   := backend/target/$(BACK_PROFILE)/cwbhacker
+BACK_BUILD := $(if $(DEBUG),cargo build,RUSTFLAGS="-C target-cpu=native" cargo build --profile fastest)
 VITE       := frontend/node_modules/.bin/vite
 
 # **The game's own python leads PATH, when the machine has one set aside.**
@@ -171,8 +177,8 @@ start: ## start both servers in the background
 	@if $(call held,$(BACK_PORT),cwbhacker); then \
 	  echo "backend already up on $(BACK_PORT) — 'make restart' to bounce it"; \
 	else \
-	  echo "building the backend (the first one is slow)…"; \
-	  ( cd backend && cargo build -p cwbhacker 2>&1 | tail -3 ) || exit 1; \
+	  echo "building the backend, $(BACK_PROFILE) (the first one is slow)…"; \
+	  ( cd backend && $(BACK_BUILD) -p cwbhacker 2>&1 | tail -3 ) || exit 1; \
 	fi
 	@$(MAKE) -s _deps
 	@$(MAKE) -s art
