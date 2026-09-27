@@ -99,7 +99,10 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
     // is the attempt directory, so every attempt paid for a cache it threw
     // away. Pointed at the land's cache root it is inside the home (§1) and
     // the second compile of the day starts warm, as `CARGO_HOME` does for Rust.
-    compiler.env("NODE_COMPILE_CACHE", sub.cache_root.join("node-compile-cache"));
+    compiler.env(
+        "NODE_COMPILE_CACHE",
+        sub.cache_root.join("node-compile-cache"),
+    );
 
     let compile = proc::run(
         compiler,

@@ -928,7 +928,9 @@ pub fn typescript_runtime_kind(class: &str, message: &str) -> (&'static str, &'s
         {
             ("nil-deref", "ts:undefined-property")
         }
-        "TypeError" if message.contains("is not a function") || message.contains("is not iterable") => {
+        "TypeError"
+            if message.contains("is not a function") || message.contains("is not iterable") =>
+        {
             ("missing-trait", "ts:not-a-function")
         }
         "TypeError" => ("type-mismatch", "ts:type-error"),

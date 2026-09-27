@@ -153,10 +153,24 @@ fn a_type_error_is_a_compile_error_with_tscs_code() {
     if !installed() {
         return;
     }
-    let run = run("const fare: number = 12;\nconst shown: string = fare;\nconsole.log(shown);\n", &one_case());
-    assert_eq!(run.report.verdict, Verdict::CompileError, "{}", run.report.compiler_stderr);
-    assert_eq!(run.stages, vec!["compiling"], "nothing ran: {:?}", run.stages);
-    let found = cwbhacker_core::mistakes::classify_compile("typescript", &run.report.compiler_stderr);
+    let run = run(
+        "const fare: number = 12;\nconst shown: string = fare;\nconsole.log(shown);\n",
+        &one_case(),
+    );
+    assert_eq!(
+        run.report.verdict,
+        Verdict::CompileError,
+        "{}",
+        run.report.compiler_stderr
+    );
+    assert_eq!(
+        run.stages,
+        vec!["compiling"],
+        "nothing ran: {:?}",
+        run.stages
+    );
+    let found =
+        cwbhacker_core::mistakes::classify_compile("typescript", &run.report.compiler_stderr);
     assert!(
         found
             .iter()
@@ -178,8 +192,13 @@ fn strict_null_checks_are_on() {
         &one_case(),
     );
     assert_eq!(run.report.verdict, Verdict::CompileError);
-    let found = cwbhacker_core::mistakes::classify_compile("typescript", &run.report.compiler_stderr);
-    assert!(found.iter().any(|m| m.kind == "nil-deref"), "{found:?}\n{}", run.report.compiler_stderr);
+    let found =
+        cwbhacker_core::mistakes::classify_compile("typescript", &run.report.compiler_stderr);
+    assert!(
+        found.iter().any(|m| m.kind == "nil-deref"),
+        "{found:?}\n{}",
+        run.report.compiler_stderr
+    );
 }
 
 /// What is not in `node.d.ts` is not there: `@types/node` does not leak in
@@ -189,10 +208,24 @@ fn only_the_declared_node_api_exists() {
     if !installed() {
         return;
     }
-    let run = run("const os = require(\"os\");\nconsole.log(Buffer.from(\"x\"));\n", &one_case());
-    assert_eq!(run.report.verdict, Verdict::CompileError, "{}", run.report.runtime_stderr);
-    let found = cwbhacker_core::mistakes::classify_compile("typescript", &run.report.compiler_stderr);
-    assert!(found.iter().any(|m| m.kind == "unknown-name" || m.kind == "type-mismatch"), "{found:?}");
+    let run = run(
+        "const os = require(\"os\");\nconsole.log(Buffer.from(\"x\"));\n",
+        &one_case(),
+    );
+    assert_eq!(
+        run.report.verdict,
+        Verdict::CompileError,
+        "{}",
+        run.report.runtime_stderr
+    );
+    let found =
+        cwbhacker_core::mistakes::classify_compile("typescript", &run.report.compiler_stderr);
+    assert!(
+        found
+            .iter()
+            .any(|m| m.kind == "unknown-name" || m.kind == "type-mismatch"),
+        "{found:?}"
+    );
 }
 
 #[test]
@@ -202,8 +235,13 @@ fn a_syntax_error_is_a_compile_error() {
     }
     let run = run("function f( {\n  return 1;\n}\n", &one_case());
     assert_eq!(run.report.verdict, Verdict::CompileError);
-    let found = cwbhacker_core::mistakes::classify_compile("typescript", &run.report.compiler_stderr);
-    assert!(found.iter().any(|m| m.kind == "syntax"), "{found:?}\n{}", run.report.compiler_stderr);
+    let found =
+        cwbhacker_core::mistakes::classify_compile("typescript", &run.report.compiler_stderr);
+    assert!(
+        found.iter().any(|m| m.kind == "syntax"),
+        "{found:?}\n{}",
+        run.report.compiler_stderr
+    );
 }
 
 /// The other half, the erasure: `tsc` is satisfied (an index is not checked
@@ -222,8 +260,14 @@ fn undefined_at_runtime_is_nil_deref_on_the_ts_line() {
                   }\n\
                   console.log(first());\n";
     let run = run(source, &one_case());
-    assert_eq!(run.report.verdict, Verdict::RuntimeError, "{}", run.report.compiler_stderr);
-    let found = cwbhacker_core::mistakes::classify_runtime("typescript", &run.report.runtime_stderr);
+    assert_eq!(
+        run.report.verdict,
+        Verdict::RuntimeError,
+        "{}",
+        run.report.compiler_stderr
+    );
+    let found =
+        cwbhacker_core::mistakes::classify_runtime("typescript", &run.report.runtime_stderr);
     assert!(
         found
             .iter()
@@ -231,7 +275,12 @@ fn undefined_at_runtime_is_nil_deref_on_the_ts_line() {
         "{found:?}: {}",
         run.report.runtime_stderr
     );
-    assert_eq!(found[0].line, Some(5), "{found:?}\n{}", run.report.runtime_stderr);
+    assert_eq!(
+        found[0].line,
+        Some(5),
+        "{found:?}\n{}",
+        run.report.runtime_stderr
+    );
 }
 
 #[test]
@@ -239,11 +288,17 @@ fn unbounded_recursion_is_classified_as_recursion() {
     if !installed() {
         return;
     }
-    let run = run("function down(n: number): number {\n  return down(n + 1) + 1;\n}\nconsole.log(down(0));\n", &one_case());
+    let run = run(
+        "function down(n: number): number {\n  return down(n + 1) + 1;\n}\nconsole.log(down(0));\n",
+        &one_case(),
+    );
     assert_eq!(run.report.verdict, Verdict::RuntimeError);
-    let found = cwbhacker_core::mistakes::classify_runtime("typescript", &run.report.runtime_stderr);
+    let found =
+        cwbhacker_core::mistakes::classify_runtime("typescript", &run.report.runtime_stderr);
     assert!(
-        found.iter().any(|m| m.code.as_deref() == Some("ts:recursion")),
+        found
+            .iter()
+            .any(|m| m.code.as_deref() == Some("ts:recursion")),
         "{found:?}: {}",
         run.report.runtime_stderr
     );
@@ -259,7 +314,8 @@ fn a_thrown_error_nobody_caught_is_unhandled() {
         &one_case(),
     );
     assert_eq!(run.report.verdict, Verdict::RuntimeError);
-    let found = cwbhacker_core::mistakes::classify_runtime("typescript", &run.report.runtime_stderr);
+    let found =
+        cwbhacker_core::mistakes::classify_runtime("typescript", &run.report.runtime_stderr);
     assert!(
         found
             .iter()
@@ -268,7 +324,8 @@ fn a_thrown_error_nobody_caught_is_unhandled() {
         run.report.runtime_stderr
     );
     let run2 = crate::run("throw \"offline\";\n", &one_case());
-    let found = cwbhacker_core::mistakes::classify_runtime("typescript", &run2.report.runtime_stderr);
+    let found =
+        cwbhacker_core::mistakes::classify_runtime("typescript", &run2.report.runtime_stderr);
     assert!(
         found.iter().any(|m| m.code.as_deref() == Some("ts:throw")),
         "{found:?}: {}",
@@ -293,7 +350,10 @@ fn an_infinite_loop_times_out() {
         })),
     );
     assert_eq!(run.report.verdict, Verdict::Timeout);
-    assert!(started.elapsed().as_secs() < 60, "the runner waited far longer than the timeout");
+    assert!(
+        started.elapsed().as_secs() < 60,
+        "the runner waited far longer than the timeout"
+    );
 }
 
 /// A callback that never yields holds the event loop the same way: the
@@ -343,7 +403,10 @@ fn the_gate_agrees_with_the_probe() {
     let refusal = cwbhacker_runner::unsupported("typescript", &one_case());
     assert_eq!(refusal.is_none(), installed(), "{refusal:?}");
     if let Some(reason) = refusal {
-        assert!(reason.contains("npm install"), "a refusal without the fix: {reason}");
+        assert!(
+            reason.contains("npm install"),
+            "a refusal without the fix: {reason}"
+        );
     }
     for harness in ["cargo", "gotest"] {
         let wrong = spec(serde_json::json!({
@@ -396,11 +459,17 @@ fn the_runner_writes_only_under_the_home_it_was_given() {
         events: cwbhacker_runner::no_events(),
     };
     let report = cwbhacker_runner::run(&submission);
-    assert_eq!(report.verdict, Verdict::Accepted, "{}", report.compiler_stderr);
-    let mut entries: Vec<String> = std::fs::read_dir(home.path().join("build/typescript/att_footprint"))
-        .unwrap()
-        .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
-        .collect();
+    assert_eq!(
+        report.verdict,
+        Verdict::Accepted,
+        "{}",
+        report.compiler_stderr
+    );
+    let mut entries: Vec<String> =
+        std::fs::read_dir(home.path().join("build/typescript/att_footprint"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+            .collect();
     entries.sort();
     assert_eq!(
         entries,

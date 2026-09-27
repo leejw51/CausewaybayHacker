@@ -101,7 +101,10 @@ pub fn start(
     land: &str,
     category: Option<&str>,
 ) -> Result<Session> {
-    if !matches!(land, "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript") {
+    if !matches!(
+        land,
+        "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript"
+    ) {
         return Err(bad_request(format!("unknown land '{land}'")));
     }
     if let Some(open) = live(conn, address)? {

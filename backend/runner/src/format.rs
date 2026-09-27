@@ -384,7 +384,13 @@ pub fn toolchains() -> Vec<Toolchain> {
         // TypeScript Land's compiler is `tsc`; the `node` it runs on and the
         // `node` that runs the program are the same one, and a `tsc` that
         // answers has found it.
-        ("typescript", "tsc", &["--version"][..], "prettier", TYPESCRIPT_HINT),
+        (
+            "typescript",
+            "tsc",
+            &["--version"][..],
+            "prettier",
+            TYPESCRIPT_HINT,
+        ),
     ] {
         let compiles = answers(compiler, args);
         let formats = is_supported(land);
