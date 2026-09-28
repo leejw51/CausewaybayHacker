@@ -135,9 +135,9 @@ export const zh: Partial<Catalogue> = {
   "lands.typescriptBlurb": "接口、泛型、类型收窄。运行之前每个值都有类型，编译器已经全部读过。",
   "lands.verybasicBlurb": "小测验。哪一行才是对的语法？四选一，然后把它敲出来。",
   "lands.basicBlurb":
-    "早晨的散步。一次一个语法点，先讲解，再填一两行 — 类型、循环、结构体、排序、闭包、线程、树。",
+    "早晨的散步。一次一个语法点，先讲解，再填一到四行 — 现场编程屏幕默认你已烂熟于手的那些语法。",
   "lands.advancedBlurb":
-    "先做用上这些语法的小编程题，然后是午市高峰：一个柜台两台收银机，同时发生。",
+    "现场编程测试，不计时。一道题，一整个程序，可见用例和隐藏用例 — 把语法真正用起来，然后是同时发生的午市高峰。",
   "lands.hackerBlurb": "面试。一个房间，一只钟，没有谁替你把行写完。",
   "lands.category": "{land} — 分类",
   "lands.clearedOf": "{total} 条中通关 {cleared} 条",

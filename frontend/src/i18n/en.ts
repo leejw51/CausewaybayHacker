@@ -157,9 +157,9 @@ export const en = {
     "Interfaces, generics, narrowing. Every value has a type before it runs, and the compiler has read all of it.",
   "lands.verybasicBlurb": "The quiz. Which line is the grammar? Pick one of four, then type it.",
   "lands.basicBlurb":
-    "The morning walk. One construct at a time, explained, and one or two lines to type — types, loops, structs, sorts, closures, a thread, a tree.",
+    "The morning walk. One construct at a time, explained, and one to four lines to type — the grammar a live coding screen assumes you have in your fingers.",
   "lands.advancedBlurb":
-    "Small coding quizzes on the grammar, then the lunch rush: two tills on one counter, both at once.",
+    "The live coding test, untimed. A brief, a whole program, visible and hidden cases — the grammar applied, then the lunch rush of it happening all at once.",
   "lands.hackerBlurb": "The interview. One room, one clock, and nothing finishing your lines.",
   "lands.category": "{land} — CATEGORY",
   "lands.clearedOf": "{cleared} / {total} CLEARED",

@@ -35,9 +35,11 @@ Skynet's plan all along — and takes it back one street at a time.
   checks the program and erases the types, and `node` runs what is left.
 * Four **categories** per land: `verybasic` (the quiz: four lines, one right,
   pick it then type it), `basic` (grammar activation: a construct
-  shown, one or two lines to type), `advanced` (simple coding quizzes on that grammar — ownership, errors,
-  traits, iterators — then threads, mutexes, lifetimes, channels), `hacker`
-  (HackerRank-style timed quests).
+  shown, one to four lines to type — in Rust Land the language's own
+  grammar: ownership, borrows, lifetimes, threads, channels), `advanced`
+  (the live coding test, untimed: whole programs on that grammar —
+  ownership, errors, traits, iterators — then threads, mutexes, lifetimes,
+  channels), `hacker` (HackerRank-style timed quests).
 * Each category is a **map** — a Super Mario World overworld of numbered nodes
   joined by paths. Clear a node and it is stamped `CLEARED`, for good.
 * A node holds one **quest**. A quest is code the player writes, that the server

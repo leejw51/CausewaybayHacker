@@ -8,499 +8,843 @@ locale = "ko"
 
 # ---------------------------------------------------------------- 01
 [[quest]]
-id    = "rust.basic.01.first-light"
-title = "첫 불빛"
-story = "06:40, 자딘스 바자 위. 커서만 깜박이고 회색 안내문은 사라졌다. 아직 기억으로 칠 수 있는 것은 전부 당신 것이다."
+id    = "rust.basic.01.the-move"
+title = "주인은 하나"
+story = "06:40, 자딘스 바자 위. 계산대 위에 영수증 한 장, 그리고 이 거리 전체의 규칙이 거기 적혀 있다: 물건의 주인은 하나이고, 넘겨주면 넘어간 것이다."
 brief = '''
-정확히 다음을 출력하세요:
+`String`의 주인은 정확히 하나입니다. `let kept = receipt;`는 복사가 아니라
+**이동(move)**입니다. 그 줄부터 `receipt`는 쓸 수 없는 이름이 되고, 쓰면
+컴파일러가 E0382, borrow of moved value로 거부합니다. 값은 새 이름 아래로
+옮겨 갔습니다.
 
 ```
-hello, causewaybay
+let kept = receipt;
 ```
 
-소문자, 쉼표 하나, 공백 하나, 한 줄. 그 외에는 아무것도 없어야 합니다.
+영수증은 만들어져 있고 `println!` 두 줄도 적혀 있습니다. `// FILL` 주석이
+있는 자리에 이동 줄을 쳐서 `kept`가 문자열의 주인이 되게 하세요.
+
+```
+output: one receipt, one owner
+        22
+```
 '''
 hints = [
-  "println!은 매크로이므로 느낌표를 붙입니다.",
-  "문자열은 정확해야 합니다: 소문자, 쉼표 하나, 그 뒤 공백 하나.",
+  "let kept = receipt; — 옛 이름을 오른쪽에 둔 let 한 줄.",
+  "clone은 없습니다. 문자열은 복사되지 않고 손을 바꿉니다. 이 줄 뒤에 receipt를 쓰면 E0382입니다.",
 ]
 
 # ---------------------------------------------------------------- 02
 [[quest]]
-id    = "rust.basic.02.bindings"
-title = "요금표"
-story = "퍼시벌 스트리트 전차 정류장의 요금표에는 숫자 하나만 남아 있고, 일일 요금과 월 정기권이 있던 자리는 두 칸 모두 비어 있다."
+id    = "rust.basic.02.borrow"
+title = "보기만 한다"
+story = "퍼시벌 스트리트 트램 정류장. 차장은 명단의 이름을 전부 읽고 명단을 그대로 돌려준다. 명단의 주인은 언제나 사무실뿐이었다."
 brief = '''
-`let`은 값에 이름을 붙입니다. 타입은 콜론 뒤에 쓸 수 있고, `println!("{}", …)`은
-중괄호 자리에 들어온 값을 출력한 뒤 줄을 바꿉니다. `i64`의 산술은 종이에
-쓰는 것과 똑같이 씁니다.
+`&`는 빌려줍니다. `name: &str`을 받는 함수는 문자열을 *보기만* 하고, 호출한
+쪽이 계속 주인으로 남아 그 뒤에도 쓸 수 있습니다. `&names[i]`는 원소 하나를
+빌리는 것이고, `&String`은 호출 자리에서 알아서 `&str`이 됩니다.
 
 ```
-println!("{}", n * n);
+total += width(&names[i]);
 ```
 
-`n`은 이미 읽혀 있고 앞의 두 줄도 출력되어 있습니다. `// FILL` 주석 자리에 저
-줄을 그대로 입력하세요: 세 번째 `println!`, `n` 곱하기 `n`입니다.
+`width`와 `println!` 두 줄은 적혀 있습니다. `// FILL` 주석이 있는 자리에
+이름 하나하나를 `&`로 빌려주는 호출을 치세요. 두 번째 줄은 반복문 뒤에도
+이름들이 여전히 당신 것임을 증명합니다.
 
 ```
-input:  12
-output: 12
-        24
-        144
+input:  MEI
+        BO
+        ALEX
+output: 9
+        MEI,BO,ALEX
 ```
 '''
 hints = [
-  "println!(\"{}\", n * n);",
-  "바로 위 두 줄과 같은 모양입니다. 두 번째 인자의 식만 달라집니다.",
+  "total += width(&names[i]); — 앰퍼샌드는 인자 쪽에 붙습니다.",
+  "width는 &str을 원하고, &String은 호출 자리에서 &str로 강제 변환되므로 &names[i]면 충분합니다.",
 ]
 
 # ---------------------------------------------------------------- 03
 [[quest]]
-id    = "rust.basic.03.types"
-title = "나눠 내는 계산서"
-story = "퍼시벌 스트리트 매점, 커피 두 잔에 지폐 한 장. 계산기는 각자 몇 개인지, 남는 것이 얼마인지, 정확한 몫이 얼마인지 말해야 하는데 오늘은 세 줄이 모두 비어 있다."
+id    = "rust.basic.03.mut-borrow"
+title = "고치라고 빌려준다"
+story = "럭키맥 키오스크가 게시판의 모든 가격을 같은 만큼 올린다. 게시판은 벽을 떠나지 않는다. 그것을 고치는 손이 빌려온 손이다."
 brief = '''
-정수 둘을 나누면 정수가 나옵니다: `7 / 2`는 `3`이고 `7 % 2`는 나머지 `1`입니다.
-소수를 얻으려면 먼저 변환해야 합니다 — `as f64`가 정수를 부동소수점 수로
-바꾸고, 포맷 문자열의 `{:.2}`는 소수점 아래 정확히 두 자리로 출력합니다.
+`&mut`는 고치라고 빌려줍니다. `prices: &mut Vec<i64>`를 받는 함수는 호출한
+쪽의 벡터를 제자리에서 바꿀 수 있습니다. 호출하는 쪽은 `&mut prices`라고
+쓰고, `prices` 자체가 `let mut`이어야 합니다. 안에서는 `iter_mut()`가
+`&mut i64`를 하나씩 건네고, `*p`가 그 뒤에 있는 숫자입니다.
 
 ```
-println!("{:.2}", a as f64 / b as f64);
+*p += by;
+bump(&mut prices, by);
 ```
 
-`a`와 `b`는 읽혀 있고 정수 나눗셈과 나머지는 출력되어 있습니다. `// FILL` 주석
-자리에 저 줄을 입력하세요.
+`bump`와 출력은 적혀 있습니다. `// FILL` 주석이 있는 두 자리에 두 줄을
+치세요: `bump` 안의 변경, 그리고 벡터를 빌려주는 호출.
 
 ```
-input:  7 2
-output: 3
-        1
-        3.50
+input:  3
+        10 20 30
+output: 13 23 33
 ```
 '''
 hints = [
-  "println!(\"{:.2}\", a as f64 / b as f64);",
-  "나누기 전에 양쪽 모두 `as f64`로 변환하세요. 아니면 정수끼리 나눠져서 소수는 이미 사라진 뒤입니다.",
+  "반복문 안에 *p += by;, 그리고 main에 bump(&mut prices, by);",
+  "p는 &mut i64입니다. 별표가 그것을 뚫고 들어갑니다. 호출에는 &가 아니라 &mut가 필요하고, prices를 mut로 선언한 이유가 바로 이것입니다.",
 ]
 
 # ---------------------------------------------------------------- 04
 [[quest]]
-id    = "rust.basic.04.strings"
-title = "가게 간판"
-story = "자딘스 바자의 간판 화가는 이름이 세 가지로 필요하다. 값을 매기려면 글자 수, 간판에는 대문자, 유리 안쪽에는 거울상으로."
+id    = "rust.basic.04.clone"
+title = "두 번째 사본"
+story = "하이산 플레이스의 명단 두 장: 문지기가 도착 순서대로 들고 있는 것과 매니저가 정렬하는 것. 매니저 것을 정렬해도 문지기 것은 건드리면 안 된다."
 brief = '''
-`String`은 `.len()`으로 자기 길이를 알고 `.to_uppercase()`로 대문자 사본을
-만듭니다. `.reverse()`는 없습니다: `.chars()`로 글자를 하나씩 걷고, `.rev()`로
-방향을 돌린 뒤, `.collect()`로 새 `String`에 모읍니다. `let`에 적은 타입이
-`collect`에게 무엇을 만들지 알려 줍니다.
+이동은 주인을 하나만 남깁니다. 둘이 필요하면 `.clone()`이 깊은 복사를
+만들고, 그때부터 둘은 서로 독립입니다. 작고 단순한 값 — `i64`, `bool`,
+`char`, `f64`, 그것들의 튜플 — 은 `Copy`라서 `let b = a;`가 복사하고 `a`는
+clone 없이도 계속 쓸 수 있습니다.
 
 ```
-let rev: String = line.chars().rev().collect();
+let mut sorted = names.clone();
 ```
 
-줄은 읽혀 있고 길이와 대문자 형태는 출력되어 있습니다. `// FILL` 주석 아래의
-자리 표시 `let rev` 대신 저 `let`을 입력하세요.
+이름은 읽혀 있고 `sorted.sort()`와 `println!` 두 줄은 적혀 있습니다.
+`// FILL` 주석이 있는 자리에 clone을 쳐서 원래 순서가 살아남게 하세요.
 
 ```
-input:  kwan lee
-output: 8
-        KWAN LEE
-        eel nawk
+input:  MEI BO ALEX
+output: MEI BO ALEX
+        ALEX BO MEI
 ```
 '''
 hints = [
-  "let rev: String = line.chars().rev().collect();",
-  "`.chars()`는 글자를 도는 이터레이터이고, `.rev()`는 거꾸로 걷게 하며, `.collect()`는 `let`이 요구한 `String`을 만듭니다.",
+  "let mut sorted = names.clone(); — sort()가 제자리에서 바꾸므로 mut입니다.",
+  "let mut sorted = names;도 컴파일은 되지만, 그러면 names가 사라지고 첫 println!이 E0382가 됩니다.",
 ]
 
 # ---------------------------------------------------------------- 05
 [[quest]]
-id    = "rust.basic.05.loops"
-title = "전차 정류장 세기"
-story = "이워 스트리트 전차의 차장은 종이 띠에 정류장을 기록한다. 누적 합계와, 세 번째 정류장마다 표시 하나. 띠는 첫 줄 아래로 비어 있다."
+id    = "rust.basic.05.exchange"
+title = "교환"
+story = "자딘스 바자의 두 계산대가 교대 시간에 서랍을 맞바꾸고, 옛 서랍은 들어 올려지고 빈 서랍이 그 자리에 놓인다. 복사되는 것은 없다. 물건이 손을 바꾼다."
 brief = '''
-`for` 루프는 범위를 걷습니다. `1..n`은 `n` 앞에서 멈추고, `1..=n`은 `n`을
-포함합니다. 루프 변수는 매번 새로 바인딩되고, `+=`는 `mut` 합계에 더합니다.
+`std::mem`은 값을 복사 없이 교환합니다. `swap(&mut a, &mut b)`는 두 이름이
+쥔 것을 맞바꿉니다. `take(&mut a)`는 값을 꺼내 오고 그 타입의 기본값 —
+빈 `String`, 빈 `Vec`, `0` — 을 뒤에 남깁니다. 그래서 `&mut` 안에 있는
+것을 소유할 수 있습니다. `replace(&mut a, v)`는 같은 일을 하되 당신이 고른
+값을 남깁니다.
 
 ```
-for i in 1..=n {
-    sum += i;
-    if i % 3 == 0 {
-        ticks += 1;
-    }
-}
+std::mem::swap(&mut a, &mut b);
+let taken = std::mem::take(&mut a);
 ```
 
-`n`은 읽혀 있고, 합계 변수들은 선언되어 출력되며, 루프 본문도 적혀 있습니다.
-자리 표시 `for i in 0..0 {` 대신 첫 줄 `for i in 1..=n {`을 입력하세요.
+두 줄이 `a`와 `b`로 읽힙니다. `// FILL` 주석이 있는 자리에 swap과 take를
+치세요.
 
 ```
-input:  6
-output: 21
-        2
+input:  LEFT
+        RIGHT
+output: RIGHT LEFT
+        [RIGHT] []
 ```
 '''
 hints = [
-  "for i in 1..=n {",
-  "`..=`가 끝을 포함하는 범위입니다. `1..n`은 하나 모자라게 멈춰서 합이 `n`만큼 작아집니다.",
+  "std::mem::swap(&mut a, &mut b); 그다음 let taken = std::mem::take(&mut a);",
+  "둘 다 &mut를 받습니다. 값은 제자리에 있고 내용물만 움직입니다. take 뒤의 a는 빈 String이지, 이동되어 사라진 것이 아닙니다 — 여전히 쓸 수 있습니다.",
 ]
 
 # ---------------------------------------------------------------- 06
 [[quest]]
-id    = "rust.basic.06.functions"
-title = "승차 카드"
-story = "퍼시벌 스트리트 전차 정류장의 기계는 승차 카드를 판다. 처음 열 번은 한 가격, 나머지는 더 싸게. 오늘은 모든 카드의 합계가 0으로 찍힌다."
+id    = "rust.basic.06.slices"
+title = "줄의 한가운데"
+story = "하이산 플레이스의 줄에서 맨 앞과 맨 뒤를 뺀 사람들: 실제로 기다리고 있는 사람들."
 brief = '''
-함수는 `fn 이름(매개변수: 타입) -> 반환타입 { 본문 }`입니다. 본문의 마지막 식은
-세미콜론 없이 두면 그것이 반환값이 되고, `if … else …`도 식이므로 그 마지막
-줄이 될 수 있습니다.
+`&v[a..b]`는 슬라이스입니다. `Vec`의 일부를 빌려 보는 창으로, `a`부터
+`b` 직전까지이고 복사는 없습니다. 타입은 `&[i64]`이고, `&[i64]`를 받는
+함수는 벡터 전체(`&nums`)든 그 일부 창이든 같은 방식으로 받습니다. `..`
+하나만 쓰면 전부, `a..`는 끝까지입니다.
 
 ```
-fn fare(rides: i64) -> i64 {
-    if rides <= 10 { rides * 5 } else { 50 + (rides - 10) * 3 }
-}
+let middle = &nums[1..nums.len() - 1];
 ```
 
-`fare`는 선언되어 있고 `main`은 `n`을 읽어 `fare(n)`을 출력합니다. 자리 표시
-`0` 대신 `if … else` 줄을 본문으로 입력하세요.
+`total`과 `println!` 세 줄은 적혀 있습니다. `// FILL` 주석이 있는 자리에
+슬라이스를 치세요.
 
 ```
-input:  12
-output: 56
+input:  5 1 2 3 9
+output: 6
+        20
+        3
 ```
 '''
 hints = [
-  "if rides <= 10 { rides * 5 } else { 50 + (rides - 10) * 3 }",
-  "`return`도 세미콜론도 없습니다. `if … else`가 마지막 식이므로 그 값이 `fare`의 반환값입니다.",
+  "let middle = &nums[1..nums.len() - 1];",
+  "범위의 끝은 포함하지 않으므로 len() - 1은 마지막 원소 바로 앞에서 멈춥니다. 앞의 &가 벡터에서 꺼내 가는 대신 빌리게 만듭니다.",
 ]
 
 # ---------------------------------------------------------------- 07
 [[quest]]
-id    = "rust.basic.07.structs"
-title = "가판대 카드"
-story = "자딘스 바자의 모든 가판대에는 카드가 있다. 이름, 가격, 개수. 카드 프린터는 콜론과 0만 찍고 그 앞에는 아무것도 없다."
+id    = "rust.basic.07.string-str"
+title = "소유한 글과 빌린 글"
+story = "자딘스 바자의 가게 간판은 한 번 칠해지고 가게가 소유한다. 읽는 사람은 모두 빌려 보는 것이고, 그날을 위해 만든 현수막은 새 물건이다."
 brief = '''
-`struct`는 이름 붙은 필드를 묶습니다. 값은 각 필드를 이름으로 지정하는
-리터럴로 만드는데, 지역 변수 이름이 필드 이름과 같으면 `name: name`을 `name`으로
-줄일 수 있습니다. 메서드는 `impl` 블록 안에 살고 `&self`를 받아 그것을 통해
-필드를 읽습니다.
+`String`은 글을 소유하고 자랄 수 있습니다. `&str`은 다른 곳에 있는 글을
+빌립니다. 읽기만 하는 함수는 `&str`을 받고, 새 글을 만드는 함수는
+`String`을 돌려줍니다. `format!`은 `println!`이 한 줄을 만들듯 `String`을
+만들고, `&name`(또는 `name.as_str()`)은 `String`을 `&str`로 빌려줍니다.
 
 ```
-impl Stall {
-    fn total(&self) -> i64 {
-        self.price * self.qty
-    }
-}
-
-let stall = Stall { name, price, qty };
+format!("** {} **", name)
+let line = banner(&name);
 ```
 
-`Stall`과 그 `impl`은 선언되어 있고 `name`, `price`, `qty`는 읽혀 있습니다. 자리
-표시 `0` 대신 `total`의 본문을, 자리 표시 리터럴 대신 `let stall` 리터럴을
-입력하세요.
+`// FILL` 주석이 있는 두 자리에 두 줄을 치세요: `banner`의 본문, 그리고
+`main`의 호출.
 
 ```
-input:  mango 12 3
-output: mango: 36
+input:  mei
+output: ** mei **
+        9
 ```
 '''
 hints = [
-  "let stall = Stall { name, price, qty }; — 그리고 total 안에는: self.price * self.qty",
-  "메서드 안에서는 `self`를 통해 필드에 닿습니다. `main`에서는 변수 이름이 이미 필드 이름과 같으니 리터럴에 이름만 나열하면 됩니다.",
+  "세미콜론 없는 format!(\"** {} **\", name)이 함수의 값입니다. main에는 let line = banner(&name);",
+  "&가 없는 banner(name)은 &str 자리에 String을 넘기려는 것이라 E0308입니다. 앰퍼샌드가 이 노드의 전부입니다.",
 ]
 
 # ---------------------------------------------------------------- 08
 [[quest]]
-id    = "rust.basic.08.enums"
-title = "노선의 색"
-story = "타임스 스퀘어 아래 MTR 표지판은 노선 셋을 알고 각각 제 색으로 칠한다. 색 조회는 셋 모두에 빈 문자열을 돌려준다."
+id    = "rust.basic.08.chars-bytes"
+title = "글자와 숫자"
+story = "빅토리아 파크의 사물함 번호: 글자와 숫자가 섞여 있다. 관리인은 숫자를 다 더하고 첫 글자를 외친다."
 brief = '''
-`enum`은 닫힌 변형(variant)의 집합이고, `match`는 변형마다 가지를 고릅니다. 각
-팔(arm)은 `패턴 => 값,`이며, 컴파일러는 모든 변형에 팔이 있기를 요구합니다 —
-하나라도 빠지면 빌드되지 않습니다.
+`&str`은 바이트입니다. `.chars()`는 문자 단위로, `.bytes()` /
+`.as_bytes()`는 `u8` 단위로 걷습니다. `c.to_digit(10)`은 숫자 문자를
+`Some(숫자)`로, 나머지는 `None`으로 바꾸므로 `filter_map`이 숫자만
+남깁니다. 바이트는 숫자입니다: `b'a'`는 97이고, 글자 산수는
+`(byte - b'a' + b'A') as char`입니다.
 
 ```
-let colour = match line {
-    Line::Island => "blue",
-    Line::TsuenWan => "red",
-    Line::KwunTong => "green",
-};
+let digits: Vec<u32> = code.chars().filter_map(|c| c.to_digit(10)).collect();
+let first = (code.as_bytes()[0] - b'a' + b'A') as char;
 ```
 
-`Line`과 단어를 변형으로 바꾸는 `match`는 적혀 있고, 색깔 `match`의 첫 팔도
-있습니다. `// FILL` 주석 자리에 나머지 두 팔을 입력하고 `_ => ""` 줄은
-지우세요.
+`// FILL` 주석이 있는 두 자리에 두 줄을 치세요. 코드는 항상 소문자
+글자로 시작합니다.
 
 ```
-input:  tsuenwan
-output: red
+input:  a1b2c3
+output: 6
+        A
 ```
 '''
 hints = [
-  "Line::TsuenWan => \"red\", 그리고 Line::KwunTong => \"green\",",
-  "세 변형 모두 팔이 생기면 `_ => \"\"` 포괄 팔은 도달할 수 없으니 없애도 됩니다.",
+  "code.chars().filter_map(|c| c.to_digit(10)).collect() — 그다음 (code.as_bytes()[0] - b'a' + b'A') as char.",
+  "to_digit은 Option<u32>를 돌려주고 filter_map이 None을 버립니다. 바이트에서 b'a'를 빼면 a가 0이고, b'A'를 더하면 대문자에 닿습니다.",
 ]
 
 # ---------------------------------------------------------------- 09
 [[quest]]
-id    = "rust.basic.09.vector"
-title = "하이산 플레이스의 줄"
-story = "하이산 플레이스의 도어맨은 손님 무리가 도착할 때마다 인원수를 띠에 적는다. 무리가 몇인지, 첫 번째, 마지막, 합계를 말해야 하는데 띠는 비어 있다."
+id    = "rust.basic.09.option"
+title = "없을 수도 있다"
+story = "한가한 아침의 타임스 스퀘어 게시판. 최고 입찰이 없을 수도 있고, 짝수 표 번호가 없을 수도 있다. 게시판은 짐작하는 대신 그렇다고 말해야 한다."
 brief = '''
-`Vec<T>`는 늘어나는 리스트이고, 하나에 하는 일은 이 네 가지입니다. `.push(x)`는 끝에
-추가합니다. `.remove(i)`는 인덱스 `i`의 원소를 빼내고 뒤의 것들을 앞으로 당깁니다.
-`v[i] = x`는 `i`의 원소를 제자리에서 고치고, `.sort()`는 전체를 오름차순으로
-정렬합니다 — 넷 중 무엇을 하든 `Vec`은 `mut`여야 합니다.
+`Option<T>`는 `Some(값)` 아니면 `None`이고, 컴파일러는 `None`일 때 어떻게
+할지를 반드시 말하게 합니다. `if let Some(m) = …`은 값이 있을 때만 블록을
+실행합니다. `.unwrap_or(0)`은 기본값을 줍니다. `.find(…)`는 첫 번째
+일치를 `Option<&T>`로 돌려주고, `.copied()`가 `Option<&i64>`를
+`Option<i64>`로 바꿉니다.
 
 ```
-v.push(100);
-v.remove(0);
-v[0] = -1;
-v.sort();
+if let Some(m) = nums.iter().max() { println!("MAX {}", m); }
+let even = nums.iter().find(|&&x| x % 2 == 0).copied().unwrap_or(0);
 ```
 
-`v`에는 한 줄의 정수들이 들어 있고, 결과와 길이가 출력됩니다. 네 개의 `// FILL` 주석
-자리에 네 줄을 그 순서대로 입력하세요.
+`// FILL` 주석이 있는 두 자리에 두 줄을 치세요. 입력이 비어 있으면 첫
+줄은 아무것도 출력하지 않고 둘째 줄은 `0`입니다.
 
 ```
-input:  1 9 5 2
-output: -1 2 5 100
-        4
+input:  3 5 8 1
+output: MAX 8
+        8
 ```
 '''
 hints = [
-  "v.push(100); 다음 v.remove(0); 다음 v[0] = -1; 다음 v.sort(); — 추가, 삭제, 수정, 정렬.",
-  "remove(0)은 전부 앞으로 당기므로 두 번째였던 원소가 v[0]이 되고, 수정이 바꾸는 것은 그것입니다. sort()는 남은 것을 정렬합니다.",
+  "if let Some(m) = nums.iter().max() { println!(\"MAX {}\", m); } 그리고 find(...).copied().unwrap_or(0).",
+  "빈 이터레이터의 max()는 None이고 if let은 그냥 건너뜁니다. find는 Option<&i64>를 돌려주므로 copied()로 Option<i64>를 만들어야 unwrap_or(0)의 타입이 맞습니다.",
 ]
 
 # ---------------------------------------------------------------- 10
 [[quest]]
-id    = "rust.basic.10.maps"
-title = "주문 메모장"
-story = "이워 스트리트의 차찬텡은 모든 주문을 한 번씩 외치고, 주방은 요리별 집계를 알파벳 순으로 원한다. 메모장에는 요리만 있고 숫자가 없다."
+id    = "rust.basic.10.result"
+title = "숫자가 아닌 줄"
+story = "퍼시벌 스트리트의 계산대가 가격 한 줄을 받는다. 그중 하나가 단어다. 계산대는 죽지 않는다. 어느 줄이 왜 잘못됐는지 말한다."
 brief = '''
-`BTreeMap`은 키마다 값을 하나 담고 키를 스스로 정렬해 둡니다 — 정렬할 것이 없고, 순회하면
-이미 순서대로입니다. `.insert(k, v)`는 키를 추가하고(있으면 값을 바꾸고), `.remove(&k)`는
-키를 빼내고, `.get_mut(&k)`는 있는 값의 가변 참조를 돌려줍니다 — `Option`이므로
-unwrap하고, `*`가 그것을 통해 대입하게 해 줍니다.
+`Result<T, E>`는 `Ok(값)` 아니면 `Err(오류)`입니다. `Result`를 돌려주는
+함수 안에서 `?` 연산자는 `Ok`를 풀어 주고, `Err`이면 그 자리에서 호출한
+쪽으로 **반환**합니다 — `match` 대신 글자 하나. `"12".parse::<i64>()`는
+`Result<i64, ParseIntError>`입니다.
 
 ```
-count.insert("bill".to_string(), 1);
-count.remove("tea");
-*count.get_mut("bill").unwrap() = 9;
+out.push(tok.parse::<i64>()?);
 ```
 
-`count`는 이미 한 줄의 단어를 세고 있고 키 순서로 출력됩니다. `// FILL` 주석 자리에
-세 줄을 그 순서대로 입력하세요.
+`parse_all`은 벡터 아니면 첫 오류를 돌려주고, `main`이 그것을 match합니다.
+`// FILL` 주석이 있는 자리에 `?`가 있는 줄을 치세요.
 
 ```
-input:  tea toast tea
-output: bill 9
-        toast 1
+input:  1 2 3
+output: 6
 ```
 '''
 hints = [
-  "count.insert(\"bill\".to_string(), 1); 다음 count.remove(\"tea\"); 다음 *count.get_mut(\"bill\").unwrap() = 9;",
-  "키가 String이므로 insert는 \"bill\".to_string()을 받습니다; remove와 get_mut는 &str을 받는데, \"tea\"가 이미 그것입니다.",
+  "out.push(tok.parse::<i64>()?);",
+  "?는 반환 타입이 Result(또는 Option)이고 오류 타입이 맞는 함수 안에서만 됩니다 — 여기서는 ParseIntError이고, parse가 주는 것이 정확히 그것입니다.",
 ]
 
 # ---------------------------------------------------------------- 11
 [[quest]]
-id    = "rust.basic.11.sets"
-title = "도장 수첩"
-story = "퍼시벌 스트리트 매점의 적립 수첩에는 방문마다 도장이 하나씩 찍히고, 같은 가판대가 두 번 찍는다. 점원은 서로 다른 가판대가 몇인지, 그 번호를 순서대로 알아야 한다."
+id    = "rust.basic.11.match"
+title = "숫자의 모양"
+story = "빅토리아 파크의 개찰구가 표 번호를 나눈다: 0, 한 자리, 짝수, 홀수. 네 갈래, 그리고 빠져나가는 것은 없다."
 brief = '''
-집합은 각 값을 한 번만 담고, `BTreeSet`은 스스로 정렬해 두므로 호출할 정렬이 없습니다 —
-순회하면 이미 순서대로입니다. `.insert(x)`는 값을 추가하고(이미 있으면 아무것도 안 하고),
-`.remove(&x)`는 하나를 빼내며 있었는지를 돌려줍니다. 집합에는 "수정"이 없습니다: 값이
-곧 키이므로, 수정은 옛 값을 지우고 새 값을 넣는 것입니다 — 세 번째 줄이 하는 일이고,
-옛 값이 있었을 때만입니다.
+`match`는 모든 경우를 덮어야 하고, 각 갈래는 패턴입니다: 리터럴, 범위
+`1..=9`, 가드가 붙은 바인딩 `x if x % 2 == 0`, 나머지를 위한 `_`. 맞는
+첫 갈래가 이기므로 순서가 중요합니다. 표현식이기도 해서, 각 갈래의 값이
+`match` 전체의 값이 됩니다.
 
 ```
-seen.insert(100);
-seen.remove(&1);
-if seen.remove(&2) { seen.insert(20); }
+0 => "ZERO",
+1..=9 => "ONE DIGIT",
+x if x % 2 == 0 => "EVEN",
+_ => "ODD",
 ```
 
-`seen`은 이미 한 줄의 서로 다른 정수들을 담고 있고, 크기와 내용이 출력됩니다. `// FILL`
-주석 자리에 세 줄을 그 순서대로 입력하세요.
+`match`는 `TODO`라고 말하는 갈래 하나로 열려 있습니다. 그것을 저 네
+갈래로, 그 순서대로 바꾸세요.
 
 ```
-input:  3 1 3 2 1
-output: 3
-        3 20 100
+input:  12
+output: EVEN
 ```
 '''
 hints = [
-  "seen.insert(100); 다음 seen.remove(&1); 다음 if seen.remove(&2) { seen.insert(20); }",
-  "remove는 참조(&1)를 받고 값이 있었으면 true를 돌려줍니다 — if가 쓰는 것이 그것이라, 2가 없는 집합은 그대로 둡니다.",
+  "0 => \"ZERO\", 1..=9 => \"ONE DIGIT\", x if x % 2 == 0 => \"EVEN\", _ => \"ODD\",",
+  "가드 갈래를 _ 앞에 두세요. 아니면 절대 실행되지 않습니다. 1..=9는 양 끝을 포함하고, 1..9였다면 9는 가드로 넘어갑니다.",
 ]
 
 # ---------------------------------------------------------------- 12
 [[quest]]
-id    = "rust.basic.12.stack-queue"
-title = "접시 더미"
-story = "보링턴 로드의 딤섬 카운터에서 접시는 쌓여서 위에서 빠지고, 번호표는 줄 앞에서 빠진다. 두 더미 모두 손대지 않은 채 놓여 있다."
+id    = "rust.basic.12.iterator-chain"
+title = "이워 스트리트 한 번에"
+story = "이워 스트리트, 한 번 걷기: 짝수 가게만 남기고, 그 번호를 제곱하고, 열보다 큰 것을 전부 더한다. 인덱스도, 두 번째 반복문도 없다."
 brief = '''
-`Vec`은 스택입니다: `.push(x)`는 위에 추가하고, `.pop()`은 맨 위를 제거하고(`Option`으로),
-`.last_mut()`는 맨 위의 가변 참조라 제자리에서 고칠 수 있습니다. `VecDeque`는 큐입니다:
-`.push_back(x)`는 뒤에 서고 `.pop_front()`는 앞에서 나갑니다 — 그쪽은 이미 작성돼 있습니다.
+이터레이터 체인은 왼쪽에서 오른쪽으로 읽습니다. `.iter()`가 벡터를 걷고,
+`.filter(|&&x| …)`가 클로저가 그렇다고 한 것만 남기고, `.map(|x| …)`이
+변환하고, 마지막 `.collect()`나 `.sum()`이 값으로 바꿉니다. 그 마지막
+호출 전에는 아무것도 실행되지 않습니다. `iter()`는 `&i64`를 내고,
+`filter`는 그것의 참조를 보므로 숫자에 닿으려면 `&&x` 패턴이 됩니다.
 
 ```
-stack.push(42);
-stack.pop();
-*stack.last_mut().unwrap() = 0;
+let squares: Vec<i64> = nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect();
+let big: i64 = nums.iter().filter(|&&x| x > 10).sum();
 ```
 
-두 컨테이너 모두 한 줄의 정수들을 담고 있습니다. `// FILL` 주석 자리에 스택 세 줄을 그
-순서대로 입력하세요; 그러면 스택이 아래에서 위로 출력되고, 다음 줄에 큐의 앞이 출력됩니다.
+`// FILL` 주석이 있는 두 자리에 두 줄을 치세요.
 
 ```
-input:  1 2 3 4
-output: 1 2 3 0
-        1
+input:  1 2 3 4 11 20
+output: 4 16 400
+        31
 ```
 '''
 hints = [
-  "stack.push(42); 다음 stack.pop(); 다음 *stack.last_mut().unwrap() = 0;",
-  "pop이 42를 바로 다시 빼내므로, 수정은 그 전에 맨 위였던 값에 닿습니다 — 마지막에 들어온 것이 먼저 나갑니다.",
+  "nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect() — 둘째는 .filter(|&&x| x > 10).sum().",
+  "let에 적은 타입이 collect()와 sum()에게 무엇을 만들지 말해 줍니다. Vec<i64>와 i64가 없으면 컴파일러가 추론하지 못합니다.",
 ]
 
 # ---------------------------------------------------------------- 13
 [[quest]]
-id    = "rust.basic.13.sorting"
-title = "가격 사다리"
-story = "보링턴 로드의 과일 가판대는 게시판에는 싼 순으로, 사장에게는 비싼 순으로 가격을 적는다. 두 게시판 모두 상자가 트럭에서 내려온 순서 그대로다."
+id    = "rust.basic.13.fold-zip-windows"
+title = "짝, 오르막, 누적"
+story = "퍼시벌 스트리트의 트램 계수기가 하루치 숫자를 읽는다: 앞 시간보다 오른 시간이 몇 번인지, 전부의 곱, 그리고 각 숫자 옆에 그 시간."
 brief = '''
-`.sort()`는 `mut` `Vec`을 제자리에서 오름차순으로 정렬합니다. 다른 순서가
-필요하면 원소 둘을 비교하는 클로저를 받는 `.sort_by`가 있습니다: `a.cmp(b)`는
-오름차순이니 `b.cmp(a)`는 내림차순입니다.
+면접 화면이 계속 묻는 어댑터 셋. 슬라이스의 `.windows(2)`는 이웃한 쌍을
+원소 두 개짜리 슬라이스로 하나씩 냅니다. `.fold(start, |acc, x| …)`는
+누적값 하나를 전체에 꿰어 갑니다. `.zip(…)`은 두 수열을 나란히 걷고,
+`(0..).zip(&nums)`는 `enumerate`를 손으로 쓴 것입니다.
 
 ```
-asc.sort();
-desc.sort_by(|a, b| b.cmp(a));
+let ups = nums.windows(2).filter(|w| w[1] > w[0]).count();
+let product = nums.iter().fold(1i64, |acc, &x| acc * x);
+let pairs: Vec<String> = (0..).zip(&nums).map(|(i, x)| format!("{}:{}", i, x)).collect();
 ```
 
-숫자의 사본 둘이 만들어져 있고 둘 다 출력됩니다. `// FILL` 주석 자리에 저 두
-줄을 입력하세요.
+`// FILL` 주석이 있는 세 자리에 세 줄을 치세요.
 
 ```
-input:  5 2 9 1
-output: 1 2 5 9
-        9 5 2 1
+input:  1 3 2 5
+output: 2
+        30
+        0:1 1:3 2:2 3:5
 ```
 '''
 hints = [
-  "asc.sort(); — 그리고 desc.sort_by(|a, b| b.cmp(a));",
-  "둘 다 제자리에서 정렬하고 아무것도 돌려주지 않으므로, 대입할 것이 아니라 한 줄짜리 문장입니다.",
+  "windows(2).filter(|w| w[1] > w[0]).count() — fold(1i64, |acc, &x| acc * x) — (0..).zip(&nums).map(|(i, x)| format!(\"{}:{}\", i, x)).collect()",
+  "windows는 슬라이스 메서드라 nums.iter()가 아니라 nums에 바로 붙습니다. fold의 1i64가 누적값의 타입을 고정합니다. 그냥 1이면 모호합니다.",
 ]
 
 # ---------------------------------------------------------------- 14
 [[quest]]
-id    = "rust.basic.14.sort-by-key"
-title = "순위표"
-story = "타임스 스퀘어 위 오락실은 최고 점수를 높은 순으로, 동점은 이름 순으로 게시한다. 게시판은 아직 사람들이 들어온 순서 그대로다."
+id    = "rust.basic.14.entry"
+title = "바자가 외치는 것"
+story = "아침 내내 자딘스 바자에서 외쳐진 모든 단어를 센다. 큰 것부터, 같으면 가나다순."
 brief = '''
-`.sort_by_key`는 원소마다 클로저가 돌려주는 값으로 정렬합니다. 튜플은 필드
-순서대로 비교되므로 튜플 키는 첫 필드로 정렬하고 같으면 두 번째 필드로 가르며,
-필드를 `std::cmp::Reverse`로 감싸면 그 필드만 내림차순이 됩니다.
+`HashMap`의 entry API가 한 줄짜리 카운터입니다. `counts.entry(key)`는
+키가 이미 있든 없든 그 자리를 찾고, `.or_insert(0)`은 없으면 `0`을
+넣은 뒤 어느 쪽이든 값의 `&mut`를 돌려주고, `*… += 1`이 올립니다. 조회
+한 번, `contains_key` 먼저 할 필요 없음.
 
 ```
-rows.sort_by_key(|r| (std::cmp::Reverse(r.1), r.0.clone()));
+*counts.entry(w.to_string()).or_insert(0) += 1;
 ```
 
-행은 `(String, i64)` 쌍으로 읽혀 출력됩니다. `// FILL` 주석 자리에 저 줄을
-입력하세요.
+맵, 반복문, 정렬, 출력은 적혀 있습니다. `// FILL` 주석이 있는 자리에
+entry 줄을 치세요.
 
 ```
-input:  3
-        mei 90
-        alex 95
-        kit 90
-output: alex 95
-        kit 90
-        mei 90
+input:  a b a c b a
+output: a 3
+        b 2
+        c 1
 ```
 '''
 hints = [
-  "rows.sort_by_key(|r| (std::cmp::Reverse(r.1), r.0.clone()));",
-  "키는 튜플입니다: `Reverse(score)`가 점수를 내림차순으로 만들고, 그 뒤의 `name.clone()`이 동점을 알파벳순으로 가릅니다.",
+  "*counts.entry(w.to_string()).or_insert(0) += 1;",
+  "키가 String이므로 w(&str)를 to_string()으로 바꿉니다. 앞의 별표가 or_insert가 돌려준 &mut usize를 역참조합니다.",
 ]
 
 # ---------------------------------------------------------------- 15
 [[quest]]
-id    = "rust.basic.15.closures"
-title = "봉사료"
-story = "하이산 플레이스 푸드코트의 계산서 프린터는 모든 줄에 같은 요금을 더한다. 요금을 한 번 들었지만 첫 줄 전에 잊어버렸다."
+id    = "rust.basic.15.sort-by"
+title = "리더보드"
+story = "타임스 스퀘어의 오락실이 그날 순위를 붙인다: 점수 높은 순, 같으면 이름이 앞서는 쪽. 두 번째 판은 이름 길이순이다."
 brief = '''
-클로저는 인라인으로 쓴 함수입니다: `|x| x + 1`. 건네받지 않아도 주변 스코프의
-변수를 쓸 수 있는데, 그것이 캡처입니다. 매개변수 타입 `|x: i64|`를 적는 것은
-선택이지만 컴파일러가 추측하지 않게 해 줍니다.
+`sort_by`는 `Ordering`을 돌려주는 비교 클로저를 받습니다. `b.cmp(&a)`가
+내림차순이고, `.then_with(|| …)`가 두 번째 비교로 동점을 가릅니다.
+`sort_by_key`는 클로저가 뽑아낸 것으로 오름차순 정렬하고, 둘 다
+**안정적**입니다: 같은 키는 순서를 지킵니다. `cmp`가 없는 실수는
+`a.partial_cmp(b).unwrap()`입니다.
 
 ```
-let add = |x: i64| x + k;
+rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+by_len.sort_by_key(|r| r.0.len());
 ```
 
-`k`와 숫자들은 읽혀 있고, `add`는 모든 숫자에 적용되어 출력됩니다. 자리 표시
-`let add` 대신 저 줄을 입력하세요.
+`// FILL` 주석이 있는 자리에 두 정렬을 치세요. `by_len`은 첫 정렬 전에
+만든 clone이라 동점은 입력 순서입니다.
 
 ```
-input:  5
-        1 2 3
-output: 6 7 8
+input:  MEI 90
+        BO 95
+        ALEX 90
+output: BO ALEX MEI
+        BO MEI ALEX
 ```
 '''
 hints = [
-  "let add = |x: i64| x + k;",
-  "`k`는 읽기만 하므로 클로저는 빌립니다. `move`는 필요 없고 `k`는 그 뒤에도 쓸 수 있습니다.",
+  "rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))); 그리고 by_len.sort_by_key(|r| r.0.len());",
+  "cmp에서 a보다 b가 앞에 오는 것이 내림차순을 만듭니다. cmp는 참조를 받으므로 &a.1입니다. then_with는 첫 비교가 Equal일 때만 실행됩니다.",
 ]
 
 # ---------------------------------------------------------------- 16
 [[quest]]
-id    = "rust.basic.16.lambdas"
-title = "짝수 테이블"
-story = "빅토리아 파크 푸드 페어는 테이블에 번호를 매기고 짝수 테이블만 제곱미터 부담금을 낸다. 클립보드의 부담금 합계는 0이다."
+id    = "rust.basic.16.heap-reverse"
+title = "작은 것부터"
+story = "타임스 스퀘어의 딤섬 창구는 번호가 가장 낮은 표부터 부른다. 더미는 힙이고, 러스트의 힙은 따로 말하지 않으면 가장 큰 것을 내준다."
 brief = '''
-이터레이터 어댑터는 사슬로 이어집니다: `.iter()`가 `Vec`을 걷고, `.filter(…)`는
-클로저가 예라고 한 원소만 남기며, `.map(…)`은 각 원소를 클로저의 반환값으로
-바꾸고, `.sum()`이 더합니다. 끝의 `.sum()`이 당기기 전에는 아무것도 실행되지
-않습니다. 클로저는 참조를 보므로 `filter`는 `&&x`를, `map`은 `&x`를 받습니다.
+`BinaryHeap`은 최대 힙입니다: `pop()`이 가장 큰 것을 줍니다. 값마다
+`std::cmp::Reverse`로 감싸면 순서가 뒤집혀서 `BinaryHeap<Reverse<i64>>`는
+가장 작은 것을 냅니다 — 최단 경로와 k번째 작은 수 문제가 전부 원하는
+최소 힙. `while let Some(Reverse(x)) = heap.pop()`이 비우면서 풀어냅니다.
 
 ```
-let total: i64 = nums.iter().filter(|&&x| x % 2 == 0).map(|&x| x * x).sum();
+heap.push(Reverse(x));
+while let Some(Reverse(x)) = heap.pop() { out.push(x); }
 ```
 
-숫자들은 읽혀 있고 `total`은 출력됩니다. 자리 표시 `let total: i64 = 0;` 대신
-저 줄을 입력하세요.
+`// FILL` 주석이 있는 자리에 push와 비우기를 치세요.
 
 ```
-input:  1 2 3 4 5 6
-output: 56
+input:  5 1 9 3
+output: 1 3 5 9
 ```
 '''
 hints = [
-  "let total: i64 = nums.iter().filter(|&&x| x % 2 == 0).map(|&x| x * x).sum();",
-  "`let`의 `: i64`가 `sum`에게 무엇으로 더할지 알려 줍니다. 없으면 컴파일러가 어떤 숫자 타입인지 되묻습니다.",
+  "heap.push(Reverse(x)); 그다음 while let Some(Reverse(x)) = heap.pop() { out.push(x); }",
+  "Reverse는 튜플 구조체라 push에서는 Reverse(x)로 감싸고 패턴에서는 같은 모양으로 풀어냅니다. 없으면 출력이 큰 것부터 나옵니다.",
 ]
 
 # ---------------------------------------------------------------- 17
 [[quest]]
-id    = "rust.basic.17.threads"
+id    = "rust.basic.17.derive-ord"
+title = "필드 순서대로 비교"
+story = "퍼시벌 스트리트 게시판의 요금표, 구역순 그다음 가격순. 비교를 쓰는 사람은 없다. 컴파일러가 쓰라는 말을 듣는다."
+brief = '''
+`sort()`, `max()`, `BinaryHeap`, `==`는 모두 타입이 비교 트레이트를
+구현해야 합니다. `#[derive(…)]`가 구조체에 그것을 대신 써 주는데,
+**선언된 필드 순서대로 필드별로** 비교합니다: `==`에는 `PartialEq, Eq`,
+`<`와 정렬에는 `PartialOrd, Ord`, `.clone()`에는 `Clone`, `{:?}`에는
+`Debug`.
+
+```
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+```
+
+`struct Fare` 바로 윗줄, `// FILL` 주석이 있는 자리에 그 속성을 치세요.
+없으면 `fares.sort()`가 컴파일되지 않습니다.
+
+```
+input:  2 5 BUS
+        1 9 TRAM
+        1 3 FERRY
+output: FERRY TRAM BUS
+        BUS
+```
+'''
+hints = [
+  "struct Fare 바로 위에 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)].",
+  "Ord는 Eq와 PartialOrd를, PartialOrd는 PartialEq를 요구하므로 넷이 다 들어갑니다. 구조체의 필드 순서가 정렬 순서입니다.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.basic.18.fast-input"
+title = "한 번에 다 읽는다"
+story = "모든 해커랭크 문제의 첫 줄: n과 k, 그다음 숫자 n개. 키오스크는 전부를 한 번에 읽고 위에서부터 토큰을 뜯어 간다."
+brief = '''
+`read_to_string`으로 stdin을 한 번에 읽고, 이터레이터 하나에서 토큰을
+뜯어 갑니다. `split_ascii_whitespace()`가 `&str`을 하나씩 내고,
+`.next().unwrap().parse()`가 하나를 숫자로 바꾸고, `it.by_ref().take(n)`이
+이터레이터를 소비하지 않고 다음 `n`개를 가져갑니다. `let`에 적은 타입이
+parse의 목표를 정합니다.
+
+```
+let n: usize = it.next().unwrap().parse().unwrap();
+let k: usize = it.next().unwrap().parse().unwrap();
+let nums: Vec<i64> = it.by_ref().take(n).map(|t| t.parse().unwrap()).collect();
+```
+
+`// FILL` 주석이 있는 자리에 세 줄을 치세요. 프로그램은 `n`개 중 앞
+`k`개의 합을 출력합니다.
+
+```
+input:  5 2
+        3 4 5 6 7
+output: 7
+```
+'''
+hints = [
+  "let n: usize = it.next().unwrap().parse().unwrap(); 두 번, 그다음 it.by_ref().take(n).map(|t| t.parse().unwrap()).collect()",
+  "parse()는 let의 타입에서 목표를 추론하므로 : usize와 : Vec<i64>가 실제 일을 합니다. by_ref()가 있어야 take()가 이터레이터를 먹어 치우는 대신 빌립니다.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.basic.19.formatting"
+title = "소수점 여섯 자리"
+story = "재래시장의 저울은 평균을 소수점 여섯 자리로 찍고, 눈금을 한 열로 맞추고, 개수에 앞자리 0을 붙여 찍는다."
+brief = '''
+`println!`의 중괄호는 콜론 뒤에 서식을 받습니다. `{:.6}`은 소수점 여섯
+자리. `{:<5}`는 다섯 칸에 왼쪽 정렬(`>` 오른쪽, `^` 가운데). `{:03}`은
+숫자를 0으로 채워 세 자리로. `{:?}`는 디버그 형식으로, `Vec` 전체를
+찍습니다.
+
+```
+println!("{:.6}", mean);
+println!("{:<5}|", x);
+println!("{:03}", nums.len());
+```
+
+`// FILL` 주석이 있는 자리에 `println!` 세 줄을 치세요.
+
+```
+input:  1 2 4
+output: 2.333333
+        1    |
+        2    |
+        4    |
+        003
+```
+'''
+hints = [
+  "println!(\"{:.6}\", mean); — println!(\"{:<5}|\", x); — println!(\"{:03}\", nums.len());",
+  "서식은 중괄호 안, 콜론 뒤에 옵니다: .6은 정밀도, <5는 정렬과 너비, 03은 0 채움과 너비.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.basic.20.overflow"
+title = "i64가 멈추는 곳"
+story = "헤네시 로드 환전소의 큰 숫자 둘. 넓은 계산대는 진짜 곱을 말하고, 좁은 계산대는 거짓말 대신 NONE이라 말하고, 셋째는 한 바퀴 돈다. 그러라고 했으니까."
+brief = '''
+들어가지 않는 `i64` 곱은 디버그에서는 **패닉**하고 릴리스에서는 한 바퀴
+돕니다 — 어느 쪽이든 틀린 값입니다. `as i128`은 곱하기 전에 넓힙니다.
+`a.checked_mul(b)`는 결과가 들어가지 않으면 `None`을 돌려줍니다.
+`a.wrapping_mul(b)`는 일부러 2⁶⁴로 나눈 나머지로 돕니다. 해싱 문제가
+원하는 것이 그것입니다.
+
+```
+let wide = a as i128 * b as i128;
+let narrow = a.checked_mul(b);
+println!("{}", a.wrapping_mul(b));
+```
+
+`// FILL` 주석이 있는 자리에 세 줄을 치세요.
+
+```
+input:  3000000000 4000000000
+output: NONE
+        12000000000000000000
+        -6446744073709551616
+```
+'''
+hints = [
+  "let wide = a as i128 * b as i128; — let narrow = a.checked_mul(b); — println!(\"{}\", a.wrapping_mul(b));",
+  "곱하기 전에 두 피연산자를 캐스트하세요. (a * b) as i128은 먼저 넘친 뒤 잔해를 넓힙니다. checked_와 wrapping_은 add, sub, mul에 똑같이 있습니다.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.basic.21.lifetime-fn"
+title = "그건 얼마나 오래 유효한가"
+story = "이워 스트리트의 가게 간판 둘과 더 긴 쪽을 가리키는 함수. 함수는 빌린 것을 돌려주고, 컴파일러는 그것이 누구 것인지 알고 싶어 한다."
+brief = '''
+참조를 돌려주는 함수는 어느 입력에서 빌렸는지 말해야 합니다. `<'a>`가
+수명을 선언하고, `&'a str`이 매개변수를 거기 묶고, `-> &'a str`이 결과가
+그만큼 산다고 약속합니다. 입력 둘이 같은 `'a`이면 결과는 둘 중 **짧은**
+쪽만큼 유효합니다.
+
+```
+fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {
+```
+
+본문은 적혀 있습니다. `// FILL`로 표시된 시그니처 줄을 주석이 붙은
+것으로 바꾸세요. 수명이 없으면 컴파일되지 않습니다(E0106).
+
+```
+input:  TRAM
+        FERRY
+output: FERRY
+```
+'''
+hints = [
+  "fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {",
+  "참조 매개변수가 하나면 컴파일러가 수명을 대신 채워 줍니다(생략 규칙). 둘이면 결과가 어느 쪽을 빌렸는지 알 수 없으니 당신이 말합니다.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.basic.22.lifetime-struct"
+title = "이름을 빌린 표"
+story = "트램 차고의 일일권은 자기 것이 아닌 이름을 달고 있다: 명부를 가리킨다. 표는 그것이 가리키는 페이지보다 오래 살 수 없다."
+brief = '''
+참조를 담는 구조체에는 수명 매개변수가 필요하고, 그 구조체의 모든 `impl`
+블록에도 필요합니다. `name: &'a str` 필드를 가진 `struct Ticket<'a>`는
+`Ticket`이 자기가 가리키는 글보다 오래 살 수 없다고 말하고,
+`impl<'a> Ticket<'a>`가 같은 이름을 메서드로 가져갑니다.
+
+```
+struct Ticket<'a> {
+impl<'a> Ticket<'a> {
+```
+
+`// FILL`로 표시된 두 줄을 바꾸세요. 필드와 메서드는 적혀 있고 바뀌지
+않습니다.
+
+```
+input:  MEI 2
+output: MEI@2
+```
+'''
+hints = [
+  "struct Ticket<'a> { 그리고 impl<'a> Ticket<'a> {",
+  "필드의 'a는 이미 있습니다. 구조체에서 선언해야 하고, impl은 impl<'a>로 다시 선언한 뒤 Ticket<'a>로 적용합니다.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.basic.23.trait"
+title = "그녀만의 트레이트"
+story = "코즈웨이베이의 모든 탈것에는 요금이 있고, 모든 요금에는 라벨이 있다. 트램은 3 정액, 버스는 킬로미터당 2. 라벨은 둘을 위해 한 번만 쓴다."
+brief = '''
+`trait`는 행동에 이름을 붙입니다: 타입이 약속하는 메서드의 집합.
+`impl Trait for Type { … }`이 그 약속을 지키고, 트레이트가 기본 본문을
+준 메서드 — 여기서는 `label` — 는 그것과 함께 공짜로 딸려 와서 당신이
+쓴 메서드를 호출합니다.
+
+```
+impl Fare for Tram { fn fare(&self) -> i64 { 3 } }
+impl Fare for Bus { fn fare(&self) -> i64 { 2 * self.km } }
+```
+
+트레이트, 두 구조체, `main`은 적혀 있습니다. `// FILL` 주석이 있는
+자리에 두 `impl`을 치세요.
+
+```
+input:  7
+output: 3 HKD
+        14 HKD
+```
+'''
+hints = [
+  "impl Fare for Tram { fn fare(&self) -> i64 { 3 } } 그리고 Bus에도 같은 모양으로 2 * self.km.",
+  "fare만 쓰면 됩니다. label은 트레이트에 기본 본문이 있어 상속됩니다. 메서드 시그니처는 &self까지 트레이트의 것과 정확히 같아야 합니다.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "rust.basic.24.generics"
+title = "한 번만 쓴다"
+story = "하이산 플레이스 안내 데스크의 함수 하나가 가장 큰 것을 찾는다. 숫자를 받든 글자를 받든. 한 번만 쓰고, 비교할 수 있기만을 요구한다."
+brief = '''
+`<T: Bound>`가 함수를 제네릭으로 만듭니다: `T`는 그 바운드를 구현하는
+아무 타입이나 뜻합니다. `PartialOrd`가 본문에서 `>`를 쓰게 하고,
+`Copy`가 `let mut best = xs[0]`으로 슬라이스에서 원소를 복사해 오게
+합니다. 컴파일러는 호출된 타입마다 함수 사본 하나를 만듭니다.
+
+```
+fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {
+```
+
+`// FILL`로 표시된 시그니처 줄을 바꾸세요. 본문은 적혀 있고 `main`이
+`&[i64]`와 `&[char]`로 호출합니다.
+
+```
+input:  3 9 2
+        b z a
+output: 9
+        z
+```
+'''
+hints = [
+  "fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {",
+  "Copy를 빼면 xs[0]이 빌린 슬라이스에서의 이동이 됩니다(E0507). PartialOrd를 빼면 >가 부를 것이 없습니다. 바운드는 본문이 필요한 만큼, 그 이상은 아닙니다.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "rust.basic.25.box-dyn"
+title = "컴파일러가 이름 붙일 수 있는 크기"
+story = "요금 사무소의 쟁반 하나에 트램 표와 버스 표가 나란히. 크기가 다르니 쟁반은 상자를 담고, 상자마다 자기가 무엇을 담았는지 안다."
+brief = '''
+`Vec`은 모든 원소가 같은 크기여야 하는데, 구조체 둘은 그렇지 않습니다.
+`Box<dyn Fare>`는 `Fare`를 구현하는 *무언가*를 힙에 소유하는 포인터
+크기의 값 하나입니다. 어느 메서드가 실행될지는 실행 시간에 정해집니다
+(동적 디스패치). `&dyn Fare`가 빌린 형태입니다.
+
+```
+let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Bus { km })];
+```
+
+트레이트와 두 `impl`은 적혀 있습니다. `// FILL` 주석이 있는 자리에
+벡터를 치세요.
+
+```
+input:  7
+output: 17
+        2
+```
+'''
+hints = [
+  "let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Bus { km })];",
+  "let의 타입이 Box<Tram>과 Box<Bus>를 각각 Box<dyn Fare>로 바꿉니다. 그것이 없으면 vec!이 서로 다른 두 원소 타입을 거부합니다.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "rust.basic.26.rc-refcell"
+title = "공유한 손잡이로 고치기"
+story = "타임스 스퀘어 기계실의 일지 한 권, 그것을 쥔 직원 둘. 어느 쪽도 혼자 주인이 아니고, 빌림 검사는 컴파일러에서 일지 자체로 옮겨 간다."
+brief = '''
+`Rc<T>`는 참조 계수 소유자입니다: `Rc::clone(&log)`은 **같은** 값의 두
+번째 손잡이를 만들지, 사본을 만들지 않습니다. `RefCell<T>`는 공유한
+손잡이를 통해 고치게 해 줍니다 — `.borrow_mut()`가 빌림 규칙을 실행
+시간에 검사하고, 어기면 패닉합니다. `Rc<RefCell<…>>`가 단일 스레드의
+공유되고 변경 가능한 값입니다.
+
+```
+let writer = Rc::clone(&log);
+```
+
+`log`는 만들어져 있고 반복문이 `writer`를 통해 씁니다. `// FILL` 주석이
+있는 자리에 두 번째 손잡이를 치세요.
+
+```
+input:  1 2 3
+output: 2
+        [2, 4, 6]
+```
+'''
+hints = [
+  "let writer = Rc::clone(&log);",
+  "log.clone()도 같은 일을 합니다. Rc::clone(&log)은 계수만 올라갔다고 소리 내어 말하는 표기입니다. strong_count가 2인 것이 증거입니다.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "rust.basic.27.closures"
+title = "클로저 세 종류"
+story = "럭키맥 키오스크의 봉사료: 수수료를 더하고, 곁다리로 몇 번 불렸는지 세는 클로저. 두 번째 것은 부를 수 있는 무언가만 원하는 함수에 넘겨진다."
+brief = '''
+클로저는 자기가 쓰는 것을 붙잡습니다. 읽기만 하면 `Fn`, 붙잡은 변수를
+**바꾸면** `FnMut`이고 `let mut`로 묶어야 하며, 값을 꺼내 가면
+`FnOnce`입니다. 함수는 바운드로 셋 중 무엇이든 받을 수 있습니다:
+`f: impl Fn(i64) -> i64`. 앞의 `move`는 값으로 붙잡기를 강제하고,
+스레드가 원하는 것이 그것입니다.
+
+```
+let mut charge = |x: i64| { seen += 1; x + fee };
+println!("{}", apply(|x| x * fee, 10));
+```
+
+`apply`는 적혀 있습니다. `// FILL` 주석이 있는 자리에 `FnMut` 클로저와
+호출을 치세요.
+
+```
+input:  1 2 3
+output: 3 4 5
+        3
+        20
+```
+'''
+hints = [
+  "let mut charge = |x: i64| { seen += 1; x + fee }; 그다음 apply(|x| x * fee, 10)",
+  "charge는 쓰이는 동안 seen을 가변으로 빌리므로 seen의 println!은 마지막 호출 뒤에 와야 합니다 — 실제로 그렇습니다. apply에 넘기는 클로저는 fee를 읽기만 하므로 그냥 Fn입니다.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "rust.basic.28.threads"
 title = "계산대 넷"
-story = "자딘스 바자는 계산대 넷을 동시에 열고 각각 제 영수증을 처리한다. 매니저가 계산대 순서로 거두는데 쟁반은 빈 채로 돌아온다."
+story = "자딘스 바자가 계산대 넷을 한꺼번에 열고 각자 자기 영수증을 처리한다. 매니저는 계산대 순서대로 걷고, 쟁반은 비어서 돌아온다."
 brief = '''
 `thread::spawn`은 클로저를 실행하는 스레드를 시작하고 `JoinHandle`을
-돌려줍니다. `move`는 클로저가 쓰는 것의 사본을 클로저 자신의 것으로 주어,
-사라졌을지 모르는 스택 프레임을 스레드가 빌리지 않게 합니다. `.join()`은
-스레드를 기다렸다가 클로저의 반환값을 `Result`로 돌려줍니다.
+돌려줍니다. `move`는 클로저가 쓰는 것의 사본을 클로저에 주어, 스레드가
+사라졌을지 모를 스택 프레임을 빌리지 않게 합니다. `.join()`은 스레드를
+기다리고 클로저가 돌려준 것을 `Result`로 돌려줍니다.
 
 ```
 handles.push(thread::spawn(move || x * x));
 squares.push(h.join().unwrap());
 ```
 
-두 루프는 적혀 있습니다. 첫 번째 `// FILL` 주석 자리에 첫 줄을, 두 번째 자리에
-둘째 줄을 입력하세요.
+두 반복문은 적혀 있습니다. 첫 `// FILL` 주석 자리에 첫 줄을, 둘째 자리에
+둘째 줄을 치세요.
 
 ```
 input:  1 2 3
@@ -510,322 +854,164 @@ output: 1 4 9
 '''
 hints = [
   "handles.push(thread::spawn(move || x * x)); — 그다음 squares.push(h.join().unwrap());",
-  "핸들을 넣은 순서대로 join하는 것이 출력을 입력 순서로 유지합니다. 스레드 자체는 아무 때나 끝나도 됩니다.",
+  "핸들을 넣은 순서대로 join하는 것이 출력을 입력 순서로 유지합니다. 스레드 자체는 아무 때나 끝납니다.",
 ]
 
-# ---------------------------------------------------------------- 18
+# ---------------------------------------------------------------- 29
 [[quest]]
-id    = "rust.basic.18.binary-tree"
-title = "자동 완성"
-story = "퍼시벌 스트리트 전화 부스, 회색 안내문이 돌아와 천 번은 본 트리를 내민다. 직접 노드 하나씩 키우는 트리에는 완성이 없고, 그때까지 트리는 비어 있다."
+id    = "rust.basic.29.arc-mutex"
+title = "서랍 하나, 손은 여럿"
+story = "타임스 스퀘어의 현금 서랍 하나와 모든 계산대에서 뻗어 오는 손. 손마다 서랍의 손잡이를 하나씩 갖고, 서랍은 한 번에 한 손에게만 열린다."
 brief = '''
-이진 탐색 트리는 값 하나와 선택적 자식 둘 `Option<Box<Node>>`을 가진
-`Node`입니다: `None`은 빈 서브트리, `Some(Box::new(…))`는 실제 서브트리입니다.
-삽입은 재귀입니다 — 빈 서브트리는 새 잎이 되고, 실제 서브트리는 값을 속한 쪽으로
-내려보낸 뒤 돌아온 서브트리를 저장합니다. `.take()`는 자식을 `Option`에서 꺼내
-재귀 호출에 건네고 다시 넣을 수 있게 합니다.
+`Arc<T>`는 스레드용 `Rc`입니다: `Arc::clone(&total)`이 스레드마다 값
+하나의 손잡이를 줍니다. `Mutex<T>`가 그것을 지킵니다: `.lock().unwrap()`이
+잠금을 기다렸다가 값으로 역참조되는 가드를 돌려주고, 가드가 스코프를
+벗어나면 잠금이 풀립니다. `*guard += x`가 그것을 통해 씁니다.
 
 ```
-if value < n.value {
-    n.left = insert(n.left.take(), value);
-} else {
-    n.right = insert(n.right.take(), value);
-}
+let total = Arc::clone(&total);
+*total.lock().unwrap() += x;
 ```
 
-`Node`, `inorder`, `height`, `main`과 `insert`의 뼈대는 그 `if … else`까지 적혀
-있습니다. `// FILL` 주석 자리에 대입문 두 줄을 입력하세요.
-
-```
-input:  5 3 8 1 4
-output: 1 3 4 5 8
-        3
-```
-'''
-hints = [
-  "n.left = insert(n.left.take(), value); — 그리고 n.right = insert(n.right.take(), value);",
-  "`take()`는 뒤에 `None`을 남기고 내려보낼 자식을 줍니다. 호출 결과를 대입하면 자란 서브트리가 제자리로 돌아갑니다.",
-]
-
-# ---------------------------------------------------------------- 04
-[[quest]]
-id    = "rust.basic.04.int-types"
-title = "카운터의 폭"
-story = "퍼시벌 스트리트 전차 정류장 카운터는 숫자를 32비트 칸에, 하루 합계를 64비트 칸에 담는데, 하나를 다른 쪽으로 복사하는 줄이 빠져 있다."
-brief = '''
-정수에는 폭이 있습니다. `i32`는 32비트에 부호가 있고, `u64`는 64비트에
-음수가 없습니다. Rust는 둘 사이를 알아서 바꿔 주지 않습니다. `as`가 그 일을
-하고, 목표 타입은 여러분이 씁니다. 폭마다 자기 한계를 상수로 알고 있습니다 —
-`i32::MAX`, `u64::MAX`.
-
-```
-let b: u64 = a as u64;
-println!("{}", u64::MAX);
-```
-
-`a`는 `i32`로 읽어 둡니다. 첫 번째 `// FILL` 자리에 캐스트를, 두 번째 자리에
-`u64::MAX` 줄을 그대로 입력하세요.
-
-```
-input:  21
-output: 21
-        42
-        2147483647
-        18446744073709551615
-```
-'''
-hints = [
-  "let b: u64 = a as u64; — 그다음 마지막 줄에 println!(\"{}\", u64::MAX);",
-  "정수 폭을 바꾸는 방법은 `as`뿐입니다. 없이 `let b: u64 = a;`라고 쓰면 컴파일되지 않습니다.",
-]
-
-# ---------------------------------------------------------------- 05
-[[quest]]
-id    = "rust.basic.05.big-int"
-title = "서른두 바이트"
-story = "코즈웨이베이의 모든 키와 해시는 서른두 바이트 폭이다. 키오스크는 그 단어를 64자리 16진수로 찍는데, 오늘은 전부 0이다."
-brief = '''
-256비트 정수 타입은 없으니, 32바이트 숫자는 32바이트짜리 배열입니다:
-`[u8; 32]`. `u128`이 가장 넓은 정수이고, `to_be_bytes()`는 그것을 상위
-바이트부터 16바이트로 바꾸며, `copy_from_slice`는 같은 길이의 슬라이스에
-슬라이스를 써 넣습니다 — 여기서는 단어의 마지막 16바이트에, 종이에 적듯
-숫자가 오른쪽 끝에 놓이도록.
-
-```
-word[16..].copy_from_slice(&n.to_be_bytes());
-```
-
-`word`는 0으로 채워진 32바이트로 시작해 16진수로 출력됩니다. `// FILL` 주석
-자리에 그 줄을 그대로 입력하세요.
-
-```
-input:  255
-output: 00000000000000000000000000000000000000000000000000000000000000ff
-        64
-```
-'''
-hints = [
-  "word[16..].copy_from_slice(&n.to_be_bytes());",
-  "`word[16..]`는 마지막 열여섯 바이트이고 `n.to_be_bytes()`도 열여섯 바이트입니다. copy_from_slice는 두 길이가 같아야 합니다.",
-]
-
-# ---------------------------------------------------------------- 06
-[[quest]]
-id    = "rust.basic.06.floats"
-title = "저울의 두 눈금"
-story = "자딘스 바자의 과일 저울은 배정밀도 무게를 간직하고 다이얼에는 단정밀도로 보여 주는데, 오늘 아침엔 둘 다 0이다."
-brief = '''
-`f64`는 64비트 부동소수점 수로, 달리 정해진 게 없으면 쓰는 것이고, `f32`는
-폭이 절반에 정밀도가 약 일곱 자리입니다. 타입만 정해 주면 `parse()`가
-텍스트에서 둘 중 무엇이든 읽고, `as f32`는 `f64`를 좁히며, 서식 문자열의
-`{:.3}`은 소수점 아래 세 자리를 찍습니다.
-
-```
-let x: f64 = s.parse().unwrap();
-let y = x as f32;
-```
-
-`s`는 다듬어진 입력입니다. 두 자리표시자 자리에 위의 두 줄을 그대로
-입력하세요.
-
-```
-input:  3.14159265358979
-output: 3.141593
-        3.142
-        6.3
-```
-'''
-hints = [
-  "let x: f64 = s.parse().unwrap(); 그다음 let y = x as f32;",
-  "parse()는 타입을 알아야 합니다. 바인딩의 `: f64`가 그것을 알려 줍니다.",
-]
-
-# ---------------------------------------------------------------- 08
-[[quest]]
-id    = "rust.basic.08.string-slices"
-title = "조각난 간판"
-story = "이워 스트리트의 간판장이는 가게 이름 앞 세 글자를 잘라 새 판에 옮겨 붙이고 뒤에 접미사를 칠하는데, 판이 비어 있다."
-brief = '''
-`&str`은 바이트 범위로 자를 수 있습니다: `&s[..3]`은 앞 세 바이트를 복사
-없이 `s`에서 빌려 옵니다. `String::from(head)`는 커질 수 있는 소유 복사본을
-만들고, `push_str`은 거기에 제자리에서 덧붙입니다. (범위는 바이트 단위라
-ASCII 텍스트용이고, 다중 바이트 문자를 가르는 범위는 패닉합니다.)
-
-```
-let head: &str = &s[..3];
-t.push_str("-lane");
-```
-
-`s`는 다듬어진 입력이고 `t`는 `head`로 만들어집니다. 첫 번째 `// FILL`
-자리에 슬라이스를, 두 번째 자리에 덧붙임을 그대로 입력하세요.
-
-```
-input:  percival
-output: per
-        per-lane
-        8
-```
-'''
-hints = [
-  "let head: &str = &s[..3]; 그리고 t를 만든 뒤 t.push_str(\"-lane\");",
-  "`&s[..3]`은 빌리고, String::from은 복사하고, push_str은 복사본에 덧붙이며 s는 그대로 둡니다.",
-]
-
-# ---------------------------------------------------------------- 09
-[[quest]]
-id    = "rust.basic.09.int-slices"
-title = "줄의 한가운데"
-story = "하이산 플레이스 대기열 카운터는 줄 한가운데 두 사람을 새 명단에 옮기고 뒤에 줄 전체를 붙이는데, 명단이 비어 있다."
-brief = '''
-`v[1..3]`은 `Vec`의 슬라이스입니다: 원소 1과 2를 빌린 것. `.to_vec()`은
-슬라이스를 자기만의 새 `Vec`으로 복사하고, `extend_from_slice`는 슬라이스의
-모든 원소를 `Vec` 끝에 덧붙입니다. 먼저 복사하고, 그다음 덧붙입니다 — 원래의
-`v`는 절대 바뀌지 않습니다.
-
-```
-let mut middle: Vec<i64> = v[1..3].to_vec();
-middle.extend_from_slice(&v);
-```
-
-`v`는 입력에서 읽습니다. 두 자리표시자 자리에 위의 두 줄을 그대로 입력하세요.
+`spawn` 앞에 clone을, 그 안에 잠근 덧셈을, `// FILL` 주석이 있는 자리에
+치세요. 이름을 가리는(shadowing) 것이 관용구입니다.
 
 ```
 input:  1 2 3 4
-output: 2 3 1 2 3 4
-        6
+output: 10
+        1
 ```
 '''
 hints = [
-  "let mut middle: Vec<i64> = v[1..3].to_vec(); 그다음 middle.extend_from_slice(&v);",
-  "Vec에 범위를 쓰면 슬라이스입니다. to_vec()이 extend를 할 수 있게 해 주는 복사입니다.",
+  "spawn 앞에 let total = Arc::clone(&total);, 안에 *total.lock().unwrap() += x;",
+  "clone이 없으면 move가 하나뿐인 Arc를 첫 스레드로 가져가서 둘째 반복이 E0382입니다. 끝에 찍히는 계수가 1인 것은 모든 clone이 자기 스레드와 함께 버려졌기 때문입니다.",
 ]
 
-# ---------------------------------------------------------------- 10
+# ---------------------------------------------------------------- 30
 [[quest]]
-id    = "rust.basic.10.byte-slices"
-title = "이름의 바이트"
-story = "타임스 스퀘어 개찰구는 이름을 날바이트로 읽어 앞 두 바이트만 남기고 뒤에 느낌표를 찍는데, 도장이 빈 채로 나온다."
+id    = "rust.basic.30.atomics-rwlock"
+title = "단어 하나, 잠금 없음"
+story = "빅토리아 파크의 회전문 계수기는 모든 출입구가 줄 서지 않고 올리고, 게시판은 많은 이가 읽고 적은 이가 쓴다."
 brief = '''
-`s.as_bytes()`는 텍스트를 `&[u8]` — 바이트 하나가 `u8` 하나인 바이트
-슬라이스로 본 것입니다. 다른 슬라이스처럼 범위로 자르고, `.to_vec()`은
-`Vec<u8>`으로 복사하며, `extend_from_slice`는 바이트를 더 덧붙입니다.
-`"!".as_bytes()`는 리터럴의 바이트입니다. `{:02x}`는 바이트 하나를 16진수
-두 자리로 찍고, `String::from_utf8_lossy`는 바이트를 다시 텍스트로 만듭니다.
+정수 하나에는 뮤텍스보다 원자값이 낫습니다:
+`AtomicUsize::fetch_add(1, Ordering::SeqCst)`가 아무 스레드에서나 잠금
+없이 올리고, `.load(Ordering::SeqCst)`가 읽습니다. 쓰기보다 읽기가 훨씬
+많은 더 큰 값에는 `RwLock`이 여러 독자를 한꺼번에(`.read()`), 작성자는
+하나(`.write()`) 허용하고, 각각 `Mutex`처럼 가드를 돌려줍니다.
 
 ```
-let mut head: Vec<u8> = bytes[..2].to_vec();
-head.extend_from_slice("!".as_bytes());
+hits.fetch_add(1, Ordering::SeqCst);
+board.write().unwrap().push(x);
 ```
 
-`bytes`는 입력의 바이트입니다. 두 자리표시자 자리에 위의 두 줄을 그대로
-입력하세요.
+clone과 spawn은 적혀 있습니다. 스레드 안, `// FILL` 주석이 있는 자리에
+올리기와 쓰기를 치세요.
 
 ```
-input:  mei
-output: 6d6521
-        me!
-```
-'''
-hints = [
-  "let mut head: Vec<u8> = bytes[..2].to_vec(); 그다음 head.extend_from_slice(\"!\".as_bytes());",
-  "bytes[..2]는 &[u8]이고, to_vec()이 소유하며, extend_from_slice는 또 다른 &[u8]을 받습니다.",
-]
-
-# ---------------------------------------------------------------- 16
-[[quest]]
-id    = "rust.basic.16.list"
-title = "전차 줄, 양쪽 끝"
-story = "퍼시벌 스트리트의 전차 줄은 뒤에서 승객을 태우고 앞에서 검표원을 태우는데, 탑승자 명단이 비어 있다."
-brief = '''
-`LinkedList`는 양 끝을 싸게 바꿀 수 있는 순서열입니다. `.push_back(x)`는 꼬리에
-추가하고, `.pop_front()`는 머리를 제거하고, `.front_mut()`는 머리의 가변 참조를
-돌려줍니다 — `Option`이므로 unwrap하고, 앞의 `*`가 그것을 통해 대입하게 해 줍니다.
-`LinkedList`에는 `sort`가 없습니다: 정렬하려면 `Vec`으로 복사해서(스타터가 `sorted`로
-해 둡니다) 그것을 정렬합니다. (거의 언제나 `Vec`이 더 나은 선택이고, 이것은 이름을
-알아 둘 것입니다.)
-
-```
-list.push_back(0);
-list.pop_front();
-*list.front_mut().unwrap() = 9;
-sorted.sort();
-```
-
-`list`는 한 줄의 정수들로 만들어지고, 그것과 정렬된 복사본, 길이가 출력됩니다.
-`// FILL` 주석 자리에 네 줄을 그 순서대로 입력하세요.
-
-```
-input:  3 1 4
-output: 9 4 0
-        0 4 9
+input:  4 2 9
+output: 2 4 9
         3
 ```
 '''
 hints = [
-  "list.push_back(0); 다음 list.pop_front(); 다음 *list.front_mut().unwrap() = 9; 다음 sorted.sort();",
-  "front_mut()는 Option<&mut i64>입니다: unwrap하고 * 를 통해 대입하세요 — pop 뒤의 앞쪽은 원래 두 번째 원소입니다. sorted는 Vec이므로 sort()가 있습니다.",
+  "hits.fetch_add(1, Ordering::SeqCst); 그리고 board.write().unwrap().push(x);",
+  "fetch_add는 &self를 받습니다. 원자값에 Mutex도 mut도 필요 없는 이유입니다. 여기서 write 가드는 임시값이라 문장이 끝나면 잠금이 풀립니다.",
 ]
 
-# ---------------------------------------------------------------- 18
+# ---------------------------------------------------------------- 31
 [[quest]]
-id    = "rust.basic.18.hashtable"
-title = "정렬 안 된 주문 메모"
-story = "보링턴 로드 딤섬 카운터는 이번엔 집계를 해시 테이블에 담고, 테이블 마음대로의 순서로 읽어 내는데, 그 순서가 아침마다 다르다."
+id    = "rust.basic.31.channel"
+title = "창구 하나"
+story = "타임스 스퀘어 주방 뒤편의 창구: 요리사 하나가 보내고, 패스가 받고, 창구가 그의 뒤에서 닫히기에 패스는 요리사가 끝났음을 안다."
 brief = '''
-`HashMap`은 `BTreeMap`과 같은 발상 — 키마다 값 하나 — 이지만 키를 정렬하는 대신
-해시합니다: 조회는 상수 시간이고, 순회 순서는 임의이며 실행마다 달라지므로 출력 전에
-키를 정렬합니다. 연산은 같은 세 가지입니다: `.insert(k, v)` 추가, `.remove(&k)` 삭제,
-`.get_mut(&k)` 수정.
+`mpsc::channel()`은 송신자와 수신자를 돌려줍니다. 송신자는 스레드로
+이동하고 `tx.send(v)`가 값을 건네줍니다. 반대편의 `rx.iter()`는 보내진
+것을 전부 순서대로 내고, **모든 송신자가 버려지면 끝납니다** — 여기서는
+생산자 스레드가 끝나며 그 `tx`가 함께 사라질 때.
 
 ```
-counts.insert("bun".to_string(), 1);
-counts.remove("siu");
-*counts.get_mut("bun").unwrap() = 4;
-keys.sort();
+let (tx, rx) = mpsc::channel::<i64>();
+let got: Vec<i64> = rx.iter().collect();
 ```
 
-`counts`는 이미 한 줄의 단어를 세고 있고, 출력을 위해 키가 `keys`로 모입니다. `// FILL`
-주석 자리에 네 줄을 그 순서대로 입력하세요 — 정렬은 `keys`가 만들어진 뒤의 네 번째입니다.
-
-```
-input:  siu mai har gau siu mai
-output: bun 4
-        gau 1
-        har 1
-        mai 2
-```
-'''
-hints = [
-  "counts.insert(\"bun\".to_string(), 1); 다음 counts.remove(\"siu\"); 다음 *counts.get_mut(\"bun\").unwrap() = 4; 다음 keys.sort();",
-  "이름만 바뀐 BTreeMap의 줄들과 똑같습니다; 그 뒤의 keys.sort()가 HashMap의 값입니다.",
-]
-
-# ---------------------------------------------------------------- 22
-[[quest]]
-id    = "rust.basic.22.reverse"
-title = "거꾸로 가는 전차"
-story = "이워 스트리트 전차는 종점에서 온 길을 되짚어 정류장을 거꾸로 달리는데, 차고의 명단은 여전히 앞으로 읽힌다."
-brief = '''
-`Vec`은 제자리에서 뒤집힙니다: `v.reverse()`면 끝, 복사 없음. 문자열은
-문자로 색인할 수 없으니 반복자를 통해 뒤집습니다: `s.chars().rev()`가 뒤에서
-앞으로 걷고 `collect::<String>()`이 그것이 내놓는 것으로 새 문자열을 만듭니다.
-
-```
-v.reverse();
-let rev: String = s.chars().rev().collect();
-```
-
-`v`는 첫째 줄, `s`는 둘째 줄입니다. 두 자리표시자 자리에 위의 두 줄을 그대로
-입력하세요.
+생산자 스레드는 적혀 있습니다. `// FILL` 주석이 있는 자리에 채널과
+모아 받는 줄을 치세요.
 
 ```
 input:  1 2 3
-        tram
-output: 3 2 1
-        mart
+output: 10 20 30
 ```
 '''
 hints = [
-  "v.reverse(); 그다음 let rev: String = s.chars().rev().collect();",
-  "reverse()는 v를 그 자리에서 바꿉니다. chars().rev().collect()는 새 String을 만들고 s는 그대로 둡니다.",
+  "let (tx, rx) = mpsc::channel::<i64>(); 그리고 let got: Vec<i64> = rx.iter().collect();",
+  "rx.iter()는 채널이 닫힐 때까지 막고, 채널은 생산자 클로저 끝에서 tx가 버려질 때 닫힙니다 — 그래서 collect는 정확히 생산자가 끝날 때 끝납니다.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "rust.basic.32.producers"
+title = "요리사는 여럿, 패스는 하나"
+story = "타임스 스퀘어 주방의 모든 요리사가 같은 창구로 보내는데, 패스는 자기가 쥐고 있는 줄도 잊은 창구 열쇠를 하나 갖고 있다. 그것을 내려놓기 전까지 패스는 오지 않을 요리사를 기다린다."
+brief = '''
+*mpsc*는 다중 생산자입니다: `tx.clone()`이 스레드마다 하나의 채널로
+가는 자기 송신자를 줍니다. 수신 반복은 **모든** 송신자가 사라져야
+끝나는데, 원래 `tx`가 아직 `main`에 앉아 있습니다. `drop(tx)`가 그것을
+내려놓습니다. 그 줄이 없으면 프로그램은 영원히 끝나지 않습니다.
+
+```
+let tx = tx.clone();
+drop(tx);
+```
+
+`spawn` 앞에 clone을, 반복문 뒤에 drop을, `// FILL` 주석이 있는 자리에
+치세요. 결과는 인덱스로 정렬되므로 스레드가 어떤 순서로 돌든 상관없습니다.
+
+```
+input:  1 2 3
+output: 0 10
+        1 20
+        2 30
+        RECV 3
+```
+'''
+hints = [
+  "반복문 안에 let tx = tx.clone();, 뒤에 drop(tx);",
+  "clone이 없으면 move가 하나뿐인 송신자를 첫 스레드로 가져가서 둘째 반복이 E0382입니다. drop이 없으면 rx.iter()가 main 자신의 송신자를 영원히 기다립니다 — 실행이 실패하는 대신 타임아웃됩니다.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "rust.basic.33.worker-pool"
+title = "창구"
+story = "12:30, 타임스 스퀘어. 주문서 한 장, 요리사 셋, 패스로 돌아가는 창구 하나. 주문서는 잠금 아래 공유되고, 요리사는 표 한 장 뜯을 동안만 그것을 쥐고, 주문서가 비면 요리사들은 집에 가고 패스가 접시를 센다."
+brief = '''
+워커 풀은 채널 둘과 잠금 하나입니다. 작업은 `job_tx`로 내려가고,
+워커들은 `Arc<Mutex<…>>` 뒤의 `job_rx` 하나를 공유하며 각자
+`job_rx.lock().unwrap().recv()`로 작업을 하나 가져갑니다 — 잠금은
+임시값이라 그 문장이 끝나면 풀리고, 요리는 잠금 **바깥**에서 일어납니다.
+`recv()`는 모든 `job_tx`가 버려지면 `Err`을 돌려주고, 워커는 그것으로
+멈출 때를 압니다. 결과는 `done_tx`로 돌아오고, 패스는 모든 `done_tx` —
+워커들의 clone *그리고* main 자신의 것 — 가 사라질 때까지 모읍니다.
+
+```
+let job = job_rx.lock().unwrap().recv();
+drop(job_tx);
+drop(done_tx);
+```
+
+풀, 반복문, 수집은 적혀 있습니다. 워커 안에 잠근 수신을, `main`에 두
+drop을, `// FILL` 주석이 있는 자리에 치세요. drop 어느 하나가 빠져도
+데드락입니다.
+
+```
+input:  1 2 3
+output: 0 2
+        1 5
+        2 10
+```
+'''
+hints = [
+  "워커에 let job = job_rx.lock().unwrap().recv();, 보내기 뒤에 drop(job_tx);와 drop(done_tx);",
+  "lock()의 가드는 그 let의 임시값이라 세미콜론에서 버려지고, 이 워커가 요리하는 동안 다른 워커가 다음 작업을 가져갈 수 있습니다. cook()에 걸쳐 쥐고 있으면 풀이 직렬화됩니다.",
+  "drop(job_tx)가 워커의 recv()를 Err로 바꾸는 것이고, drop(done_tx)가 워커들이 자기 것을 버린 뒤 done_rx.iter()가 끝나게 하는 것입니다. 어느 쪽이든 잊으면 프로그램은 영원히 기다립니다.",
 ]

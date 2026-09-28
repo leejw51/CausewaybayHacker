@@ -1,7 +1,8 @@
-# RUST LAND — VERY BASIC. The quiz before the walk: the same grammar BASIC
-# activates, asked first. Every node shows a program with one hole and four
-# lines that might fill it; three are near-misses that do not compile, do the
-# wrong thing or are another language's spelling. Pick the right one, then
+# RUST LAND — VERY BASIC. The quiz before the walk: the plain grammar, asked
+# first; BASIC then drills the grammar that is Rust's own. Every node shows a
+# program with one hole and four lines that might fill it; three are
+# near-misses that do not compile, do the wrong thing or are another
+# language's spelling. Pick the right one, then
 # type it. Types, containers, a stack, a queue, a heap, structs, closures, a
 # thread, a mutex, and THE AUTOCOMPLETE over a tree at the end — the grammar
 # a HackerRank-style live coding test leans on.

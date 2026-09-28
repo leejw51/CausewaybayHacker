@@ -157,9 +157,9 @@ export const cs: Partial<Catalogue> = {
   "lands.verybasicBlurb":
     "Kvíz. Který řádek je správná gramatika? Vyber jeden ze čtyř a pak ho napiš.",
   "lands.basicBlurb":
-    "Ranní procházka. Vždy jedna konstrukce, vysvětlená, a jeden dva řádky k doplnění — typy, smyčky, struktury, řazení, closures, vlákno, strom.",
+    "Ranní procházka. Vždy jedna konstrukce, vysvětlená, a jeden až čtyři řádky k doplnění — gramatika, kterou živé kódování považuje za samozřejmost.",
   "lands.advancedBlurb":
-    "Malé kódovací úlohy na gramatiku, pak polední špička: dvě pokladny u jednoho pultu, obě naráz.",
+    "Živé kódování bez časomíry. Zadání, celý program, viditelné i skryté případy — gramatika v praxi, a pak polední špička, kdy se všechno děje naráz.",
   "lands.hackerBlurb": "Pohovor. Jedna místnost, jedny hodiny a nikdo, kdo by dopsal tvůj řádek.",
   "lands.category": "{land} — KATEGORIE",
   "lands.clearedOf": "{cleared} Z {total} SPLNĚNO",

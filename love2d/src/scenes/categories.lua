@@ -17,8 +17,9 @@ local Categories = {}
 Categories.__index = Categories
 
 local BLURB = {
-  basic = "grammar. the streets you already walked.",
-  advanced = "threads, mutexes, lifetimes, channels.",
+  verybasic = "the quiz. four lines, one right; pick it, then type it.",
+  basic = "grammar. one construct, one to four lines, untimed.",
+  advanced = "the live coding test, untimed. whole programs, hidden cases.",
   hacker = "timed. the whiteboard is watching.",
 }
 

@@ -1,61 +1,83 @@
 # RUST LAND — BASIC. The morning walk, Jardine's Bazaar to the Percival Street
-# kiosk. The grammar road: grammar practice, not a quiz. Every node explains
-# one construct, shows its syntax the way a cheat-sheet card would, and hands
-# over a whole program with a hole of one or two lines where that construct
-# goes. The player types the idiom; the tests only check that it ran. Types
-# and conversion, integer widths, a 32-byte word, f64 and f32, strings and
-# string slices, integer and byte slices (slice, copy, append), loops,
-# functions, a struct, an enum, Vec, LinkedList, BTreeMap, HashMap, BTreeSet,
-# a stack and a queue, sorting (plain and by key) and reversing, closures,
-# iterator chains, threads, and a binary search tree at the boss. Nothing here
-# is timed, and nothing here is long: verify_pack refuses a basic solution
-# that adds more than two lines over its starter.
+# kiosk. The grammar road, second half: VERY BASIC asked the plain grammar
+# (types, containers, a struct, a closure, a thread); this road drills the
+# grammar that is Rust's own and that a live coding screen assumes you have
+# in your fingers — ownership and the move, `&` and `&mut`, the exchange
+# (`mem::swap`, `mem::take`), slices, `String` against `&str`, chars and
+# bytes, `Option`, `Result` and `?`, `match`, iterator chains, the entry API,
+# comparators, a min-heap through `Reverse`, a derived `Ord`, fast stdin,
+# formatted stdout, overflow, lifetimes on a function and on a struct, a
+# trait, a generic bound, `Box<dyn Trait>`, `Rc<RefCell>`, closure kinds —
+# and then the concurrency grammar: threads, `Arc<Mutex>`, atomics and
+# `RwLock`, an `mpsc` channel, many producers and one consumer, and a worker
+# pool at the boss: producers, consumers, one hatch.
 #
-# The bigger quests that used to sit here — ownership, errors, iterators,
-# modules, smart pointers, traits — are the first half of the ADVANCED road.
+# Every node explains one construct, shows its syntax the way a cheat-sheet
+# card would, and hands over a whole program with a hole of one to four
+# lines where that construct goes. The player types the idiom; the tests
+# only check that it ran. Nothing here is timed, and nothing here is long:
+# verify_pack refuses a basic solution that adds more than four lines over
+# its starter. Applying this grammar to whole programs is the ADVANCED road;
+# doing it under a clock is HACKER.
 #
 # Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
 # Format: SPEC §12. Every solution and starter in this file is run by
-# tools/verify_pack.py and by CI (SPEC §9.4, §9.5).
+# tests/content/verify_pack.py and by CI (SPEC §9.4, §9.5).
 
 pack = "rust.basic"
 land = "rust"
 category = "basic"
-version = 2
+version = 3
 
 # ---------------------------------------------------------------- 01
 [[quest]]
-id          = "rust.basic.01.first-light"
+id          = "rust.basic.01.the-move"
 node        = 1
-title       = "FIRST LIGHT"
+title       = "ONE OWNER"
 difficulty  = 1
-story       = "06:40 above Jardine's Bazaar. The cursor sits there and the grey text is gone. Whatever you can still type from memory is yours."
-concepts    = ["io", "strings"]
+story       = "06:40 above Jardine's Bazaar. One receipt on the counter, and the rule of the whole street on it: a thing has one owner, and handing it over is handing it over."
+concepts    = ["ownership", "bindings"]
 requires    = []
-map          = { x = 0.044, y = 0.146, kind = "quest" }
+map          = { x = 0.049, y = 0.052, kind = "quest" }
 brief       = '''
-Print exactly:
+A `String` has exactly one owner. `let kept = receipt;` does not copy it:
+it **moves** it, and from that line on `receipt` is not a name you can
+use — the compiler refuses with E0382, borrow of moved value. The value
+is where it went, under its new name.
 
 ```
-hello, causewaybay
+let kept = receipt;
 ```
 
-Lowercase, one comma, one space, one line. Nothing else.
+The receipt is made and the two `println!`s are written. Type the move
+where the `// FILL` comment is, so that `kept` owns the string.
+
+```
+output: one receipt, one owner
+        22
+```
 '''
 starter     = '''
 fn main() {
-    // your code here
-    // ANSWER: println!("hello, causewaybay");
+    let receipt = String::from("one receipt, one owner");
+    // FILL: move receipt into a new owner named kept
+    // ANSWER: let kept = receipt;
+    let kept = String::new();
+    println!("{}", kept);
+    println!("{}", kept.len());
 }
 '''
 solution    = '''
 fn main() {
-    println!("hello, causewaybay");
+    let receipt = String::from("one receipt, one owner");
+    let kept = receipt;
+    println!("{}", kept);
+    println!("{}", kept.len());
 }
 '''
 hints = [
-  "println! is a macro, so it keeps the exclamation mark.",
-  "The string is exact: lowercase, one comma, one space after it.",
+  "let kept = receipt; — a let with the old name on the right.",
+  "No clone: the string is not copied, it changes hands. Using receipt after this line is E0382.",
 ]
 
 [quest.tests]
@@ -65,68 +87,93 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+  { name = "moves", stdin = "", expect = "one receipt, one owner\n22\n", visible = true },
 ]
 
 # ---------------------------------------------------------------- 02
 [[quest]]
-id          = "rust.basic.02.bindings"
+id          = "rust.basic.02.borrow"
 node        = 2
-title       = "THE FARE BOARD"
+title       = "ONLY LOOKING"
 difficulty  = 1
-story       = "The tram-stop board on Percival Street shows one number and then two blanks where the day rate and the monthly used to be."
-concepts    = ["io", "bindings", "types"]
-requires    = ["rust.basic.01.first-light"]
-map          = { x = 0.247, y = 0.058, kind = "quest" }
+story       = "The Percival Street tram stop. The conductor reads every name on the list and hands the list straight back; nobody ever owned it but the office."
+concepts    = ["borrowing", "ownership", "functions"]
+requires    = ["rust.basic.01.the-move"]
+map          = { x = 0.249, y = 0.046, kind = "quest" }
 brief       = '''
-A `let` gives a value a name. The type can be written after a colon, and
-`println!("{}", …)` prints whatever is in the braces, followed by a newline.
-Arithmetic on an `i64` is written the way it is on paper.
+`&` lends. A function that takes `name: &str` only *looks* at the string;
+the caller keeps it and can use it afterwards. `&names[i]` is a borrow of
+one element, and a `&String` turns into a `&str` on its own at the call.
 
 ```
-println!("{}", n * n);
+total += width(&names[i]);
 ```
 
-`n` is read and the first two lines are printed for you. Type that line
-where the `// FILL` comment is: the third `println!`, `n` times itself.
+`width` and both `println!`s are written. Type the call where the `// FILL`
+comment is, lending each name with `&`. The second line proves the names
+are still yours after the loop.
 
 ```
-input:  12
-output: 12
-        24
-        144
+input:  MEI
+        BO
+        ALEX
+output: 9
+        MEI,BO,ALEX
 ```
 '''
 starter     = '''
 use std::io::Read;
 
+fn width(name: &str) -> usize {
+    name.chars().count()
+}
+
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let n: i64 = input.trim().parse().unwrap();
+    let names: Vec<String> = input
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
 
-    println!("{}", n);
-    println!("{}", n * 2);
-    // FILL: print n multiplied by itself
-    // ANSWER: println!("{}", n * n);
+    let mut total = 0;
+    for i in 0..names.len() {
+        // FILL: add the width of names[i], lending it with &
+        // ANSWER: total += width(&names[i]);
+        let _ = i;
+    }
+    println!("{}", total);
+    println!("{}", names.join(","));
 }
 '''
 solution    = '''
 use std::io::Read;
 
+fn width(name: &str) -> usize {
+    name.chars().count()
+}
+
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let n: i64 = input.trim().parse().unwrap();
+    let names: Vec<String> = input
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
 
-    println!("{}", n);
-    println!("{}", n * 2);
-    println!("{}", n * n);
+    let mut total = 0;
+    for i in 0..names.len() {
+        total += width(&names[i]);
+    }
+    println!("{}", total);
+    println!("{}", names.join(","));
 }
 '''
 hints = [
-  "println!(\"{}\", n * n);",
-  "The two lines above it are the same shape; only the expression in the second argument changes.",
+  "total += width(&names[i]); — the ampersand goes on the argument.",
+  "width wants a &str; a &String coerces to one at the call, so &names[i] is enough.",
 ]
 
 [quest.tests]
@@ -136,73 +183,92 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "twelve", stdin = "12\n", expect = "12\n24\n144\n", visible = true },
-  { name = "negative", stdin = "-3\n", expect = "-3\n-6\n9\n", visible = false },
-  { name = "zero", stdin = "0\n", expect = "0\n0\n0\n", visible = false },
+  { name = "three", stdin = "MEI\nBO\nALEX\n", expect = "9\nMEI,BO,ALEX\n", visible = true },
+  { name = "one", stdin = "CAUSEWAY\n", expect = "8\nCAUSEWAY\n", visible = false },
+  { name = "blank-lines", stdin = "A\n\nBB\n\n", expect = "3\nA,BB\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 03
 [[quest]]
-id          = "rust.basic.03.types"
+id          = "rust.basic.03.mut-borrow"
 node        = 3
-title       = "THE SPLIT BILL"
+title       = "LENT TO BE CHANGED"
 difficulty  = 1
-story       = "Two coffees, one note at the Percival Street kiosk. The till says how many each, what is left over, and the exact share, and today all three lines are blank."
-concepts    = ["types", "io"]
-requires    = ["rust.basic.02.bindings"]
-map          = { x = 0.333, y = 0.132, kind = "quest" }
+story       = "The Lucky Mac kiosk raises every price on the board by the same amount. The board never leaves the wall; the hand that changes it is borrowed."
+concepts    = ["borrowing", "mutability", "functions"]
+requires    = ["rust.basic.02.borrow"]
+map          = { x = 0.422, y = 0.069, kind = "quest" }
 brief       = '''
-Two integers divided give an integer: `7 / 2` is `3`, and `7 % 2` is the
-remainder, `1`. To get a decimal you convert first — `as f64` turns an
-integer into a floating-point number — and `{:.2}` in the format string
-prints it with exactly two digits after the point.
+`&mut` lends for changing. A function that takes `prices: &mut Vec<i64>`
+can alter the caller's vector in place; the caller writes `&mut prices`
+at the call, and `prices` itself must be `let mut`. Inside, `iter_mut()`
+hands out `&mut i64`s, and `*p` is the number behind one.
 
 ```
-println!("{:.2}", a as f64 / b as f64);
+*p += by;
+bump(&mut prices, by);
 ```
 
-`a` and `b` are read and the integer division and the remainder are
-printed. Type that line where the `// FILL` comment is.
+`bump` and the printing are written. Type the two lines where the `// FILL`
+comments are: the change inside `bump`, and the call that lends the vector.
 
 ```
-input:  7 2
-output: 3
-        1
-        3.50
+input:  3
+        10 20 30
+output: 13 23 33
 ```
 '''
 starter     = '''
 use std::io::Read;
 
+fn bump(prices: &mut Vec<i64>, by: i64) {
+    for p in prices.iter_mut() {
+        // FILL: add by to the number p points at
+        // ANSWER: *p += by;
+        let _ = p;
+    }
+}
+
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-    let (a, b) = (nums[0], nums[1]);
+    let mut it = input.split_whitespace().map(|t| t.parse::<i64>().unwrap());
+    let by = it.next().unwrap();
+    let mut prices: Vec<i64> = it.collect();
 
-    println!("{}", a / b);
-    println!("{}", a % b);
-    // FILL: print a divided by b as an f64, with two decimals
-    // ANSWER: println!("{:.2}", a as f64 / b as f64);
+    // FILL: lend prices mutably to bump, with by
+    // ANSWER: bump(&mut prices, by);
+    let _ = by;
+
+    let out: Vec<String> = prices.iter().map(|p| p.to_string()).collect();
+    println!("{}", out.join(" "));
 }
 '''
 solution    = '''
 use std::io::Read;
 
+fn bump(prices: &mut Vec<i64>, by: i64) {
+    for p in prices.iter_mut() {
+        *p += by;
+    }
+}
+
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-    let (a, b) = (nums[0], nums[1]);
+    let mut it = input.split_whitespace().map(|t| t.parse::<i64>().unwrap());
+    let by = it.next().unwrap();
+    let mut prices: Vec<i64> = it.collect();
 
-    println!("{}", a / b);
-    println!("{}", a % b);
-    println!("{:.2}", a as f64 / b as f64);
+    bump(&mut prices, by);
+
+    let out: Vec<String> = prices.iter().map(|p| p.to_string()).collect();
+    println!("{}", out.join(" "));
 }
 '''
 hints = [
-  "println!(\"{:.2}\", a as f64 / b as f64);",
-  "Convert both sides with `as f64` before dividing, or the division is done on integers and the decimals are already gone.",
+  "*p += by; inside the loop, then bump(&mut prices, by); in main.",
+  "p is a &mut i64: the star reaches through it. The call needs &mut, not &, and prices was declared mut for exactly this.",
 ]
 
 [quest.tests]
@@ -212,41 +278,38 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "seven-two", stdin = "7 2\n", expect = "3\n1\n3.50\n", visible = true },
-  { name = "ten-four", stdin = "10 4\n", expect = "2\n2\n2.50\n", visible = false },
-  { name = "exact", stdin = "9 3\n", expect = "3\n0\n3.00\n", visible = false },
+  { name = "three", stdin = "3\n10 20 30\n", expect = "13 23 33\n", visible = true },
+  { name = "negative", stdin = "-5\n5 6 7\n", expect = "0 1 2\n", visible = false },
+  { name = "one", stdin = "100\n1\n", expect = "101\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 04
 [[quest]]
-id          = "rust.basic.04.int-types"
+id          = "rust.basic.04.clone"
 node        = 4
-title       = "THE COUNTER WIDTHS"
+title       = "A SECOND COPY"
 difficulty  = 1
-story       = "The tram-stop counter on Percival Street holds its number in a 32-bit cell and the day's total in a 64-bit one, and the line that copies one into the other is missing."
-concepts    = ["types", "bindings"]
-requires    = ["rust.basic.03.types"]
-map          = { x = 0.518, y = 0.065, kind = "quest" }
+story       = "Two lists at Hysan Place: the one the door keeps in arrival order, and the one the manager sorts. Sorting the manager's must not touch the door's."
+concepts    = ["ownership", "types", "sorting"]
+requires    = ["rust.basic.03.mut-borrow"]
+map          = { x = 0.573, y = 0.081, kind = "quest" }
 brief       = '''
-An integer has a width. `i32` is 32 bits and signed; `u64` is 64 bits and
-never negative. Rust does not convert between them on its own: `as` does it,
-and you say the target type. Every width knows its own limit — `i32::MAX`,
-`u64::MAX` — as a constant.
+A move leaves one owner. When you need two, `.clone()` makes a deep copy
+and both are independent from then on. Small plain values — `i64`, `bool`,
+`char`, `f64`, tuples of them — are `Copy`: `let b = a;` copies them and
+`a` stays usable without any clone.
 
 ```
-let b: u64 = a as u64;
-println!("{}", u64::MAX);
+let mut sorted = names.clone();
 ```
 
-`a` is read as an `i32`. Type the cast where the first `// FILL` is and the
-`u64::MAX` line where the second is.
+The names are read, `sorted.sort()` and both `println!`s are written. Type
+the clone where the `// FILL` comment is, so the original order survives.
 
 ```
-input:  21
-output: 21
-        42
-        2147483647
-        18446744073709551615
+input:  MEI BO ALEX
+output: MEI BO ALEX
+        ALEX BO MEI
 ```
 '''
 starter     = '''
@@ -255,16 +318,15 @@ use std::io::Read;
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let a: i32 = input.trim().parse().unwrap();
+    let names: Vec<String> = input.split_whitespace().map(|t| t.to_string()).collect();
 
-    // FILL: b is a, widened to a u64
-    // ANSWER: let b: u64 = a as u64;
-    let b: u64 = 0;
-    println!("{}", a);
-    println!("{}", b * 2);
-    println!("{}", i32::MAX);
-    // FILL: print the largest u64
-    // ANSWER: println!("{}", u64::MAX);
+    // FILL: a deep copy of names, so sorting one leaves the other alone
+    // ANSWER: let mut sorted = names.clone();
+    let mut sorted: Vec<String> = Vec::new();
+    sorted.sort();
+
+    println!("{}", names.join(" "));
+    println!("{}", sorted.join(" "));
 }
 '''
 solution    = '''
@@ -273,18 +335,18 @@ use std::io::Read;
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let a: i32 = input.trim().parse().unwrap();
+    let names: Vec<String> = input.split_whitespace().map(|t| t.to_string()).collect();
 
-    let b: u64 = a as u64;
-    println!("{}", a);
-    println!("{}", b * 2);
-    println!("{}", i32::MAX);
-    println!("{}", u64::MAX);
+    let mut sorted = names.clone();
+    sorted.sort();
+
+    println!("{}", names.join(" "));
+    println!("{}", sorted.join(" "));
 }
 '''
 hints = [
-  "let b: u64 = a as u64; — then println!(\"{}\", u64::MAX); on the last line.",
-  "`as` is the only way from one integer width to another; without it `let b: u64 = a;` does not compile.",
+  "let mut sorted = names.clone(); — mut, because sort() changes it in place.",
+  "let mut sorted = names; would compile too, and then names is gone and the first println! is E0382.",
 ]
 
 [quest.tests]
@@ -294,39 +356,41 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "twenty-one", stdin = "21\n", expect = "21\n42\n2147483647\n18446744073709551615\n", visible = true },
-  { name = "seven", stdin = "7\n", expect = "7\n14\n2147483647\n18446744073709551615\n", visible = false },
-  { name = "zero", stdin = "0\n", expect = "0\n0\n2147483647\n18446744073709551615\n", visible = false },
+  { name = "three", stdin = "MEI BO ALEX\n", expect = "MEI BO ALEX\nALEX BO MEI\n", visible = true },
+  { name = "sorted-already", stdin = "A B C\n", expect = "A B C\nA B C\n", visible = false },
+  { name = "one", stdin = "ZED\n", expect = "ZED\nZED\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 05
 [[quest]]
-id          = "rust.basic.05.big-int"
+id          = "rust.basic.05.exchange"
 node        = 5
-title       = "THE THIRTY-TWO BYTES"
+title       = "THE EXCHANGE"
 difficulty  = 2
-story       = "Every key and every hash in Causeway Bay is thirty-two bytes wide. The kiosk prints the word as sixty-four hex digits and today every one of them is a zero."
-concepts    = ["types", "slices", "strings"]
-requires    = ["rust.basic.04.int-types"]
-map          = { x = 0.604, y = 0.137, kind = "quest" }
+story       = "Two tills at Jardine's Bazaar swap drawers at the shift change, and the old drawer is lifted out and an empty one dropped in its place. Nothing is copied; things change hands."
+concepts    = ["ownership", "mutability", "borrowing"]
+requires    = ["rust.basic.04.clone"]
+map          = { x = 0.752, y = 0.075, kind = "quest" }
 brief       = '''
-There is no 256-bit integer type, so a 32-byte number is an array of 32
-bytes: `[u8; 32]`. `u128` is the widest integer there is, `to_be_bytes()`
-turns one into its 16 bytes most-significant first, and `copy_from_slice`
-writes a slice into a slice of the same length — here, the last 16 bytes of
-the word, so the number sits at the right-hand end like it would on paper.
+`std::mem` exchanges values without copying them. `swap(&mut a, &mut b)`
+trades what two names hold. `take(&mut a)` moves the value out and leaves
+the type's default behind — an empty `String`, an empty `Vec`, `0` — so
+you can own something that lives inside a `&mut`. `replace(&mut a, v)`
+is the same with a value of your choosing left behind.
 
 ```
-word[16..].copy_from_slice(&n.to_be_bytes());
+std::mem::swap(&mut a, &mut b);
+let taken = std::mem::take(&mut a);
 ```
 
-`word` starts as 32 zero bytes and is printed as hex. Type that line where
-the `// FILL` comment is.
+Two lines are read into `a` and `b`. Type the swap and the take where the
+`// FILL` comments are.
 
 ```
-input:  255
-output: 00000000000000000000000000000000000000000000000000000000000000ff
-        64
+input:  LEFT
+        RIGHT
+output: RIGHT LEFT
+        [RIGHT] []
 ```
 '''
 starter     = '''
@@ -335,14 +399,18 @@ use std::io::Read;
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let n: u128 = input.trim().parse().unwrap();
+    let mut lines = input.lines();
+    let mut a = lines.next().unwrap_or("").trim().to_string();
+    let mut b = lines.next().unwrap_or("").trim().to_string();
 
-    let mut word = [0u8; 32];
-    // FILL: the last 16 bytes of word are n, most-significant byte first
-    // ANSWER: word[16..].copy_from_slice(&n.to_be_bytes());
-    let hex: String = word.iter().map(|b| format!("{:02x}", b)).collect();
-    println!("{}", hex);
-    println!("{}", hex.len());
+    // FILL: exchange a and b, no third variable, no clone
+    // ANSWER: std::mem::swap(&mut a, &mut b);
+    println!("{} {}", a, b);
+
+    // FILL: take a out, leaving an empty String behind
+    // ANSWER: let taken = std::mem::take(&mut a);
+    let taken = String::new();
+    println!("[{}] [{}]", taken, a);
 }
 '''
 solution    = '''
@@ -351,18 +419,20 @@ use std::io::Read;
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let n: u128 = input.trim().parse().unwrap();
+    let mut lines = input.lines();
+    let mut a = lines.next().unwrap_or("").trim().to_string();
+    let mut b = lines.next().unwrap_or("").trim().to_string();
 
-    let mut word = [0u8; 32];
-    word[16..].copy_from_slice(&n.to_be_bytes());
-    let hex: String = word.iter().map(|b| format!("{:02x}", b)).collect();
-    println!("{}", hex);
-    println!("{}", hex.len());
+    std::mem::swap(&mut a, &mut b);
+    println!("{} {}", a, b);
+
+    let taken = std::mem::take(&mut a);
+    println!("[{}] [{}]", taken, a);
 }
 '''
 hints = [
-  "word[16..].copy_from_slice(&n.to_be_bytes());",
-  "`word[16..]` is the last sixteen bytes and `n.to_be_bytes()` is sixteen bytes; copy_from_slice needs the two lengths to match.",
+  "std::mem::swap(&mut a, &mut b); then let taken = std::mem::take(&mut a);",
+  "Both take &mut: the values stay where they are and only the contents move. After take, a is an empty String, not a moved-out one — it is still usable.",
 ]
 
 [quest.tests]
@@ -372,80 +442,85 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "ff", stdin = "255\n", expect = "00000000000000000000000000000000000000000000000000000000000000ff\n64\n", visible = true },
-  { name = "one", stdin = "1\n", expect = "0000000000000000000000000000000000000000000000000000000000000001\n64\n", visible = false },
-  { name = "big", stdin = "340282366920938463463374607431768211455\n", expect = "00000000000000000000000000000000ffffffffffffffffffffffffffffffff\n64\n", visible = false },
+  { name = "two", stdin = "LEFT\nRIGHT\n", expect = "RIGHT LEFT\n[RIGHT] []\n", visible = true },
+  { name = "same", stdin = "X\nX\n", expect = "X X\n[X] []\n", visible = false },
+  { name = "words", stdin = "one two\nthree\n", expect = "three one two\n[three] []\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 06
 [[quest]]
-id          = "rust.basic.06.floats"
+id          = "rust.basic.06.slices"
 node        = 6
-title       = "THE SCALE'S TWO READINGS"
+title       = "THE MIDDLE OF THE QUEUE"
 difficulty  = 1
-story       = "The fruit scale at Jardine's Bazaar keeps a double-precision weight and shows a single-precision one on the dial, and this morning both read zero."
-concepts    = ["types", "io"]
-requires    = ["rust.basic.05.big-int"]
-map          = { x = 0.822, y = 0.054, kind = "quest" }
+story       = "The queue at Hysan Place, minus the first and the last: the people who are actually waiting."
+concepts    = ["slices", "borrowing", "iteration"]
+requires    = ["rust.basic.05.exchange"]
+map          = { x = 0.914, y = 0.047, kind = "quest" }
 brief       = '''
-`f64` is a 64-bit floating-point number, the one to use unless something
-says otherwise; `f32` is half the width and about seven digits of precision.
-`parse()` reads either from text once the type is named, `as f32` narrows an
-`f64`, and a `{:.3}` in the format string prints three digits after the
-point.
+`&v[a..b]` is a slice: a borrowed window onto part of a `Vec`, from `a`
+up to but not including `b`, with no copy made. Its type is `&[i64]`, and
+a function that takes `&[i64]` accepts a whole vector (`&nums`) or any
+window of one the same way. `..` on its own is everything; `a..` runs to
+the end.
 
 ```
-let x: f64 = s.parse().unwrap();
-let y = x as f32;
+let middle = &nums[1..nums.len() - 1];
 ```
 
-`s` is the trimmed input. Type those two lines in place of the two
-placeholders.
+`total` and the three `println!`s are written. Type the slice where the
+`// FILL` comment is.
 
 ```
-input:  3.14159265358979
-output: 3.141593
-        3.142
-        6.3
+input:  5 1 2 3 9
+output: 6
+        20
+        3
 ```
 '''
 starter     = '''
 use std::io::Read;
 
+fn total(xs: &[i64]) -> i64 {
+    xs.iter().sum()
+}
+
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let s = input.trim();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
 
-    // FILL: x is s parsed as an f64
-    // ANSWER: let x: f64 = s.parse().unwrap();
-    let x: f64 = 0.0;
-    // FILL: y is x narrowed to an f32
-    // ANSWER: let y = x as f32;
-    let y: f32 = 0.0;
-    println!("{:.6}", x);
-    println!("{:.3}", y);
-    println!("{:.1}", x * 2.0);
+    // FILL: the middle of nums — everything but the first and the last
+    // ANSWER: let middle = &nums[1..nums.len() - 1];
+    let middle: &[i64] = &[];
+
+    println!("{}", total(middle));
+    println!("{}", total(&nums));
+    println!("{}", middle.len());
 }
 '''
 solution    = '''
 use std::io::Read;
 
+fn total(xs: &[i64]) -> i64 {
+    xs.iter().sum()
+}
+
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let s = input.trim();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
 
-    let x: f64 = s.parse().unwrap();
-    let y = x as f32;
-    println!("{:.6}", x);
-    println!("{:.3}", y);
-    println!("{:.1}", x * 2.0);
+    let middle = &nums[1..nums.len() - 1];
+
+    println!("{}", total(middle));
+    println!("{}", total(&nums));
+    println!("{}", middle.len());
 }
 '''
 hints = [
-  "let x: f64 = s.parse().unwrap(); then let y = x as f32;",
-  "parse() needs to know the type: the `: f64` on the binding is what tells it.",
+  "let middle = &nums[1..nums.len() - 1];",
+  "The range end is exclusive, so len() - 1 stops just before the last element. The & in front makes it a borrow rather than a move out of the vector.",
 ]
 
 [quest.tests]
@@ -455,74 +530,86 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "pi", stdin = "3.14159265358979\n", expect = "3.141593\n3.142\n6.3\n", visible = true },
-  { name = "half", stdin = "2.5\n", expect = "2.500000\n2.500\n5.0\n", visible = false },
-  { name = "tenth", stdin = "0.1\n", expect = "0.100000\n0.100\n0.2\n", visible = false },
+  { name = "five", stdin = "5 1 2 3 9\n", expect = "6\n20\n3\n", visible = true },
+  { name = "two", stdin = "4 7\n", expect = "0\n11\n0\n", visible = false },
+  { name = "negatives", stdin = "1 -2 -3 1\n", expect = "-5\n-3\n2\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 07
 [[quest]]
-id          = "rust.basic.04.strings"
+id          = "rust.basic.07.string-str"
 node        = 7
-title       = "THE SHOP SIGN"
-difficulty  = 1
-story       = "The sign painter on Jardine's Bazaar needs the name three ways: how many letters to price it, in capitals for the board, and mirrored for the inside of the glass."
-concepts    = ["strings", "iteration"]
-requires    = ["rust.basic.06.floats"]
-map          = { x = 0.898, y = 0.144, kind = "quest" }
+title       = "OWNED AND BORROWED TEXT"
+difficulty  = 2
+story       = "The shop sign at Jardine's Bazaar is painted once and owned by the shop. Everyone who reads it borrows it; the banner made for the day is a new thing."
+concepts    = ["strings", "ownership", "borrowing"]
+requires    = ["rust.basic.06.slices"]
+map          = { x = 0.935, y = 0.266, kind = "quest" }
 brief       = '''
-A `String` knows its own length with `.len()` and makes an upper-case copy
-with `.to_uppercase()`. There is no `.reverse()`: you walk the characters
-with `.chars()`, turn the walk around with `.rev()`, and `.collect()` them
-into a new `String`. The type on the `let` tells `collect` what to build.
+`String` owns its text and can grow; `&str` borrows text that lives
+somewhere else. A function that only reads takes `&str`; one that builds
+new text returns `String`. `format!` builds a `String` the way `println!`
+builds a line, and `&name` (or `name.as_str()`) lends a `String` as a
+`&str`.
 
 ```
-let rev: String = line.chars().rev().collect();
+format!("** {} **", name)
+let line = banner(&name);
 ```
 
-The line is read and its length and upper-case form are printed. Type that
-`let` in place of the placeholder `let rev` under the `// FILL` comment.
+Type the two lines where the `// FILL` comments are: the body of `banner`
+and the call in `main`.
 
 ```
-input:  kwan lee
-output: 8
-        KWAN LEE
-        eel nawk
+input:  mei
+output: ** mei **
+        9
 ```
 '''
 starter     = '''
 use std::io::Read;
 
+fn banner(name: &str) -> String {
+    // FILL: the name between two pairs of stars, as a new String
+    // ANSWER: format!("** {} **", name)
+    let _ = name;
+    String::new()
+}
+
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let line = input.trim_end_matches('\n').to_string();
+    let name: String = input.trim().to_string();
 
+    // FILL: call banner, lending name as a &str
+    // ANSWER: let line = banner(&name);
+    let line = String::new();
+
+    println!("{}", line);
     println!("{}", line.len());
-    println!("{}", line.to_uppercase());
-    // FILL: let rev: String = the characters of line, reversed, collected
-    // ANSWER: let rev: String = line.chars().rev().collect();
-    let rev: String = String::new();
-    println!("{}", rev);
 }
 '''
 solution    = '''
 use std::io::Read;
 
+fn banner(name: &str) -> String {
+    format!("** {} **", name)
+}
+
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let line = input.trim_end_matches('\n').to_string();
+    let name: String = input.trim().to_string();
 
+    let line = banner(&name);
+
+    println!("{}", line);
     println!("{}", line.len());
-    println!("{}", line.to_uppercase());
-    let rev: String = line.chars().rev().collect();
-    println!("{}", rev);
 }
 '''
 hints = [
-  "let rev: String = line.chars().rev().collect();",
-  "`.chars()` is an iterator over the characters, `.rev()` walks it backwards, and `.collect()` builds the `String` the `let` asks for.",
+  "format!(\"** {} **\", name) with no semicolon is the function's value; let line = banner(&name); in main.",
+  "banner(name) without the & tries to pass a String where a &str is wanted: E0308. The ampersand is the whole lesson.",
 ]
 
 [quest.tests]
@@ -532,39 +619,123 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "two-words", stdin = "kwan lee\n", expect = "8\nKWAN LEE\neel nawk\n", visible = true },
-  { name = "one-word", stdin = "tram\n", expect = "4\nTRAM\nmart\n", visible = false },
-  { name = "digits", stdin = "Yee Wo 12\n", expect = "9\nYEE WO 12\n21 oW eeY\n", visible = false },
+  { name = "mei", stdin = "mei\n", expect = "** mei **\n9\n", visible = true },
+  { name = "long", stdin = "causeway bay\n", expect = "** causeway bay **\n18\n", visible = false },
+  { name = "one", stdin = "x\n", expect = "** x **\n7\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 08
 [[quest]]
-id          = "rust.basic.08.string-slices"
+id          = "rust.basic.08.chars-bytes"
 node        = 8
-title       = "THE SIGN, IN PIECES"
-difficulty  = 1
-story       = "The Yee Wo Street sign painter cuts the first three letters off a shop name, copies them onto a fresh board and paints a suffix after them, and the board is blank."
-concepts    = ["strings", "slices"]
-requires    = ["rust.basic.04.strings"]
-map          = { x = 0.953, y = 0.263, kind = "quest" }
+title       = "LETTERS AND DIGITS"
+difficulty  = 2
+story       = "A locker code at Victoria Park: letters and digits mixed. The attendant adds the digits up and shouts the first letter."
+concepts    = ["strings", "types", "iteration"]
+requires    = ["rust.basic.07.string-str"]
+map          = { x = 0.757, y = 0.218, kind = "quest" }
 brief       = '''
-A `&str` can be sliced by byte range: `&s[..3]` is the first three bytes,
-borrowed from `s`, not copied. `String::from(head)` makes an owned copy that
-can grow, and `push_str` appends to it in place. (Ranges are in bytes, so
-this is for ASCII text; a range that cuts a multi-byte character panics.)
+A `&str` is bytes; `.chars()` walks it as characters and `.bytes()` /
+`.as_bytes()` as `u8`. `c.to_digit(10)` turns a digit character into
+`Some(number)` and anything else into `None`, so `filter_map` keeps only
+the digits. Bytes are numbers: `b'a'` is 97, and letter arithmetic is
+`(byte - b'a' + b'A') as char`.
 
 ```
-let head: &str = &s[..3];
-t.push_str("-lane");
+let digits: Vec<u32> = code.chars().filter_map(|c| c.to_digit(10)).collect();
+let first = (code.as_bytes()[0] - b'a' + b'A') as char;
 ```
 
-`s` is the trimmed input and `t` is made from `head`. Type the slice where
-the first `// FILL` is and the append where the second is.
+Type the two lines where the `// FILL` comments are. The code always
+starts with a lowercase letter.
 
 ```
-input:  percival
-output: per
-        per-lane
+input:  a1b2c3
+output: 6
+        A
+```
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let code = input.trim();
+
+    // FILL: the digits of code, each as a number
+    // ANSWER: let digits: Vec<u32> = code.chars().filter_map(|c| c.to_digit(10)).collect();
+    let digits: Vec<u32> = Vec::new();
+
+    // FILL: the first byte, moved from lowercase to uppercase, as a char
+    // ANSWER: let first = (code.as_bytes()[0] - b'a' + b'A') as char;
+    let first = '?';
+
+    println!("{}", digits.iter().sum::<u32>());
+    println!("{}", first);
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let code = input.trim();
+
+    let digits: Vec<u32> = code.chars().filter_map(|c| c.to_digit(10)).collect();
+
+    let first = (code.as_bytes()[0] - b'a' + b'A') as char;
+
+    println!("{}", digits.iter().sum::<u32>());
+    println!("{}", first);
+}
+'''
+hints = [
+  "code.chars().filter_map(|c| c.to_digit(10)).collect() — then (code.as_bytes()[0] - b'a' + b'A') as char.",
+  "to_digit returns an Option<u32>; filter_map drops the Nones. A byte minus b'a' is 0 for a, and adding b'A' lands on the capital.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed", stdin = "a1b2c3\n", expect = "6\nA\n", visible = true },
+  { name = "no-digits", stdin = "zebra\n", expect = "0\nZ\n", visible = false },
+  { name = "many", stdin = "m9999\n", expect = "36\nM\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "rust.basic.09.option"
+node        = 9
+title       = "MAYBE NOTHING"
+difficulty  = 2
+story       = "The Times Square noticeboard on a quiet morning. There may be no highest bid, and there may be no even ticket number; the board must say so instead of guessing."
+concepts    = ["error-handling", "pattern-matching", "zero-values"]
+requires    = ["rust.basic.08.chars-bytes"]
+map          = { x = 0.608, y = 0.276, kind = "quest" }
+brief       = '''
+`Option<T>` is `Some(value)` or `None`, and the compiler makes you say
+what happens on `None`. `if let Some(m) = …` runs a block only when there
+is a value. `.unwrap_or(0)` gives a default. `.find(…)` returns the first
+match as an `Option<&T>`, and `.copied()` turns `Option<&i64>` into
+`Option<i64>`.
+
+```
+if let Some(m) = nums.iter().max() { println!("MAX {}", m); }
+let even = nums.iter().find(|&&x| x % 2 == 0).copied().unwrap_or(0);
+```
+
+Type the two lines where the `// FILL` comments are. On empty input the
+first prints nothing and the second is `0`.
+
+```
+input:  3 5 8 1
+output: MAX 8
         8
 ```
 '''
@@ -574,17 +745,16 @@ use std::io::Read;
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let s = input.trim();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
 
-    // FILL: head is the first three bytes of s
-    // ANSWER: let head: &str = &s[..3];
-    let head: &str = "";
-    let mut t = String::from(head);
-    // FILL: append "-lane" to t
-    // ANSWER: t.push_str("-lane");
-    println!("{}", head);
-    println!("{}", t);
-    println!("{}", s.len());
+    // FILL: print MAX and the largest, only when there is one
+    // ANSWER: if let Some(m) = nums.iter().max() { println!("MAX {}", m); }
+
+    // FILL: the first even number, or 0 when there is none
+    // ANSWER: let even = nums.iter().find(|&&x| x % 2 == 0).copied().unwrap_or(0);
+    let even = -1;
+
+    println!("{}", even);
 }
 '''
 solution    = '''
@@ -593,19 +763,18 @@ use std::io::Read;
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let s = input.trim();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
 
-    let head: &str = &s[..3];
-    let mut t = String::from(head);
-    t.push_str("-lane");
-    println!("{}", head);
-    println!("{}", t);
-    println!("{}", s.len());
+    if let Some(m) = nums.iter().max() { println!("MAX {}", m); }
+
+    let even = nums.iter().find(|&&x| x % 2 == 0).copied().unwrap_or(0);
+
+    println!("{}", even);
 }
 '''
 hints = [
-  "let head: &str = &s[..3]; and, after t is made, t.push_str(\"-lane\");",
-  "`&s[..3]` borrows; String::from copies; push_str appends to the copy and leaves s alone.",
+  "if let Some(m) = nums.iter().max() { println!(\"MAX {}\", m); } and then find(...).copied().unwrap_or(0).",
+  "max() on an empty iterator is None and if let simply skips. find hands back Option<&i64>; copied() makes it Option<i64> so unwrap_or(0) type-checks.",
 ]
 
 [quest.tests]
@@ -615,160 +784,86 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "percival", stdin = "percival\n", expect = "per\nper-lane\n8\n", visible = true },
-  { name = "jardine", stdin = "jardine\n", expect = "jar\njar-lane\n7\n", visible = false },
-  { name = "hysan", stdin = "hysan\n", expect = "hys\nhys-lane\n5\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 09
-[[quest]]
-id          = "rust.basic.09.int-slices"
-node        = 9
-title       = "THE MIDDLE OF THE QUEUE"
-difficulty  = 1
-story       = "The Hysan Place queue counter copies the two people in the middle of the line onto a fresh list and then the whole line after them, and the list stays empty."
-concepts    = ["slices", "collections"]
-requires    = ["rust.basic.08.string-slices"]
-map          = { x = 0.753, y = 0.338, kind = "quest" }
-brief       = '''
-`v[1..3]` is a slice of a `Vec`: elements 1 and 2, borrowed. `.to_vec()`
-copies a slice into a new `Vec` of its own, and `extend_from_slice` appends
-every element of a slice onto the end of a `Vec`. Copy first, then append —
-the original `v` is never changed.
-
-```
-let mut middle: Vec<i64> = v[1..3].to_vec();
-middle.extend_from_slice(&v);
-```
-
-`v` is read from the input. Type those two lines in place of the two
-placeholders.
-
-```
-input:  1 2 3 4
-output: 2 3 1 2 3 4
-        6
-```
-'''
-starter     = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let v: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    // FILL: middle is a copy of v[1..3]
-    // ANSWER: let mut middle: Vec<i64> = v[1..3].to_vec();
-    let mut middle: Vec<i64> = Vec::new();
-    // FILL: append all of v onto the end of middle
-    // ANSWER: middle.extend_from_slice(&v);
-    let line: Vec<String> = middle.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    println!("{}", middle.len());
-}
-'''
-solution    = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let v: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    let mut middle: Vec<i64> = v[1..3].to_vec();
-    middle.extend_from_slice(&v);
-    let line: Vec<String> = middle.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    println!("{}", middle.len());
-}
-'''
-hints = [
-  "let mut middle: Vec<i64> = v[1..3].to_vec(); then middle.extend_from_slice(&v);",
-  "A range on a Vec is a slice; to_vec() is the copy that lets you extend it.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "four", stdin = "1 2 3 4\n", expect = "2 3 1 2 3 4\n6\n", visible = true },
-  { name = "five", stdin = "9 8 7 6 5\n", expect = "8 7 9 8 7 6 5\n7\n", visible = false },
-  { name = "same", stdin = "4 4 4 4\n", expect = "4 4 4 4 4 4\n6\n", visible = false },
+  { name = "four", stdin = "3 5 8 1\n", expect = "MAX 8\n8\n", visible = true },
+  { name = "empty", stdin = "\n", expect = "0\n", visible = false },
+  { name = "all-odd", stdin = "7 9 11\n", expect = "MAX 11\n0\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 10
 [[quest]]
-id          = "rust.basic.10.byte-slices"
+id          = "rust.basic.10.result"
 node        = 10
-title       = "THE BYTES OF THE NAME"
-difficulty  = 1
-story       = "The Times Square turnstile reads a name as raw bytes, keeps the first two and stamps an exclamation mark after them, and the stamp comes out empty."
-concepts    = ["slices", "strings", "types"]
-requires    = ["rust.basic.09.int-slices"]
-map          = { x = 0.671, y = 0.280, kind = "quest" }
+title       = "THE LINE THAT IS NOT A NUMBER"
+difficulty  = 2
+story       = "The Percival Street till takes a line of prices. One of them is a word. The till does not crash; it says which line was bad and why."
+concepts    = ["error-handling", "functions", "pattern-matching"]
+requires    = ["rust.basic.09.option"]
+map          = { x = 0.425, y = 0.232, kind = "quest" }
 brief       = '''
-`s.as_bytes()` is the text as a `&[u8]` — a slice of bytes, one `u8` each.
-Slice it by range like any slice, `.to_vec()` copies it into a `Vec<u8>`,
-and `extend_from_slice` appends more bytes; `"!".as_bytes()` is the bytes of
-a literal. `{:02x}` prints one byte as two hex digits, and
-`String::from_utf8_lossy` turns bytes back into text.
+`Result<T, E>` is `Ok(value)` or `Err(error)`. Inside a function that
+returns a `Result`, the `?` operator unwraps an `Ok` and **returns** an
+`Err` to the caller on the spot — one character instead of a `match`.
+`"12".parse::<i64>()` is a `Result<i64, ParseIntError>`.
 
 ```
-let mut head: Vec<u8> = bytes[..2].to_vec();
-head.extend_from_slice("!".as_bytes());
+out.push(tok.parse::<i64>()?);
 ```
 
-`bytes` is the input's bytes. Type those two lines in place of the two
-placeholders.
+`parse_all` returns the vector or the first error, and `main` matches on
+it. Type the line with `?` where the `// FILL` comment is.
 
 ```
-input:  mei
-output: 6d6521
-        me!
+input:  1 2 3
+output: 6
 ```
 '''
 starter     = '''
 use std::io::Read;
+use std::num::ParseIntError;
+
+fn parse_all(line: &str) -> Result<Vec<i64>, ParseIntError> {
+    let mut out = Vec::new();
+    for tok in line.split_whitespace() {
+        // FILL: parse the token and push it; a bad token returns the error to the caller
+        // ANSWER: out.push(tok.parse::<i64>()?);
+        let _ = tok;
+    }
+    Ok(out)
+}
 
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let s = input.trim();
-    let bytes = s.as_bytes();
-
-    // FILL: head is a copy of the first two bytes
-    // ANSWER: let mut head: Vec<u8> = bytes[..2].to_vec();
-    let mut head: Vec<u8> = Vec::new();
-    // FILL: append the bytes of "!" onto head
-    // ANSWER: head.extend_from_slice("!".as_bytes());
-    let hex: String = head.iter().map(|b| format!("{:02x}", b)).collect();
-    println!("{}", hex);
-    println!("{}", String::from_utf8_lossy(&head));
+    match parse_all(input.trim()) {
+        Ok(nums) => println!("{}", nums.iter().sum::<i64>()),
+        Err(e) => println!("BAD: {}", e),
+    }
 }
 '''
 solution    = '''
 use std::io::Read;
+use std::num::ParseIntError;
+
+fn parse_all(line: &str) -> Result<Vec<i64>, ParseIntError> {
+    let mut out = Vec::new();
+    for tok in line.split_whitespace() {
+        out.push(tok.parse::<i64>()?);
+    }
+    Ok(out)
+}
 
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let s = input.trim();
-    let bytes = s.as_bytes();
-
-    let mut head: Vec<u8> = bytes[..2].to_vec();
-    head.extend_from_slice("!".as_bytes());
-    let hex: String = head.iter().map(|b| format!("{:02x}", b)).collect();
-    println!("{}", hex);
-    println!("{}", String::from_utf8_lossy(&head));
+    match parse_all(input.trim()) {
+        Ok(nums) => println!("{}", nums.iter().sum::<i64>()),
+        Err(e) => println!("BAD: {}", e),
+    }
 }
 '''
 hints = [
-  "let mut head: Vec<u8> = bytes[..2].to_vec(); then head.extend_from_slice(\"!\".as_bytes());",
-  "bytes[..2] is a &[u8]; to_vec() owns it; extend_from_slice takes another &[u8].",
+  "out.push(tok.parse::<i64>()?);",
+  "? only works in a function whose return type is a Result (or Option) with a matching error type — here ParseIntError, which is exactly what parse gives.",
 ]
 
 [quest.tests]
@@ -778,1403 +873,1413 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "mei", stdin = "mei\n", expect = "6d6521\nme!\n", visible = true },
-  { name = "alex", stdin = "alex\n", expect = "616c21\nal!\n", visible = false },
-  { name = "go", stdin = "go\n", expect = "676f21\ngo!\n", visible = false },
+  { name = "good", stdin = "1 2 3\n", expect = "6\n", visible = true },
+  { name = "bad", stdin = "1 x 3\n", expect = "BAD: invalid digit found in string\n", visible = false },
+  { name = "empty", stdin = "\n", expect = "0\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 11
 [[quest]]
-id          = "rust.basic.05.loops"
+id          = "rust.basic.11.match"
 node        = 11
-title       = "THE TRAM COUNT"
-difficulty  = 1
-story       = "The conductor on the Yee Wo Street tram tallies stops on a paper strip: the running total, and a tick every third stop. The strip is blank past the first line."
-concepts    = ["control-flow", "io"]
-requires    = ["rust.basic.10.byte-slices"]
-map          = { x = 0.474, y = 0.314, kind = "quest" }
+title       = "THE SHAPE OF THE NUMBER"
+difficulty  = 2
+story       = "A gate at Victoria Park sorts ticket numbers: zero, one digit, even, odd. Four arms and nothing falls through."
+concepts    = ["pattern-matching", "control-flow"]
+requires    = ["rust.basic.10.result"]
+map          = { x = 0.269, y = 0.204, kind = "quest" }
 brief       = '''
-A `for` loop walks a range. `1..n` stops before `n`; `1..=n` includes it.
-The loop variable is a fresh binding each time round, and `+=` adds to a
-`mut` total.
+`match` must cover every case, and its arms are patterns: a literal, a
+range `1..=9`, a binding with a guard `x if x % 2 == 0`, and `_` for the
+rest. The first arm that fits wins, so order matters. It is an expression:
+each arm's value becomes the value of the whole `match`.
 
 ```
-for i in 1..=n {
-    sum += i;
-    if i % 3 == 0 {
-        ticks += 1;
+0 => "ZERO",
+1..=9 => "ONE DIGIT",
+x if x % 2 == 0 => "EVEN",
+_ => "ODD",
+```
+
+The `match` is opened for you with one arm that says `TODO`. Replace it
+with those four arms, in that order.
+
+```
+input:  12
+output: EVEN
+```
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let n: i64 = input.trim().parse().unwrap();
+
+    let word = match n {
+        // FILL: zero, then one digit (1 to 9), then even by guard, then everything else
+        // ANSWER: 0 => "ZERO",
+        // ANSWER: 1..=9 => "ONE DIGIT",
+        // ANSWER: x if x % 2 == 0 => "EVEN",
+        // ANSWER: _ => "ODD",
+        _ => "TODO",
+    };
+    println!("{}", word);
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let n: i64 = input.trim().parse().unwrap();
+
+    let word = match n {
+        0 => "ZERO",
+        1..=9 => "ONE DIGIT",
+        x if x % 2 == 0 => "EVEN",
+        _ => "ODD",
+    };
+    println!("{}", word);
+}
+'''
+hints = [
+  "0 => \"ZERO\", 1..=9 => \"ONE DIGIT\", x if x % 2 == 0 => \"EVEN\", _ => \"ODD\",",
+  "Put the guard arm before _ or it never runs. 1..=9 is inclusive at both ends; 1..9 would leave 9 to the guard.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "even", stdin = "12\n", expect = "EVEN\n", visible = true },
+  { name = "zero", stdin = "0\n", expect = "ZERO\n", visible = false },
+  { name = "digit", stdin = "7\n", expect = "ONE DIGIT\n", visible = false },
+  { name = "odd", stdin = "15\n", expect = "ODD\n", visible = false },
+  { name = "negative-even", stdin = "-4\n", expect = "EVEN\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "rust.basic.12.iterator-chain"
+node        = 12
+title       = "ONE PASS DOWN YEE WO STREET"
+difficulty  = 2
+story       = "Yee Wo Street, one walk: keep the even shopfronts, square their numbers, and add up everything above ten. No index, no second loop."
+concepts    = ["iteration", "closures"]
+requires    = ["rust.basic.11.match"]
+map          = { x = 0.082, y = 0.223, kind = "quest" }
+brief       = '''
+An iterator chain reads left to right: `.iter()` walks the vector,
+`.filter(|&&x| …)` keeps what the closure says yes to, `.map(|x| …)`
+transforms, and a final `.collect()` or `.sum()` turns it into a value.
+Nothing runs until that last call. `iter()` yields `&i64`, and `filter`
+sees a reference to that, hence the `&&x` pattern that reaches the number.
+
+```
+let squares: Vec<i64> = nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect();
+let big: i64 = nums.iter().filter(|&&x| x > 10).sum();
+```
+
+Type the two lines where the `// FILL` comments are.
+
+```
+input:  1 2 3 4 11 20
+output: 4 16 400
+        31
+```
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    // FILL: the squares of the even numbers, as a Vec
+    // ANSWER: let squares: Vec<i64> = nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect();
+    let squares: Vec<i64> = Vec::new();
+
+    // FILL: the sum of everything above 10
+    // ANSWER: let big: i64 = nums.iter().filter(|&&x| x > 10).sum();
+    let big: i64 = 0;
+
+    let out: Vec<String> = squares.iter().map(|x| x.to_string()).collect();
+    println!("{}", out.join(" "));
+    println!("{}", big);
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let squares: Vec<i64> = nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect();
+
+    let big: i64 = nums.iter().filter(|&&x| x > 10).sum();
+
+    let out: Vec<String> = squares.iter().map(|x| x.to_string()).collect();
+    println!("{}", out.join(" "));
+    println!("{}", big);
+}
+'''
+hints = [
+  "nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect() — and .filter(|&&x| x > 10).sum() for the second.",
+  "The type on the let is what tells collect() and sum() what to build; without Vec<i64> and i64 the compiler cannot infer them.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six", stdin = "1 2 3 4 11 20\n", expect = "4 16 400\n31\n", visible = true },
+  { name = "none-even", stdin = "1 3 5\n", expect = "\n0\n", visible = false },
+  { name = "all-big", stdin = "12 14\n", expect = "144 196\n26\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "rust.basic.13.fold-zip-windows"
+node        = 13
+title       = "PAIRS, RUNS AND A RUNNING TOTAL"
+difficulty  = 2
+story       = "The tram counter on Percival Street reads a day of counts: how many hours went up on the hour before, the product of them all, and each with its hour beside it."
+concepts    = ["iteration", "slices", "closures"]
+requires    = ["rust.basic.12.iterator-chain"]
+map          = { x = 0.039, y = 0.369, kind = "quest" }
+brief       = '''
+Three adapters a screen keeps asking for. `.windows(2)` on a slice yields
+every pair of neighbours as a two-element slice. `.fold(start, |acc, x| …)`
+threads one accumulator through the whole sequence. `.zip(…)` walks two
+sequences side by side, and `(0..).zip(&nums)` is `enumerate` spelled by
+hand.
+
+```
+let ups = nums.windows(2).filter(|w| w[1] > w[0]).count();
+let product = nums.iter().fold(1i64, |acc, &x| acc * x);
+let pairs: Vec<String> = (0..).zip(&nums).map(|(i, x)| format!("{}:{}", i, x)).collect();
+```
+
+Type the three lines where the `// FILL` comments are.
+
+```
+input:  1 3 2 5
+output: 2
+        30
+        0:1 1:3 2:2 3:5
+```
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    // FILL: how many neighbours go up, with windows of two
+    // ANSWER: let ups = nums.windows(2).filter(|w| w[1] > w[0]).count();
+    let ups = 0;
+
+    // FILL: the product of everything, with fold starting at 1
+    // ANSWER: let product = nums.iter().fold(1i64, |acc, &x| acc * x);
+    let product = 0;
+
+    // FILL: each number with its index, as i:x, with zip
+    // ANSWER: let pairs: Vec<String> = (0..).zip(&nums).map(|(i, x)| format!("{}:{}", i, x)).collect();
+    let pairs: Vec<String> = Vec::new();
+
+    println!("{}", ups);
+    println!("{}", product);
+    println!("{}", pairs.join(" "));
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let ups = nums.windows(2).filter(|w| w[1] > w[0]).count();
+
+    let product = nums.iter().fold(1i64, |acc, &x| acc * x);
+
+    let pairs: Vec<String> = (0..).zip(&nums).map(|(i, x)| format!("{}:{}", i, x)).collect();
+
+    println!("{}", ups);
+    println!("{}", product);
+    println!("{}", pairs.join(" "));
+}
+'''
+hints = [
+  "windows(2).filter(|w| w[1] > w[0]).count() — fold(1i64, |acc, &x| acc * x) — (0..).zip(&nums).map(|(i, x)| format!(\"{}:{}\", i, x)).collect()",
+  "windows is a slice method, so it is on nums directly, not on nums.iter(). The 1i64 in fold fixes the accumulator's type; a bare 1 would be ambiguous.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 3 2 5\n", expect = "2\n30\n0:1 1:3 2:2 3:5\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "0\n7\n0:7\n", visible = false },
+  { name = "rising", stdin = "1 2 3 4\n", expect = "3\n24\n0:1 1:2 2:3 3:4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "rust.basic.14.entry"
+node        = 14
+title       = "WHAT THE BAZAAR SHOUTS"
+difficulty  = 2
+story       = "Every word shouted across Jardine's Bazaar in a morning, counted. The loud ones first; ties in alphabetical order."
+concepts    = ["collections", "hashing", "sorting"]
+requires    = ["rust.basic.13.fold-zip-windows"]
+map          = { x = 0.229, y = 0.425, kind = "quest" }
+brief       = '''
+`HashMap`'s entry API is the one-line counter. `counts.entry(key)` finds
+the slot for a key whether or not it exists yet; `.or_insert(0)` puts a
+`0` there when it does not and hands back a `&mut` to the value either
+way; `*… += 1` bumps it. One lookup, no `contains_key` first.
+
+```
+*counts.entry(w.to_string()).or_insert(0) += 1;
+```
+
+The map, the loop, the sort and the printing are written. Type the entry
+line where the `// FILL` comment is.
+
+```
+input:  a b a c b a
+output: a 3
+        b 2
+        c 1
+```
+'''
+starter     = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for w in input.split_whitespace() {
+        // FILL: count this word, inserting 0 first if it is new
+        // ANSWER: *counts.entry(w.to_string()).or_insert(0) += 1;
+        let _ = w;
+    }
+
+    let mut pairs: Vec<(&String, &usize)> = counts.iter().collect();
+    pairs.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+    for (w, c) in pairs {
+        println!("{} {}", w, c);
     }
 }
+'''
+solution    = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for w in input.split_whitespace() {
+        *counts.entry(w.to_string()).or_insert(0) += 1;
+    }
+
+    let mut pairs: Vec<(&String, &usize)> = counts.iter().collect();
+    pairs.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+    for (w, c) in pairs {
+        println!("{} {}", w, c);
+    }
+}
+'''
+hints = [
+  "*counts.entry(w.to_string()).or_insert(0) += 1;",
+  "The key is a String, so w (a &str) is turned into one with to_string(). The star in front dereferences the &mut usize that or_insert returns.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six", stdin = "a b a c b a\n", expect = "a 3\nb 2\nc 1\n", visible = true },
+  { name = "ties", stdin = "tram bus tram bus\n", expect = "bus 2\ntram 2\n", visible = false },
+  { name = "one", stdin = "hello\n", expect = "hello 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "rust.basic.15.sort-by"
+node        = 15
+title       = "THE LEADERBOARD"
+difficulty  = 2
+story       = "The arcade at Times Square posts the day: highest score first, and when two tie, the one whose name comes first. The second board is by how long the name is."
+concepts    = ["sorting", "closures", "iteration"]
+requires    = ["rust.basic.14.entry"]
+map          = { x = 0.401, y = 0.407, kind = "quest" }
+brief       = '''
+`sort_by` takes a comparator closure returning an `Ordering`. `b.cmp(&a)`
+is descending; `.then_with(|| …)` breaks ties with a second comparison.
+`sort_by_key` sorts by whatever the closure extracts, ascending, and both
+are **stable**: equal keys keep their order. For floats, which have no
+`cmp`, it is `a.partial_cmp(b).unwrap()`.
+
+```
+rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+by_len.sort_by_key(|r| r.0.len());
 ```
 
-`n` is read, the totals are declared and printed, and the loop body is
-written. Type the first line, `for i in 1..=n {`, in place of the
-placeholder `for i in 0..0 {`.
+Type the two sorts where the `// FILL` comments are. `by_len` is a clone
+made before the first sort, so its ties are in input order.
 
 ```
-input:  6
-output: 21
+input:  MEI 90
+        BO 95
+        ALEX 90
+output: BO ALEX MEI
+        BO MEI ALEX
+```
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut rows: Vec<(String, i64)> = input
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let mut it = l.split_whitespace();
+            (it.next().unwrap().to_string(), it.next().unwrap().parse().unwrap())
+        })
+        .collect();
+    let mut by_len = rows.clone();
+
+    // FILL: highest score first; equal scores by name
+    // ANSWER: rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+    // FILL: shortest name first, stable
+    // ANSWER: by_len.sort_by_key(|r| r.0.len());
+
+    let names: Vec<&str> = rows.iter().map(|r| r.0.as_str()).collect();
+    println!("{}", names.join(" "));
+    let names: Vec<&str> = by_len.iter().map(|r| r.0.as_str()).collect();
+    println!("{}", names.join(" "));
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut rows: Vec<(String, i64)> = input
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let mut it = l.split_whitespace();
+            (it.next().unwrap().to_string(), it.next().unwrap().parse().unwrap())
+        })
+        .collect();
+    let mut by_len = rows.clone();
+
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+    by_len.sort_by_key(|r| r.0.len());
+
+    let names: Vec<&str> = rows.iter().map(|r| r.0.as_str()).collect();
+    println!("{}", names.join(" "));
+    let names: Vec<&str> = by_len.iter().map(|r| r.0.as_str()).collect();
+    println!("{}", names.join(" "));
+}
+'''
+hints = [
+  "rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))); and by_len.sort_by_key(|r| r.0.len());",
+  "b before a in cmp is what makes it descending. cmp takes a reference, hence &a.1. then_with only runs when the first comparison is Equal.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "MEI 90\nBO 95\nALEX 90\n", expect = "BO ALEX MEI\nBO MEI ALEX\n", visible = true },
+  { name = "all-tied", stdin = "CC 1\nA 1\nBB 1\n", expect = "A BB CC\nA CC BB\n", visible = false },
+  { name = "stable-len", stdin = "ZZ 5\nAA 9\nB 1\n", expect = "AA ZZ B\nB ZZ AA\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "rust.basic.16.heap-reverse"
+node        = 16
+title       = "THE SMALLEST FIRST"
+difficulty  = 2
+story       = "The dim sum window at Times Square calls the lowest ticket first. The pile is a heap, and a heap in Rust hands out the biggest unless you tell it otherwise."
+concepts    = ["heaps", "collections", "pattern-matching"]
+requires    = ["rust.basic.15.sort-by"]
+map          = { x = 0.608, y = 0.39, kind = "quest" }
+brief       = '''
+`BinaryHeap` is a max-heap: `pop()` gives the largest. Wrapping each value
+in `std::cmp::Reverse` flips the order, so `BinaryHeap<Reverse<i64>>` pops
+the smallest — the min-heap every shortest-path and k-smallest question
+wants. `while let Some(Reverse(x)) = heap.pop()` unwraps as it drains.
+
+```
+heap.push(Reverse(x));
+while let Some(Reverse(x)) = heap.pop() { out.push(x); }
+```
+
+Type the push and the drain where the `// FILL` comments are.
+
+```
+input:  5 1 9 3
+output: 1 3 5 9
+```
+'''
+starter     = '''
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let mut heap: BinaryHeap<Reverse<i64>> = BinaryHeap::new();
+    for x in nums {
+        // FILL: push x, wrapped so the heap treats small as big
+        // ANSWER: heap.push(Reverse(x));
+        let _ = x;
+    }
+
+    let mut out: Vec<i64> = Vec::new();
+    // FILL: pop until empty, unwrapping the Reverse as you go
+    // ANSWER: while let Some(Reverse(x)) = heap.pop() { out.push(x); }
+
+    let words: Vec<String> = out.iter().map(|x| x.to_string()).collect();
+    println!("{}", words.join(" "));
+}
+'''
+solution    = '''
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let mut heap: BinaryHeap<Reverse<i64>> = BinaryHeap::new();
+    for x in nums {
+        heap.push(Reverse(x));
+    }
+
+    let mut out: Vec<i64> = Vec::new();
+    while let Some(Reverse(x)) = heap.pop() { out.push(x); }
+
+    let words: Vec<String> = out.iter().map(|x| x.to_string()).collect();
+    println!("{}", words.join(" "));
+}
+'''
+hints = [
+  "heap.push(Reverse(x)); then while let Some(Reverse(x)) = heap.pop() { out.push(x); }",
+  "Reverse is a tuple struct, so Reverse(x) both wraps on push and destructures in the pattern. Without it the output would come out largest first.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "5 1 9 3\n", expect = "1 3 5 9\n", visible = true },
+  { name = "dupes", stdin = "2 2 1\n", expect = "1 2 2\n", visible = false },
+  { name = "negatives", stdin = "0 -5 5\n", expect = "-5 0 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "rust.basic.17.derive-ord"
+node        = 17
+title       = "COMPARED FIELD BY FIELD"
+difficulty  = 2
+story       = "Fares on the Percival Street board, sorted by zone and then by price. Nobody writes the comparison; the compiler is told to."
+concepts    = ["traits", "sorting", "structs"]
+requires    = ["rust.basic.16.heap-reverse"]
+map          = { x = 0.783, y = 0.365, kind = "quest" }
+brief       = '''
+`sort()`, `max()`, `BinaryHeap` and `==` all need the type to implement
+comparison traits. `#[derive(…)]` writes them for a struct, comparing
+**field by field in declaration order**: `PartialEq, Eq` for `==`,
+`PartialOrd, Ord` for `<` and sorting, `Clone` for `.clone()`, `Debug`
+for `{:?}`.
+
+```
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+```
+
+Type that attribute where the `// FILL` comment is, on the line above
+`struct Fare`. Without it, `fares.sort()` does not compile.
+
+```
+input:  2 5 BUS
+        1 9 TRAM
+        1 3 FERRY
+output: FERRY TRAM BUS
+        BUS
+```
+'''
+starter     = '''
+use std::io::Read;
+
+// FILL: let the compiler write ==, <, clone and {:?} for Fare, field by field
+// ANSWER: #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct Fare {
+    zone: u8,
+    price: i64,
+    name: String,
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut fares: Vec<Fare> = input
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let mut it = l.split_whitespace();
+            Fare {
+                zone: it.next().unwrap().parse().unwrap(),
+                price: it.next().unwrap().parse().unwrap(),
+                name: it.next().unwrap().to_string(),
+            }
+        })
+        .collect();
+
+    fares.sort();
+    let names: Vec<&str> = fares.iter().map(|f| f.name.as_str()).collect();
+    println!("{}", names.join(" "));
+    println!("{}", fares.iter().max().unwrap().name);
+}
+'''
+solution    = '''
+use std::io::Read;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct Fare {
+    zone: u8,
+    price: i64,
+    name: String,
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut fares: Vec<Fare> = input
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let mut it = l.split_whitespace();
+            Fare {
+                zone: it.next().unwrap().parse().unwrap(),
+                price: it.next().unwrap().parse().unwrap(),
+                name: it.next().unwrap().to_string(),
+            }
+        })
+        .collect();
+
+    fares.sort();
+    let names: Vec<&str> = fares.iter().map(|f| f.name.as_str()).collect();
+    println!("{}", names.join(" "));
+    println!("{}", fares.iter().max().unwrap().name);
+}
+'''
+hints = [
+  "#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)] directly above struct Fare.",
+  "Ord requires Eq and PartialOrd, and PartialOrd requires PartialEq, so all four go in. The field order in the struct is the sort order.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "2 5 BUS\n1 9 TRAM\n1 3 FERRY\n", expect = "FERRY TRAM BUS\nBUS\n", visible = true },
+  { name = "same-zone", stdin = "1 7 B\n1 7 A\n1 2 C\n", expect = "C A B\nB\n", visible = false },
+  { name = "one", stdin = "3 1 MTR\n", expect = "MTR\nMTR\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "rust.basic.18.fast-input"
+node        = 18
+title       = "READ IT ALL AT ONCE"
+difficulty  = 2
+story       = "The first line of every HackerRank problem: n and k, then n numbers. The kiosk reads the whole thing in one go and takes tokens off the top."
+concepts    = ["io", "types", "iteration"]
+requires    = ["rust.basic.17.derive-ord"]
+map          = { x = 0.914, y = 0.376, kind = "quest" }
+brief       = '''
+Read stdin once with `read_to_string`, then take tokens off one iterator:
+`split_ascii_whitespace()` yields `&str`s, `.next().unwrap().parse()`
+turns one into a number, and `it.by_ref().take(n)` takes the next `n`
+without consuming the iterator. The type on the `let` picks the parse.
+
+```
+let n: usize = it.next().unwrap().parse().unwrap();
+let k: usize = it.next().unwrap().parse().unwrap();
+let nums: Vec<i64> = it.by_ref().take(n).map(|t| t.parse().unwrap()).collect();
+```
+
+Type the three lines where the `// FILL` comments are. The program prints
+the sum of the first `k` of the `n` numbers.
+
+```
+input:  5 2
+        3 4 5 6 7
+output: 7
+```
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut it = input.split_ascii_whitespace();
+
+    // FILL: n and then k, both usize, straight off the iterator
+    // ANSWER: let n: usize = it.next().unwrap().parse().unwrap();
+    // ANSWER: let k: usize = it.next().unwrap().parse().unwrap();
+    let n: usize = 0;
+    let k: usize = 0;
+
+    // FILL: the next n tokens, parsed as i64
+    // ANSWER: let nums: Vec<i64> = it.by_ref().take(n).map(|t| t.parse().unwrap()).collect();
+    let nums: Vec<i64> = Vec::new();
+
+    println!("{}", nums.iter().take(k).sum::<i64>());
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut it = input.split_ascii_whitespace();
+
+    let n: usize = it.next().unwrap().parse().unwrap();
+    let k: usize = it.next().unwrap().parse().unwrap();
+
+    let nums: Vec<i64> = it.by_ref().take(n).map(|t| t.parse().unwrap()).collect();
+
+    println!("{}", nums.iter().take(k).sum::<i64>());
+}
+'''
+hints = [
+  "let n: usize = it.next().unwrap().parse().unwrap(); twice, then it.by_ref().take(n).map(|t| t.parse().unwrap()).collect()",
+  "parse() infers its target from the let's type, so the : usize and : Vec<i64> are doing real work. by_ref() lets take() borrow the iterator instead of eating it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five-two", stdin = "5 2\n3 4 5 6 7\n", expect = "7\n", visible = true },
+  { name = "all", stdin = "3 3\n1 1 1\n", expect = "3\n", visible = false },
+  { name = "one-line", stdin = "4 1 10 20 30 40\n", expect = "10\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "rust.basic.19.formatting"
+node        = 19
+title       = "SIX DECIMAL PLACES"
+difficulty  = 2
+story       = "The scale at the wet market prints the mean to six places, lines the readings up in a column, and stamps the count with leading zeros."
+concepts    = ["io", "strings", "types"]
+requires    = ["rust.basic.18.fast-input"]
+map          = { x = 0.951, y = 0.554, kind = "quest" }
+brief       = '''
+The braces in `println!` take a format spec after a colon. `{:.6}` is six
+decimal places. `{:<5}` left-aligns in five columns (`>` right, `^`
+centre). `{:03}` pads a number with zeros to width three. `{:?}` is the
+debug form, which prints a whole `Vec`.
+
+```
+println!("{:.6}", mean);
+println!("{:<5}|", x);
+println!("{:03}", nums.len());
+```
+
+Type the three `println!`s where the `// FILL` comments are.
+
+```
+input:  1 2 4
+output: 2.333333
+        1    |
+        2    |
+        4    |
+        003
+```
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+    let mean = nums.iter().sum::<i64>() as f64 / nums.len() as f64;
+
+    // FILL: the mean, six decimal places
+    // ANSWER: println!("{:.6}", mean);
+
+    for x in &nums {
+        // FILL: x left-aligned in five columns, then a pipe
+        // ANSWER: println!("{:<5}|", x);
+        let _ = x;
+    }
+
+    // FILL: the count, zero-padded to three digits
+    // ANSWER: println!("{:03}", nums.len());
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+    let mean = nums.iter().sum::<i64>() as f64 / nums.len() as f64;
+
+    println!("{:.6}", mean);
+
+    for x in &nums {
+        println!("{:<5}|", x);
+    }
+
+    println!("{:03}", nums.len());
+}
+'''
+hints = [
+  "println!(\"{:.6}\", mean); — println!(\"{:<5}|\", x); — println!(\"{:03}\", nums.len());",
+  "The spec sits after the colon inside the braces: .6 is precision, <5 is alignment and width, 03 is zero-fill and width.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 4\n", expect = "2.333333\n1    |\n2    |\n4    |\n003\n", visible = true },
+  { name = "wide", stdin = "12345 -7\n", expect = "6169.000000\n12345|\n-7   |\n002\n", visible = false },
+  { name = "one", stdin = "10\n", expect = "10.000000\n10   |\n001\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "rust.basic.20.overflow"
+node        = 20
+title       = "WHERE AN I64 STOPS"
+difficulty  = 2
+story       = "Two big numbers at the money changer on Hennessy Road. The wide till says the real product; the narrow one says NONE instead of lying; and the third wraps round, because it was told to."
+concepts    = ["types", "math", "panics"]
+requires    = ["rust.basic.19.formatting"]
+map          = { x = 0.769, y = 0.567, kind = "quest" }
+brief       = '''
+An `i64` product that does not fit **panics** in debug and wraps in
+release — either way it is wrong. `as i128` widens before multiplying.
+`a.checked_mul(b)` returns `None` when the result would not fit.
+`a.wrapping_mul(b)` wraps on purpose, mod 2⁶⁴, which is what a hashing
+question wants.
+
+```
+let wide = a as i128 * b as i128;
+let narrow = a.checked_mul(b);
+println!("{}", a.wrapping_mul(b));
+```
+
+Type the three lines where the `// FILL` comments are.
+
+```
+input:  3000000000 4000000000
+output: NONE
+        12000000000000000000
+        -6446744073709551616
+```
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut it = input.split_whitespace().map(|t| t.parse::<i64>().unwrap());
+    let a = it.next().unwrap();
+    let b = it.next().unwrap();
+
+    // FILL: the product in i128, so it never overflows
+    // ANSWER: let wide = a as i128 * b as i128;
+    let wide: i128 = 0;
+
+    // FILL: the product in i64, or None when it does not fit
+    // ANSWER: let narrow = a.checked_mul(b);
+    let narrow: Option<i64> = None;
+
+    match narrow {
+        Some(v) => println!("{}", v),
+        None => println!("NONE"),
+    }
+    println!("{}", wide);
+
+    // FILL: print the product wrapped round on purpose
+    // ANSWER: println!("{}", a.wrapping_mul(b));
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut it = input.split_whitespace().map(|t| t.parse::<i64>().unwrap());
+    let a = it.next().unwrap();
+    let b = it.next().unwrap();
+
+    let wide = a as i128 * b as i128;
+
+    let narrow = a.checked_mul(b);
+
+    match narrow {
+        Some(v) => println!("{}", v),
+        None => println!("NONE"),
+    }
+    println!("{}", wide);
+
+    println!("{}", a.wrapping_mul(b));
+}
+'''
+hints = [
+  "let wide = a as i128 * b as i128; — let narrow = a.checked_mul(b); — println!(\"{}\", a.wrapping_mul(b));",
+  "Cast both operands before the multiply: (a * b) as i128 overflows first and widens the wreckage. checked_ and wrapping_ exist for add, sub and mul alike.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "overflows", stdin = "3000000000 4000000000\n", expect = "NONE\n12000000000000000000\n-6446744073709551616\n", visible = true },
+  { name = "fits", stdin = "6 7\n", expect = "42\n42\n42\n", visible = false },
+  { name = "negative", stdin = "-5 3\n", expect = "-15\n-15\n-15\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "rust.basic.21.lifetime-fn"
+node        = 21
+title       = "HOW LONG IS THAT GOOD FOR"
+difficulty  = 3
+story       = "Two shop signs on Yee Wo Street and a function that points at the longer one. It hands back a borrow, and the compiler wants to know whose."
+concepts    = ["lifetimes", "borrowing", "functions"]
+requires    = ["rust.basic.20.overflow"]
+map          = { x = 0.597, y = 0.544, kind = "quest" }
+brief       = '''
+A function that returns a reference must say which input it borrows
+from. `<'a>` declares a lifetime, `&'a str` ties a parameter to it, and
+`-> &'a str` promises the result lives as long as that. Two inputs on
+the same `'a` means the result is good for as long as the **shorter**
+of the two.
+
+```
+fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {
+```
+
+The body is written. Replace the signature line marked `// FILL` with the
+annotated one; without the lifetime it does not compile (E0106).
+
+```
+input:  TRAM
+        FERRY
+output: FERRY
+```
+'''
+starter     = '''
+use std::io::Read;
+
+// FILL: the same signature with a lifetime 'a on both inputs and the output
+// ANSWER: fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {
+fn longer(a: &str, b: &str) -> &str {
+    if a.len() >= b.len() { a } else { b }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let first = lines.next().unwrap_or("").trim();
+    let second = lines.next().unwrap_or("").trim();
+    println!("{}", longer(first, second));
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {
+    if a.len() >= b.len() { a } else { b }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let first = lines.next().unwrap_or("").trim();
+    let second = lines.next().unwrap_or("").trim();
+    println!("{}", longer(first, second));
+}
+'''
+hints = [
+  "fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {",
+  "With one reference parameter the compiler fills the lifetime in for you (elision). With two it cannot know which one the result borrows, so you say.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "second", stdin = "TRAM\nFERRY\n", expect = "FERRY\n", visible = true },
+  { name = "first", stdin = "CAUSEWAY\nBAY\n", expect = "CAUSEWAY\n", visible = false },
+  { name = "tie", stdin = "AB\nCD\n", expect = "AB\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "rust.basic.22.lifetime-struct"
+node        = 22
+title       = "A TICKET THAT BORROWS A NAME"
+difficulty  = 3
+story       = "A day ticket at the tram depot carries a name it does not own: it points at the register. The ticket cannot outlive the page it points into."
+concepts    = ["lifetimes", "structs", "borrowing"]
+requires    = ["rust.basic.21.lifetime-fn"]
+map          = { x = 0.438, y = 0.576, kind = "quest" }
+brief       = '''
+A struct that holds a reference needs a lifetime parameter, and so does
+every `impl` block for it. `struct Ticket<'a>` with a field `name: &'a str`
+says a `Ticket` cannot outlive the text it points at; `impl<'a> Ticket<'a>`
+carries the same name into the methods.
+
+```
+struct Ticket<'a> {
+impl<'a> Ticket<'a> {
+```
+
+Replace the two lines marked `// FILL`. The field and the method are
+written and do not change.
+
+```
+input:  MEI 2
+output: MEI@2
+```
+'''
+starter     = '''
+use std::io::Read;
+
+// FILL: the struct line, with a lifetime for the borrowed name
+// ANSWER: struct Ticket<'a> {
+struct Ticket {
+    name: &'a str,
+    zone: u8,
+}
+
+// FILL: the impl line, carrying the same lifetime
+// ANSWER: impl<'a> Ticket<'a> {
+impl Ticket {
+    fn label(&self) -> String {
+        format!("{}@{}", self.name, self.zone)
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut it = input.split_whitespace();
+    let name = it.next().unwrap_or("");
+    let zone: u8 = it.next().unwrap_or("0").parse().unwrap();
+    let ticket = Ticket { name, zone };
+    println!("{}", ticket.label());
+}
+'''
+solution    = '''
+use std::io::Read;
+
+struct Ticket<'a> {
+    name: &'a str,
+    zone: u8,
+}
+
+impl<'a> Ticket<'a> {
+    fn label(&self) -> String {
+        format!("{}@{}", self.name, self.zone)
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut it = input.split_whitespace();
+    let name = it.next().unwrap_or("");
+    let zone: u8 = it.next().unwrap_or("0").parse().unwrap();
+    let ticket = Ticket { name, zone };
+    println!("{}", ticket.label());
+}
+'''
+hints = [
+  "struct Ticket<'a> { and impl<'a> Ticket<'a> {",
+  "The 'a on the field is already there; it needs declaring on the struct, and the impl declares it again with impl<'a> and then applies it with Ticket<'a>.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mei", stdin = "MEI 2\n", expect = "MEI@2\n", visible = true },
+  { name = "bo", stdin = "BO 7\n", expect = "BO@7\n", visible = false },
+  { name = "zero", stdin = "X 0\n", expect = "X@0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "rust.basic.23.trait"
+node        = 23
+title       = "A TRAIT OF HER OWN"
+difficulty  = 3
+story       = "Every ride in Causeway Bay has a fare, and every fare has a label. A tram is a flat three; a bus is two a kilometre. The label is written once, for both."
+concepts    = ["traits", "structs", "dispatch"]
+requires    = ["rust.basic.22.lifetime-struct"]
+map          = { x = 0.225, y = 0.566, kind = "quest" }
+brief       = '''
+A `trait` names behaviour: a set of methods a type promises. `impl Trait
+for Type { … }` keeps that promise, and a method the trait gives a default
+body for — `label` here — comes free with it, calling the one you wrote.
+
+```
+impl Fare for Tram { fn fare(&self) -> i64 { 3 } }
+impl Fare for Bus { fn fare(&self) -> i64 { 2 * self.km } }
+```
+
+The trait, both structs and `main` are written. Type the two `impl`s
+where the `// FILL` comments are.
+
+```
+input:  7
+output: 3 HKD
+        14 HKD
+```
+'''
+starter     = '''
+use std::io::Read;
+
+trait Fare {
+    fn fare(&self) -> i64;
+    fn label(&self) -> String {
+        format!("{} HKD", self.fare())
+    }
+}
+
+struct Tram;
+struct Bus {
+    km: i64,
+}
+
+// FILL: a tram costs 3
+// ANSWER: impl Fare for Tram { fn fare(&self) -> i64 { 3 } }
+
+// FILL: a bus costs 2 per km
+// ANSWER: impl Fare for Bus { fn fare(&self) -> i64 { 2 * self.km } }
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let km: i64 = input.trim().parse().unwrap();
+    println!("{}", Tram.label());
+    println!("{}", Bus { km }.label());
+}
+'''
+solution    = '''
+use std::io::Read;
+
+trait Fare {
+    fn fare(&self) -> i64;
+    fn label(&self) -> String {
+        format!("{} HKD", self.fare())
+    }
+}
+
+struct Tram;
+struct Bus {
+    km: i64,
+}
+
+impl Fare for Tram { fn fare(&self) -> i64 { 3 } }
+
+impl Fare for Bus { fn fare(&self) -> i64 { 2 * self.km } }
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let km: i64 = input.trim().parse().unwrap();
+    println!("{}", Tram.label());
+    println!("{}", Bus { km }.label());
+}
+'''
+hints = [
+  "impl Fare for Tram { fn fare(&self) -> i64 { 3 } } and the same shape for Bus with 2 * self.km.",
+  "Only fare needs writing: label has a default body in the trait and is inherited. The method signature must match the trait's exactly, &self included.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven", stdin = "7\n", expect = "3 HKD\n14 HKD\n", visible = true },
+  { name = "zero", stdin = "0\n", expect = "3 HKD\n0 HKD\n", visible = false },
+  { name = "far", stdin = "50\n", expect = "3 HKD\n100 HKD\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "rust.basic.24.generics"
+node        = 24
+title       = "WRITE IT ONCE"
+difficulty  = 3
+story       = "One function at the Hysan Place desk that finds the largest, whether it is handed numbers or letters. It is written once and asks only that the things can be compared."
+concepts    = ["generics", "traits", "slices"]
+requires    = ["rust.basic.23.trait"]
+map          = { x = 0.062, y = 0.59, kind = "quest" }
+brief       = '''
+`<T: Bound>` makes a function generic: `T` stands for any type that
+implements the bound. `PartialOrd` lets the body use `>`; `Copy` lets it
+copy elements out of the slice with `let mut best = xs[0]`. The compiler
+then builds one copy of the function per type it is called with.
+
+```
+fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {
+```
+
+Replace the signature line marked `// FILL`. The body is written and
+`main` calls it with `&[i64]` and with `&[char]`.
+
+```
+input:  3 9 2
+        b z a
+output: 9
+        z
+```
+'''
+starter     = '''
+use std::io::Read;
+
+// FILL: the same function over any T that can be compared and copied
+// ANSWER: fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {
+fn largest(xs: &[i64]) -> i64 {
+    let mut best = xs[0];
+    for &x in xs {
+        if x > best {
+            best = x;
+        }
+    }
+    best
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let nums: Vec<i64> = lines.next().unwrap().split_whitespace().map(|t| t.parse().unwrap()).collect();
+    let letters: Vec<char> = lines.next().unwrap().split_whitespace().map(|t| t.chars().next().unwrap()).collect();
+    println!("{}", largest(&nums));
+    println!("{}", largest(&letters));
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {
+    let mut best = xs[0];
+    for &x in xs {
+        if x > best {
+            best = x;
+        }
+    }
+    best
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let nums: Vec<i64> = lines.next().unwrap().split_whitespace().map(|t| t.parse().unwrap()).collect();
+    let letters: Vec<char> = lines.next().unwrap().split_whitespace().map(|t| t.chars().next().unwrap()).collect();
+    println!("{}", largest(&nums));
+    println!("{}", largest(&letters));
+}
+'''
+hints = [
+  "fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {",
+  "Drop Copy and xs[0] is a move out of a borrowed slice (E0507). Drop PartialOrd and > has nothing to call. Bounds are what the body needs, no more.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "both", stdin = "3 9 2\nb z a\n", expect = "9\nz\n", visible = true },
+  { name = "negatives", stdin = "-3 -9 -2\nq\n", expect = "-2\nq\n", visible = false },
+  { name = "one-each", stdin = "42\nk\n", expect = "42\nk\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "rust.basic.25.box-dyn"
+node        = 25
+title       = "A SIZE THE COMPILER CAN NAME"
+difficulty  = 3
+story       = "One tray at the fare office holding a tram ticket and a bus ticket side by side. They are different sizes, so the tray holds boxes, and each box knows what it holds."
+concepts    = ["smart-pointers", "dispatch", "traits"]
+requires    = ["rust.basic.24.generics"]
+map          = { x = 0.074, y = 0.703, kind = "quest" }
+brief       = '''
+A `Vec` needs every element to be the same size, and two structs are not.
+`Box<dyn Fare>` is one pointer-sized value that owns *something* on the
+heap that implements `Fare`; which method runs is decided at run time
+(dynamic dispatch). `&dyn Fare` is the borrowed form.
+
+```
+let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Bus { km })];
+```
+
+The trait and both `impl`s are written. Type the vector where the
+`// FILL` comment is.
+
+```
+input:  7
+output: 17
         2
 ```
 '''
 starter     = '''
 use std::io::Read;
 
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let n: i64 = input.trim().parse().unwrap();
-
-    let mut sum = 0;
-    let mut ticks = 0;
-    // FILL: for i over 1 to n, inclusive
-    // ANSWER: for i in 1..=n {
-    for i in 0..0 {
-        sum += i;
-        if i % 3 == 0 {
-            ticks += 1;
-        }
-    }
-    println!("{}", sum);
-    println!("{}", ticks);
+trait Fare {
+    fn fare(&self) -> i64;
 }
-'''
-solution    = '''
-use std::io::Read;
+
+struct Tram;
+struct Bus {
+    km: i64,
+}
+
+impl Fare for Tram { fn fare(&self) -> i64 { 3 } }
+impl Fare for Bus { fn fare(&self) -> i64 { 2 * self.km } }
 
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let n: i64 = input.trim().parse().unwrap();
+    let km: i64 = input.trim().parse().unwrap();
 
-    let mut sum = 0;
-    let mut ticks = 0;
-    for i in 1..=n {
-        sum += i;
-        if i % 3 == 0 {
-            ticks += 1;
-        }
-    }
-    println!("{}", sum);
-    println!("{}", ticks);
-}
-'''
-hints = [
-  "for i in 1..=n {",
-  "`..=` is the inclusive range. `1..n` would stop one short and the sum would be off by `n`.",
-]
+    // FILL: one Vec holding a Tram and a Bus { km }, each behind a Box<dyn Fare>
+    // ANSWER: let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Bus { km })];
+    let rides: Vec<Box<dyn Fare>> = Vec::new();
 
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "six", stdin = "6\n", expect = "21\n2\n", visible = true },
-  { name = "one", stdin = "1\n", expect = "1\n0\n", visible = false },
-  { name = "ten", stdin = "10\n", expect = "55\n3\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 12
-[[quest]]
-id          = "rust.basic.06.functions"
-node        = 12
-title       = "THE RIDE CARD"
-difficulty  = 1
-story       = "The tram-stop machine on Percival Street sells ride cards: the first ten rides at one price, the rest cheaper. It prints a total of zero for every card today."
-concepts    = ["functions", "control-flow"]
-requires    = ["rust.basic.05.loops"]
-map          = { x = 0.396, y = 0.276, kind = "quest" }
-brief       = '''
-A function is `fn name(parameter: Type) -> ReturnType { body }`. The last
-expression in the body, with no semicolon, is what it returns — and an
-`if … else …` is an expression, so it can be that last line.
-
-```
-fn fare(rides: i64) -> i64 {
-    if rides <= 10 { rides * 5 } else { 50 + (rides - 10) * 3 }
-}
-```
-
-`fare` is declared and `main` reads `n` and prints `fare(n)`. Type the
-`if … else` line as the body, in place of the placeholder `0`.
-
-```
-input:  12
-output: 56
-```
-'''
-starter     = '''
-use std::io::Read;
-
-fn fare(rides: i64) -> i64 {
-    // FILL: 5 per ride up to 10 rides; 50 plus 3 per ride past that
-    // ANSWER: if rides <= 10 { rides * 5 } else { 50 + (rides - 10) * 3 }
-    0
-}
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let n: i64 = input.trim().parse().unwrap();
-    println!("{}", fare(n));
-}
-'''
-solution    = '''
-use std::io::Read;
-
-fn fare(rides: i64) -> i64 {
-    if rides <= 10 { rides * 5 } else { 50 + (rides - 10) * 3 }
-}
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let n: i64 = input.trim().parse().unwrap();
-    println!("{}", fare(n));
-}
-'''
-hints = [
-  "if rides <= 10 { rides * 5 } else { 50 + (rides - 10) * 3 }",
-  "No `return` and no semicolon: the `if … else` is the last expression, so its value is what `fare` gives back.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "twelve", stdin = "12\n", expect = "56\n", visible = true },
-  { name = "three", stdin = "3\n", expect = "15\n", visible = false },
-  { name = "ten", stdin = "10\n", expect = "50\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 13
-[[quest]]
-id          = "rust.basic.07.structs"
-node        = 13
-title       = "THE STALL CARD"
-difficulty  = 1
-story       = "Every stall in Jardine's Bazaar has a card: a name, a price, a count. The card printer puts out a colon and a zero and nothing in front of it."
-concepts    = ["structs", "functions"]
-requires    = ["rust.basic.06.functions"]
-map          = { x = 0.185, y = 0.313, kind = "quest" }
-brief       = '''
-A `struct` groups named fields. A value is built with a literal that names
-each field — and when a local variable has the same name as the field,
-`name: name` shortens to `name`. Methods live in an `impl` block and take
-`&self`, through which the fields are read.
-
-```
-impl Stall {
-    fn total(&self) -> i64 {
-        self.price * self.qty
-    }
-}
-
-let stall = Stall { name, price, qty };
-```
-
-`Stall` and its `impl` are declared, and `name`, `price` and `qty` are
-read. Type the body of `total` in place of the placeholder `0`, and the
-`let stall` literal in place of the placeholder one.
-
-```
-input:  mango 12 3
-output: mango: 36
-```
-'''
-starter     = '''
-use std::io::Read;
-
-struct Stall {
-    name: String,
-    price: i64,
-    qty: i64,
-}
-
-impl Stall {
-    fn total(&self) -> i64 {
-        // FILL: price times qty
-        // ANSWER: self.price * self.qty
-        0
-    }
-}
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let mut it = input.split_whitespace();
-    let name = it.next().unwrap().to_string();
-    let price: i64 = it.next().unwrap().parse().unwrap();
-    let qty: i64 = it.next().unwrap().parse().unwrap();
-
-    // FILL: build the Stall from name, price and qty
-    // ANSWER: let stall = Stall { name, price, qty };
-    let stall = Stall { name: String::new(), price: 0, qty: 0 };
-    println!("{}: {}", stall.name, stall.total());
-}
-'''
-solution    = '''
-use std::io::Read;
-
-struct Stall {
-    name: String,
-    price: i64,
-    qty: i64,
-}
-
-impl Stall {
-    fn total(&self) -> i64 {
-        self.price * self.qty
-    }
-}
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let mut it = input.split_whitespace();
-    let name = it.next().unwrap().to_string();
-    let price: i64 = it.next().unwrap().parse().unwrap();
-    let qty: i64 = it.next().unwrap().parse().unwrap();
-
-    let stall = Stall { name, price, qty };
-    println!("{}: {}", stall.name, stall.total());
-}
-'''
-hints = [
-  "let stall = Stall { name, price, qty }; — and in total: self.price * self.qty",
-  "Inside a method the fields are reached through `self`; in `main` the variables already have the field names, so the literal can list them bare.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "mango", stdin = "mango 12 3\n", expect = "mango: 36\n", visible = true },
-  { name = "lychee", stdin = "lychee 7 10\n", expect = "lychee: 70\n", visible = false },
-  { name = "none", stdin = "durian 90 0\n", expect = "durian: 0\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 14
-[[quest]]
-id          = "rust.basic.08.enums"
-node        = 14
-title       = "THE LINE COLOUR"
-difficulty  = 2
-story       = "The MTR sign under Times Square knows three lines and paints each its own colour. The colour lookup returns an empty string for all three."
-concepts    = ["enums", "pattern-matching"]
-requires    = ["rust.basic.07.structs"]
-map          = { x = 0.119, y = 0.272, kind = "quest" }
-brief       = '''
-An `enum` is a closed set of variants, and `match` picks a branch per
-variant. Each arm is `Pattern => value,` and the compiler insists that
-every variant has an arm — leave one out and it will not build.
-
-```
-let colour = match line {
-    Line::Island => "blue",
-    Line::TsuenWan => "red",
-    Line::KwunTong => "green",
-};
-```
-
-`Line` and the word-to-variant `match` are written, and the first arm of
-the colour `match` is there. Type the other two arms where the `// FILL`
-comments are, and delete the `_ => ""` line.
-
-```
-input:  tsuenwan
-output: red
-```
-'''
-starter     = '''
-use std::io::Read;
-
-enum Line {
-    Island,
-    TsuenWan,
-    KwunTong,
-}
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let line = match input.trim() {
-        "island" => Line::Island,
-        "tsuenwan" => Line::TsuenWan,
-        _ => Line::KwunTong,
-    };
-
-    let colour = match line {
-        Line::Island => "blue",
-        // FILL: TsuenWan is red
-        // ANSWER: Line::TsuenWan => "red",
-        // FILL: KwunTong is green
-        // ANSWER: Line::KwunTong => "green",
-        _ => "",
-    };
-
-    println!("{}", colour);
-}
-'''
-solution    = '''
-use std::io::Read;
-
-enum Line {
-    Island,
-    TsuenWan,
-    KwunTong,
-}
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let line = match input.trim() {
-        "island" => Line::Island,
-        "tsuenwan" => Line::TsuenWan,
-        _ => Line::KwunTong,
-    };
-
-    let colour = match line {
-        Line::Island => "blue",
-        Line::TsuenWan => "red",
-        Line::KwunTong => "green",
-    };
-
-    println!("{}", colour);
-}
-'''
-hints = [
-  "Line::TsuenWan => \"red\", and Line::KwunTong => \"green\",",
-  "Once all three variants have an arm the `_ => \"\"` catch-all is unreachable and can go.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "tsuenwan", stdin = "tsuenwan\n", expect = "red\n", visible = true },
-  { name = "island", stdin = "island\n", expect = "blue\n", visible = false },
-  { name = "kwuntong", stdin = "kwuntong\n", expect = "green\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 15
-[[quest]]
-id          = "rust.basic.09.vector"
-node        = 15
-title       = "THE QUEUE AT HYSAN"
-difficulty  = 1
-story       = "The doorman at Hysan Place writes each group's size on a strip as they arrive. He has to say how many groups, the first, the last, and the total, and the strip stays empty."
-concepts    = ["slices", "iteration"]
-requires    = ["rust.basic.08.enums"]
-map          = { x = 0.055, y = 0.556, kind = "quest" }
-brief       = '''
-A `Vec<T>` is a growable list, and the three things you do to one are
-these. `.push(x)` adds at the end. `.remove(i)` takes the element at index
-`i` out and shifts the rest down. `v[i] = x` edits the element at `i` in
-place, and `.sort()` puts the whole thing in ascending order — the `Vec`
-has to be `mut` for any of the four.
-
-```
-v.push(100);
-v.remove(0);
-v[0] = -1;
-v.sort();
-```
-
-`v` holds the line's integers, and the result and its length are printed.
-Type the four lines, in that order, where the four `// FILL` comments are.
-
-```
-input:  1 9 5 2
-output: -1 2 5 100
-        4
-```
-'''
-starter     = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let mut v: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    // FILL: add 100 at the end
-    // ANSWER: v.push(100);
-    // FILL: remove the first element
-    // ANSWER: v.remove(0);
-    // FILL: edit the first element to -1
-    // ANSWER: v[0] = -1;
-    // FILL: sort ascending
-    // ANSWER: v.sort();
-
-    let line: Vec<String> = v.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    println!("{}", v.len());
-}
-'''
-solution    = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let mut v: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    v.push(100);
-    v.remove(0);
-    v[0] = -1;
-    v.sort();
-
-    let line: Vec<String> = v.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    println!("{}", v.len());
-}
-'''
-hints = [
-  "v.push(100); then v.remove(0); then v[0] = -1; then v.sort(); — add, remove, edit, sort.",
-  "remove(0) shifts everything down, so the element that was second is now v[0], and that is the one the edit changes; sort() then orders whatever is left.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "four", stdin = "1 9 5 2\n", expect = "-1 2 5 100\n4\n", visible = true },
-  { name = "two", stdin = "5 6\n", expect = "-1 100\n2\n", visible = false },
-  { name = "big", stdin = "3 8 200 1\n", expect = "-1 1 100 200\n4\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 16
-[[quest]]
-id          = "rust.basic.16.list"
-node        = 16
-title       = "THE TRAM QUEUE, BOTH ENDS"
-difficulty  = 1
-story       = "The tram queue at Percival Street takes riders on at the back and lets the inspector on at the front, and the list of who is aboard is empty."
-concepts    = ["collections", "iteration"]
-requires    = ["rust.basic.09.vector"]
-map          = { x = 0.255, y = 0.468, kind = "quest" }
-brief       = '''
-A `LinkedList` is a sequence that is cheap to change at either end.
-`.push_back(x)` adds at the tail, `.pop_front()` removes the head, and
-`.front_mut()` hands back a mutable reference to the head — an `Option`, so
-it is unwrapped, and the `*` in front is what lets you assign through it.
-A `LinkedList` has no `sort`: to sort one you copy it into a `Vec` (the
-starter does, as `sorted`) and sort that. (A `Vec` is nearly always the
-better choice; this is the one to know the name of.)
-
-```
-list.push_back(0);
-list.pop_front();
-*list.front_mut().unwrap() = 9;
-sorted.sort();
-```
-
-`list` is built from the line's integers; it is printed, then its sorted
-copy, then its length. Type the four lines, in that order, where the
-`// FILL` comments are.
-
-```
-input:  3 1 4
-output: 9 4 0
-        0 4 9
-        3
-```
-'''
-starter     = '''
-use std::collections::LinkedList;
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    let mut list: LinkedList<i64> = LinkedList::new();
-    for &x in &nums {
-        list.push_back(x);
-    }
-    // FILL: add a 0 at the back
-    // ANSWER: list.push_back(0);
-    // FILL: remove the front
-    // ANSWER: list.pop_front();
-    // FILL: edit the front to 9
-    // ANSWER: *list.front_mut().unwrap() = 9;
-    let mut sorted: Vec<i64> = list.iter().copied().collect();
-    // FILL: sort the copy ascending
-    // ANSWER: sorted.sort();
-
-    let line: Vec<String> = list.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    let line: Vec<String> = sorted.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    println!("{}", list.len());
-}
-'''
-solution    = '''
-use std::collections::LinkedList;
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    let mut list: LinkedList<i64> = LinkedList::new();
-    for &x in &nums {
-        list.push_back(x);
-    }
-    list.push_back(0);
-    list.pop_front();
-    *list.front_mut().unwrap() = 9;
-    let mut sorted: Vec<i64> = list.iter().copied().collect();
-    sorted.sort();
-
-    let line: Vec<String> = list.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    let line: Vec<String> = sorted.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    println!("{}", list.len());
-}
-'''
-hints = [
-  "list.push_back(0); then list.pop_front(); then *list.front_mut().unwrap() = 9; then sorted.sort();",
-  "front_mut() is an Option<&mut i64>: unwrap it, and assign through the * — the front after the pop is the old second element. sorted is a Vec, so it has sort().",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "three", stdin = "3 1 4\n", expect = "9 4 0\n0 4 9\n3\n", visible = true },
-  { name = "one", stdin = "7\n", expect = "9\n9\n1\n", visible = false },
-  { name = "five", stdin = "5 4 3 2 1\n", expect = "9 3 2 1 0\n0 1 2 3 9\n5\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 17
-[[quest]]
-id          = "rust.basic.10.maps"
-node        = 17
-title       = "THE ORDER PAD"
-difficulty  = 2
-story       = "The cha chaan teng on Yee Wo Street shouts every order once and the kitchen wants a tally per dish, in alphabetical order. The pad has the dishes and no numbers."
-concepts    = ["collections", "strings"]
-requires    = ["rust.basic.16.list"]
-map          = { x = 0.327, y = 0.554, kind = "quest" }
-brief       = '''
-A `BTreeMap` holds a value per key and keeps the keys sorted by itself —
-there is nothing to sort, walking it is already in order. `.insert(k, v)`
-adds a key (or replaces its value), `.remove(&k)` takes a key out, and
-`.get_mut(&k)` hands back a mutable reference to a value that is there —
-an `Option`, so it is unwrapped, and the `*` lets you assign through it.
-
-```
-count.insert("bill".to_string(), 1);
-count.remove("tea");
-*count.get_mut("bill").unwrap() = 9;
-```
-
-`count` already tallies the line's words and is printed in key order.
-Type the three lines, in that order, where the `// FILL` comments are.
-
-```
-input:  tea toast tea
-output: bill 9
-        toast 1
-```
-'''
-starter     = '''
-use std::collections::BTreeMap;
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-
-    let mut count: BTreeMap<String, i64> = BTreeMap::new();
-    for w in input.split_whitespace() {
-        *count.entry(w.to_string()).or_insert(0) += 1;
-    }
-    // FILL: add the key "bill" with the value 1
-    // ANSWER: count.insert("bill".to_string(), 1);
-    // FILL: remove the key "tea"
-    // ANSWER: count.remove("tea");
-    // FILL: edit the value under "bill" to 9
-    // ANSWER: *count.get_mut("bill").unwrap() = 9;
-
-    for (k, v) in &count {
-        println!("{} {}", k, v);
-    }
-}
-'''
-solution    = '''
-use std::collections::BTreeMap;
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-
-    let mut count: BTreeMap<String, i64> = BTreeMap::new();
-    for w in input.split_whitespace() {
-        *count.entry(w.to_string()).or_insert(0) += 1;
-    }
-    count.insert("bill".to_string(), 1);
-    count.remove("tea");
-    *count.get_mut("bill").unwrap() = 9;
-
-    for (k, v) in &count {
-        println!("{} {}", k, v);
-    }
-}
-'''
-hints = [
-  "count.insert(\"bill\".to_string(), 1); then count.remove(\"tea\"); then *count.get_mut(\"bill\").unwrap() = 9;",
-  "The key is a String, so insert takes \"bill\".to_string(); remove and get_mut take a &str, which \"tea\" already is.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "tea", stdin = "tea toast tea\n", expect = "bill 9\ntoast 1\n", visible = true },
-  { name = "one-word", stdin = "congee\n", expect = "bill 9\ncongee 1\n", visible = false },
-  { name = "only-tea", stdin = "tea tea\n", expect = "bill 9\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 18
-[[quest]]
-id          = "rust.basic.18.hashtable"
-node        = 18
-title       = "THE ORDER PAD, UNSORTED"
-difficulty  = 2
-story       = "The dim sum counter on Bowrington Road keeps its tally in a hash table this time, and reads it back in whatever order the table feels like, which is a different one every morning."
-concepts    = ["collections", "hashing", "sorting"]
-requires    = ["rust.basic.10.maps"]
-map          = { x = 0.529, y = 0.468, kind = "quest" }
-brief       = '''
-A `HashMap` is the same idea as the `BTreeMap` — a value per key — but it
-hashes the key instead of ordering it: lookups are constant-time, and
-iteration order is arbitrary and changes run to run, so the keys are sorted
-before printing. The three operations are the same three: `.insert(k, v)`
-adds, `.remove(&k)` removes, `.get_mut(&k)` edits.
-
-```
-counts.insert("bun".to_string(), 1);
-counts.remove("siu");
-*counts.get_mut("bun").unwrap() = 4;
-keys.sort();
-```
-
-`counts` already tallies the line's words, and the keys are collected into
-`keys` for printing. Type the four lines, in that order, at the `// FILL`
-comments — the sort is the fourth, after `keys` is made.
-
-```
-input:  siu mai har gau siu mai
-output: bun 4
-        gau 1
-        har 1
-        mai 2
-```
-'''
-starter     = '''
-use std::collections::HashMap;
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-
-    let mut counts: HashMap<String, i64> = HashMap::new();
-    for w in input.split_whitespace() {
-        *counts.entry(w.to_string()).or_insert(0) += 1;
-    }
-    // FILL: add the key "bun" with the value 1
-    // ANSWER: counts.insert("bun".to_string(), 1);
-    // FILL: remove the key "siu"
-    // ANSWER: counts.remove("siu");
-    // FILL: edit the value under "bun" to 4
-    // ANSWER: *counts.get_mut("bun").unwrap() = 4;
-
-    let mut keys: Vec<&String> = counts.keys().collect();
-    // FILL: sort the keys, because a HashMap has no order of its own
-    // ANSWER: keys.sort();
-    for k in &keys {
-        println!("{} {}", k, counts[*k]);
-    }
-}
-'''
-solution    = '''
-use std::collections::HashMap;
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-
-    let mut counts: HashMap<String, i64> = HashMap::new();
-    for w in input.split_whitespace() {
-        *counts.entry(w.to_string()).or_insert(0) += 1;
-    }
-    counts.insert("bun".to_string(), 1);
-    counts.remove("siu");
-    *counts.get_mut("bun").unwrap() = 4;
-
-    let mut keys: Vec<&String> = counts.keys().collect();
-    keys.sort();
-    for k in &keys {
-        println!("{} {}", k, counts[*k]);
-    }
-}
-'''
-hints = [
-  "counts.insert(\"bun\".to_string(), 1); then counts.remove(\"siu\"); then *counts.get_mut(\"bun\").unwrap() = 4; then keys.sort();",
-  "Exactly the BTreeMap lines with the names changed; keys.sort() after them is the price of a HashMap.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "dim-sum", stdin = "siu mai har gau siu mai\n", expect = "bun 4\ngau 1\nhar 1\nmai 2\n", visible = true },
-  { name = "one", stdin = "tram\n", expect = "bun 4\ntram 1\n", visible = false },
-  { name = "repeat", stdin = "b a b a c\n", expect = "a 2\nb 2\nbun 4\nc 1\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 19
-[[quest]]
-id          = "rust.basic.11.sets"
-node        = 19
-title       = "THE STAMP BOOK"
-difficulty  = 2
-story       = "The loyalty book at the Percival Street kiosk has a stamp per visit and the same stall stamps twice. The clerk needs how many different stalls, and their numbers in order."
-concepts    = ["collections", "sorting"]
-requires    = ["rust.basic.18.hashtable"]
-map          = { x = 0.619, y = 0.533, kind = "quest" }
-brief       = '''
-A set holds each value once, and `BTreeSet` keeps them sorted by itself, so
-there is no sort to call — iterating is already in order. `.insert(x)`
-adds a value (and does nothing if it is already there), `.remove(&x)` takes
-one out and returns whether it was there. A set has no "edit": a value is
-its own key, so editing one is removing the old value and inserting the
-new — which is what the third line does, only when the old one was there.
-
-```
-seen.insert(100);
-seen.remove(&1);
-if seen.remove(&2) { seen.insert(20); }
-```
-
-`seen` already holds the line's distinct integers, and its size and contents
-are printed. Type the three lines, in that order, at the `// FILL` comments.
-
-```
-input:  3 1 3 2 1
-output: 3
-        3 20 100
-```
-'''
-starter     = '''
-use std::collections::BTreeSet;
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    let mut seen: BTreeSet<i64> = BTreeSet::new();
-    for &x in &nums {
-        seen.insert(x);
-    }
-    // FILL: add 100
-    // ANSWER: seen.insert(100);
-    // FILL: remove 1
-    // ANSWER: seen.remove(&1);
-    // FILL: edit 2 into 20 (remove it, and insert 20 if it was there)
-    // ANSWER: if seen.remove(&2) { seen.insert(20); }
-
-    println!("{}", seen.len());
-    let line: Vec<String> = seen.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-}
-'''
-solution    = '''
-use std::collections::BTreeSet;
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    let mut seen: BTreeSet<i64> = BTreeSet::new();
-    for &x in &nums {
-        seen.insert(x);
-    }
-    seen.insert(100);
-    seen.remove(&1);
-    if seen.remove(&2) { seen.insert(20); }
-
-    println!("{}", seen.len());
-    let line: Vec<String> = seen.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-}
-'''
-hints = [
-  "seen.insert(100); then seen.remove(&1); then if seen.remove(&2) { seen.insert(20); }",
-  "remove takes a reference (&1) and returns true if the value was there — which is what the if uses, so a set without a 2 is left alone.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "five", stdin = "3 1 3 2 1\n", expect = "3\n3 20 100\n", visible = true },
-  { name = "all-same", stdin = "7 7 7\n", expect = "2\n7 100\n", visible = false },
-  { name = "distinct", stdin = "9 4 6\n", expect = "4\n4 6 9 100\n", visible = false },
-  { name = "two", stdin = "2 1\n", expect = "2\n20 100\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 20
-[[quest]]
-id          = "rust.basic.12.stack-queue"
-node        = 20
-title       = "THE PLATE STACK"
-difficulty  = 2
-story       = "At the Bowrington Road dim sum counter the plates stack up and come off the top, and the ticket numbers come off the front of the queue. Both piles sit there untouched."
-concepts    = ["stacks-queues", "collections"]
-requires    = ["rust.basic.11.sets"]
-map          = { x = 0.801, y = 0.447, kind = "quest" }
-brief       = '''
-A `Vec` is a stack: `.push(x)` adds on top, `.pop()` removes the top (as an
-`Option`), and `.last_mut()` is a mutable reference to the top, for editing
-it in place. A `VecDeque` is a queue: `.push_back(x)` joins the back and
-`.pop_front()` leaves from the front — that side is already written.
-
-```
-stack.push(42);
-stack.pop();
-*stack.last_mut().unwrap() = 0;
-```
-
-Both containers hold the line's integers. Type the three stack lines, in
-that order, at the `// FILL` comments; the stack is then printed bottom to
-top, and the queue's front on the line after.
-
-```
-input:  1 2 3 4
-output: 1 2 3 0
-        1
-```
-'''
-starter     = '''
-use std::collections::VecDeque;
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-    let mut stack: Vec<i64> = Vec::new();
-    let mut queue: VecDeque<i64> = VecDeque::new();
-    for &x in &nums {
-        stack.push(x);
-        queue.push_back(x);
-    }
-
-    // FILL: add 42 on top of the stack
-    // ANSWER: stack.push(42);
-    // FILL: remove the top of the stack
-    // ANSWER: stack.pop();
-    // FILL: edit the top of the stack to 0
-    // ANSWER: *stack.last_mut().unwrap() = 0;
-
-    let line: Vec<String> = stack.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    let first = queue.pop_front().unwrap();
-    println!("{}", first);
-}
-'''
-solution    = '''
-use std::collections::VecDeque;
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-    let mut stack: Vec<i64> = Vec::new();
-    let mut queue: VecDeque<i64> = VecDeque::new();
-    for &x in &nums {
-        stack.push(x);
-        queue.push_back(x);
-    }
-
-    stack.push(42);
-    stack.pop();
-    *stack.last_mut().unwrap() = 0;
-
-    let line: Vec<String> = stack.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    let first = queue.pop_front().unwrap();
-    println!("{}", first);
-}
-'''
-hints = [
-  "stack.push(42); then stack.pop(); then *stack.last_mut().unwrap() = 0;",
-  "The pop takes the 42 straight back off, so the edit lands on the value that was on top before — last in, first out.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "four", stdin = "1 2 3 4\n", expect = "1 2 3 0\n1\n", visible = true },
-  { name = "two", stdin = "7 9\n", expect = "7 0\n7\n", visible = false },
-  { name = "five", stdin = "5 3 5 1 2\n", expect = "5 3 5 1 0\n5\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 21
-[[quest]]
-id          = "rust.basic.13.sorting"
-node        = 21
-title       = "THE PRICE LADDER"
-difficulty  = 1
-story       = "The fruit stall on Bowrington Road lists its prices cheapest first for the board and dearest first for the boss. Both boards show the prices in the order the boxes came off the van."
-concepts    = ["sorting", "slices"]
-requires    = ["rust.basic.12.stack-queue"]
-map          = { x = 0.901, y = 0.543, kind = "quest" }
-brief       = '''
-`.sort()` puts a `mut` `Vec` in ascending order, in place. For any other
-order there is `.sort_by`, which takes a closure comparing two elements:
-`a.cmp(b)` is ascending, so `b.cmp(a)` is descending.
-
-```
-asc.sort();
-desc.sort_by(|a, b| b.cmp(a));
-```
-
-Two copies of the numbers are made and both are printed. Type those two
-lines where the `// FILL` comments are.
-
-```
-input:  5 2 9 1
-output: 1 2 5 9
-        9 5 2 1
-```
-'''
-starter     = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    let mut asc = nums.clone();
-    // FILL: sort asc ascending
-    // ANSWER: asc.sort();
-    let mut desc = nums.clone();
-    // FILL: sort desc descending with sort_by
-    // ANSWER: desc.sort_by(|a, b| b.cmp(a));
-    let _ = (&mut asc, &mut desc);
-
-    let a: Vec<String> = asc.iter().map(|x| x.to_string()).collect();
-    let d: Vec<String> = desc.iter().map(|x| x.to_string()).collect();
-    println!("{}", a.join(" "));
-    println!("{}", d.join(" "));
-}
-'''
-solution    = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    let mut asc = nums.clone();
-    asc.sort();
-    let mut desc = nums.clone();
-    desc.sort_by(|a, b| b.cmp(a));
-
-    let a: Vec<String> = asc.iter().map(|x| x.to_string()).collect();
-    let d: Vec<String> = desc.iter().map(|x| x.to_string()).collect();
-    println!("{}", a.join(" "));
-    println!("{}", d.join(" "));
-}
-'''
-hints = [
-  "asc.sort(); — and desc.sort_by(|a, b| b.cmp(a));",
-  "Both sort in place and return nothing, so they are statements on their own line, not something to assign.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "four", stdin = "5 2 9 1\n", expect = "1 2 5 9\n9 5 2 1\n", visible = true },
-  { name = "dupes", stdin = "3 3 1\n", expect = "1 3 3\n3 3 1\n", visible = false },
-  { name = "negative", stdin = "0 -4 8\n", expect = "-4 0 8\n8 0 -4\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 22
-[[quest]]
-id          = "rust.basic.22.reverse"
-node        = 22
-title       = "THE TRAM, BACKWARDS"
-difficulty  = 1
-story       = "The Yee Wo Street tram runs its stops back the way it came at the end of the line, and the depot's list still reads forwards."
-concepts    = ["slices", "strings", "iteration"]
-requires    = ["rust.basic.13.sorting"]
-map          = { x = 0.953, y = 0.667, kind = "quest" }
-brief       = '''
-A `Vec` reverses in place: `v.reverse()` and it is done, no copy. A string
-is not indexable by character, so it is reversed through its iterator:
-`s.chars().rev()` walks it backwards and `collect::<String>()` builds a new
-string from what it yields.
-
-```
-v.reverse();
-let rev: String = s.chars().rev().collect();
-```
-
-`v` is the first line and `s` the second. Type those two lines in place of
-the two placeholders.
-
-```
-input:  1 2 3
-        tram
-output: 3 2 1
-        mart
-```
-'''
-starter     = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let mut lines = input.lines();
-    let mut v: Vec<i64> = lines.next().unwrap().split_whitespace().map(|t| t.parse().unwrap()).collect();
-    let s = lines.next().unwrap().trim();
-
-    // FILL: reverse v in place
-    // ANSWER: v.reverse();
-    // FILL: rev is s, backwards
-    // ANSWER: let rev: String = s.chars().rev().collect();
-    let rev: String = String::new();
-    let line: Vec<String> = v.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    println!("{}", rev);
-}
-'''
-solution    = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let mut lines = input.lines();
-    let mut v: Vec<i64> = lines.next().unwrap().split_whitespace().map(|t| t.parse().unwrap()).collect();
-    let s = lines.next().unwrap().trim();
-
-    v.reverse();
-    let rev: String = s.chars().rev().collect();
-    let line: Vec<String> = v.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    println!("{}", rev);
-}
-'''
-hints = [
-  "v.reverse(); then let rev: String = s.chars().rev().collect();",
-  "reverse() changes v where it is; chars().rev().collect() makes a new String and leaves s alone.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "tram", stdin = "1 2 3\ntram\n", expect = "3 2 1\nmart\n", visible = true },
-  { name = "stops", stdin = "10 20 30 40\nstops\n", expect = "40 30 20 10\nspots\n", visible = false },
-  { name = "one", stdin = "5\nx\n", expect = "5\nx\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 23
-[[quest]]
-id          = "rust.basic.14.sort-by-key"
-node        = 23
-title       = "THE LEADERBOARD"
-difficulty  = 3
-story       = "The arcade above Times Square posts its high scores, best first, ties by name. The board still shows the order people happened to walk in."
-concepts    = ["sorting", "structs"]
-requires    = ["rust.basic.22.reverse"]
-map          = { x = 0.750, y = 0.724, kind = "quest" }
-brief       = '''
-`.sort_by_key` sorts by whatever the closure returns for each element. A
-tuple is compared field by field, so a tuple key sorts by the first field
-and breaks ties on the second; wrapping a field in `std::cmp::Reverse`
-flips that field to descending.
-
-```
-rows.sort_by_key(|r| (std::cmp::Reverse(r.1), r.0.clone()));
-```
-
-The rows are read as `(String, i64)` pairs and printed. Type that line
-where the `// FILL` comment is.
-
-```
-input:  3
-        mei 90
-        alex 95
-        kit 90
-output: alex 95
-        kit 90
-        mei 90
-```
-'''
-starter     = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let mut lines = input.lines();
-    let n: usize = lines.next().unwrap().trim().parse().unwrap();
-    let mut rows: Vec<(String, i64)> = Vec::new();
-    for _ in 0..n {
-        let mut it = lines.next().unwrap().split_whitespace();
-        let name = it.next().unwrap().to_string();
-        let score: i64 = it.next().unwrap().parse().unwrap();
-        rows.push((name, score));
-    }
-
-    // FILL: sort rows by score descending, then name ascending
-    // ANSWER: rows.sort_by_key(|r| (std::cmp::Reverse(r.1), r.0.clone()));
-    let _ = &mut rows;
-
-    for (name, score) in &rows {
-        println!("{} {}", name, score);
-    }
-}
-'''
-solution    = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let mut lines = input.lines();
-    let n: usize = lines.next().unwrap().trim().parse().unwrap();
-    let mut rows: Vec<(String, i64)> = Vec::new();
-    for _ in 0..n {
-        let mut it = lines.next().unwrap().split_whitespace();
-        let name = it.next().unwrap().to_string();
-        let score: i64 = it.next().unwrap().parse().unwrap();
-        rows.push((name, score));
-    }
-
-    rows.sort_by_key(|r| (std::cmp::Reverse(r.1), r.0.clone()));
-
-    for (name, score) in &rows {
-        println!("{} {}", name, score);
-    }
-}
-'''
-hints = [
-  "rows.sort_by_key(|r| (std::cmp::Reverse(r.1), r.0.clone()));",
-  "The key is a tuple: `Reverse(score)` makes the score descend, and `name.clone()` after it settles ties alphabetically.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "three", stdin = "3\nmei 90\nalex 95\nkit 90\n", expect = "alex 95\nkit 90\nmei 90\n", visible = true },
-  { name = "one", stdin = "1\nsolo 1\n", expect = "solo 1\n", visible = false },
-  { name = "ties", stdin = "4\nbo 10\nal 10\ncy 20\ndi 5\n", expect = "cy 20\nal 10\nbo 10\ndi 5\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 24
-[[quest]]
-id          = "rust.basic.15.closures"
-node        = 24
-title       = "THE SERVICE CHARGE"
-difficulty  = 2
-story       = "The bill printer at the Hysan Place food court adds the same charge to every line. It was told the charge once and forgot it before the first line."
-concepts    = ["closures", "functions"]
-requires    = ["rust.basic.14.sort-by-key"]
-map          = { x = 0.666, y = 0.676, kind = "quest" }
-brief       = '''
-A closure is a function written inline: `|x| x + 1`. It can use variables
-from the scope around it without being handed them — that is the capture.
-Naming the parameter's type, `|x: i64|`, is optional but keeps the
-compiler from guessing.
-
-```
-let add = |x: i64| x + k;
-```
-
-`k` and the numbers are read, and `add` is applied to every number and
-printed. Type that line in place of the placeholder `let add`.
-
-```
-input:  5
-        1 2 3
-output: 6 7 8
-```
-'''
-starter     = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let mut lines = input.lines();
-    let k: i64 = lines.next().unwrap().trim().parse().unwrap();
-    let nums: Vec<i64> = lines.next().unwrap().split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    // FILL: a closure that adds k to its argument
-    // ANSWER: let add = |x: i64| x + k;
-    let add = |x: i64| x;
-
-    let out: Vec<String> = nums.iter().map(|&x| add(x).to_string()).collect();
-    println!("{}", out.join(" "));
-}
-'''
-solution    = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let mut lines = input.lines();
-    let k: i64 = lines.next().unwrap().trim().parse().unwrap();
-    let nums: Vec<i64> = lines.next().unwrap().split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    let add = |x: i64| x + k;
-
-    let out: Vec<String> = nums.iter().map(|&x| add(x).to_string()).collect();
-    println!("{}", out.join(" "));
-}
-'''
-hints = [
-  "let add = |x: i64| x + k;",
-  "`k` is only read, so the closure borrows it; no `move` is needed and `k` stays usable afterwards.",
-]
-
-[quest.tests]
-harness    = "stdio"
-timeout_ms = 5000
-compile_timeout_ms = 30000
-max_stdout_bytes = 262144
-match      = "trim"
-cases = [
-  { name = "five", stdin = "5\n1 2 3\n", expect = "6 7 8\n", visible = true },
-  { name = "zero", stdin = "0\n4 4\n", expect = "4 4\n", visible = false },
-  { name = "negative", stdin = "-3\n10 0 3\n", expect = "7 -3 0\n", visible = false },
-]
-
-# ---------------------------------------------------------------- 25
-[[quest]]
-id          = "rust.basic.16.lambdas"
-node        = 25
-title       = "THE EVEN TABLES"
-difficulty  = 2
-story       = "Victoria Park's food fair numbers its tables and only the even ones pay a square-metre levy. The levy total on the clipboard is zero."
-concepts    = ["closures", "iteration"]
-requires    = ["rust.basic.15.closures"]
-map          = { x = 0.472, y = 0.739, kind = "quest" }
-brief       = '''
-Iterator adapters chain: `.iter()` walks a `Vec`, `.filter(…)` keeps the
-elements a closure says yes to, `.map(…)` replaces each with what a closure
-returns, and `.sum()` adds them up. Nothing runs until the `.sum()` at the
-end pulls. The closures see references, so `filter` gets `&&x` and `map`
-gets `&x`.
-
-```
-let total: i64 = nums.iter().filter(|&&x| x % 2 == 0).map(|&x| x * x).sum();
-```
-
-The numbers are read and `total` is printed. Type that line in place of
-the placeholder `let total: i64 = 0;`.
-
-```
-input:  1 2 3 4 5 6
-output: 56
-```
-'''
-starter     = '''
-use std::io::Read;
-
-fn main() {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
-
-    // FILL: the even numbers, squared, summed
-    // ANSWER: let total: i64 = nums.iter().filter(|&&x| x % 2 == 0).map(|&x| x * x).sum();
-    let total: i64 = 0;
-
+    let total: i64 = rides.iter().map(|r| r.fare()).sum();
     println!("{}", total);
+    println!("{}", rides.len());
 }
 '''
 solution    = '''
 use std::io::Read;
 
+trait Fare {
+    fn fare(&self) -> i64;
+}
+
+struct Tram;
+struct Bus {
+    km: i64,
+}
+
+impl Fare for Tram { fn fare(&self) -> i64 { 3 } }
+impl Fare for Bus { fn fare(&self) -> i64 { 2 * self.km } }
+
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+    let km: i64 = input.trim().parse().unwrap();
 
-    let total: i64 = nums.iter().filter(|&&x| x % 2 == 0).map(|&x| x * x).sum();
+    let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Bus { km })];
 
+    let total: i64 = rides.iter().map(|r| r.fare()).sum();
     println!("{}", total);
+    println!("{}", rides.len());
 }
 '''
 hints = [
-  "let total: i64 = nums.iter().filter(|&&x| x % 2 == 0).map(|&x| x * x).sum();",
-  "The `: i64` on the `let` tells `sum` what to add into; without it the compiler asks you which number type you meant.",
+  "let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Bus { km })];",
+  "The type on the let is what turns each Box<Tram> and Box<Bus> into a Box<dyn Fare>; without it the vec! would refuse two different element types.",
 ]
 
 [quest.tests]
@@ -2184,21 +2289,214 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "six", stdin = "1 2 3 4 5 6\n", expect = "56\n", visible = true },
-  { name = "odd-only", stdin = "1 3 5\n", expect = "0\n", visible = false },
-  { name = "negative", stdin = "-4 3 -2\n", expect = "20\n", visible = false },
+  { name = "seven", stdin = "7\n", expect = "17\n2\n", visible = true },
+  { name = "zero", stdin = "0\n", expect = "3\n2\n", visible = false },
+  { name = "far", stdin = "100\n", expect = "203\n2\n", visible = false },
 ]
 
 # ---------------------------------------------------------------- 26
 [[quest]]
-id          = "rust.basic.17.threads"
+id          = "rust.basic.26.rc-refcell"
 node        = 26
+title       = "MUTATING THROUGH A SHARED HANDLE"
+difficulty  = 3
+story       = "One logbook at the Times Square plant room, two clerks holding it. Neither owns it alone, and the borrow check moves from the compiler to the book itself."
+concepts    = ["smart-pointers", "interior-mutability", "borrowing"]
+requires    = ["rust.basic.25.box-dyn"]
+map          = { x = 0.269, y = 0.689, kind = "quest" }
+brief       = '''
+`Rc<T>` is a reference-counted owner: `Rc::clone(&log)` makes a second
+handle to the **same** value, not a copy. `RefCell<T>` lets you mutate
+through a shared handle — `.borrow_mut()` checks the borrow rule at run
+time and panics if it is broken. `Rc<RefCell<…>>` is the single-threaded
+shared, mutable value.
+
+```
+let writer = Rc::clone(&log);
+```
+
+`log` is made and the loop writes through `writer`. Type the second
+handle where the `// FILL` comment is.
+
+```
+input:  1 2 3
+output: 2
+        [2, 4, 6]
+```
+'''
+starter     = '''
+use std::cell::RefCell;
+use std::io::Read;
+use std::rc::Rc;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let log: Rc<RefCell<Vec<i64>>> = Rc::new(RefCell::new(Vec::new()));
+
+    // FILL: a second handle onto the same log, not a second log
+    // ANSWER: let writer = Rc::clone(&log);
+    let writer: Rc<RefCell<Vec<i64>>> = Rc::new(RefCell::new(Vec::new()));
+
+    for x in nums {
+        writer.borrow_mut().push(x * 2);
+    }
+
+    println!("{}", Rc::strong_count(&log));
+    println!("{:?}", log.borrow());
+}
+'''
+solution    = '''
+use std::cell::RefCell;
+use std::io::Read;
+use std::rc::Rc;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let log: Rc<RefCell<Vec<i64>>> = Rc::new(RefCell::new(Vec::new()));
+
+    let writer = Rc::clone(&log);
+
+    for x in nums {
+        writer.borrow_mut().push(x * 2);
+    }
+
+    println!("{}", Rc::strong_count(&log));
+    println!("{:?}", log.borrow());
+}
+'''
+hints = [
+  "let writer = Rc::clone(&log);",
+  "log.clone() does the same thing; Rc::clone(&log) is the spelling that says out loud that only the count went up. The strong_count of 2 is the proof.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "2\n[2, 4, 6]\n", visible = true },
+  { name = "empty", stdin = "\n", expect = "2\n[]\n", visible = false },
+  { name = "one", stdin = "-4\n", expect = "2\n[-8]\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "rust.basic.27.closures"
+node        = 27
+title       = "THREE KINDS OF CLOSURE"
+difficulty  = 3
+story       = "The service charge at the Lucky Mac kiosk: a closure that adds the fee and, on the side, counts how many times it was asked. A second one is handed to a function that only wants something callable."
+concepts    = ["closures", "mutability", "functions"]
+requires    = ["rust.basic.26.rc-refcell"]
+map          = { x = 0.415, y = 0.741, kind = "quest" }
+brief       = '''
+A closure captures what it uses. One that only reads is `Fn`; one that
+**changes** a captured variable is `FnMut` and must be bound with
+`let mut`; one that moves a value out is `FnOnce`. A function can take
+any of them by bound: `f: impl Fn(i64) -> i64`. `move` in front forces
+capture by value, which is what a thread needs.
+
+```
+let mut charge = |x: i64| { seen += 1; x + fee };
+println!("{}", apply(|x| x * fee, 10));
+```
+
+`apply` is written. Type the `FnMut` closure and the call where the
+`// FILL` comments are.
+
+```
+input:  1 2 3
+output: 3 4 5
+        3
+        20
+```
+'''
+starter     = '''
+use std::io::Read;
+
+fn apply(f: impl Fn(i64) -> i64, x: i64) -> i64 {
+    f(x)
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let fee = 2;
+    let mut seen = 0;
+
+    // FILL: a closure that adds fee to x and counts every call in seen
+    // ANSWER: let mut charge = |x: i64| { seen += 1; x + fee };
+    let mut charge = |x: i64| x;
+
+    let charged: Vec<String> = nums.iter().map(|&x| charge(x).to_string()).collect();
+    println!("{}", charged.join(" "));
+    println!("{}", seen);
+
+    // FILL: hand apply a closure that multiplies by fee, with 10
+    // ANSWER: println!("{}", apply(|x| x * fee, 10));
+}
+'''
+solution    = '''
+use std::io::Read;
+
+fn apply(f: impl Fn(i64) -> i64, x: i64) -> i64 {
+    f(x)
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let fee = 2;
+    let mut seen = 0;
+
+    let mut charge = |x: i64| { seen += 1; x + fee };
+
+    let charged: Vec<String> = nums.iter().map(|&x| charge(x).to_string()).collect();
+    println!("{}", charged.join(" "));
+    println!("{}", seen);
+
+    println!("{}", apply(|x| x * fee, 10));
+}
+'''
+hints = [
+  "let mut charge = |x: i64| { seen += 1; x + fee }; and then apply(|x| x * fee, 10)",
+  "charge borrows seen mutably for as long as it is used, so the println! of seen has to come after the last call — which it does. The closure passed to apply only reads fee, so it is a plain Fn.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "3 4 5\n3\n20\n", visible = true },
+  { name = "empty", stdin = "\n", expect = "\n0\n20\n", visible = false },
+  { name = "one", stdin = "10\n", expect = "12\n1\n20\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "rust.basic.28.threads"
+node        = 28
 title       = "THE FOUR TILLS"
 difficulty  = 3
 story       = "Jardine's Bazaar opens four tills at once and each works its own receipt. The manager collects them in till order and the tray comes back empty."
 concepts    = ["concurrency", "closures"]
-requires    = ["rust.basic.16.lambdas"]
-map          = { x = 0.394, y = 0.686, kind = "quest" }
+requires    = ["rust.basic.27.closures"]
+map          = { x = 0.579, y = 0.719, kind = "quest" }
 brief       = '''
 `thread::spawn` starts a thread running a closure and hands back a
 `JoinHandle`. `move` gives the closure its own copy of what it uses, so
@@ -2288,157 +2586,95 @@ cases = [
   { name = "five", stdin = "2 -2 0 5 1\n", expect = "4 4 0 25 1\n34\n", visible = false },
 ]
 
-# ---------------------------------------------------------------- 27
+# ---------------------------------------------------------------- 29
 [[quest]]
-id          = "rust.basic.18.binary-tree"
-node        = 27
-title       = "THE AUTOCOMPLETE"
-difficulty  = 4
-story       = "The Percival Street phone kiosk, and the ghost text is back, offering a tree it has seen a thousand times. It has no completion for one you grow yourself, node by node, and the tree stays empty until you do."
-concepts    = ["trees", "recursion", "structs"]
-requires    = ["rust.basic.17.threads"]
-map          = { x = 0.818, y = 0.870, kind = "boss" }
+id          = "rust.basic.29.arc-mutex"
+node        = 29
+title       = "ONE DRAWER, MANY HANDS"
+difficulty  = 3
+story       = "One cash drawer at Times Square and a hand from every till reaching for it. Each hand gets its own handle to the drawer, and the drawer opens for one hand at a time."
+concepts    = ["shared-state", "concurrency", "interior-mutability"]
+requires    = ["rust.basic.28.threads"]
+map          = { x = 0.752, y = 0.733, kind = "quest" }
 brief       = '''
-A binary search tree is a `Node` with a value and two optional children,
-`Option<Box<Node>>`: `None` is an empty subtree, `Some(Box::new(…))` a
-real one. Inserting is recursive — an empty subtree becomes a new leaf; a
-real one hands the value down the side it belongs on and stores the
-subtree that comes back. `.take()` moves a child out of its `Option` so
-it can be handed to the recursive call and put back.
+`Arc<T>` is `Rc` for threads: `Arc::clone(&total)` gives each thread its
+own handle to one value. `Mutex<T>` guards it: `.lock().unwrap()` waits
+for the lock and returns a guard that derefs to the value, and the lock
+is released when the guard goes out of scope. `*guard += x` writes
+through it.
 
 ```
-if value < n.value {
-    n.left = insert(n.left.take(), value);
-} else {
-    n.right = insert(n.right.take(), value);
-}
+let total = Arc::clone(&total);
+*total.lock().unwrap() += x;
 ```
 
-`Node`, `inorder`, `height`, `main` and the shape of `insert` are written,
-down to that `if … else`. Type the two assignment lines where the `// FILL`
-comments are.
+Type the clone before the `spawn` and the locked add inside it, where
+the `// FILL` comments are. Shadowing the name is the idiom.
 
 ```
-input:  5 3 8 1 4
-output: 1 3 4 5 8
-        3
+input:  1 2 3 4
+output: 10
+        1
 ```
 '''
 starter     = '''
 use std::io::Read;
-
-struct Node {
-    value: i64,
-    left: Option<Box<Node>>,
-    right: Option<Box<Node>>,
-}
-
-fn insert(root: Option<Box<Node>>, value: i64) -> Option<Box<Node>> {
-    match root {
-        None => Some(Box::new(Node { value, left: None, right: None })),
-        Some(mut n) => {
-            if value < n.value {
-                // FILL: insert into the left child, and store what comes back
-                // ANSWER: n.left = insert(n.left.take(), value);
-            } else {
-                // FILL: the same on the right
-                // ANSWER: n.right = insert(n.right.take(), value);
-            }
-            Some(n)
-        }
-    }
-}
-
-fn inorder(node: &Option<Box<Node>>, out: &mut Vec<i64>) {
-    if let Some(n) = node {
-        inorder(&n.left, out);
-        out.push(n.value);
-        inorder(&n.right, out);
-    }
-}
-
-fn height(node: &Option<Box<Node>>) -> i64 {
-    match node {
-        None => 0,
-        Some(n) => 1 + height(&n.left).max(height(&n.right)),
-    }
-}
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
     let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
 
-    let mut root: Option<Box<Node>> = None;
+    let total = Arc::new(Mutex::new(0i64));
+    let mut handles = Vec::new();
     for &x in &nums {
-        root = insert(root, x);
+        // FILL: this thread's own handle to total
+        // ANSWER: let total = Arc::clone(&total);
+        handles.push(thread::spawn(move || {
+            // FILL: lock, and add x through the guard
+            // ANSWER: *total.lock().unwrap() += x;
+            let _ = x;
+        }));
+    }
+    for h in handles {
+        h.join().unwrap();
     }
 
-    let mut out = Vec::new();
-    inorder(&root, &mut out);
-    let line: Vec<String> = out.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    println!("{}", height(&root));
+    println!("{}", *total.lock().unwrap());
+    println!("{}", Arc::strong_count(&total));
 }
 '''
 solution    = '''
 use std::io::Read;
-
-struct Node {
-    value: i64,
-    left: Option<Box<Node>>,
-    right: Option<Box<Node>>,
-}
-
-fn insert(root: Option<Box<Node>>, value: i64) -> Option<Box<Node>> {
-    match root {
-        None => Some(Box::new(Node { value, left: None, right: None })),
-        Some(mut n) => {
-            if value < n.value {
-                n.left = insert(n.left.take(), value);
-            } else {
-                n.right = insert(n.right.take(), value);
-            }
-            Some(n)
-        }
-    }
-}
-
-fn inorder(node: &Option<Box<Node>>, out: &mut Vec<i64>) {
-    if let Some(n) = node {
-        inorder(&n.left, out);
-        out.push(n.value);
-        inorder(&n.right, out);
-    }
-}
-
-fn height(node: &Option<Box<Node>>) -> i64 {
-    match node {
-        None => 0,
-        Some(n) => 1 + height(&n.left).max(height(&n.right)),
-    }
-}
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
     let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
 
-    let mut root: Option<Box<Node>> = None;
+    let total = Arc::new(Mutex::new(0i64));
+    let mut handles = Vec::new();
     for &x in &nums {
-        root = insert(root, x);
+        let total = Arc::clone(&total);
+        handles.push(thread::spawn(move || {
+            *total.lock().unwrap() += x;
+        }));
+    }
+    for h in handles {
+        h.join().unwrap();
     }
 
-    let mut out = Vec::new();
-    inorder(&root, &mut out);
-    let line: Vec<String> = out.iter().map(|x| x.to_string()).collect();
-    println!("{}", line.join(" "));
-    println!("{}", height(&root));
+    println!("{}", *total.lock().unwrap());
+    println!("{}", Arc::strong_count(&total));
 }
 '''
 hints = [
-  "n.left = insert(n.left.take(), value); — and n.right = insert(n.right.take(), value);",
-  "`take()` leaves `None` behind and gives you the child to pass down; assigning the call's result puts the grown subtree back.",
+  "let total = Arc::clone(&total); before the spawn, then *total.lock().unwrap() += x; inside.",
+  "Without the clone, move takes the one Arc into the first thread and the second iteration is E0382. The count printed at the end is 1 because every clone was dropped with its thread.",
 ]
 
 [quest.tests]
@@ -2448,8 +2684,487 @@ compile_timeout_ms = 30000
 max_stdout_bytes = 262144
 match      = "trim"
 cases = [
-  { name = "balanced", stdin = "5 3 8 1 4\n", expect = "1 3 4 5 8\n3\n", visible = true },
-  { name = "chain", stdin = "1 2 3\n", expect = "1 2 3\n3\n", visible = false },
-  { name = "single", stdin = "7\n", expect = "7\n1\n", visible = false },
-  { name = "left-deep", stdin = "9 4 2 6 1\n", expect = "1 2 4 6 9\n4\n", visible = false },
+  { name = "four", stdin = "1 2 3 4\n", expect = "10\n1\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "7\n1\n", visible = false },
+  { name = "eight", stdin = "1 1 1 1 1 1 1 1\n", expect = "8\n1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "rust.basic.30.atomics-rwlock"
+node        = 30
+title       = "ONE WORD, NO LOCK"
+difficulty  = 3
+story       = "A turnstile counter at Victoria Park that every gate bumps without queueing, and a noticeboard many read and few write."
+concepts    = ["shared-state", "concurrency", "thread-safety"]
+requires    = ["rust.basic.29.arc-mutex"]
+map          = { x = 0.956, y = 0.726, kind = "quest" }
+brief       = '''
+For a single integer, an atomic beats a mutex: `AtomicUsize::fetch_add(1,
+Ordering::SeqCst)` bumps it from any thread with no lock at all, and
+`.load(Ordering::SeqCst)` reads it. For a bigger value that is read far
+more than written, `RwLock` gives many readers at once (`.read()`) and one
+writer (`.write()`), each returning a guard like `Mutex` does.
+
+```
+hits.fetch_add(1, Ordering::SeqCst);
+board.write().unwrap().push(x);
+```
+
+The clones and the spawn are written. Type the bump and the write inside
+the thread, where the `// FILL` comments are.
+
+```
+input:  4 2 9
+output: 2 4 9
+        3
+```
+'''
+starter     = '''
+use std::io::Read;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock};
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let hits = Arc::new(AtomicUsize::new(0));
+    let board: Arc<RwLock<Vec<i64>>> = Arc::new(RwLock::new(Vec::new()));
+
+    let mut handles = Vec::new();
+    for &x in &nums {
+        let hits = Arc::clone(&hits);
+        let board = Arc::clone(&board);
+        handles.push(thread::spawn(move || {
+            // FILL: bump hits by one, atomically
+            // ANSWER: hits.fetch_add(1, Ordering::SeqCst);
+            // FILL: take the write lock and push x
+            // ANSWER: board.write().unwrap().push(x);
+            let _ = x;
+        }));
+    }
+    for h in handles {
+        h.join().unwrap();
+    }
+
+    let mut seen = board.read().unwrap().clone();
+    seen.sort();
+    let out: Vec<String> = seen.iter().map(|x| x.to_string()).collect();
+    println!("{}", out.join(" "));
+    println!("{}", hits.load(Ordering::SeqCst));
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock};
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let hits = Arc::new(AtomicUsize::new(0));
+    let board: Arc<RwLock<Vec<i64>>> = Arc::new(RwLock::new(Vec::new()));
+
+    let mut handles = Vec::new();
+    for &x in &nums {
+        let hits = Arc::clone(&hits);
+        let board = Arc::clone(&board);
+        handles.push(thread::spawn(move || {
+            hits.fetch_add(1, Ordering::SeqCst);
+            board.write().unwrap().push(x);
+        }));
+    }
+    for h in handles {
+        h.join().unwrap();
+    }
+
+    let mut seen = board.read().unwrap().clone();
+    seen.sort();
+    let out: Vec<String> = seen.iter().map(|x| x.to_string()).collect();
+    println!("{}", out.join(" "));
+    println!("{}", hits.load(Ordering::SeqCst));
+}
+'''
+hints = [
+  "hits.fetch_add(1, Ordering::SeqCst); and board.write().unwrap().push(x);",
+  "fetch_add takes &self, which is why an atomic needs no Mutex and no mut. The write guard is a temporary here, so the lock is released at the end of the statement.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "4 2 9\n", expect = "2 4 9\n3\n", visible = true },
+  { name = "one", stdin = "5\n", expect = "5\n1\n", visible = false },
+  { name = "six", stdin = "6 5 4 3 2 1\n", expect = "1 2 3 4 5 6\n6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id          = "rust.basic.31.channel"
+node        = 31
+title       = "ONE HATCH"
+difficulty  = 3
+story       = "The hatch at the back of the Times Square kitchen: one cook sends, the pass receives, and the pass knows the cook is done because the hatch closes behind him."
+concepts    = ["channels", "concurrency"]
+requires    = ["rust.basic.30.atomics-rwlock"]
+map          = { x = 0.963, y = 0.865, kind = "quest" }
+brief       = '''
+`mpsc::channel()` returns a sender and a receiver. The sender moves into
+a thread and `tx.send(v)` hands a value across; `rx.iter()` on the other
+side yields everything sent, in order, and **ends when every sender has
+been dropped** — here, when the producer thread finishes and its `tx`
+goes with it.
+
+```
+let (tx, rx) = mpsc::channel::<i64>();
+let got: Vec<i64> = rx.iter().collect();
+```
+
+The producer thread is written. Type the channel and the collecting
+receive where the `// FILL` comments are.
+
+```
+input:  1 2 3
+output: 10 20 30
+```
+'''
+starter     = '''
+use std::io::Read;
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    // FILL: a channel of i64: tx to send on, rx to receive from
+    // ANSWER: let (tx, rx) = mpsc::channel::<i64>();
+
+    let producer = thread::spawn(move || {
+        for x in nums {
+            tx.send(x * 10).unwrap();
+        }
+    });
+
+    // FILL: receive until the channel closes, into a Vec
+    // ANSWER: let got: Vec<i64> = rx.iter().collect();
+    let got: Vec<i64> = Vec::new();
+
+    producer.join().unwrap();
+    let out: Vec<String> = got.iter().map(|x| x.to_string()).collect();
+    println!("{}", out.join(" "));
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let (tx, rx) = mpsc::channel::<i64>();
+
+    let producer = thread::spawn(move || {
+        for x in nums {
+            tx.send(x * 10).unwrap();
+        }
+    });
+
+    let got: Vec<i64> = rx.iter().collect();
+
+    producer.join().unwrap();
+    let out: Vec<String> = got.iter().map(|x| x.to_string()).collect();
+    println!("{}", out.join(" "));
+}
+'''
+hints = [
+  "let (tx, rx) = mpsc::channel::<i64>(); and let got: Vec<i64> = rx.iter().collect();",
+  "rx.iter() blocks until the channel closes, and the channel closes when tx is dropped at the end of the producer's closure — so the collect finishes exactly when the producer does.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "10 20 30\n", visible = true },
+  { name = "one", stdin = "-4\n", expect = "-40\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "50 40 30 20 10\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id          = "rust.basic.32.producers"
+node        = 32
+title       = "MANY COOKS, ONE PASS"
+difficulty  = 3
+story       = "Every cook in the Times Square kitchen sends through the same hatch, and the pass has a hatch key of its own it forgot it was holding. Until it puts that down, the pass waits for a cook who is never coming."
+concepts    = ["channels", "concurrency", "cancellation"]
+requires    = ["rust.basic.31.channel"]
+map          = { x = 0.792, y = 0.888, kind = "quest" }
+brief       = '''
+*mpsc* is multi-producer: `tx.clone()` gives each thread its own sender
+onto the one channel. The receive loop ends only when **every** sender is
+gone — and the original `tx` is still sitting in `main`. `drop(tx)` puts
+it down; without that line the program never finishes.
+
+```
+let tx = tx.clone();
+drop(tx);
+```
+
+Type the clone before the `spawn` and the drop after the loop, where the
+`// FILL` comments are. The results are sorted by index, so the order the
+threads run in does not matter.
+
+```
+input:  1 2 3
+output: 0 10
+        1 20
+        2 30
+        RECV 3
+```
+'''
+starter     = '''
+use std::io::Read;
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let (tx, rx) = mpsc::channel::<(usize, i64)>();
+    for (i, x) in nums.into_iter().enumerate() {
+        // FILL: this thread's own sender
+        // ANSWER: let tx = tx.clone();
+        thread::spawn(move || {
+            tx.send((i, x * 10)).unwrap();
+        });
+    }
+    // FILL: put down the sender main is still holding
+    // ANSWER: drop(tx);
+
+    let mut got: Vec<(usize, i64)> = rx.iter().collect();
+    got.sort();
+    for (i, v) in &got {
+        println!("{} {}", i, v);
+    }
+    println!("RECV {}", got.len());
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let (tx, rx) = mpsc::channel::<(usize, i64)>();
+    for (i, x) in nums.into_iter().enumerate() {
+        let tx = tx.clone();
+        thread::spawn(move || {
+            tx.send((i, x * 10)).unwrap();
+        });
+    }
+    drop(tx);
+
+    let mut got: Vec<(usize, i64)> = rx.iter().collect();
+    got.sort();
+    for (i, v) in &got {
+        println!("{} {}", i, v);
+    }
+    println!("RECV {}", got.len());
+}
+'''
+hints = [
+  "let tx = tx.clone(); inside the loop, drop(tx); after it.",
+  "Without the clone, move takes the one sender into the first thread and the loop's second turn is E0382. Without the drop, rx.iter() waits on main's own sender forever — the run times out rather than failing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "0 10\n1 20\n2 30\nRECV 3\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "0 70\nRECV 1\n", visible = false },
+  { name = "empty", stdin = "\n", expect = "RECV 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id          = "rust.basic.33.worker-pool"
+node        = 33
+title       = "THE HATCH"
+difficulty  = 4
+story       = "12:30 at Times Square. One order pad, three cooks, one hatch back to the pass. The pad is shared under a lock, a cook holds it only long enough to tear off one ticket, and when the pad is empty the cooks go home and the pass counts the plates."
+concepts    = ["channels", "shared-state", "concurrency", "deadlock"]
+requires    = ["rust.basic.32.producers"]
+map          = { x = 0.605, y = 0.876, kind = "boss" }
+brief       = '''
+The worker pool is two channels and a lock. Jobs go down `job_tx`; the
+workers share one `job_rx` behind `Arc<Mutex<…>>`, and each takes a job
+with `job_rx.lock().unwrap().recv()` — the lock is a temporary, so it is
+released at the end of that statement and the cooking happens **outside**
+it. `recv()` returns `Err` once every `job_tx` is dropped, and that is
+how a worker knows to stop. Results come back on `done_tx`, and the pass
+collects until every `done_tx` — the workers' clones *and* main's own —
+is gone.
+
+```
+let job = job_rx.lock().unwrap().recv();
+drop(job_tx);
+drop(done_tx);
+```
+
+The pool, the loop and the collection are written. Type the locked
+receive inside the worker and the two drops in `main`, where the
+`// FILL` comments are. Either drop missing is a deadlock.
+
+```
+input:  1 2 3
+output: 0 2
+        1 5
+        2 10
+```
+'''
+starter     = '''
+use std::io::Read;
+use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn cook(x: i64) -> i64 {
+    x * x + 1
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let (job_tx, job_rx) = mpsc::channel::<(usize, i64)>();
+    let (done_tx, done_rx) = mpsc::channel::<(usize, i64)>();
+    let job_rx = Arc::new(Mutex::new(job_rx));
+
+    let mut workers = Vec::new();
+    for _ in 0..3 {
+        let job_rx = Arc::clone(&job_rx);
+        let done_tx = done_tx.clone();
+        workers.push(thread::spawn(move || loop {
+            // FILL: take one job under the lock; the lock goes before the cooking
+            // ANSWER: let job = job_rx.lock().unwrap().recv();
+            let job: Result<(usize, i64), mpsc::RecvError> = Err(mpsc::RecvError);
+            match job {
+                Ok((i, x)) => done_tx.send((i, cook(x))).unwrap(),
+                Err(_) => break,
+            }
+        }));
+    }
+
+    for (i, x) in nums.into_iter().enumerate() {
+        job_tx.send((i, x)).unwrap();
+    }
+    // FILL: no more jobs — close the pad so recv() starts returning Err
+    // ANSWER: drop(job_tx);
+    // FILL: main's own done sender, or done_rx.iter() never ends
+    // ANSWER: drop(done_tx);
+
+    for w in workers {
+        w.join().unwrap();
+    }
+    let mut results: Vec<(usize, i64)> = done_rx.iter().collect();
+    results.sort();
+    for (i, v) in &results {
+        println!("{} {}", i, v);
+    }
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn cook(x: i64) -> i64 {
+    x * x + 1
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let nums: Vec<i64> = input.split_whitespace().map(|t| t.parse().unwrap()).collect();
+
+    let (job_tx, job_rx) = mpsc::channel::<(usize, i64)>();
+    let (done_tx, done_rx) = mpsc::channel::<(usize, i64)>();
+    let job_rx = Arc::new(Mutex::new(job_rx));
+
+    let mut workers = Vec::new();
+    for _ in 0..3 {
+        let job_rx = Arc::clone(&job_rx);
+        let done_tx = done_tx.clone();
+        workers.push(thread::spawn(move || loop {
+            let job = job_rx.lock().unwrap().recv();
+            match job {
+                Ok((i, x)) => done_tx.send((i, cook(x))).unwrap(),
+                Err(_) => break,
+            }
+        }));
+    }
+
+    for (i, x) in nums.into_iter().enumerate() {
+        job_tx.send((i, x)).unwrap();
+    }
+    drop(job_tx);
+    drop(done_tx);
+
+    for w in workers {
+        w.join().unwrap();
+    }
+    let mut results: Vec<(usize, i64)> = done_rx.iter().collect();
+    results.sort();
+    for (i, v) in &results {
+        println!("{} {}", i, v);
+    }
+}
+'''
+hints = [
+  "let job = job_rx.lock().unwrap().recv(); in the worker; drop(job_tx); and drop(done_tx); after the sends.",
+  "The guard from lock() is a temporary in that let, so it is dropped at the semicolon and the other workers can take the next job while this one cooks. Holding it across the cook() would serialise the pool.",
+  "drop(job_tx) is what turns recv() into Err for the workers; drop(done_tx) is what lets done_rx.iter() finish once the workers have dropped theirs. Forget either and the program waits forever.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "0 2\n1 5\n2 10\n", visible = true },
+  { name = "one", stdin = "0\n", expect = "0 1\n", visible = false },
+  { name = "ten", stdin = "1 2 3 4 5 6 7 8 9 10\n", expect = "0 2\n1 5\n2 10\n3 17\n4 26\n5 37\n6 50\n7 65\n8 82\n9 101\n", visible = false },
 ]

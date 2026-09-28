@@ -149,8 +149,8 @@ export const yue: Partial<Catalogue> = {
     "interface、generic、收窄型別。未行之前個個值都有型，compiler 已經睇晒。",
   "lands.verybasicBlurb": "小測驗。邊一行先係啱嘅文法？四選一，然後打返出嚟。",
   "lands.basicBlurb":
-    "朝早行街。一次一個文法，先解釋，再填一兩行 — 型別、迴圈、結構、排序、閉包、線程、樹。",
-  "lands.advancedBlurb": "先做用呢啲文法嘅小編程題，然後午市高峰：一個櫃檯兩部收銀機，同時發生。",
+    "朝早行街。一次一個文法，先解釋，再填一至四行 — 即場寫程式嘅畫面當你已經熟到手嘅嗰啲文法。",
+  "lands.advancedBlurb": "即場寫程式測試，唔計時。一條題目，成個程式，睇得到嘅例子同埋隱藏嘅例子 — 真正用到啲文法，然後係同時發生嘅午市高峰。",
   "lands.hackerBlurb": "面試。一間房、一個鐘，冇人幫你寫完你嗰行。",
   "lands.category": "{land} — 分類",
   "lands.clearedOf": "{total} 條入面通關咗 {cleared} 條",

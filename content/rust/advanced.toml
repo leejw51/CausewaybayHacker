@@ -1,9 +1,11 @@
-# RUST LAND — ADVANCED. The morning walk turns into the lunch rush. First the
-# language's own machinery — ownership, slices, strings, structs, enums,
-# collections, errors, iterators, modules, smart pointers, traits — and then
-# 12:30, when everything happens at once: threads, move closures, channels,
-# Arc<Mutex>, RwLock, lifetimes, generics, a pipeline, and DEADLOCK in the
-# Times Square plant room. The grammar drills live on the BASIC road now.
+# RUST LAND — ADVANCED. The live coding test, untimed. Every quest is a brief,
+# a whole program and hidden cases — what BASIC drilled as one-line holes,
+# applied. First the language's own machinery — ownership, slices, strings,
+# structs, enums, collections, errors, iterators, modules, smart pointers,
+# traits — and then 12:30, when everything happens at once: threads, move
+# closures, channels, Arc<Mutex>, RwLock, lifetimes, generics, a pipeline,
+# and DEADLOCK in the Times Square plant room. Doing this under a clock is
+# the HACKER road.
 #
 # Every quest here has a deterministic answer on purpose: results are joined in
 # order, collected and sorted, or piped. A quest whose output depends on the

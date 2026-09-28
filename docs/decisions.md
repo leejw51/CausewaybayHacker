@@ -7355,3 +7355,58 @@ overworld that goes from a quiet tram stop to the big screen. The land's
 colour is `#3178C6`. Both clients carry it, with syntax highlighting — the
 web client through `@codemirror/lang-javascript`, a new dependency — and six
 lands fit the lands screen as 3×2 or 2×3.
+
+## 2026-09-28 — RUST LAND's BASIC road is the language's own grammar, and ADVANCED is the live coding test
+
+The four roads of RUST LAND are now, in the user's words: 입문 (VERY BASIC)
+the plain grammar, 기초 (BASIC) the advanced grammar, 심화 (ADVANCED) the
+live coding test, 해커 (HACKER) the live coding test HackerRank-style. Two
+of those were already true. VERY BASIC's quiz walks types, containers, a
+struct, a closure, a thread, a mutex, a heap and a tree; HACKER has been the
+timed interview since it opened. What changed is the middle.
+
+**BASIC is rewritten, `rust.basic` version 3, 33 nodes.** It was the plain
+grammar as one-line drills — the same 27 constructs VERY BASIC asks, typed
+rather than picked — and the two roads said the same thing twice. It is now
+the grammar that is Rust's own and that a live screen assumes: ownership and
+the move, `&`, `&mut`, the exchange (`mem::swap`, `mem::take`), slices,
+`String`/`&str`, chars and bytes, `Option`, `Result` and `?`, `match`,
+iterator chains, `fold`/`zip`/`windows`, the entry API, comparators, a
+`Reverse` heap, a derived `Ord`, fast stdin, formatted stdout, overflow, a
+lifetime on a function and on a struct, a trait, a generic bound,
+`Box<dyn>`, `Rc<RefCell>`, closure kinds — then threads, `Arc<Mutex>`,
+atomics and `RwLock`, an `mpsc` channel, many producers and one consumer,
+and a worker pool (producers, consumers, one hatch) at the boss. The road's
+mechanics are unchanged: a whole program, `// FILL` and `// ANSWER:` at the
+hole, one to four added lines, untimed. "Exchange" in the brief was read as
+`std::mem::swap`/`take`/`replace`; if it meant something else, node 05 is
+the one to change.
+
+**ADVANCED keeps every quest and every id.** It was already whole programs
+from a brief with hidden cases — what a live coding test is — and renaming
+its ids would have discarded five translation packs and everyone's cleared
+list for a header comment. Only the framing changed: it is the untimed live
+coding road that applies what BASIC drilled, and HACKER is the same thing
+under a clock.
+
+**The stale translations went, and Korean came back.**
+`content/i18n/*/rust.basic.toml` in five locales named quest ids that no
+longer exist, which `verify_pack.py --i18n` fails on ("is not a quest of
+rust.basic"). A file that does not exist is a coverage gap, not a failure,
+so the four other locales were removed; `ko` was written fresh for all 33,
+since that is the language the road was asked for in.
+
+**The road blurbs are shared by six lands, and only one land moved.** The
+BASIC and ADVANCED blurbs in `frontend/src/i18n/*.ts`, the LÖVE client's
+`categories.lua` (which also gained the VERY BASIC line it never had) and
+its five `lang/*.lua` catalogues, README, SPEC §0 and `docs/story.md` §4 now
+describe the shape of each road — one construct, one to four lines; the live
+coding test, untimed — rather than enumerating Rust's topics, so they stay
+true for GO, C++, PYTHON, PYTORCH and TYPESCRIPT, whose BASIC roads are
+still the plain grammar. Moving those lands the same way is a separate
+decision, not a consequence of this one.
+
+**Node 01 is stdin-free on purpose.** `e2e/journey.spec.ts` opens
+RUST × BASIC's first node and answers it by printing its visible case, so
+the first node of this road must have a constant answer — ONE OWNER does,
+and it is also the node the ANSWER-drill suite types, so it is three lines.
