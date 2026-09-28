@@ -126,6 +126,18 @@ test("CODE PLAYGROUND is a tile, and the coder's panel is on the code page", asy
   await clickButton(page, "close");
   await expect.poll(async () => ids(page)).not.toContain("send");
   await expect.poll(async () => ids(page)).toContain("unfocus");
+
+  // DONE with the room open closes the room too: back on the framed page
+  // the AGENT button is unlit, and coming back to CODE does not bring a
+  // panel up that nobody asked for.
+  await clickButton(page, "agent");
+  await expect.poll(async () => ids(page)).toContain("send");
+  await clickButton(page, "unfocus");
+  await expect.poll(async () => ids(page)).not.toContain("send");
+  await expect.poll(async () => ids(page)).toContain("code");
+  await clickButton(page, "code");
+  await expect.poll(async () => ids(page)).toContain("unfocus");
+  expect(await ids(page)).not.toContain("send");
 });
 
 test("with a key the coder answers, and the room is a messenger that syncs", async ({
