@@ -200,9 +200,6 @@ type Held = {
  */
 const SCRATCH = "SCRATCH";
 
-/** How many pads there have to be before the list offers to narrow itself. */
-const SEARCH_FROM = 5;
-
 export class PlaygroundScene implements Scene {
   readonly name = "playground";
   readonly mood = "lands" as const;
@@ -518,18 +515,6 @@ export class PlaygroundScene implements Scene {
     const q = this.query.trim().toLowerCase();
     if (!q) return this.snippets;
     return this.snippets.filter((s) => s.name.toLowerCase().includes(q));
-  }
-
-  /**
-   * Whether the box is worth its row.
-   *
-   * Four pads fit on any screen and are read in one glance; a search field
-   * over them is a control that costs height and saves nothing. It stays once
-   * it is in use, or the act of filtering down to two results would take the
-   * box away and strand the filter.
-   */
-  private searchable(): boolean {
-    return this.snippets.length >= SEARCH_FROM || this.query !== "";
   }
 
   /** Take what is in the field, if it is anything. */
@@ -1479,7 +1464,11 @@ export class PlaygroundScene implements Scene {
     }
     if (hit.id === "unfocus") {
       this.focus = false;
-      this.app.chip.select();
+      // The room goes with the page it is drawn on, as on the quest bench:
+      // left open behind the framed page it would be a lit AGENT button over
+      // a panel nobody can see, and the next press would "open" it again.
+      if (this.coder?.open) this.coder.toggle();
+      else this.app.chip.select();
       return;
     }
     if (hit.id === "poster" || hit.id === "reader") {
@@ -1682,13 +1671,14 @@ export class PlaygroundScene implements Scene {
 
     // The rule, stated once, where it cannot be missed. It is the opposite of
     // the quest screen's rule and the player has to be told which one they are
-    // standing on. It gives up its room to the search box first: by the time
-    // there are pads to hunt through, the rule has been read.
-    const finding = this.searchable();
-    const findH = finding
-      ? Math.max(this.app.layout.minTouchH(), body.height + Math.round(14 * s))
-      : 0;
-    const noteRoom = listTop - pad - (finding ? findH + pad : 0);
+    // standing on. It gives up its room to the search box first.
+    //
+    // The box is always offered, however few pads there are. It once hid
+    // itself under five, on the grounds that four pads are read in one
+    // glance — and then it was gone exactly when somebody looked for it, and
+    // nobody could tell whether the list had a search at all.
+    const findH = Math.max(this.app.layout.minTouchH(), body.height + Math.round(14 * s));
+    const noteRoom = listTop - pad - findH - pad;
     // Clipped to its room rather than trusted to stop: a Hangul line inks
     // below the nominal line height it is measured by, so "does the next line
     // fit?" let half a row of glyphs through and the buttons were drawn
@@ -1718,13 +1708,9 @@ export class PlaygroundScene implements Scene {
     });
     y += pad;
 
-    if (finding) {
-      well(g, inner[0], y, inner[2], findH, [0.06, 0.05, 0.14, 0.98]);
-      this.searchOverlay?.place([inner[0] + 4, y + 3, inner[2] - 8, findH - 6], body.size);
-      y += findH + pad;
-    } else {
-      this.searchOverlay?.hide();
-    }
+    well(g, inner[0], y, inner[2], findH, [0.06, 0.05, 0.14, 0.98]);
+    this.searchOverlay?.place([inner[0] + 4, y + 3, inner[2] - 8, findH - 6], body.size);
+    y += findH + pad;
 
     const rowH = Math.max(this.app.layout.minTouchH(), body.height + Math.round(14 * s));
     const room = listTop - pad - y;
