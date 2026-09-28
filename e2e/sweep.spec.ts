@@ -417,15 +417,18 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({
   expect(await editorText(page)).not.toBe("");
   await shot(page, "62-answer-ghost");
 
-  // **TAB indents.** It is the editor's key, and ANSWER must not take it —
-  // taking it made indenting impossible, which is why the completion is a
-  // button now.
+  // **TAB is a key like any other in the drill.** An indent the answer does
+  // not have is refused, the same as a wrong letter — the drill puts the
+  // answer's own indentation in by itself — and the editor says so.
   const beforeTab = await docText();
   await page.keyboard.press("Tab");
   await page.waitForTimeout(250);
-  expect(await docText()).not.toBe(beforeTab);
-  for (let i = 0; i < 8; i++) await page.keyboard.press("Backspace");
-  await page.waitForTimeout(250);
+  expect(await docText()).toBe(beforeTab);
+  expect(
+    await page.evaluate(() =>
+      document.querySelector(".cwb-editor")!.classList.contains("cwb-miss"),
+    ),
+  ).toBe(true);
 
   // +LINE hands over a line at a time. Pressed until it stops, it is the
   // answer — which is the whole of what the button promises.

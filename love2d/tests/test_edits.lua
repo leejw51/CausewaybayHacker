@@ -599,6 +599,39 @@ return function()
     T.eq(Quest.answer_closer("fn main", answer), nil, "nothing where the next is yours")
     T.eq(Quest.answer_closer("fn maim(", answer), nil, "never past a divergence")
 
+    -- What the file has said before, and a keyword, come on one letter.
+    local rs = "use std::io::Read;\n\nfn main() {\n    let mut input = String::new();\n"
+      .. "    let m: std::collections::HashMap<String, i64> = std::collections::HashMap::new();\n"
+      .. "    for w in input.split_whitespace() {}\n}\n"
+    local function upto(s) return rs:sub(1, (rs:find(s, 1, true))) end
+    T.eq(Quest.answer_pattern("u", rs, "rust"), "se", "a keyword, on its first letter")
+    T.eq(Quest.answer_pattern("use std::io::Read;\n\nf", rs, "rust"), "n", "`fn` too")
+    local eq = rs:sub(1, rs:find("= std::collections::HashMap::new", 1, true) + 2)
+    T.eq(Quest.answer_pattern(eq, rs, "rust"), "td::collections::HashMap",
+      "a run the file has already said, to a token's edge")
+    T.eq(Quest.answer_pattern(upto("input.split"), rs, "rust"), "nput", "a name typed before")
+    T.eq(Quest.answer_pattern(upto("split_whitespace"), rs, "rust"), nil,
+      "a new word that is not a keyword is answer_word's")
+    T.eq(Quest.answer_pattern(eq, rs, "rust", #eq + 5), "td::", "never past the stop")
+    T.eq(Quest.answer_pattern("ux", rs, "rust"), nil, "never past a divergence")
+
+    -- **A wrong key does not go in**, and retyping what the drill put in is
+    -- habit rather than a miss.
+    local Editor = require("src.editor")
+    local drill = setmetatable({
+      answer_on = true, answer_text = "fn main() {}\n",
+      editor = Editor.new(),
+      fx = { burst = function() end }, echo = "n", combo = 5,
+    }, { __index = Quest })
+    drill.editor:set_text("fn")
+    drill.editor:move("doc_end")
+    T.eq(drill:answer_admits(" "), true, "the answer's next character goes in")
+    T.eq(drill:answer_admits("n"), false, "the drill's own letter, retyped, does not")
+    T.eq(drill.combo, 5, "and is not a miss")
+    T.eq(drill:answer_admits("x"), false, "a wrong key is refused")
+    T.eq(drill.combo, 0, "and the run starts over")
+    T.ok(drill.miss_at ~= nil, "and the count is told to shake")
+
     -- Which hole is live, and the moment it stops being: the scene compares
     -- the one live before a keystroke with the one after, so a hole whose
     -- last character the player typed themselves is still a moment.

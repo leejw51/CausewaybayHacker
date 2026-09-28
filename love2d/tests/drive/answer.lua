@@ -39,6 +39,12 @@ add({ key = "f6" })
 add({ until_ = function(app)
       return app.scene.quest and app.scene.editor:text() == app.scene.quest.starter
     end, note = "the starter is back", timeout = 15 })
+-- **The quiz first.** A quest with a quiz keeps its editor locked until the
+-- quiz is answered, and every keystroke below would be refused as locked.
+add({ until_ = function(app)
+      local s = app.scene
+      if s:quiz_locked() then s:pick(s.quest.quiz.answer + 1) end
+      return not s:quiz_locked() end, note = "the quiz is answered", timeout = 5 })
 add({ shot = "A1-quest-band.png" })
 -- CODE, by its button.
 add({ until_ = function(app)
@@ -75,16 +81,15 @@ add({ until_ = function(app)
       print(("typed line 1: matched=%d wrong=%d"):format(p.matched, p.wrong))
       return true end, timeout = 5 })
 add({ shot = "A4-answer-on-target.png" })
--- **TAB indents.** It is the editor's key and ANSWER must not take it —
--- that conflict is why the completion moved to a button.
+-- **TAB is a key like any other in the drill.** An indent the answer does not
+-- have is refused like a wrong letter — the drill puts the answer's own
+-- indentation in by itself — and outside the drill TAB still indents.
 add({ until_ = function(app)
       local s = app.scene
       local was = s.editor:text()
       s:keypressed("tab", {})
-      check(s.editor:text() ~= was, "TAB did not indent — something is eating the key")
-      for _ = 1, #s.editor:text() - #was do s.editor:backspace() end
-      check(s.editor:text() == was, "the indent did not come back out")
-      return true end, note = "TAB indents", timeout = 5 })
+      check(s.editor:text() == was, "TAB put in an indent the answer does not have")
+      return true end, note = "TAB is refused off the answer", timeout = 5 })
 -- +LINE hands over a line at a time. Pressed until it stops, it is the answer.
 add({ until_ = function(app)
       local s = app.scene
@@ -104,14 +109,18 @@ add({ until_ = function(app)
       return true end, timeout = 5 })
 add({ shot = "A7-answer-typed.png" })
 
--- Now a character that is not the answer: a burst, and the count stops.
+-- Now a character that is not the answer: **it does not go in.** The buffer
+-- stays the answer, the caret bursts red and the count is told to shake.
+add({ until_ = function(app) app.probe_before = app.scene.editor:text(); return true end, timeout = 3 })
 add({ text = "z" })
 add({ wait = 0.2 })
 add({ until_ = function(app)
       local s = app.scene
-      check(s.answer_prog.wrong > 0, "a wrong character was not counted")
+      check(s.editor:text() == app.probe_before, "a wrong character went in")
+      check(s.answer_prog.wrong == 0, "the count moved for a key that was refused")
+      check(s.miss_at ~= nil, "the miss was not noticed")
       check(#s.fx.live > 0, "no burst for the mistake")
-      print(("mistake: wrong=%d particles=%d"):format(s.answer_prog.wrong, #s.fx.live))
+      print(("mistake refused: wrong=%d particles=%d"):format(s.answer_prog.wrong, #s.fx.live))
       return true end, timeout = 5 })
 add({ shot = "A5-answer-mistake.png" })
 -- BLANKS: the same answer with holes in it. The code is on the screen and

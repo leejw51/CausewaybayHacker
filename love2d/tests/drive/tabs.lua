@@ -49,6 +49,12 @@ add({ until_ = function(app)
       return app.scene.quest and app.scene.editor:text() == app.scene.quest.starter
     end, note = "the starter is back", timeout = 15 })
 -- ANSWER on, through its own button on the band.
+-- **The quiz first.** A quest with a quiz keeps its editor locked until the
+-- quiz is answered, and every keystroke below would be refused as locked.
+add({ until_ = function(app)
+      local s = app.scene
+      if s:quiz_locked() then s:pick(s.quest.quiz.answer + 1) end
+      return not s:quiz_locked() end, note = "the quiz is answered", timeout = 5 })
 add({ click = function(app) local r = app.scene.answer_rect; return { r.x + r.w / 2, r.y + r.h / 2 } end })
 add({ until_ = function(app) return app.scene.answer_on end, note = "ANSWER on", timeout = 30 })
 add({ until_ = function(app)
