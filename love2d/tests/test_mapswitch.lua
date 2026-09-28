@@ -58,27 +58,44 @@ return function()
     end
   end)
 
-  T.case("TAB walks rust → go → cpp → python → pytorch → typescript and wraps to rust", function()
+  T.case("TAB walks rust → go → cpp → python → pytorch → typescript → remix and wraps to rust", function()
     -- SPEC §0's order, the same one the land cards come in, so what TAB does
     -- on the map is what RIGHT does on the land screen.
-    T.same(Land.ORDER, { "rust", "go", "cpp", "python", "pytorch", "typescript" })
-    local map, asked, app = fake_map("rust", "advanced")
+    T.same(Land.ORDER, { "rust", "go", "cpp", "python", "pytorch", "typescript", "remix" })
+    -- On BASIC, a road every land has; a road REMIX lacks is the next case.
+    local map, asked, app = fake_map("rust", "basic")
     local seen = {}
     for _ = 1, #Land.ORDER do
       map:cycle_land()
       seen[#seen + 1] = map.land
-      T.eq(map.category, "advanced", "the category never moves")
+      T.eq(map.category, "basic", "the category never moves")
       T.eq(app.land, map.land, "the app followed")
     end
-    T.same(seen, { "go", "cpp", "python", "pytorch", "typescript", "rust" })
+    T.same(seen, { "go", "cpp", "python", "pytorch", "typescript", "remix", "rust" })
     T.same(asked,
-      { "go.advanced", "cpp.advanced", "python.advanced", "pytorch.advanced", "typescript.advanced",
-        "rust.advanced" },
+      { "go.basic", "cpp.basic", "python.basic", "pytorch.basic", "typescript.basic",
+        "remix.basic", "rust.basic" },
       "one world.map per step, each for the right map")
   end)
 
+  T.case("TAB into a land without this road lands on the last road it has", function()
+    -- TYPESCRIPT × HACKER, then TAB: REMIX has no hacker road, and the
+    -- switch must not ask the server for a map it would answer not_found.
+    local map, asked, app = fake_map("typescript", "hacker")
+    map:cycle_land()
+    T.eq(map.land, "remix")
+    T.eq(map.category, "basic")
+    T.same(asked, { "remix.basic" })
+    T.eq(app.category, "basic")
+    -- And Q on REMIX walks only its two roads.
+    map:cycle_category()
+    T.eq(map.category, "verybasic")
+    map:cycle_category()
+    T.eq(map.category, "basic")
+  end)
+
   T.case("TAB wraps back", function()
-    local map = fake_map("typescript", "advanced")
+    local map = fake_map("remix", "advanced")
     map:cycle_land()
     T.eq(map.land, "rust")
     T.eq(map.category, "advanced")

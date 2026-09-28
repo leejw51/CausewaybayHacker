@@ -23,7 +23,7 @@
  *
  * Pure. `tests/complete.test.ts` holds it.
  */
-import type { Land } from "../net/protocol";
+import type { Lang } from "../net/protocol";
 import { INDENT } from "../ui/editor";
 import { inProse, type CodeContext } from "./help";
 
@@ -63,7 +63,7 @@ interface Template {
  * language handles errors — and the caret is put where the first real
  * decision is.
  */
-const TEMPLATES: Record<Land, readonly Template[]> = {
+const TEMPLATES: Record<Lang, readonly Template[]> = {
   rust: [
     { id: "rust.for", key: "for", stmt: true, lines: ["for x in $xs {", "\t", "}"] },
     { id: "rust.while", key: "while", stmt: true, lines: ["while $cond {", "\t", "}"] },
@@ -180,7 +180,7 @@ const TEMPLATES: Record<Land, readonly Template[]> = {
     { id: "py.enumerate", key: "enumerate", lines: ["enumerate($xs)"] },
     { id: "py.range", key: "range", lines: ["range($n)"] },
   ],
-  // PyTorch Land keeps Python's grammar skeletons and adds the ones that are
+  // PyTorch Lang keeps Python's grammar skeletons and adds the ones that are
   // the actual writing: the loop body in the order it has to be in, a Module
   // with `super().__init__()` already there, and the two blocks people forget
   // to open. Every key is the word the first line starts with — the insert is
@@ -219,7 +219,7 @@ const TEMPLATES: Record<Land, readonly Template[]> = {
     { id: "pt.tensor", key: "torch", lines: ["torch.tensor($data)"] },
     { id: "pt.shape", key: "tuple", lines: ["tuple($x.shape)"] },
   ],
-  // TypeScript Land: brace blocks at prettier's two spaces, types written
+  // TypeScript Lang: brace blocks at prettier's two spaces, types written
   // where strict mode wants them, and the stdin idiom under `require`, since
   // that is the one module `node.d.ts` declares. No key is a prefix of
   // another.
@@ -266,7 +266,7 @@ const MIN_WORD = 4;
  * The template's text, indented to the caret's own line, with the caret
  * marker taken out and its offset kept.
  */
-function render(tpl: Template, lang: Land, indent: string): { text: string; caret: number } {
+function render(tpl: Template, lang: Lang, indent: string): { text: string; caret: number } {
   const unit = INDENT[lang];
   const body = tpl.lines
     .map((l) => l.replace(/^\t+/, (m) => unit.repeat(m.length)))
@@ -291,7 +291,7 @@ function words(source: string): Map<string, number> {
  * place a suggestion is welcome, and even there only when the file or the
  * grammar has something specific to say.
  */
-export function completeAt(lang: Land, ctx: CodeContext): Suggestion | null {
+export function completeAt(lang: Lang, ctx: CodeContext): Suggestion | null {
   if (inProse(ctx.path)) return null;
   const word = ctx.word;
   if (word.length < MIN_PREFIX) return null;
@@ -341,8 +341,8 @@ export function completeAt(lang: Land, ctx: CodeContext): Suggestion | null {
 }
 
 /** Every template, for the test that keeps them well-formed. */
-export function templates(): ReadonlyArray<Template & { lang: Land }> {
-  return (Object.keys(TEMPLATES) as Land[]).flatMap((lang) =>
+export function templates(): ReadonlyArray<Template & { lang: Lang }> {
+  return (Object.keys(TEMPLATES) as Lang[]).flatMap((lang) =>
     TEMPLATES[lang].map((t) => ({ ...t, lang })),
   );
 }

@@ -1,4 +1,12 @@
-import { atScreen, expect, freshAccount, login, pickLand, test, type Land } from "./fixtures.js";
+import {
+  atScreen,
+  expect,
+  freshAccount,
+  login,
+  pickLand,
+  test,
+  type Land,
+} from "./fixtures.js";
 import type { Page } from "@playwright/test";
 
 /**
@@ -40,7 +48,11 @@ import type { Page } from "@playwright/test";
  */
 
 /** One pixel of the game canvas, in virtual coordinates. */
-async function pixelAt(page: Page, vx: number, vy: number): Promise<[number, number, number]> {
+async function pixelAt(
+  page: Page,
+  vx: number,
+  vy: number,
+): Promise<[number, number, number]> {
   return page.evaluate(
     ([x, y]) => {
       const canvas = document.getElementById("game") as HTMLCanvasElement;
@@ -51,7 +63,12 @@ async function pixelAt(page: Page, vx: number, vy: number): Promise<[number, num
       const scale = canvas.width / virtual[0];
       const g = canvas.getContext("2d");
       if (!g) throw new Error("no 2d context");
-      const d = g.getImageData(Math.round(x * scale), Math.round(y * scale), 1, 1).data;
+      const d = g.getImageData(
+        Math.round(x * scale),
+        Math.round(y * scale),
+        1,
+        1,
+      ).data;
       return [d[0], d[1], d[2]] as [number, number, number];
     },
     [vx, vy],
@@ -67,7 +84,10 @@ async function pixelAt(page: Page, vx: number, vy: number): Promise<[number, num
  * top of the panel and it is about twenty tall, so fourteen down is inside it
  * at every type step.
  */
-async function plateBarColour(page: Page, land: Land): Promise<[number, number, number]> {
+async function plateBarColour(
+  page: Page,
+  land: Land,
+): Promise<[number, number, number]> {
   const rect = await page.evaluate((id) => {
     const b = window.__cwbCapture?.buttons().find((x) => x.id === id);
     return b ? b.rect : null;
@@ -78,19 +98,33 @@ async function plateBarColour(page: Page, land: Land): Promise<[number, number, 
 }
 
 /** How far apart two colours are, as plain Euclidean distance in RGB. */
-function apart(a: [number, number, number], b: [number, number, number]): number {
+function apart(
+  a: [number, number, number],
+  b: [number, number, number],
+): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
 test.describe("the lands are drawn in their own colours", () => {
-  test("each land's plate wears a different accent", async ({ page, ready }) => {
+  test("each land's plate wears a different accent", async ({
+    page,
+    ready,
+  }) => {
     void ready;
     await page.goto("/");
     await login(page, freshAccount());
     await atScreen(page, "lands");
 
     const seen: Record<string, [number, number, number]> = {};
-    for (const land of ["rust", "go", "cpp", "python", "pytorch", "typescript"] as Land[]) {
+    for (const land of [
+      "rust",
+      "go",
+      "cpp",
+      "python",
+      "pytorch",
+      "typescript",
+      "remix",
+    ] as Land[]) {
       await pickLand(page, land);
       // Settle so the plate's open/close tween has finished and the bar is at
       // full strength rather than mid-fade.
@@ -107,7 +141,10 @@ test.describe("the lands are drawn in their own colours", () => {
     for (let i = 0; i < lands.length; i++) {
       for (let j = i + 1; j < lands.length; j++) {
         const d = apart(seen[lands[i]], seen[lands[j]]);
-        expect(d, `${lands[i]} vs ${lands[j]} are the same colour`).toBeGreaterThan(24);
+        expect(
+          d,
+          `${lands[i]} vs ${lands[j]} are the same colour`,
+        ).toBeGreaterThan(24);
       }
     }
   });
@@ -134,8 +171,12 @@ test.describe("the lands are drawn in their own colours", () => {
     // ISO C++ blue is #00599C: blue dominates and red is nearly absent.
     expect(cpp[2], `cpp bar ${cpp} is not blue`).toBeGreaterThan(cpp[0]);
     // Python gold is #FFD43B: red and green dominate, blue trails.
-    expect(python[0], `python bar ${python} is not gold`).toBeGreaterThan(python[2]);
-    expect(python[1], `python bar ${python} is not gold`).toBeGreaterThan(python[2]);
+    expect(python[0], `python bar ${python} is not gold`).toBeGreaterThan(
+      python[2],
+    );
+    expect(python[1], `python bar ${python} is not gold`).toBeGreaterThan(
+      python[2],
+    );
 
     await pickLand(page, "pytorch");
     await page.evaluate(() => window.__cwbCapture?.settle(1.5));
@@ -144,8 +185,12 @@ test.describe("the lands are drawn in their own colours", () => {
 
     // The torch flame is #E84820: red dominates both of the others, which is
     // what keeps it apart from Python's gold, where green is nearly as high.
-    expect(pytorch[0], `pytorch bar ${pytorch} is not flame`).toBeGreaterThan(pytorch[1]);
-    expect(pytorch[0], `pytorch bar ${pytorch} is not flame`).toBeGreaterThan(pytorch[2]);
+    expect(pytorch[0], `pytorch bar ${pytorch} is not flame`).toBeGreaterThan(
+      pytorch[1],
+    );
+    expect(pytorch[0], `pytorch bar ${pytorch} is not flame`).toBeGreaterThan(
+      pytorch[2],
+    );
     expect(
       pytorch[1] - pytorch[2],
       `pytorch bar ${pytorch} is gold, not flame`,
@@ -159,12 +204,14 @@ test.describe("the lands are drawn in their own colours", () => {
     // TypeScript blue is #3178C6: blue leads, like C++'s — so what keeps the
     // two lands apart is that TypeScript's is the lighter one, with red and
     // green both well up where C++'s navy has almost none of either.
-    expect(typescript[2], `typescript bar ${typescript} is not blue`).toBeGreaterThan(
-      typescript[0],
-    );
-    expect(typescript[2], `typescript bar ${typescript} is not blue`).toBeGreaterThan(
-      typescript[1],
-    );
+    expect(
+      typescript[2],
+      `typescript bar ${typescript} is not blue`,
+    ).toBeGreaterThan(typescript[0]);
+    expect(
+      typescript[2],
+      `typescript bar ${typescript} is not blue`,
+    ).toBeGreaterThan(typescript[1]);
     expect(
       typescript[0] + typescript[1],
       `typescript bar ${typescript} is C++'s navy, not TypeScript's blue`,
@@ -189,7 +236,10 @@ test.describe("the capture hook tells the truth about the screen", () => {
     expect(backing!.fx).toEqual(backing!.game);
   });
 
-  test("every land plate is on screen and none is off the bottom", async ({ page, ready }) => {
+  test("every land plate is on screen and none is off the bottom", async ({
+    page,
+    ready,
+  }) => {
     void ready;
     await page.goto("/");
     await login(page, freshAccount());

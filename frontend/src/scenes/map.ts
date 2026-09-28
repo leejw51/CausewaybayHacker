@@ -43,7 +43,7 @@ import {
   landName,
 } from "../ui/chrome";
 import { motionScale, reducedMotion, seconds, Tween } from "../engine/motion";
-import { LANDS, type Category, type Land, type MapNode } from "../net/protocol";
+import { LANDS, roadsOf, type Category, type Land, type MapNode } from "../net/protocol";
 import { LandsScene } from "./lands";
 import { PlaygroundScene } from "./playground";
 import { QuestScene } from "./quest";
@@ -63,15 +63,16 @@ const PLATE: Record<Land, string> = {
   python: "map_python",
   pytorch: "map_pytorch",
   typescript: "map_typescript",
+  remix: "map_remix",
 };
 
 /**
- * The twelve maps, laid out the way the switcher shows them: four lands across
- * three categories. The order is the order of the bar and the order the keys
- * cycle in (`LANDS` comes from the protocol so every screen agrees on it), and
- * there is one of each so the player can see every place from any one of them.
+ * The maps, laid out the way the switcher shows them: the lands across, and
+ * each land's roads. The order is the order of the bar and the order the keys
+ * cycle in (`LANDS` and `roadsOf` come from the protocol so every screen
+ * agrees), and there is one of each so the player can see every place from
+ * any one of them — but only the roads a land has: REMIX LAND has two.
  */
-const CATEGORIES: readonly Category[] = ["verybasic", "basic", "advanced", "hacker"];
 
 /**
  * Where each of the six maps was left, keyed by land and category.
@@ -211,7 +212,7 @@ export class MapScene implements Scene {
     null;
   /** One reset at a time; the button is a request, not a queue. */
   private resetting = false;
-  /** Each node's arrival, staggered, so the overworld assembles itself. */
+  /** Each node's arrival — all at once, so the overworld is there to read. */
   private pops: Tween[] = [];
   private readonly plateIn = new Tween(seconds("panel"));
   /** The land/category switcher's hit rects, rebuilt every frame from `bar()`. */
@@ -353,11 +354,12 @@ export class MapScene implements Scene {
               starsTotal: res.stars_total ?? res.total * 3,
             };
       // Only the first load pops the nodes in. A refresh after a clear should
-      // change one stamp, not replay the whole opening.
+      // change one stamp, not replay the whole opening. All of them together:
+      // they used to arrive one by one, a twentieth of a second apart, which
+      // on a 57-node road was three seconds of watching stamps appear before
+      // the map could be read. One pop, the whole overworld at once.
       if (first) {
-        this.pops = this.nodes.map(
-          (_, i) => new Tween(seconds("node"), seconds("nodeStagger") * i),
-        );
+        this.pops = this.nodes.map(() => new Tween(seconds("node")));
       }
       this.status = this.nodes.length === 0 ? t("map.none") : "";
       if (this.selected >= this.nodes.length) this.selected = 0;
@@ -493,7 +495,7 @@ export class MapScene implements Scene {
     if (phone) {
       return [
         { id: "menu", label: t("map.menu"), lit: false, group: 0 },
-        ...CATEGORIES.map((c) => ({
+        ...roadsOf(this.land).map((c) => ({
           id: `cat:${c}`,
           label: t(`map.${c}` as "map.basic"),
           lit: c === this.category,
@@ -508,7 +510,7 @@ export class MapScene implements Scene {
         lit: l === this.land,
         group: 0,
       })),
-      ...CATEGORIES.map((c) => ({
+      ...roadsOf(this.land).map((c) => ({
         id: `cat:${c}`,
         label: t(`map.${c}` as "map.basic"),
         lit: c === this.category,
@@ -697,6 +699,11 @@ export class MapScene implements Scene {
    * place" with the language it already has.
    */
   private switchTo(land: Land, category: Category): void {
+    // A land that does not have this road — TAB from TYPESCRIPT × HACKER
+    // to REMIX — lands on the road it does have, rather than on a map the
+    // server would answer `not_found` for.
+    const roads = roadsOf(land);
+    if (!roads.includes(category)) category = roads[roads.length - 1];
     if (land === this.land && category === this.category) return;
     this.remember();
     this.justSwitched = true;
@@ -722,9 +729,10 @@ export class MapScene implements Scene {
   }
 
   private cycleCategory(step: number): void {
-    const i = CATEGORIES.indexOf(this.category);
-    const n = CATEGORIES.length;
-    this.switchTo(this.land, CATEGORIES[(i + step + n) % n]);
+    const roads = roadsOf(this.land);
+    const i = roads.indexOf(this.category);
+    const n = roads.length;
+    this.switchTo(this.land, roads[(i + step + n) % n]);
   }
 
   // -- input ---------------------------------------------------------------

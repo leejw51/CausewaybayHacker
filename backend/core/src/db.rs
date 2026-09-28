@@ -111,6 +111,11 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0021_typescript",
         include_str!("../migrations/0021_typescript.sql"),
     ),
+    (
+        22,
+        "0022_remix",
+        include_str!("../migrations/0022_remix.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {

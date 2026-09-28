@@ -184,7 +184,7 @@ fn state_of(
 /// two things every operation here needs from it.
 fn quest_of(conn: &Connection, quest_id: &str) -> Result<(&'static str, String)> {
     let quest = quests::get(conn, quest_id)?;
-    Ok((extension(&quest.land), quest.starter))
+    Ok((extension(&quest.lang), quest.starter))
 }
 
 /// `edit.state`. A read, and the message a client sends when the quest screen

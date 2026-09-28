@@ -251,6 +251,34 @@ describe("landGrid — where the plates actually land", () => {
     }
   });
 
+  it("puts seven lands three across and three down, and scrolls rather than squashes", () => {
+    // REMIX. The seventh is the first land that is not a language, and the
+    // first to need a third row at 980 wide: 3+3+1. The plates keep the
+    // height six had — the grid never shrinks a plate below VIABLE to fit a
+    // row — so the third row is reached by scrolling, which the column does
+    // before any plate goes blank.
+    const g = landGrid(COL, 7, GAP, MIN_COL, VIABLE, COMFORTABLE, 5, true, 0);
+    expect(g.cols).toBe(3);
+    expect(g.rows).toBe(3);
+    expect(g.ph).toBeGreaterThanOrEqual(VIABLE);
+    expect(g.overflow).toBeGreaterThan(0);
+    expect(g.overflow).toBeLessThan(g.ph + GAP + g.ph);
+    for (const o of g.origins) {
+      expect(o.x).toBeGreaterThanOrEqual(COL[0]);
+      expect(o.x + g.pw).toBeLessThanOrEqual(COL[0] + COL[2]);
+    }
+    // And the same seven on a phone: two across, four down, nothing lost.
+    for (const col of [
+      [16, 120, 358, 520],
+      [16, 64, 400, 260],
+    ] as Array<[number, number, number, number]>) {
+      const phone = landGrid(col, 7, GAP, 150, 0, 0, 5, true, 0);
+      expect(phone.overflow).toBe(0);
+      expect(phone.cols).toBe(2);
+      expect(phone.rows).toBe(4);
+    }
+  });
+
   it("never costs a sixth land a row a fifth did not, once two columns fit", () => {
     // Where one column is all that fits, every land is a row and that is the
     // phone's problem to solve (below). Anywhere wider, six packs into the

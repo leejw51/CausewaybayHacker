@@ -64,6 +64,7 @@ export const LANDS = [
   "python",
   "pytorch",
   "typescript",
+  "remix",
 ] as const;
 export type Land = (typeof LANDS)[number];
 

@@ -74,11 +74,11 @@ import { python } from "@codemirror/lang-python";
 import { javascript } from "@codemirror/lang-javascript";
 import { RUBBLE_MAX } from "../engine/burst";
 import { Theme } from "../engine/theme";
-import type { Land } from "../net/protocol";
+import type { Lang } from "../net/protocol";
 import type { CodeContext } from "../ai/help";
 
 /** The syntax mode per land: highlighting and indentation, nothing cleverer. */
-const MODE: Record<Land, () => Extension> = {
+const MODE: Record<Lang, () => Extension> = {
   rust,
   go,
   cpp,
@@ -112,7 +112,7 @@ export const CODE_FONT_MAX = 2.4;
  * monospace face barely reads as an indent at all — people were reaching for
  * Tab after every ENTER to get the indentation they expected.
  */
-export const INDENT: Record<Land, string> = {
+export const INDENT: Record<Lang, string> = {
   rust: "    ",
   go: "\t",
   cpp: "    ",
@@ -122,7 +122,7 @@ export const INDENT: Record<Land, string> = {
   typescript: "  ",
 };
 
-export const MAIN_FILE: Record<Land, string> = {
+export const MAIN_FILE: Record<Lang, string> = {
   rust: "main.rs",
   go: "main.go",
   cpp: "main.cpp",
@@ -709,7 +709,7 @@ export function answerWord(typed: string, answer: string, min = 2): string | nul
  * answer says `let`, and typing `turn` after `re` a hundred times is the
  * boring part of copying code, not the learning part.
  */
-const COMMON: Record<Land, ReadonlySet<string>> = (() => {
+const COMMON: Record<Lang, ReadonlySet<string>> = (() => {
   const py =
     "def return if elif else for while in import from class self print range len None True False and or not with as lambda try except raise pass break continue yield input int str list dict set append split strip join".split(
       " ",
@@ -731,7 +731,22 @@ const COMMON: Record<Land, ReadonlySet<string>> = (() => {
       ),
     ),
     python: new Set(py),
-    pytorch: new Set([...py, "torch", "nn", "tensor", "Tensor", "Module", "forward", "backward", "zeros", "ones", "randn", "optim", "grad", "no_grad"]),
+    pytorch: new Set([
+      ...py,
+      "torch",
+      "nn",
+      "tensor",
+      "Tensor",
+      "Module",
+      "forward",
+      "backward",
+      "zeros",
+      "ones",
+      "randn",
+      "optim",
+      "grad",
+      "no_grad",
+    ]),
     typescript: new Set(
       "let const function return if else for while of in new class interface type enum extends implements readonly private public async await import from export as keyof typeof number string boolean undefined null void never unknown true false console log length push map filter reduce split trim join Array Map Set Record Math require readFileSync".split(
         " ",
@@ -761,7 +776,7 @@ const WORD_CH = /[A-Za-z0-9_]/;
 export function answerPattern(
   typed: string,
   answer: string,
-  lang: Land,
+  lang: Lang,
   stop = Infinity,
 ): string | null {
   const { matched } = answerProgress(typed, answer);
@@ -788,7 +803,8 @@ export function answerPattern(
   if (best > limit) best = limit;
   // A run that stops inside a word would leave half of one; back up to the
   // token's edge, and leave trailing blanks for the player to put in.
-  while (best > matched && WORD_CH.test(answer[best - 1]) && WORD_CH.test(answer[best] ?? "")) best--;
+  while (best > matched && WORD_CH.test(answer[best - 1]) && WORD_CH.test(answer[best] ?? ""))
+    best--;
   while (best > matched && /[ \t]/.test(answer[best - 1])) best--;
   // The word itself has to be covered, or this is `answerWord`'s job.
   if (best < wordEnd) return null;
@@ -995,7 +1011,7 @@ export type EditEvent =
  * Lezer grammars the editor already ships; a C++ `do … while` closes on its
  * `;` rather than its brace, which is why the closer set below has one.
  */
-const LOOPS: Record<Land, ReadonlySet<string>> = {
+const LOOPS: Record<Lang, ReadonlySet<string>> = {
   rust: new Set(["ForExpression", "WhileExpression", "LoopExpression"]),
   go: new Set(["ForStatement"]),
   cpp: new Set(["ForStatement", "WhileStatement", "DoStatement", "ForRangeLoop"]),
@@ -1020,7 +1036,9 @@ export function toneOfNode(name: string, parent: string): Tone | null {
   if (/Integer|Float|Number|Boolean|None|True|False|Escape/.test(name)) return "number";
   if (/Type|Primitive|Class|Namespace|Lifetime/.test(name)) return "type";
   // `VariableDefinition` is @lezer/javascript's name for the `x` in `const x`.
-  if (/Identifier|VariableName|VariableDefinition|DefName|FieldName|Macro|PropertyName/.test(name)) {
+  if (
+    /Identifier|VariableName|VariableDefinition|DefName|FieldName|Macro|PropertyName/.test(name)
+  ) {
     return /Call|Macro/.test(parent) ? "call" : "name";
   }
   // A keyword's node is named after itself: `for`, `fn`, `return`.
@@ -1066,7 +1084,7 @@ export function toneOf(state: EditorState, pos: number, ch: string): Tone {
  */
 export function loopClosedBy(
   state: EditorState,
-  lang: Land,
+  lang: Lang,
   from: number,
   text: string,
 ): { from: number; to: number } | null {
@@ -1196,7 +1214,7 @@ export function narrowEdit(
 export class Editor {
   readonly dom = document.createElement("div");
   private view: EditorView;
-  private lang: Land;
+  private lang: Lang;
   /**
    * Where the effects go. Set by the screen that owns the editor; nothing is
    * measured while it is null, so an editor nobody is decorating pays
@@ -1215,7 +1233,7 @@ export class Editor {
   /** Whether the editor had focus when it was locked, to hand back after. */
   private refocus = false;
 
-  constructor(lang: Land, doc: string, onChange?: () => void) {
+  constructor(lang: Lang, doc: string, onChange?: () => void) {
     this.dom.className = "cwb-editor";
     this.lang = lang;
     this.view = new EditorView({
@@ -1365,7 +1383,7 @@ export class Editor {
     });
   }
 
-  private stateFor(lang: Land, doc: string, onChange?: () => void): EditorState {
+  private stateFor(lang: Lang, doc: string, onChange?: () => void): EditorState {
     return EditorState.create({
       doc,
       extensions: [
@@ -1425,7 +1443,7 @@ export class Editor {
   }
 
   /** Swap language and document together: a new quest is a new state. */
-  load(lang: Land, doc: string): void {
+  load(lang: Lang, doc: string): void {
     this.lang = lang;
     this.lastPair = null;
     // A new document: the caret's first place in it is not a move from the

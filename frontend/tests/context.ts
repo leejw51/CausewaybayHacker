@@ -15,12 +15,12 @@ import { cpp } from "@codemirror/lang-cpp";
 import { python } from "@codemirror/lang-python";
 import { javascript } from "@codemirror/lang-javascript";
 import type { CodeContext } from "../src/ai/help";
-import type { Land } from "../src/net/protocol";
+import type { Lang } from "../src/net/protocol";
 
 /** The caret in a fixture. Not a character any of the grammars uses. */
 const MARK = "‸";
 
-const MODE: Record<Land, () => Extension> = {
+const MODE: Record<Lang, () => Extension> = {
   rust,
   go,
   cpp,
@@ -30,7 +30,7 @@ const MODE: Record<Land, () => Extension> = {
 };
 
 /** The context the editor would build, from a fixture with the caret at `‸`. */
-export function contextOf(lang: Land, marked: string): CodeContext {
+export function contextOf(lang: Lang, marked: string): CodeContext {
   const pos = marked.indexOf(MARK);
   expect(pos, `no caret in ${marked}`).toBeGreaterThanOrEqual(0);
   const doc = marked.replace(MARK, "");

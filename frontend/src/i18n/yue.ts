@@ -147,10 +147,12 @@ export const yue: Partial<Catalogue> = {
   "lands.pytorchBlurb": "張量、梯度、attention。乜都係 shape，地庫嗰嚿嘢都係咁砌出嚟。",
   "lands.typescriptBlurb":
     "interface、generic、收窄型別。未行之前個個值都有型，compiler 已經睇晒。",
+  "lands.remixBlurb": "Go、Rust、Python：同一個程式寫三次。一個概念，三種語法，並排記入手指。",
   "lands.verybasicBlurb": "小測驗。邊一行先係啱嘅文法？四選一，然後打返出嚟。",
   "lands.basicBlurb":
     "朝早行街。一次一個文法，先解釋，再填一至四行 — 即場寫程式嘅畫面當你已經熟到手嘅嗰啲文法。",
-  "lands.advancedBlurb": "即場寫程式測試，唔計時。一條題目，成個程式，睇得到嘅例子同埋隱藏嘅例子 — 真正用到啲文法，然後係同時發生嘅午市高峰。",
+  "lands.advancedBlurb":
+    "即場寫程式測試，唔計時。一條題目，成個程式，睇得到嘅例子同埋隱藏嘅例子 — 真正用到啲文法，然後係同時發生嘅午市高峰。",
   "lands.hackerBlurb": "面試。一間房、一個鐘，冇人幫你寫完你嗰行。",
   "lands.category": "{land} — 分類",
   "lands.clearedOf": "{total} 條入面通關咗 {cleared} 條",
@@ -184,6 +186,7 @@ export const yue: Partial<Catalogue> = {
   "map.python": "PYTHON",
   "map.pytorch": "PYTORCH",
   "map.typescript": "TYPESCRIPT",
+  "map.remix": "REMIX",
   "map.none": "呢條街仲乜都冇",
   "map.failed": "讀唔到張地圖",
   "map.stars": "星",
@@ -514,6 +517,7 @@ export const yue: Partial<Catalogue> = {
   "search.python": "PYTHON",
   "search.pytorch": "PYTORCH",
   "search.typescript": "TYPESCRIPT",
+  "search.remix": "REMIX",
   "search.unified": "合併",
   "search.text": "字面",
   "search.meaning": "意思",
@@ -601,6 +605,7 @@ export const yue: Partial<Catalogue> = {
   "ai.python": "PYTHON",
   "ai.pytorch": "PYTORCH",
   "ai.typescript": "TYPESCRIPT",
+  "ai.remix": "REMIX",
   "ai.newPlan": "新計劃",
   "ai.drillSize": "練 {n} 條",
   "ai.coach": "教練",

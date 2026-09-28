@@ -90,6 +90,9 @@ const SKY: Record<Land, { top: number; bottom: number; glow: number }> = {
   // TypeScript is the ICC tower at dusk: a clear cold blue going to steel,
   // and every window lit the same TypeScript blue.
   typescript: { top: 0x0e2a5c, bottom: 0x0a1428, glow: 0x3178c6 },
+  // REMIX LAND is tea time on Sugar Street: a pale afternoon sky going to
+  // the caramel of the café front, and a milk-tea glow.
+  remix: { top: 0x4a86c0, bottom: 0x5c3c18, glow: 0xd8a870 },
 };
 
 /**

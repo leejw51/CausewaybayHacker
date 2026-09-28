@@ -194,6 +194,11 @@ pub struct Quiz {
 pub struct Quest {
     pub id: String,
     pub land: String,
+    /// §5.3 — the language the quest is judged in. The land's name in every
+    /// land but REMIX, where one trio of nodes is Go, Rust and Python; absent
+    /// from a server older than the field, and then the land is the language.
+    #[serde(default)]
+    pub lang: Option<String>,
     pub category: String,
     pub node: i64,
     pub title: String,
@@ -228,23 +233,25 @@ pub struct Quest {
 }
 
 impl Quest {
-    /// The `lang` a submit must carry. §4.9: it *must match the quest's land*,
-    /// and a disagreement is `bad_request` — so it is derived from the quest,
+    /// The `lang` a submit must carry. §4.9: it *must match the quest's
+    /// language* — its own `lang` in REMIX LAND, its land everywhere else —
+    /// and a disagreement is `bad_request`, so it is derived from the quest,
     /// never from a file extension or a flag.
     pub fn lang(&self) -> &str {
-        &self.land
+        self.lang.as_deref().unwrap_or(&self.land)
     }
 
-    /// The scratch file's extension, per land.
+    /// The scratch file's extension, per language.
     ///
     /// Two lands are not named after their extension: `python`, and `pytorch`
     /// — which *is* Python, writes a `main.py` on the server
     /// (`core::attempts::source_filename`) and must write a `.py` here too.
     /// It fell through to the `rs` arm, so every PyTorch quest arrived in the
     /// terminal client as a Rust file: opened as Rust by the editor,
-    /// highlighted as Rust, and handed to `rustfmt` by `cwbh fmt`.
+    /// highlighted as Rust, and handed to `rustfmt` by `cwbh fmt`. REMIX is
+    /// not a language at all, so the match is on `lang()`, never the land.
     pub fn file_extension(&self) -> &str {
-        match self.land.as_str() {
+        match self.lang() {
             "go" => "go",
             "cpp" => "cpp",
             "python" | "pytorch" => "py",
@@ -627,5 +634,22 @@ mod tests {
         assert_eq!(ext("python"), "py");
         assert_eq!(ext("pytorch"), "py");
         assert_eq!(ext("typescript"), "ts");
+    }
+
+    /// REMIX LAND's quests say their own language (PROTOCOL §5.3), and the
+    /// extension, the submit's `lang` and the formatter all follow it — a
+    /// Go quest on that land is a `.go` file, not a `.remix` one.
+    #[test]
+    fn a_remix_quest_is_in_its_own_language() {
+        let quest: Quest = serde_json::from_value(serde_json::json!({
+            "id": "remix.basic.01.numbers-go", "land": "remix", "lang": "go", "category": "basic",
+            "node": 1, "title": "INTEGER AND FLOAT — GO", "difficulty": 1,
+            "time_limit_s": null, "opened_at": null, "deadline_at": null,
+            "starter": "package main", "state": "open", "stars": 0,
+            "tests": { "match": "trim", "timeout_ms": 5000, "visible": [], "hidden_count": 0 }
+        }))
+        .unwrap();
+        assert_eq!(quest.lang(), "go");
+        assert_eq!(quest.file_extension(), "go");
     }
 }

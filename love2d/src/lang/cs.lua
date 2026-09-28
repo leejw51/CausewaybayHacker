@@ -146,6 +146,7 @@ return {
   ["dicts, generators, the GIL"] = "slovníky, generátory, GIL",
   ["tensors, gradients, attention"] = "tenzory, gradienty, attention",
   ["interfaces, generics, narrowing"] = "rozhraní, generika, zužování typů",
+  ["go, rust, python: one program, three times"] = "go, rust, python: jeden program, třikrát",
   -- UNREVIEWED: "fused" ranking — no settled term
   ["both rankings, fused"] = "obě pořadí sloučená",
   ["the words you typed"] = "slova, která jsi napsal",

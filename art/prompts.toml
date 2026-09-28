@@ -1440,3 +1440,53 @@ rerolls = 2
 note = "The first wording (night-time diorama, TypeScript-blue) was rejected by xAI content moderation twice, with no image; rewritten in the landscape plate form it passed. The first accepted roll had wide empty lawns and was rolled again."
 prompt = """\
 16-bit SNES overworld world map in the exact style of the Super Mario World world map screen, TALL PORTRAIT composition: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no logos, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges, with buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere. Causeway Bay Hong Kong in the evening after a rain shower, shrunk to a miniature. The ground is warm mid-grey wet paving and dark green grass verges with amber and white street-light reflections in the puddles, clearly lit, never black and never empty. The screens are the light: bright electric blue and cyan LED billboards on the rooftops showing abstract pixel block patterns, glowing blue arrival boards at tram stops, a dark-green double-decker tram on a curving track, shopping-mall facades lined with blue LED strips, shops with warm yellow windows, parks of round green trees, rooftop water tanks. The TOP-LEFT is quiet and dim: a small tram stop with one blue board. The town grows brighter going down the map, and the BOTTOM-RIGHT is the brightest place: a big plaza under one huge blue-white giant screen on a tall tower. A wide winding PALE CREAM paved walkway snakes the full height of the map from the top left down to the bottom right in smooth S-bends, bright against the darker ground and unbroken."""
+
+[[asset]]
+name = "sprite_remix"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The character is a small friendly cartoon creature that is a Hong Kong café mug of yuenyeung, coffee and tea in one cup: a squat cream-white ceramic mug for a body with a thin caramel-brown band round the rim and a little round handle on one side, filled to the brim with a drink that is two colours swirled together, dark coffee brown and warm milk-tea orange, meeting in a marbled swirl on top, two big round white pixel eyes and a small happy smile on the front of the mug, two short stubby dark-brown legs, standing on a small round white saucer. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no logo. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "mascot_remix_basic"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the character). A small friendly cartoon creature that is a Hong Kong café mug of yuenyeung: a squat cream-white ceramic mug body with a thin caramel-brown band round the rim and a little handle, a swirled dark-coffee-brown and milk-tea-orange drink filling it to the brim, two big round white pixel eyes and a curious little smile on the front, two short stubby dark-brown legs, sitting on a round jade-green café stool and holding up three small completely blank cream cards fanned out in one stubby arm. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no logo. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "emblem_remix_basic"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). The inside of a bright Hong Kong tea café in the afternoon, the scene filling the whole width of the banner: a long counter with a row of round jade-green stools, glass cabinets of egg tarts and pineapple buns, a wall of small square cream tiles, a slow ceiling fan, warm afternoon sunlight through the front window, and in the middle one round table with three chairs where three small cartoon animals sit together with a cup of milk tea in front of each: a bright orange crab, a light-blue gopher and a coiled blue-and-yellow snake. Warm cream, caramel, jade-green and orange colours. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers, no symbols on any menu, sign or board; every board is plain. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "map_remix_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen, TALL PORTRAIT composition: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no logos, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges. The TOP-LEFT CORNER, the TOP-RIGHT CORNER, the BOTTOM-LEFT CORNER and the BOTTOM-RIGHT CORNER each contain buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere — every part of the picture has roofs, kerbs, trees, streets or stalls in it. Causeway Bay Hong Kong at three in the afternoon, tea time, shrunk to a miniature, in warm honey and caramel light: cream and butter-yellow paving, tan streets, terracotta and caramel-brown roofs, jade-green shop awnings, round green trees, Super Mario World candy colours. Packed densely across every part of the map: a green double-decker tram on a curving track, rows of small cafés with jade-green shopfronts and round stools on the pavement, a bakery with a striped cream awning, tenement blocks in coral and cream with bamboo scaffolding, a small park, rooftop water tanks, a market lane of stalls. The TOP-LEFT holds a small corner café with one round table outside; the streets get busier across the map, and the BOTTOM-RIGHT is one big bright café on a corner with a wide open serving hatch and a long row of round stools. A wide winding PALE CREAM paved walkway snakes the full height of the map from the top left down to the bottom right in smooth S-bends, bright against the ground and unbroken."""
+
+[[asset]]
+name = "map_remix"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no logos, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges. The TOP-LEFT CORNER, the TOP-RIGHT CORNER, the BOTTOM-LEFT CORNER and the BOTTOM-RIGHT CORNER each contain buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere — every part of the picture has roofs, kerbs, trees, streets or stalls in it. Causeway Bay Hong Kong at three in the afternoon, tea time, shrunk to a miniature, in warm honey and caramel light: cream and butter-yellow paving, tan streets, terracotta and caramel-brown roofs, jade-green shop awnings, round green trees, Super Mario World candy colours. Packed densely across every part of the map: a green double-decker tram on a curving track, rows of small cafés with jade-green shopfronts and round stools on the pavement, a bakery with a striped cream awning, tenement blocks in coral and cream with bamboo scaffolding, a small park, rooftop water tanks, a market lane of stalls. The TOP-LEFT holds a small corner café with one round table outside; the streets get busier across the map, and the BOTTOM-RIGHT is one big bright café on a corner with a wide open serving hatch and a long row of round stools. A wide winding PALE CREAM paved walkway snakes back and forth across the whole map from the top left corner to the bottom right corner in smooth S-bends, bright against the ground and unbroken."""

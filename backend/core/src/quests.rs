@@ -27,6 +27,11 @@ pub struct Quest {
     pub id: String,
     pub pack: String,
     pub land: String,
+    /// The language this quest is judged in (SPEC §12): the runner it goes
+    /// to, the file it is saved as, the grammar an editor colours it with.
+    /// The land's name everywhere but REMIX LAND, where one trio of nodes
+    /// is the same program in `go`, `rust` and `python`.
+    pub lang: String,
     pub category: String,
     pub node: i64,
     pub title: String,
@@ -85,6 +90,10 @@ impl Quest {
         let mut value = serde_json::json!({
             "id": self.id,
             "land": self.land,
+            // PROTOCOL §5.3: what a submit's `lang` must match, and what the
+            // editor opens the file as. Only REMIX LAND has it differ from
+            // `land`; a client keys the screen on `land` and the code on this.
+            "lang": self.lang,
             "category": self.category,
             "node": self.node,
             "title": self.title,
@@ -209,7 +218,7 @@ impl Quest {
 
 const COLUMNS: &str = "id, pack, land, category, node, title, brief, story, difficulty,
                        time_limit_s, starter, solution, hints, concepts, tests, checksum,
-                       map_x, map_y, map_kind, quiz";
+                       map_x, map_y, map_kind, quiz, lang";
 
 fn row_to_quest(row: &rusqlite::Row<'_>) -> rusqlite::Result<Quest> {
     let hints: String = row.get(12)?;
@@ -240,6 +249,7 @@ fn row_to_quest(row: &rusqlite::Row<'_>) -> rusqlite::Result<Quest> {
         quiz: row
             .get::<_, Option<String>>(19)?
             .and_then(|s| serde_json::from_str(&s).ok()),
+        lang: row.get(20)?,
         text_locale: "en".into(),
     })
 }

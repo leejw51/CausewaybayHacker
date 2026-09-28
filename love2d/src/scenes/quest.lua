@@ -142,6 +142,11 @@ function Quest.backdrop(land, category)
     -- the front end is served from for ADVANCED.
     return Assets.pick(advanced and "bg_datacentre" or "bg_street", "bg_street", "bg_flat")
   end
+  if land == "remix" then
+    -- REMIX LAND is the café on Sugar Street: the till, with its counter and
+    -- its price board, is the nearest plate to a cha chaan teng.
+    return Assets.pick("bg_till", "bg_street", "bg_flat")
+  end
   return Assets.pick(advanced and "bg_times" or "bg_street", "bg_street", "bg_flat")
 end
 
@@ -347,7 +352,7 @@ end
 function Quest:agent_host()
   local scene = self
   return {
-    lang = function() return (scene.quest and scene.quest.land) or scene.app.land or "rust" end,
+    lang = function() return Land.lang_of(scene.quest, scene.app.land) end,
     -- What the person was asked to do, the cases they can see, and what the
     -- last RUN said. Without it the coder on a graded screen can read the
     -- file and nothing else, which makes the one question anybody has here —
@@ -475,8 +480,9 @@ function Quest:execute(mode)
 
   self.app.session:request(mode, {
     quest_id = self.quest.id,
-    -- §4.9: `lang` must match the quest's land.
-    lang = self.quest.land,
+    -- §4.9: `lang` must match the quest's language — its own `lang` in
+    -- REMIX LAND, its land everywhere else.
+    lang = Land.lang_of(self.quest, self.app.land),
     source = self.editor:text(),
   }, function(ok, payload, why)
     self.running_mode = nil
@@ -556,7 +562,7 @@ function Quest:format()
   SFX.play("move")
 
   self.app.session:request("code.format", {
-    lang = self.quest.land,
+    lang = Land.lang_of(self.quest, self.app.land),
     source = self.editor:text(),
   }, function(ok, payload, why)
     self.formatting = false
@@ -614,7 +620,7 @@ end
 function Quest:copy_ask()
   local q = self.quest
   if not q then return end
-  local lang = q.land or self.app.land or "rust"
+  local lang = Land.lang_of(q, self.app.land)
   local file = "main." .. (lang == "cpp" and "cpp" or lang == "go" and "go"
     or lang == "python" and "py" or lang == "pytorch" and "py"
     or lang == "typescript" and "ts" or "rs")
@@ -1337,8 +1343,8 @@ function Quest:fill_blanks()
       for _, b in ipairs(self.blanks or {}) do
         if #src >= b.from and #src < b.to then stop = b.to; break end
       end
-      local land = (self.quest and self.quest.land) or self.app.land or "rust"
-      grown = Quest.answer_pattern(src, self.answer_text, land, stop)
+      local lang = Land.lang_of(self.quest, self.app.land)
+      grown = Quest.answer_pattern(src, self.answer_text, lang, stop)
         or Quest.answer_word(src, self.answer_text)
       add = grown
     end
@@ -1831,7 +1837,7 @@ end
 
 --- The honest fallback: hand the buffer to `$EDITOR` and read it back.
 function Quest:external_edit()
-  local text, err = External.edit(self.editor:text(), self.quest and self.quest.land or "rust")
+  local text, err = External.edit(self.editor:text(), Land.lang_of(self.quest, self.app.land))
   if not text then
     self.app:toast(err or I18n.t("could not open $EDITOR"))
     return
@@ -1874,7 +1880,7 @@ function Quest:update(dt)
     self.coder:update(dt)
   end
   -- The land's loop keywords, for the effect a closed loop gets.
-  self.editor.lang = self.quest and self.quest.land or self.app.land
+  self.editor.lang = Land.lang_of(self.quest, self.app.land)
   self:answer_tick()
   self:tick_clock()
   if self.running_mode then

@@ -41,6 +41,7 @@ local BLURB = {
   python = "dicts, generators, the GIL",
   pytorch = "tensors, gradients, attention",
   typescript = "interfaces, generics, narrowing",
+  remix = "go, rust, python: one program, three times",
 }
 
 function Lands.new(app)

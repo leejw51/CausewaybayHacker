@@ -38,6 +38,10 @@ T.land = {
   -- TypeScript blue #3178C6: lighter and colder than C++'s navy #00599C,
   -- with red and green both well up where C++ has almost none.
   typescript = { 49 / 255, 120 / 255, 198 / 255, 1 },
+  -- REMIX LAND is the yuenyeung café at tea time: milk tea with the coffee
+  -- in it, a caramel warmer and greyer than Rust's orange and darker than
+  -- Python's gold.
+  remix = { 216 / 255, 168 / 255, 112 / 255, 1 },
 }
 -- The haze is the tint at map strength: a deep blue over the typhoon
 -- shelter at noon, a warm amber over the wet market at dawn, and a torch
@@ -50,6 +54,7 @@ T.haze = {
   python = { 255 / 255, 212 / 255, 59 / 255, 0.12 },
   pytorch = { 232 / 255, 72 / 255, 32 / 255, 0.18 },
   typescript = { 49 / 255, 120 / 255, 198 / 255, 0.16 },
+  remix = { 216 / 255, 168 / 255, 112 / 255, 0.14 },
 }
 
 -- The editor's colours, keyed by `src/editor.lua`'s span kinds. Chosen out of

@@ -11,10 +11,10 @@
  * part worth testing: a comment that opens a fence it never closes, or that
  * lets a line through unprefixed, is a file that does not compile.
  */
-import type { Land } from "../net/protocol";
+import type { Lang } from "../net/protocol";
 
 /** How each land spells "the rest of this line is not code". */
-export const LINE_COMMENT: Record<Land, string> = {
+export const LINE_COMMENT: Record<Lang, string> = {
   rust: "//",
   go: "//",
   cpp: "//",
@@ -63,7 +63,7 @@ function wrapWords(text: string, cols: number): string[] {
  * A reply with nothing in it is no lines at all, not an empty comment: the
  * caller inserts what it gets back, and `// ` on its own is litter.
  */
-export function commentLines(text: string, lang: Land, cols = COLS): string[] {
+export function commentLines(text: string, lang: Lang, cols = COLS): string[] {
   const mark = LINE_COMMENT[lang] ?? "//";
   const body = text.replace(/\r/g, "").trim();
   if (!body) return [];

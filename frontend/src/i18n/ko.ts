@@ -141,6 +141,8 @@ export const ko: Partial<Catalogue> = {
     "텐서, 그래디언트, 어텐션. 모든 것이 shape이고, 지하실의 그것도 그것으로 만들어졌다.",
   "lands.typescriptBlurb":
     "인터페이스, 제네릭, 타입 좁히기. 실행되기 전에 모든 값에 타입이 있고, 컴파일러는 이미 전부 읽었다.",
+  "lands.remixBlurb":
+    "Go, Rust, Python: 같은 프로그램을 세 번. 하나의 개념, 세 가지 문법을 손가락에 나란히.",
   "lands.verybasicBlurb": "퀴즈. 어느 줄이 맞는 문법인가? 넷 중 하나를 고르고, 그 줄을 친다.",
   "lands.basicBlurb":
     "아침 산책. 문법 하나씩 설명을 읽고 한 줄에서 네 줄만 채운다 — 라이브 코딩 화면이 손에 익었다고 가정하는 그 문법.",
@@ -179,6 +181,7 @@ export const ko: Partial<Catalogue> = {
   "map.python": "PYTHON",
   "map.pytorch": "PYTORCH",
   "map.typescript": "TYPESCRIPT",
+  "map.remix": "REMIX",
   "map.none": "아직 이 거리에는 아무것도 없습니다",
   "map.failed": "지도를 읽지 못했습니다",
   "map.stars": "별",
@@ -518,6 +521,7 @@ export const ko: Partial<Catalogue> = {
   "search.python": "PYTHON",
   "search.pytorch": "PYTORCH",
   "search.typescript": "TYPESCRIPT",
+  "search.remix": "REMIX",
   "search.unified": "통합",
   "search.text": "단어",
   "search.meaning": "의미",
@@ -608,6 +612,7 @@ export const ko: Partial<Catalogue> = {
   "ai.python": "PYTHON",
   "ai.pytorch": "PYTORCH",
   "ai.typescript": "TYPESCRIPT",
+  "ai.remix": "REMIX",
   "ai.newPlan": "새 계획",
   "ai.drillSize": "{n}개 훈련",
   "ai.coach": "코치",

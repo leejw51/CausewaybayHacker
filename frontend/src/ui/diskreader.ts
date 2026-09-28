@@ -27,7 +27,7 @@
  * feeds the rest a PNG it builds and a payload it forges.
  */
 import jsQR from "jsqr";
-import { isLand, type Land } from "../net/protocol";
+import { isLang, type Lang } from "../net/protocol";
 import { recoverSigner } from "../wallet/wallet";
 import {
   fromBase64,
@@ -43,7 +43,7 @@ export type Verdict = "verified" | "forged" | "unsigned" | "hashed";
 
 export interface Disk {
   source: string;
-  lang: Land;
+  lang: Lang;
   /** The EIP-55 address the picture names as the author. */
   address: string;
   signature: string | null;
@@ -78,7 +78,7 @@ export function fromChunks(bytes: Uint8Array): Disk | null {
   const t = readPngText(bytes);
   if (typeof t.Source !== "string" || typeof t.Signer !== "string") return null;
   const signature = typeof t.Signature === "string" ? t.Signature : null;
-  const lang = isLand(t.Lang) ? t.Lang : "rust";
+  const lang = isLang(t.Lang) ? t.Lang : "rust";
   return {
     source: t.Source,
     lang,
@@ -95,7 +95,7 @@ export function fromChunks(bytes: Uint8Array): Disk | null {
 export interface Label {
   address: string;
   signature: string | null;
-  lang: Land;
+  lang: Lang;
   body: string;
   kind: "source" | "deflate" | "hash";
 }
@@ -104,7 +104,7 @@ export interface Label {
 export function parseLabel(text: string): Label | null {
   const p = parseQrPayload(text);
   if (!p) return null;
-  const lang = isLand(p.lang) ? p.lang : "rust";
+  const lang = isLang(p.lang) ? p.lang : "rust";
   const kind = p.body.startsWith(QR_HASH)
     ? "hash"
     : p.body.startsWith(QR_DEFLATE)

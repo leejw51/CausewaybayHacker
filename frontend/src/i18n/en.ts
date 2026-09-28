@@ -155,6 +155,8 @@ export const en = {
     "Tensors, gradients, attention. Everything is a shape, and the thing in the basement is made of them.",
   "lands.typescriptBlurb":
     "Interfaces, generics, narrowing. Every value has a type before it runs, and the compiler has read all of it.",
+  "lands.remixBlurb":
+    "Go, Rust, Python: the same program three times. One idea, three grammars, side by side in the fingers.",
   "lands.verybasicBlurb": "The quiz. Which line is the grammar? Pick one of four, then type it.",
   "lands.basicBlurb":
     "The morning walk. One construct at a time, explained, and one to four lines to type — the grammar a live coding screen assumes you have in your fingers.",
@@ -194,6 +196,7 @@ export const en = {
   "map.python": "PYTHON",
   "map.pytorch": "PYTORCH",
   "map.typescript": "TYPESCRIPT",
+  "map.remix": "REMIX",
   "map.none": "no streets here yet",
   "map.failed": "could not read the map",
   "map.stars": "STARS",
@@ -540,6 +543,7 @@ export const en = {
   "search.python": "PYTHON",
   "search.pytorch": "PYTORCH",
   "search.typescript": "TYPESCRIPT",
+  "search.remix": "REMIX",
   "search.unified": "UNIFIED",
   "search.text": "TEXT",
   "search.meaning": "MEANING",
@@ -634,6 +638,7 @@ export const en = {
   "ai.python": "PYTHON",
   "ai.pytorch": "PYTORCH",
   "ai.typescript": "TYPESCRIPT",
+  "ai.remix": "REMIX",
   "ai.newPlan": "NEW PLAN",
   "ai.drillSize": "DRILL {n}",
   "ai.coach": "THE COACH",

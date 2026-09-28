@@ -85,6 +85,18 @@
       "h": 1152
     },
     {
+      "name": "map_remix",
+      "file": "map_remix.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "map_remix_p",
+      "file": "map_remix_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
       "name": "bg_street",
       "file": "bg_street.jpg",
       "w": 1152,
@@ -243,6 +255,21 @@
         "minx": 7,
         "miny": 18,
         "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "sprite_remix",
+      "file": "sprite_remix.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 9,
+        "miny": 7,
+        "maxx": 117,
         "maxy": 120
       }
     },
@@ -1113,6 +1140,21 @@
       }
     },
     {
+      "name": "emblem_remix_basic",
+      "file": "emblem_remix_basic.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 94,
+        "miny": 7,
+        "maxx": 289,
+        "maxy": 120
+      }
+    },
+    {
       "name": "mascot_rust_basic",
       "file": "mascot_rust_basic.png",
       "w": 128,
@@ -1379,6 +1421,21 @@
         "minx": 19,
         "miny": 7,
         "maxx": 108,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_remix_basic",
+      "file": "mascot_remix_basic.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 96.0,
+        "minx": 7,
+        "miny": 25,
+        "maxx": 120,
         "maxy": 120
       }
     },

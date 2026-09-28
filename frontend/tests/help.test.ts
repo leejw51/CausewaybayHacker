@@ -13,9 +13,9 @@
 import { describe, expect, it } from "vitest";
 import { catalogue, helpAt, inProse } from "../src/ai/help";
 import { contextOf } from "./context";
-import type { Land } from "../src/net/protocol";
+import type { Lang } from "../src/net/protocol";
 
-const at = (lang: Land, marked: string) => helpAt(lang, contextOf(lang, marked));
+const at = (lang: Lang, marked: string) => helpAt(lang, contextOf(lang, marked));
 
 describe("helpAt names the construct the caret is in", () => {
   it("finds a Rust match arm, and the match around it", () => {
@@ -158,7 +158,7 @@ describe("helpAt keeps quiet where it should", () => {
   });
 
   it("says nothing on an empty document", () => {
-    for (const lang of ["rust", "go", "cpp", "python", "typescript"] as Land[]) {
+    for (const lang of ["rust", "go", "cpp", "python", "typescript"] as Lang[]) {
       expect(at(lang, "‸")).toBeNull();
     }
   });

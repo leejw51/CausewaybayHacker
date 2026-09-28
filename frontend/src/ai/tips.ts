@@ -15,9 +15,9 @@
  * on purpose for now: the catalogue is the agent's own voice, and translating
  * seventy lines of Rust folklore is a job for a translator, not a build.
  */
-import type { Land } from "../net/protocol";
+import type { Lang } from "../net/protocol";
 
-export const TIPS: Record<Land, readonly string[]> = {
+export const TIPS: Record<Lang, readonly string[]> = {
   rust: [
     "`?` is a return in disguise: it hands the error up and gets on with it.",
     "Borrow (`&T`) when you only need to look; take ownership when you need to keep.",
@@ -91,7 +91,7 @@ export const TIPS: Record<Land, readonly string[]> = {
     "`torch.manual_seed` fixes one global stream; pass a `torch.Generator` when you want a reproducible one.",
     "The scale in attention is the square root of the *head* dimension, not the model dimension.",
   ],
-  // TypeScript Land runs `tsc` in strict mode against a `node.d.ts` of a few
+  // TypeScript Lang runs `tsc` in strict mode against a `node.d.ts` of a few
   // dozen lines, not @types/node: what is not declared there is TS2304
   // before a line runs. The tips are about that compiler and that file.
   typescript: [
@@ -111,7 +111,7 @@ export const TIPS: Record<Land, readonly string[]> = {
 };
 
 /** The next tip after `last`, never the same one twice running. */
-export function nextTip(lang: Land, last: number, roll: number = Math.random()): number {
+export function nextTip(lang: Lang, last: number, roll: number = Math.random()): number {
   const n = TIPS[lang].length;
   if (n <= 1) return 0;
   let i = Math.floor(roll * (n - 1));
@@ -159,7 +159,7 @@ function insideLoop(source: string, needle: RegExp): boolean {
  * every rule here is cheap, obvious when it fires, and about a habit rather
  * than a compile error (the compiler already says those better).
  */
-export function advise(lang: Land, source: string): Advice[] {
+export function advise(lang: Lang, source: string): Advice[] {
   const out: Advice[] = [];
   const say = (id: string, text: string) => out.push({ id, text });
   switch (lang) {

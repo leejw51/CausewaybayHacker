@@ -93,32 +93,36 @@ fn the_shipped_korean_sample_imports_and_reaches_the_wire() {
     assert!(t.skipped.is_empty(), "{:?}", t.skipped);
 
     let conn = store.conn();
-    let text = quests::get_text(&conn, "rust.basic.01.first-light", Some("ko"))
+    let text = quests::get_text(&conn, "rust.basic.01.the-move", Some("ko"))
         .unwrap()
         .expect("a Korean row for the first quest");
-    assert_eq!(text.title, "첫 불빛");
+    assert_eq!(text.title, "주인은 하나");
     assert_eq!(text.hints.len(), 2);
 
     // The wire: Korean prose, English code, and the object says which it is.
-    let quest = quests::get(&conn, "rust.basic.02.bindings")
+    let quest = quests::get(&conn, "rust.basic.02.borrow")
         .unwrap()
         .localized(&conn, Some("ko"))
         .unwrap();
     let wire = quest.to_wire(progress::State::Open, 0, 0, None, None);
     assert_eq!(wire["text_locale"], "ko");
-    assert_eq!(wire["title"], "요금표");
+    assert_eq!(wire["title"], "보기만 한다");
     assert!(
-        wire["brief"].as_str().unwrap().contains("output: 12"),
+        wire["brief"].as_str().unwrap().contains("output: 9"),
         "the sample I/O is verbatim"
     );
     assert!(
         wire["starter"].as_str().unwrap().contains("fn main()"),
         "code is never translated"
     );
-    assert_eq!(wire["hints_total"], 2);
-    assert_eq!(
-        quest.hints[1],
-        "바로 위 두 줄과 같은 모양입니다. 두 번째 인자의 식만 달라집니다."
+    assert_eq!(wire["hints_total"], quest.hints.len());
+    assert!(
+        quest
+            .hints
+            .iter()
+            .all(|h| h.chars().any(|c| ('\u{AC00}'..='\u{D7A3}').contains(&c))),
+        "every hint on the wire is the Korean one: {:?}",
+        quest.hints
     );
 
     // The map: every node says for itself which language its title is in, and
@@ -128,7 +132,7 @@ fn the_shipped_korean_sample_imports_and_reaches_the_wire() {
     // tracks the rows that exist, so a half-translated map is honest about
     // which half.
     let map = world::map_localized(&conn, ALICE, "rust", "basic", Some("ko")).unwrap();
-    assert_eq!(map.nodes[0].title, "첫 불빛");
+    assert_eq!(map.nodes[0].title, "주인은 하나");
     for node in &map.nodes {
         let translated = quests::get_text(&conn, &node.quest_id, Some("ko"))
             .unwrap()

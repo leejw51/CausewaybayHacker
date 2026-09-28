@@ -22,7 +22,11 @@ Rules:
   rather than a column. TypeScript is the opposite case and gets neither: its
   four packs are ports of Python's, node for node, carrying the same slugs, so
   a `typescript` column would be the `python` column copied out. It added no
-  slug.
+  slug. REMIX LAND added none either: each of its quests is judged in Go,
+  Rust or Python and carries that language's own slugs — the Go node of the
+  interface trio says `interfaces`, the Rust node `traits`, the Python node
+  `duck-typing` — so a `remix` column would be three columns above, one node
+  at a time.
 
 ---
 

@@ -154,6 +154,8 @@ export const cs: Partial<Catalogue> = {
     "Tenzory, gradienty, attention. Všechno je tvar a ta věc ve sklepě je z nich poskládaná.",
   "lands.typescriptBlurb":
     "Rozhraní, generika, zužování typů. Každá hodnota má typ dřív, než se spustí, a kompilátor už to všechno přečetl.",
+  "lands.remixBlurb":
+    "Go, Rust, Python: tentýž program třikrát. Jedna myšlenka, tři gramatiky, vedle sebe v prstech.",
   "lands.verybasicBlurb":
     "Kvíz. Který řádek je správná gramatika? Vyber jeden ze čtyř a pak ho napiš.",
   "lands.basicBlurb":
@@ -193,6 +195,7 @@ export const cs: Partial<Catalogue> = {
   "map.python": "PYTHON",
   "map.pytorch": "PYTORCH",
   "map.typescript": "TYPESCRIPT",
+  "map.remix": "REMIX",
   "map.none": "v této ulici zatím nic není",
   "map.failed": "mapu se nepodařilo načíst",
   "map.stars": "HVĚZDY",
@@ -536,6 +539,7 @@ export const cs: Partial<Catalogue> = {
   "search.python": "PYTHON",
   "search.pytorch": "PYTORCH",
   "search.typescript": "TYPESCRIPT",
+  "search.remix": "REMIX",
   "search.unified": "SPOJENĚ",
   "search.text": "SLOVA",
   "search.meaning": "VÝZNAM",
@@ -628,6 +632,7 @@ export const cs: Partial<Catalogue> = {
   "ai.python": "PYTHON",
   "ai.pytorch": "PYTORCH",
   "ai.typescript": "TYPESCRIPT",
+  "ai.remix": "REMIX",
   "ai.newPlan": "NOVÝ PLÁN",
   "ai.drillSize": "TRÉNINK {n}",
   "ai.coach": "TRENÉR",

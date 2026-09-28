@@ -137,6 +137,7 @@ return {
   ["dicts, generators, the GIL"] = "dicts、generators、仲有 GIL",
   ["tensors, gradients, attention"] = "tensors、gradients、attention",
   ["interfaces, generics, narrowing"] = "interfaces、generics、收窄型別",
+  ["go, rust, python: one program, three times"] = "go、rust、python：同一個程式寫三次",
   -- UNREVIEWED: "fused" ranking — no settled term
   ["both rankings, fused"] = "兩個排名合埋",
   ["the words you typed"] = "你打嘅字",

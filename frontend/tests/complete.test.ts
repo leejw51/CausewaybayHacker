@@ -13,17 +13,17 @@
 import { describe, expect, it } from "vitest";
 import { completeAt, templates } from "../src/ai/complete";
 import { INDENT } from "../src/ui/editor";
-import type { Land } from "../src/net/protocol";
+import type { Lang } from "../src/net/protocol";
 import { contextOf } from "./context";
 
 /** The whole line as it would read once the suggestion is taken. */
-function taken(lang: Land, marked: string): string {
+function taken(lang: Lang, marked: string): string {
   const ctx = contextOf(lang, marked);
   const s = completeAt(lang, ctx);
   return s === null ? "" : ctx.before + s.text;
 }
 
-const idAt = (lang: Land, marked: string) => completeAt(lang, contextOf(lang, marked))?.id ?? null;
+const idAt = (lang: Lang, marked: string) => completeAt(lang, contextOf(lang, marked))?.id ?? null;
 
 describe("completeAt offers the language's own shapes", () => {
   it("finishes a Go range loop from two letters", () => {
@@ -141,11 +141,11 @@ describe("the template table itself", () => {
     // an `in` wants a construct around it, the prefix wants two letters —
     // that a template can sit in the table and never be offered. This is
     // the whole table, typed.
-    const around: Record<string, [Land, string]> = {
+    const around: Record<string, [Lang, string]> = {
       // The `#` is typed already, which is why this one is not a statement.
       "cpp.include": ["cpp", "#inc\u2038\nint main() {}\n"],
     };
-    const body: Record<Land, (line: string) => string> = {
+    const body: Record<Lang, (line: string) => string> = {
       rust: (l) => `fn f() {\n    ${l}\n}\n`,
       go: (l) => `package main\nfunc f() {\n\t${l}\n}\n`,
       cpp: (l) => `int main() {\n  ${l}\n}\n`,
@@ -162,7 +162,7 @@ describe("the template table itself", () => {
   });
 
   it("covers every land with a grammar of its own", () => {
-    for (const lang of ["rust", "go", "cpp", "python", "typescript"] as Land[]) {
+    for (const lang of ["rust", "go", "cpp", "python", "typescript"] as Lang[]) {
       expect(all.filter((t) => t.lang === lang).length).toBeGreaterThan(9);
     }
   });

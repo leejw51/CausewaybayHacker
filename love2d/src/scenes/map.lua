@@ -37,7 +37,6 @@ Map.__index = Map
 -- The lands and the three categories, in SPEC §0's order. TAB walks the
 -- lands in this order and wraps.
 local LANDS = Land.ORDER
-local CATEGORIES = Land.CATEGORIES
 
 --- Where the player was, per map, keyed `land.category`.
 ---
@@ -118,6 +117,14 @@ end
 function Map:switch(land, category)
   land = land or self.land
   category = category or self.category
+  -- A land without this road — TAB from TYPESCRIPT × HACKER to REMIX —
+  -- lands on the last road it does have.
+  local roads = Land.roads(land)
+  local has = false
+  for _, road in ipairs(roads) do
+    if road == category then has = true end
+  end
+  if not has then category = roads[#roads] end
   if land == self.land and category == self.category then return end
   self:cancel_reset()
 
@@ -162,13 +169,14 @@ end
 
 --- Q — the next category of this land, wrapping. One action, not two.
 function Map:cycle_category()
-  for i, category in ipairs(CATEGORIES) do
+  local roads = Land.roads(self.land)
+  for i, category in ipairs(roads) do
     if category == self.category then
-      self:switch(self.land, CATEGORIES[i % #CATEGORIES + 1])
+      self:switch(self.land, roads[i % #roads + 1])
       return
     end
   end
-  self:switch(self.land, CATEGORIES[1])
+  self:switch(self.land, roads[1])
 end
 
 function Map:refresh()
@@ -785,6 +793,7 @@ function Map:draw_header()
   for _, land in ipairs(LANDS) do
     land_w = math.max(land_w, mascot + 8 + UI.textWidth(I18n.t(Land.name(land)), land_size) + 10)
   end
+  local CATEGORIES = Land.roads(self.land)
   local cat_w = 0
   for _, category in ipairs(CATEGORIES) do
     cat_w = math.max(cat_w, UI.textWidth(I18n.t(Land.category_label(category)), cat_size) + 16)

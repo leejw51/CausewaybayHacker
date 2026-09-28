@@ -44,9 +44,8 @@ const BASE = {
   panel: 0.52,
   /** The gap between one panel arriving and the next. */
   stagger: 0.07,
-  /** A map node popping in, and the gap between them. */
+  /** A map node popping in. Every node pops together: there is no gap. */
   node: 0.44,
-  nodeStagger: 0.05,
   /** The map camera easing to a new node. */
   camera: 0.58,
   /** The stamp coming down. Short, because a stamp is an impact. */

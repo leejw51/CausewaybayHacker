@@ -53,9 +53,9 @@ import { Overlay } from "../ui/overlay";
 import { clipMessage, copyText, readText } from "../ui/clip";
 import { LogBuffer } from "../net/logbuf";
 import { WireError } from "../net/client";
-import { isLand, LANDS, playerText } from "../net/protocol";
+import { isLang, LANGS, playerText } from "../net/protocol";
 import { onLocale, t, tEn } from "../i18n";
-import type { Land, PlaygroundRun, RunStage, SnippetBrief, Snippet } from "../net/protocol";
+import type { Lang, PlaygroundRun, RunStage, SnippetBrief, Snippet } from "../net/protocol";
 import { LandsScene } from "./lands";
 import {
   isUnlocked,
@@ -106,15 +106,15 @@ const LEGACY_LOCAL_KEY = "cwbhacker.playground";
 /** How long after the last keystroke the autosave fires. */
 const AUTOSAVE_AFTER = 2.5;
 
-const STARTER: Record<Land, string> = {
+const STARTER: Record<Lang, string> = {
   rust: 'fn main() {\n    println!("hello, causewaybay");\n}\n',
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hello, causewaybay")\n}\n',
   cpp: '#include <iostream>\n\nint main() {\n    std::cout << "hello, causewaybay\\n";\n}\n',
   python: 'print("hello, causewaybay")\n',
-  // The scratchpad opens on the import, because a PyTorch Land scratchpad
-  // without it is four keystrokes from being a Python Land scratchpad.
+  // The scratchpad opens on the import, because a PyTorch Lang scratchpad
+  // without it is four keystrokes from being a Python Lang scratchpad.
   pytorch: 'import torch\n\nprint("hello, causewaybay", torch.tensor([1, 2, 3]).tolist())\n',
-  // Standard input the one way every TypeScript Land quest reads it: the
+  // Standard input the one way every TypeScript Lang quest reads it: the
   // runner has no @types/node, only the few declarations `node.d.ts` gives,
   // and `require("fs").readFileSync(0, "utf8")` is the idiom it declares.
   typescript:
@@ -160,8 +160,8 @@ export function resyncSteps(heldId: string | null): Array<"list" | "pad" | "room
  * — a chime, a burst and "updated on another device" for nothing.
  */
 export function snippetDiffers(
-  snippet: { source: string; lang: Land; name: string; stdin?: string },
-  saved: { source: string; lang: Land; name: string; stdin: string },
+  snippet: { source: string; lang: Lang; name: string; stdin?: string },
+  saved: { source: string; lang: Lang; name: string; stdin: string },
 ): boolean {
   return (
     snippet.source !== saved.source ||
@@ -179,7 +179,7 @@ export function snippetDiffers(
 type Held = {
   id: string | null;
   name: string;
-  lang: Land;
+  lang: Lang;
   source: string;
   /** What the program reads. Part of the pad, not of the session. */
   stdin: string;
@@ -201,7 +201,7 @@ export class PlaygroundScene implements Scene {
   readonly name = "playground";
   readonly mood = "lands" as const;
   /** Read by `App` to tint the city: the language you are writing in. */
-  land: Land = "rust";
+  land: Lang = "rust";
 
   private editor: Editor | null = null;
   private overlay: Overlay | null = null;
@@ -247,7 +247,7 @@ export class PlaygroundScene implements Scene {
    */
   private padSerial = 0;
   private savedSource = "";
-  private savedLang: Land = "rust";
+  private savedLang: Lang = "rust";
   /**
    * The name the server last confirmed.
    *
@@ -1020,7 +1020,7 @@ export class PlaygroundScene implements Scene {
       this.held = {
         id: typeof v.id === "string" ? v.id : null,
         name: typeof v.name === "string" ? v.name : SCRATCH,
-        lang: isLand(v.lang) ? v.lang : "rust",
+        lang: isLang(v.lang) ? v.lang : "rust",
         source: v.source,
         stdin: typeof v.stdin === "string" ? v.stdin : "",
         dirty: v.dirty === true,
@@ -1324,7 +1324,7 @@ export class PlaygroundScene implements Scene {
     this.app.chip.select();
   }
 
-  private setLang(lang: Land): void {
+  private setLang(lang: Lang): void {
     if (lang === this.held.lang) return;
     const source = this.editor?.source ?? this.held.source;
     // Only the untouched starter is swapped. Somebody who has written Go and
@@ -1512,7 +1512,7 @@ export class PlaygroundScene implements Scene {
     else if (hit.id === "new") this.fresh();
     else if (hit.id === "delete") void this.remove();
     else if (hit.id === "back") void this.app.go(new LandsScene(this.app), "back");
-    else if (isLand(hit.id)) this.setLang(hit.id);
+    else if (isLang(hit.id)) this.setLang(hit.id);
     else if (hit.id.startsWith("snip:")) void this.load(hit.id.slice(5));
   }
 
@@ -2170,7 +2170,7 @@ export class PlaygroundScene implements Scene {
     // width, like SUBMIT on the quest screen: they are a *state*, not an
     // action, and the chosen one is painted lit so the screen says which file
     // you are in twice over. One box per land, each as wide as its own label.
-    const langBoxes = LANDS.map((land) => {
+    const langBoxes = LANGS.map((land) => {
       const label = t(`pg.${land}` as "pg.rust");
       const [bw, bh] = btnBox(fonts.button, [label], 0, fonts.button.size * 2, layout.minTouchH());
       return { land, label, bw, bh };

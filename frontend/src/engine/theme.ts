@@ -58,6 +58,11 @@ export const TRACK_COL: Record<string, RGBA> = {
   // deep navy with no red in it at all, this is the brighter, lighter blue
   // with red and green both well up — side by side they read as two lands.
   typescript: c(48, 120, 200),
+  // REMIX LAND is the yuenyeung café at tea time: milk tea with the coffee
+  // in it, a caramel on the same grid. Warmer and greyer than Rust's
+  // orange and darker than Python's gold, so the three warm lands read as
+  // three.
+  remix: c(216, 168, 112),
 };
 
 export const TRACK_HAZE: Record<string, RGBA> = {
@@ -72,6 +77,9 @@ export const TRACK_HAZE: Record<string, RGBA> = {
   // TYPESCRIPT LAND is the office tower at dusk: cold glass, lit floors.
   // Lighter and greyer than C++'s deep blue, so the two maps do not match.
   typescript: [0.08, 0.18, 0.34, 0.22],
+  // REMIX LAND is Sugar Street at three in the afternoon: honey light, a
+  // haze the colour of the tea.
+  remix: [0.34, 0.24, 0.1, 0.2],
 };
 
 /** A colour a canvas will take, with an optional alpha override. */

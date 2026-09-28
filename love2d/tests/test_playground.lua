@@ -91,11 +91,15 @@ return function()
     -- The desk is where a player checks the toolchain is there before a
     -- quest asks anything of it, so the starter for each language is the
     -- smallest program that compiles and prints — and there is one for
-    -- every land the map can show, in the order the map shows them.
+    -- every language the map can show, in the order the map shows them.
+    -- Every language, not every land: REMIX is a land and not a language,
+    -- and a scratchpad in it would have no toolchain to run on.
     local Playground = require("src.scenes.playground")
     local Land = require("src.land")
-    T.same(Playground.LANGS, Land.ORDER, "TAB walks the lands' order")
-    for _, lang in ipairs(Land.ORDER) do
+    T.same(Playground.LANGS, Land.LANGS, "TAB walks the languages' order")
+    T.same(Land.LANGS, { "rust", "go", "cpp", "python", "pytorch", "typescript" })
+    T.eq(Playground.STARTER.remix, nil, "remix is not a language a scratchpad can be in")
+    for _, lang in ipairs(Land.LANGS) do
       local starter = Playground.STARTER[lang]
       T.ok(type(starter) == "string" and #starter > 0, lang .. " has a starter")
       T.ok(starter:find("hello", 1, true) ~= nil, lang .. "'s starter says hello")

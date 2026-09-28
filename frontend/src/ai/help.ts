@@ -27,7 +27,7 @@
  * English, on purpose, for the reason `tips.ts` gives: the catalogue is the
  * agent's own voice, and translating it is a job for a translator.
  */
-import type { Land } from "../net/protocol";
+import type { Lang } from "../net/protocol";
 
 /** What the editor knows about the caret, with no CodeMirror in the type. */
 export interface CodeContext {
@@ -369,12 +369,12 @@ const NODES_BY_LAND = {
 };
 
 /**
- * PyTorch Land is parsed by the same `@lezer/python` grammar, so a `for` is a
+ * PyTorch Lang is parsed by the same `@lezer/python` grammar, so a `for` is a
  * `ForStatement` in both and the construct help is the same sentence. The
- * *words* differ, and those are the catalogue below. TypeScript Land is its
+ * *words* differ, and those are the catalogue below. TypeScript Lang is its
  * own grammar and has its own entry above.
  */
-const NODES: Record<Land, Record<string, string>> = {
+const NODES: Record<Lang, Record<string, string>> = {
   ...NODES_BY_LAND,
   pytorch: NODES_BY_LAND.python,
 };
@@ -385,7 +385,7 @@ const NODES: Record<Land, Record<string, string>> = {
  * Checked before the construct, because "you are on `unwrap`" is more use
  * than "you are in a let declaration" — the caret picked the word out.
  */
-const WORDS: Record<Land, Record<string, string>> = {
+const WORDS: Record<Lang, Record<string, string>> = {
   rust: {
     unwrap:
       '`unwrap()` is a crash with no message. `?` hands the error up, `unwrap_or(d)` picks a value, `expect("why")` at least says what broke.',
@@ -640,7 +640,7 @@ export function inProse(path: readonly string[]): boolean {
   return false;
 }
 
-export function helpAt(lang: Land, ctx: CodeContext): Help | null {
+export function helpAt(lang: Lang, ctx: CodeContext): Help | null {
   if (inProse(ctx.path)) return null;
   const word = WORDS[lang][ctx.word];
   if (word) return { id: `${lang}.w.${ctx.word}`, text: word };
@@ -656,7 +656,7 @@ export function helpAt(lang: Land, ctx: CodeContext): Help | null {
 /** Every id the catalogue can produce, for the test that keeps them short. */
 export function catalogue(): Help[] {
   const out: Help[] = [];
-  for (const lang of Object.keys(NODES) as Land[]) {
+  for (const lang of Object.keys(NODES) as Lang[]) {
     for (const [k, text] of Object.entries(WORDS[lang])) out.push({ id: `${lang}.w.${k}`, text });
     for (const [k, text] of Object.entries(NODES[lang])) out.push({ id: `${lang}.n.${k}`, text });
   }

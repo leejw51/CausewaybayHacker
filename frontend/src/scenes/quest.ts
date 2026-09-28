@@ -65,7 +65,17 @@ import { Coder } from "../ui/agent/coder";
 import type { TaskBrief } from "../ai/tools";
 import { WireError } from "../net/client";
 import { playerText } from "../net/protocol";
-import type { Attempt, XpGain, Category, EditState, Land, Quest, RunStage } from "../net/protocol";
+import type {
+  Attempt,
+  XpGain,
+  Category,
+  EditState,
+  Land,
+  Lang,
+  Quest,
+  RunStage,
+} from "../net/protocol";
+import { questLang } from "../net/protocol";
 import { LogBuffer } from "../net/logbuf";
 import { blocks } from "../ui/markdown";
 import { quizPick, startsLocked, visibleBox } from "../ui/quiz";
@@ -101,7 +111,7 @@ const STACKS = ["auto", "row", "column"] as const;
  * The fence a Markdown reader wants for each land. `cpp` and `py` are the
  * tags every renderer knows; the file's own extension is not always one.
  */
-const FENCE_LANG: Record<Land, string> = {
+const FENCE_LANG: Record<Lang, string> = {
   rust: "rust",
   go: "go",
   cpp: "cpp",
@@ -551,6 +561,16 @@ export class QuestScene implements Scene {
    */
   private coder: Coder | null = null;
 
+  /**
+   * The language of the code on this screen (§5.3): the editor's grammar,
+   * the file name, the formatter, the tips and what a submit says it is in.
+   * The land's name until the quest arrives, and then the quest's own
+   * `lang` — which only differs in REMIX LAND, where the land is a place
+   * and the quest says whether it is Go, Rust or Python. The backdrop, the
+   * colour and the way back to the map stay keyed on `land`.
+   */
+  private lang: Lang;
+
   constructor(
     private readonly app: App,
     readonly land: Land,
@@ -563,7 +583,9 @@ export class QuestScene implements Scene {
      * theirs. Undefined means a first visit, and then the starter is right.
      */
     private readonly draft?: string,
-  ) {}
+  ) {
+    this.lang = questLang({ land });
+  }
 
   /**
    * Set by `leave`. `enter` awaits the server in the middle of building the
@@ -612,6 +634,7 @@ export class QuestScene implements Scene {
       });
       if (this.gone) return;
       this.quest = res.quest;
+      this.lang = questLang(res.quest);
       // §4.8. The editor opens on the player's own most recent run or submit,
       // fetched from the server with the quest itself — no local storage, no
       // save button, nothing new sent. A player who typed for ten minutes and
@@ -621,7 +644,7 @@ export class QuestScene implements Scene {
       // The source is read on submit and there is nothing to save locally —
       // but a change is the one moment the edit stack cares about, so it
       // starts the idle timer that eventually takes a copy.
-      this.editor = new Editor(this.land, this.opened, () => this.touched());
+      this.editor = new Editor(this.lang, this.opened, () => this.touched());
       this.editor.onMiss = (text) => this.missed(text);
       // The quiz comes first on VERY BASIC: the editor opens locked and the
       // right choice is the key. A cleared quest is past its quiz.
@@ -633,7 +656,7 @@ export class QuestScene implements Scene {
       this.fx.attach(this.editor);
       this.coder?.leave();
       this.coder = new Coder(this.app, {
-        lang: () => this.land,
+        lang: () => this.lang,
         // §4.8's quest, as the agent needs it: what the person was asked to
         // do, the cases they can see, and what the last RUN said. Without it
         // the agent on this screen can read the file and nothing else, which
@@ -650,7 +673,7 @@ export class QuestScene implements Scene {
         format: async () => {
           if (!this.editor) return { changed: false, problem: "no editor" };
           const res = await this.app.client.request("code.format", {
-            lang: this.land,
+            lang: this.lang,
             source: this.editor.source,
           });
           if (res.problem) return { changed: false, problem: res.problem };
@@ -746,7 +769,8 @@ export class QuestScene implements Scene {
       const res = await this.app.client.request(kind, {
         quest_id: this.quest.id,
         source: sent,
-        lang: this.land,
+        // §4.9: the quest's language, which in REMIX LAND is not the land.
+        lang: this.lang,
       });
       this.stage = "idle";
       this.log.end();
@@ -898,7 +922,7 @@ export class QuestScene implements Scene {
     this.formatting = true;
     try {
       const res = await this.app.client.request("code.format", {
-        lang: this.land,
+        lang: this.lang,
         source: this.editor.source,
       });
       if (res.problem) {
@@ -1248,7 +1272,7 @@ export class QuestScene implements Scene {
       const src = this.editor.source;
       const hole = target.blanks.find((b) => src.length >= b.from && src.length < b.to);
       const grown =
-        answerPattern(src, target.text, this.land, hole ? hole.to : Infinity) ??
+        answerPattern(src, target.text, this.lang, hole ? hole.to : Infinity) ??
         answerWord(src, target.text);
       const add =
         answerIndent(src, target.text) ??
@@ -1495,10 +1519,10 @@ export class QuestScene implements Scene {
     if (!this.quest || !this.editor) return;
     try {
       const res = await this.app.client.request("quest.reset", { quest_id: this.quest.id });
-      this.editor.load(this.land, res.starter);
+      this.editor.load(this.lang, res.starter);
       this.opened = res.starter;
     } catch {
-      this.editor.load(this.land, this.quest.starter);
+      this.editor.load(this.lang, this.quest.starter);
       this.opened = this.quest.starter;
     }
   }
@@ -1781,8 +1805,8 @@ export class QuestScene implements Scene {
   private askText(): string {
     return askBlock({
       brief: this.quest ? this.briefText() : "",
-      file: MAIN_FILE[this.land],
-      fence: FENCE_LANG[this.land],
+      file: MAIN_FILE[this.lang],
+      fence: FENCE_LANG[this.lang],
       source: this.editor?.source ?? "",
       output: this.consoleText(),
     });
@@ -2410,7 +2434,7 @@ export class QuestScene implements Scene {
         primary: this.stage === "idle",
         strong: false,
       },
-      ...(this.app.client.canFormat(this.land)
+      ...(this.app.client.canFormat(this.lang)
         ? [{ id: "format", label: t("quest.format"), dim: this.formatting }]
         : []),
       // ASK AI, not AGENT. On a graded screen the thing a person wants is to
@@ -2485,7 +2509,7 @@ export class QuestScene implements Scene {
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
-      ...(this.app.client.canFormat(this.land)
+      ...(this.app.client.canFormat(this.lang)
         ? [{ id: "format", label: t("quest.format"), dim: this.formatting }]
         : []),
       { id: "undo", label: t("quest.undo"), dim: !steps.undo },
@@ -2554,11 +2578,13 @@ export class QuestScene implements Scene {
         : this.drill === "solution"
           ? `   ${t("quest.solutionOnly")}`
           : "";
-    const combo = on && this.combo >= 3 && !prog.done ? `   ${t("quest.combo")} x${this.combo}` : "";
-    const best = on && prog.done && this.bestCombo >= 3 ? `   ${t("quest.bestCombo")} x${this.bestCombo}` : "";
+    const combo =
+      on && this.combo >= 3 && !prog.done ? `   ${t("quest.combo")} x${this.combo}` : "";
+    const best =
+      on && prog.done && this.bestCombo >= 3 ? `   ${t("quest.bestCombo")} x${this.bestCombo}` : "";
     const status = on
-      ? `${MAIN_FILE[this.land]}${drill}   ${prog.matched} / ${prog.total}${tail}${combo}${best}`
-      : MAIN_FILE[this.land];
+      ? `${MAIN_FILE[this.lang]}${drill}   ${prog.matched} / ${prog.total}${tail}${combo}${best}`
+      : MAIN_FILE[this.lang];
     g.fillStyle = css(
       !on ? Theme.dim : prog.done ? Theme.admit : prog.wrong > 0 ? Theme.red : Theme.coin,
     );
@@ -2868,7 +2894,7 @@ export class QuestScene implements Scene {
     // The bench's face: the button face, or the smaller chrome face in the
     // compact register, where eight labels a finger tall each took a row.
     const bench = this.compactMode ? fonts.stationSm : fonts.button;
-    const label = MAIN_FILE[this.land];
+    const label = MAIN_FILE[this.lang];
     const inner = titledPanel(g, rect, `${label}   ${this.stageLabel()}`, accent);
 
     const btnH = Math.max(layout.minTouchH(), bench.height + 20);

@@ -16,13 +16,14 @@ return function()
   T.section("lands — the four, and what each resolves to")
 
   T.case("the order is SPEC §0's, and every land has a name", function()
-    T.same(Land.ORDER, { "rust", "go", "cpp", "python", "pytorch", "typescript" })
+    T.same(Land.ORDER, { "rust", "go", "cpp", "python", "pytorch", "typescript", "remix" })
     T.eq(Land.name("rust"), "RUST")
     T.eq(Land.name("go"), "GO")
     T.eq(Land.name("cpp"), "C++", "nobody calls it CPP")
     T.eq(Land.name("python"), "PYTHON")
     T.eq(Land.name("pytorch"), "PYTORCH")
     T.eq(Land.name("typescript"), "TYPESCRIPT")
+    T.eq(Land.name("remix"), "REMIX")
     T.eq(Land.name("zig"), "ZIG", "a land the client has not heard of keeps its id")
     T.eq(Land.name(nil), "?")
   end)
@@ -32,7 +33,8 @@ return function()
     T.eq(Land.rank("python"), 4)
     T.eq(Land.rank("pytorch"), 5)
     T.eq(Land.rank("typescript"), 6)
-    T.eq(Land.rank("zig"), 7)
+    T.eq(Land.rank("remix"), 7)
+    T.eq(Land.rank("zig"), 8)
     local seen = {}
     for _, land in ipairs(Land.ORDER) do
       local phase = Land.phase(land)
@@ -98,18 +100,41 @@ return function()
     T.eq(Land.MASCOT.python, "sprite_python")
     T.eq(Land.MASCOT.pytorch, "sprite_pytorch")
     T.eq(Land.MASCOT.typescript, "sprite_typescript")
+    T.eq(Land.MASCOT.remix, "sprite_remix")
     -- Headless there are no images at all, so `pick` finds nothing — which
     -- is the behaviour on a checkout without `art/`, and must not error.
     T.eq(Land.mascot("cpp"), nil)
     T.eq(Land.mascot("zig"), nil)
   end)
 
-  T.case("each land has a scratch-file extension for $EDITOR", function()
+  T.case("each language has a scratch-file extension for $EDITOR", function()
     T.same(External.EXT,
       { rust = "rs", go = "go", cpp = "cpp", python = "py", pytorch = "py", typescript = "ts" })
     for _, land in ipairs(Land.ORDER) do
-      T.ok(External.EXT[land] ~= nil, land .. " has an extension")
+      -- REMIX is a land and not a language: its quests are judged in Go,
+      -- Rust or Python, and the extension follows the quest's `lang`.
+      if land ~= "remix" then
+        T.ok(External.EXT[land] ~= nil, land .. " has an extension")
+      end
     end
+    T.eq(External.EXT.remix, nil, "remix is not a language")
+  end)
+
+  T.case("every language land has four roads and remix the two grammar roads", function()
+    for _, land in ipairs(Land.LANGS) do
+      T.same(Land.roads(land), { "verybasic", "basic", "advanced", "hacker" }, land)
+    end
+    T.same(Land.roads("remix"), { "verybasic", "basic" })
+    T.same(Land.roads("zig"), Land.CATEGORIES, "an unknown land is offered every road")
+  end)
+
+  T.case("a quest's language is its own lang, else its land, and never remix", function()
+    T.eq(Land.lang_of({ land = "go" }), "go")
+    T.eq(Land.lang_of({ land = "remix", lang = "python" }), "python")
+    T.eq(Land.lang_of({ land = "rust", lang = "rust" }), "rust")
+    T.eq(Land.lang_of({ land = "remix" }, "go"), "go", "a remix quest with no lang falls to the app's")
+    T.eq(Land.lang_of(nil, "cpp"), "cpp")
+    T.eq(Land.lang_of(nil), "rust")
   end)
 
   T.section("lands — the CODE PLAYGROUND tile leads the screen")

@@ -5,12 +5,14 @@
 In Causeway Bay, a Rust coder wakes up and cannot write a `for` loop. The
 vibe-coding was never a convenience — it was Skynet's long game, and it worked.
 Every skill is still in there somewhere. You get them back one street at a time,
-in Rust, in Go, in C++, in Python, in PyTorch and in TypeScript, and then you
-go and fight the thing that took them — which, in PyTorch Land, you build a
-small one of yourself.
+in Rust, in Go, in C++, in Python, in PyTorch and in TypeScript — and, in the
+café on Sugar Street, in three of them at once — and then you go and fight the
+thing that took them — which, in PyTorch Land, you build a small one of
+yourself.
 
-Six lands — **RUST LAND**, **GO LAND**, **C++ LAND**, **PYTHON LAND**,
-**PYTORCH LAND** and **TYPESCRIPT LAND**. Four roads through each:
+Seven lands — **RUST LAND**, **GO LAND**, **C++ LAND**, **PYTHON LAND**,
+**PYTORCH LAND**, **TYPESCRIPT LAND** and **REMIX LAND**. Four roads through
+each language land, and two through REMIX:
 
 | | |
 | --- | --- |
@@ -18,6 +20,21 @@ Six lands — **RUST LAND**, **GO LAND**, **C++ LAND**, **PYTHON LAND**,
 | **BASIC** | grammar activation, not a quiz: each node shows one construct with the exact line to type, in the brief and again as an `ANSWER:` comment at the hole; you type it, it compiles, the idiom is back in the fingers; untimed. In Rust Land this is the language's own grammar, the half a live coding screen assumes — ownership and the move, `&` and `&mut`, `mem::swap`/`take`, slices, `String`/`&str`, chars and bytes, `Option`/`Result`/`?`, `match`, iterator chains, the entry API, comparators, a `Reverse` heap, a derived `Ord`, fast stdin, formatting, overflow, lifetimes on a function and a struct, a trait, a generic bound, `Box<dyn>`, `Rc<RefCell>`, closure kinds, threads, `Arc<Mutex>`, atomics and `RwLock`, a channel, many producers and one consumer, a worker pool at the boss. The other lands' BASIC roads are the plain grammar — integer widths, floats, strings, slices, loops, functions, structs, enums, containers, sorting, closures, a thread, a tree |
 | **ADVANCED** | the live coding test, untimed: a brief, a whole program, visible and hidden cases. Rust Land applies what BASIC drilled — ownership, slices, errors, traits, iterators, generics — and then the lunch rush: threads, channels, mutexes, lifetimes, a pipeline, DEADLOCK. The other lands keep the same shape with their own grammar: interfaces, pointers, goroutines, `select`, async, RAII, generators |
 | **HACKER** | the live interview: timed HackerRank-shaped quests, hidden tests, the same 34 problems in every land — TypeScript's included — except PyTorch Land, whose interview is the machine-learning one: write softmax so it does not overflow, write cross-entropy so it matches the library, write Adam so it matches the library, mask a padded batch, cache the keys and values, build a transformer block that agrees with a reference to 1e-5 |
+
+**REMIX LAND** is the one land that is not a language. It is the same program
+three times: every concept is a *trio* of nodes — Go, then Rust, then Python,
+always in that order — with the same tests, so the three grammars for one idea
+sit side by side in the fingers. Nineteen trios: integers and floats, strings,
+loops, closures, structs, enums and match, errors, the list, the map, a
+comprehension, sorting, a tree, an interface / a trait / a protocol, generics,
+ownership, a lifetime, threads, a mutex, and one producer with many consumers
+at the boss. Where a language has no such construct (a lifetime in Go, a
+comprehension in Rust, ownership in Python) the trio keeps its shape and the
+brief says what stands in. Two roads: VERY BASIC asks each line as a
+question first — and two of the four choices are the *other two languages'*
+line, because writing Python in a Go file is the mistake the land exists to
+cure — and BASIC has you type it. Each quest is judged by its own language's
+toolchain; the land adds no toolchain of its own.
 
 Each road is a Super Mario World overworld. Clear a node, it is stamped
 `CLEARED`, for good.

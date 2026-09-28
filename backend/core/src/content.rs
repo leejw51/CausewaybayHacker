@@ -59,6 +59,34 @@ pub struct QuestDef {
     /// VERY BASIC only: the four choices and the index of the right one.
     #[serde(default)]
     pub quiz: Option<QuizDef>,
+    /// REMIX LAND only: which toolchain judges this quest — `go`, `rust` or
+    /// `python`. The land is a place on the lands screen; the language is
+    /// what the runner, the editor and the mistake classifier key on, and in
+    /// every land but `remix` they are the same word, so the field is
+    /// absent there. See [`quest_lang`].
+    #[serde(default)]
+    pub lang: Option<String>,
+}
+
+/// Every land, in SPEC §0's order. `remix` is the one that is not a language.
+pub const LANDS: &[&str] = &[
+    "rust",
+    "go",
+    "cpp",
+    "python",
+    "pytorch",
+    "typescript",
+    "remix",
+];
+
+/// The languages a REMIX LAND quest may be written in: the same program,
+/// three grammars, one trio of nodes per concept (SPEC §12).
+pub const REMIX_LANGS: &[&str] = &["go", "rust", "python"];
+
+/// The language a quest is judged in. The pack's land, except in `remix`,
+/// where every quest says for itself.
+pub fn quest_lang<'a>(land: &'a str, quest: &'a QuestDef) -> &'a str {
+    quest.lang.as_deref().unwrap_or(land)
 }
 
 /// `[quest.quiz]` — the question is the brief; these are the answers.
@@ -354,10 +382,7 @@ pub const CONCEPT_VOCABULARY: &[&str] = &[
 
 /// SPEC §12's rules, all of them, before a single row is written.
 pub fn validate(pack: &Pack) -> Result<()> {
-    if !matches!(
-        pack.land.as_str(),
-        "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript"
-    ) {
+    if !LANDS.contains(&pack.land.as_str()) {
         return Err(bad_request(format!("unknown land '{}'", pack.land)));
     }
     if !matches!(
@@ -402,6 +427,32 @@ pub fn validate(pack: &Pack) -> Result<()> {
                 "quest '{}' has difficulty {} outside 1..5",
                 quest.id, quest.difficulty
             )));
+        }
+        // REMIX LAND is the one land whose quests are not all in one
+        // language, so each says which — and only there. In a language land
+        // a `lang` that disagrees with the land would send a Go program to
+        // rustc, which is not a quest but a trap.
+        match (pack.land.as_str(), quest.lang.as_deref()) {
+            ("remix", None) => {
+                return Err(bad_request(format!(
+                    "quest '{}' is a remix quest with no lang; say go, rust or python",
+                    quest.id
+                )))
+            }
+            ("remix", Some(lang)) if !REMIX_LANGS.contains(&lang) => {
+                return Err(bad_request(format!(
+                    "quest '{}' has lang '{lang}'; remix quests are go, rust or python",
+                    quest.id
+                )))
+            }
+            (land, Some(lang)) if land != "remix" && lang != land => {
+                return Err(bad_request(format!(
+                    "quest '{}' has lang '{lang}' in the {land} land; only remix quests \
+                     name a language of their own",
+                    quest.id
+                )))
+            }
+            _ => {}
         }
         if !matches!(quest.map.kind.as_str(), "quest" | "boss" | "gate") {
             return Err(bad_request(format!(
@@ -540,7 +591,7 @@ fn tests_json(quest: &QuestDef) -> Result<serde_json::Value> {
 /// pack's quest source". Serialized deterministically so the same content
 /// always produces the same checksum.
 pub fn checksum(quest: &QuestDef) -> Result<String> {
-    let canonical = serde_json::json!({
+    let mut canonical = serde_json::json!({
         "id": quest.id,
         "node": quest.node,
         "title": quest.title,
@@ -557,6 +608,12 @@ pub fn checksum(quest: &QuestDef) -> Result<String> {
         "map": { "x": quest.map.x, "y": quest.map.y, "kind": quest.map.kind },
         "quiz": quest.quiz,
     });
+    // Only when the pack says it: a key that is absent in every language
+    // land keeps every existing checksum exactly what it was, so adding the
+    // field did not report six lands' quests as "updated" on the next boot.
+    if let Some(lang) = &quest.lang {
+        canonical["lang"] = serde_json::Value::String(lang.clone());
+    }
     let mut hasher = Sha256::new();
     hasher.update(serde_json::to_vec(&canonical)?);
     Ok(hex::encode(hasher.finalize()))
@@ -646,13 +703,15 @@ fn reconcile(conn: &Connection, pack: &Pack, ids: &[String]) -> Result<PackCount
         let changed = conn.execute(
             "INSERT INTO quests (id, pack, land, category, node, title, brief, story,
                                  difficulty, time_limit_s, starter, solution, hints,
-                                 concepts, tests, checksum, map_x, map_y, map_kind, quiz)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)
+                                 concepts, tests, checksum, map_x, map_y, map_kind, quiz,
+                                 lang)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,
+                     ?21)
              ON CONFLICT(id) DO UPDATE SET
                pack=?2, land=?3, category=?4, node=?5, title=?6, brief=?7, story=?8,
                difficulty=?9, time_limit_s=?10, starter=?11, solution=?12, hints=?13,
                concepts=?14, tests=?15, checksum=?16, map_x=?17, map_y=?18, map_kind=?19,
-               quiz=?20",
+               quiz=?20, lang=?21",
             params![
                 quest.id,
                 pack.pack,
@@ -674,6 +733,7 @@ fn reconcile(conn: &Connection, pack: &Pack, ids: &[String]) -> Result<PackCount
                 quest.map.y,
                 quest.map.kind,
                 quest.quiz.as_ref().map(serde_json::to_string).transpose()?,
+                quest_lang(&pack.land, quest),
             ],
         );
         match changed {

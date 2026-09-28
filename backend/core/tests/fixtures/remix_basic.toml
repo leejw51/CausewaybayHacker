@@ -1,0 +1,110 @@
+# A throwaway pack for the backend's own tests: REMIX LAND, one trio — the
+# same greeting in Go, Rust and Python, each quest saying its own `lang`
+# (SPEC §12). Shaped like the shipped content and NOT the shipped content.
+pack = "remix.basic"
+land = "remix"
+category = "basic"
+version = 1
+
+[[quest]]
+id          = "remix.basic.01.hello-go"
+node        = 1
+lang        = "go"
+title       = "FIRST LIGHT — GO"
+difficulty  = 1
+story       = "Table one. Gogo orders it in Go."
+concepts    = ["io", "strings"]
+requires    = []
+map         = { x = 0.10, y = 0.20, kind = "quest" }
+brief       = '''
+Print `hello, causewaybay` and nothing else.
+'''
+starter     = '''
+package main
+
+func main() {
+}
+'''
+solution    = '''
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("hello, causewaybay")
+}
+'''
+hints = ["Println lives in fmt."]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+match      = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]
+
+[[quest]]
+id          = "remix.basic.02.hello-rust"
+node        = 2
+lang        = "rust"
+title       = "FIRST LIGHT — RUST"
+difficulty  = 1
+story       = "Table one. Ferris orders it in Rust."
+concepts    = ["io", "strings"]
+requires    = ["remix.basic.01.hello-go"]
+map         = { x = 0.50, y = 0.50, kind = "quest" }
+brief       = '''
+Print `hello, causewaybay` and nothing else.
+'''
+starter     = '''
+fn main() {
+}
+'''
+solution    = '''
+fn main() {
+    println!("hello, causewaybay");
+}
+'''
+hints = ["println! is a macro, so it takes a !."]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+match      = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]
+
+[[quest]]
+id          = "remix.basic.03.hello-python"
+node        = 3
+lang        = "python"
+title       = "FIRST LIGHT — PYTHON"
+difficulty  = 1
+story       = "Table one. The python orders it in Python."
+concepts    = ["io", "strings"]
+requires    = ["remix.basic.02.hello-rust"]
+map         = { x = 0.90, y = 0.80, kind = "boss" }
+brief       = '''
+Print `hello, causewaybay` and nothing else.
+'''
+starter     = '''
+def main():
+    pass
+
+
+main()
+'''
+solution    = '''
+print("hello, causewaybay")
+'''
+hints = ["print is a function in Python 3."]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+match      = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]

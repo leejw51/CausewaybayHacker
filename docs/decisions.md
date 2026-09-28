@@ -7410,3 +7410,107 @@ decision, not a consequence of this one.
 RUST × BASIC's first node and answers it by printing its visible case, so
 the first node of this road must have a constant answer — ONE OWNER does,
 and it is also the node the ANSWER-drill suite types, so it is three lines.
+
+## 2026-09-28 — A seventh land: REMIX, the one that is not a language
+
+REMIX LAND is `rust`, `go`, `cpp`, `python`, `pytorch`, `typescript`,
+**`remix`**: the same program three times. Every concept is a *trio* of
+nodes — Go, then Rust, then Python, always in that order — with the same
+tests, so the three grammars for one idea sit side by side in the fingers,
+and a player who has three languages half-remembered gets them back
+together rather than one land at a time. Nineteen trios on each of two
+roads, 114 quests: integers and floats, strings, loops, closures, structs,
+enums and match, errors, the list, the map, a comprehension, sorting, a
+tree, an interface / a trait / a protocol, generics, ownership, a lifetime,
+threads, a mutex, and a producer with many consumers at the boss. Where a
+language has no such construct the trio keeps its shape and the brief says
+what stands in: Go's comprehension is the loop, Python's lifetime is the
+collector, Go's and Python's ownership is a slice header and a shared
+reference. The setting is the yuenyeung café on Sugar Street (`docs/story.md`
+§3), where the three mascots share one table.
+
+**A land is a place; a language is what compiles.** In six lands they were
+the same word, and the code used one string for both. This land breaks that,
+so the split is made explicit end to end rather than special-cased: a quest
+gains `lang` (SPEC §12, PROTOCOL §5.3), required in `remix` and refused
+everywhere else, written to a new `quests.lang` column by migration 0022 and
+filled from `land` by a trigger for every row that does not say. The server
+judges, files and classifies a submission by `quest.lang` (`submit.rs`, the
+edit stack's extension), never by `quest.land`; `attempts.lang` and
+`snippets.lang` are not widened, because an attempt at a remix quest is an
+attempt in Go, Rust or Python and a scratchpad cannot be in a land. The
+runner, `unsupported`, `mistakes`, `source_filename` and the build
+directories already took a language and needed no change — which is the
+test of the split being in the right place. `interview.start` still lists
+the six: REMIX has no HACKER road.
+
+**0022 also narrows the FTS update trigger to the indexed columns.** The
+fill-in-`lang` trigger updates the row from inside its own INSERT, and
+SQLite fires the two AFTER INSERT triggers in an order it does not promise;
+when the fill ran first, the old any-column `quests_au` issued an FTS
+`delete` for a row the index did not hold yet and the index was corrupt from
+then on ("database disk image is malformed" on the next search — every
+awards test failed that way). `quests_au` is now `AFTER UPDATE OF title,
+brief, concepts, story`, which is the only update the index has anything to
+learn from.
+
+**The clients key the screen on `land` and the code on `lang`.** The web
+client's `Land` type is now `Lang | "remix"`, with `Lang` the six, and every
+grammar-keyed table — the syntax mode, `MAIN_FILE`, the fence, the tips, the
+completions, the help catalogue, the poster's tokeniser, the coder's bench,
+the playground's starters and language chips, a snippet's `lang` — is a
+`Record<Lang, …>`, so the compiler found every place that had been using
+a land as a language. `QuestScene` keeps `land` for the backdrop, the tint
+and the way back to the map, and takes `lang = questLang(quest)` for the
+editor, the formatter and the submit. The LÖVE client does the same through
+`Land.lang_of(quest)`, and its playground walks `Land.LANGS` rather than
+`Land.ORDER`. The CLI's `Quest::lang()` and `file_extension()` read the
+field, so a Go quest on this land is a `.go` file. The smoke mock serves a
+remix trio and judges each by its `lang`, and the contract admits the land.
+
+**Two roads, and the clients mostly coped.** Both lands screens draw the
+roads `world.lands` reports rather than a fixed four, so a land with
+`verybasic` and `basic` only needed no change there. The *map's* switcher
+did not: it offered every land the same four tabs, and on REMIX two of them
+opened a map the server answers `not_found` for. `roadsOf(land)` in the
+protocol module and `Land.roads(land)` in the LÖVE client say which roads a
+land has, the switcher shows those, Q cycles through those, and a TAB into a
+land without the current road lands on the last road it does have.
+ADVANCED and HACKER are deliberately absent: the land's content is basic
+grammar by design, and the interview belongs to the language lands.
+
+**The map's nodes now pop in together.** They arrived one by one, a
+twentieth of a second apart, which was a flourish on a 27-node road and
+three seconds of watching stamps appear on a 57-node one. `nodeStagger` is
+gone from the motion table; every node's tween starts at once.
+
+**The packs are generated from one copy of each program.** VERY BASIC and
+BASIC are the same 57 programs with different holes — one line and four
+choices, or one to four lines with an `ANSWER:` comment — and two packs
+written by hand would drift. `scripts/remix_pack.py` holds each trio once,
+derives both starters, and makes the quiz's wrong choices the *other two
+languages'* line plus one wrong in this language, because writing Python in a
+Go file is the mistake this land exists to cure. `verify_pack.py` grew the
+land's own rule, `remix_trios`: threes, in order, same cases byte for byte,
+same difficulty, same title up to the language — and judges each quest by
+its `lang`. All 114 verify: every solution accepted, every starter refused,
+every wrong choice refused when swapped in, on go 1.27, rustc 1.98 and
+Python 3.14. Writing it found two real gaps: Python's `//` floors where Go
+and Rust truncate (the negative case went), and a Python quiz whose missing
+`with lock:` still passed under the GIL (the quiz starter got a stand-in).
+
+**Go 1.21+ and Python 3.12+ are assumed by two trios** — `cmp.Ordered` and
+`cmp.Or` in the generics and sorting trios, `def largest[T]` in the generics
+one — which CI's Go 1.27 and Python 3.13 satisfy; older toolchains fail
+those six quests at the content gate, not silently.
+
+**The art.** Grok, through `art/tools/gen.sh`, recipes in `art/prompts.toml`:
+a yuenyeung mug for the sprite, the same mug on a jade stool with three
+blank menus for the BASIC mascot, the three regulars at one table for the
+band, and a tea-time overworld in both orientations, all 57 nodes on ground
+by `checknodes.py`. The land's colour is milk tea, `(216, 168, 112)`.
+
+**Also fixed on the way:** `core/tests/quest_text.rs` still named the
+rust.basic ids the 2026-09-28 rewrite retired, and CI's backend job was red
+on it; it now names the current first two quests and asserts the shape of
+the hints rather than one hint's text.

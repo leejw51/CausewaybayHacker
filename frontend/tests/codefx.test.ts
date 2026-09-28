@@ -35,7 +35,7 @@ import {
 import { Theme } from "../src/engine/theme";
 import { trim } from "../src/ui/codefx";
 import { bracketPairAt, loopClosedBy, toneOf } from "../src/ui/editor";
-import type { Land } from "../src/net/protocol";
+import type { Lang } from "../src/net/protocol";
 
 /** A generator that is the same every run, so a plan is a fixed picture. */
 function seeded(seed = 7): () => number {
@@ -298,7 +298,7 @@ const MODE = {
   typescript: () => javascript({ typescript: true }),
 } as const;
 
-function state(lang: Land, doc: string): EditorState {
+function state(lang: Lang, doc: string): EditorState {
   return EditorState.create({ doc, extensions: [MODE[lang]()] });
 }
 
@@ -330,7 +330,7 @@ describe("toneOf: which colour a character is", () => {
 });
 
 /** Type `text` into `doc` at `at`, and ask the editor's rule about it. */
-function closes(lang: Land, doc: string, at: number, text: string) {
+function closes(lang: Lang, doc: string, at: number, text: string) {
   const next = doc.slice(0, at) + text + doc.slice(at);
   return loopClosedBy(state(lang, next), lang, at, text);
 }

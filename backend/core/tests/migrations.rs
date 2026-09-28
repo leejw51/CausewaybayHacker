@@ -633,15 +633,13 @@ fn migration_0020_opens_the_fifth_land() {
 }
 
 #[test]
-fn the_newest_migration_opens_the_sixth_land() {
-    // The "newest migration" pin: fails loudly if a 0022 is added without a
-    // test of its own here. 0021 widens the same three CHECK constraints
-    // 0020 rebuilt, so `typescript` is a land the database will
-    // accept. Everything already in the three tables has to survive the
-    // rebuild, which is the half of this that is worth testing.
-    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
-    assert_eq!(previous, 20);
-    let conn = database_at_version(previous);
+fn migration_0021_opens_the_sixth_land() {
+    // 0021 widens the same three CHECK constraints 0020 rebuilt, so
+    // `typescript` is a land the database will accept. Everything already in
+    // the three tables has to survive the rebuild, which is the half of this
+    // that is worth testing. (The "newest migration" pin moved on to 0022's
+    // test below.)
+    let conn = database_at_version(20);
     conn.execute(
         "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
            VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}')",
@@ -727,6 +725,133 @@ fn the_newest_migration_opens_the_sixth_land() {
         })
         .unwrap();
     assert_eq!(snips, 1, "the rebuild carried the snippets across");
+
+    // The FTS index is rebuilt by the migration, so search still finds the
+    // row whose table was dropped and recreated underneath it.
+    let hits: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quest_fts WHERE quest_fts MATCH 't'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(hits >= 1, "the FTS index came back with the table");
+}
+
+#[test]
+fn the_newest_migration_opens_the_seventh_land_and_gives_every_quest_a_language() {
+    // The "newest migration" pin: fails loudly if a 0023 is added without a
+    // test of its own here. 0022 is the first land that is not a language:
+    // `remix` joins `quests.land`, and `quests.lang` — the toolchain a quest
+    // is judged in — arrives beside it, filled in from `land` for every row
+    // that was already there and for every INSERT that does not say.
+    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
+    assert_eq!(previous, 21);
+    let conn = database_at_version(previous);
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum)
+         VALUES ('go.basic.01.a', 'p', 'go', 'basic', 1, 't', 'b', 's', 1, 's', 's', '{}', 'c')",
+        [],
+    )
+    .unwrap();
+    assert!(
+        conn.execute(
+            "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                                 starter, solution, tests, checksum)
+             VALUES ('remix.basic.01.a', 'p', 'remix', 'basic', 1, 't', 'b', 's', 1, 's', 's', '{}', 'c')",
+            [],
+        )
+        .is_err(),
+        "0021 has no remix in its CHECK"
+    );
+
+    db::prepare(&conn).unwrap();
+
+    // The row that was there is in the language of its land.
+    let lang: String = conn
+        .query_row(
+            "SELECT lang FROM quests WHERE id = 'go.basic.01.a'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(lang, "go", "0022 fills lang from land for existing rows");
+
+    // A remix quest says its language, and the land is now a land.
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum, lang)
+         VALUES ('remix.basic.01.a', 'p', 'remix', 'basic', 1, 't', 'b', 's', 1, 's', 's', '{}', 'c',
+                 'rust')",
+        [],
+    )
+    .expect("quests takes the seventh land with a language");
+
+    // One that does not say is refused: the trigger would write `remix`
+    // into `lang`, and `remix` is not a language the runner has.
+    assert!(
+        conn.execute(
+            "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                                 starter, solution, tests, checksum)
+             VALUES ('remix.basic.02.b', 'p', 'remix', 'basic', 2, 't', 'b', 's', 1, 's', 's', '{}', 'c')",
+            [],
+        )
+        .is_err(),
+        "a remix quest with no lang is refused"
+    );
+    let count: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quests WHERE id = 'remix.basic.02.b'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(count, 0, "the refused row left nothing behind");
+
+    // And a raw INSERT in a language land still needs no `lang`: the
+    // trigger fills it, so the fixtures the older tests write keep working.
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum)
+         VALUES ('python.basic.01.a', 'p', 'python', 'basic', 1, 't', 'b', 's', 1, 's', 's', '{}', 'c')",
+        [],
+    )
+    .unwrap();
+    let lang: String = conn
+        .query_row(
+            "SELECT lang FROM quests WHERE id = 'python.basic.01.a'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(lang, "python");
+
+    // `attempts.lang` and `snippets.lang` were not widened: an attempt at a
+    // remix quest is filed under the language it was judged in.
+    conn.execute(
+        "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
+           VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}')",
+        [],
+    )
+    .unwrap();
+    assert!(
+        conn.execute(
+            "INSERT INTO attempts (id, address, quest_id, lang, source, verdict, created_at)
+               VALUES ('a1', '0xaa', 'remix.basic.01.a', 'remix', 'fn main(){}', 'accepted',
+                       '2026-02-02T00:00:00Z')",
+            [],
+        )
+        .is_err(),
+        "remix is not a language an attempt can be in"
+    );
+    conn.execute(
+        "INSERT INTO attempts (id, address, quest_id, lang, source, verdict, created_at)
+           VALUES ('a1', '0xaa', 'remix.basic.01.a', 'rust', 'fn main(){}', 'accepted',
+                   '2026-02-02T00:00:00Z')",
+        [],
+    )
+    .expect("an attempt at a remix quest is filed under its language");
 
     // The FTS index is rebuilt by the migration, so search still finds the
     // row whose table was dropped and recreated underneath it.

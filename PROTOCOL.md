@@ -518,7 +518,8 @@ The main event.
 ```json
 → payload: {
     "quest_id": "rust.basic.03.shadowing",
-    "lang":     "rust",                   must match the quest's land
+    "lang":     "rust",                   must match the quest's `lang` (§5.3) — its land,
+                                          except in REMIX LAND, where the quest says
     "source":   "fn main() { … }"
   }
 ← payload: { "attempt": Attempt,          §5.4
@@ -1349,7 +1350,14 @@ type MapNode = {
 
 ```ts
 type Quest = {
-  id: string; land: "rust"|"go"|"cpp"|"python"|"pytorch"|"typescript"; category: "verybasic"|"basic"|"advanced"|"hacker";
+  id: string; land: "rust"|"go"|"cpp"|"python"|"pytorch"|"typescript"|"remix"; category: "verybasic"|"basic"|"advanced"|"hacker";
+  /** The language the quest is judged in (SPEC §12): the runner, the file
+   *  name, the editor's grammar and the formatter all key on it, and a
+   *  submit's `lang` must equal it (§4.9). The land's own name everywhere
+   *  but REMIX LAND, where one trio of nodes is Go, Rust and Python. A client
+   *  keys the screen — backdrop, colour, the way back to the map — on `land`,
+   *  and the code on it on `lang`. */
+  lang: "rust"|"go"|"cpp"|"python"|"pytorch"|"typescript";
   node: number; title: string; brief: string; story: string;
   /** §4.8 — the language of title, story, brief and the hints. "en" unless a
    *  translation (SPEC §12.1) was substituted for the `locale` the client

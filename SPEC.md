@@ -26,20 +26,27 @@ nothing else.
 A 16-bit trainer. A rust coder in Causeway Bay lost their craft to vibe coding —
 Skynet's plan all along — and takes it back one street at a time.
 
-* Six **lands**: `rust`, `go`, `cpp`, `python`, `pytorch`, `typescript`. The
-  player picks one; the others are still there. `pytorch` is Python with
-  `torch`: the same interpreter, the same `main.py`, the same stdio harness and
-  the same `py:` mistake codes — what differs is what a program may import, and
-  that is the content's business rather than the runner's. `typescript` is the
-  opposite case: a sixth toolchain in its own right, not an alias — `tsc`
-  checks the program and erases the types, and `node` runs what is left.
+* Seven **lands**: `rust`, `go`, `cpp`, `python`, `pytorch`, `typescript`,
+  `remix`. The player picks one; the others are still there. `pytorch` is
+  Python with `torch`: the same interpreter, the same `main.py`, the same
+  stdio harness and the same `py:` mistake codes — what differs is what a
+  program may import, and that is the content's business rather than the
+  runner's. `typescript` is the opposite case: a sixth toolchain in its own
+  right, not an alias — `tsc` checks the program and erases the types, and
+  `node` runs what is left. `remix` is the one land that is **not a
+  language**: the same program three times, one trio of nodes per concept
+  in Go, Rust and Python, and every quest of it carries a `lang` of its own
+  (§12) naming which of the three judges it. A land is a place on the lands
+  screen; a language is what compiles. In six lands they are the same word.
 * Four **categories** per land: `verybasic` (the quiz: four lines, one right,
   pick it then type it), `basic` (grammar activation: a construct
   shown, one to four lines to type — in Rust Land the language's own
   grammar: ownership, borrows, lifetimes, threads, channels), `advanced`
   (the live coding test, untimed: whole programs on that grammar —
   ownership, errors, traits, iterators — then threads, mutexes, lifetimes,
-  channels), `hacker` (HackerRank-style timed quests).
+  channels), `hacker` (HackerRank-style timed quests). A land may have fewer
+  than four: the clients draw the roads `world.lands` reports, and REMIX
+  LAND has the two grammar roads only, `verybasic` and `basic`.
 * Each category is a **map** — a Super Mario World overworld of numbered nodes
   joined by paths. Clear a node and it is stamped `CLEARED`, for good.
 * A node holds one **quest**. A quest is code the player writes, that the server
@@ -527,9 +534,10 @@ the blob where the queries are makes the database the wrong shape. So
 ~/.causewaybayhacker/edits/<address>/<quest_id>/<sha256>.<ext>
 ```
 
-`<ext>` is the land's source extension — `rs`, `go`, `cpp`, `py` (twice: the
-PyTorch land's source is a `main.py` like the Python land's), `ts`, the same
-`source_filename(lang)` that names the file in an attempt directory (§1), so
+`<ext>` is the quest's language's source extension — `rs`, `go`, `cpp`, `py`
+(twice: the PyTorch land's source is a `main.py` like the Python land's),
+`ts`; the land's, except in `remix`, where it is the quest's own `lang` — the
+same `source_filename(lang)` that names the file in an attempt directory (§1), so
 one of these opens in an editor and compiles by hand like anything else the
 player wrote. `<address>` is the lowercase form (§3.4), as it is under
 `users/`.
@@ -653,7 +661,8 @@ payload that carries an address is ignored, not trusted.
 
 `<land>.<category>.<node:02d>.<slug>` — `rust.basic.03.shadowing`,
 `go.hacker.07.two-sum`, `cpp.basic.01.hello`, `python.advanced.17.the-gil`,
-`pytorch.hacker.34.teaching-cluster`, `typescript.basic.01.first-screen`.
+`pytorch.hacker.34.teaching-cluster`, `typescript.basic.01.first-screen`,
+`remix.basic.02.numbers-rust`.
 Stable forever; the slug is part of it so a reordered
 map does not renumber someone's cleared list into nonsense. If a node moves,
 the `node` column changes and the id does not.
@@ -1348,6 +1357,21 @@ by the owner.
 One TOML file per land + category, in `content/<land>/<category>.toml`. The
 server imports them at startup (and on `cwbhacker import`), upserting by
 `quests.id` and recomputing `checksum`.
+
+A quest in `remix` carries one more key, `lang = "go" | "rust" | "python"`:
+the language it is judged in, saved as, coloured as and formatted with. It is
+required there and refused in every other land, where the land *is* the
+language and a `lang` that disagreed would send a Go program to `rustc`. The
+importer writes it to `quests.lang`; for every other land that column is the
+land's name, filled in by the database itself. REMIX's own rule, checked by
+`verify_pack.py` (`remix_trios`): nodes come in threes — `go`, `rust`,
+`python`, in that order — and the three of a trio have the same test cases
+byte for byte, the same difficulty and the same title up to the language,
+because "the same program in three languages" is the whole promise of the
+land, and a trio whose Python asks a different question is three quests, not
+a remix. `content/remix/*.toml` is written by `scripts/remix_pack.py` from one
+copy of each program, so the quiz road and the drill road cannot drift apart;
+edit the trio there, not the TOML.
 
 ```toml
 pack = "rust.basic"

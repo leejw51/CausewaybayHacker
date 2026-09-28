@@ -42,6 +42,7 @@ const NPC: Record<Land, string> = {
   python: "sprite_python",
   pytorch: "sprite_pytorch",
   typescript: "sprite_typescript",
+  remix: "sprite_remix",
 };
 const BLURB: Record<Land, () => string> = {
   rust: () => t("lands.rustBlurb"),
@@ -50,6 +51,7 @@ const BLURB: Record<Land, () => string> = {
   python: () => t("lands.pythonBlurb"),
   pytorch: () => t("lands.pytorchBlurb"),
   typescript: () => t("lands.typescriptBlurb"),
+  remix: () => t("lands.remixBlurb"),
 };
 
 /**
@@ -781,10 +783,7 @@ export class LandsScene implements Scene {
       // One note when the cursor arrives on a row or a plate, and none while
       // it sits there: a blip per mouse-move event is a rattle, not feedback.
       if (this.catBtns.hovered && this.catBtns.hovered !== was) this.app.chip.blip();
-      else if (
-        this.landBtns.hovered?.startsWith("land:") &&
-        this.landBtns.hovered !== wasLand
-      ) {
+      else if (this.landBtns.hovered?.startsWith("land:") && this.landBtns.hovered !== wasLand) {
         this.app.chip.blip();
       }
       return;

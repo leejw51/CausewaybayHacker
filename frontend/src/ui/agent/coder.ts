@@ -14,7 +14,7 @@
  * that one is throttled hard.
  */
 import type { App } from "../../app";
-import type { Land } from "../../net/protocol";
+import type { Lang } from "../../net/protocol";
 import type { ChatMessage } from "../../net/protocol";
 import { WireError } from "../../net/client";
 import { ensureFonts, printf, wrap, width } from "../../engine/text";
@@ -55,7 +55,7 @@ import { emptyRoom, fold, type Room, roomMove, type PadRef } from "./sync";
 
 /** What the screen lends the agent. */
 export interface Host {
-  lang(): Land;
+  lang(): Lang;
   /** The pad the room belongs to; null on a screen with no room (a quest). */
   roomId(): string | null;
   /**

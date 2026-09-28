@@ -144,11 +144,14 @@ pub fn run(
         let row = progress::get(&conn, address, &quest_id)?;
         (quest, row.cleared, row.opened_at)
     };
-    let lang = opt_str_field(payload, "lang").unwrap_or_else(|| quest.land.clone());
-    if lang != quest.land {
+    // The quest's language, not its land: in REMIX LAND the two differ, and
+    // the language is the one the runner, the build directory and the
+    // mistake classifier all key on (PROTOCOL §4.9).
+    let lang = opt_str_field(payload, "lang").unwrap_or_else(|| quest.lang.clone());
+    if lang != quest.lang {
         return Err(bad_request(format!(
             "quest '{quest_id}' is a {} quest, not {lang}",
-            quest.land
+            quest.lang
         )));
     }
     let full_spec = TestSpec::parse(&quest.tests)?;

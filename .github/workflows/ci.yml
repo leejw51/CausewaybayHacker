@@ -512,6 +512,7 @@ jobs:
           content/python/basic.toml content/python/advanced.toml content/python/hacker.toml
           content/pytorch/verybasic.toml content/pytorch/basic.toml
           content/pytorch/advanced.toml content/pytorch/hacker.toml
+          content/remix/verybasic.toml content/remix/basic.toml
 
       # A printed zero must be an exact zero. `pytorch.advanced.17.layernorm`
       # prints the mean of a normalised row: zero by construction, `1.49e-08`
@@ -540,7 +541,7 @@ jobs:
       - run: >
           python3 tests/content/verify_pack.py --i18n
           content/rust/*.toml content/go/*.toml content/cpp/*.toml content/python/*.toml
-          content/pytorch/*.toml
+          content/pytorch/*.toml content/remix/*.toml
 
   # A dry run of the server tarball, on every push and pull request. It is the
   # whole release path minus signing: the frontend and both binaries are

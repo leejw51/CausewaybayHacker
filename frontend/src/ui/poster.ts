@@ -57,7 +57,7 @@ import { typescriptLanguage } from "@codemirror/lang-javascript";
 import type { LRLanguage } from "@codemirror/language";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import qrcode from "qrcode-generator";
-import type { Land } from "../net/protocol";
+import type { Lang } from "../net/protocol";
 import type { Assets } from "../engine/assets";
 import { fontAt, type Font } from "../engine/text";
 import { css, Theme, type RGBA } from "../engine/theme";
@@ -127,7 +127,7 @@ export interface PosterWords {
 }
 
 export interface PosterInput {
-  lang: Land;
+  lang: Lang;
   /**
    * `source`, deflated (`packSource`), for the label when the plain text is
    * too dense; null when the browser cannot deflate. `makePoster` fills it,
@@ -384,7 +384,7 @@ export function fitDisc(
 
 // -- tokenising (pure) ---------------------------------------------------------
 
-const PARSER: Record<Land, LRLanguage> = {
+const PARSER: Record<Lang, LRLanguage> = {
   rust: rustLanguage,
   go: goLanguage,
   cpp: cppLanguage,
@@ -399,7 +399,7 @@ const PARSER: Record<Land, LRLanguage> = {
  * punctuation and plain otherwise — `toneOf`'s tie-break, applied to a whole
  * program at once.
  */
-export function tones(source: string, lang: Land): Tone[] {
+export function tones(source: string, lang: Lang): Tone[] {
   const out: Tone[] = new Array<Tone>(source.length);
   for (let i = 0; i < source.length; i++) {
     const ch = source[i];
@@ -482,7 +482,7 @@ export const QR_MAGIC = "CWBH1";
 export function qrPayload(
   address: string,
   signature: string | null,
-  lang: Land,
+  lang: Lang,
   source: string,
   packed: Uint8Array | null = null,
 ): { text: string; hashed: boolean } {
@@ -720,7 +720,7 @@ export function posterFileName(name: string, at: Date): string {
  * compile is BASIC's, back at the grammar; anything else — a runtime error,
  * a timeout, nothing run yet — is ADVANCED's, still working on it.
  */
-export function mascotFor(lang: Land, run: PosterRun | null): string {
+export function mascotFor(lang: Lang, run: PosterRun | null): string {
   const road =
     run === null ? "advanced" : run.ok ? "hacker" : run.compileError ? "basic" : "advanced";
   return `mascot_${lang}_${road}`;

@@ -60,7 +60,17 @@ SCRATCH = pathlib.Path(
 )
 CACHE = pathlib.Path(os.environ.get("CWBHACKER_CI_CACHE", _root / "cache"))
 
-ID_RE = re.compile(r"^(rust|go|cpp|python|pytorch|typescript)\.(verybasic|basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
+ID_RE = re.compile(r"^(rust|go|cpp|python|pytorch|typescript|remix)\.(verybasic|basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
+
+# REMIX LAND (SPEC §12): the same program three times, one trio of nodes per
+# concept, always in this order. `lang` on the quest says which toolchain
+# judges it; the land says only where on the lands screen it sits.
+REMIX_LANGS = ("go", "rust", "python")
+
+
+def quest_lang(pack, q):
+    """The toolchain a quest is judged in: its own `lang` in remix, the land elsewhere."""
+    return q.get("lang", pack["land"])
 
 MISTAKE_MAP_HEADING = "## 2. Mistake kind → concepts"
 
@@ -458,6 +468,18 @@ def structural(pack, path, vocab):
                     errs.append(f"{qid}: duplicate choices")
         elif "quiz" in q:
             errs.append(f"{qid}: only verybasic quests carry a quiz")
+        # `lang` is REMIX LAND's field: required there, one of its three, and
+        # refused everywhere else, where a `lang` that disagreed with the land
+        # would send a Go program to rustc.
+        if land == "remix":
+            if q.get("lang") not in REMIX_LANGS:
+                errs.append(f"{qid}: a remix quest needs lang = go | rust | python, "
+                            f"got {q.get('lang')!r}")
+        elif "lang" in q and q["lang"] != land:
+            errs.append(f"{qid}: lang {q['lang']!r} in the {land} land; only remix "
+                        f"quests name a language of their own")
+    if land == "remix":
+        errs += remix_trios(quests)
     # map layout: not a straight line, no two nodes on top of each other
     for i in range(len(pts)):
         for j in range(i + 1, len(pts)):
@@ -479,6 +501,37 @@ def structural(pack, path, vocab):
     if turns < len(pts) // 2:
         errs.append(f"map: only {turns} direction changes over {len(pts)} nodes — too straight")
     return errs, turns
+
+
+def remix_trios(quests):
+    """REMIX LAND's own rule: nodes come in threes, go then rust then python,
+    and the three of a trio are the same program — the same cases, byte for
+    byte, the same difficulty, the same title after the language. "Same
+    logic in three languages" is the whole promise of the land, and a trio
+    whose Python asks a different question is three quests, not a remix."""
+    errs = []
+    if len(quests) % 3:
+        errs.append(f"remix: {len(quests)} nodes is not a whole number of trios")
+    by_node = sorted(quests, key=lambda q: q["node"])
+    for i in range(0, len(by_node) - len(by_node) % 3, 3):
+        trio = by_node[i:i + 3]
+        langs = tuple(q.get("lang") for q in trio)
+        if langs != REMIX_LANGS:
+            errs.append(f"remix: nodes {trio[0]['node']}-{trio[-1]['node']} are "
+                        f"{langs}, want {REMIX_LANGS}")
+        first = trio[0]
+        for q in trio[1:]:
+            if q["tests"]["cases"] != first["tests"]["cases"]:
+                errs.append(f"{q['id']}: its cases differ from {first['id']}'s — "
+                            f"a trio is one program")
+            if q["tests"].get("match", "trim") != first["tests"].get("match", "trim"):
+                errs.append(f"{q['id']}: its match mode differs from {first['id']}'s")
+            if q["difficulty"] != first["difficulty"]:
+                errs.append(f"{q['id']}: its difficulty differs from {first['id']}'s")
+            if q["title"].rsplit(" — ", 1)[0] != first["title"].rsplit(" — ", 1)[0]:
+                errs.append(f"{q['id']}: its title {q['title']!r} is not "
+                            f"{first['title']!r}'s with the language swapped")
+    return errs
 
 
 # ---------------------------------------------------------------- i18n
@@ -690,8 +743,9 @@ def main(argv):
         for q in pack["quest"]:
             wd_s = SCRATCH / f"{q['id']}.sol"
             wd_t = SCRATCH / f"{q['id']}.start"
-            sv, sp, st, sn = judge(land, q["solution"], q, wd_s)
-            tv, tp, tt, tn = judge(land, q["starter"], q, wd_t)
+            lang = quest_lang(pack, q)
+            sv, sp, st, sn = judge(lang, q["solution"], q, wd_s)
+            tv, tp, tt, tn = judge(lang, q["starter"], q, wd_t)
             vis = sum(1 for c in q["tests"]["cases"] if c.get("visible"))
             sol_ok = sv == "accepted" and sp == st
             start_ok = not (tv == "accepted" and tp == tt)
@@ -712,7 +766,7 @@ def main(argv):
                             swapped.append(indent + wrong.strip())
                         else:
                             swapped.append(line)
-                    wv, wp, wt, _ = judge(land, "\n".join(swapped), q, SCRATCH / f"{q['id']}.wrong{k}")
+                    wv, wp, wt, _ = judge(lang, "\n".join(swapped), q, SCRATCH / f"{q['id']}.wrong{k}")
                     if wv == "accepted" and wp == wt:
                         quiz_ok = False
                         print(f"        WRONG CHOICE {k} ALSO PASSES: {wrong!r}")

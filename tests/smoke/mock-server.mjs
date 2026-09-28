@@ -255,6 +255,59 @@ const TYPESCRIPT_QUESTS = [
   },
 ];
 
+/**
+ * REMIX LAND is the one land that is not a language: one trio of nodes, the
+ * same program in Go, Rust and Python, each quest carrying its own `lang`
+ * (PROTOCOL §5.3). The mock judges each by that field, as the server does.
+ */
+const REMIX_QUESTS = [
+  {
+    id: "remix.basic.01.hello-go",
+    lang: "go",
+    node: 1,
+    title: "FIRST LIGHT — GO",
+    difficulty: 1,
+    kind: "quest",
+    x: 0.08,
+    y: 0.2,
+    requires: [],
+    starter: "package main\n\nfunc main() {\n}\n",
+    solution: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hello, causewaybay")\n}\n',
+    expect: "hello, causewaybay\n",
+    hints: [],
+  },
+  {
+    id: "remix.basic.02.hello-rust",
+    lang: "rust",
+    node: 2,
+    title: "FIRST LIGHT — RUST",
+    difficulty: 1,
+    kind: "quest",
+    x: 0.5,
+    y: 0.5,
+    requires: ["remix.basic.01.hello-go"],
+    starter: "fn main() {\n}\n",
+    solution: 'fn main() {\n    println!("hello, causewaybay");\n}\n',
+    expect: "hello, causewaybay\n",
+    hints: [],
+  },
+  {
+    id: "remix.basic.03.hello-python",
+    lang: "python",
+    node: 3,
+    title: "FIRST LIGHT — PYTHON",
+    difficulty: 1,
+    kind: "boss",
+    x: 0.9,
+    y: 0.8,
+    requires: ["remix.basic.02.hello-rust"],
+    starter: "def main():\n    pass\n\n\nmain()\n",
+    solution: 'print("hello, causewaybay")\n',
+    expect: "hello, causewaybay\n",
+    hints: [],
+  },
+];
+
 const LANDS = {
   rust: QUESTS,
   go: GO_QUESTS,
@@ -262,11 +315,15 @@ const LANDS = {
   python: PYTHON_QUESTS,
   pytorch: PYTORCH_QUESTS,
   typescript: TYPESCRIPT_QUESTS,
+  remix: REMIX_QUESTS,
 };
 const questsOf = (land) => LANDS[land] ?? [];
 const findQuest = (id) => Object.values(LANDS).flat().find((q) => q.id === id);
 // The land is the first segment of the id (SPEC §4.1), never a lookup.
-const langOf = (id) => id.split(".", 1)[0];
+const landOf = (id) => id.split(".", 1)[0];
+// The language is the land's name — except in REMIX, where the quest says
+// (§5.3), and the mock reads the fixture the way the server reads the row.
+const langOf = (q) => q.lang ?? landOf(q.id);
 
 // --------------------------------------------------------------------- state
 
@@ -563,7 +620,10 @@ wss.on("connection", (ws) => {
         const state = stateOf(me, q);
         const quest = {
           id: q.id,
-          land: langOf(q.id),
+          land: landOf(q.id),
+          // §5.3: the language the quest is judged in — the land's name,
+          // except in REMIX where the fixture says.
+          lang: langOf(q),
           category: "basic",
           node: q.node,
           title: q.title,
@@ -595,7 +655,7 @@ wss.on("connection", (ws) => {
         const isRun = type === "quest.run";
         const q = findQuest(payload.quest_id);
         if (!q) return err(id, type, "not_found", "no such quest");
-        if (payload.lang !== langOf(q.id))
+        if (payload.lang !== langOf(q))
           return err(id, type, "bad_request", "lang does not match the quest's land");
         // §3.2: one in flight per CONNECTION, not per user.
         const isBusy = broke("busy-per-user")
@@ -628,7 +688,7 @@ wss.on("connection", (ws) => {
 
           // "Judging": does the source print what the visible case expects?
           const src = String(payload.source ?? "");
-          const isGo = langOf(q.id) === "go";
+          const isGo = langOf(q) === "go";
           // The mock has no compiler. It recognises one shape of compile
           // error — a bare identifier where a value is printed — because the
           // checker asserts that `undefined: tolal` classifies as
@@ -678,7 +738,7 @@ wss.on("connection", (ws) => {
             // Same shape as Python's, because it is Python's runner.
             pytorch: () => /print\("([^"]*)"\)/.exec(src)?.[1],
             typescript: () => /console\.log\("([^"]*)"\)/.exec(src)?.[1],
-          }[langOf(q.id)]?.();
+          }[langOf(q)]?.();
           const ok = printed !== undefined && `${printed}\n` === q.expect;
           const had = progress.get(`${me}|${q.id}`);
           const firstClear = ok && had?.state !== "cleared";

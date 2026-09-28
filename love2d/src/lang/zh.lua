@@ -135,6 +135,7 @@ return {
   ["dicts, generators, the GIL"] = "dicts、generators、还有 GIL",
   ["tensors, gradients, attention"] = "张量、梯度、attention",
   ["interfaces, generics, narrowing"] = "接口、泛型、类型收窄",
+  ["go, rust, python: one program, three times"] = "go、rust、python：同一个程序写三遍",
   ["both rankings, fused"] = "两种排序融合",
   ["the words you typed"] = "你输入的词",
   ["what you meant"] = "你想表达的意思",

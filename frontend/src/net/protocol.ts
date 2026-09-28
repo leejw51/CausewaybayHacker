@@ -119,19 +119,48 @@ export function playerText(code: ErrorCode): string {
 // §5 shared shapes
 // ---------------------------------------------------------------------------
 
-export type Land = "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript";
+/**
+ * A language: what the server compiles and runs (SPEC §5.1), what the editor
+ * colours, what a scratchpad or an attempt is *in*. Six of them, and every
+ * table keyed on grammar — the syntax mode, the file name, the tips, the
+ * completions — is a `Record<Lang, …>`.
+ */
+export type Lang = "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript";
+export const LANGS: readonly Lang[] = ["rust", "go", "cpp", "python", "pytorch", "typescript"];
+export function isLang(v: unknown): v is Lang {
+  return typeof v === "string" && (LANGS as readonly string[]).includes(v);
+}
+/**
+ * A land: a place on the lands screen, with a map, a colour and a mascot.
+ * Every language is a land, and REMIX LAND is the one that is not a
+ * language: the same program three times, in Go, in Rust and in Python, so
+ * its quests each carry a `lang` of their own (§5.3). A screen keys on the
+ * land; the code on it keys on the quest's `lang`.
+ */
+export type Land = Lang | "remix";
 /**
  * Every land, in the order the lands screen shows them and the keys cycle
  * through them. One list so a sixth land is one edit, not a hunt through every
  * ternary that used to spell out "rust or go". The fifth was one edit here and
  * a type error at every `Record<Land, …>` that had not been told, which is
- * exactly what this list is for.
+ * exactly what this list is for. The seventh was the same edit and then the
+ * split above, because it is the first land whose name is not a grammar.
  */
-export const LANDS: readonly Land[] = ["rust", "go", "cpp", "python", "pytorch", "typescript"];
+export const LANDS: readonly Land[] = [...LANGS, "remix"];
 export function isLand(v: unknown): v is Land {
   return typeof v === "string" && (LANDS as readonly string[]).includes(v);
 }
 export type Category = "verybasic" | "basic" | "advanced" | "hacker";
+/** SPEC §0's four roads, in the order they are walked. */
+export const CATEGORIES: readonly Category[] = ["verybasic", "basic", "advanced", "hacker"];
+/**
+ * The roads a land has (SPEC §0). Every language land has the four; REMIX
+ * LAND has the two grammar roads only, and a switcher that offered it an
+ * ADVANCED or a HACKER would be offering a map with nothing on it.
+ */
+export function roadsOf(land: Land | string): readonly Category[] {
+  return land === "remix" ? ["verybasic", "basic"] : CATEGORIES;
+}
 
 /**
  * §5.3. VERY BASIC only: the grammar asked as a question first. Four choices,
@@ -206,6 +235,13 @@ export interface Quest {
   quiz?: Quiz;
   id: string;
   land: Land;
+  /**
+   * §5.3 — the language this quest is judged in: what a submit's `lang` must
+   * match and what the editor opens the file as. The land's own name
+   * everywhere but REMIX LAND. Optional because an older server omits it,
+   * and then the land is the language; see `questLang`.
+   */
+  lang?: Lang;
   category: Category;
   node: number;
   title: string;
@@ -440,7 +476,7 @@ export interface CategorySummary {
 export interface PlaygroundRun {
   /** Minted so the stream can be correlated; never stored. */
   attempt_id: string;
-  lang: Land;
+  lang: Lang;
   outcome: "ok" | "compile_error" | "runtime_error" | "timeout" | "output_limit";
   compile_ms: number;
   run_ms: number;
@@ -460,7 +496,7 @@ export interface PlaygroundRun {
 export interface Snippet {
   id: string;
   name: string;
-  lang: Land;
+  lang: Lang;
   source: string;
   /** What the program reads. A scratchpad has no test cases to supply it. */
   stdin: string;
@@ -553,9 +589,9 @@ export interface Requests {
   /** §4.7b. Destructive: only ever sent after the player said yes. */
   "world.reset": { land: Land; category: Category };
   "quest.get": { quest_id: string; locale?: string };
-  "quest.submit": { quest_id: string; lang: Land; source: string };
+  "quest.submit": { quest_id: string; lang: Lang; source: string };
   /** §4.9b — the same shape, deliberately, so one code path sends either. */
-  "quest.run": { quest_id: string; lang: Land; source: string };
+  "quest.run": { quest_id: string; lang: Lang; source: string };
   "quest.hint": { quest_id: string; index: number; locale?: string };
   /** §4.11b — the whole answer, priced like the largest hint there is. */
   "quest.solve": { quest_id: string };
@@ -579,9 +615,9 @@ export interface Requests {
   // has not shipped them answers `not_found`, which the screen says out loud
   // rather than silently pretending the scratchpad is empty.
   // §4.9d. Never recorded: formatting is not an attempt at the problem.
-  "code.format": { lang: Land; source: string };
-  "playground.run": { lang: Land; source: string; stdin?: string };
-  "playground.save": { id?: string; name?: string; lang: Land; source: string; stdin?: string };
+  "code.format": { lang: Lang; source: string };
+  "playground.run": { lang: Lang; source: string; stdin?: string };
+  "playground.save": { id?: string; name?: string; lang: Lang; source: string; stdin?: string };
   "playground.list": Record<string, never>;
   "playground.load": { id: string };
   "playground.delete": { id: string };
@@ -768,3 +804,14 @@ export interface Events {
 }
 
 export type EventType = keyof Events;
+
+/**
+ * The language a quest is written in (§5.3). `lang` when the server sent it;
+ * otherwise the land, which is the language everywhere but REMIX LAND — and a
+ * remix quest from a server too old to say would be unplayable anyway, so it
+ * falls to Rust rather than to nothing.
+ */
+export function questLang(q: { land: Land | string; lang?: Lang | string }): Lang {
+  if (isLang(q.lang)) return q.lang;
+  return isLang(q.land) ? q.land : "rust";
+}

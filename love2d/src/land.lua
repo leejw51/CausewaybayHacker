@@ -13,14 +13,21 @@ local Assets = require("src.assets")
 local Land = {}
 
 -- SPEC §0's order: the two lands the game shipped with, then the two that
--- joined them, then the one the ending was always about, then TypeScript.
-Land.ORDER = { "rust", "go", "cpp", "python", "pytorch", "typescript" }
+-- joined them, then the one the ending was always about, then TypeScript,
+-- then REMIX — the one land that is not a language: the same program in
+-- Go, Rust and Python, whose quests each carry a `lang` of their own.
+Land.ORDER = { "rust", "go", "cpp", "python", "pytorch", "typescript", "remix" }
+
+-- The languages: every land but REMIX, in the same order. A scratchpad, an
+-- attempt and a formatter are in a language, never in a land (PROTOCOL
+-- §5.9), so the playground's TAB walks this list and not `ORDER`.
+Land.LANGS = { "rust", "go", "cpp", "python", "pytorch", "typescript" }
 
 -- The name on the card. `("cpp"):upper()` is "CPP", which nobody calls the
 -- language; the other three happen to upper-case into themselves.
 Land.NAME = {
   rust = "RUST", go = "GO", cpp = "C++", python = "PYTHON", pytorch = "PYTORCH",
-  typescript = "TYPESCRIPT",
+  typescript = "TYPESCRIPT", remix = "REMIX",
 }
 
 -- The land's mascot, and what stands in while the art is being drawn: the
@@ -34,10 +41,11 @@ Land.MASCOT = {
   python = "sprite_python",
   pytorch = "sprite_pytorch",
   typescript = "sprite_typescript",
+  remix = "sprite_remix",
 }
 local STANDIN = {
   cpp = "sprite_ferris", python = "sprite_gogo", pytorch = "sprite_python",
-  typescript = "sprite_cpp",
+  typescript = "sprite_cpp", remix = "sprite_python",
 }
 
 function Land.name(land)
@@ -47,6 +55,16 @@ end
 --- SPEC §0's four roads, in the order they are walked. `verybasic` is the
 --- quiz road (PROTOCOL §5.3): the grammar asked before it is typed.
 Land.CATEGORIES = { "verybasic", "basic", "advanced", "hacker" }
+
+--- The roads `land` has (SPEC §0): every language land has the four, and
+--- REMIX LAND the two grammar roads only. What the map's switcher offers
+--- and what Q cycles through, so no key leads to a map the server answers
+--- `not_found` for.
+Land.REMIX_ROADS = { "verybasic", "basic" }
+function Land.roads(land)
+  if land == "remix" then return Land.REMIX_ROADS end
+  return Land.CATEGORIES
+end
 
 --- The English label a category is translated from. `verybasic` is two
 --- words on screen; every other road is its id in capitals, as before.
@@ -66,6 +84,16 @@ function Land.rank(land)
     if name == land then return i end
   end
   return #Land.ORDER + 1
+end
+
+--- The language a quest is judged in (PROTOCOL §5.3): its own `lang` when
+--- the server sent one, else its land — which is the language everywhere
+--- but REMIX LAND. The editor, the formatter, the scratch file and the
+--- submit all key on this; the backdrop and the tint key on the land.
+function Land.lang_of(quest, fallback)
+  if quest and quest.lang then return quest.lang end
+  if quest and quest.land and quest.land ~= "remix" then return quest.land end
+  return fallback or "rust"
 end
 
 --- The idle bob's phase for a land's mascot, spread evenly round the cycle

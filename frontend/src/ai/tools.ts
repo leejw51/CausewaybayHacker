@@ -10,7 +10,7 @@
  * One file per entry, always, so there is no path in any of these: "the
  * code" is the editor's text and that is the whole project.
  */
-import type { Land } from "../net/protocol";
+import type { Lang } from "../net/protocol";
 
 export interface ToolDef {
   name: string;
@@ -77,7 +77,7 @@ export interface TaskBrief {
  * model's next turn is not asked for while the program is still appearing.
  */
 export interface Bench {
-  lang: Land;
+  lang: Lang;
   file: string;
   /** The editor's text right now. */
   read(): string;

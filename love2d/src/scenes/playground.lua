@@ -53,7 +53,9 @@ local Store = require("src.store")
 -- TAB walks the languages in the lands' order, and the starter is the same
 -- program in each: the smallest thing that compiles and prints, so the desk
 -- proves the toolchain is there before anybody types.
-local LANGS = Land.ORDER
+-- The languages, not the lands: REMIX LAND is a place where three of these
+-- are spoken, and a scratchpad has to be in one of them (PROTOCOL §5.9).
+local LANGS = Land.LANGS
 
 local STARTER = {
   rust = 'fn main() {\n    println!("hello");\n}\n',

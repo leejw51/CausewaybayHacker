@@ -530,14 +530,16 @@ export function mockTransport(): TransportFactory {
               // The other five lands exist and are empty: enough for the lands
               // screen to draw six plates and for a click on any of them to
               // reach a map that says "no streets here yet".
-              ...(["go", "cpp", "python", "pytorch", "typescript"] as const).map((land) => ({
-                land,
-                categories: [
-                  { category: "basic" as const, total: 0, cleared: 0, stars: 0, open: false },
-                  { category: "advanced" as const, total: 0, cleared: 0, stars: 0, open: false },
-                  { category: "hacker" as const, total: 0, cleared: 0, stars: 0, open: false },
-                ],
-              })),
+              ...(["go", "cpp", "python", "pytorch", "typescript", "remix"] as const).map(
+                (land) => ({
+                  land,
+                  categories: [
+                    { category: "basic" as const, total: 0, cleared: 0, stars: 0, open: false },
+                    { category: "advanced" as const, total: 0, cleared: 0, stars: 0, open: false },
+                    { category: "hacker" as const, total: 0, cleared: 0, stars: 0, open: false },
+                  ],
+                }),
+              ),
             ],
           });
         }

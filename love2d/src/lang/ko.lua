@@ -132,6 +132,7 @@ return {
   ["dicts, generators, the GIL"] = "dicts, generators, 그리고 GIL",
   ["tensors, gradients, attention"] = "tensors, gradients, 그리고 attention",
   ["interfaces, generics, narrowing"] = "interfaces, generics, 그리고 타입 좁히기",
+  ["go, rust, python: one program, three times"] = "go, rust, python: 같은 프로그램을 세 번",
   ["both rankings, fused"] = "두 순위를 합쳐서",
   ["the words you typed"] = "입력한 단어 그대로",
   ["what you meant"] = "말하려던 의미",

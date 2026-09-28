@@ -133,6 +133,10 @@ const PACKS_COMPILED = [
   "content/python/basic.toml",
   "content/python/advanced.toml",
   "content/python/hacker.toml",
+  // REMIX LAND is Go, Rust and Python, and its two packs need nothing the
+  // four compilers above do not already give.
+  "content/remix/verybasic.toml",
+  "content/remix/basic.toml",
 ];
 const PACKS_PYTORCH = [
   "content/pytorch/verybasic.toml",

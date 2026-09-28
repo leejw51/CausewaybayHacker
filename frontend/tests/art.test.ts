@@ -83,6 +83,7 @@ const LAND_MASCOTS = [
   "sprite_python",
   "sprite_pytorch",
   "sprite_typescript",
+  "sprite_remix",
 ];
 const BOSSES = [
   "boss_autocomplete",
@@ -98,7 +99,13 @@ const BOSSES = [
   "boss_recursion",
 ];
 const CATEGORIES = ["basic", "advanced", "hacker"];
-const LANDS = ["rust", "go", "cpp", "python", "pytorch", "typescript"];
+const LANDS = ["rust", "go", "cpp", "python", "pytorch", "typescript", "remix"];
+/**
+ * The roads a land has a band and a mascot for. VERY BASIC draws neither on
+ * any land, and REMIX LAND has only the two grammar roads, so its art is one
+ * band and one mascot rather than three of each.
+ */
+const ROADS_OF = (land: string): string[] => (land === "remix" ? ["basic"] : CATEGORIES);
 
 /** Manifest entries by name, which is how every scene looks art up. */
 const byName = new Map(MANIFEST.art.map((a) => [a.name, a]));
@@ -109,7 +116,7 @@ describe("the manifest and the directory agree", () => {
       ...LAND_MASCOTS,
       ...BOSSES,
       ...LANDS.flatMap((l) => [`map_${l}`, `map_${l}_p`]),
-      ...LANDS.flatMap((l) => CATEGORIES.flatMap((c) => [`mascot_${l}_${c}`, `emblem_${l}_${c}`])),
+      ...LANDS.flatMap((l) => ROADS_OF(l).flatMap((c) => [`mascot_${l}_${c}`, `emblem_${l}_${c}`])),
     ];
     const missing = wanted.filter((n) => !byName.has(n));
     expect(missing).toEqual([]);
@@ -177,7 +184,7 @@ describe("no two things that should look different are the same file", () => {
   });
 
   it("gives each land and road its own category mascot", () => {
-    const names = LANDS.flatMap((l) => CATEGORIES.map((c) => `mascot_${l}_${c}`)).filter((n) =>
+    const names = LANDS.flatMap((l) => ROADS_OF(l).map((c) => `mascot_${l}_${c}`)).filter((n) =>
       byName.has(n),
     );
     const shas = names.map((n) => readPng(byName.get(n)!.file).sha);
@@ -185,7 +192,7 @@ describe("no two things that should look different are the same file", () => {
   });
 
   it("gives each land and road its own emblem band", () => {
-    const names = LANDS.flatMap((l) => CATEGORIES.map((c) => `emblem_${l}_${c}`)).filter((n) =>
+    const names = LANDS.flatMap((l) => ROADS_OF(l).map((c) => `emblem_${l}_${c}`)).filter((n) =>
       byName.has(n),
     );
     const shas = names.map((n) => readPng(byName.get(n)!.file).sha);
@@ -231,7 +238,7 @@ describe("every generated asset can be made again", () => {
       "boss_gil",
       "boss_recursion",
       ...["cpp", "python"].flatMap((l) =>
-        CATEGORIES.flatMap((c) => [`mascot_${l}_${c}`, `emblem_${l}_${c}`]),
+        ROADS_OF(l).flatMap((c) => [`mascot_${l}_${c}`, `emblem_${l}_${c}`]),
       ),
     ];
     expect(wanted.filter((n) => !named.has(n))).toEqual([]);
